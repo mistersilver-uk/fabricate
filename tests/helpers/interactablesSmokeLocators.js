@@ -1,40 +1,5 @@
-/**
- * The Foundry smoke harness read as the OTHER END of a hand-maintained mirror (issue 1520).
- *
- * ── WHY THIS FILE EXISTS ──────────────────────────────────────────────────────────────────
- * Nothing statically tied a locator string in `scripts/foundry-test-run.mjs` to a class or an
- * attribute a Svelte root actually emits, and the smoke CANNOT RUN IN CI. So a conversion that
- * moved one of those hooks off the DOM was invisible to `npm test` and surfaced, weeks later, as
- * a click timeout in a capture run - by which time the change that caused it was several
- * branches back. Bringing three windows onto shared primitives is exactly the change that moves
- * them: a hook that used to be written on the element beside its label now reaches the DOM
- * through a primitive's rest spread, its `triggerData` map or its `dataAttr` prop.
- *
- * `tests/helpers/stepperSourceContract.js` and
- * `tests/components/foundry-manager-rail-hooks.test.js` are the shipped precedent for this
- * shape: read the harness, extract what it addresses, and assert the product still writes it.
- *
- * ── THREE RULES THE MATCHING OBEYS, ALL LEARNED THE HARD WAY ──────────────────────────────
- * THE CORPUS IS THE EMITTING HALF, NOT THE FILE. A window's classes appear twice - on the
- * element and as the selector painting it - so a whole-file scan reports a DELETED class
- * attribute as emitted. See {@link emittingHalfOf} for the mutation that proved it.
- *
- * TOKEN-TERMINATED, NOT `includes`. Every hook here is a PREFIX of a longer name one edit away -
- * `data-interactable-node-respawn` of `data-interactable-node-respawn-policy` - so a substring
- * test stays GREEN on a hook that has been renamed rather than kept. Proved by mutation: renaming
- * `data-interactable-node-respawn` to `...-respawn-x` left the substring form passing. The
- * terminator is `(?![a-z-])`.
- *
- * A FLOOR ON THE COUNT. A `for...of` over an empty array asserts nothing and reports success, so
- * a harness rewrite that stopped locating anything - or a regex that stopped matching - would
- * leave every clause built on this vacuous while reading as a healthy guard.
- *
- * ── SCOPED BY PREFIX, NOT POOLED ──────────────────────────────────────────────────────────
- * Each window's hooks are asserted against ITS OWN root rather than against the union of the
- * three. A pooled check would go green on a hook the config panel writes while the manager's own
- * copy of it had been deleted, which is precisely the drift this file is for.
- */
-import { readFileSync } from 'node:fs';
+/** The Foundry smoke harness read as the OTHER END of a hand-maintained mirror (issue 1520). */
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
@@ -42,12 +7,44 @@ import assert from 'node:assert/strict';
 import { byCodePoint } from './ratchetBaseline.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(__dirname, '../..');
 
-/** The Foundry smoke harness, whole. Read once; every consumer reads the same text. */
-export const SMOKE_SOURCE = readFileSync(
-  resolve(__dirname, '../../scripts/foundry-test-run.mjs'),
-  'utf8'
+const smokeModulesIn = (relativeDir) =>
+  readdirSync(resolve(REPO_ROOT, relativeDir))
+    .filter((entry) => entry.endsWith('.mjs'))
+    .sort(byCodePoint)
+    .map((entry) => `${relativeDir}/${entry}`);
+
+/** Every file the walk lives in, derived from the directory so a new module cannot be missed. */
+export const SMOKE_SOURCE_FILES = [
+  'scripts/foundry-test-run.mjs',
+  ...smokeModulesIn('scripts/foundry-smoke'),
+  ...smokeModulesIn('scripts/foundry-smoke/pageOps'),
+  ...smokeModulesIn('scripts/foundry-smoke/scenarios'),
+];
+
+/** Each file's text, in order. Read once; every consumer reads the same text. */
+export const SMOKE_SOURCE_SEGMENTS = SMOKE_SOURCE_FILES.map((file) =>
+  readFileSync(resolve(REPO_ROOT, file), 'utf8')
 );
+
+/**
+ * The Foundry smoke walk, whole, as one text — a plain concatenation with no separator. An
+ * ordered or lazy-`[\s\S]`/`[^]` scan over it is unsafe (it can match across two unrelated
+ * modules); use `SMOKE_SOURCE_SEGMENTS` or `withinOneModule` instead (issue 1692).
+ */
+export const SMOKE_SOURCE = SMOKE_SOURCE_SEGMENTS.join('');
+
+/**
+ * Whether a lazy-`[\s\S]`/`[^]` pattern matches inside a SINGLE smoke module, so an ordered pin
+ * cannot be satisfied by text that spans two unrelated modules (issue 1692).
+ *
+ * @param {RegExp} pattern A non-global pattern; each segment is tested independently.
+ * @returns {boolean} True when at least one module's own text matches.
+ */
+export function withinOneModule(pattern) {
+  return SMOKE_SOURCE_SEGMENTS.some((segment) => pattern.test(segment));
+}
 
 /**
  * Read a Svelte root's source by repository-relative path.
@@ -60,33 +57,14 @@ export function readRootSource(relativePath) {
 }
 
 /**
- * Order two lowercase hook / class tokens, explicitly.
- *
- * A bare `.sort()` compares UTF-16 code units, which is right for these tokens only by
- * accident of their being ASCII - and the accident is one non-ASCII hook away from ending.
- * SonarCloud flags the bare form (`javascript:S2871`), so an explicit comparator is required
- * rather than preferred.
- *
- * IT IS `byCodePoint` RATHER THAN A PINNED `localeCompare`, and the correction is this
- * repository's own rule rather than a taste (issue 1520 review). `tests/helpers/ratchetBaseline.js`
- * forbids `localeCompare` for exactly this job - an ordering a suite compares with
- * `assert.deepEqual` - because the result is locale-dependent and "a baseline could sort
- * differently on two machines and produce a diff nobody authored". Pinning the locale argument
- * does NOT close that: the collation still comes from the runner's ICU build, which a CI image
- * upgrade can change under an unchanged locale. The shared comparator is re-exported here rather
- * than wrapped, so this file's callers name one function and there is one implementation.
- *
- * @type {(left: string, right: string) => number}
+ * Order two lowercase hook / class tokens, explicitly. A bare `.sort()` compares UTF-16 code units,
+ * which is right for these tokens only by accident of their being ASCII - and the accident is one
+ * non-ASCII hook away from ending (issue 1520).
  */
 export const byTokenName = byCodePoint;
 
 /**
  * Every distinct lowercase token in a source that starts with `prefix`.
- *
- * A `data-*` attribute name and a class token are the SAME lexical shape - lowercase letters
- * and hyphens, terminated by a letter - so one scan answers for both, and the prefix the
- * caller passes is what says which is being read. It is a regex FRAGMENT, not a literal, so a
- * caller can scope one family away from a sibling that shares its stem.
  *
  * @param {string} source The text to scan.
  * @param {string} prefix e.g. `data-interactable-manager-`, `fab-im-`.
@@ -99,43 +77,7 @@ export function prefixedTokensIn(source, prefix) {
 
 /**
  * The half of a `.svelte` source that can put a token on an ELEMENT: markup and script, with the
- * scoped `<style>` block and every comment removed.
- *
- * WHY THE WHOLE FILE IS THE WRONG CORPUS, proved by mutation (issue 1520 review). A window's own
- * class names are written TWICE - once on the element and once as the selector of the scoped rule
- * that paints it - so "the file contains `fab-im-row`" is true while nothing renders it. Deleting
- * ` class="fab-im-row"` and ` class="fab-im-empty"` from the Manage panel's markup, leaving
- * `.fab-im-row {` and `.fab-im-empty {` in its `<style>` block, left this file's own clause and
- * the whole View Lab suite green - while the smoke's `rowCount < 3` throw would fire, its
- * `.fab-im-empty` wait would time out, and both manager capture cases would fail their
- * `expectSelector`, which fails the capture WHOLE and publishes nothing.
- *
- * A RENAME was already caught, and only by a different clause: the residue census in
- * `interactablesWindowContract.js` is an exact `deepEqual`, so a renamed class changes the set. A
- * DELETION does not change it, because the surviving rule keeps the name in the census.
- *
- * Comments go for the same reason one step removed: a docblock that names a class is prose about
- * the element, not the element. Both of this family's windows carry paragraphs naming their own
- * hooks, and one of them is a paragraph explaining that a hook must not be named in prose.
- *
- * `//` is stripped only at the head of a line, so a `https://` inside a string survives.
- *
- * ── THE COMMENTS GO FIRST, AND THE BLOCK IS ANCHORED AT COLUMN 0 ──────────────────────────
- * Both are corrections, and both were found by putting this reduction under the View Lab's own
- * selector scan (issue 1520 review round 2). The style strip used to run FIRST, over the raw
- * text, and it is non-greedy — so a docblock that merely NAMES `<style>` in prose opened the
- * match there and closed it at the real block's `</style>`, taking every line of markup in
- * between with it. Measured on `components/Chip.svelte`, whose header explains that its CSS
- * lives in a scoped block: `data-chip-tint` is written on its root element and the reduction
- * reported the file as emitting nothing at all.
- *
- * That direction FAILS CLOSED for the locator scan below — a hook that vanishes reds — so it
- * had gone unnoticed. It does not fail closed for every consumer, and a reduction that deletes
- * the markup it exists to isolate is wrong in either direction.
- *
- * So the comments are removed first, which also disposes of the two CSS comments inside a block
- * that name `<style>`, and the block itself is then matched only where a Svelte component can
- * actually write one: at the start of a line.
+ * scoped `<style>` block and every comment removed (issue 1520).
  *
  * @param {string} rootSource A Svelte root's whole source text.
  * @returns {string} The part of it that can carry an attribute or a class.
@@ -151,10 +93,6 @@ export function emittingHalfOf(rootSource) {
 /**
  * Assert every locator string is still written by the root that is supposed to emit it.
  *
- * The scan runs over {@link emittingHalfOf} rather than the whole file, which is what makes the
- * assertion's own sentence true; see that function for the mutation that proved it was not.
- *
- * @param {object} params
  * @param {string[]} params.locators The strings the harness addresses.
  * @param {string} params.rootSource The root's own source text.
  * @param {number} params.floor The smallest count that is not a broken scan.

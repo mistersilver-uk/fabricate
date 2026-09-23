@@ -1,26 +1,4 @@
-/**
- * Promotion-time release guards for `.github/workflows/promote-to-public.yml` (issue #716).
- *
- * The promote workflow is the ONLY thing that makes a version publicly obtainable, and every step
- * that can fail MUST precede the irreversible un-draft. Two MUSTs in the Release and Distribution
- * spec had no machine guard while every sibling MUST did; both are operationalised here, as PURE
- * functions the workflow's inline node steps delegate to, so the load-bearing decisions are unit
- * tested against doubles rather than only against a live promotion.
- *
- *   - `assertHotfixMinimumNotRaised` — §Hotfix isolation: "A hotfix MUST NOT raise the module's
- *     declared minimum Foundry version." Foundry refuses to install a package whose minimum exceeds
- *     the running core version, so a hotfix that raises it strands exactly the users the fix is for.
- *   - `evaluateRegistryLeadTarget` — §Registry lead prohibition: a channel or tester manifest URL
- *     MUST NOT return 404 while the module is listed on the registry, enforced against every private
- *     target that retains a cohort, "a verification performed by the promotion, never an assumption".
- *
- * ⚠️ NEITHER guard uses `compareSemver`. `foundryIsNewerVersion` is the comparator the player's
- * client runs, and it deliberately disagrees with SemVer (`1.4.0-beta.3` outranks `1.4.0`), which is
- * what keeps the private cohorts private. The minimum-version comparison is between Foundry core
- * GENERATION values (bare integers such as `13`, or dotted core versions), never module versions —
- * but it is still Foundry's comparator that decides "raised", because that is the comparison the
- * client makes when it refuses to install. See `./semver.js`.
- */
+/** Promotion-time release guards for `.github/workflows/promote-to-public.yml` (issue #716). */
 
 import { foundryIsNewerVersion } from './semver.js';
 
@@ -30,8 +8,6 @@ const HOTFIX_SPEC_REF = 'Release and Distribution §Hotfix isolation';
  * Normalise a declared `compatibility.minimum` to a comparable string, or `null` when it carries no
  * value. Absent is deliberately distinct from any present value: it means "could not read", never
  * "0".
- * @param {unknown} value The raw `compatibility.minimum` field.
- * @returns {string|null} The trimmed value, or `null` when absent or empty.
  */
 function normaliseMinimum(value) {
   if (value === null || value === undefined) return null;
@@ -41,21 +17,7 @@ function normaliseMinimum(value) {
 
 /**
  * Refuse a hotfix promotion whose declared minimum Foundry version exceeds the current public
- * release's, per §Hotfix isolation. Only the hotfix path is constrained: a version built on the
- * release line traverses the private stages and MAY raise the minimum, because the cohort it would
- * strand is offered the newer core generation through the normal upgrade path. A hotfix reaches the
- * SAME public cohort a raised minimum would lock out of its own fix, so it is the one route the
- * prohibition binds.
- *
- * The verdict is RETURNED, never thrown or printed, so the workflow step and the tests inspect it.
- *
- * @param {object} options The inputs.
- * @param {boolean} options.isHotfix Whether this is a hotfix-line promotion (source channel `N.N.x`).
- * @param {string} options.version The version being promoted.
- * @param {unknown} options.promotedMinimum The promoted artefact's `compatibility.minimum`.
- * @param {string} [options.previousVersion] The current public version (`prev_public`), for messages.
- * @param {unknown} options.previousMinimum The current public release's `compatibility.minimum`.
- * @returns {{ok: boolean, error?: string, reason?: string}} The verdict.
+ * release's, per §Hotfix isolation.
  */
 export function assertHotfixMinimumNotRaised({
   isHotfix,
@@ -71,9 +33,8 @@ export function assertHotfixMinimumNotRaised({
   const promoted = normaliseMinimum(promotedMinimum);
   const previous = normaliseMinimum(previousMinimum);
 
-  // A hotfix always fixes an existing public version, so both artefacts MUST declare a minimum to
-  // compare. Absence is unverifiable, not proof of no raise — fail closed, matching the house
-  // pattern for every other release guard.
+  // A hotfix always fixes an existing public version, so both artefacts must declare a minimum to
+  // compare.
   if (promoted === null) {
     return {
       ok: false,
@@ -94,10 +55,8 @@ export function assertHotfixMinimumNotRaised({
     };
   }
 
-  // Foundry's OWN comparator decides "raised", exactly as the running client does when it refuses to
-  // install a package whose minimum exceeds its core generation. This compares Foundry core
-  // GENERATION values (bare integers or dotted core versions), never module versions and never
-  // SemVer.
+  // Foundry's own comparator decides "raised", exactly as the running client does when it refuses
+  // to install a package whose minimum exceeds its core generation.
   if (foundryIsNewerVersion(promoted, previous)) {
     return {
       ok: false,
@@ -117,41 +76,77 @@ export function assertHotfixMinimumNotRaised({
   };
 }
 
+/** The tester identity a config declares for one channel: the group names and the secret's name. */
+function testerIdentity(config, channel) {
+  const declared = config?.channels?.[channel] ?? {};
+  const groups = Array.isArray(declared.testerGroups) ? declared.testerGroups.map(String) : [];
+  const secretEnv =
+    typeof declared.testerSecretEnv === 'string' && declared.testerSecretEnv.trim() !== ''
+      ? declared.testerSecretEnv.trim()
+      : '(none)';
+  return { groups, secretEnv };
+}
+
+/** One side of the comparison, in a form safe to log: no segment value, only names. */
+function describeIdentity({ groups, secretEnv }) {
+  return `tester group(s) [${groups.join(', ') || 'none'}] via ${secretEnv}`;
+}
+
 /**
- * Decide one private target for the registry-lead check, per §Registry lead prohibition. Evaluated
- * per target — the channel manifest AND each tester manifest — because Foundry decides the defection
- * offer against the manifest URL the client actually baked, not the channel's.
+ * Diagnose a disagreement between the ref a promotion was dispatched from and the ref that
+ * publishes a channel, about that channel's tester identity (§Tester group identity). Compares
+ * names only — a segment value is a secret and is never read here.
  *
- * Two ways a cohort-retaining target defects once the registry advertises `version`:
- *
- *   - its head is a version Foundry considers OLDER than `version` (a backwards head), or
- *   - its manifest URL returns 404 (an ABSENT head) while the module is listed on the registry.
- *
- * Both let Foundry offer the client a permanent rewrite to the registry's manifest URL — for a
- * private cohort, a silent, irreversible defection. The absent-head half is the one the guard used
- * to skip; it is now a hard failure for every cohort-retaining NON-SOURCE target. A SOURCE-channel
- * target is exempt here only because the promotion's source-advertises verification already
- * hard-fails an absent head on it, per target, before this check runs.
- *
- * @param {object} options The inputs.
- * @param {string} options.channel The channel this target belongs to (`beta` or `early-access`).
- * @param {string} options.sourceChannel The promotion's source channel (`early-access` or `N.N.x`).
- * @param {string} options.label The target's stable, secret-free label.
- * @param {string|null|undefined} options.head The version the target advertises, or `null` when absent.
- * @param {string} options.version The version being promoted to the registry.
- * @returns {{decision: 'safe'|'refuse', kind?: 'absent'|'backwards', reason: string}} The verdict.
+ * @returns {{drifted: boolean, summary: string, remedy: string}} The diagnosis.
  */
+export function evaluateTesterConfigDrift({
+  channel,
+  dispatchConfig,
+  publisherConfig,
+  publisherRef = 'origin/release',
+}) {
+  const dispatch = testerIdentity(dispatchConfig, channel);
+  const publisher = testerIdentity(publisherConfig, channel);
+  const sides =
+    `this ref declares ${describeIdentity(dispatch)}, while ${publisherRef} — the ref that ` +
+    `publishes ${channel} — declares ${describeIdentity(publisher)}`;
+
+  // Group names compared as sets: declaration order carries no meaning, a rename does.
+  const dispatchGroups = new Set(dispatch.groups);
+  const publisherGroups = new Set(publisher.groups);
+  const sameGroups =
+    dispatchGroups.size === publisherGroups.size &&
+    [...dispatchGroups].every((group) => publisherGroups.has(group));
+
+  if (sameGroups && dispatch.secretEnv === publisher.secretEnv) {
+    return {
+      drifted: false,
+      summary: `${channel} tester identity agrees across refs: ${sides}.`,
+      remedy: '',
+    };
+  }
+
+  return {
+    drifted: true,
+    summary:
+      `tester-configuration drift on ${channel}: ${sides}. A tester group's identity is ` +
+      'deployment configuration, so the prefix this promotion evaluates is not the one the ' +
+      'channel has actually been published under.',
+    remedy:
+      `Publish the current ${channel} head under the new identity first — a release-s3.yml ` +
+      `workflow_dispatch from the ref carrying it (tag = that head's version, channel ${channel}) ` +
+      `— or land the rotation on ${publisherRef} so the publisher and this ref agree.`,
+  };
+}
+
+/** Decide one private target for the registry-lead check, per §Registry lead prohibition. */
 export function evaluateRegistryLeadTarget({ channel, sourceChannel, label, head, version }) {
   const isSourceChannel = channel === sourceChannel;
 
   if (head === null || head === undefined) {
-    // An absent head on the SOURCE channel is already hard-failed, per target, by the
-    // source-advertises verification that runs before this loop — skip it here rather than duplicate
-    // that refusal. An absent head on a cohort-retaining NON-SOURCE channel is the 404 the spec
-    // forbids: the manifest URL a retained cohort baked returns nothing while the module is listed on
-    // the registry, so Foundry offers that cohort a rewrite out of its private channel. Enforcement
-    // is a verification performed by the promotion, so this is a hard failure, never the assumption
-    // that the target was simply never published.
+    // An absent head on the source channel is already hard-failed, per target, by the
+    // source-advertises verification that runs before this loop — skip it here rather than
+    // duplicate that refusal.
     if (isSourceChannel) {
       return {
         decision: 'safe',
@@ -178,16 +173,7 @@ export function evaluateRegistryLeadTarget({ channel, sourceChannel, label, head
   }
 
   if (channel === 'beta') {
-    // The remedy is ordered by what is actually reachable. "Push more work to main" is the remedy
-    // ONLY while main's own line is already numbered above v${version}; when the prerelease line is
-    // itself numbered below it (main still computing prereleases of a version the release line has
-    // long since passed), every version main mints is below it too, so that advice cannot work.
-    // The operation that fixes it is the forward-port, and it WAS scheduled inside the very
-    // promotion this refusal blocks — a deadlock. Since issue #1001 it runs at the PRERELEASE
-    // promotion instead (release.yml, once its early-access publish is verified), with the release
-    // promotion's own job 2 as a confirming backstop, and it is dispatchable on its own from
-    // .github/workflows/forward-port.yml. Naming the forward-port first is what makes this refusal
-    // escapable: it is runnable on its own and makes nothing publicly obtainable.
+    // The remedy is ordered by what is actually reachable.
     return {
       decision: 'refuse',
       kind: 'backwards',

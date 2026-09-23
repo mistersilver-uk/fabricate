@@ -11,9 +11,7 @@ function read(relPath) {
   return readFileSync(resolve(repoRoot, relPath), 'utf8');
 }
 
-// Prettier formats components as of issue 923, so a source-contract assertion must not depend
-// on where the formatter chose to break a line. Match against a whitespace-collapsed copy and
-// write needles in the formatter's own idiom — `arrowParens: 'always'` means `(tab) =>`.
+// Prettier formats components as of issue 923.
 const squish = (value) => value.replace(/\s+/g, ' ');
 
 const systemEditSource = squish(read('src/ui/svelte/apps/manager/SystemEditView.svelte'));
@@ -91,8 +89,7 @@ describe('Travel & Realms participation toggle', () => {
       ),
       'the action writes participation onto the system'
     );
-    // Routing it through the realm store would leave the toggle permanently false: the world
-    // travel config carries no `enabled` at all.
+    // Routing it through the realm store would leave the toggle permanently false.
     assert.equal(adminStoreSource.includes('updateRealmSettings(systemId'), false);
     assert.ok(
       managerRootSource.includes(
@@ -120,17 +117,19 @@ describe('Travel & Realms participation toggle', () => {
 });
 
 describe('World and Travel navigation', () => {
+  // The four rail-markup claims this used to make are retired rather than re-pointed at
+  // `ManagerWorldNav.svelte` (issue 1717): `#manager-world-nav-travel`, its `data-world-nav-item`,
+  // `#manager-world-nav-parties` and the absence of `#manager-nav-travel` are each recorded by the
+  // rail census in `tests/components/manager-rail-mounted.js`, which pins the complete element
+  // list, so an added or renamed entry is a moved row. What stays here is the half the shell still
+  // owns: the route token, and that nothing about the selected system gates it.
   it('exposes World > Travel as an ungated world route', () => {
-    assert.ok(managerRootSource.includes('id="manager-world-nav-travel"'), 'World exposes Travel');
-    assert.ok(managerRootSource.includes('data-world-nav-item="travel"'), 'the Travel entry is a World nav item');
-    assert.ok(managerRootSource.includes('id="manager-world-nav-parties"'), 'World still exposes Parties');
     assert.ok(
       managerRootSource.includes("const isWorldTravelRoute = $derived(currentView === 'world-travel')"),
       'the route is its own view token'
     );
     // Ungated: nothing about the selected system may decide whether the route exists.
     assert.equal(managerRootSource.includes('canShowSystemTravel'), false);
-    assert.equal(managerRootSource.includes('id="manager-nav-travel"'), false);
     assert.equal(managerRootSource.includes('manager-system-travel-group'), false);
   });
 
@@ -157,17 +156,12 @@ describe('World and Travel navigation', () => {
     );
     assert.ok(managerRootSource.includes('<GatheringRealmsTab realms={worldRealms}'), 'Realms destination');
     assert.ok(managerRootSource.includes('<GatheringMapLinksTab sceneRegions={mapCurrentSceneRegions}'), 'Map destination');
-    // Unlike World > Currency it KEEPS the right-hand inspector: the realm detail pane is the
-    // authoring surface, whereas currency's unit editors expand in place.
-    // The class string carries the CARD FAMILY'S ROOT since issue 1508 rooted `InspectorCard` at
-    // `fabricate-card`: this is one of the root's 32 deferred hand-rolled cards, and every one of
-    // them gained the token so that the family's re-rooted sheet rules still reach it.
-    assert.ok(
-      managerRootSource.includes(
-        '{:else if isWorldTravelRoute} <section class="fabricate-card manager-inspector-card manager-travel-inspector"'
-      ),
-      'the realm/map inspector lives under the new route'
-    );
+    // Unlike World > Currency it keeps the right-hand inspector. Its markup moved into
+    // `world/TravelInspector.svelte` at issue 1707 phase 2 and the arm that selects it into
+    // `environment/GatheringInspectorRail.svelte` at phase 3, so neither is root source text any
+    // more: `manager-world-scope-mounted.js` asserts the realms route reaches
+    // `.manager-travel-inspector` through the root, and the card is pinned by count in
+    // `inspector-card-source-contract.test.js`.
     assert.equal(managerRootSource.includes('!isWorldTravelRoute && !isWorldDowntimeRoute'), false);
   });
 });

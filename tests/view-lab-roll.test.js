@@ -1,26 +1,4 @@
-/**
- * The View Lab's `Roll` class.
- *
- * This is the seam that made the crafting roll prompt photographable at all: `evaluateCheckRoll`
- * returns `{engine: false}` on `typeof globalThis.Roll !== 'function'` before it reaches
- * `options.prompt`, so while the shim installed a plain object no crafting, salvage or alchemy
- * dialog could open in the harness.
- *
- * Two classes of assertion here, and they fail for different reasons:
- *
- * 1. SHAPE — `rolledDiceGroups` in `src/systems/checkRoll.js` reads `die.number`, `die.faces`,
- *    `die.total`, `die.results[].result` and `die.results[].active`. A shape drift here does not
- *    throw; it silently changes what a published frame shows.
- * 2. DETERMINISM — `player-crafting-run-summary` and `player-crafting-roll-result` are frames of a
- *    craft that SUCCEEDS, and that success is a function of four fixture facts: the seed, the check
- *    formula, the threshold and the crafter's roll data. All four are READ from the fixtures rather
- *    than copied, so moving any one of them fails here by name instead of surfacing later as an
- *    unexplained frame diff. `player-inventory-bulk-roll-prompt` (issue 859) is the same class of
- *    claim about a different prompt: whether that dialog opens AT ALL, and whether it offers three
- *    buttons or one, are functions of the salvage check the batch's own fixtures author.
- * 3. COMPOSITION — that the shim actually installs a constructor. Asserting the class in isolation
- *    left the whole capability revertible with the suite green.
- */
+/** The View Lab's `Roll` class (issue 859). */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -92,12 +70,7 @@ const LIVE_SEED = (() => {
 })();
 
 test('the seeded smithing check clears its own threshold', () => {
-  // The COMPOSED invariant, not three copied literals. `player-crafting-run-summary` and
-  // `player-crafting-roll-result` are frames of a craft that SUCCEEDS, and that success is a
-  // function of four fixture facts: the seed, the check formula, the threshold and the crafter's
-  // roll data. Reading all four from the fixtures is what makes this fail by name when any one of
-  // them moves — the earlier version hardcoded 3, 23 and 12, so the seed, the threshold and the
-  // ability mod could each be changed with the suite green.
+  // The COMPOSED invariant, not three copied literals.
   const content = buildLabContent();
   const actors = buildLabActors(content);
   const smithing = content.systems.find((system) => system.id === 'lab-smithing');
@@ -121,25 +94,6 @@ test('the bulk roll prompt frame is what its own subjects authored', () => {
   // COMPOSED, and about a frame that exists: `player-inventory-bulk-roll-prompt` publishes the ONE
   // dialog a whole batch answers, and two of its visible properties are decided entirely by fixture
   // data rather than by anything the panel does.
-  //
-  //   1. THE DIALOG OPENS AT ALL. `BulkSalvageService._resolveRollDecision` filters the batch to
-  //      the subjects whose own system's salvage check is USABLE and returns without prompting when
-  //      none is. Blank that formula and the case stops being capturable — which is the good
-  //      failure — but the silent one is the reverse: a second subject gaining a usable check
-  //      changes the "One roll setting for N items" heading and the strip beneath it with every
-  //      assertion in the registry still passing.
-  //   2. HOW MANY BUTTONS IT DRAWS. `allowAdvantage` is all-or-nothing over those usable subjects
-  //      and asks whether each AUTHORED formula carries a plain `1d20`. Rewriting the fixture's
-  //      formula to, say, `2d10 + @abilities.int.mod` collapses the published Advantage / Normal /
-  //      Disadvantage row to a single Roll button, and the case's own `expectSelector` — which
-  //      names the subject strip — would not notice.
-  //
-  // The subjects are DERIVED FROM THE CASE, never listed here. Hardcoding them is what decouples a
-  // pin from the frame it claims to be about: re-pointing the case at other cards would leave this
-  // asserting facts about two components the picture no longer contains.
-  //
-  // The same two predicates the service itself calls, imported rather than re-derived — a private
-  // regex here would agree with the service right up until one of them changed.
   const viewCase = getCaseById('player-inventory-bulk-roll-prompt');
   assert.ok(viewCase, 'the bulk roll-prompt case is still in the registry');
 
@@ -209,8 +163,6 @@ test('the die shape is the one rolledDiceGroups reads', async () => {
   assert.equal(die.results.length, 3);
   // `active: true` on a kept result, matching every Foundry-shaped dice fixture in this repo
   // (`check-roll.test.js`, `check-roll-dice.test.js`, `check-roll-tier-step.test.js`).
-  // `rolledDiceGroups` filters on `!== false` so it would accept an absent key too, but the lab
-  // must emit the shape production emits — otherwise a later fidelity fix reads as a regression.
   assert.ok(
     die.results.every((entry) => entry.active === true),
     'a kept result is explicitly active'
@@ -429,8 +381,7 @@ test('prepared run checks hand the evaluated lab roll to player chat on both cha
 test('the statics behave exactly as the object they replaced', () => {
   const Roll = makeRoll();
   // Pinned because ~15 recipe check cards render off `replaceFormulaData`, and
-  // `resolveCheckFormulaDisplay` gates its `resolved` flag on `validate`. Changing either would
-  // move frames that have nothing to do with rolling.
+  // `resolveCheckFormulaDisplay` gates its `resolved` flag on `validate`.
   assert.equal(Roll.replaceFormulaData('1d20 + @prof', { prof: 3 }), '1d20 + 3');
   assert.equal(
     Roll.replaceFormulaData('1d20 + @prof', {}, { missing: 'NaN' }),
@@ -446,10 +397,7 @@ test('the statics behave exactly as the object they replaced', () => {
 test('the shim installs a Roll CONSTRUCTOR, so evaluateCheckRoll reaches the prompt', async () => {
   // COMPOSITION, and the reason this test exists: every other test here imports `createLabRoll`
   // directly, so reverting `installFoundryShim.js` to the pre-change two-static object left the
-  // whole capability gone with the suite green. `evaluateCheckRoll` bails on
-  // `typeof globalThis.Roll !== 'function'` BEFORE it calls `options.prompt`, so an object here
-  // means no crafting, salvage or alchemy dialog can EVER open in the lab — which is exactly the
-  // state the roll-prompt frame was added to escape.
+  // whole capability gone with the suite green.
   const content = buildLabContent();
   const actors = buildLabActors(content);
   const previous = { Roll: globalThis.Roll, game: globalThis.game, ui: globalThis.ui };
@@ -486,26 +434,8 @@ test('the shim installs a Roll CONSTRUCTOR, so evaluateCheckRoll reaches the pro
   }
 });
 
-// The `player-crafting-roll-prompt` frame's PREMISE, read from the fixtures rather than
-// assumed (issues 1055, 1094). That case is the world's only picture of the interactive
-// modifier fieldset, and every input it depends on lives in `labContent.js`:
-// `CraftingEngine._buildInteractiveModifierChoice` returns a descriptor only when the
-// EFFECTIVE combination rule is `playerPicks`, the active mode carries an authored
-// (post-shim) roll formula, and at least TWO modifiers are eligible.
-//
-// It rotted exactly once and cost a whole capture run to find. The rule used to be a
-// per-RECIPE override on `hb-r-stillroom`; issue 1055 removed a recipe's ability to
-// override the rule at all, `Recipe._normalizeCraftingModifier` began dropping the stored
-// `policy`, the system stayed on `highest` — and the case failed in CI with "nothing
-// matches `.fabricate-roll-prompt__modifiers`", which reads like a deleted CSS class
-// rather than like a fixture that stopped reaching the state. Nothing in `npm test`
-// noticed, because no unit test asserted the fixture could still get there.
-//
-// RE-POINTED, not deleted, by issue 1094. The formula condition used to be "the rolled
-// check still spends the retired placeholder", and the fixture carried one for exactly
-// that reason. The placeholder is gone and the gate now asks whether the check has an
-// authored formula at all — so this assertion follows the gate rather than being dropped,
-// which would have left that capture case with no `npm test` guard again.
+// The `player-crafting-roll-prompt` frame's PREMISE, read from the fixtures rather than assumed
+// (issues 1055, 1094).
 test('the lab fixtures still reach the interactive modifier fieldset (issues 1055, 1094)', () => {
   const content = buildLabContent();
   const herbalism = content.systems.find((system) => system.id === 'lab-herbalism');
@@ -519,10 +449,7 @@ test('the lab fixtures still reach the interactive modifier fieldset (issues 105
     active.checkUsable,
     'the active mode still carries an authored roll formula — without one the engine offers no choice'
   );
-  // Read the AUTHORED field, not `active.rollFormula`. That value is POST-shim, so the
-  // shim has already removed any placeholder by the time it is returned and only the
-  // never-matched `@craftingmodifier` could ever turn this red — the assertion would pass
-  // over a fixture that still seeded the token, which is exactly what it exists to catch.
+  // Read the AUTHORED field, not `active.rollFormula`.
   const authoredFormula = herbalism?.craftingCheck?.[active.slot]?.rollFormula ?? '';
   assert.ok(authoredFormula.trim() !== '', 'the fixture authors a formula on the active slot');
   assert.equal(
@@ -530,14 +457,8 @@ test('the lab fixtures still reach the interactive modifier fieldset (issues 105
     false,
     'and the FIXTURE seeds no retired placeholder, so the capture case does not depend on one'
   );
-  // The lab fixture authors its two libraries at their PRE-MIGRATION locations on purpose
-  // (issues 1095 C13, 1117), so the lab BUILD's migration pass is what lifts and merges
-  // them. This test reads `buildLabContent()` directly — before that pass — so it applies
-  // the same relocation the runner would, rather than asserting against a shape the
-  // rendered world never has. `tests/view-lab-world-migration.test.js` owns the merge
-  // itself, including the id collision the two lab libraries carry: only the CHECK entries
-  // matter to a crafting check, and those keep their ids, so the crafting-side reading here
-  // is unaffected by it.
+  // The lab fixture authors its two libraries at their PRE-MIGRATION locations on purpose (issues
+  // 1095 C13, 1117), so the lab BUILD's migration pass is what lifts and merges them.
   const migrated = {
     ...herbalism,
     modifiers: herbalism.craftingCheck?.checkModifiers,

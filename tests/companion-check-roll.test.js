@@ -1,21 +1,4 @@
-/**
- * The Standalone Check Roll (issue 1293) — `src/systems/companionCheckRoll.js`.
- *
- * The module is a Foundry-free leaf that takes every collaborator as a seam, so this suite
- * drives it two ways and the difference is deliberate:
- *
- *  - **REAL runners** (`runFormulaPassFail` / `runFormulaProgressive`) over a stubbed
- *    `globalThis.Roll`, wherever the claim is about what the member does with a runner's
- *    ANSWER. The three-step discriminator ladder is the point of this change, and a canned
- *    runner reply would let the ladder be graded against a reconstruction rather than against
- *    the runner it actually ships beside. r2's ladder was wrong precisely because it was
- *    derived from a reconstruction.
- *  - **SPY runners**, wherever the claim is about what the member PASSES, or that it passed
- *    nothing at all. A gate that refuses before dispatch is only assertable by call count.
- *
- * `buildInteractiveRollOptions` is the REAL one in both, because it is a pure function and
- * because the flavor it composes is the string the default-label rule is about.
- */
+/** The Standalone Check Roll (issue 1293) — `src/systems/companionCheckRoll.js`. */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -37,9 +20,7 @@ import {
   assertMessageIsFromTable,
 } from './helpers/companionContractOutcomes.js';
 
-// ---------------------------------------------------------------------------
 // Stubs
-// ---------------------------------------------------------------------------
 
 const ACTOR = {
   id: 'actor-1',
@@ -50,21 +31,9 @@ const ACTOR = {
 /**
  * Install a `globalThis.Roll` that COUNTS ITS CONSTRUCTIONS.
  *
- * The construction count is what makes "the dismissal short-circuits before the roll"
- * assertable at all. A chat spy proves nothing there: the dismissal returns from
- * `evaluateCheckRoll` before BOTH the `new Roll(...)` and the `toMessage` block, so the chat
- * count is 0 either way and a member that rolled and then refused would pass.
- *
- * `replaceFormulaData` really substitutes, because without it `resolveCheckFormulaDisplay`
- * returns `null` unconditionally and every `resolvedFormula` assertion is vacuous — an
- * `assert.notEqual(null, '1d20+@prof')` passes trivially and an `assert.doesNotMatch(null, …)`
- * throws `ERR_INVALID_ARG_TYPE` rather than asserting anything.
- *
- * @param {object} [options]
  * @param {number} [options.total] the total every roll answers
  * @param {boolean} [options.throwOnConstruct] make the dice engine throw, as a broken formula
- *   reaching `new Roll(...)` would
- * @returns {{ constructions: string[], chat: object[] }}
+ * reaching `new Roll(...)` would
  */
 function installRoll({ total = 18, throwOnConstruct = false } = {}) {
   const constructions = [];
@@ -76,8 +45,6 @@ function installRoll({ total = 18, throwOnConstruct = false } = {}) {
       this.data = data;
       this.total = total;
       // One plain d20 group, so a `diceGroups.length > 0` assertion is about real structure.
-      // The die total and the roll total differ on the zero case (`1d20 - 5` rolling a 5),
-      // which is exactly the shape a legitimate total of `0` really has.
       this.dice = [{ number: 1, faces: 20, total: 5, results: [{ result: 5, active: true }] }];
     }
     async evaluate() {
@@ -121,13 +88,7 @@ function installChat() {
   return chatPosts;
 }
 
-/**
- * The seam bag, with per-seam call records.
- *
- * `localize` answers the FALLBACK, which is what a client with no `game.i18n` — and Foundry's
- * own `localize` for a missing string — produces. That makes the default-label criterion an
- * assertion about the shipped English rather than about a test double's invention.
- */
+/** The seam bag, with per-seam call records. */
 function makeSeams({ real = false, ...overrides } = {}) {
   const calls = {
     prompt: [],
@@ -239,9 +200,7 @@ function assertBulkAnswerShape(result) {
   assertMessageDataCovers(result, `resolveBulkCheckDecision's ${result.outcome} answer`);
 }
 
-// ---------------------------------------------------------------------------
 // AC-2, AC-9(3) — the dismissal short-circuits BEFORE the roll
-// ---------------------------------------------------------------------------
 
 describe('AC-2 — a dismissed prompt is a refusal, and it refuses before anything rolls', () => {
   it('constructs NO Roll on a dismissal and exactly one on a confirmation', async () => {
@@ -279,9 +238,7 @@ describe('AC-2 — a dismissed prompt is a refusal, and it refuses before anythi
   });
 });
 
-// ---------------------------------------------------------------------------
 // AC-3 — the formula is @-resolved, and no modifier context is passed
-// ---------------------------------------------------------------------------
 
 describe('AC-3 — the formula is @-resolved and the modifier context is explicitly null', () => {
   it('answers a resolvedFormula with the placeholders substituted', async () => {
@@ -320,9 +277,7 @@ describe('AC-3 — the formula is @-resolved and the modifier context is explici
   });
 });
 
-// ---------------------------------------------------------------------------
 // AC-6 — a missing dice engine, on BOTH arms
-// ---------------------------------------------------------------------------
 
 describe('AC-6 — a missing dice engine refuses on both arms, and dispatches to neither runner', () => {
   for (const [arm, extra] of [
@@ -350,9 +305,7 @@ describe('AC-6 — a missing dice engine refuses on both arms, and dispatches to
   }
 });
 
-// ---------------------------------------------------------------------------
 // AC-7 — the pre-resolved decision
-// ---------------------------------------------------------------------------
 
 describe('AC-7 — a pre-resolved decision drives the roll without opening a dialog', () => {
   it('opens a dialog for a confirmed interactive roll', async () => {
@@ -390,11 +343,9 @@ describe('AC-7 — a pre-resolved decision drives the roll without opening a dia
   });
 
   it('treats a decision carrying confirmed:TRUE as a decision, and still rolls', async () => {
-    // The other half of AC-7's `confirmed` claim, and the COMMON one: the design's whole
-    // argument is about a caller that forwarded a whole prompt answer, and a prompt answer is
-    // usually a confirmation. Without this cell the guard can be widened from
-    // `confirmed === false` to `confirmed !== undefined` — a single substitution — and every
-    // forwarded confirmation silently becomes a cancellation that rolls nothing, forever.
+    // The other half of AC-7's `confirmed` claim, and the COMMON one: the design's whole argument
+    // is about a caller that forwarded a whole prompt answer, and a prompt answer is usually a
+    // confirmation.
     installChat();
     const rolls = installRoll();
     const { seams, calls } = makeSeams({ real: true });
@@ -421,12 +372,8 @@ describe('AC-7 — a pre-resolved decision drives the roll without opening a dia
   });
 
   it('treats a hand-built decision carrying confirmed:false as a cancel', async () => {
-    // Constructed BY HAND rather than obtained from the prompt, because this is the assertion
-    // that proves the `confirmed`-strip is load-bearing. A decision carries NO `confirmed` key
-    // — `BulkSalvageService` strips it deliberately, and the evaluator's `=== false` early
-    // exit is what a carried-through flag would trip. A caller that forwarded a whole prompt
-    // answer has therefore handed over a refusal, and the member honours it: without this the
-    // caller signals a decline and gets a roll it never asked for, silently.
+    // Constructed BY HAND rather than obtained from the prompt, because this is the assertion that
+    // proves the `confirmed`-strip is load-bearing.
     installChat();
     const rolls = installRoll();
     const { seams } = makeSeams({ real: true });
@@ -445,9 +392,7 @@ describe('AC-7 — a pre-resolved decision drives the roll without opening a dia
   });
 });
 
-// ---------------------------------------------------------------------------
 // AC-8, AC-17, AC-20 — the bulk decision
-// ---------------------------------------------------------------------------
 
 describe('AC-8 — allowAdvantage is computed over the USABLE subset, all-or-nothing', () => {
   for (const [formulas, expected, why] of [
@@ -547,11 +492,7 @@ describe('AC-20 — the bulk prompt is told the WHOLE batch, not the usable subs
     assert.equal(calls.promptBulk[0].count, 4, 'the batch is what the player queued');
     assert.equal('subjects' in calls.promptBulk[0], false, 'and no thumbnail strip is claimed');
     assert.deepEqual(result.covered, [0, 2]);
-    // The two VALUES, and not merely their presence. `assertMessageDataCovers` proves the bag
-    // supplies every placeholder the string interpolates and says nothing about what it
-    // supplies: swapping `count` and `total` satisfies it in full and renders "covering 4 of
-    // 2 checks" in front of a GM. The fixture is deliberately asymmetric (2 of 4) so the swap
-    // is visible at all.
+    // The two VALUES, and not merely their presence.
     assert.deepEqual(
       result.messageData,
       { count: 2, total: 4 },
@@ -560,17 +501,12 @@ describe('AC-20 — the bulk prompt is told the WHOLE batch, not the usable subs
   });
 });
 
-// ---------------------------------------------------------------------------
 // AC-14 (bulk half) — a HOSTILE request to the member that reads no actor
-// ---------------------------------------------------------------------------
 
 describe('AC-14 (bulk half) — resolveBulkCheckDecision never throws, whatever formulas is', () => {
-  // AC-14 is `rollActorCheck`-only, so the `Array.isArray` guard on `request.formulas` — the
-  // single line that keeps this member's "a `stable` member NEVER THROWS" promise — is
-  // asserted by nothing. Every other case in this file hands it a real array. Drop the guard
-  // and each of these three throws a `TypeError` out of a `stable` member: a string has no
-  // `.entries()` that yields `[index, formula]` pairs the way an array does, and a plain
-  // object and a number have no `.entries()` at all.
+  // AC-14 is `rollActorCheck`-only, so the `Array.isArray` guard on `request.formulas` — the single
+  // line that keeps this member's "a `stable` member NEVER THROWS" promise — is asserted by
+  // nothing.
   for (const formulas of ['1d20', { 0: '1d20' }, 42, true, undefined, null]) {
     it(`refuses rather than throwing for formulas ${JSON.stringify(formulas) ?? 'undefined'}`, async () => {
       installChat();
@@ -621,20 +557,15 @@ describe('AC-14 (bulk half) — resolveBulkCheckDecision never throws, whatever 
   });
 });
 
-// ---------------------------------------------------------------------------
 // AC-9 — the module rolls nothing, proved three ways
-// ---------------------------------------------------------------------------
 
 const MODULE_PATH = resolve(import.meta.dirname, '../src/systems/companionCheckRoll.js');
 const MODULE_SOURCE = readFileSync(MODULE_PATH, 'utf8');
 
 /**
- * The module's text with comments and string literals removed.
- *
- * Every ABSENCE assertion below reads this rather than the raw file, so the module header is
- * free to EXPLAIN what the module does not do without satisfying its own prohibition. A raw
- * grep runs in the failing direction here: the header names `globalThis.Roll` in order to say
- * it is never read.
+ * The module's text with comments and string literals removed. Every ABSENCE assertion below reads
+ * this rather than the raw file, so the module header is free to EXPLAIN what the module does not
+ * do without satisfying its own prohibition.
  */
 const MODULE_CODE = MODULE_SOURCE.replaceAll(/\/\*[\s\S]*?\*\//g, '')
   .replaceAll(/\/\/.*$/gm, '')

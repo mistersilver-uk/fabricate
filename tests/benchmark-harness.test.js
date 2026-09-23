@@ -1,29 +1,7 @@
 /**
- * The harness that measures the harness (issue 1071).
- *
- * A benchmark harness IS measurement code, so the defect class it is prone to is a fixture that
- * silently generates the wrong thing and a counter that cannot go up. Both fail SILENTLY: the
- * run stays green, the numbers look plausible, and the whole performance programme calibrates
- * against nothing. Every assertion below is aimed at one of those two.
- *
- * The load-bearing ones, in the order they matter:
- *
- * 1. **The inventory axis is independent of corpus size.** #1070 is explicit that a profile
- *    scaling both together cannot attribute a regression to either. Proved by generating the
- *    SAME held-inventory spec against two different library sizes and against no corpus at all.
- * 2. **A majority of held items resolve to NO component.** The counter-intuitive requirement:
- *    an all-component inventory exercises the cheap durable tier and would let every criterion
- *    go green while the reported 7.5 s regression survives untouched.
- * 3. **The counters can actually go up, and by an amount derived from the declared scale.** A
- *    miss over an N-component library must examine at least N candidates; a durable-flag hit
- *    must examine strictly fewer. Asserting against a recorded observation instead would pass
- *    against a counter that had been silently disconnected. This covers the three counter kinds
- *    this file imports — `countingCandidates`, `countingActor`, `countCalls` — and NOT
- *    `scaleCounters.js`'s fourth, `countingEnumerations`, whose non-vacuity is proved at its
- *    use site by the bulk guards in `tests/runtime-definition-indexes.test.js`. Stated so the
- *    list above is not read as a claim of exhaustiveness over the module.
- * 4. **A different seed produces a different corpus.** Otherwise "deterministic" would be
- *    indistinguishable from "ignores its inputs".
+ * The harness that measures the harness (issue 1071). 1. **The inventory axis is independent of
+ * corpus size.** #1070 is explicit that a profile scaling both together cannot attribute a
+ * regression to either.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -112,11 +90,8 @@ describe('scale fixtures are reproducible from {profile, seed} alone', () => {
 });
 
 describe('pickDistinct returns exactly the requested scale', () => {
-  // The sampler is the one place a fixture generator can silently produce the WRONG SCALE, which
-  // is the defect class the whole harness exists to catch. SonarCloud's S1994 flagged its old
-  // fill loop for testing `chosen.size` while incrementing `index`; that loop terminated
-  // correctly, but nothing here proved it did, and nothing bounded it if the clamp above it ever
-  // moved. These assertions bind the contract instead of the implementation.
+  // The sampler is the one place a fixture generator can silently produce the WRONG SCALE, which is
+  // the defect class the whole harness exists to catch.
   const pool = ['a', 'b', 'c', 'd', 'e', 'f'];
 
   for (const count of [0, 1, 3, 6]) {
@@ -147,8 +122,7 @@ describe('pickDistinct returns exactly the requested scale', () => {
 
   it('terminates and still returns the full count for a degenerate generator', () => {
     // A generator pinned at 0 is the pathological input the old rejection-sampling guard existed
-    // for. Selection sampling has no guard and no fallback: it cannot spin, because it runs
-    // exactly `count` iterations.
+    // for.
     const picked = pickDistinct(() => 0, pool, 4);
     assert.equal(picked.length, 4);
     assert.equal(new Set(picked).size, 4);
@@ -368,9 +342,7 @@ describe('the fixture checksum detects generator drift and nothing else', () => 
   it('distinguishes two FIXTURES differing only in a previously-collapsing field', () => {
     // The collapse that mattered is not at the scalar level, it is at the fixture level: two
     // otherwise-identical fixture objects that hash the same are two fixtures the drift guard can
-    // no longer tell apart. Both fields below rendered identically before — a Date fell through
-    // to the plain-object branch where `Object.keys` yields `[]` (so every date was `{}`), and a
-    // symbol hit `JSON.stringify`, which returns the VALUE `undefined` rather than a string.
+    // no longer tell apart.
     const withDateA = { id: 'c-1', stamped: new Date(0) };
     const withDateB = { id: 'c-1', stamped: new Date(86_400_000) };
     assert.notEqual(fixtureChecksum(withDateA), fixtureChecksum(withDateB));
@@ -388,10 +360,7 @@ describe('the fixture checksum detects generator drift and nothing else', () => 
   });
 
   it('orders keys by code unit, which is what makes the digest machine-independent', () => {
-    // Pins the comparator, and pins it AGAINST `localeCompare` specifically. A locale-aware
-    // compare orders "a" before "B" in en-GB but code-unit order puts "B" first, so swapping the
-    // comparator for the obvious-looking one would make the same fixture hash differently on two
-    // machines with different ICU data — the exact non-determinism this module exists to remove.
+    // Pins the comparator, and pins it AGAINST `localeCompare` specifically.
     assert.equal(stableStringify({ a: 1, B: 2 }), '{"B":2,"a":1}');
     assert.equal(stableStringify({ B: 2, a: 1 }), '{"B":2,"a":1}');
     assert.equal(fixtureChecksum({ a: 1, B: 2 }), fixtureChecksum({ B: 2, a: 1 }));

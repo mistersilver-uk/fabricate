@@ -1,15 +1,5 @@
 /**
  * THE manager's labelled push-button, mounted (issues 1096 and 1118).
- *
- * `manager-layout.test.js` already measures what this control LOOKS like: it renders a
- * converted card button beside the Tool Studio's and compares computed geometry in a real
- * browser. What nothing pinned until now is what the component actually EMITS — which
- * element, which attributes on it, and which class string — and that is the half where this
- * primitive's defects have historically lived, because every one of them is invisible to
- * lint, to `format:check` and to a screenshot of a correctly-rendering screen.
- *
- * The pins below are therefore chosen by FAILURE MODE rather than by prop.
- *
  * `is-warning-action` is the sharpest of them. Five of the six roles emit `is-${role}` and
  * `warning` does not: the sheet declares `.manager-button.is-warning-action` and declares
  * `.manager-button.is-warning` NOWHERE. That asymmetry is the entire reason `ROLE_CLASSES`
@@ -22,32 +12,6 @@
  * the amber rule shipped with no call site. So the class is asserted by literal here, and
  * the absence of `is-warning` is asserted alongside it, because the defect was a plausible
  * spelling and not a typo.
- *
- * The ELEMENT identity pins matter for the same reason at a different layer. The component
- * renders `<svelte:element>` rather than a literal `<button>`, so the tag is now computed
- * from props at runtime and a regression there produces markup that still carries every
- * class and every `data-*` hook the rest of the suite looks for. A `<div>` or a
- * `<button>`-turned-`<a>` would keep passing the class-string assertions, the mounted
- * `querySelector` hooks and the computed-style parity gate, while losing focusability,
- * implicit role and Enter activation. Hence `tagName` is read directly on every path,
- * including the default one.
- *
- * The `href`, `type`, `disabled` and `rel` pins each encode a rule about VALID MARKUP that
- * a browser will not complain about: an anchor with `type="button"`, an anchor with
- * `disabled`, and an anchor with no `href` all render and all look right. The last is the
- * one reachable from product data rather than from a mistake — several anchor call sites
- * take their `href` from a caller's link list — which is why the empty case renders a real
- * `<button>` instead of a link-shaped element nobody can focus.
- *
- * `is-full-width` is pinned as a class the primitive owns, because it exists precisely so
- * that "full width" stops being a per-screen class string. If it drifts, the four sites that
- * asked for it silently return to their natural width.
- *
- * The component is an import-free LEAF — no stores, no bridge, no sibling component — so
- * this is a one-entry harness. `compiledModules` names the path as a LITERAL rather than
- * through the `componentPath` binding: `mounted-harness-primitive-allowlist.test.js` reads
- * that list by matching path-shaped quoted strings, and a bare identifier there would make
- * this suite read as compiling nothing at all.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -75,8 +39,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
   it('renders a real <button type="button"> with no role modifier by default', async () => {
     await harness.mount({});
     const node = button();
-    // `tagName`, not the class string: `<svelte:element>` computes the tag from props, so a
-    // regression that emitted a <div> here would keep every class and hook intact.
+    // `tagName`, not the class string: `<svelte:element>` computes the tag from props.
     assert.equal(node.tagName, 'BUTTON');
     assert.equal(node.getAttribute('type'), 'button');
     // A manager button inside a `<form>`-adjacent card must never submit by accident.
@@ -87,8 +50,6 @@ describe('ManagerButton emits the element and classes its call sites are styled 
     await harness.mount({ role: 'warning' });
     const node = button();
     // The sheet declares `.manager-button.is-warning-action` and no `.manager-button.is-warning`.
-    // A role emitting the second spelling renders an unpainted button that looks fine in the
-    // DOM and wrong on the screen, which is the shipped defect this role exists to repair.
     assert.ok(node.classList.contains('is-warning-action'), node.className);
     assert.ok(!node.classList.contains('is-warning'), node.className);
   });
@@ -112,11 +73,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
   });
 
   it('renders neutral for a role that names an inherited member of the mapping', async () => {
-    // `ROLE_CLASSES[role]` reads Object.prototype too, so a plain index made the
-    // unrecognised-role contract above hold for every string EXCEPT the handful that are
-    // names on that prototype — and those emit a function's source text as a class list.
-    // Not reachable from product data; it is pinned because the guard that closes it
-    // (`Object.hasOwn`) is a line a future tidy-up would read as redundant (issue 1118).
+    // `ROLE_CLASSES[role]` reads Object.prototype too.
     for (const role of ['toString', 'constructor', 'hasOwnProperty']) {
       await harness.mount({ role });
       assert.equal(
@@ -141,12 +98,6 @@ describe('ManagerButton emits the element and classes its call sites are styled 
   });
 
   // ── THE 38px RUNG (issue 1371) ────────────────────────────────────────────────────────
-  //
-  // `size` is the one prop on this component that can change the control's BOX, so its
-  // default is a compatibility contract across 48 call-site files: absent, it must emit no
-  // class at all. The sheet half — that `is-size-38` is 38px and takes the band's corner
-  // with it — is measured in `manager-control-rungs.test.js` beside M12b's other four
-  // controls, which is where the ladder arithmetic already lives.
   it('emits NO size class by default, so every shipped button keeps its 34px control', async () => {
     await harness.mount({ role: 'primary' });
     assert.equal(button().className, 'fabricate-button manager-button fab-manager-button is-primary');
@@ -155,7 +106,6 @@ describe('ManagerButton emits the element and classes its call sites are styled 
   it('emits is-size-38 when asked, between its own modifiers and the caller class', async () => {
     await harness.mount({ role: 'primary', size: '38', fullWidth: true, class: 'manager-thing' });
     // The documented order, and the same one `ManagerSearchField` states for the same token:
-    // the primitive's own modifiers, then the rung, then whatever the caller appended.
     assert.equal(
       button().className,
       'fabricate-button manager-button fab-manager-button is-primary is-full-width is-size-38 manager-thing'
@@ -168,8 +118,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
   });
 
   it('DROPS an unrecognised rung rather than emitting a class the sheet does not paint', async () => {
-    // A retired rung, a rung the sheet has no rule for, an adjective, and the prototype
-    // spelling of a rung that is not this one — each must render the shipped 34px control.
+    // A retired rung, a rung the sheet has no rule for, an adjective.
     for (const size of ['36', '40', 34, 'tall', '', 'toString']) {
       await harness.mount({ size });
       assert.equal(
@@ -216,9 +165,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
 
   it('falls back to a button for an empty href and for an unrecognised tag', async () => {
     await harness.mount({ tag: 'a', href: ' ' });
-    // An anchor with no href is not focusable, has no implicit link role and does not
-    // activate on Enter. Anchor call sites take their href from caller data, so this case is
-    // reachable from the product rather than only from a mistake.
+    // An anchor with no href is not focusable.
     assert.equal(button().tagName, 'BUTTON');
     assert.equal(button().getAttribute('type'), 'button');
     harness.remount();

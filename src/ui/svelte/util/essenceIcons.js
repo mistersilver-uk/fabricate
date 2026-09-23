@@ -6,12 +6,9 @@ import {
 
 export const DEFAULT_ESSENCE_ICON = 'fas fa-mortar-pestle';
 
-/**
- * The shared `--fab-tag-*` palette an essence's optional colour is chosen from
- * (issue 917). The palette is the whole vocabulary — there is no custom-hex entry for
- * an essence — because a free hex cannot be guaranteed legible against all seven
- * themes. It mirrors the preset list the manager's colour picker renders.
- */
+// The whole colour vocabulary an essence may be given (issue 917): there is no custom-hex entry,
+// because a free hex cannot be guaranteed legible against all seven themes. It mirrors the preset
+// list the manager's colour picker renders.
 export const ESSENCE_COLOR_TOKENS = Object.freeze([
   'sage',
   'mist',
@@ -23,18 +20,9 @@ export const ESSENCE_COLOR_TOKENS = Object.freeze([
   'mauve'
 ]);
 
-/**
- * Normalize a stored essence colour to a bare palette token, or null.
- *
- * Null is a FIRST-CLASS state, not a failure: an essence with no authored colour
- * renders in the theme accent, which is what every essence renders as today. An
- * unrecognized token normalizes to null for the same reason — falling back to the
- * accent is honest, whereas coercing it to an arbitrary preset would invent a colour
- * the GM never chose.
- *
- * @param {unknown} value
- * @returns {string|null}
- */
+// Null is a FIRST-CLASS state, not a failure: an essence with no authored colour renders in the
+// theme accent. An unrecognized token normalizes to null for the same reason — coercing it to an
+// arbitrary preset would invent a colour the GM never chose.
 export function normalizeEssenceColorToken(value) {
   const token = String(value ?? '').trim().replace(/^--fab-tag-/, '');
   return ESSENCE_COLOR_TOKENS.includes(token) ? token : null;
@@ -141,9 +129,10 @@ const PREFIX_ALIASES = Object.freeze({
  * A key here must name something the vocabulary can actually offer, which the drift guard in
  * `tests/essenceIconCompatibility.test.js` enforces. That bites hardest on the fantasy staples:
  * Font Awesome Free publishes no `sword`, `axe`, `dagger`, `mace`, `bow`, `castle`, `chest`,
- * `crystal` or singular `coin` glyph, and Fabricate may reference only Free names (see the
- * licensing note in `foundryIconCatalogue.js`), so those keys had nothing left to hang on and are
- * gone rather than left as dead weight. `coins` survives and still carries money and treasure.
+ * `crystal` or singular `coin` glyph, and Fabricate may reference only Free names (see
+ * `openspec/specs/ui-visual-style/spec.md`, `#### Icon vocabulary`), so those keys had nothing left
+ * to hang on and are gone rather than left as dead weight. `coins` survives and still carries
+ * money and treasure.
  * `bag` went for a different reason: `bag-shopping` is the only Free member and curation excludes
  * it as modern shopping. If Font Awesome promotes any of them into the free set, the key comes
  * back with the glyph.
@@ -299,9 +288,6 @@ const CSS_STRING = /^(["'])(.*)\1$/s;
  * Foundry 13's bundle sets BOTH, on different rules, for the same glyph. Keying on the text would
  * split one glyph into two picker rows and let a name excluded in one group be re-admitted in the
  * other.
- *
- * @param {string} cssValue the declaration's value, quotes included
- * @returns {string} a stable key for the glyph, or `''` when the value names none
  */
 function glyphKeyFromCssString(cssValue) {
   const string = CSS_STRING.exec(String(cssValue ?? '').trim());
@@ -389,10 +375,6 @@ function collectGlyphsFromRules(rules, glyphsByName) {
  * Every sheet is read through the same guard, because a stylesheet a client loaded from another
  * origin throws `SecurityError` on `cssRules` rather than answering null, and one such sheet must
  * not cost the measurement the rest of the document.
- *
- * @param {Document|null|undefined} [documentObject]
- * @returns {Map<string, string>} icon name -> an opaque per-GLYPH key, so two names sharing a
- *   drawing group together however their release spells the assignment
  */
 export function measureLoadedFontAwesomeGlyphs(documentObject = globalThis.document) {
   const glyphsByName = new Map();
@@ -431,10 +413,6 @@ function preferredVersionedName(names, sourceDefinitionsByName) {
  * Grouping by glyph rather than merely filtering names is load-bearing across the v6 -> v7 major:
  * v7 remapped some formerly distinct v6 icons as aliases. If V13 says two names point at different
  * glyphs, they become two rows again here even if the V14 source catalogue groups them together.
- *
- * @param {ReadonlyArray<{iconCode:string,label:string,aliases?:ReadonlyArray<string>}>} sourceDefinitions
- * @param {Map<string,string>} glyphsByName
- * @returns {ReadonlyArray<{iconCode:string,label:string,aliases:ReadonlyArray<string>}>>}
  */
 export function buildIconDefinitionsForMeasuredBundle(sourceDefinitions, glyphsByName) {
   if (!(glyphsByName instanceof Map) || glyphsByName.size === 0) return Object.freeze([]);
@@ -546,24 +524,10 @@ function iconDefinitionsForMajor(major, options = {}) {
   return measuredIconDefinitions();
 }
 
-/**
- * Full icon list for a Foundry generation.
- *
- * @param {number|null} [major]
- * @param {{glyphsByName?:Map<string,string>}} [options]
- * @returns {ReadonlyArray<{iconCode:string,label:string,aliases:ReadonlyArray<string>}>}
- */
 export function getFoundryIconDefinitionsForMajor(major = currentFoundryMajor(), options = {}) {
   return iconDefinitionsForMajor(major, options).all;
 }
 
-/**
- * Curated icon list for a Foundry generation.
- *
- * @param {number|null} [major]
- * @param {{glyphsByName?:Map<string,string>}} [options]
- * @returns {ReadonlyArray<{iconCode:string,label:string,aliases:ReadonlyArray<string>}>}
- */
 export function getFoundryCuratedIconDefinitionsForMajor(
   major = currentFoundryMajor(),
   options = {}

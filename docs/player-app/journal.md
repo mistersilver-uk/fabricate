@@ -147,6 +147,9 @@ After execution, history reports actual awards as **Crafted**, **Brought back**,
 - Existing **Progressive** gathering uses its accumulated yield budget and ordered component costs.
   Those costs are not drop chances or outcome tiers.
 
+A result whose amount is rolled shows its dice expression rather than a plain number while it is still only a preview, because no preview can know what the roll will be.
+Once the run has actually awarded it, the same result states the roll that produced it beside the quantity delivered, such as "Rolled 1d6 = 4", and a roll of zero or lower states that nothing was produced rather than showing an empty quantity.
+
 ### Reading a closed run
 
 Finished history is a read-only account of what happened.

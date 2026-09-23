@@ -1,14 +1,4 @@
-/**
- * Knowledge surface pure projection (issue 785).
- *
- * The uses derivations are pinned as ONE table over `(limitUses, maxUses,
- * timesUsed)` rather than as rendered strings, because the contract under test is
- * that `spent` is the exact complement of
- * `RecipeVisibilityService._filterNonExhausted` on BOTH axes — including the
- * `Number(timesUsed || 0)` coercion and the fail-open on a non-finite or
- * non-positive `maxUses`. A row that claimed a copy was spent while the runtime
- * still granted craftability from it would be the worst failure this surface has.
- */
+/** Knowledge surface pure projection (issue 785). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -32,8 +22,6 @@ import {
 } from '../src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js';
 
 // (label, limitUses, maxUses, timesUsed) -> (remaining, spent, canExpend, usesChip).
-// `spent` mirrors `_filterNonExhausted`: keep when `!limitUses`, keep when maxUses
-// is not a finite number > 0, else keep while `Number(timesUsed || 0) < maxUses`.
 const USES_CASES = [
   // limitUses false: unlimited on every timesUsed, and Expend is never offered.
   ['uncapped, unused', false, 5, 0, null, false, false, 'unlimited'],
@@ -330,6 +318,38 @@ describe('knowledgeStudio snapshot projection', () => {
     });
     assert.equal(projected.selectedActorId, 'a2');
     assert.equal(projected.defaultTab, KNOWLEDGE_TAB_LEARNED_RECIPES);
+  });
+
+  it('carries the loading and error keys on both return shapes (issue 1969)', () => {
+    const empty = projectKnowledgeSnapshot(null, { active: true });
+    assert.equal(empty.loading, false);
+    assert.equal(empty.error, false);
+    const populated = projectKnowledgeSnapshot(raw, { active: true });
+    assert.equal(populated.loading, false);
+    assert.equal(populated.error, false);
+
+    const loading = projectKnowledgeSnapshot(null, { active: true, loading: true });
+    assert.equal(loading.loading, true);
+    assert.equal(loading.error, false);
+    const failed = projectKnowledgeSnapshot(null, { active: true, error: true });
+    assert.equal(failed.loading, false);
+    assert.equal(failed.error, true);
+  });
+
+  it('lets loading mask error, and a populated or closed surface is neither', () => {
+    const both = projectKnowledgeSnapshot(null, { active: true, loading: true, error: true });
+    assert.equal(both.loading, true);
+    assert.equal(both.error, false, 'loading and error are never both true');
+
+    for (const [label, snapshot, active] of [
+      ['populated', raw, true],
+      ['closed', null, false],
+      ['closed and populated', raw, false],
+    ]) {
+      const projected = projectKnowledgeSnapshot(snapshot, { active, loading: true, error: true });
+      assert.equal(projected.loading, false, `${label}: never loading`);
+      assert.equal(projected.error, false, `${label}: never in error`);
+    }
   });
 
   it('builds a NEW object on every call', () => {

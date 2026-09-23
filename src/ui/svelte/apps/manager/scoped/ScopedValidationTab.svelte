@@ -1,81 +1,14 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The validation tab shared by every scoped-entity editor (issue 1362, epic 1357).
-
-  A GENERALISATION, not a new surface. `essences/EssenceValidationTab` and
-  `tools/ToolValidationTab` were already thin shells over `EditorValidationSurface` in exactly
-  this shape — a stack wrapper carrying one hook, the surface, and an optional trailing note —
-  and both are callers of this component now. Extracting a primitive obliges converting every
-  existing site of its shape, and there are exactly TWO: `checks/ChecksValidationTab` is the
-  only other `EditorValidationSurface` caller and is deliberately NOT a member, because it is
-  a SYSTEM-level route taking sections and dirty-activity state rather than an
-  entity-plus-scope shell. Named here so a later reader does not find the third caller and
-  ask why it was skipped.
-
-  ── WHAT IT OWNS, AND WHY ───────────────────────────────────────────────────────────────
-  The three COUNT labels and the pass / warn STATUS labels are identical at both sites, so
-  they are localized here once. Only the BLOCK label differs — an essence always saves, so
-  its blocking row reads `INCOMPLETE`, while a Tool refuses to save and reads `BLOCKS ENABLE`
-  — so that one is a prop. Anything the sites genuinely disagree about is a prop; nothing
-  they agree about is restated at a call site.
-
-  ── THE ROW ACTION PASSES STRAIGHT THROUGH (issue 1517) ─────────────────────────────────
-  `onSelectIssue` was already forwarded; `viewDataAttr` and `viewLabel` join it, and all three
-  are FORWARDED rather than owned. What a row action is called and which hook names its route are
-  properties of the CALLER's surface — the Tool editor's rows carry a Tool route and the world
-  entry pages carry none — whereas the count words and the pass/warn labels below genuinely are
-  this shell's, which is why those are localized here and these are not.
-
-  NEITHER IS DEFAULTED HERE. An unpassed prop forwards as `undefined`, so the surface applies its
-  own default — which is what keeps the row action's accessible name in exactly one place. A
-  caller that passes neither therefore reaches the surface with precisely what it reached it with
-  before; four of the five callers pass neither today.
-
-  `focusNonce` is DELIBERATELY UNTOUCHED by this. It scrolls the first BLOCKING row into view when
-  the tab OPENS, which is a property of arriving at the tab rather than of activating one row's
-  action, and exactly one of the five callers opts into it.
-
-  ── THE TWO OPT-IN FACES (issue 1371 r11-entry, UX finding F-D) ──────────────────────────
-  The world Component entry draws this tab the way the reference does, and the reference's tab
-  differs from the four shipped ones in two ways that are NOT a caller's copy decision:
-
-   1. NO HEADING AND NO INTRO. `proto:957-960`: the Validation body's first child is the
-      two-column grid — verdict hero on the left, count rows on the right. This needs no prop:
-      `title` and `intro` already default to `''` and `EditorValidationSurface` draws no head
-      block at all when both are empty, so a caller SUPPRESSES the pair by not passing it.
-      Recorded here because "the prop that suppresses the heading" is the first thing a reader
-      looks for and there is deliberately none.
-   2. THE HERO STATES THE VERDICT, NOT THE SUBJECT. `proto:4577-4578` derives the headline and
-      its sub-line from the counts — `{n} blocking issues` / `Passing with warnings` /
-      `All clear`, over `Clear these before saving.` / `{n} warnings will not stop a save.` /
-      `Every check passes. Ready to save.` — and `proto:4579` derives the glyph with them. A
-      site that passes a static `summary` instead heads a record with two blocking rows under a
-      sentence describing what the record IS, which is the one thing the tab already says.
-
-  `verdictSummary` is that second face, and it lives HERE rather than at the call site for the
-  reason the block label does not: which words state a verdict is a property of this surface's
-  vocabulary, not of one entity type, so a second consumer asking for it must get the same
-  eight strings rather than its own translation of them. It is `false` by default and, when
-  false, `summary` reaches `EditorValidationSurface` byte-identically — which is what keeps the
-  four shipped consumers unmoved.
-
-  Props:
-   - title / intro / summary / counts / groups: forwarded to `EditorValidationSurface`.
-   - verdictSummary: opt in to the counts-derived hero above. The caller's own `summary` is
-     then unread, because the two would be two answers to one question.
-   - blockLabel: the block row's status word.
-   - stackClass: the site's existing wrapper class, kept so no shipped rule stops matching.
-   - rowDataAttr: the per-row hook the site's tests read.
-   - viewDataAttr / viewLabel: forwarded verbatim to `EditorValidationSurface`, WITHOUT defaults
-     of their own. See the block below.
-   - onSelectIssue: the row action's `(target, focusTarget)` callback, forwarded to the surface.
-   - hookAttribute / hookValue: the wrapper's own `data-*` hook. `hookValue` may be `true`
-     for a bare boolean attribute.
-   - focusNonce: ticks to scroll the first BLOCKING row into view. It lives here rather than
-     at a call site because "show me the first thing that blocks" is a property of this
-     surface, not of one entity type; a site with nothing to focus passes 0.
-   - children: an optional trailing snippet, for a site with something below the surface
-     (the Tool editor's save-failure alert).
+  The validation tab shared by every scoped-entity editor (issue 1362, epic 1357). A
+  GENERALISATION, not a new surface: the essence and tool tabs were already this shape, and
+  `checks/ChecksValidationTab` is deliberately not a member — it is a SYSTEM-level route.
+  The COUNT and pass / warn labels are identical at both sites and localized here once; only the
+  BLOCK label differs and is a prop. `onSelectIssue`, `viewDataAttr` and `viewLabel` are
+  FORWARDED and NOT defaulted here, so the row action's name lives in exactly one place.
+  `verdictSummary` is the reference's second face (`proto:4577-4579`), where the hero states the
+  VERDICT derived from the counts; `false` by default, and then `summary` passes through
+  byte-identically. The heading-less face needs no prop: `title` and `intro` default to `''`.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -87,17 +20,13 @@
     summary = {},
     counts = { passing: 0, warnings: 0, blocking: 0 },
     groups = [],
-    // The counts-derived hero of `proto:4577-4579`. `false` keeps `summary` verbatim, so every
-    // consumer that does not ask for it renders exactly what it rendered before.
+    // The counts-derived hero of `proto:4577-4579`; `false` keeps `summary` verbatim.
     verdictSummary = false,
     blockLabel = '',
     stackClass = 'manager-scoped-tab-stack',
     rowDataAttr = '',
-    // DECLARED WITHOUT DEFAULTS, deliberately. `EditorValidationSurface` owns both defaults —
-    // the empty hook name and the localization key the row action's name resolves from — and a
-    // default written here would be a SECOND place that name lives, which is how a name and the
-    // word beside it drift apart. An unpassed prop forwards as `undefined`, which is exactly
-    // what makes the surface apply its own.
+    // DECLARED WITHOUT DEFAULTS, deliberately: a default here would be a SECOND place the row
+    // action's name lives, and an unpassed prop forwards as `undefined`.
     viewDataAttr,
     viewLabel,
     hookAttribute = '',
@@ -123,17 +52,8 @@
   }
 
   /**
-   * One localized string with `{token}` substitution applied to WHICHEVER string was taken.
-   *
-   * The fallback is interpolated too, which is not decoration: outside a running world
-   * `localize` answers with the key, so every mounted render of this tab reads the fallback —
-   * and a fallback left holding a literal `{count}` is a headline that says `{count} blocking
-   * issues` in every test and in the View Lab.
-   *
-   * @param {string} key
-   * @param {string} fallback
-   * @param {Record<string, unknown>} [data]
-   * @returns {string}
+   * One localized string with `{token}` substitution applied to WHICHEVER string was taken: a
+   * fallback holding a literal `{count}` would render in every test and in the View Lab.
    */
   function phrase(key, fallback, data) {
     let result = text(key, fallback);
@@ -144,19 +64,8 @@
   }
 
   /**
-   * The verdict the counts add up to, in the reference's own three-way vocabulary.
-   *
-   * WORST-FIRST, and the order is the meaning: a record with two blocking rows and one warning
-   * is blocked, and a hero that reported the warning would be reporting the second-worst thing
-   * the rows say. It is written as an early-return chain rather than a nested ternary, which
-   * SonarCloud reports as S3358.
-   *
-   * NO `icon` IS STATED. `EditorValidationSurface` owns the per-status glyph and falls back to
-   * its own `statusIcons` when `summary.icon` is absent, so naming one here would be this tab
-   * inventing a second glyph vocabulary for the three statuses the surface already draws.
-   *
-   * @param {{passing?: number, warnings?: number, blocking?: number}} current the tile counts.
-   * @returns {{status: string, title: string, sub: string}}
+   * The verdict the counts add up to. WORST-FIRST, and the order is the meaning; an early-return
+   * chain rather than a nested ternary (S3358). No `icon`: the surface owns the per-status glyph.
    */
   function verdictOf(current) {
     const blocking = Number(current?.blocking) || 0;
@@ -205,17 +114,12 @@
     };
   }
 
-  // The caller's `summary` is passed through UNTOUCHED unless the verdict face is asked for,
-  // which is what makes the default byte-identical rather than merely equivalent.
+  // The caller's `summary` passes through UNTOUCHED unless the verdict face is asked for.
   const shownSummary = $derived(verdictSummary ? verdictOf(counts) : summary);
 
   const wrapperAttributes = $derived(hookAttribute ? { [hookAttribute]: hookValue } : {});
-  // THE SHARED VOCABULARY, UNDER ITS OWN NAME AND IN ONE CASING (issue 1517). These five words
-  // were read from the RECIPE editor's namespace by a tab that is not the recipe editor's, and
-  // their fallbacks were `PASS` and `WARNING` where the shipped English — and every other
-  // validation surface — says `Pass` and `Warning`. Both halves are the same defect: one
-  // vocabulary with more than one home drifts, and the fallback is the copy a reader of this file
-  // believes. `block` stays the caller's word: it is the only one a call site chooses.
+  // THE SHARED VOCABULARY, UNDER ITS OWN NAME AND IN ONE CASING (issue 1517): these five words
+  // were read from the RECIPE editor's namespace. `block` stays the caller's word.
   const countLabels = $derived({
     passing: text('FABRICATE.Admin.Manager.Validation.CountPassing', 'Passing'),
     warnings: text('FABRICATE.Admin.Manager.Validation.CountWarnings', 'Warnings'),
@@ -246,10 +150,8 @@
 </div>
 
 <style>
-  /* The one stack rule both converted sites carried. `EssenceValidationTab` kept it in its
-     own scoped block and the Tool site takes it from the global sheet's
-     `.manager-tool-tab-stack`; each site still passes its own class alongside this one, so
-     no shipped rule stops matching. */
+  /* The one stack rule both converted sites carried; each still passes its own class alongside
+     this one, so no shipped rule stops matching. */
   .manager-scoped-tab-stack {
     display: flex;
     flex-direction: column;

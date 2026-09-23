@@ -1,36 +1,16 @@
 /**
  * Parse plain `.js` / `.mjs` into an ESTree AST for the gates that need structure rather than text
- * (issues 1658, 1659). Its guarantees are proved from inside the `npm test` glob by
- * `tests/module-ast.test.js`, because `tests/helpers/` is outside that glob.
- *
- * `svelte/compiler`'s `parse` is template-only and `compileModule` returns code, so neither yields a
- * module AST. `acorn` is present only transitively; declaring it would touch `package.json` and
- * `package-lock.json`, both high-risk paths. `svelte-eslint-parser` is already a declared
- * devDependency and its `.svelte.js` rune-module mode is a strict superset of module JS.
- *
- * Feeding plain JS to the template parser inside a synthetic `<script>` wrapper was rejected: it
- * shifts every offset by the wrapper's length, breaks on an unescaped `</script` in any string,
- * comment or template literal, and fails outright on a hashbang.
+ * (issues 1658, 1659).
  */
 import { parseForESLint } from 'svelte-eslint-parser';
 
-/**
- * The parser selects its mode from the extension, so the name must end `.svelte.js`; nothing reads
- * the file system, and no claim is made about where the source came from.
- */
+/** The parser selects its mode from the extension, so the name must end `.svelte.js`. */
 const PROBE_FILE_PATH = 'probe.svelte.js';
 
-/**
- * Keys that make the tree cyclic or carry no child nodes, so a walk must not follow them.
- * `tokens` and `comments` hang off the Program: walking them costs a full second pass over the
- * file and is what makes "a token in a docblock is not a node" literally true of this walk.
- */
+/** Keys that make the tree cyclic or carry no child nodes, so a walk must not follow them. */
 const SKIPPED_KEYS = new Set(['parent', 'loc', 'range', 'tokens', 'comments']);
 
-/**
- * @param {string} source
- * @returns {{ast: object, scopeManager: object}} `loc` and `range` are unshifted from `source`.
- */
+/** `loc` and `range` on the result are unshifted from `source`. */
 export function parseModule(source) {
   const { ast, scopeManager } = parseForESLint(String(source ?? ''), {
     filePath: PROBE_FILE_PATH,
@@ -42,12 +22,7 @@ export function parseModule(source) {
   return { ast, scopeManager };
 }
 
-/**
- * Every node under `root`, depth-first, each visited once.
- *
- * @param {object} root
- * @returns {Generator<object>}
- */
+/** Every node under `root`, depth-first, each visited once. */
 export function* walkNodes(root, seen = new Set()) {
   if (!root || typeof root !== 'object' || seen.has(root)) return;
   seen.add(root);
@@ -89,4 +64,55 @@ export function identifierNames(node) {
   const names = new Set();
   for (const inner of walkNodes(node)) if (inner.type === 'Identifier') names.add(inner.name);
   return names;
+}
+
+const SPECIFIER_TYPES = Object.freeze([
+  'ImportDeclaration',
+  'ExportNamedDeclaration',
+  'ExportAllDeclaration',
+]);
+
+/** Every specifier a subtree names in a static import or re-export. */
+export function importedModules(node) {
+  const specifiers = [];
+  for (const inner of walkNodes(node)) {
+    if (SPECIFIER_TYPES.includes(inner.type) && inner.source?.value) {
+      specifiers.push(inner.source.value);
+    }
+  }
+  return specifiers;
+}
+
+/** Every specifier a subtree names in an `import(…)` with a literal argument. */
+export function lazilyImportedModules(node) {
+  const specifiers = [];
+  for (const inner of walkNodes(node)) {
+    if (inner.type === 'ImportExpression' && inner.source?.type === 'Literal') {
+      specifiers.push(inner.source.value);
+    }
+  }
+  return specifiers;
+}
+
+/** Static and lazy are separate questions: a chunked module is imported one way, not the other. */
+export function importsModule(node, specifier) {
+  return importedModules(node).includes(specifier);
+}
+
+export function importsModuleLazily(node, specifier) {
+  return lazilyImportedModules(node).includes(specifier);
+}
+
+/** Anywhere, property keys and member names included, which is what makes an absence sound. */
+export function referencesIdentifier(node, name) {
+  return identifierNames(node).has(name);
+}
+
+/** Whether a subtree declares `const <name>`, wherever the declaration sits. */
+export function declaredConstant(node, name) {
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'VariableDeclaration' || inner.kind !== 'const') continue;
+    if (inner.declarations.some((declarator) => declarator.id?.name === name)) return true;
+  }
+  return false;
 }

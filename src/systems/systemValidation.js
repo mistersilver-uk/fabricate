@@ -68,20 +68,18 @@
 
 import { evaluateEnvironmentReadiness } from '../ui/svelte/apps/manager/environment/environmentReadiness.js';
 import { evaluateRecipeReadiness } from '../ui/svelte/apps/manager/recipe/recipeReadiness.js';
+import { diceEngine } from '../utils/rollFormulaRollability.js';
 import {
   routedTierOptionsForPolicy,
   routedOutcomeTierNames,
 } from '../utils/routedOutcomeKeywords.js';
+import { trimString as trimmed } from '../utils/scalars.js';
 
 import { ResolutionModeService } from './ResolutionModeService.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
-}
-
-function trimmed(value) {
-  return typeof value === 'string' ? value.trim() : '';
 }
 
 /**
@@ -163,7 +161,10 @@ function projectRecipe(recipe) {
  */
 function isRecipeIncomplete(recipe, raw) {
   if (typeof recipe?.validate === 'function' && typeof recipe?.validateStructure === 'function') {
-    return recipe.validate().valid === false && recipe.validateStructure().valid === true;
+    const injected = { Roll: diceEngine() };
+    return (
+      recipe.validate(injected).valid === false && recipe.validateStructure(injected).valid === true
+    );
   }
   const steps = asArray(raw?.steps);
   if (steps.length > 0) {

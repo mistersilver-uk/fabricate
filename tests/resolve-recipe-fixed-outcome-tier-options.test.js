@@ -1,10 +1,5 @@
-// Unit tests for resolveRecipeFixedOutcomeTierOptions — the pure helper that resolves
-// the recipe editor's "Minimum success tier" dropdown options. Success tiers of a
-// FIXED-type routed crafting check only, ranked ascending by `start`; gated on the
-// system's real `routedByCheck` resolution mode (the min-tier gate is only threaded
-// through the routedByCheck runtime path — routedByIngredients shares the routed
-// check config but never reads the field). Every other case yields [] so the control
-// auto-hides.
+// Unit tests for resolveRecipeFixedOutcomeTierOptions — the pure helper that resolves the recipe
+// editor's "Minimum success tier" dropdown options.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 

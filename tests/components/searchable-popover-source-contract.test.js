@@ -1,12 +1,5 @@
 /**
- * The END STATE of the `.manager-travel-picker` conversion, and the contract its trigger
- * capability creates (issue 1458).
- *
- * ── WHERE THE FIVE SHARED CLAUSES LIVE ──────────────────────────────────────────────────
- * `tests/helpers/primitiveAdoptionContract.js`, shared with `field-source-contract.test.js`
- * and `manager-filter-bar-source-contract.test.js`. That file records why those five questions
- * are shared and why they are NOT the ones `tests/helpers/primitiveSourceContract.js` asks.
- *
+ * The END STATE of the `.manager-travel-picker` conversion.
  * The short version is sharper here than anywhere it has been so far, because this contract
  * class is a prefix of FOUR other real classes that ship on real elements —
  * `.manager-travel-picker-value` on the trigger's label span, `.manager-travel-picker-trigger`
@@ -14,74 +7,26 @@
  * `.manager-travel-picker-inline-close` on its dismiss button. A `\b`-terminated token pattern
  * matches before a hyphen and would count every one of them; the factory's
  * `classTokenPattern` terminates `(?![\w-])` and does not. The family is broader still:
- * `manager-travel-parties*`, which `GatheringPartiesTab` writes on nine raw elements, shares
- * the `manager-travel` stem and has nothing to do with this primitive.
- *
- * ── THE NAMING DEBT THIS FILE PINS RATHER THAN FIXES ────────────────────────────────────
- * `.manager-travel-*` is a legacy World › Travel name that now carries the manager's ONE
- * picker: 113 rules in `styles/fabricate.css` name it, and every one of them is scoped under
- * `.fabricate-manager`. That misnomer is knowingly SPREAD by this change and not renamed by
- * it, and the ordering is the argument: converting CONCENTRATES the debt, because the family
- * stops being written by hand-rolled call sites and starts being written by one component, so
- * a rename afterwards touches the primitive plus the sheet while a rename now would touch
- * every site. The clauses below are what makes that concentration real — they refuse a new
- * raw writer of the class — so the later rename has exactly one producer to retarget.
- *
- * ── AND THE CLAUSES THAT EARN THIS FILE ─────────────────────────────────────────────────
- * Two, and both are about the popover's ARIA contract rather than its markup:
- *
- *  - Every call site names BOTH surfaces. `triggerAriaLabel` or a visible `triggerLabel` names
- *    the button; `dialogAriaLabel` names the portaled `role="dialog"` AND the `role="listbox"`
- *    inside it, because the primitive passes that one string to both, and
- *    `dialogAriaLabelledBy` names the same pair by POINTER for a site that has a caption
- *    rather than a string (issue 1504). A site that passes neither renders an unnamed dialog
- *    containing an unnamed listbox, which is invisible in a frame, is not a compiler error and
- *    is not an ESLint rule. One shipped site was exactly that — `ComponentIdentityStrip`'s
- *    source-actions overflow menu — and this clause is what found it.
- *
- *    A SOURCE READ CANNOT FINISH THIS JOB once a PRIMITIVE composes the primitive. This clause
- *    reads the call site's text, so `Select`'s `dialogAriaLabel={label || ariaLabel}` is present
- *    and non-empty here while resolving to `''` at runtime for every one of ITS callers that
- *    names the control by a caption. The runtime half is
- *    `tests/components/select-mounted.test.js`'s "names the open panel and its listbox under
- *    both naming shapes", which asserts the rendered attributes.
- *  - `triggerHasPopup="listbox"` implies `showSearch={false}`. The capability exists because
- *    the ten hand-rolled popovers this primitive absorbs disagreed on what the trigger
- *    announces, and the disagreement tracked what each of them actually opened: a panel with a
- *    query field is a dialog, a bare list of choices is a listbox. Absorbing the difference as
- *    a prop makes it possible to announce `listbox` over a panel that renders a search field,
- *    which promises assistive technology a control the GM never gets. Nothing else can catch
- *    that: both spellings render, both pass every mounted assertion, and the defect is a
- *    sentence a screen reader says.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 
 import { parse } from 'svelte/compiler';
 
 import { measureImporters } from '../../scripts/lib/componentImporters.js';
 import { repoRoot } from '../helpers/sourceScan.js';
+import { declaredPropNames } from '../helpers/sveltePropsDeclaration.js';
 import {
+  SOURCES,
   definePrimitiveAdoptionContract,
   walkTemplate,
 } from '../helpers/primitiveAdoptionContract.js';
 
 const POPOVER_PATH = 'src/ui/svelte/components/SearchablePopover.svelte';
+const PANEL_PATH = 'src/ui/svelte/components/SearchablePopoverPanel.svelte';
 
-/**
- * The primitive itself, and it is the WHOLE allowlist.
- *
- * It is here for a structural reason rather than as a carve-out, and the reason is worth
- * stating because the sibling contract for `ManagerToolbar` records the opposite. That bar
- * emits its class from `class={classes}` — a bare identifier — so the raw-element detector,
- * which reads the `class` attribute's SOURCE TEXT, cannot see the token and the bar needs no
- * entry. This one writes ``class={`manager-travel-picker ${pickerClass}`}``, a template
- * literal with the token spelled out in it, so the detector counts it. Same primitive shape,
- * opposite answer, decided by how the class is interpolated.
- *
- * One site, pinned by exact count: the picker root is the only element in the component whose
- * class names this token, and a second would mean the primitive had grown a second root.
- */
+/** The primitive itself, and it is the WHOLE allowlist. */
 const RAW_ALLOWLIST = Object.freeze([
   Object.freeze({
     path: POPOVER_PATH,
@@ -94,22 +39,7 @@ const RAW_ALLOWLIST = Object.freeze([
   }),
 ]);
 
-/**
- * A synthetic source with a KNOWN raw-site count, driven through the detector by the factory.
- *
- * Deliberately written out rather than produced by a per-primitive factory function. The
- * sibling filter-bar contract builds two fixtures from one `detectorSource(tokens)` helper
- * because it registers two primitives in one file and the two fixtures differ only in their
- * tokens; there is one primitive here, and a second copy of that helper's shape would be new
- * duplicated lines on new code for no second caller.
- *
- * Every line of it discriminates something the detector must NOT count:
- *  - the prose mention, which is how this primitive documents itself;
- *  - `manager-travel-picker-value` and `manager-travel-parties`, the prefix and the stem-mate;
- *  - the `<SearchablePopover>` component tag, which is the converted shape;
- *  - the scoped rule at the bottom.
- * Two raw elements are left, and the lowering substitution converts one of them.
- */
+/** A synthetic source with a KNOWN raw-site count, driven through the detector by the factory. */
 const DETECTOR_FIXTURE = [
   '<!--',
   '  Prose mentioning manager-travel-picker, which is how this primitive documents itself.',
@@ -138,13 +68,9 @@ const popover = definePrimitiveAdoptionContract({
   // 23 call sites in 22 components as issue 1503 lands (21 in 20 before it; the two pickers
   // joined), and 24 in 23 as issue 1504 composes `components/Select.svelte` over it. Both
   // figures are the `<SearchablePopover>` component NODES this factory parses, not `grep` hits.
-  // 16 and 13 leave headroom for a conversion that merges two sites without letting a
-  // third of the corpus vanish unnoticed.
   callSiteFloor: 16,
   fileFloor: 13,
-  // Declared boolean props with a `false` default, so a bare attribute correctly sets them to
-  // `true`. The factory reads the primitive's own source and refuses a name it does not declare
-  // that way, so a `data-*` hook cannot be smuggled through this list.
+  // Declared boolean props with a `false` default.
   booleanProps: Object.freeze([
     'triggerChip',
     'inlineSearchTrigger',
@@ -152,17 +78,9 @@ const popover = definePrimitiveAdoptionContract({
     'compactOptionRows',
     'disabled',
     'triggerAriaDisabled',
-    // Issue 1503. `IconPicker` writes it as `ignoreScrollWithin={true}` rather than bare, which
-    // is identical at runtime — but the omission was forced by this list rather than chosen, and
-    // a list of the primitive's boolean props that is missing one is a trap for the next caller.
-    // The loop below still reads the primitive's own source and refuses a name it does not
-    // declare with a `false` default, so this is a declaration being recorded, not a widening.
+    // Issue 1503. `IconPicker` writes it as `ignoreScrollWithin={true}` rather than bare.
     'ignoreScrollWithin',
-    // Issue 1513's two, and they have DIFFERENT callers: `ComponentSourcesBar` writes
-    // `multiple` bare (which implies the gate), and `RecipeItemContentsTab` writes `stayOpen`
-    // bare without it — a single-value picker whose panel survives the choice. The loop below
-    // re-reads the primitive's own source, so recording a name it does not declare with a
-    // `false` default reds here rather than widening anything.
+    // Issue 1513's two, and they have DIFFERENT callers.
     'multiple',
     'stayOpen',
   ]),
@@ -192,17 +110,6 @@ const popover = definePrimitiveAdoptionContract({
  * The accessible name a `trigger` SNIPPET writes on the element that receives the primitive's
  * spread, or null (issue 1503).
  *
- * WHY THE SPREAD TARGET AND NOT "SOMEWHERE IN THE SNIPPET". The snippet may draw a whole shell
- * around the button — `EssenceSourceSelector`'s is a drop zone with an image tile and a clear
- * button beside it — and an `aria-label` on any of those names something that is not the
- * trigger. The element carrying `{...attributes}` IS the trigger, because that is the object
- * holding the primitive's `onclick`, its `aria-expanded` and the attachment that anchors the
- * panel to it.
- *
- * The snippet's source is re-parsed rather than pattern-matched. A tag-span regex cannot be
- * trusted here: these buttons carry template-literal `class` values and expression attributes,
- * and the `>` that ends the tag is not the first `>` in its text.
- *
  * @param {{snippetSource: (name: string) => string|null}} site an adoption call site.
  * @returns {string|null} the verbatim `aria-label` attribute source, or null.
  */
@@ -222,27 +129,7 @@ function snippetTriggerName(site) {
   return found;
 }
 
-/**
- * ISSUE 1513'S TWO CAPABILITIES ARE DEFAULT-OFF, AND THAT IS ASSERTED AS A CONJUNCTION.
- *
- * A quantifier alone ("every importer renders unchanged") is not measurable from a source read,
- * so the claim is split into the two halves that ARE:
- *
- *   (a) the primitive declares `multiple = false` and `stayOpen = false` — checked by the
- *       valueless-attribute clause's own loop above, which re-reads the primitive's source and
- *       refuses to exempt a name it does not find declared that way; and
- *   (b) NO importer other than the adopters named here passes either prop, which is this clause.
- *
- * The population is `scripts/lib/componentImporters.js` — the same measurement the design-system
- * register's membership bar uses — because "no OTHER importer" is a claim about the import
- * graph. The ANSWER, though, is read from the component walk's parsed call sites: an importer
- * that passes a prop does it on a `<SearchablePopover>` node, so the two measurements have to
- * agree about the file set and only the AST can say what a node actually passes. The clause
- * asserts that agreement rather than assuming it.
- *
- * ADOPTERS ARE PINNED BY EXACT SET rather than by count. A new caller is a decision about the
- * capability's spread and belongs in a diff that says so.
- */
+/** ISSUE 1513'S TWO CAPABILITIES ARE DEFAULT-OFF, AND THAT IS ASSERTED AS A CONJUNCTION. */
 const MULTI_SELECT_ADOPTERS = Object.freeze([
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
   // The link-recipe picker, which takes the GATE ALONE (issue 1513, phase 4). Linking stays one
@@ -272,18 +159,7 @@ function adopterFiles() {
 }
 
 test('`multiple` and `stayOpen` are passed by the adopters alone, so every other importer is unmoved', () => {
-  // THE READER IS THE AST, NOT THE FILE TEXT, and the difference is a defect this clause once
-  // had rather than a preference. It used to test each importer's WHOLE SOURCE against
-  // `/(?<![\w-])(multiple|stayOpen)(?![\w-])/`, which matches the words wherever they occur —
-  // and both adopters carry them in prose: `ComponentSourcesBar`'s docblock explains what
-  // `multiple` reads, and this very file's names are quoted in half a dozen comments across the
-  // tree. Measured: deleting the `multiple` attribute from `ComponentSourcesBar`'s call site
-  // left the clause 11/11 GREEN, because the paragraph above the call site still said the word.
-  // A pin that survives the deletion it exists to catch is decorative, and the two probes below
-  // were the same read and therefore vacuous in the same way.
-  //
-  // `site.attribute(name)` resolves against the parsed call site's OWN attributes, so a comment
-  // cannot satisfy it and a prop moved onto a wrapper cannot either.
+  // THE READER IS THE AST, NOT THE FILE TEXT.
   assert.deepEqual(
     adopterFiles(),
     [...MULTI_SELECT_ADOPTERS].sort((left, right) => left.localeCompare(right)),
@@ -292,12 +168,7 @@ test('`multiple` and `stayOpen` are passed by the adopters alone, so every other
       'is a decision about where a multi-selectable listbox is announced'
   );
 
-  // THE POPULATION IS STILL EVERY IMPORTER, asserted rather than assumed. The component walk the
-  // call sites come from and the import graph are two different measurements, and this clause is
-  // a claim about the second: "no OTHER importer passes either prop". So the graph has to be
-  // alive — a floor, because an `importersOf` that returned nothing would leave the deepEqual
-  // above quantifying over a corpus this file never checked — and every adopter has to be in it,
-  // which is what says the two measurements are looking at the same set of files.
+  // THE POPULATION IS STILL EVERY IMPORTER.
   const importers = measureImporters(repoRoot).importersOf(POPOVER_PATH);
   assert.ok(
     importers.length >= 20,
@@ -311,10 +182,7 @@ test('`multiple` and `stayOpen` are passed by the adopters alone, so every other
       'the import graph disagree about which files this contract is over'
   );
 
-  // NON-VACUITY, on the reader rather than on the result: an `attribute()` that resolved nothing
-  // would make the deepEqual above pass the day the adopter list emptied, and one that resolved
-  // everything would fail loudly, which is the safe direction. This pins the first, once per
-  // prop, because the two adopters no longer both carry both names.
+  // NON-VACUITY, on the reader rather than on the result.
   assert.ok(
     popover.callSites.some((site) => site.file === MULTIPLE_ADOPTER && site.attribute('multiple')),
     'the reader must find a `multiple` ATTRIBUTE on the call site in the one file that passes ' +
@@ -328,11 +196,48 @@ test('`multiple` and `stayOpen` are passed by the adopters alone, so every other
   );
 });
 
+/**
+ * The primitive's `$props()` destructure, verbatim — the opening `let {` through the closing
+ * `} = $props();`.
+ */
+function propsBlock() {
+  const source = SOURCES[POPOVER_PATH] ?? '';
+  const closer = '} = $props();';
+  const start = source.indexOf('  let {');
+  const end = source.indexOf(closer, start);
+  assert.ok(start !== -1 && end > start, `${POPOVER_PATH} declares no \`let { … } = $props()\``);
+  return source.slice(start, end + closer.length);
+}
+
+/** The destructure as it stood before the panel was extracted (issue 1719). */
+const PROPS_BLOCK_DIGEST = 'e01ee104cdd7442f362b3e569cdf14c3d62d2fccf399b176bdf72181ea0d69c0';
+const PROPS_BLOCK_NAMES = 59;
+
+test('the declared prop surface is byte-identical to the pre-decomposition block', () => {
+  // Why a digest and not a list. The decomposition at issue 1719 moved two thirds of this
+  // component out of it, and the one thing it must not have moved is what its 24 importers pass:
+  // a name, an order or a default silently changed here is a behaviour change at every one of
+  // them, and the mounted suites would keep passing because they pass their props by name. A
+  // names-only assertion cannot see a changed default and a sorted one cannot see a reordering,
+  // so the whole block is compared; the count below is the readable half of the same claim.
+  const block = propsBlock();
+  assert.equal(
+    declaredPropNames(block + '\n').length,
+    PROPS_BLOCK_NAMES,
+    'the number of declared props changed, so the public surface changed'
+  );
+  assert.equal(
+    createHash('sha256').update(block).digest('hex'),
+    PROPS_BLOCK_DIGEST,
+    'the `$props()` destructure is no longer byte-identical to the block this component shipped ' +
+      'before its panel was extracted. A decomposition must not touch it. If the surface is ' +
+      'meant to change, re-derive this digest in the same commit and say which name, order or ' +
+      `default moved and why. The block read:\n${block}`
+  );
+});
+
 test('the snippet-trigger naming route reads the element the spread lands on', () => {
-  // NON-VACUITY, and it is the whole reason this route can be trusted: the two pickers are the
-  // only sites that take it, so a reader that silently found nothing would push them into the
-  // `unnamed` list — the failing direction, which cannot hide — while a reader that returned a
-  // constant would let a nameless snippet pass. This clause pins the reader against both.
+  // NON-VACUITY, and it is the whole reason this route can be trusted.
   const snippetSites = popover.callSites.filter((site) => site.snippetSource('trigger'));
   assert.equal(
     snippetSites.length,
@@ -394,11 +299,34 @@ test('the snippet-trigger naming route reads the element the spread lands on', (
   );
 });
 
+test('the anchor the picker hands its panel is what the panel positions against', () => {
+  // One chain across two files (issue 1719). The picker owns the trigger element and the panel owns
+  // the attachment, so the fact `anchoredPopover` is measured against the trigger — not the picker
+  // root, and not a `triggerButton` options object — is now two spellings that have to agree. A
+  // mounted assertion cannot see the difference: happy-dom returns a zero-valued
+  // `getBoundingClientRect` for either node, so the panel lands at the same place when it is wrong.
+  const picker = SOURCES[POPOVER_PATH] ?? '';
+  const panel = SOURCES[PANEL_PATH] ?? '';
+  assert.match(
+    picker,
+    /anchor=\{triggerElement \?\? pickerRoot\}/,
+    `${POPOVER_PATH} no longer hands the panel the trigger element, falling back to its own root`
+  );
+  assert.match(
+    panel,
+    /trigger: anchor,/,
+    `${PANEL_PATH} no longer positions against the anchor it was handed, so the panel would be ` +
+      'measured against whatever the attachment defaults to'
+  );
+  assert.ok(
+    declaredPropNames(panel).includes('anchor'),
+    `${PANEL_PATH} no longer declares an \`anchor\` prop, so the regex above could match a ` +
+      'renamed local rather than the prop the picker actually passes'
+  );
+});
+
 test('every popover names its trigger and the panel that opens', () => {
-  // NON-VACUITY first, read through a different accessor than the factory's own floors: a
-  // broken `attribute()` would report every site as unnamed, which is the failing direction and
-  // cannot hide, while one that returned a constant would leave every site passing. The count
-  // is what tells those apart.
+  // NON-VACUITY first, read through a different accessor than the factory's own floors.
   assert.ok(
     popover.callSites.length >= 16,
     `only ${popover.callSites.length} call sites, so this clause has lost most of its domain`
@@ -406,38 +334,13 @@ test('every popover names its trigger and the panel that opens', () => {
 
   const unnamed = [];
   for (const site of popover.callSites) {
-    // The TRIGGER is named by `triggerAriaLabel` or by a visible `triggerLabel`, and either is
-    // enough: a button with text has an accessible name from its content. `triggerTitle` is
-    // deliberately NOT accepted — a `title` is a tooltip that some assistive technology reads
-    // as a name and some does not, so accepting it would let a site pass on a maybe.
-    //
-    // THE THIRD ROUTE (issue 1503): a site that hands the primitive a `trigger` SNIPPET renders
-    // its own button, and the primitive renders none — so `triggerAriaLabel` cannot name
-    // anything and would in fact be harmful, because it rides the spread and would override the
-    // name the snippet writes. Such a site names the button INSIDE the snippet, on the element
-    // the primitive's attributes are spread onto, and this clause asserts that rather than
-    // accepting the snippet's mere presence.
-    //
-    // A SOURCE READ IS NOT SUFFICIENT ON ITS OWN, and this file does not pretend otherwise. The
-    // spread runs LAST, so an `aria-label: undefined` key in the object the primitive hands the
-    // snippet would REMOVE the very attribute read here and this clause would still pass. The
-    // runtime half lives where it can be run: `icon-picker-mounted.test.js` and
-    // `essence-source-selector-keyboard-mounted.test.js` mount each picker and assert the
-    // RENDERED trigger's `aria-label`, its `title` and that a caller-set `disabled` survived —
-    // and `manager-mounted.test.js` has asserted `.essence-icon-picker-trigger`'s `title` since
-    // long before this route existed, which is the standing regression net for exactly this.
+    // The TRIGGER is named by `triggerAriaLabel` or by a visible `triggerLabel`.
     const triggerName =
       site.attribute('triggerAriaLabel') ??
       site.attribute('triggerLabel') ??
       snippetTriggerName(site);
     if (!triggerName) unnamed.push(`${site.file}: the trigger has no accessible name`);
-    // The PANEL is named by `dialogAriaLabel` or by `dialogAriaLabelledBy`, either of which the
-    // primitive passes to BOTH the portaled `role="dialog"` and the `role="listbox"` inside it.
-    // TWO ROUTES rather than one because a caller that renders a caption holds a POINTER and has
-    // no string to pass; resolving one to `''` is the defect, not choosing the other. Present
-    // AND non-empty on whichever route is taken: an empty value satisfies a presence check and
-    // names nothing, and an empty `aria-label` on a dialog is worse than omitting it, because it
-    // suppresses the element's other naming routes while contributing none of its own.
+    // The PANEL is named by `dialogAriaLabel` or by `dialogAriaLabelledBy`.
     const panelName = ['dialogAriaLabel', 'dialogAriaLabelledBy']
       .map((prop) => site.attribute(prop))
       .find((written) => written && !/=(""|'')$/.test(written));
@@ -461,9 +364,7 @@ test('every popover names its trigger and the panel that opens', () => {
 
 test('a popover announcing a listbox does not render a search field', () => {
   const withPopup = popover.callSites.filter((site) => site.attribute('triggerHasPopup'));
-  // The capability has to be REACHED for this clause to mean anything, and it is new — so a
-  // floor rather than a count, and a floor above zero. Four sites convert with it as this
-  // lands; at zero, the clause below quantifies over nothing and reports clean.
+  // The capability has to be REACHED for this clause to mean anything, and it is new.
   assert.ok(
     withPopup.length >= 4,
     `only ${withPopup.length} call sites pass triggerHasPopup, so this clause is vacuous`
@@ -472,8 +373,7 @@ test('a popover announcing a listbox does not render a search field', () => {
   const offenders = [];
   for (const site of popover.callSites) {
     const declared = site.attribute('triggerHasPopup');
-    // The default is `dialog`, which is truthful for a searchable panel, so an omission is
-    // correct by construction and is not this clause's business.
+    // The default is `dialog`, which is truthful for a searchable panel.
     if (!declared) continue;
     // The two informational values, and nothing else. `aria-haspopup` also accepts `menu`,
     // `tree` and `grid`, and this primitive renders none of those — a site asking for one
@@ -499,21 +399,11 @@ test('a popover announcing a listbox does not render a search field', () => {
 });
 
 test('a popover that renders no search field announces a listbox', () => {
-  // THE CONVERSE OF THE CLAUSE ABOVE, and it is a separate test rather than a second loop in it
-  // because it quantifies over a different population: that one reads the sites that DECLARE
-  // `triggerHasPopup`, this one reads the sites that suppress the search field. Checking only the
-  // first direction is what let one site ship the contradiction — `RecipeIngredientGroupCard`'s
-  // row-level `or…` menu passed `showSearch={false}` and no `triggerHasPopup`, so it took the
-  // `dialog` default while rendering the primitive's bare-listbox shape, and under the focus
-  // model its trigger announces `aria-haspopup="dialog"` beside `role="combobox"` and an
-  // `aria-controls` naming a `role="listbox"`. The other six search-suppressed sites all
-  // declare it, so the odd one out was invisible to every reader that looked at the rest.
+  // THE CONVERSE OF THE CLAUSE ABOVE.
   const suppressed = popover.callSites.filter(
     (site) => site.attribute('showSearch') === 'showSearch={false}'
   );
-  // A floor rather than a count, and above zero: at zero this clause quantifies over nothing and
-  // reports clean. Six sites suppress the field as issue 1503 lands, seven once issue 1504's
-  // `Select` joins them.
+  // A floor rather than a count, and above zero.
   assert.ok(
     suppressed.length >= 5,
     `only ${suppressed.length} call sites suppress the search field, so this clause is vacuous`
@@ -542,10 +432,6 @@ test('no call site restates a class the primitive emits itself', () => {
   // close is back. The raw-element clause cannot see it, because
   // `<SearchablePopover triggerClass="manager-travel-picker">` is a COMPONENT node and that
   // detector skips those by design.
-  //
-  // `manager-travel-picker-trigger` is NOT a restatement and three shipped sites pass it: it
-  // is a real, separate class in `styles/fabricate.css` that the primitive does not emit. The
-  // `(?![\w-])` termination is what tells the two apart.
   const emitted = [
     'manager-travel-picker',
     'manager-travel-popover',

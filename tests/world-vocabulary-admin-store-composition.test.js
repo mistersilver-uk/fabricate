@@ -1,24 +1,4 @@
-/**
- * The world vocabulary's numbers, through the REAL `createAdminStore` (issue 1392, epic 1357).
- *
- * ── WHAT THIS CLOSES, AND WHY NOTHING ELSE COULD ──────────────────────────────────────────
- * `adminStore.js` is a gateway file, and this change is bounded to ONE added executable line in
- * it: the recipe corpus that `buildWorldScopeState` is not otherwise handed. Every other
- * assertion about the reference count calls `buildWorldScopeState` directly with a `recipes`
- * argument of its own, so deleting that line leaves the whole suite green — measured, 501 tests
- * across 13 suites — while the product renders every world recipe category as `Unused` under a
- * red one-click delete. A bound nothing guards is a bound in name only.
- *
- * So this drives the composition rather than the leaf: the real store, the shared services
- * fixture, one recipe carrying a category and one world vocabulary entry naming it, and the
- * assertion is on the PUBLISHED `viewState`.
- *
- * ── AND WHY IT ASSERTS `silentlyDeletable` AS WELL AS THE COUNT ────────────────────────────
- * The count alone would let a fix that restored the number but not the gate pass. The consequence
- * of the missing line is not a wrong figure a GM might notice — it is a destructive affordance:
- * `0` publishes `silentlyDeletable: true`, which paints the row `Unused` under the immediate
- * delete and removes the confirm from a category forty recipes may be using.
- */
+/** The world vocabulary's numbers, through the REAL `createAdminStore` (issue 1392, epic 1357). */
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
 import test from 'node:test';
@@ -60,8 +40,7 @@ test('the published viewState carries a REAL world recipe-category reference cou
   const store = createAdminStore(services);
   try {
     // The publish is the tail of an ASYNC refresh, so a synchronous read of `viewState` sees the
-    // pre-publish shape. Selecting the fixture's system is what every other adminStore suite
-    // drives it with.
+    // pre-publish shape.
     await store.selectSystem('sys1');
     const vocabulary = get(store.viewState).worldScope.vocabulary;
 

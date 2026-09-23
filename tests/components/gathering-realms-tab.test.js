@@ -12,6 +12,8 @@ import {
   createSvelteCompiler,
   installComponentTestGlobals,
 } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertWholeHeaderDisclosure } from '../helpers/wholeHeaderDisclosure.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -51,6 +53,18 @@ function rows() {
   return target.querySelectorAll('.manager-travel-realms-row');
 }
 
+// The browse body every Manager browse pane uses: a full-bleed filter bar, then the inset scroller.
+function assertBrowseBody(contentSelector, site) {
+  const panel = target.querySelector('[data-travel-panel="realms"]');
+  const scroller = panel.querySelector(':scope > .manager-table-scroll');
+  assert.ok(Boolean(scroller), `${site}: the panel's body is the shared .manager-table-scroll`);
+  assert.ok(Boolean(scroller.querySelector(contentSelector)), `${site}: ${contentSelector} sits inside the scroller`);
+  const toolbar = panel.querySelector('.fabricate-filter-bar');
+  assert.ok(Boolean(toolbar), `${site}: the filter bar renders`);
+  assert.ok(toolbar.parentElement === panel, `${site}: the filter bar is a direct child of the panel`);
+  assert.ok(!scroller.contains(toolbar), `${site}: the filter bar is not inside the scroller`);
+}
+
 describe('GatheringRealmsTab mounted behavior', () => {
   before(async () => {
     setupDOM();
@@ -59,15 +73,14 @@ describe('GatheringRealmsTab mounted behavior', () => {
     tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-realms-tab-'));
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
-    writeRawModule('src/ui/svelte/util/foundryBridge.js');
+    for (const modulePath of FOUNDRY_BRIDGE_RAW_MODULES) writeRawModule(modulePath);
     // The lifted browse view-state (issue 1438), imported by BOTH components below.
-    writeRawModule('src/utils/managerBrowserViewState.js');
+    writeRawModule('src/ui/model/managerBrowserViewState.js');
+    writeRawModule('src/ui/svelte/util/disclosurePhrase.js');
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     for (const modulePath of SEARCHABLE_POPOVER_RAW_MODULES) writeRawModule(modulePath);
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
-    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the shared
-    // no-state primitive (issue 785) and the manager's ONE chip (issue 883) — spread rather
-    // than copied.
+    // Issue 1504: the shared `<Select>`'s whole compiled closure.
     for (const selectModule of SELECT_COMPILED_MODULES) {
       writeCompiledSvelte(selectModule);
     }
@@ -133,6 +146,37 @@ describe('GatheringRealmsTab mounted behavior', () => {
     remount();
   });
 
+  it('lays the populated, empty and no-match states on the shared browse body', async () => {
+    await mountTab({ realms: [makeRealm({ id: 'r1', name: 'Northreach' })] });
+    assertBrowseBody('.manager-travel-realms-list', 'populated');
+    remount();
+
+    await mountTab({ realms: [] });
+    assertBrowseBody('[data-travel-realms-empty]', 'empty');
+    remount();
+
+    await mountTab({ realms: [makeRealm({ id: 'r1', name: 'Northreach' })] });
+    const search = target.querySelector('input[type="search"]');
+    search.value = 'zzz';
+    search.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+    await tick();
+    flushSync();
+    assertBrowseBody('[data-travel-realms-empty]', 'no match');
+    remount();
+  });
+
+  it('keeps the pager outside the scroller, after it', async () => {
+    await mountTab({ realms: makeRealms(7) });
+    const pager = target.querySelector('.manager-pagination');
+    assert.ok(Boolean(pager), 'seven realms render a pager');
+    const panel = target.querySelector('[data-travel-panel="realms"]');
+    const scroller = panel.querySelector(':scope > .manager-table-scroll');
+    assert.ok(pager.parentElement === panel, 'the pager is a direct child of the panel');
+    assert.ok(Boolean(scroller) && scroller.nextElementSibling === pager, 'the pager follows the scroller');
+    remount();
+  });
+
   it('pages to the selected realm when it is on a later page', async () => {
     // 8 realms (2 pages of 6); r8 is on page 2. Selecting it should reveal it.
     await mountTab({ realms: makeRealms(8), selectedRealmId: 'r8' });
@@ -152,7 +196,7 @@ describe('GatheringRealmsTab mounted behavior', () => {
     });
     let header = target.querySelector('.manager-travel-realms-header');
     assert.equal(header.getAttribute('aria-expanded'), 'false');
-    assert.equal(target.querySelector('[data-manager-realm-editor]'), null);
+    assert.ok(!target.querySelector('[data-manager-realm-editor]'));
     header.click();
     flushSync();
     assert.deepEqual(selections, ['r1']);
@@ -177,6 +221,43 @@ describe('GatheringRealmsTab mounted behavior', () => {
     target.querySelector('.manager-travel-realms-header').click();
     flushSync();
     assert.deepEqual(toggles, ['']);
+    remount();
+  });
+
+  it('opens the realm row from its own header button, which names itself and resolves its region', async () => {
+    const selections = [];
+    await mountTab({
+      realms: [makeRealm({ id: 'r1', name: 'Northreach', environmentCount: 3, partyCount: 1 })],
+      selectedRealmId: '',
+      onSelectRealm: (id) => selections.push(id)
+    });
+    assertWholeHeaderDisclosure({
+      root: target,
+      header: target.querySelector('.manager-travel-realms-header'),
+      recordName: 'Northreach',
+      expanded: false,
+      chevronSelector: '.manager-travel-realms-chevron i',
+      site: 'the travel realm row, collapsed'
+    });
+    target.querySelector('.manager-travel-realms-header').click();
+    flushSync();
+    assert.deepEqual(selections, ['r1'], 'activating the header requests the selection');
+    remount();
+
+    await mountTab({
+      realms: [makeRealm({ id: 'r1', name: 'Northreach', environmentCount: 3, partyCount: 1 })],
+      selectedRealmId: 'r1'
+    });
+    const body = assertWholeHeaderDisclosure({
+      root: target,
+      header: target.querySelector('.manager-travel-realms-header'),
+      recordName: 'Northreach',
+      expanded: true,
+      chevronSelector: '.manager-travel-realms-chevron i',
+      site: 'the travel realm row, open'
+    });
+    assert.ok(body.matches('[data-manager-realm-editor]'), 'the controlled region is the editor body');
+    assert.ok(body.querySelector('[data-manager-realm-env-editor]'), 'and the editor renders inside it');
     remount();
   });
 });

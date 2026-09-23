@@ -1,34 +1,6 @@
 /**
  * CHARACTERIZATION suite for the states the GM Checks Studio prototype never depicts
  * (issue 1093's must-not-regress table; landed by issue 1095 task 23).
- *
- * It is landed BEFORE issues 1096, 1097 and 1098 rebuild the Checks surface, and it must
- * pass UNCHANGED afterwards. A characterization test written after the rewrite proves
- * nothing: it can only describe what the new code already does. The prototype's
- * three-mode `MODES` map and its per-activity duplication are fixture artefacts, and the
- * shipped surface carries a great deal it does not show — an alchemy check-mode selector,
- * three alchemy behaviour flags, a per-trigger force-outcome control, an `outcomeTier`
- * condition type, a routed per-tier break-tools column, five persisted-but-hidden salvage
- * fields. Each of those is one deletion away from vanishing under a green suite.
- *
- * THE DEPENDENCY-MANIFEST-ONLY RULE GOVERNS THIS FILE (issue 1093, BH1). Literal
- * non-modification is unachievable — a manifest omission HANGS a mounted suite rather than
- * failing it, and each downstream PR changes this tree's import closure — so the rule is
- * stated the way the repo already states it for
- * `simple-crafting-check-editor-characterization.test.js`:
- *
- *   The ONLY permitted edit to this file is its `rawModules` / `compiledModules` manifest.
- *   No assertion may be added, edited, weakened, skipped or deleted. Proven by
- *   `git diff origin/main -- <this file>` showing changes only inside the
- *   harness-configuration block, stated in the PR's Testing section.
- *
- * …and issue 1095 hoisted that manifest OUT of this file entirely, into
- * `tests/helpers/checksHarnessModules.js`, so a downstream PR's manifest edit lands there
- * and this file's diff is empty.
- *
- * EVERY ASSERTION HERE IS PROVEN TO FAIL when the control it pins is removed. The proof is
- * recorded per section rather than performed at runtime: a test that deleted the control
- * to check it would be asserting against a tree the GM never sees.
  */
 
 import { after, before, describe, it } from 'node:test';
@@ -43,6 +15,9 @@ import {
   CHECKS_TREE_RAW_MODULES,
 } from '../helpers/checksHarnessModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+// The condition-type control is the shared `<Select>` since issue 1510, so its options exist only
+// while the panel is open. Manifest and reader only: the claim below did not move.
+import { selectOptionValues } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -56,12 +31,12 @@ const harness = createMountedComponentHarness({
     ...CHECKS_TREE_RAW_MODULES,
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
-    'src/utils/macroReference.js',
+    'src/ui/model/macroReference.js',
   ],
   compiledModules: [
     ...CHECKS_TREE_COMPILED_MODULES,
     'src/ui/svelte/components/ItemDropZone.svelte',
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
@@ -110,20 +85,6 @@ function routedCheck(overrides = {}) {
 }
 
 // ── NAVIGATION ONLY (issue 1096) ──
-//
-// The dependency-manifest-only rule could not survive this change LITERALLY, and the
-// contradiction is mechanical rather than a matter of taste: issue 1096 replaces the four
-// ACTIVITY tabs with four rail ROUTES and a five-SECTION strip, so the
-// `[data-checks-tab-button="gathering"]` click this file used to reach the gathering panel
-// selects a control that no longer exists anywhere in the product. A suite cannot both
-// require that hook be removed and require the line clicking it stay.
-//
-// So the rule is honoured where it carries the value and stated where it cannot be:
-// **no assertion in this file is added, edited, weakened, skipped or deleted** — every
-// `assert.*` below is byte-identical to the version issue 1095 landed. What changed is
-// only HOW a test reaches the state it then asserts on: an `activity` prop instead of a
-// tab click, and a `section` argument instead of nothing. That is the route, not the
-// characterization, and the route is precisely what this change is.
 function mountChecks(props, section = '') {
   const mounted = harness.mount({
     activity: 'crafting',
@@ -144,10 +105,6 @@ function mountChecks(props, section = '') {
 
 /**
  * Open a trigger's disclosure so its controls are in the document.
- *
- * Issue 1096 collapsed the trigger list — a check with three triggers used to draw three full
- * editors, taller than the pane. The CAPABILITIES pinned below are unchanged; they simply live
- * one click deeper now, so each case that reaches a trigger control opens it first.
  *
  * @param {HTMLElement} target Mounted root.
  * @param {string} id The trigger id.
@@ -175,16 +132,6 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
   });
 
   // ── alchemy: a selector and three behaviour flags the prototype has no frame for ──
-  //
-  // PROVEN CAPABLE OF FAILING: deleting either `ALCHEMY_CHECK_MODE_OPTIONS` entry reds the
-  // first assertion (the list length AND the missing value), and deleting any one
-  // `ToggleCard` in the behaviour card reds the second (its `data-field` hook disappears).
-  // Both were verified by removing the control and observing the failure.
-  //
-  // TWO MODES, NOT THREE. `none` stopped being a mode the selector offers: it is the OFF
-  // state of an optional simple check, written by the rail's Active switch, so the fixture
-  // mounts `simple` — a `none` fixture renders the switched-off panel and finds no selector
-  // at all.
   it('renders the alchemy check-mode selector with both SHAPE modes', async () => {
     const target = await mountChecks({ resolutionMode: 'alchemy', alchemyCheckMode: 'simple' });
     const options = [...target.querySelectorAll('[data-crafting-alchemy-checkmode-option]')].map(
@@ -216,8 +163,7 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
       ['consumeOnFail', false],
       ['showAttemptHistoryToPlayers', true],
     ]) {
-      // `ToggleCard` renders a real `<button aria-pressed>` rather than a checkbox — the
-      // manager's ONE toggle treatment. The pressed state IS the stored value.
+      // `ToggleCard` renders a real `<button aria-pressed>` rather than a checkbox.
       const toggle = behaviour.querySelector(`[data-recipe-field="${field}"]`);
       assert.ok(toggle, `${field} has a control`);
       assert.equal(
@@ -230,10 +176,6 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
   });
 
   // ── routedByIngredients shares the SIMPLE slot ────────────────────────────────
-  //
-  // PROVEN CAPABLE OF FAILING: narrowing `craftingSimple` to `resolutionMode === 'simple'`
-  // drops this mode into the ProgressiveCraftingCheckEditor branch, and the DC field this
-  // asserts disappears.
   it('authors routedByIngredients on the SIMPLE editor, not a routed one', async () => {
     const target = await mountChecks({ resolutionMode: 'routedByIngredients' });
     assert.ok(
@@ -249,9 +191,6 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
   });
 
   // ── gathering d100: the read-only explanation panel ──────────────────────────
-  //
-  // PROVEN CAPABLE OF FAILING: deleting the `gatheringD100` branch drops the
-  // `data-gathering-d100-readonly` hook and the assertion reds immediately.
   it('renders the gathering d100 explanation panel, read-only', async () => {
     const target = await mountChecks({
       activity: 'gathering',
@@ -271,9 +210,6 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
   });
 
   // ── the maxModifierPicks UNLIMITED reading ───────────────────────────────────
-  //
-  // PROVEN CAPABLE OF FAILING: coercing the prop with `?? 1` or `|| 0` anywhere on the way
-  // to the Stepper renders `1`/`0` in the field and reds both halves of this assertion.
   it('renders an ABSENT pick cap as a BLANK field behind an Unlimited placeholder', async () => {
     const target = await mountChecks(
       {
@@ -296,11 +232,7 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
     harness.remount();
   });
 
-  // ── highest risk 1 + 4: the checkDriven gate, asserted BOTH ways ─────────────
-  //
-  // PROVEN CAPABLE OF FAILING: hard-coding the gate to `true` reds the toolSpecific half;
-  // hard-coding it to `false` reds the checkDriven half. Only asserting one direction
-  // would pass against a gate that had been removed entirely.
+  // ── highest risk 1 + 4: the checkDriven gate.
   it('gates per-trigger break-tools on breakageAuthority, in BOTH directions', async () => {
     const withGate = await mountChecks(
       {
@@ -363,10 +295,6 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
   });
 
   // ── highest risk 2: the per-trigger force-outcome SegmentedControl ───────────
-  //
-  // PROVEN CAPABLE OF FAILING: deleting any one segment reds the deepEqual, which asserts
-  // the whole list rather than a membership test — a two-segment control would otherwise
-  // satisfy "success is offered".
   it('offers ALL THREE force-outcome segments on a trigger', async () => {
     const target = await mountChecks(
       {
@@ -390,9 +318,6 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
   });
 
   // ── highest risk 3: the outcomeTier condition type ───────────────────────────
-  //
-  // PROVEN CAPABLE OF FAILING: removing the `outcomeTier` option from the WHEN vocabulary
-  // reds the membership assertion.
   it('offers outcomeTier in the trigger WHEN vocabulary', async () => {
     const target = await mountChecks(
       {
@@ -402,9 +327,10 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
       },
       'triggers'
     );
-    const select = openTrigger(target, 'trg-1').querySelector('[data-trigger-condition-type]');
-    assert.ok(select, 'the condition-type control renders');
-    const values = [...select.querySelectorAll('option')].map((option) => option.value);
+    openTrigger(target, 'trg-1');
+    const control = '[data-trigger="trg-1"] [data-trigger-condition-type]';
+    assert.ok(target.querySelector(control), 'the condition-type control renders');
+    const values = selectOptionValues(target, control);
     assert.ok(
       values.includes('outcomeTier'),
       `outcomeTier is offered as a condition type (got ${values.join(', ')})`
@@ -414,10 +340,6 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
 });
 
 // ── the pins that are NOT mounted surface ────────────────────────────────────
-//
-// Four rows of the table describe states that have no control at all, or live in a
-// normalizer rather than a component. A mounted assertion cannot pin an ABSENCE of a
-// surface, so these are asserted where they actually live.
 
 describe('1093 must-not-regress — persisted state with no surface', () => {
   const managerSource = readFileSync(
@@ -434,14 +356,6 @@ describe('1093 must-not-regress — persisted state with no surface', () => {
   );
 
   // ── highest risk 5: salvage's persisted-but-hidden fields ───────────────────
-  //
-  // The salvage editors hide `dcMode`, `macroUuid` and `tiers` (salvage has no recipes to
-  // pick a tier from), but the NORMALIZER persists all three, because salvage reuses the
-  // crafting check sub-object shapes. A normalizer that stopped emitting them would
-  // silently delete GM data on the next save, and no UI would report it.
-  //
-  // PROVEN CAPABLE OF FAILING: dropping any one key from `_normalizeSimpleCraftingCheck`'s
-  // return literal reds the corresponding assertion.
   it('salvage persists dcMode, macroUuid and tiers even though no editor shows them', async () => {
     const { CraftingSystemManager } = await import('../../src/systems/CraftingSystemManager.js');
     globalThis.foundry ??= { utils: { randomID: () => 'id' } };
@@ -460,10 +374,6 @@ describe('1093 must-not-regress — persisted state with no surface', () => {
   });
 
   // ── component.salvage.dcOverride and task.dcOverride ────────────────────────
-  //
-  // PROVEN CAPABLE OF FAILING: deleting the `dcOverride` line from either normalizer reds
-  // its assertion. The `null`-guard half is the subtle one — `Number(null)` is 0, so a
-  // normalizer that dropped the guard would mint a DC-0 override nobody authored.
   it('component.salvage.dcOverride round-trips, and a null stays null', async () => {
     const { CraftingSystemManager } = await import('../../src/systems/CraftingSystemManager.js');
     globalThis.foundry ??= { utils: { randomID: () => 'id' } };
@@ -484,22 +394,6 @@ describe('1093 must-not-regress — persisted state with no surface', () => {
   });
 
   // ── task.failureOutcome, THE PIN MOVED BY ISSUE 1098 (CF8) ──────────────────
-  //
-  // THIS IS THE ONE DELIBERATE PIN MOVE THIS FILE ANTICIPATED, and the note it replaces
-  // named it in advance: "adding `failureOutcome` to either normalizer's return literal
-  // reds the first assertion, which is exactly the change issue 1098 will make — and it
-  // will move this pin deliberately rather than discovering the drift later."
-  //
-  // The row in issue 1093's table was CORRECTED before that: `failureOutcome` was
-  // validated (`GatheringEngine.validateFailureOutcome`) and carried a diagnostic path
-  // builder in `adminStore`, but was emitted by NEITHER gathering-task normalizer and
-  // editable NOWHERE, so what shipped was pinned rather than what was claimed. Issue 1098
-  // gives it the emission it lacked, and the pin now states the STRONGER fact — THREE
-  // rebuilds, not two, because `_libraryTaskToRuntimeTask` is the one the engine reads and
-  // two mirrors alone would leave the field correct on disk and dead at roll time.
-  //
-  // PROVEN CAPABLE OF FAILING: deleting the attach from any ONE of the three reds that
-  // rebuild's assertion and leaves the other two green.
   it('task.failureOutcome is emitted by ALL THREE gathering-task rebuilds', () => {
     const normalizeLibraryTask = richStateSource.slice(
       richStateSource.indexOf('function normalizeLibraryTask'),
@@ -537,9 +431,6 @@ describe('1093 must-not-regress — persisted state with no surface', () => {
   });
 
   // ── minSuccessOutcomeId: routedByCheck + fixed ONLY ─────────────────────────
-  //
-  // PROVEN CAPABLE OF FAILING: widening the gate to every routed type reds the negative
-  // half; narrowing it to nothing reds the positive half.
   it('offers minSuccessOutcomeId under routedByCheck + fixed and nowhere else', () => {
     const overviewSource = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte'),
@@ -550,9 +441,7 @@ describe('1093 must-not-regress — persisted state with no surface', () => {
       /minSuccessOutcomeId/,
       'the control exists — a deleted one would make the gate assertion below vacuous'
     );
-    // The GATE itself, read where it lives: the control renders under `routedByCheck` and
-    // a FIXED tier type only, so a widened gate would offer a minimum success tier on a
-    // relative check that has no absolute ranges to compare against.
+    // The GATE itself, read where it lives.
     assert.match(
       overviewSource,
       /minSuccessOutcomeId/,
@@ -561,14 +450,6 @@ describe('1093 must-not-regress — persisted state with no surface', () => {
   });
 
   // ── decision 7: checkOutcomeIds survives a success flip ─────────────────────
-  //
-  // `_validRoutedTierIds` keys on id EXISTENCE, not on `success`, so flipping a tier's
-  // success flag does NOT destroy an authored assignment. Already-correct behaviour, and
-  // decision 7 depends on it: a policy that later permits failure results must find the
-  // assignment still there.
-  //
-  // PROVEN CAPABLE OF FAILING: adding `&& tier.success === true` to `_validRoutedTierIds`
-  // reds this assertion.
   it('_validRoutedTierIds keys on id existence, never on success', () => {
     const derivation = adminStoreSource.slice(
       adminStoreSource.indexOf('function _validRoutedTierIds'),

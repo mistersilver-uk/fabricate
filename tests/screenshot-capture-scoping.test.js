@@ -1,12 +1,4 @@
-/*
- * Scoped `screenshots` capture profile (issue #826) — PURE unit coverage.
- *
- * These tests NEVER import `scripts/foundry-test-run.mjs`: it top-level-imports
- * playwright and autoruns `main()`, so importing it here would launch Chromium then
- * `process.exit()` — killing the whole `node --test` run (reported as `# cancelled`,
- * never `# fail`). They import the playwright-free routine-map module and source-grep
- * the harness instead (the `tests/ui-pr-screenshot-evidence.test.js` precedent).
- */
+/** Scoped `screenshots` capture profile (issue #826) — PURE unit coverage. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, readdirSync } from 'node:fs';
@@ -33,18 +25,54 @@ import {
   isD0SectionNeededForTargets,
 } from '../scripts/lib/screenshotCaptureMap.js';
 import { runFixturedScreenshotSection } from '../scripts/lib/smokeSectionFixture.js';
+import {
+  SMOKE_SOURCE,
+  SMOKE_SOURCE_FILES,
+  SMOKE_SOURCE_SEGMENTS,
+} from './helpers/interactablesSmokeLocators.js';
+import { SMOKE_SCENARIOS } from '../scripts/foundry-smoke/registry.mjs';
+import { SOURCES } from './helpers/primitiveAdoptionContract.js';
 
-const HARNESS = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
+/** Every scenario in the registry, groups and their children alike, in walk order. */
+function* flattenScenarios(scenarios) {
+  for (const scenario of scenarios) {
+    yield scenario;
+    yield* flattenScenarios(scenario.children ?? []);
+  }
+}
+
+const HARNESS = SMOKE_SOURCE;
+
+/** One smoke module's own text, so an ordered pin cannot be satisfied across a module boundary. */
+function smokeModule(fileSuffix) {
+  const at = SMOKE_SOURCE_FILES.findIndex((file) => file.endsWith(fileSuffix));
+  assert.ok(at >= 0, `no smoke module ends with ${fileSuffix}`);
+  return SMOKE_SOURCE_SEGMENTS[at];
+}
 const CAPTURE_MAP_SRC = readFileSync('scripts/lib/screenshotCaptureMap.js', 'utf8');
 const SECTION_FIXTURE_SRC = readFileSync('scripts/lib/smokeSectionFixture.js', 'utf8');
-// The two things that author click targets against the rendered manager: the Foundry smoke
-// harness and the View Lab case registry. A selector shape that is unclickable is unclickable
-// in both, so guards that can tell an unclickable control from a clickable one iterate this list
-// rather than naming one producer. (A guard that only approximates the shape has to be scoped to
-// the producer whose text it is known not to over-ban; the segment guard below does both.)
+// Every `.js` under the case directory, so an offender is reported against its authoring file.
+const CASE_FILE_DIRECTORY = 'scripts/lib/view-lab-cases';
+const CASE_FILES = readdirSync(CASE_FILE_DIRECTORY)
+  .filter((name) => name.endsWith('.js'))
+  .sort()
+  .map((name) => ({
+    path: `${CASE_FILE_DIRECTORY}/${name}`,
+    source: readFileSync(`${CASE_FILE_DIRECTORY}/${name}`, 'utf8'),
+  }));
+
+/** The one case file whose source holds `text`. */
+function caseFileHolding(text) {
+  const holders = CASE_FILES.filter(({ source }) => source.includes(text));
+  assert.equal(holders.length, 1, `exactly one case file must contain: ${text}`);
+  return holders[0];
+}
+
+// The things that author click targets against the rendered manager: the Foundry smoke harness and
+// the View Lab case files.
 const CAPTURE_PRODUCERS = [
   { path: 'scripts/foundry-test-run.mjs', source: HARNESS },
-  { path: 'scripts/lib/viewLabCases.js', source: readFileSync('scripts/lib/viewLabCases.js', 'utf8') },
+  ...CASE_FILES,
 ];
 const KNOWLEDGE_LABELS = [
   'manager-knowledge-owned-copies',
@@ -107,10 +135,12 @@ function writeScopedRunEvidence(results, changedFiles, frames = []) {
 
 function harnessFunctionSpan(start, end) {
   const match = HARNESS.match(new RegExp(
-    String.raw`function ${start}[^]*?(?=\n(?:async )?function ${end})`,
+    String.raw`function ${start}[^]*?(?=\n(?:export )?(?:async )?function ${end})`,
   ));
   assert.ok(match, `${start} harness function was not found`);
-  return match[0];
+  // The span can enclose later declarations, which are `export`ed now that the walk is modules;
+  // `new Function` compiles a script, where `export` is a syntax error.
+  return match[0].replaceAll(/^export (?=(?:async )?function )/gm, '');
 }
 
 const assertSingleToolMutation = new Function(
@@ -145,9 +175,8 @@ test('a broad styles/theme.css change scopes to theme-or-global-ui (6 core windo
   const views = mapChangedFilesToViews(['styles/theme.css']);
   assert.deepEqual(views.map(v => v.id), ['theme-or-global-ui']);
   const labels = smokeLabelsForChangedFiles(['styles/theme.css']);
-  // One frame per app-AREA shell plus the two manager archetypes (library vs editor),
-  // rather than several frames from one area. See the recipe's comment for why each
-  // earns its place; adding to this set costs every global change.
+  // One frame per app-AREA shell plus the two manager archetypes (library vs editor), rather than
+  // several frames from one area.
   assert.deepEqual(labels, [
     'manager-default-selection',
     'manager-components-normal',
@@ -196,8 +225,7 @@ test('Tool Studio frames are triggered only by Tool Studio files', () => {
   ]).map(v => v.id);
   assert.ok(own.includes('01-library-1280x720'), 'its own file must still trigger the set');
   assert.ok(own.includes('stress-wrapping-680'), 'stress frames too');
-  // The manager ROUTER hosts every manager view, so it is a global change, not a Tool
-  // Studio one.
+  // The manager ROUTER hosts every manager view, so it is a global change, not a Tool Studio one.
   const root = mapChangedFilesToViews([
     'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
   ]).map(v => v.id);
@@ -230,10 +258,8 @@ test("theme-or-global-ui's six labels are all reachable and span phase-D0 and ph
   for (const label of themeView.smokeLabels) {
     assert.ok(isCapturableLabel(label), `${label} unreachable`);
   }
-  // A scoped global run now needs BOTH phases, because the set covers the player app as
-  // well as the manager. That is the deliberate cost of the coverage: the old
-  // manager-only set could skip phase E precisely because it never looked at
-  // `.fabricate-app`.
+  // A scoped global run now needs BOTH phases, because the set covers the player app as well as the
+  // manager.
   const phases = phasesForTargetLabels(themeView.smokeLabels);
   assert.deepEqual([...phases].sort(), [CAPTURE_PHASE_D0, CAPTURE_PHASE_E].sort());
   assert.equal(isPhaseNeededForTargets(CAPTURE_PHASE_D0, themeView.smokeLabels), true);
@@ -420,9 +446,7 @@ test('the Foundry Map capture uses a deterministic click while View Lab retains 
   assert.match(mapInteraction, /await mapDestination\.click\(\)/);
   assert.doesNotMatch(mapInteraction, /\.press\('(?:Enter|Space)'\)/);
 
-  const viewLabCases = CAPTURE_PRODUCERS.find(
-    ({ path }) => path === 'scripts/lib/viewLabCases.js'
-  ).source;
+  const viewLabCases = caseFileHolding("id: 'manager-world-travel-long-label-focus'").source;
   const keyboardCaseStart = viewLabCases.indexOf(
     "id: 'manager-world-travel-long-label-focus'"
   );
@@ -440,31 +464,31 @@ test('the Foundry Map capture uses a deterministic click while View Lab retains 
 });
 
 test('Phase C seeds world modifiers and character prerequisites canonically before the settings-list action', () => {
-  const phaseCStart = HARNESS.indexOf("startPhase('phase-C')");
-  const gatheringStart = HARNESS.indexOf(
-    "await game.settings.set('fabricate', 'gatheringConfig'",
-    phaseCStart
+  const worldSeed = smokeModule('phase-c-system-fixture.mjs');
+  const d0Spine = smokeModule('d0-spine.mjs');
+  assert.ok(HARNESS.includes("startPhase('phase-C')"), 'phase C still opens its own phase');
+  const gatheringStart = worldSeed.indexOf(
+    "await game.settings.set('fabricate', 'gatheringConfig'"
   );
-  const systemPatchStart = HARNESS.indexOf('// Tools remain SYSTEM-OWNED', gatheringStart);
-  const systemPatchEnd = HARNESS.indexOf(
+  const systemPatchStart = worldSeed.indexOf('// Tools remain SYSTEM-OWNED', gatheringStart);
+  const systemPatchEnd = worldSeed.indexOf(
     '// Reference the deliberately-unlabelled tool',
     systemPatchStart
   );
-  const listStart = HARNESS.indexOf('// --- Settings-list ergonomics (issue 768) ---');
-  const firstAction = HARNESS.indexOf("locator('[data-toggle-modifier]')", listStart);
+  const listStart = d0Spine.indexOf('// --- Settings-list ergonomics (issue 768) ---');
+  const firstAction = d0Spine.indexOf("locator('[data-toggle-modifier]')", listStart);
   assert.ok(
-    phaseCStart >= 0 &&
-      phaseCStart < gatheringStart &&
+    gatheringStart >= 0 &&
       gatheringStart < systemPatchStart &&
       systemPatchStart < systemPatchEnd &&
-      systemPatchEnd < listStart &&
+      listStart >= 0 &&
       listStart < firstAction,
     'the Phase-C gathering patch, canonical system patch, and list action must remain strictly ordered'
   );
 
-  const gatheringPatch = HARNESS.slice(gatheringStart, systemPatchStart);
-  const systemPatch = HARNESS.slice(systemPatchStart, systemPatchEnd);
-  const beforeFirstAction = HARNESS.slice(listStart, firstAction);
+  const gatheringPatch = worldSeed.slice(gatheringStart, systemPatchStart);
+  const systemPatch = worldSeed.slice(systemPatchStart, systemPatchEnd);
+  const beforeFirstAction = d0Spine.slice(listStart, firstAction);
   const systemObjectMatch = gatheringPatch.match(/^(\s*)\[systemId\]: \{/m);
   assert.ok(systemObjectMatch, 'the Phase-C gathering fixture must retain its system object');
   const topLevelCharacterModifiers = new RegExp(
@@ -485,9 +509,8 @@ test('Phase C seeds world modifiers and character prerequisites canonically befo
 
   // Tools stay on the canonical `csm.updateSystem` system-scoped write; modifiers moved to the
   // WORLD `characterLibraries` setting (issue 1308/1311) and must NOT be a key of that same
-  // `updateSystem` payload any more — a regression back onto `system.modifiers` would silently
-  // stop feeding the World > Rules & Resources > Modifiers screen, which reads the world list
-  // only.
+  // `updateSystem` payload any more — a regression back onto `system.modifiers` would silently stop
+  // feeding the World > Rules & Resources > Modifiers screen, which reads the world list only.
   const updateSystemCallStart = systemPatch.indexOf('await csm.updateSystem(systemId, {');
   const updateSystemCallEnd = systemPatch.indexOf('});', updateSystemCallStart);
   assert.ok(
@@ -514,16 +537,15 @@ test('Phase C seeds world modifiers and character prerequisites canonically befo
   assert.match(characterLibrariesCall, /modifiers:\s*\[/);
   assert.match(characterLibrariesCall, /smoke-mod-herbalism/);
   assert.match(characterLibrariesCall, /smoke-mod-survival/);
-  // Character prerequisites moved to WORLD scope alongside modifiers (issue 1308/1311):
-  // the base 2-entry corpus must ride the SAME characterLibraries write, not a
-  // `characterPrerequisites` key on the system-creation payload — a regression there
-  // would silently stop feeding both the World > Rules & Resources > Character
-  // Prerequisites screen and the Tool Studio Requirements tab.
+  // Character prerequisites moved to WORLD scope alongside modifiers (issue 1308/1311): the base
+  // 2-entry corpus must ride the SAME characterLibraries write, not a `characterPrerequisites` key
+  // on the system-creation payload — a regression there would silently stop feeding both the World
+  // > Rules & Resources > Character Prerequisites screen and the Tool Studio Requirements tab.
   assert.match(characterLibrariesCall, /characterPrerequisites:\s*\[/);
   assert.match(characterLibrariesCall, /smoke-pre-trained/);
   assert.match(characterLibrariesCall, /smoke-pre-focused/);
 
-  const systemCreationPatch = HARNESS.slice(phaseCStart, gatheringStart);
+  const systemCreationPatch = worldSeed.slice(0, gatheringStart);
   assert.doesNotMatch(
     systemCreationPatch,
     /characterPrerequisites:\s*\[/,
@@ -554,7 +576,7 @@ test('manager stability counts populated system Travel realm and map rows', () =
       `${selector} must participate in overflow measurement`
     );
     assert.ok(
-      rowCountBlock.includes(`metric.selector === '${selector}'`),
+      rowCountBlock.includes(`'${selector}'`),
       `${selector} must satisfy the populated-row backstop`
     );
   }
@@ -644,38 +666,29 @@ test('a component-only target set runs ONLY components-checks; recipes is skippa
   assert.equal(isD0SectionNeededForTargets('gathering', targets), false);
 });
 
-// The bulk panel has FOUR sections and no single frame can hold them all, so issue 772
-// ships three: the staged frame and the pristine/unstaged frame on the essence-bearing
-// Arcane Forge, and the Progressive DC frame on the progressive system. The first two are
-// components-checks captures; the third rides the existing progressive walk position.
+// The bulk panel has FOUR sections and no single frame can hold them all, so issue 772 ships three:
+// the staged frame and the pristine/unstaged frame on the essence-bearing Arcane Forge, and the
+// Progressive DC frame on the progressive system.
 const BULK_EDIT_LABELS = [
   'manager-components-bulk-edit',
   'manager-components-bulk-edit-unstaged',
   'manager-components-bulk-edit-progressive',
 ];
 // Issue 1010 twins the surface in the Recipe Studio, whose panel has five axes and the same
-// impossibility: the pristine draft and a staged one are the same controls in exclusive
-// states, and the blocked-enable Callout exists only over a selection containing a refused
-// recipe. All three are recipes-section captures.
+// impossibility: the pristine draft and a staged one are the same controls in exclusive states, and
+// the blocked-enable Callout exists only over a selection containing a refused recipe.
 const RECIPE_BULK_EDIT_LABELS = [
   'manager-recipes-bulk-edit',
   'manager-recipes-bulk-edit-unstaged',
   'manager-recipes-bulk-edit-blocked',
 ];
-// The ONE shared scaffold all six route through (issue 1010 generalised it). The properties
-// that survive parameterisation are asserted against THIS body; the ones that became studio
-// data are asserted against the studio descriptors below, per studio.
+// The ONE shared scaffold all six route through (issue 1010 generalised it).
 const BULK_EDIT_SCAFFOLD = HARNESS.match(
   /async function captureBulkEditFrame\([\s\S]*?\n\}\n/,
 )?.[0];
 
 /**
  * One studio descriptor's source text.
- *
- * The selectors, the layout pin and the row-selection strategy moved OUT of the scaffold and
- * into these objects, so an assertion left pointing at the scaffold would pass by construction
- * — the literal it looks for can no longer appear there whatever the walk does. Each is
- * re-pinned here against the studio that owns it instead.
  *
  * @param {string} name The exported const name.
  * @returns {string|undefined} The `Object.freeze({ … })` body, or undefined when absent.
@@ -700,11 +713,9 @@ test('the issue-772 bulk-edit frames are scoped to the sections that can render 
     assert.equal(isD0SectionNeededForTargets(name, arcaneTargets), false, name);
   }
 
-  // The Progressive DC frame is gated on `componentDifficultyAxisProgressive`, which is
-  // false on Arcane Forge (routedByCheck crafting, routed salvage, d100 gathering) and
-  // true only on the deliberately-broken progressive system. That system already has a
-  // walk position in `overview-interactables`, so the frame reuses it rather than
-  // reconfiguring a system mid-walk — and therefore scopes to THAT section, not this one.
+  // The Progressive DC frame is gated on `componentDifficultyAxisProgressive`, which is false on
+  // Arcane Forge (routedByCheck crafting, routed salvage, d100 gathering) and true only on the
+  // deliberately-broken progressive system.
   const progressiveTargets = ['manager-components-bulk-edit-progressive'];
   assert.equal(isD0SectionNeededForTargets('overview-interactables', progressiveTargets), true);
   assert.equal(isD0SectionNeededForTargets('components-checks', progressiveTargets), false);
@@ -763,17 +774,8 @@ test('the issue-1010 recipe bulk-edit frames are scoped to the recipes section',
 test('the shared bulk-edit capture scaffold writes nothing and hands the rail back', () => {
   assert.ok(BULK_EDIT_SCAFFOLD, 'the bulk-edit capture scaffold was not found in the harness');
 
-  // NET-ZERO: the walk stages through the shipped controls and never presses Apply, so no
-  // component and no recipe is written and no later frame in the section sees a mutated
-  // fixture.
-  //
-  // Asserted over the WHOLE harness, per studio, rather than over the scaffold body. Under
-  // issue 1010's parameterisation the scaffold no longer names either Apply hook at all, so
-  // the shipped scaffold-scoped assertion became one that cannot fail however the walk
-  // behaves — and an Apply click would in any case be written in a `stage` callback at a call
-  // site, which is outside the scaffold. Both hooks are named because a guard that forbade
-  // only the component one would let a recipe-studio Apply through, which is the same defect
-  // one studio later.
+  // NET-ZERO: the walk stages through the shipped controls and never presses Apply, so no component
+  // and no recipe is written and no later frame in the section sees a mutated fixture (issue 1010).
   for (const applyHook of ['data-component-bulk-apply', 'data-recipe-bulk-apply']) {
     assert.equal(
       new RegExp(String.raw`${applyHook}\]'\)(?:\s*\.\w+\([^()]*\))*\s*\.click\(`).test(HARNESS),
@@ -788,20 +790,14 @@ test('the shared bulk-edit capture scaffold writes nothing and hands the rail ba
     false,
     'the bulk-edit state must be driven through the UI',
   );
-  // It goes through `captureStableManagerView`, as the plain browser frame beside it does, so
-  // the overflow and overlay guards run on the bulk state too rather than only the bare
-  // `screenshot()`. The layout itself is now the studio's, and is pinned per studio below.
-  assert.match(BULK_EDIT_SCAFFOLD, /captureStableManagerView\(page, \{ layout: studio\.layout, label \}\)/);
-  // The panel REPLACES the single-row inspector; a rail rendering both is a failure, not a
-  // frame. Nothing asserted this before it became shared, and it is the one property a
-  // second studio could plausibly get wrong.
-  assert.match(BULK_EDIT_SCAFFOLD, /studio\.displacedInspectorSelector\)\.count\(\) > 0/);
-  // The selection is cleared in a `finally`, so a failed capture cannot leave the rail
-  // showing the bulk panel for every following frame in the section — and a failed CLEAR is
-  // recorded as its own failed step rather than swallowed, because that leak is silent
-  // evidence corruption. It is recorded rather than thrown: throwing from this `finally`
-  // would mask an in-flight capture error and abort the rest of the section, while a
-  // recorded step failure is already fatal to the run.
+  // It goes through `captureStableManagerView`, as the plain browser frame beside it does, so the
+  // overflow and overlay guards run on the bulk state too rather than only the bare `screenshot()`.
+  assert.match(BULK_EDIT_SCAFFOLD, /captureStableManagerView\(ctx, \{ layout: studio\.layout, label \}\)/);
+  // The panel REPLACES the single-row inspector; a rail rendering both is a failure, not a frame.
+  assert.match(BULK_EDIT_SCAFFOLD, /studio\.displacedInspectorSelector\)\.count\(\)\) > 0/);
+  // The selection is cleared in a `finally`, so a failed capture cannot leave the rail showing the
+  // bulk panel for every following frame in the section — and a failed CLEAR is recorded as its own
+  // failed step rather than swallowed, because that leak is silent evidence corruption.
   assert.match(BULK_EDIT_SCAFFOLD, /\} finally \{[\s\S]*?studio\.clearSelector/);
   assert.match(
     BULK_EDIT_SCAFFOLD,
@@ -815,10 +811,9 @@ test('the shared bulk-edit capture scaffold writes nothing and hands the rail ba
 });
 
 test('each bulk-edit studio pins its own layout, selection control and teardown hooks', () => {
-  // The three literals the shipped scaffold-scoped assertions pinned — the layout, the row
-  // box selector and the `finally` clear — are studio DATA now, so they are re-pinned here
-  // against the studio that owns each one. Stated as a table so neither studio can be
-  // dropped by an edit that only remembers the other.
+  // The three literals the shipped scaffold-scoped assertions pinned — the layout, the row box
+  // selector and the `finally` clear — are studio DATA now, so they are re-pinned here against the
+  // studio that owns each one.
   const studios = [
     {
       name: 'COMPONENT_BULK_EDIT_STUDIO',
@@ -863,13 +858,10 @@ test('each bulk-edit studio pins its own layout, selection control and teardown 
 });
 
 test('the recipe bulk-edit frames pin their rows by NAME, not by position', () => {
-  // The failure this exists to refuse: `manager-recipes-bulk-edit-blocked` is about ONE row —
-  // the seeded off-and-un-enableable recipe that makes the panel's blocked count non-zero.
-  // Selecting positionally would stage Enable over two ordinary recipes and publish the frame
-  // with no Callout in it, while still satisfying every guard the scaffold has (two rows
-  // selected, a visible count readout, a mounted panel).
+  // The failure this exists to refuse: `manager-recipes-bulk-edit-blocked` is about ONE row — the
+  // seeded off-and-un-enableable recipe that makes the panel's blocked count non-zero.
   const blocked = HARNESS
-    .split('await captureBulkEditFrame(page, results, {')
+    .split('await captureBulkEditFrame(ctx, {')
     .slice(1)
     .find((candidate) => candidate.match(/label: '([^']+)'/)?.[1] === 'manager-recipes-bulk-edit-blocked');
   assert.ok(blocked, 'the blocked recipe bulk-edit call site was not found');
@@ -1012,19 +1004,10 @@ test('no capture producer clicks the hidden radio inside a SegmentedControl segm
   }
 
   // The derived ban is keyed on literal attribute names, and this harness spells exactly this
-  // family by interpolation — `` `[data-recipe-bulk-${axis}-option="unchanged"] input:checked` ``
-  // — so a new frame written in the harness's own established idiom, `` `[data-recipe-bulk-
+  // family by interpolation — `` `[data-recipe-bulk-${axis}-option="unchanged"] input:checked` `` —
+  // so a new frame written in the harness's own established idiom, `` `[data-recipe-bulk-
   // ${axis}-option="lock"] input` ``, contains no literal `data-recipe-bulk-lock-option` and the
-  // derived trap never sees it. That is precisely the defect that shipped. So the harness also
-  // gets a generic net over the SHAPE, independent of how the attribute name was assembled.
-  //
-  // HARNESS-ONLY, deliberately. `scripts/lib/viewLabCases.js` legitimately clicks
-  // `[data-crafting-modifier-policy-option="playerPicks"] input` and
-  // `[data-dc-mode-option="dynamic"] input`; both are `RadioCardGroup`, whose radio is a visible
-  // in-flow 16x16 control that is safe to click through, and banning the shape there would
-  // reinstate the over-ban this guard was rewritten to drop. Only the derived, component-keyed
-  // ban above — which knows a `SegmentedControl` from a `RadioCardGroup` — applies to both
-  // producers. The harness's only text of this shape today is the `:checked` sentinel.
+  // derived trap never sees it.
   const interpolationSafeTrap = /-option="[^"]*"\] input(?!:checked)/g;
   assert.deepEqual(
     HARNESS.match(interpolationSafeTrap) ?? [],
@@ -1033,66 +1016,196 @@ test('no capture producer clicks the hidden radio inside a SegmentedControl segm
   );
 });
 
-// ── The converted one-of-N controls (issue 1504) ──────────────────────────────────────────
-//
-// `locator.selectOption()` is Playwright's `<select>`-ONLY API. It does not degrade on any other
-// element: it throws. So the day a control stopped drawing the operating system's drop-down and
-// started drawing the app's own option list, every driver that reached it this way broke — and
-// the only thing that would have said so is a twenty-minute manual run against real Foundry,
-// which is the same blind spot the Checks-hook guard below exists for.
-//
-// The replacement is two clicks, the trigger then the row, and the row is addressed FROM THE
-// PAGE because `SearchablePopover` portals its panel to the nearest application root. That is
-// the part a later reader will want to "tidy" into a panel-scoped locator, which matches nothing
-// and fails as a 30-second actionability timeout rather than as a missing option — so the panel
-// class is checked against the product too.
+// The converted one-of-N controls (issue 1504). `locator.selectOption()` is Playwright's
+// `<select>`-ONLY API.
 const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-pagination-size',
   'data-scoped-list-sort',
   'data-scoped-list-filter',
   'data-recipe-bulk-category',
   'data-recipe-bulk-check-tier',
-  // ISSUE 1511 — the player app's six. `data-inventory-system-select` is the one the SMOKE
-  // already waits on, and the one whose hook survived a conversion by riding `triggerData` onto
-  // the trigger; `data-journal-sort` is the one that renders TWICE on one screen, which is why
-  // it is spelled here rather than left to a per-case locator.
+  // ISSUE 1511 — the player app's six.
   'data-inventory-system-select',
   'data-journal-sort',
   'data-crafting-category-filter',
   'data-crafting-system-filter',
   'data-inventory-sort',
   'data-inventory-page-size',
-  // ISSUE 1510 PHASE 1 — the manager's settings and tabs. `data-world-currency-strategy-select`
-  // is the one BOTH producers drive: the smoke walks it three times and the case registry twice,
-  // which is why the two `select:` steps and the three `selectOption` calls converted together.
+  // ISSUE 1510 PHASE 1 — the manager's settings and tabs.
   'data-world-currency-strategy-select',
   'data-world-currency-provider-select',
   'data-import-mapping-category',
   'data-prerequisite-operator',
   'data-economy-regen-policy',
   'data-economy-regen-unit',
+  // ISSUE 1510 PHASE 2, COMMIT 2a — the recipe studio. `data-recipe-field` is spelled WITH its
+  // value at the three cells that carry it, because the bare attribute is shared with the tab's
+  // inputs and textareas and a bare entry would ban driving those natively too.
+  'data-recipe-category-select',
+  'data-recipe-field="checkTierId"',
+  'data-recipe-field="minSuccessOutcomeId"',
+  'data-recipe-field="craftingModifierSet"',
+  'data-recipe-option-kind',
+  // Issue 1510 phase 2, commit 2b — the component studio. Each is spelled bare, checked rather than
+  // assumed: `data-component-edit-category` and `data-complication-trigger` are each a prefix of
+  // two further hooks, but both of those name a state paragraph and a clause wrapper rather than a
+  // control, so no bare entry here bans driving a native control that survives. `data-salvage-route`
+  // carries the outcome name as its value, so it has no fixed value to spell; and of the container
+  // hook `data-salvage-routing`, which wraps no native control.
+  'data-component-edit-category',
+  'data-salvage-route',
+  'data-salvage-dc-preset',
+  'data-complication-trigger',
+  'data-complication-roll-condition-cmp',
+  // Issue 1510 phase 2, commit 2c — the checks studio. Each is spelled bare, checked rather than
+  // assumed: no entry here is a prefix of a further hook on a native control that survives, and
+  // `data-trigger-tier-step`, `data-preview-against` and `data-checks-preview-as` are shorter
+  // container hooks wrapping none.
+  'data-checks-preview-record',
+  'data-trigger-condition-type',
+  'data-trigger-group',
+  'data-trigger-aggregate',
+  'data-trigger-operator',
+  'data-trigger-tier-step-target',
+  'data-preview-against-select',
+  'data-simple-band-record',
+  // Issue 1510 phase 2, commit 2d — the gathering task editor. `data-gathering-task-field` is
+  // spelled with its value, the bare attribute being shared with the core card's name input and
+  // description textarea. The four node hooks are bare, measured: of the family's seven attributes
+  // only `-interval` prefixes another, and what it prefixes is the converted unit trigger itself.
+  'data-gathering-task-field="defaultEnvironmentId"',
+  'data-gathering-task-node-deplete',
+  'data-gathering-task-node-respawn',
+  'data-gathering-task-node-interval-unit',
+  'data-gathering-task-node-gain-mode',
+  // Issue 1510 phase 2, commit 2e — the environment overview and the Tool rails.
+  // `data-environment-field` is spelled with its value, the bare attribute being shared with the
+  // identity card's name input, textarea, status toggle and two chip rows; `data-tool-preview-actor`
+  // is bare and prefixes nothing. The overview's two add controls are deliberately absent: each
+  // carries the chip row's own `data-chip-remove-fallback` rather than a hook of its own, and that
+  // attribute is on the rows and on three availability menus too.
+  'data-environment-field="dangerLevel"',
+  'data-tool-preview-actor',
+  // Issue 1510 phase 3, commit 3a — the systems, access and recipe-item browse toolbars. Each is
+  // spelled bare, checked rather than assumed: no entry here prefixes a hook on a native control
+  // that survives, and `data-access-filter` is not a prefix of `data-access-category-filter`. The
+  // systems status filter is deliberately absent — it carries no hook of its own, its own toolbar
+  // holding one filter, and the capture producer addresses it by `.manager-filter` instead.
+  'data-access-category-filter',
+  'data-access-filter',
+  'data-books-scrolls-status-filter',
+  'data-books-scrolls-type-filter',
+  'data-books-scrolls-cap-filter',
+  // Issue 1510 phase 3, commit 3c — the gathering task and event toolbars. None carries a hook or
+  // an `aria-label`, so each is spelled by the caption-id SUFFIX its trigger's `aria-labelledby`
+  // ends in, which is what a capture producer addresses it by. `-status-filter` is also the tail
+  // of the books-and-scrolls hook above and of two segmented controls' hooks, none a native select.
+  '-status-filter',
+  '-biome-filter',
+  '-availability-filter',
+  '-danger-filter',
+  // Issue 1510 phase 3, commit 3d — the recipe, component and essence toolbars. Each is spelled
+  // bare, checked rather than assumed: the three `-sort` hooks prefix their sibling direction
+  // buttons' `-sort-direction` hooks, which name buttons rather than native selects, and no entry
+  // here prefixes a hook on a native control that survives.
+  'data-recipe-category-filter',
+  'data-recipe-sort',
+  'data-component-category-filter',
+  'data-component-essence-filter',
+  'data-component-sort',
+  'data-essence-sort',
+  // Issue 1510 phase 3, commit 3e — the Tool library's sort, the vocabulary panel's sort and the
+  // recipe inspector's ingredient-set picker. `data-tool-sort-key` is not a bare `data-tool-sort`
+  // because that would prefix the sibling button's `data-tool-sort-direction`; the route hook is
+  // spelled with its value, the value naming which of the inspector's route controls it is.
+  'data-tool-sort-key',
+  'data-vocabulary-sort',
+  'data-recipe-route="ingredient-set"',
 ]);
+
+/**
+ * Every converted hook still names a control in `src/`.
+ * A renamed hook leaves a dead entry banning nothing, and the floor above cannot see it: renaming
+ * `data-tool-preview-actor` in the component left this whole file green, because the floor only
+ * needs three of the list to survive and forty-odd entries accumulated over five commits.
+ */
+function assertEveryConvertedHookResolves() {
+  // The `src/**/*.svelte` corpus is imported rather than walked again: every hook on the list is a
+  // component-emitted attribute, and one collector for the tree is one collector.
+  const sources = Object.values(SOURCES);
+  const missing = CONVERTED_SELECT_HOOKS.filter((hook) => {
+    // A valued hook is written `'data-x': 'y'` through `triggerData`, never as the literal
+    // attribute, so both spellings count as resolving it.
+    const valued = /^([^=]+)="(.+)"$/u.exec(hook);
+    const needles = valued ? [`'${valued[1]}': '${valued[2]}'`, hook] : [hook];
+    // A hook resolves only where it ENDS: `data-recipe-sort` is a prefix of the sibling button's
+    // `data-recipe-sort-direction`, which would otherwise keep a renamed sort hook resolving.
+    const patterns = needles.map(
+      (needle) => new RegExp(`${needle.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}(?![\\w-])`, 'u')
+    );
+    return !sources.some((source) => patterns.some((pattern) => pattern.test(source)));
+  });
+  assert.deepEqual(
+    missing,
+    [],
+    'these hooks name no control under `src/`, so the ban judges nothing and a capture step could ' +
+      'drive the renamed control with `selectOption` unchallenged'
+  );
+}
+
+/**
+ * Every `const <name> = …locator('<selector>')` binding in a producer, so a drive written against a
+ * binding is judged by the hook the binding carries. The clauses below read a 400-character
+ * look-back and this harness binds outside it: the tier-step target's hook is declared roughly 700
+ * characters above the drive that uses it (issue 1510). A name keeps EVERY selector bound to it,
+ * because a second walk re-declaring the name would otherwise hide the first drive behind it, and
+ * each binding resolves to its initializer's LAST `.locator()` hop — `page.locator('.card')
+ * .locator('[data-x]')` names the control, not the card, so a hook written on the last hop is judged.
+ */
+function locatorBindings(source) {
+  const bindings = new Map();
+  const pattern = /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*[^;]*\.locator\((['"`])((?:(?!\2).)*)\2\)/gu;
+  for (const match of source.matchAll(pattern)) {
+    bindings.set(match[1], [...(bindings.get(match[1]) ?? []), match[3]]);
+  }
+  return bindings;
+}
+
+/**
+ * Every selector a drive at `index` could be against: the chain's last `.locator(...)` hop, plus
+ * each selector bound to its RECEIVER where the call is written `<name>.selectOption(`. Both,
+ * never one — a binding resolves what the window cannot see, and the window resolves the hop a
+ * shadowed or unparsed binding would miss.
+ */
+function drivenLocators(source, index, bindings) {
+  const receiver = /([A-Za-z_$][\w$]*)\s*$/u.exec(source.slice(Math.max(0, index - 80), index));
+  const chain = source.slice(Math.max(0, index - 400), index);
+  const hops = [...chain.matchAll(/\.locator\((['"`])((?:(?!\1).)*)\1\)/gu)];
+  const bound = receiver ? (bindings.get(receiver[1]) ?? []) : [];
+  return [...new Set([...bound, hops.at(-1)?.[2] ?? ''])].filter(Boolean);
+}
 
 test('no capture producer drives a converted select with Playwright’s <select>-only API', () => {
   const offenders = [];
   let calls = 0;
   for (const producer of CAPTURE_PRODUCERS) {
+    const bindings = locatorBindings(producer.source);
     for (const match of producer.source.matchAll(/\.selectOption\(/g)) {
       calls += 1;
       // The locator chain that reaches the call, which may be spread over several lines. A
-      // window rather than a line, because the harness's own idiom wraps a long chain.
+      // window rather than a line, because the harness's own idiom wraps a long chain — and the
+      // RESOLVED locator beside it, for the drive written against a binding declared above it.
       const chain = producer.source.slice(Math.max(0, match.index - 400), match.index);
+      const resolved = drivenLocators(producer.source, match.index, bindings);
       for (const hook of CONVERTED_SELECT_HOOKS) {
-        if (!chain.includes(hook)) continue;
+        if (!chain.includes(hook) && !resolved.some((selector) => selector.includes(hook))) continue;
         offenders.push(`${producer.path}: \`${hook}\` is driven by .selectOption()`);
       }
     }
   }
-  // NON-VACUITY, both ways. `selectOption` must still appear somewhere — five capture steps and
-  // several smoke assertions drive genuinely native selects, every one of them the MANAGER'S
-  // since issue 1511 converted the player app's six, and all of them issue 1510's to retire — or
-  // this scan is reading a corpus with nothing in it to judge. And at least one converted hook
-  // must still be named by a producer, or the ban holds over an empty intersection.
+  // NON-VACUITY, both ways. `selectOption` must still appear somewhere — the smoke's two drives of
+  // the manager's crafting-system scope select, a residue control issue 1777 owns — or this scan
+  // is reading a corpus with nothing in it to judge.
   assert.ok(
     calls > 0,
     'no capture producer calls `selectOption` at all, so this guard is judging an empty set. ' +
@@ -1107,6 +1220,7 @@ test('no capture producer drives a converted select with Playwright’s <select>
       'floor of 3. A lower number means the hooks were renamed and this ban now names controls ' +
       'nothing drives.'
   );
+  assertEveryConvertedHookResolves();
   assert.deepEqual(
     offenders,
     [],
@@ -1124,48 +1238,37 @@ test('no capture producer drives a converted select with Playwright’s <select>
 // one lands as a 30-second Playwright actionability throw inside the `capture` job that publishes
 // this PR's own screenshot evidence — not as a red unit test. Eleven steps converted at issue
 // 1504, the player app's six joined the hook list at issue 1511, and issue 1510 is converting the
-// manager's — its first phase took the two `[data-world-currency-strategy-select]` steps, leaving
-// THREE native `select:` steps in the registry: the recipe category filter, the system Component
-// Rules list's essence filter and the system Tool Rules list's sort. All three are issue 1510's
-// later phases to retire, so the surface this clause covers is still shrinking towards zero.
+// manager's. Its first phase took the two `[data-world-currency-strategy-select]` steps; phase 2
+// took the gathering task editor's respawn policy in commit 2d and the environment overview's two
+// membership add controls in commit 2e, and phase 3 took the last, the system Tool Rules list's
+// sort, in commit 3e. No native `select:` step remains; this clause now stops one coming back.
 test('no View Lab step drives a converted select with the registry’s native `select:` verb', () => {
-  const registry = CAPTURE_PRODUCERS.find(
-    ({ path }) => path === 'scripts/lib/viewLabCases.js'
-  ).source;
   // The step's own literal shape: a `selector` string immediately followed by the `select:` key,
-  // which is how every one of these steps is authored. Reading the pair together is what lets the
-  // clause tell WHICH control a native verb was aimed at.
-  const steps = [
-    ...registry.matchAll(/\{\s*selector:\s*(['"`])([^'"`]*)\1\s*,\s*select:/g),
-  ];
+  // which is how every one of these steps is authored.
   const offenders = [];
-  for (const match of steps) {
-    const selector = match[2];
-    for (const hook of CONVERTED_SELECT_HOOKS) {
-      if (!selector.includes(hook)) continue;
-      offenders.push(`scripts/lib/viewLabCases.js: \`${selector}\` is driven by a \`select:\` step`);
+  let steps = [];
+  for (const { path, source } of CASE_FILES) {
+    const found = [...source.matchAll(/\{\s*selector:\s*(['"`])([^'"`]*)\1\s*,\s*select:/g)];
+    steps = [...steps, ...found];
+    for (const match of found) {
+      const selector = match[2];
+      for (const hook of CONVERTED_SELECT_HOOKS) {
+        if (!selector.includes(hook)) continue;
+        offenders.push(`${path}: \`${selector}\` is driven by a \`select:\` step`);
+      }
     }
   }
-  // THE NON-VACUITY FLOOR IS THE CONVERTED SET, NOT THE SURVIVING NATIVE ONE (issue 1510).
-  //
-  // It used to be `steps.length >= 4`: five `select:` steps survived and the clause asserted that
-  // at least four still did. That floor was WRITTEN TO BE RETIRED — its own message says "if the
-  // last native select has converted, delete this clause rather than leaving it green" — and this
-  // phase's two conversions (`[data-world-currency-strategy-select]`, twice) drop the count to
-  // three, so it would have red on a change that improved exactly what it guards.
-  //
-  // A floor over the SURVIVING natives shrinks to zero as this conversion finishes and takes the
-  // ban with it. A floor over the REPLACEMENT grows instead, and it quantifies over the same
-  // question: is there still a live population of registry select drives for the ban above to be
-  // judging? 14 `chooseSelectOption(` call sites at this phase's base, 16 after it. The floor is
-  // the base figure so the clause cannot red on the phase that raises it, and it is never lowered
-  // by a later phase — every remaining phase converts more steps onto the same helper.
+  const registry = CASE_FILES.map(({ source }) => source).join('\n');
+  // THE NON-VACUITY FLOOR IS THE CONVERTED SET, NOT THE SURVIVING NATIVE ONE (issue 1510). A floor
+  // over the SURVIVING natives shrinks to zero as this conversion finishes and takes the ban with
+  // it.
   const replacements = [...registry.matchAll(/chooseSelectOption\(/gu)];
   assert.ok(
-    replacements.length >= 14,
-    `only ${replacements.length} \`chooseSelectOption(\` call sites remain in the registry, ` +
-      'against a floor of 14. Converted steps were reverted to the native `select:` verb, or the ' +
-      'helper was renamed and this clause is now judging an empty set.'
+    replacements.length >= 22,
+    `only ${replacements.length} \`chooseSelectOption(\` occurrences remain in the registry, ` +
+      'against a floor of 22 — 21 call sites plus the definition in `caseFactories.js`, which the ' +
+      'glob reads too. Converted steps were reverted to the native `select:` verb, or the helper ' +
+      'was renamed and this clause is now judging an empty set.'
   );
   assert.deepEqual(
     offenders,
@@ -1178,93 +1281,6 @@ test('no View Lab step drives a converted select with the registry’s native `s
   );
 });
 
-// THE ELEMENT- AND ARIA-TYPED DRIVES THE BAN ABOVE CANNOT SEE (issue 1510).
-//
-// That ban is hook-adjacent and `.selectOption(`-only, and six of the nine manager selects the
-// smoke drives carry no `data-*` hook within its 400-character window at all: they are addressed
-// by element (`.manager-filter select`) or by aria (`select[aria-label="…"]`). Reverting one of
-// those to a converted control lands as a 30-second Playwright actionability timeout inside the
-// `capture` job that publishes a PR's own evidence, not as a red unit test.
-//
-// So the ban is extended the only way a static scan can be made falsifiable here: an ALLOWLIST of
-// the element-typed locators that still name a genuinely native `<select>`, shrink-only. A new
-// element-typed drive reds by construction, and each phase of this conversion DELETES the entries
-// it retires. When the list empties, this clause and its floor are deleted rather than left green.
-//
-// "SELECT-TYPED" MEANS A BARE `select` ELEMENT TOKEN, NEVER THE SUBSTRING.
-// `[data-manager-scope-select]`, `.manager-tools-sort-select` and `.manager-scope-select` all
-// contain the six letters and not one of them is a `<select>`; a substring test would ban three
-// locators the surviving native drives actually use. The token is matched with its own boundaries
-// and never after a `-` or a `_`.
-const NATIVE_SELECT_ELEMENT_TOKEN = /(?<![\w-])select(?![\w-])/u;
-
-// Every element- or aria-typed locator a capture producer still drives a NATIVE select through,
-// with the issue that retires it. Shrink-only: an entry leaves when its control converts.
-const NATIVE_ELEMENT_TYPED_SELECT_LOCATORS = Object.freeze([
-  // Issue 1510 Phase 3 — the browse toolbars' `.manager-filter` lane filters and the four
-  // environment browser filters, which carry their names in `aria-label` rather than in a hook.
-  '.fabricate-manager .manager-filter select',
-  '.fabricate-manager select[aria-label="Filter environments by status"]',
-  '.fabricate-manager select[aria-label="Filter environments by selection mode"]',
-]);
-
-test('no capture producer drives a converted select by an element-typed locator', () => {
-  const offenders = [];
-  const seen = new Set();
-  let elementTyped = 0;
-  for (const producer of CAPTURE_PRODUCERS) {
-    for (const match of producer.source.matchAll(/\.selectOption\(/gu)) {
-      // The LOCATOR is the argument of the LAST `.locator(...)` before the call: a chain built
-      // from several hops still ends on the one that names the element being driven. Reading the
-      // last quoted STRING instead picks up a comment or a fragment of the surrounding source,
-      // because the window is a character window rather than a parse.
-      //
-      // THE BODY IS "ANY RUN THAT IS NOT THE OPENING QUOTE", not "no quote of any kind". An
-      // aria-typed locator is written `'select[aria-label="…"]'` — a DOUBLE quote inside a
-      // SINGLE-quoted argument — and a `[^'"`]*` body cannot cross it, so the hop failed to match
-      // and every one of those drives read as the empty string. Four of the six element-typed
-      // drives in the harness are that shape, `elementTyped` measured 2 where it should measure
-      // 6, and the two aria entries in the allowlist below were dead. `(?:(?!\1).)*` is the
-      // backreference-aware body: it excludes only the quote character that opened the argument.
-      const chain = producer.source.slice(Math.max(0, match.index - 400), match.index);
-      const hops = [...chain.matchAll(/\.locator\((['"`])((?:(?!\1).)*)\1\)/gu)];
-      const locator = hops.at(-1)?.[2] ?? '';
-      if (!NATIVE_SELECT_ELEMENT_TOKEN.test(locator)) continue;
-      elementTyped += 1;
-      seen.add(locator);
-      if (NATIVE_ELEMENT_TYPED_SELECT_LOCATORS.includes(locator)) continue;
-      offenders.push(`${producer.path}: \`${locator}\``);
-    }
-  }
-  assert.ok(
-    elementTyped > 0,
-    'no capture producer drives any select by an element-typed locator, so the `select` element ' +
-      'token test above is quantifying over nothing. If the last one has converted, delete this ' +
-      'clause and its allowlist rather than leaving them green.'
-  );
-  // THE ALLOWLIST'S OWN DRIFT GUARD, and the clause that would have caught the regex above. An
-  // allowlist entry that matches no drive is not a harmless spare: it is either a locator that
-  // was rewritten without the entry being retired, or — as it was here — evidence that the scan
-  // cannot see the shape the entry describes. Shrink-only means an entry leaves when its control
-  // converts, and this is what makes "leaves" observable.
-  assert.deepEqual(
-    NATIVE_ELEMENT_TYPED_SELECT_LOCATORS.filter((locator) => !seen.has(locator)),
-    [],
-    'these allowlist entries match no element-typed drive in any capture producer. Either the ' +
-      'drive was rewritten and the entry must be deleted with it, or the scan has stopped ' +
-      'reaching the shape the entry names and the ban is passing on a producer it cannot read.'
-  );
-  assert.deepEqual(
-    offenders,
-    [],
-    'these capture steps drive a `<select>` by an ELEMENT-TYPED locator that is not on the ' +
-      'shrink-only native allowlist. Either the control converted and the drive must become the ' +
-      "harness's own `chooseSelectOption(page, trigger, { value })` — Playwright's " +
-      '`selectOption` throws on a `<button role="combobox">` — or a new native select was added, ' +
-      'which the design-system ratchet forbids:\n  ' + offenders.join('\n  ')
-  );
-});
-
 test('no capture producer reads a converted select back with an <input>-only API', () => {
   // `.inputValue()` is the same blind spot READ rather than driven: it is an `<input>`- and
   // `<select>`-only API and throws on a `<button role="combobox">`, and the hook-adjacent ban
@@ -1273,11 +1289,13 @@ test('no capture producer reads a converted select back with an <input>-only API
   const offenders = [];
   let readBacks = 0;
   for (const producer of CAPTURE_PRODUCERS) {
+    const bindings = locatorBindings(producer.source);
     for (const match of producer.source.matchAll(/\.inputValue\(/gu)) {
       readBacks += 1;
       const chain = producer.source.slice(Math.max(0, match.index - 400), match.index);
+      const resolved = drivenLocators(producer.source, match.index, bindings);
       for (const hook of CONVERTED_SELECT_HOOKS) {
-        if (!chain.includes(hook)) continue;
+        if (!chain.includes(hook) && !resolved.some((selector) => selector.includes(hook))) continue;
         offenders.push(`${producer.path}: \`${hook}\` is read back with .inputValue()`);
       }
     }
@@ -1295,14 +1313,7 @@ test('no capture producer reads a converted select back with an <input>-only API
   );
 });
 
-/**
- * Every `.test.js` under `tests/`, with `tests/helpers/select-control.js` deliberately absent.
- *
- * That module is where the two-click idiom is DEFINED, so it names a converted hook beside a
- * `[data-popover-option` on purpose and is the one file the clause below must not judge.
- *
- * @returns {Array<{path: string, source: string}>}
- */
+/** Every `.test.js` under `tests/`, with `tests/helpers/select-control.js` deliberately absent. */
 function suiteSources() {
   const suites = [];
   for (const entry of readdirSync('tests', { recursive: true, withFileTypes: true })) {
@@ -1314,17 +1325,10 @@ function suiteSources() {
 }
 
 test('no suite drives a converted select by an inline open-then-click of its own', () => {
-  // ACCEPTANCE 3'S SECOND HALF, and the reason it is a character window rather than a parse: in
-  // the reimplementation this exists to catch, the trigger hook and the option row sit on
-  // DIFFERENT lines — `openSelectPanel`'s two steps written out by hand — so a line-level scan
-  // sees neither beside the other. A legitimate post-open assertion naturally sits inside the
-  // same window as the helper call that opened the panel, so naming `chooseSelectOption(` or
-  // `openSelectPanel(` in the window is what tells the two apart.
-  //
-  // The idiom matters more than the keystrokes it saves. A hand-rolled open-then-click hard-codes
-  // the panel's portal root, its option-row attribute and its trigger class at every site, so the
-  // primitive cannot change any of the three without a sweep — which is exactly the position the
-  // capture producers were in before this conversion, and what the two helpers exist to prevent.
+  // ACCEPTANCE 3'S SECOND HALF, and the reason it is a character window rather than a parse: in the
+  // reimplementation this exists to catch, the trigger hook and the option row sit on DIFFERENT
+  // lines — `openSelectPanel`'s two steps written out by hand — so a line-level scan sees neither
+  // beside the other.
   const WINDOW = 400;
   const offenders = [];
   let windows = 0;
@@ -1357,7 +1361,7 @@ test('no suite drives a converted select by an inline open-then-click of its own
 
 test('the option list a capture producer clicks is rooted where the portal puts it', () => {
   const primitive = readFileSync('src/ui/svelte/components/Select.svelte', 'utf8');
-  const popover = readFileSync('src/ui/svelte/components/SearchablePopover.svelte', 'utf8');
+  const popover = readFileSync('src/ui/svelte/components/SearchablePopoverPanel.svelte', 'utf8');
   // Name-level, like the Checks guard below: the VALUES are option identities that vary per
   // world, and the names are what a rename would take away.
   assert.ok(
@@ -1367,16 +1371,11 @@ test('the option list a capture producer clicks is rooted where the portal puts 
   );
   assert.ok(
     popover.includes('data-popover-option'),
-    '`SearchablePopover.svelte` no longer writes `data-popover-option`, so the identity handle ' +
-      'every converted driver clicks by is on no row at all'
+    '`SearchablePopoverPanel.svelte` no longer writes `data-popover-option`, so the identity ' +
+      'handle every converted driver clicks by is on no row at all'
   );
 
-  // HARNESS-ONLY, on the `interpolationSafeTrap` precedent above. The registry legitimately
-  // writes the panel with an ancestor in front of it — `player-inventory-page-size`'s
-  // `expectSelector` asserts `.fabricate-app > .fabricate-select-popover…`, which is the
-  // portal TARGET being proved rather than a click being scoped. The harness has no such
-  // shape: every mention of the panel there is a click target, and a click target with a
-  // container in front of it is the failure this whole rewrite exists to avoid.
+  // HARNESS-ONLY, on the `interpolationSafeTrap` precedent above.
   const roots = [...HARNESS.matchAll(/(\w+)\.locator\(\s*['"`]\.fabricate-select-popover/g)];
   assert.ok(
     roots.length > 0,
@@ -1395,24 +1394,16 @@ test('the option list a capture producer clicks is rooted where the portal puts 
   }
 });
 
-// ── The Checks Studio's navigation hooks (issue 1096) ─────────────────────────────────────
-//
-// Issue 1096 replaced the four `data-checks-tab-button` ACTIVITY TABS with four rail routes and
-// a five-section strip. The smoke walk went on clicking the tabs and NOTHING failed: that hook
-// lived only in Svelte markup and in a Playwright selector string, so no unit test, lint rule or
-// type check ever saw the pair. The walk against real Foundry is the only thing that does, and
-// it is a manual twenty-minute run — which is how a whole surface's navigation came to be broken
-// on a branch whose CI was green.
-//
-// So both capture producers get a source-text contract: every `data-checks-*` attribute NAME
-// they navigate by must still be authored in the Checks Studio's own source. Name-level rather
-// than value-level, because the markup interpolates the values (`data-checks-panel={activity}`)
-// — and name-level is exactly the granularity this defect needed, since `data-checks-tab-button`
-// left `src/` altogether.
+// The Checks Studio's navigation hooks (issue 1096). Issue 1096 replaced the four
+// `data-checks-tab-button` ACTIVITY TABS with four rail routes and a five-section strip.
 const CHECKS_STUDIO_DIR = 'src/ui/svelte/apps/manager/checks';
 const CHECKS_STUDIO_SRC = [
   ...readdirSync(CHECKS_STUDIO_DIR).map((entry) => join(CHECKS_STUDIO_DIR, entry)),
   'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+  // The Checks rail entries and their issue badges are `ManagerSystemNav.svelte`'s (issue 1717).
+  'src/ui/svelte/apps/manager/ManagerSystemNav.svelte',
+  // `data-checks-save` is the page header's crafting action unit (issue 1720).
+  'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte',
 ]
   .map((path) => readFileSync(path, 'utf8'))
   .join('\n');
@@ -1422,8 +1413,6 @@ test('every Checks hook a capture producer navigates by is still shipped', () =>
     [...CHECKS_STUDIO_SRC.matchAll(/\b(data-checks-[\w-]+)/g)].map((match) => match[1]),
   );
   // A derived contract whose input set silently empties passes forever while checking nothing.
-  // These three are the routing spine — the view wrapper, the activity panel and the section
-  // strip — so their absence means the scan read the wrong files, not that the product changed.
   for (const anchor of ['data-checks-editor', 'data-checks-panel', 'data-checks-section-button']) {
     assert.ok(shipped.has(anchor), `the Checks Studio source scan found no ${anchor}`);
   }
@@ -1448,13 +1437,11 @@ test('every Checks hook a capture producer navigates by is still shipped', () =>
 
 test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () => {
   // Split rather than one lazy regex per label: a `[\s\S]*?label: '<wanted>'` starts at the
-  // EARLIEST call site and happily swallows the two before it, which would let a staging
-  // control from the staged frame satisfy — or here, break — an assertion about another.
-  // Each segment is then truncated at its own `});` terminator, which is the first line in
-  // it that is nothing but indentation and the closer.
+  // EARLIEST call site and happily swallows the two before it, which would let a staging control
+  // from the staged frame satisfy — or here, break — an assertion about another.
   const callOf = (label) => {
     const segment = HARNESS
-      .split('captureBulkEditFrame(page, results, {')
+      .split('captureBulkEditFrame(ctx, {')
       .slice(1)
       .find((candidate) => candidate.match(/label: '([^']+)'/)?.[1] === label);
     if (!segment) return null;
@@ -1468,14 +1455,16 @@ test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () =
   assert.match(staged, /data-bulk-tag-state="\$\{state\}"/);
   assert.match(staged, /data-component-bulk-essences\] \[data-component-edit-essence\] \[data-stepper-increment\]/);
 
-  // UNSTAGED: the pristine draft. Nothing is staged, so the ASSERTIONS are the state —
-  // Apply inert, and the essence chip on the unstaged face that is the only route to
-  // "clear essences on every selected component". It must not touch a staging control, or
-  // it would photograph the frame it exists to be the opposite of.
+  // UNSTAGED: the pristine draft. Nothing is staged, so the ASSERTIONS are the state — Apply inert,
+  // and the essence chip on the unstaged face that is the only route to "clear essences on every
+  // selected component".
   const unstaged = callOf('manager-components-bulk-edit-unstaged');
   assert.ok(unstaged, 'the unstaged bulk-edit call site was not found');
   assert.match(unstaged, /data-component-bulk-essences-staged="false"/);
-  assert.match(unstaged, /if \(!await bulkPanel\.locator\('\[data-component-bulk-apply\]'\)\.first\(\)\.isDisabled\(\)\)/);
+  assert.match(
+    unstaged,
+    /if \(!\(await bulkPanel\.locator\('\[data-component-bulk-apply\]'\)\.first\(\)\.isDisabled\(\)\)\)/
+  );
   for (const stagingControl of [
     'data-component-bulk-category-option',
     'data-bulk-tag',
@@ -1510,15 +1499,17 @@ test('a Tool Studio target runs only the dedicated persisted-net-zero tools sect
 });
 
 test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer coverage, and restoration', () => {
-  const toolStudioWalk = HARNESS.match(
-    /async function exerciseToolStudioPointerTargets[\s\S]*?(?=\n\/\*\*\n \* Close Foundry application windows)/,
+  const pointerTargets = smokeModule('d0-tools-pointer-targets.mjs');
+  const toolStudioWalk = pointerTargets.match(
+    /async function exerciseToolStudioPointerTargets[\s\S]*$/,
   )?.[0];
   assert.ok(toolStudioWalk, 'Tool Studio walk source was not found');
-  const managerSizing = HARNESS.match(
-    /async function setManagerWindowSize[\s\S]*?(?=\n\/\*\*\n \* Capture a manager view)/,
+  const lifecycle = smokeModule('pageOps/pageLifecycle.mjs');
+  const managerSizing = lifecycle.match(
+    /async function setManagerWindowSize[\s\S]*?(?=\n(?:export )?(?:async )?function )/,
   )?.[0];
   assert.ok(managerSizing, 'manager sizing helper source was not found');
-  const managerReadiness = HARNESS.match(
+  const managerReadiness = lifecycle.match(
     /async function waitForManagerApplicationRendered[\s\S]*?(?=\n\/\*\*\n \* Resize the rendered Crafting System Manager)/,
   )?.[0];
   assert.ok(managerReadiness, 'manager render-readiness helper source was not found');
@@ -1537,7 +1528,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     assert.match(
       toolStudioWalk,
       new RegExp(
-        String.raw`await resetToolStudioScroll\(page\);\s*await (?:captureToolStudioProduct\(page, '${label}', \w+\)|screenshot\(page, '${label}'(?:, \{[\s\S]*?\})?\));`
+        String.raw`await resetToolStudioScroll\(page\);\s*await (?:captureToolStudioProduct\(\s*ctx,\s*'${label}',\s*\w+\s*\)|screenshot\(page, '${label}'(?:, \{[\s\S]*?\})?\));`
       ),
       `${label} must reset the actual Tool Studio scroll owners immediately before capture`,
     );
@@ -1621,23 +1612,16 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(HARNESS, /typeof sourceSystem\?\.description === 'string'[\s\S]*?sourceSystem\.description\.value = parityDescription/);
   assert.match(
     HARNESS,
-    /normalized Tool snapshot[\s\S]*?description: 'A well-balanced forge hammer\. Durable, but the haft splinters when hard used\.'/,
+    /normalized Tool snapshot[\s\S]*?description:\s*'A well-balanced forge hammer\. Durable, but the haft splinters when hard used\.'/,
   );
-  // NAME-ASCENDING, THE WHOLE LIST, IN ORDER. This used to pin only that "Smith's Hammer"
-  // preceded 'Woodcarving Tools', which the fixture-authored order satisfies just as well —
-  // "Smith's Hammer" is upserted first there — so it could not tell the shipped
-  // `SORT BY [Name] [Asc]` default (issue 1373) from no sort at all. Pinning every name in
-  // sequence is what actually fails if the walk is "restored" to authored order.
+  // NAME-ASCENDING, THE WHOLE LIST, IN ORDER (issue 1373).
   assert.match(
     HARNESS,
     /const expectedToolNames = \[\s*"Alchemist's Supplies",\s*'Arcane Forge',\s*'Ley-Line Nexus',\s*"Master's Anvil",\s*'Moonwell',\s*"Smith's Hammer",\s*'Volcanic Vent',\s*'Woodcarving Tools',\s*\];/,
     'the parity library order must stay pinned name-ascending, not in fixture-authored order',
   );
-  // FIRST-RENDER EVIDENCE, ORDERED BY SOURCE POSITION rather than by a tool name the sort order
-  // now decides. Auto-selection has to be read after the order check (so the row it names is
-  // known) and before anything that touches the library — the sort-direction toggle included,
-  // since the effect behind it does not re-run for a selection that is still present, and before
-  // the first selection click, which would make it prove nothing at all.
+  // FIRST-RENDER EVIDENCE, ORDERED BY SOURCE POSITION rather than by a tool name the sort order now
+  // decides.
   const orderCheckIndex = toolStudioWalk.indexOf('Tool Studio parity library order drifted');
   const autoSelectionIndex = toolStudioWalk.indexOf('did not automatically select its first row');
   const sortToggleIndex = toolStudioWalk.indexOf('sortDirectionToggle.click()');
@@ -1671,21 +1655,14 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     HARNESS,
     /route transition asks ApplicationV2[\s\S]*?sourceViewport: \{ width: 1280, height: 720 \}/,
   );
-  // THE SYSTEM WALK MUST NOT AUTHOR IDENTITY (issue 1373). It used to drag a second world Item
-  // onto a `[data-tool-source-card]` drop target on THIS screen, which is a crafting system
-  // re-pointing which world Item a Tool IS — the capability the epic moved to the world Tool
-  // entry. The pin is inverted rather than deleted: the shape of what must not come back is what
-  // this assertion is for, and a deleted assertion states nothing.
+  // THE SYSTEM WALK MUST NOT AUTHOR IDENTITY (issue 1373).
   assert.doesNotMatch(
     toolStudioWalk,
     /data-tool-source-card|data-tool-source-copy-uuid|data-tool-source-unlink|dragTo\(sourceCard\)/,
     'the SYSTEM Tool walk must not drive an identity edit — that belongs to the world Tool entry',
   );
   assert.doesNotMatch(toolStudioWalk, /new DataTransfer|dispatchEvent\('drop'|data-tool-source-picker|manager-tool-source-replace/);
-  // THE THREE-TAB STRIP AND THE TWO NEW CONTROLS. `#tool-tab-overview` no longer exists, so a
-  // walk still naming it would fail on a missing locator rather than on a wrong screen; the
-  // inherit switch and the remove callout are pointer-tested rather than pressed, because both
-  // WRITE and would rewrite every parity frame captured after them.
+  // THE THREE-TAB STRIP AND THE TWO NEW CONTROLS.
   assert.doesNotMatch(toolStudioWalk, /tool-tab-overview/);
   assert.match(
     toolStudioWalk,
@@ -1702,7 +1679,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     /scrollToolEditorPanelToReveal\([\s\S]*?data-tool-remove-from-system[\s\S]*?manager-tool-parity-02-remove-1280x720/,
     'the remove-from-system frame must reveal the callout it exists to show',
   );
-  assert.match(HARNESS, /async function withSingleToolClipboardWrite[\s\S]*?copyToClipboard[\s\S]*?calls\?\.length === 1[\s\S]*?info\.length !== 1[\s\S]*?errors\.length !== 0/);
+  assert.match(HARNESS, /function withSingleToolClipboardWrite[\s\S]*?copyToClipboard[\s\S]*?calls\?\.length === 1[\s\S]*?info\.length !== 1[\s\S]*?errors\.length > 0/);
   assert.match(
     HARNESS,
     /async function assertToolLibraryPagination[\s\S]*?data-tool-library[\s\S]*?data-tool-library-scroll[\s\S]*?data-tool-browser-pagination[\s\S]*?await assertSelectionRetained\(\)[\s\S]*?DOCUMENT_POSITION_FOLLOWING[\s\S]*?footer moved when only the result list scrolled/,
@@ -1721,18 +1698,32 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   );
   assert.doesNotMatch(
     HARNESS,
-    /manager-tools-row:first-child'\)\?\.classList\.contains\('is-selected'\)/,
+    /manager-tools-row:first-child'\)\s*\?\.classList\.contains\('is-selected'\)/,
     'Tool library selection must never be pinned to row position again',
   );
   for (const paginationCall of [
-    "{ expectedTotal: 8, expectedPage: 1, expectFooter: false, selectedToolId: fixture.toolId }",
-    "{ expectedTotal: 8, expectedPage: 1, expectScrollable: true, expectFooter: false, selectedToolId: fixture.toolId }",
-    "{ expectedTotal: 9, expectedPage: 1, selectedToolId: fixture.toolId }",
-    "{ expectedTotal: 9, expectedPage: 1, expectScrollable: true, selectedToolId: fixture.toolId }",
+    ['expectedTotal: 8', 'expectedPage: 1', 'expectFooter: false', 'selectedToolId: fixture.toolId'],
+    [
+      'expectedTotal: 8',
+      'expectedPage: 1',
+      'expectScrollable: true',
+      'expectFooter: false',
+      'selectedToolId: fixture.toolId',
+    ],
+    ['expectedTotal: 9', 'expectedPage: 1', 'selectedToolId: fixture.toolId'],
+    [
+      'expectedTotal: 9',
+      'expectedPage: 1',
+      'expectScrollable: true',
+      'selectedToolId: fixture.toolId',
+    ],
   ]) {
-    assert.ok(
-      toolStudioWalk.includes(paginationCall),
-      `Tool pagination call ${paginationCall} must name the selected Tool`,
+    // Matched field by field rather than as one spelling: Prettier puts each field on its own line.
+    const shape = new RegExp(paginationCall.map((field) => `${field},?`).join(String.raw`\s*`));
+    assert.match(
+      toolStudioWalk,
+      shape,
+      `Tool pagination call {${paginationCall.join(', ')}} must name the selected Tool`,
     );
   }
   const issue800Search = HARNESS.indexOf("getByRole('searchbox', { name: 'Search components' })");
@@ -1752,12 +1743,15 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     /paginationComponentId[\s\S]*?smoke-tool-studio-pagination-ninth[\s\S]*?componentId: paginationComponentId/,
     'the synthetic ninth Tool must carry a valid managed Component identity',
   );
-  assert.ok(HARNESS.includes("editor.locator('[data-tool-prerequisite-row]').count() !== 5"));
+  assert.match(HARNESS, /editor\.locator\('\[data-tool-prerequisite-row\]'\)\.count\(\)\) !== 5/);
   assert.match(
     toolStudioWalk,
     /const expectedPrerequisiteNames = \[[\s\S]*?'Expert Crafter'[\s\S]*?"Proficient with Smith's Tools"[\s\S]*?'Attuned to the Weave'[\s\S]*?'Strength 13 or higher'[\s\S]*?'Trained in Arcana'[\s\S]*?Tool Studio parity prerequisite order drifted/,
   );
-  assert.ok(HARNESS.includes("editor.locator('[data-tool-validation-check].is-invalid').count() !== 0"));
+  assert.match(
+    HARNESS,
+    /editor\.locator\('\[data-tool-validation-check\]\.is-invalid'\)\.count\(\)\) !== 0/
+  );
   assert.match(
     toolStudioWalk,
     /input\[name="tool-on-break"\]\[value="destroy"\][\s\S]*?saveToolStudioDraftIfDirty\(editor\)[\s\S]*?tab\('requirements'\)/,
@@ -1776,15 +1770,15 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     'manager-tool-parity-04-requirements-1280x720',
     'manager-tool-parity-05-validation-1280x720',
   ]) {
-    assert.ok(
-      HARNESS.includes(`captureToolStudioProduct(page, '${label}', wideGeometry)`),
+    assert.match(
+      HARNESS,
+      new RegExp(String.raw`captureToolStudioProduct\(\s*ctx,\s*'${label}',\s*wideGeometry\s*\)`),
       `${label} must capture the truthful settled wide product frame`,
     );
   }
-  assert.ok(
-    HARNESS.includes(
-      "captureToolStudioProduct(page, 'manager-tool-parity-06-breakage-900x700', narrowGeometry)"
-    ),
+  assert.match(
+    HARNESS,
+    /captureToolStudioProduct\(\s*ctx,\s*'manager-tool-parity-06-breakage-900x700',\s*narrowGeometry\s*\)/,
     'the 900px parity frame must capture the truthful settled narrow product frame',
   );
   assert.match(
@@ -1825,23 +1819,23 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   );
   assert.match(
     HARNESS,
-    /const addRepairAlternative = firstRepairGroup\.locator\('\[data-recipe-add="alternative-component"\]'\);[\s\S]*?assertPointerTarget\(page, addRepairAlternative,[\s\S]*?Tool repair OR add-component control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair OR add'/,
+    /const addRepairAlternative = firstRepairGroup\.locator\(\s*'\[data-recipe-add="alternative-component"\]'\s*\);[\s\S]*?assertPointerTarget\(\s*page,\s*addRepairAlternative,[\s\S]*?Tool repair OR add-component control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair OR add'/,
   );
   assert.match(
     HARNESS,
-    /const addRepairGroup = editor\.locator\('\[data-tool-repair-requirements\] \[data-recipe-add="tag-requirement"\]'\);[\s\S]*?assertPointerTarget\(page, addRepairGroup,[\s\S]*?Tool repair AND control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair AND add'/,
+    /const addRepairGroup = editor\.locator\(\s*'\[data-tool-repair-requirements\] \[data-recipe-add="tag-requirement"\]'\s*\);[\s\S]*?assertPointerTarget\(\s*page,\s*addRepairGroup,[\s\S]*?Tool repair AND control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair AND add'/,
     'the repair group control must choose one strict-safe pointer target and mutate once',
   );
   assert.doesNotMatch(HARNESS, /\.manager-tool-repair-add-option select/);
   assert.doesNotMatch(HARNESS, /\.manager-recipe-or-trigger/);
   assert.match(
     HARNESS,
-    /const componentTarget = replacementGrid\.locator\('\.manager-tool-replacement-component-trigger'\);[\s\S]*?'Component replacement selection'[\s\S]*?\(\) => componentOption\.click\(\)[\s\S]*?Component replacement selection did not update the draft control/,
+    /const componentTarget = replacementGrid\.locator\(\s*'\.manager-tool-replacement-component-trigger'\s*\);[\s\S]*?'Component replacement selection'[\s\S]*?\(\) => componentOption\.click\(\)[\s\S]*?Component replacement selection did not update the draft control/,
   );
   assert.doesNotMatch(toolStudioWalk, /Direct Item replacement|data-tool-replacement-type|data-tool-replacement-picker/);
   assert.match(
     toolStudioWalk,
-    /withSingleToolStoreMutation\(\s*page,\s*'setToolBreakageAuthority',\s*'check-driven authority',\s*\(\) => checkDriven\.click\(\),\s*\(\) => waitForToolBreakageAuthority\(page, systemId\),[\s\S]*?withSingleToolDraftTransition\(\s*page,\s*fixture\.toolId,\s*'check-driven Tool Edit route'/,
+    /withSingleToolStoreMutation\(\s*page,\s*'setToolBreakageAuthority',\s*'check-driven authority',\s*\(\) => checkDriven\.click\(\),\s*\(\) => waitForToolBreakageAuthority\(page, systemId\),?[\s\S]*?withSingleToolDraftTransition\(\s*page,\s*fixture\.toolId,\s*'check-driven Tool Edit route'/,
     'the persisted + projected authority mutation must settle before the exactly-once Edit route',
   );
   assert.match(
@@ -1851,15 +1845,15 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   );
   assert.match(
     HARNESS,
-    /async function waitForToolBreakageAuthority[\s\S]*?getCraftingSystemManager\(\)\.getSystem\(systemId\)\?\.toolBreakage\?\.authority[\s\S]*?__fabricateSmokeManagerApp\?\._adminStore\?\.viewState\?\.subscribe[\s\S]*?timeout: 10_000/,
+    /async function waitForToolBreakageAuthority[\s\S]*?getCraftingSystemManager\(\)\.getSystem\(systemId\)\s*\?\.toolBreakage\?\.authority[\s\S]*?__fabricateSmokeManagerApp\?\._adminStore\?\.viewState\?\.subscribe[\s\S]*?timeout: 10_000/,
   );
   assert.match(
     toolStudioWalk,
-    /const liveManagerApp = await requireSingleLocator\(page\.locator\('#fabricate-crafting-system-manager'\), 'live Crafting System Manager app'\);[\s\S]*?const editorManager = liveManagerApp\.locator\('\.fabricate-manager\[data-manager-view="tool-edit"\]'\);/,
+    /const liveManagerApp = await requireSingleLocator\(\s*page\.locator\('#fabricate-crafting-system-manager'\),\s*'live Crafting System Manager app'\s*\);[\s\S]*?const editorManager = liveManagerApp\.locator\(\s*'\.fabricate-manager\[data-manager-view="tool-edit"\]'\s*\);/,
   );
   assert.match(
     toolStudioWalk,
-    /const immuneOnBreakFieldset = editor\.locator\('\[data-tool-breakage-tab\]:has\(input\[name="tool-check-breakable"\]\[value="immune"\]:checked\) \[data-tool-on-break-controls\]:disabled'\);[\s\S]*?await immuneOnBreakFieldset\.waitFor\(\{ state: 'visible', timeout: 10_000 \}\);[\s\S]*?await assertDisabledToolOnBreakFieldset\(immuneOnBreakFieldset\);/,
+    /const immuneOnBreakFieldset = editor\.locator\(\s*'\[data-tool-breakage-tab\]:has\(input\[name="tool-check-breakable"\]\[value="immune"\]:checked\) \[data-tool-on-break-controls\]:disabled'\s*\);[\s\S]*?await immuneOnBreakFieldset\.waitFor\(\{\s*state: 'visible',\s*timeout: 10_000,?\s*\}\);[\s\S]*?await assertDisabledToolOnBreakFieldset\(immuneOnBreakFieldset\);/,
   );
   assert.match(
     HARNESS,
@@ -1897,7 +1891,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   // through that helper's `restore` slot — never that it merely mentions the function.
   assert.match(
     HARNESS,
-    /runFixturedScreenshotSection\(\{[\s\S]*?step: 'tool-studio-evidence',[\s\S]*?restore: \(fixture\) => restoreToolStudioFixture\(/,
+    /runFixturedScreenshotSection\(\{[\s\S]*?step: 'tool-studio-evidence',[\s\S]*?restore: \(fixture\) =>\s*restoreToolStudioFixture\(/,
     'the Tool Studio section must hand its restore to the shared fixtured-section helper',
   );
   assert.match(
@@ -2109,7 +2103,7 @@ test('the Knowledge walk seeds every projected state, proves the inert merge, an
   // The section wires the shared lifecycle helper and restores in its `finally` slot.
   assert.match(
     HARNESS,
-    /shouldRunScreenshotSection\('knowledge'\)[\s\S]*?runFixturedScreenshotSection\(\{[\s\S]*?step: 'knowledge-surface-evidence',[\s\S]*?restore: \(fixture\) => restoreKnowledgeFixture\(/,
+    /section: 'knowledge'[\s\S]*?runFixturedScreenshotSection\(\{[\s\S]*?step: 'knowledge-surface-evidence',[\s\S]*?restore: \(fixture\) =>\s*restoreKnowledgeFixture\(/,
     'the Knowledge section must hand its restore to the shared fixtured-section helper',
   );
   // The narrow frame is captured ABOVE the 831px collapse, which is the band where
@@ -2221,7 +2215,7 @@ test('the Tool Studio fixture composes durable Tool identity through the canonic
   assert.match(HARNESS, /source\.unsetFlag\('fabricate', 'fabricate\.roles'\)/);
   assert.match(
     HARNESS,
-    /if \(source\) \{\s*await source\.unsetFlag\('fabricate', 'fabricate\.roles'\);\s*if \(fixture\.sourceRoles\) await source\.setFlag\('fabricate', 'fabricate\.roles', fixture\.sourceRoles\);\s*if \(fixture\.sourceCreated\) await source\.delete\(\);\s*\}/,
+    /if \(source\) \{\s*await source\.unsetFlag\('fabricate', 'fabricate\.roles'\);\s*if \(fixture\.sourceRoles\)\s*await source\.setFlag\('fabricate', 'fabricate\.roles', fixture\.sourceRoles\);\s*if \(fixture\.sourceCreated\) await source\.delete\(\);\s*\}/,
     'restoration must clear the fixture leaf, restore any prior roles snapshot, and delete the owned Smith fixture',
   );
   assert.match(
@@ -2262,13 +2256,19 @@ test('an unknown section name is fail-safe (runs) rather than silently skipped',
   assert.equal(isD0SectionNeededForTargets('not-a-real-section', ['manager-recipes-normal']), true);
 });
 
-test('the harness wires a scoped-skip guard for every declared section (drift guard)', () => {
+test('the walk registers a scoped-skip section for every declared section (drift guard)', () => {
+  // The guard is no longer a literal per block: `runScenarios` reads each scenario's `section` and
+  // skips it, so what must not drift is the registry's section map.
+  const registered = new Set(
+    [...flattenScenarios(SMOKE_SCENARIOS)].map((scenario) => scenario.section).filter(Boolean)
+  );
   for (const section of D0_SKIPPABLE_SECTIONS) {
     assert.ok(
-      HARNESS.includes(`shouldRunScreenshotSection('${section.name}')`),
-      `section '${section.name}' has no shouldRunScreenshotSection guard in the harness — it would never be skipped`,
+      registered.has(section.name),
+      `section '${section.name}' has no registered scenario — it would never be skipped`,
     );
   }
+  assert.match(smokeModule('runScenarios.mjs'), /ctx\.shouldRunScreenshotSection\(scenario\.section\)/);
   // The guard is inert under rc/ci/full: it short-circuits true when scoping is off.
   assert.ok(/function shouldRunScreenshotSection[\s\S]*?if \(!SCREENSHOT_SCOPING_ACTIVE\) return true;/.test(HARNESS));
 });
@@ -2283,22 +2283,16 @@ test('no skippable-section label sits inside a DIFFERENT section\'s guard block 
   // captureRecipeEditorRoundtrip -> 'manager-recipes-editor-roundtrip') fall in no span
   // and are simply never attributed here — the invariant is only that a label must never
   // land in the WRONG span, which such labels cannot.
-  const guards = D0_SKIPPABLE_SECTIONS.map(section => {
-    const at = HARNESS.indexOf(`shouldRunScreenshotSection('${section.name}')`);
-    assert.ok(at !== -1, `section '${section.name}' guard not found in harness`);
-    return { name: section.name, at };
-  }).sort((a, b) => a.at - b.at);
-
-  for (let i = 0; i < guards.length; i += 1) {
-    const start = guards[i].at;
-    const end = i + 1 < guards.length ? guards[i + 1].at : HARNESS.length;
-    const span = HARNESS.slice(start, end);
+  for (const section of D0_SKIPPABLE_SECTIONS) {
+    const at = SMOKE_SOURCE_SEGMENTS.findIndex((text) => text.includes(`section: '${section.name}'`));
+    assert.ok(at >= 0, `section '${section.name}' has no owning module`);
+    const span = SMOKE_SOURCE_SEGMENTS[at];
     for (const other of D0_SKIPPABLE_SECTIONS) {
-      if (other.name === guards[i].name) continue;
+      if (other.name === section.name) continue;
       for (const label of other.labels) {
         assert.ok(
           !span.includes(`'${label}'`),
-          `label '${label}' is mapped to section '${other.name}' but its literal sits inside the '${guards[i].name}' guard block — a scoped run for '${other.name}' would skip its frame (cross-section drift)`,
+          `label '${label}' is mapped to section '${other.name}' but its literal sits in the '${section.name}' scenario module — a scoped run for '${other.name}' would skip its frame (cross-section drift)`,
         );
       }
     }

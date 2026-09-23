@@ -1,11 +1,6 @@
 /**
  * Proves that the `happy-dom` component test infrastructure works inside
  * `node --test`.
- *
- * `setupDOM()` assigns a live happy-dom Window's globals to `globalThis`
- * before the tests run. If `document`, `HTMLElement`, and basic DOM query
- * methods are all present and functional after that call, the infrastructure
- * is ready for real Svelte component tests.
  */
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,45 +1,7 @@
 /**
  * Source contract: the manager's card shell is written in ONE place (issue 1427).
- *
  * `class="manager-inspector-card"` was a CSS convention, like the `manager-button` one
- * `manager-button-source-contract.test.js` closes. 80 sites across 20 components wrote it out by
- * hand on a `<section>`, and `styles/fabricate.css` turned it into the padding, the hairline
- * border, the 8px radius, the surface fill and the stacked gap.
- *
- * ── WHY THIS FILE EARNS ITS PLACE WHEN NOTHING RENDERS WRONG ──────────────────────────────
- * The icon-button contract has a clause that cannot be photographed — a missing accessible name.
- * This one has no such clause, and that is worth saying rather than papering over: a card written
- * as a bare `<section>` renders visibly wrong, so the convention is self-policing in a way the
- * accessible name is not.
- *
- * What it is NOT self-policing about is enumeration. The whole argument for extracting the shell
- * is that a change to it should be one edit and its callers should be listable; a convention
- * re-established at one new site quietly restores the state where neither is true, and the next
- * reader has no way to know whether 19 callers or 20 exist. The class-only clause is the gate on
- * that. The bare-`data-*` clause is the one with teeth: it catches a real, silent DOM change the
- * conversion itself can make.
- *
- * ── THE EXEMPTIONS, AND WHY EACH IS ONE ───────────────────────────────────────────────────
- * `InspectorCard.svelte` is the primitive; it writes the class because writing it is what it is
- * for. `CraftingSystemManagerRoot.svelte` is DEFERRED, not exempt: its 32 sites are 40% of the
- * whole census, and landing a sweep's tail in a converging 12k-line root is how a refactor
- * collides with everything else in flight. Both are pinned by COUNT, so a later pass that
- * converts SOME of the root's sites reds here instead of quietly halving a deferral nobody is
- * tracking any more.
- *
- * ── WHERE THE CLAUSES THEMSELVES LIVE ─────────────────────────────────────────────────────
- * `tests/helpers/primitiveSourceContract.js`, shared with `icon-button-source-contract.test.js`,
- * which asks the same four questions about `<IconButton>`. That file records why — SonarCloud
- * measured 88 duplicated lines between the two guards while each carried its own copy, and two
- * copies drift into disagreeing about what a call site IS. This file supplies the facts the
- * clauses are stated over; everything below the exemption table is data.
- *
- * The corpus is read from the working tree rather than by shelling to `grep` (a raw NUL byte
- * makes a file BINARY to a recursive grep, and `checks/ChecksView.svelte` carries seven of this
- * sweep's sites), `<style>` blocks and comments are stripped before matching, and the tag scan
- * tracks `{}` DEPTH so an inline arrow's `>` or a COMPARISON inside an expression attribute
- * cannot end a tag early. Each of those is load-bearing and each is argued where it lives:
- * `helpers/primitiveSourceContract.js` and `helpers/svelteTagScan.js`.
+ * `manager-button-source-contract.test.js` closes.
  */
 import { definePrimitiveSourceContract } from './helpers/primitiveSourceContract.js';
 
@@ -51,9 +13,6 @@ const PRIMITIVE = 'src/ui/svelte/components/InspectorCard.svelte';
 /**
  * The `.svelte` files under `src/` that may still write the class, each with its reason and the
  * exact number of times it writes it.
- *
- * Counted rather than merely listed, and keyed on the class rather than on a line number, which
- * rots on the first edit above it.
  */
 const CLASS_EXCEPTIONS = Object.freeze([
   Object.freeze({
@@ -68,14 +27,76 @@ const CLASS_EXCEPTIONS = Object.freeze([
   }),
   Object.freeze({
     file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-    count: 32,
+    count: 4,
     why:
-      'deferred: root convergence pending. Thirty-two hand-rolled cards — the gathering task, ' +
-      'drop, event and travel inspectors, the drop and modifier editors, and the systems ' +
-      'feature panels — are held out of the sweep because the converging 12k-line root is the ' +
-      'wrong place to land its tail. They are 40% of the whole census, the highest ' +
-      'concentration in this programme. Pinned by count so a later root pass that converts ' +
-      'some of the 32 fails here instead of leaving a fraction of a deferral nobody is tracking.',
+      'deferred: root convergence pending. Four hand-rolled cards remain — the systems feature ' +
+      'panels — and they are held out of the sweep because the converging root is the wrong ' +
+      'place to land its tail. The fifth was the Tags & Categories at-a-glance card, and issue ' +
+      '1915 retired that inspector rail rather than converting it. The count was 32 until 1707 ' +
+      'wrote the twice-authored modifier panel once (two cards de-duplicated, not converted), 28 ' +
+      'until its phase 2 moved nineteen into the leaf rows below, and 9 until its phase 3 moved ' +
+      'the four the chain drew around those branches into the rail row below. Pinned by count so ' +
+      'a later root pass that converts some of the four fails here instead of leaving a fraction ' +
+      'of a deferral nobody is tracking.',
+  }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte',
+    count: 3,
+    why:
+      'deferred with a named reason: issue 1707 phase 2 relocated the gathering event branch ' +
+      'without converting a card — the event identity, details and environment-usage cards — so ' +
+      'the deferral is unchanged in substance and this screen is now small enough for a ' +
+      'conversion lane to take on its own. Pinned by count so a later partial pass fails here ' +
+      'rather than silently reducing a deferral nobody is tracking.',
+  }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/manager/environment/GatheringInspectorRail.svelte',
+    count: 4,
+    why:
+      'deferred with a named reason: issue 1707 phase 3 relocated the inspector chain without ' +
+      'converting a card — the gathering-tab placeholder, and the selected environment\'s ' +
+      'summary, details and draft-state cards — so the deferral is unchanged in substance and ' +
+      'this file is now small enough for a conversion lane to take on its own. Pinned by count ' +
+      'so a later partial pass fails here rather than silently reducing a deferral nobody is ' +
+      'tracking.',
+  }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
+    count: 2,
+    why:
+      'deferred with a named reason: issue 1707 relocated these two without converting either — ' +
+      'the condition-modifier card and the character-modifier card of the panel it wrote once — ' +
+      'so the deferral is unchanged in substance and the file is now small enough for a ' +
+      'conversion lane to take this screen on its own. Pinned by count so a later partial pass ' +
+      'fails here rather than silently reducing a deferral nobody is tracking.',
+  }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/manager/environment/GatheringRulesInspector.svelte',
+    count: 1,
+    why:
+      'deferred with a named reason: issue 1707 phase 2 relocated the Gathering Rules card ' +
+      'without converting it, and it is the whole card this file draws. Pinned by count so a ' +
+      'later partial pass fails here rather than silently reducing a deferral nobody is tracking.',
+  }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte',
+    count: 7,
+    why:
+      'deferred with a named reason: issue 1707 phase 2 relocated the gathering task branch ' +
+      'without converting a card — the task identity, details, drops-summary and ' +
+      'environment-usage cards while browsing, and the drop header, values and no-drops cards ' +
+      'while editing. Pinned by count so a later partial pass fails here rather than silently ' +
+      'reducing a deferral nobody is tracking.',
+  }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/manager/world/TravelInspector.svelte',
+    count: 8,
+    why:
+      'deferred with a named reason: issue 1707 phase 2 relocated the travel branch without ' +
+      'converting a card — the realm name, environments and parties cards on the realms tab, and ' +
+      'the region identity, link and two party cards on the map tab, plus the outer card both ' +
+      'tabs share. Pinned by count so a later partial pass fails here rather than silently ' +
+      'reducing a deferral nobody is tracking.',
   }),
 ]);
 

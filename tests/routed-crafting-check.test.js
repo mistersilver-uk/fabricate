@@ -1,8 +1,7 @@
-// Engine integration tests for the authored routed crafting check
-// (CraftingEngine._runRoutedCheck via the _runCraftingCheck routed dispatch):
-// relative + fixed tier mapping, threshold meet/exceed, breakTools tiers, the
-// recipe-tier / dynamic base-DC resolution (which mirrors the simple check, NOT
-// the flat salvage DC), and the no-formula required-check failure.
+// Engine integration tests for the authored routed crafting check (CraftingEngine._runRoutedCheck
+// via the _runCraftingCheck routed dispatch): relative + fixed tier mapping, threshold meet/exceed,
+// breakTools tiers, the recipe-tier / dynamic base-DC resolution (which mirrors the simple check,
+// NOT the flat salvage DC), and the no-formula required-check failure.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -247,10 +246,8 @@ test('an engine-evaluated routed check is tagged engineEvaluated', async () => {
 });
 
 test('evaluateCheckBreakage: a non-engine-evaluated result does NOT force breakage', () => {
-  // A result that was not produced by an engine roll-formula path (no
-  // `engineEvaluated` marker) can never force tool breakage, even if it carries a
-  // `data.breakTools` flag. This guards the `engineEvaluated` gate inside
-  // evaluateCheckBreakage now that the legacy macro check source is gone.
+  // A result that was not produced by an engine roll-formula path (no `engineEvaluated` marker) can
+  // never force tool breakage, even if it carries a `data.breakTools` flag.
   const checkResult = { success: true, outcome: 'Fine', value: 7, data: { breakTools: true } };
   assert.notEqual(checkResult.engineEvaluated, true);
   assert.equal(
@@ -272,10 +269,8 @@ test('evaluateCheckBreakage: an engine routed breakTools tier DOES force breakag
   assert.equal(evaluateCheckBreakage({ checkResult: r }).forceBreak, true);
 });
 
-// ── Recipe minimum-success-tier gate: routedByCheck-only (issue 725) ──────────
-// The gate is scoped to `routedByCheck`. Alchemy `checkMode: tiered` runs through the
-// SAME `_runRoutedCheck`, but the dispatch forces `minOutcomeId: null`, so a carried
-// (unclearable) `minSuccessOutcomeId` is inert on an alchemy brew.
+// Recipe minimum-success-tier gate: routedByCheck-only (issue 725) ────────── The gate is scoped to
+// `routedByCheck`.
 
 const MIN_GATE_FIXED = [
   { id: 'f-lo', name: 'Low', success: true, breakTools: false, start: 1, end: 10 },
@@ -327,12 +322,10 @@ test('no Roll engine does not block the craft and fabricates no route', async ()
 });
 
 
-// ── Tier-step evidence reaches the result chat card (issue 975) ──────────────
-// The engine's `tierStepForCard` mapping had NO coverage: the chat-card suites feed
-// the presentation model directly and the suites above stop at the check result, so
-// every `_postCraftChatMessage` call site could silently drop the routed evidence and
-// still ship green. These drive a whole `craft()` so the note asserted on came from
-// the runtime's own `data.tierStepApplied`.
+// Tier-step evidence reaches the result chat card (issue 975) ────────────── the
+// `craftCardFields` `tierStepForCard` mapping had NO coverage: the chat-card suites feed the presentation model
+// directly and the suites above stop at the check result, so every `_postCraftChatMessage` call
+// site could silently drop the routed evidence and still ship green.
 
 /** The text of the rendered tier-step notice on a posted card, or null when absent. */
 function tierStepNoteOf(content) {
@@ -373,9 +366,8 @@ test('a stepped routed craft posts the tier-step note the runtime actually produ
 });
 
 test('a stepped-up routed craft posts the note on the SUCCESS card too', async () => {
-  // The failure and success branches map the evidence at separate call sites, so a
-  // rename that missed one would still pass the failure case above. 16 matches Fine;
-  // the trigger steps up one rank onto Mythic, which succeeds.
+  // The failure and success branches map the evidence at separate call sites, so a rename that
+  // missed one would still pass the failure case above.
   stubRoll(16, [{ number: 1, faces: 20, total: 16, results: [{ result: 16, active: true }] }]);
   const { result, chatMessages } = await craftForChatCard(
     defaultRouted({

@@ -1,16 +1,10 @@
-/**
- * THE DIFFICULTY CARD, DRIVEN THROUGH ITS CONTROLS (issue 1096).
- *
- * Written after an audit asked which controls in this change a test actually CLICKS. The
- * comparison segments and the DC-source radios were asserted by PRESENCE only — their
- * `onChange` handlers were reachable by reading the source and by nothing else, which is the
- * same exposure that lets a control ship inert with a green proof beside it.
- */
+/** THE DIFFICULTY CARD, DRIVEN THROUGH ITS CONTROLS (issue 1096). */
 import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -18,14 +12,14 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-check-difficulty-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/apps/manager/checks/checksCopy.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/RadioCardGroup.svelte',
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
@@ -38,11 +32,7 @@ before(() => harness.setup());
 after(() => harness.teardown());
 afterEach(() => harness.remount());
 
-/**
- * The real control inside a segment is the visually hidden radio; the `<label>` is only the
- * styled surface. Set `.checked`, then dispatch a bubbling `change` — a bare `.click()` on
- * the label is NOT it.
- */
+/** The real control inside a segment is the visually hidden radio. */
 function choose(root, attr, value) {
   const radio = root.querySelector(`[${attr}="${value}"] input[type="radio"]`);
   assert.ok(radio, `a radio exists for ${attr}="${value}"`);

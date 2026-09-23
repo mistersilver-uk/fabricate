@@ -1,24 +1,4 @@
-/**
- * The manager's ONE bulk edit panel chrome, and the three per-site parameters issue 1371 added
- * to it (gap-list rows 38, 39 and 47).
- *
- * `bulk-edit-dock-pinning.test.js` measures what this shell's dock DOES in a real browser — the
- * sticky construction, its three negative bleeds, and Apply staying inside the scrollport at
- * every scroll offset. What nothing pinned until now is what the shell EMITS, and that is the
- * half the three new parameters live in: each one either swaps a string the caller owns or adds
- * a child to a box the dock comment says must not be resized.
- *
- * EVERY ASSERTION IS WRITTEN IN BOTH DIRECTIONS, and that is the point of the file rather than
- * thoroughness for its own sake. The world Component catalogue is the only caller that opts in;
- * the Component, Recipe and Essence Studios pass none of the three and must render exactly what
- * they rendered before. A parameter that ignored its caller and one that quietly applied the
- * catalogue's face to everybody each satisfy one half of the pair and fail the other.
- *
- * `localize` is stubbed by the harness's Foundry shim and returns the key, so `text(key,
- * fallback)` resolves to the FALLBACK here. That is why the expected strings below are the
- * fallbacks written in the component rather than the values in `lang/en.json`; the two are the
- * same English, and `tests/ui-lang-keys-resolve.test.js` is what pins that they stay so.
- */
+/** The manager's ONE bulk edit panel chrome. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -26,6 +6,7 @@ import { describe, it, before, after, afterEach } from 'node:test';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const SHELL_PATH = 'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte';
@@ -33,7 +14,7 @@ const SHELL_PATH = 'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte';
 const shell = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-bulk-edit-panel-shell-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
   compiledModules: [SHELL_PATH, 'src/ui/svelte/components/ManagerButton.svelte'],
   componentPath: SHELL_PATH
 });
@@ -48,14 +29,7 @@ afterEach(() => {
   shell.remount();
 });
 
-/**
- * A stand-in destructive action for the dock's foot.
- *
- * `createRawSnippet` is imported by PATH and not from the bare `svelte` specifier: the harness
- * drives the compiled components with the client runtime at `node_modules/svelte/src/
- * index-client.js`, and a snippet built from a second copy of that runtime is a different type
- * the component refuses to render. `bulk-edit-dock-pinning.test.js` is the precedent.
- */
+/** A stand-in destructive action for the dock's foot. */
 const dockFootSnippet = createRawSnippet(() => ({
   render: () => '<button type="button" data-danger="">Delete 3 components</button>'
 }));
@@ -114,8 +88,7 @@ describe('BulkEditPanelShell takes its per-site parameters (issue 1371)', () => 
       wide.querySelector('.fab-bulk-edit-dock').classList.contains('is-bleed-space-4'),
       'asked for, the dock wears the class its wider bleed is painted from'
     );
-    // AND THE CLASS HAS A RULE BEHIND IT, in the scoped block for the reason the `has-foot`
-    // pin below records: a sheet rule for these five properties would match and be discarded.
+    // AND THE CLASS HAS A RULE BEHIND IT.
     const source = readFileSync(resolve(repoRoot, SHELL_PATH), 'utf8');
     const rule = /\.fab-bulk-edit-dock\.is-bleed-space-4\s*\{([^}]*)\}/.exec(source);
     assert.ok(rule, 'nothing paints the class the dock emits for the wider bleed');
@@ -131,9 +104,7 @@ describe('BulkEditPanelShell takes its per-site parameters (issue 1371)', () => 
   });
 
   it('renders the caller Clear label over the shipped phrase', async () => {
-    // `proto:626` reads `Clear` where this panel reads `Clear selection` — the action sits under
-    // a `BULK EDIT` eyebrow in a rail showing nothing but the selection, so `selection` is the
-    // only thing it could be clearing.
+    // `proto:626` reads `Clear` where this panel reads `Clear selection`.
     const root = await shell.mount({ ...BASE, clearLabel: 'Clear' });
     const clear = root.querySelector('[data-component-bulk-clear]');
     assert.equal(clear.textContent.trim(), 'Clear', 'the caller label was ignored');
@@ -143,13 +114,11 @@ describe('BulkEditPanelShell takes its per-site parameters (issue 1371)', () => 
   });
 
   it('renders the caller hero sentence over the shipped one', async () => {
-    // `proto:628` names the staging that panel actually offers, where the shell's default is
-    // deliberately noun-free because it is shared by four screens.
+    // `proto:628` names the staging that panel actually offers.
     const copy = 'Pick the systems to add them to, stage a category or tags, then commit below.';
     const root = await shell.mount({ ...BASE, hint: copy });
     assert.equal(root.querySelector('.fab-bulk-edit-hero-hint').textContent.trim(), copy);
-    // AND THE HEADING IS UNTOUCHED BY IT: the hero's two lines are different facts, and a
-    // parameter that overwrote both would silently delete the count from the rail.
+    // AND THE HEADING IS UNTOUCHED BY IT: the hero's two lines are different facts.
     assert.equal(
       root.querySelector('[data-component-bulk-count]').textContent.trim(),
       BASE.heading,
@@ -171,9 +140,7 @@ describe('BulkEditPanelShell takes its per-site parameters (issue 1371)', () => 
     assert.ok(Boolean(danger), 'the dockFoot snippet rendered nothing at all');
     assert.ok(dock.contains(danger), 'the snippet rendered outside the dock it names');
 
-    // SIBLING, AND AFTER — both halves, because `compareDocumentPosition` reports a node
-    // rendered INSIDE Apply as following it too, and a snippet that landed in the button's
-    // own children would satisfy an order-only assertion while drawing a button in a button.
+    // SIBLING, AND AFTER — both halves.
     const apply = root.querySelector('[data-component-bulk-apply]');
     assert.ok(!apply.contains(danger), 'the snippet rendered INSIDE Apply rather than beside it');
     assert.ok(
@@ -204,10 +171,7 @@ describe('BulkEditPanelShell takes its per-site parameters (issue 1371)', () => 
       '`proto:791` draws the foot on an 8px column rhythm, and --fab-space-2 IS 8px'
     );
 
-    // AND THE BASE DOCK RULE DOES NOT STATE IT, which is what keeps the three shipped studios
-    // out of this change: with one child the two display modes are not obviously identical,
-    // because Apply carries a `margin-top` whose behaviour is a block-flow question in one mode
-    // and not a question at all in the other.
+    // AND THE BASE DOCK RULE DOES NOT STATE IT.
     const base = /\.fab-bulk-edit-dock\s*\{([^}]*)\}/.exec(source);
     assert.ok(base, 'the dock still declares its own rule');
     assert.ok(

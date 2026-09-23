@@ -1,23 +1,11 @@
 /**
- * Shared fixtures for the POOLED currency balance and debit (issue 1342).
- *
- * They live here rather than inside one suite because two suites need them — the pooled pair's own
- * behaviour, and the `balance` macro key that lets a `macro` world answer the same question — and
- * because a second copy of a three-rung ladder plus an actor fake is exactly the near-identical
- * block the new-code duplication gate fails.
- *
- * `tests/helpers/` is outside the `npm test` glob, so it may hold a fixture module but never a
- * `.test.js`.
+ * Shared fixtures for the POOLED currency balance and debit (issue 1342). `tests/helpers/` is
+ * outside the `npm test` glob, so it may hold a fixture module but never a `.test.js`.
  */
 
 /**
  * A three-rung ladder: `gp` -> 10 `sp` -> 10 `cp`, so `gp` prices at 100 copper and the TERMINAL
  * BASE UNIT is `cp`.
- *
- * The three rungs are what make the pooled debit's denomination rule testable at all. On a
- * two-rung ladder the over-charge the base-unit rule prevents is small enough to be mistaken for
- * rounding; at `baseValue = 100` a per-payer ceiling is worth up to 99 copper per actor and shows
- * up as a plainly wrong number.
  */
 export const POOLED_LADDER = [
   {
@@ -45,14 +33,7 @@ export const POOLED_MACROS = Object.freeze({
   balance: 'Macro.bal',
 });
 
-/**
- * An actor holding coins at `system.currency.*` that records every `actor.update(...)` payload.
- *
- * Separate from `CurrencyCraftingActorFake` because the pooled assertions are about a SET: every
- * fixture actor needs a distinct name and id so a ledger row can be attributed, and the suites
- * assert on `totalCopper()` — the whole ladder branch in one denomination — rather than on a
- * single rung, since the point of a base-unit debit is that it makes change across rungs.
- */
+/** An actor holding coins at `system.currency.*` that records every `actor.update(...)` payload. */
 export class PooledActorFake {
   /**
    * @param {string} name
@@ -98,14 +79,7 @@ export function pooledSeams({
   };
 }
 
-/**
- * A spender double wrapping a real one, recording every call and failing nominated ones.
- *
- * `failSpendAt` / `failRefundAt` nominate a 1-based CALL INDEX rather than an actor or a unit,
- * because every pooled payment names the same unit — the terminal base one — so a unit-keyed
- * injection (the shape `makeDelegatingCoinSpender` uses for aggregated groups) could not select
- * the second payer's leg from the first's.
- */
+/** A spender double wrapping a real one, recording every call and failing nominated ones. */
 export function makePooledSpenderSpy(base, { failSpendAt = [], failRefundAt = [] } = {}) {
   const spendCalls = [];
   const refundCalls = [];

@@ -9,12 +9,18 @@ const repoRoot = resolve(__dirname, '../..');
 const browserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte');
 const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
+// Issue 1707 phase 2 moved the event inspector branch out of the root into this leaf.
+const eventInspectorPath = resolve(
+  repoRoot,
+  'src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte'
+);
 const langPath = resolve(repoRoot, 'lang/en.json');
 const cssPath = resolve(repoRoot, 'styles/fabricate.css');
 
 const browserSource = readFileSync(browserPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
+const eventInspectorSource = readFileSync(eventInspectorPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 const css = readFileSync(cssPath, 'utf8');
 
@@ -27,10 +33,7 @@ describe('GatheringEventsBrowserView source contract', () => {
     // input itself — a source assertion left pointing at moved markup passes for the wrong
     // reason or fails for one.
     assert.ok(browserSource.includes('<ManagerSearchField'), 'browser should render the shared search field');
-    // The term is no longer this component's to own (issue 1438): it lives on the lifted
-    // `browserState` the manager root binds, so the field reads a `$derived` alias and writes
-    // back through `ui`. Both halves are asserted — a read with no writer renders a field the
-    // GM cannot type into, and passes a presence-only check.
+    // The term is no longer this component's to own (issue 1438).
     assert.ok(browserSource.includes('value={searchTerm}'), 'browser should render the search term');
     assert.ok(
       browserSource.includes('onInput={(next) => (ui.searchTerm = next)}'),
@@ -57,8 +60,7 @@ describe('GatheringEventsBrowserView source contract', () => {
     assert.ok(headBlockStart >= 0, 'head block should be present');
     const headBlockEnd = browserSource.indexOf('</div>', headBlockStart);
     const headBlock = browserSource.slice(headBlockStart, headBlockEnd);
-    // See `gathering-task-browser-redesign.test.js`: issue 1515 made this browser a list, so the
-    // strip is `aria-hidden` and its labels carry no `columnheader` role.
+    // See `gathering-task-browser-redesign.test.js`: issue 1515 made this browser a list.
     assert.ok(headBlock.includes('aria-hidden="true"'), 'the column strip should be aria-hidden');
     assert.equal(headBlock.includes('role="columnheader"'), false, 'no column headers in a list');
     const headerMatches = headBlock.match(/<span/g) || [];
@@ -170,11 +172,12 @@ describe('GatheringEventsBrowserView source contract', () => {
   });
 
   it('renders a "Used in environments" inspector card identical to the task one', () => {
-    assert.ok(rootSource.includes('data-event-environment-usage'), 'event inspector should expose the usage card data attribute');
-    assert.ok(rootSource.includes('manager-event-environment-usage-grid'), 'event usage tiles should sit in a grid container');
-    assert.ok(rootSource.includes('manager-event-environment-usage-card'), 'event usage should render tiled cards');
-    assert.ok(rootSource.includes('manager-event-environment-usage-thumb'), 'event usage tile should include a thumbnail image');
-    assert.ok(rootSource.includes('gatheringEventReferencingEnvironments'), 'inspector should filter environments referencing the event');
+    assert.ok(eventInspectorSource.includes('data-event-environment-usage'), 'event inspector should expose the usage card data attribute');
+    assert.ok(eventInspectorSource.includes('manager-event-environment-usage-grid'), 'event usage tiles should sit in a grid container');
+    assert.ok(eventInspectorSource.includes('manager-event-environment-usage-card'), 'event usage should render tiled cards');
+    assert.ok(eventInspectorSource.includes('manager-event-environment-usage-thumb'), 'event usage tile should include a thumbnail image');
+    // `enabledEventIds` is the filter's own body, not proof it reaches the leaf: that forward is
+    // asserted by DOM in `manager-gathering-mounted.js` (issue 1707 phase 2 review).
     assert.ok(rootSource.includes('enabledEventIds'), 'usage should be derived from enabledEventIds');
     const events = lang.FABRICATE.Admin.Manager.Environment.Events;
     assert.equal(events.UsedInEnvironmentsCard, 'Used in environments');

@@ -1,7 +1,6 @@
 // Engine integration tests for the simple pass/fail crafting check
-// (CraftingEngine._runSimpleCheck): DC resolution (static / tier / dynamic),
-// meet-vs-exceed comparison, per-die critical raw rolls, and the simple/alchemy
-// gating. Covers the full matrix of authoring scenarios at craft time.
+// (CraftingEngine._runSimpleCheck): DC resolution (static / tier / dynamic), meet-vs-exceed
+// comparison, per-die critical raw rolls, and the simple/alchemy gating.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -289,9 +288,8 @@ test('a non-matching forced-outcome trigger leaves the comparison in charge', as
   assert.equal(result.success, false, '13 < 15 and no forced outcome');
 });
 
-// ── Gating: alchemy checkMode (none / simple) ───────────────────────────────
-// Alchemy check-ness is driven by the SYSTEM-level alchemy.checkMode, NOT the
-// generic craftingCheck.enabled toggle.
+// Gating: alchemy checkMode (none / simple) ─────────────────────────────── Alchemy check-ness is
+// driven by the SYSTEM-level alchemy.checkMode, NOT the generic craftingCheck.enabled toggle.
 
 test('alchemy checkMode=none never runs a check (auto-success), ignoring a stray formula + enabled', async () => {
   const { engine } = makeEngine({

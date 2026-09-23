@@ -8,30 +8,23 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import {
   assertSelectHasResolvedName,
+  chooseSelectOption,
   closeSelectPanel,
   selectOptionLabels,
   selectOptionValues,
 } from '../helpers/select-control.js';
 import { assertNoElement } from '../helpers/svelte-dom.js';
 import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-/**
- * World > Currency (issue 1278), mounted on its own.
- *
- * The strategy branches, provider read-only list and macro drop zones are covered through the
- * whole-manager mount in `manager-mounted.test.js`, which is where the route and its chrome are
- * asserted. What this suite pins is what the RELOCATION changed about the card itself: it is a
- * page now rather than one section among several on a crafting system's Settings tab, so its
- * collapse state is its own, its reorder announcement travels with it, and it renders without any
- * crafting system in hand at all.
- */
+/** World > Currency (issue 1278), mounted on its own. */
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-currency-tab-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
@@ -42,24 +35,24 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
     'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js'
   ],
   compiledModules: [
     // THE APP'S ONE SELECT AND ITS WHOLE COMPILED CLOSURE (issue 1510), spread rather than copied.
-    // This tree renders `components/Select.svelte` now, and a `.svelte` the tree renders but the
-    // harness omits HANGS the suite (`# cancelled`) rather than failing it.
     ...SELECT_COMPILED_MODULES,
     // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled) rather
     // than failing it, so every one is named.
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/Field.svelte',
     // THE manager's labelled push-button (issue 1118). The currency card header and each expanded unit render it.
-    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
@@ -80,6 +73,44 @@ const UNITS = Object.freeze([
   { id: 'sp', label: 'Silver', abbreviation: 'sp', actorPath: 'system.currency.sp', contains: [] }
 ]);
 
+/**
+ * The same ladder with gold broken down, which is what the sub-unit controls need (issue 1691).
+ * Copper is the third rung: the Add sub-unit builder renders only while an eligible unit is left.
+ */
+const NESTED_UNITS = Object.freeze([
+  {
+    ...UNITS[0],
+    denomination: 100,
+    contains: [{ unitId: 'sp', amount: 10 }]
+  },
+  { ...UNITS[1], denomination: 10 },
+  {
+    id: 'cp',
+    label: 'Copper',
+    abbreviation: 'cp',
+    actorPath: 'system.currency.cp',
+    denomination: 1,
+    contains: []
+  }
+]);
+
+const PROVIDERS = Object.freeze([{ id: 'dnd5e-inventory', label: 'D&D 5e actor inventory' }]);
+
+const hook = (root, selector) => root.querySelector(selector);
+
+function assertHooks(root, selectors, present) {
+  for (const selector of selectors) {
+    assert.equal(Boolean(hook(root, selector)), present, `${selector} rendered=${present}`);
+  }
+}
+
+/** Open one unit's editor, which is where the whole per-unit ladder lives. */
+async function expandUnit(root, unitId) {
+  hook(root, `[data-world-currency-unit-expand="${unitId}"]`).dispatchEvent(clickEvent());
+  await flushRender();
+  return root;
+}
+
 before(() => harness.setup());
 after(() => harness.teardown());
 afterEach(() => harness.remount());
@@ -87,8 +118,6 @@ afterEach(() => harness.remount());
 describe('World > Currency tab (mounted)', () => {
   it('renders the ladder with NO crafting system in hand', async () => {
     // The point of the move. The tab takes no system prop at all, and it is deliberately ungated:
-    // a GM has to be able to author coins BEFORE any system can switch currency on, so gating this
-    // page on participation would be a chicken-and-egg lock-out.
     const root = await harness.mount({ currencyUnits: UNITS });
 
     assert.ok(root.querySelector('[data-world-currency-page]'), 'the page root renders');
@@ -115,9 +144,7 @@ describe('World > Currency tab (mounted)', () => {
   });
 
   it('gives the page a single section heading directly under the shell heading', async () => {
-    // The shell renders <h1>World Currency</h1>; the card's own title used to be an <h3> under
-    // the Settings tab's <h2>. Left as an h3 it would skip a level, which costs a screen-reader
-    // user the landmark they navigate the page by.
+    // The shell renders <h1>World Currency</h1>.
     const root = await harness.mount({ currencyUnits: UNITS });
     const heading = root.querySelector('.manager-card-title');
 
@@ -137,8 +164,7 @@ describe('World > Currency tab (mounted)', () => {
 
   it('disables Seed presets when the world ruleset has no preset bundle', async () => {
     const unsupported = await harness.mount({ currencyUnits: [], currencyPresetsSupported: false });
-    // Pinned by its label, not by "the first tooltipped button on the page" — that would pass on
-    // any other disabled control that happens to carry a tooltip.
+    // Pinned by its label, not by "the first tooltipped button on the page".
     const seedOff = [...unsupported.querySelectorAll('button')].find((button) =>
       button.textContent.includes('Seed presets')
     );
@@ -151,6 +177,215 @@ describe('World > Currency tab (mounted)', () => {
       button.textContent.includes('Seed presets')
     );
     assert.equal(seedOn.disabled, false);
+  });
+
+  // ── The default actorProperty ladder (issue 1691, converted from the source contract) ──
+  it('offers the two header actions and writes them to the world seam', async () => {
+    const calls = [];
+    const root = await harness.mount({
+      currencyUnits: UNITS,
+      currencyPresetsSupported: true,
+      onAddCurrencyUnit: async () => {
+        calls.push('add');
+        return null;
+      },
+      onSeedCurrencyPresets: async () => calls.push('seed')
+    });
+
+    assert.ok(hook(root, '.manager-currency-unit-card'), 'the ladder is one edit card');
+    hook(root, '[data-add-currency-unit]').dispatchEvent(clickEvent());
+    hook(root, '[data-seed-currency-presets]').dispatchEvent(clickEvent());
+    await flushRender();
+
+    assert.deepEqual(calls, ['add', 'seed']);
+  });
+
+  it('collapses a unit to a summary row and expands it into the sub-unit ladder', async () => {
+    const root = await harness.mount({ currencyUnits: NESTED_UNITS });
+
+    assert.ok(hook(root, '.manager-character-modifier-summary'), 'a closed unit is a summary row');
+    assertHooks(root, ['.manager-currency-subunit-builder', '[data-world-currency-subunit]'], false);
+
+    await expandUnit(root, 'gp');
+
+    assertHooks(
+      root,
+      [
+        '.manager-currency-subunit-builder',
+        '.manager-currency-subunit-section',
+        '[data-world-currency-subunit="sp"]',
+        '.manager-currency-subunit-amount'
+      ],
+      true
+    );
+    assert.equal(
+      root.querySelectorAll('[data-world-currency-subunit]').length,
+      1,
+      'one chip per contained unit, and none from any other branch'
+    );
+  });
+
+  it('edits and removes a sub-unit through the world sub-unit actions', async () => {
+    const updates = [];
+    const deletes = [];
+    const root = await harness.mount({
+      currencyUnits: NESTED_UNITS,
+      onUpdateCurrencySubUnit: async (...args) => updates.push(args),
+      onDeleteCurrencySubUnit: async (...args) => deletes.push(args)
+    });
+    await expandUnit(root, 'gp');
+
+    const amount = hook(root, '.manager-currency-subunit-amount');
+    amount.value = '25';
+    amount.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await flushRender();
+    assert.deepEqual(updates, [['gp', 'sp', '25']], 'the amount edit names the pair it changes');
+
+    hook(root, '[data-world-currency-subunit="sp"] [data-chip-remove]').dispatchEvent(
+      clickEvent()
+    );
+    await flushRender();
+    assert.deepEqual(deletes, [['gp', 'sp']], 'and removing the chip unlinks the same pair');
+  });
+
+  // ── The three peer spend strategies (issue 1278) ──
+  it('offers the three peer spend strategies and reports the chosen one', async () => {
+    const chosen = [];
+    const root = await harness.mount({
+      currencyUnits: UNITS,
+      onSetCurrencySpendStrategy: async (next) => chosen.push(next)
+    });
+    const strategy = '[data-world-currency-strategy-select]';
+
+    assert.deepEqual(selectOptionValues(root, strategy), [
+      'actorProperty',
+      'actorInventory',
+      'macro'
+    ]);
+    closeSelectPanel(root, strategy);
+    chooseSelectOption(root, strategy, 'macro');
+    await flushRender();
+
+    assert.deepEqual(chosen, ['macro'], 'the shared Select hands the caller its own typed value');
+    assertHooks(root, ['[data-world-currency-inventory-mode-select]'], false);
+  });
+
+  it('reflects the selected strategy in the one shared hint', async () => {
+    const onProperty = await harness.mount({ currencyUnits: UNITS });
+    const property = hook(onProperty, '[data-world-currency-strategy-hint]').textContent;
+
+    harness.remount();
+    const onMacro = await harness.mount({ currencyUnits: UNITS, currencySpendStrategy: 'macro' });
+
+    assert.notEqual(
+      hook(onMacro, '[data-world-currency-strategy-hint]').textContent.trim(),
+      property.trim(),
+      'the hint changes with the strategy rather than restating one fixed line'
+    );
+  });
+
+  it('steers a provider-less world to macro without wiping its ladder', async () => {
+    const root = await harness.mount({
+      currencyUnits: UNITS,
+      currencySpendStrategy: 'actorInventory',
+      currencyProviderOptions: []
+    });
+
+    assertHooks(root, ['[data-world-currency-no-provider]', '[data-world-currency-unit="gp"]'], true);
+    assertHooks(root, ['[data-world-currency-provider-select]'], false);
+  });
+
+  it('hands the provider the ladder, read-only, and takes the editing affordances away', async () => {
+    const chosen = [];
+    const root = await harness.mount({
+      currencyUnits: NESTED_UNITS,
+      currencySpendStrategy: 'actorInventory',
+      currencyProviderId: 'dnd5e-inventory',
+      currencyProviderOptions: PROVIDERS,
+      onSetCurrencyProvider: async (next) => chosen.push(next)
+    });
+
+    assertHooks(
+      root,
+      [
+        '[data-world-currency-provider-managed]',
+        '.manager-currency-provider-managed-callout',
+        '.manager-currency-provider-managed-summary',
+        '.manager-currency-readonly-fields',
+        '[data-world-currency-readonly-label]',
+        '[data-world-currency-abbreviation]',
+        '[data-world-currency-denomination]'
+      ],
+      true
+    );
+    assertHooks(
+      root,
+      [
+        '[data-add-currency-unit]',
+        '[data-seed-currency-presets]',
+        '[data-world-currency-subunit]',
+        '[data-world-currency-unit-expand="gp"]'
+      ],
+      false
+    );
+
+    chooseSelectOption(root, '[data-world-currency-provider-select]', 'dnd5e-inventory');
+    await flushRender();
+    assert.deepEqual(chosen, ['dnd5e-inventory']);
+  });
+
+  // ── Macro mode (issue 1278): three zones, one row, and no ladder arithmetic ──
+  it('draws the three macro zones side by side, each named for its own field', async () => {
+    const root = await harness.mount({ currencyUnits: UNITS, currencySpendStrategy: 'macro' });
+
+    const zones = root.querySelector('[data-world-currency-macros]');
+    assert.ok(zones, 'the macro card renders');
+    assert.equal(zones.classList.contains('manager-currency-macro-zones'), true);
+    assert.equal(zones.classList.contains('manager-currency-macro-row'), true, 'in a single row');
+
+    const empty = [...root.querySelectorAll('[data-world-currency-macro-dropzone]')];
+    assert.ok(empty.length >= 3, `three macro fields draw a zone each (found ${empty.length})`);
+    for (const zone of empty) {
+      assert.equal(zone.classList.contains('manager-component-source-drop-zone'), true);
+    }
+    const names = empty.map((zone) => zone.getAttribute('aria-label'));
+    assert.equal(new Set(names).size, names.length, `each zone is named for its field: ${names}`);
+  });
+
+  it('unlinks a linked macro from the zone that carries it', async () => {
+    const cleared = [];
+    const root = await harness.mount({
+      currencyUnits: UNITS,
+      currencySpendStrategy: 'macro',
+      currencyMacros: { canAfford: 'Macro.abc', increment: '', decrement: '', balance: '' },
+      onClearCurrencyMacro: async (key) => cleared.push(key)
+    });
+
+    const linked = hook(root, '[data-world-currency-macro="canAfford"]');
+    assert.ok(linked, 'a linked macro replaces its drop zone');
+    linked.querySelector('button').dispatchEvent(clickEvent());
+    await flushRender();
+
+    assert.deepEqual(cleared, ['canAfford'], 'unlinking names the field it clears');
+  });
+
+  it('replaces the per-unit breakdown with a conversion note under the macro strategy', async () => {
+    const root = await harness.mount({
+      currencyUnits: NESTED_UNITS,
+      currencySpendStrategy: 'macro'
+    });
+    await expandUnit(root, 'gp');
+
+    assertHooks(root, ['[data-world-currency-unit-macro-note]'], true);
+    assertHooks(
+      root,
+      [
+        '.manager-currency-subunit-section',
+        '.manager-currency-subunit-builder',
+        '[data-world-currency-subunit]'
+      ],
+      false
+    );
   });
 
   it('announces a reorder through its OWN polite live region', async () => {
@@ -185,13 +420,7 @@ describe('World > Currency tab (mounted)', () => {
     assert.equal(root.querySelector('[data-move-currency-up="sp"]').disabled, false);
   });
 
-  /**
-   * The world profile's validation report (issue 1493).
-   *
-   * `validateCurrencyProfile` had no caller in the manager at all, so a ladder that could not be
-   * spent against looked perfectly healthy on the page that authors it. The errors arrive as plain
-   * strings from `adminStore`; this component deliberately does not import `currencyProfile.js`.
-   */
+  /** The world profile's validation report (issue 1493). */
   it('renders the validation errors, each one, where the ladder is authored', async () => {
     const root = await harness.mount({
       currencyUnits: UNITS,
@@ -213,12 +442,7 @@ describe('World > Currency tab (mounted)', () => {
   });
 
   it('renders a repeated validator message rather than throwing on it', async () => {
-    // The list is keyed on the INDEX, never on the message. Svelte 5 throws `each_key_duplicate`
-    // on a repeated key in BOTH its dev and production branches, and these rows are plain
-    // validator strings, so keying on the string itself would turn a duplicated message into a
-    // crash of the whole route. They are distinct today only because `validateCurrencyProfile`
-    // happens to return `[...new Set(errors)]`, an unpinned detail of a file this surface does
-    // not own. (Unkeyed is not on the table: `svelte/require-each-key` fails `lint:svelte`.)
+    // The list is keyed on the INDEX.
     const repeated = 'Currency unit "Gold" is missing an actor data path.';
     const root = await harness.mount({
       currencyUnits: UNITS,
@@ -261,14 +485,7 @@ describe('World > Currency tab (mounted)', () => {
   });
 
   it('hides the silent region with the shipped visually-hidden utility, not a margin hack', async () => {
-    // A permanently mounted live region has to be a REAL hidden element while it is silent, or it
-    // leaves a phantom row in the section's gapped flex column. `.visually-hidden`
-    // (`styles/fabricate.css`, under `.fabricate-manager`) is the shipped utility for exactly
-    // that, and it is the one the reorder announcer at the top of this same component already
-    // uses; it clips the element out of flow while leaving it in the accessibility tree.
-    //
-    // This asserts the CLASS, never a computed style: happy-dom cannot compute the cascade, so a
-    // `getComputedStyle` assertion here would pass against a stylesheet that was never loaded.
+    // A permanently mounted live region has to be a REAL hidden element while it is silent.
     const silent = await harness.mount({ currencyUnits: UNITS, currencyValidationErrors: [] });
     const hidden = silent.querySelector('[data-world-currency-validation]');
     assert.equal(
@@ -330,18 +547,7 @@ describe('World > Currency tab (mounted)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Issue 1493 (revision 3) — the note has to be true of the screen it appears on.
-//
-// The published `currency-macro` frame shows this note above FIVE perfectly healthy units,
-// reporting two errors that are not about any unit at all: a missing "can afford" macro and
-// a missing "decrement" one. `validateCurrencyProfile` raises at least four non-unit-scoped
-// errors, so "these currency units can't be spent yet" and "fix the units below" named the
-// wrong thing and pointed the wrong way — the problems are listed ABOVE the sentence.
-//
-// `game.i18n` is backed by the real `lang/en.json` here, so these are assertions on the
-// shipped copy rather than on the component's inline fallbacks.
-// ---------------------------------------------------------------------------
 
 describe('WorldCurrencyTab validation copy (issue 1493)', () => {
   let restoreI18n = () => {};
@@ -397,11 +603,7 @@ describe('WorldCurrencyTab validation copy (issue 1493)', () => {
     );
   });
 
-  // The one lang<->fallback mirror this change keeps: `WorldCurrencyTab` predates the
-  // decision to drop these shims and uses `text(key, fallback)` throughout, so unwinding it
-  // here would leave the file half-converted. Guarded instead, because a fallback that
-  // drifts from the shipped copy silently changes the wording rather than degrading to it —
-  // which is exactly what this revision found: both fallbacks still held the OLD sentences.
+  // The one lang<->fallback mirror this change keeps.
   it('keeps its validation fallbacks byte-identical to the shipped copy', () => {
     const source = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'),
@@ -426,7 +628,7 @@ describe('WorldCurrencyTab validation copy (issue 1493)', () => {
   });
 
   it('names both converted currency controls by their captions, and keeps their option lists', async () => {
-    // THE PROVIDER CONTROL'S FIRST MOUNTED COVERAGE (issue 1510), and the pin for BOTH names this
+    // THE PROVIDER CONTROL'S FIRST MOUNTED COVERAGE (issue 1510).
     // change touched. The strategy control's wrapper demoted to `Field as="div"`; the provider's
     // was DELETED, its caption and its hint riding the primitive's own `label=`/`hint=` form —
     // which is `hint`'s first caller in the corpus.
@@ -448,19 +650,14 @@ describe('WorldCurrencyTab validation copy (issue 1493)', () => {
     ]);
     closeSelectPanel(root, provider);
 
-    // BOTH NAMES NARROWED, DELIBERATELY, and this is the assertion that records it. Each wrapper
-    // was a `<Field as="label">` holding the caption, the control AND a hint, so the containment
-    // named each control by its caption plus the whole hint paragraph — and for the strategy that
-    // name CHANGED with the value, because the hint reflects the chosen strategy. Both are named
-    // by their caption alone now.
+    // BOTH NAMES NARROWED, DELIBERATELY.
     assert.equal(assertSelectHasResolvedName(root, provider), 'Provider');
     assert.equal(
       assertSelectHasResolvedName(root, '[data-world-currency-strategy-select]'),
       'Spend strategy'
     );
 
-    // The provider's hint is the primitive's own note line, after the control rather than inside
-    // the name, and the strategy's stayed the caller's hooked `<small>`.
+    // The provider's hint is the primitive's own note line.
     assert.ok(
       root.querySelector(provider).closest('.manager-field').querySelector('.fabricate-select-note'),
       'the provider hint renders through `hint=`, under the control'

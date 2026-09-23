@@ -7,13 +7,8 @@ import {
 } from '../src/systems/GatheringRealmStore.js';
 
 /**
- * The realm store is WORLD scope since issue 1282: it persists the `travelConfig` setting
- * rather than writing realms onto a crafting system through `updateSystem`. Every method lost
- * its leading `systemId`, and `getRealmSettings()` no longer carries `enabled` — participation
- * is a crafting system's answer, not the world's.
- *
- * These drive the real store over an in-memory setting, so the normalizer it round-trips
- * through is exercised rather than stubbed.
+ * The realm store is WORLD scope since issue 1282: it persists the `travelConfig` setting rather
+ * than writing realms onto a crafting system through `updateSystem`.
  */
 function makeStore(seed = null, { warn = () => {} } = {}) {
   const settings = { travelConfig: seed };

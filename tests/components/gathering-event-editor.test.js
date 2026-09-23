@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { ROUTE_EXIT_GUARDS } from '../../src/ui/svelte/apps/manager/routeExitGuards.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const editorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringEventEditView.svelte');
@@ -16,6 +18,11 @@ const chanceSliderPath = resolve(repoRoot, 'src/ui/svelte/components/ChanceSlide
 const editorSource = readFileSync(editorPath, 'utf8');
 const chanceSliderSource = readFileSync(chanceSliderPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
+// The header's action toolbar moved out of the root in issue 1720.
+const gatheringActionsSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte'),
+  'utf8'
+);
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
@@ -35,11 +42,7 @@ describe('GatheringEventEditView source contract', () => {
     );
   });
 
-  // The 1..100 floor is an EVENT rule — the hint says "Chance from 1 to 100", `dropRateValid`
-  // enforces it and an error renders below it — so it survives the move to the shared
-  // control (issue 883) rather than being normalised away to the task-drop floor of 0. The
-  // clamp itself now lives one seam further out, in `ChanceSlider`, so the contract is
-  // asserted across BOTH halves: the editor asks for the floor, the control honours it.
+  // The 1..100 floor is an EVENT rule — the hint says "Chance from 1 to 100".
   it('clamps dropRate to 1..100 before dispatching the update', () => {
     assert.ok(/\bmin=\{1\}/.test(editorSource), 'editor should ask the shared slider for a floor of 1');
     assert.equal(
@@ -111,8 +114,7 @@ describe('GatheringEventEditView source contract', () => {
         `editor should render through the shared slider, not hand-rolled ${dead}`
       );
     }
-    // Matched as a definition and as a binding, not as a bare name: the source comment
-    // recording the removal names the handler on purpose.
+    // Matched as a definition and as a binding, not as a bare name.
     assert.equal(
       /function\s+onDropRateInput\s*\(/.test(editorSource),
       false,
@@ -132,9 +134,10 @@ describe('GatheringEventEditView source contract', () => {
     assert.equal(/function\s+enableEventModifier\s*\(/.test(editorSource), false, 'enableEventModifier helper should be removed');
   });
 
+  // The two hook pins this block opened with are asserted in the DOM now — at the event route by
+  // `manager-gathering-mounted.js`, at both subjects by `manager-environments-mounted.js` — because
+  // issue 1707 computes every hook name from `subject` and no root literal spells them.
   it('renders the event modifier inspector (time, weather, character) from the manager root', () => {
-    assert.ok(rootSource.includes('data-gathering-event-condition-modifiers={kind}'), 'root should render event condition modifier cards');
-    assert.ok(rootSource.includes('data-gathering-event-character-modifiers'), 'root should render event character modifier card');
     assert.ok(rootSource.includes('addGatheringEventConditionModifier'), 'root should expose add condition modifier handler');
     assert.ok(rootSource.includes('updateGatheringEventConditionModifier'), 'root should expose update condition modifier handler');
     assert.ok(rootSource.includes('deleteGatheringEventConditionModifier'), 'root should expose delete condition modifier handler');
@@ -152,27 +155,35 @@ describe('GatheringEventEditView source contract', () => {
     // The operator Positive/Negative <select> is gone; value is typed signed.
     assert.ok(rootSource.includes('function gatheringModifierValueClass'), 'root should expose a signed value-class helper');
     assert.ok(rootSource.includes('function signedToOperatorValue'), 'root should split a signed input back into { operator, value }');
-    assert.ok(
-      rootSource.includes('manager-condition-modifier-row-reference ${gatheringModifierValueClass(modifier)}'),
-      'condition modifier box should be colored by its signed value'
-    );
-    assert.ok(rootSource.includes('class="manager-condition-modifier-value"'), 'condition modifier should use the single signed-input wrapper');
+    // The coloured box and the signed-input wrapper are asserted in the DOM by
+    // `manager-environments-mounted.js`; the root no longer writes either.
     assert.equal(rootSource.includes('manager-condition-modifier-row-body'), false, 'the old two-line value body should be removed');
     assert.equal(rootSource.includes('gatheringDropModifierOperatorClass'), false, 'the operator-only class helper should be removed');
   });
 
   it('formats condition modifier values as signed percentages', () => {
+    // The formatter stays in the root; the input that renders its return, its `inputmode` and its
+    // `%` adornment moved into the shared panel and are asserted in the DOM by
+    // `manager-environments-mounted.js`.
     assert.ok(rootSource.includes('function gatheringModifierDisplayValue'), 'root should expose a signed display formatter');
-    assert.ok(rootSource.includes('value={gatheringModifierDisplayValue(modifier)}'), 'condition modifier input should render the formatted signed value');
-    assert.ok(/<input\s+type="text"\s+inputmode="numeric"/.test(rootSource), 'condition modifier value should be a numeric text input so a leading + can render');
-    assert.ok(rootSource.includes('<span aria-hidden="true">%</span>'), 'condition modifier value should show a % adornment');
   });
 
   it('supports Arrow Up/Down stepping on condition modifier values', () => {
     assert.ok(rootSource.includes('function onGatheringDropModifierKeydown'), 'root should expose a drop modifier keydown stepper');
     assert.ok(rootSource.includes('function onGatheringEventModifierKeydown'), 'root should expose an event modifier keydown stepper');
-    assert.ok(/onkeydown=\{\(event\) =>\s*onGatheringDropModifierKeydown/.test(rootSource), 'drop modifier input should wire the keydown stepper');
-    assert.ok(/onkeydown=\{\(event\) =>\s*onGatheringEventModifierKeydown/.test(rootSource), 'event modifier input should wire the keydown stepper');
+    // The `onkeydown` attribute is the shared panel's now, and since issue 1707 phase 2 the drop's
+    // arity normalisation is the task leaf's; since phase 3 the root hands both steppers to the
+    // rail under scope-distinguished names. What the root still owns is handing each scope's
+    // stepper down, and the normalised call reaching the real row is asserted by the mounted
+    // Arrow-step case in `manager-gathering-mounted.js`.
+    assert.ok(
+      /onDropConditionModifierKeydown=\{onGatheringDropModifierKeydown\}/.test(rootSource),
+      'the drop panel call site should wire the drop keydown stepper'
+    );
+    assert.ok(
+      /onEventConditionModifierKeydown=\{onGatheringEventModifierKeydown\}/.test(rootSource),
+      'the event panel call site should wire the event keydown stepper'
+    );
     assert.ok(/onGatheringDropModifierKeydown[\s\S]*ArrowUp[\s\S]*ArrowDown/.test(rootSource), 'stepper should handle ArrowUp and ArrowDown');
   });
 
@@ -195,9 +206,9 @@ describe('GatheringEventEditView source contract', () => {
     assert.ok(rootSource.includes('const gatheringEventValidation = $derived'), 'root should expose an event validation derived');
     assert.ok(rootSource.includes('function saveGatheringEventDraft'), 'root should expose saveGatheringEventDraft');
     assert.ok(rootSource.includes('function deleteGatheringEventDraft'), 'root should expose deleteGatheringEventDraft');
-    assert.ok(rootSource.includes('function confirmGatheringEventRouteExit'), 'route-exit chain should include event confirm');
-    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Environment.Events.Save'), 'toolbar Save button uses the event Save lang key');
-    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Environment.Events.Dirty'), 'toolbar Dirty chip uses the event Dirty lang key');
+    assert.ok(ROUTE_EXIT_GUARDS.some((guard) => guard.view === 'gathering-event-edit'), 'route-exit chain should include event confirm');
+    assert.ok(gatheringActionsSource.includes('FABRICATE.Admin.Manager.Environment.Events.Save'), 'toolbar Save button uses the event Save lang key');
+    assert.ok(gatheringActionsSource.includes('FABRICATE.Admin.Manager.Environment.Events.Dirty'), 'toolbar Dirty chip uses the event Dirty lang key');
     assert.ok(rootSource.includes('event={editingGatheringEvent}'), 'editor mount should bind the draft event');
   });
 

@@ -24,16 +24,8 @@ function* entries(node, prefix = '') {
   yield [prefix, node];
 }
 
-// The `(s)` idiom is this corpus's accepted shorthand for a count that VARIES — "{count}
-// recipe(s)" is fine because the number is interpolated and could be anything. A `…One`
-// sibling exists precisely so the SINGULAR case can be written out properly, so a hardcoded
-// literal `1` beside a `(s)` marker is the two conventions colliding: it renders "1 recipe(s)",
-// which is the ugliest possible reading of a string whose whole reason to exist is that it
-// handles one gracefully.
-//
-// Issue 1156 shipped exactly that twice ("1 recipe(s) that requires it") while fixing a verb
-// agreement in the same sentence — the verb was split into a `…One` key and the plural marker
-// was carried across with it.
+// The `(s)` idiom is this corpus's accepted shorthand for a count that VARIES — "{count} recipe(s)"
+// is fine because the number is interpolated and could be anything (issue 1156).
 const HARDCODED_ONE_WITH_PLURAL_MARKER = /\b1 [A-Za-z][A-Za-z ]*?\(s\)/;
 
 describe('1156/lang a hardcoded singular does not also carry the plural marker', () => {
@@ -52,9 +44,8 @@ describe('1156/lang a hardcoded singular does not also carry the plural marker',
   });
 
   it('would catch the defect it was written for', () => {
-    // Non-vacuity: the pattern must actually fire on the string that motivated the gate, or a
-    // green result above proves nothing. See the repo's standing rule that a mechanical check is
-    // worthless until it has been shown able to fail.
+    // Non-vacuity: the pattern must actually fire on the string that motivated the gate, or a green
+    // result above proves nothing.
     assert.match(
       'Delete essence {name}? 1 recipe(s) that requires it will be rewritten.',
       HARDCODED_ONE_WITH_PLURAL_MARKER

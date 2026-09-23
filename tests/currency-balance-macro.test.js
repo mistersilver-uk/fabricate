@@ -1,21 +1,5 @@
 /**
- * The `balance` currency macro key (issue 1342, Phase 3).
- *
- * A `macro` world hands its currency to GM-authored macros, so before this key existed Fabricate
- * could SPEND such a world's coins and could not SEE them. `balance` is the fourth slot, and the
- * only one that asks rather than acts — which is why almost everything here is about the one rule
- * that distinguishes an answer from a non-answer:
- *
- *   **A returned number `0` means provably none. Anything that is not a number means CANNOT SEE.**
- *
- * Mapping a broken macro to `0` is the specific lie the rule exists to prevent: it would report
- * every character in a `macro` world as penniless, with the same confidence as a real reading.
- *
- * The rest of the suite is mirror-guarding. Adding a key to `CURRENCY_MACRO_KEYS` backfills it
- * through the normalizer into every existing world for free — there is no migration — but four
- * surfaces do NOT follow automatically, and each of them fails silently: a constructor that drops
- * the uuid, a projection that hides the field in the unloaded state, and an editor that never
- * offers it. The drift guards below fail when any of them stops covering the declared vocabulary.
+ * The `balance` currency macro key (issue 1342, Phase 3). The rest of the suite is mirror-guarding.
  */
 
 import assert from 'node:assert/strict';
@@ -39,13 +23,7 @@ import { POOLED_LADDER, POOLED_MACROS } from './helpers/pooled-currency-fixtures
 
 const source = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
-/**
- * A spender whose `balance` macro resolves to a runnable script returning `answer`.
- *
- * `macro` is read with `in` rather than defaulted, because one of the refusal shapes under test IS
- * an explicit `null` — a `??` default would silently substitute a runnable document for it and the
- * case would pass for the wrong reason.
- */
+/** A spender whose `balance` macro resolves to a runnable script returning `answer`. */
 function balanceSpender(answer, options = {}) {
   const { macros = POOLED_MACROS } = options;
   const macro = 'macro' in options ? options.macro : { type: 'script', command: 'return 1;' };
@@ -176,8 +154,7 @@ describe('MacroCoinSpender.readCoins', () => {
 describe('the balance key needs no migration', () => {
   it('backfills an existing world that predates it, at read time, without throwing', async () => {
     // Exactly what a world persisted before this key existed holds: three macro slots and no
-    // fourth. `CurrencyConfigStore.load()` normalizes on EVERY read, so this is the shape the
-    // runtime sees the first time anything asks — no migration step, no `migrationVersion` bump.
+    // fourth.
     const persisted = {
       spendStrategy: 'macro',
       providerId: '',
@@ -217,7 +194,7 @@ describe('the balance key needs no migration', () => {
 
 describe('the surfaces that do not follow the vocabulary automatically', () => {
   const PROJECTIONS = [
-    '../src/ui/svelte/stores/adminStore.js',
+    '../src/ui/svelte/stores/adminCurrencySection.js',
     '../src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
     '../src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte',
   ];
@@ -225,8 +202,7 @@ describe('the surfaces that do not follow the vocabulary automatically', () => {
   it('declares every macro slot in every hardcoded empty projection', async () => {
     // These literals are only reached in the UNLOADED state, which is why a missing key is
     // invisible: everything else in the app reads the normalized config, where the slot is always
-    // present. A field absent from the empty projection simply never renders until a world config
-    // arrives, and nothing reports it.
+    // present.
     for (const path of PROJECTIONS) {
       const text = source(path);
       const counts = CURRENCY_MACRO_KEYS.map((key) => [
@@ -258,9 +234,8 @@ describe('the surfaces that do not follow the vocabulary automatically', () => {
 });
 
 /**
- * The three tokens the pooled currency pair answers that the contract did not declare while it
- * had no member able to emit them. `currencyAffordance.js` spelled them locally in an explicit
- * FORWARD REFERENCE, and this guard compared the two spellings so they could not diverge.
+ * The three tokens the pooled currency pair answers that the contract did not declare while it had
+ * no member able to emit them.
  */
 const POOLED_CURRENCY_TOKENS = Object.freeze([
   'insufficient',
@@ -271,9 +246,7 @@ const POOLED_CURRENCY_TOKENS = Object.freeze([
 describe('the pooled outcome tokens', () => {
   it('are answered through the contract, with no second vocabulary beside it', () => {
     // The forward reference is retired: the contract declares all three beside the pooled members
-    // that answer them (issue 1342). So the guard that once compared two spellings now pins the
-    // single home against the module that answers with it — and reds if a second one reappears,
-    // which is the whole failure the forward reference was written to be safe from.
+    // that answer them (issue 1342).
     const text = source('../src/systems/currencyAffordance.js');
     for (const token of POOLED_CURRENCY_TOKENS) {
       assert.equal(

@@ -1,22 +1,4 @@
-/**
- * The gathering task editor's seven migrated numeric fields, MOUNTED (issue 1050).
- *
- * This is the behavioural half that `stepper-call-site-contract.test.js` cannot state. That suite
- * proves each call site passes `allowUnset` if and only if its field genuinely persists absence;
- * this one drives the real component and watches what its update function actually receives — the
- * other end of the chain, where a handler that coerced `null` into a number would break the
- * guarantee without touching a single prop.
- *
- * Seven of the fifteen fields in D1a's two tables live here, including three of the four
- * genuine-absence ones outside the manager root, which is why this is the editor that earns a
- * mount rather than one of the nineteen.
- *
- * It is also the Phase 3 entry for the keyboard non-regression check: `Stepper` owns no keydown
- * handler, so Up/Down are native `<input type="number">` behaviour and the only thing that keeps
- * them working is that the element stays a number input on a live commit path. See
- * `tests/helpers/numericKeyboardStep.js` for why that is driven by `stepUp()` plus an `input`
- * event rather than by a synthesised `keydown`.
- */
+/** The gathering task editor's seven migrated numeric fields, MOUNTED (issue 1050). */
 import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -27,7 +9,16 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { stepMigratedNumberField, stepNativeNumberInput } from '../helpers/numericKeyboardStep.js';
+// The editor's seven converted pickers are opened and clicked through the shared helper (issue 1510).
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  closeSelectPanel,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const EDITOR_PATH = 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
@@ -38,8 +29,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
-    // The SHARED subject check-modifier picker's resolver (issue 1095): it asks what an
-    // ABSENT `maxModifierPicks` means rather than coercing it. These four close its graph.
+    // The SHARED subject check-modifier picker's resolver (issue 1095).
     'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
     'src/systems/salvageCheckUsability.js',
@@ -48,7 +38,7 @@ const harness = createMountedComponentHarness({
     'src/utils/craftingCheckExpression.js',
     'src/utils/rollExpressionAverage.js',
     'src/utils/rollFormulaRollability.js',
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/dropRateTier.js',
@@ -61,24 +51,29 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/gatheringImageDefaults.js',
-    'src/utils/complicationSummary.js',
+    'src/ui/model/complicationSummary.js',
     'src/systems/characterPrerequisites.js',
+    // The seven converted option vocabularies (issue 1510).
+    'src/ui/svelte/apps/manager/gatheringTaskSelectOptions.js',
   ],
   // A component missing here does not fail this suite — it HANGS it, reported as `# cancelled`.
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
-    // ONE labelled push-button (issue 1118), which the stamina Add modifier and both Add drop
-    // rule controls render, and the three availability add menus' shared primitive (issue 1458).
+    // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
+    // The result group card renders the product's ONE ordered list (issue 1512) and the stage's
+    // complication band through it.
+    'src/ui/svelte/components/SortableList.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeStageComplicationBand.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeResultItemRow.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
@@ -99,11 +94,7 @@ before(() => harness.setup());
 after(() => harness.teardown());
 afterEach(() => harness.remount());
 
-/**
- * A task with every migrated field populated: both economy cards on, a stamina modifier with both
- * bounds set, a node pool, and an over-time chance respawn (the one branch that renders the
- * chance field).
- */
+/** A task with every migrated field populated: both economy cards on. */
 function taskFixture() {
   return {
     id: 'task-1',
@@ -139,7 +130,15 @@ async function mountEditor(resolutionMode = 'routed') {
     // (`dcOverrideEnabled`) — under `d100` the field this suite's headline case drives does not
     // exist at all.
     resolutionMode,
-    characterModifierLibrary: [{ id: 'mod-a', label: 'Herbalism' }],
+    characterModifierLibrary: [
+      { id: 'mod-a', label: 'Herbalism' },
+      { id: 'mod-b', label: 'Prospecting' },
+    ],
+    // The converted default-environment picker has rows only when the parent feeds it some.
+    environmentOptions: [
+      { id: 'env-forest', name: 'Old Forest' },
+      { id: 'env-cave', name: 'Deep Cave' },
+    ],
     onUpdateTask: (patch) => {
       updates.push(patch);
       task = { ...task, ...patch };
@@ -148,14 +147,7 @@ async function mountEditor(resolutionMode = 'routed') {
   return {
     root,
     updates,
-    /**
-     * Feed the recorded patches back in, the way the real host does.
-     *
-     * Not optional bookkeeping: `commit()`'s dedupe guard compares against the value the component
-     * currently holds, so a second edit back to the ORIGINAL value is correctly a no-op while the
-     * component still believes nothing changed. A test that never re-props would read that
-     * correct no-op as a broken commit path.
-     */
+    /** Feed the recorded patches back in, the way the real host does. */
     sync: () => harness.setProps({ task }),
     /** The real `<input>` behind a Stepper, located by its test hook or its accessible name. */
     field: (selector) => {
@@ -195,8 +187,7 @@ const CLEARS_TO_ABSENCE = [
   {
     id: 'nodes.max',
     selector: '[data-gathering-task-node-count]',
-    // Clearing the pool nulls the whole `nodes` object, which is what
-    // `normalizeNodeConfig(null)` short-circuits on.
+    // Clearing the pool nulls the whole `nodes` object.
     read: (patch) => patch.nodes,
     expected: null,
   },
@@ -215,9 +206,6 @@ const CLEARS_TO_ABSENCE = [
 ];
 
 // The cosmetic-zero fields. The invariant is deliberately NOT "clearing persists 0":
-// `allowUnset={false}` cannot do that — `onInput` returns early on `''` and `onBlur` re-asserts
-// the prior value — so the testable statement is that the update function never RECEIVES `null`,
-// paired with a live-value check proving the field still commits at all.
 const NEVER_RECEIVES_NULL = [
   {
     id: 'staminaCost',
@@ -237,26 +225,7 @@ const NEVER_RECEIVES_NULL = [
 ];
 
 describe('Gathering task editor steppers (issue 1050)', () => {
-  // ── Two adds on one screen, two roles, and both were wrong (issue 1118) ──────────────
-  //
-  // Audit rows 34 and 35. The gathering task editor renders two ADD verbs, and the sweep found
-  // them spelt as one bare `manager-button` each:
-  //
-  //  - Add modifier appends to the stamina modifier list directly above it, which is `dashed`:
-  //    a dashed outline reads as the empty slot the next row will fill. It takes NO `fullWidth`
-  //    — that is the delta's per-row ruling, and it is about the container: the list is a
-  //    column of grid rows, and a full-width dashed control under them reads as a fourth row
-  //    rather than as the thing that adds one. Its scoped `justify-self: start` went with the
-  //    conversion rather than being fought for; `justify-self` is a grid property and the
-  //    button's parent is a column flex container, so it had never done anything.
-  //  - Add drop rule is the drops section's CREATE action in toolbar chrome, which is
-  //    `primary`. The proof it was a mistake rather than a choice is on the SAME screen: the
-  //    identical verb in the drops empty state calls the same `onAddDrop` with the same label
-  //    and already shipped `is-primary`. Two spellings of one verb on one screen.
-  //
-  // Each is addressed by its own hook, and the two are asserted against EACH OTHER: moving
-  // either role onto the other control reds this, where "the editor contains a dashed button"
-  // and "the editor contains a primary button" would both still pass.
+  // ── Two adds on one screen, two roles.
   it('paints Add modifier as a dashed append and Add drop rule as the toolbar primary', async () => {
     const { root } = await mountEditor('d100');
 
@@ -296,8 +265,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
   });
 
   it('renders every migrated field as a real number input inside a Stepper', async () => {
-    // Fail closed: if a selector stopped resolving, every table-driven assertion below would
-    // silently assert nothing, and `field()` throwing here says so in one place.
+    // Fail closed: if a selector stopped resolving.
     const { field } = await mountEditor();
     for (const { selector } of [...CLEARS_TO_ABSENCE, ...NEVER_RECEIVES_NULL]) {
       assert.equal(field(selector).type, 'number', `${selector} is still a number input`);
@@ -343,10 +311,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
   });
 
   it('still steps from the keyboard, which is native number-input behaviour', async () => {
-    // Phase 3's keyboard non-regression check. `Stepper` has no keydown handler of its own, so
-    // this is what proves the migration did not quietly trade the arrows for a `type="text"` box:
-    // `stepUp()` throws on a non-steppable input, and the recorded commit proves the `input` event
-    // the browser fires afterwards still reaches `onInput` -> `commit` -> the call site.
+    // Phase 3's keyboard non-regression check. `Stepper` has no keydown handler of its own.
     const { field, updates, sync } = await mountEditor();
     const dc = field('[data-gathering-task-dc-override]');
     assert.equal(
@@ -377,38 +342,177 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     stepNativeNumberInput(input, 'down');
     await sync();
 
-    const unit = root.querySelector('[data-gathering-task-node-interval-unit]');
-    assert.equal(unit.tagName, 'SELECT');
-    unit.value = 'minutes';
-    unit.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    const unit = '[data-gathering-task-node-interval-unit]';
+    assert.equal(root.querySelector(unit).tagName, 'BUTTON', 'the unit control is a trigger now');
+    chooseSelectOption(root, unit, 'minutes');
     await sync();
     assert.equal(lastWrite(updates, read).intervalUnit, 'minutes');
     assert.equal(lastWrite(updates, read).intervalAmount, 1440);
     assert.equal(input.value, '1440');
-    assert.equal(unit.value, 'minutes');
+    // The harness localizes to the key, so every label here is the call site's own fallback.
+    assert.equal(selectTriggerText(root, unit), 'minutes', 'and the trigger reads the chosen unit');
   });
 
-  it('lets the respawn unit select size to its content, on specificity not source order', () => {
-    // The attribute qualifier in that rule is what makes it work, and it is easy to delete as
-    // redundant because `select` alone reads like it says the same thing. It does not. Svelte 5
-    // emits its scoping class as `:where(.svelte-hash)` on every compound after the first, and
-    // `:where()` contributes ZERO specificity — so the unqualified form compiles to (0,2,1),
-    // exactly TIES the blanket rule, and resolves on the load order of two separately delivered
-    // stylesheets. Asserted on the compiled CSS rather than the source, because the source is
-    // not where the tie happens.
+  it('lets the respawn unit picker size to its content, on specificity not source order', () => {
+    // The attribute qualifier makes it win; `:global()` is what lets it reach the trigger at all.
     const compiled = scopedComponentCss(resolve(repoRoot, EDITOR_PATH)).css;
-    const rule = /\.manager-task-node-interval-row[^{]*select[^{]*\{[^}]*\}/.exec(
-      compiled.replace(/\/\*[\s\S]*?\*\//g, '')
-    );
-    assert.ok(Boolean(rule), 'the interval-row select rule survives compilation');
+    const rule =
+      /\.manager-task-node-interval-row[^{]*\.fabricate-select-trigger\[data-gathering-task-node-interval-unit\][^{]*\{[^}]*\}/.exec(
+        compiled.replace(/\/\*[\s\S]*?\*\//g, '')
+      );
+    assert.ok(Boolean(rule), 'the interval-row trigger rule survives compilation');
     const selector = rule[0].split('{')[0];
     // `:where()` is free, so it is excluded from the count on purpose.
     const classColumn = selector.replace(/:where\([^)]*\)/g, '').match(/\.[\w-]+|\[[^\]]+\]/g);
     assert.ok(
       classColumn.length > 2,
-      `${selector.trim()} must out-specify \`.fabricate-field.manager-field select\` (0,2,1), `
+      `${selector.trim()} must out-specify a two-class caller rule, `
         + `but its class column is ${classColumn.length}`
     );
     assert.match(rule[0], /width: auto/, 'and it is the width that is being released');
+  });
+
+  // ── The seven converted pickers (issue 1510), each driven rather than read.
+  const CONVERTED = [
+    {
+      id: 'default environment',
+      trigger: '[data-gathering-task-field="defaultEnvironmentId"]',
+      name: 'Default environment (canvas drop)',
+      offers: ['__unchanged__', 'env-forest', 'env-cave'],
+      choose: 'env-cave',
+      read: (patch) => patch.defaultEnvironmentId,
+      expected: 'env-cave',
+    },
+    {
+      id: 'stamina cost modifier',
+      trigger: '.fabricate-select-trigger[aria-label="Per-actor cost modifiers"]',
+      name: 'Per-actor cost modifiers',
+      offers: ['mod-a', 'mod-b'],
+      choose: 'mod-b',
+      read: (patch) => patch.staminaCostModifiers?.[0]?.modifierId,
+      expected: 'mod-b',
+    },
+    {
+      id: 'stamina modifier sign',
+      trigger: '.fabricate-select-trigger[aria-label="Operator"]',
+      name: 'Operator',
+      offers: ['-', '+'],
+      choose: '-',
+      read: (patch) => patch.staminaCostModifiers?.[0]?.operator,
+      expected: '-',
+    },
+    {
+      id: 'deplete',
+      trigger: '[data-gathering-task-node-deplete]',
+      name: 'Deplete',
+      offers: ['onStart', 'onSuccess'],
+      choose: 'onSuccess',
+      read: (patch) => patch.nodes?.depletionTiming,
+      expected: 'onSuccess',
+    },
+    {
+      id: 'respawn policy',
+      trigger: '[data-gathering-task-node-respawn]',
+      name: 'Respawn',
+      offers: ['manual', 'overTime', 'nonRegenerating'],
+      choose: 'nonRegenerating',
+      read: (patch) => patch.nodes?.respawn?.policy,
+      expected: 'nonRegenerating',
+    },
+    {
+      id: 'respawn interval unit',
+      trigger: '[data-gathering-task-node-interval-unit]',
+      name: 'Respawn interval unit',
+      offers: ['minutes', 'hours', 'days', 'weeks'],
+      choose: 'days',
+      read: (patch) => patch.nodes?.respawn?.intervalUnit,
+      expected: 'days',
+    },
+    {
+      id: 'gain mode',
+      trigger: '[data-gathering-task-node-gain-mode]',
+      name: 'Each interval',
+      offers: ['guaranteed', 'chance', 'expression'],
+      choose: 'expression',
+      read: (patch) => patch.nodes?.respawn?.gainMode,
+      expected: 'expression',
+    },
+  ];
+
+  it('renders every converted picker as a named trigger, offering the rows it used to', async () => {
+    const { root } = await mountEditor();
+    for (const control of CONVERTED) {
+      const trigger = root.querySelector(control.trigger);
+      assert.ok(Boolean(trigger), `${control.id}: no trigger matches ${control.trigger}`);
+      assert.equal(trigger.tagName, 'BUTTON', `${control.id} renders the shared picker's trigger`);
+      assert.equal(
+        assertSelectHasResolvedName(root, control.trigger),
+        control.name,
+        `${control.id} resolves to its pinned accessible name`
+      );
+      assert.deepEqual(
+        selectOptionValues(root, control.trigger),
+        control.offers,
+        `${control.id} offers the rows its <option> list did`
+      );
+      // One panel at a time: a list left open is the one the next lookup would find.
+      closeSelectPanel(root, control.trigger);
+    }
+  });
+
+  it('describes the default-environment picker by the hint that sits beside it', async () => {
+    // The `Field` host is a `<div>` now, so the hint is no longer part of the computed name and
+    // has to be referenced explicitly (issue 1510).
+    const { root } = await mountEditor();
+    const picker = '[data-gathering-task-field="defaultEnvironmentId"]';
+    const trigger = root.querySelector(picker);
+    const described = (trigger.getAttribute('aria-describedby') ?? '').trim();
+    assert.ok(described.length > 0, `${picker} carries no \`aria-describedby\` at all`);
+    const hint = trigger.ownerDocument.getElementById(described);
+    assert.ok(
+      Boolean(hint),
+      `${picker} points \`aria-describedby\` at "${described}", which names no element`
+    );
+    assert.match(
+      hint.textContent.replaceAll(/\s+/gu, ' ').trim(),
+      /tagged scene region/u,
+      'and the element it names is the canvas-drop hint, not another caption'
+    );
+  });
+
+  it('clears the default environment back to the sentinel', async () => {
+    const { root, updates, sync } = await mountEditor();
+    const picker = '[data-gathering-task-field="defaultEnvironmentId"]';
+    const read = (patch) => patch.defaultEnvironmentId;
+    chooseSelectOption(root, picker, 'env-cave');
+    await sync();
+    assert.equal(lastWrite(updates, read), 'env-cave', 'choosing an environment persists its id');
+    assert.equal(selectTriggerText(root, picker), 'Deep Cave', 'and the trigger reads it back');
+
+    chooseSelectOption(root, picker, '__unchanged__');
+    await sync();
+    assert.equal(
+      lastWrite(updates, read),
+      null,
+      'choosing the sentinel row must clear the default environment, not persist an empty string'
+    );
+    assert.equal(
+      selectTriggerText(root, picker),
+      'None (ask on drop)',
+      'and the trigger reads the sentinel back'
+    );
+  });
+
+  it('forwards the chosen value of every converted picker to the update function', async () => {
+    for (const control of CONVERTED) {
+      const { root, updates } = await mountEditor();
+      chooseSelectOption(root, control.trigger, control.choose);
+      assert.equal(
+        lastWrite(updates, control.read),
+        control.expected,
+        `${control.id}: choosing ${control.choose} must reach the update function`
+      );
+      harness.remount();
+    }
   });
 });

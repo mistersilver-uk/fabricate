@@ -6,87 +6,20 @@ export {
   FOUNDRY_ICON_FREE_INTERSECTION
 } from './foundryIconCatalogue.js';
 
-// Patterns that identify the icons the curated vocabulary leaves out.
+// The patterns that decide what the curated icon vocabulary leaves OUT. The rule they serve — a
+// glyph suits ANY fiction and Foundry can render it, so the question is "is there a story this
+// picture belongs in" — and every exclusion category below are specified in
+// `openspec/specs/ui-visual-style/spec.md`, `#### Icon vocabulary`. That requirement also states why
+// a pattern matching nothing today is RETAINED: Font Awesome promotes icons out of Pro, so a
+// deleted pattern stops excluding the moment its members are promoted, with nothing to report it.
 //
-// THE RULE. If a glyph suits ANY fiction — fantasy, science fiction or general fiction — and
-// Foundry can render it, it is available. A syringe is a med-bay; a stopwatch times a training
-// montage; a dumbbell IS the training montage; a checkered flag ends a race, and has ended chariot
-// races for far longer than it has ended motor ones; a blighted ear of wheat is the oldest fantasy
-// plot there is. The question to ask of a new icon is never "would a dungeon have one", nor even
-// "would a fictional setting have one", but "is there a story this picture belongs in".
-//
-// That rule is WIDER than the one this list was first written against, and widening it dissolved
-// whole categories rather than shortening them. A syringe, a set of pills, a blender, a detergent
-// jug, a plug, a pair of lungs and a dumbbell were all held out as "present-day clinical or
-// domestic furniture no fiction is reaching for". General fiction reaches for every one of them,
-// and science fiction reaches for the med-bay twice. The clinical, pandemic, consumer-electronics,
-// civilian-transport, fast-food and modern-sports blocks are gone for that reason — not trimmed,
-// gone — because their reasoning was "a dungeon has no ambulance", and that was never the test.
-//
-// WHAT STAYS OUT is single characters and emoji reactions, plus four narrower things, and every
-// one of them is about what the glyph DEPICTS:
-//
-//  1. Glyphs whose meaning is a SOFTWARE AFFORDANCE rather than a depicted object: the editor's
-//     controls, transport controls, file formats, chart types, and the arrows that mean navigate.
-//  2. Glyphs whose SUBJECT is a real-world institution, currency or cause — a currency sign, an
-//     agency-marked relief building, a party emblem, an access provision's symbol — as against a
-//     gesture, a symbol or an object a fiction is free to reuse.
-//  3. Present-day SIGNAGE: the pictograms that label a building rather than depict a thing in it.
-//     This is what survives of a much broader category, and it still catches something — the
-//     restroom sign, the no-entry sign, the parking P, the lift and the hospital H are drawings of
-//     signs. The bath, the toilet and the ambulance those signs point at are objects, and they
-//     are curated in.
-//  4. Redundant variants of a glyph the vocabulary already carries.
-//
-// THE INSTITUTION RULE IS ABOUT DEPICTION, NEVER PROVENANCE. A release is not something a GM can
-// see; the drawing is. A crate, a borehole and a cooking burner are curated in even though Font
-// Awesome shipped them alongside the relief pictograms, and a raised-hand Vulcan salute is curated
-// in even though Star Trek owns the gesture's name, because what the glyph depicts is a hand.
-//
-// WEAPONS ARE IN. A gun, a bomb and a land mine are all things fiction is about. The arrow that is
-// a projectile is in for the same reason the arrows that mean "go that way" are out. The medieval
-// armoury is missing for a reason that is NOT this rule: Font Awesome's free release publishes no
-// sword, axe, dagger, mace or bow at all, and Fabricate may name only what that release publishes
-// (see the licence note in foundryIconCatalogue.js). The rule would admit them; there is nothing
-// to admit.
-//
-// NAMES ARE NOT THE SUBJECT EITHER. A depiction cannot be dodged by spelling, so a glyph is
-// excluded when ANY of its names matches — `automobile` is the same drawing as `car`, and the
-// vocabulary would otherwise offer under one name the picture it had just excluded under another.
-//
-// BRANDS ARE NOT IN THIS LIST any more. They used to be, as a block of company names. They are now
-// excluded where they can be MEASURED rather than guessed: a logo is exactly a glyph that only
-// Font Awesome's brands face draws, and the catalogue generator drops those before this list runs.
-//
-// SOME PATTERNS BELOW NOW MATCH NOTHING, AND THEY STAY. The catalogue this list filters is
-// intersected with Font Awesome Free, because Foundry's Pro licence forbids a third-party package
-// from referencing a Pro icon in code — foundryIconCatalogue.js quotes the clause. When that
-// intersection landed, 39 of the 146 patterns here matched no name left in the catalogue:
-// `/^(circle|square)apore-dollar$/`, the enclosed currency signs, `/^transporter-([1-7]|empty)$/`,
-// the twenty-four clock faces, and others.
-//
-// Pruning them would read as tidying and behave as a trapdoor. Font Awesome PROMOTES icons from
-// Pro into the free set between releases, so a pattern deleted today is a pattern that silently
-// stops excluding the first time its members are promoted and the catalogue is regenerated — and
-// nothing would report it, because the exclusion it used to make is the thing that vanished. Every
-// pattern here describes what a glyph DEPICTS, and a depiction does not change with a licence, so
-// one is retired when the IDEA behind it is retired and never because this release of the free set
-// happens not to ship its members.
-//
-// `circleapore-dollar`, `squareapore-dollar` and `signapore-dollar-sign` are, for the avoidance of
-// the obvious guess, genuine upstream Font Awesome spellings measured in Foundry's own bundle
-// rather than corrupted text. They are not to be "corrected".
+// `circleapore-dollar`, `squareapore-dollar` and `signapore-dollar-sign` are genuine upstream Font
+// Awesome spellings, measured in Foundry's own bundle. They are not to be "corrected".
 export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
 
-  // ── Single characters and typographic marks ──
-  //
-  // A letter, a digit and a comma are characters. Foundry renders them and every fiction is
-  // written down, but a picker offering "E" beside "Dragon" is offering a font, not an icon. The
-  // enclosed forms and the mathematical operators go with them.
-  //
-  // What is NOT here: `asterisk`, `exclamation` and `question`. Those three read as a drawing as
-  // readily as a mark — they are what a story hangs over a character's head — and the first of
-  // them is a star.
+  // Single characters and typographic marks: a picker offering "E" beside "Dragon" is offering a
+  // font. Deliberately NOT here: `asterisk`, `exclamation` and `question`, which read as a drawing
+  // as readily as a mark — they are what a story hangs over a character's head.
   /^\d$/,
   /^[a-z]$/,
   /^(00|100)$/,
@@ -101,26 +34,17 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^(omega|pi|theta|overline|option|single-quote-left|single-quote-right|square-root|tally|tally-[1-4])$/,
   /^(plus|minus|xmark|times|equals|divide)-large$/,
 
-  // ── Emoji reactions ──
-  //
-  // A grinning face is a reaction to a story, not a thing in one. The whole set goes, under either
-  // the `face-` prefix Font Awesome 6 gave them or the bare names Pro still carries alongside it.
+  // Emoji reactions: a grinning face is a reaction to a story, not a thing in one. Both the `face-`
+  // prefix Font Awesome 6 gave them and the bare names Pro still carries alongside it.
   /^face-/,
   /^(angry|dizzy|exploding-head|flushed|frown|frown-open|grimace|grin|grin-alt|grin-beam|grin-beam-sweat|grin-hearts|grin-squint|grin-squint-tears|grin-stars|grin-tears|grin-tongue|grin-tongue-squint|grin-tongue-wink|grin-wink|hushed|kiss|kiss-beam|kiss-wink-heart|laugh|laugh-beam|laugh-squint|laugh-wink|meh|meh-blank|meh-rolling-eyes|sad-cry|sad-tear|smile|smile-beam|smile-plus|smile-wink|surprise|tired|weary|woozy)$/,
 
-  // ── 1. Software affordances ──
-  //
-  // The glyphs whose meaning is "click me" or "this file is a spreadsheet". They depict no object
-  // a character could pick up, and the reason they stay out is not that they are modern — a
-  // starship's console has buttons — but that their subject is the software, not the fiction.
-  //
-  // The line this block draws, and it is a real one: a rack of servers, a stack of discs, a chip, a
-  // satellite dish, a laptop and a robot are DEPICTED OBJECTS and stay curated in. A console
-  // prompt, a square-wave chart and a "download" arrow are not.
+  // 1. Software affordances: glyphs meaning "click me" or "this file is a spreadsheet". Not because
+  // they are modern — a starship console has buttons — but because their subject is the software. A
+  // rack of servers, a chip, a satellite dish, a laptop and a robot are DEPICTED OBJECTS and stay.
 
-  // Directional arrows, carets and chevrons — the whole navigational vocabulary. Font Awesome Pro
-  // draws some nine hundred of them and every one means "go that way". `arrow-archery` is the one
-  // member the weapons rule pulls back out: it draws a projectile, not a direction.
+  // The whole navigational vocabulary, every member of which means "go that way". `arrow-archery`
+  // is the one the weapons rule pulls back out: it draws a projectile, not a direction.
   /^arrows?-(?!archery)/,
   /^arrows?$/,
   /^(caret|carets|chevron|chevrons|angle|angles)-/,
@@ -149,17 +73,15 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^globe-(pointer|wifi|www)$/,
   /^(wave|waves)-(sine|square|triangle)$/,
 
-  // Windows, browsers and the desktop metaphor. The MACHINE is an object and stays; the chrome
-  // drawn on its screen is not.
+  // Windows and the desktop metaphor: the MACHINE is an object and stays, its screen chrome is not.
   /^(window|windows|browser|browsers|sidebar|panel|dashboard|screen-users|display-(arrow|chart|code|slash))($|-)/,
   /^(rectangle|square)-(ad|history|list|pro|terminal|this-way-up|wide|xmark|kanban|barcode)$/,
   /^rectangle-(4k|api|beta|code|hd|high-dynamic-range|history|irc|n-a|new|sd|tall|vertical-history)/,
   /^rectangles-mixed$/,
   /^square-(code|root|rss)$/,
 
-  // Files, folders, formats and the mail SYSTEM. A sealed letter, an opened one and a letter with
-  // a page in it are pre-modern objects and stay curated; a file format and a
-  // delivery-confirmation badge are not.
+  // Files, formats and the mail SYSTEM. A sealed letter, an opened one and a letter with a page in
+  // it are pre-modern objects and stay; a file format and a delivery-confirmation badge are not.
   /^files?$/,
   /^file-(aiff|arrow|audio|ban|binary|brackets|cad|caret|chart|check|circle|clipboard|code|csv|css|dashed-line|doc|download|edit|eps|excel|export|fragment|gif|half-dashed|html|icns|image|import|jpg|js|lock|magnifying-glass|midi|minus|mov|mp3|mp4|music|odf|pdf|pen|plus|png|powerpoint|ppt|prescription|search|shield|slash|spreadsheet|svg|tex$|times|upload|user|vector|video|wav|waveform|word|xls|xmark|xml|zip|zipper)/,
   /^(folder|folders|inbox|inboxes|paperclip|attachment)($|-)/,
@@ -177,11 +99,10 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^(login|logout|sign-in|sign-out|right-from-bracket|right-to-bracket|left-from-bracket|left-to-bracket|power-off|restart|shutdown)($|-)/,
   /^(circle|square|hexagon|octagon|diamond|rectangle)-(check|dashed|ellipsis|exclamation|half|info|minus|notch|plus|question|xmark|sort|three-quarters|quarters?|image|kanban|binary|full|share|user|users|video|waveform)/,
 
-  // ── 2. Real-world institutions, currencies and causes ──
+  // 2. Real-world institutions, currencies and causes.
 
-  // Currency signs and the money instruments built around them. A coin, a purse, a sack of gold
-  // and a gemstone are treasure in any fiction, and a hand holding a coin is alms; a national
-  // currency's SIGN is a present-day institution's mark, and so is the badge drawn around it.
+  // A coin, a purse and a sack of gold are treasure in any fiction; a national currency's SIGN is a
+  // present-day institution's mark, and so is the badge drawn around it.
   /-sign$/,
   /^(circle|square|badge|box|comment|comments|display-chart-up-circle|envelope-open|filter-circle|funnel|gauge-circle|inbox|lightbulb|message|shield|user)-(dollar|usd|euro|currency|percent)/,
   /^(austral|baht|bangladeshi-taka|bitcoin|brazilian-real|cedi|cent|chf|circleapore-dollar|cny|cruzeiro|danish-krone|dollar|dong|eur|euro|florin|franc|gbp|guarani|hryvnia|ils|indian-rupee|inr|jpy|kip|krw|lari|lira|litecoin|malaysian-ringgit|manat|mill|naira|norwegian-krone|peruvian-soles|peseta|peso|polish-zloty|renminbi|ruble|rupee|rupiah|shekel|singapore-dollar|sterling|swedish-krona|tenge|try|tugrik|turkish-lira|usd|won|yen)$/,
@@ -193,19 +114,11 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^route-(highway|interstate)$/,
   /^(cash-register|credit-card|receipt|circle-dollar-to-slot|donate|barcode-read|barcode-scan|rectangle-ad|billboard|ranking-star)($|-)/,
 
-  // The pictograms of a present-day relief operation: agency-marked buildings and personnel, camp
-  // and sanitation materiel, transfers and rations, the figures that stand for displaced,
-  // endangered and injured people, and the disasters an operation responds to.
-  //
-  // Scoped by what the glyph DEPICTS. A glyph from the same release that draws an ordinary object
-  // or action a character handles is curated in, and several are — a packed crate, porters
-  // carrying one, a cooking burner, a kitchen set, a borehole, a spilled sack, a lookout tower,
-  // and a blighted ear of wheat, which this list used to catch and no longer does: a harvest
-  // failing is a story, not an operation, and the category's own wording never predicted it.
-  //
-  // `people-pulling` is the one member of this cluster the rule ABOVE would admit and the list
-  // below still excludes, so it is held out on the redundancy rule instead: two figures hauling a
-  // load is ordinary labour, but `people-carry-box` already carries that idea.
+  // The pictograms of a present-day relief operation, scoped by what the glyph DEPICTS: a glyph
+  // from the same release drawing an ordinary object a character handles stays curated in, and
+  // several do — a packed crate, a cooking burner, a borehole, a blighted ear of wheat.
+  // `people-pulling` is the one member the depiction rule would admit; it is held out on the
+  // REDUNDANCY rule instead, because `people-carry-box` already carries that idea.
   /^bridge-(circle|lock|water)/,
   /^building-(circle|lock|ngo|shield|un|user|wheat)/,
   /^child-(combatant|dress|reaching)$/,
@@ -229,53 +142,26 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^tent($|s$|-)/,
   /^users-(between-lines|line|rays|rectangle|viewfinder)$/,
 
-  // Symbols that stand for a present-day access provision or political cause rather than depicting
-  // an object or an action.
+  // Symbols standing for an access provision or political cause rather than depicting an object.
   /^(american-sign-language-interpreting|asl-interpreting|assistive-listening-systems|audio-description|blind|braille|closed-captioning|deaf|deafness|hard-of-hearing|universal-access|low-vision)($|-)/,
   /^(ear-(deaf|listen)|eye-low-vision|hands-asl-interpreting|hands-american-sign-language-interpreting|person-cane|wheelchair(-move)?)$/,
   /^(check-to-slot|democrat|republican|person-booth|landmark-(dome|flag)|recycle|ban-smoking|flag-usa)$/,
   /^(genderless|neuter|non-binary|transgender)$/,
 
-  // ── 3. Present-day signage ──
-  //
-  // The pictograms that label a building rather than depict a thing inside it. A restroom sign is
-  // a drawing of a sign; the toilet, the bath and the ambulance those signs point at are objects,
-  // and every one of them is curated in.
+  // 3. Present-day signage: pictograms that LABEL a building rather than depict a thing inside it.
+  // The toilet, the bath and the ambulance those signs point at are objects, and all stay curated.
   /^(restroom|do-not-enter|ban($|-(bug|parking))|hospital-symbol|helicopter-symbol|square-parking|circle-parking|parking|elevator|escalator|street-view|location-(arrow|check|crosshairs|dot|exclamation|minus|pen|pin|plus|question|smile|xmark))/,
   /^nfc-(lock|magnifying-glass|pen|signal|slash|trash)$/,
 
-  // ── 4. Redundant variants of a curated glyph ──
-  //
-  // A variant that only changes a fill level, a needle position, a rotation, a status badge or the
-  // scenery behind a glyph the vocabulary already carries adds picker rows without adding an idea.
-  // The picker shows seven or eight rows at a time and generates each label from the icon code, so
-  // nine thermometers spend two viewports saying "temperature". What stays is ONE member per
-  // idea — the clearest glyph for it, plus any member of the same family that means something
-  // DIFFERENT rather than more or less of the same thing. The steps between go.
-  //
-  // Deliberately NOT "the ends of a ladder", which is what this said until review measured it
-  // against what ships and found it predicted the opposite on two families of three. Temperature
-  // DROPS both its ends (`-empty`, `-full`) and keeps two middles, because hot and cold are two
-  // conditions while a fill level is one condition drawn nine times; battery keeps its ends only
-  // because a dead cell and a charged one are likewise two conditions rather than two degrees.
-  // And a single member need not be the BARE code: the gauges differ only by needle position, so
-  // the family contributes one dial, and the one worth having is the legible one.
-  //
-  // A `-slash` is NOT a fill level and is not caught here. A crossed-out droplet means "no water",
-  // which is a different statement from "water", and fiction says both.
-  //
-  // Neither is a badge on a DEPICTED OBJECT, and that line is what keeps
-  // `wheat-awn-circle-exclamation` in. A tick on a circle is a control saying "done"; a warning on
-  // an ear of wheat is a blighted crop, a warning on an aircraft is a grounded flight, and a cross
-  // on a road is a road nobody is getting down. Those are events a story is made of, so the badge
-  // is the point of the drawing rather than a status light stuck on it. The badges the affordance
-  // block above catches are the ones stuck on a SHAPE, which depicts nothing to make a statement
-  // about.
-  //
-  // Kept: battery-empty and battery (which is the full cell, and the name the bundle offers it
-  // under); thermometer with temperature-high and temperature-low;
-  // gauge-high; shop and store; city; jet-fighter; tower-broadcast and tower-observation; one
-  // clock; one hourglass at half; one calendar; one speech bubble and one pair of them.
+  // 4. Redundant variants. What stays is ONE member per idea, plus any member of the same family
+  // meaning something DIFFERENT rather than more or less of the same thing; the steps between go.
+  // It is NOT "the ends of a ladder": temperature drops BOTH its ends and keeps two middles,
+  // because hot and cold are two conditions while a fill level is one condition drawn nine times,
+  // and battery keeps its ends only because a dead cell and a charged one are two conditions too.
+  // A `-slash` is not a fill level — "no water" is a different statement from "water".
+  // Neither is a badge on a DEPICTED OBJECT, which is what keeps `wheat-awn-circle-exclamation`:
+  // a warning on an ear of wheat is a blighted crop, where a tick on a circle is a control saying
+  // "done". The affordance block above catches the badges stuck on a SHAPE, which depicts nothing.
   /^battery-(half|quarter|three-quarters|low|bolt|exclamation)$/,
   /^gauge(-simple)?(-(low|med|med-low|med-high|min|max))?$/,
   /^gauge(-simple)?-circle-/,
@@ -324,40 +210,22 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^video-(arrow|down-to-line|plus|question)/,
   /^(heart|rainbow|star-sharp)-half($|-)/,
 
-  // ── Remaining out-of-scope icons ──
-  //
-  // Members that no category above predicts and that no story is reaching for.
+  // Members no category above predicts, and that no story is reaching for.
   /^(fingerprint|language|notdef|ditto|icons|icons-alt|font-awesome|web-awesome|square-font-awesome)($|-)/,
   /^(poo|poo-storm|poop|hand-middle-finger)$/
 ]);
 
-/**
- * Whether a single icon NAME matches one of the exclusions.
- *
- * Named for what it does. It answers "does this name match an exclusion", NOT "is this icon
- * available": it consults no catalogue, so it says `false` of a typo and of a name Foundry cannot
- * render. Membership is `isCuratedIconEntry` applied to a catalogue entry, or `findCuratedIcon`
- * applied to a name, and the curated vocabulary below is built that way and nowhere else.
- *
- * @param {string} iconName a bare Font Awesome icon name, such as `mortar-pestle`
- * @returns {boolean}
- */
+// Answers "does this name match an exclusion", NOT "is this icon available": it consults no
+// catalogue, so it says `false` of a typo and of a name Foundry cannot render. MEMBERSHIP is
+// `isCuratedIconEntry` over a catalogue entry, or `findCuratedIcon` over a name.
 export function isExcludedIconName(iconName) {
   const normalized = String(iconName || '').trim();
   if (!normalized) return true;
   return EXCLUDED_ICON_CODE_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
-/**
- * Whether a catalogue entry belongs to the curated vocabulary.
- *
- * A glyph is curated when NONE of its names is excluded. Evaluating every name rather than only
- * the offered one is what keeps the exclusions about depiction: `car` and `automobile` are one
- * drawing, and a rule that excluded only the name it happened to list would offer the other.
- *
- * @param {{ iconCode: string, aliases?: ReadonlyArray<string> }} definition
- * @returns {boolean}
- */
+// A glyph is curated when NONE of its names is excluded. Evaluating every name is what keeps the
+// exclusions about DEPICTION: `car` and `automobile` are one drawing.
 export function isCuratedIconEntry(definition) {
   const iconCode = String(definition?.iconCode || '').trim();
   if (!iconCode) return false;
@@ -365,16 +233,9 @@ export function isCuratedIconEntry(definition) {
   return ![iconCode, ...aliases].some((name) => isExcludedIconName(name));
 }
 
-/**
- * The curated vocabulary: every catalogue entry that survives the exclusions above.
- *
- * This is the ONE vocabulary Fabricate's pickers draw from, and it is constructed HERE and only
- * here. A surface that hand-curates a second list has created a second vocabulary that drifts from
- * this one; and a name added BESIDE this filter rather than to the catalogue would be a name the
- * catalogue cannot vouch for, which is how a set ends up offering an icon Foundry cannot draw.
- *
- * @type {ReadonlyArray<{ iconCode: string, label: string, aliases: ReadonlyArray<string> }>}
- */
+// The ONE vocabulary Fabricate's pickers draw from, constructed HERE and only here. A surface
+// hand-curating a second list has created a vocabulary that drifts from this one, and a name added
+// BESIDE this filter rather than to the catalogue is one the catalogue cannot vouch for.
 export const FOUNDRY_CURATED_ICON_DEFINITIONS = Object.freeze(
   FOUNDRY_ICON_DEFINITIONS.filter(isCuratedIconEntry)
 );
@@ -385,15 +246,8 @@ for (const definition of FOUNDRY_CURATED_ICON_DEFINITIONS) {
   for (const alias of definition.aliases) curatedByName.set(alias, definition);
 }
 
-/**
- * The curated entry a name resolves to, under its offered name or any of its aliases.
- *
- * This is the membership check: unlike `isExcludedIconName` it answers from the catalogue, so a
- * name Foundry cannot render resolves to null however plausible it looks.
- *
- * @param {string} iconName
- * @returns {{ iconCode: string, label: string, aliases: ReadonlyArray<string> }|null}
- */
+// The membership check: unlike `isExcludedIconName` it answers from the CATALOGUE, so a name
+// Foundry cannot render resolves to null however plausible it looks.
 export function findCuratedIcon(iconName) {
   return curatedByName.get(String(iconName || '').trim()) ?? null;
 }

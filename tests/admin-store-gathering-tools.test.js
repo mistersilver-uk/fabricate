@@ -1,15 +1,4 @@
-/**
- * Coverage for the per-system library tools and their draft layer in adminStore.
- *
- * Tools are SYSTEM-OWNED: the canonical library lives on the crafting system
- * (`system.tools`, persisted via the crafting system manager's `craftingSystems`
- * setting), NOT under `gatheringConfig.systems[id].tools`. This suite exercises:
- *   - _normalizeGatheringLibraryTool persistence + legacy compatibility (via the
- *     system-tools round-trip surfaced on viewState.selectedSystem.tools),
- *   - addGatheringLibraryTool / updateGatheringLibraryTool / deleteGatheringLibraryTool
- *     persisting through the crafting system manager,
- *   - the toolsDraft lifecycle (enter/update/save/cancel) and dirty tracking.
- */
+/** Coverage for the per-system library tools and their draft layer in adminStore. */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
@@ -18,6 +7,7 @@ import { SETTING_KEYS } from '../src/config/settings.js';
 import { Tool } from '../src/models/Tool.js';
 import { createToolScopeStore } from '../src/systems/worldScopeStores.js';
 import { createAdminStore } from '../src/ui/svelte/stores/adminStore.js';
+import { createServices as createSharedServices } from './helpers/adminStoreServices.js';
 
 let generatedToolId = 0;
 
@@ -103,13 +93,8 @@ function createMockServices(overrides = {}) {
             }
           : {}),
       });
-      // REPLACES THE ARRAY, exactly as `CraftingSystemManager#upsertTool` does
-      // (`system.tools = existing ? tools.map(...) : [...tools, staged]`). An IN-PLACE
-      // `sys.tools[index] = staged` is a looser double than the thing it stands for, and the
-      // looseness is load-bearing here: the read union memoizes on the world corpus object AND
-      // the in-system array, guarded by `(revision, length)`. A same-identity, same-length
-      // mutation misses every invalidation signal there is, so the union would serve the
-      // pre-save row and the editor's post-save re-read would silently test the memo.
+      // REPLACES THE ARRAY, exactly as `CraftingSystemManager#upsertTool` does (`system.tools =
+      // existing ? tools.map(...) : [...tools, staged]`).
       const index = sys.tools.findIndex((tool) => tool.id === staged.id);
       sys.tools =
         index >= 0
@@ -133,33 +118,15 @@ function createMockServices(overrides = {}) {
     deleteItem: async () => {},
   };
 
-  const mockRecipeManager = {
-    getRecipes: () => [],
-    getRecipe: () => null,
-    createRecipe: async () => ({}),
-    updateRecipe: async () => {},
-    deleteRecipe: async () => {},
-    importRecipes: async () => {},
-    exportRecipes: () => [],
-  };
-
-  const base = {
-    getSetting: (key) => store[key] ?? null,
-    setSetting: async (key, value) => {
-      store[key] = value;
-    },
+  const base = createSharedServices(systems[0], [], [], {
+    settings: store,
     getCraftingSystemManager: () => mockSystemManager,
-    getRecipeManager: () => mockRecipeManager,
     getGatheringEnvironmentStore: () => ({ list: () => [], save: async () => true }),
-    getScriptMacros: () => [],
-    getSceneOptions: () => [],
-    notify: { info: () => {}, warn: () => {}, error: () => {} },
     confirmDialog: async () => true,
-    localize: (key) => key,
     copyToClipboard: async () => {},
     openRecipeEditor: () => {},
     renderImportDialog: async () => {},
-  };
+  });
 
   const merged = { ...base, ...overrides };
   merged._store = store;
@@ -172,19 +139,8 @@ function createMockServices(overrides = {}) {
 /**
  * A REAL tool scope store over an in-memory settings map, seeded with one world Tool.
  *
- * Real rather than doubled because adoption and the inherit switch are both round trips: the
- * membership write has to reach the setting, be re-normalized on publish, and come back out
- * through the read union. A double that stored the record it was handed would pass whatever the
- * write path did.
- *
- * Module scope rather than inside one `describe`, because two suites drive it now — adoption and
- * the rules editor's union read — and a second copy is the new-code duplication the SonarCloud
- * gate fails on.
- *
- * @param {Array<object>} entities
  * @param {Record<string, object>} [defaults] World defaults keyed by entity id.
  * @param {Record<string, object>} [membership] Membership records keyed `<entityId>|<systemId>`.
- * @returns {object}
  */
 function seededToolScope(entities, defaults = {}, membership = {}) {
   const settings = new Map([[SETTING_KEYS.TOOL_SCOPE, { entities, defaults, membership }]]);
@@ -208,9 +164,7 @@ const WORLD_HAMMER = {
 };
 
 describe('adminStore library tools (system-owned)', () => {
-  // ---------------------------------------------------------------------------
   // Normalization (via system-tools round-trip surfaced on viewState)
-  // ---------------------------------------------------------------------------
 
   describe('_normalizeGatheringLibraryTool', () => {
     it('defaults a sparse tool to limited uses with destroy on break', async () => {
@@ -330,10 +284,8 @@ describe('adminStore library tools (system-owned)', () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // Task → tool reference normalization (task.toolIds: string[]) — still in
-  // gatheringConfig (tasks remain gathering-scoped).
-  // ---------------------------------------------------------------------------
+  // Task → tool reference normalization (task.toolIds: string[]) — still in gatheringConfig (tasks
+  // remain gathering-scoped).
 
   describe('task toolIds normalization', () => {
     it('legacy tasks without toolIds default to an empty array', async () => {
@@ -368,9 +320,7 @@ describe('adminStore library tools (system-owned)', () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
   // Library CRUD — persists through the crafting system manager onto system.tools
-  // ---------------------------------------------------------------------------
 
   describe('library CRUD', () => {
     it('addGatheringLibraryTool appends a normalized tool to the system', async () => {
@@ -423,9 +373,7 @@ describe('adminStore library tools (system-owned)', () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
   // Draft layer
-  // ---------------------------------------------------------------------------
 
   describe('toolsDraft lifecycle', () => {
     it('enterToolsDraft snapshots the live system tools array', async () => {
@@ -604,9 +552,7 @@ describe('adminStore library tools (system-owned)', () => {
       await store.selectSystem('sys1');
       store.enterToolsDraft('sys1');
       const added = store.createToolDraft();
-      // A non-blank invalid tool (edited but missing the required component). A
-      // genuinely-invalid tool still blocks the save and sets the error state;
-      // only blank, unmodified new drafts are discarded cleanly (issue 297).
+      // A non-blank invalid tool (edited but missing the required component) (issue 297).
       store.updateToolInDraft(added.id, { label: 'Unfinished Tool' });
       const validation = store.validateToolsDraft();
       assert.equal(validation.valid, false);
@@ -918,19 +864,10 @@ describe('adminStore library tools (system-owned)', () => {
       assert.equal(services._systemManager.getSystem('sys1').toolBreakage.authority, 'checkDriven');
     });
 
-    // ── CLEARING THE OVERRIDE IS REACHABLE (issue 1374) ─────────────────────────────────
-    //
-    // `setToolBreakageAuthority` used to coerce every argument that was not `checkDriven`
-    // into `toolSpecific`, so a GM could author a per-system break mode and never take it
-    // back: "inherit the world value" was a one-way door with no door. Anything that is
-    // neither token is now a CLEAR, written as `{ toolBreakage: {} }`.
-    //
-    // ASSERTED ON THE FORWARDED PATCH, NEVER ON A POST-STATE. This suite's system-manager
-    // double ends its `updateSystem` in `Object.assign`, which cannot DELETE a key — so a
-    // correct clear leaves `Object.hasOwn(sys, 'toolBreakage')` TRUE here, and a post-state
-    // assertion would be false against correct code. The absence half of the property needs
-    // the REAL manager and lives in `tests/crafting-system-tool-normalization.test.js`,
-    // beside the normalizer clause it depends on.
+    // CLEARING THE OVERRIDE IS REACHABLE (issue 1374). `setToolBreakageAuthority` used to coerce
+    // every argument that was not `checkDriven` into `toolSpecific`, so a GM could author a
+    // per-system break mode and never take it back: "inherit the world value" was a one-way door
+    // with no door.
     it('forwards a CLEAR for anything that is neither authority token', async () => {
       const services = createMockServices({
         systems: [makeSystem({ id: 'sys1', toolBreakage: { authority: 'checkDriven' } })],
@@ -970,9 +907,7 @@ describe('adminStore library tools (system-owned)', () => {
     });
   });
 
-  // -------------------------------------------------------------------------------------
   // Adopting a WORLD Tool into a crafting system (issue 1373)
-  // -------------------------------------------------------------------------------------
 
   describe('world Tool adoption', () => {
     it('surfaces an adopted world Tool as a member row of the Tool Rules list', async () => {
@@ -1052,10 +987,8 @@ describe('adminStore library tools (system-owned)', () => {
     });
 
     it('carries the WORLD master switch onto the adopted row, through the read union', async () => {
-      // THE REPOINT'S OWN GUARD. `selectedSystem.tools` reads through `resolvedToolsFor` now, so
-      // a world-disabled Tool reads disabled on the screen a GM administers Tools from. Reading
-      // the raw in-system array answers `enabled: true` here — the normalized record carries its
-      // own `enabled` unconditionally and knows nothing of the world default.
+      // THE REPOINT'S OWN GUARD. `selectedSystem.tools` reads through `resolvedToolsFor` now, so a
+      // world-disabled Tool reads disabled on the screen a GM administers Tools from.
       const toolScopeStore = seededToolScope([WORLD_HAMMER]);
       const services = createMockServices({ getToolScopeStore: () => toolScopeStore });
       const store = createAdminStore(services);
@@ -1097,14 +1030,7 @@ describe('adminStore library tools (system-owned)', () => {
     });
 
     it('adopts inheriting: the union states the world sections, the record authors none', async () => {
-      // THE SEED'S JOB CHANGED (issue 1373). It used to COPY `breakage` and `onBreak` onto the
-      // in-system record, because the union re-spread that record last and an identity-only
-      // record won those key contests with the normalizer's defaults - a row reading
-      // `Unlimited uses` under a pill saying `Inherits world defaults`. Clause 1a resolves an
-      // inheriting section from the world default now, so the copy is what would be wrong: it
-      // puts an override-shaped value on a record whose switch says it has none.
-      //
-      // Both halves are asserted, because either one alone is satisfiable by the other's defect.
+      // THE SEED'S JOB CHANGED (issue 1373).
       const toolScopeStore = seededToolScope([WORLD_HAMMER], {
         'wt-hammer': {
           id: 'wt-hammer',
@@ -1139,9 +1065,7 @@ describe('adminStore library tools (system-owned)', () => {
 
     it('still seeds `repairRequirements`, which has no live parent to inherit from', async () => {
       // The counter-case to the seed removal above, and the reason "seed all four" is the wrong
-      // reading of it. `repairRequirements` is in `TOOL_SEEDED_SECTIONS`, not `TOOL_SECTIONS`:
-      // the resolver never reads it back out of the world defaults, so no union can supply it and
-      // an adopted Tool without the copy simply has no repair recipe.
+      // reading of it.
       const toolScopeStore = seededToolScope([WORLD_HAMMER], {
         'wt-hammer': {
           id: 'wt-hammer',
@@ -1160,9 +1084,7 @@ describe('adminStore library tools (system-owned)', () => {
     });
 
     it('never seeds `enabled`, so the world master switch stays a read-time veto', async () => {
-      // The counter-case to the seed above. Copying the world `enabled` onto the record would
-      // freeze one moment's answer into the crafting system, and a later world ENABLE would read
-      // back disabled forever.
+      // The counter-case to the seed above.
       const toolScopeStore = seededToolScope([WORLD_HAMMER], {
         'wt-hammer': { id: 'wt-hammer', enabled: false },
       });
@@ -1192,23 +1114,14 @@ describe('adminStore library tools (system-owned)', () => {
     });
   });
 
-  // -------------------------------------------------------------------------------------
   // The Tool RULES EDITOR: display from the union, save only what is overridden (issue 1373)
-  // -------------------------------------------------------------------------------------
 
   describe('tool rules editor inheritance', () => {
     /**
      * A world Tool with all four sections authored, adopted into `sys1` and left INHERITING.
      *
-     * `bonus` and `prerequisites` matter most: they joined `TOOL_SECTIONS` at `1.31.0` and have
-     * no adoption-time copy, so before the union read the editor stated the in-system record's
-     * empty values over an authored world bonus — the rail read `No check bonus` while every
-     * craft added `@prof`.
-     *
-     * @param {object} [options]
      * @param {Record<string, boolean>} [options.inherit] The membership record's inherit map.
      * @param {Array<object>} [options.systemTools] Extra in-system Tool records.
-     * @returns {Promise<{store: object, services: object, worldDefault: object}>}
      */
     async function inheritingTool({ inherit = {}, systemTools = [] } = {}) {
       const worldDefault = {
@@ -1243,22 +1156,12 @@ describe('adminStore library tools (system-owned)', () => {
       return { store, services, worldDefault };
     }
 
-    /**
-     * The one persisted in-system record, straight off the mock manager.
-     *
-     * @param {object} services
-     * @returns {object}
-     */
+    /** The one persisted in-system record, straight off the mock manager. */
     function persistedTool(services) {
       return services._systemTools().find((tool) => tool.id === 'wt-hammer');
     }
 
-    /**
-     * The `(tool, system)` row of the world projection — the only thing carrying the switch.
-     *
-     * @param {object} store
-     * @returns {object|null}
-     */
+    /** The `(tool, system)` row of the world projection — the only thing carrying the switch. */
     function membershipRow(store) {
       const entry = (get(store.viewState).worldScope?.tool?.entries || []).find(
         (row) => row.id === 'wt-hammer'
@@ -1267,10 +1170,7 @@ describe('adminStore library tools (system-owned)', () => {
     }
 
     it('opens the draft on the WORLD value for every inheriting section', async () => {
-      // THE DEFECT, STATED AS AN ASSERTION. `openToolDraft` read `getSystem(id).tools` — the raw
-      // in-system array — so the cards and the effective-rules rail described a Tool that does
-      // not exist: `breakage` only agreed because adoption copied it, and the two new sections
-      // disagreed outright.
+      // THE DEFECT, STATED AS AN ASSERTION.
       const { store, services } = await inheritingTool();
       assert.deepEqual(
         persistedTool(services).bonus,
@@ -1296,11 +1196,7 @@ describe('adminStore library tools (system-owned)', () => {
     });
 
     it('saving an UNTOUCHED inheriting Tool changes nothing', async () => {
-      // THE NEGATIVE THE WHOLE CHANGE TURNS ON. Routing the read through the union without making
-      // the save section-aware would persist the world's answer onto the in-system record on the
-      // next save, converting every inheriting section into an override — invisibly, with every
-      // suite still green, and visible later only as a system that stopped tracking its world
-      // default. So this asserts the RECORD, not the draft, and asserts the switch survived too.
+      // THE NEGATIVE THE WHOLE CHANGE TURNS ON.
       const { store, services } = await inheritingTool();
       const before = JSON.stringify(persistedTool(services));
 
@@ -1326,9 +1222,7 @@ describe('adminStore library tools (system-owned)', () => {
     });
 
     it('a save that DOES write leaves every inheriting section on the record untouched', async () => {
-      // The stronger half of the pair. The assertion above is satisfied by the dirty guard's
-      // early return alone, which would still hold for a save path that wrote the union row —
-      // so this one dirties a NON-section field and drives a real `upsertTool`.
+      // The stronger half of the pair.
       const { store, services } = await inheritingTool();
       const before = persistedTool(services);
 
@@ -1375,8 +1269,7 @@ describe('adminStore library tools (system-owned)', () => {
     it('flipping a section to OVERRIDDEN seeds it from the value that was on screen', async () => {
       // `scoped/InheritRow` states this contract in its own docblock, and the in-system record
       // cannot satisfy it alone: while the section inherited, that record held the normalizer's
-      // default and never the world value. Seeding at the moment of override is what makes the
-      // GM's first keystroke an edit OF the inherited value rather than a jump to an older one.
+      // default and never the world value.
       const { store, services } = await inheritingTool();
       assert.equal(store.openToolDraft('wt-hammer', 'sys1'), true);
 
@@ -1424,7 +1317,7 @@ describe('adminStore library tools (system-owned)', () => {
 
     it('an in-system Tool with no world half saves its own sections verbatim', async () => {
       // The compatibility case. A pre-migration Tool has no membership record, so there is no
-      // switch to read and `_toolRecordForSave` must write the draft whole — otherwise the
+      // switch to read and `toolRecordForSave` must write the draft whole — otherwise the
       // section-aware save would silently refuse every edit on an unmigrated world.
       const services = createMockServices({
         systemTools: [{ id: 't1', label: 'Axe', componentId: 'comp-axe' }],

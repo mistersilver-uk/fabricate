@@ -65,9 +65,8 @@ test('evaluateInteractableCreate never cancels a non-interactable carrying a lin
 });
 
 test('evaluateInteractableCreate allows any interactable shape (issue 342 allow-through)', () => {
-  // Since issue 342 the guard always allows an interactable create — sourceless or
-  // not — because a sourceless one is born unconfigured + inert and configured
-  // later. The only creation-time mutation is the linked-visual neutralisation.
+  // Since issue 342 the guard always allows an interactable create — sourceless or not — because a
+  // sourceless one is born unconfigured + inert and configured later.
   assert.deepEqual(
     evaluateInteractableCreate({
       type: INTERACTABLE,

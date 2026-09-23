@@ -1,25 +1,4 @@
-/**
- * CHARACTERIZATION suite for `ManagerColorPopover` (issue 1036).
- *
- * Landed BEFORE the inline layout mode and the `allowNone` No-colour cell are added, and
- * it must pass UNCHANGED afterwards. Both additions are GATED — inline mode behind a
- * layout prop, the ninth cell behind `allowNone` (default `false`) — precisely because
- * `EnvironmentsBrowserView`'s two call sites render this popover into a `repeat(4, 1fr)`
- * preset grid and would otherwise gain a ninth cell and a clear-to-unset route they do not
- * have. This file is what proves the gate holds.
- *
- * The character being pinned:
- *
- * - exactly EIGHT preset cells, in the shipped palette order, each addressable by
- *   `data-manager-color-token`;
- * - the accessible name of each cell, which is both its `aria-label` and its `title` and
- *   is therefore the popover's whole screen-reader surface;
- * - selection marking, including the `unset` case — `normalizedToken` folds an absent
- *   value onto `sage`, so without `unset` the palette would mark Sage selected for a model
- *   that has chosen nothing;
- * - the `onChange` payload shape, which carries BOTH axes on every emission;
- * - `allowCustom`, which is what the per-essence colour (issue 917) already turns off.
- */
+/** CHARACTERIZATION suite for `ManagerColorPopover` (issue 1036). */
 
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';

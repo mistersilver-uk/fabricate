@@ -9,9 +9,9 @@ const EXPECTATION = {
   maxContentBoxInlineSize: 960,
 };
 
-function element({ width, padding = 0, border = 0, gridTemplateColumns = 'none' }) {
+function element({ width, bottom = 0, padding = 0, border = 0, gridTemplateColumns = 'none' }) {
   return {
-    getBoundingClientRect: () => ({ width }),
+    getBoundingClientRect: () => ({ width, bottom }),
     computedStyle: {
       paddingLeft: `${padding}px`,
       paddingRight: `${padding}px`,
@@ -22,9 +22,10 @@ function element({ width, padding = 0, border = 0, gridTemplateColumns = 'none' 
   };
 }
 
-function frame(elements) {
+function frame(elements, queried = []) {
   return {
     locator(selector) {
+      queried.push(selector);
       const target = elements[selector];
       return {
         count: async () => (target ? 1 : 0),
@@ -81,11 +82,8 @@ test('rejects multi-track and none computed grids', async () => {
   );
 });
 
-// ── The track count is an INPUT (issue 1362) ────────────────────────────────────────────
-//
-// The five 1024px responsive cases assert "this stacked", and the assertion was literally
-// `tracks.length !== 1`. A full-width route asserts the opposite shape — rail plus one
-// released content column, and NO inspector — so a case has to be able to say which.
+// The track count is an INPUT (issue 1362). The five 1024px responsive cases assert "this stacked",
+// and the assertion was literally `tracks.length !== 1`.
 
 const FULL_WIDTH_EXPECTATION = {
   containerSelector: '.layout-container',
@@ -152,4 +150,71 @@ test('rejects missing container and grid selectors', async () => {
     ),
     /grid selector ".layout-grid" was not found/
   );
+});
+
+// The rail must reach the grid's bottom edge (issue 1972). The Knowledge shape: three tracks and no
+// absent aside, so the fill check cannot hide behind the `absentSelector` early return.
+const FILL_EXPECTATION = {
+  containerSelector: '.layout-container',
+  gridSelector: '.layout-grid',
+  expectedTracks: 3,
+  fillSelector: '.layout-rail',
+};
+
+function fillFrame({ railBottom, gridBottom = 900, rail = true } = {}) {
+  return frame({
+    '.layout-container': element({ width: 880 }),
+    '.layout-grid': element({
+      width: 880,
+      bottom: gridBottom,
+      gridTemplateColumns: '220px 250px 410px',
+    }),
+    ...(rail ? { '.layout-rail': element({ width: 220, bottom: railBottom }) } : {}),
+  });
+}
+
+test('accepts a fill element whose bottom is within 1px of the grid bottom', async () => {
+  await assert.doesNotReject(
+    assertViewLabLayout(fillFrame({ railBottom: 900 }), FILL_EXPECTATION, 'flush')
+  );
+  await assert.doesNotReject(
+    assertViewLabLayout(fillFrame({ railBottom: 899 }), FILL_EXPECTATION, 'one-pixel')
+  );
+});
+
+test('rejects a fill element that stops short of or overhangs the grid bottom', async () => {
+  await assert.rejects(
+    assertViewLabLayout(fillFrame({ railBottom: 898 }), FILL_EXPECTATION, 'short'),
+    /\.layout-rail bottom 898px must reach \.layout-grid bottom 900px/
+  );
+  await assert.rejects(
+    assertViewLabLayout(fillFrame({ railBottom: 902 }), FILL_EXPECTATION, 'overhang'),
+    /\.layout-rail bottom 902px must reach \.layout-grid bottom 900px/
+  );
+});
+
+test('rejects a fill selector that matches nothing', async () => {
+  await assert.rejects(
+    assertViewLabLayout(fillFrame({ rail: false }), FILL_EXPECTATION, 'no-rail'),
+    /fill selector "\.layout-rail" was not found/
+  );
+});
+
+test('never queries for a fill element when the case declares none', async () => {
+  const queried = [];
+  const withoutFill = { ...FILL_EXPECTATION, fillSelector: undefined };
+  await assert.doesNotReject(
+    assertViewLabLayout(
+      frame(
+        {
+          '.layout-container': element({ width: 880 }),
+          '.layout-grid': element({ width: 880, gridTemplateColumns: '220px 250px 410px' }),
+        },
+        queried
+      ),
+      withoutFill,
+      'no-fill'
+    )
+  );
+  assert.deepEqual(queried, ['.layout-container', '.layout-grid']);
 });

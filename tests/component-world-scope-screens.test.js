@@ -1,20 +1,6 @@
 /**
- * The world Component screens' SOURCE contract (issue 1371, epic 1357).
- *
- * ## What is settled here rather than on a mounted tree
- *
- * Three kinds of fact, and each is unobservable from a rendered DOM:
- *
- *  - the GATEWAY CORRECTION's evidence. `### GM World Scoped Entity Routes` requirement 7 makes a
- *    closure void for a seam its enumeration does not name and admits a correction that supplies
- *    one — but requires the claim to be EVIDENCED on the reopening change's own diff. Nothing
- *    renders that evidence, so it is an import-surface, published-surface and route-enumeration
- *    assertion, modelled on the requirement-7 evidence PR 1400 shipped for the essence lane.
- *  - the PROP CONTRACT. A screen that declares a prop its call site does not pass makes the
- *    lookup fall THROUGH to the shell's spread, and every reader of that prop becomes a live
- *    subscriber to a bundle that is a new object on every world-scope publish. That is a
- *    performance fact with no rendered symptom at all.
- *  - the REACHABILITY BANNER's staleness, which is prose and which no gate read until this file.
+ * The world Component screens' SOURCE contract (issue 1371, epic 1357). the GATEWAY CORRECTION's
+ * evidence.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -25,10 +11,27 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
 
+/** Every module under the View Lab case directory as one text (issue 1671 split the index). */
+const CASE_FILE_DIRECTORY = 'scripts/lib/view-lab-cases';
+const caseRegistrySource = () =>
+  readdirSync(resolve(repoRoot, CASE_FILE_DIRECTORY))
+    .filter((name) => name.endsWith('.js'))
+    .sort()
+    .map((name) => read(`${CASE_FILE_DIRECTORY}/${name}`))
+    .join('\n');
+
 const MANAGER = 'src/ui/svelte/apps/manager';
 const SCOPED = `${MANAGER}/scoped`;
 
 const rootSource = read(`${MANAGER}/CraftingSystemManagerRoot.svelte`);
+// The page header's action ladder is its own unit since issue 1720, so the header seams below
+// are rendered by these two while the gateway still declares their handlers.
+const headerActionsSource = read(`${MANAGER}/ManagerHeaderActions.svelte`);
+const craftingActionsSource = read(`${MANAGER}/ManagerHeaderCraftingActions.svelte`);
+// The gateway's route enumeration is spelled across two units since issue 1720: the shell and the
+// page-header model it resolves the eyebrow, title and lede from.
+const routeSource = `${rootSource}
+${read(`${MANAGER}/headerModel.svelte.js`)}`;
 const adminStore = read('src/ui/svelte/stores/adminStore.js');
 const cataloguePage = read(`${SCOPED}/WorldComponentCataloguePage.svelte`);
 const entryPage = read(`${SCOPED}/WorldComponentEntryPage.svelte`);
@@ -49,9 +52,7 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
 
   /** Every module specifier the gateway imports, in source order. */
   function gatewayImportSpecifiers() {
-    // COMMENTS STRIPPED FIRST, as every other scan in this file does. A `from '…component…'`
-    // written inside a comment would red the equality below for a prose reason — the vacuous
-    // shape in reverse, where the scan sees something the module does not import.
+    // COMMENTS STRIPPED FIRST, as every other scan in this file does.
     return [...withoutComments(rootSource).matchAll(/from '([^']+)'/g)].map((match) => match[1]);
   }
 
@@ -63,59 +64,35 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
     assert.deepEqual(
       specifiers.filter((specifier) => /component/i.test(specifier)).sort(),
       [
-        '../../../../utils/componentBrowserModel.js',
-        '../../../../utils/componentBulkEditModel.js',
         '../../../../utils/componentCategories.js',
+        '../../../model/componentBrowserModel.js',
+        '../../../model/componentBulkEditModel.js',
         // DRAGGED IN BY ISSUE 1509's FILE MOVE, on exactly the `Chip` precedent recorded below.
-        // The armed two-step Delete was always imported here; it moved from
-        // `apps/manager/ArmedDangerButton.svelte` to `components/ArmedDangerButton.svelte` once
-        // its family turned out to be `ManagerButton`'s already-rooted one, and this clause
-        // selects on the specifier TEXT matching /component/i — so a directory move is enough to
-        // enter the set. The gateway imports the same module it did before, mints no route with
-        // it, and a row action is not a screen.
         '../../components/ArmedDangerButton.svelte',
-        '../../components/ChanceSlider.svelte',
-        // DRAGGED IN BY ISSUE 1506's FILE MOVE, and it is neither a screen nor a new
-        // dependency. `Chip` was always imported here; it moved from `apps/manager/Chip.svelte`
-        // to `components/Chip.svelte`, and this clause selects on the specifier TEXT matching
-        // /component/i, so a directory rename is enough to enter the set. The gateway imports
-        // exactly the same module it did before, mints no route with it, and the primitive is
-        // a badge rather than a surface.
+        // `ChanceSlider.svelte` left this list in issue 1707 phase 2: the drop-rate slider that
+        // imported it moved into `environment/GatheringTaskInspector.svelte`, so the gateway no
+        // longer imports it directly.
+        // DRAGGED IN BY ISSUE 1506's FILE MOVE, and it is neither a screen nor a new dependency.
         '../../components/Chip.svelte',
-        // DRAGGED IN BY ISSUE 1515's HEADER CONVERSION (D12), and it is a LABEL PRIMITIVE
-        // rather than a screen — the same reading as the two file-move rows above, reached from
-        // what the import DOES rather than from where it moved. `one page header per manager
-        // route` deleted the six per-view section headers that each drew their own eyebrow and
-        // gave the shell one, so the gateway now renders that line itself, as the shared
-        // `<Kicker>` leaf, from `viewKicker()`. It mints no route (the route enumeration below
-        // is unchanged and asserted as a whole set), renders no `data-scoped-page`, is
-        // unreachable from the nav, and draws copy the six headers were already drawing.
-        // It matches this clause's `/component/i` filter only because the shared primitives live
-        // under `components/`.
-        '../../components/Kicker.svelte',
+        // Moved by issue 1710's file move, and it is neither a screen nor a new dependency.
+        '../../components/EmptyState.svelte',
+        // `Kicker.svelte` and `Medallion.svelte` left this list in issue 1720 with the page
+        // header that renders the eyebrow and the eight identity headings.
         '../../components/ManagerButton.svelte',
-        '../../components/Medallion.svelte',
         '../../util/componentEditor.js',
         './ComponentEditView.svelte',
         './ComponentsBrowserView.svelte',
-        './component/ComponentEditorHeader.svelte',
+        // `./component/ComponentEditorHeader.svelte` left this list in issue 1720 with the
+        // header action ladder that renders it.
         './components/ComponentBrowserInspector.svelte',
         './components/ComponentBulkEditPanel.svelte',
-        // THE `Add from catalogue` PICKER (revision 8, M9). It IS a new component import into the
-        // gateway, and it is the one this requirement most needs justified — so it is justified
-        // rather than waved through. It is not a SCREEN: it mints no route (the route enumeration
-        // below is unchanged and asserted as a whole set), it renders no `data-scoped-page`, and
-        // it is unreachable from the nav. It is a DIALOG, and a dialog has to be hosted from the
-        // gateway because `ManagerModal` portals its panel to the application root and a dialog
-        // rendered from inside a view dies with that view — which is why the folder-mapping and
-        // import-report dialogs are mounted here too. What it replaces is a header action that
-        // navigated to a route token that does not exist.
+        // THE `Add from catalogue` PICKER (revision 8, M9).
         './scoped/ComponentAddFromCatalogueDialog.svelte',
         './scoped/WorldComponentCataloguePage.svelte',
         './scoped/WorldComponentEntryPage.svelte',
-        // A STRING LEAF, not a screen. `componentListSubtitle` / `componentRulesSubtitle` are the
-        // C1 and D1 header subtitles, which the shell — not a page — renders, so the copy has to
-        // be reachable from here. It exports no component and mounts nothing.
+        // A string leaf, not a screen. `componentRulesSubtitle` is the D1 header subtitle the
+        // shell renders; `componentListSubtitle` left for `headerModel.svelte.js` in issue 1720.
+        // It exports no component and mounts nothing.
         './scoped/componentScoped.js',
       ],
       'a correction that had to import a new SCREEN COMPONENT would be building here rather ' +
@@ -149,13 +126,7 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
   });
 
   it('and the usage argument gains a component leg beside its two siblings', () => {
-    // RE-PINNED TO LANE STORE'S SHARED LIBRARY READ (revision 8). The essence leg took no
-    // argument and fetched the world's recipes itself; it is now handed the SAME `worldRecipes`
-    // array the projection's `recipes` key already binds, so the leg that was a second unfiltered
-    // read of the whole library is a pass of one that had already happened. This pin is a literal
-    // and stays one: the three legs and their three arguments are the claim, because an argument
-    // silently dropped from any of them restores exactly the per-publish cost the composition
-    // exists to remove, with no rendered symptom at all.
+    // RE-PINNED TO LANE STORE'S SHARED LIBRARY READ (revision 8).
     assert.match(
       adminStore,
       /usage: \{\s*component: _worldComponentUsage\(recipeCache\),\s*essence: _worldEssenceUsage\(worldRecipes\),\s*tool: _worldToolUsage\(recipeCache\),\s*\}/,
@@ -163,16 +134,7 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
         'third answered 0 recipes for every world component in the world'
     );
     // AND `worldRecipes` IS BOUND ONCE AND PASSED TWICE, which is what makes the line above a
-    // SHARED read rather than a renamed one. Without this half, an essence leg handed
-    // `_allRecipes()` inline — a second full library fetch per publish — matches nothing here
-    // only by luck of the identifier, and a `worldRecipes` re-derived per consumer would satisfy
-    // the regex above exactly while costing what the composition was written to stop.
-    //
-    // NOT ASSERTED AS A COUNT OF `_allRecipes()`, and that is measured rather than assumed: the
-    // reader's own DECLARATION, the essence leg's default parameter and two prose mentions all
-    // match that text, so a count is four-ish for reasons that have nothing to do with the claim.
-    // The two bindings below are what the claim actually is, and the leg's own default parameter
-    // belongs to the store's suite rather than to this one.
+    // SHARED read rather than a renamed one.
     assert.match(
       adminStore,
       /const worldRecipes = _allRecipes\(\);/,
@@ -183,10 +145,7 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
       /recipes: worldRecipes,/,
       'and the projection input takes that binding rather than calling the reader again'
     );
-    // AND THE TWO LEGS THAT WALK THE RECIPES SHARE ONE READ. The per-refresh recipe fetch is a
-    // bounded budget the store's own suite asserts, and a second consumer reading the cohort
-    // again scales that budget by the crafting-system count — which is a cost with no rendered
-    // symptom at all, so nothing but the budget assertion and this line would report it.
+    // AND THE TWO LEGS THAT WALK THE RECIPES SHARE ONE READ.
     assert.match(
       adminStore,
       /const recipeCache = new Map\(\);/,
@@ -194,12 +153,7 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
     );
   });
 
-  /**
-   * EVERY route token the gateway enumerated on `origin/main`, pinned as a literal list.
-   *
-   * Read off the parent commit rather than off the file under test, which is the difference
-   * between a pin and a tautology: a scan compared against itself agrees with any tree.
-   */
+  /** EVERY route token the gateway enumerated on `origin/main`, pinned as a literal list. */
   const ROUTE_TOKENS = Object.freeze([
     'access',
     'books-scrolls',
@@ -239,7 +193,7 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
   it('ROUTE ENUMERATION: the gateway mints no route', () => {
     // The four component routes already existed. A sixth seam that minted one would show up
     // here, which is what distinguishes carrying a seam from building a screen.
-    const tokens = [...rootSource.matchAll(/currentView === '([a-z-]+)'/g)].map(
+    const tokens = [...routeSource.matchAll(/currentView === '([a-z-]+)'/g)].map(
       (match) => match[1]
     );
     assert.ok(tokens.length > 20, 'the route-token scan found nothing; it is broken');
@@ -251,9 +205,7 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
     ]) {
       assert.ok(tokens.includes(token), `${token} is enumerated`);
     }
-    // THE WHOLE SET, NOT THE COMPONENT SUBSET. A subset comparison passes a sixth seam that mints
-    // a route for some OTHER family, which is exactly the thing requirement 7's enumeration is a
-    // claim about: the correction may carry a seam, and may not mint a route anywhere.
+    // THE WHOLE SET, NOT THE COMPONENT SUBSET.
     const shipped = [...new Set(tokens)].sort();
     assert.deepEqual(
       shipped.filter((token) => token.includes('component')),
@@ -272,8 +224,7 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
 
 describe('the two world component pages declare only what their call site passes', () => {
   // AC-4, and it is ONE DIRECTION ONLY. The reverse does not hold and must not be asserted: the
-  // component bundle spreads four keys and a screen legitimately declares three of them. The
-  // hazard is declared-but-unpassed, never passed-but-undeclared.
+  // component bundle spreads four keys and a screen legitimately declares three of them.
 
   /** Every identifier a component's `$props()` destructure declares. */
   function declaredProps(source) {
@@ -312,14 +263,6 @@ describe('the two world component pages declare only what their call site passes
   /**
    * The one PRE-EXISTING declared-but-unpassed prop, named rather than tolerated by a loosened
    * assertion.
-   *
-   * `random` is the component editor's injected id mint — declared so the complications section
-   * never reaches for a global source of randomness, and left unpassed since it shipped, so its
-   * default `undefined` is what that section actually receives. It predates this change and is
-   * NOT this lane's to move: the fix is one line at the call site, and doing it here would be a
-   * behaviour change in a file this change reopens only for a named seam.
-   *
-   * A PAIR rather than a bare name, so the exemption cannot silently cover a second screen.
    */
   const KNOWN_UNPASSED = new Set(['ComponentEditView|random']);
 
@@ -365,31 +308,22 @@ describe('the two world component pages declare only what their call site passes
   });
 });
 
-// ── THE THREE ENTRY WIRES THE GATEWAY OWNS AND NO MOUNT OF THE PAGE CAN SEE (issue 1371
-// r19-entry2, quality Q1 and Q8) ──────────────────────────────────────────────────────────────
-//
-// The page's own mounted suite mounts the PAGE. Everything on this list is written where the page
-// is not: two of them in `.manager-header`, which is a sibling of `.manager-main` and structurally
-// unreachable from the page's tree, and the third a value the gateway derives and hands down. Each
-// has the same failure shape — the screen still renders, the control is still there, and the thing
-// it was supposed to carry is silently absent.
+// THE THREE ENTRY WIRES THE GATEWAY OWNS AND NO MOUNT OF THE PAGE CAN SEE (issue 1371 r19-entry2,
+// quality Q1 and Q8). The page's own mounted suite mounts the PAGE.
 describe('the world component entry’s gateway-owned wires are pinned at source', () => {
   it('names the two header hooks the capture registry and the mounted suites press', () => {
-    // The sibling screens carry this pair (`essence-world-scope-screens.test.js`) and this one
-    // did not: `grep data-world-component-save` over the whole repository answered the gateway's
-    // own attribute and ONE `disabled` read, so a rename would have been caught by nothing that
-    // could name the button. `ScopedEntryHeaderActions` takes both as props precisely so that a
-    // shared edit cannot rename one site out from under another.
-    assert.match(rootSource, /backAttribute="data-world-component-back"/);
-    assert.match(rootSource, /saveAttribute="data-world-component-save"/);
+    // The sibling screens carry this pair (`essence-world-scope-screens.test.js`) and this one did
+    // not: `grep data-world-component-save` over the whole repository answered the gateway's own
+    // attribute and ONE `disabled` read, so a rename would have been caught by nothing that could
+    // name the button.
+    assert.match(headerActionsSource, /backAttribute="data-world-component-back"/);
+    assert.match(headerActionsSource, /saveAttribute="data-world-component-save"/);
   });
 
   it('hands the entry the WORLD essence roster, which is what makes the M31 card non-empty', () => {
     // Hand this the wrong list — the selected system's essences, an empty array, nothing at all —
     // and the `Essence contribution` card draws `[data-scoped-entry-essences-empty]`: a dead end
-    // that looks deliberate, on the card the whole world-essences section exists for. The lab case
-    // that would catch it (`world-component-entry-essences`) is selected by the PAGE's files, not
-    // by the gateway's, so a root-only change reaches neither it nor any mounted suite.
+    // that looks deliberate, on the card the whole world-essences section exists for.
     const mount = /<WorldComponentEntryPage\b([\s\S]*?)\/>/.exec(rootSource);
     assert.ok(mount, 'the gateway mounts the entry');
     assert.match(
@@ -401,42 +335,38 @@ describe('the world component entry’s gateway-owned wires are pinned at source
 });
 
 describe('the `Add from catalogue` header action opens a picker and navigates nowhere (M9)', () => {
-  // Revision 5's control read `openWorldScopedEntry('world-component-' + 'catalogue', '')`. That
-  // token is a VIEW LAB CASE ID rather than a route: `WORLD_SCOPED_VIEWS` does not carry it, the
-  // view chain has no branch for it, and `openWorldScopedEntry` assigns whatever token it is
-  // handed — so pressing the header action dropped the GM on the crafting-systems library. It
-  // survived four gate runs because `data-component-add-from-catalogue` appeared in NO test file.
-  //
-  // THE TOKEN IS SPLIT ACROSS A CONCATENATION IN THIS COMMENT, deliberately, because the
-  // assertion below is `comments included` — a file that could not write the literal at all would
-  // be unable to explain what it forbids.
-  //
-  // THE FORWARD IS ASSERTED AT SOURCE because the seam is what a mounted suite cannot see: the
-  // picker's own behaviour has its own file, and what broke here was the WIRE.
+  // Revision 5's control read `openWorldScopedEntry('world-component-' + 'catalogue', '')`.
   const DEAD_TOKEN = `world-component-${'catalogue'}`;
   const body = withoutComments(rootSource);
+  const actionBody = withoutComments(craftingActionsSource);
 
   it('the token that resolves to nothing is gone from the gateway entirely', () => {
     // COMMENTS INCLUDED. The revision-5 line came with a comment claiming the handler widened the
     // list's own membership filter, which it never did — so the prose was as wrong as the call,
     // and a scan over stripped source would have left the claim standing.
     assert.ok(
-      !rootSource.includes(DEAD_TOKEN),
-      'the gateway names the dead token nowhere, in code or in prose'
+      !`${rootSource}${craftingActionsSource}`.includes(DEAD_TOKEN),
+      'neither the gateway nor the ladder that took its control names the dead token, in '  +
+        'code or in prose'
     );
     // NON-VACUITY: the token IS a live capture-case id, so a scan that had stopped matching
     // anything would report the same clean answer above.
     assert.ok(
-      readFileSync(resolve(repoRoot, 'scripts/lib/viewLabCases.js'), 'utf8').includes(DEAD_TOKEN),
+      caseRegistrySource().includes(DEAD_TOKEN),
       'the case registry still owns it, so the assertion above is about the gateway'
     );
   });
 
   it('the header action opens the picker, and the picker is mounted with the composed write', () => {
     assert.match(
+      actionBody,
+      /data-component-add-from-catalogue\s+onclick=\{openComponentAddFromCatalogue\}/,
+      'the action presses one named gateway handler and no navigation helper at all'
+    );
+    assert.match(
       body,
-      /data-component-add-from-catalogue\s+onclick=\{\(\) => \(componentAddFromCatalogueOpen = true\)\}/,
-      'the action sets the picker open and calls no navigation helper at all'
+      /function openComponentAddFromCatalogue\(\) \{\s*componentAddFromCatalogueOpen = true;\s*\}/,
+      'and that handler only sets the picker open'
     );
     const mount = /<ComponentAddFromCatalogueDialog\s([\s\S]*?)\/>/.exec(body);
     assert.ok(mount, 'the gateway mounts the picker');
@@ -446,15 +376,8 @@ describe('the `Add from catalogue` header action opens a picker and navigates no
       'wired to the COMPOSED adoption — the generic membership-only write would leave every ' +
         'adopted component invisible to the very list it was adopted into'
     );
-    // AND THE ANSWER IS A STRICT BOOLEAN (reviewer 5, r9). The optional chain that makes an
-    // unwired leg safe is the same one that answered `undefined` rather than `false`, so the
-    // picker's refusal branch could not fire on the one case it exists for. The `=== true` is on
-    // the AWAITED value, which is the half a `typeof` check cannot see.
-    //
-    // AND THE SYSTEM IS THE DIALOG'S SECOND ARGUMENT, NEVER THE LIVE SELECTION (issue 1371 r17,
-    // reviewer 3 + Foundry 1). The rail's system select stays clickable under the backdrop-less
-    // modal and the dismiss is refused mid-run, so `selectedSystemId` can move under a run; the
-    // dialog pins its subject at run start and this wire must read only what it is handed.
+    // AND THE ANSWER IS A STRICT BOOLEAN (reviewer 5, r9). AND THE SYSTEM IS THE DIALOG'S SECOND
+    // ARGUMENT, NEVER THE LIVE SELECTION (issue 1371 r17, reviewer 3 + Foundry 1).
     assert.match(
       mount[1],
       /onAdd=\{async \(entityId, targetSystemId\) =>\s*\(await store\?\.worldScope\?\.component\?\.addToSystem\?\.\(entityId, targetSystemId\)\) === true\}/,
@@ -471,11 +394,7 @@ describe('the `Add from catalogue` header action opens a picker and navigates no
 
   it('and the picker is bound to its route rather than to an outside click', () => {
     // FOUNDRY 2 (r9). The gateway's comment claimed the picker "cannot outlive its route" because
-    // `ManagerModal` dismisses on an outside click. `dismissOnOutsideClick` listens on `mousedown`
-    // and Escape and NEVER on `click` (`src/ui/svelte/actions/dismissOnOutsideClick.js`), so a
-    // keyboard activation of a rail control navigated and left the dialog standing over the new
-    // route. Asserted at SOURCE because reaching it in a mounted tree means standing up the whole
-    // 29,000-line gateway and driving a real route change through it.
+    // `ManagerModal` dismisses on an outside click.
     assert.match(
       body,
       /\$effect\(\(\) => \{\s*if \(currentView !== 'components'\) componentAddFromCatalogueOpen = false;\s*\}\);/,
@@ -489,31 +408,24 @@ describe('the `Add from catalogue` header action opens a picker and navigates no
   });
 
   it('the header action is drawn at the rung the reference draws it at', () => {
-    // UX F-A (r9). `proto:1046` draws `+ Add from catalogue` at 38px and 38 is a published rung,
-    // so the 34 it shipped at was licensed by nothing. It is the SHARED opt-in — `ManagerButton`'s
-    // `size` prop, the same `is-size-38` token M12b gave the field and the selects — rather than a
-    // local height, which is the per-screen override the opt-in exists to prevent.
-    const action = /<ManagerButton\s([\s\S]*?)data-component-add-from-catalogue\b/.exec(body);
+    // UX F-A (r9). `proto:1046` draws `+ Add from catalogue` at 38px and 38 is a published rung, so
+    // the 34 it shipped at was licensed by nothing.
+    const action = /<ManagerButton\s([\s\S]*?)data-component-add-from-catalogue\b/.exec(
+      actionBody
+    );
     assert.ok(action, 'the gateway renders the header action through the shared button');
     assert.match(action[1], /size="38"/, 'at the 38px rung');
     // NON-VACUITY: the stale paragraph that said the prop did not exist is gone with it.
     assert.ok(
-      !rootSource.includes('ManagerButton` has NO size prop yet'),
+      !craftingActionsSource.includes('ManagerButton` has NO size prop yet'),
       'and the note claiming there was no prop to pass does not outlive the prop'
     );
   });
 });
 
 describe('the deep link into a system’s Component Rules is a capability, not just a wire', () => {
-  // QE 5. `openSystemComponentRules` is new at issue 1371 and named by no test: replacing its
-  // whole body with `return false;` left 628 tests green. Both controls that reach it — the world
-  // catalogue inspector's `Rules ↗` and the entry's `View system rules ↗` — were covered only up
-  // to a test-local spy, which proves the FORWARD and says nothing about what is forwarded TO.
-  //
-  // ASSERTED AT SOURCE because the handler lives in the gateway, which one 29,000-line suite
-  // mounts and which needs a whole world corpus to reach this state from. The click half now has
-  // real coverage at both call sites (`world-component-catalogue-mounted` and
-  // `world-component-entry-mounted`); this is the half those cannot see.
+  // QE 5. `openSystemComponentRules` is new at issue 1371 and named by no test: replacing its whole
+  // body with `return false;` left 628 tests green.
   const body = withoutComments(rootSource);
 
   it('it selects the system FIRST and commits the route only if that succeeded', () => {
@@ -525,11 +437,7 @@ describe('the deep link into a system’s Component Rules is a capability, not j
       /if \(!systemId\) return false;/,
       'a missing system is refused rather than committing a route with nothing selected'
     );
-    // THE LINKED COMPONENT IS THE SELECTION THE LIST OPENS ON (issue 1371 r13-list, M14). The
-    // list now selects its first drawn row whenever nothing this system holds is selected, so a
-    // deep link that left the id unused would land the GM on a DIFFERENT component from the one
-    // whose entry they came from. The seed goes through the same helper the system-switch reset
-    // uses, INSIDE the guarded callback, so a refused selection seeds nothing.
+    // THE LINKED COMPONENT IS THE SELECTION THE LIST OPENS ON (issue 1371 r13-list, M14).
     assert.match(
       handler[1],
       /return afterTruthyResult\(selectSystem\(systemId, 'components'\), \(\) => \{\s*resetComponentSelectionFor\(systemId, String\(entityId \?\? ''\)\);\s*activeView = 'components';\s*\}\);/,
@@ -555,10 +463,9 @@ describe('the deep link into a system’s Component Rules is a capability, not j
     );
   });
 
-  // ── THE SELECTION SEAM THE AUTO-SELECT DEPENDS ON (issue 1371 r13-list, M14) ──────────────
-  // Two facts a mounted view cannot see, because the view is mounted standalone and the root is
-  // what feeds it. Both are silent when wrong: the list still renders, the inspector still shows
-  // the root's stored-order fallback, and the only symptom is M14 unfixed.
+  // THE SELECTION SEAM THE AUTO-SELECT DEPENDS ON (issue 1371 r13-list, M14) ────────────── Two
+  // facts a mounted view cannot see, because the view is mounted standalone and the root is what
+  // feeds it.
   it('the browser is handed the RAW selection, so its auto-select can see an empty one', () => {
     const mount = /<ComponentsBrowserView\s([\s\S]*?)\/>/.exec(body);
     assert.ok(mount, 'the gateway mounts the rules list');
@@ -662,8 +569,7 @@ describe('the deep link names a route that resolves, and the gateway wires it', 
   it('the gateway WIRES the exit on both mounts, rather than leaving it defaulted', () => {
     // A navigation prop left unwired is silently inert: every callback on these views is wired
     // explicitly at the root rather than riding the bundle spread, and the shipped navigation
-    // callback beside this one defaults to a NO-OP in the props block. A mounted test would pass
-    // against that default while the link was dead in production.
+    // callback beside this one defaults to a NO-OP in the props block.
     assert.equal(
       [...rootSource.matchAll(/onOpenWorldEntry=\{\(route, entityId\) =>/g)].length,
       2,
@@ -673,11 +579,7 @@ describe('the deep link names a route that resolves, and the gateway wires it', 
 });
 
 describe('no new scoped file trips either naming gate', () => {
-  // AC-2. The catalogue's bulk panel is a `scoped/` sibling, so both gates reach it.
-  // THE THREE `WorldComponentEntry*` CHILDREN ARE THE FOURTH THROUGH SIXTH FILES THIS GATE SEES
-  // (issue 1371, parity round 4). The seven PAGES are unchanged; what grew is the set of `World…`
-  // named files, so the count moves and the claim under it does not: what the gate actually
-  // protects is that a child never carries a route hook, which is the assertion below.
+  // AC-2. The catalogue's bulk panel is a `scoped/` sibling, so both gates reach it (issue 1371).
   const WORLD_CHILDREN = [
     'WorldComponentEntryPreviewRail.svelte',
     'WorldComponentEntrySourceCard.svelte',
@@ -721,10 +623,6 @@ describe('no new scoped file trips either naming gate', () => {
 describe('the reachability banner names exactly the entity types still unreachable', () => {
   // AC-24, and it is the mechanism epic 1357 assigned to this lane. The paragraph was stale for
   // TOOLS for a whole release: prose is not a gate, and nothing detected it.
-  //
-  // THE PREDICATE IS THE IMPORT STATEMENT, NOT THE IDENTIFIER. Two essence pages name
-  // `ScopedPlaceholderPage` in PROSE, so a name-matching derivation reports both as delegating
-  // and reds for the wrong reason.
   const SPEC = 'openspec/specs/data-models/spec.md';
 
   /** Which world scoped-entity page files still delegate to the shared placeholder body. */
@@ -735,9 +633,7 @@ describe('the reachability banner names exactly the entity types still unreachab
   }
 
   it('the WALK resolves the whole world page set, so an empty answer is not a broken scan', () => {
-    // THE SCAN IS ASSERTED AS WELL AS THE ANSWER. After this lane the unreachable set is EMPTY,
-    // so the biconditional degenerates to `[] === []` — which is what a total failure of the walk
-    // also produces.
+    // THE SCAN IS ASSERTED AS WELL AS THE ANSWER.
     const pages = readdirSync(resolve(repoRoot, SCOPED)).filter(
       (entry) => entry.startsWith('World') && entry.endsWith('.svelte')
     );
@@ -745,13 +641,7 @@ describe('the reachability banner names exactly the entity types still unreachab
   });
 
   it('and no world page delegates to the shared placeholder at all any more', () => {
-    // THIS WAS `['WorldVocabularyPage.svelte']` UNTIL ISSUE 1392 LANDED ON `main`. The vocabulary
-    // route was the last delegating world page — excluded from the unreachable set BY NAME rather
-    // than by inference, because `### GM World Vocabulary Route` states it is not a scoped-entity
-    // corpus — and PR 7a of epic 1357 gave it a real body. So the answer is now empty for two
-    // independent reasons, and the clause below still excludes it by name so that a vocabulary
-    // page which ever went back to delegating would red HERE rather than in the banner's derived
-    // scoped-entity set, where it does not belong.
+    // THIS WAS `['WorldVocabularyPage.svelte']` UNTIL ISSUE 1392 LANDED ON `main`.
     assert.deepEqual(delegatingPages(), []);
   });
 
@@ -785,9 +675,7 @@ describe('the reachability banner names exactly the entity types still unreachab
   });
 
   it('the banner still states that a reachable WRITER is not a consumed corpus', () => {
-    // The other half of what this paragraph is for. A banner that said only "everything is
-    // reachable" would leave a reader concluding a world tag list reaches a craft, and it does
-    // not: the additive merge is resolver-only.
+    // The other half of what this paragraph is for.
     const spec = read(SPEC);
     assert.match(spec, /A REACHABLE WRITER DOES NOT MAKE THE CORPUS CONSUMED/);
   });

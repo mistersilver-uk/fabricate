@@ -1,17 +1,4 @@
-/**
- * System Overview settings-list manual reorder (issue 768, increment 2). The
- * three lists — Modifiers, Character Prerequisites and Currency Units — persist their
- * order AS the array order, so each reorder op rewrites the array in place through
- * the list's existing save path and the order-preserving normalizer round-trips
- * it. These tests drive the REAL adminStore + normalizers (no stubs), asserting
- * the reordered order survives re-projection and persistence, and that
- * invalid/no-op moves are rejected.
- *
- * ALL THREE are WORLD state now, and each drives its real store: currency units since issue 1278,
- * modifiers and character prerequisites since issue 1308. So every case here reads its order back
- * off a top-level `viewState` slice rather than off the selected system, and none of the reorder
- * actions takes a crafting system id.
- */
+/** System Overview settings-list manual reorder (issue 768, increment 2). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
@@ -20,6 +7,7 @@ import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { normalizeCharacterPrerequisiteList } from '../../src/systems/characterPrerequisites.js';
 import { CurrencyConfigStore } from '../../src/systems/CurrencyConfigStore.js';
 import { CharacterLibrariesStore } from '../../src/systems/CharacterLibrariesStore.js';
+import { createServices as createSharedServices } from '../helpers/adminStoreServices.js';
 
 function createServices({ modifiers = [], prerequisites = [], currencyUnits = [] } = {}) {
   let idSeq = 0;
@@ -78,23 +66,20 @@ function createServices({ modifiers = [], prerequisites = [], currencyUnits = []
     setSetting,
     randomID: () => `cur-seed-${++idSeq}`,
   });
-  return {
+  // The systemManager stays local because its `updateSystem` deep-clones the requirements it
+  // persists, which is what keeps the currency ladder from aliasing the caller's draft.
+  return createSharedServices(system, [], [], {
     getSetting,
     setSetting,
     getCurrencyConfigStore: () => currencyStore,
     getCharacterLibrariesStore: () => characterLibrariesStore,
     getCraftingSystemManager: () => systemManager,
-    getRecipeManager: () => ({ getRecipes: () => [], getRecipe: () => null }),
     getGatheringEnvironmentStore: () => ({ list: () => [], listBySystem: async () => [] }),
     getFoundrySystemId: () => 'dnd5e',
-    getScriptMacros: () => [],
-    getSceneOptions: () => [],
-    notify: { info: () => {}, warn: () => {}, error: () => {} },
     confirmDialog: async () => true,
-    localize: (key) => key,
     _system: system,
     _settingStore: settingStore,
-  };
+  });
 }
 
 async function storeFor(overrides) {

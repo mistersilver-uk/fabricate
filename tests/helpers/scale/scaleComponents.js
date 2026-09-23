@@ -1,23 +1,4 @@
-/**
- * The synthetic component library every scale profile resolves against (issue 1071).
- *
- * The library is the RIGHT-HAND factor of the two products the performance programme is
- * chasing — `items × components` for identity resolution and `CraftingEngine.findComponentItems`,
- * and `recipes × items` for `evaluateCraftability`'s per-call inventory re-flattening. Because
- * they are products, a library that is small measures nothing: an inventory axis run against
- * ten components would report a flat line and certify a defect as fixed.
- *
- * Components are built as duck-typed literals rather than through a model constructor. There
- * is no `Component` model class to hydrate — `CraftingSystemManager._normalizeSystem` is the
- * only thing that ever normalises one, and it is measured separately by its own profile — so a
- * literal here is both faster and closer to what the read paths actually receive out of the
- * `craftingSystems` world setting.
- *
- * The base `{ id, registeredItemUuid, originItemUuid, aliasItemUuids }` shape comes from the
- * existing `componentIdentityFixtures.component` helper rather than being restated. SonarCloud
- * counts `tests/**` duplication exactly like `src/`, and a second component-literal factory is
- * precisely the copy it flags.
- */
+/** The synthetic component library every scale profile resolves against (issue 1071). */
 import { component } from '../componentIdentityFixtures.js';
 
 import { intBetween, pickDistinct } from './scaleRandom.js';
@@ -38,15 +19,7 @@ export const SCALE_TAGS = Object.freeze(['metal', 'herb', 'gem', 'bone', 'cloth'
 /** Fixed category names, so the browser-model grouping benchmarks have real buckets. */
 export const SCALE_CATEGORIES = Object.freeze(['ore', 'flora', 'fauna', 'arcana', 'salvage']);
 
-/**
- * The compendium-style source uuid a component is registered from. Shared by the library and
- * by the inventory generator, so an owned stack that IS a component and the component itself
- * agree on the reference without either restating the format.
- *
- * @param {string} systemId
- * @param {number} index
- * @returns {string}
- */
+/** The compendium-style source uuid a component is registered from. */
 export function componentSourceUuid(systemId, index) {
   return `Compendium.fabricate-bench.components.Item.${systemId}-src-${index}`;
 }
@@ -54,16 +27,7 @@ export function componentSourceUuid(systemId, index) {
 /**
  * Build a component library of exactly `count` components.
  *
- * Every component carries a registered source uuid, a display name, a category, tags, an
- * essence map and a salvage definition, because the read paths under measurement touch all
- * of them: the inventory listing reads essences and salvage, the browser models group by
- * category and filter by tag, and identity resolution reads the source refs.
- *
- * @param {object} options
- * @param {number} options.count
  * @param {() => number} options.random Seeded generator.
- * @param {string} options.systemId
- * @returns {object[]}
  */
 export function buildComponentLibrary({ count, random, systemId }) {
   const components = [];
@@ -111,15 +75,7 @@ export function buildComponentLibrary({ count, random, systemId }) {
 /**
  * Build the first-class Tool library the tool-heavy profile needs.
  *
- * Tools are a separate candidate set with the same source-ref shape, and
- * `resolveToolStates` walks it per ingredient set — so a profile that claims to be
- * tool-heavy and ships an empty tool library measures nothing.
- *
- * @param {object} options
- * @param {number} options.count
- * @param {string} options.systemId
  * @param {object[]} options.components Tools are linked to a component source.
- * @returns {object[]}
  */
 export function buildToolLibrary({ count, systemId, components }) {
   const tools = [];

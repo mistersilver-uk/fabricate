@@ -112,7 +112,7 @@ Two standing exceptions keep their rules in the global sheet: anything that must
 A portaled `position: fixed` element fed host-relative coordinates mis-positions (shifts by the window's viewport offset), and outside-click dismissal that relies on the portal escape hatch is fragile.
 Reuse the `IconPicker.svelte` pattern; if a portal is genuinely required to escape an `overflow: hidden` ancestor, the portal host must be a positioned containing block and the popover `position: absolute` (not `fixed`).
 Verify drop position and outside-click-dismiss in real Foundry, since Svelte scoped styles and the layout cascade differ once a node is portaled.
-- Keep product-specific UI contracts in `openspec/specs/ui-integration/spec.md` (or, while still being planned, the issue's `openspec-delta` block); UX guidance should cite those contracts rather than rely on memory.
+- Keep product-specific UI contracts in the owning `openspec/specs/ui-*/spec.md` shard named by `openspec/specs/ui-integration/spec.md`'s surface map (or, while still being planned, the issue's `openspec-delta` block); UX guidance should cite those contracts rather than rely on memory.
 When reviewing a plan, audit the UI portion of the issue delta against these contracts.
 - Be specific with file paths, selectors, viewport sizes, and screenshot names.
 - If browser tooling is unavailable, say so and rely on the Vite dev server plus code inspection first, then existing screenshots.
@@ -124,29 +124,6 @@ There is no `SCREENSHOTS_NEEDED:` handoff; only a maintainer-applied `screenshot
 That harness is local-only and never runs in CI, so any drift it exposes and nobody closes must be written into the handoff rather than left to a red build that will not exist.
 Follow that reference's parity review protocol end to end: approve a prototype-backed screen only with the reachable-state matrix, both harness passes and the before, after and control frames in hand, and treat the prototype as authority for type, copy, structure, state, order and colour role while the design-system library keeps geometry, the token a role resolves to, and primitives.
 - Do not implement production UI changes unless the user explicitly switches to implementation work.
-
-## PR description template
-
-PR titles must comply with Conventional Commits.
-For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
-
-When recommending PR text to the workflow driver, use these H2 sections in order.
-The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close.
-Use the non-closing `Refs #<issue>` only for a partial change that should leave the issue open.
-
-```md
-## Description
-
-Closes #<issue>
-
-## Benefit(s)
-
-## Changes in this PR
-
-## Testing
-
-## Screenshots (if applicable)
-```
 
 ## Expected output
 

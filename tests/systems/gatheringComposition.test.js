@@ -1,57 +1,7 @@
 /**
- * The drift guard for "does this environment compose this library record" (issue #1321).
- *
- * That question used to be answered independently in seven places, and the answers disagreed.
- * This change gives it one home — `src/systems/gatheringComposition.js` — and this suite is the
- * mechanism that keeps it one: a case matrix over **composition mode × match shape ×
- * library-enabled × membership in `enabled*Ids` / `disabled*Ids` / `forced*Ids`**, asserted
- * against **every surviving consumer**, so a future change cannot update one and leave the rest.
- *
- * **The rule, and the two sentences that are the whole of it.**
- *
- * - **automatic** — `(matches ∪ forced*Ids) − disabled*Ids`. Force add and exclude are its two
- *   overrides of its own match filter and they can collide on one record: **exclude wins**.
- *   `enabled*Ids` is NOT consulted — a stale allow-list left over from manual mode neither admits
- *   nor suppresses anything here.
- * - **manual** — exactly `enabled*Ids`, full stop. A hand-picked list has no filter, therefore
- *   nothing to override: a listed record composes whether or not it currently matches, and
- *   `disabled*Ids` and `forced*Ids` are BOTH ignored.
- *
- * Over both: a record disabled in the library (`enabled === false`) composes nowhere, so a force
- * can never revive one.
- *
- * Those two sentences are the maintainer's ruling on issue #1315: force add and exclude belong to
- * automatic mode, the one mode with a filter for them to override, and manual mode is plain add
- * and remove.
- *
- * **The oracle is the rule, not the implementation.** {@link COMPOSITION_RULE} spells the answer
- * out as thirty-two literal booleans, and the first test below re-derives every one of them from
- * the two sentences above, written as expressions. Every arm below is
- * compared against that table — including the shared predicate itself. Comparing a consumer to
- * `environmentComposesRecord` instead would prove only that the consumer calls it, which is the
- * one thing that is already obvious from reading it; comparing the predicate to itself would
- * prove nothing at all.
- *
- * **The arms, and the real consumer each one invokes.**
- *
- * | site | consumer invoked here |
- * | --- | --- |
- * | — | `environmentComposesRecord` — the shared home the other six now read from |
- * | 1 | `GatheringRichStateService.composeEnvironment` (the authoritative runtime chain) |
- * | 2 | `createAdminStore(...).viewState.environmentComposition` → `_classifyCompositionRecords` |
- * | 3 | `createAdminStore(...).deleteGatheringLibrary{Task,Event}` → `_environmentComposesGatheringRecord` |
- * | 4 | `GatheringEnvironmentStore._composesAnyLibraryTask` (the enable gate's fallback ONLY) |
- * | 6 | `tests/stores/admin-store-environments.test.js`'s fake — see the arm; NOT invocable |
- * | 7 | `resolveDraw` (`tests/view-lab/world/labRunStates.js`) |
- * | seam | `activeEnvironmentsForRecord`, which sites 9 and 10 both call |
- *
- * There is deliberately **no site-5 arm and no site-8 arm**: both consumers were deleted rather
- * than converted.
- *
- * **Site 6 is the one arm that cannot invoke its consumer, and it says so where it sits.** The
- * fake is a module-private `function` inside a `.test.js` that exports nothing, and importing a
- * suite to reach it would register that suite's whole test list inside this one. Its arm pins the
- * real gate's behaviour and the fake's source text instead, and names the gap.
+ * The drift guard for "does this environment compose this library record" (issue #1321). Over both:
+ * a record disabled in the library (`enabled === false`) composes nowhere, so a force can never
+ * revive one.
  */
 
 import assert from 'node:assert/strict';
@@ -88,19 +38,13 @@ import { resolveDraw } from '../view-lab/world/labRunStates.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-/**
- * Code-unit ordering, supplied explicitly. `Array#sort()`/`toSorted()` without a comparator is
- * both an ESLint error here (`unicorn/require-array-sort-compare`) and a SonarCloud BUG, and every
- * sort below exists only to make a set comparison order-independent.
- */
+/** Code-unit ordering, supplied explicitly. */
 function byCodeUnit(left, right) {
   if (left === right) return 0;
   return left < right ? -1 : 1;
 }
 
-// ---------------------------------------------------------------------------
 // The rule, stated as data
-// ---------------------------------------------------------------------------
 
 const MODES = Object.freeze(['automatic', 'manual']);
 
@@ -111,19 +55,13 @@ const MODES = Object.freeze(['automatic', 'manual']);
 const MEMBERSHIPS = Object.freeze(['none', 'E', 'D', 'F', 'ED', 'EF', 'DF', 'EDF']);
 
 /**
- * The answer, written out. Keyed `<mode>|<match|nomatch>|<membership>`, and deliberately
- * literal: an oracle expressed as a re-worded copy of the implementation cancels with the
- * implementation's own mistakes, which is precisely the failure mode a "single home" change
- * has to be protected from.
- *
- * The library-enabled axis is not in the table because it is not a case-by-case answer: a
- * record with `enabled === false` composes nowhere, full stop, so {@link ruleSays} applies it
- * as a gate over the whole table rather than doubling its rows.
+ * The answer, written out. Keyed `<mode>|<match|nomatch>|<membership>`, and deliberately literal:
+ * an oracle expressed as a re-worded copy of the implementation cancels with the implementation's
+ * own mistakes, which is precisely the failure mode a "single home" change has to be protected
+ * from.
  */
 const COMPOSITION_RULE = Object.freeze({
-  // Automatic — `(matches ∪ F) − D`. `E` is never read, which is why every `E` row reads exactly
-  // like its `E`-less counterpart; every `D` row is false whatever else is on it, because exclude
-  // wins over a force; and `F` is true on its own, which is the whole point of a force.
+  // Automatic — `(matches ∪ F) − D`.
   'automatic|match|none': true,
   'automatic|match|E': true,
   'automatic|match|D': false,
@@ -141,9 +79,7 @@ const COMPOSITION_RULE = Object.freeze({
   'automatic|nomatch|DF': false,
   'automatic|nomatch|EDF': false,
   // Manual — exactly `E`. `D` and `F` are both ignored, so every row here is simply "is `E` in the
-  // membership", and the `nomatch` block is IDENTICAL to the `match` block above it. That identity
-  // is the rule, not a copy-paste: manual mode has no match filter, so `matches` cannot move a
-  // manual answer. A future edit that makes these two blocks differ has re-introduced one.
+  // membership", and the `nomatch` block is IDENTICAL to the `match` block above it.
   'manual|match|none': false,
   'manual|match|E': true,
   'manual|match|D': false,
@@ -178,23 +114,13 @@ function ruleSays({ mode, matches, membership, libraryEnabled }) {
   return answer;
 }
 
-// ---------------------------------------------------------------------------
 // The case matrix
-// ---------------------------------------------------------------------------
 
 const SYSTEM_ID = 'sys1';
 const ENV_BIOME = 'forest';
 const ENV_DANGER = 'hazardous';
 
-/**
- * The three ways a record can stand against the environment's biome and danger level.
- *
- * `dangerMismatch` earns its place twice over. For an EVENT it is a second, independent route
- * to `matches === false`, so no arm can pass by treating "matches" as a synonym for "shares a
- * biome". For a TASK it is a match, because `includeDanger` is false for tasks — so the same
- * authored record is expected to compose as a task and not as an event, and an arm that fed the
- * wrong `kind` through would fail on exactly these cases.
- */
+/** The three ways a record can stand against the environment's biome and danger level. */
 const SHAPES = Object.freeze({
   matching: Object.freeze({ biomes: [ENV_BIOME], dangerTags: ['unsafe'] }),
   biomeMismatch: Object.freeze({ biomes: ['desert'], dangerTags: ['unsafe'] }),
@@ -309,11 +235,7 @@ function configFor(mode) {
   };
 }
 
-/**
- * Report every disagreement at once rather than aborting on the first. A matrix that stops at
- * case 1 of 192 tells you a consumer drifted; a matrix that lists all of them tells you HOW,
- * which is the difference between a five-minute fix and an afternoon.
- */
+/** Report every disagreement at once rather than aborting on the first. */
 function assertMatrixArm(entries, actualOf, label) {
   const wrong = [];
   for (const entry of entries) {
@@ -398,10 +320,7 @@ describe('the case matrix', () => {
         // exempted: a library-disabled record composes nowhere; a record whose only listing is
         // `disabled*Ids` composes nowhere either (automatic excludes it, manual has no pick to
         // admit it); and `DF` — excluded AND forced — composes nowhere because exclude wins over
-        // force in automatic and manual reads neither list. `DF` joined this group with issue
-        // #1315: while manual honoured forces it was the one membership that composed in one mode
-        // and not the other. Anything else being one-sided is a broken fixture, not a property of
-        // the rule.
+        // force in automatic and manual reads neither list (issue 1315).
         const oneSided = {
           false: 'a library-disabled record',
           D: 'a disabled-only listing',
@@ -469,10 +388,8 @@ describe('the shared predicate itself', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Site 1 — the engine. `GatheringRichStateService.composeEnvironment` is what actually runs for
 // players, so it is the arm the other six exist to agree with.
-// ---------------------------------------------------------------------------
 
 function makeEngine(config) {
   const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, config]]);
@@ -489,9 +406,7 @@ function makeEngine(config) {
 
 describe('site 1 — GatheringRichStateService.composeEnvironment', () => {
   it('composes exactly the records the rule admits', () => {
-    // The real service, the real setting seam, the real composed output. `_recordIsForced` and
-    // `_environmentIncludesLibraryRecord` no longer exist — the chain is one predicate call now —
-    // so this asserts what `composeEnvironment` RETURNS rather than reaching for a private helper.
+    // The real service, the real setting seam, the real composed output.
     for (const mode of MODES) {
       const engine = makeEngine(configFor(mode));
       const composed = engine.composeEnvironment(MATRIX_ENVIRONMENTS[mode], { id: SYSTEM_ID });
@@ -506,16 +421,7 @@ describe('site 1 — GatheringRichStateService.composeEnvironment', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Sites 2 and 3 — the admin store. Both are closures inside the exported `createAdminStore`
-// factory, so both are reached through the public surface: site 2 through `viewState`, site 3
-// through the library-record impact path a delete confirmation runs.
-//
-// The services fixture is the SHARED `tests/helpers/adminStoreServices.js` one. Three suites
-// still carry a local `createMockServices`, and a fourth copy of it inside the change whose whole
-// subject is removing duplicated rules would be self-defeating (and would fail the new-code
-// duplication gate besides).
-// ---------------------------------------------------------------------------
+// Sites 2 and 3 — the admin store.
 
 function makeAdminStoreFor(mode) {
   const environments = [MATRIX_ENVIRONMENTS[mode]];
@@ -537,8 +443,7 @@ function makeAdminStoreFor(mode) {
         listBySystem: async () => environments,
       }),
       // Every delete below is DECLINED, so the library is never mutated and one store serves the
-      // whole arm. The dialog content is the observable: the store writes the composing
-      // environments into it before asking.
+      // whole arm.
       confirmDialog: async (options) => {
         dialogs.push(options);
         return false;
@@ -548,7 +453,7 @@ function makeAdminStoreFor(mode) {
   return { store: createAdminStore(services), dialogs, environment: environments[0] };
 }
 
-describe('site 2 — adminStore._classifyCompositionRecords, through viewState', () => {
+describe('site 2 — environmentComposition.classifyCompositionRecords, through viewState', () => {
   /** Every classified row for one mode's environment, keyed by record id. */
   async function classifiedRowsFor(mode) {
     const { store } = makeAdminStoreFor(mode);
@@ -564,50 +469,23 @@ describe('site 2 — adminStore._classifyCompositionRecords, through viewState',
   }
 
   it('classifies each record into a vocabulary state the rule would compose', async () => {
-    // Claim one of two: the STATE is right. The set this test re-projects through is
-    // `ENVIRONMENT_COMPOSED_COMPOSITION_STATES` — the question is "does this row compose",
-    // which is not the same question as "does the Included list show it", even while issue 1315
-    // leaves the two sets with the same four members.
-    //
-    // Re-projecting HERE is what this test can prove and also exactly what it cannot: the
-    // projection happens in the test, so the store could pick either set and this assertion would
-    // not move. That hole is closed by the next test, and the two are kept apart because the
-    // vocabulary state and the projection of it are two different claims.
+    // Claim one of two: the STATE is right (issue 1315).
     for (const mode of MODES) {
       const rowsById = await classifiedRowsFor(mode);
       assertMatrixArm(
         CASES.filter((entry) => entry.mode === mode),
         (entry) =>
           ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has(rowsById.get(entry.id).compositionState),
-        `_classifyCompositionRecords compositionState (${mode})`
+        `classifyCompositionRecords compositionState (${mode})`
       );
     }
   });
 
   it("projects through the store's OWN set, which re-deriving the projection here cannot see", async () => {
-    // Claim two: the store projects the state through the same set this suite does. The store
-    // writes `composed = ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has(compositionState)` and then
-    // `runtimeState = composed && conditionsMet ? 'available' : 'unavailable'` (`adminStore.js`),
-    // and `composed` itself is not published — `runtimeState` is the only read of it available
-    // through `viewState`.
-    //
-    // So the PRECONDITION is that `conditionsMet` holds, and it is measured off the store's own
-    // published field for every row rather than assumed from the fixtures: no matrix record
-    // declares a `weather` or `timeOfDay` list, so `evaluateEnvironmentMatch` reports both
-    // dimensions as `any`. If that ever stops being true this fails loudly here instead of
-    // silently narrowing the assertion below to a subset nobody notices.
-    //
-    // What this second claim can and cannot prove, stated honestly. It reads the store's OWN
-    // projection (`runtimeState`) rather than re-deriving one, which is the shape that caught a
-    // real defect on issue 1321. But since 1315 the composed and included sets have the SAME four
-    // members — `includedNotMatching` joined the composed set when manual mode stopped filtering
-    // by match — so swapping the store to the included set changes no answer and neither claim
-    // would notice. The membership equality is asserted separately, and the symbol the store
-    // reads is pinned as source text below, which is what actually discriminates while the two
-    // sets coincide. If a later change parts them, this arm becomes discriminating on its own
-    // again with no edit.
+    // Claim two: the store projects the state through the same set this suite does. What this
+    // second claim can and cannot prove, stated honestly (issue 1321).
     const storeSource = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/stores/adminStore.js'),
+      resolve(repoRoot, 'src/ui/model/environmentComposition.js'),
       'utf8'
     );
     assert.ok(
@@ -629,15 +507,13 @@ describe('site 2 — adminStore._classifyCompositionRecords, through viewState',
       assertMatrixArm(
         CASES.filter((entry) => entry.mode === mode),
         (entry) => rowsById.get(entry.id).runtimeState === 'available',
-        `_classifyCompositionRecords runtimeState, i.e. the store's own composed projection (${mode})`
+        `classifyCompositionRecords runtimeState, i.e. the store's own composed projection (${mode})`
       );
     }
   });
 
   it('reaches every state in the vocabulary, so neither projection is asserted over a stub', async () => {
-    // The ratchet on both arms above. A classifier that had collapsed to two states would still
-    // project correctly on every case while having lost six distinctions, so the states the
-    // matrix actually produces are enumerated and compared against the whole vocabulary.
+    // The ratchet on both arms above.
     const observed = new Set();
     for (const mode of MODES) {
       const rowsById = await classifiedRowsFor(mode);
@@ -655,8 +531,7 @@ describe('site 3 — adminStore._environmentComposesGatheringRecord, through the
   it('names an environment as affected exactly where the rule composes', async () => {
     // `deleteGatheringLibraryTask` / `deleteGatheringLibraryEvent` ask
     // `_gatheringLibraryRecordUsages` which environments surface the record, and that walks
-    // `_environmentComposesGatheringRecord` per environment. The confirmation content is where
-    // the answer becomes observable, so the arm reads it there rather than reimplementing it.
+    // `_environmentComposesGatheringRecord` per environment.
     for (const mode of MODES) {
       const { store, dialogs, environment } = makeAdminStoreFor(mode);
       await store.selectSystem(SYSTEM_ID);
@@ -682,11 +557,9 @@ describe('site 3 — adminStore._environmentComposesGatheringRecord, through the
   });
 });
 
-// ---------------------------------------------------------------------------
 // Site 4 — the enable gate. Since issue 1315 it has two branches and no mode-blind guard: manual
 // asks its own picked list, which is exactly what manual composes, and automatic delegates to the
-// predicate. The arm covers the automatic branch, where the predicate governs.
-// ---------------------------------------------------------------------------
+// predicate.
 
 function makeEnvironmentStore(getConfig) {
   return new GatheringEnvironmentStore({
@@ -698,20 +571,13 @@ function makeEnvironmentStore(getConfig) {
 
 /**
  * A DECOY id, listed alongside the record under test so that every id list is non-empty even when
- * the record is in none of them. It names nothing in the library, so it is rule-neutral by
- * construction — and it is the difference between an arm that can see an "an empty list means
- * allow-all" defect and one that cannot. Verified by mutation: without it, teaching automatic mode
- * to honour `enabledTaskIds` as an allow-list leaves this arm green.
+ * the record is in none of them.
  */
 const DECOY_TASK_ID = 'decoy-task-in-no-library';
 
 /**
- * One environment carrying exactly one record's listings — so a gate that answers "does ANY
- * library task compose here" answers the per-record question this matrix asks.
- *
- * `decoys` is off for the gate tests below on purpose: the manual branch answers on any non-empty
- * `enabledTaskIds`, so a decoy there would stop the automatic delegation ever being reached and
- * quietly empty the delegation test.
+ * One environment carrying exactly one record's listings — so a gate that answers "does ANY library
+ * task compose here" answers the per-record question this matrix asks.
  */
 function soleRecordEnvironment(entry, { decoys = false } = {}) {
   const base = decoys ? [DECOY_TASK_ID] : [];
@@ -750,8 +616,6 @@ describe('site 4 — GatheringEnvironmentStore._composesAnyLibraryTask', () => {
 
   it('_environmentHasTaskSource delegates to it in automatic mode', () => {
     // Manual answers from its own picked list; automatic has no list to consult and delegates.
-    // This pins the delegation, so a conversion that imported the predicate but never called it
-    // still fails.
     let config = {};
     const store = makeEnvironmentStore(() => config);
     const delegating = CASES.filter(
@@ -773,12 +637,7 @@ describe('site 4 — GatheringEnvironmentStore._composesAnyLibraryTask', () => {
 
   it('asks each mode its own gate question, with no mode-blind guard left', () => {
     // Reported, not absorbed. Each of these is a case where the gate says "this environment has a
-    // task source" and the predicate says "this record does not compose". The FIRST is deliberate
-    // — an authored id is authored intent even when nothing composes from it today. The SECOND is
-    // not: issue #1315 moved forces to automatic mode, so a manual-mode force list composes
-    // nothing at all, and this gate still accepts one as a task source. This arm pins TODAY's
-    // behaviour and names it, rather than asserting the repair from a lane that cannot make it;
-    // `GatheringEnvironmentStore` belongs to issue #1315's enable-gate task, not to this suite.
+    // task source" and the predicate says "this record does not compose" (issue 1315).
     let config = {};
     const store = makeEnvironmentStore(() => config);
     const nonComposing = (mode, membership) =>
@@ -791,9 +650,8 @@ describe('site 4 — GatheringEnvironmentStore._composesAnyLibraryTask', () => {
           entry.membership === membership
       );
 
-    // Guard 1 used to fire in AUTOMATIC mode, where `enabledTaskIds` is ignored by composition.
-    // Issue 1321 recorded that as a known gap and deferred it here; 1315 closed it, so automatic
-    // now asks the predicate and a stale allow-list is no longer a task source.
+    // Guard 1 used to fire in AUTOMATIC mode, where `enabledTaskIds` is ignored by composition
+    // (issue 1321).
     const staleAllowList = nonComposing('automatic', 'E');
     config = { systems: { [SYSTEM_ID]: { tasks: [staleAllowList.record] } } };
     assert.equal(EXPECTED.get(staleAllowList.id), false, 'the record does not compose');
@@ -819,11 +677,10 @@ describe('site 4 — GatheringEnvironmentStore._composesAnyLibraryTask', () => {
       'and the gate agrees, so guard 1 in manual mode is coarse about nothing'
     );
 
-    // Guard 2 was the divergence issue #1315 CREATED, and closed in the same change: it fired on
-    // a manual-mode `forcedTaskIds`, and a manual-mode force composes nothing whatsoever now, so
-    // it would have let an environment be enabled while composing no task at all — the failure
-    // the gate exists to prevent, in its own words. Both guards are gone; manual asks its own
-    // id list and automatic asks the predicate.
+    // Guard 2 was the divergence issue #1315 CREATED, and closed in the same change: it fired on a
+    // manual-mode `forcedTaskIds`, and a manual-mode force composes nothing whatsoever now, so it
+    // would have let an environment be enabled while composing no task at all — the failure the
+    // gate exists to prevent, in its own words.
     const manualForce = CASES.find(
       (entry) =>
         entry.kind === 'task' &&
@@ -879,18 +736,12 @@ describe('site 4 — GatheringEnvironmentStore._composesAnyLibraryTask', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Site 6 — the fake in `tests/stores/admin-store-environments.test.js`.
-// ---------------------------------------------------------------------------
 
 describe('site 6 — the admin-store-environments fake enable gate', () => {
   it('CANNOT be invoked from here, and this is the arm that says so', () => {
     // `validateEnvironmentForFakeCreate` is a module-private `function` in a `.test.js` that
-    // exports nothing, and there is no cross-suite import anywhere in `tests/`. Importing that
-    // suite to reach it would register its entire test list inside this one. So this arm does the
-    // two things that ARE available, and names the gap rather than implying coverage it lacks:
-    // it pins the real gate's guard behaviour (below), and it pins the fake's rule as source text
-    // (here), so a change to either side has to touch this file.
+    // exports nothing, and there is no cross-suite import anywhere in `tests/`.
     const suite = readFileSync(
       resolve(repoRoot, 'tests/stores/admin-store-environments.test.js'),
       'utf8'
@@ -921,8 +772,7 @@ describe('site 6 — the admin-store-environments fake enable gate', () => {
   it('mirrors a real gate whose two guards behave exactly as the fake states', () => {
     // The behavioural half. These four assertions are the rule the fake reimplements, run against
     // the REAL `_environmentHasTaskSource` with an empty library so the fallback contributes
-    // nothing — which is the fake's own stated situation. If the real guards move, this reds and
-    // the fake has to move with them.
+    // nothing — which is the fake's own stated situation.
     const store = makeEnvironmentStore(() => ({ systems: { [SYSTEM_ID]: { tasks: [] } } }));
     const gate = (overrides) =>
       store._environmentHasTaskSource({
@@ -959,17 +809,13 @@ describe('site 6 — the admin-store-environments fake enable gate', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Site 7 — `resolveDraw`, the View Lab's blind/targeted run seeder.
-// ---------------------------------------------------------------------------
 
 describe('site 7 — labRunStates.resolveDraw', () => {
   it('draws exactly the pool candidates the rule composes', () => {
     // `resolveDraw` has no task library, so its candidate pool is the environment's own
     // `enabledTaskIds ∪ forcedTaskIds` and it calls the predicate with `matches: true` for every
-    // candidate. The axes it can therefore reach are mode x membership, with `matches` and
-    // `enabled` both asserted rather than varied — stated here rather than left for a reader to
-    // infer from a smaller-than-expected case count.
+    // candidate.
     const failures = [];
     for (const mode of MODES) {
       for (const membership of MEMBERSHIPS) {
@@ -1027,15 +873,9 @@ describe('site 7 — labRunStates.resolveDraw', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// The seam — `activeEnvironmentsForRecord`, which sites 9 and 10 both call.
-//
-// This is the ONE arm that must fail against pre-change behaviour, because the two "Active
-// environments" facts it replaces rendered a wrong number to a GM in BOTH directions. It is
-// asserted against the real View Lab world, because that world is the corpus the PR's frames are
-// captured from and a criterion written against a different fixture would prove nothing about
-// them.
-// ---------------------------------------------------------------------------
+// The seam — `activeEnvironmentsForRecord`, which sites 9 and 10 both call. This is the ONE arm
+// that must fail against pre-change behaviour, because the two "Active environments" facts it
+// replaces rendered a wrong number to a GM in BOTH directions.
 
 const LAB = buildLabContent();
 const LAB_HERBALISM = 'lab-herbalism';
@@ -1060,16 +900,9 @@ function seamIds(id, kind) {
 
 /**
  * The DELETED `gatheringTaskAllowedInEnvironment` / `activeGatheringTaskEnvironmentCount` rule
- * (`CraftingSystemManagerRoot.svelte`, site 9 before this change), reproduced here for one
- * purpose: to prove the seam's answers are not merely correct but DIFFERENT, and different in the
- * two specific directions the defect ran in. It excluded on `disabledTaskIds`, applied
- * `enabledTaskIds` as an allow-list in EVERY mode with an empty list meaning allow-all, and never
- * consulted `forcedTaskIds`.
- *
- * The deleted chain also re-implemented weather and time-of-day inline. That half is inert over
- * this corpus — no herbalism task or event declares either — so it is omitted rather than
- * reproduced as dead code, and the conditions axis below covers the same ground against the seam
- * directly.
+ * (`CraftingSystemManagerRoot.svelte`, site 9 before this change), reproduced here for one purpose:
+ * to prove the seam's answers are not merely correct but DIFFERENT, and different in the two
+ * specific directions the defect ran in.
  */
 function deletedTaskCountRule(record) {
   const recordBiomes = (record.biomes ?? []).map(String);
@@ -1138,9 +971,7 @@ describe('the seam — activeEnvironmentsForRecord against the real lab world', 
   });
 
   it('fixes the automatic under-count: hb-env-ridge carries a non-empty enabledTaskIds', () => {
-    // `hb-env-ridge` is AUTOMATIC with `enabledTaskIds: ['hb-task-fungi']`. The deleted rule read
-    // that list as an allow-list and dropped every other task from ridge's count; automatic
-    // composition ignores it entirely, so the engine composes them and the fact under-reported.
+    // `hb-env-ridge` is AUTOMATIC with `enabledTaskIds: ['hb-task-fungi']`.
     const ridge = LAB_ENVIRONMENTS.find((entry) => entry.id === 'hb-env-ridge');
     assert.equal(ridge.compositionMode, 'automatic');
     assert.deepEqual(
@@ -1159,11 +990,9 @@ describe('the seam — activeEnvironmentsForRecord against the real lab world', 
 
   it('composes a manual environment as exactly its picked list, matching or not', () => {
     // `hb-env-thicket` is MANUAL. It held its whole composed set in `forcedTaskIds` and no
-    // `enabledTaskIds` at all, because manual mode used to filter by match and a force was the
-    // only way past that filter; issue #1315 removed the filter, and the world migration folds
-    // forced into enabled, so the authored fixture now carries the folded shape. What the seam
-    // composes there is the picked list and nothing else — `hb-task-spring`, in no list, does not
-    // compose into thicket even though it is biome-less and matches everything.
+    // `enabledTaskIds` at all, because manual mode used to filter by match and a force was the only
+    // way past that filter; issue #1315 removed the filter, and the world migration folds forced
+    // into enabled, so the authored fixture now carries the folded shape.
     const thicket = LAB_ENVIRONMENTS.find((entry) => entry.id === 'hb-env-thicket');
     assert.equal(thicket.compositionMode, 'manual');
     assert.deepEqual(
@@ -1183,14 +1012,8 @@ describe('the seam — activeEnvironmentsForRecord against the real lab world', 
 
   it('an answer can move without its integer moving, which is why membership is asserted', () => {
     // The case that makes a count-based criterion useless: one environment before, one after, and
-    // not the same one. An assertion on `.length` here passes while the answer changed completely.
-    //
-    // Authored rather than taken from the lab corpus, and that is the point of the pair of
-    // environments below: `env-stale-auto` is AUTOMATIC carrying an allow-list that does not name
-    // the record — the deleted rule dropped it, the seam composes it, because automatic mode does
-    // not read `enabled*Ids` — while `env-empty-manual` is MANUAL with no lists at all, which the
-    // deleted rule read as allow-all and the seam composes nothing into. The lab world showed
-    // exactly this shape until issue #1315 folded its manual force lists into its pick lists.
+    // not the same one. An assertion on `.length` here passes while the answer changed completely
+    // (issue 1315).
     const record = { id: 'r', name: 'R', enabled: true };
     const environments = [
       { id: 'env-stale-auto', compositionMode: 'automatic', enabledTaskIds: ['someone-else'] },
@@ -1213,8 +1036,7 @@ describe('the seam — activeEnvironmentsForRecord against the real lab world', 
 
   it('fixes the event fact, which was `enabledEventIds` membership and nothing else', () => {
     // Site 10 was match-blind, mode-blind, forced-blind, `disabledEventIds`-blind and did not even
-    // filter disabled environments. `hb-event-wolves` is listed only by thicket, and grove and
-    // ridge compose it automatically.
+    // filter disabled environments.
     assert.deepEqual(deletedEventCountRule(labRecord('hb-event-wolves')), ['hb-env-thicket']);
     assert.equal(seamIds('hb-event-wolves', 'event').length, 3, 'the event fact moves 1 to 3');
     assert.deepEqual(deletedEventCountRule(labRecord('hb-event-storm')).length, 3);
@@ -1226,9 +1048,8 @@ describe('the seam — activeEnvironmentsForRecord against the real lab world', 
   });
 
   it('applies danger matching for events and not for tasks', () => {
-    // Authored OUTSIDE the lab world on purpose: both lab events are danger-tag-less, so nothing
-    // in the corpus above distinguishes `includeDanger: true` from `includeDanger: false`. This is
-    // the one seam argument no other assertion can see.
+    // Authored OUTSIDE the lab world on purpose: both lab events are danger-tag-less, so nothing in
+    // the corpus above distinguishes `includeDanger: true` from `includeDanger: false`.
     const deadly = { id: 'deadly-event', name: 'Deadly', enabled: true, dangerTags: ['deadly'] };
     const safeEnvironment = {
       id: 'env-safe',
@@ -1269,9 +1090,7 @@ describe('the seam — activeEnvironmentsForRecord against the real lab world', 
 
 describe('the seam — the conditions axis', () => {
   // Two kinds of case, because the conditions arguments are the part that decides the number and
-  // each of the two is wrong in a way that fails SILENTLY. Sites 1, 3, 4, 6 and 7 consume the
-  // condition-BLIND predicate, and site 2's arm projects onto the `composed` set rather than the
-  // condition-aware `runtimeState`, so the axis belongs here and nowhere else.
+  // each of the two is wrong in a way that fails SILENTLY.
   const environments = [
     { id: 'env-a', compositionMode: 'automatic', biomes: ['forest'], dangerTags: ['safe'] },
   ];
@@ -1285,8 +1104,7 @@ describe('the seam — the conditions axis', () => {
   it('converts the SETTINGS shape to the CURRENT shape rather than passing it through', () => {
     // Passing `{ weather: { enabled, current } }` straight into `evaluateEnvironmentMatch`'s third
     // positional makes `normalizeConditionId` read `.id ?? .value ?? .label` off an object, return
-    // `''`, and fail `conditionsMet` for every record with a non-empty weather or time list. The
-    // failure is silent: a smaller number, no error. This case reds if the conversion is dropped.
+    // `''`, and fail `conditionsMet` for every record with a non-empty weather or time list.
     const stormy = {
       weather: { enabled: true, current: 'storm' },
       timeOfDay: { enabled: true, current: 'day' },
@@ -1305,10 +1123,8 @@ describe('the seam — the conditions axis', () => {
   });
 
   it('honours weather.enabled === false, which only `options.conditionSettings` carries', () => {
-    // `evaluateEnvironmentMatch` reads the per-dimension enable gates off `options.conditionSettings`
-    // and defaults that to `null`, which hard-codes both gates to TRUE. So a seam that passed only
-    // the converted positional would start EXCLUDING records from a system that has weather
-    // switched off — a fresh wrong number one argument over from the one above.
+    // `evaluateEnvironmentMatch` reads the per-dimension enable gates off
+    // `options.conditionSettings` and defaults that to `null`, which hard-codes both gates to TRUE.
     assert.deepEqual(
       ids(stormyTask, {
         weather: { enabled: false, current: 'clear' },
@@ -1340,13 +1156,11 @@ describe('the seam — the conditions axis', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // The vocabulary. The three exported sets are the second half of the "one home" this change
 // creates, and their exact membership is asserted here because that is what replaces the guard
-// retired with `tests/components/environment-editor.test.js:497`'s source regex — a positive
-// import assertion restores non-vacuity, but not the "these four are NOT in the included set"
-// half at `:498-499`.
-// ---------------------------------------------------------------------------
+// retired with `tests/components/environment-editor.test.js:497`'s source regex — a positive import
+// assertion restores non-vacuity, but not the "these four are NOT in the included set" half at
+// `:498-499`.
 
 describe('the composition-state vocabulary', () => {
   it('is exactly eight states', () => {
@@ -1380,9 +1194,7 @@ describe('the composition-state vocabulary', () => {
 
   it('the COMPOSED subset is exactly four states, and DOES carry includedNotMatching', () => {
     // It grew from three to four with issue #1315: manual mode has no match filter, so a picked
-    // record that does not match COMPOSES. The state survives the ruling — as
-    // `includedNotMatching` rather than `includedButUnavailable` — because the Included list still
-    // has to tell a GM which of its rows do not match, and this is the only carrier of that fact.
+    // record that does not match COMPOSES.
     assert.deepEqual([...ENVIRONMENT_COMPOSED_COMPOSITION_STATES].toSorted(byCodeUnit), [
       'explicitlyIncluded',
       'forceIncluded',
@@ -1392,9 +1204,7 @@ describe('the composition-state vocabulary', () => {
     assert.ok(ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has('includedNotMatching'));
     // The two sets now hold the same four members, and that is a COINCIDENCE of this vocabulary,
     // not an identity: "shown in the Included list" and "composes at runtime" are different
-    // questions and the next state to join either one can part them again. Asserted as equal
-    // membership rather than as the same object, so a consumer swapping one import for the other
-    // is still a real change that a future vocabulary edit will catch here first.
+    // questions and the next state to join either one can part them again.
     assert.deepEqual(
       [...ENVIRONMENT_INCLUDED_COMPOSITION_STATES].toSorted(byCodeUnit),
       [...ENVIRONMENT_COMPOSED_COMPOSITION_STATES].toSorted(byCodeUnit),
@@ -1441,8 +1251,7 @@ describe('the vocabulary consumers that cannot import it', () => {
 
   it('an unrecognised state resolves to the unknown chip, not to a plausible wrong one', () => {
     // The previous fallback was `META[state] || META.candidate`, which drew a confident "Matching
-    // candidate" — a state the GM can act on — for a state nothing had registered. #1315 adds a
-    // state to this vocabulary, so that branch is one change away from being reachable.
+    // candidate" — a state the GM can act on — for a state nothing had registered.
     const meta = resolveCompositionStateMeta('partiallyIncluded');
     assert.equal(meta, UNKNOWN_COMPOSITION_STATE_META);
     assert.equal(meta.unknown, true);
@@ -1463,9 +1272,7 @@ describe('the vocabulary consumers that cannot import it', () => {
 
   it('environmentReadiness raises staleIncluded for exactly one state in the vocabulary', () => {
     // `environmentReadiness.js` keeps its state name as a STRING LITERAL: it tests a single state
-    // rather than set membership, and the module's contract is that it has no import graph. That
-    // makes it the one consumer where an unregistered state fails silently — it simply stops
-    // raising the issue — so the guard is behavioural: call the exported predicate once per state.
+    // rather than set membership, and the module's contract is that it has no import graph.
     const raising = [];
     for (const state of ENVIRONMENT_COMPOSITION_STATES) {
       const { issues } = evaluateEnvironmentReadiness(
@@ -1503,11 +1310,7 @@ describe('the vocabulary consumers that cannot import it', () => {
     );
     const stale = issues.find((issue) => issue.id === 'staleIncluded');
     assert.ok(stale, 'the issue is raised');
-    // `info`, and NOT `blocks: 'enable'` (issue #1315). This state composes, so it cannot be a
-    // reason to refuse enabling, and a critical error here told the GM to undo the very thing
-    // manual mode invites. The severity is asserted rather than left to the copy because it is
-    // the difference between a note and a blocker on the screen that decides whether an
-    // environment may be turned on.
+    // `info`, and NOT `blocks: 'enable'` (issue #1315).
     assert.equal(stale.severity, 'info');
     assert.ok(!stale.blocks, 'a composing record never blocks enable');
     assert.equal(stale.recordId, 'stale');

@@ -1,26 +1,4 @@
-/**
- * Numeric steppers show no native spinner arrows (maintainer round, issue 1036).
- *
- * A control that already carries −/+ adjuncts AND native Up/Down keyboard stepping does not
- * also need the browser's drawn arrows: they are a third affordance duplicating both, and on
- * the 48px shared stepper they eat ~13-17px of the field and shunt the centred mono value
- * off-centre.
- *
- * ── WHY THIS IS A SOURCE TEST ──────────────────────────────────────────────────────
- * happy-dom computes no cascade and implements no `::-webkit-*` pseudo-element, so a mounted
- * assertion could not see this either way. The rendered proof is the View Lab capture; this
- * pins the declarations that capture depends on, so deleting one fails here with the reason
- * attached rather than silently changing a screenshot nobody re-reads.
- *
- * ── THE `type="number"` ASSERTION IS THE POINT ─────────────────────────────────────
- * `Stepper.svelte` has NO keydown handler. Up/Down work purely because it is a native number
- * input, whose native step fires `input` → `onInput` → `commit`. Suppressing the pseudo-
- * elements removes only the drawn buttons and leaves that intact. Switching the element to
- * `type="text"` would ALSO remove the arrows — and would silently delete keyboard stepping,
- * which is the regression the component's own header says it exists to prevent. So the
- * spinner assertions are paired with a type assertion: a future "fix" that reaches for
- * `type="text"` fails here.
- */
+/** Numeric steppers show no native spinner arrows (maintainer round, issue 1036). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -40,33 +18,20 @@ const read = (relative) => readFileSync(resolve(repoRoot, relative), 'utf8');
 const stepperSource = read(STEPPER_PATH);
 const globalCss = read('styles/fabricate.css');
 
-/**
- * The `{ … }` body of the first RULE whose selector list matches `selectorPattern`.
- *
- * Anchored to the start of a line so a class NAME occurring in markup (`class="fab-stepper-
- * input"`) cannot be mistaken for a selector and swallow everything up to the next `{`.
- */
+/** The `{ … }` body of the first RULE whose selector list matches `selectorPattern`. */
 function ruleBody(source, selectorPattern) {
   const match = new RegExp(`^\\s*${selectorPattern}[^{]*\\{([^}]*)\\}`, 'ms').exec(source);
   return match ? match[1] : '';
 }
 
-/**
- * The class tokens of every selector in the global sheet that suppresses a native spinner.
- *
- * One entry per selector, so a rule listing `::-webkit-outer-spin-button` and
- * `::-webkit-inner-spin-button` contributes two — which is what a per-selector judgement needs.
- */
+/** The class tokens of every selector in the global sheet that suppresses a native spinner. */
 function spinnerSuppressionSelectors(css) {
   return [...withoutComments(css).matchAll(/([^{},]*)::-webkit-(?:inner|outer)-spin-button/g)].map(
     ([, selector]) => selector.trim()
   );
 }
 
-/**
- * The area roots. A selector whose only classes are these names NO specific control — it is a
- * blanket rule wearing a scope.
- */
+/** The area roots. A selector whose only classes are these names NO specific control. */
 const AREA_ROOTS = new Set([
   'fabricate-manager',
   'fabricate-app',
@@ -93,8 +58,7 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
       /-webkit-appearance: none;/,
       'including the prefixed property, which is the one Chromium actually honours here'
     );
-    // `margin: 0` alone is the half-fix that shipped elsewhere in this repo: it closes the
-    // gap around the buttons without removing them. Pin that it is not the whole rule.
+    // `margin: 0` alone is the half-fix that shipped elsewhere in this repo.
     assert.ok(
       !/^\s*margin:\s*0;\s*$/.test(spinner),
       'and not merely zeroed margins, which leaves the buttons drawn'
@@ -107,8 +71,7 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
   });
 
   it('keeps the Stepper input a real number input so Up/Down still step it', () => {
-    // Comments stripped: this file's own prose explains why the type matters, and that
-    // explanation must not be counted as if it were markup.
+    // Comments stripped: this file's own prose explains why the type matters.
     const markup = withoutComments(stepperSource);
     // ONE field, declared as a `{#snippet}` and rendered into both orientation branches. The
     // count is still EXACT and still the drift guard it was when each branch wrote its own
@@ -124,18 +87,13 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
       !/type="text"/.test(markup),
       'it does not drift to a text input, which would remove native keyboard stepping'
     );
-    // …and both orientations really do reach it, which is the half the count above stopped
-    // stating once the two branches shared a definition. Without this, deleting the render
-    // from the vertical branch would leave a component with no field in that orientation and
-    // an exact-count assertion that still passed.
+    // …and both orientations really do reach it.
     assert.equal(
       (markup.match(/\{@render numericField\(\)\}/g) ?? []).length,
       2,
       'the vertical and horizontal branches both render it'
     );
-    // The component still owns no keydown handler, which is WHY the type matters. If one is
-    // ever added, this assertion should be replaced by a mounted key-press test rather than
-    // deleted — the guarantee is "Up/Down step the value", however it is implemented.
+    // The component still owns no keydown handler.
     assert.ok(
       !/onkeydown|on:keydown/.test(markup),
       'stepping is still native, so the input type is what guarantees it'
@@ -149,14 +107,6 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
   // remaining one, and a per-surface assertion here would now only re-pin dead CSS.
 
   // ── THE REPO-WIDE SCAN (issue 1050) ────────────────────────────────────────────────
-  //
-  // This replaces the pre-migration `does not blanket-suppress spinners on bare number fields`
-  // assertion, which could only say what the sheet must NOT contain. Every editable numeric field
-  // is now a `Stepper`, so the stronger statement is available and is the one made here: the exact
-  // set of bare `type="number"` fields that survive, and the reason each survives.
-  //
-  // `Stepper.svelte` is excluded BY PATH rather than by count, and its own exact-count-of-2
-  // assertion above is what stops that exclusion hiding a regression in the primitive.
   const sources = collectSvelteSources();
   const scannedPaths = Object.keys(sources);
   const bareFieldCounts = new Map(
@@ -192,9 +142,7 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
         + 'non-reuse register:\n  '
         + BARE_NUMBER_FIELD_REGISTER.map((entry) => `${entry.register} ${entry.path}: ${entry.reason}`).join('\n  ')
     );
-    // Derived from the register's own length rather than hard-coded, so adding an entry cannot
-    // hide a SECOND bare field appearing in an already-registered file: the claim being pinned is
-    // "one per entry", and that claim is what the total states.
+    // Derived from the register's own length rather than hard-coded.
     assert.equal(
       [...bareFieldCounts.values()].reduce((total, count) => total + count, 0),
       BARE_NUMBER_FIELD_REGISTER.length,
@@ -203,12 +151,7 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
   });
 
   it('suppresses a spinner only where the selector names a specific control', () => {
-    // The narrowed form of the assertion this replaces, and the ONLY mechanical guard on register
-    // entry R2. A blanket `.fabricate-manager input[type="number"]::-webkit-inner-spin-button`
-    // would strip the currency sub-unit amount's arrows — a field with no adjuncts and no range
-    // track, whose spinner is therefore its only pointer path to the value. That is exactly the
-    // regression PR #1037 refused to ship, and the whole `iff` criterion depends on it not
-    // happening. R1's rule passes because it names `.manager-drop-rate-percent`.
+    // The narrowed form of the assertion this replaces.
     const selectors = spinnerSuppressionSelectors(globalCss);
     assert.ok(
       selectors.length > 0,
@@ -228,13 +171,7 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
   });
 
   it('suppresses the ChanceSlider spinner, which is R1 earning the iff a different way', () => {
-    // R1 is the one field allowed to keep a bare input AND lose its arrows, because its sibling
-    // `type="range"` track already gives a pointer a way to step the same value. Without this the
-    // register entry would be a claim in a comment with nothing behind it.
-    // ROOTED AT THE CLASS THE PRIMITIVE EMITS (issue 1508), not at the manager area: the rule is
-    // `.fabricate-slider .manager-drop-rate-percent …` at the same rank and the same position it
-    // held before, so the suppression travels with the component into a host that carries no
-    // `.fabricate-manager` — which is where R1's `iff` has to hold too.
+    // R1 is the one field allowed to keep a bare input AND lose its arrows.
     const rule = ruleBody(
       globalCss,
       String.raw`\.fabricate-slider \.manager-drop-rate-percent input\[type="number"\]::-webkit-outer-spin-button`

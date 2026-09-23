@@ -1,18 +1,4 @@
-/**
- * THE CORE-FALLBACK DOWNTIME TAB STRIP'S ARIA CONTRACT (issue 1208).
- *
- * Two defects found while reviewing the player rail (#1198) and fixed there, which also
- * existed in this already-merged Manager component:
- *
- *  1. The `role="tooltip"` spans were emitted INSIDE the `role="tablist"`. A tablist's only
- *     permitted owned role is `tab`, so axe-core's `aria-required-children` reports them and
- *     a screen reader deriving "tab N of M" from owned children can count the extra nodes.
- *  2. The roving `tabindex` was bound to `activeTabId` with no fallback, so an `activeTabId`
- *     naming no rendered tab made EVERY button `-1` and took the strip out of the Tab order.
- *
- * Defect 2 is driven directly here because no in-tree caller reaches it — which is precisely
- * why it needs a test rather than a reachability argument.
- */
+/** THE CORE-FALLBACK DOWNTIME TAB STRIP'S ARIA CONTRACT (issue 1208). */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
@@ -20,6 +6,7 @@ import { after, afterEach, before, describe, it } from 'node:test';
 import { flushSync, tick } from 'svelte';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 /** Settle the component after a dispatched DOM event, the way the mounted suites do. */
 async function settle() {
@@ -33,7 +20,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-downtime-tabs-a11y-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
   compiledModules: ['src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte'],
   componentPath: 'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
 });
@@ -101,8 +88,7 @@ describe('the Downtime tab strip keeps its ARIA contract', () => {
       'the tablist owns tab buttons DIRECTLY, with no wrapper between'
     );
 
-    // The association each button declares must survive the move: an IDREF resolves
-    // document-wide, so the target only has to exist somewhere in the document.
+    // The association each button declares must survive the move.
     for (const tab of TABS) {
       const button = root.querySelector(`[data-downtime-tab="${tab.id}"]`);
       const describedBy = button.getAttribute('aria-describedby');
@@ -125,9 +111,7 @@ describe('the Downtime tab strip keeps its ARIA contract', () => {
       ['0', '-1', '-1', '-1'],
       'the strip must stay reachable by Tab even when the active id matches nothing'
     );
-    // Bound to `activeTabId`, NOT to the fallback: the APG fallback governs which button is
-    // the tab stop, never which tab reports as selected. Announcing a selection the panel
-    // does not show would be worse than announcing none.
+    // Bound to `activeTabId`, NOT to the fallback.
     assert.deepEqual(selections(root), ['false', 'false', 'false', 'false']);
   });
 

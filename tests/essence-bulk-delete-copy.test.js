@@ -1,22 +1,8 @@
 /**
- * Pins the two-count essence bulk-delete strings the mounted `EssenceBulkEditPanel`
- * suite cannot reach without mounting the much heavier `CraftingSystemManagerRoot`
- * (issue 1036 — the copy defect the driver found in the published `manager-essences-
- * bulk-delete-armed` frame, plus the same class of defect in the delete-summary toast).
- *
- * `FABRICATE.Admin.Manager.Essence.BulkEdit.Deleted` and `.DeleteConfirmAria` each carry
- * TWO independent counts (an essence count and a recipe count) in one sentence. No
- * sibling key anywhere in `lang/en.json` pluralizes two numbers in one string — the
- * established `…One` convention (`GroupCountOne`, `OptionsOne`, `HeadingOne`, …) only
- * ever branches on ONE count. Rather than inventing a four-way key matrix (1/1, 1/N,
- * N/1, N/N) for two strings, this fix reuses the "(s)" idiom the SAME essence namespace
- * already uses nearby for exactly this shape of problem — see
- * `FABRICATE.Admin.Manager.Essence.DisabledInvalidatesRecipes`, "{count} enabled
- * recipe(s) require this essence…" — which is count-agreement-neutral by construction:
- * it reads correctly whichever count lands on it, so there is nothing to branch.
- *
- * This test proves that neutrality holds at both ends: count 1 does not read as a
- * mismatched plural, and a count > 1 still carries both numbers.
+ * Pins the two-count essence bulk-delete strings the mounted `EssenceBulkEditPanel` suite cannot
+ * reach without mounting the much heavier `CraftingSystemManagerRoot` (issue 1036 — the copy defect
+ * the driver found in the published `manager-essences- bulk-delete-armed` frame, plus the same
+ * class of defect in the delete-summary toast).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -69,10 +55,7 @@ describe('1036/copy essence bulk-delete two-count strings', () => {
     assert.equal(sentence, 'Deleted 3 essence(s) and rewrote 2 recipe(s).');
   });
 
-  // Issue 1144 — the twin of the component toast's `DeletedWithDisabled` string. The toast
-  // is the ONLY feedback that survives the panel unmounting on a successful delete, and
-  // "recipes disabled" is the most consequential of the three outcomes reported: recipes the
-  // GM's players could craft this morning and cannot craft now.
+  // Issue 1144 — the twin of the component toast's `DeletedWithDisabled` string.
   it('DeletedWithDisabled reports the disable count as well as the other two', () => {
     assert.equal(
       interpolate(bulkEdit.DeletedWithDisabled, { count: 3, recipes: 2, disabled: 1 }),
@@ -81,25 +64,15 @@ describe('1036/copy essence bulk-delete two-count strings', () => {
   });
 
   it('the zero-disable case has its own shorter sentence, not a trailing "0 of them"', () => {
-    // Two whole sentences rather than one plus an appended clause: a locale that cannot
-    // append an English subordinate clause is the usual cost of building a sentence out of
-    // fragments.
+    // Two whole sentences rather than one plus an appended clause: a locale that cannot append an
+    // English subordinate clause is the usual cost of building a sentence out of fragments.
     assert.ok(!bulkEdit.Deleted.includes('{disabled}'), 'the short form names no disable count');
     assert.notEqual(bulkEdit.Deleted, bulkEdit.DeletedWithDisabled);
   });
 });
 
 // WCAG 2.5.3 Label in Name (issue 1132). A speech-input user activates a control by saying what
-// they can READ, so the accessible name has to CONTAIN the visible label string. Both essence
-// faces failed, and the conversion onto the shared `BulkDeleteCard` is what forced the audit:
-//
-//  - the ARMED name opened "Confirm deleting …" beside a button reading "Confirm delete";
-//  - the IDLE PLURAL name read "Delete 3 essence definitions" beside "Delete 3 essences". The
-//    `…One` branch passed only by luck — "Delete 1 essence definition" happens to contain
-//    "Delete 1 essence" — which is precisely why it is asserted here rather than assumed.
-//
-// The component twin's identical block is in `component-bulk-delete-copy.test.js`; both are
-// pinned per FACE, because the pair is one label edit away from breaking the same way again.
+// they can READ, so the accessible name has to CONTAIN the visible label string.
 describe('1132/copy essence bulk-delete names contain their visible labels', () => {
   it('the ARMED accessible name contains, and leads with, the armed label', () => {
     const name = interpolate(bulkEdit.DeleteConfirmAria, { count: 4, recipes: 2 });
@@ -121,10 +94,8 @@ describe('1132/copy essence bulk-delete names contain their visible labels', () 
   });
 
   it('the armed announcement names the consequence, not just the state', () => {
-    // The card renders a live region on every studio now, so the Essence Studio needs something
-    // for it to say: a region that exists and never speaks is an affordance that lies. A bare
-    // "armed" would tell a screen-reader user that something changed but not what confirming
-    // would do.
+    // The card renders a live region on every studio now, so the Essence Studio needs something for
+    // it to say: a region that exists and never speaks is an affordance that lies.
     const announcement = interpolate(bulkEdit.DeleteArmedAnnouncement, { count: 3, recipes: 2 });
     assert.match(announcement, /3 essence definition\(s\)/);
     assert.match(announcement, /2 recipe\(s\)/);
@@ -136,7 +107,7 @@ describe('1132/copy essence bulk-delete names contain their visible labels', () 
 // the commonest single delete of all — an essence carried by nothing and required by no
 // recipe — read "This removes it from 0 component(s) and rewrites 0 recipe(s) that require
 // it." The recipe dialog fixed this for its own consequences in #1152 and added the
-// `ui-integration` clause making zero-omission the rule for every studio's singular dialog;
+// `ui-system-studio` clause (recipe and essence single deletes) making zero-omission the rule;
 // this is the essence sibling of that fix.
 describe('1156/copy the essence delete dialog omits zero consequences', () => {
   const deleteConfirm = lang.FABRICATE.Admin.Manager.Essence.DeleteConfirm;

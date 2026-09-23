@@ -1,91 +1,4 @@
-/**
- * The lab scene's `fabricate.interactable` Region Behaviours (issue 1520).
- *
- * The three canvas windows — the Interactable browser, the rich config panel and the Manage
- * Interactables list — were unphotographable until this file existed, and the gap was worse than
- * "no evidence": `mapChangedFilesToCases` returned `fabricate-app-shell` for a diff touching all
- * three, and `check-screenshots` reported SATISFIED on a frame of the PLAYER crafting window.
- *
- * ── WHAT THIS SEEDS, AND WHY EACH BEHAVIOUR IS HERE ────────────────────────────────────────────
- *
- * The shapes are MIRRORED FROM THE SMOKE'S OWN SEED (`scripts/foundry-test-run.mjs`, the Azure
- * Grove interactables), not invented, because the smoke frames are what the lab frames are
- * compared against. Two of the three are that seed:
- *
- *   - `deep-gate-forage` — a CONFIGURED gathering-task interactable, `taskNodeLink: 'linked'`, no
- *     linked visual. This is the smoke's `interactable-config-linked` / `-source-configured`
- *     subject, and the manager row it produces reports `region-only` for the reason
- *     `classifyMarkerStatus` gives: `linkedVisual.mode` defaults to `marker` but the uuid is null,
- *     so there is no configured marker to be missing.
- *   - `deep-gate-draft` — an UNCONFIGURED behaviour: the schema `initial`s Foundry's native
- *     Region → Behaviors → "+ Add Behavior" path produces from an EMPTY `system`. It instantiates
- *     valid and is born inert, and `isUnconfiguredInteractable` is what the config panel's "Needs
- *     configuration" state keys on. Its manager row renders the `Fabricate.unconfigured.tool`
- *     sentinel as its own name, which looks like a defect and is not: it is exactly what a GM
- *     sees, and the smoke's own `interactables-manager-list` frame shows the same row.
- *
- * The third is the lab's own, and it earns its place by reaching branches the smoke's two cannot:
- *
- *   - `deep-gate-cache` — a TOOL interactable with a Tile marker that RESOLVES, and
- *     `state.locked`. Between them those give the manager list a non-`region-only` marker badge
- *     and a non-default state badge, so `markerLabel` and `stateBadges` are photographed rather
- *     than assumed. The smoke has no such interactable, which is why the manager cases declare
- *     `reaches: 'window'` rather than `exact`.
- *   - `deep-gate-lost` — a TOOL interactable whose configured marker does NOT resolve, added at
- *     issue 1520's review. `classifyMarkerStatus` returns `missing` only for a marker that is
- *     configured AND unresolvable, so no amount of leaving a field out produces it: the uuid has
- *     to be present, well-formed and absent from the world's document index. Until this
- *     behaviour existed the three docblocks above were an accurate record that `markerStatus ===
- *     'missing'` was unreachable in the lab — which mattered because `missing` is the largest of
- *     the marker badge's three tone changes (`danger`, against `muted` and `neutral`), so the
- *     one tone a reviewer most needed to see was the one no frame could show. `state.enabled:
- *     false` rides along on the same row for the same reason: `Disabled` was the one state badge
- *     no seeded behaviour produced.
- *
- * ── WHY A SECOND BEHAVIOUR RATHER THAN A `buildLabWorld` FLAG ──────────────────────────────────
- *
- * The config panel has to reach BOTH its configured and its needs-configuration states. Those are
- * two DIFFERENT behaviours in production — one placed by Fabricate, one born from the native
- * "+ Add Behavior" path — so a flag that rebuilt the world in one mode or the other would model
- * something that does not exist, would cost a second world build for the second frame, and would
- * add a key to `readParams` for a distinction the world can simply carry. Seeding both, and
- * letting the case name the ref it opens, is cheaper and truthful; the manager's populated list
- * wants both rows anyway.
- *
- * The manager's EMPTY state is the one thing no behaviour count can produce from this world, so
- * that alone is a `buildLabWorld` flag (`noInteractables`), in the same shape as `noParties` and
- * `noTools`.
- *
- * ── WHY ALL THREE SIT ON THE ONE DECLARED REGION, AND WHAT THAT COSTS ──────────────────────────
- *
- * `labWorld.js` declares exactly one region, `deep-gate`, and this file adds NO second one. That
- * is a deliberate constraint rather than an economy. The manager's Travel → Map Region Links tab
- * renders `readSceneRegions(game.scenes.current)`, so a region added here would appear in three
- * already-published manager frames — and, worse, would make this module's readership no longer
- * canvas-only, silently falsifying its `ATTRIBUTED_LAB_INPUTS` entry in
- * `scripts/lib/viewLabCases.js`. Nothing outside the canvas windows reads a region's
- * `behaviors`, so attaching three behaviours to the existing region changes no other frame.
- *
- * A Region carrying several behaviours is legal Foundry and Fabricate handles it explicitly
- * (`planInteractableDeletion` exists precisely because a region can carry behaviours Fabricate
- * did not place), but it is not the ordinary shape, and it has one visible cost: the Manage
- * panel's promote picker offers this scene's only region, already marked "already an
- * interactable". The promote frame drives that selection anyway, so it photographs a complete,
- * enabled promote panel. Seeding a genuinely promotable region is the improvement to make when
- * the Travel Map frames are being re-photographed for another reason, and it must move the
- * attribution entry with it.
- *
- * ── THE COLLECTION SHAPES, AND WHY THEY ARE NOT PLAIN ARRAYS ───────────────────────────────────
- *
- * `labWorld.js` declares its scene's `regions` as a plain array, which every SCAN path tolerates
- * (`scanSceneInteractables`, `_listRegions`, `readSceneRegions` and `regionHitTest` all accept an
- * array, a `.contents` or a `.values()`). The two RESOLVE paths do not:
- * `InteractableConfigApp._resolveBehavior` and `InteractablesManagerApp._resolveBehavior` both
- * walk `scene.regions.get(id).behaviors.get(id)`, and an array has no `get`. So this file installs
- * a minimal `{ contents, get, values, size, [Symbol.iterator] }` collection over both levels — the
- * same surface `installFoundryShim`'s `createCollection` exposes, which is what every reader in
- * `src/` is written against.
- */
+/** The lab scene's `fabricate.interactable` Region Behaviours (issue 1520). */
 
 import { buildInteractableSourceUuid } from '../../../src/canvas/interactableResolution.js';
 import {
@@ -101,15 +14,7 @@ export const LAB_INTERACTABLE_SCENE_ID = 'lab-scene';
 /** The region `labWorld.js` declares, which every seeded behaviour hangs off. */
 const LAB_INTERACTABLE_REGION_ID = 'deep-gate';
 
-/**
- * The behaviour refs a case can open the config panel against, by NAME rather than by id.
- *
- * Named rather than written as raw ids in the registry because the ref is a three-part
- * `{sceneId, regionId, behaviorId}` and a case should not carry three fixture ids to say "the
- * unconfigured one". The mount page resolves `?interactable=<name>` through this table, so a
- * renamed fixture fails at mount naming the key it could not resolve, rather than rendering an
- * empty panel that publishes as evidence.
- */
+/** The behaviour refs a case can open the config panel against, by NAME rather than by id. */
 export const LAB_INTERACTABLE_REFS = Object.freeze({
   configured: Object.freeze({
     sceneId: LAB_INTERACTABLE_SCENE_ID,
@@ -126,24 +31,11 @@ export const LAB_INTERACTABLE_REFS = Object.freeze({
 /** The Tile document the tool interactable's marker resolves to. */
 const MARKER_TILE_UUID = 'Scene.lab-map.Tile.deep-gate-marker';
 
-/**
- * A Tile uuid that resolves to NOTHING, for the one behaviour whose marker is missing.
- *
- * It is deliberately well-formed and deliberately not registered: `classifyMarkerStatus` reads
- * `missing` off "a marker is configured AND it does not resolve", so a malformed or blank uuid
- * would classify as `region-only` instead and the frame would show the wrong badge with nothing
- * saying so. The id says what it models — a GM deleted the Tile the interactable pointed at,
- * which is the only way a shipped world reaches this state.
- */
+/** A Tile uuid that resolves to NOTHING, for the one behaviour whose marker is missing. */
 const DELETED_MARKER_TILE_UUID = 'Scene.lab-map.Tile.deep-gate-deleted-marker';
 
 /**
  * A minimal Foundry collection over a fixed list.
- *
- * Deliberately the same member set `installFoundryShim`'s `createCollection` exposes rather than a
- * narrower one: `src/` reads these through four different tolerant coercions, and a collection
- * missing whichever member the next reader happens to prefer fails by rendering an empty list
- * rather than by throwing.
  *
  * @param {object[]} entries The documents.
  * @returns {object} The collection.
@@ -169,11 +61,6 @@ function collectionOf(entries) {
 
 /**
  * The first gathering task of a crafting system that declares one, as `{ systemId, taskId }`.
- *
- * DERIVED from the built content rather than named, so a fixture rename moves this with it. A
- * hard-coded task id would leave the interactable pointing at nothing, and that failure is quiet:
- * `resolveSourceLabel` returns null, `pickLabel` falls through to the stored name, and the frame
- * publishes with a plausible-looking row that resolves no source at all.
  *
  * @param {object} content The built lab content.
  * @returns {{systemId: string, taskId: string}|null} The source, or null when the world has none.
@@ -218,16 +105,12 @@ function environmentFor(content, systemId) {
 /**
  * One `fabricate.interactable` Region Behaviour document.
  *
- * `parent` is wired because `identifyRegionBehaviorRef` walks `behavior.parent.parent` to recover
- * the `{sceneId, regionId, behaviorId}` triple every row, every action and every config ref is
- * keyed by — a behaviour with no `parent` produces no ref at all, and `buildInteractableRow` then
- * drops the row SILENTLY rather than failing.
- *
  * @param {object} params Behaviour fields.
  * @param {object} params.region The owning region document.
  * @param {string} params.id Behaviour id.
  * @param {string} params.name The behaviour document's own name.
- * @param {object|null} params.system Its system data, or null for a natively-added unconfigured one.
+ * @param {object|null} params.system Its system data, or null for a natively-added unconfigured
+ * one.
  * @returns {object} The behaviour document.
  */
 function behaviorDocument({ region, id, name, system }) {
@@ -257,16 +140,12 @@ function behaviorDocument({ region, id, name, system }) {
 /**
  * Seed the lab scene's interactables, in place.
  *
- * Called BEFORE `installFoundryShim`, because the shim wraps `world.scenes` in the collection
- * `game.scenes` exposes and captures `current` / `active` from it.
- *
  * @param {object} world The lab world under construction.
  * @param {object} world.content The built lab content.
  * @param {object[]} world.scenes The scene list `labWorld.js` declares.
  * @param {Map<string, object>} [world.documents] The uuid index `fromUuidSync` resolves against.
- * @returns {void}
- * @throws {Error} When the world carries no scene, region, Tool or gathering task to bind to —
- *   each of which would otherwise render an empty window that publishes as evidence.
+ * @throws {Error} When the world carries no scene, region, Tool or gathering task to bind to — each
+ * of which would otherwise render an empty window that publishes as evidence.
  */
 export function seedLabInteractables(world) {
   const scene = (world?.scenes ?? []).find(
@@ -292,8 +171,7 @@ export function seedLabInteractables(world) {
   }
 
   // The marker Tile, registered in the uuid index so `resolveLinkedVisual` takes its PRIMARY
-  // `fromUuidSync` path rather than the scene-embedded fallback. Both resolve it; only the
-  // primary is the path production takes.
+  // `fromUuidSync` path rather than the scene-embedded fallback.
   const markerTile = {
     id: 'deep-gate-marker',
     _id: 'deep-gate-marker',
@@ -309,8 +187,7 @@ export function seedLabInteractables(world) {
   world.documents?.set?.(MARKER_TILE_UUID, markerTile);
 
   // The region keeps its declared identity — id, uuid, name and colour — because the manager's
-  // Travel Map frames are photographs of exactly those fields. Only `shapes` and `behaviors` are
-  // added, and neither is read outside the canvas windows.
+  // Travel Map frames are photographs of exactly those fields.
   const region = Object.assign(declared, {
     parent: scene,
     shapes: [{ type: 'rectangle', x: 1000, y: 1000, width: 400, height: 400 }],
@@ -366,10 +243,8 @@ export function seedLabInteractables(world) {
     },
   });
 
-  // The row whose marker is MISSING: same shape as `cache`, pointing at a uuid the world does
-  // not carry, and disabled. It reuses `toolSource` rather than naming a second one because the
-  // row this frame is for is about the MARKER and the STATE, not about which Tool it resolves —
-  // and a second source id would tie the fixture to a second content ordering for nothing.
+  // The row whose marker is MISSING: same shape as `cache`, pointing at a uuid the world does not
+  // carry, and disabled.
   const lost = behaviorDocument({
     region,
     id: 'deep-gate-lost',

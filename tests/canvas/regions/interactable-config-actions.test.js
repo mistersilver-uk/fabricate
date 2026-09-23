@@ -1,11 +1,7 @@
 /**
  * Pure-helper coverage for the rich GM config panel's action/decision module
- * (`interactableConfigActions.js`): the state-flag / clear-visual planners and
- * the interactable view-model summary.
- *
- * A region-first interactable carries NO per-interactable node pool (the
- * environment's `nodeRuntime[taskId]` owns depletion/respawn), so there is no
- * restock plan or node-state summary to cover here.
+ * (`interactableConfigActions.js`): the state-flag / clear-visual planners and the interactable
+ * view-model summary.
  */
 
 import { describe, it } from 'node:test';
@@ -111,9 +107,7 @@ describe('summarizeInteractable', () => {
   });
 
   it('reports status none — NOT missing — for an explicit region-only interactable (mode none)', () => {
-    // Region-only = `linkedVisual.mode:'none'`. This is intentional, so the panel
-    // must show "region only", never the missing-visual warning — even though the
-    // resolver would return null (there is no marker to resolve).
+    // Region-only = `linkedVisual.mode:'none'`.
     const regionOnly = toolSystem({
       presentation: { promptText: null, hidden: true },
       linkedVisual: { uuid: null, documentName: null, mode: 'none', missingPolicy: 'warn' }
@@ -186,9 +180,7 @@ describe('planConfigureSource (issue 342 — never writes a partial identity)', 
   });
 
   it('clears the off-type id when RE-TARGETING the OTHER direction (task → tool)', () => {
-    // Mirror of the tool → gatheringTask re-target: re-target a configured
-    // gatheringTask → tool. The resulting patch must set the tool identity and
-    // CLEAR both task-side ids (taskId/environmentId) so no stale task id lingers.
+    // Mirror of the tool → gatheringTask re-target: re-target a configured gatheringTask → tool.
     const current = taskSystem();
     const patch = planConfigureSource(current, {
       interactableType: 'tool',

@@ -1,31 +1,5 @@
 /**
  * What the Foundry `perf` profile measures, and which class each number belongs to (issue 1073).
- *
- * ## Why a registry rather than a list of `page.evaluate` calls
- *
- * Issue 1073 enumerates ten measurements. A harness that simply implements some of them reports a
- * confident-looking JSON in which an absent measurement and a measurement that returned zero are
- * indistinguishable, and in which nothing says whether a printed number may be asserted. Both
- * failures are silent, and both are the kind this programme exists to stop.
- *
- * So every measurement the issue asks for is declared here — including the ones this change does
- * NOT implement, each with the reason it is not implemented — and the run record is assembled from
- * this registry rather than from whatever the scenarios happened to return. A measurement with no
- * result is reported as missing, by name.
- *
- * ## The two classes, inherited from issue 1071 and not re-invented
- *
- * - **Class 1 — machine-invariant.** Operation and corpus counts, payload byte sizes, row counts,
- *   hook-delivery counts. Reproducible on any machine from `{fixture, seed}`, therefore assertable.
- * - **Class 2 — machine-dependent.** Wall clock, heap, long-task durations. Recorded, never
- *   asserted, and only ever compared as a ratio between two runs on one machine.
- *
- * REAL FOUNDRY WEAKENS CLASS 1, AND THIS IS THE ONE PLACE THAT SAYS SO. Under plain Node a class-1
- * count is invariant full stop. Inside a live Foundry it is invariant *given the Foundry build and
- * the game system*, because those decide document schemas, what a create call preserves, and which
- * hooks fire. That is why every class-1 value here is recorded against the run's arm and Foundry
- * build, and why the profile writes NO committed baseline of its own: the committed, cross-machine
- * baseline is issue 1071's headless one. See `benchmarks/README.md` (issue 1071) for that half.
  */
 
 /** The measurement classes, named so no call site writes a bare `1` or `2`. */
@@ -43,12 +17,7 @@ export const MEASUREMENT_STATUS = Object.freeze({
   DEFERRED: 'deferred',
 });
 
-/**
- * Every measurement issue 1073 names, in report order.
- *
- * `id` is the key the scenarios return their results under, so a scenario that changes its id
- * without changing this table reports as missing rather than as silently absent.
- */
+/** Every measurement issue 1073 names, in report order. */
 export const PERF_MEASUREMENTS = Object.freeze([
   {
     id: 'startup-phases',
@@ -217,12 +186,7 @@ export const PERF_MEASUREMENT_IDS = Object.freeze(
   PERF_MEASUREMENTS.map((measurement) => measurement.id)
 );
 
-/**
- * Look one measurement up by id.
- *
- * @param {string} id
- * @returns {object|null}
- */
+/** Look one measurement up by id. */
 export function findMeasurement(id) {
   return PERF_MEASUREMENTS.find((measurement) => measurement.id === id) ?? null;
 }
@@ -241,23 +205,7 @@ export function deferredMeasurements() {
   );
 }
 
-/**
- * Reconcile scenario output against the registry.
- *
- * This is the function that makes an absent measurement loud. It answers three questions no
- * consumer of a raw results object can answer for itself: which declared measurements produced
- * nothing, which results nothing declared, and — for every result that did arrive — which of its
- * values may be asserted and which may only be reported.
- *
- * @param {Record<string, {invariant?: object, timing?: object, unavailable?: string}>} results
- * @returns {{
- *   reconciled: Array<object>,
- *   missing: string[],
- *   undeclared: string[],
- *   invariant: Record<string, object>,
- *   timing: Record<string, object>
- * }}
- */
+/** Reconcile scenario output against the registry. */
 export function reconcileResults(results) {
   const supplied = new Set(Object.keys(results ?? {}));
   const reconciled = [];

@@ -1,19 +1,11 @@
 /**
  * `ModifierPillSelect` MOUNTED (issue 1055) — the announcement and focus contracts.
- *
- * Both are invisible to every suite that renders this control as part of a bigger tree:
- * `aria-live` and focus leave no mark on the markup those suites assert on, so the two
- * fixes below are deletable green everywhere else.
- *
  * 1. `aria-live="polite"` used to sit on `[data-modifier-pill-row]`. `aria-relevant`
  *    defaults to `additions text`, so removing a keyed `{#each}` child was excluded
  *    outright — a removal announced NOTHING — while an addition announced the whole new
  *    pill subtree, remove-button label included ("Medicine, Remove Medicine"). The region
  *    is now a visually-hidden text node of its own, `[data-modifier-pill-status]`, whose
  *    content is a sentence naming the current selection.
- * 2. Removing a pill destroys the button that had focus, dropping it to `<body>` and
- *    stranding a keyboard user at the top of the document. Focus moves to a surviving
- *    neighbour BEFORE `onToggle` is emitted, which is why no `tick()` is involved.
  */
 import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,6 +13,7 @@ import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const PILL_SELECT_PATH = 'src/ui/svelte/components/ModifierPillSelect.svelte';
@@ -29,7 +22,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-modifier-pill-select-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     // `SearchablePopover` portals its panel to the manager host and lays it out against
@@ -39,12 +32,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
   ],
-  // `Field.svelte` is THE manager's labelled form field (issue 1428): this control's
-  // `.manager-field` column renders through it since the conversion, so it is in this
-  // tree's static graph. Omitting it does not fail the suite — the harness's dependency
-  // validator throws in `before()` and every test here reports as `# cancelled`.
+  // `Field.svelte` is THE manager's labelled form field (issue 1428).
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
     // `SearchablePopover` and the two primitives IT renders (issue 1458). The add menu is
@@ -52,8 +43,9 @@ const harness = createMountedComponentHarness({
     // suite, it cancels every test in it.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     PILL_SELECT_PATH,
   ],
   componentPath: PILL_SELECT_PATH,
@@ -69,24 +61,13 @@ const NONE_LABEL = 'No modifiers — nothing is added to this recipe’s check r
 
 before(async () => {
   await harness.setup();
-  // The shared harness stubs `i18n.format` as `key:{json}`, which reads as a real
-  // translation, so this component's `format()` helper would prefer it over its English
-  // fallback and the summary would never be a sentence. Returning the key selects the
-  // fallback branch — the one an unlocalized build takes, and the one worth pinning.
+  // The shared harness stubs `i18n.format` as `key:{json}`.
   globalThis.game.i18n.format = (key) => key;
 });
 after(() => harness.teardown());
 afterEach(() => harness.remount());
 
-/**
- * Let Svelte flush, twice over.
- *
- * TWO rounds rather than one, and it is the popover's own contract that needs the second:
- * `SearchablePopover.restoreTriggerFocus` schedules the focus move inside `tick().then(...)`,
- * because in its inline-search mode the trigger is unmounted while the panel is open and the
- * element focus must return to does not exist until Svelte has remounted it. One round settles
- * the close; the focus lands in the round after.
- */
+/** Let Svelte flush, twice over. */
 async function settle() {
   flushSync();
   await tick();
@@ -105,11 +86,7 @@ function focusDescriptor(element) {
   return element.tagName?.toLowerCase?.() ?? 'unknown';
 }
 
-/**
- * Mount the control with the given selection, recording every emitted toggle together
- * with where focus was AT THE MOMENT the callback ran — which is what proves the move
- * happens before the emission rather than after some later render.
- */
+/** Mount the control with the given selection. */
 async function mountPills(selectedIds, props = {}) {
   const toggles = [];
   const root = await harness.mount({
@@ -202,22 +179,7 @@ describe('ModifierPillSelect focus contract (issue 1055)', () => {
   });
 });
 
-/**
- * The picker conversion's INTERACTION contract (issue 1458).
- *
- * The add menu is `SearchablePopover` now, and everything below is invisible to a markup
- * comparison — which is the point. A parsed-DOM diff of this component before and after the
- * conversion reports exactly four differences on the closed trigger, every one of them a class
- * or a scoping hash, and reports NOTHING about whether the menu still opens, still announces
- * itself, still closes on Escape, still returns focus, or still refuses to open at the cap. A
- * lost key handler looks identical to a kept one in a snapshot.
- *
- * The at-cap clause is the sharpest of them, because the wrong repair is the plausible one:
- * `disabled` would have made the button refuse to open with no code at all, and it would also
- * have removed it from several screen readers' tab order and broken the focus fallback pinned
- * above — `focus()` on a disabled button silently no-ops. `triggerAriaDisabled` is the prop
- * that separates "refuses" from "is not there", and these two clauses are what say so.
- */
+/** The picker conversion's INTERACTION contract (issue 1458). */
 describe('ModifierPillSelect popover contract (issue 1458)', () => {
   const menuButton = (root) => root.querySelector('[data-modifier-pill-menu-button]');
   const menuOptions = (root) =>

@@ -1,19 +1,6 @@
 /**
  * `CraftingSystemManager.deleteRecipes` — the batched recipe delete and the cascade every
  * GM-initiated recipe deletion routes through (issue 1132).
- *
- * Both managers are REAL here and so is the settings store: `save()` is NOT replaced by a
- * counter, because three of the claims under test are about what is PERSISTED (the pruned
- * membership array, the untouched basis marker, and the in-memory map still agreeing with
- * the world setting after a refused write). Writes are counted at the `game.settings.set`
- * seam instead, which is also the only object in this suite capable of saying no — every
- * other persistence fake in the repo is omnipotent, which is exactly what makes "the write
- * was refused" a structurally invisible defect class.
- *
- * The recipe-visibility service is real too, so the actor-flag pass genuinely walks
- * `selectWritableActors(game.actors)` and issues real `-=` deletions through `Actor#update`.
- * "Mutates no actor flags" is therefore asserted against recorded updates, not against a
- * recorder standing in for the pass.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -35,13 +22,10 @@ const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilit
 const SYSTEM_ID = 'sys1';
 const hookCalls = [];
 
-// `createRecipe`/`updateRecipe` log a debug line per recipe; the batch would drown the
-// reporter.
+// `createRecipe`/`updateRecipe` log a debug line per recipe; the batch would drown the reporter.
 console.debug = () => {};
 
-// ---------------------------------------------------------------------------
 // Fixtures
-// ---------------------------------------------------------------------------
 
 function recipeData(id, overrides = {}) {
   return {
@@ -134,13 +118,8 @@ function makeFixture({
 } = {}) {
   hookCalls.length = 0;
   const env = installFoundryEnv({ actors, canModifySettings });
-  // THE SETTINGS SEAM TAKES A SNAPSHOT, WHICH IS WHAT MAKES "PERSISTED" MEAN ANYTHING HERE.
-  // `save()` writes `[...this.systems.values()]` — the LIVE normalized objects — and the
-  // fixture seeds the same references, so a reader that walked the stored array reported the
-  // mutated live definition whether or not `save()` had run: deleting the `await this.save()`
-  // left `persistedMembership()` green and only the separate write COUNT caught it. Three of
-  // this suite's claims are about what is persisted, so the store round-trips through JSON on
-  // the way in, exactly as a real world setting does (issue 1132, review round).
+  // THE SETTINGS SEAM TAKES A SNAPSHOT, WHICH IS WHAT MAKES "PERSISTED" MEAN ANYTHING HERE (issue
+  // 1132).
   const realSet = globalThis.game.settings.set.bind(globalThis.game.settings);
   globalThis.game.settings.set = (namespace, key, value) =>
     realSet(namespace, key, value === undefined ? value : JSON.parse(JSON.stringify(value)));
@@ -235,15 +214,12 @@ describe('CraftingSystemManager.deleteRecipes — the bounded write', () => {
     });
     assert.equal(fixture.writesOf(SETTING_KEYS.RECIPES), 1, 'one `recipes` write');
     assert.equal(fixture.writesOf(SETTING_KEYS.CRAFTING_SYSTEMS), 1, 'one `craftingSystems` write');
-    // ONE LEARNED-RECIPES pass, which is what this counter measures. The clean-up as a whole
-    // is one clean-up per SET rather than per recipe, but it is two writable-actor walks —
-    // the run store's and this one — so "a single actor-flag pass" was never true of it.
+    // ONE LEARNED-RECIPES pass, which is what this counter measures.
     assert.equal(fixture.flagPasses(), 1, 'one learned-recipes flag pass for the whole set');
 
-    // BOTH signals. `deleteComponents` and `deleteEssences` each rewrite recipes and emit
-    // only the systems one; on the writing client `reload()` returns false, so the
-    // `updateSetting` bridge re-emits nothing locally and the missing hook leaves the
-    // acting GM's own other windows stale.
+    // BOTH signals. `deleteComponents` and `deleteEssences` each rewrite recipes and emit only the
+    // systems one; on the writing client `reload()` returns false, so the `updateSetting` bridge
+    // re-emits nothing locally and the missing hook leaves the acting GM's own other windows stale.
     assert.equal(hooksNamed('fabricate.craftingSystemsChanged').length, 1);
     const recipesChanged = hooksNamed('fabricate.recipesChanged');
     assert.equal(recipesChanged.length, 1);
@@ -260,10 +236,7 @@ describe('CraftingSystemManager.deleteRecipes — the bounded write', () => {
   });
 
   // The same hook is still emitted with a singular `{recipeId}` by `RecipeManager.deleteRecipe`,
-  // which stays live for `deleteSystem` and the compendium importer. Emitting only `recipeIds`
-  // made the payload PATH-DEPENDENT for a one-recipe delete: same hook, two shapes, differing
-  // by which entry point ran. Every in-repo listener is arity-0, but that is a fact about this
-  // repo and not about a third-party module reading the hook.
+  // which stays live for `deleteSystem` and the compendium importer.
   it('carries BOTH payload keys for a one-recipe set, so the shape is not path-dependent', async () => {
     const fixture = makeFixture({
       system: systemData({ definitions: [bookDefinition('book-a', ['r1'])] }),
@@ -352,9 +325,7 @@ describe('CraftingSystemManager.deleteRecipes — the membership prune', () => {
   });
 
   it('leaves the basis marker exactly as it found it — including when the prune empties the last array', async () => {
-    // The one non-trivial marker case. `_normalizeSystem` INFERS the marker as
-    // `persisted === true || some(def.recipeIds.length > 0)`, so after this prune the
-    // inference yields FALSE and only the persisted `true` carries the basis forward.
+    // The one non-trivial marker case.
     const fixture = makeFixture({
       system: systemData({ definitions: [bookDefinition('book-a', ['r1']), bookDefinition('book-b')] }),
     });
@@ -374,9 +345,7 @@ describe('CraftingSystemManager.deleteRecipes — the membership prune', () => {
   it('does not FLIP a legacy-basis system, and rewrites nothing there', async () => {
     // A legacy-basis system is by construction one where every `recipeIds` is empty, so
     // `recipeItemsRewritten === 0` is a THEOREM of the marker inference and holds for any
-    // implementation — including one with no basis awareness at all. The load-bearing
-    // claim is the other half: the STATED count is still the number of recipe items that
-    // will no longer contain them, because membership dies with the recipe.
+    // implementation — including one with no basis awareness at all.
     const recipes = [recipeData('r1', { recipeItemId: 'book-a' }), recipeData('r2')];
     const fixture = makeFixture({
       recipes,
@@ -397,10 +366,7 @@ describe('CraftingSystemManager.deleteRecipes — the membership prune', () => {
 
     assert.equal(stated.recipeItemsAffected, 1, 'the book does stop containing it');
     assert.equal(result.recipeItemsRewritten, 0, 'and no definition is rewritten');
-    // THE NUMBER THE GM IS SHOWN, RETURNED BY THE WRITE. `plan.affectedIds` was being
-    // computed and discarded, so the completion message reported the rewritten figure and
-    // this delete announced no recipe-item consequence at all — while the card, one action
-    // earlier, had promised one (issue 1132, review round).
+    // THE NUMBER THE GM IS SHOWN, RETURNED BY THE WRITE (issue 1132).
     assert.equal(
       result.recipeItemsAffected,
       stated.recipeItemsAffected,
@@ -530,11 +496,8 @@ describe('the routed callers', () => {
   const source = (relative) => readFileSync(resolve(__dirname, relative), 'utf8');
 
   it("exempts the compendium importer's ORPHAN-PRUNE PHASE, and only that phase", () => {
-    // The pack owns the whole definition set it just wrote in phase 3, and the prune
-    // deliberately batches to a single `recipes` write, which a per-delete
-    // `craftingSystems` write would break. An overwrite import that changes resolution
-    // mode still reaches the cascade transitively and correctly, through
-    // `updateSystem` → `_migrateRecipesForModeChange`.
+    // The pack owns the whole definition set it just wrote in phase 3, and the prune deliberately
+    // batches to a single `recipes` write, which a per-delete `craftingSystems` write would break.
     const importer = source('../src/systems/CompendiumImporter.js');
     assert.ok(
       /_pruneOrphanedRecipes[\s\S]*?this\._recipeManager\.deleteRecipe\(/.test(importer),

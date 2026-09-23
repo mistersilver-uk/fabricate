@@ -1,27 +1,20 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Books & Scrolls tab (issue 676): the books and scrolls that teach this recipe.
-  Rehomed out of the deleted RecipeContextRail, whose "Appears in" section was the
-  only surface answering "which books teach THIS recipe" — the Books & Scrolls screen
-  is organised the other way round (pick a book, then see its recipes) — and the only
-  consumer of `onRemoveRecipeItem` anywhere in `src/`.
+  Books & Scrolls tab: the books and scrolls that teach this recipe. Rehomed out of the deleted
+  RecipeContextRail, whose "Appears in" section was the only surface answering "which books teach
+  THIS recipe" — the Books & Scrolls screen is organised the other way round — and the only
+  consumer of `onRemoveRecipeItem` in `src/`.
 
-  GATED on `visibilityEffect.showBooksScrolls` — the system's canonical
-  `visibilityMode` through `craftingEffect(mode)`, exactly as the rail gated its
-  section. The gate lives in RecipeEditorTabs so the tab BUTTON disappears with the
-  panel.
+  GATED on `visibilityEffect.showBooksScrolls`, from the system's canonical `visibilityMode`; the
+  gate lives in `RecipeEditorTabs`, so the tab BUTTON disappears with the panel.
 
-  A SUMMARY, not an editor: a recipe is ADDED to a book from the book's own editor,
-  so there is deliberately no drop zone and no "Link another" here — that would be a
-  second authoring path for the same many-to-many. Each row can still be REMOVED,
-  which is a removal from THIS recipe's membership rather than authoring a new one.
-
-  The recipe<->recipe-item link is many-to-many: a recipe can be taught by several
-  books. There is NO book/scroll `kind` — RecipeItemDefinition manages every recipe
-  item regardless of Foundry item type, so no kind chip is rendered.
+  A SUMMARY, not an editor: a recipe is ADDED to a book from the book's own editor, so there is
+  deliberately no drop zone and no "Link another" — that would be a second authoring path for one
+  many-to-many. A row can still be REMOVED, which edits THIS recipe's membership. There is no
+  book/scroll `kind`, so no kind chip is rendered.
 -->
 <script>
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../../util/recipeImageIcons.js';
@@ -54,8 +47,7 @@
       .filter(Boolean)
   );
 
-  // Resolve each book's underlying item document for a live thumb/name + the
-  // missing-state, keyed by definition id.
+  // Each book's underlying item document, for a live thumb, name and missing-state.
   let resolvedByDefId = $state({});
   $effect(() => {
     void recipe?.id;
@@ -172,9 +164,8 @@
         {/each}
       </ul>
     {:else}
-      <!-- The shared no-state primitive at the sidebar/inline scale, replacing this
-           tab's own `.manager-recipe-section-empty` panel. `manager-recipe-tab-empty`
-           keeps the container concern (issue 796: a full-width, UNCAPPED panel) in the
+      <!-- The shared no-state primitive at the sidebar/inline scale.
+           `manager-recipe-tab-empty` keeps the full-width UNCAPPED container concern in the
            global sheet, where an ancestor-reached rule can live. -->
       <EmptyState
         compact
@@ -210,11 +201,9 @@
 </section>
 
 <style>
-  /* Reconciled with `.manager-recipe-access-body` (issue 740): NO `align-items`, so the
-     list fills via default `stretch` and the auto-fill grid tiles across the panel. An
-     `align-items: flex-start` here would collapse the grid to a single content-width
-     column. The "Open Books & Scrolls" action opts back out with its own
-     `align-self: flex-start`. */
+  /* Reconciled with `.manager-recipe-access-body`: NO `align-items`, so the list stretches and
+     the grid tiles across the panel — `flex-start` would collapse it to one content-width
+     column. The "Open Books & Scrolls" action opts back out with its own `align-self`. */
   .manager-recipe-books-body {
     display: flex;
     flex-direction: column;
@@ -222,12 +211,9 @@
     min-width: 0;
   }
 
-  /* The book rows carry their OWN vocabulary now. In the rail they borrowed the
-     GATHERING environment editor's `manager-environment-scene-*` classes — a book is
-     not a scene, and borrowing a neighbour's vocabulary is how a surface silently
-     inherits that neighbour's ramp (issue 676's tag pills went amber exactly this way).
-     A thumb + a name + an unlink is a short row, tiled by the auto-fill grid below just
-     like the access list (the uncapped auto-fill grid since issue 740). */
+  /* The book rows carry their OWN vocabulary. In the rail they borrowed the gathering
+     environment editor's `manager-environment-scene-*` classes, and borrowing a neighbour's
+     vocabulary is how a surface silently inherits that neighbour's ramp. */
   .manager-recipe-book-link {
     display: flex;
     align-items: center;
@@ -254,9 +240,8 @@
     object-fit: cover;
   }
 
-  /* A `<button>` styled as a name link needs Foundry's button chrome reset: core pins a
-     fixed height and centres the content, which crops the name and pulls it off the
-     thumb's baseline. */
+  /* A `<button>` styled as a name link needs Foundry's button chrome reset: core pins a fixed
+     height and centres the content, cropping the name off the thumb's baseline. */
   .manager-recipe-book-name {
     display: block;
     flex: 1 1 auto;
@@ -285,26 +270,22 @@
     text-decoration: underline;
   }
 
-  /* Grid parity with `.manager-recipe-access-list` (issue 740/796): a thumb + a name + an
-     unlink is a short row, so tile the list into a grid that fills the panel rather than a
-     single stretched column. A FIXED three-column grid (`minmax(0, 1fr)` so a long book
-     name shrinks its card gracefully instead of overflowing) gives ~340px per card at the
-     ~1040px editor panel — a third more name width than the earlier `auto-fill` 220px
-     tracks, which were truncating long titles. A lone card now fills one of three columns
-     rather than staying compact; that width is the accepted trade-off. Scoped under the
-     `.manager-recipe-books-tab` ancestor for a deterministic (0,3,0) win over the shared
-     `.fabricate-manager .manager-recipe-item-links` flex rule (0,2,0), which sets
-     `display: flex` on this same `<ul>` — a bare scoped class would collide at equal
-     specificity, decided only by injection order. */
+  /* Grid parity with `.manager-recipe-access-list`: a thumb, a name and an unlink is a short
+     row, so the list tiles rather than stretching into one column. A FIXED three-column grid
+     with `minmax(0, 1fr)`, so a long book name shrinks its card instead of overflowing, gives
+     ~340px per card at the ~1040px editor panel; a lone card filling one of three columns is
+     the accepted trade-off. Scoped under the `.manager-recipe-books-tab` ancestor for a
+     deterministic (0,3,0) win over the shared `.fabricate-manager .manager-recipe-item-links`
+     flex rule (0,2,0) on this same `<ul>`, which would otherwise collide at equal specificity
+     and be decided by injection order. */
   .manager-recipe-books-tab .manager-recipe-item-links {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--fab-space-1);
   }
 
-  /* The shared rule sets `margin: 0 0 var(--fab-space-2)`, but the body already spaces the
-     list from the action with its `gap`; keep this `margin: 0` so the spacing isn't
-     doubled. */
+  /* The body already spaces the list from the action with its `gap`, so `margin: 0` here keeps
+     the shared rule's bottom margin from doubling it. */
   .manager-recipe-item-links {
     margin: 0;
   }

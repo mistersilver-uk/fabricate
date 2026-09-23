@@ -1,39 +1,6 @@
 /**
  * Differential equivalence for the staged ingredient resolver (issue 1083), with the PRE-1083
  * whole-set solver as the oracle.
- *
- * The acceptance bar is not "still satisfiable". It is byte-identical selections wherever the
- * old path already succeeded: `plan` order and per-stack draws feed consumption, `currencySpends`
- * feeds the currency ledger, and `selectedIngredients` is read POSITIONALLY by
- * `RecipeManager._chosenOptionByGroup`. A resolver that found a different valid assignment would
- * pass every correctness test in this repository and silently consume different documents.
- *
- * ## How the oracle is captured
- *
- * There is no way to run both implementations in one process, so the old one is run once and its
- * answers are frozen here. {@link FINGERPRINTS} was produced by checking out
- * `src/models/IngredientSet.js` at this branch's base (`af58030e`, the last commit before the
- * undo journal) and running this exact file's generator against it. The generator is seeded and
- * lives in this file, so both runs saw byte-identical inputs.
- *
- * Regenerate with:
- *
- *   git checkout <ref> -- src/models/IngredientSet.js
- *   FABRICATE_PRINT_SOLVER_FINGERPRINTS=1 node --conditions=browser --test \
- *     tests/ingredient-set-solver-equivalence.test.js
- *
- * A regenerated table is a claim that the contract changed, and has to be argued as one — that
- * is the point of freezing it rather than recomputing it.
- *
- * ## What the corpus covers
- *
- * 240 seeded cases over every shape the five interlocking guarantees live in: component and tag
- * options that overlap on the same stacks (the shared `remaining` ledger and no-double-count),
- * `quantity > 1` groups that only resolve under a partial unit split, essence options funded from
- * a joint block including dual-essence carriers, currency options (ordered strictly after items),
- * `optionOverrides` pins with and without a `heldItemId`, and unsatisfiable sets whose
- * `missingGroups` have/need must survive unchanged. Roughly a third of the corpus is
- * unsatisfiable, which is deliberate: the failing path is the one that explores the whole space.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -65,11 +32,7 @@ const TAGS = ['iron', 'wood', 'ember'];
 const ESSENCES = ['fire', 'earth'];
 const UNITS = ['gp', 'sp'];
 
-/**
- * One held stack: a component identity, a tag list and an essence map, all decided by the seed.
- * The matcher and essence probe below read these fields, so the fixture's identity model is
- * explicit rather than borrowed from Fabricate's flag resolution.
- */
+/** One held stack: a component identity, a tag list and an essence map, all decided by the seed. */
 function heldStack(random, index) {
   return {
     uuid: `held-${index}`,
@@ -160,14 +123,12 @@ function buildCase(caseIndex) {
   return { set: new IngredientSet({ id: `set-${caseIndex}`, ingredientGroups }), items, options };
 }
 
-/**
- * The full observable selection as one string.
- *
- * Every field a consumer reads is in here, in order: a fingerprint that only compared `success`
- * would be satisfied by a resolver that consumed entirely different stacks. `selectedIngredients`
- * is recorded as the per-group option INDEX because that is exactly how
- * `RecipeManager._chosenOptionByGroup` reads it — positionally.
- */
+const entriesOf = (record) =>
+  Object.entries(record ?? {})
+    .map(([key, value]) => `${key}=${value}`)
+    .join(',');
+
+/** The full observable selection as one string. */
 function fingerprint(set, selection) {
   const optionIndexOf = (option) => {
     for (const [groupIndex, group] of set.ingredientGroups.entries()) {
@@ -176,6 +137,8 @@ function fingerprint(set, selection) {
     }
     return '?';
   };
+  const pool = selection.essencePool;
+  const stats = selection.searchStats;
   const parts = [
     selection.success ? 'ok' : 'no',
     `sel[${selection.selectedIngredients.map(optionIndexOf).join(',')}]`,
@@ -190,12 +153,20 @@ function fingerprint(set, selection) {
     `miss[${selection.missingGroups
       .map((missing) => `${missing.group?.id ?? '?'}:${missing.have}/${missing.need}`)
       .join(',')}]`,
-    `alloc[${Object.entries(selection.essenceAllocation)
-      .map(([key, units]) => `${key}=${units}`)
-      .join(',')}]`,
-    `pool[${(selection.essencePool?.requirements ?? [])
+    `alloc[${entriesOf(selection.essenceAllocation)}]`,
+    `pool[${(pool?.requirements ?? [])
       .map((requirement) => `${requirement.essenceId}:${requirement.delivered}/${requirement.need}`)
       .join(',')}]`,
+    `carry[${(pool?.carriers ?? [])
+      .map(
+        (carrier) =>
+          `${carrier.itemKey}:${entriesOf(carrier.perUnit)}:` +
+          `${carrier.allocatedUnits}/${carrier.ownedUnits}`
+      )
+      .join(',')}]`,
+    `sugg[${entriesOf(pool?.suggested)}]`,
+    `tot[${entriesOf(pool?.totals)}]`,
+    `stats[${stats.nodes}/${stats.capHit}/${Object.isFrozen(stats)}]`,
   ];
   return parts.join(' ');
 }
@@ -216,250 +187,250 @@ if (process.env.FABRICATE_PRINT_SOLVER_FINGERPRINTS) {
 }
 
 /**
- * Captured from `src/models/IngredientSet.js` at `af58030e` — the whole-set snapshot/restore
- * solver, before the undo journal, the pass index and contention scoping.
+ * The committed oracle: its selection fields carry the pre-1083 solver's answers forward, and its
+ * search-cost and essence-pool detail pin the current implementation byte for byte.
  */
 const FINGERPRINTS = [
-  'no sel[0.1,2.1] plan[held-0x1,held-1x1,held-1x2] cur[] miss[g-1:0/3] alloc[] pool[]',
-  'no sel[1.0,2.1] plan[held-0x3,held-0x1@g-1,held-1x2@g-0] cur[] miss[g-0:2/3] alloc[held-1=2,held-0=1] pool[earth:2/3,fire:1/1]',
-  'ok sel[0.1] plan[held-0x1] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0,1.2] plan[held-1x2,held-4x1@g-1] cur[] miss[] alloc[held-4=1] pool[fire:1/1]',
-  'no sel[1.1,2.0] plan[held-1x1,held-1x1@g-2] cur[] miss[g-0:0/1] alloc[held-1=1] pool[earth:2/2]',
-  'ok sel[0.0] plan[held-1x2] cur[] miss[] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/2] alloc[] pool[]',
-  'ok sel[0.1,1.0,2.0,3.0] plan[held-2x1,held-0x1,held-3x1,held-5x1,held-3x1@g-1] cur[] miss[] alloc[held-3=1] pool[earth:1/1]',
-  'no sel[] plan[] cur[] miss[g-0:1/2] alloc[] pool[]',
-  'no sel[0.0,2.1] plan[held-1x2,held-0x1@g-2+g-3] cur[] miss[g-1:1/3,g-3:1/2] alloc[held-0=1] pool[earth:1/1,earth:1/2]',
-  'no sel[] plan[] cur[] miss[g-0:1/2] alloc[] pool[]',
-  'no sel[3.0] plan[held-1x3@g-3] cur[] miss[g-0:0/3,g-1:0/3,g-2:0/3] alloc[held-1=3] pool[earth:0/3,earth:0/3,fire:3/3]',
-  'ok sel[0.1,1.0,2.0,3.0] plan[held-0x2,held-2x1,held-1x1] cur[7gp] miss[] alloc[] pool[]',
-  'ok sel[0.1] plan[held-0x1] cur[] miss[] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/1,g-1:0/2] alloc[] pool[earth:0/1,fire:0/2]',
-  'ok sel[0.0,1.0,2.0,3.0] plan[held-0x2,held-1x1,held-6x3,held-5x2@g-1] cur[] miss[] alloc[held-5=2] pool[earth:2/2]',
-  'ok sel[0.0] plan[held-0x1] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.1,1.0,2.0] plan[held-1x2,held-0x1@g-0+g-2,held-1x1@g-2] cur[] miss[] alloc[held-0=1,held-1=1] pool[earth:1/1,fire:3/3]',
-  'ok sel[0.0] plan[held-1x2] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0,1.2,2.1] plan[held-1x2,held-0x1,held-1x1] cur[] miss[] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:1/3,g-1:0/3] alloc[] pool[]',
-  'ok sel[0.1,1.0,2.1] plan[held-1x1,held-1x2,held-2x1] cur[] miss[] alloc[] pool[]',
-  'no sel[0.1] plan[held-0x2] cur[] miss[g-1:0/2] alloc[] pool[]',
-  'no sel[0.1] plan[held-0x2] cur[] miss[g-1:0/2,g-2:0/3] alloc[] pool[]',
-  'no sel[0.0,3.0] plan[held-0x1,held-1x2] cur[43gp] miss[g-1:0/1,g-2:0/3] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[]',
-  'no sel[0.0,2.0,3.0] plan[held-4x1,held-0x3,held-2x1@g-2] cur[] miss[g-1:0/1] alloc[held-2=1] pool[earth:1/1]',
-  'no sel[0.0,1.0,3.0] plan[held-0x2,held-4x3,held-2x1] cur[] miss[g-2:0/1] alloc[] pool[]',
-  'ok sel[0.0,1.0,2.0,3.1] plan[held-1x2,held-0x1,held-4x2@g-0,held-5x1@g-0] cur[8sp] miss[] alloc[held-4=2,held-5=1] pool[earth:3/3]',
-  'no sel[1.0,3.0] plan[held-0x1,held-1x2,held-2x1@g-3] cur[] miss[g-0:0/1,g-2:2/3] alloc[held-2=1] pool[earth:0/1,fire:2/2]',
-  'ok sel[0.1,1.1,2.0] plan[held-2x1,held-3x3,held-0x2@g-0] cur[] miss[] alloc[held-0=2] pool[earth:3/3]',
-  'ok sel[0.0,1.0,2.0] plan[held-0x1,held-0x1,held-3x1] cur[] miss[] alloc[] pool[]',
-  'no sel[1.0] plan[held-0x1] cur[] miss[g-0:0/3] alloc[] pool[fire:0/3]',
-  'ok sel[0.0] plan[held-2x2@g-0] cur[] miss[] alloc[held-2=2] pool[fire:2/2]',
-  'ok sel[0.0,1.0] plan[held-1x2,held-0x2] cur[] miss[] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[]',
-  'no sel[0.1] plan[held-3x2] cur[] miss[g-1:0/2] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[]',
-  'ok sel[0.0,1.0] plan[held-0x2,held-1x1@g-0] cur[] miss[] alloc[held-1=1] pool[earth:1/1]',
-  'no sel[0.0,1.1,2.2] plan[held-2x1,held-0x1,held-2x2@g-1] cur[] miss[g-3:0/1] alloc[held-2=2] pool[earth:3/3]',
-  'ok sel[0.0] plan[held-3x2@g-0] cur[] miss[] alloc[held-3=2] pool[fire:3/3]',
-  'ok sel[0.0,1.0,2.0] plan[held-1x1,held-1x1,held-2x1] cur[] miss[] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/2] alloc[] pool[]',
-  'ok sel[0.0] plan[held-1x1@g-0] cur[] miss[] alloc[held-1=1] pool[earth:2/2]',
-  'no sel[0.0,2.0] plan[held-0x2,held-2x1@g-2] cur[] miss[g-1:0/1] alloc[held-2=1] pool[fire:2/2]',
-  'ok sel[0.0] plan[held-0x1] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0] plan[held-0x2] cur[] miss[] alloc[] pool[]',
-  'no sel[1.1,2.0,3.0] plan[held-0x1,held-4x2,held-1x2,held-1x1,held-6x2] cur[] miss[g-0:0/1] alloc[] pool[]',
-  'ok sel[0.0] plan[held-0x1] cur[] miss[] alloc[] pool[]',
-  'no sel[1.0] plan[held-1x1@g-1] cur[] miss[g-0:1/2,g-2:1/2,g-3:0/3] alloc[held-1=1] pool[earth:1/1]',
-  'no sel[0.0,3.0] plan[held-1x1,held-5x1@g-3] cur[] miss[g-1:0/1,g-2:0/1] alloc[held-5=1] pool[earth:1/1]',
-  'ok sel[0.1] plan[held-0x1] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.1,1.1] plan[held-1x1,held-1x1,held-4x2] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.1] plan[held-2x2] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.1] plan[held-0x1] cur[] miss[] alloc[] pool[]',
-  'no sel[0.0] plan[] cur[25gp] miss[g-1:2/3] alloc[] pool[]',
-  'no sel[0.2,1.0,3.0] plan[held-2x3,held-2x1,held-4x1,held-1x1,held-4x1,held-6x1] cur[] miss[g-2:0/1] alloc[] pool[]',
-  'ok sel[0.0] plan[] cur[9gp] miss[] alloc[] pool[]',
-  'no sel[0.0,1.0,3.0] plan[held-0x3,held-3x1@g-0,held-4x1@g-0+g-3] cur[] miss[g-2:0/1] alloc[held-4=1,held-3=1] pool[earth:3/3,fire:2/2]',
-  'no sel[] plan[] cur[] miss[g-0:0/1,g-1:0/3] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/2,g-1:0/1,g-2:0/2] alloc[] pool[earth:0/2,earth:0/2]',
-  'no sel[0.0,1.0] plan[held-2x3,held-3x3] cur[] miss[g-2:0/1] alloc[] pool[]',
-  'ok sel[0.0,1.0] plan[held-0x1,held-2x2@g-1] cur[] miss[] alloc[held-2=2] pool[fire:2/2]',
-  'no sel[] plan[] cur[] miss[g-0:0/1,g-1:0/3] alloc[] pool[]',
-  'ok sel[0.0] plan[held-0x3] cur[] miss[] alloc[] pool[]',
-  'no sel[3.0] plan[] cur[8sp] miss[g-0:0/3,g-1:0/2,g-2:0/3] alloc[] pool[earth:0/2]',
-  'no sel[0.0,2.1] plan[held-0x2@g-0+g-2] cur[] miss[g-1:0/3,g-3:0/2] alloc[held-0=2] pool[earth:1/1,earth:1/1]',
-  'no sel[0.0,1.0] plan[held-1x2,held-0x2@g-1+g-2] cur[] miss[g-2:0/1] alloc[held-0=2] pool[fire:2/2,fire:0/1]',
-  'no sel[1.1,3.0] plan[held-1x1,held-4x1] cur[] miss[g-0:0/2,g-2:0/1] alloc[] pool[]',
-  'no sel[0.2,1.0] plan[held-4x1,held-3x1@g-0] cur[] miss[g-2:0/1] alloc[held-3=1] pool[fire:1/1]',
-  'ok sel[0.0] plan[held-0x2] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0] plan[held-1x1@g-0] cur[] miss[] alloc[held-1=1] pool[earth:1/1]',
-  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[]',
-  'no sel[0.0] plan[held-0x3] cur[] miss[g-1:2/3] alloc[] pool[]',
-  'ok sel[0.1,1.0] plan[held-0x3,held-1x2@g-0] cur[] miss[] alloc[held-1=2] pool[fire:3/3]',
-  'ok sel[0.0] plan[held-3x2,held-4x1] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0,1.0,2.0] plan[held-0x1,held-1x1,held-1x1] cur[] miss[] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/3,g-1:0/3] alloc[] pool[]',
-  'ok sel[0.0,1.0,2.0] plan[held-0x2,held-6x1@g-0] cur[31sp] miss[] alloc[held-6=1] pool[earth:2/2]',
-  'no sel[1.0,2.1] plan[held-0x2,held-0x1] cur[] miss[g-0:0/2] alloc[] pool[earth:0/2]',
-  'ok sel[0.0] plan[held-0x2] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0] plan[held-2x2] cur[] miss[] alloc[] pool[]',
-  'no sel[1.0,2.0] plan[held-0x1] cur[15gp] miss[g-0:1/3,g-3:0/1] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[fire:0/1]',
-  'no sel[2.1] plan[held-1x2,held-2x1] cur[] miss[g-0:0/3,g-1:0/3,g-3:0/1] alloc[] pool[earth:0/3]',
-  'ok sel[0.1,1.0] plan[held-0x2,held-4x1] cur[] miss[] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/2] alloc[] pool[]',
-  'ok sel[0.0,1.1,2.0] plan[held-4x1,held-1x2,held-0x1] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0] plan[held-1x3] cur[] miss[] alloc[] pool[]',
-  'no sel[1.1] plan[held-1x1,held-3x1] cur[] miss[g-0:0/2] alloc[] pool[]',
-  'no sel[0.0,2.0] plan[held-0x1,held-3x3@g-2] cur[] miss[g-1:1/2] alloc[held-3=3] pool[fire:3/3]',
-  'ok sel[0.0] plan[held-0x2] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.1,1.0] plan[held-0x2,held-2x1,held-3x2@g-0] cur[] miss[] alloc[held-3=2] pool[earth:2/2]',
-  'no sel[] plan[] cur[] miss[g-0:2/3,g-1:0/2] alloc[] pool[]',
-  'ok sel[0.0,1.0] plan[held-0x2,held-0x1] cur[] miss[] alloc[] pool[]',
-  'no sel[1.0,2.0] plan[held-2x2,held-0x1] cur[] miss[g-0:0/1] alloc[] pool[fire:0/1]',
-  'no sel[] plan[held-1x1@g-0] cur[] miss[g-0:1/2,g-1:0/2,g-2:0/2] alloc[held-1=1] pool[earth:1/2,fire:0/2,fire:0/2]',
-  'ok sel[0.1] plan[held-0x2,held-2x1] cur[] miss[] alloc[] pool[]',
-  'no sel[0.0,2.0] plan[held-4x2,held-3x1,held-6x2@g-1] cur[] miss[g-1:2/3,g-3:0/1] alloc[held-6=2] pool[earth:2/3]',
-  'no sel[0.0] plan[held-0x1] cur[] miss[g-1:0/3,g-2:0/2,g-3:0/1] alloc[] pool[]',
-  'ok sel[0.2,1.0] plan[held-0x3,held-2x2@g-1] cur[] miss[] alloc[held-2=2] pool[fire:2/2]',
-  'no sel[0.0] plan[held-2x3] cur[] miss[g-1:0/1] alloc[] pool[]',
-  'no sel[0.0,2.1] plan[held-0x1] cur[44sp] miss[g-1:0/1,g-3:0/2] alloc[] pool[]',
-  'no sel[0.0,2.0] plan[held-0x2,held-1x2,held-2x1] cur[] miss[g-1:0/3,g-3:0/1] alloc[] pool[]',
-  'no sel[0.0] plan[held-0x1,held-3x2] cur[] miss[g-1:2/3] alloc[] pool[]',
-  'no sel[0.0] plan[held-2x3] cur[] miss[g-1:0/2] alloc[] pool[]',
-  'ok sel[0.0] plan[held-0x1] cur[] miss[] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:2/3] alloc[] pool[]',
-  'ok sel[0.0,1.0,2.1,3.0] plan[held-2x3,held-3x1,held-3x1,held-6x1@g-0] cur[] miss[] alloc[held-6=1] pool[earth:2/2]',
-  'ok sel[0.1,1.0] plan[held-0x1,held-1x1@g-1] cur[] miss[] alloc[held-1=1] pool[fire:1/1]',
-  'ok sel[0.1,1.1] plan[held-3x1,held-4x1,held-4x1] cur[] miss[] alloc[] pool[]',
-  'no sel[0.0,2.0] plan[held-0x1,held-0x2,held-2x1] cur[] miss[g-1:0/1] alloc[] pool[]',
-  'ok sel[0.0] plan[held-0x2] cur[] miss[] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/2] alloc[] pool[]',
-  'no sel[0.0,3.0] plan[held-0x3,held-2x2] cur[] miss[g-1:2/3,g-2:2/3] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/3,g-1:1/2] alloc[] pool[]',
-  'no sel[0.2,1.0] plan[held-1x2@g-0+g-1] cur[] miss[g-2:0/3] alloc[held-1=2] pool[fire:3/3,fire:1/1]',
-  'no sel[] plan[] cur[] miss[g-0:0/2] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[]',
-  'no sel[3.0] plan[held-1x1] cur[] miss[g-0:0/1,g-1:0/1,g-2:0/2] alloc[] pool[]',
-  'no sel[0.0,3.0] plan[held-0x1,held-0x1@g-3] cur[] miss[g-1:0/3,g-2:0/3] alloc[held-0=1] pool[earth:1/1]',
-  'ok sel[0.0] plan[held-0x1] cur[] miss[] alloc[] pool[]',
-  'no sel[1.0] plan[held-0x1@g-1] cur[] miss[g-0:0/1] alloc[held-0=1] pool[earth:1/1]',
-  'no sel[0.0,2.0] plan[held-0x2,held-1x1] cur[] miss[g-1:0/1] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/1,g-1:1/3] alloc[] pool[fire:0/1]',
-  'no sel[1.0] plan[held-1x1@g-1] cur[] miss[g-0:0/1,g-2:0/1] alloc[held-1=1] pool[fire:2/2]',
-  'ok sel[0.0,1.0,2.1] plan[held-0x2,held-4x1,held-0x2,held-1x1] cur[] miss[] alloc[] pool[]',
-  'no sel[0.0] plan[held-1x2] cur[] miss[g-1:2/3] alloc[] pool[]',
-  'no sel[2.0] plan[held-0x2] cur[] miss[g-0:1/3,g-1:0/2,g-3:1/2] alloc[] pool[earth:0/2]',
-  'ok sel[0.1,1.0] plan[held-0x3,held-1x3] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0] plan[held-3x1@g-0] cur[] miss[] alloc[held-3=1] pool[fire:2/2]',
-  'no sel[] plan[] cur[] miss[g-0:0/1,g-1:0/1] alloc[] pool[]',
-  'no sel[1.0] plan[held-0x1] cur[] miss[g-0:0/2] alloc[] pool[]',
-  'no sel[1.0] plan[held-4x2] cur[] miss[g-0:2/3] alloc[] pool[]',
-  'ok sel[0.1] plan[held-0x2] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0,1.0,2.0,3.0] plan[held-2x2,held-1x3,held-6x1,held-0x3] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.1,1.1] plan[held-0x2,held-0x2] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0,1.1,2.0,3.1] plan[held-1x2,held-5x1,held-2x2,held-3x1,held-5x3] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0,1.1] plan[held-0x1,held-0x2] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0,1.0] plan[held-0x2,held-1x1,held-1x1,held-2x1] cur[] miss[] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/3] alloc[] pool[]',
-  'no sel[0.0,2.0] plan[held-0x1,held-1x1,held-3x2] cur[] miss[g-1:0/3] alloc[] pool[]',
-  'no sel[1.0,2.0] plan[held-0x1] cur[19gp] miss[g-0:1/2] alloc[] pool[]',
-  'no sel[0.0,1.0,3.1] plan[held-2x2,held-1x1@g-0,held-2x1@g-0+g-3] cur[] miss[g-2:0/1] alloc[held-2=1,held-1=1] pool[fire:3/3,earth:1/1]',
-  'ok sel[0.0] plan[held-2x2] cur[] miss[] alloc[] pool[]',
-  'no sel[1.0,2.0] plan[held-2x1@g-1] cur[27sp] miss[g-0:0/1] alloc[held-2=1] pool[earth:1/1]',
-  'ok sel[0.0,1.0,2.0] plan[held-0x2,held-0x1,held-1x1,held-1x2@g-1] cur[] miss[] alloc[held-1=2] pool[fire:3/3]',
-  'ok sel[0.2] plan[held-0x1,held-1x2] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0,1.0] plan[held-0x2,held-0x1] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0,1.0] plan[held-1x1,held-1x3@g-1] cur[] miss[] alloc[held-1=3] pool[earth:3/3]',
-  'no sel[1.0] plan[held-2x1] cur[] miss[g-0:0/2] alloc[] pool[]',
-  'no sel[0.0,2.0] plan[held-1x3,held-1x1] cur[] miss[g-1:1/2,g-3:1/3] alloc[] pool[]',
-  'ok sel[0.0,1.0,2.0,3.0] plan[held-0x2,held-6x2,held-3x1@g-2] cur[11gp] miss[] alloc[held-3=1] pool[earth:2/2]',
-  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[]',
-  'no sel[0.0,1.0] plan[held-1x2,held-0x2] cur[] miss[g-2:0/3] alloc[] pool[]',
-  'ok sel[0.0] plan[held-0x2] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0] plan[held-1x1@g-0] cur[] miss[] alloc[held-1=1] pool[fire:2/2]',
-  'no sel[] plan[] cur[] miss[g-0:0/3] alloc[] pool[earth:0/3]',
-  'ok sel[0.0,1.0,2.0] plan[held-1x1,held-3x1,held-4x3,held-0x2] cur[] miss[] alloc[] pool[]',
-  'no sel[0.2,1.0,2.0] plan[held-0x2,held-0x2,held-1x1,held-1x1@g-2] cur[] miss[g-3:0/1] alloc[held-1=1] pool[fire:2/2]',
-  'ok sel[0.1,1.0] plan[held-1x1,held-2x1@g-0] cur[] miss[] alloc[held-2=1] pool[fire:2/2]',
-  'ok sel[0.1,1.0] plan[held-2x3,held-2x1,held-3x2] cur[] miss[] alloc[] pool[]',
-  'no sel[1.1] plan[held-1x1] cur[] miss[g-0:0/3] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[]',
-  'ok sel[0.0] plan[held-0x2] cur[] miss[] alloc[] pool[]',
-  'no sel[0.0] plan[held-0x1@g-0] cur[] miss[g-1:0/2] alloc[held-0=1] pool[fire:2/2]',
-  'no sel[0.0,1.1,3.0] plan[held-3x3,held-0x1,held-2x1] cur[] miss[g-2:0/1] alloc[] pool[earth:0/1]',
-  'ok sel[0.0,1.0,2.0,3.0] plan[held-0x2,held-3x1,held-3x1,held-4x2,held-1x3] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.1] plan[held-0x1@g-0] cur[] miss[] alloc[held-0=1] pool[fire:1/1]',
-  'no sel[0.1] plan[held-3x2] cur[] miss[g-1:0/3] alloc[] pool[earth:0/3]',
-  'no sel[] plan[] cur[] miss[g-0:2/3] alloc[] pool[]',
-  'ok sel[0.0,1.0] plan[held-0x1,held-0x2,held-4x1] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0,1.0,2.0,3.0] plan[held-2x3,held-1x1,held-2x1,held-5x2,held-3x2] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0] plan[held-1x3] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0] plan[held-2x2] cur[] miss[] alloc[] pool[]',
-  'no sel[1.0,2.0] plan[held-0x1,held-1x1@g-1] cur[] miss[g-0:0/3] alloc[held-1=1] pool[fire:1/1]',
-  'no sel[0.0] plan[held-0x1] cur[] miss[g-1:0/2] alloc[] pool[]',
-  'no sel[] plan[held-1x2@g-1] cur[] miss[g-0:0/1,g-1:2/3] alloc[held-1=2] pool[earth:2/3]',
-  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[]',
-  'no sel[1.0] plan[held-4x1] cur[] miss[g-0:0/1] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/3,g-1:0/2] alloc[] pool[]',
-  'no sel[1.0,3.0] plan[held-0x2] cur[50gp] miss[g-0:1/2,g-2:1/3] alloc[] pool[]',
-  'ok sel[0.1,1.0] plan[held-0x2,held-3x2] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0] plan[held-0x2] cur[] miss[] alloc[] pool[]',
-  'no sel[1.0,3.1] plan[held-0x1,held-1x1] cur[] miss[g-0:0/1,g-2:1/3] alloc[] pool[]',
-  'no sel[0.0,2.0] plan[held-0x2,held-2x1@g-0] cur[] miss[g-1:0/1] alloc[held-2=1] pool[earth:2/2]',
-  'no sel[1.1,2.0] plan[held-1x3,held-0x1] cur[] miss[g-0:0/1,g-3:0/2] alloc[] pool[]',
-  'ok sel[0.0,1.0] plan[held-0x2,held-5x1@g-0,held-6x1@g-0] cur[] miss[] alloc[held-5=1,held-6=1] pool[earth:3/3]',
-  'ok sel[0.2,1.0,2.0] plan[held-2x1,held-5x1,held-0x1] cur[] miss[] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/2] alloc[] pool[]',
-  'ok sel[0.0,1.0,2.0,3.1] plan[held-0x3,held-2x1,held-4x1,held-1x1,held-5x1,held-3x1@g-2] cur[] miss[] alloc[held-3=1] pool[earth:1/1]',
-  'ok sel[0.0] plan[held-1x1@g-0] cur[] miss[] alloc[held-1=1] pool[earth:1/1]',
-  'ok sel[0.0] plan[held-1x2,held-3x1] cur[] miss[] alloc[] pool[]',
-  'no sel[2.0] plan[held-1x1@g-2] cur[] miss[g-0:0/1,g-1:0/3,g-3:0/3] alloc[held-1=1] pool[earth:1/1]',
-  'ok sel[0.1,1.0,2.2] plan[held-0x1,held-2x2,held-1x1,held-2x1,held-3x1,held-1x3@g-1] cur[] miss[] alloc[held-1=3] pool[earth:3/3]',
-  'ok sel[0.0] plan[held-0x1,held-1x1,held-2x1] cur[] miss[] alloc[] pool[]',
-  'no sel[0.0] plan[held-0x1] cur[] miss[g-1:0/3] alloc[] pool[]',
-  'ok sel[0.0] plan[held-5x1] cur[] miss[] alloc[] pool[]',
-  'no sel[0.0] plan[held-0x2,held-3x1] cur[] miss[g-1:0/1,g-2:1/3] alloc[] pool[]',
-  'ok sel[0.0,1.0] plan[held-2x2,held-1x1,held-5x2] cur[] miss[] alloc[] pool[]',
-  'no sel[1.0] plan[held-0x2,held-2x1] cur[] miss[g-0:0/3] alloc[] pool[]',
-  'ok sel[0.0,1.0,2.0,3.0] plan[held-1x2,held-0x2,held-5x1@g-0+g-3] cur[] miss[] alloc[held-5=1] pool[earth:1/1,fire:1/1]',
-  'no sel[] plan[] cur[] miss[g-0:0/1,g-1:0/1] alloc[] pool[]',
-  'no sel[1.0] plan[held-1x1] cur[] miss[g-0:0/1] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/1,g-1:0/1] alloc[] pool[]',
-  'no sel[0.0] plan[held-0x1,held-1x1] cur[] miss[g-1:0/1] alloc[] pool[]',
-  'ok sel[0.0,1.0,2.2,3.0] plan[held-2x2,held-4x1,held-1x3,held-0x1@g-2] cur[] miss[] alloc[held-0=1] pool[fire:1/1]',
-  'no sel[0.0,2.0] plan[held-1x1,held-1x1] cur[] miss[g-1:1/2] alloc[] pool[]',
-  'no sel[1.0,2.0] plan[held-2x1,held-1x2@g-2] cur[] miss[g-0:0/2] alloc[held-1=2] pool[earth:0/2,fire:2/2]',
-  'no sel[1.1,2.1] plan[held-0x1,held-1x1] cur[] miss[g-0:2/3] alloc[] pool[]',
-  'ok sel[0.0,1.0,2.0] plan[held-1x2,held-2x3,held-1x1] cur[] miss[] alloc[] pool[]',
-  'no sel[1.0] plan[held-1x1@g-1,held-3x1@g-0] cur[] miss[g-0:1/2] alloc[held-1=1,held-3=1] pool[fire:1/2,earth:2/2]',
-  'no sel[1.1,3.0] plan[held-1x3] cur[16gp] miss[g-0:0/1,g-2:0/3] alloc[] pool[]',
-  'ok sel[0.0,1.0] plan[held-2x1,held-0x1] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0,1.1] plan[held-2x1,held-5x2,held-6x1@g-0] cur[] miss[] alloc[held-6=1] pool[fire:1/1]',
-  'ok sel[0.0,1.0,2.2] plan[held-0x2,held-3x3@g-1+g-2,held-4x1@g-1+g-2] cur[] miss[] alloc[held-4=1,held-3=3] pool[earth:2/2,earth:3/3]',
-  'ok sel[0.0,1.0] plan[held-4x3,held-1x2@g-0] cur[] miss[] alloc[held-1=2] pool[earth:3/3]',
-  'ok sel[0.0,1.0,2.0,3.0] plan[held-3x2,held-0x3,held-5x1] cur[26gp] miss[] alloc[] pool[]',
-  'no sel[1.0,2.0] plan[held-1x2,held-2x1,held-3x2@g-1] cur[] miss[g-0:0/3] alloc[held-3=2] pool[fire:2/2]',
-  'ok sel[0.2,1.0] plan[held-2x1,held-5x2,held-0x1@g-0] cur[] miss[] alloc[held-0=1] pool[earth:2/2]',
-  'ok sel[0.1] plan[] cur[32sp] miss[] alloc[] pool[]',
-  'ok sel[0.0,1.2] plan[held-0x2,held-3x1@g-1,held-4x1@g-1] cur[] miss[] alloc[held-4=1,held-3=1] pool[earth:3/3]',
-  'no sel[1.0,2.0,3.1] plan[held-0x2,held-3x1,held-2x1,held-4x1] cur[] miss[g-0:0/1] alloc[] pool[earth:0/1]',
-  'no sel[0.0,1.1,2.1] plan[held-0x2,held-2x1,held-0x1,held-3x1] cur[] miss[g-3:0/3] alloc[] pool[]',
-  'no sel[1.0,2.0] plan[held-0x3,held-1x2] cur[] miss[g-0:0/3,g-3:0/1] alloc[] pool[]',
-  'no sel[] plan[] cur[] miss[g-0:0/1,g-1:1/2] alloc[] pool[]',
-  'ok sel[0.0,1.1,2.0] plan[held-2x1,held-3x3,held-1x3] cur[] miss[] alloc[] pool[]',
-  'no sel[0.0,1.0] plan[held-1x3,held-0x2@g-1] cur[] miss[g-2:0/2,g-3:0/3] alloc[held-0=2] pool[fire:2/2]',
-  'no sel[2.1] plan[held-1x2@g-2] cur[] miss[g-0:0/2,g-1:0/2,g-3:0/3] alloc[held-1=2] pool[fire:0/2,earth:2/2,fire:0/3]',
-  'ok sel[0.0] plan[held-1x1] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.1] plan[held-1x2,held-4x1] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0] plan[held-0x1] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0,1.0] plan[held-1x1,held-2x2] cur[] miss[] alloc[] pool[]',
-  'ok sel[0.0,1.0,2.0,3.0] plan[held-3x1,held-0x3,held-0x1,held-1x1@g-2] cur[] miss[] alloc[held-1=1] pool[fire:2/2]',
-  'no sel[1.0,2.0,3.0] plan[held-0x2,held-0x2,held-4x1@g-2] cur[] miss[g-0:0/1] alloc[held-4=1] pool[fire:1/1]',
-  'ok sel[0.1,1.0] plan[held-1x1,held-0x1] cur[] miss[] alloc[] pool[]',
-  'no sel[0.1] plan[held-2x1,held-3x1] cur[] miss[g-1:2/3] alloc[] pool[]',
-  'no sel[0.1] plan[held-0x2] cur[] miss[g-1:0/1,g-2:1/3,g-3:1/2] alloc[] pool[fire:0/1]',
-  'ok sel[0.0] plan[held-1x1,held-2x1] cur[] miss[] alloc[] pool[]',
+  'no sel[0.1,2.1] plan[held-0x1,held-1x1,held-1x2] cur[] miss[g-1:0/3] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'no sel[1.0,2.1] plan[held-0x3,held-0x1@g-1,held-1x2@g-0] cur[] miss[g-0:2/3] alloc[held-1=2,held-0=1] pool[earth:2/3,fire:1/1] carry[held-0:fire=2:1/1,held-1:earth=1:2/2] sugg[held-1=2,held-0=1] tot[fire=2,earth=2] stats[0/false/true]',
+  'ok sel[0.1] plan[held-0x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.2] plan[held-1x2,held-4x1@g-1] cur[] miss[] alloc[held-4=1] pool[fire:1/1] carry[held-4:fire=1:1/4] sugg[held-4=1] tot[fire=1] stats[3/false/true]',
+  'no sel[1.1,2.0] plan[held-1x1,held-1x1@g-2] cur[] miss[g-0:0/1] alloc[held-1=1] pool[earth:2/2] carry[held-0:earth=1:0/1,held-1:earth=2:1/2] sugg[held-1=1] tot[earth=2] stats[0/false/true]',
+  'ok sel[0.0] plan[held-1x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.1,1.0,2.0,3.0] plan[held-2x1,held-0x1,held-3x1,held-5x1,held-3x1@g-1] cur[] miss[] alloc[held-3=1] pool[earth:1/1] carry[held-3:earth=2:1/1] sugg[held-3=1] tot[earth=2] stats[10/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:1/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0,2.1] plan[held-1x2,held-0x1@g-2+g-3] cur[] miss[g-1:1/3,g-3:1/2] alloc[held-0=1] pool[earth:1/1,earth:1/2] carry[held-0:earth=2:1/1] sugg[held-0=1] tot[earth=2] stats[1/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:1/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[3.0] plan[held-1x3@g-3] cur[] miss[g-0:0/3,g-1:0/3,g-2:0/3] alloc[held-1=3] pool[earth:0/3,earth:0/3,fire:3/3] carry[held-1:fire=1:3/3] sugg[held-1=3] tot[fire=3] stats[0/false/true]',
+  'ok sel[0.1,1.0,2.0,3.0] plan[held-0x2,held-2x1,held-1x1] cur[7gp] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[4/false/true]',
+  'ok sel[0.1] plan[held-0x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1,g-1:0/2] alloc[] pool[earth:0/1,fire:0/2] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.0,2.0,3.0] plan[held-0x2,held-1x1,held-6x3,held-5x2@g-1] cur[] miss[] alloc[held-5=2] pool[earth:2/2] carry[held-2:earth=1:0/2,held-5:earth=1:2/3,held-6:earth=1:0/1] sugg[held-5=2] tot[earth=2] stats[5/false/true]',
+  'ok sel[0.0] plan[held-0x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.1,1.0,2.0] plan[held-1x2,held-0x1@g-0+g-2,held-1x1@g-2] cur[] miss[] alloc[held-0=1,held-1=1] pool[earth:1/1,fire:3/3] carry[held-0:earth=1,fire=2:1/1,held-1:fire=2:1/1] sugg[held-0=1,held-1=1] tot[earth=1,fire=4] stats[4/false/true]',
+  'ok sel[0.0] plan[held-1x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.2,2.1] plan[held-1x2,held-0x1,held-1x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[4/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:1/3,g-1:0/3] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.1,1.0,2.1] plan[held-1x1,held-1x2,held-2x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[4/false/true]',
+  'no sel[0.1] plan[held-0x2] cur[] miss[g-1:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.1] plan[held-0x2] cur[] miss[g-1:0/2,g-2:0/3] alloc[] pool[] carry[] sugg[] tot[] stats[36/false/true]',
+  'no sel[0.0,3.0] plan[held-0x1,held-1x2] cur[43gp] miss[g-1:0/1,g-2:0/3] alloc[] pool[] carry[] sugg[] tot[] stats[11/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0,2.0,3.0] plan[held-4x1,held-0x3,held-2x1@g-2] cur[] miss[g-1:0/1] alloc[held-2=1] pool[earth:1/1] carry[held-1:earth=2:0/4,held-2:earth=1:1/1] sugg[held-2=1] tot[earth=1] stats[4/false/true]',
+  'no sel[0.0,1.0,3.0] plan[held-0x2,held-4x3,held-2x1] cur[] miss[g-2:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'ok sel[0.0,1.0,2.0,3.1] plan[held-1x2,held-0x1,held-4x2@g-0,held-5x1@g-0] cur[8sp] miss[] alloc[held-4=2,held-5=1] pool[earth:3/3] carry[held-4:earth=1:2/2,held-5:earth=1:1/2] sugg[held-4=2,held-5=1] tot[earth=3] stats[5/false/true]',
+  'no sel[1.0,3.0] plan[held-0x1,held-1x2,held-2x1@g-3] cur[] miss[g-0:0/1,g-2:2/3] alloc[held-2=1] pool[earth:0/1,fire:2/2] carry[held-2:fire=2:1/1] sugg[held-2=1] tot[fire=2] stats[0/false/true]',
+  'ok sel[0.1,1.1,2.0] plan[held-2x1,held-3x3,held-0x2@g-0] cur[] miss[] alloc[held-0=2] pool[earth:3/3] carry[held-0:earth=2:2/2,held-2:earth=2:0/2] sugg[held-0=2] tot[earth=4] stats[4/false/true]',
+  'ok sel[0.0,1.0,2.0] plan[held-0x1,held-0x1,held-3x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[4/false/true]',
+  'no sel[1.0] plan[held-0x1] cur[] miss[g-0:0/3] alloc[] pool[fire:0/3] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0] plan[held-2x2@g-0] cur[] miss[] alloc[held-2=2] pool[fire:2/2] carry[held-1:fire=1:0/1,held-2:fire=1:2/4] sugg[held-2=2] tot[fire=2] stats[2/false/true]',
+  'ok sel[0.0,1.0] plan[held-1x2,held-0x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.1] plan[held-3x2] cur[] miss[g-1:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.0] plan[held-0x2,held-1x1@g-0] cur[] miss[] alloc[held-1=1] pool[earth:1/1] carry[held-1:earth=1:1/2,held-2:earth=1:0/2,held-3:earth=1:0/2] sugg[held-1=1] tot[earth=1] stats[3/false/true]',
+  'no sel[0.0,1.1,2.2] plan[held-2x1,held-0x1,held-2x2@g-1] cur[] miss[g-3:0/1] alloc[held-2=2] pool[earth:3/3] carry[held-2:earth=2:2/3] sugg[held-2=2] tot[earth=4] stats[4/false/true]',
+  'ok sel[0.0] plan[held-3x2@g-0] cur[] miss[] alloc[held-3=2] pool[fire:3/3] carry[held-0:fire=2:0/1,held-1:fire=2:0/1,held-3:fire=2:2/2] sugg[held-3=2] tot[fire=4] stats[2/false/true]',
+  'ok sel[0.0,1.0,2.0] plan[held-1x1,held-1x1,held-2x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[4/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0] plan[held-1x1@g-0] cur[] miss[] alloc[held-1=1] pool[earth:2/2] carry[held-0:earth=2:0/1,held-1:earth=2:1/4,held-3:earth=2:0/2] sugg[held-1=1] tot[earth=2] stats[2/false/true]',
+  'no sel[0.0,2.0] plan[held-0x2,held-2x1@g-2] cur[] miss[g-1:0/1] alloc[held-2=1] pool[fire:2/2] carry[held-2:fire=2:1/4,held-3:fire=1:0/3] sugg[held-2=1] tot[fire=2] stats[3/false/true]',
+  'ok sel[0.0] plan[held-0x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0] plan[held-0x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[1.1,2.0,3.0] plan[held-0x1,held-4x2,held-1x2,held-1x1,held-6x2] cur[] miss[g-0:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0] plan[held-0x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[1.0] plan[held-1x1@g-1] cur[] miss[g-0:1/2,g-2:1/2,g-3:0/3] alloc[held-1=1] pool[earth:1/1] carry[held-1:earth=2:1/1] sugg[held-1=1] tot[earth=2] stats[1/false/true]',
+  'no sel[0.0,3.0] plan[held-1x1,held-5x1@g-3] cur[] miss[g-1:0/1,g-2:0/1] alloc[held-5=1] pool[earth:1/1] carry[held-4:earth=2:0/1,held-5:earth=1:1/4,held-6:earth=2:0/1] sugg[held-5=1] tot[earth=1] stats[3/false/true]',
+  'ok sel[0.1] plan[held-0x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.1,1.1] plan[held-1x1,held-1x1,held-4x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'ok sel[0.1] plan[held-2x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.1] plan[held-0x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0] plan[] cur[25gp] miss[g-1:2/3] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.2,1.0,3.0] plan[held-2x3,held-2x1,held-4x1,held-1x1,held-4x1,held-6x1] cur[] miss[g-2:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[4/false/true]',
+  'ok sel[0.0] plan[] cur[9gp] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[2/false/true]',
+  'no sel[0.0,1.0,3.0] plan[held-0x3,held-3x1@g-0,held-4x1@g-0+g-3] cur[] miss[g-2:0/1] alloc[held-4=1,held-3=1] pool[earth:3/3,fire:2/2] carry[held-1:earth=1,fire=2:0/1,held-2:earth=1:0/4,held-3:earth=2:1/3,held-4:earth=1,fire=2:1/2] sugg[held-4=1,held-3=1] tot[earth=3,fire=2] stats[4/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1,g-1:0/3] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/2,g-1:0/1,g-2:0/2] alloc[] pool[earth:0/2,earth:0/2] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0,1.0] plan[held-2x3,held-3x3] cur[] miss[g-2:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'ok sel[0.0,1.0] plan[held-0x1,held-2x2@g-1] cur[] miss[] alloc[held-2=2] pool[fire:2/2] carry[held-1:fire=1:0/1,held-2:fire=1:2/4] sugg[held-2=2] tot[fire=2] stats[3/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1,g-1:0/3] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0] plan[held-0x3] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[3.0] plan[] cur[8sp] miss[g-0:0/3,g-1:0/2,g-2:0/3] alloc[] pool[earth:0/2] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0,2.1] plan[held-0x2@g-0+g-2] cur[] miss[g-1:0/3,g-3:0/2] alloc[held-0=2] pool[earth:1/1,earth:1/1] carry[held-0:earth=1:2/3] sugg[held-0=2] tot[earth=2] stats[3/false/true]',
+  'no sel[0.0,1.0] plan[held-1x2,held-0x2@g-1+g-2] cur[] miss[g-2:0/1] alloc[held-0=2] pool[fire:2/2,fire:0/1] carry[held-0:fire=1:2/2] sugg[held-0=2] tot[fire=2] stats[21/false/true]',
+  'no sel[1.1,3.0] plan[held-1x1,held-4x1] cur[] miss[g-0:0/2,g-2:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.2,1.0] plan[held-4x1,held-3x1@g-0] cur[] miss[g-2:0/1] alloc[held-3=1] pool[fire:1/1] carry[held-3:fire=2:1/2] sugg[held-3=1] tot[fire=2] stats[3/false/true]',
+  'ok sel[0.0] plan[held-0x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0] plan[held-1x1@g-0] cur[] miss[] alloc[held-1=1] pool[earth:1/1] carry[held-1:earth=1:1/4] sugg[held-1=1] tot[earth=1] stats[2/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[1/false/true]',
+  'no sel[0.0] plan[held-0x3] cur[] miss[g-1:2/3] alloc[] pool[] carry[] sugg[] tot[] stats[24/false/true]',
+  'ok sel[0.1,1.0] plan[held-0x3,held-1x2@g-0] cur[] miss[] alloc[held-1=2] pool[fire:3/3] carry[held-1:fire=2:2/2] sugg[held-1=2] tot[fire=4] stats[9/false/true]',
+  'ok sel[0.0] plan[held-3x2,held-4x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.0,2.0] plan[held-0x1,held-1x1,held-1x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[4/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/3,g-1:0/3] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.0,2.0] plan[held-0x2,held-6x1@g-0] cur[31sp] miss[] alloc[held-6=1] pool[earth:2/2] carry[held-2:earth=1:0/2,held-6:earth=2:1/2] sugg[held-6=1] tot[earth=2] stats[2/false/true]',
+  'no sel[1.0,2.1] plan[held-0x2,held-0x1] cur[] miss[g-0:0/2] alloc[] pool[earth:0/2] carry[] sugg[] tot[] stats[1/false/true]',
+  'ok sel[0.0] plan[held-0x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0] plan[held-2x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[1.0,2.0] plan[held-0x1] cur[15gp] miss[g-0:1/3,g-3:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[1/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[fire:0/1] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[2.1] plan[held-1x2,held-2x1] cur[] miss[g-0:0/3,g-1:0/3,g-3:0/1] alloc[] pool[earth:0/3] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.1,1.0] plan[held-0x2,held-4x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.1,2.0] plan[held-4x1,held-1x2,held-0x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[4/false/true]',
+  'ok sel[0.0] plan[held-1x3] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[1.1] plan[held-1x1,held-3x1] cur[] miss[g-0:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0,2.0] plan[held-0x1,held-3x3@g-2] cur[] miss[g-1:1/2] alloc[held-3=3] pool[fire:3/3] carry[held-3:fire=1:3/3] sugg[held-3=3] tot[fire=3] stats[11/false/true]',
+  'ok sel[0.0] plan[held-0x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.1,1.0] plan[held-0x2,held-2x1,held-3x2@g-0] cur[] miss[] alloc[held-3=2] pool[earth:2/2] carry[held-1:earth=1:0/1,held-3:earth=1:2/3] sugg[held-3=2] tot[earth=2] stats[3/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:2/3,g-1:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[1/false/true]',
+  'ok sel[0.0,1.0] plan[held-0x2,held-0x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'no sel[1.0,2.0] plan[held-2x2,held-0x1] cur[] miss[g-0:0/1] alloc[] pool[fire:0/1] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[] plan[held-1x1@g-0] cur[] miss[g-0:1/2,g-1:0/2,g-2:0/2] alloc[held-1=1] pool[earth:1/2,fire:0/2,fire:0/2] carry[held-1:earth=1:1/1] sugg[held-1=1] tot[earth=1] stats[9/false/true]',
+  'ok sel[0.1] plan[held-0x2,held-2x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0,2.0] plan[held-4x2,held-3x1,held-6x2@g-1] cur[] miss[g-1:2/3,g-3:0/1] alloc[held-6=2] pool[earth:2/3] carry[held-6:earth=1:2/2] sugg[held-6=2] tot[earth=2] stats[0/false/true]',
+  'no sel[0.0] plan[held-0x1] cur[] miss[g-1:0/3,g-2:0/2,g-3:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[5/false/true]',
+  'ok sel[0.2,1.0] plan[held-0x3,held-2x2@g-1] cur[] miss[] alloc[held-2=2] pool[fire:2/2] carry[held-2:fire=1:2/3] sugg[held-2=2] tot[fire=2] stats[9/false/true]',
+  'no sel[0.0] plan[held-2x3] cur[] miss[g-1:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0,2.1] plan[held-0x1] cur[44sp] miss[g-1:0/1,g-3:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0,2.0] plan[held-0x2,held-1x2,held-2x1] cur[] miss[g-1:0/3,g-3:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'no sel[0.0] plan[held-0x1,held-3x2] cur[] miss[g-1:2/3] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0] plan[held-2x3] cur[] miss[g-1:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0] plan[held-0x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:2/3] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.0,2.1,3.0] plan[held-2x3,held-3x1,held-3x1,held-6x1@g-0] cur[] miss[] alloc[held-6=1] pool[earth:2/2] carry[held-3:earth=2:0/1,held-6:earth=2:1/3] sugg[held-6=1] tot[earth=2] stats[5/false/true]',
+  'ok sel[0.1,1.0] plan[held-0x1,held-1x1@g-1] cur[] miss[] alloc[held-1=1] pool[fire:1/1] carry[held-1:fire=2:1/1] sugg[held-1=1] tot[fire=2] stats[2/false/true]',
+  'ok sel[0.1,1.1] plan[held-3x1,held-4x1,held-4x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'no sel[0.0,2.0] plan[held-0x1,held-0x2,held-2x1] cur[] miss[g-1:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'ok sel[0.0] plan[held-0x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0,3.0] plan[held-0x3,held-2x2] cur[] miss[g-1:2/3,g-2:2/3] alloc[] pool[] carry[] sugg[] tot[] stats[65/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/3,g-1:1/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.2,1.0] plan[held-1x2@g-0+g-1] cur[] miss[g-2:0/3] alloc[held-1=2] pool[fire:3/3,fire:1/1] carry[held-0:fire=2:0/3,held-1:fire=2:2/4,held-2:fire=1:0/4] sugg[held-1=2] tot[fire=4] stats[3/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[3.0] plan[held-1x1] cur[] miss[g-0:0/1,g-1:0/1,g-2:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0,3.0] plan[held-0x1,held-0x1@g-3] cur[] miss[g-1:0/3,g-2:0/3] alloc[held-0=1] pool[earth:1/1] carry[held-0:earth=1:1/3] sugg[held-0=1] tot[earth=1] stats[3/false/true]',
+  'ok sel[0.0] plan[held-0x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[1.0] plan[held-0x1@g-1] cur[] miss[g-0:0/1] alloc[held-0=1] pool[earth:1/1] carry[held-0:earth=1:1/4,held-1:earth=2:0/2] sugg[held-0=1] tot[earth=1] stats[0/false/true]',
+  'no sel[0.0,2.0] plan[held-0x2,held-1x1] cur[] miss[g-1:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1,g-1:1/3] alloc[] pool[fire:0/1] carry[] sugg[] tot[] stats[8/false/true]',
+  'no sel[1.0] plan[held-1x1@g-1] cur[] miss[g-0:0/1,g-2:0/1] alloc[held-1=1] pool[fire:2/2] carry[held-1:fire=2:1/1] sugg[held-1=1] tot[fire=2] stats[0/false/true]',
+  'ok sel[0.0,1.0,2.1] plan[held-0x2,held-4x1,held-0x2,held-1x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[4/false/true]',
+  'no sel[0.0] plan[held-1x2] cur[] miss[g-1:2/3] alloc[] pool[] carry[] sugg[] tot[] stats[17/false/true]',
+  'no sel[2.0] plan[held-0x2] cur[] miss[g-0:1/3,g-1:0/2,g-3:1/2] alloc[] pool[earth:0/2] carry[] sugg[] tot[] stats[1/false/true]',
+  'ok sel[0.1,1.0] plan[held-0x3,held-1x3] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'ok sel[0.0] plan[held-3x1@g-0] cur[] miss[] alloc[held-3=1] pool[fire:2/2] carry[held-0:fire=1:0/3,held-3:fire=2:1/1] sugg[held-3=1] tot[fire=2] stats[2/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1,g-1:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[1.0] plan[held-0x1] cur[] miss[g-0:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[1.0] plan[held-4x2] cur[] miss[g-0:2/3] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.1] plan[held-0x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.0,2.0,3.0] plan[held-2x2,held-1x3,held-6x1,held-0x3] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[5/false/true]',
+  'ok sel[0.1,1.1] plan[held-0x2,held-0x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'ok sel[0.0,1.1,2.0,3.1] plan[held-1x2,held-5x1,held-2x2,held-3x1,held-5x3] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[13/false/true]',
+  'ok sel[0.0,1.1] plan[held-0x1,held-0x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'ok sel[0.0,1.0] plan[held-0x2,held-1x1,held-1x1,held-2x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/3] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0,2.0] plan[held-0x1,held-1x1,held-3x2] cur[] miss[g-1:0/3] alloc[] pool[] carry[] sugg[] tot[] stats[66/false/true]',
+  'no sel[1.0,2.0] plan[held-0x1] cur[19gp] miss[g-0:1/2] alloc[] pool[] carry[] sugg[] tot[] stats[1/false/true]',
+  'no sel[0.0,1.0,3.1] plan[held-2x2,held-1x1@g-0,held-2x1@g-0+g-3] cur[] miss[g-2:0/1] alloc[held-2=1,held-1=1] pool[fire:3/3,earth:1/1] carry[held-0:fire=2:0/3,held-1:fire=1:1/2,held-2:fire=2,earth=1:1/1,held-4:earth=2:0/2,held-5:fire=2,earth=2:0/1] sugg[held-2=1,held-1=1] tot[fire=3,earth=1] stats[4/false/true]',
+  'ok sel[0.0] plan[held-2x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[1.0,2.0] plan[held-2x1@g-1] cur[27sp] miss[g-0:0/1] alloc[held-2=1] pool[earth:1/1] carry[held-2:earth=1:1/2] sugg[held-2=1] tot[earth=1] stats[0/false/true]',
+  'ok sel[0.0,1.0,2.0] plan[held-0x2,held-0x1,held-1x1,held-1x2@g-1] cur[] miss[] alloc[held-1=2] pool[fire:3/3] carry[held-1:fire=2:2/3] sugg[held-1=2] tot[fire=4] stats[4/false/true]',
+  'ok sel[0.2] plan[held-0x1,held-1x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.0] plan[held-0x2,held-0x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'ok sel[0.0,1.0] plan[held-1x1,held-1x3@g-1] cur[] miss[] alloc[held-1=3] pool[earth:3/3] carry[held-1:earth=1:3/3] sugg[held-1=3] tot[earth=3] stats[3/false/true]',
+  'no sel[1.0] plan[held-2x1] cur[] miss[g-0:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0,2.0] plan[held-1x3,held-1x1] cur[] miss[g-1:1/2,g-3:1/3] alloc[] pool[] carry[] sugg[] tot[] stats[31/false/true]',
+  'ok sel[0.0,1.0,2.0,3.0] plan[held-0x2,held-6x2,held-3x1@g-2] cur[11gp] miss[] alloc[held-3=1] pool[earth:2/2] carry[held-2:earth=2:0/2,held-3:earth=2:1/4] sugg[held-3=1] tot[earth=2] stats[5/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0,1.0] plan[held-1x2,held-0x2] cur[] miss[g-2:0/3] alloc[] pool[] carry[] sugg[] tot[] stats[99/false/true]',
+  'ok sel[0.0] plan[held-0x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0] plan[held-1x1@g-0] cur[] miss[] alloc[held-1=1] pool[fire:2/2] carry[held-1:fire=2:1/2] sugg[held-1=1] tot[fire=2] stats[2/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/3] alloc[] pool[earth:0/3] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.0,2.0] plan[held-1x1,held-3x1,held-4x3,held-0x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[4/false/true]',
+  'no sel[0.2,1.0,2.0] plan[held-0x2,held-0x2,held-1x1,held-1x1@g-2] cur[] miss[g-3:0/1] alloc[held-1=1] pool[fire:2/2] carry[held-1:fire=2:1/2] sugg[held-1=1] tot[fire=2] stats[70/false/true]',
+  'ok sel[0.1,1.0] plan[held-1x1,held-2x1@g-0] cur[] miss[] alloc[held-2=1] pool[fire:2/2] carry[held-0:fire=2:0/1,held-2:fire=2:1/4] sugg[held-2=1] tot[fire=2] stats[2/false/true]',
+  'ok sel[0.1,1.0] plan[held-2x3,held-2x1,held-3x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'no sel[1.1] plan[held-1x1] cur[] miss[g-0:0/3] alloc[] pool[] carry[] sugg[] tot[] stats[1/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0] plan[held-0x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0] plan[held-0x1@g-0] cur[] miss[g-1:0/2] alloc[held-0=1] pool[fire:2/2] carry[held-0:fire=2:1/2,held-1:fire=1:0/3,held-3:fire=2:0/2] sugg[held-0=1] tot[fire=2] stats[2/false/true]',
+  'no sel[0.0,1.1,3.0] plan[held-3x3,held-0x1,held-2x1] cur[] miss[g-2:0/1] alloc[] pool[earth:0/1] carry[] sugg[] tot[] stats[4/false/true]',
+  'ok sel[0.0,1.0,2.0,3.0] plan[held-0x2,held-3x1,held-3x1,held-4x2,held-1x3] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[120/false/true]',
+  'ok sel[0.1] plan[held-0x1@g-0] cur[] miss[] alloc[held-0=1] pool[fire:1/1] carry[held-0:fire=1:1/2] sugg[held-0=1] tot[fire=1] stats[2/false/true]',
+  'no sel[0.1] plan[held-3x2] cur[] miss[g-1:0/3] alloc[] pool[earth:0/3] carry[] sugg[] tot[] stats[14/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:2/3] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.0] plan[held-0x1,held-0x2,held-4x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'ok sel[0.0,1.0,2.0,3.0] plan[held-2x3,held-1x1,held-2x1,held-5x2,held-3x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[5/false/true]',
+  'ok sel[0.0] plan[held-1x3] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0] plan[held-2x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[1.0,2.0] plan[held-0x1,held-1x1@g-1] cur[] miss[g-0:0/3] alloc[held-1=1] pool[fire:1/1] carry[held-1:fire=1:1/3,held-2:fire=2:0/1] sugg[held-1=1] tot[fire=1] stats[0/false/true]',
+  'no sel[0.0] plan[held-0x1] cur[] miss[g-1:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[] plan[held-1x2@g-1] cur[] miss[g-0:0/1,g-1:2/3] alloc[held-1=2] pool[earth:2/3] carry[held-1:earth=1:2/2] sugg[held-1=2] tot[earth=2] stats[0/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[1/false/true]',
+  'no sel[1.0] plan[held-4x1] cur[] miss[g-0:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/3,g-1:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[1.0,3.0] plan[held-0x2] cur[50gp] miss[g-0:1/2,g-2:1/3] alloc[] pool[] carry[] sugg[] tot[] stats[1/false/true]',
+  'ok sel[0.1,1.0] plan[held-0x2,held-3x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'ok sel[0.0] plan[held-0x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[1.0,3.1] plan[held-0x1,held-1x1] cur[] miss[g-0:0/1,g-2:1/3] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0,2.0] plan[held-0x2,held-2x1@g-0] cur[] miss[g-1:0/1] alloc[held-2=1] pool[earth:2/2] carry[held-2:earth=2:1/4] sugg[held-2=1] tot[earth=2] stats[3/false/true]',
+  'no sel[1.1,2.0] plan[held-1x3,held-0x1] cur[] miss[g-0:0/1,g-3:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.0] plan[held-0x2,held-5x1@g-0,held-6x1@g-0] cur[] miss[] alloc[held-5=1,held-6=1] pool[earth:3/3] carry[held-0:earth=2:0/1,held-2:earth=1:0/1,held-4:earth=2:0/3,held-5:earth=2:1/4,held-6:earth=1:1/3] sugg[held-5=1,held-6=1] tot[earth=3] stats[3/false/true]',
+  'ok sel[0.2,1.0,2.0] plan[held-2x1,held-5x1,held-0x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[4/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/2] alloc[] pool[] carry[] sugg[] tot[] stats[1/false/true]',
+  'ok sel[0.0,1.0,2.0,3.1] plan[held-0x3,held-2x1,held-4x1,held-1x1,held-5x1,held-3x1@g-2] cur[] miss[] alloc[held-3=1] pool[earth:1/1] carry[held-3:earth=2:1/1] sugg[held-3=1] tot[earth=2] stats[26/false/true]',
+  'ok sel[0.0] plan[held-1x1@g-0] cur[] miss[] alloc[held-1=1] pool[earth:1/1] carry[held-0:earth=2:0/2,held-1:earth=2:1/4] sugg[held-1=1] tot[earth=2] stats[2/false/true]',
+  'ok sel[0.0] plan[held-1x2,held-3x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[2/false/true]',
+  'no sel[2.0] plan[held-1x1@g-2] cur[] miss[g-0:0/1,g-1:0/3,g-3:0/3] alloc[held-1=1] pool[earth:1/1] carry[held-1:earth=1:1/1] sugg[held-1=1] tot[earth=1] stats[0/false/true]',
+  'ok sel[0.1,1.0,2.2] plan[held-0x1,held-2x2,held-1x1,held-2x1,held-3x1,held-1x3@g-1] cur[] miss[] alloc[held-1=3] pool[earth:3/3] carry[held-1:earth=1:3/3] sugg[held-1=3] tot[earth=3] stats[75/false/true]',
+  'ok sel[0.0] plan[held-0x1,held-1x1,held-2x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0] plan[held-0x1] cur[] miss[g-1:0/3] alloc[] pool[] carry[] sugg[] tot[] stats[2/false/true]',
+  'ok sel[0.0] plan[held-5x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0] plan[held-0x2,held-3x1] cur[] miss[g-1:0/1,g-2:1/3] alloc[] pool[] carry[] sugg[] tot[] stats[15/false/true]',
+  'ok sel[0.0,1.0] plan[held-2x2,held-1x1,held-5x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[1.0] plan[held-0x2,held-2x1] cur[] miss[g-0:0/3] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.0,2.0,3.0] plan[held-1x2,held-0x2,held-5x1@g-0+g-3] cur[] miss[] alloc[held-5=1] pool[earth:1/1,fire:1/1] carry[held-2:fire=2:0/1,held-3:fire=2:0/1,held-4:fire=1:0/1,held-5:earth=1,fire=2:1/2] sugg[held-5=1] tot[earth=1,fire=2] stats[5/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1,g-1:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[1.0] plan[held-1x1] cur[] miss[g-0:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[1/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1,g-1:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'no sel[0.0] plan[held-0x1,held-1x1] cur[] miss[g-1:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.0,2.2,3.0] plan[held-2x2,held-4x1,held-1x3,held-0x1@g-2] cur[] miss[] alloc[held-0=1] pool[fire:1/1] carry[held-0:fire=1:1/2] sugg[held-0=1] tot[fire=1] stats[5/false/true]',
+  'no sel[0.0,2.0] plan[held-1x1,held-1x1] cur[] miss[g-1:1/2] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'no sel[1.0,2.0] plan[held-2x1,held-1x2@g-2] cur[] miss[g-0:0/2] alloc[held-1=2] pool[earth:0/2,fire:2/2] carry[held-1:fire=1:2/3] sugg[held-1=2] tot[fire=2] stats[1/false/true]',
+  'no sel[1.1,2.1] plan[held-0x1,held-1x1] cur[] miss[g-0:2/3] alloc[] pool[] carry[] sugg[] tot[] stats[1/false/true]',
+  'ok sel[0.0,1.0,2.0] plan[held-1x2,held-2x3,held-1x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[4/false/true]',
+  'no sel[1.0] plan[held-1x1@g-1,held-3x1@g-0] cur[] miss[g-0:1/2] alloc[held-1=1,held-3=1] pool[fire:1/2,earth:2/2] carry[held-0:earth=2:0/2,held-1:earth=2:1/4,held-3:fire=1:1/1] sugg[held-1=1,held-3=1] tot[earth=2,fire=1] stats[0/false/true]',
+  'no sel[1.1,3.0] plan[held-1x3] cur[16gp] miss[g-0:0/1,g-2:0/3] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.0] plan[held-2x1,held-0x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'ok sel[0.0,1.1] plan[held-2x1,held-5x2,held-6x1@g-0] cur[] miss[] alloc[held-6=1] pool[fire:1/1] carry[held-5:fire=1:0/1,held-6:fire=1:1/2] sugg[held-6=1] tot[fire=1] stats[3/false/true]',
+  'ok sel[0.0,1.0,2.2] plan[held-0x2,held-3x3@g-1+g-2,held-4x1@g-1+g-2] cur[] miss[] alloc[held-4=1,held-3=3] pool[earth:2/2,earth:3/3] carry[held-3:earth=1:3/3,held-4:earth=2:1/1] sugg[held-4=1,held-3=3] tot[earth=5] stats[4/false/true]',
+  'ok sel[0.0,1.0] plan[held-4x3,held-1x2@g-0] cur[] miss[] alloc[held-1=2] pool[earth:3/3] carry[held-1:earth=2:2/4] sugg[held-1=2] tot[earth=4] stats[3/false/true]',
+  'ok sel[0.0,1.0,2.0,3.0] plan[held-3x2,held-0x3,held-5x1] cur[26gp] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[5/false/true]',
+  'no sel[1.0,2.0] plan[held-1x2,held-2x1,held-3x2@g-1] cur[] miss[g-0:0/3] alloc[held-3=2] pool[fire:2/2] carry[held-3:fire=1:2/2] sugg[held-3=2] tot[fire=2] stats[0/false/true]',
+  'ok sel[0.2,1.0] plan[held-2x1,held-5x2,held-0x1@g-0] cur[] miss[] alloc[held-0=1] pool[earth:2/2] carry[held-0:earth=2:1/3,held-3:earth=2:0/2] sugg[held-0=1] tot[earth=2] stats[3/false/true]',
+  'ok sel[0.1] plan[] cur[32sp] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.2] plan[held-0x2,held-3x1@g-1,held-4x1@g-1] cur[] miss[] alloc[held-4=1,held-3=1] pool[earth:3/3] carry[held-0:earth=1:0/2,held-1:earth=1:0/1,held-3:earth=1:1/4,held-4:earth=2:1/4] sugg[held-4=1,held-3=1] tot[earth=3] stats[3/false/true]',
+  'no sel[1.0,2.0,3.1] plan[held-0x2,held-3x1,held-2x1,held-4x1] cur[] miss[g-0:0/1] alloc[] pool[earth:0/1] carry[] sugg[] tot[] stats[74/false/true]',
+  'no sel[0.0,1.1,2.1] plan[held-0x2,held-2x1,held-0x1,held-3x1] cur[] miss[g-3:0/3] alloc[] pool[] carry[] sugg[] tot[] stats[4/false/true]',
+  'no sel[1.0,2.0] plan[held-0x3,held-1x2] cur[] miss[g-0:0/3,g-3:0/1] alloc[] pool[] carry[] sugg[] tot[] stats[1/false/true]',
+  'no sel[] plan[] cur[] miss[g-0:0/1,g-1:1/2] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.1,2.0] plan[held-2x1,held-3x3,held-1x3] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[4/false/true]',
+  'no sel[0.0,1.0] plan[held-1x3,held-0x2@g-1] cur[] miss[g-2:0/2,g-3:0/3] alloc[held-0=2] pool[fire:2/2] carry[held-0:fire=1:2/3] sugg[held-0=2] tot[fire=2] stats[3/false/true]',
+  'no sel[2.1] plan[held-1x2@g-2] cur[] miss[g-0:0/2,g-1:0/2,g-3:0/3] alloc[held-1=2] pool[fire:0/2,earth:2/2,fire:0/3] carry[held-1:earth=1:2/3] sugg[held-1=2] tot[earth=2] stats[0/false/true]',
+  'ok sel[0.0] plan[held-1x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.1] plan[held-1x2,held-4x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0] plan[held-0x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
+  'ok sel[0.0,1.0] plan[held-1x1,held-2x2] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'ok sel[0.0,1.0,2.0,3.0] plan[held-3x1,held-0x3,held-0x1,held-1x1@g-2] cur[] miss[] alloc[held-1=1] pool[fire:2/2] carry[held-1:fire=2:1/4,held-2:fire=2:0/3,held-4:fire=2:0/3] sugg[held-1=1] tot[fire=2] stats[5/false/true]',
+  'no sel[1.0,2.0,3.0] plan[held-0x2,held-0x2,held-4x1@g-2] cur[] miss[g-0:0/1] alloc[held-4=1] pool[fire:1/1] carry[held-1:fire=2:0/4,held-3:fire=2:0/1,held-4:fire=1:1/3] sugg[held-4=1] tot[fire=1] stats[0/false/true]',
+  'ok sel[0.1,1.0] plan[held-1x1,held-0x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[3/false/true]',
+  'no sel[0.1] plan[held-2x1,held-3x1] cur[] miss[g-1:2/3] alloc[] pool[] carry[] sugg[] tot[] stats[11/false/true]',
+  'no sel[0.1] plan[held-0x2] cur[] miss[g-1:0/1,g-2:1/3,g-3:1/2] alloc[] pool[fire:0/1] carry[] sugg[] tot[] stats[11/false/true]',
+  'ok sel[0.0] plan[held-1x1,held-2x1] cur[] miss[] alloc[] pool[] carry[] sugg[] tot[] stats[0/false/true]',
 ];
 
 test('the corpus exercises every guarantee it claims to', () => {
@@ -489,19 +460,9 @@ test('the corpus exercises every guarantee it claims to', () => {
 });
 
 test('a substantial share of the corpus still reaches the backtracking search', () => {
-  // The generator is a hand-maintained mirror of the shapes this table claims to cover, and
-  // issue 1083 added a fast path that resolves an UNCONTENDED component without visiting a
-  // single node. A future tweak to the seed, the option mix or the inventory sizes could drift
-  // the corpus into being answered entirely by that fast path, at which point the 240-line
-  // oracle above would still be a wall of green while testing none of the search it exists to
-  // pin. `searchStats.nodes` is the only observable that can tell the two apart.
-  //
-  // What this does NOT claim is rescue DEPTH. A prune or ordering error inside the search is
-  // still masked whenever `_resolveGreedy` — which applies neither the pass index's essence
-  // prune nor contention scoping — can answer the case on its own, and only a small minority of
-  // the corpus is genuinely rescued by the search. That is why the essence-prune boundary is
-  // pinned by a named case in `tests/ingredient-set-essence-block.test.js` rather than left to
-  // this corpus.
+  // The generator is a hand-maintained mirror of the shapes this table claims to cover, and issue
+  // 1083 added a fast path that resolves an UNCONTENDED component without visiting a single node.
+  // What this does NOT claim is rescue DEPTH.
   let searched = 0;
   let contended = 0;
   for (let caseIndex = 0; caseIndex < CASE_COUNT; caseIndex += 1) {
@@ -546,9 +507,8 @@ test('the staged resolver is byte-identical to the pre-1083 solver', () => {
 });
 
 test('every satisfied selection is a valid, non-double-counting draw', () => {
-  // Equivalence to the old solver is necessary, not sufficient: two implementations can agree on
-  // a wrong answer. This re-derives the invariants from the fixture instead of from either
-  // implementation, so a shared defect still fails.
+  // Equivalence to the old solver is necessary, not sufficient: two implementations can agree on a
+  // wrong answer.
   for (let caseIndex = 0; caseIndex < CASE_COUNT; caseIndex += 1) {
     const { set, items, options } = buildCase(caseIndex);
     const selection = set.resolveIngredientSelection(items, MATCHER, options);
@@ -575,9 +535,7 @@ test('every satisfied selection is a valid, non-double-counting draw', () => {
 });
 
 test('resolution is repeatable and independent of held-item order', () => {
-  // Determinism is a hard requirement, not a nicety. `success` must be invariant under a
-  // shuffled inventory (that is what the #663 search exists to guarantee), and an identical
-  // input must produce an identical plan every time.
+  // Determinism is a hard requirement, not a nicety.
   for (let caseIndex = 0; caseIndex < CASE_COUNT; caseIndex += 1) {
     const { set, items, options } = buildCase(caseIndex);
     const first = set.resolveIngredientSelection(items, MATCHER, options);

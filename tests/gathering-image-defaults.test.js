@@ -1,11 +1,7 @@
 /**
  * Source-of-truth coverage for the shared gathering default-image constants.
- *
- * `src/gatheringImageDefaults.js` is a layering-safe, import-free module so both
- * `src/systems/` and `src/ui/` can consume it. This test pins the three constant
- * VALUES and asserts that the entity default-image fallback sites import the
- * shared constants rather than re-declaring the literal — there must be a single
- * source of truth so GM and player surfaces never diverge.
+ * `src/gatheringImageDefaults.js` is a layering-safe, import-free module so both `src/systems/` and
+ * `src/ui/` can consume it.
  */
 
 import { describe, it } from 'node:test';
@@ -66,10 +62,8 @@ describe('gatheringImageDefaults constant values', () => {
 });
 
 describe('gathering default-image fallback sites use the shared constants', () => {
-  // Each consumer must import the matching shared constant and must not embed the
-  // old hardcoded literal at the entity default-image fallback. Component / drop /
-  // tool / realm / actor images keep their own non-gathering defaults and are not
-  // listed here.
+  // Each consumer must import the matching shared constant and must not embed the old hardcoded
+  // literal at the entity default-image fallback.
   const environmentConsumers = [
     'src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte',
     'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
@@ -89,7 +83,7 @@ describe('gathering default-image fallback sites use the shared constants', () =
     'src/ui/svelte/apps/gathering/GatheringEventRow.svelte',
     'src/ui/svelte/apps/gathering/GatheringEventDetail.svelte',
     'src/systems/GatheringEngine.js',
-    'src/systems/GatheringChatCard.js'
+    'src/ui/presenters/GatheringChatCard.js'
   ];
 
   for (const relPath of environmentConsumers) {

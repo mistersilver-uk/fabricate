@@ -19,13 +19,14 @@
   import Chip from '../../components/Chip.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import Select from '../../components/Select.svelte';
 
   let {
     recipes = [],
@@ -95,6 +96,25 @@
     accessFilter = 'all';
     onSearchChange('');
   }
+
+  // Both vocabularies carry their `<option>` text verbatim, the category rows included: the
+  // `name (count)` join is what a GM read before the conversion (issue 1510).
+  const categorySelectOptions = $derived([
+    { value: 'all', label: text('FABRICATE.Admin.Manager.Recipe.CategoryAll', 'All categories') },
+    ...(recipeCategories || []).map((category) => ({
+      value: category.name,
+      label: `${category.name} (${category.count})`,
+    })),
+  ]);
+
+  const accessSelectOptions = $derived([
+    { value: 'all', label: text('FABRICATE.Admin.Manager.Access.FilterAll', 'All recipes') },
+    {
+      value: 'granted',
+      label: text('FABRICATE.Admin.Manager.Access.FilterGranted', 'Granted'),
+    },
+    { value: 'none', label: text('FABRICATE.Admin.Manager.Access.FilterNone', 'No access') },
+  ]);
 </script>
 
 <main
@@ -109,44 +129,35 @@
       ariaLabel={text('FABRICATE.Admin.Manager.Recipe.SearchLabel', 'Search recipes')}
       inputAttrs={{ 'data-access-search': '' }}
     />
-    <label class="manager-filter">
+    <!-- Both wrappers are a `<span>` rather than the `<label>` they were: `Select.svelte`'s host
+         invariant, and each trigger keeps the `aria-label` its select carried (issue 1510). -->
+    <span class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span>
-      <select
+      <Select
+        size="toolbar"
         value={categoryFilter}
-        onchange={(event) => (categoryFilter = event.currentTarget.value)}
-        data-access-category-filter
-        aria-label={text(
+        options={categorySelectOptions}
+        showTick={false}
+        ariaLabel={text(
           'FABRICATE.Admin.Manager.Recipe.CategoryFilterLabel',
           'Filter recipes by category'
         )}
-      >
-        <option value="all"
-          >{text('FABRICATE.Admin.Manager.Recipe.CategoryAll', 'All categories')}</option
-        >
-        {#each recipeCategories || [] as category (category.name)}
-          <option value={category.name}>{category.name} ({category.count})</option>
-        {/each}
-      </select>
-    </label>
-    <label class="manager-filter">
+        triggerData={{ 'data-access-category-filter': '' }}
+        onChange={(next) => (categoryFilter = next)}
+      />
+    </span>
+    <span class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.Access.Filter', 'Access')}</span>
-      <select
+      <Select
+        size="toolbar"
         value={accessFilter}
-        onchange={(event) => (accessFilter = event.currentTarget.value)}
-        data-access-filter
-        aria-label={text('FABRICATE.Admin.Manager.Access.FilterLabel', 'Filter recipes by access')}
-      >
-        <option value="all"
-          >{text('FABRICATE.Admin.Manager.Access.FilterAll', 'All recipes')}</option
-        >
-        <option value="granted"
-          >{text('FABRICATE.Admin.Manager.Access.FilterGranted', 'Granted')}</option
-        >
-        <option value="none"
-          >{text('FABRICATE.Admin.Manager.Access.FilterNone', 'No access')}</option
-        >
-      </select>
-    </label>
+        options={accessSelectOptions}
+        showTick={false}
+        ariaLabel={text('FABRICATE.Admin.Manager.Access.FilterLabel', 'Filter recipes by access')}
+        triggerData={{ 'data-access-filter': '' }}
+        onChange={(next) => (accessFilter = next)}
+      />
+    </span>
     <Chip
       >{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}')
         .replace('{shown}', filteredRecipes.length)

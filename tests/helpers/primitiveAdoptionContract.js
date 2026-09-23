@@ -1,41 +1,8 @@
 /**
- * The shared spine of a primitive's ADOPTION contract (issues 1428, 1039).
- *
- * ── WHY THIS IS SHARED RATHER THAN WRITTEN THREE TIMES ──────────────────────────────────
+ * The shared spine of a primitive's ADOPTION contract (issues 1428, 1039). WHY THIS IS SHARED
+ * RATHER THAN WRITTEN THREE TIMES ──────────────────────────────────
  * `tests/helpers/primitiveSourceContract.js` already owns one spine, and it is a DIFFERENT
- * question. That one is a text scan: it asks whether anything but the primitive mentions the
- * contract class anywhere in a component's markup, which is sound only while the class is not a
- * PREFIX of another real class and while a substring can tell a raw element from a component
- * tag. `manager-field` is a prefix of `manager-field-label`, `manager-toolbar` is a prefix of
- * `manager-toolbar-pills`, and `<Chip class="manager-toolbar-pills">` is a component tag whose
- * text contains the token either way — so `field-source-contract.test.js` declined that factory
- * and parsed the template instead. This file is what that decision generalises to.
- *
- * The question here is therefore narrower and sharper: does any RAW ELEMENT still carry the
- * class, counted per file, with the token matched on both boundaries and `<style>` blocks and
- * docblock prose excluded structurally rather than by stripping. Five components document
- * `manager-field` in prose and three more name it in a scoped rule; a text scan reports every
- * one of those as an unconverted site.
- *
- * ── WHAT IS DELIBERATELY NOT HERE ───────────────────────────────────────────────────────
- * Anything true of ONE primitive stays in that primitive's own file, stated over the scan this
- * factory returns. `Field`'s closed `as` host set and its per-host floors are the live example:
- * they exist because a `<label>` field names the control it wraps and a `<div>` field does not,
- * which is an accessibility contract no bar and no search field has an equivalent of. The
- * filter bar's and the search field's own clause — that every call site passes an accessible
- * name — is the mirror image, and lives in their file for the same reason.
- *
- * ── AND THE ANTI-VACUITY HALF, WHICH IS THE REASON THIS IS A FACTORY AND NOT A MIXIN ────
- * Every clause below is "for every X, P(X)", vacuously true over zero X, and the raw-element
- * detector shipped returning zero for an entire corpus on its first run — anchored on
- * `(?:^|\s)` against text whose delimiter is a quote. The corpus cannot catch that, because the
- * whole point of a completed conversion is that the corpus contains no positive case. So each
- * caller supplies a SYNTHETIC fixture with a known count and a known lowered count, and the
- * detector is driven over it. A caller that forgets is a caller with no clauses: the fixture is
- * required, not optional.
- *
- * This file is deliberately NOT named `*.test.js`: `tests/helpers/` is outside the `npm test`
- * glob, so nothing here is collected as a suite. Its clauses run under each caller's name.
+ * question.
  */
 
 import assert from 'node:assert/strict';
@@ -47,29 +14,13 @@ import { collectSources } from './sourceScan.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-/**
- * `{ repoRelativePath: text }` for every `.svelte` under `src/`.
- *
- * The SHARED corpus reader, which seven suites and the `primitiveSourceContract` factory
- * already quantify over, rather than a walker of this file's own: a second recursive directory
- * walk is a copy that can silently stop recursing while every caller goes on reporting clean.
- *
- * Read ONCE at module load and shared by every caller in a process, because parsing the corpus
- * is the expensive part and three primitives asking the same question of it is three times the
- * work for one answer.
- */
+/** `{ repoRelativePath: text }` for every `.svelte` under `src/`. */
 export const SOURCES = collectSources(join(repoRoot, 'src'), { extensions: ['.svelte'] });
 
 /**
  * Walk a parsed template, yielding every element and component node.
  *
- * The Svelte parser rather than a regular expression, for two reasons this corpus makes
- * concrete: a contract class appears in DOCBLOCK PROSE in several of these components and
- * inside a scoped `<style>` in several more, and a text scan reports every one of those as an
- * unconverted site. A `class` attribute on an element node is the only thing that renders.
- *
  * @param {object} node any AST node
- * @param {(node: object) => void} visit
  */
 export function walkTemplate(node, visit) {
   if (!node || typeof node !== 'object') return;
@@ -93,16 +44,6 @@ export function walkTemplate(node, visit) {
 /**
  * A whole-token pattern for a contract class.
  *
- * BOTH boundaries are lookarounds rather than character classes. The first draft of the `Field`
- * gate anchored on `(?:^|\s)` and matched NOTHING, because the text it runs over is the whole
- * attribute — `class="manager-field"` — whose delimiter is a quote.
- *
- * The trailing lookahead is `(?![\w-])` and never `\b`, because `\b` matches BEFORE a hyphen:
- * a `\b`-terminated pattern for `manager-toolbar` counts `.manager-toolbar-pills`, and one for
- * `manager-field` counts `manager-field-error`. Both are real, different classes on real,
- * different elements in this corpus.
- *
- * @param {string} contractClass
  * @returns {RegExp} matching the class as a whole token
  */
 export function classTokenPattern(contractClass) {
@@ -111,10 +52,6 @@ export function classTokenPattern(contractClass) {
 
 /**
  * Count raw (non-component) elements whose `class` attribute carries the contract token.
- *
- * Exported so each caller's discrimination clause can drive it over a synthetic source. That
- * clause is not decoration: the first version of this detector returned zero for every file in
- * the corpus, and both clauses built on it went green.
  *
  * @param {string} source component source text
  * @param {string} filename a filename for the parser's error messages
@@ -165,11 +102,8 @@ export function rawSitesIn(source, filename, classPattern) {
  */
 
 /**
- * Register the five shared clauses for one primitive, and hand back the scan they are stated
- * over so the caller can add clauses of its own.
- *
- * @param {AdoptionContractSpec} spec
- * @returns {{rawSites: Map<string, number>, callSites: AdoptionCallSite[]}}
+ * Register the five shared clauses for one primitive, and hand back the scan they are stated over
+ * so the caller can add clauses of its own.
  */
 export function definePrimitiveAdoptionContract(spec) {
   const {
@@ -201,12 +135,7 @@ export function definePrimitiveAdoptionContract(spec) {
       );
       callSites.push({
         file,
-        // THE NODE ITSELF, AND ITS SNIPPET CHILDREN (issue 1503). A caller that hands the
-        // primitive a `trigger` snippet renders its own button, so everything a naming clause
-        // needs — the `aria-label`, the element the primitive's attributes are spread onto — is
-        // INSIDE the snippet and reachable only from the component node. Keeping only the
-        // attributes discarded it, and a clause written against attributes alone would have to
-        // accept the snippet's mere presence as a name, which is not a name.
+        // THE NODE ITSELF, AND ITS SNIPPET CHILDREN (issue 1503).
         node,
         snippetSource: (name) => {
           const snippet = (node.fragment?.nodes ?? []).find(
@@ -246,11 +175,10 @@ export function definePrimitiveAdoptionContract(spec) {
   });
 
   test(`the ${label} raw-element detector discriminates, so its clause is not vacuous`, () => {
-    // THE ANTI-VACUITY ANCHOR. The corpus cannot supply one: the whole point of the clause
-    // below is that the corpus contains (almost) no positive case, and once the deferred
-    // allowlist converts it will contain none at all — at which point a broken detector and a
-    // converted tree are indistinguishable. A synthetic source keeps a positive case that
-    // survives the debt being paid.
+    // THE ANTI-VACUITY ANCHOR. The corpus cannot supply one: the whole point of the clause below is
+    // that the corpus contains (almost) no positive case, and once the deferred allowlist converts
+    // it will contain none at all — at which point a broken detector and a converted tree are
+    // indistinguishable.
     assert.equal(
       rawSitesIn(detectorFixture.source, 'fixture.svelte', classPattern),
       detectorFixture.expected,
@@ -301,18 +229,10 @@ export function definePrimitiveAdoptionContract(spec) {
   });
 
   test(`no <${tag}> carries a VALUELESS attribute, because a component renders one differently`, () => {
-    // A rendering trap that belongs to the rest spread rather than to any one primitive, and it
-    // is invisible in the source diff: `<div data-x>` sets `data-x=""`, while the same `data-x`
+    // A rendering trap that belongs to the rest spread rather than to any one primitive, and it is
+    // invisible in the source diff: `<div data-x>` sets `data-x=""`, while the same `data-x`
     // written on a component arrives in `...rest` as boolean `true` and `set_attribute` writes
-    // `data-x="true"`. Presence selectors — which is what every suite and every smoke step uses
-    // — resolve either way, so the DOM changes and nothing reports it.
-    //
-    // A BOOLEAN PROP the primitive declares is the one exception, and it is a real one rather
-    // than a loophole: `<ManagerSearchField compact>` sets a prop whose default is `false` to
-    // `true`, which is exactly what it means and is this codebase's idiom (`<EmptyState
-    // compact>`). The exemption is CHECKED rather than trusted — the loop below reads the
-    // primitive's own source and refuses a name it does not declare with a `false` default — so
-    // a `data-*` hook cannot be smuggled through the list.
+    // `data-x="true"`.
     const primitiveSource = SOURCES[primitive] ?? '';
     for (const name of booleanProps) {
       assert.ok(

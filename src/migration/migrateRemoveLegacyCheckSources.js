@@ -1,39 +1,12 @@
 /**
- * Migration 1.8.0: remove the deprecated "check source" mechanisms from persisted
- * crafting systems, and the orphaned recipe-level result-selection macro they were
- * paired with.
- *
- * A crafting/salvage/gathering check is now "usable" iff it carries an authored roll
- * formula for its resolution mode (`simple.rollFormula` / `routed.rollFormula` /
- * `progressive.rollFormula`). The legacy mechanisms — running a macro to produce the
- * check result, and the built-in game-system adapter — are gone, along with their
- * persisted fields. This migration strips the dead root-level fields from each of the
- * three check objects on every system:
- *
- *   - `macroUuid`         (the macro-as-check-source; the live dynamic-DC macro lives
- *                          on `simple.macroUuid` and is intentionally PRESERVED)
- *   - `successMacroUuid`
- *   - `failureMacroUuid`
- *   - `checkSource`       (and its `'builtIn'` value)
- *   - `builtIn`           (the `{ability, skill, dc, advantage}` adapter config)
- *
- * Applied to `system.craftingCheck`, `system.salvageCraftingCheck`, and
- * `system.gatheringCraftingCheck`. The `enabled` flag and the simple/routed/progressive
- * sub-objects (including `simple.macroUuid`, the dynamic-DC macro) are untouched.
- *
- * It also retires the orphaned `resultSelection.macroUuid` on recipes. The legacy
- * `macroOutcome` result-selection provider was removed in 1.6.0 (rewritten onto
- * `check` by `migrateRemoveResultSelectionProviders`, which deliberately kept the
- * paired `macroUuid`); nothing has read that field since, so it is stripped here from
- * each recipe's top-level `resultSelection` and every `steps[].resultSelection`.
- *
- * Pure function: no I/O, no Foundry calls, deep-clones its input. Idempotent — each
- * field removal is a `delete` of an already-absent key on re-run, so a second pass is a
- * no-op. Runs at the new highest version (1.8.0), strictly after every earlier check
- * migration.
+ * `1.8.0` — remove the deprecated check-source mechanisms from persisted systems, and the orphaned
+ * recipe-level result-selection macro paired with them. Pure, deep-cloning and idempotent.
+ * A check is now usable iff it carries an authored roll formula for its mode, so the
+ * macro-as-source and built-in adapter fields are stripped from all three check blocks — while
+ * `simple.macroUuid`, the live dynamic-DC macro, is deliberately PRESERVED.
  */
 
-import { isPlainObject, clone } from './migrationHelpers.js';
+import { isPlainObject, clone, forEachSystem } from './migrationHelpers.js';
 
 const DEAD_ROOT_FIELDS = [
   'macroUuid',
@@ -44,12 +17,8 @@ const DEAD_ROOT_FIELDS = [
 ];
 
 /**
- * Delete the deprecated root-level check-source fields from one check object, leaving
- * `enabled`, `mode`, `consumption`, and the simple/routed/progressive sub-objects intact.
- * `simple.macroUuid` (the dynamic-DC macro) is never touched because it is nested under
- * `simple`, not at the check root.
- *
- * @param {object} check - a craftingCheck / salvageCraftingCheck / gatheringCraftingCheck object (mutated)
+ * Delete the deprecated ROOT-level check-source fields from one check, leaving `enabled`, `mode`,
+ * `consumption` and the three sub-objects intact.
  */
 function stripDeadCheckFields(check) {
   if (!isPlainObject(check)) return;
@@ -60,11 +29,7 @@ function stripDeadCheckFields(check) {
   }
 }
 
-/**
- * Migrate one crafting system: strip the dead check-source fields from all three checks.
- *
- * @param {object} system - raw crafting-system object (mutated)
- */
+/** Migrate one system: strip the dead check-source fields from all three checks. */
 function migrateSystem(system) {
   if (!isPlainObject(system)) return;
   stripDeadCheckFields(system.craftingCheck);
@@ -72,12 +37,7 @@ function migrateSystem(system) {
   stripDeadCheckFields(system.gatheringCraftingCheck);
 }
 
-/**
- * Delete the orphaned `macroUuid` from one `resultSelection` object (the 1.6.0
- * `macroOutcome` vestige). The `provider` and any other fields are left intact.
- *
- * @param {object} selection - a recipe/step `resultSelection` object (mutated)
- */
+/** Delete the orphaned `macroUuid` from one `resultSelection`; every other field is left. */
 function stripResultSelectionMacroUuid(selection) {
   if (!isPlainObject(selection)) return;
   if (Object.hasOwn(selection, 'macroUuid')) {
@@ -85,12 +45,7 @@ function stripResultSelectionMacroUuid(selection) {
   }
 }
 
-/**
- * Migrate one recipe: strip the orphaned `resultSelection.macroUuid` from the recipe-level
- * container and every step.
- *
- * @param {object} recipe - raw recipe object (mutated)
- */
+/** Migrate one recipe: strip that field from the recipe-level container and every step. */
 function migrateRecipe(recipe) {
   if (!isPlainObject(recipe)) return;
   stripResultSelectionMacroUuid(recipe.resultSelection);
@@ -101,15 +56,10 @@ function migrateRecipe(recipe) {
   }
 }
 
-/**
- * Run the 1.8.0 sweep over the runner's one-pass data bundle.
- *
- * @param {{ systems?: object[], recipes?: object[] }} data
- * @returns {{ systems: object[], recipes: object[] }}
- */
+/** Run the `1.8.0` sweep over the runner's bundle. */
 export function migrateRemoveLegacyCheckSources(data = {}) {
   const systems = Array.isArray(data?.systems) ? clone(data.systems) : [];
-  for (const system of systems) migrateSystem(system);
+  forEachSystem(systems, (system) => migrateSystem(system));
 
   const recipes = Array.isArray(data?.recipes) ? clone(data.recipes) : [];
   for (const recipe of recipes) migrateRecipe(recipe);

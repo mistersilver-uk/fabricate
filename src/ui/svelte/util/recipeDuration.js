@@ -1,19 +1,11 @@
-/**
- * Shared helpers for a recipe step's duration (`timeRequirement`). The display
- * formatter and unit ordering live here so the step accordion and the duration
- * editor render durations identically (no duplicated inline formatter).
- */
+// A recipe step's duration (`timeRequirement`). The formatter and the unit ordering live together
+// so the step accordion and the duration editor cannot render a duration differently.
 import { localize } from './foundryBridge.js';
 
-/**
- * Duration units in descending magnitude. The display formatter walks them in
- * this order; the editor renders an input per unit in the same order.
- * @type {readonly string[]}
- */
+// Descending magnitude: the formatter walks them in this order and the editor renders in it too.
 export const TIME_UNITS = ['years', 'months', 'days', 'hours', 'minutes'];
 
-// English fallbacks used when no i18n is available. Singular reuses the shared
-// `Economy.Unit.*` labels; plural has its own `Recipe.DurationUnitPlural.*` keys.
+// English fallbacks for no i18n. Singular reuses `Economy.Unit.*`; plural has its own keys.
 const SINGULAR_FALLBACK = {
   years: 'year',
   months: 'month',
@@ -29,9 +21,7 @@ const PLURAL_FALLBACK = {
   minutes: 'minutes'
 };
 
-// Compact, mono-friendly unit abbreviations ("2 hr", "30 min", "1 day") used by
-// the inline duration steppers on the Overview tab. These are deliberately terse
-// and unit-count-agnostic (no separate plural) so the pill stays narrow.
+// Deliberately terse and count-agnostic (no plural) so the Overview tab's stepper pill stays narrow.
 const ABBREV_FALLBACK = {
   years: 'yr',
   months: 'mo',
@@ -45,24 +35,12 @@ function text(key, fallback) {
   return translated && translated !== key ? translated : fallback;
 }
 
-/**
- * The singular unit label (e.g. "Minute"), shared with the editor's per-input
- * unit suffix so the popover and the formatted string draw from one source.
- * @param {string} unit - One of `TIME_UNITS`.
- * @returns {string}
- */
+// Shared with the editor's per-input suffix, so the popover and the formatted string are one source.
 export function durationUnitLabelSingular(unit) {
   return text(`FABRICATE.Admin.Manager.Economy.Unit.${unit}`, SINGULAR_FALLBACK[unit] || unit);
 }
 
-/**
- * The unit label for a given quantity, respecting plurals: exactly 1 uses the
- * singular `Economy.Unit.*` label, any other count uses the plural
- * `Recipe.DurationUnitPlural.*` label (e.g. "1 Minute" vs "2 Minutes").
- * @param {string} unit - One of `TIME_UNITS`.
- * @param {number} value - The quantity for that unit.
- * @returns {string}
- */
+// Exactly 1 takes the singular key; every other count takes the plural one.
 export function durationUnitLabel(unit, value) {
   if (Number(value) === 1) return durationUnitLabelSingular(unit);
   return text(
@@ -71,12 +49,7 @@ export function durationUnitLabel(unit, value) {
   );
 }
 
-/**
- * Build a compact "2 Hours, 30 Minutes" string from the non-zero fields of a time
- * requirement, pluralizing each unit by its count and separating units with ", ".
- * @param {object|null} time - `{ minutes, hours, days, months, years }` or null.
- * @returns {string} Empty string when there is no duration.
- */
+// "2 Hours, 30 Minutes" over the non-zero fields; `''` when there is no duration.
 export function formatTimeRequirement(time) {
   if (!time || typeof time !== 'object') return '';
   const parts = [];
@@ -89,12 +62,6 @@ export function formatTimeRequirement(time) {
   return parts.join(', ');
 }
 
-/**
- * The compact, mono-friendly unit abbreviation (e.g. "hr", "min") used by the
- * inline duration stepper pill on the Overview tab.
- * @param {string} unit - One of `TIME_UNITS`.
- * @returns {string}
- */
 export function durationUnitAbbrev(unit) {
   return text(
     `FABRICATE.Admin.Manager.Recipe.DurationUnitAbbrev.${unit}`,
@@ -102,14 +69,7 @@ export function durationUnitAbbrev(unit) {
   );
 }
 
-/**
- * Build a compact "2 hr 30 min" style string from the non-zero fields of a time
- * requirement — the friendly label shown beside the inline duration steppers on
- * the Overview tab. Returns the localized "Instant" label when there is no
- * duration.
- * @param {object|null} time - `{ minutes, hours, days, months, years }` or null.
- * @returns {string}
- */
+// "2 hr 30 min" for the inline steppers; the localized "Instant" label when there is no duration.
 export function formatTimeRequirementCompact(time) {
   if (!time || typeof time !== 'object') {
     return text('FABRICATE.Admin.Manager.Recipe.DurationInstant', 'Instant');

@@ -1,22 +1,19 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Results tab. Single-step recipes show the recipe-level result section directly;
-  multi-step recipes show the ordered steps as an expandable/collapsible accordion
-  (shared with Overview, Ingredients, and Tools) — WITHOUT drag-reorder (order is
-  set in Overview) but WITH the time/currency chips and a delete button in each
-  header, each expanded step hosting its own result section (scoped via `idPrefix`).
-  Deleting a step here removes the whole step (its ingredients and tools too), so
-  the parent confirms.
+  Results tab. Single-step recipes show the recipe-level result section directly; multi-step
+  recipes show the ordered steps as an accordion — WITHOUT drag-reorder, order being set in
+  Overview, but WITH the time/currency chips and a delete button in each header, each expanded
+  step hosting its own result section scoped via `idPrefix`. Deleting a step here removes the
+  whole step, so the parent confirms.
 
-  Each result section emits the whole replacement groups array via a single
-  `onChange(nextGroups)`; the shell maps it to the right scope patch (recipe vs.
-  step) through `onUpdateResultGroups(stepId, nextGroups)`. `stepId` is null for
-  the single-step (recipe) scope.
+  Each section emits the whole replacement groups array via one `onChange(nextGroups)`; the shell
+  maps it to the right scope through `onUpdateResultGroups(stepId, nextGroups)`, `stepId` being
+  null for the single-step scope.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import ToggleCard from '../../../components/ToggleCard.svelte';
-  import Callout from '../Callout.svelte';
+  import Callout from '../../../components/Callout.svelte';
   import RecipeStepAccordion from './RecipeStepAccordion.svelte';
   import RecipeResultsSection from './RecipeResultsSection.svelte';
 
@@ -24,36 +21,29 @@
     recipe = null,
     // Alchemy Simple two-slot result editor (issue 554); forwarded to each section.
     alchemySimple = false,
-    // Simple resolution mode with the check enabled uses the SAME two-slot editor
-    // (success + reserved failure); single-step only (issue 643).
+    // Simple resolution mode with the check enabled uses the SAME two-slot editor.
     simpleFailureSlot = false,
     isMultiStep = false,
-    // COLLAPSED chain (issue 710): the system's multi-step feature is off but the
-    // recipe still carries authored steps, so the parent passes `isMultiStep={false}`
-    // AND a single-step projection of the recipe whose result groups are the FINAL
-    // step's. Edits write through to that step. This flag only drives the explanatory
-    // note — the editor surface is the normal single-step one.
+    // COLLAPSED chain: the parent passes `isMultiStep={false}` AND a single-step projection whose
+    // result groups are the FINAL step's, and edits write through to that step. This flag drives
+    // only the explanatory note; the surface is the normal single-step one.
     collapsed = false,
     componentOptions = [],
-    // Result routing (routed systems). Provider + the system's outcome tiers feed
-    // the per-result-set assignment controls; ingredient-mode assignment writes
-    // back through onAssignIngredientSet(stepId, groupId, setId, assigned).
+    // Result routing: the provider and the system's outcome tiers feed the per-result-set
+    // assignment controls.
     routingProvider = null,
     outcomeTierOptions = [],
     outcomeTiersDefined = false,
     // Issue 1098: threaded on to the section and the single-step group card alike.
     failureResultsAllowed = false,
-    // Progressive systems award results in order; forwarded to each result section
-    // so its rows get drag-reorder handles.
+    // Progressive systems award results in order; forwarded to each result section.
     progressive = false,
-    // Deep-link from a progressive row's read-only difficulty badge to the component
-    // editor's Difficulty card (component.difficulty is a Component property).
+    // Deep link from a progressive row's difficulty badge to the component editor.
     onOpenComponent = () => {},
     onAssignIngredientSet = () => {},
     onUpdateResultGroups = () => {},
     onDeleteStep = () => {},
-    // GM policy: may a player reorder this recipe's progressive stages? Default true
-    // (issue 651). Written back through onUpdateRecipe by the shell.
+    // GM policy: may a player reorder this recipe's progressive stages? Default true.
     onToggleAllowPlayerResultReorder = () => {},
   } = $props();
 
@@ -71,14 +61,9 @@
   );
   const steps = $derived(Array.isArray(recipe?.steps) ? recipe.steps : []);
 
-  // Per-mode heading + intro OUTSIDE any card (§C3).
-  //
-  // The progressive heading is "Results", matching the progressive SALVAGE editor
-  // (issue 676). The two are the same surface and must not drift: salvage says
-  // "Results" over its ordered stage list, and "Result stages (by difficulty)" plus a
-  // paragraph of mechanics restated, above a list whose own info strip already explains
-  // the roll budget, was the recipe side saying it three times. The strip below is the
-  // one place that explanation belongs.
+  // Per-mode heading and intro, OUTSIDE any card. The progressive heading is "Results", matching
+  // the progressive SALVAGE editor: the two are the same surface and must not drift, and the
+  // strip below is the one place the roll-budget explanation belongs.
   const heading = $derived(
     progressive
       ? {
@@ -148,25 +133,14 @@
   {/if}
 
   {#if progressive}
-    <!-- The strip and the reorder policy sit ABOVE the list, not after it (issue 676,
-         matching the progressive salvage editor): both describe what the ORDER MEANS,
-         and the order is the thing being authored below. The reorder card used to render
-         at the very BOTTOM — the GM read the policy governing the list only after they
-         had finished writing it. Salvage fixed that first; this is the recipe side
-         following its already-migrated sibling.
+    <!-- The strip and the reorder policy sit ABOVE the list, matching the progressive salvage
+         editor: both describe what the ORDER MEANS, and the order is what is authored below.
 
-         The strip's copy is NOT folded into the card's sub-line: the strip states an
-         INVARIANT (the award mechanic is true of every progressive recipe regardless of
-         this toggle) while the card states a CONDITIONAL. When the toggle is off the
-         budget explanation must still be true, so a merged sub-line would caveat itself.
-
-         NEUTRAL, not info (issue 1505), on the same reading: the specimen reserves the info
-         tint for a note about LIVE state, and the sentence above says in terms that this
-         strip states an invariant. It also sits directly above an info-tinted ToggleCard, so
-         tinting it spent the colour twice and made the standing rule read as the lesser of
-         the two boxes. The salvage editor's twin follows THIS one on the tone, which is the
-         reverse of the placement debt above: salvage led on where the pair sits, the recipe
-         side led on how loud the upper box is. -->
+         The strip's copy is NOT folded into the card's sub-line, because the strip states an
+         INVARIANT — the award mechanic holds whatever the toggle says — while the card states a
+         CONDITIONAL, so a merged sub-line would caveat itself. NEUTRAL rather than info on the
+         same reading: the info tint is reserved for a note about LIVE state, and this strip sits
+         directly above an info-tinted ToggleCard, so tinting it would spend the colour twice. -->
     <Callout
       tone="neutral"
       icon="fas fa-dice-d20"
@@ -209,7 +183,7 @@
       </p>
     {:else}
       <RecipeStepAccordion {steps} alwaysOpen {onDeleteStep}>
-        {#snippet body(step)}
+        {#snippet body(step, index)}
           <RecipeResultsSection
             idPrefix={`step-${step.id}-`}
             resultGroups={stepResultGroups(step)}
@@ -217,6 +191,7 @@
             {componentOptions}
             {routingProvider}
             {progressive}
+            isTerminalStep={index === steps.length - 1}
             {onOpenComponent}
             ingredientSets={stepIngredientSets(step)}
             {outcomeTierOptions}

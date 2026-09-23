@@ -1,77 +1,13 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  THE button for a right-hand inspector's actions (issue 1036).
+  THE button for a right-hand inspector's action stack (issue 1036).
+  `openspec/specs/ui-visual-style/spec.md`'s "Right-inspector actions" rule makes importing it the
+  contract; only the ESSENCE inspector is converted so far.
 
-  ── POINT OF ARRIVAL ──────────────────────────────────────────────────────────────
-  Every GM studio ends in the same place: a right-hand rail whose last card is a stack of
-  verbs for the selected entity — Duplicate, Edit, Delete, Copy source UUID, Unlink. Before
-  this component there were THREE renderings of that one meaning:
-
-   1. `.manager-recipe-browser-inspector-*` — 36/38px, `0.78rem`, accent primary, danger
-      delete, declared in `styles/fabricate.css`.
-   2. `.manager-component-browser-inspector-*` — the same block, joined into the same
-      selector lists, so a change to one silently re-typed the other.
-   3. the essence inspector's bare `.manager-button` / `.is-primary` / `.is-danger`, which
-      inherited the manager's 34px control at the app's body size — visibly chunkier text
-      than either — and painted its primary in the SUCCESS family, so `Edit essence`
-      rendered green where the design's primary is the accent.
-
-  The maintainer's ruling is that the Tool Studio's editor header buttons are the refined
-  treatment and the one every right inspector should arrive at, so this component takes THAT
-  as its base: `0.72rem` label, 700 weight, the compact control height, a 6px radius, and
-  icon-before-label with the chip gap. It is the same scale the Tool Studio's
-  `← Back to tools` / `Delete` / `Save tool` render at
-  (`.fabricate-manager .manager-header-actions .manager-button`, `min-height: 38px`,
-  `font-size: 0.72rem`), re-expressed for a full-width stacked rail rather than a
-  right-aligned toolbar.
-
-  The NEXT studio's inspector must import this rather than hand-rolling a fourth variant.
-  `openspec/specs/ui-integration/spec.md` states that as a contract; this comment states the
-  reason it exists at all.
-
-  ── WHAT IS DEFERRED, AND WHY IT IS NOT A LICENCE ─────────────────────────────────
-  Only the ESSENCE inspector is converted in this change. The recipe, component, Tool Studio
-  and Tags inspectors still render their own treatments and are listed for a follow-up: a
-  sweep re-photographs four more studios, and folding that into a change whose subject is the
-  essence rail would make a frame regression ambiguous between the two. A primitive that
-  coexists with unconverted duplicates has added a variant rather than removed one, so the
-  deferral is recorded rather than assumed.
-
-  ── IT IS NOT `.manager-button` ───────────────────────────────────────────────────
-  Deliberately. `.fabricate-button.manager-button.is-primary` is three classes; a scoped
-  Svelte rule compiles to two (`.fab-inspector-action.is-primary.svelte-<hash>` still selects
-  on two of ITS OWN classes plus the hash, but the global rule would win the tone), so
-  reusing that class and those modifier names would put the primitive's own tones behind the
-  global sheet's. The `fab-` namespace is the repo's convention for an area-agnostic shared
-  primitive (`fab-medallion`, `fab-avatar`, `fab-selection-check`) and it collides with
-  nothing in the global sheet. The third example here was `fab-status-pill` until issue 1506
-  retired that component into the chip; it is repointed at a class that still exists, because
-  a namespace convention illustrated by a class nothing emits illustrates nothing.
-
-  Because it is not `.manager-button`, it must carry the Foundry `<button>` reset itself —
-  Foundry pins a fixed `height` and its own `font-family` on every button. Those declarations
-  are in the scoped block below, exactly as `Chip.svelte` carries them for its own
-  button-tagged variant. Foundry's rules are inside `@layer`, so this unlayered block beats
-  them at any specificity.
-
-  Every token it reads is declared in `:root` or in all seven theme blocks — never an
-  area-scoped `--fab-manager-*` property — so the component stays usable outside
-  `.fabricate-manager`.
-
-  Props:
-   - tone: `'neutral'` (default), `'primary'` (accent fill — the ONE loud verb per rail),
-     `'danger'` (danger text on the panel surface; destructive, never louder than primary) or
-     `'warning'` (amber; a verb that BREAKS A LINK rather than destroying a record — the
-     essence inspector's `Unlink Source` is the shipped example and it carried the amber
-     `.manager-button.is-warning-action` treatment before this extraction, so dropping the
-     tone would have re-typed a live control into the destructive family).
-   - icon: Font Awesome classes for the leading glyph.
-   - label: the localized button text. Strings arrive pre-localized; this is a leaf.
-   - disabled / title / ariaLabel: forwarded.
-   - onClick: the verb.
-
-  Every other attribute — `data-*` hooks especially — is forwarded through the rest spread,
-  so a call site keeps its own selectors.
+  `tone`: `primary` is the ONE loud verb per rail, `danger` destroys a record, `warning` BREAKS A
+  LINK rather than destroying one (`Unlink Source` is the shipped case), and an unknown value
+  renders neutral. `label` arrives localized and `{...rest}` lands on the `<button>`. It is NOT
+  `.manager-button`, because that class would put the global sheet's tones ahead of this
+  primitive's own; it takes the area-agnostic `fab-` namespace and the Foundry `<button>` reset.
 -->
 <script>
   let {
@@ -85,8 +21,7 @@
     ...rest
   } = $props();
 
-  // An unrecognised tone renders the neutral treatment rather than emitting an unstyled
-  // `is-*` class, so a typo shows up as the default button instead of silently doing nothing.
+  // An unrecognised tone renders the neutral treatment rather than an unstyled `is-*` class.
   const TONES = new Set(['primary', 'danger', 'warning']);
   const classes = $derived(
     ['fab-inspector-action', TONES.has(tone) ? `is-${tone}` : ''].filter(Boolean).join(' ')
@@ -108,9 +43,8 @@
 </button>
 
 <style>
-  /* The Tool Studio's header treatment, re-expressed for a stacked rail. The `appearance`,
-     `height` and `font-family` declarations are the Foundry `<button>` reset — see the
-     header and CONTRIBUTING.md "Instance 1 — button layout". */
+  /* The Tool Studio's header treatment, restated for a stacked rail; `appearance`, `height` and
+     `font-family` are the Foundry `<button>` reset (CONTRIBUTING.md "Instance 1"). */
   .fab-inspector-action {
     appearance: none;
     -webkit-appearance: none;
@@ -123,53 +57,23 @@
     min-width: 0;
     height: auto;
 
-    /* 34px — the shared compact control height, and a notch under the Tool Studio header's
-       38px because a rail button is not a toolbar button. */
+    /* 34px — the shared compact control height, a notch under the Tool Studio header's 38px. */
     min-height: 34px;
     padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border);
 
-    /* THE CORNER FOLLOWS THE HEIGHT (issue 1371, maintainer ruling M12a applied to this
-       primitive). This was 6px, which `openspec/specs/design-system/spec.md`'s radius ladder
-       gives to a CHIP at or below 24px; a control of 34 to 38px takes 9. A 34px button on a
-       chip's corner is the identical off-ladder pairing M12a closed one rule up on
-       `.manager-button.fab-manager-button`, and the rules list measured it as the last line on
-       `sys-inspector-foot-action`.
-
-       IT IS A COMPLIANCE FIX AND NOT AN OPT-IN, for M12a's reason: a published ladder is not a
-       per-caller preference, and an opt-in would leave every OTHER inspector foot action on the
-       wrong rung while making the wrongness look deliberate. It moves every inspector foot
-       action by three pixels of corner curvature and nothing else — no box, no stacking context
-       and no hit target moves.
-
-       `.is-primary` below overrides the height to 36px, which is a RETIRED rung and is already
-       booked as debt in `tests/components/control-height-known-literals.js`. It is left exactly
-       as it stands: 36 is inside the 34-38 band this corner serves, so it takes the same 9 and
-       no second value is introduced here. */
+    /* THE CORNER FOLLOWS THE HEIGHT (issue 1371, ruling M12a): the radius ladder in
+       `openspec/specs/design-system/spec.md` gives 9 to a control of 34 to 38. `.is-primary`'s 36 is
+       a retired rung, booked in `tests/components/control-height-known-literals.js`. */
     border-radius: 9px;
     color: var(--fab-text);
 
-    /* NO FILL — THE NEUTRAL VERB SITS ON THE PANE, IT DOES NOT STAND OFF IT (issue 1372,
-       maintainer parity round 6).
-
-       This was `--fab-bg-2`, and the rail it lives in was moved onto `--fab-bg-0` in the same
-       epic (`EntityListInspectorFrame.svelte`) — so `Duplicate essence` was painting two rungs
-       ABOVE its own surface and reading as raised. The prototype's equivalent secondary is a
-       step BELOW its surface, on a value that sits under `--fab-bg-0` and has no token; minting
-       one would have to be authored into all seven themes and would move every theme's ramp
-       contour, so the exact value is not available.
-
-       Unfilled and bounded by `--fab-border` is: it is the treatment the prototype's own
-       `← Back` wears next to `Save essence` (`essEntry.png`, where the button's fill measures
-       identical to the header behind it), and it is what every other card on these three screens
-       already does. The affordance is not lost with it — the hover below still washes to
-       `--fab-surface-raised`, the border is the same one the cards carry, and the accent primary
-       directly beneath it is what the eye lands on first, which is the ordering the rail wants. */
+    /* NO FILL — THE NEUTRAL VERB SITS ON THE PANE (issue 1372, maintainer parity round 6): the rail
+       is `--fab-bg-0`, so the old `--fab-bg-2` read as raised. The hover still washes to raised. */
     background: transparent;
     font-family: inherit;
 
-    /* 0.72rem (~11.5px), the Tool Studio's header label size. The essence rail rendered
-       these at the app's inherited body size, which is what "chunky with large text" was. */
+    /* 0.72rem, the Tool Studio's header label size; the essence rail inherited the app body size. */
     font-size: 0.72rem;
     font-weight: 700;
     line-height: 1;
@@ -193,11 +97,7 @@
     background: var(--fab-surface-raised);
   }
 
-  /* PRIMARY is the ACCENT, not success. The design system states it plainly — "Primary =
-     accent + on-accent text · Confirm = success" — and the recipe and component inspectors
-     already paint their Edit in the accent. The essence rail's green Edit was the odd one
-     out and this is where that is fixed. Two extra pixels of height so the loud verb leads
-     its neighbours without a second size for the same control. */
+  /* PRIMARY is the ACCENT, not success. Two extra pixels so the loud verb leads its neighbours. */
   .fab-inspector-action.is-primary {
     min-height: 36px;
     border-color: var(--fab-accent-border);
@@ -210,11 +110,8 @@
     background: var(--fab-accent-strong);
   }
 
-  /* DANGER keeps the panel surface and speaks in danger text and a danger-tinted edge, so a
-     destructive verb reads as destructive without ever out-shouting the primary. It restates
-     the neutral's absent fill rather than inheriting it, because that is the declaration a
-     later tone edit is most likely to reintroduce here on its own: "keeps the panel surface"
-     is the sentence, and a rung is not the panel surface. */
+  /* DANGER keeps the panel surface and speaks in danger text and edge, so it never out-shouts the
+     primary. The absent fill is restated rather than inherited: a later tone edit would restore it. */
   .fab-inspector-action.is-danger {
     border-color: var(--fab-danger-border);
     color: var(--fab-danger-text);
@@ -227,9 +124,7 @@
     background: var(--fab-danger-soft);
   }
 
-  /* WARNING is the amber the shipped `Unlink Source` wore. Unlinking a source breaks a
-     reference; it deletes nothing, so it is not danger. Same values as
-     `.manager-button.is-warning-action`, carried across rather than reinterpreted. */
+  /* WARNING is the amber `Unlink Source` wore: unlinking breaks a reference and deletes nothing. */
   .fab-inspector-action.is-warning {
     border-color: var(--fab-warning-border);
     color: var(--fab-warning-text);

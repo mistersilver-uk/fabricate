@@ -1,50 +1,13 @@
 /**
- * Represents a system-owned library Tool shared by crafting, salvage, and gathering.
- *
- * Spec contract (data-models/spec.md, gathering-and-harvesting):
- *   componentId:       string | null          - OPTIONAL managed-component link (issue 561);
- *                                               null for a first-class tool registered from an
- *                                               Item uuid, populated for a whetstone or a
- *                                               migrated legacy tool (no longer the matching basis)
- *   name / img:        string | null          - registration/migration source-display snapshot (issue 561);
- *   description:       string                 - registration/migration source-description snapshot;
- *                                               NOT `label`, and not auto-refreshed on rename
- *   registeredItemUuid /
- *   originItemUuid /
- *   aliasItemUuids:   string / string[]      - the tool's OWN source references (issue 561), the
- *                                               matching basis; a valid tool carries EITHER a
- *                                               componentId OR its own source references
- *   requirement:       null | {               - optional truthy-expression gate
- *     formula:         string                   // dice/roll expression
- *   }
- *   prerequisites:     { enabled, ids, gateMode } - optional shared-prerequisite gate
- *   bonus:             { enabled, expression } - optional expression contribution
- *   breakage:          { mode, ...mode-specific fields }
- *     mode === 'limitedUses':     maxUses:        number | null     (null = unlimited; usage tracked on the item)
- *     mode === 'breakageChance':  breakageChance: number (integer 0..100)
- *     mode === 'diceExpression':  formula:        string (Foundry roll), threshold: number
- *   checkBreakable:    boolean                    check-driven exclusion switch; legacy
- *                                               `breakage.mode: 'immune'` reads forward as false
- *   onBreak:           { mode, ...mode-specific fields }
- *     mode === 'destroy':       (no fields)
- *     mode === 'flagBroken':    (no fields)
- *     mode === 'replaceWith':   replacementTarget: { type: 'component', componentId }
- *                                | { type: 'item', itemUuid }
- *   repairRequirements: IngredientGroup[]       - materials required to repair a flagged copy
- *
- * Item-flag conventions:
- *   Item.flags.fabricate.toolUsage  = { timesUsed: number }   // limitedUses only
- *   Item.flags.fabricate.toolBroken = true                    // set by the flagBroken on-break action
- *
- * The flagBroken on-break action also appends a localized " (broken)" suffix to the
- * owned item's display name. The append is idempotent: the suffix is never doubled, and it is
- * never appended to an item that was already toolBroken-flagged before the action fired. The
- * suffix is display-only. The toolBroken flag, not the name, remains the authoritative
- * presence-gate disqualifier. Note: a component matched purely by name (no registeredItemUuid/fallback
- * ids) stops matching its component once renamed, so a GM clearing the toolBroken flag must also
- * restore the original name to regain damaged-tier recognition.
+ * A system-owned library Tool shared by crafting, salvage and gathering. Its field contract — the
+ * optional `componentId` link, the tool's own source references as the matching basis, and the
+ * `breakage` / `checkBreakable` / `onBreak` / `repairRequirements` shapes — is the data-models
+ * "Tool" section, with `flags.fabricate.toolUsage` and `flags.fabricate.toolBroken` as its item-flag
+ * conventions. The flagBroken action's " (broken)" name suffix is display-only and idempotent; the
+ * flag, never the name, is the authoritative presence-gate disqualifier.
  */
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import { stringOnlyIdList as normalizeIdList } from '../utils/scalars.js';
 
 import { IngredientGroup } from './IngredientGroup.js';
 
@@ -73,18 +36,6 @@ function normalizeRequirement(input) {
   if (!input || typeof input !== 'object') return null;
   const formula = typeof input.formula === 'string' ? input.formula : '';
   return { formula };
-}
-
-function normalizeIdList(values) {
-  if (!Array.isArray(values)) return [];
-  return [
-    ...new Set(
-      values
-        .filter((value) => typeof value === 'string')
-        .map((value) => value.trim())
-        .filter(Boolean)
-    ),
-  ];
 }
 
 function normalizePrerequisites(input) {
@@ -168,48 +119,25 @@ export class Tool {
   constructor(data = {}) {
     this.id = typeof data.id === 'string' && data.id.trim() ? data.id.trim() : null;
     this.enabled = data.enabled !== false;
-    /**
-     * @type {string|null} OPTIONAL managed-component link (issue 561). A first-class
-     * tool registered from an Item uuid carries `componentId: null` and its own source
-     * references. A whetstone (also a component) or a tool migrated from a legacy
-     * componentId-tool keeps `componentId` populated for `onBreak.replaceWith` resolution
-     * and the UI's linked-component display, but it is no longer the matching basis.
-     */
     this.componentId =
       typeof data.componentId === 'string' && data.componentId ? data.componentId : null;
 
-    /**
-     * @type {string} OPTIONAL, pre-existing, USER-authored display label override. A
-     * distinct field — NOT part of the registration/migration display snapshot below,
-     * which is `name` + `img` only. Never written by snapshot capture, migration, or any
-     * refresh, so a GM's authored label is never clobbered.
-     */
     this.label = typeof data.label === 'string' ? data.label : '';
 
-    /**
-     * @type {string|null} Display-snapshot name captured at registration/migration
-     * (issue 561). NOT auto-refreshed on source-Item rename (recipe-item parity). Used as
-     * the presence name-fallback string and the UI display source for an item-sourced tool.
-     */
     this.name = typeof data.name === 'string' && data.name ? data.name : null;
 
-    /** @type {string|null} Display-snapshot image, captured with {@link Tool#name}. */
     this.img = typeof data.img === 'string' && data.img ? data.img : null;
 
-    /** @type {string} Display-snapshot description captured with name/image. */
     this.description = typeof data.description === 'string' ? data.description : '';
 
-    /** @type {string|null} The tool's own registered source document uuid. */
     this.registeredItemUuid =
       typeof data.registeredItemUuid === 'string' && data.registeredItemUuid
         ? data.registeredItemUuid
         : null;
 
-    /** @type {string|null} The tool's own canonical/compendium source uuid. */
     this.originItemUuid =
       typeof data.originItemUuid === 'string' && data.originItemUuid ? data.originItemUuid : null;
 
-    /** @type {string[]} Additional source references for runtime matching. */
     this.aliasItemUuids = Array.isArray(data.aliasItemUuids)
       ? [
           ...new Set(
@@ -221,29 +149,22 @@ export class Tool {
         ]
       : [];
 
-    /** @type {{formula: string}|null} Optional truthy-expression gate */
     this.requirement =
       data.requirement === null || data.requirement === undefined
         ? null
         : normalizeRequirement(data.requirement);
 
-    /** @type {{enabled: boolean, ids: string[], gateMode: 'bonus'|'usability'}} */
     this.prerequisites = normalizePrerequisites(data.prerequisites);
 
-    /** @type {{enabled: boolean, expression: string}} */
     this.bonus = normalizeBonus(data.bonus);
 
-    /** @type {{mode: string, [key: string]: any}} Breakage mechanic configuration */
     this.breakage = normalizeBreakage(data.breakage);
 
-    // Legacy `immune` was overloaded across both breakage authorities. Read it forward
-    // without erasing the safe tool-specific configuration; canonical writes never emit it.
+    // Legacy `immune` was overloaded across both breakage authorities.
     this.checkBreakable = data.breakage?.mode === 'immune' ? false : data.checkBreakable !== false;
 
-    /** @type {{mode: string, [key: string]: any}} On-break action configuration */
     this.onBreak = normalizeOnBreak(data.onBreak);
 
-    /** @type {IngredientGroup[]} Authoring-only materials required to repair a flagged copy. */
     this.repairRequirements = normalizeRepairRequirements(data.repairRequirements);
   }
 
@@ -251,16 +172,13 @@ export class Tool {
     return this.label.trim() || this.name || fallback;
   }
 
-  /**
-   * Validate the Tool against the spec contract.
-   * @returns {{ valid: boolean, errors: string[] }}
-   */
+  /** Validate the Tool against the spec contract. */
   validate() {
     const errors = [];
 
-    // A first-class tool is valid with EITHER a managed-component link (`componentId`)
-    // OR its own source references (`registeredItemUuid`/`originItemUuid`); a tool with NEITHER
-    // cannot be matched, so it is invalid (issue 561).
+    // A first-class tool is valid with EITHER a managed-component link (`componentId`) OR its own
+    // source references (`registeredItemUuid`/`originItemUuid`); a tool with NEITHER cannot be
+    // matched, so it is invalid (issue 561).
     const hasSourceRefs = !!(this.registeredItemUuid || this.originItemUuid);
     if (!this.componentId && !hasSourceRefs) {
       errors.push('a tool requires either a componentId or its own source references');
@@ -317,8 +235,8 @@ export class Tool {
         this.componentId &&
         target.componentId === this.componentId
       ) {
-        // Only meaningful when the tool HAS a componentId; a null-component (item-sourced)
-        // tool can never collide with its own component id, so the differ-check is skipped.
+        // Only meaningful when the tool HAS a componentId; a null-component (item-sourced) tool can
+        // never collide with its own component id, so the differ-check is skipped.
         errors.push('onBreak.replacementTarget componentId must differ from componentId');
       }
     }
@@ -339,9 +257,7 @@ export class Tool {
     return { valid: errors.length === 0, errors };
   }
 
-  /**
-   * Serialize to a plain JSON-safe object containing only spec-defined fields.
-   */
+  /** Serialize to a plain JSON-safe object containing only spec-defined fields. */
   toJSON() {
     return {
       ...(this.id && { id: this.id }),
@@ -369,38 +285,19 @@ export class Tool {
     };
   }
 
-  /**
-   * Deserialize from a plain object. Unknown fields are silently ignored.
-   * @param {object} data
-   * @returns {Tool}
-   */
+  /** Deserialize from a plain object. */
   static fromJSON(data) {
     return new Tool(data);
   }
 
-  /**
-   * Decide whether the tool breaks this attempt.
-   *
-   * The decision is pure (no side effects) given the injected `random` and
-   * `evaluateExpression`. For `limitedUses` mode the caller is expected to
-   * have already incremented the item's usage counter via {@link applyUsage}
-   * before calling this method, so the comparison uses the post-increment
-   * `timesUsed` value.
-   *
-   * @param {object} params
-   * @param {object} [params.actor]
-   * @param {object} [params.item]                  - owned Foundry Item (for limitedUses)
-   * @param {Function} [params.evaluateExpression]  - async ({expression, actor, kind}) => number|boolean
-   * @param {Function} [params.random]              - () => number in [0, 1); defaults to Math.random
-   * @returns {Promise<{ broken: boolean, mode: string, evidence: object }>}
-   */
+  /** Decide whether the tool breaks this attempt. */
   async evaluateBreakage({ actor, item, evaluateExpression, random } = {}) {
     const mode = this.breakage.mode;
 
     if (mode === 'limitedUses') {
-      // Prefer the authoritative `toolUsage` flag; fall back to the legacy catalyst usage
-      // flag (`catalystItemUsage`) so items already degraded as catalysts keep their used
-      // count after the 0.6.0 Catalyst→Tool migration. Writes always go to `toolUsage`.
+      // Prefer the authoritative `toolUsage` flag; fall back to the legacy catalyst usage flag
+      // (`catalystItemUsage`) so items already degraded as catalysts keep their used count after
+      // the 0.6.0 Catalyst→Tool migration.
       const usage = getFabricateFlag(item, 'toolUsage', null) ||
         getFabricateFlag(item, 'catalystItemUsage', null) || { timesUsed: 0 };
       const timesUsed = Number(usage?.timesUsed || 0);
@@ -442,41 +339,19 @@ export class Tool {
     return { broken: false, mode, evidence: {} };
   }
 
-  /**
-   * Increment the usage counter on an owned tool item. Only meaningful for the
-   * `limitedUses` mode; a no-op for the other two modes which do not persist
-   * state on the item.
-   *
-   * @param {Item} item - The owned Foundry Item instance
-   */
+  /** Increment the usage counter on an owned tool item. */
   async applyUsage(item) {
     if (this.breakage.mode !== 'limitedUses') return;
 
-    // Seed from `toolUsage`, falling back to the legacy `catalystItemUsage` so the very
-    // first post-migration write continues the catalyst-era count rather than resetting it.
-    // The result is always written to `toolUsage` (authoritative); the legacy flag is left
-    // in place (idempotent — once `toolUsage` exists, the fallback is never re-entered).
+    // Seed from `toolUsage`, falling back to the legacy `catalystItemUsage` so the very first
+    // post-migration write continues the catalyst-era count rather than resetting it.
     const current = getFabricateFlag(item, 'toolUsage', null) ||
       getFabricateFlag(item, 'catalystItemUsage', null) || { timesUsed: 0 };
     const timesUsed = Number(current?.timesUsed || 0) + 1;
     await setFabricateFlag(item, 'toolUsage', { timesUsed });
   }
 
-  /**
-   * Apply the configured on-break action to an owned tool item.
-   *
-   * For the `flagBroken` action, in addition to setting the `toolBroken` flag, a localized
-   * " (broken)" suffix is appended to the item's display name. The append is idempotent: it is
-   * skipped when the item was already broken-flagged before this call or when the name already
-   * ends with the suffix. The suffix is display-only. The flag remains the authoritative
-   * presence-gate disqualifier. A component matched purely by name (no registeredItemUuid/fallback ids)
-   * stops matching its component once renamed, so a GM clearing the flag must also restore the name.
-   *
-   * @param {object} params
-   * @param {Item} params.item                                       - The owned Foundry Item to act on
-   * @param {object} [params.actor]                                  - Actor that owned the item
-   * @param {Function} [params.createReplacement]                    - async ({ actor, target }) => Item|{success: true}|true|null
-   */
+  /** Apply the configured on-break action to an owned tool item. */
   async applyBreakage({ item, actor, createReplacement } = {}) {
     const mode = this.onBreak.mode;
 

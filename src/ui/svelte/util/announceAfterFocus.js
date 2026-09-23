@@ -1,75 +1,15 @@
-/**
- * ONE ORDERING RULE FOR "MOVE THE KEYBOARD AND SAY WHAT HAPPENED" (issue 1157).
- *
- * Two surfaces do this pair — `CraftingSystemManagerRoot`, when an action empties a bulk
- * selection and unmounts the panel it was performed from, and `BulkDeleteCard`, when an
- * awaited write comes back refused and leaves the card mounted. They did it in the opposite
- * order and a microtask apart, which is the same order and close enough together that the
- * two reach the screen reader in a single task:
- *
- *   1. write the sentence into a `polite` live region;
- *   2. move focus.
- *
- * A `polite` announcement is QUEUED speech, and NVDA and JAWS both CANCEL pending speech on a
- * focus change. So the plausible outcome of that order is that the GM hears the focus target
- * and never hears the sentence — the exact silence the fix was for, now hidden behind a
- * working focus hop. The risk scales with the length of the sentence, so the composite Recipe
- * apply report ("Applied bulk changes to 4 recipes. 2 additions…") is the most exposed.
- *
- * The safe order is the other one: move focus FIRST, let its utterance start, and queue the
- * announcement BEHIND it. That is what this module owns, so the two call sites cannot drift
- * into two different orders — which is exactly how they came to hold two different ones.
- *
- * THIS IS INFERRED AT BEHAVIOUR, NOT MEASURED. Nothing in this repo — happy-dom, Chromium
- * under Playwright, the View Lab — runs a screen reader, so no gate here can observe an
- * utterance. What the tests can and do observe is the ORDER: the focus target holds the
- * keyboard before the region has any text, and the text arrives afterwards. Read the delay
- * below as the cheap, reversible side of an untestable question, not as a measurement.
- */
+// One ordering rule for "move the keyboard and say what happened" (issues 1157, 1517): move focus
+// FIRST and queue the announcement BEHIND it, because a `polite` announcement is QUEUED speech and
+// NVDA and JAWS both cancel pending speech on a focus change. This is inferred at behaviour, not
+// measured — nothing here runs a screen reader, so the tests observe the ORDER only.
 
-/**
- * How long the announcement waits behind the focus utterance.
- *
- * Long enough that the focus event has been delivered to the AT and its utterance has begun —
- * the accessibility tree is updated out of process, so same-task and next-task insertions can
- * still be coalesced into the focus change. Short enough that a GM waiting to be told what
- * their own keypress did is not left in silence; at this length the sentence follows the
- * target's name as the next thing spoken.
- *
- * Exported because the mounted suites wait on it. A test that hardcoded its own number would
- * silently start asserting the un-delayed state the moment this changed.
- */
+// Exported because the mounted suites wait on it; a test with its own number would go blind.
 export const ANNOUNCE_AFTER_FOCUS_MS = 150;
 
-/**
- * Move the keyboard, then announce.
- *
- * THE MOVER ANSWERS IN ONE OF TWO SHAPES, and the second is not a second policy (issue 1517).
- * A synchronous mover reports `true`/`false`, which is what the two 1157 call sites do. An
- * ASYNCHRONOUS one — the validation row action, whose destination panel does not exist until
- * Svelte has flushed the route it just wrote — returns a promise of the element it landed on,
- * or `null` when it landed nowhere. Both are read by {@link queueAnnouncement} as the same
- * question, "did focus move", and both are queued behind the same {@link
- * ANNOUNCE_AFTER_FOCUS_MS}. The alternative was a second helper holding a third ordering
- * policy, which is the drift the paragraph above exists to prevent.
- *
- * @param {() => boolean|Promise<Element|null>} moveFocus  Attempts the focus move. Returns
- *   `true` — or, in the promise shape, the element it focused — only if it actually moved
- *   focus. Every caller here declines the move in some state — the GM is somewhere they chose
- *   to be, or the target is gone — and a decline must NOT buy the delay: with no focus
- *   utterance to queue behind there is nothing to wait for, and waiting would only delay the
- *   one thing the GM is owed.
- * @param {(focused: Element|null) => void} announce  Writes the sentence into the live region.
- *   It is handed the element the mover resolved, so a caller composing its sentence FROM the
- *   destination cannot write one before focus moved: there is nothing to write it from. A
- *   `true`/`false` mover has no element to hand over and its callers take no argument.
- * @param {number} [delayMs]  Overridable for tests; callers use the exported default.
- */
+// A mover answers `true`/`false` or a promise of the element it landed on; both are read as the one
+// question "did focus move". A decline must NOT buy the delay: there is no utterance to queue behind.
 export function announceAfterFocusMove(moveFocus, announce, delayMs = ANNOUNCE_AFTER_FOCUS_MS) {
-  // The microtask is not part of the ordering rule — it is what makes the focus target
-  // resolvable at all. Every caller acts from a state write that has already scheduled
-  // Svelte's flush, so the node to focus is only re-rendered (and, for the card, only
-  // re-enabled) after this callback's turn comes round.
+  // Not part of the ordering rule: the microtask is what makes the focus target resolvable at all.
   queueMicrotask(() => {
     const outcome = moveFocus?.();
     if (typeof outcome?.then === 'function') {
@@ -80,13 +20,6 @@ export function announceAfterFocusMove(moveFocus, announce, delayMs = ANNOUNCE_A
   });
 }
 
-/**
- * The ordering rule itself, over whichever shape the mover answered in.
- *
- * @param {boolean|Element|null|undefined} outcome  What the mover reported.
- * @param {(focused: Element|null) => void} announce
- * @param {number} delayMs
- */
 function queueAnnouncement(outcome, announce, delayMs) {
   const focused = outcome !== null && typeof outcome === 'object' ? outcome : null;
   if (outcome !== true && !focused) {

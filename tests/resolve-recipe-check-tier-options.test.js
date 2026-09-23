@@ -1,8 +1,5 @@
-// Unit tests for resolveRecipeCheckTierOptions — the pure helper that resolves the
-// recipe editor's "Check tier" dropdown options from the selected system's active
-// crafting-check mode. Extracted from CraftingSystemManagerRoot's recipeCheckTierOptions
-// derived, which previously only handled simple-static checks and so left routed
-// relative checks unable to surface their authored recipe tiers (issue 512).
+// Unit tests for resolveRecipeCheckTierOptions — the pure helper that resolves the recipe editor's
+// "Check tier" dropdown options from the selected system's active crafting-check mode (issue 512).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -47,10 +44,8 @@ test('routed mode + fixed type yields no options', () => {
   assert.deepEqual(resolveRecipeCheckTierOptions(craftingCheck, 'routed'), []);
 });
 
-// The gates mirror the editors' normalizations, which key off the EXCLUDED value
-// only (simple: `dcMode === 'dynamic'`; routed: `type === 'fixed'`). Any other
-// value — including a non-canonical one — is treated as the tier-bearing mode, so
-// the dropdown can never diverge from what the check editor actually shows.
+// The gates mirror the editors' normalizations, which key off the EXCLUDED value only (simple:
+// `dcMode === 'dynamic'`; routed: `type === 'fixed'`).
 test('non-canonical dcMode/type is treated as the tier-bearing mode, mirroring the editors', () => {
   assert.deepEqual(
     resolveRecipeCheckTierOptions({ simple: { dcMode: 'weird', tiers: SIMPLE_TIERS } }, 'simple'),

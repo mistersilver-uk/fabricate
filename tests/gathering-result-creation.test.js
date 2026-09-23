@@ -1,20 +1,9 @@
 /**
  * Issue 780: a GATHERED AWARD item must carry the durable per-system component identity
- * (`flags.fabricate.roles[systemId].componentId`) of the awarded component at creation, so
- * a gathered part resolves to its OWN component through the identity tier once #601 removes
- * the name-fallback match tier — instead of degrading to name-only when the awarding
- * component has no registered source item.
- *
- * These drive the REAL `createGatheringResultCreator().create()` closure and assert on the
- * CAPTURED `createEmbeddedDocuments` payload (never a fake-document read-back — the stamp
- * lives in the create payload). Key invariants pinned here:
- *   - the stamped id is the one the RESULT authored (`result.componentId || systemItemId`),
- *     NEVER `source.id` (in the registeredItemUuid case `source` is the source Item);
- *   - ANY `itemUuid`-resolved result — even one carrying a stray `result.componentId` —
- *     stamps NO roles leaf (no managed component);
- *   - a dotted `systemId` stamps nothing (degrades to raw-reference resolution);
- *   - `flags.core.sourceId` is still written;
- *   - the stack/`existing.update` branch stamps NO roles leaf (create-only).
+ * (`flags.fabricate.roles[systemId].componentId`) of the awarded component at creation, so a
+ * gathered part resolves to its OWN component through the identity tier once #601 removes the
+ * name-fallback match tier — instead of degrading to name-only when the awarding component has no
+ * registered source item.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,6 +29,8 @@ globalThis.foundry = {
 };
 
 const { createGatheringResultCreator } = await import('../src/gatheringResultCreation.js');
+const { seededRollClass, withRoll } = await import('./helpers/seededRoll.js');
+const { itemReceipt } = await import('../src/systems/runHistoryEvidence.js');
 
 const SYSTEM_ID = 'sys-780';
 
@@ -249,15 +240,9 @@ for (const result of [[], undefined, [{ uuid: 'Actor.other.Item.wrong', quantity
   });
 }
 
-// ---------------------------------------------------------------------------
-// The award seam must never drop a result in silence.
-//
-// A gathering attempt that reports success and then quietly awards nothing is
-// indistinguishable from a broken module: the node and stamina are already spent and
-// nobody is told why. Two silent drops lived here — an `itemUuid` branch with no
-// component fallback (the sibling `registeredItemUuid` branch has always had one), and
-// a bare `continue` for anything that failed to resolve.
-// ---------------------------------------------------------------------------
+// The award seam must never drop a result in silence. A gathering attempt that reports success and
+// then quietly awards nothing is indistinguishable from a broken module: the node and stamina are
+// already spent and nobody is told why.
 
 test('an itemUuid that fails to resolve FALLS BACK to the row component instead of vanishing', async () => {
   const system = { id: SYSTEM_ID, components: COMPONENTS };
@@ -360,4 +345,97 @@ test('a planned component award carries componentId so it survives to the card a
   assert.equal(planned[0].itemUuid, null, 'no uuid yet — the document does not exist');
   assert.equal(planned[0].componentId, SOURCELESS_COMPONENT.id, 'componentId is the identity');
   assert.equal(planned[0].quantity, 3);
+});
+
+test('1645: a gathering attempt rolls each amount once across plan() and create()', async () => {
+  const system = { id: SYSTEM_ID, components: COMPONENTS };
+  globalThis.fromUuidSync = () => null;
+  const { Roll, calls } = seededRollClass({ totals: { '1d4+2': 5, '1d6': 2 } });
+  await withRoll(Roll, async () => {
+    const actor = capturingActor();
+    const resultGroups = [
+      {
+        results: [
+          { id: 'ore-row', componentId: SOURCELESS_COMPONENT.id, quantity: 1, quantityFormula: '1d4+2' },
+          { id: 'clay-row', componentId: SOURCELESS_COMPONENT.id, quantity: 9, quantityFormula: '1d6' },
+        ],
+      },
+    ];
+    const creator = createGatheringResultCreator(managerWith(system));
+    const planned = await creator.plan({ actor, system, resultGroups });
+    const created = await creator.create({ actor, system, resultGroups });
+
+    assert.deepEqual(
+      calls.map((call) => call.formula),
+      ['1d4+2', '1d6'],
+      'ONE roll per result across both passes — create() consumes the plan'
+    );
+    assert.deepEqual(planned.map((ref) => ref.quantity), [5, 2], 'the plan states the roll');
+    assert.deepEqual(planned[0].rolled, { formula: '1d4+2', total: 5 });
+    assert.deepEqual(created.map((receipt) => receipt.quantity), [5, 2], 'and the award matches');
+    assert.deepEqual(created[0].rolled, { formula: '1d4+2', total: 5 }, 'the receipt carries it too');
+  });
+});
+
+test('1645: a structurally equal clone of the planned row consumes the plan, never a second roll', async () => {
+  const system = { id: SYSTEM_ID, components: COMPONENTS };
+  globalThis.fromUuidSync = () => null;
+  const { Roll, calls } = seededRollClass({ totals: { '1d4+2': 5 } });
+  await withRoll(Roll, async () => {
+    const row = () => ({
+      id: 'ore-row',
+      resultRowId: 'group:ore-row:0',
+      componentId: SOURCELESS_COMPONENT.id,
+      quantity: 1,
+      quantityFormula: '1d4+2',
+    });
+    const creator = createGatheringResultCreator(managerWith(system));
+    // The run reloads between plan and award, so the awarded row is an equal COPY of the planned one.
+    const planned = await creator.plan({ actor: capturingActor(), system, resultGroups: [{ results: [row()] }] });
+    const created = await creator.create({ actor: capturingActor(), system, resultGroups: [{ results: [row()] }] });
+
+    assert.equal(calls.length, 1, 'ONE roll for one authored row');
+    assert.equal(planned[0].quantity, 5);
+    assert.equal(created[0].quantity, 5, 'the awarded stack is the planned integer');
+  });
+});
+
+test('1645: a gathered amount that rolls to zero creates no item', async () => {
+  const system = { id: SYSTEM_ID, components: COMPONENTS };
+  globalThis.fromUuidSync = () => null;
+  const { Roll } = seededRollClass({ totals: { '1d4-8': -3 } });
+  await withRoll(Roll, async () => {
+    const actor = capturingActor();
+    const created = await createGatheringResultCreator(managerWith(system)).create({
+      actor,
+      system,
+      resultGroups: [
+        { results: [{ componentId: SOURCELESS_COMPONENT.id, quantity: 4, quantityFormula: '1d4-8' }] },
+      ],
+    });
+    assert.equal(actor.captured.length, 0, 'nothing is created for an empty award');
+    assert.equal(created.length, 0, 'and no receipt claims one was');
+  });
+});
+
+test('1645: a planned roll survives the run-item normalizer that rebuilds every entry', async () => {
+  const system = { id: SYSTEM_ID, components: COMPONENTS };
+  globalThis.fromUuidSync = () => null;
+  const { Roll } = seededRollClass({ totals: { '1d4+2': 5 } });
+  await withRoll(Roll, async () => {
+    const [planned] = await createGatheringResultCreator(managerWith(system)).plan({
+      actor: capturingActor(),
+      system,
+      resultGroups: [
+        {
+          results: [
+            { componentId: SOURCELESS_COMPONENT.id, quantity: 1, quantityFormula: '1d4+2' },
+          ],
+        },
+      ],
+    });
+    // `normalizeRunItems` rebuilds each entry through `itemReceipt`, which carries only the keys it
+    // names — so the journal sees the roll only because the receipt shape carries it (issue 1645).
+    assert.deepEqual(itemReceipt(planned).rolled, { formula: '1d4+2', total: 5 });
+  });
 });

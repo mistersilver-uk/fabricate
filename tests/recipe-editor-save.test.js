@@ -1,16 +1,8 @@
-/**
- * Tests for T-036: RecipeManager logs the recipe name and ID on create/update.
- *
- * These tests verify that:
- * 1. RecipeManager.createRecipe logs the recipe name and ID to console
- * 2. RecipeManager.updateRecipe logs the recipe name and ID to console
- */
+/** Tests for T-036: RecipeManager logs the recipe name and ID on create/update. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
 // Minimal FoundryVTT stubs required by imported modules
-// ---------------------------------------------------------------------------
 
 globalThis.foundry = {
   utils: {
@@ -36,18 +28,12 @@ globalThis.ui = {
 
 globalThis.ChatMessage = { create: () => {}, getSpeaker: () => ({}) };
 
-// ---------------------------------------------------------------------------
 // Imports (dynamic, after globals are set)
-// ---------------------------------------------------------------------------
 
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 
-// ---------------------------------------------------------------------------
-// Helper: build a minimal valid recipe payload that satisfies Recipe.validate()
-// and IngredientSet.validate(). An ingredient set must contain at least one
-// ingredient group, each group must have at least one option, and each
-// Ingredient option must have a match rule or itemUuid.
-// ---------------------------------------------------------------------------
+// Helper: build a minimal valid recipe payload that satisfies Recipe.validate() and
+// IngredientSet.validate().
 
 const TEST_SYSTEM_ID = 'test-system-001';
 
@@ -83,11 +69,8 @@ function makeValidPayload(overrides = {}) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Helper: build a RecipeManager with save() stubbed out so tests run without
-// real Foundry settings storage.  System-level validators are also stubbed to
-// avoid needing a real crafting system in game.fabricate.
-// ---------------------------------------------------------------------------
+// Helper: build a RecipeManager with save() stubbed out so tests run without real Foundry settings
+// storage.
 
 function makeManager() {
   const manager = new RecipeManager();
@@ -101,9 +84,7 @@ function makeManager() {
   return manager;
 }
 
-// ---------------------------------------------------------------------------
 // Test 1: RecipeManager.createRecipe logs the recipe name and ID to console
-// ---------------------------------------------------------------------------
 
 test('RecipeManager.createRecipe logs recipe name and ID after successful save', async () => {
   const manager = makeManager();
@@ -128,9 +109,7 @@ test('RecipeManager.createRecipe logs recipe name and ID after successful save',
   }
 });
 
-// ---------------------------------------------------------------------------
 // Test 2: RecipeManager.updateRecipe logs the recipe name and ID to console
-// ---------------------------------------------------------------------------
 
 test('RecipeManager.updateRecipe logs recipe name and ID after successful save', async () => {
   const manager = makeManager();

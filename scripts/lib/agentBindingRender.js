@@ -1,13 +1,6 @@
 /**
- * The two provider templates. Every file under `.claude/agents/` and `.codex/agents/` is
- * rendered here from `agentBindingRoles.js` and `agentModelTiers.js`.
- *
- * THIS IS ONE OF THE TWO PLACES THE `ESCALATE_TIER` CONTRACT IS AUTHORED; the other is
- * `AGENTS.md`. It was hand-maintained in 36 binding files, in eight wordings that had drifted.
- *
- * The two templates are not one template with a format switch: Claude is YAML frontmatter over
- * one-sentence-per-line Markdown, Codex is TOML over a `"""` block of joined paragraphs. Nothing
- * throws; `bindingRenderErrors` returns `string[]` so `node --test` can import it.
+ * The two provider templates. Every file under `.claude/agents/` and `.codex/agents/` is rendered
+ * here from `agentBindingRoles.js` and `agentModelTiers.js`.
  */
 import { BINDING_ROLES, bindingTargets, roleSkillPath } from './agentBindingRoles.js';
 import { TIER_MODELS, UNTIERED_ROLE_TIERS, toolParityErrors } from './agentModelTiers.js';
@@ -136,11 +129,7 @@ function renderCodex({ role, token, tier }, declaredTier) {
 
 /**
  * Every binding file this repository generates, as `repo-relative path -> exact bytes`, plus the
- * errors that make a record unrenderable. A record failing tool/sandbox parity is reported here
- * rather than written, so the generator cannot emit a spawn tool into any role or a mutation
- * tool into a read-only one.
- *
- * @returns {{ files: Map<string, string>, errors: string[] }}
+ * errors that make a record unrenderable.
  */
 export function renderedBindings() {
   const files = new Map();
@@ -167,11 +156,8 @@ export function renderedBindings() {
 }
 
 /**
- * Tool/sandbox parity for ONE ROLE RECORD, using the same rule the on-disk bindings are gated
- * by. The mapping role declares no Claude tools because it has no Claude binding.
- *
- * @param {object} role
- * @returns {string[]}
+ * Tool/sandbox parity for one role record, using the same rule the on-disk bindings are gated by.
+ * The mapping role declares no Claude tools because it has no Claude binding.
  */
 export function roleToolSafetyErrors(role) {
   if (role.codexOnly) return [];
@@ -184,15 +170,7 @@ export function roleToolSafetyErrors(role) {
   });
 }
 
-/**
- * Compare every generated binding against the bytes on disk.
- *
- * `read` is injected rather than taken from the filesystem so a test can perturb one file
- * without touching the checkout — which is how both directions of the gate are proved.
- *
- * @param {(rel: string) => string | null} read
- * @returns {string[]}
- */
+/** Compare every generated binding against the bytes on disk. */
 export function bindingRenderErrors(read) {
   const { files, errors } = renderedBindings();
   for (const [rel, expected] of files) {

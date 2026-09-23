@@ -36,9 +36,7 @@ const CHECK = {
   usable: true,
 };
 
-// One table row per resolution mode: the fixture recipe + the data-recipe-section
-// markers its mode body must render. Parameterized (not copy-pasted blocks) so a
-// new mode is one row.
+// One table row per resolution mode.
 const MODE_CASES = [
   {
     mode: 'simple',
@@ -123,8 +121,7 @@ describe('RecipeDetail mounted behavior', () => {
         );
       }
       assert.ok(target.querySelector('[data-crafting-craft]'), 'craft button present');
-      // The craft button is a fixed footer OUTSIDE the scrolling detail region, so it
-      // stays visible without overlapping the recipe details.
+      // The craft button is a fixed footer OUTSIDE the scrolling detail region.
       const scroll = target.querySelector('[data-crafting-detail-scroll]');
       assert.ok(scroll, 'the detail content has a dedicated scroll region');
       assert.equal(
@@ -170,8 +167,7 @@ describe('RecipeDetail mounted behavior', () => {
     const [sufficient, short] = tiles;
     assert.equal(sufficient.getAttribute('data-slot-state'), 'met');
     assert.equal(short.getAttribute('data-slot-state'), 'short');
-    // A fixed requirement is not selectable, so it is role="img" with a label rather
-    // than a button promising a choice the surface does not offer.
+    // A fixed requirement is not selectable.
     assert.equal(sufficient.getAttribute('role'), 'img', 'a fixed slot is not a button');
     assert.ok(sufficient.getAttribute('aria-label').includes('Iron'), 'and carries a name');
 
@@ -380,6 +376,40 @@ describe('RecipeDetail mounted behavior', () => {
     assert.equal(outputName(targetB), 'Steel Boss', 'Produces follows the selected route (set-b)');
   });
 
+  it('reads the terminal-step product for a MULTI-step routed recipe (issue 1907)', async () => {
+    // Every projected set resolves against the first step, whose group may legally be empty on a
+    // multi-step recipe, so the headline follows `result.items` instead of the selected route.
+    const routed = (stepCount) =>
+      recipe({
+        modeToken: 'routedByIngredients',
+        modeLabel: 'Routed by ingredients',
+        defaultSetId: 'set-a',
+        stepCount,
+        result: { items: [{ name: 'Folded Blade', img: null, qty: 1 }], time: null, timeLabel: null, xp: null },
+        ingredientSets: [
+          { id: 'set-a', label: 'Fold', craftability: craftability(), products: [] },
+        ],
+      });
+
+    const outputNames = (target) =>
+      [...target.querySelectorAll('[data-io-group="outputs"] .crafting-io-output-name')].map(
+        (node) => node.textContent.trim()
+      );
+
+    const hint = (target) =>
+      target.querySelector('[data-recipe-section="routing-hint"]')?.textContent.trim();
+
+    const multi = await harness.mount({ recipe: routed(2), selectedSetId: 'set-a' });
+    assert.deepEqual(outputNames(multi), ['Folded Blade'], 'the terminal product is shown');
+    // The hint has to agree with the row above it: on a multi-step recipe the chosen option no
+    // longer decides the product, so the absolute copy would contradict the screen.
+    assert.equal(hint(multi), 'FABRICATE.App.Crafting.Detail.IngredientRoutingHintMultiStep');
+
+    const single = await harness.mount({ recipe: routed(1), selectedSetId: 'set-a' });
+    assert.deepEqual(outputNames(single), [], 'a single-step recipe still follows its selected set');
+    assert.equal(hint(single), 'FABRICATE.App.Crafting.Detail.IngredientRoutingHint');
+  });
+
   it('colours tiered outcomes green for success and red for failure', async () => {
     const target = await harness.mount({
       recipe: recipe({
@@ -545,8 +575,7 @@ describe('RecipeDetail mounted behavior', () => {
     });
 
     assert.ok(target.querySelector('[data-recipe-teaser]'), 'teaser hint rendered');
-    // The mode chip reveals the crafting mechanism, so it must NOT render for a
-    // redacted teaser (which still carries a modeLabel in the model).
+    // The mode chip reveals the crafting mechanism.
     assert.equal(
       target.querySelector('.crafting-detail-mode-chip'),
       null,
@@ -636,9 +665,7 @@ describe('RecipeDetail mounted behavior', () => {
     );
   });
 
-  // Only the step the engine would execute next may be interactive: a later step's
-  // rail would drive a craft it does not describe, and the engine drops an allocation
-  // naming the wrong step. The dispatcher is the only place that can be proved.
+  // Only the step the engine would execute next may be interactive.
   it('makes ONLY the active step rail interactive in a multi-step recipe', async () => {
     const fixture = steppedEssenceRecipe();
     const target = await harness.mount({
@@ -668,16 +695,14 @@ describe('RecipeDetail mounted behavior', () => {
       !steps[1].querySelector('[data-recipe-section="essence-pool"]'),
       'and opens no chooser at all'
     );
-    // Every rail in the list gets its OWN DOM id namespace, so aria-controls on one
-    // step's tile can never point at another step's panel.
+    // Every rail in the list gets its OWN DOM id namespace.
     assert.equal(
       steps[0].querySelector('[data-recipe-section="essence-pool"]').getAttribute('id'),
       'fabricate-req-step-step-ess-1-panel'
     );
   });
 
-  // With no run in flight the active step IS the displayed step, so this case reads the
-  // recomputed value; the case below covers the two coming apart.
+  // With no run in flight the active step IS the displayed step.
   it('feeds the displayed step rail the re-evaluated craftability, not the baked step projection', async () => {
     const fixture = steppedEssenceRecipe();
     const recomputed = essenceCraftability();
@@ -691,18 +716,13 @@ describe('RecipeDetail mounted behavior', () => {
       rail: {}
     });
     const steps = target.querySelectorAll('[data-recipe-section="steps"] ol > [data-recipe-step]');
-    // The step projection authors TWO essence requirements; the store's re-evaluated
-    // value authors one. Reading the baked projection here would silently show tiles
-    // that do not match the plan the craft consumes.
+    // The step projection authors TWO essence requirements.
     assert.equal(steps[0].querySelectorAll('[data-requirement-slot]').length, 1);
     assert.equal(steps[1].querySelectorAll('[data-requirement-slot]').length, 1);
   });
 
   // The re-evaluated craftability the store hands down is projected from the recipe's
   // FIRST step, which stops being the active step the moment a run is parked past it.
-  // Substituting it into the ACTIVE step then paints that step with the first step's
-  // requirements, consumption plan and tools, so both blocks read identically and a
-  // player is told to gather the wrong materials for the step they are actually on.
   it('renders each step from its own projection while a run is parked on a later step', async () => {
     const fixture = steppedEssenceRecipe({ activeStepIndex: 1, activeStepId: 'step-ess-2' });
     // `displayedStepId` stays 'step-ess-1' — the step the top-level projection describes.
@@ -813,8 +833,7 @@ describe('RecipeDetail mounted behavior', () => {
   });
 
   it('does not leak the craft duration on a redacted (discovery) teaser', async () => {
-    // A timed recipe that is still undiscovered must not reveal its timing — the chip
-    // is suppressed alongside the mode chip on a teaser.
+    // A timed recipe that is still undiscovered must not reveal its timing.
     const teaser = recipe({
       redaction: { redacted: true, hiddenFields: ['ingredients', 'results', 'description'] },
       browseStatus: 'discovery',
@@ -859,21 +878,6 @@ describe('RecipeDetail mounted behavior', () => {
     const empty = target.querySelector('[data-crafting-detail-state="empty"]');
     assert.ok(Boolean(empty), 'empty hint rendered');
     // A PANE, NOT A VIEW ROOT, AND THE FRAME MOVE IS PUBLISHED HERE (issue 1514).
-    //
-    // This pane hand-rolled the same centred fill the five player view ROOTS drew, so it was
-    // first routed through the shared composition as a sixth caller. It is not a sixth of the
-    // same thing: each of those five roots declared `background: var(--fab-surface)` for
-    // itself, and this pane declared `padding: var(--fab-space-4)` and NO background. Routed
-    // through the composition it filled the centre column — which is `--fab-surface-soft`
-    // with a border and `overflow: hidden` — edge to edge with the opaque surface, visibly
-    // darker than the tinted right column beside it in the same frame.
-    //
-    // So the pane keeps its own wrapper and nests the panel, which is the caller-owned answer
-    // five other sites in this change already take. TWO frame deltas remain and both are
-    // accepted rather than discovered: the bare 28px glyph over a 13px muted sentence becomes
-    // the shared panel's 46px tile over a 13px/600 serif title in `--fab-text-secondary`, and
-    // the panel is what the primitive draws rather than what this file drew. The fill and the
-    // inset are not among them any more.
     assert.ok(
       Boolean(empty.querySelector('.manager-empty')),
       'the pane draws the shared no-state panel rather than a bare glyph over a paragraph'
@@ -904,11 +908,7 @@ describe('RecipeDetail mounted behavior', () => {
 
     const blocking = target.querySelector('[data-recipe-blocking]');
     assert.ok(Boolean(blocking), 'blocking notice rendered');
-    // THE WELL IS A NON-BLOCKING `Notice` (issue 1514), which is the only routing that keeps the
-    // `role="status"` this markup already carried — `Callout` emits `role="note"` or nothing.
-    // Both attributes matched on their exact values: `status` is a substring of nothing the
-    // primitive emits today, but a later role could contain it, and the ARIA contract is the
-    // whole reason this site went to `Notice` rather than to the strip beside it.
+    // THE WELL IS A NON-BLOCKING `Notice` (issue 1514).
     assert.equal(blocking.getAttribute('role'), 'status', 'the status role survives the conversion');
     assert.equal(
       blocking.getAttribute('aria-live'),
@@ -961,11 +961,7 @@ describe('RecipeDetail mounted behavior', () => {
       null,
       'the labelled status badge is dropped in favour of the pip'
     );
-    // The well is a non-blocking `Notice` since issue 1514, so the palette is the primitive's
-    // resolved TONE rather than this file's `is-uncraftable` modifier class. Matched on the
-    // attribute's exact value: `danger` is a substring of nothing else the primitive emits, but
-    // a `.includes` on the class list would have gone on passing against `is-danger-soft` or
-    // any other name a later tone takes.
+    // The well is a non-blocking `Notice` since issue 1514.
     assert.equal(
       header.querySelector('[data-recipe-blocking]').getAttribute('data-notice-tone'),
       'danger',
@@ -992,8 +988,7 @@ describe('RecipeDetail mounted behavior', () => {
   });
 
   it('draws that badge as the shared chip, in the tone the map routes it to', async () => {
-    // Issue 1506: `AVAILABLE` returns `tone: 'success'`, which `Chip` does not paint. Bound
-    // straight on, the craftable header would have lost its green with nothing red anywhere.
+    // Issue 1506: `AVAILABLE` returns `tone: 'success'`.
     const target = await harness.mount({
       recipe: recipe({ browseStatus: 'available' }),
       selectedSetId: recipe().defaultSetId,

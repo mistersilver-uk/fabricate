@@ -1,16 +1,7 @@
 /**
- * Pins the canonical Tool display precedence (`openspec/specs/data-models/spec.md`
- * `## Tool` requirement 13) against the shared table in
- * `tests/helpers/toolDisplayPrecedenceCases.js`.
- *
- * This file covers the reference implementation, `toolStudio.js`. The two surfaces
- * that re-derive the ordering because they receive the component lookup pre-flattened
- * are pinned against the SAME table from their mounted suites:
- *   - `RecipeToolsSection` in tests/components/recipe-edit-mounted.test.js
- *   - `GatheringTaskEditView` in tests/components/manager-mounted.test.js
- *
- * Issue 976: two of the three omitted the snapshot rung, so an item-sourced tool
- * (`componentId: null`) rendered "Unnamed tool" and the item-bag sentinel.
+ * Pins the canonical Tool display precedence (`openspec/specs/data-models/spec.md` `## Tool`
+ * requirement 13) against the shared table in `tests/helpers/toolDisplayPrecedenceCases.js`. This
+ * file covers the reference implementation, `toolStudio.js` (issue 976).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -72,10 +63,8 @@ test('exactly one case reaches the localized fallback and the item-bag sentinel'
 });
 
 test('the item-sourced defect case is unresolvable through componentId alone', () => {
-  // The regression guard proper. Before 976 the recipe and gathering surfaces read
-  // ONLY the linked component, so this shape produced a placeholder. Asserting the
-  // component lookup yields nothing proves the case cannot pass by accident if the
-  // snapshot rung is deleted again.
+  // The regression guard proper. Before 976 the recipe and gathering surfaces read ONLY the linked
+  // component, so this shape produced a placeholder.
   const defectCase = TOOL_DISPLAY_PRECEDENCE_CASES.find(
     (testCase) => testCase.id === 'item-sourced-unlabelled'
   );
@@ -109,20 +98,8 @@ test('flattenToolForRecipeLibrary mirrors the recipeToolsLibrary derivation', ()
   assert.equal(orphanFlattened.componentImg, '');
 });
 
-// ---------------------------------------------------------------------------
-// Issue 1119 — the surfaces issue 976 did not enumerate.
-//
-// 976 pinned three MANAGER surfaces against the table above. Five more re-derived the same
-// ordering and got it wrong, three of them player-facing: gathering tool states rendered
-// "Unknown tool", the salvage chat card emitted BLANK entries, craft chat chips skipped the
-// authored label, the Run Journal printed a raw id, and the interactable browser showed
-// "Unnamed tool".
-//
-// They could not reuse 976's reference implementation because it lived under the manager UI
-// and `src/systems/` cannot import from there without inverting the layering. That
-// architectural fact IS the recurrence mechanism, so the precedence now lives in
-// `src/models/toolDisplay.js` and this block pins both the chokepoint and its adopters.
-// ---------------------------------------------------------------------------
+// Issue 1119 — the surfaces issue 976 did not enumerate. 976 pinned three MANAGER surfaces against
+// the table above.
 
 const { resolveToolDisplayName, resolveToolDisplayImage, resolveToolDescription } =
   await import('../src/models/toolDisplay.js');
@@ -167,15 +144,13 @@ test('interactableSourceLibrary.resolveToolName follows the same precedence', ()
 
 test('every non-UI tool-display surface delegates rather than re-deriving', async () => {
   // The surfaces that cannot be instantiated cheaply here (the two engines, the Run Journal
-  // projection in main.js, and the Svelte browser body) are pinned structurally instead:
-  // each must IMPORT the chokepoint. This is a weaker check than executing the table, and
-  // is recorded as such — but it is not vacuous: it fails the moment a surface goes back to
-  // deriving its own ordering, which is precisely how 976 recurred five times.
+  // projection in `src/bootstrap/journalFacade.js`, and the Svelte browser body) are pinned
+  // structurally instead: each must IMPORT the chokepoint.
   const { readFileSync } = await import('node:fs');
   const surfaces = [
     'src/systems/GatheringEngine.js',
     'src/systems/CraftingEngine.js',
-    'src/main.js',
+    'src/bootstrap/journalFacade.js',
     'src/ui/interactableSourceLibrary.js',
     'src/ui/svelte/apps/InteractableBrowserRoot.svelte',
   ];

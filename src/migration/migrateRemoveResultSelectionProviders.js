@@ -1,42 +1,12 @@
 /**
- * 1.6.0 — Remove the legacy routed result-selection providers `macroOutcome` and
- * `rollTableOutcome`, canonicalizing result routing on the `check` provider (pure,
- * deep-clone, idempotent, version-gated).
- *
- * `check` is already the runtime canonical provider (recipes accept it and
- * `ResolutionModeService` folds `macroOutcome` into it); the legacy pair survives
- * only as deprecated persisted aliases. This migration rewrites persisted data so
- * the legacy providers no longer appear:
- *
- *  1. Recipes — rewrite `resultSelection.provider` `macroOutcome|rollTableOutcome →
- *     check` on the recipe-level container, on every `steps[].resultSelection`, AND
- *     on alchemy recipe-level (no-`steps[]`) recipes. `macroOutcome → check` is
- *     behaviourally equivalent (lossless). `rollTableOutcome → check` is lossy: the
- *     table-draw mechanism is gone, so `rollTableUuid` is DROPPED from every
- *     selection (the recipe/step is recorded in the recovery warning). `macroUuid`
- *     is kept.
- *  2. Gathering routed tasks — `gatheringConfig.systems[*].tasks[*]` carrying a
- *     legacy `resultSelection` lose it entirely: routed gathering becomes
- *     system-check-formula only. Each stripped task is recorded in the recovery
- *     warning so the GM can populate `gatheringCraftingCheck.routed.rollFormula`.
- *
- * Recovery warning: dropped roll-table recipes/steps and stripped gathering tasks
- * are collected into a transient `_removedResultSelectionProviders` payload on the
- * return value. The runner captures it for a one-time GM notice and strips it so it
- * is never persisted (mirrors `_migratedCatalystCount`).
- *
- * Idempotent: once no `macroOutcome`/`rollTableOutcome` provider, no `rollTableUuid`,
- * and no gathering-task `resultSelection` remain, a re-run finds nothing to transform
- * and is a no-op (and reports an empty warning payload).
- *
- * Pure: returns `{ recipes, gatheringConfig, _removedResultSelectionProviders }` and
- * performs no I/O.
- *
- * @param {object} data Runner payload.
- * @param {Array<object>} [data.recipes] Raw recipes setting.
- * @param {object} [data.gatheringConfig] Raw gatheringConfig setting.
- * @returns {{ recipes: Array<object>, gatheringConfig: object, _removedResultSelectionProviders: { droppedRollTableRecipes: Array<object>, strippedGatheringTasks: Array<object> } }}
+ * `1.6.0` — remove the legacy routed result-selection providers, canonicalizing routing on `check`.
+ * Pure, deep-clone, idempotent, version-gated; spec § Legacy Result-Selection Provider Removal owns
+ * the rules and which arm is lossy. The dropped recipes and stripped tasks travel on a transient
+ * `_removedResultSelectionProviders` field the runner captures for a one-time GM notice and strips
+ * before persisting.
  */
+
+import { isPlainObject } from './migrationHelpers.js';
 
 const LEGACY_PROVIDERS = new Set(['macroOutcome', 'rollTableOutcome']);
 
@@ -53,7 +23,7 @@ export function migrateRemoveResultSelectionProviders(data = {}) {
     }
   }
 
-  if (_isPlainObject(gatheringConfig) && _isPlainObject(gatheringConfig.systems)) {
+  if (isPlainObject(gatheringConfig) && isPlainObject(gatheringConfig.systems)) {
     for (const [systemId, systemConfig] of Object.entries(gatheringConfig.systems)) {
       _migrateGatheringSystem(systemId, systemConfig, strippedGatheringTasks);
     }
@@ -61,19 +31,17 @@ export function migrateRemoveResultSelectionProviders(data = {}) {
 
   return {
     recipes: Array.isArray(recipes) ? recipes : data.recipes,
-    gatheringConfig: _isPlainObject(gatheringConfig) ? gatheringConfig : data.gatheringConfig,
+    gatheringConfig: isPlainObject(gatheringConfig) ? gatheringConfig : data.gatheringConfig,
     _removedResultSelectionProviders: { droppedRollTableRecipes, strippedGatheringTasks },
   };
 }
 
 /**
- * Rewrite the recipe-level and per-step result selections. Records each dropped
- * roll-table recipe/step (recipe id/name + optional step id) in `dropped`.
- * @param {object} recipe
- * @param {Array<object>} dropped
+ * Rewrite the recipe-level and per-step selections, recording each dropped roll-table recipe or
+ * step in `dropped`.
  */
 function _migrateRecipe(recipe, dropped) {
-  if (!_isPlainObject(recipe)) return;
+  if (!isPlainObject(recipe)) return;
 
   // Recipe-level container (covers routed recipe-level AND alchemy no-`steps[]`).
   if (_rewriteSelection(recipe.resultSelection)) {
@@ -82,7 +50,7 @@ function _migrateRecipe(recipe, dropped) {
 
   if (Array.isArray(recipe.steps)) {
     for (const step of recipe.steps) {
-      if (!_isPlainObject(step)) continue;
+      if (!isPlainObject(step)) continue;
       if (_rewriteSelection(step.resultSelection)) {
         dropped.push({
           recipeId: recipe.id ?? null,
@@ -95,14 +63,11 @@ function _migrateRecipe(recipe, dropped) {
 }
 
 /**
- * Rewrite a single `resultSelection` in place: legacy provider → `check`, drop
- * `rollTableUuid`. Returns true when a `rollTableUuid` was dropped from a
- * `rollTableOutcome` selection (so the caller can record it for recovery).
- * @param {*} selection
- * @returns {boolean} whether a roll-table reference was dropped
+ * Rewrite one `resultSelection` in place, answering whether a roll-table reference was dropped so
+ * the caller can record it.
  */
 function _rewriteSelection(selection) {
-  if (!_isPlainObject(selection)) return false;
+  if (!isPlainObject(selection)) return false;
 
   const wasRollTable = selection.provider === 'rollTableOutcome';
   const hadRollTableUuid = 'rollTableUuid' in selection;
@@ -116,17 +81,11 @@ function _rewriteSelection(selection) {
   return wasRollTable && hadRollTableUuid;
 }
 
-/**
- * Strip the now-unsupported `resultSelection` from every routed gathering task in a
- * system config. Records each stripped task in `stripped`.
- * @param {string} systemId
- * @param {object} systemConfig
- * @param {Array<object>} stripped
- */
+/** Strip the unsupported `resultSelection` from every routed task, recording each in `stripped`. */
 function _migrateGatheringSystem(systemId, systemConfig, stripped) {
-  if (!_isPlainObject(systemConfig) || !Array.isArray(systemConfig.tasks)) return;
+  if (!isPlainObject(systemConfig) || !Array.isArray(systemConfig.tasks)) return;
   for (const task of systemConfig.tasks) {
-    if (!_isPlainObject(task)) continue;
+    if (!isPlainObject(task)) continue;
     if (!('resultSelection' in task)) continue;
     delete task.resultSelection;
     stripped.push({
@@ -135,10 +94,6 @@ function _migrateGatheringSystem(systemId, systemConfig, stripped) {
       taskName: task.name ?? null,
     });
   }
-}
-
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function _clone(value) {

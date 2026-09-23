@@ -1,22 +1,7 @@
-/**
- * Shared `createAdminStore` test fixtures (issue 785).
- *
- * The `makeRecipe` / `makeSystem` / `createServices` triple was duplicated across
- * adminStore suites; SonarCloud counts `tests/**` like `src/`, so a fresh copy fails
- * the new-code duplication gate — and extracting a helper only helps if the copies it
- * was extracted FROM are deleted, since CPD needs just two copies to report. The
- * suites whose triple was token-identical therefore import from here.
- *
- * `createServices` takes an `overrides` object so a suite can add or replace any
- * single service (a spy, a seam stub) without forking the whole factory. Two
- * recipe-manager writes are threadable through it: `updateRecipe` replaces the
- * default capturing stub outright.
- */
+/** Shared `createAdminStore` test fixtures (issue 785). */
 
-// Sonar flags `Math.random()` as S2245 (a MAJOR vulnerability) even in test code,
-// and a single new-code finding above rating A fails the quality gate. A monotonic
-// counter is both gate-safe and strictly better here: fixture ids become
-// deterministic, so a failing assertion names the same recipe on every run.
+// Sonar flags `Math.random()` as S2245 (a MAJOR vulnerability) even in test code, and a single
+// new-code finding above rating A fails the quality gate.
 let recipeIdSequence = 0;
 
 export function makeRecipe(overrides = {}) {
@@ -61,13 +46,76 @@ export function makeSystem(overrides = {}) {
   };
 }
 
+/**
+ * `getSetting`/`setSetting` over a caller-owned record. Without one the fixture's defaults hold
+ * (`lastManagedCraftingSystem` -> `sys1`); with one the record is the only source, so a suite that
+ * seeds nothing starts with no selected system.
+ */
+function settingAccessors(settings) {
+  if (!settings) {
+    return {
+      getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys1' : ''),
+      setSetting: async () => {},
+    };
+  }
+  return {
+    getSetting: (key) => settings[key] ?? '',
+    setSetting: async (key, value) => {
+      settings[key] = value;
+    },
+  };
+}
+
+/** System writes that mutate `system` and log `{ kind, id, updates }` into the caller's array. */
+function systemWriteMethods(system, systemWrites) {
+  return {
+    updateSystem: async (id, updates = {}) => {
+      systemWrites.push({ kind: 'updateSystem', id, updates });
+      if (id !== system.id) return null;
+      Object.assign(system, updates);
+      return system;
+    },
+  };
+}
+
+/** Capturing dialog/localization/notification hooks, each wired only when its sink is supplied. */
+function dialogAccessors({ confirmations, localizations, notifications, confirm } = {}) {
+  return {
+    ...(confirmations && {
+      confirmDialog: async (config) => {
+        confirmations.push(config);
+        return confirm !== false;
+      },
+    }),
+    ...(localizations && {
+      localize: (key, data) => {
+        localizations.push({ key, data });
+        return key;
+      },
+    }),
+    ...(notifications && {
+      notify: {
+        info: (message) => notifications.info.push(String(message)),
+        warn: (message) => notifications.warn.push(String(message)),
+        error: (message) => notifications.error.push(String(message)),
+      },
+    }),
+  };
+}
+
+/**
+ * The shared services double. `updateRecipe`, `settings`, `systemWrites` and `dialogCapture` are
+ * consumed here and reach the managers; every other `overrides` key lands on the services object
+ * only, so a suite that needs a different manager passes `overrides.getCraftingSystemManager`.
+ */
 export function createServices(system, recipes = [], capture = [], overrides = {}) {
-  const { updateRecipe, ...serviceOverrides } = overrides;
+  const { updateRecipe, settings, systemWrites, dialogCapture, ...serviceOverrides } = overrides;
   const systems = [system];
   const systemManager = {
     getSystems: () => systems,
     getSystem: (id) => systems.find((s) => s.id === id) || null,
-    getItems: () => [],
+    getItems: () => system.items || [],
+    ...(systemWrites ? systemWriteMethods(system, systemWrites) : {}),
     updateRecipeItemDefinition: async (systemId, recipeItemId, patch) => {
       capture.push({ systemId, recipeItemId, patch });
       const definition = (system.recipeItemDefinitions || []).find((d) => d.id === recipeItemId);
@@ -89,22 +137,20 @@ export function createServices(system, recipes = [], capture = [], overrides = {
       }),
   };
   return {
-    getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys1' : ''),
-    setSetting: async () => {},
+    ...settingAccessors(settings),
     getCraftingSystemManager: () => systemManager,
     getRecipeManager: () => recipeManager,
     getScriptMacros: () => [],
     getSceneOptions: () => [],
     getWorldUsers: () => [],
-    // The raw actor DOCUMENTS the store builds its learned-knowledge index from (issue
-    // 1132). It reads `globalThis.game` because that is where these fixtures already seed
-    // their actors; the real seam in `SvelteCraftingSystemManagerApp` does the same read.
+    // The raw actor DOCUMENTS the store builds its learned-knowledge index from (issue 1132).
     getWorldActors: () => {
       const raw = globalThis.game?.actors;
       return Array.isArray(raw?.contents) ? raw.contents : Array.isArray(raw) ? raw : [];
     },
     localize: (key) => key,
     notify: { info: () => {}, warn: () => {}, error: () => {} },
+    ...(dialogCapture ? dialogAccessors(dialogCapture) : {}),
     ...serviceOverrides,
   };
 }
@@ -116,12 +162,8 @@ export function createServices(system, recipes = [], capture = [], overrides = {
  * single-nested-only fixture correctly resolves to nothing.
  */
 /**
- * `isOwner` defaults to TRUE because these fixtures model a GM session, which is the only
- * session the manager runs in. `Actor#isOwner` short-circuits to OWNER for any `isGM`, so a
- * GM client genuinely sees every world actor as writable — and the learned-knowledge index
- * is scoped to `selectWritableActors` (issue 970/1132), so an actor without the field is
- * filtered out and contributes nothing. Pass `isOwner: false` to model the non-owned actor
- * both the count and the cascade must exclude.
+ * `isOwner` defaults to TRUE because these fixtures model a GM session, which is the only session
+ * the manager runs in (issue 970).
  */
 export function makeFlaggedActor({
   id,

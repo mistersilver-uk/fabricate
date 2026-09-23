@@ -1,28 +1,14 @@
 /**
- * Issue 917 — the crafting READ side's step scoping and shared essence pool.
- *
- * Three things are pinned here:
- *
- *  1. `CraftingListingBuilder` names the step an actor's run is actually parked on.
- *     The projection was hard-pinned to step 0 for every mode, so a player with a run
- *     on step 2 saw a step-0 requirement rail driving a step-2 craft. The rail stays
- *     step-0 (a routed/progressive recipe surfaces no `steps[]` to move it to), but
- *     the model now NAMES both steps plus the armed-time-gate state, which is what
- *     lets the UI render read-only instead of lying.
- *  2. The `stepRecipeView` module the builder and `CraftingEngine` now share: the
- *     tool-id union, and the two rules that make step/set resolution safe.
- *  3. `Fabricate#evaluateSelectedSet`'s stepped-recipe regression — it read
- *     `recipe.ingredientSets`, which is EMPTY for every explicit multi-step recipe, so
- *     it returned null and the issue-552 per-group option overrides were silently dead
- *     on stepped recipes. `main.js` cannot be imported (module-level Foundry side
- *     effects), so the behaviour is proven at the extracted seam and the wiring is
- *     pinned by a source contract.
+ * Issue 917 — the crafting READ side's step scoping and shared essence pool. Three things are
+ * pinned here:
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
+
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -39,19 +25,14 @@ globalThis.game = { user: { isGM: true, name: 'GM' }, fabricate: {}, time: { wor
 const { Recipe } = await import('../src/models/Recipe.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
-const { CraftingListingBuilder } = await import('../src/systems/CraftingListingBuilder.js');
+const { CraftingListingBuilder } = await import('../src/ui/presenters/CraftingListingBuilder.js');
 const { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } = await import(
   '../src/systems/stepRecipeView.js'
 );
 
-const MAIN_SOURCE = readFileSync(
-  resolve(dirname(fileURLToPath(import.meta.url)), '../src/main.js'),
-  'utf8'
-);
+const MAIN_SOURCE = entryModuleSource('src/bootstrap/craftingFacade.js');
 
-// ---------------------------------------------------------------------------
 // Fixtures — a two-step forge recipe whose FIRST step is essence-funded
-// ---------------------------------------------------------------------------
 
 const EMBER_ESSENCE = { id: 'ember', name: 'Ember', icon: 'fa-fire' };
 
@@ -152,9 +133,7 @@ function buildRecipeModel({ recipe = forgeRecipe(), craftingRunManager = null, a
   });
 }
 
-// ---------------------------------------------------------------------------
 // 1. activeRunStepState — the shared synchronous run read
-// ---------------------------------------------------------------------------
 
 test('activeRunStepState reports step 0 with no run manager, no actor, or no active run', () => {
   const actor = { id: 'a' };
@@ -188,9 +167,7 @@ test('activeRunStepState falls back to step 0 for a non-finite or negative run i
   }
 });
 
-// ---------------------------------------------------------------------------
 // 2. The shared step view + step/set resolution rules
-// ---------------------------------------------------------------------------
 
 test('buildStepRecipeView unions recipe and step tool ids rather than falling back', () => {
   const view = buildStepRecipeView(
@@ -237,9 +214,7 @@ test('resolveStepIngredientSet returns null for an unknown step or an empty reci
   assert.equal(resolveStepIngredientSet({ steps: [], setId: 'set-1' }), null);
 });
 
-// ---------------------------------------------------------------------------
 // 3. The builder names the active step
-// ---------------------------------------------------------------------------
 
 test('with no active run the displayed step IS the active step (today behaviour)', () => {
   const model = buildRecipeModel({ craftingRunManager: runManagerAt(null) });
@@ -300,9 +275,7 @@ test('a redacted teaser exposes no step structure', () => {
   assert.equal(model.activeStepTimeGateArmed, false);
 });
 
-// ---------------------------------------------------------------------------
 // 4. The essence pool reaches the per-set craftability the rail renders
-// ---------------------------------------------------------------------------
 
 test('the first step set carries the shared essence pool the rail edits', () => {
   const model = buildRecipeModel({ craftingRunManager: runManagerAt(null) });
@@ -318,9 +291,7 @@ test('the first step set carries the shared essence pool the rail edits', () => 
   assert.equal(pool.carriers[0].allocatedUnits, 1);
 });
 
-// ---------------------------------------------------------------------------
 // 5. evaluateSelectedSet — the stepped-recipe regression
-// ---------------------------------------------------------------------------
 
 test('a stepped recipe has NO top-level ingredient sets, which is what broke evaluateSelectedSet', () => {
   const recipe = forgeRecipe();
@@ -384,16 +355,16 @@ test('a supplied allocation flows through the same seam and steers the pool', ()
   assert.equal(craftability.essencePool.requirements[0].delivered, 0);
 });
 
-// ---------------------------------------------------------------------------
 // 6. Source contract — the facade is actually wired to the seam above
-// ---------------------------------------------------------------------------
 
-test('src/main.js resolves evaluateSelectedSet through the execution steps', () => {
-  const body = MAIN_SOURCE.slice(
-    MAIN_SOURCE.indexOf('evaluateSelectedSet({'),
-    MAIN_SOURCE.indexOf('_getAlchemyListingBuilder()')
-  );
-  assert.ok(body.length > 0, 'the facade method was located');
+test('the crafting slice resolves evaluateSelectedSet through the execution steps', () => {
+  // Both anchors are guarded: `slice(-1, n)` over a large corpus answers the last character, so a
+  // `body.length > 0` check passes on an anchor that moved out of the module.
+  const start = MAIN_SOURCE.indexOf('evaluateSelectedSet({');
+  const end = MAIN_SOURCE.indexOf('_getAlchemyListingBuilder()', start);
+  assert.notEqual(start, -1, 'located evaluateSelectedSet');
+  assert.ok(end > start, 'located the next member after it');
+  const body = MAIN_SOURCE.slice(start, end);
   assert.ok(
     body.includes('resolveStepIngredientSet({'),
     'the step/set resolution runs through the shared helper'
@@ -408,7 +379,7 @@ test('src/main.js resolves evaluateSelectedSet through the execution steps', () 
   );
 });
 
-test('src/main.js wires the run manager into the crafting listing builder and craftRecipe', () => {
+test('the crafting slice wires the run manager into the listing builder and craftRecipe', () => {
   assert.ok(
     MAIN_SOURCE.includes('craftingRunManager: this.craftingRunManager,'),
     'the builder receives the run manager as a constructor dependency'

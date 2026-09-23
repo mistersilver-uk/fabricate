@@ -1,4 +1,4 @@
-import { isSafeFlagKeySegment } from '../config/flags.js';
+import { forcedDeletionEntry, isSafeFlagKeySegment } from '../config/flags.js';
 
 import {
   cloneJson,
@@ -183,8 +183,7 @@ export class GatheringStaminaService {
    * omits (a cleared `maxOverride`, a retired legacy `provider`). `writeState`
    * persists through `Actor#setFlag`, whose recursive merge never removes an
    * omitted key, so without this a cleared value resurrects on the next read.
-   * Mirrors `deleteRemovedActiveRunFlags` in `src/config/flags.js`; the `-=`
-   * write form is unchanged across V13 and V14.
+   * Every retired key rides one `Actor#update` built by `forcedDeletionEntry`.
    *
    * @param {object} actor Foundry actor.
    * @param {string} key The stamina map key (system id, or 'default').
@@ -192,15 +191,14 @@ export class GatheringStaminaService {
    * @param {object} next The entry about to be merged in.
    */
   async _deleteRetiredStaminaKeys(actor, key, stored, next) {
-    // A dotted/unsafe key cannot be addressed by a deletion path at all —
-    // `expandObject` re-splits it and the `-=` would land on another node.
+    // A dotted key cannot be addressed by a deletion: `expandObject` re-splits it.
     if (typeof actor?.update !== 'function' || !isSafeFlagKeySegment(key)) return;
     const retired = Object.keys(stored || {}).filter(
       (field) => isSafeFlagKeySegment(field) && !(field in (next || {}))
     );
-    if (retired.length === 0) return;
     const path = `flags.${FLAG_NAMESPACE}.${STATE_FLAG_KEY}.stamina.${key}`;
-    await actor.update(Object.fromEntries(retired.map((field) => [`${path}.-=${field}`, null])));
+    const deletions = retired.map((field) => forcedDeletionEntry(path, field)).filter(Boolean);
+    if (deletions.length > 0) await actor.update(Object.fromEntries(deletions));
   }
 
   async setActorStamina(

@@ -1,29 +1,16 @@
 /**
- * Cohort-scoped counting for the two GM libraries (issue 1081).
- *
- * Page-scoping the row projection makes ONE number dangerous: a group header's category
- * total. Grouping is applied to the PAGE — the pager is the unit of truth for how many rows
- * are on screen — so the total beside the rendered count has to come from the FILTERED
- * COHORT, and the array nearest to hand once projection is page-scoped is the page.
- *
- * `categoryTotalOf` (`browserGroupCounts.js`) cannot catch that mistake: it guards one
- * direction only, falling back to the rendered count whenever the supplied total is not
- * strictly greater. A total counted over a NARROWER cohort than what is rendered therefore
- * collapses silently to the rendered count and the header reads plausibly and wrongly.
- *
- * So the fixtures below are built so the two answers DIFFER, and each assertion is paired
- * with the page-scoped number it must not be. A fixture whose page happens to hold the whole
- * category would pass against either implementation and would prove nothing.
+ * Cohort-scoped counting for the two GM libraries (issue 1081). So the fixtures below are built so
+ * the two answers DIFFER, and each assertion is paired with the page-scoped number it must not be.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { countByCategory } from '../src/utils/browserGroupCounts.js';
-import { buildRecipeBrowserModel, recipeCategoryOf } from '../src/utils/recipeBrowserModel.js';
+import { countByCategory } from '../src/ui/model/browserGroupCounts.js';
+import { buildRecipeBrowserModel, recipeCategoryOf } from '../src/ui/model/recipeBrowserModel.js';
 import {
   buildComponentBrowserModel,
   componentCategoryOf,
-} from '../src/utils/componentBrowserModel.js';
+} from '../src/ui/model/componentBrowserModel.js';
 
 /** Deliberately > one page (25) in the first bucket, so page 1 cannot hold the category. */
 const ALCHEMY_ROWS = 40;

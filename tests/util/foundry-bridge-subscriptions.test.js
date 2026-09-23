@@ -15,43 +15,19 @@ import {
   RUN_FLAG_DIFF_PATHS,
   readCraftingDataFallbackCount,
   resetCraftingDataFallbackCount,
-} from '../../src/ui/svelte/util/foundryBridge.js';
-
-// Minimal fake of Foundry's Hooks: records handlers per name so tests can fire them
-// and assert on/off wiring.
-function makeHooks() {
-  const handlers = new Map();
-  let nextId = 0;
-  return {
-    on(name, fn) {
-      if (!handlers.has(name)) handlers.set(name, new Map());
-      const id = ++nextId;
-      handlers.get(name).set(id, fn);
-      return id;
-    },
-    off(name, id) {
-      handlers.get(name)?.delete(id);
-    },
-    fire(name, ...args) {
-      for (const fn of [...(handlers.get(name)?.values() ?? [])]) fn(...args);
-    },
-    count(name) {
-      return handlers.get(name)?.size ?? 0;
-    },
-  };
-}
+} from '../../src/ui/svelte/util/foundryHooks.js';
+import { installFoundryBridgeEnv } from '../helpers/foundryBridgeEnv.js';
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe('subscribeInventoryChange', () => {
+  let env;
   let hooks;
   beforeEach(() => {
-    hooks = makeHooks();
-    globalThis.Hooks = hooks;
+    env = installFoundryBridgeEnv();
+    hooks = env.hooks;
   });
-  afterEach(() => {
-    delete globalThis.Hooks;
-  });
+  afterEach(() => env.restore());
 
   it('registers create/update/delete item hooks and unsubscribes cleanly', () => {
     const unsubscribe = subscribeInventoryChange(() => {});
@@ -153,24 +129,22 @@ describe('subscribeInventoryChange', () => {
 });
 
 describe('subscribeCraftingDataChange', () => {
+  let env;
   let hooks;
   beforeEach(() => {
-    hooks = makeHooks();
-    globalThis.Hooks = hooks;
+    env = installFoundryBridgeEnv();
+    hooks = env.hooks;
     resetCraftingDataFallbackCount();
   });
-  afterEach(() => {
-    delete globalThis.Hooks;
-  });
+  afterEach(() => env.restore());
 
   /** One well-formed scoped payload naming exactly the given domains. */
   const change = (...domains) => ({ source: 'recipes', scopes: [{ systemId: 'sys-a', domains }] });
 
   it('binds ONLY the unpublished scoped hook, not the two published ones', () => {
     // The zero-argument bindings on `fabricate.craftingSystemsChanged` / `fabricate.recipesChanged`
-    // discarded the payload, so no narrowing was possible however good a delta was emitted
-    // (issue 1078). They are gone; the two hooks keep firing for third-party subscribers, and
-    // every publisher of one also publishes the scoped signal.
+    // discarded the payload, so no narrowing was possible however good a delta was emitted (issue
+    // 1078).
     const unsubscribe = subscribeCraftingDataChange(() => {});
     assert.equal(hooks.count(CRAFTING_DATA_CHANGED_HOOK), 1);
     assert.equal(hooks.count('fabricate.craftingSystemsChanged'), 0);
@@ -181,9 +155,7 @@ describe('subscribeCraftingDataChange', () => {
 
   it('mirrors the producer-side DOMAIN NAMES exactly', () => {
     // The routing predicate holds the seven names as a literal for the same reason it holds the
-    // hook name as one — no new import may enter this module. This is what stops the mirror
-    // drifting, and an eighth domain added to the taxonomy without updating the mirror would
-    // route every change naming it BROADLY, which is safe but is the narrowing silently lost.
+    // hook name as one — no new import may enter this module.
     const seen = [];
     subscribeCraftingDataChange((payload) => seen.push(payload.scopes[0].domains[0]));
     for (const domain of INVALIDATION_DOMAIN_NAMES) {
@@ -199,11 +171,9 @@ describe('subscribeCraftingDataChange', () => {
   });
 
   it('routes broadly when EVERY domain a change names is unrecognised', () => {
-    // The one input class that would otherwise route NARROW when it must route broad: an
-    // unknown name yields a non-empty set intersecting no subscriber's wanted set, so nothing
-    // refreshes and the counter does not move — a stale read model wearing the appearance of
-    // correct narrowing. Unreachable from today's producers, and reachable the moment #1092
-    // replicates a payload between clients on different module versions.
+    // The one input class that would otherwise route NARROW when it must route broad: an unknown
+    // name yields a non-empty set intersecting no subscriber's wanted set, so nothing refreshes and
+    // the counter does not move — a stale read model wearing the appearance of correct narrowing.
     let calls = 0;
     subscribeCraftingDataChange(() => (calls += 1), { domains: ['labelling'] });
 
@@ -225,9 +195,9 @@ describe('subscribeCraftingDataChange', () => {
   });
 
   it('mirrors the producer-side hook name exactly', () => {
-    // The consumer holds the name as a LITERAL rather than importing it, because ~75 mounted
-    // harnesses declare `foundryBridge.js` and one new static import would make every one of
-    // them fail until it declared the new transitive module. This is what stops the two drifting.
+    // The consumer holds the name as a LITERAL rather than importing it, because the mounted
+    // harnesses declare this module and one new static import would make every one of them fail
+    // until it declared the new transitive module. This is what stops the two drifting.
     assert.equal(CRAFTING_DATA_CHANGED_HOOK, PRODUCER_HOOK);
   });
 
@@ -290,28 +260,22 @@ describe('subscribeCraftingDataChange', () => {
 });
 
 describe('subscribeActorRunFlagChange', () => {
+  let env;
   let hooks;
   beforeEach(() => {
-    hooks = makeHooks();
-    globalThis.Hooks = hooks;
+    env = installFoundryBridgeEnv();
+    hooks = env.hooks;
     // hasProperty resolves a POSIX-dotted path against a nested change diff.
-    globalThis.foundry = {
-      utils: {
-        hasProperty: (object, path) =>
-          String(path)
-            .split('.')
-            .every((seg) => {
-              if (object == null || typeof object !== 'object' || !(seg in object)) return false;
-              object = object[seg];
-              return true;
-            }),
-      },
-    };
+    globalThis.foundry.utils.hasProperty = (object, path) =>
+      String(path)
+        .split('.')
+        .every((seg) => {
+          if (object == null || typeof object !== 'object' || !(seg in object)) return false;
+          object = object[seg];
+          return true;
+        });
   });
-  afterEach(() => {
-    delete globalThis.Hooks;
-    delete globalThis.foundry;
-  });
+  afterEach(() => env.restore());
 
   const craftingRunChange = {
     flags: { fabricate: { fabricate: { craftingRuns: { active: {} } } } },
@@ -359,14 +323,10 @@ describe('subscribeActorRunFlagChange', () => {
     assert.doesNotThrow(() => subscribeActorRunFlagChange(() => {})());
   });
 
-  // -------------------------------------------------------------------------
-  // Update-operator spellings, and the mirror that must not drift (issue 1654)
-  //
-  // An update operator is part of the last path segment, so a write using one arrives under
-  // a different key: the 1.34.0 remap force-replaces each run container, reaching this diff
-  // as `flags.fabricate.fabricate.==craftingRuns`. The bare-spelling probes matched no
-  // operator form, so the Journal listing and the nav active-run badge never refreshed.
-  // -------------------------------------------------------------------------
+  // Update-operator spellings, and the mirror that must not drift (issue 1654). An update operator
+  // is part of the last path segment, so a write using one arrives under a different key: the
+  // 1.34.0 remap force-replaces each run container, reaching this diff as
+  // `flags.fabricate.fabricate.==craftingRuns`.
 
   /** The expanded diff Foundry hands `updateActor` for one flattened update key. */
   const diffFor = (updateKey) => {
@@ -390,13 +350,9 @@ describe('subscribeActorRunFlagChange', () => {
   };
 
   it('THE DRIFT GUARD: its mirrored path list equals runFlagInvalidation own derivation', () => {
-    // `foundryBridge.js` cannot import the matcher: it is declared by hand in ~102 mounted
-    // component manifests, and a manifest missing an entry hangs the suite (`# cancelled`)
-    // rather than failing it. So the list is mirrored and guarded here, exactly as
-    // `worldScopeRekeyPending.js` mirrors `SETTING_KEYS`.
-    //
-    // A new run container, a new operator prefix, or a change to where the prefix sits fails
-    // here instead of leaving the bridge one spelling behind.
+    // `foundryHooks.js` cannot import the matcher: it is declared by hand in the mounted
+    // component manifests, and a manifest missing an entry hangs the suite (`# cancelled`) rather
+    // than failing it.
     const derived = RUN_CONTAINER_FLAG_PATHS.flatMap(({ flagPath }) =>
       runContainerDiffPaths(flagPath)
     );
@@ -404,7 +360,7 @@ describe('subscribeActorRunFlagChange', () => {
     assert.deepEqual(
       [...RUN_FLAG_DIFF_PATHS].sort(),
       [...derived].sort(),
-      'foundryBridge RUN_FLAG_DIFF_PATHS has drifted from runFlagInvalidation; mirror it'
+      'foundryHooks RUN_FLAG_DIFF_PATHS has drifted from runFlagInvalidation; mirror it'
     );
   });
 
@@ -431,10 +387,9 @@ describe('subscribeActorRunFlagChange', () => {
   });
 
   it('refreshes NOTHING when Foundry own hasProperty is unavailable, deliberately', () => {
-    // A pinned choice: the shared matcher falls back to its own POSIX-dotted probe when handed
-    // a non-function, so delegating without the `typeof` guard would switch this bridge from
-    // "refresh nothing without the engine's probe" to "refresh on a guessed diff shape".
-    // Changing that deliberately means changing this test.
+    // A pinned choice: the shared matcher falls back to its own POSIX-dotted probe when handed a
+    // non-function, so delegating without the `typeof` guard would switch this bridge from "refresh
+    // nothing without the engine's probe" to "refresh on a guessed diff shape".
     delete globalThis.foundry;
     assert.ok(!firesFor('flags.fabricate.fabricate.craftingRuns'), 'not even the plain spelling');
     assert.ok(!firesFor('flags.fabricate.fabricate.==craftingRuns'));

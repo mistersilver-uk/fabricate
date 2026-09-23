@@ -1,76 +1,47 @@
-/**
- * IconPicker selection semantics for the one-row-per-glyph vocabulary introduced by PR #1274.
- *
- * Stored values are not guaranteed to be the exact class the picker now offers: Font Awesome
- * aliases such as `cog` resolve to the offered `gear` row, regular-weight values remain valid even
- * though the picker deliberately offers only one solid row per glyph, and a value stored before the
- * vocabulary narrowed may not be offered at all. In every case opening the picker must expose
- * exactly one selected option to sighted and assistive-tech users — and, because the popover shows
- * seven or eight rows of an alphabetical list hundreds long, must expose it WITHOUT SCROLLING.
- */
+/** IconPicker selection semantics for the one-row-per-glyph vocabulary introduced by PR #1274. */
 import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const ICON_PICKER = 'src/ui/svelte/components/IconPicker.svelte';
 
-/**
- * `src/utils/categoryIcons.js`'s `DEFAULT_CATEGORY_ICON`, restated rather than imported: this suite
- * mounts a component and must not drag an unrelated module into the harness allowlist to name one
- * string. It is the most common stored value the narrowed vocabulary no longer offers.
- */
+/** `src/utils/categoryIcons.js`'s `DEFAULT_CATEGORY_ICON`, restated rather than imported. */
 const STORED_BUT_NOT_OFFERED = 'fas fa-folder';
 
-/**
- * The picker's own no-matches sentence, as a KEY.
- *
- * The harness's `game.i18n.localize` returns the key for anything it does not carry
- * (`tests/helpers/svelte-component-harness.js`), so a rendered key is what proves which localized
- * string reached the panel. That is the whole point here: the primitive draws its own
- * `No matches` default whenever a caller wires this sentence to `emptyHint` instead of
- * `noMatchesHint`, and only the branch that carries the picker's OWN words is correct — the
- * unfiltered branch is unreachable in this component, because a no-query panel always pins the
- * resolved row.
- */
+/** The picker's own no-matches sentence, as a KEY. */
 const NO_ICONS_FOUND = 'FABRICATE.Admin.Features.Essences.NoIconsFound';
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-icon-picker-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
     'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
   ],
-  // THE PICKER RENDERS THROUGH THE SHARED PRIMITIVE (issue 1503), so its panel, its search row,
-  // its option rows and its empty note are `SearchablePopover`'s elements — and `SearchablePopover`
-  // renders `Chip`, `EmptyState` and, since issue 1371 gave it a `triggerButton` form,
-  // `ManagerButton`. A `.svelte` the mounted tree renders but this list omits does
-  // NOT fail the suite: `validateMountedComponentDependencies` throws in `before()` and
-  // `node --test` reports every test here as `# cancelled`, never `# fail`.
-  //
-  // This suite is invisible to `mounted-harness-primitive-allowlist.test.js` by construction: it
-  // names the picker through a const, and that gate's bare-identifier reader resolves one only
-  // through a `for (const X of …)` binding, which this file has none of. So the omission would
-  // surface nowhere but here.
+  // THE PICKER RENDERS THROUGH THE SHARED PRIMITIVE (issue 1503), so its panel.
   compiledModules: [
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     ICON_PICKER,
   ],
   componentPath: ICON_PICKER,
@@ -214,10 +185,7 @@ describe('IconPicker pinned resolved row', () => {
     const unfilteredCount = optionRows(root).length;
     assert.equal(pinnedRows(root).length, 1, 'the resolved row is pinned before any query');
 
-    // `gear` rather than a term picked for scarcity: the two suites above already depend on the
-    // gear row existing, so this test adds no new assumption about which glyphs the vocabulary
-    // carries. The assertion is on the PINNED marker, not on a row's position, for the same reason
-    // — a filtered list legitimately contains the resolved row, just not above the results.
+    // `gear` rather than a term picked for scarcity.
     await search(root, 'gear');
     const filtered = optionRows(root);
     assert.ok(filtered.length > 0, 'the query matches at least one row');
@@ -237,10 +205,6 @@ describe('IconPicker pinned resolved row', () => {
     assert.equal(pinnedRows(root).length, 0, 'and no pinned row masks that');
 
     // The `<p class="hint">` this picker used to draw is gone, and so is the defect it carried:
-    // `hint` is only painted by `.fabricate-manager .hint`, so the sentence rendered UNSTYLED
-    // anywhere outside the manager. The shared primitive's own empty branch replaces it, as a
-    // SIBLING of the listbox rather than a child of it — a listbox's only valid children are its
-    // options.
     const empty = root.querySelector('.manager-travel-popover-empty');
     assert.ok(Boolean(empty), 'the shared empty branch renders in the list`s place');
     assert.equal(empty.getAttribute('role'), 'status');
@@ -252,10 +216,6 @@ describe('IconPicker pinned resolved row', () => {
     );
 
     // WHICH EMPTINESS. `NoIconsFound` is the FILTERED sentence and belongs to `noMatchesHint`:
-    // the only reachable route into this branch is "a query matched nothing", because a panel with
-    // no active query always pins the resolved row. Wired to `emptyHint` instead, the primitive
-    // would answer with its own `No matches` default here and the picker's own words would never
-    // render at all.
     const line = empty.textContent.replaceAll(/\s+/g, ' ').trim();
     assert.match(line, new RegExp(NO_ICONS_FOUND));
     assert.doesNotMatch(
@@ -280,21 +240,7 @@ describe('IconPicker pinned resolved row', () => {
 });
 
 describe('IconPicker trigger, across the primitive`s spread', () => {
-  /**
-   * WHAT A SPREAD MAY DO TO A CALLER'S OWN BUTTON, and what it must never do (issue 1503).
-   *
-   * The trigger is the caller's own markup inside a `trigger` snippet, and the attribute object
-   * the primitive hands that snippet is spread LAST — deliberately, so the primitive keeps
-   * `type`, the ARIA pair and the handlers that carry the focus model. That order is also the
-   * hazard: Svelte's `set_attributes` REMOVES an attribute whose spread value is `undefined`, and
-   * a spread `disabled: false` OVERRIDES a caller's own `disabled={true}` because it is not
-   * undefined. Both are answered in the primitive rather than here — an undefined-value filter
-   * and a caller-owned key list — and these are the assertions that prove it on the rendered DOM,
-   * which a source read cannot: the erasure happens at runtime.
-   *
-   * `manager-mounted.test.js` already asserts this trigger's `title` on a real manager screen and
-   * must stay green with no edit; these cases are the component-level net beneath it.
-   */
+  /** WHAT A SPREAD MAY DO TO A CALLER'S OWN BUTTON, and what it must never do (issue 1503). */
   it('keeps the caller`s own name, class, style and context menu, and gains the primitive`s contract', async () => {
     const root = await harness.mount({
       value: 'fas fa-cog',

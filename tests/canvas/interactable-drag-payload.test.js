@@ -1,12 +1,6 @@
 /**
- * Phase 7 — the drag-source payload CONTRACT between the GM browser app and the
- * canvas drop handler.
- *
- * The browser rows are the only NET-NEW drag source in the module. A dragged row
- * must emit a `dropCanvasData`-compatible payload that the real
- * `classifyInteractableDrop` round-trips to the right interactableType + ids.
- * These tests assert the builder against the ACTUAL classifier (not a fake), so
- * the two halves cannot drift.
+ * Phase 7 — the drag-source payload CONTRACT between the GM browser app and the canvas drop
+ * handler. The browser rows are the only NET-NEW drag source in the module.
  */
 
 import test from 'node:test';

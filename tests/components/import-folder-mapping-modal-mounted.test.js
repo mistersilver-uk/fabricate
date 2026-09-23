@@ -13,6 +13,7 @@ import {
   selectOptionValues,
   selectTriggerText,
 } from '../helpers/select-control.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -20,7 +21,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-import-mapping-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
@@ -28,39 +29,36 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
-    // InlineVocabularyAdd imports IconPicker STATICALLY (issue 878), so the picker's own
-    // dependencies are in this graph even though this modal never sets `showIcon` and so
-    // never renders the field. Membership follows the import graph, not the rendered tree.
+    // InlineVocabularyAdd imports IconPicker STATICALLY (issue 878).
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
-    'src/utils/matchFolderVocabulary.js',
+  'src/ui/svelte/util/foundryIconCatalogue.json',
+    'src/ui/model/matchFolderVocabulary.js',
   ],
   compiledModules: [
     // THE APP'S ONE SELECT AND ITS WHOLE COMPILED CLOSURE (issue 1510), spread rather than copied.
-    // This tree renders `components/Select.svelte` now, and a `.svelte` the tree renders but the
-    // harness omits HANGS the suite (`# cancelled`) rather than failing it.
     ...SELECT_COMPILED_MODULES,
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/Chip.svelte',
     // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     // The manager's ONE selection control (issue 772). The match-by-name toggle renders
     // through it now rather than as a raw checkbox wearing Foundry's control chrome.
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
-    // The shared modal chrome (issue 877): portal, centring, title/subtitle, close and
-    // footer rail. This modal renders THROUGH it, so omitting it breaks the mount.
+    // The shared modal chrome (issue 877): portal, centring, title/subtitle.
     'src/ui/svelte/apps/manager/ManagerModal.svelte',
     'src/ui/svelte/components/Field.svelte',
     // THE manager's labelled push-button (issue 1118). Skip, New, the footer pair and InlineVocabularyAdd`s Add all render it.
-    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte',
@@ -135,10 +133,6 @@ describe('ImportFolderMappingModal (mounted)', () => {
 
   it('names every category control by the caption its wrapper used to name it by', async () => {
     // FIRST COVERAGE OF THE NAME AT THIS SITE, and it is what the demotion can silently break.
-    // The `<Field>` was `as="label"` and named the select by containment; it is `as="div"` now
-    // and the caption is POINTED at, so a caption that never received its `id` would leave the
-    // trigger with an `aria-labelledby` resolving to nothing — which no warning reports, because
-    // the primitive was given a name prop. Pinned against the pre-conversion string, measured.
     const root = await harness.mount({ open: true, folders: FOLDERS, ...VOCAB });
     for (const index of [0, 1]) {
       assert.equal(assertSelectHasResolvedName(root, categoryTrigger(index)), 'Category');
@@ -230,8 +224,7 @@ describe('ImportFolderMappingModal (mounted)', () => {
     assert.equal(commitButton().disabled, true);
   });
 
-  // The close control now belongs to the shared ManagerModal chrome (issue 877), so it
-  // is located by the primitive's hook rather than a mapping-specific one.
+  // The close control now belongs to the shared ManagerModal chrome (issue 877).
   it('calls onClose from the shared modal close button', async () => {
     let closed = 0;
     await harness.mount({ open: true, folders: FOLDERS, ...VOCAB, onClose: () => (closed += 1) });

@@ -1,11 +1,4 @@
-/**
- * The roll section's mode callout (issue 1096).
- *
- * The callout is MODE-AWARE, so the thing worth proving is not that `routedByCheck` reads
- * well — it is that every mode the studio can render has its own entry, that nothing invents
- * an entry for a mode nothing can select, and that gathering's two DORMANT modes are not
- * presented as live configurations.
- */
+/** The roll section's mode callout (issue 1096). */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -19,22 +12,13 @@ import {
 
 const LANG = JSON.parse(readFileSync(resolve(import.meta.dirname, '../lang/en.json'), 'utf8'));
 
-/**
- * Every (activity, mode) pair the Checks Studio can render.
- *
- * Written out RATHER THAN derived from the module under test, so this list is an independent
- * statement of what the product supports: deriving it would make the exhaustiveness assertion
- * compare the module to itself and pass on any subset.
- */
+/** Every (activity, mode) pair the Checks Studio can render. */
 const REACHABLE = [
   ['crafting', 'simple', ''],
   ['crafting', 'routedByIngredients', ''],
   ['crafting', 'routedByCheck', ''],
   ['crafting', 'progressive', ''],
-  // No `['crafting', 'alchemy', 'none']`. That is the OFF state of an optional check, not a
-  // mode: its route renders the shared switched-off panel, so the roll section — and this
-  // callout with it — never renders. Leaving it listed would have made the "nothing can
-  // select this" gate below pass over an entry nothing can select.
+  // No `['crafting', 'alchemy', 'none']`.
   ['crafting', 'alchemy', 'simple'],
   ['crafting', 'alchemy', 'tiered'],
   ['salvage', 'simple', ''],
@@ -88,9 +72,8 @@ test('an unrenderable pair describes nothing rather than describing the wrong mo
 });
 
 test('the two alchemy check shapes state OPPOSITE check facts', () => {
-  // Pinned because the `Check ·` fact is exactly what sent a GM looking for an off switch:
-  // alchemy simple read `Required` while carrying a perfectly good off state. Nothing else
-  // asserts fact VALUES, so a revert to `check:required` would otherwise pass every gate.
+  // Pinned because the `Check ·` fact is exactly what sent a GM looking for an off switch: alchemy
+  // simple read `Required` while carrying a perfectly good off state.
   const simple = describeCheckMode({
     activity: 'crafting',
     mode: 'alchemy',

@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { InventoryListingBuilder } from '../src/systems/InventoryListingBuilder.js';
+import { InventoryListingBuilder } from '../src/ui/presenters/InventoryListingBuilder.js';
 import {
   REPORTER_ENRICHER_DESCRIPTION,
   REPORTER_RESOLVED_EXPECTED,
@@ -46,10 +46,9 @@ function makeSystem(overrides = {}) {
 function makeBuilder({ systems, recipes = [] } = {}) {
   const systemList = systems ?? [makeSystem()];
   const getRecipesCalls = [];
-  // A tool matches an owned item when the item's name equals the tool's linked
-  // component name — the salvage tool-state projection (issue 777) resolves availability
-  // through this fake matcher, mirroring the name-fallback ownership matching these fakes
-  // already use for components.
+  // A tool matches an owned item when the item's name equals the tool's linked component name — the
+  // salvage tool-state projection (issue 777) resolves availability through this fake matcher,
+  // mirroring the name-fallback ownership matching these fakes already use for components.
   const componentsById = new Map();
   for (const system of systemList) {
     for (const component of system?.components ?? []) {
@@ -64,10 +63,8 @@ function makeBuilder({ systems, recipes = [] } = {}) {
           filters?.craftingSystemId === undefined || r.craftingSystemId === filters.craftingSystemId
       );
     },
-    // Mirrors the real `RecipeManager.toolMatchesItem` snapshot-name fallback ordering
-    // (issue 561): the tool's OWN snapshot name first, then the linked component's name.
-    // An item-sourced tool carries `componentId: null`, so a component-only fake could not
-    // represent one at all — which is the fixture-shaped form of the issue-1119 blind spot.
+    // Mirrors the real `RecipeManager.toolMatchesItem` snapshot-name fallback ordering (issue 561):
+    // the tool's OWN snapshot name first, then the linked component's name.
     toolMatchesItem: (_recipe, tool, candidate) => {
       const fallbackName = tool?.name || componentsById.get(tool?.componentId)?.name || '';
       return !!fallbackName && candidate?.name === fallbackName;
@@ -152,11 +149,7 @@ describe('InventoryListingBuilder — ownership aggregation', () => {
   });
 
   it('forwards the STORED component description unchanged, resolving nothing (issue 800)', () => {
-    // Inverted from the rejected read-side flatten. Descriptions are RESOLVED at write
-    // time, so a read surface that rewrote what it was handed would be a second,
-    // divergent implementation of the grammar. What it must do is forward the stored
-    // string byte-for-byte — including an un-repaired legacy one, which stays visibly
-    // raw until the GM runs Repair Item Data rather than being silently half-fixed here.
+    // Inverted from the rejected read-side flatten.
     const system = makeSystem({
       components: [
         { id: 'c1', name: 'Iron', img: 'icons/iron.webp', description: REPORTER_RESOLVED_EXPECTED },
@@ -487,9 +480,8 @@ describe('InventoryListingBuilder — used-by index', () => {
   });
 
   it('does not expand an essence-type ingredient option into the component used-by index', () => {
-    // An essence-type OPTION match is excluded from componentUsedBy: it would otherwise
-    // list every essence-bearing component as a consumed ingredient. The essence channel
-    // (fed by set-level `essences`) is left untouched — here it stays empty.
+    // An essence-type OPTION match is excluded from componentUsedBy: it would otherwise list every
+    // essence-bearing component as a consumed ingredient.
     const recipe = {
       id: 'r-ess-opt',
       name: 'Essence Option',
@@ -545,12 +537,8 @@ describe('InventoryListingBuilder — used-by index', () => {
   });
 
   it('resolves the used-by recipe image to the recipe own image, never the linked recipe item', () => {
-    // Inverted with issue 887. This asserted the borrow: a bag-valued recipe rendered its
-    // linked recipe item's artwork. A recipe's icon is its OWN image
-    // (`data-models/spec.md` `## Recipe` requirement 16), and the bag is the "no image"
-    // sentinel, so this resolves to the blueprint. The definition still returns DISTINCT
-    // artwork below, so re-adding the borrow fails here rather than passing vacuously.
-    // This index now shares the class's ONE resolver, `_resolveRecipeImg`.
+    // Inverted with issue 887. This asserted the borrow: a bag-valued recipe rendered its linked
+    // recipe item's artwork.
     const linkedRecipe = {
       id: 'r2',
       name: 'Smelt Iron Ingot',
@@ -1349,8 +1337,7 @@ describe('InventoryListingBuilder — recipe-item books', () => {
 
   it('matches a book duplicated from a world template via _stats.duplicateSource', () => {
     // A world item dragged onto an actor carries the link to the template only in
-    // _stats.duplicateSource — its own uuid and compendium source do not match the
-    // definition. The book must still resolve (source-uuid-only matching misses it).
+    // _stats.duplicateSource — its own uuid and compendium source do not match the definition.
     const copy = {
       uuid: 'Actor.a1.Item.copy',
       _stats: { duplicateSource: 'Item.book1' },
@@ -1472,13 +1459,9 @@ describe('InventoryListingBuilder — recipe-item books', () => {
   });
 });
 
-// --- Salvage view-model (issue 675) -----------------------------------------
-//
-// The whole point of this projection is that the panel stays presentational: mode,
-// usability, DC and thresholds are decided HERE, against the same fields the engine
-// dispatches on. Two failure modes these tests exist to catch are invisible to every
-// other gate: reading `craftingCheck` (the RECIPE block) instead of
-// `salvageCraftingCheck`, and shifting a routed FIXED range by `dcOverride`.
+// Salvage view-model (issue 675). The whole point of this projection is that the panel stays
+// presentational: mode, usability, DC and thresholds are decided HERE, against the same fields the
+// engine dispatches on.
 
 function salvageSystem({ mode = 'simple', check = {}, salvage = {}, tools, features } = {}) {
   return makeSystem({
@@ -1557,9 +1540,8 @@ describe('InventoryListingBuilder - salvage view-model', () => {
   });
 
   it('reports simple mode with NO authored salvage formula as unusable, not misconfigured', () => {
-    // The smoke fixture's exact shape: `salvageResolutionMode: 'simple'` with no salvage
-    // check authored. The raw mode alone would render a pass/fail body ("On a success" +
-    // a loss note) under a footer that never prompts. The effective read is the PAIR.
+    // The smoke fixture's exact shape: `salvageResolutionMode: 'simple'` with no salvage check
+    // authored.
     const salvage = salvageOf(salvageSystem({ mode: 'simple', check: {} }));
     assert.equal(salvage.mode, 'simple');
     assert.equal(salvage.checkUsable, false);
@@ -1588,8 +1570,6 @@ describe('InventoryListingBuilder - salvage view-model', () => {
 
   it('flags a Simple multi-success-group config as misconfigured for the GM (issue 764)', () => {
     // A stored-but-not-yet-re-normalized legacy config: two SUCCESS groups in Simple mode.
-    // The GM path (salvageOf uses a GM viewer) surfaces the misconfigured cue with the
-    // `simpleMultiGroup` discriminator so the body renders Simple-specific copy.
     const salvage = salvageOf(
       salvageSystem({
         mode: 'simple',
@@ -1638,9 +1618,8 @@ describe('InventoryListingBuilder - salvage view-model', () => {
   });
 
   it('a normalized failure-only Simple config (enabled:false) yields no panel (issue 764)', () => {
-    // Option a: a failure-only Simple config normalizes to `enabled: false`, so the
-    // builder returns null (no panel). The GM is cued by the manager invalidSalvage
-    // critical instead — asserted here so the outcome is pinned end-to-end.
+    // Option a: a failure-only Simple config normalizes to `enabled: false`, so the builder returns
+    // null (no panel).
     const salvage = salvageOf(
       salvageSystem({
         mode: 'simple',
@@ -1707,11 +1686,9 @@ describe('InventoryListingBuilder - salvage view-model', () => {
     );
   });
 
-  // AC2. The case the smoke fixture CANNOT catch: its routed salvage is
-  // `type: 'relative'`, so a projection that shifts everything by `dcOverride` passes
-  // every gate green while a fixed-authored world is shown a routing table the engine
-  // will never honour. `checkRoll`'s fixed branch matches `start <= total <= end` and
-  // never reads a DC at all - and the GM editor hides the DC field for this pairing.
+  // AC2. The case the smoke fixture CANNOT catch: its routed salvage is `type: 'relative'`, so a
+  // projection that shifts everything by `dcOverride` passes every gate green while a
+  // fixed-authored world is shown a routing table the engine will never honour.
   it('routed + FIXED renders the authored [start, end] ranges verbatim and shows NO DC', () => {
     const check = {
       routed: {
@@ -1799,11 +1776,10 @@ describe('InventoryListingBuilder - salvage view-model', () => {
   });
 
   it('675: a progressive stage carries NO quantity, whatever the GM authored', () => {
-    // Progressive results are quantity-less: the award loop charges an entry's
-    // difficulty once and grants ONE item (`CraftingEngine._resolveSalvageResultGroups`
-    // forces `quantity: 1`), so a projected count could only ever be a number the
-    // engine ignores - and the row printed it: "Balehound Teeth x2", one awarded.
-    // Repetition, not a count, is how the GM asks for two.
+    // Progressive results are quantity-less: the award loop charges an entry's difficulty once and
+    // grants ONE item (`CraftingEngine._resolveSalvageResultGroups` forces `quantity: 1`), so a
+    // projected count could only ever be a number the engine ignores - and the row printed it:
+    // "Balehound Teeth x2", one awarded.
     const salvage = salvageOf(
       salvageSystem({
         mode: 'progressive',
@@ -1944,9 +1920,8 @@ describe('InventoryListingBuilder - salvage view-model', () => {
   });
 
   it('scopes tool availability to the target actor, not a non-target party member', () => {
-    // The target actor (crafting-actor-first) holds Iron but NOT the tool; only a
-    // non-target source actor holds it. The engine validates the target actor alone, so
-    // the panel must read the tool as UNAVAILABLE despite the party holding it.
+    // The target actor (crafting-actor-first) holds Iron but NOT the tool; only a non-target source
+    // actor holds it.
     const system = toolSystem();
     const { builder } = makeBuilder({ systems: [system] });
     const listing = builder.buildListing({
@@ -1961,11 +1936,10 @@ describe('InventoryListingBuilder - salvage view-model', () => {
 });
 
 describe('InventoryListingBuilder - derived broken verdict', () => {
-  // Brokenness has TWO sources and the fixtures must be able to express both
-  // independently: `toolBroken` is a persisted PAST FACT (written by the flagBroken
-  // on-break action for every breakage mode, and carrying NO toolUsage for a
-  // chance/formula tool), while `toolUsage` exhaustion is a PROJECTION that only
-  // limitedUses supports.
+  // Brokenness has TWO sources and the fixtures must be able to express both independently:
+  // `toolBroken` is a persisted PAST FACT (written by the flagBroken on-break action for every
+  // breakage mode, and carrying NO toolUsage for a chance/formula tool), while `toolUsage`
+  // exhaustion is a PROJECTION that only limitedUses supports.
   function toolItem(name, { usage = undefined, brokenFlag = undefined } = {}) {
     return {
       name,
@@ -2009,13 +1983,9 @@ describe('InventoryListingBuilder - derived broken verdict', () => {
     assert.equal(rowByComponent(fresh, 'c1').broken, false);
   });
 
-  // THE HEADLINE CASE. `flagBroken` is the ONLY on-break mode that leaves a broken item
-  // in the player's inventory — `destroy` and `replaceWith` remove it — so nearly every
-  // broken tool a player can actually SEE is one of these. A breakageChance /
-  // diceExpression tool that has broken carries `toolBroken: true` and NO `toolUsage` at
-  // all. Reading usage alone rendered it intact — no wash, no pip, no banner — while the
-  // runtime presence gate refused it for crafting, making the whole broken treatment
-  // very nearly unreachable.
+  // THE HEADLINE CASE. `flagBroken` is the ONLY on-break mode that leaves a broken item in the
+  // player's inventory — `destroy` and `replaceWith` remove it — so nearly every broken tool a
+  // player can actually SEE is one of these.
   it('reports a broken-FLAGGED tool broken for a non-limitedUses mode, with no usage flag', () => {
     for (const mode of [
       { mode: 'breakageChance', breakageChance: 1 },
@@ -2059,11 +2029,10 @@ describe('InventoryListingBuilder - derived broken verdict', () => {
     assert.equal(rowByComponent(listing, 'c1').broken, false);
   });
 
-  // THE FALSE POSITIVE. Under the GM-selectable `checkDriven` authority the active check
-  // decides whether tools break and per-tool modes are ignored (except immune) — but
-  // `applyToolUsageAndBreakage` still calls `applyUsage` unconditionally, so `timesUsed`
-  // climbs past `maxUses` on a tool the engine will never break by exhaustion. Ungated,
-  // the row claimed "Broken" PERMANENTLY for a perfectly usable tool.
+  // THE FALSE POSITIVE. Under the GM-selectable `checkDriven` authority the active check decides
+  // whether tools break and per-tool modes are ignored (except immune) — but
+  // `applyToolUsageAndBreakage` still calls `applyUsage` unconditionally, so `timesUsed` climbs
+  // past `maxUses` on a tool the engine will never break by exhaustion.
   it('does not project exhaustion under checkDriven authority, where usage decides nothing', () => {
     const system = salvageSystem({ tools });
     system.toolBreakage = { authority: 'checkDriven' };
@@ -2095,11 +2064,9 @@ describe('InventoryListingBuilder - derived broken verdict', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// #703 — System-Validity Gate entity tier: a component whose salvage config is
-// invalid (a `blocks: 'visibility'` critical) is dropped from a non-GM viewer's
-// salvage panel, retained for a GM, and its stored `enabled` flag is never mutated.
-// ---------------------------------------------------------------------------
+// 703 — System-Validity Gate entity tier: a component whose salvage config is invalid (a `blocks:
+// 'visibility'` critical) is dropped from a non-GM viewer's salvage panel, retained for a GM, and
+// its stored `enabled` flag is never mutated.
 
 describe('InventoryListingBuilder - salvage entity-tier visibility gate (#703)', () => {
   // Simple mode requires exactly one salvage result group; two makes the component's
@@ -2144,15 +2111,7 @@ describe('InventoryListingBuilder - salvage entity-tier visibility gate (#703)',
   });
 });
 
-// ---------------------------------------------------------------------------
 // Issue 1119 — item-sourced tools in the player inventory.
-//
-// Since issue 561 a Tool registered from an Item uuid carries `componentId: null` and holds its
-// identity in its own source refs plus a `name`/`img` snapshot. `upsertTool` force-nulls
-// `componentId` for any item source and the Tool Studio offers nothing else, so this is the ONLY
-// shape a GM can author today. Every fixture above pairs a tool with a `componentId` — that is the
-// blind spot in fixture form, and it is why the builder's component-only projection shipped.
-// ---------------------------------------------------------------------------
 
 function rowByTool(listing, toolId) {
   return listing.rows.find((row) => row.toolId === toolId) ?? null;
@@ -2206,9 +2165,8 @@ describe('InventoryListingBuilder — item-sourced tools (issue 1119)', () => {
   });
 
   it('yields exactly one row for a whetstone that is both a component and a tool', () => {
-    // `c3` (Hammerhead) is a managed component AND the snapshot name of an item-sourced tool,
-    // so one owned document resolves to both. `_normalizeSystem` derives source refs onto
-    // component-linked tools on every load, so this overlap is the common case, not an edge one.
+    // `c3` (Hammerhead) is a managed component AND the snapshot name of an item-sourced tool, so
+    // one owned document resolves to both.
     const system = makeSystem({
       tools: [itemSourcedTool({ id: 't-whet', name: 'Hammerhead', img: null })],
     });

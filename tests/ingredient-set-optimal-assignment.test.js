@@ -1,12 +1,7 @@
 /**
- * Tests for item-level bounded backtracking in
- * IngredientSet.resolveIngredientSelection (issue 663): a dual-purpose item (one
- * that can satisfy more than one AND-required group) must no longer be greedily
- * consumed by the wrong group, producing a false `insufficient`. The resolver now
- * finds a satisfying item->group assignment whenever one exists, so craftability is
- * independent of inventory and group iteration order, while preserving the
- * shared-ledger no-double-count invariant, the items-strictly-beat-currency
- * ordering, the optionOverrides pins, and deterministic output.
+ * Tests for item-level bounded backtracking in IngredientSet.resolveIngredientSelection (issue
+ * 663): a dual-purpose item (one that can satisfy more than one AND-required group) must no longer
+ * be greedily consumed by the wrong group, producing a false `insufficient`.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -41,9 +36,8 @@ function essenceGroup(id, essenceId, amount) {
   return { id, options: [{ quantity: 1, match: { type: 'essence', essenceId, amount } }] };
 }
 
-// A matcher keyed by match type: `rules[type]` is the Set of item uuids that match
-// an option of that type. Avoids the resolver's flag-based matching so a test can
-// declare exactly which held items carry a tag/component identity.
+// A matcher keyed by match type: `rules[type]` is the Set of item uuids that match an option of
+// that type.
 function matcherFor(rules) {
   return (ingredient, held) => {
     const allowed = rules[ingredient?.match?.type];
@@ -70,12 +64,8 @@ function consumedByUuid(selection) {
   return totals;
 }
 
-// ---------------------------------------------------------------------------
-// The #663 worked case: `any tag:iron AND 2 fire essence`.
-// Blazing Iron carries BOTH the iron tag and 2 fire essence; Iron Ingot carries
-// the iron tag only. A valid assignment exists (Ingot -> tag, Blazing -> essence),
-// so the craft must succeed in BOTH item orders AND BOTH group orders.
-// ---------------------------------------------------------------------------
+// The #663 worked case: `any tag:iron AND 2 fire essence`. Blazing Iron carries BOTH the iron tag
+// and 2 fire essence; Iron Ingot carries the iron tag only.
 
 const WORKED_MATCHER = matcherFor({ tags: new Set(['blazing', 'ingot']) });
 const WORKED_PROBE = essenceProbe({ blazing: { fire: 2 } });
@@ -110,10 +100,8 @@ for (const groupOrder of ['tag-first', 'essence-first']) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Component-vs-tag overlap: a dual item matches BOTH a component group and a tag
-// group; greedily consuming it for the tag group would strand the component group.
-// ---------------------------------------------------------------------------
+// Component-vs-tag overlap: a dual item matches BOTH a component group and a tag group; greedily
+// consuming it for the tag group would strand the component group.
 
 test('component-vs-tag overlap is craftable in both group orders', () => {
   const matcher = matcherFor({
@@ -136,14 +124,9 @@ test('component-vs-tag overlap is craftable in both group orders', () => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// Multi-essence overlap. Issue 917 INVERTED this case by design: two essence
-// requirements in one set are now funded from a single shared block, so one unit of
-// a dual carrier credits BOTH of them. The pre-917 expectation (dual -> earth,
-// fire-only -> fire, two units spent) described the per-group draw-down this change
-// deliberately relaxes; the set is still craftable, but it now costs one unit, and
-// `fire-only` is left alone because nothing needs it.
-// ---------------------------------------------------------------------------
+// Multi-essence overlap. Issue 917 INVERTED this case by design: two essence requirements in one
+// set are now funded from a single shared block, so one unit of a dual carrier credits BOTH of
+// them.
 
 test('multi-essence overlap funds both essence requirements from one shared carrier', () => {
   const probe = essenceProbe({ dual: { fire: 2, earth: 2 }, 'fire-only': { fire: 2 } });
@@ -163,12 +146,8 @@ test('multi-essence overlap funds both essence requirements from one shared carr
   assert.equal(selection.plan.length, 1, 'one plan entry — one item key, one draw');
 });
 
-// ---------------------------------------------------------------------------
-// quantity > 1 unit-subset contention: a `quantity:3` tag group competes with a
-// specific-component group for the same stacks. Only a partial unit split
-// (1 of A + 2 of B for the tag group) leaves the single A the component group
-// needs — subset-of-items enumeration cannot express it; unit-count enumeration can.
-// ---------------------------------------------------------------------------
+// quantity > 1 unit-subset contention: a `quantity:3` tag group competes with a specific-component
+// group for the same stacks.
 
 test('quantity>1 unit-subset contention is resolved by unit-count enumeration', () => {
   const matcher = matcherFor({
@@ -191,9 +170,7 @@ test('quantity>1 unit-subset contention is resolved by unit-count enumeration', 
   assert.equal(consumed.a <= 2 && consumed.b <= 2, true, 'no stack is over-drawn (no double-count)');
 });
 
-// ---------------------------------------------------------------------------
 // Genuinely unsatisfiable inputs stay `false` with correct missingGroups.
-// ---------------------------------------------------------------------------
 
 test('genuinely unsatisfiable set stays false with have/need missingGroups', () => {
   const matcher = matcherFor({ component: new Set(['a']) });
@@ -211,9 +188,7 @@ test('genuinely unsatisfiable set stays false with have/need missingGroups', () 
 });
 
 test('a pinned-but-short optionOverrides group reports THAT option (pin-aware, never redirected)', () => {
-  // g-or offers component (needs 2) OR fire essence (amount 2, satisfiable here).
-  // Pinning the component option must report the component's have/need even though
-  // the essence option would otherwise satisfy the group (issue 552 contract).
+  // g-or offers component (needs 2) OR fire essence (amount 2, satisfiable here) (issue 552).
   const matcher = matcherFor({ component: new Set(['a']) });
   const set = new IngredientSet({
     id: 's',
@@ -240,13 +215,9 @@ test('a pinned-but-short optionOverrides group reports THAT option (pin-aware, n
   assert.equal(selection.missingGroups[0].need, 2);
 });
 
-// ---------------------------------------------------------------------------
-// Determinism (plan-review clarification #1): (a) repeatability — same inputs
-// yield the same plan across runs; (b) order-independent craftability — `success`
-// is invariant under shuffled availableItems AND group iteration order. The plan
-// itself MAY legitimately vary with availableItems order (greedy-first by
-// inventory order); it is NOT asserted shuffle-identical.
-// ---------------------------------------------------------------------------
+// Determinism (plan-review clarification #1): (a) repeatability — same inputs yield the same plan
+// across runs; (b) order-independent craftability — `success` is invariant under shuffled
+// availableItems AND group iteration order.
 
 test('determinism: repeatable plan across runs for identical inputs', () => {
   const items = [item('blazing', 1), item('ingot', 1)];
@@ -279,15 +250,10 @@ test('determinism: craftability is invariant under shuffled item and group order
   }
 });
 
-// ---------------------------------------------------------------------------
-// Stress / bound. Two fixtures, because they bound different things and only one of
-// them existed: an 18-group recipe whose groups mostly do NOT contend (bounded by
-// how little of it reaches the search at all), and an 8-group recipe whose groups
-// ALL contend for one shared pool (bounded by how far the search walks when it has
-// no choice but to run). Without the second, the largest contended fixture anywhere
-// in issue 1083's work was 4 groups, so nothing bounded node growth for a large
-// contended authored recipe.
-// ---------------------------------------------------------------------------
+// Stress / bound. Two fixtures, because they bound different things and only one of them existed:
+// an 18-group recipe whose groups mostly do NOT contend (bounded by how little of it reaches the
+// search at all), and an 8-group recipe whose groups ALL contend for one shared pool (bounded by
+// how far the search walks when it has no choice but to run) (issue 1083).
 
 test('stress: a large mostly-uncontended recipe costs about one node per group', () => {
   const groups = [];
@@ -325,26 +291,15 @@ test('stress: a large mostly-uncontended recipe costs about one node per group',
   const matcher = matcherFor({ component: componentRules, tags: tagRules });
   const set = new IngredientSet({ id: 's', ingredientGroups: groups });
 
-  // Asserted through the PUBLIC result's `searchStats` (issue 1072's seam), not by calling
-  // `_searchAssignment` directly. The direct call was this guard's weak point: issue 1083's
-  // staged resolver routes an uncontended recipe around the backtracking search entirely, so a
-  // guard bound to the private entry point would stop describing how the fixture is actually
-  // resolved and would pass because nothing reached it — a vacuous green rather than a
-  // satisfied bound. `searchStats` is attached on BOTH exits, so this reads the real cost
-  // whichever stage produced the answer.
+  // Asserted through the PUBLIC result's `searchStats` (issue 1072's seam), not by calling the
+  // assignment module's search directly.
   const selection = set.resolveIngredientSelection(items, matcher, {
     resolveItemEssences: essenceProbe(probeTable),
   });
 
   assert.equal(selection.success, true, 'the large recipe is satisfiable');
   assert.equal(selection.searchStats.capHit, false, 'the search never reaches its bound');
-  // Bounded against the recipe's OWN size rather than against the cap. Measured: 21 nodes for
-  // 18 groups here, against 19 for the pre-1083 whole-set solver — this fixture was ALREADY
-  // answered on the greedy-first path, so it never demonstrated a node-count reduction and the
-  // old `CAP/100` ceiling left ~95x of slack over a search that barely happens. What it can
-  // still say, falsifiably, is that a large authored recipe costs about one node per group;
-  // a resolver that started enumerating alternatives per group would blow through this while
-  // sitting comfortably inside the cap.
+  // Bounded against the recipe's OWN size rather than against the cap.
   assert.ok(
     selection.searchStats.nodes <= groups.length * 2,
     `a large authored recipe must resolve at roughly one node per group; used ` +
@@ -353,8 +308,7 @@ test('stress: a large mostly-uncontended recipe costs about one node per group',
   );
 
   // And it produces a valid, non-double-counting plan: every group is satisfied and no stack is
-  // drawn past what it holds. Without this the bound above could be met by a resolver that
-  // simply did less and answered wrongly.
+  // drawn past what it holds.
   assert.equal(selection.missingGroups.length, 0);
   assert.equal(selection.selectedIngredients.length, groups.length);
   const held = new Map(items.map((entry) => [entry.uuid, entry.system.quantity]));
@@ -364,20 +318,9 @@ test('stress: a large mostly-uncontended recipe costs about one node per group',
 });
 
 /**
- * The fully CONTENDED counterpart of the fixture above, and the one this file was missing.
- *
- * Every group here shares candidate stacks with every other, so contention scoping cannot help:
- * the whole recipe is one component and the search has to run. A broad tag group matches every
- * held stack, six component groups each need two units of one specific stack, and a live essence
- * block draws on a seventh — so the greedy front-load (the tag group taking `stack-0`) strands a
- * pinned group and the solver must walk its way out.
- *
- * Contended fixtures are not automatically bounded: several natural constructions of this shape
- * — N interchangeable tag groups over one shared pool — are symmetric enough to exhaust the
- * 200,000-node cap and report a satisfiable recipe as insufficient, which is the documented
- * pre-663 safeguard degradation rather than a regression. This fixture is the realistic
- * asymmetric case: distinct component identities pin most of the assignment, so the branching
- * is confined to the one broad group.
+ * The fully CONTENDED counterpart of the fixture above, and the one this file was missing. Every
+ * group here shares candidate stacks with every other, so contention scoping cannot help: the whole
+ * recipe is one component and the search has to run.
  */
 test('stress: a fully contended recipe stays two orders of magnitude under the search cap', () => {
   const PINNED = 6;

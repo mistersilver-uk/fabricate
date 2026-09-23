@@ -1,11 +1,4 @@
-/**
- * What a trigger says about itself (issue 1096).
- *
- * The card was headed by the word `When` — the label of its first `<select>` — so a list of
- * three triggers read `When`, `When`, `When`. These pin the composed sentence for every
- * condition shape and every combination of the three independent effects, because a summary
- * that disagreed with the controls under it would be worse than no summary at all.
- */
+/** What a trigger says about itself (issue 1096). */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

@@ -1,15 +1,4 @@
-/**
- * Issue 676 — wiring `component.salvage.enabled` to a GM control, and the invariant
- * that makes the control safe.
- *
- * `salvage.enabled` was persisted, normalized, and a live runtime gate (`CraftingEngine`
- * refuses salvage when false; `InventoryListingBuilder` skips the component) long before
- * any GM control wrote it — so a component auto-disabled by a resolution-mode change was
- * permanently unsalvageable from the UI. This suite pins the fix and the four traps that
- * make the fix silently useless.
- *
- * Acceptance criteria covered: AC4, AC8, AC9, AC10(a)+(b), AC12, AC13.
- */
+/** Issue 676 — wiring `component.salvage.enabled` to a GM control. */
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
@@ -19,9 +8,39 @@ import {
   COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   COMPONENT_EDIT_VIEW_RAW_MODULES,
 } from '../helpers/componentEditViewModules.js';
+// The DC preset control is the shared `<Select>` since issue 1510: choosing a value is an
+// open-then-click on a panel portaled onto the mount target, and the chosen value is read back off
+// its own option list rather than off a `value` property a button does not have.
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  closeSelectPanel,
+  selectOptionLabels,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
+
+const PRESET_TRIGGER = '[data-salvage-dc-preset]';
 
 function flushRender() {
   return new Promise((done) => setTimeout(done, 0));
+}
+
+/** The preset the control currently shows, as its own option value. */
+function chosenPreset(target) {
+  const shown = selectTriggerText(target, PRESET_TRIGGER);
+  const labels = selectOptionLabels(target, PRESET_TRIGGER);
+  const values = selectOptionValues(target, PRESET_TRIGGER);
+  closeSelectPanel(target, PRESET_TRIGGER);
+  const index = labels.indexOf(shown);
+  assert.ok(index >= 0, `the trigger shows "${shown}", which is no preset this control offers`);
+  return values[index];
+}
+
+/** Pick a preset the way a GM does, then let the reveal below it settle. */
+async function choosePreset(target, value) {
+  chooseSelectOption(target, PRESET_TRIGGER, value);
+  await flushRender();
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -91,23 +110,16 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
   // ── AC9: enablement ships ACCURATE ───────────────────────────────────────
 
   it('AC9: an enabled-ABSENT component with authored results renders the toggle OFF', async () => {
-    // THE MUTATION THIS EXISTS TO CATCH: `cloneSalvage` defaulting `enabled` to TRUE —
-    // a highly plausible copy-paste of the adjacent
-    // `allowPlayerResultReorder: source.allowPlayerResultReorder !== false`.
-    //
-    // Every PRE-EXISTING fixture reads green through that mutation, because they use
-    // `enabled: true` or `salvage: null`. Only an enabled-ABSENT fixture fails.
+    // THE MUTATION THIS EXISTS TO CATCH.
     const { dirtyEvents, props: mountProps } = track({
       component: { salvage: { resultGroups: RESULT_GROUPS } },
     });
     const target = await harness.mount(mountProps);
 
-    // The `is-on`/`is-off` pair now rides the SWITCH rather than a wrapping card: issue
-    // 676 moved salvage enablement into the panel's heading row, so there is no card.
+    // The `is-on`/`is-off` pair now rides the SWITCH rather than a wrapping card.
     assert.ok(enableToggle(target).classList.contains('is-off'), 'absent reads disabled');
     assert.equal(enableToggle(target).getAttribute('aria-pressed'), 'false');
-    // ...and rendering it must NOT re-save. Decision 6 is "no migration" — a component
-    // that merely gets LOOKED AT must not be flipped and written back.
+    // ...and rendering it must NOT re-save. Decision 6 is "no migration".
     assert.ok(!dirtyEvents.includes(true), 'merely rendering never marks the editor dirty');
     harness.remount();
   });
@@ -163,9 +175,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
   });
 
   it('AC13: updates.salvage stays a FULL spread — a partial patch would wipe resultGroups', async () => {
-    // `CraftingSystemManager.updateItem` does `{...existing, ...updates}`, so
-    // `updates.salvage` REPLACES the whole salvage sub-object. A panel emitting
-    // `{enabled: true}` would silently wipe the authored result groups.
+    // `CraftingSystemManager.updateItem` does `{...existing, ...updates}`.
     const { drafts, props: mountProps } = track({
       component: {
         salvage: { enabled: false, resultGroups: RESULT_GROUPS, ingredientQuantity: 3, toolIds: ['tool-a'] },
@@ -210,10 +220,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
   });
 
   it('AC12: THE DEADLOCK — a zero-group component can be taken to one group and then enabled', async () => {
-    // The circle that killed decision 8's first draft: enabled defaults false → the
-    // body collapses when off → the add-group control (its ONLY instance in the
-    // codebase) is hidden → resultGroups can never reach 1 → the toggle is disabled
-    // forever. Salvage would be unenablable for EVERY new component.
+    // The circle that killed decision 8's first draft.
     const target = await harness.mount(props({ component: { salvage: null } }));
 
     assert.equal(enableToggle(target).disabled, true, 'disabled at zero groups');
@@ -235,14 +242,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     const target = await harness.mount(props({ component: { salvage: null } }));
     assert.equal(enableToggle(target).disabled, true);
 
-    // The hint must be VISIBLE TEXT — not a `title`, which on a DISABLED <button> never
-    // appears in any browser (disabled controls fire no mouse events), and which no
-    // mounted test would notice was broken because the attribute IS present in the DOM.
-    //
-    // Issue 676 moved the toggle into the heading row, so there is no sub-line to carry
-    // it. The zero-group explanation is the disabled-body notice, which was ALREADY
-    // rendering the same information immediately below the toggle — it is now the one
-    // copy of it rather than the second.
+    // The hint must be VISIBLE TEXT — not a `title`.
     const hint = target.querySelector('[data-salvage-disabled-notice]');
     assert.ok(hint, 'the zero-group explanation renders as visible body copy');
     assert.match(hint.textContent, /Add a result below/);
@@ -337,8 +337,12 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     });
     const target = await harness.mount(mountProps);
 
-    const preset = target.querySelector('[data-salvage-dc-preset]');
-    assert.equal(preset.value, 'custom', 'an override matching no tier selects Custom…');
+    assert.equal(chosenPreset(target), 'custom', 'an override matching no tier selects Custom…');
+    assert.equal(
+      assertSelectHasResolvedName(target, PRESET_TRIGGER),
+      'Salvage check DC',
+      'and it still announces the name the native control did'
+    );
     assert.equal(
       target.querySelector('[data-salvage-dc-custom]').value,
       '14',
@@ -365,16 +369,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
   });
 
   it('clearing the custom DC persists null, not 0 (issue 1050, D1a)', async () => {
-    // The genuine-absence half of D1a, at a CALL SITE rather than in the primitive. What
-    // ships otherwise proves only that the stepper EMITS `null` when an `allowUnset` field
-    // is cleared (`stepper-unset-fill.test.js`) and that this call site passes `allowUnset`
-    // (`stepper-call-site-contract.test.js`). Neither can see the handler in between:
-    // changing `setSalvageDcOverride`'s `: null` to `: 0` is format-clean, lint-clean and
-    // survives every other suite, while silently turning "inherit the system salvage DC"
-    // into a hard DC of zero that no salvage roll can fail.
-    //
-    // `null` and `0` are both falsy and both render as an empty-ish field, so only reading
-    // the emitted patch distinguishes them.
+    // The genuine-absence half of D1a.
     const { drafts, props: mountProps } = track({
       component: { salvage: { enabled: true, resultGroups: RESULT_GROUPS, dcOverride: 14 } },
     });
@@ -396,14 +391,17 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     const target = await harness.mount(
       props({ component: { salvage: { enabled: true, resultGroups: RESULT_GROUPS, dcOverride: 17 } } })
     );
-    assert.equal(target.querySelector('[data-salvage-dc-preset]').value, 'dc:17');
-    assert.equal(target.querySelector('[data-salvage-dc-custom]'), null, 'no custom input for a tier match');
+    assert.equal(chosenPreset(target), 'dc:17');
+    assert.ok(
+      !target.querySelector('[data-salvage-dc-custom]'),
+      'no custom input for a tier match'
+    );
     harness.remount();
   });
 
   it('a null dcOverride selects the system default', async () => {
     const target = await harness.mount(props());
-    assert.equal(target.querySelector('[data-salvage-dc-preset]').value, 'system');
+    assert.equal(chosenPreset(target), 'system');
     harness.remount();
   });
 
@@ -413,25 +411,13 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     // `null`, so deriving the input's visibility purely from the persisted value made
     // Custom… dead on arrival: pick it -> stages null -> selection derives back to
     // `system` -> the input never renders -> an arbitrary DC is unauthorable.
-    //
-    // `main` ships a plain number input accepting any DC today, so this would have been
-    // a REGRESSION of a shipped capability, and it contradicts this change's own
-    // canonical requirement ("a Custom… option exposing an arbitrary integer"). The
-    // zero-authored-tiers case — the COMMON one — is where it bites hardest: two
-    // options, one inert.
-    //
-    // Every other DC test here starts from `dcOverride: 14`, so none of them ever
-    // SELECTS Custom… and none of them could see this.
     const { dirtyEvents, props: mountProps } = track();
     const target = await harness.mount(mountProps);
 
-    const preset = target.querySelector('[data-salvage-dc-preset]');
-    assert.equal(preset.value, 'system', 'every component starts at the system default');
-    assert.equal(target.querySelector('[data-salvage-dc-custom]'), null, 'no custom input yet');
+    assert.equal(chosenPreset(target), 'system', 'every component starts at the system default');
+    assert.ok(!target.querySelector('[data-salvage-dc-custom]'), 'no custom input yet');
 
-    preset.value = 'custom';
-    preset.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
-    await flushRender();
+    await choosePreset(target, 'custom');
 
     const custom = target.querySelector('[data-salvage-dc-custom]');
     assert.ok(custom, 'Custom… reveals its input');
@@ -445,10 +431,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     const { drafts, props: mountProps } = track();
     const target = await harness.mount(mountProps);
 
-    const preset = target.querySelector('[data-salvage-dc-preset]');
-    preset.value = 'custom';
-    preset.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
-    await flushRender();
+    await choosePreset(target, 'custom');
 
     // 14 is deliberately OFF-tier (the tiers are 12 and 17) — an arbitrary integer.
     const custom = target.querySelector('[data-salvage-dc-custom]');
@@ -457,23 +440,13 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     await flushRender();
 
     assert.equal(drafts.at(-1).updates.salvage.dcOverride, 14, 'the arbitrary DC reaches the payload');
-    assert.equal(
-      target.querySelector('[data-salvage-dc-preset]').value,
-      'custom',
-      'and the control stays on Custom…'
-    );
+    assert.equal(chosenPreset(target), 'custom', 'and the control stays on Custom…');
     harness.remount();
   });
 
   it('Custom… stays open while its input is cleared, and hands back on picking a tier', async () => {
     const target = await harness.mount(props());
-    const preset = target.querySelector('[data-salvage-dc-preset]');
-    const change = () =>
-      preset.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
-
-    preset.value = 'custom';
-    change();
-    await flushRender();
+    await choosePreset(target, 'custom');
     const custom = target.querySelector('[data-salvage-dc-custom]');
     custom.value = '';
     custom.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
@@ -484,29 +457,22 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     );
 
     // Picking a real option hands control back to the persisted value.
-    preset.value = 'dc:12';
-    change();
-    await flushRender();
-    assert.equal(target.querySelector('[data-salvage-dc-custom]'), null, 'the custom input closes');
-    assert.equal(target.querySelector('[data-salvage-dc-preset]').value, 'dc:12');
+    await choosePreset(target, 'dc:12');
+    assert.ok(!target.querySelector('[data-salvage-dc-custom]'), 'the custom input closes');
+    assert.equal(chosenPreset(target), 'dc:12');
     harness.remount();
   });
 
   it('the Custom… choice does not leak across components', async () => {
-    // It is transient UI state, not draft data, so it resets with the drafts on
-    // re-seed. Without that reset a second component would open showing a
-    // system-default DC as custom.
+    // It is transient UI state, not draft data.
     const target = await harness.mount(props());
-    const preset = target.querySelector('[data-salvage-dc-preset]');
-    preset.value = 'custom';
-    preset.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
-    await flushRender();
+    await choosePreset(target, 'custom');
     assert.ok(target.querySelector('[data-salvage-dc-custom]'));
     harness.remount();
 
     const next = await harness.mount(props({ component: { id: 'comp-2', name: 'Other' } }));
-    assert.equal(next.querySelector('[data-salvage-dc-preset]').value, 'system');
-    assert.equal(next.querySelector('[data-salvage-dc-custom]'), null);
+    assert.equal(chosenPreset(next), 'system');
+    assert.ok(!next.querySelector('[data-salvage-dc-custom]'));
     harness.remount();
   });
 
@@ -515,8 +481,12 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     const target = await harness.mount(
       props({ salvageCheckTiers: [], onManageCheckPresets: () => calls.push(true) })
     );
-    const options = [...target.querySelectorAll('[data-salvage-dc-preset] option')].map((o) => o.value);
-    assert.deepEqual(options, ['system', 'custom'], 'no presets to offer');
+    assert.deepEqual(
+      selectOptionValues(target, PRESET_TRIGGER),
+      ['system', 'custom'],
+      'no presets to offer'
+    );
+    closeSelectPanel(target, PRESET_TRIGGER);
 
     target.querySelector('[data-salvage-manage-presets]').click();
     assert.deepEqual(calls, [true], 'the deep link fires');
@@ -524,11 +494,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
   });
 
   it('AC5: the persisted `routed` token is DISPLAYED as "Routed by check", never raw', async () => {
-    // `ui-integration` -> Component Studio req 4, added by this change: "The persisted
-    // `routed` token is displayed as 'Routed by check'." Nothing displayed it — there
-    // was no mode pill in either state — so the panel silently changed shape (routing
-    // rows, ordinals, the DC control appearing/vanishing) driven by a SYSTEM-level
-    // setting the GM cannot see from this route.
+    // `ui-entity-editors` -> Component Studio req 4, added by this change.
     const target = await harness.mount(props({ salvageResolutionMode: 'routed' }));
     const pill = target.querySelector('[data-salvage-mode]');
     assert.ok(pill, 'the salvage card names its mode');
@@ -543,10 +509,6 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
 
   it('AC5: and the mode pill is the reference MICRO pill, not the default chip', async () => {
     // `proto:5721` builds it from the prototype's own `pill()` helper (`proto:3893`):
-    // `padding: 2px 8px`, a stadium corner, `600 9.5px`. That is `Chip`'s `density="list"` to
-    // within a pixel, and it is the same scale the identity callout's `World catalogue` badge
-    // takes — the reference draws ONE micro pill and uses it in both places, so a second answer
-    // here would be a scale this screen invented.
     const target = await harness.mount(props({ salvageResolutionMode: 'progressive' }));
     const pill = target.querySelector('[data-salvage-mode]');
     assert.ok(
@@ -594,14 +556,6 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
 
   it('the mode pill is EXEMPT from Ruling A — it survives salvage being off', async () => {
     // REVERSED on a user ruling (issue 676). This test used to assert the opposite:
-    // that the pill collapsed with the rest of the chrome when salvage was off.
-    //
-    // Ruling A collapses the chrome that only has meaning once salvage RUNS — the DC
-    // control, outcome routing, the reorder policy. The mode pill is not that. Ruling A
-    // ALSO keeps the result editor authorable while salvage is off, so with the pill
-    // hidden a GM could author an ordered progressive list, or a routed set of groups,
-    // with nothing on screen naming which shape they were looking at — the mode is a
-    // SYSTEM-level setting they cannot see from this route at all.
     const off = await harness.mount(
       props({ component: { salvage: { enabled: false, resultGroups: RESULT_GROUPS } }, salvageResolutionMode: 'routed' })
     );

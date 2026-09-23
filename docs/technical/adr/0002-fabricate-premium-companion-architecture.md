@@ -16,8 +16,8 @@ Following ADR 0001, the *Recommendation*, the kill criteria, the risk table and 
 All eleven positions were settled on 2026-08-16 and are recorded under *Decision*.
 
 **Context:** issue 613 (the core plugin API and premium packaging seam, plan-reviewed at revision 3), issue 345 (economy automation), issue 1185 and PR 1186 (the GM Downtime preview and the companion seam that merged with it).
-**Depends on:** issue 1185's shipped seam, `openspec/specs/ui-integration/spec.md` §Downtime Preview and Premium Extension, `openspec/specs/gathering-and-harvesting/spec.md` §Gathering Party, `openspec/specs/integrations/spec.md` (Specification 008), and the private `fabricate-premium` repository's existing release pipeline.
-**Decides for:** issue 613's chunk plan, issue 345's delivery route, the `fabricate-premium` repository's build and gate lanes, the outbound seam's home in `ui-integration`, and the scope statement Specification 008 needs.
+**Depends on:** issue 1185's shipped seam, `openspec/specs/ui-extension-points/spec.md` §Downtime Preview and Premium Extension, `openspec/specs/gathering-and-harvesting/spec.md` §Gathering Party, `openspec/specs/integrations/spec.md` (Specification 008), and the private `fabricate-premium` repository's existing release pipeline.
+**Decides for:** issue 613's chunk plan, issue 345's delivery route, the `fabricate-premium` repository's build and gate lanes, the outbound seam's home in `ui-extension-points`, and the scope statement Specification 008 needs.
 
 ---
 
@@ -228,7 +228,7 @@ The question worth answering instead is which subset unblocks the GM Downtime St
 `docs/api/index.md` publishes `getCraftingEngine()`, `getCraftingRunManager()`, `getRecipeVisibilityService()`, `getRecipeManager()`, `getCraftingSystemManager()`, `getGatheringRunManager()`, `getGatheringGateAndCheckEvaluator()` and `getGatheringRichStateService()` — the last of which its own documentation describes as "Gathering rich-state **internals**".
 
 Every method on those objects becomes de facto public the moment premium calls it, with no version marker, no deprecation policy and no test pinning the returned shape.
-`tests/fabricate-api-surface.test.js` pins that the *getters* exist, by matching literal strings in `src/main.js`; it pins nothing about what they return.
+`tests/fabricate-api-surface.test.js` pins that the *getters* exist, by matching literal strings in the module entry and its `src/bootstrap/` modules; it pins nothing about what they return.
 
 **This reframes D5 and D6 completely.**
 The question is not "what API should core build that premium currently lacks".
@@ -242,7 +242,7 @@ Verified on this record's own base rather than inherited from the July research,
 What the episode establishes is not a live bug but the failure mode: two call sites of one internal function drifted apart across a published API boundary, silently, and only a line-by-line read caught it.
 
 **Selecting D5-b amends a canonical specification, and that must not be discovered during implementation.**
-`openspec/specs/ui-integration/spec.md` requires that "a conflicting provider on the same surface, **an unsupported version**, an empty or duplicated tab set, malformed chrome or action, or an asynchronous mount **fails with a deterministic error**".
+`openspec/specs/ui-extension-points/spec.md` requires that "a conflicting provider on the same surface, **an unsupported version**, an empty or duplicated tab set, malformed chrome or action, or an asynchronous mount **fails with a deterministic error**".
 D5-b's "degrade rather than throw" contradicts that clause directly for the unsupported-version case.
 It is a defensible amendment — a deterministic error is the right answer for a malformed provider and the wrong one for a merely old companion — but it is a specification change with its own delta, not a code tweak, and it is recorded under *Consequences* as such.
 
@@ -282,7 +282,7 @@ It ships today in `fabricate-mythwright` v0.11.0 — the only premium module dec
 The whole compatibility strategy is ad-hoc optional chaining, and the failure mode is a `ui.notifications.warn`.
 
 **Worse, core now has two opposite timing contracts for companions and only one is written down as an exception.**
-`src/main.js` carries a comment beside `whenReady()` naming the exact hazard — `fabricate.ready` is one-shot, and "a late manager launch can never latch on a spent event" — which is why the replay-safe `whenReady()` promise exists.
+`src/bootstrap/Fabricate.js` carries a comment beside `whenReady()` naming the exact hazard — `fabricate.ready` is one-shot, and "a late manager launch can never latch on a spent event" — which is why the replay-safe `whenReady()` promise exists.
 `docs/api/index.md` teaches the one-shot hook in **eleven** worked examples and never mentions `whenReady()` at all.
 Meanwhile `registerWorldNavProvider` is deliberately exempted from the readiness rule and documented as such, because its registry lives in a module-scope closure and survives the init-to-ready rebind.
 So the documented entry point is the unsafe one, the safe one is undocumented, and the one shipping consumer uses the documented unsafe one.
@@ -347,7 +347,7 @@ The canonical gathering specification has already decided most of this, and it d
   Core deliberately refused exactly the brief's "every character flagged `party: true`" fallback, so adopting it in premium re-imports a rejected design.
 
 **And there is a shipped navigation collision the first revision missed.**
-`openspec/specs/ui-integration/spec.md` puts both `Parties` and `Downtime` in the GM Manager's permanent World navigation, and makes the rail's Downtime children render the active provider's tabs.
+`openspec/specs/ui-extension-points/spec.md` puts both `Parties` and `Downtime` in the GM Manager's permanent World navigation, and makes the rail's Downtime children render the active provider's tabs.
 The GM Downtime brief's five tabs include Parties.
 So the moment a real provider registers, one rail shows **World > Parties** and **World > Downtime > Parties** side by side, from two modules, over the same actors.
 That is not a copy problem; it is two aggregates surfacing at once.
@@ -376,7 +376,7 @@ D6-b has its own defect class and it is not zero.
 
 **Dangling cross-boundary references.**
 Under D6-b premium's records reference core components, recipes, currencies and gathering tasks, and **core cannot enumerate premium's references**.
-`openspec/specs/ui-integration/spec.md` requires a destructive delete to route through a confirm dialog carrying **referenced-by evidence**, and `openspec/specs/destructive-changes-and-migrations/spec.md` states the principle that nothing is left dangling.
+`openspec/specs/ui-world-scope/spec.md` requires a destructive delete to route through a confirm dialog carrying **referenced-by evidence**, and `openspec/specs/destructive-changes-and-migrations/spec.md` states the principle that nothing is left dangling.
 Neither can see across the boundary.
 So deleting a component in the free module can silently break paid content, and the GM gets a confirmation whose reference count is honest about core and blind about premium.
 
@@ -537,7 +537,7 @@ That pin is load-bearing rather than boilerplate: the redaction reading is what 
 It is listed in the V13 gap list under *What was NOT established* along with the other V14-only readings this record leans on.
 
 Hosting precedes redaction, and D7 must be read in that order.
-The shipped seam is **GM-only**: `ui-integration/spec.md` gives core the Manager shell and the "GM gate", and `DOMAIN.md` describes it as a GM Manager presentation seam.
+The shipped seam is **GM-only**: `ui-extension-points/spec.md` gives core the Manager shell and the "GM gate", and `DOMAIN.md` describes it as a GM Manager presentation seam.
 There is no player-side registry at all.
 So a player-facing premium surface has two possible shapes before redaction is even reached — premium ships its own Foundry Application, in which case core hosts nothing, contains nothing, and D8's containment analysis does not apply to it; or core builds a **second, player-side seam**, which appears nowhere in the eleven decisions and is unscoped work.
 This strengthens D7-d considerably: deferring the player surface defers an unscoped hosting decision, not merely a redaction mechanism.
@@ -762,7 +762,7 @@ The residual risk sits in specific design choices rather than in the concept, ra
    **Option F materially reduces this specific risk**, because the Patreon link genuinely does lead to an in-client install path — which is a D2 input, not merely a copy note.
 6. **Core asserts "Fabricate Premium is installed and connected" about any third-party companion.**
    This is a shipped defect, not a design trade.
-   `CraftingSystemManagerRoot.svelte` derives `premiumInstalled` from `registeredSurfaceIds.length > 0`, and `ui-integration/spec.md` codifies it: the title-bar badge lights "when, and only when, at least one provider is registered on ANY surface id".
+   `CraftingSystemManagerRoot.svelte` derives `premiumInstalled` from `registeredSurfaceIds.length > 0`, and `ui-extension-points/spec.md` codifies it: the title-bar badge lights "when, and only when, at least one provider is registered on ANY surface id".
    The badge's `title` and `aria-label` both read **"Fabricate Premium is installed and connected"**, from `FABRICATE.Admin.Manager.Titlebar.PremiumStatus`.
    But the registry inspects nothing about who is calling, and D3 deliberately permits a **free** third-party companion.
    So a free third-party companion makes the free module display a false statement about a paid product relationship — and silently annexes that third party's work to the maintainer's paid line, which sharpens item 4 above from a fair-play criticism into a concrete one.
@@ -871,7 +871,7 @@ And the premium signal reverses issue 613's explicit "no advertisement in v1".
 | **`fabricate-premium` is trusted code in core's realm.** D8-a accepts prototype pollution, DOM escape, leaked listeners, i18n collision and CSS bleed as conventions rather than enforcement. | **High** | Acceptable for a first-party companion. It becomes materially riskier the moment the same seam hosts a third party, which the registry deliberately allows. |
 | **Redaction has no possible core-owned gate.** Under D7 the only gate is a real-Foundry player-client assertion in premium's CI — the third of D9-b's three gates — and that tier does not exist. | ~~High~~ **Accepted** | **Superseded by the ruling in *Decision***, and left standing because it is the evidence that ruling was taken against. Confidentiality is not a constraint, so there is nothing to gate. The hosting half of the note survives: there is no player-side registry, so the surface itself is still unscoped work. |
 | **A shipping consumer has no version check.** Narrowing the internals under D5-b can break `fabricate-mythwright` v0.11.0 silently. | Medium | Check `bridge.js`'s four getters against the narrowed contract before publishing it, and fix the documentation so `whenReady()` is taught instead of the one-shot hook. |
-| **A second `Party` aggregate would breach a stated invariant.** Core owns `GatheringParty`; the GM Downtime brief defines its own `Party` with markers, membership moves and a `party: true` flag fallback. | Medium | **The absence of the collision is what is true today only of the preview** — `ui-integration` requires that core's preview and registry create, read and write no party role, assignment, mirror or reference, so no second aggregate exists yet. It arrives with the real provider. This is now decided as **D11**, recommended arm D11-a, on the composite uniqueness invariant and the World > Parties versus World > Downtime > Parties rail collision rather than on taste. |
+| **A second `Party` aggregate would breach a stated invariant.** Core owns `GatheringParty`; the GM Downtime brief defines its own `Party` with markers, membership moves and a `party: true` flag fallback. | Medium | **The absence of the collision is what is true today only of the preview** — `ui-extension-points` requires that core's preview and registry create, read and write no party role, assignment, mirror or reference, so no second aggregate exists yet. It arrives with the real provider. This is now decided as **D11**, recommended arm D11-a, on the composite uniqueness invariant and the World > Parties versus World > Downtime > Parties rail collision rather than on taste. |
 | **F-K2 is unevaluated, and Option H is more exposed to it than Option F.** | Medium | The Publisher Handbook sanctions multi-storefront distribution, but the Handbook is marketing copy and the **Premium Content Agreement** is the instrument that binds; it has not been read. An exclusivity, pricing-control or content-approval term would break the hybrid specifically while leaving Option F standing. |
 | **The containment gate can silently execute nothing.** The mounted tier is hand-rolled and omits `validateMountedComponentDependencies`, so one missing allowlist entry cancels all 362 tests while reporting `# fail 0`. | Medium | Route `tests/components/manager-mounted.test.js` through `createMountedComponentHarness`, and make the CI step assert `not ok` and an expected count — the same rule D9-b already imposes on the contract runner. Measured, not predicted: `# tests 362 # pass 0 # fail 0 # cancelled 362`. |
 | **Core asserts a paid-product relationship about any registrant.** `premiumInstalled` is `registeredSurfaceIds.length > 0` and the badge is labelled "Fabricate Premium is installed and connected", with no caller identity anywhere in the seam. | Medium | A free third-party companion makes the free module state something false and annexes that third party to the paid line. Both honest fixes need **Companion Identity** first: key the badge on a known companion, or drop "Premium" from the copy. |
@@ -958,7 +958,7 @@ D6-a is written against `extensions[pluginId]`, and **that key space does not ex
 And the plugin-scoped update API that validates JSON-serializability at the write boundary joins the **D5 narrowing list** beside `getGatheringPartyStore()`, because it is core API a paid product writes through.
 
 **D6-a supersedes the conclusion of *D6-b is the cheap arm, not the free one*, and invalidates none of its analysis.**
-That section's dangling-reference and durable-identity findings apply to whatever premium keeps **outside** the slice, which is most of its data: core still cannot enumerate a companion's references, `ui-integration`'s referenced-by confirm evidence is still blind across the boundary, component ids are still not globally unique so premium must still key on durable identity rather than on a bare id, and premium still needs its own migration line for its own storage.
+That section's dangling-reference and durable-identity findings apply to whatever premium keeps **outside** the slice, which is most of its data: core still cannot enumerate a companion's references, `ui-world-scope`'s referenced-by confirm evidence is still blind across the boundary, component ids are still not globally unique so premium must still key on durable identity rather than on a bare id, and premium still needs its own migration line for its own storage.
 Only the section's framing changes — that a first release avoids all of D6-a's defects is no longer the arm being carried.
 The slice's own contents stay versioned by the `schemaVersion` the slot shape already carries, which is a second versioning line *inside* the first rather than a replacement for premium's.
 
@@ -1055,7 +1055,7 @@ Three further statements assert premium's own Application, and none of them sits
 
 Deliberately left unedited, because they record the evidence this record was decided against and ADR 0001's precedent protects four artifacts rather than three: **D7-a**, the **confidentiality** position, and every *Recommendation*, **kill criterion**, **risk table row** and measurement — including the *Recommendation* table's D7 row and its corresponding risk row, which the 2026-08-16 D7 subsection already declares are left as written.
 
-The seam itself is specified in `openspec/specs/ui-integration/spec.md` §Player Navigation Extension, documented for third parties in `docs/api/index.md`, and carries its own `DOMAIN.md` row beside the Manager one.
+The seam itself is specified in `openspec/specs/ui-extension-points/spec.md` §Player Navigation Extension, documented for third parties in `docs/api/index.md`, and carries its own `DOMAIN.md` row beside the Manager one.
 
 ---
 
@@ -1094,15 +1094,15 @@ Their status is not "none of the three is implemented", which overstated the gap
 Its Principle 2 requires each integration to be gated behind a crafting-system-level toggle with "zero runtime interaction" when off, and Criterion 1 requires that toggle to exist.
 Both are false of the seam on day one: there is no toggle at all, and the seam is world- and Manager-scoped rather than crafting-system-scoped — `craftingSystemId` is nullable by design and the route stays reachable when it is `null`.
 Principle 4, "no duplicate data entry", inverts under outbound.
-**The outbound contract therefore belongs where it already lives: `openspec/specs/ui-integration/spec.md` §Downtime Preview and Premium Extension**, which owns roughly 44 requirements of it today.
+**The outbound contract therefore belongs where it already lives: `openspec/specs/ui-extension-points/spec.md` §Downtime Preview and Premium Extension**, which owns roughly 44 requirements of it today.
 `integrations/spec.md` gains a one-line scope statement declaring itself inbound-only and cross-referencing that section.
 A new `extension-seam` capability was the alternative; it was rejected because it would split one seam's requirements across two specifications for no gain.
 
-**`openspec/specs/ui-integration/spec.md`** is therefore the specification D5 actually amends, and **D5-b contradicts it today**: it requires an unsupported version to fail with a deterministic error, and D5-b degrades instead.
+**`openspec/specs/ui-extension-points/spec.md`** is therefore the specification D5 actually amends, and **D5-b contradicts it today**: it requires an unsupported version to fail with a deterministic error, and D5-b degrades instead.
 Selecting D5-b means amending that clause in the same change, with its own delta.
 
 **`openspec/specs/destructive-changes-and-migrations/spec.md`** is affected by D6 in both directions and went unmentioned.
-Its principle is that nothing is left dangling, and `ui-integration` requires a destructive delete to route through a confirm dialog with referenced-by evidence — evidence that cannot see premium's references.
+Its principle is that nothing is left dangling, and `ui-world-scope/spec.md` §GM Travel Route requires a destructive delete to route through a confirm dialog with referenced-by evidence — evidence that cannot see premium's references.
 D6-a narrows that exposure to whatever premium keeps **outside** the slice, which is most of its data, so the accepted consequence recorded under *D6-b is the cheap arm, not the free one* still holds and that specification is still where it must be written down.
 It also gains D6-a's own obligation: core's migration pass must **forward-guard** an `extensions` slice whose `schemaVersion` it does not recognise, preserving it rather than normalising or dropping it.
 
@@ -1156,7 +1156,7 @@ Four terms in this record collide with the corpus, and a record that introduces 
 
 **`companion` has two opposite meanings and they are already both in the repository.**
 `openspec/specs/integrations/spec.md` uses it ten times for a module Fabricate *consumes* — Item Piles, Simple Calendar.
-`openspec/specs/ui-integration/spec.md`, `DOMAIN.md` and this record use it for a module that consumes *Fabricate*.
+`openspec/specs/ui-extension-points/spec.md`, `DOMAIN.md` and this record use it for a module that consumes *Fabricate*.
 Because `integrations/spec.md` now gains an inbound-only scope statement pointing at the outbound section, both senses would otherwise sit one cross-reference apart.
 **Pick: `integration partner` for the inbound sense, `companion` for the outbound one**, and rename in `integrations/spec.md` when its scope statement is written.
 

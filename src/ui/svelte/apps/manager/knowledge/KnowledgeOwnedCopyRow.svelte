@@ -1,29 +1,14 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  One owned copy of a recipe item held by the selected character (issue 785).
+  One owned copy of a recipe item held by the selected character. Four load-bearing chip rules:
 
-  Chip rules that are load-bearing, not cosmetic:
+  - The uses chip has THREE states; `remaining === null` means UNLIMITED and never renders "0 left".
+  - `inert` is an INDEPENDENT second chip, never folded in, so inert-but-not-spent is renderable.
+  - Only `spent` disables Expend — `inert` does not gate the craft path, so refusing here would apply
+    a gate the engine does not. An UNCAPPED copy disables it too: expending would write nothing.
+  - The spent-row dim is scoped to the identity/meta column and MUST NOT reach the action cluster,
+    where `.manager-button:disabled`'s own `opacity: 0.62` would composite it to ~0.38.
 
-  - The uses chip has THREE states — unlimited (info · infinity · "Unlimited"),
-    remaining (warning · flame · "{used} of {max} uses spent") and spent (danger ·
-    ban · "Spent"). `remaining === null` means UNLIMITED and must never render
-    "0 left".
-  - `inert` is an INDEPENDENT second chip, never folded into the uses chip. That
-    makes five renderable combinations, including inert-but-not-spent — the
-    visible form of the known "nothing ever clears `inert`" gap.
-  - Only `spent` disables Expend. `inert` does NOT gate it, because it does not
-    gate the craft path either: an inert-but-not-spent copy still has charges the
-    runtime will spend, so disabling the GM's button would apply a gate the engine
-    does not. An UNCAPPED copy also disables it, because expending would write
-    nothing — a disabled button, never a silent no-op.
-  - The spent-row dim is scoped to the identity/meta column and MUST NOT reach the
-    action cluster: `.manager-button:disabled` already carries `opacity: 0.62`, so
-    a row-level dim would composite the disabled Expend button to ~0.38.
-
-  Props:
-   - copy: a projected owned-copy row from `knowledgeStudio.projectOwnedCopyRow`.
-   - armedToken: the surface's single armed token (mutual exclusion lives there).
-   - onExpend(itemId), onDelete(itemId), onArm(token), onDisarm(token).
+  Props: copy, armedToken (the surface's single armed token), onExpend, onDelete, onArm, onDisarm.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -56,14 +41,9 @@
     );
   }
 
-  // The enum `recipeItemTypeFromRecipeCount` returns is hard-coded English by
-  // design (it is a diagnostic enum, not display copy), so the mapping to keys
-  // happens HERE rather than by minting a second localized type vocabulary.
-  // A multi-recipe item carries its own count ("3 Recipe Book"), which is why the row
-  // no longer renders a separate "N recipe(s) inside" chip — that stated the same
-  // number twice. `recipeItemTypeFromRecipeCount` still returns the bare enum, because
-  // the Books & Scrolls type FILTER builds its options from those values and would
-  // otherwise grow one option per distinct count.
+  // `recipeItemTypeFromRecipeCount` returns a diagnostic enum, not display copy, so the mapping to
+  // keys happens HERE. The count rides the label ("3 Recipe Book") instead of a second chip, while
+  // the projection keeps returning the bare enum so the Books & Scrolls type FILTER stays finite.
   function typeLabel(type, count) {
     if (type === 'Book') {
       return fill(text('FABRICATE.Admin.Manager.Knowledge.TypeRecipeBook', '{count} Recipe Book'), {
@@ -74,8 +54,7 @@
     return text('FABRICATE.Admin.Manager.Knowledge.TypeIncomplete', 'Incomplete');
   }
 
-  // Every key is a static literal at its call site so `ui-lang-keys-resolve` and
-  // `lang-keys-no-orphans` can both see the leaf.
+  // Static literals at the call site so `ui-lang-keys-resolve` and `lang-keys-no-orphans` see them.
   function matchTierLabel(tier) {
     if (tier === 'identity')
       return text('FABRICATE.Admin.Manager.Knowledge.MatchIdentity', 'Durable match');
@@ -87,11 +66,8 @@
     return '';
   }
 
-  // The match tier is GM DIAGNOSTIC info, so only the actionable tier earns a chip:
-  // `duplicate` is the low-confidence provenance tier the bulk auto-learn gate already
-  // refuses. The other three would put a fourth bare, unexplained chip on every row in
-  // the pane that is narrowest exactly where the geometry guard measures, so they are
-  // carried in the row's title instead.
+  // Only the ACTIONABLE tier earns a chip: `duplicate` is the tier bulk auto-learn already refuses.
+  // The other three ride the row's title, rather than a fourth bare chip in the narrowest pane.
   function matchTierTitle(row) {
     const label = matchTierLabel(row.matchTier);
     if (!label) return '';
@@ -163,9 +139,7 @@
     <span class="manager-knowledge-copy-identity">
       <Medallion art={copy.img} icon="fas fa-book" size={44} alt="" />
       <span class="manager-knowledge-copy-copy">
-        <!-- Line 1 is the prototype's rhythm: name, type, quantity. Keeping the type
-             pill here rather than in the chip row is what lets line 2 carry the whole
-             state vocabulary and saves a line in the narrow band. -->
+        <!-- The prototype's rhythm — name, type, quantity — which leaves line 2 the state chips. -->
         <span class="manager-knowledge-copy-heading">
           <strong class="manager-knowledge-copy-name" title={copy.name}>{copy.name}</strong>
           <Chip data-knowledge-type={copy.type} data-knowledge-recipe-count={copy.recipeCount}
@@ -219,8 +193,7 @@
         aria-label={expendTitle(copy)}
         onclick={() => onExpend(copy.itemId)}
       >
-        <!-- Deliberately NOT `fa-fire-flame-curved`: that is the remaining-uses chip's
-             glyph, and repeating it on the action beside it reads as the same thing. -->
+        <!-- NOT `fa-fire-flame-curved`: that is the uses chip's glyph, one element away. -->
         <i class="fas fa-fire" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Knowledge.Expend', 'Expend use')}</span>
       </ManagerButton>

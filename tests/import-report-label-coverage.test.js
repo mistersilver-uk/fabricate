@@ -1,31 +1,4 @@
-/**
- * Issue 877 — the import report must never render a raw localization key.
- *
- * It did: `FABRICATE.Admin.ImportReport.OwnerType.recipeItem` appeared verbatim in the
- * GM's report, because the resolver emits an owner type (`recipeItem`, for recipe-book
- * membership) that `lang/en.json` never declared. Nothing failed — `buildImportReportContent`
- * simply passes the un-translated key through as the label.
- *
- * A literal grep for owner types UNDERCOUNTS, because several reach the report through
- * dynamic pass-through: `collectMacroDescriptors(records, ownerType, …)` takes its owner
- * type from the CALL SITE, and the internal `push(kind, ownerType, …)` helper takes both
- * from its callers. So this guard is a UNION of two views, neither of which is trusted
- * alone:
- *
- *   1. BEHAVIOURAL — drive the real `resolveImportReferences` over a payload that trips
- *      every emitting site, and read the `(kind, ownerType)` pairs it actually produced.
- *      This is what catches the dynamic pass-through.
- *   2. STATIC — sweep `src/systems/**` for owner types written as string LITERALS, which
- *      catches producers outside the resolver (`CompendiumImporter._foldComponentReferences`
- *      emits the `sourceItem` / `component` pair, and no pure payload can reach it).
- *
- * Kinds are additionally checked against the declared `REFERENCE_KINDS` enum, which is the
- * complete kind vocabulary by construction.
- *
- * The headline assertion is deliberately end-to-end: build the real report content with a
- * real `lang/en.json`-backed localizer and assert that no rendered label still equals the
- * key it was looked up by. That is the user-visible defect, stated once.
- */
+/** Issue 877 — the import report must never render a raw localization key. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -37,7 +10,7 @@ import {
   REFERENCE_KINDS,
   resolveImportReferences,
 } from '../src/systems/importReferenceResolver.js';
-import { buildImportReportContent } from '../src/systems/importReportContent.js';
+import { buildImportReportContent } from '../src/ui/presenters/importReportContent.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const LANG = JSON.parse(readFileSync(join(ROOT, 'lang', 'en.json'), 'utf8'));
@@ -58,9 +31,8 @@ function localize(key, data) {
 }
 
 /**
- * A payload rigged so EVERY reference site in `importReferenceResolver.js` emits: both
- * external descriptor classes and every internal broken-reference push. Every `ghost-*`
- * id and `*.missing*` uuid is deliberately unresolvable.
+ * A payload rigged so EVERY reference site in `importReferenceResolver.js` emits: both external
+ * descriptor classes and every internal broken-reference push.
  */
 function everyReferencePayload() {
   return {
@@ -152,12 +124,7 @@ function everyReferencePayload() {
   };
 }
 
-/**
- * The four world-scope entity kinds (issue 1364). No pure payload can reach them: they are
- * emitted by `prepareForImport` and `CompendiumImporter` rather than by `resolveImportReferences`,
- * exactly as `sourceItem` is, so the behavioural view below excludes them and the
- * enum-completeness assertion is what covers them instead.
- */
+/** The four world-scope entity kinds (issue 1364). */
 const IMPORTER_ONLY_KINDS = new Set([
   REFERENCE_KINDS.SOURCE_ITEM,
   REFERENCE_KINDS.WORLD_ENTITY_COLLISION,
@@ -170,8 +137,7 @@ const IMPORTER_ONLY_KINDS = new Set([
 /**
  * The owner types `lang/en.json` declares, pinned as a LITERAL so introducing a scope-level owner
  * type such as `worldEntity` or `worldScope` fails here rather than passing on the strength of
- * having added its own label. The four world-scope kinds reuse the shipped entity-specific owner
- * types, and the one ownerless entry takes the shipped `unknown`.
+ * having added its own label.
  */
 const DECLARED_OWNER_TYPES = [
   'component',
@@ -254,12 +220,7 @@ test('every owner type the import can emit has an OwnerType label', async () => 
 
 test('no NEW ownerType is introduced — the declared set is exactly the shipped one', () => {
   // The second arm of issue 1364's label criterion, and it points the OPPOSITE way to the guard
-  // above. That one fails when an emitted owner type has no label; this one fails when a label is
-  // ADDED for a scope-level owner type such as `worldEntity` or `worldScope`. A generic owner type
-  // is the unsearchable noun the epic's naming ruling rejects, and it would lose the entity type
-  // in a report already grouped by kind — so the four world-scope kinds reuse `component` /
-  // `tool` / `essence`, and the one entry whose subject is a SETTING rather than a record takes
-  // the shipped `unknown`.
+  // above.
   assert.deepEqual(
     Object.keys(REPORT_STRINGS.OwnerType).sort(),
     [...DECLARED_OWNER_TYPES].sort(),

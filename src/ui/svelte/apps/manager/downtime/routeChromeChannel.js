@@ -2,73 +2,38 @@ import { requireNonEmptyString } from '../../../../extensionRegistry.js';
 import { normalizeRouteChrome } from '../../../../managerExtensions.js';
 
 /**
- * The runtime side of the Manager's World navigation seam.
+ * The runtime side of the Manager's World navigation seam. `ui-extension-points/spec.md` →
+ * "Downtime Preview and Premium Extension" is canonical for every rule below.
  *
- * WHAT PROBLEM THIS SOLVES. A provider's route chrome used to be fixed at registration: a
- * tab's `title`, `subtitle`, `breadcrumb`, `actionsLabel` and `actions` were read once and
- * never again. That is enough for a companion whose tab is one screen, and wrong for one
- * whose tab is a LIST that drills into an EDITOR — the editor needs its own name, its own
- * artwork, an "Unsaved" chip and Back/Delete/Save controls, all in the page header where
- * every Fabricate editor puts them. The only way to restate chrome was to re-register the
- * provider, which flashes Core's preview through the gap and remounts the companion,
- * destroying the very editor state the header is describing.
- *
- * WHY A CHANNEL AND NOT A CONTEXT FIELD. The mount context is frozen and stays frozen, and
- * its identity is what the host's mount effect keys a remount on. A mutable chrome field
- * would break the freeze; a NEW context carrying new chrome would remount. So the context
- * carries FUNCTIONS — `setRouteChrome`, `onRouteReselect` and `onBeforeNavigate` — whose
- * writes land here, and Core re-renders its header from this channel without the context
- * identity moving at all.
- *
- * WHY THE NAVIGATION GUARD LIVES HERE TOO, in a file named after chrome. Every one of these
- * three channels is scoped to ONE MOUNT and dies with it, and that liveness rule — keyed on
- * the context object Core mints per mount — is the whole substance of this module. A guard
- * kept anywhere else would need its own copy of that rule, agreeing with this one today and
- * undetectable the day one of them learns about a lifecycle path the other does not.
- *
- * WHY THIS IS A PLAIN LEAF. It imports no Svelte and no Foundry global, so the whole
- * lifecycle — liveness, replacement, per-mount scoping, fault containment — is unit-testable
- * without mounting a component tree. The one reactive edge is `onChange`, which the Manager
- * root points at a `$state` assignment.
- *
- * WHY LIVENESS IS KEYED ON THE CONTEXT OBJECT. A companion may retain a context after its
- * mount has ended (a pending promise, a stray listener) and call `setRouteChrome` from it.
- * The context object is already minted once per mount — Core replaces it, never mutates it,
- * whenever anything a mount depends on changes — so it is the identity that was already
- * available, and comparing against it means a stale mount writes nothing rather than
- * repainting whatever screen the GM has since navigated to.
+ * A CHANNEL rather than a context field: the mount context is frozen and its identity keys a
+ * remount, so a mutable chrome field would break the freeze and a new context would remount; the
+ * context carries FUNCTIONS whose writes land here instead. All three channels are scoped to ONE
+ * MOUNT and die with it, keyed on the context object Core mints per mount. That single liveness
+ * rule is the whole substance of this module — which is why the navigation guard lives here too —
+ * and it makes this a PLAIN LEAF whose one reactive edge is `onChange`.
  */
 
 /**
- * The frozen channel a Manager root owns for its Downtime surface.
- *
- * @typedef {object} RouteChromeChannel
- * @property {(context: object) => void} beginMount Adopt `context` as the live mount and
- *   clear any chrome and reselect handler the previous one left behind.
+ * @typedef {object} RouteChromeChannel The frozen channel a Manager root owns for Downtime.
+ * @property {(context: object) => void} beginMount Adopt `context`, clearing the previous mount's.
  * @property {(context: object) => void} endMount Release `context` if it is the live mount.
- * @property {(caller: object, chrome: object|null) => boolean} setChrome Validate and store
- *   one chrome update on behalf of `caller`.
- * @property {(caller: object, handler: () => void) => (() => void)} onReselect Register
- *   `caller`'s re-activation handler and return an idempotent unsubscribe.
+ * @property {(caller: object, chrome: object|null) => boolean} setChrome Validate and store one update.
+ * @property {(caller: object, handler: () => void) => (() => void)} onReselect Register `caller`'s
+ *   re-activation handler; returns an idempotent unsubscribe.
  * @property {() => boolean} reselect Invoke the live handler, contained.
  * @property {boolean} canReselect Whether a live handler is registered right now.
- * @property {(caller: object, handler: Function) => (() => void)} onBeforeNavigate Register
- *   `caller`'s navigation guard and return an idempotent unsubscribe.
- * @property {(reason: string) => (undefined|boolean|Promise<boolean>)} confirmNavigation Ask
- *   the live mount's guard whether one navigation may proceed. `undefined` means there is
- *   nothing to ask.
- * @property {(caller: object, tabId: string) => (boolean|Promise<boolean>)} navigate Move the
- *   GM to one of the live mount's own tabs on `caller`'s behalf. Refused, as `false`, from a
- *   retired mount and from inside a guard answer this channel is still waiting on.
+ * @property {(caller: object, handler: Function) => (() => void)} onBeforeNavigate As `onReselect`,
+ *   for the navigation guard.
+ * @property {(reason: string) => (undefined|boolean|Promise<boolean>)} confirmNavigation Ask the
+ *   live guard; `undefined` means there is nothing to ask.
+ * @property {(caller: object, tabId: string) => (boolean|Promise<boolean>)} navigate Move the GM to
+ *   one of the live mount's own tabs. `false` from a retired mount, and from inside a pending guard.
  * @property {object|null} chrome The chrome Core should render, or `null` for the tab's own.
  */
 
 /**
- * The message Core logs when a companion's navigation guard fails.
- *
- * ONE constant because both failure modes report through it: a synchronous throw and a
- * rejected promise are the same defect wearing two shapes, and a companion reading its log
- * should not have to know which shape its guard produced to find the line.
+ * The message Core logs when a guard fails. ONE constant: a synchronous throw and a rejected promise
+ * are the same defect in two shapes, and a companion should not need to know which to find the line.
  */
 const GUARD_FAILURE = 'Fabricate | Downtime navigation guard failed:';
 
@@ -76,30 +41,13 @@ const GUARD_FAILURE = 'Fabricate | Downtime navigation guard failed:';
  * Create one Downtime route-chrome channel.
  *
  * @param {object} [options] Injectable edges.
- * @param {(chrome: object|null) => void} [options.onChange] Called with the chrome Core must
- *   render whenever it changes, and only when it changes.
- * @param {(available: boolean) => void} [options.onReselectAvailable] Called whether a live
- *   re-activation handler exists whenever that changes, and only when it changes.
- *
- *   SEPARATE FROM `onChange` because they are separate facts. Chrome is what the header SAYS
- *   and this is what one of its controls can DO, and a companion may publish either without
- *   the other. Core needs it because its breadcrumb offers the tab crumb as a way back up
- *   into the companion's own list — and a crumb rendered as a button over a mount that
- *   registered no handler is a control that visibly does nothing when pressed.
+ * @param {(chrome: object|null) => void} [options.onChange] The chrome Core must render, on change.
+ * @param {(available: boolean) => void} [options.onReselectAvailable] Whether a live handler exists,
+ *   on change. SEPARATE from `onChange`: chrome is what the header SAYS and this is what one of its
+ *   controls can DO, and a tab crumb over a mount that registered no handler does nothing.
  * @param {(tabId: string) => (boolean|Promise<boolean>)} [options.onNavigate] Perform one
- *   companion-requested tab navigation, and answer whether the GM moved.
- *
- *   INJECTED RATHER THAN IMPLEMENTED, because the two halves of `navigateToTab` belong to
- *   different owners. LIVENESS is this channel's — it is the same per-mount identity rule
- *   `setChrome`, `onReselect` and `onBeforeNavigate` are already bound by, and a fourth copy of
- *   it elsewhere would be a copy that agrees today and drifts the day one of them learns about
- *   a lifecycle path the other does not. MEMBERSHIP and the navigation itself are Core's: this
- *   module is a plain leaf that knows no tab set and owns no route, and the host is where the
- *   registered provider's tabs and the rail's own click handler already are. So a call that
- *   survives the liveness gate arrives here, and what it may reach is decided there.
- *
- *   The default refuses everything, so a channel created without a host — every unit test of
- *   the three members above — cannot navigate a GM who is not there.
+ *   companion-requested navigation. INJECTED: LIVENESS is this channel's, MEMBERSHIP and the move
+ *   are Core's. The default refuses, so a channel with no host cannot navigate an absent GM.
  * @param {(...args: unknown[]) => void} [options.reportError] Sink for a throwing handler.
  * @returns {RouteChromeChannel} Frozen channel.
  */
@@ -107,11 +55,8 @@ export function createRouteChromeChannel({
   onChange = () => {},
   onReselectAvailable = () => {},
   onNavigate = () => false,
-  // Read through `console` at CALL time rather than defaulting to the bare `console.error`
-  // reference. A channel is created once, when the Manager root initialises, so a captured
-  // reference would pin whatever `console.error` was at that instant — which is what makes a
-  // later swap (a test harness, a Foundry log wrapper, a debugging shim) silently ineffective
-  // against this one sink while working everywhere else.
+  // Read through `console` at CALL time: a channel is created once, so a captured reference would
+  // pin whatever `console.error` was then and make a later swap silently ineffective here.
   reportError = (...args) => console.error(...args),
 } = {}) {
   // The context object of the mount currently on screen, or null between mounts.
@@ -119,18 +64,13 @@ export function createRouteChromeChannel({
   let chrome = null;
   let reselectHandler = null;
   let navigateHandler = null;
-  // The in-flight guard answer, shared by every navigation that arrives while it is pending.
-  // See `confirmNavigation` for why it is shared rather than refused or re-asked.
   let pendingNavigation = null;
-  // Whether a guard is being asked RIGHT NOW, inside its own synchronous body. `pendingNavigation`
-  // cannot answer that: it is assigned only after the handler has returned, and only when the
-  // handler returned a promise, so throughout the one window in which a companion's guard can
-  // call back into this channel it is still `null`. See `navigate` for what that window means.
+  // Whether a guard is being asked RIGHT NOW: `pendingNavigation` is still `null` through that
+  // window, being assigned only after the handler returns.
   let askingGuard = false;
 
-  // Every assignment to `reselectHandler` goes through here, so no path can move it without
-  // telling Core. Guarded on change for the same reason `publish` is: a mount that registers
-  // no handler must never wake the header's readers.
+  // Every assignment goes through here, guarded on change, so a mount that registers no handler
+  // never wakes the header's readers.
   function setReselectHandler(next) {
     if (reselectHandler === next) return;
     const was = reselectHandler !== null;
@@ -139,8 +79,7 @@ export function createRouteChromeChannel({
   }
 
   function publish(next) {
-    // Guarded so a mount that sets no chrome — the common case, and every shipped companion
-    // today — never republishes `null` over `null` and never wakes the header's readers.
+    // Guarded, so a mount that sets no chrome never republishes `null` over `null`.
     if (chrome === next) return;
     chrome = next;
     onChange(chrome);
@@ -154,9 +93,8 @@ export function createRouteChromeChannel({
     liveContext = null;
     setReselectHandler(null);
     navigateHandler = null;
-    // A navigation still waiting on the old mount's dialog keeps the promise it was already
-    // handed; what must not survive is the VARIABLE, or the next mount's first navigation
-    // would be answered by a prompt describing a screen that no longer exists.
+    // A navigation awaiting the old dialog keeps its promise; the VARIABLE must not survive, or the
+    // next mount's first navigation would be answered by a prompt about a screen that is gone.
     pendingNavigation = null;
     publish(null);
   }
@@ -167,10 +105,8 @@ export function createRouteChromeChannel({
 
   return Object.freeze({
     beginMount(context) {
-      // A fresh mount starts from the tab's REGISTERED chrome, always. Carrying the previous
-      // mount's chrome across would mean a GM who left a companion's editor open, switched
-      // tab and came back would arrive on a list screen still wearing the editor's title,
-      // artwork, Unsaved chip and Save button — describing state the remount just discarded.
+      // A fresh mount starts from the tab's REGISTERED chrome, always: carrying the old mount's
+      // across would dress a list screen in an editor's title, chip and Save button.
       setReselectHandler(null);
       navigateHandler = null;
       pendingNavigation = null;
@@ -184,10 +120,8 @@ export function createRouteChromeChannel({
     },
 
     setChrome(caller, next) {
-      // Validate FIRST and unconditionally, so a malformed update is refused with the same
-      // message whoever sent it, and so a refusal can never leave half of one applied. The
-      // `TypeError` travels back to the companion's own call stack, which is where a
-      // programming error belongs; Core's state is untouched either way.
+      // Validate FIRST and unconditionally, so a malformed update is refused with the same message
+      // whoever sent it and the `TypeError` lands in the companion's own call stack.
       const normalized = normalizeRouteChrome(next);
       if (!isLive(caller)) return false;
       publish(normalized);
@@ -204,8 +138,7 @@ export function createRouteChromeChannel({
       return () => {
         if (!subscribed) return;
         subscribed = false;
-        // Only clear a handler that is still this one: a later `onRouteReselect` replaced it,
-        // and an unsubscribe held over that replacement must not evict the newer handler.
+        // Only clear a handler that is still this one, so a stale unsubscribe evicts nothing.
         if (reselectHandler === handler) setReselectHandler(null);
       };
     },
@@ -217,8 +150,7 @@ export function createRouteChromeChannel({
         handler();
         return true;
       } catch (error) {
-        // Core invokes this one, so Core contains it: a companion that throws while popping
-        // its own drill-down must not take the Manager's rail click down with it.
+        // Core invokes it, so Core contains it: a throwing companion must not take the rail click.
         reportError('Fabricate | Downtime route re-activation handler failed:', error);
         return false;
       }
@@ -234,47 +166,37 @@ export function createRouteChromeChannel({
       return () => {
         if (!subscribed) return;
         subscribed = false;
-        // Same replacement rule as `onReselect`: an unsubscribe held across a later
-        // registration must not evict the handler that replaced it.
+        // Same replacement rule as `onReselect`.
         if (navigateHandler === handler) navigateHandler = null;
       };
     },
 
     confirmNavigation(reason) {
-      // `undefined` — deliberately NOT `true` — is the answer when there is nothing to ask,
-      // and it IS the compatibility guarantee. It lets every caller run the exact code path it
-      // ran before this channel existed: no extra `await`, no extra microtask, no reordering,
-      // for the companion that never registers a guard and for every Core route.
+      // `undefined`, deliberately NOT `true`, when there is nothing to ask: it is what lets a caller
+      // run its pre-channel path with no extra `await` or microtask.
       if (!navigateHandler) return undefined;
-      // RE-ENTRANCY. A guard is expected to await a dialog, and a second navigation can arrive
-      // while that dialog is open — a rail click, then the window's close button. Calling the
-      // handler again would stack a second dialog on top of the first; answering the second
-      // navigation `false` outright would hand the GM a dead click with nothing to explain it.
-      // So the pending answer is SHARED: the GM's one decision resolves both navigations, and
-      // each caller then runs its own continuation. This is the same de-duplication
-      // `confirmDiscardDirtyToolsDraft` already applies to Core's own concurrent prompt.
+      // RE-ENTRANCY. A second navigation can arrive while the guard's dialog is open. Calling the
+      // handler again would stack a second dialog; refusing outright would be a dead click. So the
+      // pending answer is SHARED — one GM decision resolves both — as `confirmDiscardDirtyToolsDraft`
+      // already does for Core's own concurrent prompt.
       if (pendingNavigation) return pendingNavigation;
       let result;
-      // `finally`, not a pair of assignments: a guard that THROWS must release this as surely as
-      // one that returns, or the first companion defect would leave `navigateToTab` refusing for
-      // the rest of the mount — a second, quieter failure caused by the containment of the first.
+      // `finally`, not a pair of assignments: a THROWING guard must release this too, or one defect
+      // would leave `navigateToTab` refusing for the rest of the mount.
       askingGuard = true;
       try {
         result = navigateHandler(Object.freeze({ reason }));
       } catch (error) {
-        // A THROWN GUARD ALLOWS THE NAVIGATION, contained and reported. The alternative —
-        // reading a throw as a veto — lets one companion defect leave the GM in a Manager they
-        // cannot close and a rail that does nothing, recoverable only by reloading Foundry.
-        // Allowing costs strictly less: it degrades to the behaviour that shipped before this
-        // seam existed, where a screen exit neither wrote nor discarded a companion's draft.
+        // A THROWN GUARD ALLOWS THE NAVIGATION, contained and reported. Reading a throw as a veto
+        // would let one defect trap the GM in a Manager they cannot close; allowing degrades to the
+        // behaviour that shipped before this seam existed.
         reportGuardFailure(error);
         return undefined;
       } finally {
         askingGuard = false;
       }
-      // Only an explicit `false` vetoes. An omitted return, `undefined`, `true` or anything
-      // else allows, so a handler written to OBSERVE a navigation cannot accidentally trap the
-      // GM by forgetting to return. This is the same `=== false` reading every Core guard uses.
+      // Only an explicit `false` vetoes — the same `=== false` reading every Core guard uses — so an
+      // observing handler cannot trap the GM by forgetting to return.
       if (!result || typeof result.then !== 'function') return result !== false;
       const settled = Promise.resolve(result).then(
         (value) => value !== false,
@@ -292,35 +214,19 @@ export function createRouteChromeChannel({
     },
 
     navigate(caller, tabId) {
-      // Validated FIRST and unconditionally, for the reason `setChrome` states: a malformed
-      // argument is refused with the same message whoever sent it and whatever the mount's
-      // liveness, so a companion cannot be told its own defect is a dead mount. The `TypeError`
-      // travels back up the companion's own call stack, where a programming error belongs.
+      // Validated FIRST and unconditionally, for the reason `setChrome` states: a companion must not
+      // be told its own defect is a dead mount.
       requireNonEmptyString(
         tabId,
         'Fabricate World navigation navigateToTab requires a non-empty tab id'
       );
-      // A RETIRED MOUNT MOVES NOBODY. Same identity rule as `setChrome`, and the stakes are
-      // higher here: repainting a header the GM has left is a cosmetic wrong, and dragging them
-      // off the screen they chose is not.
+      // A RETIRED MOUNT MOVES NOBODY: the same identity rule as `setChrome`, for higher stakes.
       if (!isLive(caller)) return false;
-      // AND NEITHER DOES A MOUNT WHOSE OWN GUARD IS STILL BEING ASKED. `onBeforeNavigate`'s
-      // pending-answer rule DE-DUPLICATES two navigations Core raises concurrently, because one
-      // GM decision genuinely answers both. This is not that. Here the companion is BOTH the
-      // party being asked and the party asking, and its second question has a different
-      // destination — so the outstanding answer is not an answer to it, and there is nothing to
-      // share.
-      //
-      // The shape this refuses is the tempting one: "veto this move, and send the GM to Settings
-      // instead", written as a `navigateToTab` inside the guard body. Nesting it is unsound in
-      // both directions. A guard that always redirects re-enters its own handler without bound,
-      // because the inner navigation asks the same guard again. A guard that redirects
-      // conditionally is worse than a hang: the inner navigation COMMITS the route before the
-      // outer veto has been applied, so a GM is moved by a decision that then comes back `false`.
-      //
-      // So the answer is `false` — the seam's own word for "nobody moved" — and a companion that
-      // wants to redirect asks AFTER its answer is given, where a redirect belongs: it is a
-      // consequence of the decision, not part of making it.
+      // AND NEITHER DOES A MOUNT WHOSE OWN GUARD IS STILL BEING ASKED: not the de-duplication above,
+      // because the companion is both asked and asking and its second question has a different
+      // destination. The refused shape is a `navigateToTab` inside the guard body — always-redirect
+      // re-enters unbounded, and conditional redirect commits the inner route before the outer veto
+      // applies. So the answer is `false`, and a redirect is asked for AFTER the answer is given.
       if (askingGuard || pendingNavigation) return false;
       return onNavigate(tabId);
     },

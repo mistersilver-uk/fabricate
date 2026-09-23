@@ -158,10 +158,7 @@ test('normalizeCurrencyConfig defaults, trims, and drops the legacy inventoryMod
   assert.equal('inventoryMode' in defaults, false);
   assert.equal(defaults.spendStrategy, 'actorProperty');
   assert.equal(defaults.providerId, '');
-  // Every DECLARED slot, emitted empty. Adding a key to `CURRENCY_MACRO_KEYS` is what backfills
-  // it into every existing world (there is no migration), so this asserts the whole set rather
-  // than three names: a normalizer that stopped emitting one would still satisfy a literal that
-  // was edited in the same commit.
+  // Every DECLARED slot, emitted empty.
   assert.deepEqual(
     Object.keys(defaults.macros).sort(),
     [...CURRENCY_MACRO_KEYS].sort()
@@ -254,9 +251,7 @@ test('CraftingSystemManager defaults time requirements ON, honouring an explicit
 });
 
 // Since issue 1278 the crafting system keeps ONLY the participation flag: the ladder, strategy,
-// provider and macros are world scope. So the per-system normalizer is asserted to emit nothing
-// else, and the legacy-adapter resolution is asserted where that legacy block can now actually
-// arrive — the world normalizer, fed by the 1.26.0 migration and the export upcast.
+// provider and macros are world scope.
 test('CraftingSystemManager reduces the per-system currency block to the participation flag', () => {
   setupGlobals({});
   const manager = new CraftingSystemManager({});
@@ -602,18 +597,7 @@ test('buildCurrencySpendUpdates stays exact when paying with mixed denominations
   assert.equal(result.updates['system.currency.gp'], 0);
 });
 
-// ---------------------------------------------------------------------------
 // Resolving a unit from a string a HUMAN wrote (issue 1342).
-//
-// `findCurrencyUnit` matches an id, exactly and case-sensitively, while every surface that RENDERS
-// a coin does so through `abbreviation` -> `label` -> `id`. Nothing resolved the other direction,
-// so a caller holding a string Fabricate itself printed could not hand it back — which is what
-// made the pooled holdings read's currency axis unusable by any caller that did not already know
-// Fabricate's internal unit ids, while its component and tool axes resolved names happily.
-//
-// These cases pin the two tiers, the precedence between them, and the ambiguity report that keeps
-// a genuine collision from being decided by a coin flip inside a read a caller may consume from.
-// ---------------------------------------------------------------------------
 
 /** Three coins whose ids, abbreviations and labels are all distinct, so a hit names its tier. */
 const NAMED_LADDER = [
@@ -650,9 +634,7 @@ test('resolveCurrencyUnitByName accepts a unit id, an abbreviation or a label', 
 });
 
 test('an exact id wins outright, so another unit’s label can never shadow it', () => {
-  // A world whose unit ids are ordinary words. If the folded tier ran first, renaming the SECOND
-  // coin's label would silently redirect a caller that has always asked for `gold` — an unrelated
-  // edit changing what a working request means.
+  // A world whose unit ids are ordinary words.
   const words = [
     { id: 'bar', label: 'Gold Bar', abbreviation: 'bar', contains: [] },
     { id: 'gold', label: 'Gold Coin', abbreviation: 'gc', contains: [] },
@@ -708,9 +690,8 @@ test('a coin with no id is unaddressable and is skipped rather than half-resolve
 
 test('every name a coin DISPLAYS is a name it ACCEPTS, across the shipped presets', () => {
   // The round trip is the property the shared field list exists to guarantee, and it is why the
-  // reverse resolver reads the same declaration the display chain reads instead of choosing its
-  // own set: a string Fabricate printed must be a string Fabricate takes back. Run over the real
-  // presets rather than a fixture, because those are the coins most worlds actually carry.
+  // reverse resolver reads the same declaration the display chain reads instead of choosing its own
+  // set: a string Fabricate printed must be a string Fabricate takes back.
   for (const preset of [DND5E_CURRENCY_PRESETS, PF2E_CURRENCY_PRESETS]) {
     const units = preset.map((entry) => normalizeCurrencyUnit(entry));
     assert.ok(units.length > 0, 'the preset really does carry coins');

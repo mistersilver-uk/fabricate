@@ -1,21 +1,4 @@
-/**
- * DOM test helper for Svelte component tests.
- *
- * Imports happy-dom and wires its Window globals into `globalThis` so that
- * Svelte compiled components and DOM APIs are available inside `node --test`
- * runs, which have no built-in browser environment.
- *
- * Usage:
- *
- *   import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
- *
- *   describe('MyComponent', () => {
- *     before(setupDOM);
- *     after(teardownDOM);
- *
- *     it('renders', () => { ... });
- *   });
- */
+/** DOM test helper for Svelte component tests. */
 
 import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
@@ -24,9 +7,8 @@ import { Window } from 'happy-dom';
 let _window = null;
 
 /**
- * Snapshot of the original property descriptors for every global we install,
- * keyed by property name. Used by teardownDOM() to restore the previous state.
- * @type {Map<string, PropertyDescriptor | undefined>}
+ * Snapshot of the original property descriptors for every global we install, keyed by property
+ * name. Used by teardownDOM() to restore the previous state.
  */
 const _originals = new Map();
 
@@ -84,12 +66,8 @@ const DOM_GLOBALS = [
 ];
 
 /**
- * Install a single value as a configurable, writable, enumerable data property
- * on `globalThis`, even when the existing descriptor is a getter-only accessor.
- * Saves the previous descriptor in `_originals` for restoration.
- *
- * @param {string} key
- * @param {unknown} value
+ * Install a single value as a configurable, writable, enumerable data property on `globalThis`,
+ * even when the existing descriptor is a getter-only accessor.
  */
 function installGlobal(key, value) {
   _originals.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
@@ -102,10 +80,8 @@ function installGlobal(key, value) {
 }
 
 /**
- * Restore a single global to the descriptor saved by installGlobal().
- * If there was no previous own descriptor, the property is deleted.
- *
- * @param {string} key
+ * Restore a single global to the descriptor saved by installGlobal(). If there was no previous own
+ * descriptor, the property is deleted.
  */
 function restoreGlobal(key) {
   const saved = _originals.get(key);
@@ -125,11 +101,8 @@ function restoreGlobal(key) {
 }
 
 /**
- * Create a fresh happy-dom Window and assign its globals to `globalThis`.
- * Previous values are saved so `teardownDOM()` can restore them.
- *
- * Call this once per test file (e.g. in a `before` hook) or per test
- * when isolation is required.
+ * Create a fresh happy-dom Window and assign its globals to `globalThis`. Previous values are saved
+ * so `teardownDOM()` can restore them.
  */
 export function setupDOM() {
   _window = new Window();
@@ -146,10 +119,8 @@ export function setupDOM() {
 }
 
 /**
- * Restore all globals that `setupDOM()` replaced and close the happy-dom
- * Window to release its resources.
- *
- * Call this in an `after` hook matching the `before` that called `setupDOM()`.
+ * Restore all globals that `setupDOM()` replaced and close the happy-dom Window to release its
+ * resources.
  */
 export function teardownDOM() {
   for (const key of DOM_GLOBALS) {
@@ -163,11 +134,8 @@ export function teardownDOM() {
 }
 
 /**
- * A short, safe description of a DOM element: tag name plus the attributes a selector would
- * have matched on. Never walks into children, parents or the owner document.
- *
- * @param {Element} element
- * @returns {string}
+ * A short, safe description of a DOM element: tag name plus the attributes a selector would have
+ * matched on. Never walks into children, parents or the owner document.
  */
 function describeElement(element) {
   const attributes = Array.from(element.attributes || [])
@@ -177,22 +145,8 @@ function describeElement(element) {
 }
 
 /**
- * Assert that `selector` matches nothing under `root`.
- *
- * NEVER hand a live happy-dom node to `node:assert`. When such an assertion FAILS, assert
- * renders both operands with `inspect(value, { depth: 1000, getters: true, sorted: true })`,
- * and a happy-dom element's own enumerable state reaches its children, its parents and its
- * owner document. The rendered string grows roughly 3.3x per level of depth — on a bare
- * twelve-node chain that is already 10 MB at depth 8 — so on a mounted application tree the
- * message allocates without bound and takes the machine down with it. The failure only ever
- * appears while someone is developing a regression, which is the worst possible moment for it.
- *
- * This helper compares a SHORT description instead, so a failure reports the offending element
- * legibly and in constant space.
- *
- * @param {ParentNode | null | undefined} root
- * @param {string} selector
- * @param {string} [message]
+ * Assert that `selector` matches nothing under `root`. NEVER hand a live happy-dom node to
+ * `node:assert`.
  */
 export function assertNoElement(root, selector, message) {
   const found = root?.querySelector(selector) ?? null;

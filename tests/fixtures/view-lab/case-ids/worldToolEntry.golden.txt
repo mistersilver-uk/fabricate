@@ -1,0 +1,17 @@
+world-tool-entry
+world-tool-entry-dirty
+world-tool-entry-overview
+world-tool-entry-unlinked
+world-tool-entry-source-missing
+world-tool-entry-name-blank
+world-tool-entry-requirements
+world-tool-entry-bonus-empty-library
+world-tool-entry-unlimited-uses
+world-tool-entry-validation
+world-tool-entry-on-break-repair-empty
+world-tool-entry-on-break-replace-empty
+world-tool-entry-on-break-repair
+world-tool-entry-on-break-repair-empty-catalogue
+world-tool-entry-on-break-repair-empty-tag
+world-tool-entry-on-break-repair-tag-picker-empty
+world-tool-entry-on-break-repair-suggestions

@@ -6,6 +6,7 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { assertSelectHasResolvedName, openSelectPanel } from '../helpers/select-control.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -19,7 +20,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-currency-subunit-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
@@ -30,25 +31,25 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
     'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js'
   ],
   compiledModules: [
     // THE APP'S ONE SELECT AND ITS WHOLE COMPILED CLOSURE (issue 1510), spread rather than copied.
-    // This tree renders `components/Select.svelte` now, and a `.svelte` the tree renders but the
-    // harness omits HANGS the suite (`# cancelled`) rather than failing it.
     ...SELECT_COMPILED_MODULES,
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/Chip.svelte',
     // The shared no-state primitive (issue 785). Same rule, same consequence.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/Field.svelte',
     // THE manager's labelled push-button (issue 1118). The currency card header and each expanded unit render it.
-    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
@@ -64,9 +65,7 @@ function flushRender() {
 const GOLD_ID = 'gold-unit-id';
 const COPPER_ID = 'K9grZcOMgO9Xbm41';
 
-// Two contains-less units: gold carries an authored abbreviation, copper's is
-// unauthored (empty). Each is an eligible sub-unit of the other (disjoint
-// reachable sets), so expanding one reveals the other in the sub-unit builder.
+// Two contains-less units: gold carries an authored abbreviation.
 const CURRENCY_UNITS = Object.freeze([
   { id: GOLD_ID, label: 'Gold', abbreviation: 'gp', actorPath: '', contains: [] },
   { id: COPPER_ID, label: 'Copper', abbreviation: '', actorPath: '', contains: [] }
@@ -75,9 +74,7 @@ const CURRENCY_UNITS = Object.freeze([
 function expandUnit(root, unitId) {
   const row = root.querySelector(`[data-world-currency-unit="${unitId}"]`);
   assert.ok(row, `currency row for ${unitId} exists`);
-  // Target the Edit control by its accessible name: the summary row also carries
-  // the Move up/down reorder chevrons (issue 768), so "first icon button" is no
-  // longer the editor.
+  // Target the Edit control by its accessible name.
   const editButton = row.querySelector(
     '.manager-character-modifier-summary [aria-label="Edit currency unit"]'
   );
@@ -87,14 +84,6 @@ function expandUnit(root, unitId) {
 
 /**
  * The rows the expanded unit's sub-unit builder OFFERS, read from its open panel (issue 1510).
- *
- * The control is the shared `<Select>` now, so there are no `<option>` elements to read and the
- * rows are not descendants of the trigger at all: `SearchablePopover` PORTALS the panel to the
- * nearest application root, which in a mounted suite is the harness's own mount target. The
- * trigger is still scoped per unit, because two expanded units would each render one.
- *
- * The builder's control carries no `data-*` hook of its own — it is captioned by the primitive's
- * own labelled form and addressed structurally, exactly as it was before the conversion.
  *
  * @param {HTMLElement} root The harness mount target, which is the portal host.
  * @param {string} unitId The expanded currency unit.

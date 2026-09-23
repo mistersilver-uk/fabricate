@@ -1,18 +1,7 @@
 /**
- * Issue 1286 — the GM-authoritative complication delivery channel.
- *
- * Two properties matter here, and the first is not confidentiality: the `craftingSystems`
- * world setting replicates unfiltered, so a determined player can already READ a `gmOnly`
- * complication. What this channel guarantees is
- *
- *   - EXECUTION authority: the macro and the GM-only card happen on a GM client, from the
- *     complication the GM's own world setting holds, never from anything on the wire, and
- *   - AUTHORIZATION: what runs is bounded to complications the SERVER-ATTESTED sender's
- *     own actor was eligible for, re-checked GM-side against that sender.
- *
- * The routing decisions are unit-tested against the module; the authorization itself lives
- * in `main.js`'s apply body, where a Foundry `Actor` is reachable, so it is pinned by the
- * composition guard at the bottom of this file rather than left asserted by nothing.
+ * Issue 1286 — the GM-authoritative complication delivery channel. Two properties matter here, and
+ * the first is not confidentiality: the `craftingSystems` world setting replicates unfiltered, so a
+ * determined player can already READ a `gmOnly` complication.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -35,9 +24,10 @@ import {
   routeComplicationDeliveryMessage,
   validateComplicationDeliveryPayload,
 } from '../src/systems/complicationSocket.js';
+import { FABRICATE_ENTRY_SOURCE } from './helpers/bootstrapEntrySource.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainSource = readFileSync(resolve(__dirname, '../src/main.js'), 'utf8');
+const mainSource = FABRICATE_ENTRY_SOURCE;
 
 function entry(overrides = {}) {
   return {
@@ -62,43 +52,23 @@ function message(overrides = {}) {
 }
 
 /**
- * The body of a top-level function in `src/main.js`, from its signature to the first
- * column-zero `}`. Slicing rather than searching the whole file is what makes the
- * ordering and absence assertions below mean anything: `main.js` mentions
- * `isGatheringActorSelectableByUser` legitimately elsewhere, on paths where the ambient
- * user IS the subject.
- *
- * @param {string} name
- * @returns {string}
+ * The body of a top-level function in the module entry, from its signature to the first column-zero
+ * `}`.
  */
 function mainFunctionBody(name) {
   const start = mainSource.indexOf(`function ${name}(`);
-  assert.ok(start !== -1, `src/main.js should declare ${name}`);
+  assert.ok(start !== -1, `the module entry should declare ${name}`);
   const end = mainSource.indexOf('\n}\n', start);
   assert.ok(end > start, `${name} should be a top-level function`);
   return mainSource.slice(start, end);
 }
 
-/**
- * Source with its comments removed, so an absence assertion reads the CODE. The apply
- * body names the inert predicates in prose precisely to explain why it does not use
- * them, and a naive text search cannot tell that apart from using one.
- *
- * @param {string} source
- * @returns {string}
- */
+/** Source with its comments removed, so an absence assertion reads the CODE. */
 function withoutComments(source) {
   return source.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/\/\/[^\n]*/g, '');
 }
 
-/**
- * Every function the GM-side apply path is composed from IN `main.js`, comments stripped.
- *
- * The pure half — the authored re-read, the `script` discriminant, the macro scope and the
- * isolation loop — moved to `complicationSocket.js` and is driven with real inputs below,
- * because a source-text pin cannot tell an exact id match apart from one with a positional
- * fallback. What is left here is genuinely a Foundry edge and can only be pinned as text.
- */
+/** Every function the GM-side apply path is composed from IN `main.js`, comments stripped. */
 function complicationApplySource() {
   return withoutComments(
     [
@@ -407,15 +377,9 @@ test('a flood from one sender is throttled, and a refused message costs no budge
 });
 
 test('1286: the budget admits the FANNED-OUT worst case a legitimate player can produce', () => {
-  // The limiter is sized from the bulk SELECTION CAP, not from "one message per run". A
-  // bulk run relays one message per addressed `(craftingSystemId, actorUuid)` pair, because
-  // both are GM-side authorization inputs — so a selection fanned all the way out is 25
-  // messages for ONE player gesture, and a player may make several such gestures inside one
-  // 60-second window while ordinary crafts and a collapsed chain relay beside them.
-  //
-  // This is asserted as BEHAVIOUR rather than as `COMPLICATION_RATE_LIMIT === 100`, which
-  // would only restate the constant. It is what caught the old 30: two fanned-out runs spent
-  // 50 against it and the tail was refused silently, on a path the player never sees.
+  // The limiter is sized from the bulk SELECTION CAP, not from "one message per run". This is
+  // asserted as BEHAVIOUR rather than as `COMPLICATION_RATE_LIMIT === 100`, which would only
+  // restate the constant.
   const BULK_SELECTION_CAP = 25; // BulkSalvageService's BULK_MAX_ITEMS, stated not imported:
   // this module is the pure half of a socket channel and must not depend on a crafting
   // service to describe its own budget.
@@ -566,12 +530,8 @@ test('the de-duplication key is the resolution, the stage occurrence and the com
   );
 });
 
-// --- Composition guard -------------------------------------------------------------
-//
-// The routing above is pure and unit-testable; the actor re-authorization is not, because
-// it needs a Foundry `Actor`. It lives in `main.js`'s apply body, so these assertions pin
-// it as source text — without them the security acceptance criteria are asserted by
-// nothing at all.
+// Composition guard. The routing above is pure and unit-testable; the actor re-authorization is
+// not, because it needs a Foundry `Actor`.
 
 test('the complication route is registered on the shared channel in its own guard', () => {
   assert.ok(
@@ -593,7 +553,7 @@ test('the complication route is registered on the shared channel in its own guar
 
   const route = mainSource.indexOf('routeComplicationDeliveryMessage(payload, {');
   const guard = mainSource.lastIndexOf('try {', route);
-  const rescue = mainSource.indexOf('} catch (_error) {', route);
+  const rescue = mainSource.indexOf('} catch {', route);
   assert.ok(guard !== -1 && guard < route, 'the route should sit inside its own try block');
   assert.ok(rescue > route, 'a throw on one payload must not starve the others on this channel');
   assert.equal(
@@ -721,11 +681,9 @@ test('1286: a macro that throws on the GM side is CONTAINED, not merely stepped 
 });
 
 test('1286: entries apply SEQUENTIALLY — entry 2 does not start until entry 1 settles', async () => {
-  // Property 3 of `applyAuthoredComplications`'s docblock, and the one an order assertion
-  // alone cannot hold: both of the tests above push synchronously at the top of their
-  // executor, so their `deepEqual` on the recorded order passes just as well under
-  // `Promise.all`. Every complication macro runs against ONE GM client's document state,
-  // which is the argument `BulkSalvageService` already makes for its own rows.
+  // Property 3 of `applyAuthoredComplications`'s docblock, and the one an order assertion alone
+  // cannot hold: both of the tests above push synchronously at the top of their executor, so their
+  // `deepEqual` on the recorded order passes just as well under `Promise.all`.
   const events = [];
   let release = () => {};
   const held = new Promise((resolve) => {
@@ -854,16 +812,7 @@ test('1286: a gmOnly complication produces a GM-only card, or it produces nothin
       'for the common case and for every macro-less complication'
   );
 
-  // The ARGUMENTS are the pin, not the call. Each of the five can be dropped on its own with
-  // the call itself — and therefore the assertion above, and every other assertion in this
-  // file — still intact, and each drop breaks the card in a different way that no suite would
-  // see: without `craftingSystemId` the chatOutput selection reads a system that does not
-  // resolve, closes for EVERY system, and no GM complication card is ever posted again;
-  // without `applied` the card defaults to no rows, `buildGmComplicationCardContent` returns
-  // '' and nothing is created; without `speaker` `applyBulkChatVisibility`'s stated caller
-  // contract is broken and the whisper speaks as nobody; and without `actor` or `senderUser`
-  // the card loses the subtitle naming whose resolution it reports, which is the only thing
-  // that makes a GM whisper reconcilable with the table's own card.
+  // The ARGUMENTS are the pin, not the call.
   const cardCall = /await postGmComplicationCard\(\{([^}]*)\}\)/.exec(withoutComments(apply));
   assert.ok(cardCall, 'the GM card is called with a single options object');
   assert.deepEqual(
@@ -893,9 +842,7 @@ test('1286: a gmOnly complication produces a GM-only card, or it produces nothin
     false,
     'core.rollMode is scope: client, so on the GM client the fallback is the GM own selector'
   );
-  // `const chatData`, NOT `speaker`. `mainFunctionBody` slices from the signature, and the
-  // signature destructures `speaker` — so `indexOf('speaker')` resolved to the PARAMETER and
-  // the ordering held for any body whatsoever, including one that never set the speaker.
+  // `const chatData`, NOT `speaker`.
   assert.ok(
     card.indexOf('const chatData') < card.indexOf('applyBulkChatVisibility'),
     'applyBulkChatVisibility requires speaker to be on chatData before it is called, so the ' +
@@ -916,22 +863,17 @@ test('1286: a gmOnly complication produces a GM-only card, or it produces nothin
     'the whole body is contained: the acting client has already returned and the award is committed'
   );
 
-  // recipes-and-steps/spec.md § "The `script` gate is a call-site check" requires a uuid that
-  // does not resolve to a script macro to be "skipped and REPORTED on the GM-facing output".
-  // A console.warn on the one client that can fix the link is not a report, so the status has
-  // to survive the runner AND reach the card. `withoutComments` because the runner explains
-  // that rule in prose directly above the return, and a raw search of the body is satisfied
-  // by the explanation.
+  // recipes-and-steps/spec.md § "The `script` gate is a call-site check" requires a uuid that does
+  // not resolve to a script macro to be "skipped and REPORTED on the GM-facing output".
   assert.ok(
     withoutComments(mainFunctionBody('runComplicationMacro')).includes(
       "return { status: 'skipped', macroUuid }"
     ),
     'the broken link is reported as skipped rather than as "no macro authored"'
   );
-  // The status reaching the ROW is asserted where the row is built —
-  // `gmComplicationCardEntries` in `complicationRuntime.js`, driven with two rows whose
-  // macro outcomes differ (`component-complications-fire.test.js`). It cannot be asserted
-  // here any more, and that is the point of moving it.
+  // The status reaching the ROW is asserted where the row is built — `gmComplicationCardEntries` in
+  // `complicationRuntime.js`, driven with two rows whose macro outcomes differ
+  // (`component-complications-fire.test.js`).
 });
 
 test('1286: the GM card consults the system OWN chatOutput toggle, and the macro does not', () => {
@@ -976,17 +918,12 @@ test('1286: the GM card consults the system OWN chatOutput toggle, and the macro
 });
 
 test('1286: a broken macro link is reported even when the system narrates nothing', () => {
-  // `recipes-and-steps/spec.md` § "The `script` gate is a call-site check" is UNCONDITIONAL:
-  // a uuid that does not resolve to a script macro "is skipped and reported on the GM-facing
-  // output". This card is the ONLY GM-facing output there is, so a gate that vetoed it
-  // outright left that report in the elected GM's browser console — which the runner's own
-  // docblock already refuses to call a report. `features.chatOutput` suppresses result
-  // NARRATION; it is not a request to stop being told that a macro link is broken.
+  // `recipes-and-steps/spec.md` § "The `script` gate is a call-site check" is UNCONDITIONAL: a uuid
+  // that does not resolve to a script macro "is skipped and reported on the GM-facing output".
   const card = withoutComments(mainFunctionBody('postGmComplicationCard')).replaceAll(/\s+/g, ' ');
 
-  // Direction one — gate OFF with a faulted row: the card is still built, from the fault rows.
-  // The backreference is load-bearing. Both branches must read the SAME delivered rows, or the
-  // gated-off branch could filter some other collection and report nothing after all.
+  // Direction one — gate OFF with a faulted row: the card is still built, from the fault rows. The
+  // backreference is load-bearing.
   assert.ok(
     /const reported = complicationChatOutputEnabled\(craftingSystemId\) \? (\w+) : \1\.filter\(\(row\) => hasComplicationMacroFault\(row\)\);/.test(
       card
@@ -1048,10 +985,9 @@ test('a GM-side apply refuses a sender who owns nothing, whatever the running us
     'the actor is re-authorized against the attested sender directly'
   );
 
-  // `actor.isOwner` resolves against the AMBIENT `game.user` and is therefore true for
-  // every actor on the GM client that evaluates it, so an `isOwner`-first predicate
-  // passes for a sender who owns nothing. The blind-gather relay shipped with that
-  // defect; issue 1288 removed it there, and it must not be reintroduced here.
+  // `actor.isOwner` resolves against the AMBIENT `game.user` and is therefore true for every actor
+  // on the GM client that evaluates it, so an `isOwner`-first predicate passes for a sender who
+  // owns nothing (issue 1288).
   for (const inert of ['isGatheringActorSelectableByUser', '.isOwner', 'game.user?.isGM']) {
     assert.equal(
       complicationApplySource().includes(inert),
@@ -1072,11 +1008,8 @@ test('a GM-side apply refuses a sender who owns nothing, whatever the running us
 });
 
 test('1286: a delivery dropped because the actor is not permission-testable is REPORTED', () => {
-  // Failing closed is right — nothing may run against an actor whose permissions cannot be
-  // asked — but the drop has to leave a trace on the one client that can diagnose it.
-  // `fromUuidSync` resolves a COMPENDIUM actor uuid to a plain index entry, which carries no
-  // `testUserPermission` at all, so a well-formed delivery addressed at one was refused with
-  // no roll, no macro, no card and nothing anywhere in the log.
+  // Failing closed is right — nothing may run against an actor whose permissions cannot be asked —
+  // but the drop has to leave a trace on the one client that can diagnose it.
   const code = withoutComments(mainFunctionBody('applyComplicationDelivery'));
   const guard = code.indexOf("typeof actor.testUserPermission !== 'function'");
   assert.notEqual(guard, -1, 'the guard itself must survive: this fix does not open it up');
@@ -1094,7 +1027,7 @@ test('1286: a delivery dropped because the actor is not permission-testable is R
 
 test('the delivery writer is composed with the Foundry edges and a non-Math.random mint', () => {
   assert.ok(
-    mainSource.includes('this.complicationDeliveryWriter = createComplicationDeliveryWriter({'),
+    mainSource.includes('fabricate.complicationDeliveryWriter = createComplicationDeliveryWriter({'),
     'the acting-client writer should be composed during bootstrap'
   );
   assert.ok(
@@ -1115,13 +1048,13 @@ test('1286: the delivery writer is INJECTED into both engines that fire complica
   // at the bootstrap site. Both engines are asserted, because only one of them is obvious.
   assert.ok(
     mainSource.includes(
-      'this.craftingEngine?.installComplicationDelivery({ writer: this.complicationDeliveryWriter })'
+      'fabricate.craftingEngine?.installComplicationDelivery({\n    writer: fabricate.complicationDeliveryWriter,\n  })'
     ),
     'the crafting engine (immediate craft, timed craft FINISH and salvage) takes the writer'
   );
   assert.ok(
     mainSource.includes(
-      'gatheringEngine?.installComplicationDelivery({ writer: this.complicationDeliveryWriter })'
+      'getGatheringEngine()?.installComplicationDelivery({\n    writer: fabricate.complicationDeliveryWriter,\n  })'
     ),
     'and so does the gathering engine'
   );

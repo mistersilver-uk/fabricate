@@ -1,6 +1,7 @@
 import {
   FABRICATE_FLAG_NAMESPACE,
   LEARNED_RECIPES_FLAG_KEY,
+  forcedDeletionEntry,
   getFabricateFlag,
   setFabricateFlag,
 } from '../config/flags.js';
@@ -2256,7 +2257,7 @@ export class RecipeVisibilityService {
    * Ids come from the ENTRY-BOUNDARY reader, never from `Object.keys` (issue 1143).
    * `Document#update` nests a dotted recipe id into a subtree, so the top level of the
    * persisted map holds the id's FIRST SEGMENT (`imported`) rather than an id. That segment
-   * names no valid recipe, so it read as stale, and the `-=imported` deletion below removed
+   * names no valid recipe, so it read as stale, and the deletion of `imported` below removed
    * the whole subtree — every sibling entry whose recipe still existed with it. See
    * `recipeKeyedFlagEntries.js` for why the walk stops at the entry and why `flattenObject`
    * is the wrong inverse.
@@ -2269,7 +2270,7 @@ export class RecipeVisibilityService {
       const staleIds = [...readLearnedRecipeEntries(learned).keys()].filter(isStale);
       if (staleIds.length === 0) continue;
       // Route through the shared deletion primitive so pruned keys are actually
-      // removed with explicit `-=` deletions (the prior filtered-map `_setLearnedMap`
+      // removed with explicit forced deletions (the prior filtered-map `_setLearnedMap`
       // rebuild MERGED, so stale keys were never deleted and resurrected on reload).
       // `freeLearnBudget: false` — recipe deletion is content management, not an
       // in-fiction un-learn, so it must not refund any consumed learn budget.
@@ -2316,22 +2317,24 @@ export class RecipeVisibilityService {
    * The shared crafting-knowledge deletion primitive (issue 773) — the single path
    * behind erase-one / reset-one-system / reset-all-systems. Removes each supplied
    * recipe id from the actor's learned-knowledge store with explicit, reload-safe
-   * `-=` flag-key deletions at the full doubly-nested path
-   * `flags.fabricate.fabricate.learnedRecipes.-=<recipeId>` (and, when `clearDiscovery`,
-   * `flags.fabricate.fabricate.discoveryProgress.-=<recipeId>`), batched into ONE
-   * `Actor#update`. It NEVER prunes by rebuilding a filtered map through `setFlag`
-   * as the sole write — that merge never removes keys and the entry resurrects on
-   * reload (the `deleteRemovedActiveRunFlags` doctrine).
+   * forced deletions under the full doubly-nested path
+   * `flags.fabricate.fabricate.learnedRecipes` (and, when `clearDiscovery`,
+   * `flags.fabricate.fabricate.discoveryProgress`), each built by `forcedDeletionEntry` and
+   * batched into ONE `Actor#update`. It NEVER prunes by rebuilding a filtered map through
+   * `setFlag` as the sole write — that merge never removes keys and the entry resurrects on
+   * reload (see the recipe-visibility spec's Knowledge Reset / Erase).
    *
    * Both stores are read through the ENTRY-BOUNDARY reader in
    * `recipeKeyedFlagEntries.js` (issue 1143), never by indexing the raw map: a dotted
    * recipe id is persisted as a SUBTREE, so `hasOwnProperty(map, 'a.b')` is false and
    * `map['a.b']` is undefined against the shape actually on the document.
    *
-   * An id routes to a two-step delete-then-write fallback whenever a batched `-=<id>`
-   * key would destroy something else — because the id is not a safe segment, OR because
-   * another entry nests inside it (`a` and `a.b` share one node, so `-=a` removes both).
-   * The fallback drops the parent key (`flags.fabricate.fabricate.-=learnedRecipes`) and
+   * An id routes to a two-step delete-then-write fallback whenever a batched per-id
+   * deletion cannot remove exactly that id's entry — because the id is not a safe
+   * segment, OR because another entry nests inside it (`a` and `a.b` share one node, so
+   * deleting `a` removes both), OR because it is `__proto__`, `constructor` or
+   * `prototype`, which `forcedDeletionEntry` refuses. The fallback drops the parent key
+   * (`learnedRecipes`) and
    * re-writes the retained map, rebuilt from the entry view rather than by filtering the
    * raw top level — two SEQUENTIAL awaited operations, never a same-update mix (which
    * `mergeObject` may process delete-after-insert and wipe the whole map).
@@ -2381,7 +2384,7 @@ export class RecipeVisibilityService {
       ? learnedPlan.ids.map((id) => ({ recipeId: id, entry: learnedPlan.entries.get(id) }))
       : [];
 
-    // Common (generated-id) case: batch every in-place `-=` deletion, across both
+    // Common (generated-id) case: batch every in-place deletion, across both
     // stores, into ONE update. A store holding an id that cannot be deleted in place
     // contributes nothing here and takes the two-step fallback below instead.
     const updates = Object.assign({}, ...plans.map((plan) => this._inPlaceDeletions(plan)));
@@ -2415,8 +2418,8 @@ export class RecipeVisibilityService {
    * by `Document#update`, so `hasOwnProperty(map, 'a.b')` is false and `map['a.b']` is
    * undefined against the shape actually on the document.
    *
-   * `needsRebuild` is true when ANY requested id cannot be removed by a batched `-=<id>`
-   * key without destroying something else — see {@link isDirectlyDeletableId}. It is
+   * `needsRebuild` is true when ANY requested id cannot be removed by a batched per-id
+   * deletion without destroying something else — see {@link isDirectlyDeletableId}. It is
    * all-or-nothing per store because the fallback rewrites the whole map anyway.
    *
    * @private
@@ -2452,14 +2455,19 @@ export class RecipeVisibilityService {
     );
   }
 
-  // The in-place `-=` deletion keys for one plan, or nothing when that store has to be
+  // The in-place deletion entries for one plan, or nothing when that store has to be
   // rebuilt instead. Returned as a payload fragment so every store's deletions merge
-  // into ONE `Actor#update`.
+  // into ONE `Actor#update`. An id the helper will not address reroutes the store.
+  // Rerouting sets needsRebuild here, so this must run before the two-step loop reads it.
   _inPlaceDeletions(plan) {
     if (plan.needsRebuild) return {};
-    return Object.fromEntries(
-      plan.ids.map((id) => [`${this._nestedFlagPath}.${plan.flagKey}.-=${id}`, null])
-    );
+    const parentPath = `${this._nestedFlagPath}.${plan.flagKey}`;
+    const entries = plan.ids.map((id) => forcedDeletionEntry(parentPath, id));
+    if (entries.some((entry) => !entry)) {
+      plan.needsRebuild = true;
+      return {};
+    }
+    return Object.fromEntries(entries);
   }
 
   /**
@@ -2479,7 +2487,8 @@ export class RecipeVisibilityService {
    * @private
    */
   async _rebuildStoreWithoutIds(actor, plan) {
-    await actor.update({ [`${this._nestedFlagPath}.-=${plan.flagKey}`]: null });
+    const [path, deletion] = forcedDeletionEntry(this._nestedFlagPath, plan.flagKey);
+    await actor.update({ [path]: deletion });
     const cleared = new Set(plan.ids);
     const retained = buildFlagMapFromEntries([...plan.entries].filter(([id]) => !cleared.has(id)));
     await plan.write(actor, retained);

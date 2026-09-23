@@ -1,26 +1,7 @@
 /**
- * Regression for issue 572 — the alchemy submission DOUBLE-BUCKETING bug.
- *
- * A divergent-lineage owned item (durable identity `roles[sys].componentId = B`,
- * but a transitive `_stats.duplicateSource` pointing at component A's source) was
- * bucketed to B by the #558-fixed engine, yet to A by TWO other systemId-blind
- * sites — the workbench owned-components PALETTE
- * (`AlchemyListingBuilder._projectOwnedComponents`) and the submission COLLECTOR
- * (`resolveAlchemySubmissions`). The palette and collector therefore disagreed with
- * the engine.
- *
- * These tests drive the REAL palette projection and the REAL collector (NOT
- * hand-built submissions and NOT a hand-supplied `systemId`): the palette buckets
- * the divergent item, we feed the id the palette EMITTED into the collector exactly
- * as `Fabricate#submitAlchemyAttempt` does (see the source guard below), and the
- * collector's record flows into `craftAlchemy`. A fix that lands the collector but
- * leaves the palette systemId-blind (or the reverse) goes RED.
- *
- * Fixture invariant (LOAD-BEARING): the divergent item is `roles`-ONLY — no legacy
- * scalar `flags.fabricate.componentId`. With a scalar present,
- * `resolveComponentForItem(item, components, undefined)` would resolve B via the
- * legacy tier even systemId-blind, the divergence would vanish, and the test would
- * be vacuously green on the unfixed base. Omitting the scalar is what makes it RED.
+ * Regression for issue 572 — the alchemy submission DOUBLE-BUCKETING bug. Fixture invariant
+ * (LOAD-BEARING): the divergent item is `roles`-ONLY — no legacy scalar
+ * `flags.fabricate.componentId`.
  */
 
 import { readFileSync } from 'node:fs';
@@ -31,6 +12,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { roleItem } from './helpers/componentIdentityFixtures.js';
+import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
+
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -47,7 +30,7 @@ globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => 
 
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { SignatureValidator } = await import('../src/systems/SignatureValidator.js');
-const { AlchemyListingBuilder } = await import('../src/systems/AlchemyListingBuilder.js');
+const { AlchemyListingBuilder } = await import('../src/ui/presenters/AlchemyListingBuilder.js');
 const { resolveAlchemySubmissions } = await import('../src/utils/alchemySubmissions.js');
 const { getItemSourceReferences } = await import('../src/utils/sourceUuid.js');
 
@@ -155,9 +138,8 @@ test('tier-union pin: a name-only submission is attributed and credited through 
 
 test('tier-union pin: a bare-registeredItemUuid-only submission is attributed and credited through palette->collector->craftAlchemy', async () => {
   const w = world();
-  // ONLY a bare top-level registeredItemUuid naming A's match uuid — no uuid,
-  // compendium source, duplicateSource, roles, scalar, or name. Invisible to
-  // getItemSourceReferences; only the bare-uuid supplement tier can attribute it.
+  // ONLY a bare top-level registeredItemUuid naming A's match uuid — no uuid, compendium source,
+  // duplicateSource, roles, scalar, or name.
   const item = { registeredItemUuid: 'Item.A', system: { quantity: 1 } };
 
   const { row, result, captured } = await paletteToBrew(w, item);
@@ -185,13 +167,11 @@ test('resolveAlchemySubmissions returns { item, componentId } records bucketed s
 });
 
 test('the facade threads craftingSystemId into the collector so the palette and collector agree (main.js seam guard)', () => {
-  // Fabricate#submitAlchemyAttempt is not runtime-importable in the node test env
-  // (src/main.js imports a .css asset), so this asserts the seam on source text —
-  // the established pattern for src/main.js coverage in this repo. Without the
-  // fourth `craftingSystemId` argument the collector is systemId-blind and drops a
-  // B-bucketed placement the fixed palette emits (the naive-partial-fix regression).
+  // Fabricate#submitAlchemyAttempt is not runtime-importable in the node test env (src/main.js
+  // imports a .css asset), so this asserts the seam on source text — the established pattern for
+  // src/main.js coverage in this repo.
   const __dirname = dirname(fileURLToPath(import.meta.url));
-  const mainSource = readFileSync(resolve(__dirname, '../src/main.js'), 'utf8');
+  const mainSource = entryModuleSource('src/bootstrap/craftingFacade.js');
   assert.match(
     mainSource,
     /resolveAlchemySubmissions\(\s*sources,\s*components,\s*submittedComponentIds,\s*craftingSystemId\s*\)/,

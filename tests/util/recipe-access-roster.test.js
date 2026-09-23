@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveRecipeAccessRoster } from '../../src/utils/recipeAccessRoster.js';
+import { resolveRecipeAccessRoster } from '../../src/ui/model/recipeAccessRoster.js';
 
 const ADA = { id: 'u1', name: 'Ada', avatar: 'icons/ada.webp' };
 const BRIN = { id: 'u2', name: 'Brin', avatar: '' };
@@ -39,9 +39,7 @@ describe('resolveRecipeAccessRoster', () => {
   });
 
   it('DROPS an id that no longer resolves rather than mutating the grant', () => {
-    // A deleted actor or user leaves its id in `access`. The rail is READ-ONLY: it must
-    // omit the row, never persist the grant back without it (that would silently revoke
-    // access the GM never revoked).
+    // A deleted actor or user leaves its id in `access`.
     const access = { playerIds: ['u1', 'ghost-user'], characterIds: ['a1', 'ghost-actor'] };
     const resolved = resolveRecipeAccessRoster(access, {
       players: [ADA],
@@ -57,10 +55,8 @@ describe('resolveRecipeAccessRoster', () => {
   });
 
   it('honours a granted character OUTSIDE the player-character roster', () => {
-    // The runtime predicate applies no type filter, so a grant naming a non-PC actor is
-    // still honoured by the engine. The roster passed here is `game.actors`, not the
-    // isPlayerCharacterActor-filtered list — resolving over the latter would drop the
-    // grant from display and under-report access.
+    // The runtime predicate applies no type filter, so a grant naming a non-PC actor is still
+    // honoured by the engine.
     const vehicle = character({ id: 'a-vehicle', name: 'The Wagon' });
     const resolved = resolveRecipeAccessRoster(
       { characterIds: ['a-vehicle'] },

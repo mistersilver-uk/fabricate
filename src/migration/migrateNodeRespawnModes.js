@@ -1,26 +1,9 @@
 /**
- * 0.4.0 migration — collapse resource-node respawn policies.
- *
- * Old policies: `none | manual | elapsedTime | probability | manualAndElapsedTime`.
- * New policies: `manual | overTime`, where `overTime` carries a `gainMode`
- * (`guaranteed | chance | expression`). Mapping:
- *   none | undefined       -> manual
- *   manual                 -> manual
- *   elapsedTime            -> overTime + guaranteed
- *   probability            -> overTime + chance
- *   manualAndElapsedTime   -> overTime + chance   (the manual half is dropped;
- *                             GMs still top up counts via the restock API)
- *
- * Respawn config lives in three places, all migrated here:
- *   - library tasks:        `gatheringConfig.systems[sid].tasks[].nodes.respawn`
- *   - inline env tasks:     `environments[].tasks[].nodes.respawn`
- *   - per-env runtime state:`environments[].nodeRuntime[taskId].respawn`
- *
- * Pure, idempotent, and shape-preserving: records already on the new schema (or
- * with no respawn block) are returned by reference, so re-running is a no-op and
- * worlds with no node respawn config see zero churn. The new `gainMode`/
- * `amountExpression` defaults are supplied at read time by `normalizeRespawn`,
- * so this migration only rewrites the `policy` (+ `gainMode` where it changes).
+ * `0.4.0` — collapse resource-node respawn policies onto `manual | overTime`, the latter carrying a
+ * `gainMode`, across library tasks, inline environment tasks and per-env runtime state.
+ * `manualAndElapsedTime` maps to `overTime` plus `chance`, the manual half being dropped since GMs
+ * still top up counts through the restock API. Pure, idempotent and shape-preserving; the new
+ * defaults come from `normalizeRespawn` at read time, so this rewrites the `policy` alone.
  */
 
 import { migrateNodeRespawnConfig } from './respawnTraversal.js';
@@ -41,11 +24,6 @@ function migrateRespawn(respawn) {
   return { ...respawn, ...mapped };
 }
 
-/**
- * @param {object} gatheringConfig Raw gathering config setting.
- * @param {Array<object>} environments Raw gathering environments setting.
- * @returns {{gatheringConfig: object, environments: Array<object>}}
- */
 export function migrateNodeRespawnModes(gatheringConfig = {}, environments = []) {
   return migrateNodeRespawnConfig(gatheringConfig, environments, migrateRespawn);
 }

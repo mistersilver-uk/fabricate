@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -10,7 +11,7 @@ const repoRoot = resolve(__dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-system-overview-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
@@ -67,8 +68,7 @@ const populatedReport = {
       nav: { view: 'environment-edit' }
     },
     {
-      // A task-kind issue: `entityId` is the task RECORD id; the deep-link must
-      // resolve via the OWNING environment id (`environmentId`).
+      // A task-kind issue: `entityId` is the task RECORD id.
       kind: 'task',
       entityId: 'task-7',
       environmentId: 'e1',
@@ -137,17 +137,6 @@ describe('SystemOverviewView (mounted)', () => {
   });
 
   // ── The deep link is a `ghost`, and the sweep found it painted as a neutral (issue 1118) ──
-  //
-  // Audit row 21. One deep link per issue row, in a list whose SEVERITY CHIP is the loud
-  // thing: a solid control repeated down every row out-shouts the ranking the list exists to
-  // present, which is why `component/ComponentEditorHeader.svelte`'s Back — the ruling this
-  // repair follows — is ghost for the same reason.
-  //
-  // Bound to `[data-overview-link="recipe"]`, which names ONE control in this report and no
-  // other. Two mutations red it: dropping `role="ghost"` from the component, and moving that
-  // role onto a neighbour — the negative half below is what catches the second, because it
-  // asserts that the OTHER kinds' links carry it too by naming each, rather than asking
-  // whether "a ghost appears in this list".
   it('paints every issue row deep link as the ghost role', async () => {
     const target = await harness.mount({ report: populatedReport, onSelectIssue: () => {} });
     await flushRender();

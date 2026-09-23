@@ -1,22 +1,4 @@
-/**
- * The manager's ONE no-state primitive, pinned at the PRIMITIVE level (issue 1286).
- *
- * `EmptyState` had no dedicated suite before this file: every assertion about it went
- * through some host screen, so the `inline` variant this change adds would have shipped
- * unpinned and a regression in the primitive itself would surface as an unrelated screen's
- * failure, or not at all.
- *
- * Two kinds of assertion, deliberately:
- *
- * - the CLASS AND DOM contract, mounted. `is-compact` / `is-filtered` / `is-inline` are
- *   opt-in, so the bare panel must carry `manager-empty` and nothing else — a variant that
- *   leaked a class onto every panel would repaint every "nothing here" state in the manager.
- * - the CSS SOURCE of the `inline` variant. Its whole point is two declarations
- *   (`flex-direction: row` on the stack, and the 46px icon TILE reduced to a bare glyph)
- *   that `is-compact` does not make, and a scoped `<style>` block injected into happy-dom
- *   is not something `getComputedStyle` can be trusted to resolve. Asserting the source is
- *   what makes "inline is not just a smaller compact" a fact a test can hold.
- */
+/** The manager's ONE no-state primitive, pinned at the PRIMITIVE level (issue 1286). */
 
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,15 +9,15 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const emptyStateSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/EmptyState.svelte'),
+  resolve(repoRoot, 'src/ui/svelte/components/EmptyState.svelte'),
   'utf8'
 );
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-empty-state-',
-  compiledModules: ['src/ui/svelte/apps/manager/EmptyState.svelte'],
-  componentPath: 'src/ui/svelte/apps/manager/EmptyState.svelte',
+  compiledModules: ['src/ui/svelte/components/EmptyState.svelte'],
+  componentPath: 'src/ui/svelte/components/EmptyState.svelte',
 });
 
 function panelOf(target) {
@@ -150,9 +132,7 @@ describe('1286 EmptyState — variant contract', () => {
   });
 
   it('the INLINE variant flips the stack to a row AND drops the 46px icon tile', () => {
-    // Both halves are load-bearing. `is-compact` already shrinks the tile to 32px, so a
-    // variant that only shrank it further would be a third size rather than the prototype's
-    // bare 13px glyph on one line.
+    // Both halves are load-bearing. `is-compact` already shrinks the tile to 32px.
     const stack = ruleBody('.manager-empty.is-inline > div');
     assert.match(stack, /flex-direction:\s*row/, 'the inner stack becomes a row');
 
@@ -174,8 +154,7 @@ describe('1286 EmptyState — variant contract', () => {
     assert.match(panel, /padding:\s*var\(--fab-space-chip\)/, 'proto:2262`s 7px, nearest step 6');
     assert.match(panel, /text-align:\s*left/, 'a note reads from the left, not centred');
 
-    // The tile is released the way `is-inline` releases it rather than resized, so a caller
-    // that does pass an icon gets a bare glyph and never a third tile size.
+    // The tile is released the way `is-inline` releases it rather than resized.
     const glyph = ruleBody('.manager-empty.is-note > div > i');
     assert.match(glyph, /width:\s*auto/, 'the tile width is released');
     assert.match(glyph, /background:\s*none/, 'and its fill with it');
@@ -192,18 +171,7 @@ describe('1286 EmptyState — variant contract', () => {
   });
 
   /**
-   * THE TWO SMALL-TEXT VARIANTS INK AT THE MUTED TONE, WHICH IS THE ONE FIGURE OF THE
-   * REFERENCE'S THEY DO NOT TAKE (issue 1514).
-   *
-   * `proto:2262` inks the note line `var(--subtle)` and `proto:2545` inks the filtered
-   * sentence `var(--disabled)`, and both shipped that way. SIX of the seven palettes declare
-   * `muted` and `subtle` as ALPHAS over the surface rather than as opaque values, and all
-   * seven declare `disabled` as one, so on the
-   * default `fabricate` theme those composite to 3.69:1 and 2.66:1 on `--fab-surface` at 10px
-   * and 11.5px — small text, under the 4.5:1 floor `spec.md` states. `--fab-text-muted` reads
-   * 5.42:1 on `--fab-surface` and 5.00:1 on `--fab-surface-soft`, and clears the floor in all
-   * seven palettes with `ironblood-forge` worst at 5.19:1 and 4.77:1.
-   *
+   * THE TWO SMALL-TEXT VARIANTS INK AT THE MUTED TONE.
    * Pinned on the SOURCE rather than computed: happy-dom resolves no cascade, and the whole
    * failure mode here was that ONE palette read the subtle declaration as passing —
    * `mythwright`, the only one of the seven that states `muted` and `subtle` as opaque hues,

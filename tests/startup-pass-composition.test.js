@@ -4,33 +4,14 @@ import assert from 'node:assert/strict';
 import { composeStartupPassList } from '../src/systems/startupPassComposition.js';
 import { STARTUP_PASS_ENTITY_KINDS } from '../src/systems/startupMaintenance.js';
 
-/*
- * The boot-time destructive door (issues 1196, 1224, 1261).
- *
- * `composeStartupPassList` builds five labelled thunks, one of which prunes `user`-scoped
- * replicated preferences. Issue 1261 deleted `tests/startup-valid-id-basis.test.js` with the
- * Valid Id Basis gate it was written for, and took the arrangement-independent half of that
- * file's coverage with it — leaving this composition with no executable guard at all. This
- * suite restores that half and nothing else: there is no basis to compute any more, so nothing
- * here asserts one.
- *
- * Every failure this covers is SILENT in production. `runStartupMaintenance` catches per pass
- * into `console.error`, and an omitted pass is a `console.warn`, so a pass that stops running
- * looks exactly like a pass that ran and found nothing.
- */
+/** The boot-time destructive door (issues 1196, 1224, 1261). */
 
 /** A crafting system whose components are the salvage ids for that system. */
 function system(id, componentIds) {
   return { id, components: componentIds.map((componentId) => ({ id: componentId })) };
 }
 
-/**
- * Collaborators that record what they were called with.
- *
- * Deliberately permissive: this suite is about WHICH passes are emitted and WHAT id sets they
- * carry, so every collaborator resolves and none refuses. A double that refused would test the
- * caller's error handling instead, which `runStartupMaintenance` owns.
- */
+/** Collaborators that record what they were called with. */
 function harness({ recipes = ['r-1'], systems = [system('s-1', ['c-1'])] } = {}) {
   const calls = [];
   const record =
@@ -68,17 +49,10 @@ describe('composeStartupPassList', () => {
     assert.deepEqual(labels, Object.keys(STARTUP_PASS_ENTITY_KINDS));
   });
 
-  /*
-   * THE DRIFT GUARD, and the reason this file exists.
-   *
-   * `buildStartupPassList` omits any candidate whose label is absent from
-   * `STARTUP_PASS_ENTITY_KINDS`, so the candidate labels and the declaration table are two
-   * hand-maintained lists that must agree exactly. Renaming a label on ONE side silently
-   * removes that pass from every boot, forever, reported only as a `console.warn`.
-   *
-   * A test that looked passes up BY the declaration table's own keys cannot see this: it would
-   * agree with itself whatever the composition emits. This compares the emitted set against the
-   * table, which is the only comparison that can fail.
+  /**
+   * THE DRIFT GUARD, and the reason this file exists. `buildStartupPassList` omits any candidate
+   * whose label is absent from `STARTUP_PASS_ENTITY_KINDS`, so the candidate labels and the
+   * declaration table are two hand-maintained lists that must agree exactly.
    */
   test('every emitted label is declared, and every declared label is emitted', () => {
     const { options } = harness();
@@ -96,17 +70,9 @@ describe('composeStartupPassList', () => {
     );
   });
 
-  /*
-   * Issue 1196's failure mode, at the composition site rather than at the function.
-   *
-   * `salvage:<componentId>` preference keys are NOT system-scoped, so the prune needs one flat
-   * id set across every system. A derivation that kept them per-system, or that passed the
-   * first system's set, prunes every live `salvage:` key belonging to any other system.
-   */
+  /** Issue 1196's failure mode, at the composition site rather than at the function. */
   test('stale preferences prunes against the flat union, keeping other systems salvage keys', async () => {
-    // A `salvage:` key belonging to the SECOND system. If the derivation kept the sets
-    // per-system, or passed only the first system's, this key is not in the id set the prune
-    // consults and is deleted — silently, on a healthy world. That is issue 1196's shape.
+    // A `salvage:` key belonging to the SECOND system (issue 1196).
     const stored = {
       'salvage:c-1': ['a'],
       'salvage:c-3': ['b'],
@@ -135,14 +101,9 @@ describe('composeStartupPassList', () => {
     );
   });
 
-  /*
+  /**
    * The required-parameter guard `preferencesCleanup` gained in issue 1261 throws when
-   * `validComponentIds` is missing. Its startup caller is the one place that supplies it, and
-   * the throw would be swallowed by `runStartupMaintenance`'s per-pass catch — so if this
-   * composition ever stopped passing it, the pass would simply never run again.
-   *
-   * Asserted by running the thunk and requiring it to resolve: the guard throws BEFORE any
-   * write, so a rejection here is the argument going missing.
+   * `validComponentIds` is missing.
    */
   test('the stale-preferences thunk supplies validComponentIds, so it does not refuse', async () => {
     const { options } = harness({ systems: [system('s-1', ['c-1'])] });
@@ -173,11 +134,7 @@ describe('composeStartupPassList', () => {
     assert.deepEqual([...named('cleanupLearnedRecipes').args[0]], ['r-1', 'r-2']);
   });
 
-  /*
-   * Client identity is not an input (`data-models/spec.md`). Composition is pure and takes no
-   * `game.user`, so this asserts the property by construction: the same collaborators produce
-   * the same pass list however the client is placed.
-   */
+  /** Client identity is not an input (`data-models/spec.md`). */
   test('composition is identity-independent: the same world yields the same passes', () => {
     const first = composeStartupPassList(harness().options).map(([label]) => label);
     const second = composeStartupPassList(harness().options).map(([label]) => label);

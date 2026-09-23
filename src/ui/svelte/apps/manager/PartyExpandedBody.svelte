@@ -23,7 +23,7 @@
      names the party: deleting one drops its membership, its travel actor and its
      per-system current-realm overrides across every crafting system.
    - The realm-override control lives HERE, in the card's travel column —
-     `ui-integration/spec.md`'s GM Travel Route layout-split rule pins every editing control,
+     `ui-world-scope/spec.md`'s GM Travel Route layout-split rule pins every editing control,
      including override Set/Clear, to the full-width Parties content area.
 
   Store validation errors are CARD-SCOPED: the pane records which card issued the
@@ -35,7 +35,7 @@
   the only one on screen when a zero-member party's add is rejected.
 -->
 <script>
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import PartyNameField from './PartyNameField.svelte';
   import PartyMemberRow from './PartyMemberRow.svelte';
   import PartyAddMemberPanel from './PartyAddMemberPanel.svelte';

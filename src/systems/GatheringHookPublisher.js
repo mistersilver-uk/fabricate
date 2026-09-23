@@ -1,4 +1,5 @@
 import { GATHERING_HOOKS } from '../config/hooks.js';
+import { arrayOrWrapped as normalizeList, stringOrNull } from '../utils/scalars.js';
 
 const SCHEMA_VERSION = 1;
 
@@ -192,21 +193,9 @@ function idOf(document) {
   return stringOrNull(document?.id) || stringOrNull(document?.uuid);
 }
 
-function stringOrNull(value) {
-  if (value === null || value === undefined) return null;
-  const normalized = String(value).trim();
-  return normalized || null;
-}
-
 function numberOr(value, fallback) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
-}
-
-function normalizeList(value) {
-  if (Array.isArray(value)) return value;
-  if (value === null || value === undefined) return [];
-  return [value];
 }
 
 function deepClone(value) {

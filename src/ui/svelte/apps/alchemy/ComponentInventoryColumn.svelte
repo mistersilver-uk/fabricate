@@ -12,7 +12,7 @@
   Prop-driven so it can be mounted in isolation.
 -->
 <script>
-  import EmptyState from '../manager/EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import EssenceChips from './EssenceChips.svelte';

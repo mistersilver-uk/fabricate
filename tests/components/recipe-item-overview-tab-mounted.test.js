@@ -2,6 +2,7 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -9,7 +10,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-item-overview-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
@@ -18,8 +19,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
-    // The shared eyebrow (issue 1505). All three field labels are `<Kicker>`s, so
-    // omitting it HANGS this suite (# cancelled), never fails it.
+    // The shared eyebrow (issue 1505). All three field labels are `<Kicker>`s.
     'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte',
   ],
@@ -38,21 +38,7 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 describe('ItemDropZone emits the namespace root its rules are anchored on (issue 1509)', () => {
-  /*
-   * THE ONE ASSERTION IN THIS REPOSITORY THAT READS THE LINK FIELD'S RENDERED ROOT.
-   *
-   * Every other guard on this family reads SOURCE TEXT: the area-scope gate reads the component's
-   * `class="…"` attribute, the sheet census reads the selectors, the fixture clauses read strings
-   * in `tests/`. All of them are satisfied by a component that WRITES `fabricate-link-field` in
-   * that attribute and stops putting the attribute on its root element -- at which point every
-   * one of the fifteen re-rooted rules in `styles/fabricate.css` matches nothing and the zone
-   * draws as an unstyled div in every host, the manager included.
-   *
-   * Read off the mounted DOM, in the shape `manager-button-mounted.test.js:83` uses. THIS suite
-   * rather than one of the other eight callers', because this one is the only caller whose hook
-   * bag is DERIVED -- `data-recipe-item-link` and `data-recipe-item-dropzone` are two faces of
-   * one state -- so the same two mounts prove the root AND the per-state bag.
-   */
+  /* THE ONE ASSERTION IN THIS REPOSITORY THAT READS THE LINK FIELD'S RENDERED ROOT. */
   it('writes `fabricate-link-field` first on its root div, in the linked state', async () => {
     const root = await harness.mount({
       recipeItem: { id: 'ri1', enabled: true, caps: { item: {}, learn: {} } },
@@ -72,11 +58,6 @@ describe('ItemDropZone emits the namespace root its rules are anchored on (issue
 
   it('writes it on the ROOT div and not on a nested one', async () => {
     // THE MUTATION CONTROL'S TARGET, stated as an assertion so the control has something to flip.
-    // Moving the `fabricate-link-field` literal off the root and into the copy column's class
-    // leaves it in the markup, so it stays in the area-scope gate's `written` set and `rootless`,
-    // `gated` and the emission clause all stay green. Only a reading of WHICH element carries it
-    // can see that move -- and it is the difference between a root that is an ancestor of the
-    // whole family and one that is a sibling of most of it.
     const root = await harness.mount({
       recipeItem: { id: 'ri1', enabled: true, caps: { item: {}, learn: {} } },
       linkedItem: LINKED_ITEM,
@@ -193,7 +174,6 @@ describe('RecipeItemOverviewTab (mounted)', () => {
     assert.deepEqual(calls, ['Compendium.fabricate.items.Item.primer']);
 
     // Issue 1036/7: still rejects every payload that is not an Item naming a document.
-    // `{ type: 'Item', pack, id }` moved OUT of this list deliberately — see below.
     for (const payload of [
       { type: 'Actor', uuid: 'Actor.hero' },
       { type: 'Macro', uuid: 'Macro.dc' },
@@ -213,12 +193,7 @@ describe('RecipeItemOverviewTab (mounted)', () => {
       'the shared Item drop zone rejects non-Item and document-less drag shapes'
     );
 
-    // The legacy COMPENDIUM shape `{ pack, id }` — no `uuid` — is now ACCEPTED (issue
-    // 1036). The zone's guard read `data.uuid` directly, which made it stricter than every
-    // one of its own consumers: each already calls `resolveDropUuid` in its `onDrop` and
-    // would have handled this shape, but the zone refused it first. Foundry emits exactly
-    // this payload for a compendium drag, so the effect was that dragging an item out of a
-    // compendium silently did nothing.
+    // The legacy COMPENDIUM shape `{ pack, id }` — no `uuid`.
     const legacyDrop = new Event('drop', { bubbles: true, cancelable: true });
     Object.defineProperty(legacyDrop, 'dataTransfer', {
       value: {

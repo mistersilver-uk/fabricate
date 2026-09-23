@@ -1,41 +1,15 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  ONE library GRID CARD, shared by every studio (issue 1036 follow-up).
+  ONE library GRID CARD, shared by every studio: header (media + name, optional subtitle), badges,
+  description, a recessed facts well, a divider, then a footer of leading and trailing actions. That
+  order is the Recipe Studio prototype's, and the order IS what is being shared.
 
-  The Essence Studio proved the anatomy against the maintainer's Recipe Studio prototype;
-  this is that anatomy with the essence vocabulary lifted out, so Recipes, Components and
-  Tools can render the SAME card rather than each re-deriving it. The order is fixed
-  because it is the prototype's order and the thing being shared IS the order:
+  Fixed vocabulary is a PROP (`name`, `subtitle`, `description`, `facts`); anything whose CONTENT is
+  studio-specific is a SNIPPET, so this never imports a studio's chips nor grows a branch per studio.
+  It emits its own `fab-library-card-*` classes AND the studio's `rootClass` / `identityClass`,
+  because the smoke walk, the View Lab cases and `managerLayoutGuards` navigate by studio selectors.
 
-      header (media + name, and an optional subtitle beneath it)
-      badges
-      description
-      facts        — a recessed well of short stats, split by hairlines
-      ─────────    — divider
-      footer       — leading actions, trailing actions
-
-  ── WHAT IS A PROP AND WHAT IS A SNIPPET ────────────────────────────────────────
-  Fixed vocabulary is a PROP (`name`, `subtitle`, `description`, `facts`), because those
-  are the same idea in every studio and a studio that passes markup for them is a studio
-  drifting. Everything whose CONTENT is studio-specific is a SNIPPET (`media`, `badges`,
-  `selection`, `footerStart`, `footerEnd`), because the alternative is this component
-  importing every studio's chips and toggles and growing a branch per studio.
-
-  That split is what lets Recipes add its padlock beside the toggle (`footerStart`), show
-  its category under the name (`subtitle`), and colour a stat (`facts[].tone`) without a
-  single change here.
-
-  ── THE HOOK CLASSES ARE THE CALLER'S ───────────────────────────────────────────
-  This card emits its own `fab-library-card-*` classes, which is where the LOOK lives, and
-  ALSO whatever `rootClass` / `identityClass` the studio passes. The Foundry smoke walk,
-  the View Lab cases and `managerLayoutGuards` all navigate by studio-specific selectors
-  (`.manager-essence-row`, `.manager-essence-identity`), so those must survive the move —
-  the same override-prop convention `BulkSelectionToolbar` already uses in this app.
-
-  ── THE CARD IS NOT A `<button>`; ITS BODY IS ───────────────────────────────────
-  The root is an `<li>` with no handler. The selecting control is an inner `<button>`
-  wrapping only the NON-interactive body (header → facts). The selection box and the
-  footer controls are its SIBLINGS, because an interactive element nested inside a
+  The root `<li>` takes no handler: the selecting `<button>` wraps only the non-interactive body, and
+  the selection box and footer controls are its SIBLINGS, because an interactive element nested in a
   `<button>` is invalid DOM that `createElement` lands silently.
 -->
 <script>
@@ -55,10 +29,9 @@
     subtitleTitle = undefined,
     description = '',
     descriptionTitle = undefined,
-    // `facts` is the recessed well: [{ id, label, tone, title, attrs, class }]. `tone` is
-    // one of 'muted' (the default), 'strong' for the leading stat that carries the emphasis
-    // — the prototype's "2 in · 1 out" over its "2 steps" — or one of the semantic
-    // 'warning' / 'danger' / 'success', which resolve to the same tokens `Chip` uses.
+    // The recessed well: [{ id, label, tone, title, attrs, class }]. `tone` is 'muted' (default),
+    // 'strong' for the leading stat, or the semantic 'warning' / 'danger' / 'success', which
+    // resolve to the same tokens `Chip` uses.
     facts = [],
     factsAttrs = {},
     // Snippets
@@ -84,8 +57,7 @@
       {#if media}{@render media()}{/if}
       <span class="fab-library-card-heading">
         <span class="fab-library-card-name manager-system-name" title={nameTitle}>{name}</span>
-        <!-- Rendered only when a studio HAS a subtitle, so a studio without one reserves no
-             space for it and its cards keep the height they have today. -->
+        <!-- Only when a studio HAS one, so a studio without reserves no space and keeps its height. -->
         {#if subtitle}
           <span class="fab-library-card-subtitle" title={subtitleTitle}>{subtitle}</span>
         {/if}
@@ -127,14 +99,12 @@
 </li>
 
 <style>
-  /* The card SHELL. The row skin, hover and `.is-selected` ring stay in
-     `styles/fabricate.css` keyed off the studio's own `rootClass`, so a studio keeps one
-     consistent selected-row signal with its list rows. Only the card's INTERIOR is here. */
+  /* The card SHELL only. The row skin, hover and `.is-selected` ring stay in `styles/fabricate.css`
+     keyed off the studio's `rootClass`, so its cards and its list rows signal selection alike. */
   .fab-library-card {
     position: relative;
     display: flex;
-    /* `wrap` is inherited from the studio row rule this card grew out of. It changes nothing
-       for a column of fitting children, and it is declared rather than dropped so the card
+    /* Inherited from the studio row rule this grew out of; declared, not dropped, so the card
        computes identically to the row it replaced. */
     flex-wrap: wrap;
     flex-direction: column;
@@ -145,9 +115,8 @@
     list-style: none;
   }
 
-  /* The body `<button>`. The manager's `<button>` reset (appearance, text-align, height:auto)
-     is joined to the studio identity classes in `styles/fabricate.css`, because it must beat
-     Foundry's host button geometry; this only stacks the rows. */
+  /* The manager's `<button>` reset is joined to the studio identity classes in
+     `styles/fabricate.css` — it must beat Foundry's host geometry; this only stacks the rows. */
   .fab-library-card-body {
     display: flex;
     flex: 0 0 auto;
@@ -156,8 +125,7 @@
     gap: var(--fab-space-2);
   }
 
-  /* HEADER: media on the left, the name to its right. `padding-right` reserves the corner the
-     absolute selection box occupies, so a long name never runs under it. */
+  /* `padding-right` reserves the corner the absolute selection box occupies. */
   .fab-library-card-header {
     display: flex;
     align-items: flex-start;
@@ -185,7 +153,6 @@
     line-height: 1.2;
   }
 
-  /* The optional category line beneath the name (the prototype's "Smithing"). */
   .fab-library-card-subtitle {
     min-width: 0;
     margin-top: 0.15rem;
@@ -198,7 +165,7 @@
     line-height: 1.2;
   }
 
-  /* BADGES: a reserved min-height keeps a card with no badges the same height as one with. */
+  /* The reserved min-height keeps a card with no badges as tall as one with. */
   .fab-library-card-badges {
     display: flex;
     flex-wrap: wrap;
@@ -207,8 +174,7 @@
     min-height: 1.35rem;
   }
 
-  /* DESCRIPTION: a fixed 2-line box so the facts well and the footer land at the same offset
-     in every card and a shelf stays level. `title` keeps the full text reachable. */
+  /* A fixed 2-line box, so the well and the footer land at one offset and a shelf stays level. */
   .fab-library-card-description {
     display: -webkit-box;
     overflow: hidden;
@@ -220,9 +186,8 @@
     line-height: 1.4;
   }
 
-  /* FACTS: a RECESSED well, split by hairlines. `--fab-bg-1` over `--fab-border` is the
-     inspector stat-tile idiom (`.manager-essence-stat`), and the maintainer's prototype
-     measures to the same pair — so the faithful render and the tokenised one agree. */
+  /* A RECESSED well: `--fab-bg-1` over `--fab-border` is the inspector stat-tile idiom, which the
+     prototype measures to as well. */
   .fab-library-card-facts {
     display: flex;
     align-items: center;
@@ -236,16 +201,9 @@
     white-space: nowrap;
   }
 
-  /* The TONES a fact can take. `muted` is the container default and needs no rule; `strong`
-     is the leading stat that carries the emphasis, because a well whose halves read
-     identically is a box with no hierarchy.
-
-     The semantic three are the same `--fab-<tone>-text` tokens `Chip` already answers to —
-     for every status face in both windows since issue 1506 — so a studio marking a fact as a
-     problem gets the colour the rest of the app uses for a problem, rather than a colour
-     invented at the call site. They exist
-     so `tone` is a real enum rather than a boolean wearing a string's clothes: a studio can
-     colour a stat by NAMING one, without editing this file. */
+  /* `muted` is the container default and needs no rule. The semantic three are the same
+     `--fab-<tone>-text` tokens `Chip` answers to, so a studio colours a stat by NAMING a tone
+     rather than inventing a colour at the call site. */
   .fab-library-card-fact.is-strong {
     color: var(--fab-text);
     font-size: 0.66rem;
@@ -274,15 +232,9 @@
     background: var(--fab-border);
   }
 
-  /* FOOTER: a divider, leading actions, then trailing actions pushed to the far end.
-
-     The trailing actions are GROUPED in their own element rather than the footer using
-     `justify-content: space-between`. Space-between is only equivalent while there are
-     exactly two children: the moment a studio adds a third action — the Recipe Studio's
-     padlock beside its toggle is the known case — space-between spreads all three evenly
-     instead of keeping two leading and one trailing. The group plus `margin-left: auto`
-     holds for any number on either side, and it renders in the same box as the ungrouped
-     button did, so the card it replaced is pixel-identical. */
+  /* Trailing actions are GROUPED rather than relying on `space-between`, which is equivalent only
+     at exactly two children: a third action would spread all three evenly instead of keeping two
+     leading and one trailing. The group plus `margin-left: auto` holds for any number. */
   .fab-library-card-footer {
     display: flex;
     align-items: center;
@@ -299,8 +251,7 @@
     margin-left: auto;
   }
 
-  /* A disabled entry is DIMMED as well as badged — the badge carries the state, the dimming
-     only reinforces it. */
+  /* Dimmed as well as badged: the badge carries the state, the dimming reinforces it. */
   .fab-library-card.is-off .fab-library-card-body {
     opacity: 0.72;
   }

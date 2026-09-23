@@ -192,14 +192,8 @@ describe('findRangeConflicts', () => {
   });
 });
 
-// ── the retired check-modifier placeholder (issue 1094) ──────────────────────
-//
-// The recorded oracle and the refusal corpus are SHARED (`tests/helpers/
-// retiredPlaceholderOracle.js`), not restated here. Three suites previously carried three
-// hand-written `Roll.validate` bodies for one recorded oracle and only one encoded the
-// `max(, 2)` behaviour the whole positional rule turns on; the other two would have graded
-// a validate-driven implementation green. The helper's header carries the recording
-// provenance and the measured totals.
+// the retired check-modifier placeholder (issue 1094). The recorded oracle and the refusal corpus
+// are SHARED (`tests/helpers/ retiredPlaceholderOracle.js`), not restated here.
 
 describe('describeRetiredModifierPlaceholder: the ADDITIVE predicate', () => {
   // The predicate is the rule; the named contexts are examples of it. Asserted directly so
@@ -240,10 +234,9 @@ describe('describeRetiredModifierPlaceholder: the ADDITIVE predicate', () => {
     }
   });
 
-  // Foundry collapses an additive run by PARITY of `-` (`RollParser#_collapseOperators`),
-  // so a single-character sign test reads `2 - +@craftingmod` (effectively negative) and
-  // `2 - -@craftingmod` (effectively positive) backwards in opposite directions. Refusing
-  // runs is what keeps `subtractive` a single-character test that cannot be wrong.
+  // Foundry collapses an additive run by PARITY of `-` (`RollParser#_collapseOperators`), so a
+  // single-character sign test reads `2 - +@craftingmod` (effectively negative) and `2 -
+  // -@craftingmod` (effectively positive) backwards in opposite directions.
   it('never reports subtractive for a placement it refuses', () => {
     for (const formula of ['1d20 - -@craftingmod', '(2 - @craftingmod + 4) * 3']) {
       const placement = describeRetiredModifierPlaceholder(formula);
@@ -263,9 +256,7 @@ describe('describeRetiredModifierPlaceholder: the ADDITIVE predicate', () => {
 });
 
 describe('stripRetiredModifierPlaceholder', () => {
-  // THE NO-TOKEN SHORT-CIRCUIT, asserted by SPY rather than by output. Returning the input
-  // is only half the contract; the other half is that the majority path takes on no Foundry
-  // dependency at all, which only a call count can prove.
+  // THE NO-TOKEN SHORT-CIRCUIT, asserted by SPY rather than by output.
   it('returns a token-free formula untouched WITHOUT calling Roll.validate', () => {
     const calls = [];
     const Roll = recordedFoundryRoll(calls);
@@ -311,19 +302,9 @@ describe('stripRetiredModifierPlaceholder', () => {
     });
   }
 
-  // THE LEADING-TOKEN ARITHMETIC, pinned by TOTAL rather than by string.
-  //
-  // A leading token has no preceding operator, so the one that FOLLOWS it is the only
-  // thing carrying the sign of the next term — and it must survive the strip. Foundry's
-  // `Expression` is `_ leading:(_ @Additive)* _ head:Term tail:(…)*`
-  // (`client/dice/grammar.pegjs:17`) with `Additive = "+" / "-"` (`:89`), and `leading` is
-  // plucked and forwarded to `parser._onExpression(head, tail, leading, …)`, so `- 2`
-  // parses as -2.
-  //
-  // The oracle here is deliberately NOT the residue string: it is the total the retired
-  // `(scalar)` SUBSTITUTION produced, recomputed independently. A string assertion would
-  // have happily locked in the wrong answer — stripping the operator too yields `2`, which
-  // is a perfectly valid formula and a silently doubled modifier.
+  // THE LEADING-TOKEN ARITHMETIC, pinned by TOTAL rather than by string. A leading token has no
+  // preceding operator, so the one that FOLLOWS it is the only thing carrying the sign of the next
+  // term — and it must survive the strip.
   const substitutedTotal = (formula, scalar) =>
     evaluateNumericExpression(formula.replaceAll('@craftingmod', `(${scalar})`));
   const appendedTotal = (formula, scalar) => {
@@ -348,12 +329,8 @@ describe('stripRetiredModifierPlaceholder', () => {
     });
   }
 
-  // A formula spending the token TWICE is the ONE case where the total deliberately does
-  // NOT survive, so it is asserted here rather than left to look like a gap in the table
-  // above. `@craftingmod - 2 + @craftingmod` substituted to `(3) - 2 + (3)` = 4 and now
-  // totals 1, because the scalar is appended ONCE however many times the formula spent it.
-  // That is the accepted multiple-occurrence collapse, and the `1.21.0` migration counts
-  // the formula under `repeated` precisely so the GM is told.
+  // A formula spending the token TWICE is the ONE case where the total deliberately does NOT
+  // survive, so it is asserted here rather than left to look like a gap in the table above.
   it('COLLAPSES a doubled placeholder to one contribution, and that is the contract', () => {
     const formula = '@craftingmod - 2 + @craftingmod';
     assert.equal(substitutedTotal(formula, 3), 4, 'the retired substitution double-counted');
@@ -400,10 +377,7 @@ describe('stripRetiredModifierPlaceholder', () => {
     );
   });
 
-  // THE CORRECTION, asserted as behaviour rather than as prose. A function-argument
-  // placement must answer `''` even though `Roll.validate` would accept its residue, and
-  // it must do so WITHOUT consulting `Roll.validate` at all — a validate-driven rule would
-  // return `max(, 2)` here and disagree with this test by construction.
+  // THE CORRECTION, asserted as behaviour rather than as prose.
   it('answers "" for a function-argument placement WITHOUT asking Roll.validate', () => {
     for (const formula of ['max(@craftingmod, 2)', 'max( @craftingmod , 2)']) {
       const calls = [];
@@ -454,10 +428,7 @@ describe('stripRetiredModifierPlaceholder', () => {
     assert.deepEqual(calls, [], 'the structural check answered first');
   });
 
-  // FAIL OPEN when the dice engine is absent (headless, tests), for the ADDITIVE residue
-  // only. Returning `''` there would report `noFormula` and silently disable an authored
-  // check, which is the worse error. The non-additive answer is positional, so it is
-  // engine-independent and identical with or without a `Roll`.
+  // FAIL OPEN when the dice engine is absent (headless, tests), for the ADDITIVE residue only.
   it('KEEPS an additive residue when Roll.validate is unavailable', () => {
     const previous = globalThis.Roll;
     delete globalThis.Roll;
@@ -490,10 +461,8 @@ describe('stripRetiredModifierPlaceholder', () => {
     }
   });
 
-  // `Roll.validate` is a static that does `new this(formula)` internally, so it MUST be
-  // invoked as a method. This asserts the shim never detaches it: a detached reference
-  // leaves `this` undefined and returns false for EVERY formula, which would empty every
-  // authored check that ever carried the token.
+  // `Roll.validate` is a static that does `new this(formula)` internally, so it MUST be invoked as
+  // a method.
   it('calls Roll.validate as a METHOD, with Roll as its receiver', () => {
     const receivers = [];
     const Roll = class {
@@ -507,18 +476,10 @@ describe('stripRetiredModifierPlaceholder', () => {
   });
 });
 
-// ── the module-placement invariant (AF1) ───────────────────────────────────
-//
-// The shim lives in `craftingCheckExpression.js` and not in `checkRoll.js` for one
-// reason: the usability readers must call it, and `checkRoll.js` already imports FROM
-// `checkModifierResolver.js`, so siting it there closes the cycle
-// `checkRoll.js -> checkModifierResolver.js -> checkRoll.js`.
-//
-// This is asserted on SOURCE TEXT because it cannot be asserted any other way. ESM live
-// bindings mean the cycle may resolve fine under `node --test` by hoisting luck, while the
-// bundler reorders the same graph and the built `main.js` throws
-// `undefined is not a function` at module init. `npm run build` succeeds either way — the
-// failure is at RUNTIME in Foundry. Without this, code review is the only guard.
+// the module-placement invariant (AF1). The shim lives in `craftingCheckExpression.js` and not in
+// `checkRoll.js` for one reason: the usability readers must call it, and `checkRoll.js` already
+// imports FROM `checkModifierResolver.js`, so siting it there closes the cycle `checkRoll.js ->
+// checkModifierResolver.js -> checkRoll.js`.
 describe('the retirement shim module placement (AF1)', () => {
   const sourceOf = (path) => readFileSync(resolve(repoRootForGuard, path), 'utf8');
   const importsOf = (source) =>
@@ -561,19 +522,9 @@ describe('the retirement shim module placement (AF1)', () => {
   });
 });
 
-// ── the leading-multiplicative residue guard is BELT AND BRACES, and this proves it ──
-//
-// `isStructurallyWholeResidue` refuses two shapes: a residue that ENDS in a binary operator
-// and one that OPENS with `*`, `/` or `%`. Only the first is live. The second was claimed
-// as protection in four places and is unreachable: a residue can only open with a
-// multiplicative operator if the placeholder was LEADING and the nearest non-whitespace
-// character AFTER it was one of those operators, which clause 4 of the additive predicate
-// has already refused before any residue exists.
-//
-// Neutering the pattern to one that matches nothing leaves the whole suite green, so the
-// unreachability is asserted directly instead — over a generated sweep of placement shapes,
-// with an INDEPENDENT residue derivation that is itself cross-checked against the module's
-// own answer on every stripped row, so it cannot drift into agreement.
+// the leading-multiplicative residue guard is BELT AND BRACES, and this proves it.
+// `isStructurallyWholeResidue` refuses two shapes: a residue that ENDS in a binary operator and one
+// that OPENS with `*`, `/` or `%`.
 describe('the leading-multiplicative residue guard (belt and braces)', () => {
   const LEADS_WITH_MULTIPLICATIVE = /^\s*[*/%]/;
   const TRAILS_WITH_OPERATOR = /[+\-*/%]\s*$/;

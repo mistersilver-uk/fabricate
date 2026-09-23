@@ -9,9 +9,9 @@ import {
   expectedSelectorsForManagerSurface,
   MANAGER_SURFACE_EXPECTED_SELECTORS,
 } from '../scripts/lib/managerLayoutGuards.js';
+import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const HARNESS_PATH = join(__dirname, '..', 'scripts', 'foundry-test-run.mjs');
 
 // Per-element metrics exactly as `assertManagerLayoutStable` builds them: one
 // record per matched element, each carrying its `.selector`.
@@ -119,10 +119,7 @@ test('a summarised record with count 0 counts as missing', () => {
 
 test('expectedSelectorsForManagerSurface returns the pinned selectors for a mapped label', () => {
   assert.deepEqual(expectedSelectorsForManagerSurface('recipes normal'), ['.manager-recipe-row']);
-  // Issue 676: the component editor is a single scrolling column with no rail. Both the
-  // form the header's Save submits BY ID and the identity strip that owns the rehomed
-  // source actions are pinned — losing either is a silent break the unit suite cannot
-  // see, because it only surfaces in the serialized smoke run.
+  // Issue 676: the component editor is a single scrolling column with no rail.
   assert.deepEqual(expectedSelectorsForManagerSurface('component edit normal'), [
     '.manager-component-edit-view',
     '.manager-component-identity-strip',
@@ -138,9 +135,8 @@ test('the Knowledge surface pins its owned-copy row at BOTH widths (issue 785)',
   assert.deepEqual(expectedSelectorsForManagerSurface('knowledge narrow'), [
     '.manager-knowledge-copy-row',
   ]);
-  // The pinned selectors must be recoverable by the drift guard's `/'(\.[a-z-]+)'/g`
-  // scan, so they can carry neither a digit nor an uppercase letter. Asserted over the
-  // MAP's real values — matching a literal against a regex could never fail.
+  // The pinned selectors must be recoverable by the drift guard's `/'(\.[a-z-]+)'/g` scan, so they
+  // can carry neither a digit nor an uppercase letter.
   for (const label of ['knowledge normal', 'knowledge narrow']) {
     for (const selector of expectedSelectorsForManagerSurface(label)) {
       assert.match(selector, /^\.[a-z-]+$/, `${label}: ${selector} is not recoverable`);
@@ -160,13 +156,12 @@ test('expectedSelectorsForManagerSurface returns [] for an unmapped label', () =
   assert.deepEqual(expectedSelectorsForManagerSurface('not a real surface'), []);
 });
 
-// ── Drift guard: every pinned selector is one the harness actually measures ──
-// If a pinned selector is not in the harness's measured `selectors` list, the
-// guard can NEVER see it (metrics never carries it) → a guaranteed false
-// failure at smoke time. Fail here instead.
+// Drift guard: every pinned selector is one the harness actually measures ── If a pinned selector
+// is not in the harness's measured `selectors` list, the guard can NEVER see it (metrics never
+// carries it) → a guaranteed false failure at smoke time.
 
 test('every pinned selector is in the harness measured-selector list', async () => {
-  const source = await readFile(HARNESS_PATH, 'utf8');
+  const source = SMOKE_SOURCE;
   const measured = new Set(
     Array.from(source.matchAll(/'(\.[a-z-]+)'/g)).map((match) => match[1])
   );

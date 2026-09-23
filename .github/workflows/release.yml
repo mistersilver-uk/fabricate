@@ -99,8 +99,10 @@ jobs:
     permissions:
       contents: write
     outputs:
-      next_version: ${{ steps.semrel.outputs.next_version }}
-      next_tag: ${{ steps.semrel.outputs.next_tag }}
+      # The classifier's outputs, not semrel's: they are populated only for a version this run
+      # actually minted, so every downstream `if:` below reads an empty value otherwise.
+      next_version: ${{ steps.minted.outputs.next_version }}
+      next_tag: ${{ steps.minted.outputs.next_tag }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -132,19 +134,49 @@ jobs:
             git branch -f "$b" "origin/$b"
           done
 
+      - name: Snapshot the tags that exist before this run
+        # The discriminator the classifier below needs: semantic-release pushes a genuine release's
+        # tag before its `success` lifecycle fires, so "does $next_tag exist now" is true either
+        # way. Must run after the tag fetch above and before semantic-release, which adds one.
+        run: git tag --list > "$RUNNER_TEMP/pre-release-tags.txt"
+
       - name: Semantic Release
         id: semrel
         # GITHUB_REF_NAME / GITHUB_REF are reserved and cannot be overridden by a step `env:`; they
         # are naturally `release` (or the hotfix `N.N.x`) here because this workflow is push-triggered
         # on those branches, which is what keeps classifyBranch on the STABLE line and loads the
         # (drafted) @semantic-release/github plugin. The config's successCmd writes
-        # next_version/next_tag to this step's $GITHUB_OUTPUT, but ONLY when a release is minted.
+        # next_version/next_tag to this step's $GITHUB_OUTPUT on every `success` lifecycle,
+        # addChannel included; the classifier below tells a mint from a re-add (issue 1864).
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Local bin rather than `npx` per Sonar S6505/S8543 — see the note on ci.yml's commitlint
         # step. This step holds a write-scoped GITHUB_TOKEN, so an on-demand registry fetch here is
         # the worst place in the repo to leave one.
         run: ./node_modules/.bin/semantic-release
+
+      - name: Classify what this run minted
+        id: minted
+        # The mint gate (issue 1864). semantic-release's addChannel phase reports a tag it did not
+        # mint — cutting `1.9.x` from v1.9.6 reported v1.9.6 — so only a tag absent from the pre-run
+        # snapshot populates these outputs; publish-s3, verify-publish and forward-port then skip.
+        env:
+          NEXT_VERSION: ${{ steps.semrel.outputs.next_version }}
+          NEXT_TAG: ${{ steps.semrel.outputs.next_tag }}
+        run: |
+          if [ -z "$NEXT_TAG" ]; then
+            echo "::notice::semantic-release minted nothing on this push; nothing will be published."
+            exit 0
+          fi
+          if grep -Fxq -- "$NEXT_TAG" "$RUNNER_TEMP/pre-release-tags.txt"; then
+            echo "::notice::$NEXT_TAG existed before this run — semantic-release's addChannel phase re-added an already-released version to this line's channel and minted nothing; nothing will be published."
+            exit 0
+          fi
+          {
+            echo "next_version=$NEXT_VERSION"
+            echo "next_tag=$NEXT_TAG"
+          } >> "$GITHUB_OUTPUT"
+          echo "This run minted $NEXT_TAG."
 
       - name: Assert the drafted release carries both assets
         # Catch an ASSETLESS draft at PRODUCTION time (issue #628, task 2.3). @semantic-release/github's
@@ -154,10 +186,10 @@ jobs:
         # when the remedy is a costly re-cut; catching it as the draft is created makes the promotion's
         # check a backstop. Run in the SAME job that minted the draft: its GITHUB_TOKEN already has
         # contents: write, which draft-release visibility requires. Skipped when nothing was minted.
-        if: ${{ steps.semrel.outputs.next_tag != '' }}
+        if: ${{ steps.minted.outputs.next_tag != '' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ steps.semrel.outputs.next_tag }}
+          RELEASE_TAG: ${{ steps.minted.outputs.next_tag }}
           REPO: ${{ github.repository }}
         run: |
           NAMES=$(gh release view "$RELEASE_TAG" --repo "$REPO" --json assets --jq '.assets[].name')
@@ -194,10 +226,10 @@ jobs:
       overwrite: false
     secrets:
       # Reusable workflows do not inherit repo secrets. early-access derives its tester feed from
-      # S3_EARLY_ACCESS_PATH_SECRET; S3_TESTER_PATH_SECRET is forwarded because release-s3.yml
+      # S3_GUILD_ARTISAN_PATH_SECRET; S3_TESTER_PATH_SECRET is forwarded because release-s3.yml
       # declares it. A hotfix channel is undeclared and has no tester group, so it needs neither.
       S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
-      S3_EARLY_ACCESS_PATH_SECRET: ${{ secrets.S3_EARLY_ACCESS_PATH_SECRET }}
+      S3_GUILD_ARTISAN_PATH_SECRET: ${{ secrets.S3_GUILD_ARTISAN_PATH_SECRET }}
 
   verify-publish:
     needs: [semantic-release, publish-s3]

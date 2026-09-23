@@ -1,31 +1,16 @@
-/**
- * recipeGraphBuilder.js — Pure graph construction, layout, and filter functions (T-057)
- *
- * No Foundry or DOM dependencies. All inputs/outputs are plain objects.
- *
- * ## Bounding and indexing (issue 1082, under the issue 1070 performance programme)
- *
- * Three properties this module has to hold at corpus scale, in the order they bite:
- *
- * 1. **Cycle detection must not recurse.** `_assignLayers` used a recursive `dfs`, which
- *    threw `RangeError: Maximum call stack size exceeded` on a dependency chain deeper than
- *    roughly 8,000 recipes — measured on this checkout at depth 8,193. That is a crash, not
- *    a slow render, and it arrived long before any quadratic edge or SVG cost mattered.
- *    {@link _walkDepthFirst} is an explicit-stack transliteration of that recursion: same
- *    visit order, same GRAY/BLACK timing, therefore the same `cycleEdgeIds`.
- * 2. **Edge derivation is producer x consumer.** One component produced by P recipes and
- *    consumed by C recipes yields P*C edges, so an unscoped graph over a large corpus is
- *    quadratic in recipes. {@link buildBoundedRecipeGraph} bounds the NODE set first and
- *    then stops emitting at an edge budget, so the bound bounds WORK and not merely output.
- * 3. **The producer/consumer relation is an index, not a rescan.** {@link createRecipeGraphIndex}
- *    is built once per recipe revision and re-queried per filter interaction; see
- *    `adminStore`'s revision-token keyed cache.
- *
- * A bound that silently truncated would be worse than no bound: the consumer would render a
- * plausible-looking partial graph and call it the system. Every query therefore returns a
- * `bound` descriptor alongside the nodes and edges, `layoutGraph` and `filterGraph` carry it
- * through unchanged, and a graph is only complete when `bound.complete` is `true`.
- */
+// Pure graph construction, layout and filtering — no Foundry or DOM dependency. Three properties
+// it has to hold at corpus scale (issue 1082), in the order they bite:
+// 1. CYCLE DETECTION MUST NOT RECURSE. The recursive form threw `RangeError` on a dependency chain
+//    past ~8,000 recipes, which is a crash rather than a slow render. `_walkDepthFirst` is an
+//    explicit-stack transliteration: same visit order, same GRAY/BLACK timing, same `cycleEdgeIds`.
+// 2. EDGE DERIVATION IS PRODUCER x CONSUMER, so an unscoped graph is quadratic in recipes.
+//    `buildBoundedRecipeGraph` bounds the NODE set first and then stops emitting at an edge budget,
+//    so the bound bounds WORK and not merely output.
+// 3. THE PRODUCER/CONSUMER RELATION IS AN INDEX, built once per recipe revision and re-queried per
+//    filter interaction; `adminStore` keys it on the revision token.
+// A bound that silently truncated would be worse than no bound, so every query returns a `bound`
+// descriptor, `layoutGraph` and `filterGraph` carry it through UNCHANGED, and a graph is complete
+// only when `bound.complete` is true.
 
 import { DEFAULT_RECIPE_IMAGE } from './recipeImageIcons.js';
 
@@ -38,16 +23,9 @@ export const NODE_SPACING = 120;
 export const NODE_WIDTH = 180;
 export const NODE_HEIGHT = 80;
 
-/**
- * The default graph bound (issue 1082).
- *
- * Recorded canonically in `openspec/specs/ui-integration/spec.md` rather than living here as
- * a magic number: which neighbourhood a GM is shown is a product decision, not an
- * implementation detail. Measured basis for these figures is the `recipe-graph` scale
- * profile — at 500 nodes / 3,568 edges the bounded layout is single-digit milliseconds,
- * while the unbounded producer x consumer derivation over a 10,000-recipe corpus is
- * quadratic.
- */
+// Recorded canonically in `openspec/specs/ui-system-studio/spec.md` § Recipe Dependency Graph,
+// because which neighbourhood a GM is shown is a product decision rather than an implementation
+// detail. The measured basis is the `recipe-graph` scale profile.
 export const DEFAULT_GRAPH_MAX_NODES = 500;
 export const DEFAULT_GRAPH_MAX_EDGES = 2000;
 
@@ -67,9 +45,6 @@ const NO_NEIGHBOURS = Object.freeze([]);
  * Extract input and output component IDs from a recipe.
  * Walks ingredientSets[].ingredientGroups[].options[].match.componentId (inputs)
  * and resultGroups[].results[].componentId (outputs).
- *
- * @param {object} recipe
- * @returns {{ inputIds: Set<string>, outputIds: Set<string> }}
  */
 export function extractComponentIds(recipe) {
   const inputIds = new Set();
@@ -103,59 +78,26 @@ export function extractComponentIds(recipe) {
 // Graph construction
 // ---------------------------------------------------------------------------
 
-/**
- * Add one recipe id to a component-keyed set map, creating the set on first use.
- *
- * A `Set` rather than an array because the original construction used one: a recipe naming
- * the same component twice must contribute one entry, and the set's insertion order is what
- * makes the derived edge order stable.
- *
- * @param {Map<string, Set<string>>} target
- * @param {string} componentId
- * @param {string} recipeId
- */
+// A `Set`, so a recipe naming the same component twice contributes one entry; its insertion order
+// is what makes the derived edge order stable.
 function _addRecipeToComponent(target, componentId, recipeId) {
   const existing = target.get(componentId);
   if (existing) existing.add(recipeId);
   else target.set(componentId, new Set([recipeId]));
 }
 
-/**
- * Freeze a component-keyed set map into a component-keyed array map, preserving order.
- *
- * @param {Map<string, Set<string>>} sets
- * @returns {Map<string, string[]>}
- */
 function _toIdLists(sets) {
   const lists = new Map();
   for (const [componentId, ids] of sets) lists.set(componentId, [...ids]);
   return lists;
 }
 
-/**
- * Build the retained producer/consumer index for a recipe corpus (issue 1082).
- *
- * This is the structure every graph query reads, and it is deliberately the ONLY thing that
- * is retained. It stores the producer/consumer relation *through components* rather than a
- * materialised recipe-to-recipe adjacency, because the recipe-to-recipe relation is the
- * producer x consumer product this issue exists to bound — materialising it for the whole
- * corpus would build the very edge explosion the bounded query avoids. Neighbours are
- * expanded on demand instead, one seed at a time.
- *
- * The index holds node SEEDS, not nodes. `layoutGraph` mutates the node objects it is given
- * (`layer`, `position`, `x`, `y`), so handing the same objects to two queries would let one
- * layout leak into the next; {@link buildBoundedRecipeGraph} materialises a fresh node per
- * query instead.
- *
- * Building it is O(recipes x component references) and it is safe to retain for as long as
- * the corpus is unchanged — see `adminStore`, which keys it on the recipe revision token
- * minted by `RecipeManager` (issue 1076) rather than on a corpus hash.
- *
- * @param {object[]} recipes
- * @returns {{recipeCount: number, nodeSeedById: Map<string, object>,
- *   producerRecipeIdsByComponentId: Map<string, string[]>,
- *   consumerRecipeIdsByComponentId: Map<string, string[]>}}
- */
+// The ONLY retained structure, and it stores the relation THROUGH COMPONENTS rather than a
+// materialised recipe-to-recipe adjacency: materialising that for the whole corpus would build the
+// very edge explosion the bounded query exists to avoid, so neighbours are expanded on demand.
+// It holds node SEEDS, not nodes, because `layoutGraph` MUTATES the node objects it is given, so
+// sharing them between queries would leak one layout into the next.
+// Safe to retain while the corpus is unchanged; `adminStore` keys it on the recipe revision token.
 export function createRecipeGraphIndex(recipes) {
   const nodeSeedById = new Map();
   const producerSets = new Map();
@@ -185,12 +127,6 @@ export function createRecipeGraphIndex(recipes) {
   };
 }
 
-/**
- * A fresh, layout-ready node for one index seed.
- *
- * @param {object} seed
- * @returns {object}
- */
 function _materializeNode(seed) {
   return {
     id: seed.id,
@@ -208,14 +144,7 @@ function _materializeNode(seed) {
   };
 }
 
-/**
- * Every recipe that consumes something this recipe produces, plus every recipe that produces
- * something it consumes — one hop of the undirected dependency relation.
- *
- * @param {object} index
- * @param {string} recipeId
- * @returns {string[]}
- */
+// One hop of the undirected dependency relation.
 function _neighbourIds(index, recipeId) {
   const seed = index.nodeSeedById.get(recipeId);
   if (!seed) return NO_NEIGHBOURS;
@@ -233,12 +162,7 @@ function _neighbourIds(index, recipeId) {
   return neighbours;
 }
 
-/**
- * The seed recipe ids for each supported scope, and that scope's default hop radius.
- *
- * A `null` seed list means "every recipe" and is the one scope {@link _selectNodeIds} refuses
- * to truncate — see the note there.
- */
+// A `null` seed list means "every recipe", the one scope `_selectNodeIds` refuses to truncate.
 const GRAPH_SCOPES = Object.freeze({
   all: { defaultHops: 0, seeds: () => null },
   recipe: {
@@ -266,13 +190,6 @@ const GRAPH_SCOPES = Object.freeze({
   }
 });
 
-/**
- * Alternate two id lists, longest tail last.
- *
- * @param {string[]} left
- * @param {string[]} right
- * @returns {string[]}
- */
 function _interleave(left, right) {
   const merged = [];
   const length = Math.max(left.length, right.length);
@@ -297,11 +214,6 @@ export const GRAPH_SCOPE_NAMES = Object.freeze(Object.keys(GRAPH_SCOPES));
  * request) instead of quietly answering a different question. A SCOPED walk is truncated at
  * its frontier, because "N hops out from here, cut off at the bound" is a statement a GM can
  * act on.
- *
- * @param {object} index
- * @param {{scope: object, hops: number, maxNodes: number}} options
- * @returns {{ids: string[], candidateNodeCount: number|null, truncated: boolean,
- *   requiresScope: boolean}}
  */
 function _selectNodeIds(index, { scope, hops, maxNodes }) {
   const seedIds = GRAPH_SCOPES[scope.type].seeds(index, scope);
@@ -355,8 +267,6 @@ function _newEdge(edgeId, sourceId, targetId, componentId) {
 
 /**
  * Emit every producer x consumer pair for one shared component, up to the edge budget.
- *
- * @returns {boolean} `false` when the budget stopped emission part-way.
  */
 function _emitComponentPairs({ edgeMap, componentId, producers, consumers, maxEdges }) {
   for (const producerId of producers) {
@@ -385,11 +295,6 @@ function _emitComponentPairs({ edgeMap, componentId, producers, consumers, maxEd
  * rather than output: the pathological case (`maxNodes` producers x `maxNodes` consumers of
  * one hub component) would enumerate 250,000 pairs at a 500-node bound, and this stops at
  * `maxEdges` + one consumer list.
- *
- * @param {object} index
- * @param {Set<string>} selected
- * @param {number} maxEdges
- * @returns {{edges: object[], truncated: boolean}}
  */
 function _deriveEdges(index, selected, maxEdges) {
   const edgeMap = new Map(); // `${srcId}->${tgtId}` -> GraphEdge
@@ -418,18 +323,6 @@ function _linkNodeEdges(nodes, edges) {
 
 /**
  * Query a bounded subgraph out of a retained index (issue 1082).
- *
- * @param {object} index From {@link createRecipeGraphIndex}.
- * @param {object} [options]
- * @param {{type: string, recipeId?: string, recipeIds?: string[], componentId?: string}}
- *   [options.scope] Defaults to `{type: 'all'}`.
- * @param {number} [options.hops] Overrides the scope's default hop radius.
- * @param {number} [options.maxNodes]
- * @param {number} [options.maxEdges]
- * @param {boolean} [options.unbounded] The explicit "show me everything" request. It lifts
- *   both budgets; it does not make the result complete by fiat, and `bound` still describes
- *   what was produced.
- * @returns {{nodes: object[], edges: object[], bound: object}}
  */
 export function buildBoundedRecipeGraph(index, options = {}) {
   const scope = options.scope || { type: 'all' };
@@ -477,10 +370,6 @@ export function buildBoundedRecipeGraph(index, options = {}) {
 
 /**
  * Which budget stopped the query, in the order a consumer should report them.
- *
- * @param {boolean} nodesTruncated
- * @param {boolean} edgesTruncated
- * @returns {'nodes'|'edges'|null}
  */
 function _resolveLimitedBy(nodesTruncated, edgesTruncated) {
   if (nodesTruncated) return 'nodes';
@@ -495,10 +384,6 @@ function _resolveLimitedBy(nodesTruncated, edgesTruncated) {
  * for the benchmark harness's before/after comparison. Prefer
  * {@link buildBoundedRecipeGraph} against a retained {@link createRecipeGraphIndex} anywhere
  * the corpus size is not known in advance.
- *
- * @param {object[]} recipes
- * @param {object[]} components - managed components (unused in edge construction but kept for API symmetry)
- * @returns {{ nodes: GraphNode[], edges: GraphEdge[], bound?: object }}
  */
 export function buildRecipeGraph(recipes, components = []) {
   if (!recipes || recipes.length === 0) {
@@ -514,17 +399,6 @@ export function buildRecipeGraph(recipes, components = []) {
 /**
  * Assign x/y coordinates to nodes using a layered (Sugiyama-style) layout.
  * Mutates node and edge objects in place and returns the updated graph.
- *
- * @param {{ nodes: object[], edges: object[], bound?: object }} graph
- * @param {object} [options]
- * @param {{bump: (key: string, amount?: number) => void}} [options.instrumentation] The
- *   operation-counter seam (issue 1072's vocabulary). Layout bumps
- *   `graphAdjacencyLookups` once per incoming-neighbour lookup and
- *   `graphIncomingEdgesExamined` by the length of each list it reads, so
- *   "layout performs no repeated whole-edge filtering per node" is an assertion
- *   (`graphIncomingEdgesExamined <= edges.length`) rather than a code-review note.
- * @returns {{ nodes: object[], edges: object[], width: number, height: number,
- *   bound: object|null }}
  */
 export function layoutGraph(graph, options = {}) {
   const { nodes, edges } = graph;
@@ -618,8 +492,6 @@ export function layoutGraph(graph, options = {}) {
  * with `queue.shift()`. `shift()` is O(queue length) on a large array, so the original made
  * component discovery quadratic in the size of the largest component — the exact shape that
  * bites on the dense corpus this issue targets.
- *
- * @returns {string[][]} Each element is an array of node IDs in that component.
  */
 function _findConnectedComponents(nodes, edges) {
   const adjacency = new Map(nodes.map(n => [n.id, new Set()]));
@@ -657,10 +529,6 @@ function _findConnectedComponents(nodes, edges) {
  * Equivalent to the per-component `edges.filter(...)` it replaces — including the edge order
  * within each bucket, which layout is sensitive to — but one pass over the edges instead of
  * one pass per component with a linear array membership probe per endpoint.
- *
- * @param {string[][]} components
- * @param {object[]} edges
- * @returns {object[][]} One edge array per component, index-aligned with `components`.
  */
 function _partitionEdgesByComponent(components, edges) {
   const componentIndexByNodeId = new Map();
@@ -691,10 +559,6 @@ function _partitionEdgesByComponent(components, edges) {
  * depth of 8,193 on this checkout, well inside the 10,000-recipe corpus this programme
  * supports. The stack here is a heap array, so depth is bounded by memory rather than by the
  * call stack.
- *
- * @param {string} rootId
- * @param {{outgoing: Map<string, object[]>, color: Map<string, number>,
- *   cycleEdgeIds: Set<string>}} state
  */
 function _walkDepthFirst(rootId, { outgoing, color, cycleEdgeIds }) {
   const stack = [{ nodeId: rootId, edges: outgoing.get(rootId) || NO_NEIGHBOURS, index: 0 }];
@@ -725,7 +589,6 @@ function _walkDepthFirst(rootId, { outgoing, color, cycleEdgeIds }) {
 
 /**
  * Assign layers using longest-path algorithm with DFS cycle detection.
- * @returns {{ layerAssignment: Map<string, number>, cycleEdgeIds: Set<string> }}
  */
 function _assignLayers(nodes, edges) {
   const nodeById = new Map(nodes.map(n => [n.id, n]));
@@ -801,9 +664,6 @@ function _assignLayers(nodes, edges) {
 
 /**
  * The average position, in the previous layer, of one node's incoming neighbours.
- *
- * @returns {number} `Infinity` when the node has no neighbour in the previous layer, which
- *   sorts it after every node that does — the original behaviour.
  */
 function _barycenterOf(sourceIds, { nodeLayer, prevLayerIdx, prevPosition }) {
   let sum = 0;
@@ -826,11 +686,6 @@ function _barycenterOf(sourceIds, { nodeLayer, prevLayerIdx, prevPosition }) {
  * exactly one target's list and each node's list is read at most once, so
  * `graphIncomingEdgesExamined` cannot exceed the edge count. That inequality is the
  * assertable form of "layout performs no repeated whole-edge filtering per node".
- *
- * @param {number[]} sortedLayers
- * @param {Map<number, object[]>} layerGroups
- * @param {object[]} edges
- * @param {{bump: (key: string, amount?: number) => void}|null} [instrumentation]
  */
 function _orderWithinLayers(sortedLayers, layerGroups, edges, instrumentation = null) {
   // Build quick lookup: nodeId -> layer
@@ -905,11 +760,6 @@ function _computeEdgePaths(edges, nodeById, nodeHeight, nodeWidth) {
  *
  * The `bound` descriptor is carried through unchanged: filtering a bounded graph narrows what
  * is shown but cannot make an incomplete graph complete, so a consumer must still disclose it.
- *
- * @param {{ nodes: object[], edges: object[], bound?: object }} graph
- * @param {{ category?: string, searchTerm?: string }} filters
- * @returns {{ nodes: object[], edges: object[], width: number, height: number,
- *   bound: object|null }}
  */
 export function filterGraph(graph, { category = '', searchTerm = '' } = {}) {
   let nodes = graph.nodes;

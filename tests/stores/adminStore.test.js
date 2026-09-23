@@ -1,7 +1,4 @@
-/**
- * Tests for adminStore factory (T-120)
- * Uses node:test + node:assert/strict
- */
+/** Tests for adminStore factory (T-120) Uses node:test + node:assert/strict */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
@@ -10,15 +7,13 @@ import {
   DEFAULT_GATHERING_TASK_IMG,
 } from '../../src/gatheringImageDefaults.js';
 import { CraftingSystemManager } from '../../src/systems/CraftingSystemManager.js';
-import { InventoryListingBuilder } from '../../src/systems/InventoryListingBuilder.js';
+import { InventoryListingBuilder } from '../../src/ui/presenters/InventoryListingBuilder.js';
 import {
   REPORTER_ENRICHER_DESCRIPTION,
   REPORTER_RESOLVED_EXPECTED,
 } from '../helpers/enricherDescriptionFixtures.js';
 
-// ---------------------------------------------------------------------------
 // Mock helpers
-// ---------------------------------------------------------------------------
 
 let _systemIdCounter = 1;
 let _essenceIdCounter = 1;
@@ -80,9 +75,7 @@ function makeItem(overrides = {}) {
   };
 }
 
-/**
- * Creates a fully-stubbed services object for adminStore tests.
- */
+/** Creates a fully-stubbed services object for adminStore tests. */
 function createMockServices(overrides = {}) {
   const store = {
     lastManagedCraftingSystem: '',
@@ -184,9 +177,7 @@ function createMockServices(overrides = {}) {
     exportRecipes: () => recipes.map((r) => r.toJSON()),
   };
 
-  // The world character libraries (issue 1308). Kept as a plain in-memory fake rather than the
-  // real store, because this suite drives adminStore's projection and write paths and needs to
-  // read the persisted value straight back.
+  // The world character libraries (issue 1308).
   const characterLibraries = { characterPrerequisites: [], modifiers: [] };
   const mockCharacterLibrariesStore = {
     isSeeded: () => true,
@@ -235,21 +226,16 @@ function createMockServices(overrides = {}) {
   return merged;
 }
 
-// ---------------------------------------------------------------------------
 // Import the store factory
-// ---------------------------------------------------------------------------
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');
 const { DEFAULT_ESSENCE_ICON } = await import('../../src/ui/svelte/util/essenceIcons.js');
 const { PF2E_CURRENCY_PRESETS } = await import('../../src/config/currencyPresets.js');
 
 /**
- * Spin up an adminStore whose `updateSystem` calls are captured, select `sys1`,
- * and expose readers for the captured payload. The currency setter/seed tests
- * all share this exact setup (capture `updateSystem` → drive setters → read back
- * `requirements.currency`), so it lives here instead of being inlined per test.
+ * Spin up an adminStore whose `updateSystem` calls are captured, select `sys1`, and expose readers
+ * for the captured payload.
  *
  * @param {object} [overrides] forwarded to `createMockServices`
- * @returns {Promise<{ store: object, currency: () => object, updateArgs: () => object|null }>}
  */
 async function setupCurrencyStore(overrides = {}) {
   let updateArgs = null;
@@ -271,14 +257,10 @@ async function setupCurrencyStore(overrides = {}) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 describe('createAdminStore', () => {
-  // -------------------------------------------------------------------------
   // 1. Initialization
-  // -------------------------------------------------------------------------
 
   describe('initialization', () => {
     it('creates store with system list populated from systemManager', async () => {
@@ -355,12 +337,9 @@ describe('createAdminStore', () => {
     });
 
     it('publishes systems list and selected-system context synchronously before phase-2 await chain', async () => {
-      // Regression: previously refresh() built systemList early but only wrote
-      // viewState after awaiting expensive per-system work (item cards, environments),
-      // so the v2 systems browser flashed "No crafting systems yet" on open.
-      // The selected-system rail and inspector also need selectedSystem before
-      // refresh() yields to the microtask queue, otherwise the shell appears
-      // selected-but-broken until phase 2 finishes.
+      // Regression: previously refresh() built systemList early but only wrote viewState after
+      // awaiting expensive per-system work (item cards, environments), so the v2 systems browser
+      // flashed "No crafting systems yet" on open.
       const services = createMockServices();
       const store = createAdminStore(services);
       // createAdminStore kicks off refresh() without awaiting it; the synchronous
@@ -419,9 +398,8 @@ describe('createAdminStore', () => {
       await store.refresh();
       const selected = get(store.viewState).selectedSystem;
 
-      // Authority is now visible in the projection (was previously unprojected), and since
-      // issue 1374 it is RESOLVED against the world scope and carries the scope that authored
-      // it. This system authored `checkDriven` itself, so the source is `system`.
+      // Authority is now visible in the projection (was previously unprojected), and since issue
+      // 1374 it is RESOLVED against the world scope and carries the scope that authored it.
       assert.deepEqual(selected.toolBreakage, { authority: 'checkDriven', source: 'system' });
 
       // The checkBreakage block survives the _clonePlain projection for every mode.
@@ -442,9 +420,7 @@ describe('createAdminStore', () => {
     });
 
     it('projects the crafting check-modifier catalogue, policy, and default ids (issue 770 allowlist)', async () => {
-      // The projection is a hand-built allowlist: a field dropped from it is invisible
-      // to the UI. The ChecksView mount test feeds these as direct props, bypassing the
-      // projection, so this reads the ACTUAL projection to catch a silently-dropped field.
+      // The projection is a hand-built allowlist: a field dropped from it is invisible to the UI.
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
       services._characterLibraries.modifiers = [
@@ -481,9 +457,7 @@ describe('createAdminStore', () => {
         ['med', 'alch'],
         'the library surfaces through the world projection'
       );
-      // The BOUNDS survive the projection too. Without them the read-only chip on salvage
-      // and gathering renders nothing and the crafting steppers read blank — an
-      // absence-preserving field is exactly the kind an allowlist drops unnoticed.
+      // The BOUNDS survive the projection too.
       assert.equal(worldModifiers[0].min, -1);
       assert.equal(worldModifiers[0].max, 5);
       assert.equal(Object.hasOwn(worldModifiers[1], 'min'), false);
@@ -503,11 +477,10 @@ describe('createAdminStore', () => {
     });
 
     it('projects every policy the manager accepts, including playerPicks (issue 855)', async () => {
-      // The projection normalized the policy through a LOCAL allowlist that predated
-      // `playerPicks`, so a stored `playerPicks` came back out as `addAll`: the GM
-      // clicked "Player picks", the card re-rendered on "Add all", and the system-level
-      // policy was unselectable through the UI even though the write itself was correct.
-      // Drive every accepted value, plus an unknown one, through the real projection.
+      // The projection normalized the policy through a LOCAL allowlist that predated `playerPicks`,
+      // so a stored `playerPicks` came back out as `addAll`: the GM clicked "Player picks", the
+      // card re-rendered on "Add all", and the system-level policy was unselectable through the UI
+      // even though the write itself was correct.
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
       const store = createAdminStore(services);
@@ -534,9 +507,8 @@ describe('createAdminStore', () => {
       assert.equal(await projectPolicy(undefined), 'addAll', 'an absent policy still defaults');
     });
 
-    // Absence is a real value (issue 1055) — UNLIMITED — so a defaulted projection would
-    // forge a GM decision that was never made and would silently truncate the recipe
-    // picks already on disk.
+    // Absence is a real value (issue 1055) — UNLIMITED — so a defaulted projection would forge a GM
+    // decision that was never made and would silently truncate the recipe picks already on disk.
     it('projects maxModifierPicks WITHOUT defaulting its absence (issue 1055)', async () => {
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
@@ -561,9 +533,8 @@ describe('createAdminStore', () => {
         undefined,
         '…but its value is undefined, never a forged default'
       );
-      // RAW, not resolved: the card routes it through `resolveMaxModifierPicks` itself so
-      // it can render "unlimited" as a BLANK field rather than as a magic number. A
-      // projection that pre-resolved would have to emit `Infinity` into the view state.
+      // RAW, not resolved: the card routes it through `resolveMaxModifierPicks` itself so it can
+      // render "unlimited" as a BLANK field rather than as a magic number.
       assert.equal(
         (await projectCap({ maxModifierPicks: 0 })).maxModifierPicks,
         0,
@@ -571,11 +542,7 @@ describe('createAdminStore', () => {
       );
     });
 
-    // Deliberately NOT projected (issue 1055). Both authoring surfaces already receive
-    // the normalized rule and `policyDefersSelection` lives on the resolver, so the
-    // Checks card asks it LIVE against the radio group the GM is clicking. A projected
-    // copy would answer from the last PERSISTED rule and would be the one derivation on
-    // this axis capable of disagreeing with the card that reads it.
+    // Deliberately NOT projected (issue 1055).
     it('does NOT project a modifierPolicyDefersSelection key (issue 1055)', async () => {
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
@@ -625,9 +592,7 @@ describe('createAdminStore', () => {
         'noFormula',
         'a slot with no authored formula'
       );
-      // The THIRD cause is gone with the placeholder (issue 1094). This is the exact
-      // input that projected `noPlaceholder` before, and it now projects LIVE — which is
-      // the assertion that fails if the retired branch is left in the store.
+      // The THIRD cause is gone with the placeholder (issue 1094).
       assert.equal(
         await projectCause({
           resolutionMode: 'simple',
@@ -639,11 +604,8 @@ describe('createAdminStore', () => {
     });
 
     it('saveCraftingCheckModifiers preserves sibling check fields and never writes the library (issue 770 persistence trap)', async () => {
-      // updateSystem shallow-merges only the top level, so a selection patch that failed to
-      // spread `...existing` would drop every sibling check field. Capture the persisted
-      // payload and assert the siblings survive AND that the shared library is untouched:
-      // since issue 1117 this saver has no library half at all, and the ONE authoring
-      // surface writes it through `updateSystem({ modifiers })` instead.
+      // updateSystem shallow-merges only the top level, so a selection patch that failed to spread
+      // `...existing` would drop every sibling check field (issue 1117).
       let updateArgs = null;
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
@@ -671,10 +633,8 @@ describe('createAdminStore', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      // The patch the card actually emits when a GM unticks a row: the id leaves THIS
-      // activity's default set and nothing else changes. That is the shallow-spread footgun
-      // surface — the nested half must spread `existing` or every sibling check field
-      // vanishes and the normalizer re-defaults it.
+      // The patch the card actually emits when a GM unticks a row: the id leaves THIS activity's
+      // default set and nothing else changes.
       await store.saveCraftingCheckModifiers({ defaultModifierIds: ['med'] });
 
       const persisted = updateArgs.updates.craftingCheck;
@@ -691,9 +651,7 @@ describe('createAdminStore', () => {
       // A sibling modifier field NOT in the patch is preserved from existing.
       assert.equal(persisted.defaultModifierPolicy, 'addAll');
 
-      // THE LIBRARY IS UNREACHABLE FROM HERE (issue 1117). A patch that names it is simply
-      // merged into the activity's check block as an unknown key the normalizer drops — it
-      // does NOT become a second write path to the shared array.
+      // THE LIBRARY IS UNREACHABLE FROM HERE (issue 1117).
       await store.saveCraftingCheckModifiers({
         modifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
       });
@@ -710,11 +668,7 @@ describe('createAdminStore', () => {
       );
     });
 
-    // The two NEW savers (issue 1095). Each writes its OWN activity block, and each must
-    // spread `existing` for the reason the crafting one does: `updateSystem` shallow-merges
-    // only the top level, so a naive `{ salvageCraftingCheck: { defaultModifierIds } }`
-    // drops every sibling slot and the normalizer re-defaults them. Asserted by a
-    // SIBLING'S SURVIVAL, never by reading the saver.
+    // The two NEW savers (issue 1095).
     for (const [activity, saver, key] of [
       ['salvage', 'saveSalvageCheckModifiers', 'salvageCraftingCheck'],
       ['gathering', 'saveGatheringCheckModifiers', 'gatheringCraftingCheck'],
@@ -761,10 +715,6 @@ describe('createAdminStore', () => {
     }
 
     // THE ONE AUTHORING SURFACE'S WRITE PATH (issue 1117), now at WORLD scope (issue 1308).
-    // Every library op replaces the whole array in the world setting — so removing an entry
-    // persists with no `-=` deletion — and writes NOTHING through `updateSystem`, so it cannot
-    // re-default an activity rule it was never asked about. That second half is asserted by the
-    // crafting system receiving no write at all.
     it('addModifier and deleteModifier write the WORLD library, alone', async () => {
       const calls = [];
       const services = createMockServices();
@@ -812,10 +762,9 @@ describe('createAdminStore', () => {
       );
     });
 
-    // A no-op op writes NOTHING. `addModifier` refuses a duplicate id and
-    // `deleteModifier` refuses an id the library does not carry; without those
-    // guards each would re-persist and re-project the whole system for a request that
-    // changes nothing.
+    // A no-op op writes NOTHING. `addModifier` refuses a duplicate id and `deleteModifier` refuses
+    // an id the library does not carry; without those guards each would re-persist and re-project
+    // the whole system for a request that changes nothing.
     it('refuses a duplicate add and an unknown delete without writing', async () => {
       const calls = [];
       const services = createMockServices();
@@ -833,18 +782,13 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
 
       assert.equal(await store.addModifier({ id: 'med' }), null);
-      // The id goes in the FIRST argument since issue 1308 dropped the system id. Passing the old
-      // two-argument shape made this assert that `'sys1'` is not a modifier id, which is true and
-      // proves nothing — `'ghost'` was never tested at all.
+      // The id goes in the FIRST argument since issue 1308 dropped the system id.
       assert.equal(await store.deleteModifier('ghost'), false);
       assert.equal(await store.updateModifier('ghost', { label: 'X' }), false);
       assert.deepEqual(calls, [], 'no op that changes nothing reaches updateSystem');
     });
 
-    // The empty-`update` early return. Without it a patch naming nothing still calls
-    // `updateSystem({})`, which re-normalizes and re-persists the whole system and then
-    // re-projects it through `refresh()` — a write, a settings round trip and a store churn
-    // for a request that named nothing. Deleting the guard was green.
+    // The empty-`update` early return.
     it('writes NOTHING for a patch that carries neither the catalogue nor a selection', async () => {
       const calls = [];
       const services = createMockServices();
@@ -866,10 +810,8 @@ describe('createAdminStore', () => {
       assert.deepEqual(calls, [], 'an empty patch is a no-op, not a full-system rewrite');
     });
 
-    // A `maxModifierPicks: null` is a real VALUE in that patch, not an omission (issue
-    // 1055): absence means UNLIMITED, so clearing the field has to be able to overwrite a
-    // stored bound. A patch that dropped the null key would leave the old cap in place
-    // and the Stepper would spring back to its previous number on the next refresh.
+    // A `maxModifierPicks: null` is a real VALUE in that patch, not an omission (issue 1055):
+    // absence means UNLIMITED, so clearing the field has to be able to overwrite a stored bound.
     it('saveCraftingCheckModifiers writes a null maxModifierPicks over a stored cap', async () => {
       let persisted = null;
       const services = createMockServices();
@@ -1039,9 +981,7 @@ describe('createAdminStore', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // 2. System selection
-  // -------------------------------------------------------------------------
 
   describe('system selection', () => {
     it('selectSystem updates selectedSystemId and persists setting', async () => {
@@ -1080,16 +1020,8 @@ describe('createAdminStore', () => {
       assert.equal(vs.selectedSystem?.id, 'sys1');
     });
 
-    // A search term names a vocabulary that belongs to ONE system: "iron" is a real
-    // component in the system the GM typed it into and means nothing in the next one.
-    // Carrying it across a system change silently filters the new system's browser
-    // down to (usually) nothing, and the GM sees an empty library, not a filter.
-    //
-    // The clear lives HERE and not in the views because every consumer reads the same
-    // store: `itemSearch` reaches the component browser via
-    // `getItems(systemId, search)` → `itemCards`, and `recipeSearch`/`graphSearch`
-    // reach the recipe browser and the graph the same way. Clearing at the selection
-    // covers all of them at once and survives a system change triggered from anywhere.
+    // A search term names a vocabulary that belongs to ONE system: "iron" is a real component in
+    // the system the GM typed it into and means nothing in the next one.
     it('selectSystem clears every system-scoped search filter', async () => {
       const services = createMockServices();
       services._getSystemsMutable().push(makeSystem({ id: 'sys2', name: 'System Two' }));
@@ -1139,9 +1071,7 @@ describe('createAdminStore', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // 3. Tab switching
-  // -------------------------------------------------------------------------
 
   describe('tab switching', () => {
     it('setTab updates activeTab writable', async () => {
@@ -1158,9 +1088,7 @@ describe('createAdminStore', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // 4. System CRUD
-  // -------------------------------------------------------------------------
 
   describe('system CRUD', () => {
     it('createSystem calls systemManager.createSystem and selects the new system', async () => {
@@ -1173,11 +1101,7 @@ describe('createAdminStore', () => {
       assert.ok(vs.systems.some((s) => s.id === sysId));
     });
 
-    // NO `craftingCheck` seed (issue 1055). The authority level this call site used to
-    // stamp is gone, and its replacement — the combination rule — already has a defined
-    // default (`addAll`) that the manager and the importer share. A UI-only seed here
-    // could therefore only DISAGREE with them about what a new system starts as, so the
-    // absence of the argument is the contract.
+    // NO `craftingCheck` seed (issue 1055).
     it('createSystem seeds no craftingCheck opinion of its own (issue 1055)', async () => {
       const services = createMockServices();
       const manager = services.getCraftingSystemManager();
@@ -1206,11 +1130,8 @@ describe('createAdminStore', () => {
       );
     });
 
-    // The manager root routes this through the same "did it happen?" helper as
-    // `selectSystem`, and that helper treats ONLY `false` as no — so the return value is a
-    // contract, not an incidental. On success it hands back the system; on a declined
-    // dirty-environment confirm it must be `false`, because a `null` would read as success
-    // and navigate the GM away from the very edit they just chose to keep.
+    // The manager root routes this through the same "did it happen?" helper as `selectSystem`, and
+    // that helper treats ONLY `false` as no — so the return value is a contract, not an incidental.
     it('createSystem returns the created system so the caller can open it', async () => {
       const services = createMockServices();
       const store = createAdminStore(services);
@@ -1221,10 +1142,7 @@ describe('createAdminStore', () => {
       assert.equal(created.id, get(store.selectedSystemId));
     });
 
-    // The reported case: a system is ALREADY selected when Create is pressed. The manager
-    // root opens the created system's overview off the back of this, so if the selection
-    // does not actually move, the GM is taken to the overview of the system they already
-    // had open — which is what a GM reported after the navigation landed.
+    // The reported case: a system is ALREADY selected when Create is pressed.
     it('createSystem selects the new system even when another one is already selected', async () => {
       const services = createMockServices();
       const store = createAdminStore(services);
@@ -1241,12 +1159,8 @@ describe('createAdminStore', () => {
       );
     });
 
-    // The real `CraftingSystemManager.createSystem` fires `fabricate.craftingSystemsChanged`
-    // BEFORE it returns, and the store answers that hook by scheduling its own refresh. That
-    // refresh is therefore already in flight, holding the PREVIOUS selection, when
-    // `createSystem` goes on to select the new system — and `refresh` had no way to tell a
-    // stale run from a current one, so the older one could publish last and put the rail back
-    // on the system the GM started from.
+    // The real `CraftingSystemManager.createSystem` fires `fabricate.craftingSystemsChanged` BEFORE
+    // it returns, and the store answers that hook by scheduling its own refresh.
     it('createSystem survives the systems-changed refresh its own write triggers', async () => {
       let dataChangedCallback = null;
       const services = createMockServices({
@@ -1280,14 +1194,8 @@ describe('createAdminStore', () => {
     });
 
     // The mechanism behind that, isolated: a refresh reads the selection once at the top and
-    // publishes after async work, so an OLDER run can finish last and put the previous
-    // selection back. A GM sees the new system appear and then flick away.
-    //
-    // The interleave is FORCED here rather than hoped for. Every awaited call in the mock
-    // resolves in queue order, so two refreshes started back-to-back always finish in order
-    // and the race cannot appear by itself. Holding the first run's environment lookup open
-    // until the second has finished reproduces what varying `fromUuid`/`enrichHTML` latency
-    // does in a real world.
+    // publishes after async work, so an OLDER run can finish last and put the previous selection
+    // back. The interleave is FORCED here rather than hoped for.
     it('a superseded refresh does not publish over a newer one', async () => {
       let releaseFirst = null;
       let held = false;
@@ -1378,15 +1286,10 @@ describe('createAdminStore', () => {
     });
 
     it('deleteSystem asks in a titled window with a Delete button, all localized', async () => {
-      // The most destructive action in the app, and until issue 1154 it asked for that
-      // with hardcoded English in an untitled window whose confirm button read the
-      // generic *Yes* — `DialogV2.confirm` merges `yes` over a default with `mergeObject`,
-      // which iterates `Object.keys(other)`, and a function has none.
-      //
-      // The mock's `localize` is `(key) => key`, so asserting the KEY asserts that the
-      // string is localized at all — a literal would come back as the literal. Only a
-      // SUPPLIED label is asserted: the core default is "Yes" on V13.351 and "COMMON.Yes"
-      // on V14.365, so pinning a default would pin a build.
+      // The most destructive action in the app, and until issue 1154 it asked for that with
+      // hardcoded English in an untitled window whose confirm button read the generic *Yes* —
+      // `DialogV2.confirm` merges `yes` over a default with `mergeObject`, which iterates
+      // `Object.keys(other)`, and a function has none.
       let options = null;
       const services = createMockServices({
         confirmDialog: async (bag) => {
@@ -1538,7 +1441,6 @@ describe('createAdminStore', () => {
 
     // Salvage mode change is non-destructive (updateSystem runs only the inline
     // _disableInvalidSalvageConfigs cleanup), so the confirm is salvage-accurate.
-    // Both branches share this setup, parameterized on the confirm answer.
     async function runSalvageMode(confirmAnswer) {
       let confirmCalled = false;
       let updateArgs = null;
@@ -1583,9 +1485,7 @@ describe('createAdminStore', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // 5. Feature toggles
-  // -------------------------------------------------------------------------
 
   describe('feature toggles', () => {
     it('toggleFeature("categories", false) sends the legacy compatibility update shape', async () => {
@@ -1698,9 +1598,7 @@ describe('createAdminStore', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // 6. Category management
-  // -------------------------------------------------------------------------
 
   describe('category management', () => {
     it('addCategory appends to categories and deduplicates', async () => {
@@ -1744,10 +1642,8 @@ describe('createAdminStore', () => {
       assert.ok(savedCategories.includes('Weapons'));
     });
 
-    // ── The COMPONENT category vocabulary (issue 676) ──────────────────────────
-    // A sibling of the recipe handlers above, mirroring their coverage. The write path
-    // had none, and the root calls these optional-chained (`store.addComponentCategory?.()`)
-    // — so deleting the store export no-ops silently and ships green.
+    // The COMPONENT category vocabulary (issue 676) ────────────────────────── A sibling of the
+    // recipe handlers above, mirroring their coverage.
 
     function trackComponentCategoryWrites(seed = null) {
       const services = createMockServices();
@@ -1869,9 +1765,7 @@ describe('createAdminStore', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // 7. Tag management
-  // -------------------------------------------------------------------------
 
   describe('tag management', () => {
     it('addTag lowercases and appends', async () => {
@@ -1934,16 +1828,11 @@ describe('createAdminStore', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // 8. Essence management
-  // -------------------------------------------------------------------------
 
   describe('essence management', () => {
-    // The authored-colour cases (issue 917) all need the same rig: optionally seeded
-    // essence definitions, plus a capture of the definitions that actually reach
-    // updateSystem. Asserting the persisted payload — not that the store method was
-    // called — is the point: the GM control renders a colour that is worthless if the
-    // save path drops it.
+    // The authored-colour cases (issue 917) all need the same rig: optionally seeded essence
+    // definitions, plus a capture of the definitions that actually reach updateSystem.
     function createEssenceColourRig(seeded = null) {
       const captured = { essenceDefinitions: null };
       const services = createMockServices();
@@ -2040,9 +1929,7 @@ describe('createAdminStore', () => {
 
     it('issue 560 (asymmetric): a NEW-name-only component resolves the essence source link, while the essence keeps its OWN sourceItemUuid', async () => {
       // Post-migration data: the linked component carries ONLY the renamed
-      // registeredItemUuid/originItemUuid (no legacy sourceUuid/sourceItemUuid). The
-      // essence source resolution must read the component's NEW field names, while the
-      // essence definition's OWN output key stays `sourceItemUuid` (out of scope, kept).
+      // registeredItemUuid/originItemUuid (no legacy sourceUuid/sourceItemUuid).
       let savedEssences = null;
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
@@ -2527,17 +2414,13 @@ describe('createAdminStore', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // 9. Recipe list operations
-  // -------------------------------------------------------------------------
 
   describe('recipe list operations', () => {
     // The studio singular routes through `CraftingSystemManager.deleteRecipes`, not
     // `RecipeManager.deleteRecipe` (issue 1132): the leaf does not cascade the recipe-item
-    // membership prune, so a singular delete that called it directly would leave the very
-    // dangling ids the set delete exists to stop leaving. Asserting the SET form is the
-    // whole point of this test — an assertion on the leaf passes either way, since the
-    // cascading body calls it too.
+    // membership prune, so a singular delete that called it directly would leave the very dangling
+    // ids the set delete exists to stop leaving.
     it('deleteRecipe shows confirm and routes through the cascading set delete', async () => {
       let confirmCalled = false;
       let setCall = null;
@@ -2860,13 +2743,8 @@ describe('createAdminStore', () => {
     });
 
     it('viewState.recipes projects the per-recipe craftingModifier override for the editor (issue 770 allowlist)', async () => {
-      // Retargeted for issue 1055: the seeded rule was `byRecipe`, which the authoring
-      // surface can no longer produce, so the fixture modelled a state the editor would
-      // never round-trip. `highest` is a live rule and exercises the same allowlist.
-      // The recipe list projection is a hand-built ALLOWLIST. Omitting craftingModifier
-      // makes the Overview override control seed from `undefined` → render "Inherit
-      // system default" → and (since the editor saves the whole draft) silently write the
-      // override back to null. Read the ACTUAL projection, not a prop-fed tab.
+      // Retargeted for issue 1055: the seeded rule was `byRecipe`, which the authoring surface can
+      // no longer produce, so the fixture modelled a state the editor would never round-trip.
       const services = createMockServices();
       const origManager = services.getRecipeManager();
       const recipe = makeRecipe({
@@ -2898,10 +2776,7 @@ describe('createAdminStore', () => {
       );
     });
 
-    // The AUTHORED EMPTY set has to cross the same allowlist (issue 1055). It is the one
-    // override shape a truthiness or length test silently drops, and dropping it here
-    // would put the Overview select back on "Inherit" — the exact collapse this change
-    // exists to remove.
+    // The AUTHORED EMPTY set has to cross the same allowlist (issue 1055).
     it('viewState.recipes projects an AUTHORED EMPTY craftingModifier set (issue 1055)', async () => {
       const services = createMockServices();
       const origManager = services.getRecipeManager();
@@ -2952,11 +2827,7 @@ describe('createAdminStore', () => {
     });
 
     it('viewState.recipes projects enableBlocked true for a STRUCTURALLY BROKEN recipe that reads incomplete false (issue 1010)', async () => {
-      // The case proving `incomplete` could not have served. `_isRecipeIncomplete` is
-      // `validate().valid === false && validateStructure().valid === true`, so a recipe
-      // that fails validateStructure() reads `incomplete: false` — wearing no pill —
-      // while activation still refuses it. Reading `incomplete` for the blocked-enable
-      // count would report zero for exactly the recipes the bulk write leaves off.
+      // The case proving `incomplete` could not have served.
       const services = createMockServices();
       const origManager = services.getRecipeManager();
       const broken = makeRecipe({
@@ -3011,9 +2882,8 @@ describe('createAdminStore', () => {
     });
 
     it('viewState.recipes projects enableBlocked false when the recipe manager has no activation predicate (issue 1010)', async () => {
-      // The projection runs against injected services, so a manager without the
-      // predicate must not throw at projection time. Absent means "unknown", never
-      // "blocked" — an invalid RESULT is still honoured (the two cases above).
+      // The projection runs against injected services, so a manager without the predicate must not
+      // throw at projection time.
       const services = createMockServices();
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -3024,9 +2894,7 @@ describe('createAdminStore', () => {
     });
 
     it('updateRecipe threads a craftingModifier override through the save path (issue 770 round-trip)', async () => {
-      // The editor saves the whole draft (seeded from the projection above). Assert the
-      // store save path forwards craftingModifier to the recipe manager so an authored
-      // override survives save → reload rather than being dropped en route.
+      // The editor saves the whole draft (seeded from the projection above).
       let updateArgs = null;
       const services = createMockServices();
       const origManager = services.getRecipeManager();
@@ -3051,11 +2919,8 @@ describe('createAdminStore', () => {
       );
     });
 
-    // Issue 978. `_buildRecipeList` DERIVES `recipeItemId` from `containingDefinitions[0]`
-    // — definition order, an authoring accident. The editor seeds its draft from a whole
-    // projected row and Save posts the whole draft, so before this fix that derived
-    // scalar was persisted onto the model, arming the four legacy `src/systems` image
-    // resolvers (issue 887) for the ordinary cohort and not just the alchemy one.
+    // Issue 978. `_buildRecipeList` DERIVES `recipeItemId` from `containingDefinitions[0]` —
+    // definition order, an authoring accident.
     it('updateRecipe strips the derived recipe-item projection fields from the save payload', async () => {
       let updateArgs = null;
       const services = createMockServices();
@@ -3098,9 +2963,8 @@ describe('createAdminStore', () => {
     });
 
     it('updateRecipe strips the derived scalar in either membership order', async () => {
-      // The leaked value tracked definition order, so a single-order assertion cannot
-      // distinguish "stripped" from "happened to derive nothing". Flip the order, confirm
-      // the projection's derived scalar genuinely flips, and assert neither save carries it.
+      // The leaked value tracked definition order, so a single-order assertion cannot distinguish
+      // "stripped" from "happened to derive nothing".
       const captured = [];
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
@@ -3197,9 +3061,7 @@ describe('createAdminStore', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // 9b. System import/export
-  // -------------------------------------------------------------------------
 
   describe('system import/export', () => {
     it('exportSystem calls downloadFile with JSON payload', async () => {
@@ -3300,9 +3162,7 @@ describe('createAdminStore', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // 10. Item operations
-  // -------------------------------------------------------------------------
 
   describe('item operations', () => {
     it('deleteComponent shows confirm and calls systemManager.deleteItem', async () => {
@@ -3476,11 +3336,8 @@ describe('createAdminStore', () => {
       assert.deepEqual(call.data, { name: 'Iron', recipes: 1, disabled: 1 });
     });
 
-    // ── The set delete (issue 1129) ──────────────────────────────────────────────
-    //
-    // The store half is a passthrough with NO confirmDialog: the panel arms beside an impact
-    // statement, which carries strictly more information than a modal. A dialog here would
-    // make the arm a second gate rather than the gate.
+    // The set delete (issue 1129). The store half is a passthrough with NO confirmDialog: the panel
+    // arms beside an impact statement, which carries strictly more information than a modal.
 
     it('deleteComponents routes the whole set through the BATCHED manager primitive', async () => {
       let batchArgs = null;
@@ -3615,27 +3472,8 @@ describe('createAdminStore', () => {
     });
 
     it('describeComponentDelete returns the zero impact rather than throwing', async () => {
-      // It is called from a `$derived` in the manager root on EVERY selection change, so it
-      // runs on the render path. A throw here does not surface as a failed action — it takes
-      // the whole component browser down. So all four inputs that can be absent are pinned by
-      // OUTCOME here: whatever is missing, the caller gets the zero impact and not an
-      // exception.
-      //
-      // They are NOT four separate lines of coverage, and saying they were would overstate
-      // them. Only case 3 is load-bearing on the line it names: drop the optional call on
-      // `getRecipeManager` and this test fails. The other three are BACKSTOPPED, and deleting
-      // the guard each one names changes nothing, because `_getManagedItems` answers `[]` for
-      // an absent system and `describeComponentDeleteImpact` coerces a non-array:
-      //
-      //  - cases 1 and 2 both fall through to the later `resolved.length === 0` return
-      //    instead of stopping at `if (!sysId)` / `if (!system)`;
-      //  - case 4 survives the loss of `_selectedSystemRecipes`'s `|| []`, because
-      //    `Array.isArray(recipes) ? recipes : []` inside the describer already covers it.
-      //
-      // They are kept anyway, as render-path OUTCOME pins rather than as proof that any
-      // individual guard is necessary: the contract is that the caller gets the zero impact,
-      // whichever line delivers it, so a change that removes a backstop is caught here even
-      // though removing a redundant guard is not.
+      // It is called from a `$derived` in the manager root on EVERY selection change, so it runs on
+      // the render path.
       const services = createMockServices();
       const zero = { deletable: 0, deletableIds: [], recipesRewritten: 0, recipesDisabled: 0 };
 
@@ -3650,11 +3488,8 @@ describe('createAdminStore', () => {
       await missingSystem.selectSystem('sys1');
       assert.deepEqual(missingSystem.describeComponentDelete(['comp-1']), zero);
 
-      // 3 and 4. A recipe manager that is absent, and one whose recipe list is missing. Both
-      // reach `describeComponentDeleteImpact`, which is where an unguarded `recipes.length`
-      // would throw. Swapped in AFTER `selectSystem`, because the store's own refresh needs a
-      // working recipe manager to get this far and this test is about the describer, not
-      // about a store that never loaded.
+      // 3 and 4. A recipe manager that is absent, and one whose recipe list is missing. Both reach
+      // `describeComponentDeleteImpact`, which is where an unguarded `recipes.length` would throw.
       const recipeless = createMockServices();
       const recipelessSystem = recipeless.getCraftingSystemManager().getSystem('sys1');
       recipelessSystem.components = [makeItem({ id: 'comp-1', name: 'Herb' })];
@@ -3739,9 +3574,7 @@ describe('createAdminStore', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // 11. Search
-  // -------------------------------------------------------------------------
 
   describe('search', () => {
     it('setRecipeSearch filters viewState recipes by name', async () => {
@@ -3766,16 +3599,9 @@ describe('createAdminStore', () => {
       assert.ok(!vs.recipes.some((r) => r.id === 'r2'));
     });
 
-    // --- Leaving a library's route clears its search (issue 1462) --------------
-    //
-    // The route effect in `CraftingSystemManagerRoot` calls this on EVERY manager
-    // navigation and lets the store decide, so the short-circuit is what stands between
-    // that and a full `refresh()` per rail click. It is therefore asserted as a COST, by
-    // counting refreshes, rather than assumed from the return value.
-    //
-    // `services.getWorldActors` is called exactly once per `refresh()` — the learned-recipe
-    // index is rebuilt at the top of it, before its first `await` — so it is the cheapest
-    // honest refresh counter available from outside the store.
+    // Leaving a library's route clears its search (issue 1462). The route effect in
+    // `CraftingSystemManagerRoot` calls this on EVERY manager navigation and lets the store decide,
+    // so the short-circuit is what stands between that and a full `refresh()` per rail click.
     function storeWithRefreshCounter(extraOverrides = {}) {
       const counter = { refreshes: 0 };
       const services = createMockServices({
@@ -3819,9 +3645,7 @@ describe('createAdminStore', () => {
     });
 
     it('clearLibrarySearches clears a component term set on its own, in exactly one refresh', async () => {
-      // The mirror case, and it is not ceremony. A GM has typed in ONE library, never both,
-      // so an implementation written with `||` instead of `&&` short-circuits on the empty
-      // sibling, passes both-empty and both-set, and never clears anything in real use.
+      // The mirror case, and it is not ceremony.
       const { store, counter } = storeWithRefreshCounter();
       await store.selectSystem('sys1');
       await store.setItemSearch('iron');
@@ -3833,11 +3657,8 @@ describe('createAdminStore', () => {
     });
 
     it('clearLibrarySearches republishes the unfiltered recipe list before it is awaited', async () => {
-      // The caller is a route effect that does NOT await it, and the destination route
-      // renders in the same task. `refresh()` reaches its phase-1 publish with no preceding
-      // `await`, and that publish carries both keys the Tags & Categories counts read, so the
-      // destination never paints the filtered numbers. This fails loudly if anyone later
-      // moves work above that publish.
+      // The caller is a route effect that does NOT await it, and the destination route renders in
+      // the same task.
       const services = createMockServices();
       const origManager = services.getRecipeManager();
       services.getRecipeManager = () => ({
@@ -3881,9 +3702,7 @@ describe('createAdminStore', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // 12. Config save actions
-  // -------------------------------------------------------------------------
 
   describe('config save actions', () => {
     it('saveCraftingCheckRouted persists the routed config and preserves other check fields', async () => {
@@ -4393,9 +4212,7 @@ describe('createAdminStore', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // 12b. Teaser config
-  // -------------------------------------------------------------------------
 
   describe('teaser config', () => {
     it('saveTeaserConfig persists teaser config via updateSystem', async () => {
@@ -4436,9 +4253,7 @@ describe('createAdminStore', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // 13. State isolation
-  // -------------------------------------------------------------------------
 
   describe('state isolation', () => {
     it('two store instances do not share state', async () => {
@@ -4453,9 +4268,7 @@ describe('createAdminStore', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // Factory shape
-  // -------------------------------------------------------------------------
 
   describe('factory output shape', () => {
     it('returns all expected properties', () => {
@@ -4521,9 +4334,7 @@ describe('createAdminStore', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // 14. ViewState data contracts
-  // -------------------------------------------------------------------------
 
   describe('viewState data contracts', () => {
     it('viewState.systems entries include manager summary fields', async () => {
@@ -6204,11 +6015,7 @@ describe('createAdminStore', () => {
       // hb-env-ridge (tests/view-lab/world/labContent.js) is the acceptance's 0-to-1 fixture for
       // this fact, but it lives in the view-lab world module and this suite's fixtures come from
       // createMockServices()/services._store.gatheringConfig instead, so it is not reachable from
-      // here. This is an equivalent case built on the same rule this task adds: an automatic
-      // environment composing a mountain-biome task that carries a tool moves requiredToolCount
-      // from 0 (no composed task carries a tool) to a non-zero count once one does, the count is
-      // DISTINCT tool ids rather than a sum of per-task toolIds arrays, and a tool-bearing task
-      // that does not compose (wrong biome here) contributes nothing.
+      // here.
       const environments = [
         {
           id: 'env-ridge',
@@ -6374,11 +6181,10 @@ describe('createAdminStore', () => {
       assert.equal(staleManualDisabled.runtimeState, 'unavailable');
       assert.equal(composition.counts.excludedTasks, 0);
 
-      // The editor offers no force add in manual mode any more (issue #1315), but the store
-      // method survives for the automatic-mode control, so this pins that writing the force list
-      // on a MANUAL environment classifies nothing: manual mode reads `enabledTaskIds` and no
-      // other list. A flip that made forces manual-only again reds here, on the draft state the
-      // GM would actually be looking at.
+      // The editor offers no force add in manual mode any more (issue #1315), but the store method
+      // survives for the automatic-mode control, so this pins that writing the force list on a
+      // MANUAL environment classifies nothing: manual mode reads `enabledTaskIds` and no other
+      // list.
       store.forceIncludeEnvironmentRecord('task', 't-desert');
       draft = get(store.viewState).environmentDraft;
       assert.ok(draft.forcedTaskIds.includes('t-desert'), 'the write itself still lands');
@@ -6503,7 +6309,6 @@ describe('createAdminStore', () => {
 
     // AUTOMATIC mode, because the two populations this test needs — records that compose by
     // matching and a record that composes by force — can only coexist there since issue #1315.
-    // Manual mode composes exactly the picked list and ignores `forcedEventIds` entirely.
     it('reorders all included events including condition-blocked force-added events', async () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
@@ -6594,8 +6399,7 @@ describe('createAdminStore', () => {
 
     it('keeps force-added events included after environment edits make them match', async () => {
       // AUTOMATIC mode (issue #1315): force add is an automatic-mode override, so this is where a
-      // force can outlive the mismatch that motivated it. `h-cave` spans both biomes so that the
-      // edit below moves the FORCED record's match state without emptying the included list.
+      // force can outlive the mismatch that motivated it.
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -7153,9 +6957,7 @@ describe('createAdminStore', () => {
           'category',
           'enabled',
           'locked',
-          // The legacy book scalars issue 884 deliberately KEEPS. Named individually
-          // so deleting the whole legacy block, rather than the one image line, fails
-          // here instead of silently emptying the Books & Scrolls consumers.
+          // The legacy book scalars issue 884 deliberately KEEPS.
           'recipeItemId',
           'recipeItemIds',
           'recipeItemName',
@@ -7177,11 +6979,9 @@ describe('createAdminStore', () => {
       }
     });
 
-    // Issue 884. Book membership is many-to-many, so "the containing book" is not a
-    // well-defined thing to borrow an image from: which definition lands at index 0 is
-    // the order of `selectedSystem.recipeItemDefinitions`, an authoring accident. The
-    // projection therefore carries NO book image at all, and the four GM readers resolve
-    // `recipe.img` through the shared helper instead.
+    // Issue 884. Book membership is many-to-many, so "the containing book" is not a well-defined
+    // thing to borrow an image from: which definition lands at index 0 is the order of
+    // `selectedSystem.recipeItemDefinitions`, an authoring accident.
     it('viewState.recipes projects no containing-book image, in either membership order', async () => {
       const TOME_IMG = 'icons/sundries/books/book-tooled-eye-gold-red.webp';
       const SCROLL_IMG = 'icons/sundries/scrolls/scroll-bound-blue.webp';
@@ -7217,14 +7017,10 @@ describe('createAdminStore', () => {
           ['def-scroll', 'def-tome'],
           `both containing books still project (${order})`
         );
-        // Load-bearing for the SECOND phase: every other assertion here is
-        // order-insensitive (the id comparison is sorted), so on their own they would
-        // still pass if `refresh()` had silently re-published a cached projection —
-        // which is exactly what this case's title claims to rule out. `recipeItemName`
-        // is derived from `containingDefinitions[0]`, the same index the deleted
-        // `recipeItemImg` came from, so it is the field that genuinely flips with the
-        // reversal. It passes today by design: this guards the re-derivation, it does
-        // not chase a bug.
+        // Load-bearing for the SECOND phase: every other assertion here is order-insensitive (the
+        // id comparison is sorted), so on their own they would still pass if `refresh()` had
+        // silently re-published a cached projection — which is exactly what this case's title
+        // claims to rule out.
         assert.equal(
           row.recipeItemName,
           expectedFirstBookName,
@@ -7288,10 +7084,8 @@ describe('createAdminStore', () => {
     });
 
     it('refreshAccessRosters re-projects BOTH access rosters without a full refresh', async () => {
-      // The user-only `refreshWorldUsers` is gone: the two rosters move together (the
-      // same user and actor CRUD changes both), so the app wires one helper to both
-      // hook families. A players-only refresh would leave `controlledBy` — which derives
-      // from `actor.ownership` — stale.
+      // The user-only `refreshWorldUsers` is gone: the two rosters move together (the same user and
+      // actor CRUD changes both), so the app wires one helper to both hook families.
       let users = [{ id: 'u1', name: 'Alice' }];
       let characters = [{ id: 'a1', name: 'Vex', controlledBy: [] }];
       const services = createMockServices({
@@ -7848,11 +7642,7 @@ describe('createAdminStore', () => {
       assert.ok(!JSON.stringify(vs.itemCards).includes('[object Object]'));
     });
 
-    // -----------------------------------------------------------------------
-    // Issue 800 — read-side precedence. Descriptions are RESOLVED at write time,
-    // so the store reads the STORED value first and only falls back to the live
-    // document (enriching it) when the stored value is empty.
-    // -----------------------------------------------------------------------
+    // Issue 800 — read-side precedence.
 
     /**
      * Seed `sys1` with a single component and drive a refresh, with `fromUuid` and the
@@ -7878,11 +7668,9 @@ describe('createAdminStore', () => {
       try {
         const store = createAdminStore(services);
         await store.selectSystem('sys1');
-        // The store projects every card CHEAPLY and the browser hydrates the page it
-        // renders (issue 1081), so the linked-source half — the live description fallback
-        // and the "Missing" verdict — resolves on `hydrate()`, not on refresh. This suite
-        // drives the store with no view, so it plays the browser's part explicitly. The
-        // card fills IN PLACE, which is why the same object is returned.
+        // The store projects every card CHEAPLY and the browser hydrates the page it renders (issue
+        // 1081), so the linked-source half — the live description fallback and the "Missing"
+        // verdict — resolves on `hydrate()`, not on refresh.
         const card = get(store.viewState).itemCards[0];
         await card?.hydrate?.();
         return { card, enrichCalls, sourceLookups };
@@ -7921,10 +7709,9 @@ describe('createAdminStore', () => {
     });
 
     it('itemCards fall back to the ENRICHED live document when the stored description is empty (issue 800)', async () => {
-      // The issue 676 population — a compendium-linked component with no stored
-      // description — is exactly the population whose live text carries raw
-      // directives, so a non-enriching fallback would leave the reported bug visible
-      // here until a GM ran Repair.
+      // The issue 676 population — a compendium-linked component with no stored description — is
+      // exactly the population whose live text carries raw directives, so a non-enriching fallback
+      // would leave the reported bug visible here until a GM ran Repair.
       const { card, enrichCalls } = await itemCardFor(
         {
           id: 'comp-empty',
@@ -7949,10 +7736,7 @@ describe('createAdminStore', () => {
     });
 
     it('every read surface forwards the STORED string unchanged (issue 800 cross-caller invariant)', async () => {
-      // The cross-caller invariant in its new form. Its old form asserted that three
-      // surfaces produced identical FLATTENED output; the flatten is gone, so what must
-      // now hold across surfaces is that a STORED (already-resolved) description is
-      // forwarded byte-for-byte, with no surface resolving or rewriting it.
+      // The cross-caller invariant in its new form.
       const stored = REPORTER_RESOLVED_EXPECTED;
       const { card } = await itemCardFor({
         id: 'comp-forward',
@@ -7998,17 +7782,9 @@ describe('createAdminStore', () => {
     });
 
     it('read surfaces DIVERGE on an un-repaired labelled directive, and that is the real contract (issue 800)', async () => {
-      // The test above passes for a resolved string, but a resolved string is already
-      // plain text — so normalization is a no-op there and it would pass identically if
-      // the surfaces diverged wildly. This case uses a LABELLED directive, where they
-      // genuinely differ, so the contract is pinned rather than merely asserted.
-      //
-      // `adminStore` and the manager's sync normalizer both run `plainTextDescription`,
-      // whose retained mop-up renders the label; `InventoryListingBuilder` forwards the
-      // stored string untouched. The consequence is real and worth seeing: until a GM
-      // runs Repair Item Data, the SAME component reads "Acid" in the manager and
-      // "@UUID[…]{Acid}" in a player's inventory. Repair converges them, which is why
-      // it — not a wider read-side rewrite — is the fix.
+      // The test above passes for a resolved string, but a resolved string is already plain text —
+      // so normalization is a no-op there and it would pass identically if the surfaces diverged
+      // wildly.
       const labelled = '@UUID[Compendium.dnd5e.items.Item.acid00]{Acid}';
 
       const { card } = await itemCardFor({
@@ -8054,23 +7830,12 @@ describe('createAdminStore', () => {
       );
     });
 
-    // -----------------------------------------------------------------------
-    // Issue 148 — per-store item-card memo. Unchanged components skip their
-    // per-item `fromUuid`/`enrichHTML` on refresh; a signature over the WHOLE
-    // stored item plus the external flags (`showTags`/`showEssences`/`showSalvage`)
-    // and resolved essence catalog invalidates only what actually changed.
-    // -----------------------------------------------------------------------
+    // Issue 148 — per-store item-card memo.
 
     /**
-     * Seed `sys1` with `components`, instrument `globalThis.fromUuid` with a call
-     * counter, create the store, and run `body` with a `count()` reader and a
-     * `reset()`. Restores `fromUuid` afterwards. Shared by the memo tests so the
-     * seam swap is written once (Sonar new-code duplication).
-     *
-     * `hydrateAll()` plays the browser's part (issue 1081): the store projects every card
-     * cheaply and the view hydrates the page it renders, so a suite with no view has to say
-     * which cards it is looking at. These tests are about the MEMO — what a second look at
-     * an unchanged component costs — so they look at all of them.
+     * Seed `sys1` with `components`, instrument `globalThis.fromUuid` with a call counter, create
+     * the store, and run `body` with a `count()` reader and a `reset()`. Restores `fromUuid`
+     * afterwards (issue 1081).
      */
     async function withMemoStore(components, servicesOverrides, body) {
       const services = createMockServices(servicesOverrides);
@@ -8197,9 +7962,8 @@ describe('createAdminStore', () => {
     });
 
     it('two-phase publish: the settled selectedSystem is a NEW reference carrying enriched recipeItemDefinitions (issue 148 invariant)', async () => {
-      // The memo must not touch `selectedSystem`: phase-2 still builds a NEW
-      // selectedSystemData object, or Svelte's `$derived` never re-propagates the
-      // enriched Books & Scrolls projection.
+      // The memo must not touch `selectedSystem`: phase-2 still builds a NEW selectedSystemData
+      // object, or Svelte's `$derived` never re-propagates the enriched Books & Scrolls projection.
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.recipeItemDefinitions = [
@@ -8229,11 +7993,9 @@ describe('createAdminStore', () => {
     });
 
     it('viewState.selectedSystem projects componentCategories, independently of categories (issue 676)', async () => {
-      // AC6 clause 3. This hand-built projection is an ALLOWLIST, and its failure mode
-      // is silent: without the line, the Tags & Categories screen's component-categories
-      // section is permanently EMPTY however correctly the normalizer and the write path
-      // behave. A NON-EMPTY fixture is the point — an `|| []` fallback or a stubbed-out
-      // line reads green against an empty one.
+      // AC6 clause 3. This hand-built projection is an ALLOWLIST, and its failure mode is silent:
+      // without the line, the Tags & Categories screen's component-categories section is
+      // permanently EMPTY however correctly the normalizer and the write path behave.
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
@@ -8306,10 +8068,8 @@ describe('createAdminStore', () => {
       const vs = get(store.viewState);
       const [linkedEssence, unlinkedEssence] = vs.selectedSystem.essenceDefinitions;
 
-      // `category` (issue 676) is projected here unconditionally — this is the
-      // PER-COMPONENT field projection, distinct from the system-level
-      // `componentCategories` vocabulary projection. deepEqual (not deepInclude) is
-      // the point: it fails if the field is ever dropped from the allowlist.
+      // `category` (issue 676) is projected here unconditionally — this is the PER-COMPONENT field
+      // projection, distinct from the system-level `componentCategories` vocabulary projection.
       assert.deepEqual(vs.selectedSystem.managedItemOptions, [
         {
           id: 'comp-1',
@@ -8366,9 +8126,7 @@ describe('createAdminStore', () => {
         { id: 'comp-3', tags: [], essences: {} },
       ]);
 
-      // The managedItemOptions contract shape is unchanged (no tags leak in). It does
-      // carry the per-component `category` (issue 676) — tags and category are
-      // different axes and neither substitutes for the other.
+      // The managedItemOptions contract shape is unchanged (no tags leak in) (issue 676).
       assert.deepEqual(vs.selectedSystem.managedItemOptions, [
         { id: 'comp-1', name: 'Iron Ore', img: 'item.png', description: '', category: 'general' },
         { id: 'comp-2', name: 'Herb', img: 'item.png', description: '', category: 'general' },
@@ -8376,15 +8134,9 @@ describe('createAdminStore', () => {
       ]);
     });
 
-    // ── COMPLICATIONS ON THE COMPONENT-OPTION PROJECTION (issue 1286) ──────────────────
-    //
-    // `managedItemOptions` is the feed for BOTH GM read-only complication strips — the
-    // Component Studio's progressive salvage rows and the Recipe Studio's progressive stage
-    // rows. Each of those rows draws the complications of the component it REFERENCES, never
-    // of the component being edited, so this projection is the only route either strip has.
-    // It is the same reason `difficulty` is projected here, and the same failure mode: a
-    // field omitted from this allowlist reaches the editor as `undefined` and the surface
-    // reads as unauthored rather than as a dropped projection.
+    // COMPLICATIONS ON THE COMPONENT-OPTION PROJECTION (issue 1286). `managedItemOptions` is the
+    // feed for BOTH GM read-only complication strips — the Component Studio's progressive salvage
+    // rows and the Recipe Studio's progressive stage rows.
     it('managedItemOptions carries the authored complications, and preserves their absence', async () => {
       const complications = [
         {
@@ -8446,12 +8198,9 @@ describe('createAdminStore', () => {
       );
     });
 
-    // ── SAVE → RELOAD (issues 651, 676, and now 1286) ──────────────────────────────────
-    //
-    // The failure this pins has shipped twice: a field is authored, shown, and silently
-    // discarded on save, with persistence working perfectly the whole time. `complications`
-    // is a TOP-LEVEL sibling of `salvage`, so it rides `updates` on its own and every hop
-    // between the editor and the stored component has to carry it.
+    // SAVE → RELOAD (issues 651, 676, and now 1286). The failure this pins has shipped twice: a
+    // field is authored, shown, and silently discarded on save, with persistence working perfectly
+    // the whole time.
     it('updateComponent round-trips complications back onto the reloaded component options', async () => {
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
@@ -8572,9 +8321,7 @@ describe('createAdminStore', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // Three-way dirty-navigation confirm
-  // -------------------------------------------------------------------------
   describe('confirmDiscardDirty*Draft (three-way)', () => {
     it('returns the choiceDialog action verbatim for save/discard/cancel', async () => {
       for (const action of ['save', 'discard', 'cancel']) {
@@ -8728,14 +8475,9 @@ describe('createAdminStore — gathering economy', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// The FAILURE-RESULT POLICY and salvage's failure CONSUMPTION (issue 1098)
-//
-// `_buildSelectedSystemViewData` is a hand-built ALLOWLIST: a field omitted there is
-// INVISIBLE to the UI however correctly the normalizer and the write path behave. These
-// tests drive the REAL projection and the REAL savers, because that is the only place the
-// omission shows up.
-// ---------------------------------------------------------------------------
+// The FAILURE-RESULT POLICY and salvage's failure CONSUMPTION (issue 1098).
+// `_buildSelectedSystemViewData` is a hand-built ALLOWLIST: a field omitted there is INVISIBLE to
+// the UI however correctly the normalizer and the write path behave.
 
 describe('createAdminStore — failure-result policy (issue 1098)', () => {
   /** Project a raw system through the real store and read one activity's check back. */
@@ -8796,10 +8538,7 @@ describe('createAdminStore — failure-result policy (issue 1098)', () => {
   });
 
   it('reads breakToolsOnFail NEW-THEN-LEGACY, so a pre-1.7.0 system is not flipped ON→OFF', async () => {
-    // A system authored before the 1.7.0 rename carries ONLY `consumeCatalystsOnFail`. A
-    // projection reading the new key alone would render the toggle OFF, and the first save
-    // from that screen would persist the GM's setting as OFF — silently, and for a setting
-    // they never touched.
+    // A system authored before the 1.7.0 rename carries ONLY `consumeCatalystsOnFail`.
     const legacyOnly = await projectChecks((sys) => {
       sys.salvageCraftingCheck = { consumption: { consumeCatalystsOnFail: true } };
     });
@@ -8822,9 +8561,7 @@ describe('createAdminStore — failure-result policy (issue 1098)', () => {
   async function captureSave(run) {
     let updateArgs = null;
     const services = createMockServices();
-    // Seed a sibling on every check block. The saver has to carry it through
-    // `updateSystem`'s shallow top-level merge, and a fixture with nothing beside the
-    // policy could not tell a spread saver from one that replaced the whole block.
+    // Seed a sibling on every check block.
     const raw = services._getSystemsMutable().find((s2) => s2.id === 'sys1');
     raw.craftingCheck = { ...(raw.craftingCheck || {}), enabled: true };
     raw.salvageCraftingCheck = {
@@ -8847,10 +8584,9 @@ describe('createAdminStore — failure-result policy (issue 1098)', () => {
   }
 
   it('each activity saver writes its OWN check block and preserves every sibling', async () => {
-    // `updateSystem` shallow-merges the TOP level only, so a saver that did not spread
-    // `existing` would drop every sibling of the policy and the normalizer would then
-    // re-default them — silent data loss, and the reason this is asserted on a SIBLING
-    // rather than by reading the saver.
+    // `updateSystem` shallow-merges the TOP level only, so a saver that did not spread `existing`
+    // would drop every sibling of the policy and the normalizer would then re-default them — silent
+    // data loss, and the reason this is asserted on a SIBLING rather than by reading the saver.
     const cases = [
       ['craftingCheck', (store) => store.saveCraftingCheckFailureResultPolicy('always')],
       ['salvageCraftingCheck', (store) => store.saveSalvageCheckFailureResultPolicy('always')],
@@ -8892,9 +8628,7 @@ describe('createAdminStore — failure-result policy (issue 1098)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Issue 1081 — the store's half of the page-scoped component browser
-// ---------------------------------------------------------------------------
 
 describe('adminStore item-card hydration and cohort fetching (issue 1081)', () => {
   /** Seed `sys1` with `count` compendium-linked components carrying no stored description. */
@@ -8913,21 +8647,8 @@ describe('adminStore item-card hydration and cohort fetching (issue 1081)', () =
   }
 
   /**
-   * A card fills itself IN PLACE, which Svelte cannot see — and a NEW ARRAY of the SAME
-   * objects does not fix that.
-   *
-   * This store publishes through a `writable`, which does not proxy, so every hop between
-   * the published array and a rendered string compares by `===`: `selectedComponent` and
-   * `componentForEdit` re-run `find(...)` and return the identical object, the browser
-   * model's filter/sort/paginate chain slices and spreads without cloning, and a keyed
-   * `{#each}` reconciling an unchanged item does not update the row. The array identity gets
-   * the readers to look; only the CARD identity makes them see anything different. Publishing
-   * the same object back to all three surfaces does not keep them from diverging — it keeps
-   * them wrong together, on the pre-hydration reading, permanently.
-   *
-   * Only the cards that reported a fill are replaced, and the untouched pair below is the
-   * control for that: swapping an un-hydrated card would strand its eventual in-place fill on
-   * an object nothing publishes any more.
+   * A card fills itself IN PLACE, which Svelte cannot see — and a NEW ARRAY of the SAME objects
+   * does not fix that.
    */
   it('republishes each HYDRATED card as a new object, leaving un-hydrated cards alone', async () => {
     const services = createMockServices();
@@ -9002,19 +8723,9 @@ describe('adminStore item-card hydration and cohort fetching (issue 1081)', () =
   });
 
   /**
-   * The recipe half of the Tags & Categories reference count is published as DATA, and the
-   * count has to accompany the rows it describes in every state the store publishes — not
-   * merely arrive by the time the refresh settles.
-   *
-   * The stake is destructive rather than cosmetic. `VocabularyPanel` gates its confirm strip
-   * on the row's `totalUsage`: a tag reading `0 references` renders the `Unused` chip and is
-   * deleted on ONE CLICK with no confirmation. A tag that is referenced only as a recipe
-   * ingredient tag-placeholder — exactly the population issue 689 exists to count — reads
-   * that way the moment this record goes missing or empty while the recipes are published,
-   * and deleting it breaks ingredient matching in every recipe whose placeholder named it.
-   *
-   * Asserted over the whole publish SEQUENCE for that reason: a snapshot taken after the
-   * refresh settles cannot see a phase that published rows without their counts.
+   * The recipe half of the Tags & Categories reference count is published as DATA, and the count
+   * has to accompany the rows it describes in every state the store publishes — not merely arrive
+   * by the time the refresh settles (issue 689).
    */
   it('publishes tag-placeholder counts alongside the recipes in every published state', async () => {
     const services = createMockServices();
@@ -9085,32 +8796,9 @@ describe('adminStore item-card hydration and cohort fetching (issue 1081)', () =
   });
 
   /**
-   * The roster the essence cards are built from is THREADED into the row projection rather
-   * than re-fetched there, so a 10,000-recipe library is not copied an extra time per GM
-   * refresh. `buildRecipeList`'s own half of that contract is pinned directly in
-   * `admin-projection-modules.test.js` (a supplied roster performs zero fetches, an omitted
-   * one performs exactly one); this pins that the STORE actually supplies it.
-   *
-   * An exact budget rather than a bound, because the quantity is a per-refresh fetch count
-   * and every one of them copies the whole library. The first three are the system list's
-   * per-system `recipeCount`, this cohort fetch, and the validation report — dropping the
-   * threading adds another, and any newly added cohort read has to move this number
-   * deliberately.
-   *
-   * THE FOURTH IS `_worldToolUsage` (issue 1373), and it is moved here deliberately rather
-   * than absorbed: the world Tools Catalogue states how many recipes require each world Tool
-   * PER CRAFTING SYSTEM, and that count cannot come from the threaded cohort because the
-   * threaded cohort is the SELECTED system's alone. So the budget is three plus ONE PER
-   * CRAFTING SYSTEM, and this fixture holds exactly one.
-   *
-   * ── THE UNFILTERED READ IS BUDGETED TOO (issue 1371, round 8) ─────────────────────────
-   * `getRecipes({})` copies the WHOLE library rather than one system's cohort, and it is the
-   * one read on this path that `RecipeManager`'s cohort index cannot make cheap — so it is
-   * the more expensive of the two quantities and it was going UNCOUNTED here, which is how
-   * it silently became two. The world-scope publish takes one for `buildWorldScopeState`'s
-   * `recipes` argument (issue 1392) and the world essence usage leg took a second for the
-   * same snapshot; they now share one. Counted on the same counter shape as the cohort, for
-   * the same reason: a third consumer has to move this number deliberately.
+   * The roster the essence cards are built from is THREADED into the row projection rather than
+   * re-fetched there, so a 10,000-recipe library is not copied an extra time per GM refresh (issue
+   * 1373).
    */
   it('fetches the recipe cohort on a fixed per-refresh budget, threading it to the row projection', async () => {
     const services = createMockServices();

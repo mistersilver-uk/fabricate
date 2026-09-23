@@ -1,33 +1,4 @@
-/**
- * Sentence multisets for the harness-document split (issue #1661, phases 3-5).
- *
- * `AGENTS.md`, `CLAUDE.md` and `CONTRIBUTING.md` are being split into a short rulebook plus
- * reference files loaded on demand. The issue's acceptance was "a diff review confirms no rule
- * sentence was lost", and a human diff review of a 1,100-line move is precisely where a lost
- * sentence hides. This is the mechanical replacement.
- *
- * The unit is a sentence, and `joinWraps` is what makes it one. `AGENTS.md` requires one sentence
- * per line, but `markdownlint-sentences-per-line` only caps sentences per line: it permits a
- * sentence wrapped across several lines, so nothing enforces the rule. Both sides of every
- * comparison below are wrap-normalised here rather than assumed to be normalised already.
- *
- * WHAT NORMALISATION DELIBERATELY DOES NOT DO. It strips list markers, blockquote markers and
- * heading hashes, and collapses internal whitespace — the things a move legitimately changes when
- * a bullet becomes a paragraph or a heading level shifts. It does NOT touch punctuation, case, or
- * wording. A reworded rule must fail this: "the same rule, said differently" is exactly the edit a
- * reviewer cannot catch by eye across a 1,100-line diff, and the whole point of the checker is to
- * catch it.
- *
- * Structural lines carry no rule and are dropped: fences, table rows, horizontal rules, HTML
- * comments (including the markdownlint disable/enable pairs), and link-reference definitions.
- * FENCED CONTENT IS OUT OF SCOPE, and that is a stated limit rather than a claim of safety. A
- * fence holds commands, config and file listings, not prose rules, and normalising it as prose
- * would report whitespace changes inside a code block as lost sentences. The one fence that
- * carries a rule — the `HIGH_RISK_PATHS` list in `AGENTS.md` — has a stronger guard already:
- * `tests/agent-model-tiers.test.js` pins its entries AND their order against
- * `scripts/lib/agentModelTiers.js`. Every other fence moves or does not move as a visible unit in
- * the diff, and this checker will not tell you which.
- */
+/** Sentence multisets for the harness-document split (issue #1661, phases 3-5). */
 import { joinWraps } from './markdownWraps.js';
 
 /** Lines that carry no rule text and are dropped before comparison. */
@@ -42,12 +13,7 @@ const STRUCTURAL = [
 /** The list, blockquote and heading markers a move may legitimately add or remove. */
 const LEADING_MARKER = /^\s*(?:>+\s*)?(?:[-*+]\s+|\d+\.\s+|#{1,6}\s+)?/u;
 
-/**
- * The rule-bearing sentences of a Markdown document, normalised, in order.
- *
- * @param {string} markdown
- * @returns {string[]}
- */
+/** The rule-bearing sentences of a Markdown document, normalised, in order. */
 export function sentencesOf(markdown) {
   const sentences = [];
   let inFence = false;

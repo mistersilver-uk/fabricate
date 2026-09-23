@@ -27,6 +27,8 @@ import {
   multiSystemCardRow,
   multiSystemProgressiveCardRow,
 } from '../helpers/inventoryCollapseFixtures.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertWholeHeaderDisclosure } from '../helpers/wholeHeaderDisclosure.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -42,23 +44,21 @@ const harness = createMountedComponentHarness({
     ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/craftingArtResolution.js',
     // The essence colour fold, shared by the card tile, its pips and the inspector.
     'src/ui/svelte/util/essenceTint.js',
+    'src/ui/svelte/util/bookRecipeBrowse.js',
+    'src/ui/svelte/util/disclosurePhrase.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     // NOTE: `progressiveStageThresholds.js` / `progressiveResultOrder.js` are NOT needed
     // here. `ProgressiveStageList.svelte` imports neither (only `foundryBridge`); the
     // real importer is `inventoryStore.svelte.js`, which this suite mocks with a POJO.
-    // The store's own suite copies them instead.
   ],
   compiledModules: [
-    // The player window's own shared roster (issue 1514), spread rather than listed: this tree
-    // renders the not-yet-ready chrome, the record tile, the portrait and the kind filter's
-    // segmented track, and a manifest that named each would insert lines into a block Sonar
-    // already reads as duplicated across these suites. See `PLAYER_APP_COMPILED_MODULES`.
+    // The player window's own shared roster (issue 1514), spread rather than listed.
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
@@ -73,16 +73,12 @@ const harness = createMountedComponentHarness({
     // `.svelte.js` carries STATIC imports of every child — so the whole `detail/`
     // tree is listed here even though only one branch renders at a time. An omission
     // HANGS this suite (reported as `# cancelled`), it never fails it.
-    // The shell BOTH bodies render inside (header + shared body leaves).
     'src/ui/svelte/apps/inventory/detail/InventoryDetailHeader.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
     // The salvage tree, plus the shared stage list it reuses.
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
     // The shared complication summary row and the leaf it renders (issue 1286).
-    // `ProgressiveStageList` draws the per-stage complication band through it, and `Chip` is
-    // already above via the `SELECT_COMPILED_MODULES` spread — so omitting either HANGS this
-    // suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
@@ -152,10 +148,6 @@ function makeItem() {
 /**
  * A recipe-item "book" teaching more than one page's worth of recipes.
  *
- * SEVEN, deliberately: `InventoryBookDetail` renders its pager — and therefore its page-size
- * control — only when the filtered list is LONGER than the first page size, which is 6. Six would
- * put the control behind its own render guard and leave the clause below asserting nothing.
- *
  * @returns {object} an inventory row the detail routes to the book body.
  */
 function makeBookItem() {
@@ -209,9 +201,7 @@ function makeEssenceItem() {
   };
 }
 
-// A plain (non-reactive) store stand-in: this is a render + interaction smoke
-// test, so a POJO exposing the getters InventoryView reads is sufficient. The
-// real store's derivations are unit-tested separately.
+// A plain (non-reactive) store stand-in.
 function makeServices(item, bulk = {}) {
   const calls = {
     navigate: [],
@@ -238,8 +228,7 @@ function makeServices(item, bulk = {}) {
     pageItems: [item],
     selectedItem: item,
     selectedSystemId: null,
-    // Mirrors the real store's derivation: the top-level identity for a single-system /
-    // legacy card, else the selected (or first) participation.
+    // Mirrors the real store's derivation.
     get selectedParticipation() {
       const it = this.selectedItem;
       if (!it) return null;
@@ -265,10 +254,7 @@ function makeServices(item, bulk = {}) {
     setPageSize() {},
     load() {},
     tickWorldTime() {},
-    // Bulk salvage / destroy (issue 859). The POJO is not reactive, so every bulk state
-    // below is supplied AT MOUNT and the action seams merely RECORD — which is the only
-    // way to pin the `running` markup at all, since the View Lab cannot photograph it
-    // (its `Roll` is seeded and synchronous, so a lab run completes before the shot).
+    // Bulk salvage / destroy (issue 859). The POJO is not reactive.
     bulkSelectedKeys: bulk.selectedKeys ?? [],
     get bulkActive() {
       return (this.bulkSelectedKeys?.length ?? 0) > 0;
@@ -393,11 +379,7 @@ describe('InventoryView (mounted)', () => {
     assert.ok(detail.querySelector('[data-inventory-used-by="r1"]'), 'still shows Used by');
   });
 
-  // The grid's footer is part of its frame, not a control that earns its place past a
-  // threshold. The shared Pagination hides itself below `pageSizeOptions`' smallest
-  // option (25 here), so the shipped grid rendered NO footer at all for a realistic
-  // 18-item inventory — no count, no per-page control — and nothing in this suite
-  // looked at it.
+  // The grid's footer is part of its frame.
   it('always renders the grid footer, even when everything fits on one page', async () => {
     const { services } = makeServices(makeItem());
     const target = await harness.mount({ services });
@@ -445,8 +427,7 @@ describe('InventoryView (mounted)', () => {
     assert.ok(tile.classList.contains('has-tint'), 'gates the surface wash on a real tint');
   });
 
-  // The accent fallback path: an essence with no chosen colour emits NO inline var, so the
-  // tile's `var()` fallback paints `--fab-accent` exactly as it did before issue 1036.
+  // The accent fallback path: an essence with no chosen colour emits NO inline var.
   it('emits no tint var on an essence with no chosen colour (accent fallback)', async () => {
     const { services } = makeServices(makeEssenceItem());
     const target = await harness.mount({ services });
@@ -459,11 +440,7 @@ describe('InventoryView (mounted)', () => {
     assert.equal(tile.classList.contains('has-tint'), false);
   });
 
-  // D14: the prototype puts the salvageable and tool badges at ONE slot, which is only
-  // safe there because no prototype fixture item is both. Fabricate's flags are
-  // orthogonal and a broken salvageable tool is the headline case, so both-true must
-  // resolve to two distinct badges in one row — nothing else in the suite would catch
-  // an overlap (presence assertions pass either way).
+  // D14: the prototype puts the salvageable and tool badges at ONE slot.
   it('gives a salvageable tool BOTH corner badges, in one row, distinct elements', async () => {
     const item = makeItem();
     item.isTool = true;
@@ -496,7 +473,6 @@ describe('InventoryView (mounted)', () => {
   });
 
   // D14: "Broken" REPLACES the quantity pip; they share one slot and one ternary.
-  // Rendering them as separate elements would collide at top-right.
   it('replaces the quantity pip with a Broken pip on a broken tool', async () => {
     const item = makeItem();
     item.broken = true;
@@ -560,10 +536,7 @@ describe('InventoryView (mounted)', () => {
   });
 
   it('renders the loading state, announces it busy, and drops the claim once ready', async () => {
-    // THE LOADING BRANCH HAD NO ASSERTION HERE AT ALL before issue 1514, which is why the
-    // `aria-busy` criterion for this view was unmeetable rather than merely unmet. Asserted on
-    // the RENDERED DOM: a composition that declares the attribute and stops rendering it passes
-    // every source-text reader.
+    // THE LOADING BRANCH HAD NO ASSERTION HERE AT ALL before issue 1514.
     const { services: loadingServices, store: loadingStore } = makeServices(makeItem());
     loadingStore.loading = true;
     loadingStore.loadedOnce = false;
@@ -691,8 +664,7 @@ describe('InventoryView (mounted)', () => {
   });
 });
 
-// Build a store whose selected item is a recipe-item "book", plus a learn()
-// capture. Only the getters InventoryView/InventoryDetail read are provided.
+// Build a store whose selected item is a recipe-item "book".
 function makeBookServices(book, { learningRecipeId = null } = {}) {
   const calls = { navigate: [], learn: [], learnAll: [] };
   const store = {
@@ -999,6 +971,65 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     );
   });
 
+  it('opens a book recipe row from its own header button, which names itself and resolves its region', async () => {
+    const recipes = Array.from({ length: 8 }, (_, i) => ({
+      id: `r${i + 1}`,
+      name: `Recipe ${i + 1}`,
+      description: `Description ${i + 1}`,
+      img: null,
+      learned: false,
+    }));
+    const { services } = makeBookServices(makeBook(recipes));
+    const target = await harness.mount({ services });
+    await settle();
+
+    const row = target.querySelector('[data-inventory-learn-recipe="r1"]');
+    const headerOf = () => row.querySelector('.inventory-detail-accordion-toggle');
+    assertWholeHeaderDisclosure({
+      root: target,
+      header: headerOf(),
+      recordName: 'Recipe 1',
+      expanded: false,
+      chevronSelector: '.inventory-detail-accordion-caret',
+      site: 'the book recipe row, collapsed',
+    });
+    assert.ok(
+      Boolean(row.querySelector('[data-inventory-learn="r1"]')),
+      'the row still renders its Learn control'
+    );
+    assert.ok(
+      !headerOf().querySelector('[data-inventory-learn="r1"]'),
+      'and it sits beside the header rather than inside it'
+    );
+
+    headerOf().click();
+    await settle();
+
+    const body = assertWholeHeaderDisclosure({
+      root: target,
+      header: headerOf(),
+      recordName: 'Recipe 1',
+      expanded: true,
+      chevronSelector: '.inventory-detail-accordion-caret',
+      site: 'the book recipe row, open',
+    });
+    assert.ok(
+      body.matches('[data-inventory-recipe-body="r1"]'),
+      'the region the header controls IS the description body'
+    );
+
+    headerOf().click();
+    await settle();
+    assertWholeHeaderDisclosure({
+      root: target,
+      header: headerOf(),
+      recordName: 'Recipe 1',
+      expanded: false,
+      chevronSelector: '.inventory-detail-accordion-caret',
+      site: 'the book recipe row, collapsed again',
+    });
+  });
+
   it('does not show the recipe search for a small multi-recipe book (<= 6)', async () => {
     const recipes = Array.from({ length: 3 }, (_, i) => ({
       id: `r${i + 1}`,
@@ -1235,9 +1266,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(target.querySelector('[data-inventory-salvage-panel]'), null, 'Info is the body');
   });
 
-  // AC1. Brokenness is about usability, not salvageability: the engine has no broken
-  // check, so hiding the tab would read as "this isn't salvageable" - wrong, and
-  // unfixable by the player.
+  // AC1. Brokenness is about usability, not salvageability.
   it('AC1: a BROKEN salvageable tool still gets the Salvage tab, and the broken banner', async () => {
     const { services } = salvageServices(salvageItem({}, { broken: true, isTool: true }));
     const target = await harness.mount({ services });
@@ -1302,8 +1331,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       'nothing can be lost without a roll'
     );
     assert.equal(target.querySelector('[data-inventory-salvage-dc]'), null, 'and there is no DC');
-    // The harness localizer echoes keys, so assert the KEY the footer selected: with no
-    // usable check the label is "Salvage", not "Salvage roll".
+    // The harness localizer echoes keys, so assert the KEY the footer selected.
     assert.match(
       target.querySelector('[data-inventory-salvage-action]').textContent,
       /Salvage\.Action$/,
@@ -1331,8 +1359,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     );
   });
 
-  // AC2, rendering half. The builder decides the numbers; this pins that the panel
-  // renders the FIXED shape as a range and shows no DC chip.
+  // AC2, rendering half. The builder decides the numbers.
   it('routed + fixed renders authored ranges and NO DC; routed + relative renders thresholds', async () => {
     const fixed = salvageServices(
       salvageItem({
@@ -1408,10 +1435,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   });
 
   it('issue 764: a Simple multi-group misconfig renders Simple-specific copy and suppresses the banner', async () => {
-    // Threaded end-to-end THROUGH InventoryComponentDetail (prop-threading doctrine): the
-    // `misconfiguredReason` discriminator must reach SalvageMisconfiguredBody so it renders
-    // the Simple copy, NOT the routed "needs a check formula" copy. The green recycle
-    // banner that a Simple no-check config would otherwise show is suppressed.
+    // Threaded end-to-end THROUGH InventoryComponentDetail (prop-threading doctrine).
     const { services } = salvageServices(
       salvageItem({
         mode: 'simple',
@@ -1492,8 +1516,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     );
   });
 
-  // Guards a later move of the section inside a non-misconfigured branch: a prerequisite is
-  // worth disclosing even when the salvage config is misconfigured.
+  // Guards a later move of the section inside a non-misconfigured branch.
   it('renders the Required tools section even when the salvage is misconfigured', async () => {
     const { services } = salvageServices(
       salvageItem({
@@ -1683,8 +1706,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.ok(target.querySelector('[data-inventory-salvage-roll-hint]'), 'hints that a roll resolves it');
     const rows = target.querySelectorAll('[data-progressive-stage-reorderable]');
     assert.equal(rows.length, 2, 'both stages are reorderable');
-    // Reorder is the whole of this feature, so the permitted state says so too — the
-    // stage list only ever explained itself when the rows were FIXED.
+    // Reorder is the whole of this feature, so the permitted state says so too.
     assert.ok(
       target.querySelector('[data-inventory-salvage-reorder-note]'),
       'the reorderable state explains the affordance'
@@ -1700,8 +1722,6 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     // The opt-in extension the salvage body passes.
     assert.ok(target.querySelector('[data-progressive-stage-state]'), 'renders a state chip');
     // And the one it must NOT: the fixture's authored `quantity: 2` renders nowhere.
-    // Progressive awarding grants each entry ONE item, so the row said "×2" and the
-    // player was handed one (issue 675).
     assert.equal(
       target.querySelector('[data-progressive-stage-quantity]'),
       null,
@@ -1719,8 +1739,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(calls.reorder[0][1], 1, 'to index 1');
   });
 
-  // AC8. `canReorder: false` DETACHES the handlers rather than leaving inert rows: a
-  // player grabbing a row that does nothing is the worst outcome.
+  // AC8. `canReorder: false` DETACHES the handlers rather than leaving inert rows.
   it('AC8: allowPlayerResultReorder:false drops the grip and detaches the handlers', async () => {
     const stages = [
       { id: 's1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 1, difficulty: 4, threshold: 4 },
@@ -1749,12 +1768,6 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   });
 
   // --- The row's SHAPE (issue 675 fix round) ------------------------------------
-  //
-  // The inline row let the name flex and everything else hold a fixed width, so in the
-  // 300px inspector the name measured ZERO pixels — it did not truncate to a word, it
-  // disappeared, and the chevrons overflowed the panel. These pin the SHAPE that made
-  // it fit, because a mounted test cannot see the width: happy-dom computes no cascade,
-  // so every geometry assertion here would read green either way.
 
   const SHAPE_STAGES = [
     { id: 's1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 2, difficulty: 4, threshold: 4 },
@@ -1830,11 +1843,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   });
 
   it('prints BOTH numbers per stacked row: the component DC and the cumulative reach', async () => {
-    // Issue 675 ruling: progressive CHECKS have no DC, but COMPONENTS do. `stage.difficulty`
-    // IS the component's progressive DC (`component.difficulty`, GM-labelled "This component's
-    // Progressive DC"), distinct from `stage.threshold` (the cumulative budget to reach the
-    // stage). An earlier round dropped the DC from the stacked row on the false belief that
-    // progressive "has no DC"; that was the check DC, not the component's. Both show now.
+    // Issue 675 ruling: progressive CHECKS have no DC.
     const { services } = shapeServices();
     const target = await openSalvage(services);
 
@@ -1858,20 +1867,12 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   });
 
   // --- The flow banner (issue 675 fix round) -------------------------------------
-  //
-  // A previous round deleted this as a duplicate of the mode banner. It is not one: the
-  // mode banner NAMES the mode, this states the MECHANIC — that the roll STOPS at the
-  // first result it cannot reach — and stopping is the entire reason the order is worth
-  // arranging. Pinned by CONTENT, because two boxes both existing is exactly what the
-  // deletion argued against; what matters is that they say different things.
 
   it('states the flow rule as well as the mode name, and they are not the same claim', async () => {
     const { services } = shapeServices();
     const target = await openSalvage(services);
 
-    // The harness's i18n stub echoes keys, so this pins the two boxes to two DIFFERENT
-    // keys. The English they resolve to is pinned in `lang/en.json`; what a component
-    // test can prove is that neither box is rendering the other's string.
+    // The harness's i18n stub echoes keys.
     const banner = target.querySelector('[data-inventory-salvage-banner]');
     const flow = target.querySelector('[data-inventory-salvage-flow]');
     assert.ok(flow, 'the flow banner renders');
@@ -1939,9 +1940,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   // --- The footer note names the gesture's actual cost ---------------------------
 
   it('warns that the roll is one-shot only where there IS a roll', async () => {
-    // Keyed on `checkUsable`, like the banner and the body dispatch: with a usable check
-    // the button IS the roll — it commits, once, with no reroll — and without one there
-    // is nothing to roll and no reroll to warn about. One note for both said neither.
+    // Keyed on `checkUsable`, like the banner and the body dispatch.
     const { services } = shapeServices();
     const rolled = await openSalvage(services);
     assert.match(
@@ -1960,17 +1959,11 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   });
 
   // --- The body reconciles with the resolved roll -------------------------------
-  //
-  // The pre-roll list is a PLAN; once the roll resolves it is a RECORD. A stage row
-  // still chipped "Awaiting roll" directly beneath the green "Salvaged" ribbon is a
-  // contradiction the player has to resolve for us — and an existence-only chip
-  // assertion cannot see it.
 
   const RECON_STAGES = [
     { id: 's1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 1, difficulty: 4, threshold: 4 },
     { id: 's2', componentId: 'c3', name: 'Slag', img: null, quantity: 1, difficulty: 3, threshold: 7 },
-    // Unreachable at ANY budget (the award loop skips an invalid cost), so it is "Not
-    // reached" before AND after a roll — never "Roll fell short".
+    // Unreachable at ANY budget (the award loop skips an invalid cost).
     { id: 's3', componentId: 'c4', name: 'Dust', img: null, quantity: 1, difficulty: null, threshold: null },
   ];
 
@@ -2005,8 +1998,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
         state: 'success',
         message: 'Salvaged Mordant Gland',
         awarded: [{ name: 'Iron Shard', img: null }],
-        // The engine's OWN record of what it awarded, keyed by componentId: the roll
-        // reached stage 1 and fell short of stage 2.
+        // The engine's OWN record of what it awarded, keyed by componentId.
         awardedComponentIds: ['c2'],
         outcomeId: null,
       },
@@ -2021,9 +2013,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       null,
       'no row still claims to await a roll beneath the success ribbon',
     );
-    // The eyebrow reconciles too, rather than emptying out: "Roll to resolve" is a
-    // pre-roll instruction, and leaving the slot blank afterwards throws away the one
-    // number that summarises the list beneath it.
+    // The eyebrow reconciles too, rather than emptying out.
     assert.equal(target.querySelector('[data-inventory-salvage-roll-hint]'), null);
     assert.equal(
       target.querySelector('[data-inventory-salvage-recovered-count]').textContent.trim(),
@@ -2087,9 +2077,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     );
   });
 
-  // The other cause of the same boolean. Here the GM string is the true one, and it must
-  // survive a commit: the GM pinned this order whether or not a roll has since run down
-  // it.
+  // The other cause of the same boolean. Here the GM string is the true one.
   it('the GM-pinned reason survives a commit, and is never replaced by the spent one', async () => {
     const gmPinned = salvageServices(
       salvageItem({
@@ -2120,9 +2108,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   });
 
   it('post-roll with NO run record degrades to a neutral resolved state, inventing nothing', async () => {
-    // The runless invariant: a salvage with no run manager records no createdResults, so
-    // there is nothing to reconcile against. Claiming every stage fell short would be a
-    // lie; claiming they still await a roll would be the contradiction above.
+    // The runless invariant: a salvage with no run manager records no createdResults.
     const { services } = progressiveServices({
       salvageResult: {
         systemId: 'sys',
@@ -2180,15 +2166,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   });
 });
 
-// The player's per-stage complication band (issue 1286, PR 2), through the REAL wrapper
-// chain. What is pinned here is the TENSE FORWARDING and nothing else: the band's own rules
-// live in `progressive-stage-complications-mounted.test.js`, mounted on the shared list.
-//
-// It is a separate describe because the forwarding is the failure mode. `complications`
-// threads the same five wrapper hops `salvageOrderAnnouncement` does, and a prop dropped at
-// any hop silently defaults — here to `off`, which renders no band at all, and to `forecast`
-// after a roll, which would keep "This can go wrong" beneath a spent roll. Neither is
-// visible to an assertion that only counts stage rows.
+// The player's per-stage complication band (issue 1286, PR 2).
 describe('InventoryView (mounted) — the per-stage complication band (issue 1286)', () => {
   before(harness.setup);
   after(harness.teardown);
@@ -2203,9 +2181,7 @@ describe('InventoryView (mounted) — the per-stage complication band (issue 128
     fired: false,
   };
 
-  // The projection rides ON the stage row, exactly as `attachStageComplications` publishes
-  // it: the player's reorder is applied downstream of the builder, so a parallel list keyed
-  // by result id would desynchronise at precisely that point.
+  // The projection rides ON the stage row.
   const bandStages = (fired) => [
     { id: 's1', componentId: 'c2', name: 'Iron Shard', img: null, difficulty: 4, threshold: 4 },
     {
@@ -2244,9 +2220,7 @@ describe('InventoryView (mounted) — the per-stage complication band (issue 128
   const bandOf = (target) =>
     target.querySelector('[data-progressive-stage="s2"] [data-progressive-stage-complications]');
 
-  // Declared here rather than reused: the sibling suite's `openSalvage` is scoped inside its
-  // own describe, and hoisting it into module scope would touch a block this change has no
-  // business in.
+  // Declared here rather than reused.
   async function openBand(services) {
     const target = await harness.mount({ services });
     await settle();
@@ -2343,7 +2317,6 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
     );
 
     // NAMED BY THE CAPTION, not by the `for`/`id` pair this was the app's only instance of.
-    // There is no `id`-bearing labelable element left for a `for` to address.
     const caption = target.querySelector('.inventory-system-selector-label');
     assert.ok(Boolean(caption), 'the caption still renders');
     assert.equal(caption.tagName, 'SPAN', 'the label is demoted to a span');
@@ -2488,8 +2461,6 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
 
   it('pressing Salvage routes the SELECTED participation ids, explicitly not the primary', async () => {
     // Binds InventoryView.onSalvage (a routing site the earlier tests left unpressed):
-    // mutating it to forward the PRIMARY `selectedItem` ids instead of `activeSystem`
-    // would send System A's cA here, flipping this test.
     const { services, store } = makeServices(multiSystemCardRow());
     const salvageCalls = [];
     store.salvage = (systemId, componentId) => {
@@ -2510,10 +2481,6 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
 
   it('withholds the ribbon for a result belonging to a DIFFERENT participation of the same component id', async () => {
     // Binds the success-ribbon gate's systemId term (a routing site left untested).
-    // Both participations share the component id `shared`, so the gate MUST compare on
-    // systemId too: a result stamped for System A must not surface while System B is
-    // selected. Dropping the systemId term from the gate makes `shared === shared` true
-    // and shows the ribbon — flipping this test.
     const { services, store } = makeServices(multiSystemProgressiveCardRow());
     store.selectedSystemId = SYS_B;
     store.salvageResult = {
@@ -2536,11 +2503,7 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
   });
 });
 
-// The inspector shell exists to make ONE class of bug impossible: the two detail
-// bodies hand-rolling the same class names in their own scoped `<style>` blocks,
-// which Svelte scoping guarantees will drift again, silently and invisibly (issue
-// 675 shipped exactly that — serif 18/600 vs sans 16/600, a 64px vs 72px thumb, two
-// different eyebrows). A review note cannot hold that line; this test can.
+// The inspector shell exists to make ONE class of bug impossible.
 describe('InventoryDetailHeader (source contract)', () => {
   const SHELL_OWNED = [
     '.inventory-detail',
@@ -2589,10 +2552,7 @@ describe('InventoryDetailHeader (source contract)', () => {
       resolve(repoRoot, 'src/ui/svelte/apps/inventory/detail/InventoryDetailHeader.svelte'),
       'utf8'
     );
-    // `:where()` zeroes the ancestor guard, so the base is one class (0-1-0) and ANY
-    // consumer rule — always 0-2-0 or more once Svelte appends its scope hash — wins.
-    // A plain `:global(.inventory-detail .x)` would be 0-2-0 and would TIE with
-    // `.inventory-chip-type`, resolving on injection order.
+    // `:where()` zeroes the ancestor guard.
     for (const leaf of [
       '.inventory-chip',
       '.inventory-detail-section',
@@ -2607,7 +2567,6 @@ describe('InventoryDetailHeader (source contract)', () => {
   });
 
   // THE ELEVENTH LEAF IS GONE, AND ITS ABSENCE IS ASSERTED (issue 1514).
-  //
   // `.inventory-detail-empty-note` was published here and written by ten markup sites across
   // four files. All ten render `EmptyState note` now, so the rule was deleted with the last of
   // them. Dropping it from the two lists above would leave nothing at all watching it — and a
@@ -2623,8 +2582,7 @@ describe('InventoryDetailHeader (source contract)', () => {
       'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte',
       'src/ui/svelte/apps/inventory/bulk/InventoryBulkReport.svelte',
     ];
-    // Comments stripped first, in both syntaxes: this shell's own docblock now RECORDS the
-    // retirement by name, and a raw text scan would read that sentence as the thing it forbids.
+    // Comments stripped first, in both syntaxes.
     const written = (file) =>
       readFileSync(resolve(repoRoot, file), 'utf8')
         .replaceAll(/<!--[\s\S]*?-->/gu, '')
@@ -2640,9 +2598,7 @@ describe('InventoryDetailHeader (source contract)', () => {
   });
 });
 
-// ===========================================================================
 // Bulk salvage / destroy (issue 859).
-// ===========================================================================
 describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () => {
   before(harness.setup);
   after(harness.teardown);
@@ -2657,8 +2613,7 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
   }
 
   it('a SHIFT-click on a card reaches toggleBulkSelection, not select', async () => {
-    // One `activate(event)` handler serves click and keydown — both event types carry
-    // `shiftKey` — so the mouse and keyboard gestures cannot drift apart.
+    // One `activate(event)` handler serves click and keydown.
     const { services, calls, store } = makeServices(makeItem());
     let selected = null;
     store.select = (key) => {
@@ -2709,9 +2664,7 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
   });
 
   it('renders the bulk PANEL in the right column, and not the detail body', async () => {
-    // The panel is a SIBLING of `InventoryDetail` under `{#if bulkActive}`, so entering
-    // bulk replaces the inspector rather than routing through it — which is what keeps
-    // the bulk tree out of `InventoryDetail`'s static graph.
+    // The panel is a SIBLING of `InventoryDetail` under `{#if bulkActive}`.
     const { services } = makeServices(makeItem(), {
       selectedKeys: ['sys:c1', 'sys:c2'],
       entries: [bulkEntry(), bulkEntry({ key: 'sys:c2', name: 'Bronze Ingot' })],
@@ -2734,9 +2687,7 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
   });
 
   it('labels the panel as a region and makes the count line a live region', async () => {
-    // `role="region"` + `aria-label` go on the SHELL ROOT, not the inner panel div —
-    // otherwise the title, count line and Clear sit OUTSIDE the labelled region and a
-    // screen-reader user skips exactly the material the live region added.
+    // `role="region"` + `aria-label` go on the SHELL ROOT.
     const { services } = makeServices(makeItem(), {
       selectedKeys: ['sys:c1'],
       entries: [bulkEntry()],
@@ -2794,15 +2745,7 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
     );
     const bulkEmpty = target.querySelector('[data-inventory-bulk-empty]');
     assert.ok(Boolean(bulkEmpty), 'with the shared empty note');
-    // THE HOOK'S VALUE, NOT JUST ITS PRESENCE (issue 1514), and the value is `"true"` rather
-    // than the `""` the deleted `<p>` wrote. `EmptyState.svelte`'s `dataValue || true` coerces
-    // it, and an explicit `dataValue=""` at the call site does NOT undo that — the empty
-    // string is falsy and takes the same branch. Measured across the tree: 61 hook-bearing
-    // `EmptyState`/`Callout` sites render `="true"`, 45 passing no value and 16 passing `""`.
-    // Nothing breaks because every shipped reader is a presence selector, which is exactly
-    // why the drift is invisible; this clause pins it so the next reader does not "fix" it at
-    // a call site, where it cannot be fixed. Closing it means changing the primitive, and
-    // that moves all 61 attributes at once.
+    // THE HOOK'S VALUE, NOT JUST ITS PRESENCE (issue 1514).
     assert.equal(
       bulkEmpty.getAttribute('data-inventory-bulk-empty'),
       'true',
@@ -2811,10 +2754,7 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
   });
 
   it('renders the RUNNING state from its props — the state the lab cannot photograph', async () => {
-    // The View Lab's `Roll` is seeded and synchronous, so a lab run completes before the
-    // shot; reaching this state would need a harness hook that stalls the
-    // `salvageComponents` seam mid-run. This mounted pin is therefore the ONLY evidence
-    // the running markup has, and it drives the busy props directly.
+    // The View Lab's `Roll` is seeded and synchronous.
     const rows = [
       bulkEntry({ key: 'sys:a', name: 'Alpha' }),
       bulkEntry({ key: 'sys:b', name: 'Beta' }),
@@ -2850,9 +2790,7 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
       ['sys:a', 'sys:b', 'sys:c'],
       'one row per queued item, in run order'
     );
-    // The footer stays put and goes BUSY rather than disappearing: a control that
-    // vanishes mid-run reflows the footer under the player's cursor, and `aria-busy` is
-    // what tells assistive tech the same thing the spinner tells everyone else.
+    // The footer stays put and goes BUSY rather than disappearing.
     const commit = target.querySelector('[data-inventory-bulk-salvage]');
     assert.equal(commit.disabled, true, 'the commit button cannot be pressed twice');
     assert.equal(commit.getAttribute('aria-busy'), 'true');
@@ -2868,14 +2806,7 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
     );
   });
 
-  /**
-   * Each run row paired with the TONE of its trailing status chip — `subtle` waiting,
-   * `accent` in progress, `positive` done. The row keys alone say nothing about which row
-   * the panel claims is being worked on, which is the whole subject below.
-   *
-   * `positive` is `Chip`'s name for the family the retired pill spelled `success` (issue 1506);
-   * the tone is read off the chip's own class rather than off a hook restated per call site.
-   */
+  /** Each run row paired with the TONE of its trailing status chip. */
   function runRowTones(target) {
     return [...target.querySelectorAll('[data-inventory-bulk-run-row]')].map((node) => [
       node.getAttribute('data-inventory-bulk-run-row'),
@@ -2922,9 +2853,7 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
   });
 
   it('marks done / in progress / waiting once the first tick has landed', async () => {
-    // `current` counts COMPLETED rows, so one tick means row 1 is done and row 2 is the
-    // one being worked on. This is the value at which the guarded expression and the
-    // unguarded one agree — which is exactly why the case above exists.
+    // `current` counts COMPLETED rows.
     const { services } = busyServices({ running: true, progress: { current: 1, total: 3 } });
     const target = await harness.mount({ services });
     await settle();
@@ -2937,10 +2866,7 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
   });
 
   it('a DESTROY run marks its first row active from tick zero — the asymmetry', async () => {
-    // Destroy has no pre-first-target gap: its confirmation is answered BEFORE the store
-    // raises the busy flag at all, so `current: 0` there really does mean row 1 is being
-    // deleted. Holding destroy to salvage's rule would show a three-row queue with
-    // nothing happening for the whole run.
+    // Destroy has no pre-first-target gap.
     const { services } = busyServices({ destroying: true, progress: { current: 0, total: 3 } });
     const target = await harness.mount({ services });
     await settle();
@@ -3041,8 +2967,7 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
   });
 
   it('names BOTH the row count and the unit count on the destroy prompt', async () => {
-    // The trigger and the dialog both name them, so the whole-stack rule is legible
-    // before the fact and the row count is not discarded.
+    // The trigger and the dialog both name them.
     const { services, calls } = makeServices(makeItem(), {
       selectedKeys: ['sys:c1', 'sys:c2'],
       entries: [bulkEntry({ actorQuantity: 7 }), bulkEntry({ key: 'sys:c2', actorQuantity: 40 })],
@@ -3057,11 +2982,7 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
 
     assert.equal(calls.bulkDestroy.length, 1, 'the store owns the confirmation');
     const prompt = calls.bulkDestroy[0];
-    // `window.title`, NOT a top-level `title`: `confirmDialog` forwards this bag to
-    // `DialogV2.confirm` untouched and DialogV2 reads the frame title off `window.title`,
-    // so a top-level one renders a BLANK title bar. Asserting the nesting is the only
-    // way this pin can tell the difference — `assert.ok(prompt.title)` passed against
-    // the untitled dialog.
+    // `window.title`, NOT a top-level `title`.
     assert.ok(prompt.window?.title, 'the dialog is titled through DialogV2 window options');
     assert.equal(prompt.title, undefined, 'and not through a top-level title DialogV2 ignores');
     assert.ok(prompt.content, 'and carries the consequence a button label cannot');
@@ -3070,7 +2991,7 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
   });
 
   it('Escape clears the bulk selection from anywhere in the app', async () => {
-    // A document-level CAPTURING listener, so it fires whichever control has focus — the
+    // A document-level CAPTURING listener, so it fires whichever control has focus.
     // grid, the pagination or the search field — rather than requiring focus inside one
     // element. Armed only while bulk is active.
     const { services, calls } = makeServices(makeItem(), {
@@ -3134,14 +3055,7 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
 });
 
 // ===========================================================================
-/**
- * THE INVENTORY TAB'S ADOPTION OF THE SHARED PRIMITIVES, AND THE ROUTINGS IT REFUSED
- * (issue 1514, phase 4).
- *
- * The refusals are asserted as well as the conversions, because a deferral recorded only in a
- * comment is a deferral the next author reverses without reading it. Each is stated as the
- * measurement that produced it, and each names what the primitive would need.
- */
+/** THE INVENTORY TAB'S ADOPTION OF THE SHARED PRIMITIVES. */
 describe('Inventory primitive adoption (issue 1514)', () => {
   before(harness.setup);
   after(harness.teardown);
@@ -3428,29 +3342,14 @@ describe('Inventory primitive adoption (issue 1514)', () => {
     );
   });
 
-  /**
-   * Source text with COMMENTS REMOVED, in both syntaxes.
-   *
-   * Every refusal below is recorded in a comment beside the markup it refuses for, and each of
-   * those comments NAMES the primitive it declined — so a raw `includes` scan reads the record
-   * of the refusal as the thing it forbids, and the assertion reds on the very sentence that
-   * makes the deferral legible. Measured, not anticipated: three of these clauses failed that
-   * way before the comments were stripped.
-   */
+  /** Source text with COMMENTS REMOVED, in both syntaxes. */
   function code(file) {
     return readFileSync(resolve(repoRoot, file), 'utf8')
       .replaceAll(/<!--[\s\S]*?-->/gu, '')
       .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
   }
 
-  /**
-   * Does `file` IMPORT the named component?
-   *
-   * The sharper form of the same clause, and the one three of these need. Stripping block
-   * comments is not enough on its own: `InventoryItemCard` names `Medallion` in four `//` line
-   * comments that are genuine prose about the tile it mirrors, and a substring scan reads every
-   * one of them. What "draws no shared tile" actually means is that nothing is imported.
-   */
+  /** Does `file` IMPORT the named component? */
   function imports(file, component) {
     return new RegExp(String.raw`import\s+${component}\s+from`, 'u').test(code(file));
   }

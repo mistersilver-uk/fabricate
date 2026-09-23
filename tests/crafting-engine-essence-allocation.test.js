@@ -1,38 +1,16 @@
 /**
- * Engine-side handling of the player's essence-block allocation (issue 917).
- *
- * The allocation is a SCOPED payload — `{ stepId, ingredientSetId, allocation }` —
- * and every rule about it is enforced in `CraftingEngine`, never upstream:
- *
- *  1. It is dropped (never clamped into the wrong step) unless it names the step the
- *     engine actually resolved from `run.currentStepIndex` AND the ingredient set it
- *     actually resolved. A UI-side or facade-side guard checks an index that is stale
- *     by construction: the run can advance between the `$derived` that built the
- *     payload and the click that sends it.
- *  2. A COLLAPSED multi-step chain runs every authored step inside one `craft()` call
- *     while spreading `...options`, and it re-enters at step 0 — so the entry-time
- *     scope check passes and cannot protect the later steps. The recursion must null
- *     the allocation explicitly, exactly as it already nulls `ingredientOptionOverrides`.
- *  3. A short allocation is honoured and never topped up, so the craft must ABORT
- *     rather than consume a partial plan and still award the result. `canCraft` ran
- *     before the allocation was applied, so it cannot catch this.
- *  4. A timed step applies the allocation once, at START, and snapshots nothing: the
- *     source Items are deleted before the gate is armed, so an item-keyed map is stale
- *     by the time FINISH resumes.
- *
- * Plus a drift guard on the step->recipe view now shared by `CraftingEngine` and
- * `CraftingListingBuilder`.
+ * Engine-side handling of the player's essence-block allocation (issue 917). The allocation is a
+ * SCOPED payload — `{ stepId, ingredientSetId, allocation }` — and every rule about it is enforced
+ * in `CraftingEngine`, never upstream:
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
-import { CraftingListingBuilder } from '../src/systems/CraftingListingBuilder.js';
+import { CraftingListingBuilder } from '../src/ui/presenters/CraftingListingBuilder.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 
-// ---------------------------------------------------------------------------
 // Foundry / game globals
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -51,9 +29,7 @@ globalThis.foundry = {
 };
 globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 
-// ---------------------------------------------------------------------------
 // Fakes
-// ---------------------------------------------------------------------------
 
 class FakeItem {
   constructor(id, name, quantity = 1) {
@@ -116,10 +92,8 @@ class FakeActor {
 }
 
 /**
- * A duck-typed ingredient set that RECORDS the resolver options it was handed, so a
- * test can assert exactly what the engine forwarded (or dropped). It consumes one
- * item per authored ingredient; an EMPTY allocation map starves it, which is how the
- * short-allocation abort is exercised.
+ * A duck-typed ingredient set that RECORDS the resolver options it was handed, so a test can assert
+ * exactly what the engine forwarded (or dropped).
  */
 function recordingIngredientSet(id, ingredientDefs) {
   const seen = [];
@@ -254,9 +228,7 @@ function payload({ stepId, ingredientSetId, allocation }) {
 
 const ALLOCATION = { 'Item.emberwood': 2 };
 
-// ---------------------------------------------------------------------------
 // 1. Scoping — the payload is honoured only for the step AND set it names
-// ---------------------------------------------------------------------------
 
 test('an allocation naming the resolved step and set reaches the ingredient resolver', async () => {
   const set = recordingIngredientSet('set-1', [{ componentId: 'emberwood', quantity: 1 }]);
@@ -341,9 +313,7 @@ test('omitting the allocation leaves the resolver options byte-for-byte unchange
   assert.equal(set.seen.at(-1).essenceAllocation, null, 'no allocation is invented');
 });
 
-// ---------------------------------------------------------------------------
 // 2. Collapsed multi-step chain — a step-0 allocation must not leak forward
-// ---------------------------------------------------------------------------
 
 test('a collapsed multi-step chain applies the allocation to step 0 only', async () => {
   const first = recordingIngredientSet('set-1', [{ componentId: 'emberwood', quantity: 1 }]);
@@ -390,12 +360,8 @@ test('a collapsed chain nulls the allocation even when it names a LATER step exa
   });
   const source = new FakeActor('src', [new FakeItem('emberwood', 'Emberwood', 8)]);
 
-  // A payload scoped to step 2 / set 2. The per-call scope check drops it on entry
-  // (entry IS step 1), but it would match EXACTLY when the chain recurses into step 2
-  // through `...options`. A collapsed chain is ONE atomic action driven by ONE rail —
-  // the step-0 rail — so a later step's requirements were never shown to the player and
-  // an allocation for them can only have been fabricated. The recursion's explicit
-  // null is the only thing that stops it.
+  // A payload scoped to step 2 / set 2. The per-call scope check drops it on entry (entry IS step
+  // 1), but it would match EXACTLY when the chain recurses into step 2 through `...options`.
   await engine.craft(new FakeActor('pc'), [source], recipe, 'set-1', {
     ingredientEssenceAllocation: payload({
       stepId: 'step-2',
@@ -412,9 +378,7 @@ test('a collapsed chain nulls the allocation even when it names a LATER step exa
   );
 });
 
-// ---------------------------------------------------------------------------
 // 3. A short allocation aborts the craft rather than crafting for less
-// ---------------------------------------------------------------------------
 
 test('an allocation that does not fund the set aborts the craft with zero consumption', async () => {
   const set = recordingIngredientSet('set-1', [{ componentId: 'emberwood', quantity: 1 }]);
@@ -440,9 +404,7 @@ test('an allocation that does not fund the set aborts the craft with zero consum
   assert.equal(crafter.created.length, 0, 'no result was awarded');
 });
 
-// ---------------------------------------------------------------------------
 // 4. Timed START applies the allocation once and snapshots nothing
-// ---------------------------------------------------------------------------
 
 test('a timed step applies the allocation at START and persists no allocation snapshot', async () => {
   const set = recordingIngredientSet('set-1', [{ componentId: 'emberwood', quantity: 1 }]);
@@ -498,18 +460,11 @@ test('a timed START refuses an allocation that does not fund the set and leaves 
   assert.equal(runManager.getActiveRuns(crafter).length, 0, 'no zombie run lingers');
 });
 
-// ---------------------------------------------------------------------------
 // 5. Two plan entries naming ONE document compose rather than double-spend
-// ---------------------------------------------------------------------------
 
-// The essence block contributes at most one plan entry per item key, but a set can
-// still name the same held stack twice — a non-essence requirement and an essence
-// carrier resolving to the same Item. `_consumeIngredients` re-reads
-// `item.system.quantity` LIVE on every entry precisely so the second entry sees what
-// the first left; a snapshot taken up front would compare both entries against the
-// original quantity and delete a document that is already gone (the update path is the
-// same defect wearing a smaller number). FakeItem's `delete()` throws on a second call,
-// so the hazard fails loudly here rather than silently over-spending.
+// The essence block contributes at most one plan entry per item key, but a set can still name the
+// same held stack twice — a non-essence requirement and an essence carrier resolving to the same
+// Item.
 test('two plan entries naming one document consume the stack once, in composition', async () => {
   const engine = engineFor();
   const stack = new FakeItem('emberwood', 'Emberwood', 3);
@@ -539,9 +494,7 @@ test('two plan entries under the live stack leave the remainder behind', async (
   assert.equal(stack.system.quantity, 2, 'the two entries compose: 5 - 1 - 2');
 });
 
-// ---------------------------------------------------------------------------
 // 6. The step->recipe view is genuinely shared with the read side
-// ---------------------------------------------------------------------------
 
 test('the engine and the listing builder project the same step recipe view', () => {
   installGame(systemFor());

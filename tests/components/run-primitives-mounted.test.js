@@ -5,6 +5,7 @@ import { after, before, describe, it } from 'node:test';
 import { createRawSnippet } from 'svelte';
 
 import { createMountedComponentHarness, SELECT_COMPILED_MODULES, SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
@@ -24,9 +25,9 @@ const runActionHarness = createHarness(
   [
     component('ManagerButton'),
     component('IconButton'),
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
   ],
-  ['src/ui/svelte/util/foundryBridge.js']
+  [...FOUNDRY_BRIDGE_RAW_MODULES]
 );
 const worldClockHarness = createHarness('WorldClockChip', [component('Chip')]);
 const listRowHarness = createHarness('ListRow', [component('Medallion')]);
@@ -71,13 +72,7 @@ function sourceOf(name) {
   return readFileSync(resolve(repoRoot, component(name)), 'utf8').replaceAll('\r\n', '\n').replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 }
 
-/**
- * The body of the rule whose selector list is EXACTLY `selector`.
- *
- * A plain `indexOf` matched the TAIL of a longer list too, so a pin naming two selectors could
- * silently read a different rule that merely ends with the same two — and then assert against
- * declarations that rule never carried. Only a match at a rule boundary is a rule.
- */
+/** The body of the rule whose selector list is EXACTLY `selector`. */
 function ruleBody(source, selector) {
   const needle = `${selector} {`;
   for (let from = 0; ; ) {
@@ -275,11 +270,6 @@ describe('run primitives mounted behavior', () => {
     // Issue 1648 (M16 then M26): an unbounded prompt sentence was sizing the header as a
     // `flex: 0 1 auto` item, pushing the Begin/Cancel button off the card's right edge. Taking
     // its own line keeps the buttons — not the prose — in control of the bar's width.
-    //
-    // Both prompts are a CALLOUT under a single line of controls rather than a bare span beside
-    // them, and both decisions are pushed to the far right. Every part is load-bearing: without
-    // the auto margin the controls bunch at the left, and without the full basis the sentence
-    // rejoins the control row at a wide enough window.
     expectGeometry(
       'RunActionBar',
       '.fab-run-begin-decision,\n  .fab-run-cancel-decision',
@@ -292,11 +282,7 @@ describe('run primitives mounted behavior', () => {
     ]);
   });
 
-  /**
-   * UX2-7. Arming UNMOUNTS the control that was activated and replaces the whole row, so a
-   * keyboard user was dropped onto `<body>` and a screen-reader user was told nothing. Focus
-   * lands on the NON-destructive default, the pair announces itself, and `Escape` disarms.
-   */
+  /** UX2-7. Arming UNMOUNTS the control that was activated and replaces the whole row. */
   it('moves focus to the safe default on arming, announces the pair, and disarms on Escape', async () => {
     const target = await runActionHarness.mount({
       run: { id: 'run-1' },
@@ -325,7 +311,7 @@ describe('run primitives mounted behavior', () => {
   });
 
   it('renders the armed cancel prompt beneath its controls, not inside the decision', async () => {
-    // Issue 1648 (M26), the cancel sibling of M16 and reported from a frame: the sentence
+    // Issue 1648 (M26), the cancel sibling of M16 and reported from a frame.
     // rendered on its own line ABOVE `Yes, cancel` / `Keep crafting`, with both buttons
     // left-aligned beneath it. The maintainer: "That should be in the top right!"
     const target = await runActionHarness.mount({
@@ -406,10 +392,7 @@ describe('run primitives mounted behavior', () => {
     assert.equal(chip.textContent.replaceAll(/\s+/gu, ' ').trim(), 'World clock Day 14 · 08:00');
     assert.ok(!chip.querySelector('button'), 'the player clock has no control');
     assert.ok(chip.classList.contains('is-clock'));
-    // Issue 1648: ONE flex child holding ONE line box, so the glyph, the label and the value
-    // share a baseline. As three flex children at three type sizes they could not — centring
-    // three boxes of 9.92px, 9px and 10.5px put their baselines 1.25px apart, which is what
-    // "the world time text is not vertically centred" was.
+    // Issue 1648: ONE flex child holding ONE line box, so the glyph.
     assert.deepEqual(
       [...chip.children].map((node) => node.tagName),
       ['SPAN']
@@ -619,8 +602,7 @@ describe('run primitives mounted behavior', () => {
     nav.querySelector('[data-stage-nav-index="4"]').click();
     nav.querySelector('[data-stage-nav-return]').click();
     assert.deepEqual(viewed, [4, 3]);
-    // Named as the WHOLE selector list: `.fab-stage-nav-number` alone is also a rule of its
-    // own, and the size lives on the shared arrow+number rule.
+    // Named as the WHOLE selector list.
     expectGeometry(
       'StageNav',
       ':global(.fabricate-icon-button.manager-icon-button.fab-stage-nav-arrow),\n  .fab-stage-nav-number',

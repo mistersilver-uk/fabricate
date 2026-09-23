@@ -7,9 +7,7 @@ import assert from 'node:assert/strict';
 
 const { SignatureValidator } = await import('../src/systems/SignatureValidator.js');
 
-// ---------------------------------------------------------------------------
 // Helper builders
-// ---------------------------------------------------------------------------
 
 function makeComponent(id, tags = []) {
   return { id, name: id, tags };
@@ -36,10 +34,9 @@ function makeIngredientSet(ingredientGroups) {
   return { id: `set-${Math.random().toString(36).slice(2)}`, name: 'Test Set', ingredientGroups };
 }
 
-// Recipes default to ENABLED — the SignatureValidator scans only enabled recipes
-// (issue 649, the complement of the runtime matcher's `if (!recipe.enabled) continue;`),
-// mirroring real stored recipes which always carry the flag. A test exercising the
-// disabled path passes `enabled: false` explicitly.
+// Recipes default to ENABLED — the SignatureValidator scans only enabled recipes (issue 649, the
+// complement of the runtime matcher's `if (!recipe.enabled) continue;`), mirroring real stored
+// recipes which always carry the flag.
 function makeRecipe(id, name, ingredientSets, enabled = true) {
   return { id, name, ingredientSets, enabled };
 }
@@ -59,9 +56,7 @@ function buildValidator(system, recipes = [], components = []) {
   return new SignatureValidator(csm);
 }
 
-// ---------------------------------------------------------------------------
 // 1. Component-vs-component overlap: identical component sets → conflict
-// ---------------------------------------------------------------------------
 
 test('component-vs-component overlap: same component in both recipes → conflict', () => {
   const compA = makeComponent('comp-a');
@@ -89,9 +84,7 @@ test('component-vs-component overlap: same component in both recipes → conflic
   );
 });
 
-// ---------------------------------------------------------------------------
 // 2. Component-vs-component no overlap: disjoint component sets → no conflict
-// ---------------------------------------------------------------------------
 
 test('component-vs-component no overlap: different components → no conflict', () => {
   const components = [makeComponent('comp-a'), makeComponent('comp-b')];
@@ -110,9 +103,7 @@ test('component-vs-component no overlap: different components → no conflict', 
   assert.equal(result.conflicts.length, 0);
 });
 
-// ---------------------------------------------------------------------------
 // 3. Component-vs-tag overlap: component X has tag T, recipe B uses tag T → conflict
-// ---------------------------------------------------------------------------
 
 test('component-vs-tag overlap: component has tag used by other recipe → conflict', () => {
   const compX = makeComponent('comp-x', ['fire']);
@@ -134,9 +125,7 @@ test('component-vs-tag overlap: component has tag used by other recipe → confl
   assert.ok(result.conflicts.length > 0, 'Expected at least one conflict');
 });
 
-// ---------------------------------------------------------------------------
 // 4. Tag-vs-tag overlap (any): recipes using overlapping tags → conflict
-// ---------------------------------------------------------------------------
 
 test('tag-vs-tag overlap (any): recipes share at least one tag → conflict', () => {
   const compA = makeComponent('comp-a', ['fire', 'rare']);
@@ -159,9 +148,7 @@ test('tag-vs-tag overlap (any): recipes share at least one tag → conflict', ()
   assert.ok(result.conflicts.length > 0);
 });
 
-// ---------------------------------------------------------------------------
 // 5. Tag-vs-tag overlap (all): shared components satisfying multi-tag requirements → conflict
-// ---------------------------------------------------------------------------
 
 test('tag-vs-tag overlap (all): component with all required tags used in both recipes → conflict', () => {
   // Component has both 'fire' AND 'rare'
@@ -184,9 +171,7 @@ test('tag-vs-tag overlap (all): component with all required tags used in both re
   assert.ok(result.conflicts.length > 0);
 });
 
-// ---------------------------------------------------------------------------
 // 6. No false positives: tag 'all' with no shared component → no conflict
-// ---------------------------------------------------------------------------
 
 test('no false positives: tag all with no component having all required tags → no conflict', () => {
   // comp-a has 'fire' only; comp-b has 'rare' only — neither has both
@@ -211,9 +196,7 @@ test('no false positives: tag all with no component having all required tags →
   assert.equal(result.conflicts.length, 0);
 });
 
-// ---------------------------------------------------------------------------
 // 7. Genuinely disjoint signatures: different tags on different components → no conflict
-// ---------------------------------------------------------------------------
 
 test('genuinely disjoint signatures: no shared components between recipes → no conflict', () => {
   const compA = makeComponent('comp-a', ['fire']);
@@ -236,9 +219,7 @@ test('genuinely disjoint signatures: no shared components between recipes → no
   assert.equal(result.conflicts.length, 0);
 });
 
-// ---------------------------------------------------------------------------
 // 8. System not found → returns valid (no-op)
-// ---------------------------------------------------------------------------
 
 test('system not found: validateSystem returns valid with no conflicts', () => {
   const validator = buildValidator(null, [], []);
@@ -247,9 +228,7 @@ test('system not found: validateSystem returns valid with no conflicts', () => {
   assert.equal(result.conflicts.length, 0);
 });
 
-// ---------------------------------------------------------------------------
 // 9. Empty system: no recipes → valid
-// ---------------------------------------------------------------------------
 
 test('empty system: no recipes → valid with no conflicts', () => {
   const system = { id: 'sys-1', resolutionMode: 'simple' };
@@ -259,9 +238,7 @@ test('empty system: no recipes → valid with no conflicts', () => {
   assert.equal(result.conflicts.length, 0);
 });
 
-// ---------------------------------------------------------------------------
 // 10. Single recipe: no pairwise comparisons possible → valid
-// ---------------------------------------------------------------------------
 
 test('single recipe: only one recipe → no conflict possible', () => {
   const components = [makeComponent('comp-a', ['fire'])];
@@ -276,9 +253,7 @@ test('single recipe: only one recipe → no conflict possible', () => {
   assert.equal(result.conflicts.length, 0);
 });
 
-// ---------------------------------------------------------------------------
 // 11. validateRecipe: filters conflicts to only those involving the given recipe
-// ---------------------------------------------------------------------------
 
 test('validateRecipe: returns only conflicts involving the given recipe', () => {
   const components = [makeComponent('comp-a', [])];
@@ -304,9 +279,7 @@ test('validateRecipe: returns only conflicts involving the given recipe', () => 
   }
 });
 
-// ---------------------------------------------------------------------------
 // 12. expandIngredientToComponentIds: component type returns singleton set
-// ---------------------------------------------------------------------------
 
 test('expandIngredientToComponentIds: component match returns the component id', () => {
   const validator = buildValidator(null);
@@ -319,9 +292,7 @@ test('expandIngredientToComponentIds: component match returns the component id',
   assert.ok(result.has('comp-x'));
 });
 
-// ---------------------------------------------------------------------------
 // 13. expandIngredientToComponentIds: tag 'any' match returns all matching components
-// ---------------------------------------------------------------------------
 
 test('expandIngredientToComponentIds: tags any match returns all components with that tag', () => {
   const validator = buildValidator(null);
@@ -338,9 +309,7 @@ test('expandIngredientToComponentIds: tags any match returns all components with
   assert.ok(result.has('comp-c'), 'comp-c has fire tag');
 });
 
-// ---------------------------------------------------------------------------
 // 14. expandIngredientToComponentIds: tag 'all' match returns only components with all tags
-// ---------------------------------------------------------------------------
 
 test('expandIngredientToComponentIds: tags all match returns only components with all required tags', () => {
   const validator = buildValidator(null);
@@ -359,9 +328,7 @@ test('expandIngredientToComponentIds: tags all match returns only components wit
   assert.ok(result.has('comp-d'), 'comp-d has both plus more');
 });
 
-// ---------------------------------------------------------------------------
 // 14b. expandIngredientToComponentIds: currency contributes no component ids
-// ---------------------------------------------------------------------------
 
 test('expandIngredientToComponentIds: currency match returns an empty set', () => {
   const validator = buildValidator(null);
@@ -388,9 +355,7 @@ test('computeSignature ignores a currency option but keeps component ids in the 
   assert.ok(signature[0].has('comp-iron'));
 });
 
-// ---------------------------------------------------------------------------
 // 15. Multiple ingredient sets per recipe: each set generates separate entries
-// ---------------------------------------------------------------------------
 
 test('multiple ingredient sets per recipe: conflict detected across sets', () => {
   const components = [makeComponent('comp-a', [])];
@@ -410,14 +375,9 @@ test('multiple ingredient sets per recipe: conflict detected across sets', () =>
   assert.ok(result.conflicts.length >= 1);
 });
 
-// ---------------------------------------------------------------------------
-// 17. Shared-base multi-group recipes are NOT a collision (issue 547)
-//
-// Two distinct alchemy recipes that merely share a common base component but
-// differ in a distinguishing group must both be enablable. Neither recipe's
-// group requirements are a subset of the other's, so no single minimal
-// submission satisfies both, and there is no genuine ambiguity.
-// ---------------------------------------------------------------------------
+// 17. Shared-base multi-group recipes are NOT a collision (issue 547). Two distinct alchemy recipes
+// that merely share a common base component but differ in a distinguishing group must both be
+// enablable.
 
 test('shared-base multi-group recipes sharing one base component → no conflict (issue 547)', () => {
   const components = [
@@ -454,17 +414,11 @@ test('shared-base multi-group recipes sharing one base component → no conflict
   assert.equal(result.conflicts.length, 0);
 });
 
-// ---------------------------------------------------------------------------
-// 18. Strict subset group requirements are ALLOWED (issue 774 — INVERTS 547)
-//
-// A set whose group requirements are a STRICT subset of another's is now
-// distinguishable at runtime: the overlap is one-directional (only the larger
-// set's transversal satisfies the smaller, never the reverse), so the
-// most-specific matcher brews the larger set when its extra ingredient is present
-// and the smaller when it is not. The enable-time guard rejects only the SYMMETRIC
-// (inseparable) case, so this pair must ENABLE. (Previously issue 547 rejected it
-// under the superset-tolerant first-match runtime.)
-// ---------------------------------------------------------------------------
+// 18. Strict subset group requirements are ALLOWED (issue 774 — INVERTS 547). A set whose group
+// requirements are a STRICT subset of another's is now distinguishable at runtime: the overlap is
+// one-directional (only the larger set's transversal satisfies the smaller, never the reverse), so
+// the most-specific matcher brews the larger set when its extra ingredient is present and the
+// smaller when it is not.
 
 test('strict subset group requirements → ALLOWED (issue 774, inverts 547)', () => {
   const components = [makeComponent('comp-water'), makeComponent('comp-herb')];
@@ -494,19 +448,8 @@ test('strict subset group requirements → ALLOWED (issue 774, inverts 547)', ()
   assert.equal(result.conflicts.length, 0);
 });
 
-// ---------------------------------------------------------------------------
-// 19. OR-option shadowing stays INSEPARABLE (issue 774 — NOT inverted)
-//
-// dependent={Water},{Herb} vs covering={Water},{Herb OR Mineral}. This is NOT a
-// clean strict subset: the OR option makes the overlap SYMMETRIC. covering's own
-// natural craft can be Water+Herb (it may pick the Herb arm), which satisfies
-// dependent; and dependent's Water+Herb satisfies covering. Neither dominates, so
-// under the runtime's most-specific pick a Water+Herb submission would FIZZLE and
-// dependent could NEVER be brewed distinctly (every dependent submission also
-// matches covering). The `&&` guard therefore still REJECTS this pair — it is the
-// inseparable case an added ingredient cannot resolve. (Contrast test 18: a strict
-// subset with no OR is one-directional and allowed.)
-// ---------------------------------------------------------------------------
+// 19. OR-option shadowing stays INSEPARABLE (issue 774 — NOT inverted). dependent={Water},{Herb} vs
+// covering={Water},{Herb OR Mineral}.
 
 test('OR-option covering shadows a narrower set → conflict (issue 774, symmetric inseparable)', () => {
   const components = [
@@ -548,12 +491,9 @@ test('OR-option covering shadows a narrower set → conflict (issue 774, symmetr
   assert.ok(result.conflicts.length > 0);
 });
 
-// ---------------------------------------------------------------------------
-// 20. Distinguishing option-alternatives are NOT a collision (issue 547)
-//
-// Two sets sharing a base group but whose second groups are disjoint option
-// sets have no joint minimal submission → no collision.
-// ---------------------------------------------------------------------------
+// 20. Distinguishing option-alternatives are NOT a collision (issue 547). Two sets sharing a base
+// group but whose second groups are disjoint option sets have no joint minimal submission → no
+// collision.
 
 test('shared base with disjoint option-alternative second groups → no conflict', () => {
   const components = [
@@ -598,16 +538,9 @@ test('shared base with disjoint option-alternative second groups → no conflict
   assert.equal(result.conflicts.length, 0);
 });
 
-// ---------------------------------------------------------------------------
-// 21. quantity>=2 multi-component group is ALLOWED (issue 774 — INVERTS 547)
-//
-// A `quantity: 2` "metal"-tag group naturally crafted iron+gold plus {salt},{pepper}
-// (recipe A) fully satisfies recipe B={iron},{gold}. But the overlap is
-// one-directional: B's iron+gold cannot supply A's salt+pepper, so A strictly
-// DOMINATES B. The most-specific runtime brews A for the iron+gold+salt+pepper
-// craft and B for a bare iron+gold craft — both are reachable — so the enable-time
-// guard now ALLOWS the pair. (Previously issue 547 rejected it under first-match.)
-// ---------------------------------------------------------------------------
+// 21. quantity>=2 multi-component group is ALLOWED (issue 774 — INVERTS 547). A `quantity: 2`
+// "metal"-tag group naturally crafted iron+gold plus {salt},{pepper} (recipe A) fully satisfies
+// recipe B={iron},{gold}.
 
 test('quantity>=2 multi-component group vs its distinct components → ALLOWED (issue 774, inverts 547)', () => {
   const components = [
@@ -646,13 +579,9 @@ test('quantity>=2 multi-component group vs its distinct components → ALLOWED (
   assert.equal(result.conflicts.length, 0);
 });
 
-// ---------------------------------------------------------------------------
-// 22. quantity 1 multi-component group does NOT over-reject (issue 547)
-//
-// The same shape but with quantity 1 supplies only ONE metal unit, so a natural
-// craft is iron OR gold — never both — and does not satisfy the {iron},{gold}
-// set. Must stay enablable (guards against the fix over-rejecting quantity 1).
-// ---------------------------------------------------------------------------
+// 22. quantity 1 multi-component group does NOT over-reject (issue 547). The same shape but with
+// quantity 1 supplies only ONE metal unit, so a natural craft is iron OR gold — never both — and
+// does not satisfy the {iron},{gold} set.
 
 test('quantity 1 multi-component group vs its distinct components → no conflict (issue 547)', () => {
   const components = [
@@ -689,13 +618,9 @@ test('quantity 1 multi-component group vs its distinct components → no conflic
   assert.equal(result.conflicts.length, 0);
 });
 
-// ---------------------------------------------------------------------------
-// 23. tag/OR inseparable pair stays a conflict (issue 774 regression)
-//
-// A single `mithril` tagged BOTH `rare` and `metal` satisfies A={rare} and
-// B={metal} via the SAME one-item submission, in BOTH directions — the symmetric
-// inseparable case no ingredient can resolve. Must still be REJECTED.
-// ---------------------------------------------------------------------------
+// 23. tag/OR inseparable pair stays a conflict (issue 774 regression). A single `mithril` tagged
+// BOTH `rare` and `metal` satisfies A={rare} and B={metal} via the SAME one-item submission, in
+// BOTH directions — the symmetric inseparable case no ingredient can resolve.
 
 test('tag/OR inseparable (mithril tagged rare AND metal) → conflict (issue 774)', () => {
   const components = [makeComponent('comp-mithril', ['rare', 'metal'])];
@@ -715,15 +640,8 @@ test('tag/OR inseparable (mithril tagged rare AND metal) → conflict (issue 774
   assert.ok(result.conflicts.length > 0);
 });
 
-// ---------------------------------------------------------------------------
-// 24. Incomparable siblings are ALLOWED (issue 774)
-//
-// B={S,V,E} and C={S,V,R} share a base {S,V} but their third groups are disjoint.
-// Neither transversal satisfies the other (E ≠ R), so neither dominates and the
-// pair is separable: adding E brews B, adding R brews C. An ambiguous
-// over-submission {S,V,E,R} fizzles at runtime (covered by the engine tests), not
-// a wrong brew. The enable-time guard must ALLOW the pair.
-// ---------------------------------------------------------------------------
+// 24. Incomparable siblings are ALLOWED (issue 774). B={S,V,E} and C={S,V,R} share a base {S,V} but
+// their third groups are disjoint.
 
 test('incomparable siblings {S,V,E} / {S,V,R} → ALLOWED (issue 774)', () => {
   const components = [
@@ -760,9 +678,7 @@ test('incomparable siblings {S,V,E} / {S,V,R} → ALLOWED (issue 774)', () => {
   assert.equal(result.conflicts.length, 0);
 });
 
-// ---------------------------------------------------------------------------
 // 16. conflict message format includes recipe names
-// ---------------------------------------------------------------------------
 
 test('conflict message includes both recipe names', () => {
   const components = [makeComponent('comp-a', [])];
@@ -782,9 +698,7 @@ test('conflict message includes both recipe names', () => {
   assert.ok(msg.includes('Beta'), `Expected "Beta" in message, got: ${msg}`);
 });
 
-// ---------------------------------------------------------------------------
 // Essence match type (issue 649): capacity, expansion overlap, enabled-scoping
-// ---------------------------------------------------------------------------
 
 function makeEssenceComponent(id, essences) {
   return { id, name: id, tags: [], essences };

@@ -1,20 +1,4 @@
-/*
- * Resolution-mode config-card layout gate.
- *
- * happy-dom cannot compute the CSS cascade, so a mounted test can never prove the
- * RENDERED box model. This gate renders the real `is-config-cards` RadioCardGroup
- * markup in Chromium under the same faithful Foundry V13 core stand-in the font-size
- * gate uses (tests/fixtures/foundry-core-min.css) plus the real styles/fabricate.css,
- * and pins the geometry that a regression once broke.
- *
- * The regression it guards (crafting settings, Recipe resolution): the radio is an
- * `appearance: none` flex item, and when the winning (config-card) rule omits an
- * explicit size the radio resolves its width to `auto` and FILLS the flex line
- * (~643px in a 669px card). That starves `.manager-resolution-option-body` to 0px,
- * so every description wraps one word per line and the option name clips ("Simple" →
- * "Si"). Every unit test and the screenshot gate passed while it shipped — only the
- * rendered box model shows it, which is why this gate measures px in a real browser.
- */
+/* Resolution-mode config-card layout gate. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -25,23 +9,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
 const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 
-// The exact DOM RadioCardGroup.svelte emits with `configCards`: a
-// <fieldset class="… is-config-cards"> whose options each wrap a real radio, an icon
-// tile, and a body (name + description). Two options, one long description, so a
-// collapsed body would visibly wrap per-word. Wrapped in the .fabricate-manager
-// container (the container-query context) inside the Foundry app shell (14px base).
-//
-// THE FIELDSET CARRIES `fabricate-option-cards` (issue 1509), which is the class the
-// primitive now writes at the head of the `class` it hands to `Field` and the class
-// every rule this gate measures is rooted at. Without it this fixture matches none of
-// them and measures the browser's defaults while still reporting on the card by name.
-//
-// ONE TEMPLATE, TWO OPTIONS WRITTEN OUT, rather than a helper called twice. The
-// area-scope gate's ancestry clause is a TAG SCANNER over this file's source text: a
-// helper's `<label>` sits lexically outside the `<fieldset>` that the runtime nests it
-// under, so every element the helper emitted read as an element with no namespace root
-// above it. Writing the rows where they render is what makes the source say what the
-// DOM does.
+// The exact DOM RadioCardGroup.svelte emits with `configCards`.
 const FIXTURE = `
 <div class="application theme-dark">
   <section class="window-content">

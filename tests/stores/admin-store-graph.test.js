@@ -1,15 +1,11 @@
-/**
- * Tests for adminStore graph integration (T-057)
- * Uses node:test + node:assert/strict
- */
+/** Tests for adminStore graph integration (T-057) Uses node:test + node:assert/strict */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
+import { createServices as createSharedServices } from '../helpers/adminStoreServices.js';
 
-// ---------------------------------------------------------------------------
 // Mock helpers
-// ---------------------------------------------------------------------------
 
 function makeSystem(overrides = {}) {
   const id = overrides.id || 'sys1';
@@ -51,19 +47,8 @@ function makeRecipe(id, name, inputComponentIds = [], outputComponentIds = []) {
 }
 
 function createMockServices(recipes = [], system = null) {
-  const defaultSystem = system || makeSystem({ id: 'sys1' });
-  const systems = [defaultSystem];
-  const store = { lastManagedCraftingSystem: 'sys1' };
-
-  const mockSystemManager = {
-    getSystems: () => systems,
-    getSystem: (id) => systems.find(s => s.id === id) || null,
-    getItems: (systemId) => defaultSystem.items || []
-  };
-
-  // A revision-token-minting recipe manager (issue 1076's contract), plus a call counter so a
-  // test can assert that the graph index was NOT rebuilt. `getRecipes` is the only corpus
-  // read the graph makes, so counting it counts index rebuilds.
+  // A revision-token-minting recipe manager (issue 1076's contract), plus a call counter so a test
+  // can assert that the graph index was NOT rebuilt.
   let recipeRevision = 1;
   const mockRecipeManager = {
     corpusReads: 0,
@@ -77,25 +62,18 @@ function createMockServices(recipes = [], system = null) {
     advanceRevision: () => { recipeRevision += 1; }
   };
 
-  return {
+  return createSharedServices(system || makeSystem({ id: 'sys1' }), recipes, [], {
+    settings: { lastManagedCraftingSystem: 'sys1' },
     recipeManager: mockRecipeManager,
-    getSetting: (key) => store[key] ?? '',
-    setSetting: async (key, value) => { store[key] = value; },
-    getCraftingSystemManager: () => mockSystemManager,
     getRecipeManager: () => mockRecipeManager,
-    getScriptMacros: () => [],
-    notify: { info: () => {}, warn: () => {}, error: () => {} },
     confirmDialog: async () => true,
-    localize: (key) => key,
     copyToClipboard: async () => {},
     openRecipeEditor: () => {},
     renderImportDialog: async () => {}
-  };
+  });
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 describe('adminStore — graph integration', () => {
   it('1. Graph tab triggers graph computation in viewState', async () => {
@@ -164,9 +142,7 @@ describe('adminStore — graph integration', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Bounding and index retention — issue 1082
-// ---------------------------------------------------------------------------
 
 describe('adminStore — bounded graph and retained index (issue 1082)', () => {
   function makeCorpus(count) {

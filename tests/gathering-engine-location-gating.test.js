@@ -210,10 +210,8 @@ test('ungated legacy environment is unaffected by location gating', async () => 
   assert.equal(env.blockedReasons.some(r => r.code === 'NO_CURRENT_REALM'), false);
 });
 
-// ---------------------------------------------------------------------------
-// Toggle disabled: the realm/travel subsystem behaves as if no environment is
-// location-gated and no travel exists.
-// ---------------------------------------------------------------------------
+// Toggle disabled: the realm/travel subsystem behaves as if no environment is location-gated and no
+// travel exists.
 
 const disabledSettings = { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' };
 
@@ -235,9 +233,6 @@ test('disabled subsystem: a location-gated environment is NOT blocked and report
 
 test('disabled subsystem: the start-attempt location guard is skipped', async () => {
   // No party / no current realm, but disabled ⇒ the start guard does not block.
-  // (When ENABLED, the identical setup blocks with NO_CURRENT_REALM — see the
-  // start-guard re-evaluation test above.) Downstream run-creation is out of
-  // scope for this harness, so we assert only that NO location reason fires.
   const engine = makeEngine({
     systems: [system({ gatheringRealmSettings: disabledSettings })],
     parties: []
@@ -266,10 +261,8 @@ test('default (no gatheringRealmSettings) behaves as disabled — no location ga
   assert.equal(env.attemptable, true);
 });
 
-// ---------------------------------------------------------------------------
-// Header-bar current-realm summary (realmsEnabled + currentRealms), surfaced
-// for the player app's realm chip independently of this environment's gating.
-// ---------------------------------------------------------------------------
+// Header-bar current-realm summary (realmsEnabled + currentRealms), surfaced for the player app's
+// realm chip independently of this environment's gating.
 
 test('realms enabled: the model surfaces realmsEnabled + the party current realm (disclosed)', async () => {
   const engine = makeEngine({
@@ -329,13 +322,9 @@ test('realms disabled: realmsEnabled false with an empty current-realm list', as
   assert.deepEqual(env.currentRealms, []);
 });
 
-// ---------------------------------------------------------------------------
-// Listing-level realm context (listing.realmContext) — the party/system current
-// realm surfaced for the header chip independent of any environment selection,
-// so the chip shows even when every environment is realm-locked and none is
-// selectable. Uses STORE contract keys (enabled/realms/systemId) so the View
-// passes it straight through setRealmContext.
-// ---------------------------------------------------------------------------
+// Listing-level realm context (listing.realmContext) — the party/system current realm surfaced for
+// the header chip independent of any environment selection, so the chip shows even when every
+// environment is realm-locked and none is selectable.
 
 test('listing.realmContext: realms on + resolved realm surfaces the disclosed realm with no selection', async () => {
   const engine = makeEngine({
@@ -388,15 +377,6 @@ test('listing.realmContext: a secret undiscovered current realm is redacted (no 
 
 test('listing.realmContext: more than one participating system is NO LONGER ambiguous', async () => {
   // THIS TEST WAS INVERTED BY ISSUE 1282, deliberately.
-  //
-  // It used to assert the chip going dark whenever two realm-enabled systems were present, on
-  // the grounds that "a single chip cannot honestly represent one system's realm context".
-  // That was true, and it was a symptom of the wrong scope rather than a rule worth keeping:
-  // the realm library, the reveal mode and the party's location are world-wide now, so both
-  // systems answer identically and there is nothing left to be ambiguous about.
-  //
-  // The old behaviour was also the worse one in practice — it switched the chip off in exactly
-  // the multi-system world this change makes ordinary.
   const systemB = system({ id: 'system-b' });
   const engine = makeEngine({
     environments: [

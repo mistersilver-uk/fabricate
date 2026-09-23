@@ -1,20 +1,6 @@
 /**
- * Issue 1094 — 1.21.0: retire the check-modifier roll-formula placeholder.
- *
- * Three claims are pinned here that nothing else can pin:
- *
- * 1. THE TRANSFORM. Pure, clone-first, idempotent, and swept across all three activity
- *    checks plus the legacy `routed.rollExpression` read alias.
- * 2. THE UNTOUCHED CASE. A non-additive placement is left EXACTLY as authored and
- *    reported, because no arithmetic intent can be recovered from the text — and because
- *    one of those residues (`max(, 2)`) is a formula Foundry ACCEPTS and rolls as
- *    `-Infinity`, so guessing would be worse than refusing.
- * 3. THE REPORTING CHANNEL. `MigrationRunner.run()` returns a fixed object literal in
- *    three places and the pass loop spread-merges a migration's return value into the DATA
- *    payload, so a migration cannot add a summary key by returning it. The counts ride a
- *    transient `data._retiredCraftingModCounts` the runner captures and DELETES. The
- *    notice tests below drive a REAL `MigrationRunner.run()` rather than a hand-built
- *    summary object, or they would pass while the transient field never reached `main.js`.
+ * Issue 1094 — 1.21.0: retire the check-modifier roll-formula placeholder. Three claims are pinned
+ * here that nothing else can pin:
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,6 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
 import { RETIRED_PLACEMENT_CORPUS } from './helpers/retiredPlaceholderOracle.js';
 import { migrateExportPayload } from '../src/migration/migrateExportPayload.js';
+import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
+
 import {
   applyRetireCraftingModToken,
   buildRetiredCraftingModNotice,
@@ -85,10 +73,8 @@ test('1.21.0 strips an ADDITIVE placement together with its operator', () => {
   assert.equal(target.craftingCheck.simple.rollFormula, '1d20');
 });
 
-// A LEADING placement keeps the operator that FOLLOWS it, because that operator carries
-// the sign of the next term and a leading `Additive` is legal (`grammar.pegjs:17`, `:89`).
-// Stripping it too would turn `<token> - 2` into `2` and silently double the modifier;
-// `- 2` appends to `-2 + 3[Modifiers]`, which is exactly what `(3) - 2` always totalled.
+// A LEADING placement keeps the operator that FOLLOWS it, because that operator carries the sign of
+// the next term and a leading `Additive` is legal (`grammar.pegjs:17`, `:89`).
 test('1.21.0 strips a LEADING placement but KEEPS the operator after it', () => {
   for (const [authored, expected] of [
     [`${TOKEN} + 1d20`, '+ 1d20'],
@@ -154,13 +140,7 @@ test('1.21.0 counts an INERT active check — the formulas whose modifiers go li
   assert.equal(counts.inert, 1, 'an authored, placeholder-free active formula with a catalogue');
 });
 
-// THE LADDER IS RE-RUNNABLE, AND `1.22.0` MOVED THE CATALOGUE. This migration is `1.21.0`, so on a
-// FIRST pass the catalogue still sits at `craftingCheck.checkModifiers` — but a world already past
-// `1.22.0` has it at `system.checkModifiers` and NOTHING at the legacy key, and the runner will
-// walk this entry again. The `?? system.checkModifiers` fallback is what reads it there; without
-// it, the unconditional spread writes `checkModifiers: undefined` OVER the system-level one and
-// the count silently reports 0 for a world full of eligible modifiers. Reverting it left the suite
-// green, because every other case in this file authors the legacy location.
+// THE LADDER IS RE-RUNNABLE, AND `1.22.0` MOVED THE CATALOGUE.
 test('1.21.0 reads the catalogue at its POST-1.22.0 system-level location too', () => {
   const counts = applyRetireCraftingModToken({
     id: 'sys-1',
@@ -183,10 +163,7 @@ test('1.21.0 counts NO inert formula when the system has no catalogue to contrib
   assert.equal(counts.inert, 0, 'with no entries there is nothing to start adding');
 });
 
-// The catalogue is not the gate; the RESOLVED eligible set is. A system with entries but
-// an empty default set has had nothing start applying, so reporting it would state a
-// change that did not happen and prescribe a remedy ("clear the default set") already in
-// force.
+// The catalogue is not the gate; the RESOLVED eligible set is.
 test('1.21.0 counts NO inert formula when the catalogue resolves to an EMPTY set', () => {
   for (const defaultModifierIds of [[], undefined, ['not-in-the-catalogue']]) {
     const counts = applyRetireCraftingModToken(
@@ -307,12 +284,10 @@ test('1.21.0 is idempotent under re-run', () => {
   const second = runMigration(first.systems);
   assert.deepEqual(second.systems, first.systems, 'a second pass changes no DATA');
 
-  // The counts are a description of the data the pass looked at, not a log of what it
-  // wrote, so two of them legitimately re-report on already-migrated data: `untouched`
-  // because that formula is still on disk exactly as authored, and `inert` because the
-  // now-stripped active formula genuinely no longer spends a placeholder. Neither can
-  // reach a GM twice — the runner is version-gated, so the world pass runs once — and the
-  // export upcast discards counts entirely.
+  // The counts are a description of the data the pass looked at, not a log of what it wrote, so two
+  // of them legitimately re-report on already-migrated data: `untouched` because that formula is
+  // still on disk exactly as authored, and `inert` because the now-stripped active formula
+  // genuinely no longer spends a placeholder.
   const [report] = second._retiredCraftingModCounts;
   assert.equal(report.subtractive, 0, 'nothing was re-stripped');
   assert.equal(report.repeated, 0, 'and nothing was re-collapsed');
@@ -438,21 +413,16 @@ test('the runner applies 1.21.0 to craftingSystems and bumps the migration versi
 
   const result = await runnerOver(store).run();
 
-  // TEN migrations run from 1.20.0, not one: `1.22.0` follows this one in the ladder and
-  // lifts the catalogue to the system level (issue 1095), `1.23.0` merges it with the
-  // gathering character-modifier library (issue 1117), `1.24.0` marks the routed
-  // DC-source downgrade boundary (issue 1096) as a deliberate no-op, `1.25.0` seeds
-  // the failure-result policy to `never` on every existing check (issue 1098), `1.26.0` lifts
-  // the currency configuration to world scope (issue 1278), `1.27.0` lifts travel — realms and
-  // their map links — to world scope too (issue 1282), `1.28.0` lifts both character libraries
-  // (issue 1308), `1.29.0` folds manual force lists into their picked lists (issue 1315), and
-  // `1.30.0` lifts components, essences and tools to world scope (issue 1363), and `1.31.0`
-  // backfills each system's own tool prerequisites and check bonus as its own override
-  // (issue 1373).
-  // `1.32.0` elects each component's world essence map (issue 1371) and `1.33.0` records the
-  // mark that keeps every existing subject modifier pick rolling (issue 1608).
-  // The count is asserted rather than loosened so a FOURTEENTH migration landing here is
-  // noticed rather than absorbed — which is exactly how the fourth through thirteenth were.
+  // TEN migrations run from 1.20.0, not one: `1.22.0` follows this one in the ladder and lifts the
+  // catalogue to the system level (issue 1095), `1.23.0` merges it with the gathering
+  // character-modifier library (issue 1117), `1.24.0` marks the routed DC-source downgrade boundary
+  // (issue 1096) as a deliberate no-op, `1.25.0` seeds the failure-result policy to `never` on
+  // every existing check (issue 1098), `1.26.0` lifts the currency configuration to world scope
+  // (issue 1278), `1.27.0` lifts travel — realms and their map links — to world scope too (issue
+  // 1282), `1.28.0` lifts both character libraries (issue 1308), `1.29.0` folds manual force lists
+  // into their picked lists (issue 1315), and `1.30.0` lifts components, essences and tools to
+  // world scope (issue 1363), and `1.31.0` backfills each system's own tool prerequisites and check
+  // bonus as its own override (issue 1373).
   assert.equal(result.ran, 14);
   assert.equal(store.get('craftingSystems')[0].craftingCheck.simple.rollFormula, '1d20');
   assert.equal(store.get('migrationVersion'), '1.34.0');
@@ -578,18 +548,11 @@ test('runner: a malformed transient report is coerced rather than passed to a no
   });
 });
 
-// ── the GM notice in src/main.js ────────────────────────────────────────────
-//
-// `src/main.js` cannot be imported by a unit test (module-level Foundry side effects and
-// a `.css` asset import), so this repo's established pattern for covering it is a
-// source-text guard. The runner tests above already prove the transient field reaches
-// `run()`'s summary through a REAL pass; these pin the last hop, which is the one an
-// eyeball reviewing a diff most easily believes without checking.
+// the GM notice in src/main.js. `src/main.js` cannot be imported by a unit test (module-level
+// Foundry side effects and a `.css` asset import), so this repo's established pattern for covering
+// it is a source-text guard.
 
-const MAIN_SOURCE = readFileSync(
-  resolve(dirname(fileURLToPath(import.meta.url)), '../src/main.js'),
-  'utf8'
-);
+const MAIN_SOURCE = entryModuleSource('src/bootstrap/migrations.js');
 
 test('main.js reads the counts off the runner SUMMARY, not off the data payload', () => {
   assert.ok(
@@ -610,14 +573,7 @@ test('main.js fires the notice GM-only and only when a count is non-zero', () =>
   assert.ok(/game\.user\?\.isGM/.test(guard), 'and on the user being a GM');
 });
 
-// SEVERITY IS LOAD-BEARING, and this was found the hard way. The View Lab boots the REAL
-// migration runner over its fixtures on every build (they seed no `migrationVersion`, so
-// `lastRunVersion` is `0.0.0` and every migration runs), and `installFoundryShim` routes
-// `ui.notifications.warn` to a prefixed `console.warn` that FAILS a capture. A blanket
-// `warn` therefore failed all three affected View Lab cases at once — and one bad case
-// fails the capture job whole and publishes NOTHING. `untouched` is the only count that
-// leaves a world needing hand repair, so it alone warns; everything else takes the `info`
-// channel the 0.6.0 and 0.9.0 notices this block is modelled on use.
+// SEVERITY IS LOAD-BEARING, and this was found the hard way.
 test('main.js dispatches the composed severity to the right notification channel', () => {
   const block = MAIN_SOURCE.slice(MAIN_SOURCE.indexOf('const retiredCraftingModCounts'));
   const dispatch = block.slice(0, block.indexOf('\n  }'));
@@ -637,15 +593,8 @@ test('main.js dispatches the composed severity to the right notification channel
   );
 });
 
-// ── the notice COMPOSITION, executed ────────────────────────────────────────
-//
-// THE ARITHMETIC IS THE POINT OF THIS NOTICE, and while it lived inside `src/main.js` it
-// executed in NO test: a source-text grep can pin a dispatch but not a sum. Three semantic
-// mutations survived a green suite — folding `subtractive` into the inert count, dropping
-// the lead sentence (and with it the list of affected systems) from the join, and filtering
-// the systems list to empty so the notice named no system. It is lifted into
-// `buildRetiredCraftingModNotice` for exactly that reason, and each of those three
-// mutations now fails here.
+// the notice COMPOSITION, executed. THE ARITHMETIC IS THE POINT OF THIS NOTICE, and while it lived
+// inside `src/main.js` it executed in NO test: a source-text grep can pin a dispatch but not a sum.
 
 const REPORTED = Object.freeze([
   Object.freeze({ system: 'Alchemy', inert: 2, subtractive: 5, repeated: 0, untouched: 0 }),
@@ -803,9 +752,7 @@ test('every notice clause is localized under a key that exists in en.json', () =
     assert.ok(copyFor(key).includes('{count}'), `${key} interpolates its own count`);
   }
 
-  // THE REMEDY IS SPELLED OUT, and it names ONE action. An earlier draft also offered
-  // "choose a combination rule whose set resolves to 0", which names no rule that does
-  // that: every rule reduces the same eligible set, so switching cannot zero it.
+  // THE REMEDY IS SPELLED OUT, and it names ONE action.
   const inert = copyFor('Inert');
   assert.ok(/clear the Default modifiers set/i.test(inert), 'the real remedy is named');
   assert.equal(/resolves to 0/i.test(inert), false, 'and the remedy that does not exist is gone');
@@ -828,14 +775,9 @@ test('every notice clause is localized under a key that exists in en.json', () =
   }
 });
 
-// ── the on-disk invariant, over the whole refusal corpus ────────────────────
-//
-// The migration is the ONLY caller that writes, and it passes no dice engine, so the
-// shim's structural check is the sole guard on what lands in the setting. This drives the
-// same corpus the shim tests drive: a shape refused there but written here is exactly how
-// a formula reaches disk in a state the shim would refuse at roll time — and, because the
-// token is gone by then, the shim short-circuits and `new Roll(...)` throws as a rolled,
-// consuming, permanent failure.
+// the on-disk invariant, over the whole refusal corpus. The migration is the ONLY caller that
+// writes, and it passes no dice engine, so the shim's structural check is the sole guard on what
+// lands in the setting.
 
 const OPERATOR_BOUNDED_RE = /^\s*[*/%]|[+\-*/%]\s*$/;
 

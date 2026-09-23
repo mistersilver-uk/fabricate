@@ -1,16 +1,10 @@
-/**
- * No control may be offered where the command behind it refuses (issue 1648).
- *
- * Every case drives the REAL engine command and the REAL projection from ONE fixture and
- * asserts they agree: the projection's enabled state and the command's disposition are read
- * from the same run, in the same world, at the same moment.
- */
+/** No control may be offered where the command behind it refuses (issue 1648). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createPersistedCraftingHistory, historyItem } from './helpers/journal-fixtures.js';
 import { IngredientSet } from '../src/models/IngredientSet.js';
-import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
+import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 
 let requests = 0;
 const grant = () => ({ requestId: `readiness-${++requests}`, executionGrant: 'grant' });
@@ -32,9 +26,8 @@ const executeCall = (context, extra) => call(context, 'executeVersionedStage', e
 const beginCall = (context, extra) => call(context, 'beginVersionedStage', extra);
 
 /**
- * Re-shape the live run into the state the SHIPPED release leaves behind: a gated stage
- * with no start-phase consumption record, its inputs still held because that release spent
- * them at execute. Nothing in production backfills this; there is no migration.
+ * Re-shape the live run into the state the SHIPPED release leaves behind: a gated stage with no
+ * start-phase consumption record, its inputs still held because that release spent them at execute.
  */
 function armBeforeStartCommit(context) {
   const stored = context.actor.flags.fabricate['fabricate.craftingRuns'].active[context.runId];
@@ -283,9 +276,7 @@ test('QE-2: two prices the actor CAN afford together offer begin, and it commits
 
 /**
  * F4/FI6. An item matched as BOTH a required tool and a selected ingredient is available to the
- * engine's tool validation only because that validation excludes the selection's items. The
- * projection's tool probe must exclude the same set, or it reads available where the command
- * reads missing.
+ * engine's tool validation only because that validation excludes the selection's items.
  */
 test('QE-2: an item that is both the selection and the tool is excluded from both probes alike', async () => {
   const fixture = await createPersistedCraftingHistory({
@@ -325,8 +316,7 @@ test('QE-2: an item that is both the selection and the tool is excluded from bot
 
 /**
  * F5/FI4. A run whose recorded source actors have gone is judged against an inventory that is not
- * its own, and the engine refuses it outright. The projection says so rather than reporting
- * whatever shortfall the crafting actor's own inventory happens to show.
+ * its own, and the engine refuses it outright.
  */
 test('QE-2: a run whose source actors are gone reports that, not a material shortfall', async () => {
   const fixture = await createPersistedCraftingHistory({

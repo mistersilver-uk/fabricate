@@ -1,14 +1,6 @@
 /**
- * THE ONE RESOLVED-ESSENCE ACCESSOR, driven directly (issue 1371 r21-store4, the quality
- * engineer's round-7 gap N2).
- *
- * Six consumers read this module — the row projection, the essence usage counts, the world
- * catalogue's `used by` figure, the delete-impact refusal, the override rule's baseline and the
- * standalone editor's seed — and it had no suite of its own: every case that reached it did so
- * through a composition whose manager always answered a well-formed union. Its whole reason for
- * existing is what it does when the union CANNOT answer, because absence has to leave each of
- * those six callers reading the persisted row exactly as it did before the module existed. That
- * is the direction a mutation cannot be caught in from a happy-path composition.
+ * THE ONE RESOLVED-ESSENCE ACCESSOR, driven directly (issue 1371 r21-store4, the quality engineer's
+ * round-7 gap N2).
  */
 
 import assert from 'node:assert/strict';
@@ -24,7 +16,6 @@ import {
  * A manager stand-in whose read union answers exactly what it is given.
  *
  * @param {unknown} answer what `getComponentsForSystem` returns, or an Error it throws.
- * @returns {object}
  */
 function makeManager(answer) {
   return {

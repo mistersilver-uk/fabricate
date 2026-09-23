@@ -1,14 +1,4 @@
-/**
- * Coverage for GM-routed ENVIRONMENT resource-node depletion.
- *
- * An environment's node pool lives in `environment.nodeRuntime[taskId]`, persisted
- * in the `fabricate.gatheringEnvironments` WORLD setting. Foundry lets only a GM
- * update a world Setting document, so a player gathering from a node-backed task
- * used to fail with "User <name> lacks permission to update Setting [...]" — an
- * unhandled rejection that also left the pool un-depleted. The decrement is now
- * emitted to the active GM, which recomputes the single unit from its OWN stored
- * state.
- */
+/** Coverage for GM-routed ENVIRONMENT resource-node depletion. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -180,9 +170,7 @@ test('the active GM applies locally — a socket emit never reaches the emitter'
 });
 
 test('a GM-less session reports the unroutable depletion instead of emitting into the void', () => {
-  // Users#activeGM is null with no GM connected, so nothing would ever apply the
-  // emit. The gather still succeeds — it never gated on this write — but the pool
-  // does not deplete, and that must be observable rather than silent.
+  // Users#activeGM is null with no GM connected, so nothing would ever apply the emit.
   const emitted = [];
   const unroutable = [];
   const writer = createGatheringNodeDepletionWriter({
@@ -363,11 +351,8 @@ test('applyEnvironmentNodeDepletion no-ops on an unknown environment or task', a
   );
 });
 
-// --- composition: the real commitAcceptedAttempt path -----------------------
-//
-// The routing units above all stay green if `commitAcceptedAttempt` reverts to
-// `source.write(node)` — which is exactly the original bug. These drive the real
-// service so the seam cannot be silently disconnected.
+// composition: the real commitAcceptedAttempt path. The routing units above all stay green if
+// `commitAcceptedAttempt` reverts to `source.write(node)` — which is exactly the original bug.
 
 function makeRoutedRichState({ store, routed }) {
   const config = {
@@ -452,12 +437,8 @@ test('without the seam the decrement is authoritative and written in place', asy
   assert.equal(store._peek().nodeRuntime['lib-1'].current, 2, 'a GM writes directly');
 });
 
-// --- one consumption per run across a timed run's two commits ---------------
-//
-// A timed run commits twice: once when the wait starts and once when it matures.
-// `shouldDepleteNode` answers true at BOTH for `onStart` timing, so the pool used to
-// lose two units per run. Pre-existing and GM-visible; only surfaced for players once
-// the permission failure stopped masking it.
+// one consumption per run across a timed run's two commits. A timed run commits twice: once when
+// the wait starts and once when it matures.
 
 function makeLocalRichState(store, depletionTiming) {
   const config = {
@@ -533,11 +514,8 @@ test('an immediate attempt still consumes on its single commit', async () => {
   }
 });
 
-// --- inbound rate limiting -------------------------------------------------
-//
-// The applier re-checks the node economy but not whether the sender could actually
-// reach the task, so an authenticated user can address any (environmentId, taskId).
-// That residual is denial-of-RESOURCE; the limiter bounds it to human gathering speed.
+// inbound rate limiting. The applier re-checks the node economy but not whether the sender could
+// actually reach the task, so an authenticated user can address any (environmentId, taskId).
 
 test('the rate limiter allows a normal gathering cadence', () => {
   let clock = 0;

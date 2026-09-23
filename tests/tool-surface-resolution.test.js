@@ -1,19 +1,7 @@
 /**
  * Pins EVERY surface that answers "is this owned item a Tool" against ONE identity table
- * (`tests/helpers/toolSurfaceCases.js`), per `openspec/specs/data-models/spec.md`
- * `## Tool` requirement 12.
- *
- * Why this exists. Issue 561 made Tools first-class; issue 976 then found the same
- * component-only assumption in three DISPLAY surfaces and pinned them against a shared
- * table. The IDENTITY half was never given the same treatment, so the miss in
- * `InventoryListingBuilder` — an owned tool producing no inventory row at all — survived
- * both changes and shipped in 1.8.0 as issue 1119.
- *
- * Each surface registers an adapter. A `covered` adapter must recognise the item-sourced
- * tools and must NOT claim the plain component. An `excluded` adapter must name a reason
- * AND an open issue, and is asserted to genuinely still fail — so an exclusion that is
- * quietly fixed reds this suite and has to be promoted rather than rotting into folklore
- * the way requirement 9's "tracked separately" did.
+ * (`tests/helpers/toolSurfaceCases.js`), per `openspec/specs/data-models/spec.md` `## Tool`
+ * requirement 12 (issue 561).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -32,7 +20,7 @@ globalThis.foundry = globalThis.foundry || { utils: { getProperty: () => undefin
 const { resolveToolForItem } = await import('../src/utils/sourceUuid.js');
 const { matchGatheringTools } = await import('../src/gatheringToolRuntime.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
-const { InventoryListingBuilder } = await import('../src/systems/InventoryListingBuilder.js');
+const { InventoryListingBuilder } = await import('../src/ui/presenters/InventoryListingBuilder.js');
 
 /**
  * Install the canonical world behind `game.fabricate.getCraftingSystemManager()`, which is
@@ -51,10 +39,8 @@ function installWorld(system) {
 }
 
 /**
- * Every surface under one signature: given the canonical world and one owned document,
- * return the library Tool id that surface resolves it to (or null).
- *
- * `status: 'excluded'` records a surface KNOWN not to answer, with the issue tracking it.
+ * Every surface under one signature: given the canonical world and one owned document, return the
+ * library Tool id that surface resolves it to (or null).
  */
 const SURFACES = [
   {
@@ -154,9 +140,8 @@ test('the whetstone is one card carrying both roles, never two', () => {
 });
 
 test('every owned tool in the table reaches the player inventory', () => {
-  // The end-to-end form of the reported bug: the GM registers tools from Item uuids and
-  // the player sees nothing. Asserted over the WHOLE actor at once, so a surface that
-  // handles one identity tier but drops another still fails.
+  // The end-to-end form of the reported bug: the GM registers tools from Item uuids and the player
+  // sees nothing.
   const system = surfaceSystem();
   const manager = installWorld(system);
   const builder = new InventoryListingBuilder({

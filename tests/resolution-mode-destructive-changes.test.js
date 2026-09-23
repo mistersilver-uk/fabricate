@@ -25,15 +25,7 @@ globalThis.game = {
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
-// A recipe-manager mock that records migration calls. Recipes are plain JSON; the
-// `updateRecipe` path records the migrated `resultSelection` so tests can assert
-// the matrix outcome, and the delete paths record deletions.
-//
-// `deleteRecipes` is the batch primitive the mode migration routes through since issue
-// 1132, and this double is deliberately NOT looser than the real one: it skips an id that
-// resolves to no recipe (rather than deleting a phantom), returns the same
-// `{deleted, recipeIds, recipes}` shape, and counts its own single flag pass so a
-// per-recipe fan-out regression is visible here.
+// A recipe-manager mock that records migration calls (issue 1132).
 function makeRecipeManager(recipes = []) {
   let mutableRecipes = recipes.map((r) => ({ ...r }));
   const deleted = [];
@@ -152,10 +144,8 @@ test('changing resolutionMode migrates 1×1 recipes instead of deleting them (in
     resolutionMode: 'simple'
   }));
 
-  // The legacy `tiered` token normalizes to `routedByCheck`; the mode still
-  // changes (simple → routedByCheck). Migration-first: the 1×1 recipe-1 is now
-  // CARRIED, not deleted (intended behavior change for issue 429), and recipe-2
-  // belongs to a different system so it is untouched.
+  // The legacy `tiered` token normalizes to `routedByCheck`; the mode still changes (simple →
+  // routedByCheck) (issue 429).
   await manager.updateSystem('sys-1', { resolutionMode: 'tiered' });
 
   assert.equal(manager.getSystem('sys-1').resolutionMode, 'routedByCheck');
@@ -318,13 +308,9 @@ test('a non-alchemy mode change does not run signature reconciliation', async ()
   assert.equal(recipeManager.getSignatureCheckCount(), 0);
 });
 
-// ---------------------------------------------------------------------------
 // Crafting-check slot movement across the routedByIngredients boundary (issue 532)
-// CraftingSystemManager._reconcileCraftingCheckSlotsForModeChange, run in
-// updateSystem after normalization and before the first persist, keyed on the
-// resolution-mode change. `routedByIngredients` reads craftingCheck.simple; the
-// tier-routing routedByCheck reads craftingCheck.routed.
-// ---------------------------------------------------------------------------
+// CraftingSystemManager._reconcileCraftingCheckSlotsForModeChange, run in updateSystem after
+// normalization and before the first persist, keyed on the resolution-mode change.
 
 test('switching routedByCheck → routedByIngredients copies the pass/fail config routed → simple', async () => {
   settingsStore.clear();

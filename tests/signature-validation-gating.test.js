@@ -1,16 +1,5 @@
 /**
- * Regression: RecipeManager only enforces ingredient-signature uniqueness for
- * alchemy-mode systems.
- *
- * Signatures exist so the engine can *infer* which recipe a player is crafting
- * from the submitted ingredients (CraftingEngine._matchAlchemySignature, gated
- * on resolutionMode === 'alchemy'). In every selected-recipe mode the player
- * picks the recipe, so overlapping base materials — iron+wood → axe OR spear OR
- * shield — are never ambiguous and must not be rejected.
- *
- * Reproduces the Mythwright 0.5.x update failure: a routed system whose recipes
- * share base materials had 98/105 recipes rejected with "Overlapping signatures"
- * on update, because every already-persisted recipe collided with its peers.
+ * Regression: RecipeManager only enforces ingredient-signature uniqueness for alchemy-mode systems.
  */
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -78,9 +67,8 @@ function makeRecipeData(id, name) {
   };
 }
 
-// One stored, ENABLED recipe — the cohort a not-yet-stored candidate is scanned against
-// (issue 1167). Deliberately a single recipe, so the corpus is collision-free until the
-// candidate joins it and any conflict reported is the one the candidate introduces.
+// One stored, ENABLED recipe — the cohort a not-yet-stored candidate is scanned against (issue
+// 1167).
 function seedManagerWithOneEnabledRecipe() {
   const manager = new RecipeManager();
   manager.initialized = true;
@@ -163,15 +151,7 @@ describe('RecipeManager signature validation gating', () => {
   });
 });
 
-/**
- * Issue 1167: the collision gate must see the CANDIDATE, not only the stored corpus.
- *
- * `createRecipe` and `importRecipes` both run the activation gate BEFORE the recipe
- * reaches `this.recipes`, so a cohort built purely by substituting the candidate for its
- * stored copy matched nothing, `validateSystem` never scanned the candidate, and no
- * conflict could name its id — the gate passed unconditionally on exactly the two paths
- * that introduce a first-time collision.
- */
+/** Issue 1167: the collision gate must see the CANDIDATE, not only the stored corpus. */
 describe('RecipeManager signature gating for a not-yet-stored candidate', () => {
   beforeEach(() => {
     settingsStore.clear();

@@ -77,7 +77,7 @@ CraftingSystem = {
   // section — requirement 36.
   components: Component[],
   recipeItemDefinitions: RecipeItemDefinition[],
-  membershipResolvesByRecipeIds?: boolean, // default absent (falsy = legacy basis). Monotonic per-system marker (issue 1010/1011) recording that recipe↔book membership resolves through RecipeItemDefinition.recipeIds rather than the legacy recipe.recipeItemId scalar. Set by the first write to any definition's recipeIds, backfilled on load as a monotone OR over the persisted value, and NEVER cleared — see recipe-visibility/spec.md and ui-integration/spec.md.
+  membershipResolvesByRecipeIds?: boolean, // default absent (falsy = legacy basis). Monotonic per-system marker (issue 1010/1011) recording that recipe↔book membership resolves through RecipeItemDefinition.recipeIds rather than the legacy recipe.recipeItemId scalar. Set by the first write to any definition's recipeIds, backfilled on load as a monotone OR over the persisted value, and NEVER cleared — see recipe-visibility/spec.md and ui-system-studio/spec.md.
 
   // NO `characterPrerequisites` KEY, and no `modifiers` key (issue 1308). Both libraries
   // moved to the `characterLibraries` WORLD setting, so `_normalizeSystem` emits neither
@@ -542,7 +542,7 @@ CraftingSystem = {
     The governing rule above is unchanged and gains exactly one clause: SCOPE decides where authority is authored; AUTHORITY still decides WHETHER.
     The per-tool control stays `checkBreakable`; the prototype's `tool` / `check` / `immune` spellings are not introduced.
     The world half is PERSISTED on `fabricate.toolScope` (issue 1359) and became REACHABLE at `1.30.0`, when this requirement's own normalizer became absence-preserving.
-    A reader that re-defaults to `"toolSpecific"` locally re-creates the unreachability at its own call site, so the FOUR non-UI effective-authority readers — the shared breakage evaluator, both crafting-engine breakage decisions and the inventory listing builder's exhaustion projection — are routed through the resolver, via the one shared seam `effectiveToolBreakageAuthority` (`src/systems/toolBreakageAuthority.js`).
+    A reader that re-defaults to `"toolSpecific"` locally re-creates the unreachability at its own call site, so the FOUR non-Svelte effective-authority readers — the shared breakage evaluator, both crafting-engine breakage decisions and the inventory listing builder's exhaustion projection — are routed through the resolver, via the one shared seam `effectiveToolBreakageAuthority` (`src/systems/toolBreakageAuthority.js`).
     The UI readers are routed at ONE point rather than five: the manager's selected-system projection publishes the RESOLVED authority, and every manager surface that draws or gates on it reads that published value.
     It publishes the AUTHORING SCOPE beside it — one value per branch of the resolver — because a screen that offers "inherit" as a third choice cannot recover that from the resolved token.
     Routing them at the projection rather than at each reader is what keeps the count from growing with the screens, and it is why a screen that re-defaults locally is a defect rather than a duplicate.
@@ -643,7 +643,8 @@ CraftingSystem = {
 35. **Failure-result policy.** `failureResultPolicy` (`'never' | 'perRecord' | 'always'`) is present on ALL THREE activity checks — `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` — and answers exactly one question: may a FAILED check produce a result at all.
     It is the ORTHOGONAL axis to failure CONSUMPTION (`recipes-and-steps` §Failure Consumption Policy), which answers what a failed attempt costs; gathering carries the produce axis and no consume axis.
     It **SELECTS an authored failure output and never fabricates one**, so `always` on a record authoring none produces nothing — which is why `perRecord` and `always` share ONE runtime predicate and differ as declarations of intent rather than as a second branch.
-    All three normalizers emit it through ONE shared derivation (`_normalizeFailureResultPolicy`); because each is a whitelist rebuild, omitting it from any one drops it from that activity on the next save.
+    All three normalizers emit it through ONE shared derivation, `normalizeFailureResultPolicy` in `src/utils/failureResultPolicy.js`; because each is a whitelist rebuild, omitting it from any one drops it from that activity on the next save.
+    `CraftingSystemManager._normalizeFailureResultPolicy` is a thin delegate to that same derivation, retained for the `DOMAIN.md` **Failure Result Policy** code anchor and called from nowhere under `src/`.
     A newly-created system defaults to `perRecord`, and an absent or unrecognized value normalizes to `perRecord` on read (the `toolBreakage.authority` precedent, requirement 21).
     An UPGRADED world never reaches that default: the `1.25.0` migration seeds `never` onto every check block already on disk (`destructive-changes-and-migrations`), so no existing world changes behaviour.
 
@@ -796,7 +797,7 @@ type CurrencyConfig = {
    A GM authors a ladder incrementally, so the profile is transiently invalid the moment they add the first of two units or clear an `actorPath` to retype it; refusing those writes would make the editor unusable.
    The store normalizes on read AND on write and always saves, exactly as the per-system editor did before the move.
 5. `validate()` (`validateCurrencyProfile`) is offered so a surface can SHOW the GM what is still wrong; it never gates a write.
-   The World then Currency route is that surface and MUST render the result once a ladder exists (see `ui-integration/spec.md` _GM World Currency Route_ for the empty-ladder suppression), so a ladder that cannot be spent against is visible where it is authored rather than only at craft time.
+   The World then `Rules & Resources` route is that surface and MUST render the result once a ladder exists (see `ui-world-scope/spec.md` _GM World Rules & Resources Route_ for the empty-ladder suppression), so a ladder that cannot be spent against is visible where it is authored rather than only at craft time.
    Validity is also resolved where it matters — at craft time, in `resolveCurrencyContext`, which surfaces a clear error and refuses to spend rather than spending against a broken ladder.
    That refusal MUST carry its reason to the caller.
    A probe or gate that reduces a resolved refusal to a bare `false` reports a shortfall the player does not have, and is a defect.
@@ -1581,6 +1582,7 @@ Recipe = {
 ### Requirements
 
 1. A _craftable_ Recipe must include at least one ingredient set and at least one result group, either at recipe level (single-step mode) or within steps (multistep mode).
+   In multistep mode only the TERMINAL step's non-`failure` result groups must be non-empty; an earlier step's result groups may be empty (issue 1907).
    This is a _completeness_ requirement: it gates crafting and craftable-visibility, not persistence.
    `Recipe.validate()` enforces completeness and is the craftability contract; the crafting engine gates on it, so an incomplete recipe is never craftable.
    `Recipe.validateStructure()` omits completeness (it waives the missing-ingredient-set / missing-result-group / missing-result errors) and is the persistence contract.
@@ -1590,6 +1592,7 @@ Recipe = {
    Issue 554 retired the per-recipe `resultSelection.provider`, so `Recipe._validateRoutedResultSelection` no longer governs alchemy name-uniqueness.
    `routedByCheck` `ResultGroup.name` integrity is enforced at the service level (`ResolutionModeService._validateRoutedGroupNames`, a per-mode reference-integrity check that always applies), independent of this persistence gate.
    Incompleteness is _derived_ from the recipe's structure (no stored flag): an implicit recipe is incomplete when it has no ingredient sets or no result groups; an explicit multi-step recipe is incomplete when any step is missing an ingredient set or result group.
+   An EMPTY result group is not a missing one: a non-terminal step carrying an empty result group is complete, not a shell (issue 1907).
 3. Resolution-mode constraints are defined in `resolution-modes/spec.md`.
 4. `resultSelection.provider` is RETIRED for alchemy (issue 554): alchemy routes on the SYSTEM-level `CraftingSystem.alchemy.checkMode` (`none` | `simple` | `tiered`), not a per-recipe provider.
    The 1.14.0 migration strips `resultSelection` from every alchemy recipe.
@@ -1641,9 +1644,9 @@ Recipe = {
     An unset image — empty, whitespace, or Foundry's generic `icons/svg/item-bag.svg` sentinel — resolves to `DEFAULT_RECIPE_IMAGE` (mirrored in the UI as `DEFAULT_CRAFTING_IMAGE`, pinned equal by `tests/crafting-image-defaults.test.js`), never to a book-shaped fallback.
     Every image-resolving caller must pass through one of two deliberately mirrored chokepoints — `resolveRecipeImage` (`src/ui/svelte/util/craftingImageDefaults.js`) for the GM manager and `InventoryListingBuilder._resolveRecipeImg` for the player surfaces — rather than re-deriving the rule at the call site.
     The legacy scalars `recipe.recipeItemId` and `recipe.linkedRecipeItemUuid` are never inputs to image resolution; their remaining non-image consumers are unaffected.
-    Shipped code meets that chokepoint rule at every user-visible surface as of issue 887, which retired the borrow from the four `src/systems` resolvers — `InventoryListingBuilder`'s used-by index (which no longer has a second resolver at all), the inline block in `CraftingListingBuilder`, `CraftingEngine._resolveRecipePromptImg`, and `RunJournalBuilder._resolveCraftingRunImg` — and removed the injected `getRecipeItemImg` port that existed solely to feed one of them.
+    Shipped code meets that chokepoint rule at every user-visible surface as of issue 887, which retired the borrow from the four resolvers that then lived under `src/systems` — `InventoryListingBuilder`'s used-by index (which no longer has a second resolver at all), the inline block in `CraftingListingBuilder`, `CraftingEngine._resolveRecipePromptImg`, and `RunJournalBuilder._resolveCraftingRunImg` — and removed the injected `getRecipeItemImg` port that existed solely to feed one of them.
     `RecipeManager.resolveRecipeIcon` and `resolveRecipeIconAsync` still re-derive it under `src/systems`, ordering it the other way — an authored non-default `img` wins outright and the borrow outranks only the default — but both are caller-less, so no surface resolves through them.
-    The one re-derivation inside `src/ui` is `createRecipeGraphIndex` (`src/ui/svelte/util/recipeGraphBuilder.js`), which takes `recipe.img || DEFAULT_RECIPE_IMAGE` at the call site: it borrows nothing, but it does not treat the `icons/svg/item-bag.svg` sentinel (or a whitespace-only `img`) as "no image".
+    The one place inside `src/ui` that re-derives the rule instead of routing through one of the two chokepoints is `createRecipeGraphIndex` (`src/ui/svelte/util/recipeGraphBuilder.js`), which takes `recipe.img || DEFAULT_RECIPE_IMAGE` at the call site: it borrows nothing, but it does not treat the `icons/svg/item-bag.svg` sentinel (or a whitespace-only `img`) as "no image".
     Issue 1082 moved that expression out of `buildRecipeGraph` and into the retained index every graph query now reads; the resolution itself is unchanged.
     It carries no user impact today, because the Graph surface is an unimplemented placeholder gated behind `fabricate.experimentalFeatures` (issue 442).
 17. A UI draft seeded from the recipe-browser projection carries DERIVED, non-model fields — `recipeItemId`, `recipeItemIds`, `recipeItemName` and `recipeItemSourceUuid` — for display only (issue 978).
@@ -1772,6 +1775,16 @@ RecipeItemMatchContext = {
   isMatch: boolean,
 };
 ```
+
+### Definition Index Invalidation
+
+Identity resolution reads retained `Map` indexes derived from one crafting system's definition arrays, so those indexes carry a staleness rule every in-place mutator must honour.
+An index derived from array `A` stays valid while `A` is the same object, has the same `length`, and carries the same revision.
+Any in-place mutation of `A` — replacing or reordering an element, or rewriting an INDEXED FIELD of an element (`id`, `name`, `registeredItemUuid`, `originItemUuid`, `aliasItemUuids`, `recipeIds`) — MUST advance that array's revision.
+The element-field half is the load-bearing one: rewriting a field of an element in place changes neither the array's identity nor its length, so nothing but the revision can detect it.
+A path that rebuilds a definition array produces a new object and therefore a fresh index for free; a reload may reuse a retained array only because reuse requires whole-record equality, which makes every indexed field byte-equivalent.
+An index is keyed on the candidate ARRAY itself and never on a crafting system id, because definition ids are unique within one system only.
+Index lookups reproduce `Array.prototype.find`'s array-order precedence exactly, including the minimum-position rule that resolves a source reference to the earliest candidate matching ANY of the item's references.
 
 ## Step
 
@@ -1918,6 +1931,8 @@ Ingredient = {
 ### Requirements
 
 1. `quantity` must be positive.
+   A requirement amount is always FIXED: there is no `quantityFormula` on this model, because a rolled requirement has no coherent moment to resolve.
+   The `design-system` capability records the ruling under "One requirement row serves both sides of a recipe".
 2. `match.type` is required.
 3. If `match.type === "component"`, `match.componentId` is required.
 4. If `match.type === "tags"`, `match.tags` must contain one or more tag IDs.
@@ -1970,11 +1985,11 @@ An essence option satisfies its ingredient group by consuming essence-carrying i
 
 1. The per-item essence contribution is read through an injected bound `resolveItemEssences(item) => essenceMap` collaborator, keeping the pure model Foundry-free.
    The default resolver is **flag-only** (`fabricate.essences` item flag), so the no-probe `canBeCraftedWith`/display path stays byte-for-byte the legacy behaviour; callers (`RecipeManager`, `CraftingEngine`, the per-slot selector) bind a **component-aware** resolver that also credits component-defined essences — an intentional capability increase over the old flag-only per-set gate.
-2. Consumption reads the shared `remaining` map and commits through `_commitItemPlan` (keyed by `uuid || id`), so an item already claimed by a component/tag group in the same set is not recounted toward the essence group (anti-double-consume).
+2. Consumption reads the shared `remaining` map and commits through `ingredientLedger.commitItemPlan` (keyed by `uuid || id`), so an item already claimed by a component/tag group in the same set is not recounted toward the essence group (anti-double-consume).
 3. Consumption is **unit-granular**: an indivisible item may over-consume past `amount` (e.g. one item worth 3 essence to meet `amount: 2`), acceptable and symmetric with tag/component options.
 4. Accounting is per-unit occurrence in alchemy (the submitted multiset) and summed over the configured stack-quantity path in standard craft, mirroring the existing documented divergence between the two matchers.
    The two paths **agree** that essence requirements share units with each other: alchemy pools the whole submission across every essence requirement, and standard craft resolves an ingredient set's essence options as one joint block (clause 5).
-   They still **differ** on whether a unit already claimed by a component/tag requirement contributes its essences: alchemy credits it, standard craft does not, because clause 2's `remaining`/`_commitItemPlan` ledger has already spent that unit.
+   They still **differ** on whether a unit already claimed by a component/tag requirement contributes its essences: alchemy credits it, standard craft does not, because clause 2's `remaining`/`ingredientLedger.commitItemPlan` ledger has already spent that unit.
 5. Every `match.type === "essence"` option in one ingredient set forms a single **essence block**, resolved as one backtrackable node placed last — after every component/tag group has claimed from `remaining`.
    Within the block a consumed unit credits every essence it carries to every essence requirement in the block, so one dual-essence carrier can fund two essence requirements at once.
    The block's scope is exactly one ingredient set: it does not span ingredient sets, it does not span steps, and it does not reach across the component/tag boundary.
@@ -1987,7 +2002,7 @@ An essence option satisfies its ingredient group by consuming essence-carrying i
    The allocation is honoured whether or not it satisfies the block: a short allocation is reported short and is **never** topped up from unallocated carriers.
    A craft submitted with a player allocation that does not fund the block is therefore **refused with the missing-materials message** rather than consuming its partial plan (`CraftingEngine._allocationShortfallMessage`), mirroring the `optionOverrides` rule in `recipes-and-steps` that an insufficient override blocks the craft rather than being silently redirected; the default path, which gates on the allocator's own suggestion, is unchanged.
    The resolved allocation is returned on `selection.essenceAllocation`, so a surface displaying it is displaying exactly what the craft consumes.
-7. The block contributes **at most one consumption-plan entry per item key**, whose `quantity` is the number of units the block draws from that item, committed once through `_commitItemPlan` after every component/tag group has claimed.
+7. The block contributes **at most one consumption-plan entry per item key**, whose `quantity` is the number of units the block draws from that item, committed once through `ingredientLedger.commitItemPlan` after every component/tag group has claimed.
    A component/tag group MAY still contribute its own entry for the same item key: those draws are disjoint and compose correctly under the engine's live read of the configured stack-quantity path.
    Two entries for the same _shared_ unit do not compose, and on Foundry V13/V14 the second delete throws mid-consumption rather than silently overspending, so the block never emits a second entry for an item key it already claims.
 8. Every essence requirement's reported quantity comes from a **per essence id** partition of what the block delivers: for each essence id, the requirements naming that id settle in author order, each taking `min(need, remaining delivered of that id)`.
@@ -2050,14 +2065,14 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > READ ENTRY has run.
 > AUTHORITY has moved ONE STEP and no further (issue 1372): requirement 15's clause 1a makes the union answer an INHERITED SECTION from the world default, while `## CraftingSystem` requirement 36 keeps the in-system arrays the source of truth for every other key, every ROW and the row ORDER, re-derived at read time, with the world layer supplying only the keys they do not carry.
 > The SHED has NOT: nothing is removed from any of the eight shadowed keys, and `destructive-changes-and-migrations` still measures zero references disappearing.
-> `src/ui/**` was deliberately outside the repoint, on the precedent this banner sets for the effective tool-breakage authority: with the ORDER and ROW SET rules adopted, an unwritten world corpus reads exactly as the previous release did.
+> `src/ui/**` apart from `src/ui/presenters/` was deliberately outside the repoint, on the precedent this banner sets for the effective tool-breakage authority: with the ORDER and ROW SET rules adopted, an unwritten world corpus reads exactly as the previous release did.
 > TWO UI READERS HAVE SINCE JOINED IT (issue 1373), and both are the Tool Rules surface: the manager's selected-system `tools` projection, which the rules LIST reads, and the rules EDITOR's own draft seed.
 > The list joined because it is the surface a GM administers Tools from and reading the raw array there gave that one screen a SECOND answer to a question the read union already answers — one that could not see the world master switch of `### Tool scope` requirement 3a at all.
 > The editor joined for the same reason one route deeper: it stated the in-system value for a section the list beside it labelled `Inherits world defaults`, and `prerequisites` and `bonus` — which no adoption seed ever copied — disagreed with the world outright.
 > Each is threaded the corpus EXPLICITLY rather than probing a global, and `null` — no world half — makes the seam hand back the in-system array itself, so an unmigrated world still reads exactly as the previous release did.
-> **THE EDITOR'S READ CARRIES A WRITE OBLIGATION AND THE LIST'S DOES NOT**, because the editor is the only one of the two that saves: its save is section-aware, so a value it displays because the section INHERITS is never persisted back onto the in-system record (`ui-integration/spec.md` -> Tools Tab).
+> **THE EDITOR'S READ CARRIES A WRITE OBLIGATION AND THE LIST'S DOES NOT**, because the editor is the only one of the two that saves: its save is section-aware, so a value it displays because the section INHERITS is never persisted back onto the in-system record (`ui-system-studio/spec.md` -> Tools Tab).
 > Without that, a display repoint would convert every inheriting section into an override on the next save — an AUTHORITY move made by accident, which is exactly the conflation of clocks this banner warns about.
-> The rest of `src/ui/**` is unchanged and stays outside.
+> The rest of the UI is unchanged and stays outside.
 >
 > **DELIVERED AT `1.30.0`** (epic 1357, PR 3): the migration itself, the world entity corpus, the membership model, and the WORLD tool-breakage authority (`### Tool scope` requirement 5), which the crafting-system normalizer's absence-preserving flip makes reachable.
 > The migration ELECTS each world default from the OLDEST contributing system, the same donor that wins identity, across six sections at `1.30.0` and a seventh — the component `essences` map — since `1.32.0`; component `tags` and the world tool-breakage authority are excluded for two different reasons, and FIVE constraints can decline an individual section.
@@ -2073,10 +2088,10 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > The three vocabulary LISTS have a destination since issue 1392 — `fabricate.worldVocabulary`, modelled by `## World Vocabulary` — and nothing reads it until the consumer sweep; the two vocabulary ICON MAPS still have no destination at all.
 > `## Component`, `## EssenceDefinition` and `## Tool` therefore still describe the LIVE per-system shape and, where those sections and this one disagree, they are what the code does — with the single addition that a reader's row also carries the resolver's `member` and `inherited` keys.
 >
-> **REACHABILITY, DERIVED RATHER THAN ASSERTED.** As of issue 1371 the set of scoped-entity types with no reachable world-scope screen is EMPTY: components, essences and tools each render a real world catalogue and a real world entry. `world-vocabulary` is accounted for separately rather than counted in that set, because it is not a scoped-entity corpus at all (see `### GM World Vocabulary Route`); it delegated to `ScopedPlaceholderPage` until issue 1392 gave it a real body, so no world route delegates now.
+> **REACHABILITY, DERIVED RATHER THAN ASSERTED.** As of issue 1371 the set of scoped-entity types with no reachable world-scope screen is EMPTY: components, essences and tools each render a real world catalogue and a real world entry. `world-vocabulary` is accounted for separately rather than counted in that set, because it is not a scoped-entity corpus at all (see `ui-world-scope/spec.md` `## GM World Vocabulary Route`); it delegated to `ScopedPlaceholderPage` until issue 1392 gave it a real body, so no world route delegates now.
 > `src/ui/svelte/stores/worldScopeActions.js` implements the whole per-entity-type action family — create, update and delete a world entity, write a world-default section, add to and remove from a system, flip a section's inherit switch, write a membership override, copy a membership, and (component only) the additive tag and per-tag mute writes — and `adminStore` exposes it as `store.worldScope`.
 > **NOT EVERY LEG HAS A CALLER, and the two that do not are named rather than left to be re-derived.** `updateMembershipSection` has none — a system's own section values are written on its in-system record through the rules editor's draft, and the membership record carries the inherit SWITCH alone.
-> `setMutedTags` has none either: the prototype-parity rebuild removed every muting control, so the leg is published, tested and unauthored (`ui-integration/spec.md` `### GM World Component Screens` requirement 5).
+> `setMutedTags` has none either: the prototype-parity rebuild removed every muting control, so the leg is published, tested and unauthored (`ui-world-scope/spec.md` `## GM World Component Screens` requirement 5).
 > A published leg with no caller is a REACHABLE WRITE PATH with no writer, which is a different state from an unreachable corpus and must not be counted as one.
 >
 > **THE PUBLISH READS THE WHOLE RECIPE LIBRARY EXACTLY ONCE, AND THAT IS A PINNED BUDGET RATHER THAN AN OBSERVATION** (issue 1371).
@@ -2448,7 +2463,7 @@ The `1.30.0` pass applies the same rule to the records it writes, so a fresh wor
    **WHICH BINDS THE PROJECTION THE EDITOR IS SEEDED FROM, NOT ONLY THE EDITOR** (issue 1371 r22-store4).
    The GM component card carries TWO essence runs and they answer different questions: the whole resolved map, which is what an editor opened on that card is seeded from, and the DRAWN run — the same map through the shared chip model, in the order of the roster the site states (the system's own definitions on a system-scope surface), with nothing for an id the system's roster cannot name.
    Narrowing the seed makes the carried set EMPTY by construction, because the carried ids are exactly those the rendered rows do not cover; the editor then has no row, no carry and no way back into the write for them, and the next save drops them durably.
-   The row, the inspector and the browser's essence filter read the drawn run — `ui-integration`'s one-function rule for chips and filter — and nothing that SEEDS an editor may.
+   The row, the inspector and the browser's essence filter read the drawn run — `ui-world-scope`'s one-function rule for chips and filter — and nothing that SEEDS an editor may.
    What an in-system row may finally HOLD is still `## CraftingSystem`'s own roster rule, enforced at the in-system normalizer.
    The projection publishes, per entry, the world map as `defaults.essences` and `inheritCounts.essences`, and per system row `inherited.essences` and `resolvedEssences` — the map that system resolves, a read fact named so that no world editor writes it back.
    **EVERY GM READ OF A COMPONENT'S ESSENCES DRAWS THE RESOLVED MAP, NOT THE PERSISTED ROW** (issue 1371 r19-store2, extended at r20-store3).
@@ -2466,7 +2481,7 @@ The `1.30.0` pass applies the same rule to the records it writes, so a fresh wor
    The record's muted list is `mutedTags`; both it and `tags` normalize to trimmed, de-duplicated, order-preserving labels, and an authored EMPTY list normalizes to ABSENT on the `complications` doctrine (`## Component` requirement 20), because it carries no meaning distinct from absence.
    **Per-tag muting is written through `setMutedTags`, which the COMPONENT family alone publishes.** Its absence on the essence and tool families is `taggable: false` on their write descriptors — a per-type capability flag — and is NOT requirement 4's structural `enabled` reasoning; conflating the two would suggest a later lane could add muting to a tool by relaxing a structural rule, when what it would actually need is a tag model those types do not have.
    **NO SCREEN CALLS IT.** The leg refuses silently for a non-member — it returns `false` with no membership record — and after issue 1371's prototype-parity rebuild nothing in `src/` invokes it at all, so a stored `mutedTags` list can be READ BACK and DISPLAYED but reaches the corpus only through the `1.30.0` migration, an import, or a hand edit.
-   The screens' side of that is `ui-integration/spec.md` `### GM World Component Screens` requirement 5.
+   The screens' side of that is `ui-world-scope/spec.md` `## GM World Component Screens` requirement 5.
    **A world tag list is stated WITH ITS MEMBER COUNT before the write lands**, which is what binds the world catalogue EDITOR rather than the migration: the merge is granted to every member system at once, so the reach is the fact a GM is deciding on.
    **THE ADDITIVE MERGE STAYS RESOLVER-ONLY.**
    `## Scoped Entity Definitions` requirement 15 clause 1a switches SECTIONS, and `tags` is not one — it carries no inherited-section writer and the in-system normalizer emits it unconditionally — so the union's trailing in-system re-spread discards the resolver's answer.
@@ -2631,7 +2646,7 @@ The decline is what guarantees the transition is safe: the migration writes NO w
    The crafting-system normalizer substituted `toolSpecific` for anything missing or unrecognised on EVERY normalize until that release, so every persisted system carried a concrete value and `system.toolBreakage.authority ?? world` could never fall through; the flip that makes it absence-preserving is what made this half reachable.
    The migration WRITES NO WORLD AUTHORITY and TOUCHES NO SYSTEM'S VALUE: it treats every system's existing `toolBreakage.authority` as AUTHORED rather than defaulted, because the corpus cannot distinguish the two and treating a defaulted `toolSpecific` as absent would silently hand every existing system whatever authority the world later acquires.
    The world authority therefore stays absent until a GM authors it, which means it is reachable only for a system whose override is cleared, or one created afterwards.
-   **The FOUR non-UI effective-authority readers are routed through the resolver** — the shared breakage evaluator, both crafting-engine breakage decisions and the inventory listing builder's exhaustion projection — because a reader that re-defaults locally re-creates the unreachability at its own call site and makes the flip inert exactly there.
+   **The FOUR non-Svelte effective-authority readers are routed through the resolver** — the shared breakage evaluator, both crafting-engine breakage decisions and the inventory listing builder's exhaustion projection — because a reader that re-defaults locally re-creates the unreachability at its own call site and makes the flip inert exactly there.
    They reach it through ONE shared seam, `effectiveToolBreakageAuthority` (`src/systems/toolBreakageAuthority.js`), which resolves the world value from the published tool scope store and delegates to this requirement's resolver; a second hand-rolled `?? "toolSpecific"` at any call site would re-create the defect the flip removes.
    The UI readers are NOT a pending obligation on the world tool-breakage editor: the manager's selected-system projection resolves the authority once and publishes it, so every manager surface that draws or gates on the authority reads that resolved value and none re-defaults locally.
    This is the same routing `## CraftingSystem` requirement 21a records; it is restated here only because this requirement previously assigned it forward, and the two must not disagree about the same readers.
@@ -2652,7 +2667,7 @@ The decline is what guarantees the transition is safe: the migration writes NO w
    The record adoption writes is IDENTITY plus the SEEDED `repairRequirements` of requirement 2, and nothing else.
    `breakage` and `onBreak` were copied while requirement 15's retired clause 1 answered every key the in-system record carried: a normalizer emits both UNCONDITIONALLY, so an identity-only record won that contest with a value nobody authored — measured, a Tool whose world default was 25 uses adopted as `Unlimited uses` on a row stating "Inherits world defaults" beside it.
    Clause 1a answers an INHERITING section from the world default instead, so the union makes that row's claim true and the copy no longer does; retaining it would leave an override-shaped value on a record whose every switch says `Inheriting`, invisible while they hold and wrong the first time one is flipped.
-   WIDENING the copy to all four sections is the reading to avoid: a freshly adopted Tool inherits every section, so the only moment any of these values is read back is after a switch is turned OFF, and the UI seeds THAT from the resolved value at that moment (`ui-integration/spec.md` -> Tools Tab), which is current where an adoption-time copy is a snapshot.
+   WIDENING the copy to all four sections is the reading to avoid: a freshly adopted Tool inherits every section, so the only moment any of these values is read back is after a switch is turned OFF, and the UI seeds THAT from the resolved value at that moment (`ui-system-studio/spec.md` -> Tools Tab), which is current where an adoption-time copy is a snapshot.
    `repairRequirements` remains copied because it is NOT a section: the resolver never reads it back out of the world defaults, so no union can supply it and an adopted Tool without the copy would simply have no repair recipe.
    `enabled` is deliberately NOT copied either: requirement 3a's master switch is a VETO applied over the merged rows, and freezing one moment's answer into the crafting system would make a later world ENABLE read back as disabled forever.
 
@@ -2666,7 +2681,7 @@ per system and left to drift.
 
 TOP-LEVEL, and deliberately not a sub-section of `## Scoped Entity Definitions`.
 Requirement 12 there states the World Vocabulary is a separate concern and NOT a fourth layer, and
-`ui-integration/spec.md` records that folding the two together loses the boundary this file draws:
+`ui-world-scope/spec.md` records that folding the two together loses the boundary this file draws:
 a scoped entity is a RECORD with an identity, world defaults and per-system membership, and a
 vocabulary is a set of VALUES those records take.
 
@@ -2686,11 +2701,20 @@ vocabulary is a set of VALUES those records take.
    Nothing renames an entry, which is why the id is derived rather than minted.
    De-duplication is on `id`, FIRST-WINS.
    **This DIVERGES from the system-scope rule and the divergence is temporary and owned**:
-   `normalizeComponentCategory` preserves authored casing so `Reagent` and `reagent` remain
+   `normalizeCustomComponentCategories` preserves authored casing so `Reagent` and `reagent` remain
    distinct system categories, while `## CraftingSystem` requirement 6c already keys their shared
    icon map by the lowercased name — the inconsistency issue 1397 is the symptom of.
+   Issue 1397's crash is fixed at the DISPLAY layer — all three system row builders de-duplicate on
+   the normalized (trimmed, lower-cased) key, first spelling wins in stored order, matching this
+   rule, and the one row carries a pointer-only `title` naming every spelling it stands for — and
+   the STORAGE rule is unchanged: `normalizeCustomCategoryNames`, shared by both category
+   vocabularies, still de-duplicates on the case-preserving value, so `Reagent` and `reagent` remain
+   two distinct system categories.
+   Deleting that row removes every spelling that collapses to its key and reassigns their records by
+   the same cascade, so the case-preserving storage rule cannot strand one behind the other.
+   Component tags have no such divergence; `normalizeTag` already lower-cases.
    The world rule is the one the icon maps and the reference counter already assume; reconciling
-   the system half, and deciding how a world `reagent` and a system `Reagent` resolve in the merged
+   the storage half, and deciding how a world `reagent` and a system `Reagent` resolve in the merged
    per-kind list `## Scoped Entity Definitions` requirement 12 mandates, is issue 1411's.
 4. **Each vocabulary's reserved general bucket is not a world entry.**
    It is implicit per system, never persisted, and refused on add at both scopes
@@ -2939,7 +2963,8 @@ GatheringDropReference = {
 
 ### Purpose
 
-Group one or more results.
+Group the results one outcome awards.
+A group normally holds one or more results; the reserved `role: "failure"` group (issue 554) and a result group on a non-terminal step of a multi-step recipe (issue 1907) may hold none.
 
 ### Properties
 
@@ -2974,17 +2999,98 @@ Represent one produced item.
 ```js
 Result = {
   id: string,
-  componentId: string,
+
+  // WHAT IS AWARDED. Absent reads as "component", which is what every result
+  // persisted before this change is, so the discriminator costs no migration.
+  kind?: "component" | "currency" | "knowledge",
+
+  componentId: string,        // kind = "component"
+  unit?: string,              // kind = "currency" — a configured world CurrencyConfig.units[].id
+  recipeId?: string,          // kind = "knowledge" — the recipe the craft teaches
+
+  // A CURRENCY reward's own name, and the reason the player is given it. Both
+  // optional; a reward is complete without either.
+  label?: string,
+  reason?: string,
+
+  // HOW MANY. `quantity` is the fixed amount. A non-empty `quantityFormula`
+  // means the amount is ROLLED and is that expression; `quantity` is then the
+  // authored fallback rather than the number awarded.
   quantity: number,
+  quantityFormula?: string,
+
   propertyMacroUuid: string | null,
+
+  // PRESENT = this result IS a choice group and these are its alternatives.
+  // The carrier's own `kind` and value fields are not read while it is set.
+  alternatives?: Result[],
+
+  // GROUP SETTINGS, read only where `alternatives` is present.
+  chooser?: "playerChooses" | "rolled",
+  awardStrategy?: "anyOne" | "upTo",
+  awardCount?: number,
+  awardCountFormula?: string,
+  withReplacement?: boolean,   // `upTo` under a rolled chooser only
+  selectionFormula?: string,
+
+  // AN ALTERNATIVE'S OWN selecting range, read only on a member of a rolled group.
+  selectionRange?: { from: number, to: number },
 };
 ```
 
 ### Requirements
 
-1. `componentId` is required.
-2. `quantity` must be positive.
+1. `componentId` is required where `kind` is `"component"` or absent.
+2. `quantity` is the AUTHORED amount and must be positive.
+   The RESOLVED amount of a rolled result is a separate value, and only it may be zero.
+   A zero resolved amount is an EMPTY AWARD: the result creates no item, and the award states the roll that produced nothing rather than omitting the result.
+   Zero is the floor, so a negative total clamps to it.
 3. `propertyMacroUuid` is only valid when `features.propertyMacros` is true.
+4. `kind` is a closed set, and an absent `kind` IS `"component"`.
+   Every result persisted before this change carries no `kind` and reads unchanged, so the discriminator is additive and needs no migration.
+   An unrecognized `kind` is a misconfiguration rather than a new state, and is reported where an unknown resolution mode is.
+5. Where `kind` is `"currency"`, `unit` is required and is a configured world `CurrencyConfig.units[].id`; where it is `"knowledge"`, `recipeId` is required.
+   A `"knowledge"` result grants through `game.fabricate.grantRecipeKnowledge` rather than by writing an item.
+6. `label` and `reason` are valid only where `kind` is `"currency"`, and each is optional.
+   An amount of a currency states a quantity and no meaning, which is what they exist to supply; a component, an essence and a piece of recipe knowledge each name a record whose own name is the label.
+7. A non-empty `quantityFormula` means the amount is ROLLED, and `quantity` is not the number awarded.
+   The expression is the shared roll expression: dice plus optional actor data paths, resolved against the crafting character.
+   It is validated the way a crafting check's formula is: `Roll.validate` is parse-only and passes an expression that cannot evaluate, so a formula is usable only where it evaluates to a finite total.
+   An empty or absent `quantityFormula` leaves the amount fixed at `quantity`, which is the state every result persisted before this change is in.
+   `resolveRolledAmount` is the one seam that turns a result plus the crafting character into the integer awarded, and a formula resolves ONCE per result per award; `awardCountFormula` and `selectionFormula` resolve through that same seam.
+   The rollability floor is a maximised evaluation of the formula AS AUTHORED rather than a parse, core substituting every roll-data path it cannot resolve with zero: a path-free formula whose maximised total is not finite, or is zero or less, can never award anything and is an authoring error.
+   The not-finite rung applies to every formula, because one that cannot be rolled at all can never award anything either.
+   Only the zero-or-less rung is path-free: a path-bearing formula is accepted wherever it maximises to a finite total, because no actor-free reading can decide what its paths contribute.
+The authoring surface for all of it — the chooser as a segmented control in the group header, the award strategy, the range cell per alternative and the currency reward's naming body — is specified by the `design-system` capability, under the requirements "A result-side choice group states who chooses and how many it awards" and "One requirement row serves both sides of a recipe".
+This section states only what is persisted.
+
+8. `alternatives` PRESENT makes this result a choice group, and every member including the one the group was converted from is an entry in that array.
+   The carrier's own `kind`, `componentId`, `unit`, `recipeId`, `quantity` and `quantityFormula` are not read while `alternatives` is set, so a group is never also a result in its own right.
+   `alternatives` holds two or more entries; a group reduced to one is a plain result again.
+   Alternatives do not nest: a member MUST NOT carry `alternatives` of its own.
+9. `chooser` defaults to `"playerChooses"` and is read only on a group.
+   `"rolled"` requires a non-empty `selectionFormula`, and `"playerChooses"` ignores `selectionFormula` and every member's `selectionRange`.
+10. `awardStrategy` defaults to `"anyOne"` and is read only on a group.
+    `"upTo"` requires exactly one of `awardCount` or a non-empty `awardCountFormula`; `"anyOne"` reads neither.
+    `awardCount` must be positive.
+    `awardCountFormula` is the same roll expression a `quantityFormula` is, validated the same way.
+11. `withReplacement` is read only where `awardStrategy` is `"upTo"` AND `chooser` is `"rolled"`, and defaults to `false`.
+    It is meaningless in every other cell — there is nothing to repeat under `"anyOne"`, and a person picking from a list they can see does not repeat — where it MUST NOT be written.
+    `true` makes `awardCount` EXACT and permits the same alternative more than once; `false` awards distinct alternatives, and a count above the number of alternatives exhausts the bundle rather than erroring.
+12. No `awardStrategy` constrains `chooser`: every combination of the two is authorable.
+    A repeated draw is not a third strategy — it is `"upTo"` under `"rolled"` with `withReplacement` true — so there is no combination left to forbid.
+13. `selectionRange` is read only on a member of a group whose `chooser` is `"rolled"`, and `from` and `to` are inclusive.
+    The ranges of a group's members are read as an ORDERED LADDER rather than as independent windows: a roll below the lowest selects the lowest member and a roll above the highest selects the highest, so no authored group can produce nothing.
+    Where a roll awards more than one alternative, the `selectionFormula` is rolled once per award rather than once for the group.
+14. A choice group is NOT valid inside a `progressive` result group.
+    Progressive awards every ordered entry whose difficulty the roll affords and normalizes a result's quantity to 1, so neither a chooser nor an award strategy has anything to mean there.
+    A payload carrying one is a misconfiguration; the authoring surface does not offer it.
+15. A `ResultGroup` whose `role` is `"failure"` MAY hold choice groups on the same terms as any other result group.
+    The reserved role is a statement about ROUTING rather than about the shape of what the group holds.
+16. `Result.toJSON()` omits every key above whose value is the one the constructor rebuilds from absence, under the issue-1135 omission policy the `Ingredient` section states.
+    `id`, `componentId` where the kind is a component, and `quantity` are never omitted.
+    Absence is the pre-change on-disk state for all of them, so no reader gains a case it did not already have.
+17. The addition is LOSSLESS FORWARD and LOSSY BACKWARD: a payload written by an older build carries none of these keys and reads identically, while a downgrade drops a group's alternatives and settings rather than degrading them, and MUST say so at the point of downgrade.
 
 ## Versioned Run Lifecycle
 
@@ -3392,7 +3498,7 @@ Requirements:
    Neither field is ever written by either book-learn path.
    The field is named `grantedBy` rather than joining the `source*` family because every `source*` field on this entry already means THE BOOK.
    Adding the two fields does not widen what counts as an entry: the entry boundary is still a numeric `learnedAt`, so a node carrying only `granted` yields no entry at all.
-   Both fields are UNTRUSTED at display — the flag is public and any module may write it — so a surface tests `granted === true` and `typeof grantedBy === 'string'` strictly rather than for truth (see `ui-integration` _Knowledge Surface_).
+   Both fields are UNTRUSTED at display — the flag is public and any module may write it — so a surface tests `granted === true` and `typeof grantedBy === 'string'` strictly rather than for truth (see `ui-system-studio` _Knowledge Surface_).
 5. Stored and read via `getFabricateFlag` / `setFabricateFlag`; the effective persisted path is the doubly nested `flags.fabricate.fabricate.learnedRecipes` (the flag helpers prefix `fabricate.`), so it is never read via a raw single-nested `actor.flags.fabricate.learnedRecipes` path.
    A reader using the raw path finds nothing in a real world and silently reports zero.
 
@@ -3450,7 +3556,7 @@ Requirements:
 
 ### Purpose
 
-Define the unified, UI-safe projection the player-facing Journal screen reads (see `ui-integration/spec.md` _Journal App_).
+Define the unified, UI-safe projection the player-facing Journal screen reads (see `ui-journal-app/spec.md` _Journal App (Player)_).
 It is a **derived, computed view**, not a persisted entity: there is no new actor flag or `CraftingSystem` field, mirroring the System Validation Report's derived-view contract.
 `RunJournalBuilder` recomputes it on demand from the selected actor's three native run sources — `craftingRuns` (see _CraftingRun_ / _CraftingRunStepState_), `salvageRuns`, and `gatheringRuns` — projecting each native run into a single superset `RunModel`.
 Crafting runs populate the step fields; gathering and salvage carry no steps.
@@ -3820,7 +3926,7 @@ Bring crafting/gathering onto the Foundry VTT canvas as **Interactables** — dr
 A Fabricate Canvas Interactable is **region-first**: it is a **Scene Region** carrying a custom **`fabricate.interactable` Region Behaviour** (a `RegionBehaviorType`) that OWNS the authoritative state.
 A **linked visual** (Tile by default; optionally a Drawing or an existing GM-placed Token) is **presentation-only**. **No synthetic actor or proxy token is ever created.** A GM drags a Tool / Gathering-Task entry from the GM-only scene-control Interactable browser (or drags a tool-linked Item) onto the canvas; a Region + behaviour + linked Tile is spawned (or a **region-only** interactable with no visible marker).
 Spawning is **GM-only**.
-Activation is **token presence**: a controlled token entering the region offers the controlling player a non-blocking interact prompt (see `gathering-and-harvesting` and `ui-integration` for the activation pipeline).
+Activation is **token presence**: a controlled token entering the region offers the controlling player a non-blocking interact prompt (see `gathering-and-harvesting` and `ui-world-scope` for the activation pipeline).
 
 ### Interactable Region Behaviour (`fabricate.interactable`)
 
@@ -3887,7 +3993,7 @@ Requirements:
    Such a behaviour is **UNCONFIGURED** (`isUnconfiguredInteractable`: sentinel/empty `sourceUuid` or `systemId`, or a missing type-appropriate id) and is **concealed/inert** — the on-enter prompt does NOT fire (`shouldPromptOnEnter` ⇒ `isConcealed`), its marker is hidden from players (`resolveMarkerHidden`), and activation is **denied, never thrown** (`validateActivationRequest` returns `UNCONFIGURED` → `FABRICATE.Canvas.Interactable.Denied.Unconfigured`).
    A GM configures its identity (type → crafting system → tool/task → environment) from the rich config panel via the pure `planConfigureSource`, which writes the canonical `sourceUuid` (`buildInteractableSourceUuid`) through the existing GM-routed `updateBehavior` seam and never persists a partial identity; once configured it activates exactly like a drag/drop-placed interactable.
    A freshly-created interactable behaviour **never inherits another interactable's linked visual**: an inherited `linkedVisual.uuid` (Foundry region-duplication) is neutralised at creation so two interactables never share one marker (the #334 neutralisation is retained).
-   The pure decisions live in `src/canvas/regions/interactableCreationGuard.js` / `interactableRegionFlags.js` / `interactableConfigActions.js`; the `preCreateRegionBehavior` Foundry edge in `src/main.js` is a thin, no-throw adapter that allows creation, stamps the sentinel, and notifies the GM.
+   The pure decisions live in `src/canvas/regions/interactableCreationGuard.js` / `interactableRegionFlags.js` / `interactableConfigActions.js`; the `preCreateRegionBehavior` Foundry edge in `src/bootstrap/hooks.js` is a thin, no-throw adapter that allows creation, stamps the sentinel, and notifies the GM.
    Fabricate's own drag/drop placement paths are unchanged — they pre-build a complete `system` and never go through the unconfigured path.
 6. **Token-presence re-validation is canvas-independent.** `validateActivationRequest`'s containment re-check — confirming the activating token is still inside the interactable's region before granting — MUST be resolvable without the validating GM's rendered canvas, since the active GM may not be viewing the requester's scene.
    It consults Foundry's authoritative token→region membership (`TokenDocument#regions`) first, then Foundry's own containment test, and only then a geometric test derived from the token document rather than its placeable.
@@ -3971,6 +4077,15 @@ Requirements:
    - **Concealment (all interactables).** When the interactable is DISABLED (`state.enabled === false`) OR explicitly HIDDEN (`presentation.hidden === true`), the linked Tile marker is hidden from players (`tile.hidden = true`, GM-only), reconciled in the same active-GM pass (`resolveMarkerHidden`).
      A LOCKED interactable's marker stays visible.
 3. A missing linked visual resolves cleanly to null — the interactable still functions (the central advantage of the region-first model).
+   Recovery follows `linkedVisual.missingPolicy`, and `recreate` auto-recreates a **Tile only**: a missing Drawing or Token degrades to `warn`, because re-minting either would guess at authored geometry, a label, and colours the behaviour does not record.
+   The decision is pure (`planMissingPolicy` in `src/canvas/linkedVisuals/linkedInteractableVisual.js`); only the recreate is an edge.
+4. **The reverse flag alone never authorizes a write to the visual.** It is mintable over the socket, so a socket-routed UPDATE of a linked visual is permitted only when the patch is EXACTLY the provenance stamp — the `flags.fabricate` reverse block and nothing else, allowlisted leaf path by leaf path — or the link ROUND-TRIPS: the visual carries a well-formed reverse flag, the behaviour it names is a `fabricate.interactable`, and that behaviour's forward `system.linkedVisual.uuid` names this exact document.
+   A socket-routed DELETE requires the round-trip and never accepts the stamp, which closes the mint-then-delete escalation.
+   Both guards flatten nested and dot-notation keys alike before matching, so a flattened key cannot masquerade as a path it does not write, and both fail closed on a single foreign leaf.
+   The round-trip is defence in depth rather than closure: the forward link is itself writable over the socket, so it raises the cheapest escalation from one message to a forged pair (issue 593).
+5. **A non-GM socket sender may write only the interactable's own scoped node pool.** A behaviour update from a non-GM sender is rejected unless every leaf path it writes is `system.node` or a `system.node.*` subpath — the legitimate player-side scoped-pool decrement (issue 302).
+   `system.linkedVisual` (forward-link forge), `system.state`, `presentation` and every enable, lock or marker field are GM-only.
+   The guards are pure and live in `src/canvas/regions/interactableRegionFlags.js`.
 
 ### Gathering-Task Node State — linked to the task by default, optionally unlinked/independent (issue 302)
 
@@ -4269,7 +4384,7 @@ It is recorded here so that this gate is not read as making it safe.
 The mutation-time door recorded here previously — the flag cleanup reachable from recipe deletion, bulk recipe deletion, the public orphaned-flag entry point, compendium re-import, and system-scoped state cleanup — is now inside the requirement, per the prune-kind scoping above.
 
 **Distinguished from _membership basis_.**
-`ui-integration/spec.md` uses _basis_ only as a qualified noun — **membership basis** (`ui-integration/spec.md:1356`), **routing basis** (`:2110`), **disabled-action basis** (`:2960`) — and in each of those it names the RULE by which something is resolved.
+The UI surface specs use _basis_ only as a qualified noun — **membership basis** (`ui-system-studio/spec.md` _Books & Scrolls Surface_), **routing basis** (`ui-entity-editors/spec.md` _Step Editor_), **disabled-action basis** (`ui-crafting-app/spec.md` _Player Salvage Surface_) — and in each of those it names the RULE by which something is resolved.
 _Valid Id Basis_ names the DATA a decision rests on, which is a different sense of the same noun, so the qualifier is mandatory here too and the bare noun is never used for this concept.
 
 ## Runtime Read Indexes and Revision Tokens
@@ -4477,6 +4592,45 @@ That is a property of the knowledge gate rather than an audience-dependent deriv
 
 The prohibition on exact evaluation is also enforced structurally: the projection accepts VALUES — a definition, a system, a snapshot, an access result — and never a manager or a listing builder, so there is no collaborator present to call either function on.
 Tests MUST cover the counted invariant over a run of N summaries, and MUST prove the counter non-vacuous rather than reporting a green baseline forever.
+
+## Companion Operation Record
+
+One versioned Companion Operation Record is the durable authority for an accepted companion operation.
+It contains the operation id, immutable canonical plan, operation state, revision, decision and effect slots, evidence, final outcome, audit timestamps and archive visibility.
+No separate deduplication flag exists that could disagree with this record.
+Unknown versions, unknown structural fields, malformed JSON or slots that do not correspond one-for-one and in plan order fail closed.
+
+An accepted record is the exact revision-zero initial snapshot: accepted and updated timestamps are equal, every decision and effect is pending, all value, evidence, waiver and outcome fields are null, and both archive fields are null.
+Every later state has a positive safe-integer revision, and one successful serialized mutation advances it once.
+Duplicate observation, idempotent archive repetition and failed persistence do not advance revision.
+Finite timestamps are injected audit-only wall-clock values and never arbitrate acceptance, freshness, execution election or cross-client ordering; they need not increase across clients.
+
+A pending decision has null value and evidence, while a resolved decision has non-null saved value and evidence; false, zero and the empty string are valid saved JSON values.
+A pending effect has null evidence and waiver.
+Applied, known-failure and review-required effects require non-null durable evidence; an applying effect may retain evidence but has no waiver.
+A waiver is present if and only if the effect is waived and records a nonblank user, finite timestamp and nonblank reason.
+An unresolved decision dependency permits its effect only to remain pending or be waived.
+
+Nonterminal blocker precedence is review-required, known failure, awaiting a decision, then pending.
+`reviewRequired` requires a review-required effect; `failed` requires a known-failure effect and no review-required effect; `awaitingDecision` requires an unresolved decision needed by an unsettled effect and no review-required, known-failure or applying effect; `pending` is the remaining nonterminal state.
+Every nonterminal outcome is null.
+`completed` requires every effect applied, every decision needed by an applied effect resolved, no waiver and a non-null outcome.
+`completedWithOmissions` requires every effect applied or waived, at least one audited waiver, every decision needed by an applied effect resolved and a non-null outcome.
+
+Only terminal records may be archived.
+Archive metadata is either two nulls or a finite `hiddenAt` paired with a nonblank `hiddenBy`.
+The first successful archive writes that pair and advances revision; later archive requests return the stored record unchanged.
+There is no erase or unarchive transition, and archival cannot rewrite identity, plan, decisions, effect evidence or outcome.
+
+The record is stored on one embedded `JournalEntryPage` whose id is the operation id, beneath a resolved private ledger.
+Acceptance first reads that exact parent and page authoritatively; a valid existing record answers duplicate or conflict without issuing a normal-retry create.
+Only a proven absent page in a present readable ledger permits `createEmbeddedDocuments('JournalEntryPage', ..., { keepId: true })`, preserving embedded-id uniqueness as the race boundary.
+A missing parent, unreadable response, malformed flag, rejected write without conclusive readback, empty or cancelled write result, wrong returned id or unverified acknowledgement fails closed.
+After an ambiguous create or archive write, only authoritative readback proving the stored state may report success.
+
+Every input and output boundary returns a detached snapshot, including the accepted plan captured before the first awaited write.
+Changing caller input while persistence is pending or changing a returned record cannot alter stored state or later plan comparison.
+The adapter claims neither a V13 compare-and-swap nor a transaction across documents; runtime execution serialization, claims, effects and public methods belong to later delivery increments.
 
 ## Behavioural Ownership
 

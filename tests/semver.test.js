@@ -8,13 +8,7 @@ import {
   parseSemver
 } from '../scripts/lib/semver.js';
 
-/**
- * `foundryIsNewerVersion` is a port of Foundry's `isNewerVersion`, NOT a SemVer comparator.
- * These cases pin the quirks that make the three-channel release model work; if one of them
- * starts failing, the port has been "fixed" into something Foundry does not do.
- *
- * Each case: [target (v1), reference (v0), expected, why].
- */
+/** `foundryIsNewerVersion` is a port of Foundry's `isNewerVersion`, NOT a SemVer comparator. */
 const FOUNDRY_CASES = [
   // The load-bearing case: a prerelease has MORE dot-separated parts, so it sorts ABOVE its
   // release. This is what keeps a private beta cohort on the private feed.
@@ -26,8 +20,7 @@ const FOUNDRY_CASES = [
   ['1.5.1', '1.5.0-beta.7', true, 'a newer patch beats a soaking prerelease'],
 
   // The stall is a rollover in the part GLUED to the prerelease suffix, NOT "a patch rollover":
-  // part 3 is compared as a STRING ("10-beta" < "9-beta"). A pure-stable channel can never stall
-  // ('1.4.10' > '1.4.9'), and neither counter rolls over badly on its own — see the pairs below.
+  // part 3 is compared as a STRING ("10-beta" < "9-beta").
   ['1.4.10-beta.1', '1.4.9-beta.3', false, 'string compare on a suffixed part; 10 loses to 9'],
   ['1.4.10', '1.4.9', true, 'a pure-stable channel can never stall — no suffix to glue to'],
   ['1.5.0-beta.10', '1.5.0-beta.9', true, 'the beta counter is its own dot-part; it compares numerically'],
@@ -43,17 +36,19 @@ const FOUNDRY_CASES = [
   ['1.4.0', '1.3.9', true, 'newer minor'],
   ['1.10.0', '1.9.0', true, 'numeric compare, not lexical, on unsuffixed parts'],
 
+  // The registry identifier is bare (issue #1945): a `v` string-compares its first part.
+  ['1.9.7', 'v1.9.6', false, 'the hazard: a prefixed older version outranks a bare newer one'],
+  ['v1.9.6', '1.9.7', true, 'and the prefixed older version reads as newer'],
+  ['1.9.7', '1.9.6', true, 'bare to bare orders numerically'],
+  ['1.10.0', '1.9.6', true, 'bare to bare orders numerically across a minor rollover'],
+
   // Equal is never newer.
   ['1.4.0', '1.4.0', false, 'identical versions are not newer'],
   ['1.4.0-rc.3', '1.4.0-rc.3', false, 'identical prereleases are not newer'],
 
-  // DRIFT GUARD for the collapsed `if` in the comparison loop (review of PR for issue 627, round
-  // 1: two reviewers independently claimed upstream writes the string comparison as `else if` and
-  // that the collapse therefore diverges — it does not; upstream is a plain `if`). These two
-  // cases are the ones that WOULD flip if an `else` were ever "restored": they only reach the
-  // string comparison BECAUSE the numeric branch fell through on numerically-equal parts. Note
-  // the asymmetry — it is real, and both expectations were taken from the real Foundry function,
-  // not derived by hand.
+  // DRIFT GUARD for the collapsed `if` in the comparison loop (review of PR for issue 627, round 1:
+  // two reviewers independently claimed upstream writes the string comparison as `else if` and that
+  // the collapse therefore diverges — it does not; upstream is a plain `if`).
   ['1.04.0', '1.4.0', false, 'numerically equal parts fall through to a string compare'],
   ['1.4.0', '1.04.0', true, 'and that string compare is asymmetric'],
 
@@ -63,9 +58,8 @@ const FOUNDRY_CASES = [
   // swapped for a plausible-looking one and this whole suite would stay green.
   ['1.4.0x10', '1.4.9', true, 'Foundry coerces the hex part to 16; a /^\\d+$/ predicate would not'],
 
-  // Nullish guards — copied verbatim, and NOT inverted. An absent target is never newer; an
-  // absent reference is beaten by anything. Callers must branch on an absent channel head
-  // BEFORE calling this, not rely on it to mean "nothing published yet".
+  // Nullish guards — copied verbatim, and NOT inverted. An absent target is never newer; an absent
+  // reference is beaten by anything.
   [null, '1.4.0', false, 'an absent target is never newer'],
   [undefined, '1.4.0', false, 'an absent target is never newer'],
   ['1.4.0', null, true, 'anything beats an absent reference'],
@@ -87,11 +81,7 @@ for (const [v1, v0, expected, why] of FOUNDRY_CASES) {
   });
 }
 
-/**
- * Foundry's `Number.isNumeric` is its own extension, not `Number.isFinite`. Coercion is what
- * makes a whitespace string and a hex literal numeric while an empty string is not — and the
- * comparator branches on exactly this predicate.
- */
+/** Foundry's `Number.isNumeric` is its own extension, not `Number.isFinite`. */
 const IS_NUMERIC_CASES = [
   ['1', true],
   [1, true],
@@ -127,9 +117,8 @@ const SEMVER_CASES = [
   ['1.4.0-beta.1', '1.4.0-rc.1', -1],
   ['1.4.0-alpha.1', '1.4.0-beta.1', -1],
   ['1.4.0-beta.1', '1.4.0-beta.1.1', -1],
-  // Build metadata is refused outright, not parsed-and-ignored: nothing we publish carries it,
-  // and matching it pushed the pattern past Sonar's regex-complexity limit. `null` = no opinion,
-  // which is the correct answer from a comparator that only ever annotates a report.
+  // Build metadata is refused outright, not parsed-and-ignored: nothing we publish carries it, and
+  // matching it pushed the pattern past Sonar's regex-complexity limit.
   ['1.4.0+build.1', '1.4.0', null],
   ['1.4.0', '1.4.0+build.1', null],
   ['not-a-version', '1.4.0', null],
@@ -143,11 +132,7 @@ for (const [a, b, expected] of SEMVER_CASES) {
   });
 }
 
-/**
- * The two comparators DISAGREE, on purpose. Pin the disagreements: `foundryIsNewerVersion` is the
- * one the player's Foundry client runs, so it is the only one allowed to gate a publish, and
- * `compareSemver` exists to report the divergence — never to decide it.
- */
+/** The two comparators DISAGREE, on purpose. */
 const DISAGREEMENT_CASES = [
   ['1.5.0-beta.7', '1.5.0'],
   ['1.4.10-beta.1', '1.4.9-beta.3']

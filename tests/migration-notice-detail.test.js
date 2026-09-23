@@ -1,9 +1,4 @@
-/**
- * MIGRATION TOASTS STAY CONCISE AND THEIR DETAIL GOES TO THE CONSOLE (issue 1737).
- *
- * The ceiling is mechanical because the defect was: a permanent `1.34.0` toast grew to about 1,100
- * characters one reasonable clause at a time, and nothing measured it.
- */
+/** MIGRATION TOASTS STAY CONCISE AND THEIR DETAIL GOES TO THE CONSOLE (issue 1737). */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -46,11 +41,7 @@ function migrationLeaves(node = LANG.FABRICATE.Migration, prefix = '') {
   });
 }
 
-/**
- * Leaves that are not toast copy. `Recovery.*` renders in a DialogV2, `*Detail` is console copy,
- * and `IdentityDrift` is composed by a tested builder but never posted: the drift report is
- * console-only (maintainer, 2026-09-06).
- */
+/** Leaves that are not toast copy. */
 function isToastLeaf(path) {
   return !path.startsWith('Recovery.') && !path.endsWith('Detail') && !path.startsWith('WorldScopeEntities.IdentityDrift');
 }

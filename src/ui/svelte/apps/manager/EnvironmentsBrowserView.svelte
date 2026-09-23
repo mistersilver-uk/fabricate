@@ -2,7 +2,7 @@
 <script>
   import Field from '../../components/Field.svelte';
   import Chip from '../../components/Chip.svelte';
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
   import { anchoredPopover, hostRelativePopoverLayout } from '../../actions/anchoredPopover.js';
@@ -20,13 +20,15 @@
   import {
     DEFAULT_BROWSER_PAGE_SIZE,
     createEnvironmentsBrowserState,
-  } from '../../../../utils/managerBrowserViewState.js';
+  } from '../../../model/managerBrowserViewState.js';
+  import { createBrowserListState, createBrowserPageWindow } from './browserListState.svelte.js';
   import GatheringEconomyView from './GatheringEconomyView.svelte';
   import GatheringPartiesTab from './GatheringPartiesTab.svelte';
   import IconButton from '../../components/IconButton.svelte';
   import ActionMenu from '../../components/ActionMenu.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import Select from '../../components/Select.svelte';
 
   let {
     environments = [],
@@ -123,16 +125,11 @@
     gatheringEventsBrowserState = $bindable(null),
   } = $props();
 
-  // ── THE BROWSE VIEW-STATE IS LIFTED (issue 1438) ──────────────────────────────────────
-  // Search, the four filter axes, the page AND the system-switch sentinel live on one object
-  // the manager root owns and binds through `browserState`. Opening an environment, a task or
-  // an encounter switches `currentView` to that editor route, which unmounts this component;
-  // held locally, every control was reset by the trip out and back. The SENTINEL comes too: a
-  // component-local one re-initialises to '' on the remount, so the effect below would read
-  // the return as a system switch and wipe the state the lift exists to preserve.
-  //
-  // The vocabulary ADD-FORM inputs below are deliberately NOT lifted. A half-typed biome name
-  // is one sitting's work, not a filter, and it is still cleared by a system switch.
+  // The browse view-state is lifted (issue 1438): search, the four filter axes, the page and the
+  // system-switch sentinel live on one object the root owns and binds, because opening an editor
+  // route unmounts this component and a component-local sentinel would re-initialise to '' and
+  // read the return as a switch. The vocabulary add-form drafts below stay local — a half-typed
+  // biome name is one sitting's work — and `onSystemSwitch` clears them.
   let ownBrowserState = $state(createEnvironmentsBrowserState());
   const ui = $derived(browserState ?? ownBrowserState);
 
@@ -203,23 +200,30 @@
     },
   ];
 
+  // `pageIndex` is absent from `resetAxes`: these resets only widen the corpus, so a GM stays put.
+  const list = createBrowserListState({
+    state: () => ui,
+    resetAxes: {
+      searchTerm: '',
+      statusFilter: 'all',
+      selectionFilter: 'all',
+      riskFilter: 'all',
+      biomeFilter: 'all',
+    },
+    onSystemSwitch: () => {
+      weatherInput = '';
+      timeOfDayInput = '';
+      biomeInput = '';
+      weatherIconInput = defaultConditionIcon('weather');
+      timeOfDayIconInput = defaultConditionIcon('timeOfDay');
+      biomeIconInput = 'fas fa-tree';
+      biomeColorTokenInput = 'sage';
+      biomeCustomColorInput = '';
+      openBiomeColorPickerId = '';
+    },
+  });
   $effect(() => {
-    if (selectedSystemId === ui.systemId) return;
-    ui.searchTerm = '';
-    ui.statusFilter = 'all';
-    ui.selectionFilter = 'all';
-    ui.riskFilter = 'all';
-    ui.biomeFilter = 'all';
-    weatherInput = '';
-    timeOfDayInput = '';
-    biomeInput = '';
-    weatherIconInput = defaultConditionIcon('weather');
-    timeOfDayIconInput = defaultConditionIcon('timeOfDay');
-    biomeIconInput = 'fas fa-tree';
-    biomeColorTokenInput = 'sage';
-    biomeCustomColorInput = '';
-    openBiomeColorPickerId = '';
-    ui.systemId = selectedSystemId;
+    list.syncSystem(selectedSystemId);
   });
 
   const environmentList = $derived(environments || []);
@@ -261,6 +265,43 @@
       )
     )
   );
+  // The toolbar's four filter vocabularies, each label carried verbatim from the `<option>` text it
+  // replaced (issue 1510).
+  const statusSelectOptions = $derived([
+    {
+      value: 'all',
+      label: text('FABRICATE.Admin.Manager.Environment.StatusAll', 'All environments'),
+    },
+    { value: 'active', label: text('FABRICATE.Admin.Manager.StatusActive', 'Active') },
+    { value: 'disabled', label: text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') },
+    { value: 'dirty', label: text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved') },
+    { value: 'invalid', label: text('FABRICATE.Admin.Manager.Environment.Invalid', 'Invalid') },
+  ]);
+  const selectionSelectOptions = $derived([
+    { value: 'all', label: text('FABRICATE.Admin.Manager.Environment.SelectionAll', 'All modes') },
+    {
+      value: 'targeted',
+      label: text('FABRICATE.Admin.Environments.SelectionTargeted', 'Targeted'),
+    },
+    { value: 'blind', label: text('FABRICATE.Admin.Environments.SelectionBlind', 'Blind') },
+  ]);
+  const riskSelectOptions = $derived([
+    { value: 'all', label: text('FABRICATE.Admin.Manager.Environment.RiskAll', 'All risks') },
+    { value: 'safe', label: text('FABRICATE.Admin.Manager.Environment.RiskSafe', 'Safe') },
+    {
+      value: 'hazardous',
+      label: text('FABRICATE.Admin.Manager.Environment.RiskHazardous', 'Hazardous'),
+    },
+    { value: 'unsafe', label: text('FABRICATE.Admin.Manager.Environment.RiskUnsafe', 'Unsafe') },
+    {
+      value: 'extreme',
+      label: text('FABRICATE.Admin.Manager.Environment.RiskExtreme', 'Extreme'),
+    },
+  ]);
+  const biomeSelectOptions = $derived([
+    { value: 'all', label: text('FABRICATE.Admin.Manager.Environment.BiomeAll', 'All biomes') },
+    ...biomeOptions.map((biome) => ({ value: biome, label: prettifyTag(biome) })),
+  ]);
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
   const filteredEnvironments = $derived(
     environmentList.filter((environment) => {
@@ -297,14 +338,11 @@
       riskFilter !== 'all' ||
       biomeFilter !== 'all'
   );
-  const paginatedEnvironments = $derived(
-    filteredEnvironments.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
-  );
+  const page = createBrowserPageWindow({ state: () => ui, rows: () => filteredEnvironments });
+  const paginatedEnvironments = $derived(page.pageRows);
 
   $effect(() => {
-    if (pageIndex > 0 && pageIndex * pageSize >= filteredEnvironments.length) {
-      ui.pageIndex = 0;
-    }
+    page.clampPage();
   });
 
   function text(key, fallback) {
@@ -648,6 +686,15 @@
   function conditionValues(setting) {
     return Array.isArray(setting?.values) ? setting.values : [];
   }
+
+  function conditionSelectOptions(setting) {
+    return conditionValues(setting).map((option) => ({
+      value: conditionId(option),
+      label: conditionLabel(option),
+    }));
+  }
+
+  const instanceId = $props.id();
 </script>
 
 <main
@@ -674,97 +721,61 @@
           )}
           ariaLabel={text('FABRICATE.Admin.Manager.Environment.SearchLabel', 'Search environments')}
         />
-        <label class="manager-filter">
+        <!-- Spans, not labels: a label forwards a caption click into the trigger and re-opens its
+             panel. Each trigger is named by its own aria-label (issue 1510). -->
+        <span class="manager-filter">
           <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
-          <select
+          <Select
+            size="toolbar"
             value={statusFilter}
-            onchange={(event) => (ui.statusFilter = event.currentTarget.value)}
-            aria-label={text(
+            options={statusSelectOptions}
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.Environment.StatusFilterLabel',
               'Filter environments by status'
             )}
-          >
-            <option value="all"
-              >{text('FABRICATE.Admin.Manager.Environment.StatusAll', 'All environments')}</option
-            >
-            <option value="active">{text('FABRICATE.Admin.Manager.StatusActive', 'Active')}</option>
-            <option value="disabled"
-              >{text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled')}</option
-            >
-            <option value="dirty"
-              >{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</option
-            >
-            <option value="invalid"
-              >{text('FABRICATE.Admin.Manager.Environment.Invalid', 'Invalid')}</option
-            >
-          </select>
-        </label>
-        <label class="manager-filter">
+            onChange={(next) => (ui.statusFilter = next)}
+          />
+        </span>
+        <span class="manager-filter">
           <span>{text('FABRICATE.Admin.Environments.SelectionMode', 'Selection mode')}</span>
-          <select
+          <Select
+            size="toolbar"
             value={selectionFilter}
-            onchange={(event) => (ui.selectionFilter = event.currentTarget.value)}
-            aria-label={text(
+            options={selectionSelectOptions}
+            showTick={false}
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.Environment.SelectionFilterLabel',
               'Filter environments by selection mode'
             )}
-          >
-            <option value="all"
-              >{text('FABRICATE.Admin.Manager.Environment.SelectionAll', 'All modes')}</option
-            >
-            <option value="targeted"
-              >{text('FABRICATE.Admin.Environments.SelectionTargeted', 'Targeted')}</option
-            >
-            <option value="blind"
-              >{text('FABRICATE.Admin.Environments.SelectionBlind', 'Blind')}</option
-            >
-          </select>
-        </label>
-        <label class="manager-filter">
+            onChange={(next) => (ui.selectionFilter = next)}
+          />
+        </span>
+        <span class="manager-filter">
           <span>{text('FABRICATE.Admin.Manager.Environment.Risk', 'Risk')}</span>
-          <select
+          <Select
+            size="toolbar"
             value={riskFilter}
-            onchange={(event) => (ui.riskFilter = event.currentTarget.value)}
-            aria-label={text(
+            options={riskSelectOptions}
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.Environment.RiskFilterLabel',
               'Filter environments by risk'
             )}
-          >
-            <option value="all"
-              >{text('FABRICATE.Admin.Manager.Environment.RiskAll', 'All risks')}</option
-            >
-            <option value="safe"
-              >{text('FABRICATE.Admin.Manager.Environment.RiskSafe', 'Safe')}</option
-            >
-            <option value="hazardous"
-              >{text('FABRICATE.Admin.Manager.Environment.RiskHazardous', 'Hazardous')}</option
-            >
-            <option value="unsafe"
-              >{text('FABRICATE.Admin.Manager.Environment.RiskUnsafe', 'Unsafe')}</option
-            >
-            <option value="extreme"
-              >{text('FABRICATE.Admin.Manager.Environment.RiskExtreme', 'Extreme')}</option
-            >
-          </select>
-        </label>
-        <label class="manager-filter">
+            onChange={(next) => (ui.riskFilter = next)}
+          />
+        </span>
+        <span class="manager-filter">
           <span>{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>
-          <select
+          <Select
+            size="toolbar"
             value={biomeFilter}
-            onchange={(event) => (ui.biomeFilter = event.currentTarget.value)}
-            aria-label={text(
+            options={biomeSelectOptions}
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.Environment.BiomeFilterLabel',
               'Filter environments by biome'
             )}
-          >
-            <option value="all"
-              >{text('FABRICATE.Admin.Manager.Environment.BiomeAll', 'All biomes')}</option
-            >
-            {#each biomeOptions as biome (biome)}
-              <option value={biome}>{prettifyTag(biome)}</option>
-            {/each}
-          </select>
-        </label>
+            onChange={(next) => (ui.biomeFilter = next)}
+          />
+        </span>
         <Chip
           >{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}')
             .replace('{shown}', filteredEnvironments.length)
@@ -1117,17 +1128,21 @@
           </header>
           <p class="manager-condition-panel-hint">{conditionHint(condition.kind)}</p>
 
-          <Field as="label" class="manager-condition-current">
-            <span>{conditionCurrentLabel(condition.kind)}</span>
-            <select
-              value={condition.setting.current}
-              onchange={(event) =>
-                updateCurrentCondition(condition.kind, event.currentTarget.value)}
+          <!-- A div host: a label would forward a caption click into the trigger. The caption names
+               it through its id, and the panel may grow past the form rung's 340px ceiling to
+               follow a trigger that fills a one-column card up to the 1120px restack breakpoint
+               (issue 1510). -->
+          <Field as="div" class="manager-condition-current">
+            <span id={`${instanceId}-condition-${condition.kind}`}
+              >{conditionCurrentLabel(condition.kind)}</span
             >
-              {#each conditionValues(condition.setting) as option (conditionId(option))}
-                <option value={conditionId(option)}>{conditionLabel(option)}</option>
-              {/each}
-            </select>
+            <Select
+              value={condition.setting.current}
+              options={conditionSelectOptions(condition.setting)}
+              maxWidth={1120}
+              ariaLabelledBy={`${instanceId}-condition-${condition.kind}`}
+              onChange={(next) => updateCurrentCondition(condition.kind, next)}
+            />
           </Field>
 
           <form

@@ -1,35 +1,4 @@
-/*
- * THE CONVERTED STATUS TONES, ARBITRATED IN A REAL BROWSER, ONCE PER THEME (issue 1506).
- *
- * The 36 status pills across the manager and the player window are chips now, and the tone map
- * says which chip tone each of the retired pill's six draws on. Four of the six were supposed to
- * be a byte-identical reproduction, `subtle` a reproduction of the pill's own default face, and
- * `accent` a deliberate one-property move — its ink from the family base to `--fab-accent-text`,
- * which is an accessibility repair the chip already made and recorded.
- *
- * ── WHY THIS IS NOT A COMPARISON AGAINST THE PILL ───────────────────────────────────────────
- * Because the pill does not survive this change. A gate that compared the two components' scoped
- * blocks would be evidence rather than coverage: green for one commit, then unrunnable forever.
- * That comparison WAS run, while both files existed, and its output is in the PR. What lands is
- * the half that still has both of its sides: the chip's tone rules, and the TOKENS the mapping
- * table says each converted face is made of. So this asks "does `positive` still ink, edge and
- * fill from the success family?" rather than "does `positive` still equal what the pill drew",
- * and it keeps answering that through a token VALUE change, a theme edit or a palette move —
- * while reddening the day a tone rule re-points at a different family.
- *
- * ── WHY A BROWSER, AND WHY PER THEME ────────────────────────────────────────────────────────
- * happy-dom computes no cascade and returns `""` for every `var()`-built value, so a mounted
- * version of this file would compare token NAMES — which is what the plan's table already did by
- * hand, and which cannot see a per-theme divergence. The sweep is per theme because the themes
- * disagree in ways that break the obvious assertions: `foundry-native` flattens all four semantic
- * inks to one value, and two of the seven state `--fab-surface-raised` and `--fab-overlay-light-06`
- * at the same percentage where five do not.
- *
- * The page mirrors production's cascade rather than flattening it: `styles/fabricate.css` is
- * imported by Foundry at `layer(modules)` while a Svelte `css: 'injected'` block lands UNLAYERED
- * and beats it at any specificity, so a fixture that loaded the two flat could prove the wrong
- * winner. `tests/view-lab/cascade.css` is the reference that states it.
- */
+/* THE CONVERTED STATUS TONES, ARBITRATED IN A REAL BROWSER, ONCE PER THEME (issue 1506). */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -44,26 +13,12 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 const chip = scopedComponentCss(resolve(repoRoot, 'src/ui/svelte/components/Chip.svelte'));
 
-/**
- * THE SEVEN THEME ROOTS, read from the sheet rather than typed, so a new theme joins this sweep
- * by existing. Every `--fab-*` this file reads is declared by the root wrapper and not by the
- * sheet import, which is why each probe renders inside one.
- */
+/** THE SEVEN THEME ROOTS, read from the sheet rather than typed. */
 const THEMES = [...sheet.matchAll(/\.fabricate\[data-fabricate-theme='?"([\w-]+)"'?\]/g)].map(
   ([, name]) => name
 );
 
-/**
- * THE FROZEN MAPPING TABLE, as the TOKENS each converted face is made of.
- *
- * `chipTone` is what the map sends the pill's tone to; the three token names are what that face
- * is required to be built from. `accent` is the one row whose ink is deliberately NOT the family
- * base the retired pill used: `--fab-accent` over `--fab-accent-soft` measures under AA in
- * `ironblood-forge`, and `--fab-accent-text` is the repair. The row records both, and the test
- * below asserts the repair is a real difference rather than a rename. `neutral` is the seventh
- * row and the one the retired pill never declared: only the look-alike vocabulary emitted it, it
- * is the widened domain's ONE non-identical pair, and its move is in the ground, not ink or edge.
- */
+/** THE FROZEN MAPPING TABLE, as the TOKENS each converted face is made of. */
 const MAPPED_FACES = Object.freeze([
   Object.freeze({
     pillTone: 'success',
@@ -106,9 +61,7 @@ const MAPPED_FACES = Object.freeze([
   Object.freeze({
     pillTone: 'neutral',
     chipTone: 'neutral',
-    // The look-alikes declared `--fab-surface-raised` on their own base rule; `is-neutral`
-    // declares no `background` and inherits the base overlay. This is the widened domain's
-    // ONE non-identical pair, and the pair is in the ground rather than in ink or edge.
+    // The look-alikes declared `--fab-surface-raised` on their own base rule.
     ink: '--fab-text-muted',
     edge: '--fab-border',
     fill: '--fab-overlay-light-06',
@@ -154,8 +107,7 @@ function themeBlock(theme) {
       chip.hashClass
     )
   ).join('');
-  // One probe per token the table names, painted with that token and nothing else, so the
-  // comparison is against the TOKEN as this theme resolves it rather than against a literal.
+  // One probe per token the table names, painted with that token and nothing else.
   const tokens = TOKEN_PROBES.map(
     (token) =>
       `<span data-token="${theme}-${token}" style="color:${value(token)};` +
@@ -206,11 +158,7 @@ function tripleOf(attribute, key) {
 }
 
 /**
- * The contrast of an ink composited over this theme's own `--fab-bg-1`, which is the quantity the
- * recessive ladder is ordered by. It is named because two obvious readings are degenerate: five
- * roots state the ladder as one hue at three alphas, `mythwright` states three DIFFERENT opaque
- * hues plus one alpha, and `foundry-native` mixes two base triples — so alpha ties three of four
- * in one theme and a per-channel read ties them in another.
+ * The contrast of an ink composited over this theme's own `--fab-bg-1`.
  *
  * @param {string} ink an `rgb()`/`rgba()` string
  * @param {string} ground an opaque `rgb()` string
@@ -259,7 +207,7 @@ describe('1506 Chip — the converted status faces, per theme', () => {
   for (const theme of THEMES) {
     describe(theme, () => {
       it('DISCRIMINATES: the four semantic faces are pairwise distinct triples', async () => {
-        // The non-vacuity guard, and it is the whole triple rather than the ink: an unresolved
+        // The non-vacuity guard, and it is the whole triple rather than the ink.
         // page reports `rgb(0, 0, 0)` / `rgba(0, 0, 0, 0)` for everything, which would pass every
         // equality below vacuously — while `foundry-native` flattens all four semantic INKS to
         // one value, so an ink-only discriminator would red there on a correct implementation.
@@ -292,10 +240,7 @@ describe('1506 Chip — the converted status faces, per theme', () => {
       }
 
       it('inks accent with the REPAIRED token, which is a real difference here', async () => {
-        // The one converted face that moves a property, and the move is an accessibility repair
-        // rather than a regression: the family base over the 16% soft fill measures under AA in
-        // `ironblood-forge`. Asserted as a difference so a revert to the base reds rather than
-        // reading as a rename.
+        // The one converted face that moves a property.
         const repaired = await tripleOf('data-token', `${theme}---fab-accent-text`);
         const retired = await tripleOf('data-token', `${theme}---fab-accent`);
         assert.notEqual(
@@ -320,11 +265,7 @@ describe('1506 Chip — the converted status faces, per theme', () => {
       });
 
       it('orders the FOUR-rank recessive ink ladder by composited contrast', async () => {
-        // `secondary` names the rule the GM is reading, `neutral` a fact merely present, `subtle`
-        // a quiet non-actionable state, `muted` unavailable — each measurably weaker than the
-        // last. The ORDER is the invariant, never a percentage: five roots state it as one hue at
-        // 74/56/42%, `mythwright` as three opaque hues plus an alpha, `foundry-native` at
-        // 78/60% over a different base triple.
+        // `secondary` names the rule the GM is reading, `neutral` a fact merely present.
         const ground = (await tripleOf('data-token', `${theme}---fab-bg-1`))[2];
         const contrasts = [];
         for (const token of INK_LADDER) {

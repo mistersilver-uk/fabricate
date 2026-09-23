@@ -4,35 +4,16 @@ import { describe, it, before, after, afterEach } from 'node:test';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { assertNoElement } from '../helpers/svelte-dom.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-/**
- * World > Rules & Resources > Modifiers, mounted on its own.
- *
- * This is the modifier half of the settings-list ergonomics contract (issue 768) plus the
- * whole issue 1096 editor round. Both used to be asserted through a `SystemEditView` mount in
- * `system-edit-list-ergonomics-mounted`, because that page rendered the modifier list, the
- * character-prerequisite list and the coin ladder together. Issue 1278 took the ladder out to
- * `world-currency-list-ergonomics-mounted`; issue 1311 takes these two out the same way, so
- * this suite and its `world-prerequisites-list-ergonomics-mounted` sibling replace that file
- * rather than mounting three components from one.
- *
- * Two things did NOT come across, and their absence is asserted here rather than left implied:
- *
- * - The whole-section collapse. `WorldModifiersTab` is a route, not one card among siblings,
- *   so there is nothing for a collapse to make room for and the control is gone from the
- *   product. The guard below is the currency page's, restated for this list.
- * - The end-to-end cross-copy. The page hands the RAW entry up and stops; the destination add,
- *   the navigation and the copy announcement are the manager root's, because the destination
- *   is a sibling route. What is asserted here is the handoff. The round trip belongs to
- *   `manager-mounted`.
- */
+/** World > Rules & Resources > Modifiers, mounted on its own. */
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-modifiers-ergonomics-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
@@ -41,16 +22,17 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
     'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/components/stepperLabels.js',
     // The expression suggestion chips' derivation (issue 1096) and the per-Foundry-system
     // preset bundle it reads.
     'src/config/modifierExpressionSuggestions.js',
     'src/config/gatheringCharacterModifierPresets.js',
-    // The unified modifier library's bounds pair and roll classification (issue 1117), and
-    // the closure the resolver drags behind it.
+    // The unified modifier library's bounds pair and roll classification (issue 1117).
     'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
     'src/systems/salvageCheckUsability.js',
@@ -67,10 +49,11 @@ const harness = createMountedComponentHarness({
     // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled) rather
     // than failing it, so every one is named.
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
@@ -102,8 +85,7 @@ const MODIFIERS = Object.freeze([
   { id: 'mod-lore', label: 'Lore', icon: 'fa-solid fa-book', expression: '@skills.lore.value' },
 ]);
 
-// happy-dom does not implement scrollIntoView; stub it after the harness builds the window so
-// the router-requested open's "reveal the target" half is observable.
+// happy-dom does not implement scrollIntoView.
 let scrollCalls = [];
 before(async () => {
   await harness.setup();
@@ -130,10 +112,7 @@ describe('world modifiers list ergonomics (mounted, issue 768)', () => {
     assert.equal(summary.getAttribute('aria-expanded'), 'false', 'starts collapsed');
     assert.ok(!row.querySelector('.manager-modifier-body'), 'no editor body when collapsed');
 
-    // The label and the inline expression render on the summary, VERBATIM. The row used to
-    // strip the leading @, which agreed with an editor that drew the sigil as its own cap; the
-    // field is a plain input now (maintainer ruling, issue 1096) and the GM types the @
-    // themselves, so a list that hid it would show a value nobody wrote.
+    // The label and the inline expression render on the summary.
     assert.ok(
       row.querySelector('.manager-modifier-label').textContent.includes('Herbalism'),
       'label shows'
@@ -179,11 +158,7 @@ describe('world modifiers list ergonomics (mounted, issue 768)', () => {
   });
 
   it('carries NO whole-section collapse, because collapsing a whole route only blanks it', async () => {
-    // On the Settings tab the chevron yielded space to the sibling cards below it — the
-    // prerequisite list and the coin ladder. As a route there is nothing to make room for, so
-    // the same control would hide the page and leave a bare header row. This is the assertion
-    // that replaced `system-edit-list-ergonomics`' "collapses a whole section on its header
-    // toggle": the behaviour is gone from the product, not merely moved.
+    // On the Settings tab the chevron yielded space to the sibling cards below it.
     const root = await harness.mount({ library: MODIFIERS });
 
     assertNoElement(
@@ -198,10 +173,7 @@ describe('world modifiers list ergonomics (mounted, issue 768)', () => {
   });
 
   it('hands the RAW modifier up on Copy to prerequisites, and completes nothing itself', async () => {
-    // The whole point of the split. Across two sibling routes a copy is a NAVIGATION, which a
-    // page component cannot perform, so this page's entire contribution is the handoff: no
-    // destination write, no route change, no announcement. The round trip — mapping, add,
-    // navigate, open — is the manager root's and is asserted there.
+    // The whole point of the split. Across two sibling routes a copy is a NAVIGATION.
     const copied = [];
     const root = await harness.mount({
       library: MODIFIERS,
@@ -361,9 +333,7 @@ describe('world modifiers list ergonomics (mounted, issue 768)', () => {
     );
   });
 
-  // An inverted or unrollable pair makes the entry contribute nothing, and the row says so
-  // while COLLAPSED — a fault only visible inside an open editor is a fault a GM scanning the
-  // list cannot see.
+  // An inverted or unrollable pair makes the entry contribute nothing.
   it('flags a blocking bounds fault on the collapsed row, naming the cause', async () => {
     const root = await harness.mount({
       library: [
@@ -422,10 +392,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     return { root, row };
   }
 
-  // DEFECT 1. `Delete modifier` and `Done` shipped a BARE `manager-button`: the destructive
-  // verb was painted as a neutral one, while the identical verb in the Tool Studio is danger.
-  // The roles now come from the shared primitive, so the class is emitted from ONE place
-  // instead of remembered at each call site.
+  // DEFECT 1. `Delete modifier` and `Done` shipped a BARE `manager-button`.
   it('gives Delete the danger role and Done the ghost role, through the shared primitive', async () => {
     const { row } = await openEditor();
 
@@ -440,8 +407,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
       'Done is the quiet verb, as Back is in the Tool Studio'
     );
 
-    // Both go through `ManagerButton`, which is what stops the pair drifting apart again: the
-    // primitive's own class is present on each.
+    // Both go through `ManagerButton`, which is what stops the pair drifting apart again.
     for (const [name, button] of [
       ['Delete modifier', del],
       ['Done', done],
@@ -477,9 +443,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     );
   });
 
-  // DEFECT 2. Icon, label, minimum and maximum on ONE line, ahead of the expression. The ORDER
-  // is the assertion, not the presence: every one of these elements existed before, just
-  // stacked into three rows.
+  // DEFECT 2. Icon, label, minimum and maximum on ONE line.
   it('puts icon, label, minimum and maximum on one line, before the expression', async () => {
     const { row } = await openEditor();
 
@@ -516,9 +480,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
       'and it is not squeezed onto the same line as its three neighbours'
     );
 
-    // The bounds hint explains the BOUNDS ("empty is not zero"), so it reads directly under
-    // them. Below the expression and its suggestion chips it attached itself to the one field
-    // it says nothing about.
+    // The bounds hint explains the BOUNDS ("empty is not zero").
     const hint = row.querySelector('.manager-modifier-bounds-hint');
     assert.ok(hint, 'the hint is still rendered');
     assert.ok(
@@ -630,9 +592,6 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
   // NO RE-PREPENDING (maintainer ruling, issue 1096). This is the half of the ruling no
   // rendered assertion can reach: the field used to re-add `@` to a bare roll-data path on
   // every keystroke, so a GM who typed `abilities.str.mod` got `@abilities.str.mod` stored.
-  // What is typed is now what is stored, which is exactly why the placeholder and the hint
-  // beside the field have to teach the sigil — and why they are asserted here too, so the
-  // requirement and the thing that teaches it cannot drift apart.
   it('stores the expression exactly as typed, adding no sigil of its own', async () => {
     const patches = [];
     const { row } = await openEditor({
@@ -670,9 +629,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     chip.dispatchEvent(clickEvent());
     await flushRender();
 
-    // A BOOLEAN, never `assert.equal(activeElement, expression)`: on failure node:assert
-    // serialises both mounted elements to build its diff and walks happy-dom's circular tree
-    // until the heap dies, which surfaces as a hung `# cancelled` suite with no message.
+    // A BOOLEAN, never `assert.equal(activeElement, expression)`.
     assert.ok(
       globalThis.window.document.activeElement === expression,
       'the field the chip filled in takes focus, so the next keystroke continues the expression'

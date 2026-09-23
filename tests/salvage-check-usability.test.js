@@ -1,18 +1,6 @@
 /**
- * `salvageCheckUsability` — the SINGLE derivation of "which salvage check is active, and
- * is it usable" (issue 859).
- *
- * The pair `(salvageResolutionMode, salvageCraftingCheck[mode].rollFormula)` was being
- * derived independently in five places, and they had ALREADY drifted: the engine's check
- * runner tested the formula with raw truthiness while the builder and the whole crafting
- * path tested it trimmed, so a whitespace-only formula rolled `"   "` for the engine and
- * read as "no check" for the player's panel.
- *
- * ## The no-op half comes FIRST, deliberately
- *
- * Most of this extraction must change nothing. Pinning the unchanged answers before the
- * two intended changes is what makes the changes legible as changes rather than as
- * whatever the new module happens to return.
+ * `salvageCheckUsability` — the SINGLE derivation of "which salvage check is active, and is it
+ * usable" (issue 859). Most of this extraction must change nothing.
  */
 
 import { describe, it } from 'node:test';
@@ -28,10 +16,8 @@ const systemFor = (mode, rollFormula, extra = {}) => ({
 
 const MODES = ['simple', 'routed', 'progressive'];
 
-// ---------------------------------------------------------------------------
-// THE NO-OP HALF. Every tuple below is what `InventoryListingBuilder._buildSalvage`
-// already computed before the extraction, per mode, with and without a formula.
-// ---------------------------------------------------------------------------
+// THE NO-OP HALF. Every tuple below is what `InventoryListingBuilder._buildSalvage` already
+// computed before the extraction, per mode, with and without a formula.
 
 describe('resolveSalvageCheck: the builder tuple, unchanged, for every mode', () => {
   for (const mode of MODES) {
@@ -106,13 +92,11 @@ describe('resolveSalvageCheck: the builder tuple, unchanged, for every mode', ()
 });
 
 describe('hasCheckFormula: the promoted predicate answers identically on every sub-config shape', () => {
-  // The predicate was promoted out of `CraftingEngine._hasCheckFormula`, and its call
-  // sites have MOVED since: issue 1094 replaced the `mode === 'alchemy'` guards of
-  // `_runCraftingCheck` with `resolveActiveCraftingCheckFormula(...).checkUsable`, so the
-  // only remaining caller in `src/` is `resolveSalvageCheck` — the mainline crafting
-  // readers now share the POST-SHIM selector rather than raw truthiness.
-  // The sub-config shapes below are kept as the predicate's own contract table (authored /
-  // empty / absent key / null / undefined), which is what a caller anywhere depends on.
+  // The predicate was promoted out of `CraftingEngine._hasCheckFormula`, and its call sites have
+  // MOVED since: issue 1094 replaced the `mode === 'alchemy'` guards of `_runCraftingCheck` with
+  // `resolveActiveCraftingCheckFormula(...).checkUsable`, so the only remaining caller in `src/` is
+  // `resolveSalvageCheck` — the mainline crafting readers now share the POST-SHIM selector rather
+  // than raw truthiness.
   const CHECK_CONFIGS = [
     {
       label: 'simple slot, authored',
@@ -148,9 +132,7 @@ describe('hasCheckFormula: the promoted predicate answers identically on every s
   });
 
   it('is the SAME predicate `resolveSalvageCheck` gates `checkUsable` on', () => {
-    // One notion of a "usable" check, shared by the crafting and salvage paths. Two
-    // predicates that agreed today and drifted tomorrow is the defect this promotion
-    // closes, so the agreement is asserted rather than assumed.
+    // One notion of a "usable" check, shared by the crafting and salvage paths.
     for (const rollFormula of ['1d20', '', '   ', '\t\n', '0', undefined, null]) {
       assert.equal(
         resolveSalvageCheck(systemFor('simple', rollFormula)).checkUsable,
@@ -161,16 +143,13 @@ describe('hasCheckFormula: the promoted predicate answers identically on every s
   });
 });
 
-// ---------------------------------------------------------------------------
 // THE TWO STATED BEHAVIOUR CHANGES.
-// ---------------------------------------------------------------------------
 
 describe('change 1 — a WHITESPACE-ONLY formula is not a check', () => {
   it('reads as unusable, bringing salvage into line with crafting', () => {
-    // Before: `_runSalvageCraftingCheck` used raw truthiness, so `"   "` reached `Roll`,
-    // threw inside the runner, and surfaced as a rolled (CONSUMING) failure — while the
-    // player's panel, which trimmed, showed no check at all. Unifying on trimmed is
-    // alignment with the crafting path, not a new global constraint.
+    // Before: `_runSalvageCraftingCheck` used raw truthiness, so `" "` reached `Roll`, threw inside
+    // the runner, and surfaced as a rolled (CONSUMING) failure — while the player's panel, which
+    // trimmed, showed no check at all.
     for (const rollFormula of ['   ', '\t', '\n', ' \t\n ']) {
       const resolved = resolveSalvageCheck(systemFor('simple', rollFormula));
       assert.equal(resolved.checkUsable, false, JSON.stringify(rollFormula));
@@ -198,14 +177,12 @@ describe('change 1 — a WHITESPACE-ONLY formula is not a check', () => {
 });
 
 describe('change 2 — an unsupported mode, BOTH halves of the contract', () => {
-  // The two halves do different jobs, and a test asserting only the flag passes against
-  // an implementation that returns the raw token and silently breaks the builder:
-  //
-  //  - `mode: 'simple'` is the COERCION that keeps `_buildSalvage`'s projection
-  //    byte-identical, so a display-only consumer renders something rather than nothing;
-  //  - `unsupportedMode: true` is what the three MUTATING engine readers guard on BEFORE
-  //    reading `mode`, because acting on the coerced `simple` would award
-  //    `resultGroups[0]` for a configuration `validateSalvage` already reports invalid.
+  // The two halves do different jobs, and a test asserting only the flag passes against an
+  // implementation that returns the raw token and silently breaks the builder:. `mode: 'simple'` is
+  // the COERCION that keeps `_buildSalvage`'s projection byte-identical, so a display-only consumer
+  // renders something rather than nothing; - `unsupportedMode: true` is what the three MUTATING
+  // engine readers guard on BEFORE reading `mode`, because acting on the coerced `simple` would
+  // award `resultGroups[0]` for a configuration `validateSalvage` already reports invalid.
   const UNSUPPORTED = [
     'tiered',
     'mapped',
@@ -247,10 +224,8 @@ describe('change 2 — an unsupported mode, BOTH halves of the contract', () => 
   });
 
   it('is a DEFENSIVE GUARD, not a fix — every supported token clears it', () => {
-    // The salvage token normalizer and the 1.4.0 migration rewrite the legacy spellings,
-    // so a token outside the set is a config defect rather than a legacy value. The same
-    // posture `ResolutionModeService.validateSalvage` takes, which guards the identical
-    // case despite the normalizer claiming to have removed it.
+    // The salvage token normalizer and the 1.4.0 migration rewrite the legacy spellings, so a token
+    // outside the set is a config defect rather than a legacy value.
     for (const mode of MODES) {
       assert.equal(resolveSalvageCheck(systemFor(mode, '1d20')).unsupportedMode, false, mode);
     }
@@ -286,12 +261,8 @@ describe('resolveSalvageCheck is pure', () => {
   });
 });
 
-// ── the retirement shim, applied BEFORE the emptiness test (issue 1094) ─────
-//
-// These exist because rewriting `resolveSalvageCheck` to skip the shim entirely left the
-// whole 622-test file green. Salvage never AUTHORED the retired placeholder, so nothing
-// else in this suite could notice — but an imported bundle can carry one, and the whole
-// point of the shim here is that readiness and the roll path cannot disagree about it.
+// the retirement shim, applied BEFORE the emptiness test (issue 1094). These exist because
+// rewriting `resolveSalvageCheck` to skip the shim entirely left the whole 622-test file green.
 describe('resolveSalvageCheck applies the retirement shim before its emptiness test', () => {
   it('reports a placeholder-only formula as NOT usable', () => {
     const resolved = resolveSalvageCheck(systemFor('simple', '@craftingmod'));

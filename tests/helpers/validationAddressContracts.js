@@ -1,36 +1,6 @@
 /**
- * The two SOURCE-READ contracts every validation row action has to satisfy, written once
- * (issue 1517).
- *
- * A validation row carries two independent addresses: `target` — the ROUTE, the tab or activity
- * the editor opens — and `focusTarget` — the CONTROL, the value of the `data-validation-target`
- * attribute the offending control carries once that route is open. Neither half can check the
- * other: a producer emitting an address nothing carries is a View button that changes route and
- * focuses nothing, and no assertion inside the producer can see it.
- *
- * Two suites police that join — `checks-validation-tab.test.js` for the Checks studio and
- * `recipe-item-validation-tab-mounted.test.js` for the recipe-item editor — and before this file
- * existed each carried its own copy of both scans. They are the same scans over different tables,
- * which is what the SonarCloud new-code duplication gate counts: normalised for literals, the
- * copies are one shape. So the SHAPE lives here, parameterised by the producer's table, the
- * destination map, and the nouns each route calls its own steps.
- *
- * WHAT THE CALLER STILL OWNS, deliberately: its own address table location, its own destination
- * map, and its own expected counts. Those are the facts that differ per route and the facts a
- * reader needs to see at the call site; only the machinery moved.
- *
- * THE HAYSTACK, STATED. Every scan reads source text with its COMMENTS STRIPPED, and that is not
- * tidiness: this design documents each address in prose immediately above the code that writes it
- * — the producers name their addresses in a docblock, and the destinations explain their stamp in
- * an HTML comment — so an un-stripped scan would find every address in the sentence explaining it
- * and report a destination as stamped when nothing stamps it. HTML comment blocks are removed
- * here, and the JavaScript/CSS comment forms by the repository's shared, quote-aware
- * `stripComments` — so a `//` inside a string literal is not mistaken for a comment, and the
- * attribute VALUES, which are themselves string literals, survive the strip and are what is read.
- *
- * This file is deliberately NOT named `*.test.js`: `tests/helpers/` is outside the `npm test`
- * glob, so nothing here is collected as a suite. It registers its clauses into whichever suite
- * file calls it.
+ * The two SOURCE-READ contracts every validation row action has to satisfy, written once (issue
+ * 1517).
  */
 
 import assert from 'node:assert/strict';
@@ -46,12 +16,8 @@ const MANAGER_ROOT = 'src/ui/svelte/apps/manager';
 const HTML_COMMENT = /<!--[\s\S]*?-->/gu;
 
 /**
- * Order two strings by code point. Explicit because `sort()`'s default is "stringify, then order by
- * code point", which SonarCloud flags (`javascript:S2871`), and `localeCompare` is locale
- * dependent. Same choice, for the same reason, as `byPath` in `sourceScan.js`.
+ * Order two strings by code point.
  *
- * @param {string} left
- * @param {string} right
  * @returns {number} negative, zero or positive per the `Array#sort` contract
  */
 function byCodePoint(left, right) {
@@ -66,7 +32,6 @@ const NATIVELY_FOCUSABLE = new Set(['input', 'button', 'select', 'textarea']);
  * Read one manager source file with its comments stripped.
  *
  * @param {string} relativePath Path under `src/ui/svelte/apps/manager`.
- * @returns {string}
  */
 export function readManagerSource(relativePath) {
   const text = readFileSync(resolve(repoRoot, `${MANAGER_ROOT}/${relativePath}`), 'utf8');
@@ -74,14 +39,9 @@ export function readManagerSource(relativePath) {
 }
 
 /**
- * The two spellings an address can reach the DOM in. An address may ride a primitive's attribute
- * bag — a drop zone's `hookAttrs.root`, a popover's `triggerData` — and arrive as an object key
- * rather than as a written attribute, so a scan that knew only the written form would report a
- * carried address as missing.
+ * The two spellings an address can reach the DOM in.
  *
  * @param {string} source Stripped destination source.
- * @param {string} address
- * @returns {{ written: boolean, bagged: boolean }}
  */
 function spellingsOf(source, address) {
   return {
@@ -96,7 +56,6 @@ function spellingsOf(source, address) {
  *
  * @param {string} source Stripped source.
  * @param {number} index A position inside the tag — an attribute's own offset.
- * @returns {{element: string, tag: string}}
  */
 function openingTagAt(source, index) {
   const opening = source.slice(0, index).lastIndexOf('<');
@@ -107,22 +66,9 @@ function openingTagAt(source, index) {
 /**
  * Whether an element can really hold focus, as a fault string or null.
  *
- * THE MUTATION THIS EXISTS FOR is the one a mounted assertion cannot see: happy-dom focuses
- * anything — `.focus()` on a bare `<div>` sets `document.activeElement` — so moving a stamp off
- * the field control and onto its wrapper, or deleting a destination panel's `tabindex`, leaves
- * every mounted clause passing while a real browser focuses nothing. The element is therefore read
- * off the SOURCE: either it is one of the tags that take focus unaided, or it declares BOTH the
- * `tabindex` that makes the focus real and the `data-keyboard-focus` that tells Foundry the window
- * is focused — without the second, Space pauses the game and the arrows pan the canvas.
- *
- * SHARED BY THE TWO ELEMENTS THIS FILE READS: the CONTROL an address resolves to, and the PANEL a
- * host falls back to. They are the same question about two elements, and a second copy of the
- * reading is a second place for the pair to become a single check.
- *
  * @param {{element: string, tag: string}} located The opening tag, from {@link openingTagAt}.
  * @param {string} subject What to call it in the message.
  * @param {string} file The file it lives in, for the message.
- * @returns {string|null}
  */
 function focusDeclarationFault({ element, tag }, subject, file) {
   if (NATIVELY_FOCUSABLE.has(tag.toLowerCase())) return null;
@@ -139,9 +85,7 @@ function focusDeclarationFault({ element, tag }, subject, file) {
  * The same question, asked of the control a written stamp rides.
  *
  * @param {string} source Stripped destination source.
- * @param {string} address
  * @param {string} file The destination's path, for the message.
- * @returns {string|null}
  */
 function focusFault(source, address, file) {
   const stamp = source.indexOf(`data-validation-target="${address}"`);
@@ -153,7 +97,6 @@ function focusFault(source, address, file) {
  * focusable control in the destination that declares it, and no destination is declared for an
  * address no row carries.
  *
- * @param {object} options
  * @param {string} options.title The suite title.
  * @param {string} options.producerFile The validation tab, under the manager root.
  * @param {string} options.tableName The producer's address table, for the failure message.
@@ -165,9 +108,9 @@ function focusFault(source, address, file) {
  * @param {string} options.routeNoun What this route CHANGES — `route`, `tab`.
  * @param {string} options.destinationNoun What holds the control — `section`, `tab`.
  * @param {readonly string[]} [options.focusProvenElsewhere] Addresses carried through an attribute
- *   bag, whose element cannot be read from source and whose focusability is therefore proved by a
- *   mounted suite instead. Declared rather than skipped: a stamp silently moving from a written
- *   attribute to a bag would otherwise drop its static focus proof without a word.
+ * bag, whose element cannot be read from source and whose focusability is therefore proved by a
+ * mounted suite instead. Declared rather than skipped: a stamp silently moving from a written
+ * attribute to a bag would otherwise drop its static focus proof without a word.
  */
 export function describeValidationAddressPairing({
   title,
@@ -270,27 +213,19 @@ export function describeValidationAddressPairing({
  * its handler, writes the route BEFORE it awaits the focus move, announces only after, and hosts
  * the live region outside every block the route change unmounts.
  *
- * WHY THIS IS READ FROM SOURCE rather than mounted. The suites that own these clauses mount the
- * VALIDATION TAB, which is what makes the producer half directly clickable — the tab takes
- * `onSelectIssue` as a prop, so the exact `(target, focusTarget)` pair a row hands the host is read
- * from a real click rather than inferred. Mounting the whole editor instead needs its entire
- * compiled closure, which a sibling suite already declares, and a second copy of that closure is
- * exactly the near-identical block the duplication gate refuses.
- *
- * @param {object} options
  * @param {string} options.title The suite title.
  * @param {string} options.hostFile The editor, under the manager root.
  * @param {string} options.tabComponent The validation tab's component name, as the host spells it.
  * @param {string} [options.tabProp] The prop the tab takes the handler on. Parameterised rather
- *   than fixed at `onSelectIssue` because one tab's rows address a RECORD rather than a control,
- *   and it names its callback for what it is handed; hard-coding the majority spelling would have
- *   meant either renaming that prop to satisfy a test or leaving that host unguarded.
+ * than fixed at `onSelectIssue` because one tab's rows address a RECORD rather than a control, and
+ * it names its callback for what it is handed; hard-coding the majority spelling would have meant
+ * either renaming that prop to satisfy a test or leaving that host unguarded.
  * @param {string} options.routeCall The host's own route write, e.g. `onOpenActivity(`.
  * @param {string} options.regionMarker The live region's attribute.
  * @param {string} options.regionOutsideNoun What the region must sit outside, for the clause title.
  * @param {ReadonlyArray<{ marker: string, present: string, order: string }>} options.mustPrecede
- *   Each block the region must come before: the source `marker`, the message when the block is
- *   missing entirely, and the message when the region sits inside it.
+ * Each block the region must come before: the source `marker`, the message when the block is
+ * missing entirely, and the message when the region sits inside it.
  * @param {string} [options.handler] The host's handler name.
  */
 export function describeValidationHostContract({
@@ -314,14 +249,7 @@ export function describeValidationHostContract({
 
     it('writes the route BEFORE it hands over, and hands the announcement to the shared leaf', () => {
       // THE ORDER IS THE MECHANISM, and since issue 1517's review round the host owns only the
-      // first half of it. The route write is synchronous and FIRST, so Svelte has flushed it and
-      // the destination panel exists when `focusValidationTarget`'s `queueMicrotask` runs its
-      // query; moving focus first would query a panel that is not in the DOM. Everything after
-      // that — the panel fallback for a route-only row, the sentence composed FROM the element
-      // that resolved, and the delay that queues it behind the focus utterance — belongs to
-      // `validationAnnouncement.js`, which owns it for all six hosts. So what this reads is that
-      // the host still writes its route first, hands the focus move over as the `focus` mover
-      // rather than performing it, and gives the leaf its own live-region write.
+      // first half of it.
       const signature = String.raw`(?:async )?function ${handler}\([\s\S]*?\n {2}\}`;
       const body = new RegExp(signature, 'u').exec(host);
       assert.ok(Boolean(body), 'the row-action handler could not be located');
@@ -343,17 +271,7 @@ export function describeValidationHostContract({
     });
 
     it('binds a destination panel that can REALLY take the keyboard, and says so to Foundry', () => {
-      // THE HALF THE CLAUSE ABOVE CANNOT REACH, and no mounted suite can either. `fallbackPanel:`
-      // proves the host HANDS the leaf a panel; whether that panel can hold focus is a property of
-      // the element, and happy-dom focuses anything — a `<div>` with no `tabindex` sets
-      // `document.activeElement` exactly as one with it does. So deleting `tabindex="-1"` from a
-      // destination panel left every mounted clause in this repository green while a real browser
-      // focused nothing and the GM's next Space bar press paused the game.
-      //
-      // The panel is found through the host's OWN binding name, read out of its `fallbackPanel:`
-      // line rather than passed in: five hosts call it `tabPanel` and the Checks studio calls it
-      // `sectionPanel`, and a name restated at the call site would let a host rename its state and
-      // quietly stop being checked.
+      // THE HALF THE CLAUSE ABOVE CANNOT REACH, and no mounted suite can either.
       const binding = (/fallbackPanel: (\w+)/u.exec(host) ?? [])[1] || '';
       assert.ok(binding, 'the handler must name the panel it falls back to');
       const bound = host.indexOf(`bind:this={${binding}}`);

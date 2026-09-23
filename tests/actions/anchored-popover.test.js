@@ -1,20 +1,4 @@
-/*
- * THE ANCHORED-POPOVER ACTION, ON SYNTHETIC RECTS (issue 1500).
- *
- * happy-dom computes no layout — every `getBoundingClientRect` is a zero box — so this suite
- * STUBS the rects rather than pretending to measure. That is the right level for the algorithm:
- * flip, clamp, the two `bounds` forms and the whole-row flooring are pure functions of four
- * boxes, and asserting them against numbers we chose is what makes a wrong branch visible.
- *
- * The complementary half is `tests/components/overlay-portal-host-position.test.js`, which drives
- * the real components in Chromium and asserts the panel is adjacent to its trigger inside the
- * resolved host. That suite deliberately does not pin the algorithm; this one does, and neither
- * is sufficient alone.
- *
- * Both shipped layout functions are exercised through the action rather than re-implemented here,
- * because the contract under test is the ARGUMENT SHAPE the action hands them — the boundary a
- * copy would have got wrong.
- */
+/** THE ANCHORED-POPOVER ACTION, ON SYNTHETIC RECTS (issue 1500). */
 import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -50,9 +34,6 @@ function measuring(element, rect) {
 /**
  * The DOM every case starts from: an application root, a picker root inside it, a trigger and an
  * unpositioned panel.
- *
- * @param {object} [rects]
- * @returns {{host: HTMLElement, root: HTMLElement, trigger: HTMLElement, panel: HTMLElement}}
  */
 function scene({ host: hostRect = box(0, 0, 1000, 800), trigger: triggerRect = box(100, 100, 200, 30), panel: panelRect = box(0, 0, 200, 150) } = {}) {
   const host = measuring(document.createElement('div'), hostRect);
@@ -82,9 +63,7 @@ function options(overrides = {}) {
 /**
  * happy-dom's globals are FLATTENED onto `globalThis`, and `addEventListener` is not among them —
  * so the shipped `typeof window.addEventListener !== 'function'` guard, which three of the six
- * converted components already carried, makes the action skip its listeners entirely here. A
- * browser has them, so the suite installs the smallest thing that behaves like one; without it
- * every re-measure assertion below would pass by never running.
+ * converted components already carried, makes the action skip its listeners entirely here.
  *
  * @returns {() => void} Restores `globalThis`.
  */
@@ -97,9 +76,7 @@ function installWindowEvents() {
   globalThis.removeEventListener = (type, handler) => registry.get(type)?.delete(handler);
   globalThis.dispatchEvent = (event) => {
     // A REAL `window.dispatchEvent` SETS `event.target` TO THE WINDOW, and the window is not a
-    // `Node`. happy-dom leaves `target` null until a real dispatch, so a shim that skipped this
-    // would hand every listener an event with no target — which is the one input that made
-    // `node.contains(event.target)` safe by accident. The resize case below depends on it.
+    // `Node`.
     Object.defineProperty(event, 'target', { configurable: true, value: globalThis });
     for (const handler of [...(registry.get(event.type) ?? [])]) handler(event);
     return true;
@@ -149,9 +126,7 @@ describe('anchoredPopover', () => {
   });
 
   it('measures in the host’s coordinates, not the viewport’s', () => {
-    // The same trigger, in a host offset 400px right and 200px down. A pass that used viewport
-    // coordinates against a `position: absolute` panel inside that host would write 100/136 again
-    // and draw the panel 400px to the right of its trigger.
+    // The same trigger, in a host offset 400px right and 200px down.
     const { trigger, panel } = scene({
       host: box(400, 200, 1000, 800),
       trigger: box(500, 300, 200, 30),
@@ -243,9 +218,6 @@ describe('anchoredPopover', () => {
   it('skips a zero-sized or `display: contents` boundary and keeps walking up', () => {
     // A `display: contents` element HAS NO BOX — it renders its children in its parent's flow and
     // its rect is empty — so clipping a panel against it produces a boundary of nothing at all.
-    // `ActorSelectTopBar` ships two such wrappers. This is the arrangement that can tell the skip
-    // from its absence: the unusable candidates are NEARER the anchor than the real scroller, so
-    // a walk that took the first match would take one of them.
     const { host, root, trigger, panel } = scene();
     const scroller = measuring(document.createElement('div'), box(50, 0, 450, 800));
     scroller.className = 'manager-main';
@@ -391,15 +363,7 @@ describe('anchoredPopover', () => {
   });
 
   it('writes the measured width as BOTH of its bounds, so no class rule can clip it', () => {
-    // THE FINDING (issue 1520 review round 2). A caller raises its `maxWidth` past the panel
-    // class's own `max-width` and nothing moves, because `max-width` constrains a USED width
-    // whatever its origin — so an inline `width` cannot beat a stylesheet ceiling. Measured on
-    // the published `interactables-config-source-open` frame: a 450px trigger over a 340px panel,
-    // with `maxWidth={480}` threaded correctly through all three files.
-    //
-    // The caller's band and a 450px trigger are the config window's own numbers. Both bounds are
-    // asserted, and the ceiling is the half this finding is about: `min-width` alone would leave
-    // the 340px clip exactly where it was.
+    // THE FINDING (issue 1520 review round 2).
     const { trigger, panel } = scene({ trigger: box(20, 100, 450, 30) });
 
     const handle = anchoredPopover(
@@ -421,8 +385,7 @@ describe('anchoredPopover', () => {
   it('bounds a panel at its FLOOR too, for a trigger narrower than the band', () => {
     // The same defect in the other direction, and it is not hypothetical: the "or…" menu shipped
     // asking for 150 and rendering at 240 because the shared box floors at 240, and the fix at the
-    // time was to restate 150 in the sheet for that one call site. The floor is now the layout's
-    // own answer, so the next caller does not rediscover it.
+    // time was to restate 150 in the sheet for that one call site.
     const { trigger, panel } = scene({ trigger: box(100, 100, 40, 30) });
 
     const handle = anchoredPopover(
@@ -547,22 +510,14 @@ describe('anchoredPopover', () => {
   });
 
   it('repositions on a window resize even while scrolls inside the panel are ignored', () => {
-    // THE ONE DECLARED BEHAVIOUR CHANGE (issue 1500 r2). `resize` fires on `window`, and
-    // `Node.contains()` takes a `Node?` — so the shipped `node.contains(event.target)` THREW on
-    // every window resize in the one caller that sets `ignoreScrollWithin` (`IconPicker`), and
-    // the reposition it was supposed to trigger never ran. A resize moves the host, so this is
-    // exactly the event that must not be dropped.
+    // THE ONE DECLARED BEHAVIOUR CHANGE (issue 1500 r2).
     const { trigger, panel } = scene();
-    // happy-dom's `contains` accepts ANY value and answers false, so this defect is invisible in
-    // it — which is why it survived six copies and a conversion. `Node.contains()` is specified
-    // to take a `Node?`, and a browser throws a TypeError on anything else, so the panel is given
-    // the browser's contract here. Without this the case would pass over the bug it exists for.
+    // happy-dom's `contains` accepts ANY value and answers false, so this defect is invisible in it
+    // — which is why it survived six copies and a conversion.
     const containsNode = panel.contains.bind(panel);
     panel.contains = (other) => {
       // `null` is the one non-`Node` a browser accepts, because the parameter is typed `Node?`:
-      // `node.contains(null)` returns false rather than throwing. Shimming it as a throw would
-      // make this stand-in stricter than the API it stands in for, and the case would then be
-      // red for a call the product is allowed to make.
+      // `node.contains(null)` returns false rather than throwing.
       if (other !== null && !(other instanceof Node)) {
         throw new TypeError("Failed to execute 'contains' on 'Node': parameter 1 is not of type 'Node'.");
       }

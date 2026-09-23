@@ -104,11 +104,9 @@ test('actor knowledge survives a party change (discovery is actor-scoped)', asyn
   assert.deepEqual([...getDiscoveredRealmIds(doc)], ['r1']);
 });
 
-// --- The lazy upgrade (issue 1282) -------------------------------------------------------
-// The migration runner reaches two corpora and four world settings; it has no actor access at
-// all, so the re-key from `[systemId][realmId]` to `[realmId]` can only happen on read. If it
-// is wrong, players silently lose realm knowledge with no server-side record to recover from,
-// which is why every shape below is covered.
+// The lazy upgrade (issue 1282) ------------------------------------------------------- The
+// migration runner reaches two corpora and four world settings; it has no actor access at all, so
+// the re-key from `[systemId][realmId]` to `[realmId]` can only happen on read.
 
 test('flattens a legacy per-system map on read, so knowledge is not lost', () => {
   const doc = new FakeDocument({

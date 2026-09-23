@@ -1,16 +1,8 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  Always-editable party-name field on a World > Parties card. Keeps a local draft
-  seeded from the upstream name (reseeded when a different party is selected or the
-  name changes externally) and commits on blur / Enter; Escape reverts, and an empty
-  name reverts rather than persisting a nameless party.
-
-  The visible "Party name" label is deliberately gone (issue 1182): on a card the
-  field sits directly beneath the party's own icon tile and above its meta line, so a
-  label above it is a third line of chrome saying what the value already says. The
-  accessible name is carried by `aria-label` instead, so a screen-reader user loses
-  nothing.
--->
+  Always-editable party-name field on a World > Parties card: a local draft seeded from the upstream
+  name, committed on blur or Enter, reverted on Escape, and reverted rather than persisted when
+  empty. The visible label is deliberately gone (issue 1182) — on a card it would be a third line of
+  chrome — and `aria-label` carries the accessible name instead. -->
 <script>
   import { untrack } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
@@ -24,8 +16,7 @@
   // eslint-disable-next-line svelte/prefer-writable-derived
   let draft = $state(untrack(() => name));
 
-  // Reseed the draft whenever the upstream name changes (selection change or
-  // external rename). Does not fire while the user is typing (name is stable).
+  // Reseed on an upstream change; it does not fire while typing, because `name` is stable then.
   $effect(() => {
     draft = name;
   });
@@ -71,12 +62,9 @@
 />
 
 <style>
-  /* Theme-ROOT tokens only. Written as `input.manager-party-name-input` so the scoped
-     selector computes to (0,2,1) and TIES with the manager's permanent free-text
-     baseline (`.fabricate-manager input[type="text"]`, which pins min-height 34px and
-     radius 9px); the tie is then won on source order, because injected component CSS
-     lands after the global sheet. At a bare class it would be (0,2,0) and silently lose
-     its height and radius to the baseline. */
+  /* Theme-ROOT tokens only, and written as `input.manager-party-name-input` so the scoped selector
+     computes to (0,2,1), TIES with the manager's free-text baseline and wins on source order; at a
+     bare class it would be (0,2,0) and silently lose its height and radius. */
   input.manager-party-name-input {
     box-sizing: border-box;
     width: 100%;

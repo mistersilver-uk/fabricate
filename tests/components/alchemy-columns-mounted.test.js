@@ -8,6 +8,7 @@ import {
   createMountedComponentHarness,
   PLAYER_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -29,19 +30,15 @@ function knownRecipe(id, name) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // ComponentInventoryColumn
-// ---------------------------------------------------------------------------
 
 describe('ComponentInventoryColumn (mounted)', () => {
   const harness = createMountedComponentHarness({
     repoRoot,
     tmpPrefix: 'fabricate-alchemy-inventory-',
-    rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+    rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
     compiledModules: [
-      // The shared primitives this tree draws, as ONE spread (issue 1514). See
-      // `PLAYER_APP_COMPILED_MODULES` in the harness for why it is one roster and not a
-      // list per suite.
+      // The shared primitives this tree draws.
       ...PLAYER_APP_COMPILED_MODULES,
       'src/ui/svelte/apps/alchemy/EssenceChips.svelte',
       'src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte'
@@ -108,15 +105,13 @@ describe('ComponentInventoryColumn (mounted)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // KnownRecipesColumn
-// ---------------------------------------------------------------------------
 
 describe('KnownRecipesColumn (mounted)', () => {
   const harness = createMountedComponentHarness({
     repoRoot,
     tmpPrefix: 'fabricate-alchemy-known-',
-    rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+    rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
     compiledModules: [
       ...PLAYER_APP_COMPILED_MODULES,
       'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte'
@@ -190,15 +185,12 @@ describe('KnownRecipesColumn (mounted)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Render-bug (E) structural guard — pin the clip fix beyond screenshots.
-//
 // The row-clipping bug was `.alchemy-known-list { margin: 0 -4px; overflow-y: auto }`
 // (and the mirror in the inventory list): `overflow-y: auto` coerces `overflow-x`
 // to auto, clipping the first/last row's focus outline + radius. The fix REMOVES the
 // negative horizontal margin and adds `outline-offset` room. This source-text guard
 // fails if either regresses.
-// ---------------------------------------------------------------------------
 
 describe('Alchemy list clip-fix (source guard)', () => {
   const files = {
@@ -266,16 +258,7 @@ describe('Alchemy list clip-fix (source guard)', () => {
   });
 });
 
-/**
- * The Alchemy columns' adoption of the shared tile, no-state panel and standing statement
- * (issue 1514, phase 3).
- *
- * The tile assertions are on the GLYPH branch on purpose. Both column fixtures above carry
- * `img: null`, and the glyph fallback is the half of the conversion a caller can silently
- * lose: `Medallion` defaults to `fas fa-scroll` at `0.9rem` in the accent, where these rules
- * drew `fa-flask` at the row's own 14px in `--fab-tag-peach`. A tile that renders the right
- * BOX with the wrong face, size and ink passes every source grep for `<Medallion`.
- */
+/** The Alchemy columns' adoption of the shared tile. */
 describe('Alchemy column primitive adoption (issue 1514)', () => {
   /** The custom properties and size a medallion composes into its `style` attribute. */
   function tileStyle(tile) {
@@ -286,7 +269,7 @@ describe('Alchemy column primitive adoption (issue 1514)', () => {
     const harness = createMountedComponentHarness({
       repoRoot,
       tmpPrefix: 'fabricate-alchemy-inventory-primitives-',
-      rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+      rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
       compiledModules: [
         ...PLAYER_APP_COMPILED_MODULES,
         'src/ui/svelte/apps/alchemy/EssenceChips.svelte',
@@ -347,7 +330,7 @@ describe('Alchemy column primitive adoption (issue 1514)', () => {
     const harness = createMountedComponentHarness({
       repoRoot,
       tmpPrefix: 'fabricate-alchemy-known-primitives-',
-      rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+      rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
       compiledModules: [
         ...PLAYER_APP_COMPILED_MODULES,
         'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte'

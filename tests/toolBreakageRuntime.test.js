@@ -1,17 +1,4 @@
-/**
- * Phase 0 — the extracted shared Tool breakage runtime in isolation.
- *
- * Covers the plan/apply core consumed by BOTH the gathering engine and the
- * crafting engine:
- *   - readToolUsage flag-shape tolerance;
- *   - evaluateToolBreakagePlan projects post-increment timesUsed for limitedUses
- *     and defers to Tool.evaluateBreakage for other modes;
- *   - plannedToolBreakageOutcome shapes;
- *   - applyToolUsageAndBreakage: limitedUses writes toolUsage; non-limitedUses
- *     modes write NO usage flag; onBreak destroy/flagBroken/replaceWith;
- *   - createToolBreakageRuntime plan/apply parity (apply reuses the prior plan
- *     decision rather than re-rolling).
- */
+/** Phase 0 — the extracted shared Tool breakage runtime in isolation. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -41,10 +28,8 @@ const {
 } = await import('../src/toolBreakageRuntime.js');
 const { resolveToolForItem, itemIsToolByDurableIdentity } = await import('../src/utils/sourceUuid.js');
 
-// ---------------------------------------------------------------------------
-// FakeItem — getFlag('fabricate', 'fabricate.<key>') dot-path resolution,
-// mirroring the project's getFabricateFlag/setFabricateFlag conventions.
-// ---------------------------------------------------------------------------
+// FakeItem — getFlag('fabricate', 'fabricate.<key>') dot-path resolution, mirroring the project's
+// getFabricateFlag/setFabricateFlag conventions.
 
 function getPath(obj, path) {
   return String(path).split('.').reduce((v, k) => (v == null ? undefined : v[k]), obj);
@@ -79,9 +64,7 @@ class FakeItem {
   async delete() { this.deleted = true; }
 }
 
-// ---------------------------------------------------------------------------
 // readToolUsage
-// ---------------------------------------------------------------------------
 
 test('readToolUsage reads the nested fabricate.toolUsage flag', () => {
   const item = new FakeItem({ fabricate: { toolUsage: { timesUsed: 3 } } });
@@ -93,9 +76,7 @@ test('readToolUsage defaults to { timesUsed: 0 } when absent', () => {
   assert.deepEqual(readToolUsage(null), { timesUsed: 0 });
 });
 
-// ---------------------------------------------------------------------------
 // evaluateToolBreakagePlan
-// ---------------------------------------------------------------------------
 
 test('evaluateToolBreakagePlan projects post-increment timesUsed for limitedUses', async () => {
   const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: 2 }, onBreak: { mode: 'destroy' } });
@@ -129,9 +110,7 @@ test('evaluateToolBreakagePlan: diceExpression honored via injected evaluator', 
   assert.equal(safe.broken, false);
 });
 
-// ---------------------------------------------------------------------------
 // plannedToolBreakageOutcome
-// ---------------------------------------------------------------------------
 
 test('plannedToolBreakageOutcome shapes each onBreak mode', () => {
   assert.deepEqual(plannedToolBreakageOutcome(Tool.fromJSON({ componentId: 'c', onBreak: { mode: 'destroy' } })), { action: 'destroyed' });
@@ -142,9 +121,7 @@ test('plannedToolBreakageOutcome shapes each onBreak mode', () => {
   );
 });
 
-// ---------------------------------------------------------------------------
 // applyToolUsageAndBreakage
-// ---------------------------------------------------------------------------
 
 test('applyToolUsageAndBreakage: limitedUses increments toolUsage', async () => {
   const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: 5 }, onBreak: { mode: 'destroy' } });
@@ -156,10 +133,9 @@ test('applyToolUsageAndBreakage: limitedUses increments toolUsage', async () => 
 });
 
 test('applyToolUsageAndBreakage: limitedUses does NOT break one use early (post-increment count, no double +1)', async () => {
-  // Regression: the apply path increments via applyUsage, so the breakage decision
-  // must read the POST-increment timesUsed (Tool#evaluateBreakage), NOT re-project it
-  // with evaluateToolBreakagePlan's +1. A fresh maxUses:2 tool must survive the first
-  // apply (timesUsed 0→1, 1<2) and break only on the second (1→2, 2>=2).
+  // Regression: the apply path increments via applyUsage, so the breakage decision must read the
+  // POST-increment timesUsed (Tool#evaluateBreakage), NOT re-project it with
+  // evaluateToolBreakagePlan's +1.
   const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: 2 }, onBreak: { mode: 'flagBroken' } });
   const item = new FakeItem({});
   const first = await applyToolUsageAndBreakage({ tool, item, buildItemRef: (_a, i) => ({ itemUuid: i.uuid, quantity: 1 }) });
@@ -245,9 +221,7 @@ test('applyToolUsageAndBreakage: prefers a prior plan decision over re-evaluatin
   assert.equal(getPath(item._flags.fabricate, 'fabricate.toolBroken'), true);
 });
 
-// ---------------------------------------------------------------------------
 // createToolBreakageRuntime — plan/apply parity
-// ---------------------------------------------------------------------------
 
 function runtimeFixture({ toolData, item }) {
   const matchTools = () => ({ items: [{ tool: toolData, item }], missing: [] });
@@ -294,10 +268,8 @@ test('createToolBreakageRuntime: no matched tools yields empty evidence', async 
   assert.deepEqual(await runtime.apply({ tools: [] }), []);
 });
 
-// ---------------------------------------------------------------------------
-// Catalyst→Tool item-flag fallback (0.6.0): toolUsage preferred, catalystItemUsage
-// fallback only when toolUsage is absent. Writes always go to toolUsage.
-// ---------------------------------------------------------------------------
+// Catalyst→Tool item-flag fallback (0.6.0): toolUsage preferred, catalystItemUsage fallback only
+// when toolUsage is absent. Writes always go to toolUsage.
 
 test('readToolUsage falls back to catalystItemUsage when toolUsage is absent', () => {
   const item = new FakeItem({ fabricate: { catalystItemUsage: { timesUsed: 4 } } });
@@ -343,12 +315,8 @@ test('Tool.applyUsage prefers toolUsage over catalystItemUsage once toolUsage ex
   assert.deepEqual(item._flags.fabricate.fabricate.toolUsage, { timesUsed: 6 });
 });
 
-// ---------------------------------------------------------------------------
-// Issue 780: the broken-tool REPLACEMENT grant stamps the replacement's durable
-// per-system identity onto the CREATED item's payload. Driven through the REAL
-// createToolBreakageRuntime apply() → makeCreateReplacement path, asserting on the
-// captured createEmbeddedDocuments payload (never a read-back).
-// ---------------------------------------------------------------------------
+// Issue 780: the broken-tool REPLACEMENT grant stamps the replacement's durable per-system identity
+// onto the CREATED item's payload.
 
 const REPLACEMENT_COMPONENT_ID = 'comp-replacement';
 const REPLACEMENT_SOURCE = {
@@ -604,9 +572,7 @@ test('780 replacement: the shared helper is faithful when called directly (compo
   });
 });
 
-// ---------------------------------------------------------------------------
 // evaluateCheckBreakage (issue 419) — the single shared trigger-evaluator seam
-// ---------------------------------------------------------------------------
 
 const { evaluateCheckBreakage } = await import('../src/toolBreakageRuntime.js');
 const {
@@ -711,9 +677,7 @@ test('evaluateCheckBreakage: an empty trigger list with no legacy breakTools nev
   assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ total: 1 }) }).forceBreak, false);
 });
 
-// ---------------------------------------------------------------------------
 // createToolBreakageRuntime checkDriven authority (issue 419)
-// ---------------------------------------------------------------------------
 
 function checkDrivenRuntime(items) {
   return createToolBreakageRuntime({
@@ -815,13 +779,9 @@ test('checkDriven runtime: virtual-present tools are recorded as skipped, not mu
   assert.equal(applied[0].broken, false);
 });
 
-// ---------------------------------------------------------------------------
-// Crafting-vs-gathering drift (criterion 8): the REAL per-surface resolvers must
-// reach the identical decision for ONE shared persisted checkDriven system + ONE
-// engine-evaluated check result. This drives CraftingEngine._resolveCraftingBreakageDecision
-// AND the gathering surface's _resolveGatheringCheckBreakage → evaluateCheckBreakage,
-// so a change to either resolver can fail this test (the former tautology could not).
-// ---------------------------------------------------------------------------
+// Crafting-vs-gathering drift (criterion 8): the REAL per-surface resolvers must reach the
+// identical decision for ONE shared persisted checkDriven system + ONE engine-evaluated check
+// result.
 
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { GatheringEngine } = await import('../src/systems/GatheringEngine.js');
@@ -837,9 +797,8 @@ test('drift: crafting and gathering resolvers reach the identical break decision
   };
   const checkResult = NATURAL_ONE_RESULT;
 
-  // Crafting surface: the real resolver. A resolution-mode service stub returns the
-  // simple mode so it reads craftingCheck.simple.checkBreakage (and never touches
-  // the `game` global).
+  // Crafting surface: the real resolver. A resolution-mode service stub returns the simple mode so
+  // it reads craftingCheck.simple.checkBreakage (and never touches the `game` global).
   const craftingEngine = new CraftingEngine(null, null, { getMode: () => 'simple' });
   const craftingDecision = craftingEngine._resolveCraftingBreakageDecision(
     system,

@@ -1,30 +1,4 @@
-/**
- * Journal run states for the View Lab.
- *
- * The smoke reaches its journal frames by actually crafting: it starts runs, advances them, lets
- * some fail and cancels others, then screenshots what the journal shows. The lab cannot do that in
- * a static capture, so it writes the run records directly — the same shapes
- * `CraftingRunManager` / `SalvageRunManager` / `GatheringRunManager` persist, onto the same actor
- * flags they read (`fabricate.craftingRuns`, `.salvageRuns`, `.gatheringRuns`), each a
- * `{ active: {id: run}, history: [run] }` container.
- *
- * This is the one place in the lab where a record is authored rather than produced by the real
- * engine, and it is deliberate: a journal frame's job is to show how a run of a given STATUS renders,
- * and driving a real failure or a real time-gate maturation from a screenshot harness would take
- * more machinery than the frame is worth. The shapes are taken from the managers themselves, so a
- * field the journal reads is a field that exists.
- *
- * Statuses covered, because each renders differently:
- *   inProgress · waitingTime (time-gated, not yet mature) · succeeded · failed · cancelled
- * crossed with single-step and multi-step, because the step rail only appears for the latter.
- *
- * Two records are authored for a reason beyond how they RENDER, and each says so where it is built:
- * the in-flight blind gathering run in {@link buildLabGatheringRuns}, which exists so the Journal's
- * viewer-dependent redaction (issue 901) has a state to be photographed in at all; and the resolved
- * progressive salvage run in {@link buildResolvedProgressiveSalvageRun}, which exists so the
- * complication feature's FIRED state (issue 1286) is reachable — every `player-salvage*` case is
- * pre-roll, so without it no frame and no parity region could show a complication that has fired.
- */
+/** Journal run states for the View Lab (issue 901). */
 
 import {
   environmentComposesRecord,
@@ -48,13 +22,9 @@ const NOW = 1_209_600;
 const HOUR = 3600;
 
 /**
- * The RETAINED execution claim the `claim-retained` fixture leaves on the authority ledger: a
- * pause the lifecycle refused before it wrote anything, whose claim the authority kept because
- * it cannot prove the refusal was pre-write. This is the maintainer's own stuck world.
- *
- * ONE definition, because two harnesses reach the state by different routes and must not drift:
- * `labWorld.js` seeds the ledger page and lets the real authority derive it, while the mounted
- * lifecycle walk stubs the availability answer directly.
+ * The RETAINED execution claim the `claim-retained` fixture leaves on the authority ledger: a pause
+ * the lifecycle refused before it wrote anything, whose claim the authority kept because it cannot
+ * prove the refusal was pre-write.
  */
 export const LAB_RETAINED_CLAIM = Object.freeze({
   claimId: 'lab-retained-claim',
@@ -152,12 +122,6 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
 
 /**
  * The in-flight BLIND gathering run (issue 901), and the run id its GM-owned secret is keyed by.
- *
- * Exported because the secret does NOT live on the actor — that is the whole point of the fix — so
- * `labWorld.js` has to write the matching `gatheringBlindRuns` world-setting record under this same
- * id. Two literals in two files would be one rename away from a run whose GM preview resolves to
- * nothing, which renders as the PLAYER's frame under the GM's name: exactly the confident, wrong
- * screenshot this harness exists to prevent.
  */
 export const LAB_BLIND_GATHERING_RUN_ID = 'lab-gathering-blind-waiting';
 
@@ -224,12 +188,6 @@ function craftingRun({
 /**
  * Which environment a blind gathering run is drawn in, and which task it drew.
  *
- * DERIVED, never authored. The blind marker is `blind:<environmentId>` and the drawn task must be
- * one the environment actually composes, so both are read out of the fixture world rather than
- * spelled a second time here — a run naming an environment or task the world does not contain
- * resolves to nothing and renders as a generic stub, which is indistinguishable from the redaction
- * this frame exists to evidence. Throws rather than degrading, for the same reason.
- *
  * @param {object[]} environments Persisted environment records from `labContent`.
  * @returns {{environment: object, taskId: string}} The blind environment and the task drawn in it.
  */
@@ -239,24 +197,6 @@ function resolveBlindDraw(environments) {
 
 /**
  * The first environment matching `predicate`, and one task it composes.
- *
- * This module has no gathering task library to test biome/danger matches against — `buildLabRunStates`
- * is called with `environments` only, not the system's task records — so it cannot resolve automatic
- * mode's actual composed set: `matches − disabled`, bounded by NO id list at all (see
- * `gatheringComposition.js`). The only candidates available here are the environment's own declared
- * `enabledTaskIds` and `forcedTaskIds`, so the pool this function draws from is their union, which the
- * lab world's authoring convention keeps a superset of what really composes — it is a stand-in for a
- * real task library, not a claim that either list bounds automatic composition.
- *
- * `environmentComposesRecord` is still the arbiter of which pool candidate survives, called with
- * `matches: true` for every candidate (pool membership is the only evidence this function has, so it
- * is asserted rather than computed). That makes the predicate's real job here the mode split: a manual
- * environment keeps every pool candidate (`enabled ∪ forced` IS manual composition), while an
- * automatic one additionally drops anything the environment explicitly excludes via `disabledTaskIds`
- * — the exclusion the raw union alone did not know to apply.
- *
- * Exported so a drift test can import and mutate it directly against a task-id-only fixture, the same
- * way it is used here.
  *
  * @param {object[]} environments Persisted environment records from `labContent`.
  * @param {Function} predicate Which environment to take.
@@ -280,9 +220,7 @@ export function resolveDraw(environments, predicate, description, avoid = null) 
   const composed = pool.filter((id) =>
     environmentComposesRecord(environment, { id, enabled: true }, 'task', mode, true)
   );
-  // `avoid` keeps the completed run off the blind run's drawn task. Not cosmetic: the GM frame is
-  // read by comparing the secret preview against the rows around it, and a history row carrying the
-  // same task name makes "the GM sees the drawn task" indistinguishable from a coincidence.
+  // `avoid` keeps the completed run off the blind run's drawn task.
   const taskId = composed.find((entry) => entry !== avoid) ?? composed[0];
   if (!taskId) {
     throw new Error(
@@ -294,15 +232,6 @@ export function resolveDraw(environments, predicate, description, avoid = null) 
 
 /**
  * The GM-owned secret record for the lab's in-flight blind run (issue 901).
- *
- * This is the half of a blind run that does NOT live on the actor. `GatheringBlindRunStore` keys it
- * by run id inside the `gatheringBlindRuns` WORLD setting, which only a GM may write — so it is the
- * only place the drawn task exists, and the only reason a GM's Journal can preview it. Built here,
- * beside the run it belongs to, so the marker and the secret cannot disagree about which task was
- * drawn.
- *
- * `reservation` is deliberately absent: a reservation is taken only against a node pool, and
- * herbalism runs no resource economy, so production would record none either.
  *
  * @param {object} options Options.
  * @param {object} options.actor The actor the run belongs to.
@@ -320,9 +249,7 @@ export function buildLabBlindRunSecret({ actor, environments, tasks }) {
     environmentId: environment.id,
     taskId,
     // `_runtimeSnapshot` embeds the drawn task so a matured run resolves against the environment as
-    // it stood at START. The Journal's GM preview reads it only as a FALLBACK — it prefers the
-    // composed environment's task — so this being the library record rather than the composed one
-    // does not change the frame; it keeps the record the shape production writes.
+    // it stood at START.
     snapshot: { task, events: [], rules: {}, conditions: environment.conditions ?? {} },
     createdAtWorldTime: NOW - HOUR,
   };
@@ -331,14 +258,11 @@ export function buildLabBlindRunSecret({ actor, environments, tasks }) {
 /**
  * Build every journal state the smoke captures, for one actor and a set of real recipe ids.
  *
- * Recipe ids come from the seeded world rather than being invented: the journal resolves each run's
- * recipe to render its name, ingredients and step list, so a run pointing at a recipe that does not
- * exist renders as a redacted stub and proves nothing.
- *
  * @param {object} options Options.
  * @param {object} options.actor The actor the runs belong to.
  * @param {string} options.userId Owning user id.
- * @param {Array<{id: string, craftingSystemId: string, steps?: unknown[]}>} options.recipes Real recipes.
+ * @param {Array<{id: string, craftingSystemId: string, steps?: unknown[]}>} options.recipes Real
+ * recipes.
  * @param {object[]} options.environments Real gathering environments, for the blind run below.
  * @param {object[]} [options.tasks] Real gathering tasks.
  * @param {string|null} [options.journalCaseState] Focused persisted state selected by View Lab.
@@ -522,9 +446,7 @@ export function buildLabRunStates({
 
   const defaults = {
     craftingRuns: { active, history },
-    // Salvage and gathering share the container shape. One terminal salvage record is enough for
-    // the journal's mixed-source list to show all three kinds side by side; gathering carries an
-    // in-flight blind run as well, because that state is the one the Journal used to leak.
+    // Salvage and gathering share the container shape.
     salvageRuns: {
       active: {},
       history: [
@@ -614,9 +536,8 @@ function journalCaseFactories(context) {
       steps: [versionedRecipeStep(recipe, 0, 'waitingTime', futureGate())],
       ...extra,
     });
-  // The stage a player has NOT begun: no gate, no consumption receipt, and therefore the only
-  // shape whose route, options and essence allocation are still editable. Post-D-028 a gated
-  // stage has locked all three, so a fixture cannot arm a clock and stay open (issue 1648).
+  // The stage a player has NOT begun: no gate, no consumption receipt, and therefore the only shape
+  // whose route, options and essence allocation are still editable (issue 1648).
   const unbegun = (id, recipe = single(), extra = {}) =>
     versionedCraftingRun(context, recipe, {
       id,
@@ -719,8 +640,7 @@ function journalCaseFactories(context) {
     loading: readyAlias('lab-v1-ready-single'),
     'error-retry': readyAlias('lab-v1-ready-single'),
     // Persisted history-data witnesses live in their own module; each state seeds one selected
-    // record, plus the earlier record a recovery genuinely reads. The open account keeps both
-    // Journal panes populated so the witness is photographed in a whole window.
+    // record, plus the earlier record a recovery genuinely reads.
     ...Object.fromEntries(
       Object.entries(historyDataRunSets({ ...context, now: NOW, hour: HOUR })).map(
         ([state, build]) => [
@@ -814,9 +734,7 @@ function prototypeContainers(context, state) {
       allocation: { 'Item.jp-bitterroot': 2 },
     };
   }
-  // Both shortage states are UNBEGUN. A stage that has started spent its materials (D-026), so
-  // it can no longer be short of them, and a conservative automatic advance decides before it
-  // spends (D-010), so a run it cannot resolve never arms a clock either (issue 1648).
+  // Both shortage states are UNBEGUN (issue 1648).
   if (state === 'material-shortage') {
     const recipe = requireRecipe(context.recipes, selected.recipeId);
     selected.steps[0] = versionedRecipeStep(recipe, 0, 'inProgress', {
@@ -1126,14 +1044,8 @@ function prototypeSpecial(context, state, id, containers) {
     replacePrototypeFocus(containers.gatheringRuns, run, true);
     return true;
   }
-  // The state a multi-step craft ARRIVES in (issue 1648, M10): every earlier stage succeeded,
-  // so `completeStepSuccess` advanced into a stage with two authored routes and no plan at all.
-  // It has a time requirement, so it also has its own start — and it cannot take it until the
-  // player picks a route, which is exactly what nothing on screen used to say.
-  // A run armed by the release that consumed at EXECUTE: gated, with no start-phase receipt.
-  // Nothing backfills it and there is no migration, so it is a real, reachable state until
-  // those runs drain. Its frame is the repaired behaviour — an enabled primary whose command
-  // resolves the stage — rather than the deadlock it used to depict (issue 1648).
+  // The state a multi-step craft ARRIVES in (issue 1648, M10): every earlier stage succeeded, so
+  // `completeStepSuccess` advanced into a stage with two authored routes and no plan at all.
   if (state === 'legacy-armed') {
     const run = prototypeCraft(context, 'cord', id);
     delete run.steps[run.currentStepIndex].preparedConsumption;
@@ -1152,14 +1064,9 @@ function prototypeSpecial(context, state, id, containers) {
     replacePrototypeFocus(containers.craftingRuns, run, false);
     return true;
   }
-  // The two states the stage-start commit creates (issue 1648): a stage the player has not
-  // begun, whose choices are still open and whose materials are unspent, and the same stage
-  // once beginning it locked the choice and consumed them.
-  // `current-choice-closed` joins them because a choice SLOT exists only before a stage starts:
-  // once it has, its materials are a receipt and there is no tile left to reach for (M21).
-  // A started stage whose ingredient set was nothing but a price (D-031). Its receipt records a
-  // PAYMENT and no items, which no other fixture in the world produces — every one of them
-  // carries `currencySpends: []`, which is why the empty-region defect could not be seen.
+  // The two states the stage-start commit creates (issue 1648): a stage the player has not begun,
+  // whose choices are still open and whose materials are unspent, and the same stage once beginning
+  // it locked the choice and consumed them.
   if (state === 'stage-paid') {
     const run = prototypeCraft(context, 'permit', id);
     const current = run.steps[run.currentStepIndex];
@@ -1174,17 +1081,14 @@ function prototypeSpecial(context, state, id, containers) {
   if (['stage-not-started', 'stage-consumed', 'current-choice-closed'].includes(state)) {
     const run = prototypeCraft(context, 'rivets', id);
     const current = run.steps[run.currentStepIndex];
-    // `stage-consumed` keeps the start receipt `prototypeCraft` already armed the gate with,
-    // so the two states differ ONLY in whether the stage has begun. Restating the receipt here
-    // would let the pair's own fixture drift from every other started stage in the world.
+    // `stage-consumed` keeps the start receipt `prototypeCraft` already armed the gate with, so the
+    // two states differ ONLY in whether the stage has begun.
     if (state !== 'stage-consumed') {
       delete current.timeGate;
       delete current.preparedConsumption;
       current.status = 'inProgress';
       run.status = 'inProgress';
-      // The pick a player makes with the option control before they press begin. Without it
-      // the stage is waiting on a CHOICE, not on the start — and `beginVersionedStage`
-      // refuses it, so the control would render enabled and then refuse (issue 1648).
+      // The pick a player makes with the option control before they press begin (issue 1648).
       persistAuthoredPicks(current);
     }
     replacePrototypeFocus(containers.craftingRuns, run, false);
@@ -1266,12 +1170,7 @@ function recipeSteps(recipe) {
   return typeof recipe?.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
 }
 
-/**
- * The start-commit receipt every gated stage carries. Under D-026/D-028 a stage cannot hold a
- * time gate without one — both `markStepStarted` and the legacy `_startTimedStep` write the
- * record before they arm the clock — so a fixture that armed a gate and left this undefined
- * depicted a state the product can no longer create (issue 1648).
- */
+/** The start-commit receipt every gated stage carries (issue 1648). */
 function startedStageConsumption(step) {
   return {
     selectedIngredientSetId:
@@ -1285,14 +1184,7 @@ function startedStageConsumption(step) {
 
 /**
  * The item rows a start commit records, one per group whose picked option names a PHYSICAL
- * requirement (issue 1648, M21). The Journal renders this record instead of probing an
- * inventory the stage already emptied, so the fixture states what the commit would have
- * written rather than restating the authored group: the row carries the option the plan
- * actually picked and that option's own quantity.
- *
- * An ESSENCE group contributes no row. Real consumption records the CARRIER ITEMS that funded
- * the essence, which this fixture does not model, and emitting a row named for the essence
- * requirement itself would photograph a receipt the product never writes.
+ * requirement (issue 1648, M21). An ESSENCE group contributes no row.
  */
 function startedStageReceipts(step) {
   const overrides = step.selectionPlan?.ingredientOptionOverrides ?? {};
@@ -1367,15 +1259,7 @@ function versionedCraftingRun(context, recipe, overrides = {}) {
 
 /**
  * Un-begin the current stage: delete its clock AND its consumption receipt together, because a
- * start commit writes both or neither. This is the ONLY shape whose route, options and essence
- * allocation are still editable post-D-028, so it is what a case whose subject is an open
- * requirement rail must actually be.
- *
- * These cases used to keep the clock and drop the receipt alone, which depicted a state the
- * product cannot create. They could not be repaired while an ungated run had no progress
- * reading at all — the frames would have published with their countdown and bar deleted and
- * nothing in their place — and manual finding M18 removed that obstacle by restoring the stage
- * rail to a card with no gate (issue 1648).
+ * start commit writes both or neither (issue 1648).
  */
 function unbeginStage(run) {
   const current = run.steps?.[Math.max(0, Number(run.currentStepIndex) || 0)];
@@ -1388,12 +1272,8 @@ function unbeginStage(run) {
 }
 
 /**
- * Prototype cases whose SUBJECT is an editable requirement rail, and which are therefore
- * unbegun. The three former members of this cohort that are NOT here — `waiting-auto-eligible`,
- * `check-route` and `paused` — were repaired the other way: each photographs something only a
- * STARTED stage has (a world-time completion preference, an enabled roll, a frozen countdown),
- * so each keeps the receipt its clock implies and its walk no longer reaches for a control a
- * locked stage does not offer.
+ * Prototype cases whose SUBJECT is an editable requirement rail, and which are therefore unbegun.
+ *
  * @see unbeginStage
  */
 const UNBEGUN_PROTOTYPE_CASES = new Set([
@@ -1404,9 +1284,8 @@ const UNBEGUN_PROTOTYPE_CASES = new Set([
 ]);
 
 /**
- * Persist the option each multi-option group would be given by the player's own pick, so a
- * stage that is ready to begin reads as ready to begin. The engine's start commit requires the
- * pick to be PERSISTED; the resolver's invented one does not satisfy it.
+ * Persist the option each multi-option group would be given by the player's own pick, so a stage
+ * that is ready to begin reads as ready to begin.
  */
 function persistAuthoredPicks(step) {
   const groups = normalizeLabList(step.selectedRequirementSnapshot?.ingredientGroups);
@@ -1696,8 +1575,7 @@ function emptyRunContainers({
 
 /**
  * Build the View Lab's test-only command collaborator. It changes the same persisted containers
- * installed on the actor, then the production Journal builder/store reloads those records. This
- * proves control wiring and visible transitions without claiming Foundry authority arbitration.
+ * installed on the actor, then the production Journal builder/store reloads those records.
  *
  * @param {object} options Options.
  * @param {object} options.actor Actor carrying the run flags.
@@ -1706,7 +1584,6 @@ function emptyRunContainers({
  * @param {object[]} [options.recipes] Authored recipes used to resolve completion results.
  * @param {() => number} [options.nowWorldTime] Current world-time reader.
  * @param {() => void} [options.onPersist] Refresh readers after the actor flags have been replaced.
- * @returns {{events: object[], execute: (command: object) => Promise<object|undefined>}}
  */
 export function createLabJournalCaseController({
   actor,
@@ -1771,10 +1648,8 @@ export function createLabJournalCaseController({
 }
 
 /**
- * The stage preconditions `beginVersionedStage` and `executeVersionedStage` enforce, so no
- * fixture control can succeed where the real command refuses (issue 1648). Selection readiness
- * is not re-derived here — the simulator holds no inventory — only the lifecycle facts the run
- * record carries: whether the stage has started, and whether its clock has run out.
+ * The stage preconditions `beginVersionedStage` and `executeVersionedStage` enforce, so no fixture
+ * control can succeed where the real command refuses (issue 1648).
  */
 function stagePreconditionFailure({ run, command, recipes, now }) {
   if (!['beginStep', 'execute'].includes(command?.action)) return null;
@@ -1878,9 +1753,8 @@ function applyFixtureCommand({ command, container, run, recipes, state, now }) {
       const pausedAt = Number(run.pauseState?.pausedAt);
       const ownGate = run.runType === 'gathering' || !Array.isArray(run.steps);
       // `persistResumedRun` re-anchors the DEADLINE and nothing else: `requiredSeconds` is the
-      // authored budget and `initiatedAt` records when the stage started, so neither moves
-      // across a pause. Rewriting all three made every resumed fixture gate self-consistent
-      // and hid the progress-bar defect issue 1648 reports.
+      // authored budget and `initiatedAt` records when the stage started, so neither moves across a
+      // pause (issue 1648).
       const current = ownGate ? run.timeGate : run.steps[run.currentStepIndex]?.timeGate;
       const gate = { ...(current ?? {}), availableAt: now + remaining };
       if (ownGate) run.timeGate = gate;
@@ -2015,56 +1889,8 @@ function finishFixtureRun({ container, run, status, now }) {
 }
 
 /**
- * A RESOLVED progressive salvage run, with per-stage outcomes and a fired-complication list.
- *
- * ## Why it has to exist at all (issue 1286)
- *
- * The complication feature's player treatment has two states — forecast and FIRED — and the
- * fired one is a fact about a resolution that already happened. Every `player-salvage*` case
- * is pre-roll, and the one salvage record this module already seeds carries
- * `createdResults: []` on a Simple-mode component, so before this the fired treatment was
- * unreachable in the lab: no frame could show it and no parity region could measure it. This
- * is that state, authored the way every other record here is authored.
- *
- * ## The numbers are the award loop's, not decoration
- *
- * `hb-cracked-alembic` resolves salvage progressively, and its ordered stages cost their
- * result components' own difficulties: Empty Vial 1, Ground Reagent 2, Frostcap Mushroom 4.
- * The budget is the check's `value` verbatim (`initialRemaining: Number(checkResult?.value)`),
- * and a progressive check never fails — `runFormulaProgressive` returns `success: true` and a
- * raw total, with no threshold gate — so a total of 5 is a legal successful resolution that
- *
- *   - pays stage 1 (1), leaving 4;
- *   - pays stage 2 (2), leaving 2;
- *   - cannot pay stage 3 (4) and BREAKS, under this system's `awardMode: 'equal'`.
- *
- * That leaves two stages `full`, one `halted`, none `unreached` and none `skipped` — which is
- * why `createdResults` holds exactly two records and why the fired list names stage 2 and
- * stage 3 rather than all three. A record whose arithmetic did not close would publish a
- * confident, wrong screenshot, which is the failure this whole harness exists to prevent.
- *
- * Quantities are 1 and not the authored 2 and 1: the progressive salvage branch forces
- * `quantity: 1` per stage, so a record echoing the group's authored quantities would disagree
- * with the items the engine actually creates.
- *
- * ## `firedComplications` carries `publicComplications`' whole output
- *
- * The list is written at write time with `publicComplications`, because the container is an
- * actor flag replicated to every client with actor permission. Two consequences are seeded
- * literally rather than described:
- *
- *   - `hb-comp-dust-spoiled` fires here too — it is enabled for salvage and its only clause is
- *     `stageAwarded`, which stage 2 satisfies — and it is ABSENT from this list, because it is
- *     `gmOnly`. That absence is the disclosure guarantee, in the one document a player reads.
- *   - the entries are keyed by `resultId`, not by `componentId`, so the badge lands on the
- *     occurrence that fired and on none of that component's others. `resultId` is stable only
- *     because `labContent.js` authors the stage ids; see `CRACKED_ALEMBIC_STAGE_IDS`.
- *
- * The four keys the delta pins for the run record (`resultId`, `componentId`,
- * `complicationId`, `buckets`) are a SUBSET of what `publicComplications` returns, and the
- * projection's own docblock says a caller persisting it may narrow but must not widen. This
- * seeds the unnarrowed shape, so a reader that takes only the four still reconciles and a
- * strip that renders the authored name and description has something to render.
+ * A RESOLVED progressive salvage run, with per-stage outcomes and a fired-complication list (issue
+ * 1286).
  *
  * @param {object} options Options.
  * @param {string} options.actorUuid The owning actor's uuid.
@@ -2083,9 +1909,8 @@ function buildResolvedProgressiveSalvageRun({ actorUuid, userId }) {
     startedAt: NOW - 7 * HOUR,
     updatedAt: NOW - 6 * HOUR,
     finishedAt: NOW - 6 * HOUR,
-    // The order captured onto the run AT START, which is what a world-time-resumed salvage
-    // spends the budget down rather than re-reading the player's settings. Authored order
-    // here: this run was not reordered.
+    // The order captured onto the run AT START, which is what a world-time-resumed salvage spends
+    // the budget down rather than re-reading the player's settings.
     resultOrder: [
       CRACKED_ALEMBIC_STAGE_IDS.vial,
       CRACKED_ALEMBIC_STAGE_IDS.reagent,
@@ -2128,9 +1953,8 @@ function buildResolvedProgressiveSalvageRun({ actorUuid, userId }) {
         resultId: CRACKED_ALEMBIC_STAGE_IDS.reagent,
         componentId: 'hb-mortar-dust',
         complicationId: 'hb-comp-dust-cloud',
-        // AWARDED and fired at once, which the prototype never had to draw: its own rule
-        // derives "fired" from a stage being short. The stage keeps its success chip and
-        // carries the fired band beneath it.
+        // AWARDED and fired at once, which the prototype never had to draw: its own rule derives
+        // "fired" from a stage being short.
         buckets: ['full'],
         name: 'Choking dust',
         description:
@@ -2155,37 +1979,7 @@ function buildResolvedProgressiveSalvageRun({ actorUuid, userId }) {
 }
 
 /**
- * The gathering run container: one terminal record and one in-flight BLIND run.
- *
- * ── The blind run (issue 901) ────────────────────────────────────────────────────────────────
- *
- * The Journal is the surface that shows in-flight gathering runs, and before the fix it resolved a
- * blind run's real task id straight to the task NAME and rendered it to the acting player. The two
- * journal frames the changed-file mapping already selected could not show that either way, because
- * this world contained no blind run at all — a green gate over frames that evidence nothing, which
- * is worse than a red one because it looks like proof.
- *
- * What makes the frame evidence is the SHAPE. The persisted run carries only
- * `blindWaitingTaskId(environment)` — imported from the runtime rather than spelled `blind:` here,
- * so a change to the marker moves the fixture with it — plus the time gate and the environment's
- * risk. It carries NO task id and NO runtime snapshot: those are precisely what moved off the
- * player-owned flag and into the GM-owned world setting (see {@link buildLabBlindRunSecret}).
- * Seeding the real task here would reinstate the leak in the fixture and let a player frame pass
- * while showing the task name.
- *
- * ── The terminal run ──────────────────────────────────────────────────────────────────────────
- *
- * `lab-gathering-succeeded` previously carried neither `environmentId` nor `taskId`, and named its
- * timestamps `startedAt`/`updatedAt`/`finishedAt`. `GatheringRunManager._normalizeRun` rejects a
- * record missing any of `id`/`craftingSystemId`/`environmentId`/`taskId` and reads
- * `startedAtWorldTime`/`updatedAtWorldTime`/`completedAtWorldTime`, so the record was dropped whole
- * and the journal's gathering history has been empty in every published frame — the fixture-shape
- * failure class this module's own header describes. Repaired here so the new blind card is not the
- * only gathering row that is real.
- *
- * It resolves in a TARGETED environment, deliberately. A completed blind run reveals its task
- * (`revealPolicy: 'onSuccess'`), so putting the history row in the blind environment too would put
- * a real task name one row below the redacted one and invite the frame to be read as a leak.
+ * The gathering run container: one terminal record and one in-flight BLIND run (issue 901).
  *
  * @param {object} options Options.
  * @param {string} options.actorUuid The owning actor's uuid.
@@ -2246,19 +2040,10 @@ function buildLabGatheringRuns({ actorUuid, userId, environments }) {
  * @param {object} containers Output of {@link buildLabRunStates}.
  */
 export function installLabRunStates(actor, containers) {
-  // Each container goes at the ONE depth production writes it, and the three do not agree:
-  //
-  //   crafting  flags.fabricate.fabricate.craftingRuns   (setFabricateFlag -> dotted top-level key
-  //   salvage   flags.fabricate.fabricate.salvageRuns     -> V13 expandObject -> doubly nested)
-  //   gathering flags.fabricate.gatheringRuns            (bare setFlag, inner key has no dot)
-  //
-  // Verified against `src/systems/runFlagInvalidation.js`, which is the authority, and against
-  // V13's `updateSource` expanding only when a TOP-LEVEL key contains a dot.
-  //
-  // This previously wrote every container at BOTH the bare and the dotted key "to be safe". That
-  // was worse than picking wrong: with both spellings present, every reader finds something at
-  // whatever depth it looks, so the lab could never reproduce a depth bug — including the one this
-  // branch shipped and then fixed. Seeding one shape is what makes the frame evidence.
+  // Each container goes at the ONE depth production writes it, and the three do not agree:.
+  // crafting flags.fabricate.fabricate.craftingRuns (setFabricateFlag -> dotted top-level key
+  // salvage flags.fabricate.fabricate.salvageRuns -> V13 expandObject -> doubly nested) gathering
+  // flags.fabricate.gatheringRuns (bare setFlag, inner key has no dot)
   for (const [key, container] of Object.entries(containers)) {
     const path = RUN_CONTAINER_PATHS[key];
     if (!path) throw new Error(`labRunStates: no known flag path for container "${key}"`);

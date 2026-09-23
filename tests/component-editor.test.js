@@ -59,11 +59,9 @@ test('buildComponentEditorState exposes tag and essence sections when essences a
     { tag: 'fire', checked: true },
     { tag: 'flora', checked: false }
   ]);
-  // `enabled` is part of the row shape (issue 1036): the option list is a whitelist
-  // rebuild, so a field it does not name is invisible to the add-new offer filter no
-  // matter how correct the persisted field is. Neither definition above declares it, so
-  // both must default to TRUE here — a `false` fixture is asserted below.
-  // `colorToken` since issue 1371 r18-colour (M29): '' when the definition authored none.
+  // `enabled` is part of the row shape (issue 1036): the option list is a whitelist rebuild, so a
+  // field it does not name is invisible to the add-new offer filter no matter how correct the
+  // persisted field is.
   assert.deepEqual(state.essenceOptions, [
     { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', enabled: true, colorToken: '', quantity: 2 },
     { id: 'ess-shadow', name: 'Shadow', icon: getDefaultEssenceIcon(), enabled: true, colorToken: '', quantity: 1 }
@@ -85,9 +83,8 @@ test('1036/2: buildEditableEssenceOptions carries a FALSE enabled onto its optio
   assert.equal(state.essenceOptions.find((o) => o.id === 'ess-fire').enabled, false);
   assert.equal(state.essenceOptions.find((o) => o.id === 'ess-water').enabled, true);
 
-  // And the row is still THERE, carrying its authored quantity: the offer withholds a
-  // disabled essence, the DATA never does. `buildComponentEditorUpdates` rebuilds
-  // `updates.essences` solely from these rows, so a filter here would destroy the 3.
+  // And the row is still THERE, carrying its authored quantity: the offer withholds a disabled
+  // essence, the DATA never does.
   assert.equal(state.essenceOptions.length, 2, 'the option list is unfiltered');
   assert.deepEqual(buildComponentEditorUpdates(state).essences, { 'ess-fire': 3 });
 });
@@ -184,10 +181,8 @@ test('buildComponentEditorUpdates clamps quantities and omits disabled features'
 });
 
 test('buildComponentEditorState reads quantities from the item-card array essence shape', () => {
-  // The admin store's item cards carry essences as an array of { id, name, icon,
-  // quantity } entries (see adminStore._buildItemCards), not the persisted object
-  // map. The editor is fed those cards directly, so it must read their quantities
-  // rather than zeroing every field.
+  // The admin store's item cards carry essences as an array of { id, name, icon, quantity } entries
+  // (see adminStore._buildItemCards), not the persisted object map.
   const system = makeSystem({
     features: { itemTags: false, essences: true },
     essenceDefinitions: [

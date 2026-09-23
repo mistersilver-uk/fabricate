@@ -2,21 +2,19 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-item-tabs-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the harness
     // omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/Chip.svelte',
-    // The promoted tab-strip primitive (issue 1362). This is a DEPENDENCY DECLARATION, not
-    // an assertion: `RecipeItemEditorTabs` is a caller of it now, and the shared harness's
-    // closure validator THROWS naming this file if it is omitted. Every assertion below is
-    // unchanged, which is the mechanical tell that the promotion moved no rendered contract.
+    // The promoted tab-strip primitive (issue 1362). This is a DEPENDENCY DECLARATION.
     'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',
   ],

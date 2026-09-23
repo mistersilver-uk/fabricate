@@ -5,13 +5,15 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { findCuratedIconRecord, listCuratedIconVocabulary } from '../src/utils/iconVocabulary.js';
+import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
+
 import {
   FOUNDRY_CURATED_ICON_DEFINITIONS,
   FOUNDRY_ICON_DEFINITIONS
 } from '../src/ui/svelte/util/foundryIconVocabulary.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainSource = readFileSync(resolve(__dirname, '../src/main.js'), 'utf8');
+const mainSource = entryModuleSource('src/bootstrap/Fabricate.js');
 const apiDocs = readFileSync(resolve(__dirname, '../docs/api/index.md'), 'utf8');
 
 describe('the published icon vocabulary (issue 1269)', () => {
@@ -27,9 +29,7 @@ describe('the published icon vocabulary (issue 1269)', () => {
   });
 
   it('publishes exactly the three documented fields, and nothing else', () => {
-    // The contract a companion binds to is `{ iconCode, label, aliases }`. A spread of the stored
-    // definition would publish whatever a later regeneration of the catalogue happens to add, so
-    // the projection names its fields one at a time.
+    // The contract a companion binds to is `{ iconCode, label, aliases }`.
     for (const record of listCuratedIconVocabulary()) {
       assert.deepEqual(
         Object.keys(record).sort(),
@@ -43,9 +43,7 @@ describe('the published icon vocabulary (issue 1269)', () => {
   });
 
   // `aliases` is published because one entry exists per GLYPH rather than per name, so the offered
-  // name is only one of the names a stored icon may legitimately use. Dropping the field would
-  // publish a lossy view of a deduplicated set, and the part lost is exactly what a caller needs
-  // to interpret data a GM already saved.
+  // name is only one of the names a stored icon may legitimately use.
   it('publishes the other names a glyph answers to', () => {
     const gear = listCuratedIconVocabulary().find(({ iconCode }) => iconCode === 'gear');
 
@@ -56,10 +54,8 @@ describe('the published icon vocabulary (issue 1269)', () => {
     );
   });
 
-  // The reason the projection copies. The catalogue freezes entry by entry, so the older hazard —
-  // a caller writing through a shared object into every picker — is closed at the source. What
-  // survives is that a frozen row cannot be sorted or appended to, and that the freezing lives in
-  // a GENERATED file rather than in this contract.
+  // The reason the projection copies. The catalogue freezes entry by entry, so the older hazard — a
+  // caller writing through a shared object into every picker — is closed at the source.
   it('hands back rows a caller owns, all the way down', () => {
     const [firstDefinition] = FOUNDRY_CURATED_ICON_DEFINITIONS;
     const [firstPublished] = listCuratedIconVocabulary();
@@ -118,9 +114,7 @@ describe('resolving a name to a curated record (issue 1269)', () => {
   });
 
   it('answers null for a name the catalogue does not carry', () => {
-    // The whole reason a resolver is published rather than a predicate. The vocabulary's
-    // `isExcludedIconName` consults no catalogue, so it reports a typo as unexcluded; this
-    // answers from the catalogue and cannot.
+    // The whole reason a resolver is published rather than a predicate.
     assert.equal(findCuratedIconRecord('zzz-not-a-real-icon'), null);
     assert.equal(findCuratedIconRecord(''), null);
     assert.equal(findCuratedIconRecord(null), null);
@@ -154,10 +148,9 @@ describe('resolving a name to a curated record (issue 1269)', () => {
 
 describe('the icon vocabulary accessors on game.fabricate (issue 1269)', () => {
   it('gates both accessors on readiness and delegates to the shared projection', () => {
-    // `src/main.js` imports Foundry globals and a stylesheet at module scope and cannot be
-    // imported under `node:test`, so its wiring is asserted against its source, as every other
-    // `game.fabricate` surface test in this repository does. The BEHAVIOUR under that wiring is
-    // covered above, against the projection the accessors delegate to.
+    // `src/main.js` imports Foundry globals and a stylesheet at module scope and cannot be imported
+    // under `node:test`, so its wiring is asserted against its source, as every other
+    // `game.fabricate` surface test in this repository does.
     assert.match(
       mainSource,
       /listCuratedIcons\(\) \{\s*this\._requireReady\(\);\s*return listCuratedIconVocabulary\(\);\s*\}/,
@@ -170,17 +163,13 @@ describe('the icon vocabulary accessors on game.fabricate (issue 1269)', () => {
     );
     assert.ok(
       mainSource.includes(
-        "import { findCuratedIconRecord, listCuratedIconVocabulary } from './utils/iconVocabulary.js';"
+        "import { findCuratedIconRecord, listCuratedIconVocabulary } from '../utils/iconVocabulary.js';"
       ),
-      'main.js should take both projections from the shared module rather than re-implementing them'
+      'the facade should take both projections from the shared module rather than re-implementing them'
     );
   });
 
-  // A deliberate narrowing, pinned so reversing it is a decision rather than a slip. Nothing in
-  // the vocabulary module is reachable from the API except through the projection, which rules out
-  // publishing `isExcludedIconName` alongside the list. That predicate asks whether a name matches
-  // an exclusion, not whether Foundry can draw it, so it reports a typo as unexcluded. The
-  // published list and `findCuratedIcon` both answer from the catalogue and cannot.
+  // A deliberate narrowing, pinned so reversing it is a decision rather than a slip.
   it('reaches the vocabulary only through the projection', () => {
     assert.equal(
       /from '[^']*foundryIcon(Vocabulary|Catalogue)\.js'/.test(mainSource),
@@ -192,11 +181,7 @@ describe('the icon vocabulary accessors on game.fabricate (issue 1269)', () => {
 
 test('the API reference documents both icon vocabulary accessors', () => {
   // `docs/api/index.md` hand-lists the `game.fabricate` surface, so it is a MIRROR of `main.js`,
-  // and a mirror rots silently: a companion author reading the page is the only thing that
-  // notices.
-  //
-  // Scoped to the quick-reference block on purpose: a bare `includes` over the whole page is
-  // satisfied by the worked example below it, so deleting the roster line would prove nothing.
+  // and a mirror rots silently: a companion author reading the page is the only thing that notices.
   const quickReference = apiDocs.slice(
     apiDocs.indexOf('### Services And Runtime Methods'),
     apiDocs.indexOf('### Global Macro Helpers')

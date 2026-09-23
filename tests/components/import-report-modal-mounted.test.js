@@ -1,17 +1,9 @@
-/**
- * Issue 877 — the post-import reference report, converted from a raw-HTML DialogV2 into
- * a Svelte modal that renders through the SHARED `ManagerModal` chrome (the same one the
- * folder-mapping step in the very same import flow uses).
- *
- * These tests pin the two things the conversion is for: the report wears the shared
- * chrome (compact title + subtitle, round close, right-aligned footer) rather than
- * Foundry's dialog defaults, and it presents `buildImportReportContent` output as
- * bordered per-kind cards instead of raw `<ul>` bullets.
- */
+/** Issue 877 — the post-import reference report. */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -19,22 +11,20 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-import-report-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
-    // The shared portal-host resolver (issue 1466): `ManagerModal` imports it to find the
-    // application root it portals its dialog into.
+    // The shared portal-host resolver (issue 1466).
     'src/ui/svelte/util/overlayHost.js',
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/apps/manager/ManagerModal.svelte',
     // THE manager's labelled push-button (issue 1118). The footer Close renders it.
-    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/ImportReportModal.svelte',
@@ -42,7 +32,7 @@ const harness = createMountedComponentHarness({
   componentPath: 'src/ui/svelte/apps/manager/ImportReportModal.svelte',
 });
 
-// Shaped exactly like `buildImportReportContent` output (see src/systems/importReportContent.js).
+// Shaped exactly like `buildImportReportContent` output (see src/ui/presenters/importReportContent.js).
 const REPORTED_CONTENT = {
   title: 'Import report',
   headline: 'Import succeeded — 3 reference(s) need attention.',

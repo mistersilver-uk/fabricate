@@ -1,17 +1,4 @@
-/**
- * `ThresholdBandStrip`, the product's ONE threshold band strip (issue 1096).
- *
- * The strip is a VISUALISATION over state the numeric `Stepper`s in the tier rows still own,
- * so almost everything worth pinning here is about not lying: which authored field each
- * handle writes, what it announces, where it stops, and what it does when the authored set
- * cannot be drawn as one continuous strip at all.
- *
- * Every keyboard assertion below drives the handle the way a GM does — a real `keydown` on
- * the focusable `role="slider"` element — rather than calling an internal. That distinction
- * is the whole point of the WCAG 2.5.8 and keyboard-operability requirements: a strip that
- * only moved under a pointer would satisfy a source assertion and fail every GM who does not
- * use one.
- */
+/** `ThresholdBandStrip`, the product's ONE threshold band strip (issue 1096). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -60,8 +47,7 @@ describe('ThresholdBandStrip: geometry and handles', () => {
     const root = await harness.mount({ bands: RELATIVE_BANDS, previewDc: 12 });
     assert.equal(root.querySelectorAll('[data-band-strip-band]').length, 5);
     assert.equal(handles(root).length, 4, 'five tiers, four boundaries');
-    // The frames are explicit about this: five steppers at −10/−5/0/+5/+10 carry only FOUR
-    // boundary labels, and Ruined's own DC is not one of them.
+    // The frames are explicit about this.
     assert.deepEqual(
       handles(root).map((handle) => handle.getAttribute('aria-valuenow')),
       ['7', '12', '17', '22']
@@ -170,9 +156,7 @@ describe('ThresholdBandStrip: the band↔boundary mapping, per binding', () => {
       onChange: (patch) => writes.push(patch),
     });
     press(handles(root)[1], 'ArrowRight');
-    // A half-applied move is the failure this shape exists to make unreachable: writing the
-    // end without the start opens a one-value gap that `rangeGap` then reports as an error
-    // the GM never made.
+    // A half-applied move is the failure this shape exists to make unreachable.
     assert.equal(writes.length, 1, 'one patch, not two');
     assert.deepEqual(writes[0], {
       binding: 'fixed',
@@ -201,9 +185,7 @@ describe('ThresholdBandStrip: the band↔boundary mapping, per binding', () => {
   });
 
   it('writes through the AUTHORED index when the tier list is authored high-to-low', async () => {
-    // A GM who lists Masterwork first has authored a valid descending list, and the shipped
-    // lab fixture does exactly that. Drawing by value while writing by drawn POSITION would
-    // move the wrong tier — silently, and in the direction that looks like it worked.
+    // A GM who lists Masterwork first has authored a valid descending list.
     const writes = [];
     const root = await harness.mount({
       bands: [
@@ -236,15 +218,7 @@ describe('ThresholdBandStrip: bounds and the clamp', () => {
     // Interior handles: the neighbouring boundaries, one step in.
     assert.deepEqual(bounds[1], ['8', '16']);
     assert.deepEqual(bounds[2], ['13', '21']);
-    // Outermost: one step inside the TRACK, which in `relative` is the authored range
-    // extended one tier interval past the outermost tier (that extension is what makes the
-    // last band the same width as its neighbours rather than a sliver).
-    //
-    // ONE STEP INSIDE, not the raw edge. The first band's lower edge is 2 and its upper edge
-    // is this handle: bounding it at 2 let a drag put the two edges on the same value and
-    // collapse Ruined to zero width — a named tier reduced to nothing, with its focus ring
-    // clipped away by the track's `overflow: hidden`, so the GM could neither see it nor aim
-    // at it again. The same argument bounds the last handle one step inside the far edge.
+    // Outermost: one step inside the TRACK.
     assert.equal(bounds[0][0], '3', 'one step above the first band’s own lower edge');
     assert.equal(bounds[3][1], '26', 'one step below the far edge of the track');
   });
@@ -276,9 +250,7 @@ describe('ThresholdBandStrip: bounds and the clamp', () => {
   });
 
   it('draws the LAST fixed band the same width as an equal-sized neighbour', async () => {
-    // Slag 1–9 and Rough 10–17 are 9 and 8 wide; Masterwork 27–34 is 8 wide and must render
-    // 8 wide. Ending the drawing at the authored `to` made it 7 — one unit narrow on every
-    // fixed check, which reads as the top tier being rarer than it is.
+    // Slag 1–9 and Rough 10–17 are 9 and 8 wide.
     const root = await harness.mount({ binding: 'fixed', bands: FIXED_BANDS });
     const widths = [...root.querySelectorAll('[data-band-strip-band]')].map((band) =>
       Number((band.getAttribute('style').match(/width:\s*([\d.]+)%/) || [])[1])
@@ -292,9 +264,7 @@ describe('ThresholdBandStrip: bounds and the clamp', () => {
   });
 
   it('reports a describable range for a tier narrower than its own step', async () => {
-    // Authored data can put two boundaries closer together than `step`, which inverts the
-    // naive bound and announces `aria-valuemin` ABOVE `aria-valuemax` — a range no assistive
-    // technology can describe. The honest answer is that this handle has nowhere to go.
+    // Authored data can put two boundaries closer together than `step`.
     const root = await harness.mount({
       bands: [
         { id: 'a', name: 'A', from: 0 },
@@ -350,8 +320,7 @@ describe('ThresholdBandStrip: bounds and the clamp', () => {
     press(handles(root)[1], 'End');
     assert.deepEqual(writes.at(-1), { binding: 'relative', index: 2, dc: 4 }, 'clamped to 16');
     const beforeExtra = writes.length;
-    // The mount is uncontrolled here, so `aria-valuenow` has not moved; drive it past the
-    // neighbour explicitly and assert the emitted value is the CLAMP, never the request.
+    // The mount is uncontrolled here, so `aria-valuenow` has not moved.
     press(handles(root)[1], 'PageUp');
     assert.equal(writes.length, beforeExtra + 1);
     assert.equal(writes.at(-1).dc, 4, 'a page-sized jump lands on the same clamp, not past it');
@@ -397,7 +366,7 @@ describe('ThresholdBandStrip: colour, gradients and the fallback', () => {
     // …and the component's OWN stylesheet declares none either. The mounted half above can
     // only see what lands inline, and happy-dom applies no stylesheet at all, so a gradient
     // moved into the scoped block would satisfy it and paint one in every browser. The
-    // exemption `ui-integration/spec.md` grants a full-track semantic scale is deliberately
+    // exemption `ui-visual-style/spec.md` grants a full-track semantic scale is deliberately
     // NOT claimed: it requires the gradient to run across the COMPLETE track with the fill
     // kept full-width, which is the opposite of per-band identity.
     const source = readFileSync(
@@ -416,12 +385,7 @@ describe('ThresholdBandStrip: colour, gradients and the fallback', () => {
   });
 
   it('gives every handle a hit area of at least 24x24 CSS pixels (WCAG 2.5.8)', () => {
-    // Asserted against the DECLARATION rather than a measured box, and the limitation is
-    // stated rather than hidden: happy-dom performs no layout, so `getBoundingClientRect`
-    // returns zeros for every element here and a measured assertion would pass on an empty
-    // rule. The measured proof is the rendered frame; this is the guard that the rule the
-    // frame depends on is still written down. The ~2px seam between two bands is not a
-    // target, which is why the visible grip is deliberately NARROWER than this box.
+    // Asserted against the DECLARATION rather than a measured box.
     const source = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/components/ThresholdBandStrip.svelte'),
       'utf8'
@@ -442,10 +406,7 @@ describe('ThresholdBandStrip: colour, gradients and the fallback', () => {
         color: index % 2 === 0 ? 'var(--fab-success-soft)' : 'var(--fab-danger-soft)',
       })),
     });
-    // The colour lands as a CUSTOM PROPERTY the scoped rule paints from, not as a bare
-    // `background`. That is what gives it a declared fallback (an unset `var()` paints
-    // nothing at all), and it is also the only shape happy-dom's `cssText` parser preserves
-    // for a `color-mix()` — which the routed editor's tonal ramp derives.
+    // The colour lands as a CUSTOM PROPERTY the scoped rule paints from.
     const painted = [...root.querySelectorAll('[data-band-strip-band]')].map(
       (band) => /--fab-band-strip-fill:\s*([^;]+)/.exec(band.getAttribute('style'))?.[1]
     );
@@ -463,10 +424,7 @@ describe('ThresholdBandStrip: colour, gradients and the fallback', () => {
   });
 
   it('carries each band INK the same way, and omits it rather than inventing one', async () => {
-    // The ink travels with the fill because the two are one decision: the name is drawn ON the
-    // fill, so only whoever chose the fill can know what stays readable on it. A band that
-    // supplies no ink must emit NOTHING, or the scoped rule's `--fab-text` fallback is
-    // unreachable and an untinted band's name has no declared colour at all.
+    // The ink travels with the fill because the two are one decision.
     const root = await harness.mount({
       binding: 'fixed',
       bands: FIXED_BANDS.map((band, index) => ({
@@ -539,23 +497,7 @@ describe('ThresholdBandStrip: colour, gradients and the fallback', () => {
   });
 });
 
-/**
- * ── The runaway drag (issue 1096, maintainer report) ─────────────────────────────────
- *
- * "Band drag is far too sensitive — it scales to absurd numbers almost immediately."
- *
- * The cause was never a sensitivity constant: the pointer mapping is, and always was,
- * absolute position across the track. It was a FEEDBACK LOOP. `domain` is derived from the
- * tier list and its upper extent comes from the OUTERMOST tier, so moving the last handle
- * right raised `domain.max`, which stretched the span, which made the SAME pointer position
- * resolve to a larger value, which raised `domain.max` again — once per `pointermove`.
- *
- * The prototype does not have the defect because it captures the track rectangle and the
- * domain into the drag's closure at pointerdown and never re-reads them, and the fix
- * reproduces exactly that. So the test is the shape of the loop rather than a number: hold
- * the pointer STILL and dispatch repeatedly. A frozen scale reports one value however many
- * times it is asked; a live one climbs.
- */
+/** ── The runaway drag (issue 1096, maintainer report) ───────────────────────────────── */
 function pointer(type, clientX) {
   const event = new globalThis.Event(type, { bubbles: true });
   event.clientX = clientX;
@@ -567,8 +509,7 @@ describe('ThresholdBandStrip: the drag scale is frozen for the gesture', () => {
   /** A track whose measured geometry can be swapped mid-gesture. */
   function measurableTrack(root) {
     const track = root.querySelector('[data-band-strip-track]');
-    // happy-dom measures everything as zero, so the track is given the geometry a browser
-    // would report. Without it `valueAtClientX` bails and the gesture proves nothing.
+    // happy-dom measures everything as zero.
     let rect = { left: 0, width: 400, right: 400, top: 0, bottom: 46 };
     track.getBoundingClientRect = () => rect;
     return {
@@ -596,8 +537,7 @@ describe('ThresholdBandStrip: the drag scale is frozen for the gesture', () => {
     handle.dispatchEvent(pointer('pointermove', 100));
 
     assert.equal(emitted.length, 1, 'the drag committed');
-    // 100/400 of the 2..27 track is 8.25, snapped to 8; against the live 40px width the
-    // pointer would clamp far right and report the handle's own upper bound instead.
+    // 100/400 of the 2..27 track is 8.25, snapped to 8.
     assert.deepEqual(
       emitted[0],
       { binding: 'relative', index: 2, dc: -4 },
@@ -617,8 +557,7 @@ describe('ThresholdBandStrip: the drag scale is frozen for the gesture', () => {
 
     handle.dispatchEvent(pointer('pointerdown', 360));
     for (let i = 0; i < 8; i += 1) {
-      // A live scale re-reads the strip on every event, so anything that moves the strip
-      // between two identical pointer positions moves the value too.
+      // A live scale re-reads the strip on every event.
       track.resizeTo(400 - i * 20);
       handle.dispatchEvent(pointer('pointermove', 360));
     }
@@ -648,8 +587,7 @@ describe('ThresholdBandStrip: the drag scale is frozen for the gesture', () => {
     handle.dispatchEvent(pointer('pointerdown', 100));
     handle.dispatchEvent(pointer('pointermove', 100));
 
-    // 100/200 of the same 2..27 track lands on 15 — a different answer from the first
-    // gesture's 8, which is the point: the freeze lasts one gesture, not forever.
+    // 100/200 of the same 2..27 track lands on 15.
     assert.deepEqual(emitted.at(-1), { binding: 'relative', index: 2, dc: 3 });
   });
 });

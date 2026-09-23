@@ -13,6 +13,7 @@ import {
   validateGatheringRealmList,
   validateTravelConfig,
 } from './gatheringRealms.js';
+import { SettingsBackedStore } from './SettingsBackedStore.js';
 
 export class GatheringRealmValidationError extends Error {
   constructor(errors = []) {
@@ -48,30 +49,26 @@ export class GatheringRealmValidationError extends Error {
  * fails is logged and the realm goes anyway; the environment store prunes what is left on its
  * next save. Party overrides are deliberately untouched — the party card can clear a stale one.
  */
-export class GatheringRealmStore {
+export class GatheringRealmStore extends SettingsBackedStore {
   constructor({
     getSetting = defaultGetSetting,
     setSetting = defaultSetSetting,
     randomID = null,
     warn = console.warn,
   } = {}) {
-    this.getSetting = getSetting;
-    this.setSetting = setSetting;
+    super({ getSetting, setSetting, settingKey: SETTING_KEYS.TRAVEL_CONFIG });
     this.warn = warn;
     this.randomID = randomID || (() => globalThis.foundry?.utils?.randomID?.());
     this.config = null;
-    this.loaded = false;
+  }
+
+  _setCache(value) {
+    this.config = value;
   }
 
   load() {
-    const saved = this.getSetting(SETTING_KEYS.TRAVEL_CONFIG);
-    this.config = this._normalize(saved);
-    this.loaded = true;
+    this._publish(this._normalize(this._readSetting()));
     return cloneJson(this.config);
-  }
-
-  _ensureLoaded() {
-    if (!this.loaded) this.load();
   }
 
   _normalize(raw) {
@@ -202,6 +199,10 @@ export class GatheringRealmStore {
    * Delete a realm. Never blocks; strips the realm from every environment that cites it, then
    * removes it, and returns the deleted realm plus referenced-by repair evidence so the GM
    * confirm copy can warn about what the removal changes.
+   *
+   * `repaired.environments` is DIAGNOSTIC-ONLY: the count of environments this delete rewrote,
+   * for logs and tests. No UI consumes it — the GM is told what the delete will do by the
+   * pre-delete confirm, and the travel section reports only errors.
    *
    * @param {string} realmId
    * @param {{ environmentStore?: object, partyStore?: object }} [collaborators]
@@ -347,23 +348,10 @@ export class GatheringRealmStore {
     });
   }
 
-  /**
-   * PUBLISH THE CACHE BEFORE AWAITING THE WRITE, not after.
-   *
-   * Callers read-modify-write, so a second edit starting while the first `setSetting` is still
-   * in flight would otherwise read the pre-first-edit config and clobber it. The per-system
-   * store this replaced was safe by construction, because `CraftingSystemManager.updateSystem`
-   * writes its map before its own await; publishing late here would be a regression rather
-   * than a new limitation. The cost is a cache briefly ahead of the setting if the write
-   * rejects — recoverable on the next `load()`, which the replication bridge calls whenever
-   * the setting changes. A lost update is not recoverable at all.
-   */
   async _persist(next) {
     const normalized = this._normalize(next);
     const payload = cloneJson(normalized);
-    this.config = normalized;
-    this.loaded = true;
-    await this.setSetting(SETTING_KEYS.TRAVEL_CONFIG, payload);
+    await this._publishThenWrite(normalized, payload);
     return cloneJson(payload);
   }
 

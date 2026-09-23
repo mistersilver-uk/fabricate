@@ -1,20 +1,14 @@
 // Engine gating for the interactive `playerPicks` modifier-choice descriptor (#855).
-// The resolver (builds the descriptor) and the roll prompt (consumes it) are unit
-// tested elsewhere; this pins the ENGINE glue that decides WHEN to build one, so a
-// regression that widened the guard (e.g. to include `highest`) or NARROWED it back to a
-// placeholder-presence test would fail here rather than ship green.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
-import { CraftingListingBuilder } from '../src/systems/CraftingListingBuilder.js';
+import { CraftingListingBuilder } from '../src/ui/presenters/CraftingListingBuilder.js';
 import { resolveCheckFormulaDisplay } from '../src/systems/checkRoll.js';
 import { Recipe } from '../src/models/Recipe.js';
 import { stubInteractiveRollEnvironment } from './helpers/rollPromptDialogStub.js';
 
-// `Recipe` stamps `metadata.author` from a BARE `game` reference, which is a
-// ReferenceError rather than `undefined` when the global is absent. The authority cases
-// below build real recipes, so the minimum global lives here; the dismissal test at the
-// end of this file saves and restores whatever it finds.
+// `Recipe` stamps `metadata.author` from a BARE `game` reference, which is a ReferenceError rather
+// than `undefined` when the global is absent.
 globalThis.game = { user: { name: 'GM' } };
 
 // Stub Roll.replaceFormulaData so the internal makeRollDataExpressionEvaluator resolves
@@ -57,11 +51,7 @@ test('engine gating: a non-interactive craft threads no modifierChoice', () => {
   });
 });
 
-// `playerPicks` is the ONLY rule that defers to ROLL time. `bySubject` defers too, but to
-// the RECIPE AUTHOR at recipe-edit time — by the time the engine rolls, the choice is
-// already made and stored, so prompting would re-ask a question the recipe answered.
-// That is why the gate tests for `playerPicks` specifically rather than for
-// `policyDefersSelection`.
+// `playerPicks` is the ONLY rule that defers to ROLL time.
 test('engine gating: an interactive non-playerPicks rule threads no modifierChoice', () => {
   withRoll({ med: 2, herb: 5 }, () => {
     for (const systemPolicy of ['addAll', 'highest', 'bySubject']) {
@@ -113,16 +103,8 @@ test('engine gating: the descriptor carries the system cap, clamped to the optio
   });
 });
 
-// THE B1 GATE, re-pointed rather than deleted (issue 1094). This test used to assert the
-// OPPOSITE: that a formula without the retired placeholder threads NO descriptor. That was
-// the real gate on the whole interactive `playerPicks` feature — not `evaluateCheckRoll`'s
-// `useDeferredChoice`, which only ever keyed on the descriptor being present — so retiring
-// the placeholder without replacing this condition would have left every interactive
-// `playerPicks` craft silently offering no modifier fieldset, with `npm test` green.
-//
-// It is also the assertion that FAILS if `_buildInteractiveModifierChoice` is mutated to
-// `return null`: mutate it and this test flips red, which is what makes the gate proven
-// live rather than merely described.
+// THE B1 GATE, re-pointed rather than deleted (issue 1094). This test used to assert the OPPOSITE:
+// that a formula without the retired placeholder threads NO descriptor.
 test('engine gating: a PLACEHOLDER-FREE formula still offers the modifier fieldset (B1)', () => {
   withRoll({ med: 2, herb: 5 }, () => {
     const choice = build('1d20 + @abilities.int.mod', context(), true);
@@ -144,9 +126,8 @@ test('engine gating: an unauthored formula threads no modifierChoice', () => {
   });
 });
 
-// …and a formula whose only content was the retired placeholder is unauthored too, once
-// the shim has stripped it. Asserted with a `Roll.validate` double, because the residue
-// check is what makes the non-additive placements answer "no formula" as well.
+// …and a formula whose only content was the retired placeholder is unauthored too, once the shim
+// has stripped it.
 test('engine gating: a formula that strips to empty threads no modifierChoice', () => {
   const previousRoll = globalThis.Roll;
   globalThis.Roll = {
@@ -197,10 +178,8 @@ test('engine gating: fewer than two eligible modifiers threads no modifierChoice
   });
 });
 
-// A recipe never overrides the rule, so a stored legacy `policy` can neither opt a
-// recipe INTO an interactive roll nor opt it OUT of one. This is the descriptor-level
-// observable of that invariant; the rolled string is asserted through a real runner
-// further down.
+// A recipe never overrides the rule, so a stored legacy `policy` can neither opt a recipe INTO an
+// interactive roll nor opt it OUT of one.
 test('engine gating: a stored recipe policy can neither add nor remove the descriptor', () => {
   withRoll({ med: 2, herb: 5 }, () => {
     for (const stale of ['playerPicks', 'bySubject', 'highest', 'addAll']) {
@@ -225,24 +204,16 @@ test('engine gating: a stored recipe policy can neither add nor remove the descr
   });
 });
 
-// ── composition: every check runner actually THREADS the descriptor ──────────
-//
-// The gating tests above call `_buildInteractiveModifierChoice` directly, so they say
-// nothing about whether any runner CALLS it. Deleting the three
-// `modifierChoice: this._buildInteractiveModifierChoice(…)` threads leaves the whole
-// suite green and ships `playerPicks` dead. These tests drive the real seam end to end —
-// engine → `buildInteractiveRollOptions` → `evaluateCheckRoll` → prompt → substitution —
-// and assert the rolled formula carries the NON-DEFAULT picked value, so a missing
-// descriptor (which falls back to the deterministic `highest`) cannot coincidentally
-// match.
+// composition: every check runner actually THREADS the descriptor. The gating tests above call
+// `_buildInteractiveModifierChoice` directly, so they say nothing about whether any runner CALLS
+// it.
 
 const PICK_CATALOGUE = [
   { id: 'med', label: 'Medicine', icon: 'fa-a', expression: '@med' },
   { id: 'herb', label: 'Herbalism', icon: 'fa-b', expression: '@herb' },
 ];
-// Medicine (2) is the player's pick; Herbalism (5) is the pre-selected highest AND the
-// value the deterministic fallback would append — hence `+ 2[Modifiers]` vs
-// `+ 5[Modifiers]` discriminates.
+// Medicine (2) is the player's pick; Herbalism (5) is the pre-selected highest AND the value the
+// deterministic fallback would append — hence `+ 2[Modifiers]` vs `+ 5[Modifiers]` discriminates.
 const PICK_ACTOR = { getRollData: () => ({ med: 2, herb: 5 }) };
 const PICK_FORMULA = '1d20';
 const PICK_RECIPE = { name: 'Healing Salve', craftingSystemId: 'sys-1' };
@@ -321,11 +292,9 @@ for (const runnerCase of RUNNER_CASES) {
   });
 }
 
-// ── cancel: a dismissed playerPicks prompt aborts a REAL craft with zero mutation ──
-//
-// The repo's other zero-mutation proofs stub `_runCraftingCheck` out entirely, so none
-// of them exercises a dismissed `playerPicks` dialog reaching the abort. This one runs
-// the real check through `craft()`, dismisses the dialog, and asserts nothing moved.
+// cancel: a dismissed playerPicks prompt aborts a REAL craft with zero mutation. The repo's other
+// zero-mutation proofs stub `_runCraftingCheck` out entirely, so none of them exercises a dismissed
+// `playerPicks` dialog reaching the abort.
 
 test('engine craft: dismissing the playerPicks prompt cancels with zero Item mutation', async () => {
   const stub = stubInteractiveRollEnvironment({ dismiss: true });
@@ -441,26 +410,14 @@ test('engine craft: dismissing the playerPicks prompt cancels with zero Item mut
   }
 });
 
-// ── the four rules, as the engine actually ROLLS them (issue 1055) ───────────
-//
-// Every case here asserts the ROLLED FORMULA STRING produced by a real check runner.
-// That is deliberate and it is the only observable that can fail for the right reason:
-// a resolver-level assertion cannot see a runner that never threads the context, and a
-// descriptor-level assertion cannot see the arithmetic that reaches Foundry's `Roll`.
-// The fixture is two eligible modifiers with DIFFERENT values — Medicine 2, Herbalism 5
-// — so `addAll`/unbounded-`playerPicks` (7), `highest`/capped-`playerPicks` (5), an
-// authored empty set (0) and a one-modifier pick (2) are four distinct strings and no
-// two of them can coincide.
-//
-// `resolvedFormula` is asserted equal to the rolled string in every case, which is
-// acceptance criterion 9 (evaluated formula == displayed formula) under each rule.
+// the four rules, as the engine actually ROLLS them (issue 1055). Every case here asserts the
+// ROLLED FORMULA STRING produced by a real check runner.
 
 const RULE_SLOT = { simple: { rollFormula: PICK_FORMULA, dc: 10, thresholdMode: 'meet' } };
 
 /**
- * A crafting system with the two-modifier catalogue, a combination rule, a default
- * eligible set and — only when one is given — a pick cap. ABSENCE is unlimited and is a
- * real state, so the key is attached rather than defaulted.
+ * A crafting system with the two-modifier catalogue, a combination rule, a default eligible set and
+ * — only when one is given — a pick cap.
  */
 function ruleSystem({ policy, defaultIds = ['med', 'herb'], maxPicks } = {}) {
   const craftingCheck = {
@@ -536,9 +493,8 @@ test('engine rules: bySubject rolls the recipe author’s pick', async () => {
   );
 });
 
-// The cap is enforced at the RESOLVER, not only at the picker, so a GM who lowers it
-// below what a recipe already picked cannot leave that recipe rolling more than the
-// system now permits.
+// The cap is enforced at the RESOLVER, not only at the picker, so a GM who lowers it below what a
+// recipe already picked cannot leave that recipe rolling more than the system now permits.
 test('engine rules: a lowered cap TRUNCATES a bySubject pick already on disk', async () => {
   const recipe = modifierRecipe({ modifierIds: ['med', 'herb'] }, 'r-capped');
   assertRolled(
@@ -575,10 +531,7 @@ test('engine rules: an AUTHORED EMPTY pick appends nothing under bySubject', asy
   );
 });
 
-// THE BACK-COMPAT GUARANTEE, end to end. A world migrated by `1.20.0` carries
-// `maxModifierPicks: 1`, and at that cap `playerPicks` is arithmetically identical to
-// `highest` on every non-interactive path — which is exactly what those worlds rolled
-// before the cap existed.
+// THE BACK-COMPAT GUARANTEE, end to end.
 test('engine rules: non-interactive playerPicks at cap 1 rolls the historical highest', async () => {
   const recipe = modifierRecipe(null, 'r-headless');
   const stub = stubInteractiveRollEnvironment();
@@ -626,9 +579,7 @@ test('engine rules: non-interactive playerPicks UNBOUNDED sums the best legal se
   }
 });
 
-// The interactive multi-pick, through a REAL checkbox group. `RadioNodeList#value`
-// inspects radio inputs only, so a `{ value }` stand-in could not express a two-box
-// selection at all and would silently exercise the no-answer fallback instead.
+// The interactive multi-pick, through a REAL checkbox group.
 test('engine rules: an interactive multi-pick selection SUMS what the player ticked', async () => {
   const system = ruleSystem({ policy: 'playerPicks', maxPicks: 2 });
   const recipe = modifierRecipe(null, 'r-multi');
@@ -668,10 +619,8 @@ test('engine rules: a single-pick radio answer still appends that one modifier',
 });
 
 test('engine rules: a one-modifier eligible set collapses a playerPicks system', async () => {
-  // One eligible modifier is not a choice, so the two-option floor suppresses the
-  // descriptor and the deterministic scalar rolls instead. The stub answers with an id
-  // the (suppressed) descriptor would not offer, which production discards — so a
-  // descriptor built here could not coincidentally match.
+  // One eligible modifier is not a choice, so the two-option floor suppresses the descriptor and
+  // the deterministic scalar rolls instead.
   assertRolled(
     await rollThrough(
       ruleSystem({ policy: 'playerPicks', defaultIds: ['herb'], maxPicks: 1 }),
@@ -695,9 +644,8 @@ test('engine rules: a one-modifier eligible set collapses a playerPicks system',
 });
 
 test('engine rules: the listing DISPLAYS exactly what the engine rolls (parity)', async () => {
-  // The fixture is chosen so the two context builders can DISAGREE: `bySubject` with a
-  // capped recipe pick reads the recipe set, the cap and the rule. Under `addAll` both
-  // sides would read the system default set and the parity would hold vacuously.
+  // The fixture is chosen so the two context builders can DISAGREE: `bySubject` with a capped
+  // recipe pick reads the recipe set, the cap and the rule.
   const system = ruleSystem({ policy: 'bySubject', maxPicks: 1 });
   const recipe = modifierRecipe({ modifierIds: ['med', 'herb'] }, 'r-parity');
   const engineRoll = await rollThrough(system, recipe);

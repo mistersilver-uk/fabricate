@@ -1,16 +1,6 @@
 /**
- * The Foundry perf profile's pure layer (issue 1073).
- *
- * What is worth testing here is precisely what a live run cannot check for itself. A run needs
- * Docker, a licensed Foundry image and roughly an hour; nobody will run it to find out that a
- * preflight message was wrong or that the write budget quietly became proportional to the corpus. So
- * every derivation the profile depends on is exercised here, and the browser walk — which genuinely
- * cannot be unit-tested — is reduced to a registry whose SHAPE is pinned instead.
- *
- * Three of these are guards over hand-maintained mirrors rather than over logic, and they are the
- * ones most likely to earn their keep: the scenario-to-measurement mirror, the startup mark names
- * shared between `src/utils/startupMarks.js` and the browser-side reader, and the assertion that no
- * required workflow invokes the profile.
+ * The Foundry perf profile's pure layer (issue 1073). What is worth testing here is precisely what
+ * a live run cannot check for itself.
  */
 import { strict as assert } from 'node:assert';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -72,18 +62,9 @@ const REPOSITORY_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SYSTEM_ID = 'benchsys';
 
 /**
- * A fixture with the shape issue 1071's `buildScaleFixture` returns, at an arbitrary size.
- *
- * Built here rather than imported because issue 1071 is a separate lane: this file must pass on a
- * checkout that has the perf profile and not the fixtures. What it MUST match is the fixture's
- * SHAPE, and the mirror test below fails if the real generator is present and disagrees.
- *
- * The actor count is THREE, not one, and that is load-bearing rather than incidental: issue 1071's
- * inventory generator spreads its stacks over a crafting actor plus source actors, and a one-actor
- * fixture makes the "every actor is batched into ONE create call" assertion vacuous — `actors.length`
- * and the constant `1` are the same number, so a per-actor regression passes the budget test.
- *
- * @param {{recipes: number, components: number, stacks: number}} scale
+ * A fixture with the shape issue 1071's `buildScaleFixture` returns, at an arbitrary size. Built
+ * here rather than imported because issue 1071 is a separate lane: this file must pass on a
+ * checkout that has the perf profile and not the fixtures.
  */
 function fakeFixture({ recipes, components, stacks }) {
   const actorCount = 3;
@@ -440,16 +421,16 @@ test('an unclosed phase is reported rather than silently dropped', () => {
   assert.deepEqual(marks.opened(), [STARTUP_PHASES.STARTUP_MAINTENANCE]);
 });
 
-test('main.js opens and closes every declared startup phase', () => {
+test('the composition root opens and closes every declared startup phase', () => {
   // The mirror that rots silently: a phase declared here but never marked in `initialize()` makes
   // the profile report `missing` forever while every gate stays green.
-  const source = readFileSync(join(REPOSITORY_ROOT, 'src', 'main.js'), 'utf8');
+  const source = readFileSync(join(REPOSITORY_ROOT, 'src', 'bootstrap', 'composeServices.js'), 'utf8');
   for (const phase of STARTUP_PHASE_NAMES) {
     const constant = Object.entries(STARTUP_PHASES).find(([, value]) => value === phase)[0];
     const begins = source.split(`_startupMarks.begin(STARTUP_PHASES.${constant})`).length - 1;
     const ends = source.split(`_startupMarks.end(STARTUP_PHASES.${constant})`).length - 1;
-    assert.equal(begins, 1, `main.js must begin the ${phase} phase exactly once`);
-    assert.equal(ends, 1, `main.js must end the ${phase} phase exactly once`);
+    assert.equal(begins, 1, `the composition root must begin the ${phase} phase exactly once`);
+    assert.equal(ends, 1, `the composition root must end the ${phase} phase exactly once`);
   }
 });
 
@@ -614,10 +595,7 @@ test('a run record warns, in its own text, that its timings are class 2', () => 
 test('two runs are comparable only when host AND Foundry envelopes agree', () => {
   assert.ok(assertFoundryComparable(runRecord(), runRecord()).comparable);
 
-  // EVERY comparability field gets its OWN case, each varying exactly one value. A case that
-  // changed two at once (say `arm` and `foundryVersion` together, as a real arm switch does) would
-  // still pass if one of the two were dropped from the rule — so the fields would be individually
-  // unguarded while the test looked thorough.
+  // EVERY comparability field gets its OWN case, each varying exactly one value.
   const cases = [
     ...HOST_COMPARABILITY_FIELDS.map((field) => [{ host: { [field]: 'something-else' } }, field]),
     ...FOUNDRY_COMPARABILITY_FIELDS.map((field) => [
@@ -719,32 +697,14 @@ test('the perf lifecycle forwards the fixture as a flag', () => {
   assert.match(source, /process\.env\.FOUNDRY_PERF_FIXTURE = fixture\[1\]/);
 });
 
-/**
- * Every module specifier a source file statically loads.
- *
- * ONE definition, called by both the gate below and its can-fail proof. A proof that re-typed the
- * gate's regex would stay green while the gate's own pattern rotted, which is the failure mode a
- * can-fail proof exists to rule out.
- *
- * Covers the four forms that all produce the same load-time resolution: `import ... from`,
- * `export ... from` (a re-export loads the module identically), a bare side-effect `import '...'`,
- * and either quote style. Prettier normalises quotes, but `format:check` is a separate CI job from
- * `npm test`, so this gate does not lean on it.
- */
+/** Every module specifier a source file statically loads. */
 function staticImportSpecifiers(source) {
   const withFrom = [...source.matchAll(/^\s*(?:import|export)\s[^;]*?from\s+['"]([^'"]+)['"]/gm)];
   const bare = [...source.matchAll(/^\s*import\s+['"]([^'"]+)['"]/gm)];
   return [...withFrom, ...bare].map((match) => match[1]);
 }
 
-/**
- * `src/` specifiers reachable from `entry`, following LOCAL `./` hops inside `scripts/lib/`.
- *
- * Transitive on purpose. `foundryPerfScenarios.js` imports no `src/` module directly, but it
- * imports `./foundryPerfCapture.js`, which does -- and a load-time failure does not care how many
- * hops away it is. A direct-only scan would have reported this registry clean while a deletion two
- * files away still took out every scenario.
- */
+/** `src/` specifiers reachable from `entry`, following LOCAL `./` hops inside `scripts/lib/`. */
 function reachableSrcSpecifiers(entry) {
   const seen = new Set();
   const found = [];
@@ -778,24 +738,12 @@ function reachableSrcSpecifiers(entry) {
   return found;
 }
 
-/*
- * The one `src/` module the perf harness is allowed to load, with the reason it is safe.
- *
- * `src/utils/startupMarks.js` is a leaf of shared constants -- the startup mark prefix and phase
- * names the harness reads back out of `performance.getEntriesByType`. It is not product surface
- * that any storage work removes, and the harness cannot read marks it cannot name.
- */
+/** The one `src/` module the perf harness is allowed to load, with the reason it is safe. */
 const PERMITTED_SRC_IMPORTS = ['../../src/utils/startupMarks.js'];
 
 test('the perf harness reaches no src/ module except one named leaf', () => {
   // THE COUPLING 1261 WOULD OTHERWISE BREAK (issues 1255, 1261, 1265). Until this PR the registry
   // statically imported `src/systems/definitionStorageConsentPrompt.js`, which issue 1261 deletes.
-  // That WOULD have been a load-time `Cannot find module` for the whole registry -- taking out
-  // EVERY scenario, not just the one that used the constant. It has not happened in this tree;
-  // this gate is what keeps it from happening.
-  //
-  // Asserted against import statements rather than a whole-file grep: prose here legitimately
-  // names `src/` paths, and a grep matching those would be a gate that can only fail wrongly.
   const entries = [
     ['scripts', 'lib', 'foundryPerfScenarios.js'],
     ['scripts', 'foundry-perf-run.mjs'],

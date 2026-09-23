@@ -19,10 +19,7 @@ import { JOURNAL_RUN_COMMAND_TIMEOUT_MS } from '../src/systems/journalRunCommand
 function foundryAuthorityFixture(crypto, { failServerRead = () => false } = {}) {
   const journal = [];
   const claimCalls = [];
-  // Every message the real `SocketInterface.#handleError` would have shown the user. It raises
-  // `ui.notifications.error` UNCONDITIONALLY before returning the error for rejection, so a
-  // server rejection IS a toast and no `catch` in the adapter can take it back. Counting them is
-  // the only way to assert the maintainer's requirement: that the user sees nothing.
+  // Every message the real `SocketInterface.#handleError` would have shown the user.
   const serverRejections = [];
   const getCalls = [];
   let generatedPageIds = 0;
@@ -68,15 +65,9 @@ function foundryAuthorityFixture(crypto, { failServerRead = () => false } = {}) 
         pages.set(page.id, page);
         return [page];
       },
-      // Core resolves the DELETED DOCUMENTS, not their ids. A looser double answering ids kept
-      // the adapter's `item === page.id` fallback alive and hid the fall-open branch beside it.
-      //
-      // It also never REFUSED, which is how a vacuous absence guard came to ship beside it. Real
-      // `deleteEmbeddedDocuments` rejects twice over: `#preDeleteDocumentArray` resolves each id
-      // through `collection.get(id, {strict: true})` against the LOCAL collection before
-      // dispatching, and `_deleteDocuments` then throws `<Type> "<id>" does not exist!` for an id
-      // the SERVER has not got. Only the second is a toast, and only a SUCCESSFUL response prunes
-      // the local collection, so a rejected delete leaves `pages` exactly as it was.
+      // Core resolves the DELETED DOCUMENTS, not their ids. A looser double answering ids kept the
+      // adapter's `item === page.id` fallback alive and hid the fall-open branch beside it. It also
+      // never REFUSED, which is how a vacuous absence guard came to ship beside it.
       deleteEmbeddedDocuments: async (type, ids) => {
         for (const id of ids) {
           if (!pages.has(id)) {
@@ -114,10 +105,6 @@ function foundryAuthorityFixture(crypto, { failServerRead = () => false } = {}) 
     },
   };
   // The authoritative server read the provisioner and the claim release both rest on.
-  // `CONFIG.DatabaseBackend.get` is public on V13.351 and V14.365, and an adapter that CANNOT
-  // perform it now reports unsettled rather than "no ledger exists" — so a fixture without it
-  // would model a dead runtime. It answers from `serverPages`, never from the local mirror, and
-  // honours the `_id` query the release scopes its read with.
   const CONFIG = {
     DatabaseBackend: {
       get: async (_documentClass, { query = {} } = {}) => {
@@ -288,14 +275,7 @@ describe('journal run authority ledger', () => {
   });
 
   it('reconciles a claim whose page is already gone, rather than refusing or throwing', async () => {
-    // The maintainer hit this on the release button. `entry.pages` is the BROADCAST-FED local
-    // copy, so the UI can offer a release for a claim the server has already removed — another
-    // realm's reaper, or a release this client has not heard about. Core's
-    // `deleteEmbeddedDocuments` THROWS for an absent id, and the escaping throw left the run
-    // blocked reporting `JournalEntryPage "FabRunAuthority1" does not exist!`.
-    //
-    // Absence IS the goal state reconciliation exists to reach, so reaching it already is a
-    // success, not a `claim-mismatch` refusal. A DIFFERENT claim still refuses — asserted below.
+    // The maintainer hit this on the release button.
     const world = sharedAuthorityWorld();
     const authority = world.realm();
     await authority.setup();
@@ -331,10 +311,8 @@ describe('journal run authority ledger', () => {
   });
 
   it('announces a refusal LIFTING, and never the refusal itself', async () => {
-    // M25: availability is read when a surface builds, so a refusal captured while a command
-    // held the claim outlives that claim in the rendered view. The lift is the moment every
-    // such reading became false, so it is the one thing worth announcing. Announcing the
-    // refusal too would only repaint mid-command, and polling was ruled out.
+    // M25: availability is read when a surface builds, so a refusal captured while a command held
+    // the claim outlives that claim in the rendered view.
     const world = sharedAuthorityWorld();
     let restored = 0;
     const authority = world.realm('gm', { onAvailabilityRestored: () => (restored += 1) });
@@ -404,14 +382,8 @@ describe('journal run authority ledger', () => {
   });
 
   it('releases a claim the server already lost, without a delete it would reject', async () => {
-    // The maintainer's own world, reproduced. `entry.pages` is the BROADCAST-FED local copy, so
-    // it can still show a claim page another realm's reaper has already deleted. The release
-    // used to dispatch a delete naming that id, and the server answered
-    // `JournalEntryPage "FabRunAuthority1" does not exist!` — a message `SocketInterface`
-    // raises as a toast BEFORE rejecting, so catching the rejection never hid it, and the
-    // absence re-read beside the catch could never answer true because a rejected delete does
-    // not prune the local collection. The claim then read as unreleased and the run was left
-    // behind a blocking `claim-release-failed` recovery notice.
+    // The maintainer's own world, reproduced. `entry.pages` is the BROADCAST-FED local copy, so it
+    // can still show a claim page another realm's reaper has already deleted.
     const authority = foundryAuthorityFixture({ randomUUID: () => 'secure-uuid' });
     assert.equal((await authority.setup()).success, true);
     const ledger = authority.journal.at(0);
@@ -502,11 +474,8 @@ describe('journal run authority ledger', () => {
   });
 
   /**
-   * FI1. The release CONFIRMS server-side before deleting, and the confirming read can reject —
-   * the same seam, the same `#handleError`, as the writes around it. Unguarded, that rejection
-   * escaped `deleteClaim`, whose contract is `async => boolean`, and unwound the queued task after
-   * the request was already settled with `claimId: null`: the claim survived with nothing
-   * recording it, `publishAvailability` never ran, and every client sat at `claim-held`.
+   * FI1. The release CONFIRMS server-side before deleting, and the confirming read can reject — the
+   * same seam, the same `#handleError`, as the writes around it.
    */
   it('answers a release whose confirming server read rejects, rather than letting it escape', async () => {
     let failRead = false;
@@ -536,12 +505,7 @@ describe('journal run authority ledger', () => {
   });
 
   it('refuses a contended acquire before any create is dispatched', async () => {
-    // Why `claimOn` KEEPS its rejection. The create's duplicate-`_id` refusal is the atomic
-    // compare-and-set the whole lock is made of, and it is not the everyday error the release
-    // was, because ordinary contention never reaches it: `ledgerResult` reads the claim and
-    // answers `claim-held` for a LIVE claim before `acquire` ever calls `claimOn`. Only two
-    // realms that both saw the claim free can collide at the server, which is the knife-edge the
-    // atomicity exists for and the one case asking first could not resolve either.
+    // Why `claimOn` KEEPS its rejection.
     const authority = foundryAuthorityFixture({ randomUUID: () => 'secure-uuid' });
     assert.equal((await authority.setup()).success, true);
     const ledger = authority.journal.at(0);
@@ -568,11 +532,7 @@ describe('journal run authority ledger', () => {
   });
 
   it('reaps a stale local claim the server already lost and carries on', async () => {
-    // The same drift reached through the reaper rather than the release. A claim page left in
-    // the local copy after the server lost it is judged LEAKED once it outlives the live window,
-    // and reaping it used to dispatch the delete the server refuses — so the Journal answered
-    // `claim-held` and toasted, every command, indefinitely. Absence is the goal state, so the
-    // reap now succeeds and the command runs.
+    // The same drift reached through the reaper rather than the release.
     const authority = foundryAuthorityFixture({ randomUUID: () => 'secure-uuid' });
     assert.equal((await authority.setup()).success, true);
     const ledger = authority.journal.at(0);
@@ -778,10 +738,7 @@ describe('journal run authority ledger', () => {
     assert.deepEqual(gm.availability(), { available: false, reason: 'ledger-ambiguous' });
   });
 
-  // A READ THAT DID NOT ANSWER AUTHORISES NOTHING. The rejection used to collapse to `[]`,
-  // which `resolve()` cannot tell from "the server says none exist" — so two GMs booting while
-  // that read rejected each provisioned their own ledger, and the fixed-`_id` embedded claim
-  // cannot exclude them because they claim on different parents.
+  // A READ THAT DID NOT ANSWER AUTHORISES NOTHING.
   it('never provisions from an authoritative read that failed to answer', async () => {
     for (const [label, listLedgerRecords] of [
       ['a rejection', async () => { throw new Error('socket closed'); }],
@@ -1165,13 +1122,9 @@ describe('journal run authority ledger', () => {
     assert.equal(world.ledger.claim.claimId, 'live-claim');
   });
 
-  // --------------------------------------------------------------------------------------
-  // The claim reaper. `ledgerResult` used to answer `claim-held` for ANY claim with no
-  // liveness test of any kind, so one leaked claim blocked every user on every surface
-  // permanently until a GM ran a console API — which is how an ordinary recipe came to show
-  // a claim-held callout. The line is drawn at the REQUEST the claim guards, never at age
-  // alone, and every ambiguous case stays retained.
-  // --------------------------------------------------------------------------------------
+  // The claim reaper. `ledgerResult` used to answer `claim-held` for ANY claim with no liveness
+  // test of any kind, so one leaked claim blocked every user on every surface permanently until a
+  // GM ran a console API — which is how an ordinary recipe came to show a claim-held callout.
 
   it('derives the claim live window from the command timeout it has to outlast', () => {
     assert.ok(
@@ -1182,12 +1135,9 @@ describe('journal run authority ledger', () => {
   });
 
   it('bounds the queue wait at the command timeout, not at the claim window', () => {
-    // Issue 1759. The two numbers answer different questions and must not be confused: the
-    // claim window asks how long a command may still be RUNNING, and is four times the command
-    // timeout so a slow command is never misjudged. The queue wait asks how long a command that
-    // has not started may go on WAITING, and past the point its caller gave up the answer is
-    // "no longer". A GM's own command takes no socket round trip, so this is its only bound --
-    // at the claim window it would be a minute of frozen Journal.
+    // Issue 1759. The two numbers answer different questions and must not be confused: the claim
+    // window asks how long a command may still be RUNNING, and is four times the command timeout so
+    // a slow command is never misjudged.
     assert.equal(JOURNAL_RUN_QUEUE_WAIT_MS, JOURNAL_RUN_COMMAND_TIMEOUT_MS);
     assert.ok(
       JOURNAL_RUN_QUEUE_WAIT_MS < JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS,
@@ -1336,11 +1286,9 @@ describe('journal run authority ledger', () => {
     );
   });
 
-  // --------------------------------------------------------------------------------------
-  // A ledger swap mid-command. `writeLedgerState` retries onto the ledger that replaced a
-  // deleted one, and the claim page lives INSIDE the ledger it was created on — so the
-  // command used to run to completion holding no lock on the ledger it was writing to.
-  // --------------------------------------------------------------------------------------
+  // A ledger swap mid-command. `writeLedgerState` retries onto the ledger that replaced a deleted
+  // one, and the claim page lives INSIDE the ledger it was created on — so the command used to run
+  // to completion holding no lock on the ledger it was writing to.
 
   it('re-claims on the replacement ledger when a racing deletion swaps it mid-command', async () => {
     const world = sharedAuthorityWorld();
@@ -1535,10 +1483,8 @@ describe('journal run authority ledger', () => {
   });
 
   /**
-   * An execution grant is a bearer token, so the ONLY thing standing between it and an
-   * unrelated privileged call is the per-field binding comparison and the single-use flag.
-   * Both survived the whole corpus (issue 1648, Q-H3/Q-H4): under the first mutation a grant
-   * issued to pause `Actor.a`'s `run-1` redeemed as an execute against `Actor.evil`/`run-999`.
+   * An execution grant is a bearer token, so the ONLY thing standing between it and an unrelated
+   * privileged call is the per-field binding comparison and the single-use flag (issue 1648).
    */
   it('redeems an execution grant once, and only for the binding it was issued for', async () => {
     const world = sharedAuthorityWorld();
@@ -1599,11 +1545,8 @@ describe('journal run authority ledger', () => {
   });
 
   it('refuses a command that never gets its turn, instead of waiting for one forever', async () => {
-    // Issue 1759. Every authority command serialises through ONE promise chain, and nothing on
-    // it had a bound of its own: `sendCommand` times out, the queue did not. So one task that
-    // never settled stopped every later command on that client permanently, with no error and
-    // nothing on screen. The maintainer met that as a Foundry that had simply stopped
-    // responding, and the Foundry smoke met it as a 28-minute timeout with no diagnosis.
+    // Issue 1759. Every authority command serialises through ONE promise chain, and nothing on it
+    // had a bound of its own: `sendCommand` times out, the queue did not.
     const world = sharedAuthorityWorld();
     const authority = world.realm('gm', { queueWaitMs: 25 });
     let releaseWedge = null;
@@ -1615,8 +1558,7 @@ describe('journal run authority ledger', () => {
         })
     );
     // Let the wedged command reach its handler, so it is genuinely HOLDING the line rather than
-    // merely queued ahead. Without this the refusal below could be the first task refusing
-    // itself, which would pass while proving nothing.
+    // merely queued ahead.
     await Promise.resolve();
 
     let blockedReachedHandler = false;
@@ -1641,10 +1583,7 @@ describe('journal run authority ledger', () => {
     releaseWedge();
     assert.deepEqual(await wedged, { success: true, ran: 'wedge' });
 
-    // The refusal does not poison the client: once the line is free, commands run again. This
-    // also DRAINS the chain -- `after` is queued behind `blocked`, so its completion is proof
-    // that `blocked`'s turn has been and gone, which is what makes the next assertion real
-    // rather than a race the test happens to win.
+    // The refusal does not poison the client: once the line is free, commands run again.
     assert.deepEqual(
       await authority.run(
         { requestId: 'after', senderId: 'player', sessionId: 'three' },
@@ -1660,13 +1599,7 @@ describe('journal run authority ledger', () => {
 
   it('names the command that really holds the line, not one that finished before it', async () => {
     // Found in review of the first version of this fix, and proved before it was believed. The
-    // refusal captured `queueHolder` when it ENQUEUED, which is not when it refuses. Two calls
-    // landing in one synchronous tick -- ordinary, since a socket message handler can deliver
-    // both -- therefore each recorded whatever had last run, and the refusal named a command
-    // that had already finished before the real holder even started.
-    //
-    // A `blockedBy` that names the wrong command is worse than none: this fix exists to make a
-    // stall diagnosable, and a confident wrong answer sends the reader somewhere else entirely.
+    // refusal captured `queueHolder` when it ENQUEUED, which is not when it refuses.
     const world = sharedAuthorityWorld();
     const authority = world.realm('gm', { queueWaitMs: 25 });
     assert.equal(
@@ -1697,9 +1630,8 @@ describe('journal run authority ledger', () => {
   });
 
   it('bounds the wait for every queued entry point, not only for commands', async () => {
-    // `run` is not the only task on the chain. `bootstrapRecovery` and `reconcile` queue too, so
-    // a wedge stalls them the same way and each has to be able to say so. Left untested, the
-    // bound would hold for the path that happened to have a test and silently not for the rest.
+    // `run` is not the only task on the chain. `bootstrapRecovery` and `reconcile` queue too, so a
+    // wedge stalls them the same way and each has to be able to say so.
     const world = sharedAuthorityWorld();
     const authority = world.realm('gm', { queueWaitMs: 25 });
     let releaseWedge = null;
@@ -1725,10 +1657,7 @@ describe('journal run authority ledger', () => {
   });
 
   it('keeps a rejecting task rejecting its own caller, and only its own caller', async () => {
-    // `queue` returns a race now, not the task's own promise. Three things had to survive that:
-    // a rejection still reaches the caller that asked for it, it is never dressed up as a
-    // `queue-timeout`, and it does not escape as an unhandled rejection off the chain every
-    // later command inherits.
+    // `queue` returns a race now, not the task's own promise.
     const world = sharedAuthorityWorld();
     world.addLedger();
     let explode = true;
@@ -1760,9 +1689,7 @@ describe('journal run authority ledger', () => {
   });
 
   it('reports a handler that throws as a failed operation, never as a queue timeout', async () => {
-    // The race must not launder an exception into the refusal beside it. A player told
-    // `queue-timeout` is told nothing was changed; a handler that threw part way through has no
-    // such guarantee, and conflating the two would hide the case the claim exists to record.
+    // The race must not launder an exception into the refusal beside it.
     const world = sharedAuthorityWorld();
     const authority = world.realm('gm', { queueWaitMs: 25 });
     const response = await authority.run(

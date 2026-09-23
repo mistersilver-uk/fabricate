@@ -1,44 +1,23 @@
 /**
- * A facade method that delegates must not NARROW what it forwards (issue 1759).
- *
- * `main.js` wraps the run-command service in thin pass-through methods. One of them —
- * `executeJournalRunCommand` — was written to take `command` alone while its own caller passed
- * `(command, options)`. The second argument was dropped on the floor, so `interactive` reverted to
- * its `true` default: `game.fabricate.craft()` on a recipe with a check opened a roll dialog
- * nobody could answer and waited forever. The Foundry smoke met that as a 28-minute Phase E
- * timeout, across two releases.
- *
- * Why it survived a fix is the part worth keeping, because it is the shape of the trap. #1758
- * fixed the service AND the call site, and pinned that call site in `fabricate-api-surface.test.js`
- * under a comment reading "The options are FORWARDED, not dropped". Twelve lines earlier the same
- * file pinned the literal string `executeJournalRunCommand(command)` — the one-argument signature
- * doing the dropping. Both pins passed. Neither could see the gap between them, because a source
- * pin reads one line and this defect lives in the relationship between two.
- *
- * So this gate reads the relationship: for every delegating method, what it hands on must cover
- * what it declares. That generalises past the single method that happened to be wrong.
+ * A facade method that delegates must not NARROW what it forwards (issue 1759). Why it survived a
+ * fix is the part worth keeping, because it is the shape of the trap.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 
-/**
- * Normalise line endings before scanning.
- *
- * The checkout is CRLF on Windows and LF in CI. A scan anchored to one of them matches nothing on
- * the other — which is this gate's own failure mode, so it is removed rather than relied upon.
- */
+import { INSTALLED_FACADE_MEMBERS } from '../src/bootstrap/Fabricate.js';
+import { FABRICATE_ENTRY_SOURCE } from './helpers/bootstrapEntrySource.js';
+
+/** Normalise line endings before scanning. */
 function normaliseEndings(text) {
   return text.split(String.fromCharCode(13) + '\n').join('\n');
 }
 
-const mainSource = normaliseEndings(
-  readFileSync(resolve(import.meta.dirname, '../src/main.js'), 'utf8')
-);
+const mainSource = normaliseEndings(FABRICATE_ENTRY_SOURCE);
 
 /** A method declared at class-body indentation, with its parameter list and body. */
-const METHOD = /\n {2}(?:async )?([A-Za-z_][\w$]*)\(([^)]*)\) \{\n((?: {4}[^\n]*\n|\n)*?) {2}\}/g;
+const METHOD = /\n {2}(?:async )?([A-Za-z_][\w$]*)\(([^)]*)\) \{\n((?: {4}[^\n]*\n|\n)*?) {2}\},?\n/g;
 
 /** `this.<service>?.<sameName>(` — the delegation shape the facade uses throughout. */
 const HANDOFF_OWNER = /this\.[A-Za-z_][\w$]*$/;
@@ -50,11 +29,8 @@ const parameterNames = (text) =>
     .filter(Boolean);
 
 /**
- * Every method that hands off to a same-named method on one of its own services, as
- * `{ method, declared, forwarded }`.
- *
- * The service property is deliberately not pinned: a new service bag inherits this guard for
- * free, which is the point of gating the defect class rather than the one instance of it.
+ * Every method that hands off to a same-named method on one of its own services, as `{ method,
+ * declared, forwarded }`.
  */
 function delegations() {
   const found = [];
@@ -73,6 +49,20 @@ function delegations() {
   }
   return found;
 }
+
+test('every slice member really is installed on the prototype', () => {
+  // The export exists so the install is asserted rather than inferred: a slice dropped from the
+  // list, or a name declared twice across two slices, is visible here and nowhere else.
+  assert.ok(INSTALLED_FACADE_MEMBERS.length > 60, `expected the five slices, got ${INSTALLED_FACADE_MEMBERS.length}`);
+  assert.equal(
+    new Set(INSTALLED_FACADE_MEMBERS).size,
+    INSTALLED_FACADE_MEMBERS.length,
+    'two slices declare the same member name, so one silently overwrites the other'
+  );
+  for (const name of ['craftRecipe', 'startGatheringAttempt', 'awardComponents', 'salvageComponents', 'listJournalForActor']) {
+    assert.ok(INSTALLED_FACADE_MEMBERS.includes(name), `${name} is installed`);
+  }
+});
 
 test('the gate finds the facade delegations it exists to police', () => {
   // A scan that silently matches nothing is the vacuous shape this work keeps turning up, so the

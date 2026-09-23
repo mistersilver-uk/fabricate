@@ -4,7 +4,7 @@
   PUBLIC ENTRY POINT: `src/ui/svelte/apps/manager/RecipeItemEditor.svelte` imports
   this component for the GM "How players see it" preview, so the preview renders
   the actual player surface rather than a bespoke re-implementation and can never
-  drift from what players see (canonical spec text — `ui-integration`, Books &
+  drift from what players see (canonical spec text — `ui-system-studio`, Books &
   Scrolls Surface).
 
   That is why it stays a THIN ROUTER over three disjoint states rather than
@@ -21,7 +21,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import EmptyState from '../manager/EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import InventoryBookDetail from './detail/InventoryBookDetail.svelte';
   import InventoryComponentDetail from './detail/InventoryComponentDetail.svelte';
 

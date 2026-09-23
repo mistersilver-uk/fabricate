@@ -1,80 +1,36 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The essence browser's BULK EDIT panel (issue 1036). It renders in the shell's existing
-  `.manager-inspector` column and REPLACES `EssenceBrowserInspector` for as long as the
-  selection is non-empty — the same `> 0` threshold the Component and Recipe Studios use,
-  and for the same reason: one ticked box is already a bulk edit.
+  The essence browser's BULK EDIT panel, rendering in the shell's `.manager-inspector` column and
+  REPLACING `EssenceBrowserInspector` while the selection is non-empty. Its CHROME is the shared
+  `BulkEditPanelShell` / `BulkEditSection` / `BulkEditSelect` primitives; what is here is about
+  ESSENCES — the Icon, Colour and Status axes, the per-essence note and the delete impact. See
+  `openspec/specs/ui-visual-style/spec.md` → "Bulk edit panels" for the shared contract.
 
-  Its CHROME is not its own. The header, hero, section headings, staged select and Apply are
-  the shared `BulkEditPanelShell` / `BulkEditSection` / `BulkEditSelect` primitives. What is
-  here is what is genuinely about ESSENCES: the Icon, Colour and Status axes, the
-  per-essence note, and the delete-impact statement.
+  THREE AXES, AND NO MORE: names, descriptions, linked sources and property macros stay PER-ESSENCE,
+  each either unique to one essence or carrying behaviour a whole-selection overwrite would destroy,
+  and the panel says so in place. THE COLOUR AXIS IS ALSO WITHHELD FOR A WORLD-KNOWN SELECTION,
+  because the catalogue's colour overlay WINS over the in-system row, so a write here landed on a
+  field the next refresh hid. ANY world-known essence withholds it, not all: one instruction goes to
+  the whole selection, so an axis shadowed for some cannot promise anything true about the set.
 
-  ── THREE AXES, AND NO MORE ───────────────────────────────────────────────────────
-  Names, descriptions, linked sources and property macros stay PER-ESSENCE: each is either
-  unique to one essence or carries behaviour a whole-selection overwrite would destroy. The
-  panel says so, in place, rather than leaving their absence to be inferred.
+  THE BULK DELETE IS ARMED, A DELIBERATE DEVIATION from `AGENTS.md`'s carve-out on the maintainer's
+  binding decision for this action; do not substitute a `confirmDialog`. The card is the shared
+  `BulkDeleteCard`, and what is here is the three sentences and their arithmetic.
 
-  ── AND THE COLOUR AXIS IS WITHHELD FOR A WORLD-KNOWN SELECTION (issue 1371 r19-store2) ──
-  Maintainer ruling M29 draws every system-scope essence in the colour the world Essence
-  Catalogue gave it, and that overlay WINS over the in-system row wherever the world authored
-  one — which the `1.30.0` identity lift did for every essence whose donor had a colour. A
-  write on this axis therefore landed on a field the very next refresh hid: the rows snapped
-  back, the GM's edit was gone and nothing said so. The per-essence editor already withholds
-  its colour control on exactly this condition (`EssenceEditView`'s `scopedKnown`), so this is
-  that same gate at the bulk site, read off the rows' own `worldDefined` marker.
-
-  ANY world-known essence in the selection withholds it, not all: this axis writes ONE
-  instruction to the whole selection, so an axis that would be shadowed for some of them
-  cannot state a true promise about the set. The absence is stated in place, as the
-  per-essence absences above are.
-
-  ── THE BULK DELETE IS ARMED, AND THAT IS A DELIBERATE DEVIATION ──────────────────
-  `AGENTS.md`'s carve-out reserves the two-step arm for high-frequency destructive ROW
-  actions and keeps `confirmDialog` for "any bulk or reset action". The maintainer's binding
-  decision for THIS action is the opposite: *"Warn the GM about the impact of the delete in
-  the bulk edit sidebar and use the Arm/Confirm delete pattern on the bulk delete button."*
-  So this panel states the impact and arms, and the docs loop proposes the corresponding
-  `AGENTS.md` amendment rather than leaving the file and the shipped behaviour in
-  contradiction. Do not substitute a `confirmDialog` here.
-
-  ── THE IMPACT STATEMENT ──────────────────────────────────────────────────────────
-  The card itself is the shared `BulkDeleteCard` primitive (issue 1132), which owns the
-  heading, the impact list, the armed control, the description association, the live region,
-  the busy face, the zero-row gate and the scoped CSS that keeps the danger button at the
-  right-rail label size. What is here is only what is about ESSENCES: the three sentences and
-  the arithmetic behind them. `data-essence-bulk-*` hook names survive the move as `*Attr`
-  overrides, so the mounted suites, the smoke selectors and the View Lab cases are untouched.
-
-  It is shown BEFORE the action is armed, and it recomputes when the selection changes,
-  because it is `$derived` from the selected ROWS rather than latched at arm time.
-
-  Two of the three rows are now GATED on a non-zero count, which they were not before: the
-  primitive omits a consequence row that says nothing and always renders the subject row, so
-  a selection carried by nothing states one fact instead of one fact and a nought. That rule
-  was already shipped on the Component Studio; the conversion is what makes the two agree.
-
-  Its three numbers are three different questions and none is derived from another: how many
-  essences will be deleted, how many COMPONENTS carry any of them, and how many RECIPES will
-  be rewritten. The two carrier numbers are UNIONS over identities, never sums —
-  `deleteEssences` rewrites a shared recipe ONCE for the whole selection, so a sum would
-  promise "4 recipes" before an operation that rewrites 2. `describeEssenceDeleteImpact`
-  owns that arithmetic; this component only renders it.
-
-  The delete is WARNED, not BLOCKED (maintainer round): every selected essence is deleted
-  regardless of component usage, because the cascade strips it from every carrying component
-  and rewrites every referencing recipe. There is no blocked partition and nothing is
-  skipped — the impact statement is the whole warning.
+  The impact shows BEFORE the arm and recomputes with the selection, being `$derived` from the
+  selected ROWS. Two of its three rows are GATED on a non-zero count, and the two carrier numbers
+  are UNIONS over identities rather than sums — a shared recipe is rewritten ONCE for the whole
+  selection, so a sum would promise "4 recipes" before an operation that rewrites 2. The delete is
+  WARNED, not BLOCKED: there is no blocked partition, and the impact is the whole warning.
 -->
 <script>
   import BulkDeleteCard from '../BulkDeleteCard.svelte';
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
   import BulkEditSection from '../BulkEditSection.svelte';
-  import Callout from '../Callout.svelte';
+  import Callout from '../../../components/Callout.svelte';
   import Chip from '../../../components/Chip.svelte';
   import IconPicker from '../../../components/IconPicker.svelte';
   import ManagerColorPopover from '../../../components/ManagerColorPopover.svelte';
-  import SegmentedControl from '../SegmentedControl.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import {
     ESSENCE_BULK_COLOUR_NONE,
@@ -86,7 +42,7 @@
     setBulkEssenceColour,
     setBulkEssenceIcon,
     setBulkEssenceStatus,
-  } from '../../../../../utils/essenceBulkEditModel.js';
+  } from '../../../../model/essenceBulkEditModel.js';
 
   let {
     count = 0,
@@ -95,11 +51,8 @@
     applying = false,
     deleting = false,
     deleteArmed = false,
-    // An OPTIONAL sentence announcing what a finished delete did when it left this panel
-    // mounted — a refused or no-op write (issue 1157). The card's own live region is the only
-    // place that outcome can be spoken, because on the success path the card is gone; without
-    // it a refused delete leaves the GM on `<body>` with nothing said but a Foundry toast,
-    // which is not a live region. The owner clears it as it arms.
+    // An OPTIONAL sentence for a refused or no-op write. The card's live region is the only place
+    // that outcome can be spoken, since on the success path the card is gone.
     deleteOutcome = '',
     onDraftChange = () => {},
     onClearSelection = () => {},
@@ -123,9 +76,8 @@
   }
 
   const inert = $derived(applying === true || deleting === true);
-  // Whether the WORLD Essence Catalogue holds any selected essence, off the marker the manager's
-  // refresh stamps on each row. Absent on a fixture or a world with no corpus, which leaves the
-  // axis exactly as it shipped.
+  // Whether the WORLD catalogue holds any selected essence, off the marker the refresh stamps on
+  // each row. Absent on a fixture or a corpus-less world, which leaves the axis as it shipped.
   const worldOwnsColour = $derived(
     (Array.isArray(selectedRows) ? selectedRows : []).some((row) => row?.worldDefined === true)
   );
@@ -139,21 +91,11 @@
   const stagedStatus = $derived(draft?.status || ESSENCE_BULK_STATUS_VALUES[0]);
   const canApply = $derived(bulkEssenceDraftHasChanges(draft) && !inert);
 
-  // WITHHOLDING THE CONTROL MUST ALSO DISARM THE INSTRUCTION (issue 1371 r20-store3, reviewer
-  // round 6 finding 3).
-  //
-  // The gate is a property of the SELECTION, and the selection moves under a staged draft: stage a
-  // colour on a system-local essence, then tick a world-known one as well, and the axis, its
-  // palette and its `Leave unchanged` reset all vanish — while `colorTokenStaged` stays true. So
-  // `Apply to N` stayed enabled on the strength of an axis the panel no longer showed, and the
-  // write carried `colorToken` to every selected essence, including the ones the note had just
-  // promised are not edited here.
-  //
+  // WITHHOLDING THE CONTROL MUST ALSO DISARM THE INSTRUCTION, because the gate is a property of
+  // the SELECTION and the selection moves under a staged draft: the axis vanishes while
+  // `colorTokenStaged` stays true, leaving Apply enabled on an axis the panel no longer showed.
   // Clearing the DRAFT rather than filtering the write is what makes the screen and the write
-  // agree: `canApply`, the Apply label, the staged sub-hints and `toBulkEssenceEdit` all read the
-  // same draft, so one of them would otherwise still be speaking for a control that is gone. It
-  // settles in one pass — the cleared draft has `colorTokenStaged: false`, so the guard is false
-  // on the next run.
+  // agree, since `canApply`, the labels, the sub-hints and `toBulkEssenceEdit` all read it.
   $effect(() => {
     if (worldOwnsColour && draft?.colorTokenStaged === true) {
       onDraftChange(setBulkEssenceColour(draft, ESSENCE_BULK_COLOUR_UNCHANGED));
@@ -200,9 +142,8 @@
   );
   const stagedColourLabel = $derived(colourStageLabel(colourValue));
 
-  // No colour-NAME copy here (maintainer feedback): naming the staged swatch is overhead
-  // across every theme and colour combination, and the palette cell below already marks
-  // which one is staged. `No colour` and `Leave unchanged` both name no colour and stay.
+  // No colour-NAME copy: naming the staged swatch is overhead across every theme, and the palette
+  // cell already marks which is staged. `No colour` and `Leave unchanged` name no colour and stay.
   function colourStageLabel(value) {
     if (value === ESSENCE_BULK_COLOUR_UNCHANGED) {
       return text('FABRICATE.Admin.Manager.BulkEdit.LeaveUnchanged', 'Leave unchanged');
@@ -221,9 +162,8 @@
         })
   );
 
-  // Same ternary the rest of this panel already uses (`headingLabel`, `applyLabel`,
-  // `deleteLabel`): a literal `…One` sibling key for the count-is-1 case, so the impact
-  // statement never says "1 essence definitions" or "1 components carry".
+  // The same `…One` sibling-key ternary the rest of this panel uses, so the impact statement never
+  // says "1 essence definitions".
   const impactEssencesLabel = $derived(
     impact.deletable === 1
       ? text(
@@ -260,13 +200,10 @@
           { count: impact.recipeRewrites }
         )
   );
-  // WCAG 2.5.3 Label in Name: the accessible name must CONTAIN the visible label, so a
-  // speech-input user can activate the control by saying what they can read. The plural pair
-  // shipped as "Delete 3 essences" / "Delete 3 essence definitions", which does NOT contain the
-  // visible string, so the idle face of a destructive control was unactivatable by voice; the
-  // `…One` branch passed only by luck, since "Delete 1 essence definition" happens to contain
-  // "Delete 1 essence". The word "definitions" moved into the impact list, where the count it
-  // qualifies already lives.
+  // WCAG 2.5.3 Label in Name: the accessible name must CONTAIN the visible label. The plural pair
+  // shipped as "Delete 3 essences" / "Delete 3 essence definitions", which does not, so a
+  // destructive control's idle face was unactivatable by voice. "definitions" moved into the
+  // impact list, where the count it qualifies already lives.
   const deleteAriaLabel = $derived(
     impact.deletable === 1
       ? text(
@@ -316,15 +253,9 @@
   {onClearSelection}
   {onApply}
 >
-  <!--
-    THE AXIS RESET IS A TRAILING CHIP, NOT A SECOND FULL-WIDTH BUTTON (issue 1036 fidelity
-    pass). Both axes shipped as three stacked full-width elements — a sub-hint, a full-width
-    control, and a full-width `Leave unchanged` button under it — where the prototype draws
-    one compact row per axis. `BulkEditSection` already owns a slot for exactly this: its
-    `trailing` snippet puts a staged-axis control on the label's baseline, which is where the
-    Component Studio puts its own `Will overwrite` / `Unchanged` chips. Reusing that slot
-    removes two full-width buttons from the rail and costs no new primitive.
-  -->
+  <!-- THE AXIS RESET IS A TRAILING CHIP, NOT A SECOND FULL-WIDTH BUTTON: `BulkEditSection`'s
+       `trailing` snippet already puts a staged-axis control on the label's baseline, which is where
+       the Component Studio puts its own chips, so reusing it costs no new primitive. -->
   <BulkEditSection
     label={text('FABRICATE.Admin.Manager.Essence.Icon', 'Icon')}
     subhint={stagedIconLabel}
@@ -357,17 +288,10 @@
   </div>
 
   {#if worldOwnsColour}
-    <!-- THE WITHHELD AXIS, STATED IN PLACE AND UNDER ITS OWN HEADING. See the header note: the
-         world catalogue owns this essence's colour and the read overlay would hide anything
-         written here.
-
-         THE HEADING STAYS (issue 1371 r21-store4, the UX designer's round-7 note). Withholding
-         the control is not withholding the AXIS: the rail reads Icon / Colour / Status, and
-         dropping the label left a bare note floating between two headed sections, so a GM
-         scanning the rail could not tell whether the panel had a colour axis at all. It is the
-         same `BulkEditSection` the offered branch renders, with the note where its control
-         would be — the section heading emits siblings rather than wrapping, so "in its body" is
-         the next flex item. -->
+    <!-- THE WITHHELD AXIS, STATED IN PLACE AND UNDER ITS OWN HEADING. THE HEADING STAYS, because
+         withholding the control is not withholding the AXIS: dropping the label left a bare note
+         floating between two headed sections. It is the same `BulkEditSection` the offered branch
+         renders, with the note where its control would be. -->
     <BulkEditSection label={text('FABRICATE.Admin.Manager.Essence.Colour.Label', 'Colour')} />
     <Callout
       tone="info"
@@ -397,12 +321,9 @@
         >
       {/snippet}
     </BulkEditSection>
-    <!--
-    THREE instructions, never two: leave unchanged, clear to the theme accent, or a token.
-    The palette is rendered INLINE (`layout="inline"`) with the No-colour cell switched on,
-    which is the only route this palette has ever had back to unset — and both are gated
-    props, so the environments biome popover is untouched.
-  -->
+    <!-- THREE instructions, never two: leave unchanged, clear to the theme accent, or a token. The
+         palette renders INLINE with the No-colour cell on, its only route back to unset; both are
+         gated props, so the environments biome popover is untouched. -->
     <div class="manager-essence-bulk-colour" data-essence-bulk-colour={colourValue || 'unchanged'}>
       <ManagerColorPopover
         layout="inline"
@@ -436,8 +357,8 @@
     onChange={(value) => onDraftChange(setBulkEssenceStatus(draft, value))}
   />
 
-  <!-- NEUTRAL (issue 1505): which fields stay per-essence is true of every selection, so it
-       is documentation rather than a note about the live one. -->
+  <!-- NEUTRAL, per `openspec/specs/ui-visual-style/spec.md` → "Standing statements": which fields
+       stay per-essence is true of every selection. -->
   <Callout
     tone="neutral"
     text={text(
@@ -449,19 +370,15 @@
 </BulkEditPanelShell>
 
 <!--
-  The DELETE block sits below the shell rather than inside it: the shell's Apply is the
-  panel's primary action, and a destructive action inside the same card would read as a
-  second way of applying the staged edit. It un-pins the shell's sticky Apply dock, which is
-  accepted and gated — see `BulkEditPanelShell`'s dock comment for what survives the un-pin.
+  The DELETE block sits BELOW the shell: the shell's Apply is the panel's primary action, and a
+  destructive action in the same card would read as a second way of applying the staged edit. It
+  un-pins the sticky Apply dock, which is accepted and gated — see `BulkEditPanelShell`.
 
-  The `components` row is a DISTINCT-carrier union over the selection: a component carrying two
-  selected essences is one carrier, not two, because the cascade strips it in one pass. The copy
-  says "one or more of the selected essences" for exactly that reason. See
-  `describeEssenceDeleteImpact`.
+  The `components` row is a DISTINCT-carrier union: a component carrying two selected essences is
+  one carrier, because the cascade strips it in one pass, which is why the copy says "one or more".
 
-  `busy` is the caller's own `deleting` flag and is NOT folded into `disabled` here: the card
-  needs to tell an in-flight write apart from an inert one to render the third face at all.
-  `applying` still inerts the control, because a staged apply and a delete must not race.
+  `busy` is the caller's own `deleting` flag and is NOT folded into `disabled`, because the card
+  must tell an in-flight write from an inert one; `applying` still inerts the control.
 -->
 <BulkDeleteCard
   token="delete-essences"
@@ -494,10 +411,8 @@
 />
 
 <style>
-  /* ONE control each, now that both axis resets live on their section's label row. The
-     stack survives because each wrapper is still the hook the mounted tests and the
-     `data-essence-bulk-colour` state attribute hang on, and because the palette is a grid
-     that must occupy the rail's full width to lay its cells out. */
+  /* ONE control each, now both axis resets live on their label row. The stack survives because
+     each wrapper is still the hook the mounted tests and the state attribute hang on. */
   .manager-essence-bulk-icon,
   .manager-essence-bulk-colour {
     display: flex;
@@ -506,9 +421,7 @@
     min-width: 0;
   }
 
-  /* The delete card's three rules — the card box, the 34px/0.72rem/700 danger button and the
-     impact list's indent, colour and weight — moved to `BulkDeleteCard.svelte` with the markup
-     they style (issue 1132). They could not stay: Svelte scoping is per component, so the
-     moment that `<section>` rendered from there these selectors matched nothing, and the
-     rendered result would have been the issue 1036 defect back in every studio at once. */
+  /* The delete card's three rules moved to `BulkDeleteCard.svelte` with the markup they style:
+     Svelte scoping is per component, so the moment that `<section>` rendered from there these
+     selectors matched nothing. */
 </style>

@@ -26,9 +26,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Chip.svelte',
     // The shared no-state primitive (issue 785). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/apps/manager/MapRegionLinkPicker.svelte',
     'src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte'
   ],
@@ -43,6 +44,12 @@ const mountTab = (props) =>
 
 const rows = () => harness.target.querySelectorAll('.manager-map-link-row');
 
+// Every state sits on the shared browse body, the inset every Manager browse pane uses.
+const assertInBrowseBody = (selector) => {
+  const inBody = harness.target.querySelector(`[data-travel-panel="map"] > .manager-table-scroll ${selector}`);
+  assert.ok(Boolean(inBody), `${selector} sits inside the panel's .manager-table-scroll`);
+};
+
 describe('GatheringMapLinksTab mounted behavior', () => {
   before(harness.setup);
   after(harness.teardown);
@@ -53,6 +60,7 @@ describe('GatheringMapLinksTab mounted behavior', () => {
     const empty = harness.target.querySelector('[data-travel-map-links-empty]');
     assert.ok(empty);
     assert.match(empty.textContent, /Activate a scene/);
+    assertInBrowseBody('[data-travel-map-links-empty]');
     harness.remount();
   });
 
@@ -62,6 +70,7 @@ describe('GatheringMapLinksTab mounted behavior', () => {
     const empty = harness.target.querySelector('[data-travel-map-links-empty]');
     assert.ok(empty);
     assert.match(empty.textContent, /no regions/i);
+    assertInBrowseBody('[data-travel-map-links-empty]');
     harness.remount();
   });
 
@@ -72,8 +81,8 @@ describe('GatheringMapLinksTab mounted behavior', () => {
     assert.match(first.querySelector('.manager-map-link-name').textContent, /Northwood/);
     assert.match(first.querySelector('.manager-map-link-swatch').getAttribute('style'), /#1a9c4f/);
     assert.equal(first.dataset.managerMapRegionUuid, 'Scene.s1.Region.a');
-    // Each row carries its own link picker; the linked row shows the region name,
-    // the unlinked row reads "Not linked".
+    assertInBrowseBody('.manager-map-link-list .manager-map-link-row');
+    // Each row carries its own link picker.
     assert.match(first.querySelector('.manager-map-link-picker-cell .manager-map-link-trigger').textContent, /Verdant/);
     assert.match(rows()[1].querySelector('.manager-map-link-picker-cell .manager-map-link-trigger').textContent, /Not linked/);
     harness.remount();
@@ -92,9 +101,7 @@ describe('GatheringMapLinksTab mounted behavior', () => {
     flushSync();
     await tick();
     flushSync();
-    // The options live in the PORTALED panel, which hangs off the application root rather than
-    // off the row that opened it (issue 1466). Only one picker is open, so scoping to the mount
-    // is exact.
+    // The options live in the PORTALED panel.
     const option = Array.from(harness.target.querySelectorAll('.manager-travel-option'))
       .find(node => /Verdant/.test(node.textContent));
     assert.ok(option, 'the Verdant option should be present');

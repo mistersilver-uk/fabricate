@@ -1,18 +1,11 @@
 /**
- * The Recipe Studio's two store-side additions (issue 643):
- *
- *   - `toggleRecipeLocked(recipeId, locked)` — persists BOTH directions and is
- *     NEVER gated, in explicit contrast to `toggleRecipeEnabled`. `locked` was
- *     persisted and engine-honoured but had no UI write path at all.
- *   - `toggleRecipeEnabled`'s blocked-enable SUPPRESSION invariant: when the
- *     caller owns the message (the library's in-window flash), the Foundry
- *     notification must NOT also fire, or the GM sees the same error twice.
- *   - the `checkSummary` projection (§9): the row cannot resolve a DC itself.
+ * The Recipe Studio's two store-side additions (issue 643):. `toggleRecipeLocked(recipeId, locked)`
+ * — persists BOTH directions and is NEVER gated, in explicit contrast to `toggleRecipeEnabled`.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
-import { makeSystem } from '../helpers/adminStoreServices.js';
+import { createServices as createSharedServices, makeSystem } from '../helpers/adminStoreServices.js';
 
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');
 
@@ -43,28 +36,12 @@ function makeRecipe(overrides = {}) {
 }
 
 function createServices({ recipes, system = {}, updateRecipe, notify }) {
-  // The shared factory, with this suite's only two departures from it stated
-  // explicitly rather than re-listing the other twelve fields.
-  const systems = [makeSystem({ visibilityMode: undefined, craftingCheck: {}, ...system })];
-  return {
-    getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys1' : ''),
-    setSetting: async () => {},
-    getCraftingSystemManager: () => ({
-      getSystems: () => systems,
-      getSystem: (id) => systems.find((s) => s.id === id) || null,
-      getItems: () => [],
-    }),
-    getRecipeManager: () => ({
-      getRecipes: () => recipes,
-      getRecipe: (id) => recipes.find((r) => r.id === id) || null,
-      updateRecipe,
-    }),
-    getScriptMacros: () => [],
-    getSceneOptions: () => [],
-    getWorldUsers: () => [],
-    localize: (key) => key,
-    notify: notify || { info: () => {}, warn: () => {}, error: () => {} },
-  };
+  return createSharedServices(
+    makeSystem({ visibilityMode: undefined, craftingCheck: {}, ...system }),
+    recipes,
+    [],
+    notify ? { updateRecipe, notify } : { updateRecipe }
+  );
 }
 
 function rowFor(store, id) {
@@ -182,10 +159,7 @@ describe('adminStore toggleRecipeEnabled blocked-enable suppression', () => {
 
     assert.deepEqual(flashed, ['recipe is incomplete'], 'the flash receives the localized reason');
     assert.deepEqual(notified, [], 'the same error must not also fire as a Foundry notification');
-    // A PLAIN ERROR HAS NO PARTS TO SPLIT (issue 1515). The sink's second argument is the same
-    // refusal as `{ title, detail }` and exists only for an activation error, which carries the
-    // recipe name and the coded issues separately; anything else answers `null` so the caller
-    // falls back to the one-line message rather than drawing an empty detail line.
+    // A PLAIN ERROR HAS NO PARTS TO SPLIT (issue 1515).
     assert.deepEqual(parted, [null], 'a non-activation refusal supplies no title/detail split');
   });
 
@@ -298,11 +272,7 @@ describe('adminStore recipe check-pill projection', () => {
     assert.deepEqual(row.checkSummary, { kind: 'progressive', dc: null });
   });
 
-  // The two check-LESS kinds are not the same fact and the row must not tell the GM they
-  // are. A routedByIngredients craft resolves off the ingredient set that was used, so no
-  // check is a WORKING configuration — reported neutrally as `ingredients`. Every other
-  // mode with no usable check genuinely cannot be rolled for, and stays the `none` warning
-  // the GM can scan a library for.
+  // The two check-LESS kinds are not the same fact and the row must not tell the GM they are.
   it('reports a check-less routedByIngredients system as routed, not as a warning', async () => {
     const row = await projectWith({
       resolutionMode: 'routedByIngredients',
@@ -322,12 +292,7 @@ describe('adminStore recipe check-pill projection', () => {
   });
 
   it('shows a switched-OFF check, not a warning, for an alchemy system at checkMode none', async () => {
-    // `checkOff` rather than `none`, and the difference is configuration versus fault. `none`
-    // draws the WARNING pill ("this system has no usable crafting check"), which was fair
-    // while `none` was an obscure mode — it is now what the Checks Studio's Active switch
-    // writes when a GM deliberately turns the alchemy check off, and putting a warning
-    // triangle on every recipe in the library for a supported choice, with no per-recipe
-    // repair, is the report being wrong rather than the library being informative.
+    // `checkOff` rather than `none`, and the difference is configuration versus fault.
     const row = await projectWith({
       resolutionMode: 'alchemy',
       alchemy: { checkMode: 'none' },
@@ -359,11 +324,8 @@ describe('adminStore recipe I/O projection', () => {
   });
 });
 
-// The recipe-list projection is a hand-built ALLOWLIST: a field it omits is invisible
-// to the editor, which then seeds its draft from `undefined`. For a default-true flag
-// that failure is SILENT and inverted — the toggle card reads default-true and renders
-// ON for a recipe the GM had explicitly authored OFF, and saving that draft writes the
-// wrong value back. Only a `false` fixture can catch it (issue 651).
+// The recipe-list projection is a hand-built ALLOWLIST: a field it omits is invisible to the
+// editor, which then seeds its draft from `undefined` (issue 651).
 describe('adminStore recipe projection — allowPlayerResultReorder', () => {
   it('projects an authored FALSE (the mutation: drop it from the projection)', async () => {
     const store = createAdminStore(

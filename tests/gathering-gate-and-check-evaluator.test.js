@@ -102,9 +102,7 @@ test('thrown expression errors return diagnostics without raw throws', async () 
   assert.equal(expressionVisibility.diagnostic.provider, null);
 });
 
-// ---------------------------------------------------------------------------
 // evaluateRequirement
-// ---------------------------------------------------------------------------
 
 test('null requirement is allowed with NO_REQUIREMENT reason', async () => {
   const { evaluator } = makeEvaluator();

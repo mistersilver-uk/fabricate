@@ -1,37 +1,14 @@
 /**
- * THE TWO UNIONS, and the Valid Id Basis that stops anything pruning against a corpus it cannot
- * see (issue 1359, part of epic 1357).
- *
- * ## Why this suite exists
- *
- * `CraftingSystemManager` PRUNES references — a component's essence quantities, an essence's source
- * component, and each category icon map against its vocabulary. While those corpora lived on the
- * crafting system the basis was always at hand. Epic 1357 lifts them to world scope, and a pass
- * that derives its basis from an absent or unwritten world setting sees an EMPTY set and deletes
- * every reference in the world. `DOMAIN.md`'s Valid Id Basis rule names this exact shape: a pass
- * handed an empty set for an entity class prunes every key scoped to that class on every run,
- * reached by an omitted ARGUMENT rather than by an incomplete corpus.
- *
- * ## THERE ARE TWO UNIONS AND THEY ARE NOT THE SAME UNION
- *
- * The READ union (`resolveComponentScope` and its siblings) is membership-FILTERED and returns
- * RESOLVED values. The BASIS union (`_scopeBasis`) is deliberately NOT membership-filtered, because
- * an absent membership record is a REFUSAL and never a PRUNE. A single function used for both
- * guarantees one of the two behaviours is wrong, so the decisive case asserts them as a PAIR on one
- * fixture.
- *
- * ## The equivalence bar, and why it needs a recorded golden
- *
- * The acceptance bar for the additive half of this change is the ABSENCE of change. Diffing
- * `_normalizeSystem` against another call path inside the same new code proves nothing —
- * `resolveComponentScope` does not exist on `origin/main` — so `tests/fixtures/
- * scopedDefinitionNormalize.golden.json` was RECORDED FROM THE PRE-#1359 TREE (via `git archive`
- * of the assigned base) and is compared against verbatim, with stated corpus floors so a fixture
- * that silently shrank could not pass by coincidence.
+ * THE TWO UNIONS, and the Valid Id Basis that stops anything pruning against a corpus it cannot see
+ * (issue 1359, part of epic 1357).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
+
+import { resolve } from 'node:path';
+
+import { entrySources } from './helpers/bootstrapEntrySource.js';
 
 globalThis.foundry = {
   utils: { randomID: () => `rnd-${Math.random().toString(36).slice(2)}` },
@@ -55,7 +32,12 @@ const MANAGER_SOURCE = readFileSync(
   new URL('../src/systems/CraftingSystemManager.js', import.meta.url),
   'utf8'
 );
-const MAIN_SOURCE = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const MAIN_SOURCE = [
+  entrySources['src/bootstrap/composeServices.js'],
+  entrySources['src/bootstrap/migrations.js'],
+  entrySources['src/bootstrap/Fabricate.js'],
+  entrySources['src/bootstrap/hooks.js'],
+].join('\n');
 
 /** A manager with NO world stores at all — the unmigrated client every player boots as. */
 function unwiredManager() {
@@ -80,15 +62,11 @@ function settingsSeam(initial = {}) {
 
 /**
  * `JSON.parse(JSON.stringify(...))`, because the golden is JSON and `JSON.stringify` DROPS an
- * `undefined` value. `_normalizeSystem` legitimately emits `difficulty: undefined` for a component
- * that authored none, so a raw `deepEqual` against the golden would report four phantom
- * differences that no persisted byte can carry.
+ * `undefined` value.
  */
 const asStored = (value) => JSON.parse(JSON.stringify(value));
 
-// ---------------------------------------------------------------------------------------------
 // Criterion 1 — equivalence with the pre-#1359 tree, and the enumerated divergences
-// ---------------------------------------------------------------------------------------------
 
 describe('with every world setting unwritten', () => {
   it('the fixture is not vacuous', () => {
@@ -115,9 +93,7 @@ describe('with every world setting unwritten', () => {
   });
 
   it('every mutation-time bypass site agrees with it too', () => {
-    // "Every consumer" means `_normalizeSystem` plus the six `_scopeBasis` sites. Those five run
-    // `_normalizeComponent` against the SAME basis, so the component this normalizer emits and the
-    // component `createItem` emits for the same input must not differ.
+    // "Every consumer" means `_normalizeSystem` plus the six `_scopeBasis` sites.
     const manager = unwiredManager();
     const system = manager._normalizeSystem(scopedDefinitionCorpus());
     const { essenceIds } = manager._scopeBasis(system);
@@ -173,8 +149,7 @@ describe('the enumerated UNKNOWN-basis divergences', () => {
   });
 
   // Criterion 10: the two icon maps are asserted SEPARATELY, because they are gated by DIFFERENT
-  // vocabularies. A fixture that empties only one proves only one gate, and an implementer who
-  // gated only the component map would pass a combined criterion vacuously.
+  // vocabularies.
   it('retains componentCategoryIcons against an EMPTY componentCategories', () => {
     const { golden, now } = divergence('emptyComponentCategories');
     assert.deepEqual(golden.componentCategoryIcons, {}, 'origin/main deleted every authored icon');
@@ -202,9 +177,7 @@ describe('the enumerated UNKNOWN-basis divergences', () => {
   });
 
   it('still prunes an icon whose vocabulary is KNOWN and does not carry it', () => {
-    // The gate is UNKNOWN-vs-KNOWN, never "never prune". A non-empty vocabulary is a real basis,
-    // so an icon outside it still drops — which is what makes the four cases above a narrowing
-    // rather than a disabling.
+    // The gate is UNKNOWN-vs-KNOWN, never "never prune".
     const normalized = unwiredManager()._normalizeSystem(
       scopedDefinitionCorpus({
         componentCategoryIcons: { ore: 'fas fa-gem', ghost: 'fas fa-ghost' },
@@ -214,9 +187,7 @@ describe('the enumerated UNKNOWN-basis divergences', () => {
   });
 });
 
-// ---------------------------------------------------------------------------------------------
 // Criterion 2 (second half) — when the basis is null
-// ---------------------------------------------------------------------------------------------
 
 describe('the Valid Id Basis', () => {
   const seededStore = (create, key, value) => create(settingsSeam({ [key]: value }));
@@ -296,12 +267,6 @@ describe('the Valid Id Basis', () => {
   it('answers all THREE entity legs, each from its OWN store and its OWN legacy array', () => {
     // Every case above drives the ESSENCE leg, because that is the only one epic 1357's consumer
     // sweep has reached; `componentIds` is pinned once more by the READ-vs-BASIS pair below.
-    // `toolIds` was pinned by NOTHING: it is computed on every call and is what a later PR will
-    // prune tool references against, so replacing it with a bare `null` left all four related
-    // suites green — a half of the basis that could not be wrong is a half nothing holds.
-    //
-    // Three DISJOINT rosters and three DISJOINT legacy arrays, so a leg wired to the wrong store
-    // or reading the wrong in-system array cannot answer correctly by coincidence.
     const seam = settingsSeam({
       [SETTING_KEYS.COMPONENT_SCOPE]: { entities: [{ id: 'w-comp' }] },
       [SETTING_KEYS.ESSENCE_SCOPE]: { entities: [{ id: 'w-ess' }] },
@@ -328,9 +293,7 @@ describe('the Valid Id Basis', () => {
   });
 
   it('gives the TOOL leg the same UNKNOWN gate the essence leg gets', () => {
-    // `null` means prune nothing, and it is the whole safety property. An unseeded tool store
-    // with an empty in-system array must be UNKNOWN rather than a real, empty, prunable set;
-    // a written-empty roster must be the prunable one.
+    // `null` means prune nothing, and it is the whole safety property.
     const unseeded = new CraftingSystemManager(
       { getRecipes: () => [] },
       { toolScopeStore: seededStore(createToolScopeStore, SETTING_KEYS.TOOL_SCOPE, {}) }
@@ -351,9 +314,7 @@ describe('the Valid Id Basis', () => {
   });
 });
 
-// ---------------------------------------------------------------------------------------------
 // Criterion 6 — the two unions, asserted as a PAIR on one fixture
-// ---------------------------------------------------------------------------------------------
 
 describe('the READ union and the BASIS union', () => {
   const SYSTEM_ID = 'sys-a';
@@ -389,10 +350,8 @@ describe('the READ union and the BASIS union', () => {
       components: [
         { id: 'legacy-only', name: 'Legacy Only', category: 'reagent' },
         { id: 'shared', name: 'Legacy Shared', category: 'general' },
-        // A member whose in-system record carries identity but authors no `category`, so the
-        // world default is still observable through it (issue 1370). It has to exist in the
-        // in-system array at all: the read union's ROW SET is that array's row set while
-        // `## CraftingSystem` requirement 36 holds.
+        // A member whose in-system record carries identity but authors no `category`, so the world
+        // default is still observable through it (issue 1370).
         { id: 'w-member', name: 'Legacy Member' },
       ],
     };
@@ -443,9 +402,7 @@ describe('the READ union and the BASIS union', () => {
   });
 
   it('lets the IN-SYSTEM record win an id collision on IDENTITY', () => {
-    // INVERTED at issue 1370, and issue 1372 kept the identity half verbatim. `1363` had the world
-    // entity win `name`, which reverts the GM's own edit: every shipped identity writer writes the
-    // in-system copy and nothing writes the world entity.
+    // INVERTED at issue 1370, and issue 1372 kept the identity half verbatim.
     const { manager, system } = pairFixture();
     const shared = manager.resolveScopedComponents(system).filter((e) => e.id === 'shared');
     assert.equal(shared.length, 1, 'one entry, not two');
@@ -454,11 +411,7 @@ describe('the READ union and the BASIS union', () => {
   });
 
   it('and lets the WORLD DEFAULT win a SECTION the membership record inherits', () => {
-    // THE OTHER HALF, and the one issue 1372 moved. `shared` carries `category: 'general'` in the
-    // system and `category: 'ingot'` at world scope, and its membership record's `inherit` map is
-    // EMPTY, which reads as inheriting. Before 1372 the row answered `general` while reporting
-    // `inherited: {category: true}` in the same object - which is the contradiction the world-scope
-    // screens rendered as an `Inherits world defaults` pill over a value that never followed it.
+    // THE OTHER HALF, and the one issue 1372 moved.
     const { manager, system } = pairFixture();
     const shared = manager.resolveScopedComponents(system).find((e) => e.id === 'shared');
     assert.equal(shared.category, 'ingot');
@@ -545,9 +498,7 @@ describe('the READ union and the BASIS union', () => {
   });
 });
 
-// ---------------------------------------------------------------------------------------------
 // Criterion 12 — the memo is invalidated by BOTH edits, asserted on resolved CONTENT
-// ---------------------------------------------------------------------------------------------
 
 describe('the resolved-union memo', () => {
   function memoFixture() {
@@ -629,18 +580,10 @@ describe('the resolved-union memo', () => {
   });
 });
 
-// ---------------------------------------------------------------------------------------------
 // Criterion 8 — the census
-// ---------------------------------------------------------------------------------------------
 
 describe('the _scopeBasis call sites', () => {
-  /**
-   * Every method of `CraftingSystemManager` that calls `this._scopeBasis(`.
-   *
-   * Parsed by walking the file and tracking the most recent class-body method declaration, which is
-   * enough because the class is written one method per two-space indent level and the guard's job
-   * is to fail when a SEVENTH site appears, not to be a JavaScript parser.
-   */
+  /** Every method of `CraftingSystemManager` that calls `this._scopeBasis(`. */
   function scopeBasisCallSites(source) {
     const sites = new Set();
     let current = null;
@@ -675,8 +618,7 @@ describe('the _scopeBasis call sites', () => {
 
   it('addItemsFromPack reaches the basis through addItemFromUuid', () => {
     // Named as a prune site by the delta, and it IS one — it just does not derive its own basis,
-    // because it loops `addItemFromUuid` per item. A basis of its own would be a second derivation
-    // of the same fact.
+    // because it loops `addItemFromUuid` per item.
     assert.match(MANAGER_SOURCE, /async addItemsFromPack\(/);
     const body = MANAGER_SOURCE.slice(MANAGER_SOURCE.indexOf('async addItemsFromPack('));
     assert.match(body.slice(0, 4000), /await this\.addItemFromUuid\(/);
@@ -697,36 +639,26 @@ describe('the _scopeBasis call sites', () => {
   });
 });
 
-// ---------------------------------------------------------------------------------------------
-// Criterion 7 — construction order in src/main.js
-//
-// THIS DESCRIBE NOW CARRIES CRITERION 7 FOR TWO PRs. Issue 1363's criterion 7 is the three
-// world-scope stores' position; issue 1370's criterion 7(a) is the world identity drift audit's
-// position and its active-GM gate, and its 8(b) is the absence of a repair write between the
-// audit and its notice. They share this describe because they share one fact — the exact point in
-// `initialize()` at which the three stores are loaded and nothing has yet read the union — and
-// splitting them across two files would let the two halves of that fact drift apart.
-// ---------------------------------------------------------------------------------------------
+// Criterion 7 — construction order in the composition root. THIS DESCRIBE NOW CARRIES CRITERION 7 FOR TWO
+// PRs (issue 1363).
 
-describe('src/main.js construction order', () => {
+describe('composition-root construction order', () => {
   /**
    * Source-order assertions, the idiom `tests/migration-runner-corpus-writeback.test.js` and
-   * `tests/setting-change-bridge.test.js` already use, because `src/main.js` is not otherwise
+   * `tests/setting-change-bridge.test.js` already use, because the composition root is not otherwise
    * reachable by a unit test — and because a mis-ordering here is SILENT: reading an unregistered
    * key throws inside `ClientSettings##assertSetting`, but `load()` is guarded, so the store simply
    * stays unseeded forever with nothing in the console.
    */
   const at = (needle) => {
     const index = MAIN_SOURCE.indexOf(needle);
-    assert.notEqual(index, -1, `src/main.js no longer contains \`${needle}\``);
+    assert.notEqual(index, -1, `the module entry and src/bootstrap/ no longer contain \`${needle}\``);
     return index;
   };
 
-  // FOUR STORES SINCE ISSUE 1392. The World Vocabulary store is not a scoped-entity store and
-  // is wired into no prune basis, so a mis-order for IT degrades to a permanently unseeded
-  // vocabulary, an empty screen and a rail badge reading 0 — visible rather than destructive.
-  // It is pinned here anyway, and beside the three, because its own HARD constraint is the same
-  // one: `ClientSettings#assertSetting` throws on an unregistered key, and `load()` is guarded.
+  // FOUR STORES SINCE ISSUE 1392. The World Vocabulary store is not a scoped-entity store and is
+  // wired into no prune basis, so a mis-order for IT degrades to a permanently unseeded vocabulary,
+  // an empty screen and a rail badge reading 0 — visible rather than destructive.
   for (const store of [
     'componentScopeStore',
     'essenceScopeStore',
@@ -734,14 +666,14 @@ describe('src/main.js construction order', () => {
     'worldVocabularyStore',
   ]) {
     it(`constructs and loads ${store} after settings and migrations, before both managers`, () => {
-      const construction = at(`this.${store} = create`);
-      const load = at(`this.${store}.load();`);
-      assert.ok(at('this.registerSettings();') < construction, 'settings must be registered first');
-      assert.ok(at('await this._runMigrations();') < construction, 'migrations run before stores');
+      const construction = at(`fabricate.${store} = create`);
+      const load = at(`fabricate.${store}.load();`);
+      assert.ok(at('fabricate.registerSettings();') < construction, 'settings must be registered first');
+      assert.ok(at('await fabricate._runMigrations();') < construction, 'migrations run before stores');
       assert.ok(construction < load, 'constructed, then loaded');
-      assert.ok(load < at('this.recipeManager = new RecipeManager('), 'before the recipe manager');
+      assert.ok(load < at('fabricate.recipeManager = new RecipeManager('), 'before the recipe manager');
       assert.ok(
-        load < at('this.craftingSystemManager = new CraftingSystemManager('),
+        load < at('fabricate.craftingSystemManager = new CraftingSystemManager('),
         'and before the crafting system manager, which derives its basis from these stores'
       );
     });
@@ -759,7 +691,10 @@ describe('src/main.js construction order', () => {
       // shipped ahead of it inside a gateway file this lane may not open.
       'getVocabularyScopeStore',
     ]) {
-      const body = MAIN_SOURCE.slice(at(`  ${accessor}() {`), at(`  ${accessor}() {`) + 200);
+      // To the accessor's OWN closing brace, not a fixed-length slice: a fixed window runs past
+      // a short body into the next member and reddens this guard about a different method.
+      const start = at(`  ${accessor}() {`);
+      const body = MAIN_SOURCE.slice(start, MAIN_SOURCE.indexOf('\n  }', start));
       assert.equal(
         body.includes('_requireReady()'),
         false,
@@ -780,18 +715,16 @@ describe('src/main.js construction order', () => {
     }
   });
 
-  // -------------------------------------------------------------------------------------------
   // Issue 1370 criterion 7(a) — the world identity drift audit's position and its gate
-  // -------------------------------------------------------------------------------------------
 
   it('runs the world identity drift audit after the three loads and before either manager', () => {
     const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
-    assert.ok(at('this.toolScopeStore.load();') < audit, 'after the LAST of the three loads');
+    assert.ok(at('fabricate.toolScopeStore.load();') < audit, 'after the LAST of the three loads');
     assert.ok(
-      audit < at('this.recipeManager = new RecipeManager('),
+      audit < at('fabricate.recipeManager = new RecipeManager('),
       'and before the recipe manager, which is the first thing that can read the union'
     );
-    assert.ok(audit < at('this.craftingSystemManager = new CraftingSystemManager('));
+    assert.ok(audit < at('fabricate.craftingSystemManager = new CraftingSystemManager('));
   });
 
   it('gates the audit on the ACTIVE GM, not on isGM', () => {
@@ -814,15 +747,13 @@ describe('src/main.js construction order', () => {
     );
   });
 
-  // -------------------------------------------------------------------------------------------
   // Issue 1370 criterion 8(b) — the audit REPORTS, and repairs nothing
-  // -------------------------------------------------------------------------------------------
 
   it('sites the audit OUTSIDE _runMigrations and off the migration report guard', () => {
     const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
     assert.ok(
-      audit < at('  async _runMigrations() {'),
-      'the audit is inside initialize(), which is declared before _runMigrations()'
+      audit < at('export async function runMigrations(fabricate) {'),
+      'the audit is in the composition root, not in the migration pass'
     );
     const line = MAIN_SOURCE.slice(MAIN_SOURCE.lastIndexOf('\n', audit) + 1, audit);
     assert.equal(
@@ -834,9 +765,8 @@ describe('src/main.js construction order', () => {
   });
 
   it('writes NOTHING between the audit and its notice dispatch', () => {
-    // 8(a) calls the detector twice to prove it is pure, and that only reds if a repair went
-    // INSIDE the detector — the least likely placement. A repair would land HERE, at the call
-    // site, which no unit test can execute. So the absence is asserted by source text.
+    // 8(a) calls the detector twice to prove it is pure, and that only reds if a repair went INSIDE
+    // the detector — the least likely placement.
     const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
     // The report is CONSOLE ONLY (maintainer, 2026-09-06): its dispatch is the `info` line, not
     // a toast, and there must be no toast at all for it.

@@ -1,17 +1,6 @@
 /**
- * The `1.34.0` equivalent world essence merge transform (issue 1654).
- *
- * The write half only: what `mergeEquivalentWorldEssences` does to a corpus once
- * `buildWorldEssenceEquivalence` has decided. The decision is pinned by
- * `world-essence-equivalence.test.js` and the reference walk by
- * `world-scope-reference-walk.test.js`; what is left, and what this file owns, is the seam between
- * them — the re-point, the retirement, the re-pointed-inheriting-record rule, the sibling-key
- * promise the registry's `downgradeLosesData: false` rests on, and the identity contract the
- * runner's per-setting comparison rests on.
- *
- * Every fixture comes from the one shared builder in `helpers/worldScopeCorpus.js`; the three
- * shapes it does not build — a recipe, a gathering slice and an in-system component's essence
- * quantity map — are attached to the corpus it returns rather than produced by a second factory.
+ * The `1.34.0` equivalent world essence merge transform (issue 1654). The write half only: what
+ * `mergeEquivalentWorldEssences` does to a corpus once `buildWorldEssenceEquivalence` has decided.
  */
 
 import assert from 'node:assert/strict';
@@ -56,9 +45,7 @@ function payloadOf(corpus, extra = {}) {
   return { recipes: [], gatheringConfig: {}, ...corpus, ...extra };
 }
 
-// ---------------------------------------------------------------------------
 // Totality — a migration that throws aborts the whole pass
-// ---------------------------------------------------------------------------
 
 test('the transform is TOTAL and NON-THROWING on junk input', () => {
   for (const value of [undefined, null, 'nope', 7, []]) {
@@ -80,9 +67,7 @@ test('the transform is TOTAL and NON-THROWING on junk input', () => {
   );
 });
 
-// ---------------------------------------------------------------------------
 // The merge itself, and the references it invalidates
-// ---------------------------------------------------------------------------
 
 test('the loser is retired, its members are re-pointed, and its world entity row is deleted', () => {
   const data = payloadOf(twoIrons());
@@ -148,9 +133,7 @@ test('every reference class the shared walk covers moves, and colliding quantiti
     essences: { [MINTED]: 5, iron: 5 },
   };
   // The fourth shape the builder does not build, and the one no derived fixture can hold: the tool
-  // scope. `1.30.0` writes both halves itself — `buildMembershipRecord` clones the in-system array
-  // onto the membership record, and the world-default election lifts the donor's whole group array
-  // past a constraint 4 that inspects component ids only.
+  // scope.
   corpus.toolScope = {
     entities: [{ id: 'tool-9', name: 'Hammer' }],
     defaults: {
@@ -226,10 +209,7 @@ test('every reference class the shared walk covers moves, and colliding quantiti
       .essenceId,
     'iron'
   );
-  // Leaf position at tool scope, both halves. The membership half is the only copy `resolveTool`
-  // reads, so leaving it would make the repair check disagree with the in-system copy asserted
-  // above; the defaults half is the seed `seedToolRepairRequirements` copies into every future
-  // membership record, so leaving it would bake the retired id into systems that do not exist yet.
+  // Leaf position at tool scope, both halves.
   assert.equal(
     result.toolScope.membership['tool-9|sys-b'].repairRequirements[0].options[0].match.essenceId,
     'iron'
@@ -261,13 +241,6 @@ test("a tool scope with nothing to re-key answers the CALLER'S OWN object", () =
 test('a reference in a system the loser is NOT present in is left exactly as it is', () => {
   // Presence, not reachability: `sys-a` holds neither a membership record nor a definition row for
   // the loser, so its map has no leg.
-  //
-  // The key is not dangling today: `_scopeEntityBasis` unions the world roster with the system's
-  // own array without filtering by membership, so it survives normalization while the loser is a
-  // world entity, and `_normalizeEssenceQuantities` prunes it only once the merge retires that
-  // entity. Leaving it is right because it is refused at use, so the prune costs no behaviour; the
-  // second component shows the price of the alternative, where re-keying would sum the inert 9 into
-  // a live 4 and change what every craft in a system that never merged produces.
   const corpus = twoIrons();
   corpus.systems[0].components = [
     { id: 'comp-1', name: 'Ore', essences: { [MINTED]: 9 } },
@@ -279,9 +252,7 @@ test('a reference in a system the loser is NOT present in is left exactly as it 
   assert.equal(result.worldEssenceMergeMap.systems['sys-a'], undefined);
 });
 
-// ---------------------------------------------------------------------------
 // Pin 1 — the re-pointed inheriting record rule (requirement 8)
-// ---------------------------------------------------------------------------
 
 test('a re-pointed record inheriting `macro` with NO world default gets the CANONICAL EMPTY override', () => {
   const corpus = buildEssenceMergeCorpus({
@@ -311,13 +282,7 @@ test('a re-pointed record inheriting `macro` with NO world default gets the CANO
 
 test('a re-pointed record inheriting a REAL world value keeps that value across the merge', () => {
   // `sys-b` resolves its macro through the loser's world default; the survivor has none, and the
-  // loser's is deleted with it. Without the freeze this record would resolve to nothing the instant
-  // the re-key landed — a silent behaviour change on a world nobody edited.
-  //
-  // This asserts at the scope layer only and is structurally blind to the read seam:
-  // `resolveEssence` answers the frozen value, the read union does not consult it, and the
-  // in-system half pinned in pin 1b is what makes the merge behaviour-neutral where a GM can see
-  // it.
+  // loser's is deleted with it.
   const corpus = buildEssenceMergeCorpus({
     systems: [
       { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron', macro: 'Macro.shared' }] },
@@ -349,20 +314,11 @@ test('a section the re-pointed record already OVERRODE is left exactly as author
   assert.equal(record.systemId, 'sys-b');
 });
 
-// ---------------------------------------------------------------------------
 // Pin 1b — the in-system half of that rule, which is the half a GM can observe
-// ---------------------------------------------------------------------------
 
 /**
  * The world default `sys-b` inherits, per section, paired with the shipped fields the frozen value
  * must land on in `systems[].essenceDefinitions[]`.
- *
- * The field names are written out rather than derived: this is the write suite, and the one thing
- * it owns about this rule is that the projection lands on the names the read union reads (`macro`
- * is spelled `propertyMacroUuid`; `effectSource` is a block over three fields). A derivation would
- * restate the projection under test and agree with a wrong one.
- * `world-essence-merge-acceptance.test.js` checks the same mirror behaviourally, through the real
- * `resolveEssenceScope`, section by section.
  */
 const IN_SYSTEM_FREEZE_CASES = Object.freeze([
   Object.freeze({
@@ -421,8 +377,7 @@ for (const testCase of IN_SYSTEM_FREEZE_CASES) {
     // Without this half the freeze inverts: `unionScopedDefinitions` spreads the in-system record
     // last and `applyInheritedSections` writes the world value onto the row only while the record
     // still marks the section inheriting, so flipping the switch to `false` is the very act that
-    // stops the row taking the frozen value. Because the in-system record is spread last, writing
-    // it is what makes the union answer identically before and after.
+    // stops the row taking the frozen value.
     const corpus = inheritingOneSection(testCase);
     const row = corpus.systems[1].essenceDefinitions[0];
     for (const [field, value] of Object.entries(expected)) {
@@ -455,11 +410,7 @@ for (const testCase of IN_SYSTEM_FREEZE_CASES) {
 }
 
 test('a section the old world parent NEVER AUTHORED leaves the in-system row untouched', () => {
-  // The opposite rule, right for the opposite reason. `applyInheritedSections` skips an `undefined`
-  // world value, so this row was already answering its own field before the re-key and still is
-  // after it. The membership record takes the canonical empty — an absent local section under
-  // `inherit: false` falls back to the survivor's value — but writing that same empty onto the
-  // in-system row would destroy the authored macro and be the one behaviour change this pass made.
+  // The opposite rule, right for the opposite reason.
   const corpus = buildEssenceMergeCorpus({
     systems: [
       { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron' }] },
@@ -482,9 +433,7 @@ test('a section the old world parent NEVER AUTHORED leaves the in-system row unt
 test('EVERY in-system row under a duplicated id is frozen, because the union emits every row', () => {
   // Unreachable from a derived map — requirement 6's output-uniqueness invariant refuses such a
   // group outright — and reachable from a hand-edited persisted one, which skips those invariants
-  // by design. `unionScopedDefinitions` walks the in-system array row for row and preserves a
-  // duplicate id rather than collapsing it, so a single-row write would leave the second row
-  // pre-freeze. answering the pre-freeze value.
+  // by design.
   const corpus = buildEssenceMergeCorpus({
     systems: [
       { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron', macro: 'Macro.shared' }] },
@@ -520,10 +469,7 @@ test('the component scope has NO such hazard, because this pass never moves a co
   // The check requirement 8 needs and does not state: `rewriteMembershipReferences(record,
   // 'components', …)` rewrites the `essences` quantity map and nothing else, so a component
   // membership record's `entityId` and its `inherit` map are never touched, no component's world
-  // parent moves and no component section is ever frozen. The map keys move on both sides together
-  // — the world default through the unioned lookup, the membership record and the in-system row
-  // through their system's leg — so an inheriting component still inherits, from a default whose
-  // keys moved the same way.
+  // parent moves and no component section is ever frozen.
   const corpus = twoIrons();
   corpus.componentScope.defaults = { 'comp-1': { id: 'comp-1', essences: { [MINTED]: 2 } } };
   corpus.componentScope.membership['comp-1|sys-b'] = {
@@ -542,9 +488,7 @@ test('the component scope has NO such hazard, because this pass never moves a co
   );
 });
 
-// ---------------------------------------------------------------------------
 // Pin 2 — `essenceScope` sibling-key preservation (requirement 7's last sentence)
-// ---------------------------------------------------------------------------
 
 test('every OTHER authored key on `essenceScope` survives the merge', () => {
   // `readScopePayload` round-trips unknown siblings, and the `1.34.0` registry entry's
@@ -565,9 +509,7 @@ test('every OTHER authored key on `essenceScope` survives the merge', () => {
   assert.equal(result.essenceScope.someFutureSibling, 7);
 });
 
-// ---------------------------------------------------------------------------
 // Pin 3 — the original object for every key the pass did not change
-// ---------------------------------------------------------------------------
 
 test('a world with nothing to merge answers the ORIGINAL object for EVERY key', () => {
   // The runner compares JSON per setting, so an equal-but-fresh object is not merely wasteful — it
@@ -611,9 +553,7 @@ test('a world that DOES merge answers the original object for the keys the merge
   assert.notEqual(result.worldEssenceMergeMap, data.worldEssenceMergeMap);
 });
 
-// ---------------------------------------------------------------------------
 // Idempotence, and the persisted map's role in a re-run
-// ---------------------------------------------------------------------------
 
 test('the pass is IDEMPOTENT: a second run changes nothing and answers the originals', () => {
   const corpus = twoIrons();
@@ -657,9 +597,7 @@ test('a torn re-run rewrites from the PERSISTED map, which a re-derivation could
   assert.deepEqual(repaired.componentScope.membership['comp-9|sys-b'].essences, { iron: 2 });
 });
 
-// ---------------------------------------------------------------------------
 // The tombstone leg (requirement 17)
-// ---------------------------------------------------------------------------
 
 test('the `retired` leg snapshots what the retired entity carried, and a re-run never clears it', () => {
   const first = mergeEquivalentWorldEssences(payloadOf(twoIrons()));
@@ -692,9 +630,7 @@ test('a PERSISTED snapshot is never overwritten by a freshly derived one', () =>
   assert.equal(result.worldEssenceMergeMap.retired[MINTED].name, 'THE ORIGINAL NAME');
 });
 
-// ---------------------------------------------------------------------------
 // A refused group changes nothing — requirement 6, through the transform
-// ---------------------------------------------------------------------------
 
 test('two equivalent essences inside ONE system are REFUSED, and the corpus is untouched', () => {
   const data = payloadOf(
@@ -724,8 +660,6 @@ test('two equivalent essences inside ONE system are REFUSED, and the corpus is u
 test('a world essence whose member system has NO definition row is refused on the REBUILT keys', () => {
   // The variant neither of the first two invariants can see: both are evaluated over
   // `essenceDefinitions`, and this loser has a membership record for `sys-a` with no row there.
-  // Merging it would collide `membershipKey('iron', 'sys-a')` and drop the loser's overrides with
-  // no refusal and no report.
   const data = payloadOf(
     buildEssenceMergeCorpus({
       systems: [
@@ -744,9 +678,7 @@ test('a world essence whose member system has NO definition row is refused on th
   assert.equal(result.essenceScope, data.essenceScope);
 });
 
-// ---------------------------------------------------------------------------
 // The transient report's field names, which the GM-notice lane consumes
-// ---------------------------------------------------------------------------
 
 test('the report carries exactly the five named legs', () => {
   const report = mergeEquivalentWorldEssences(
@@ -790,15 +722,11 @@ test('the report carries exactly the five named legs', () => {
     { essenceId: 'mixed', name: 'Mixed', sections: ['macro'], reason: 'sectionDisagreement' },
   ]);
   // The fifth leg is the one that is not a derivation: it names the in-system rows requirement 8
-  // wrote. It is empty here, and that is the common case by construction — every membership record
-  // `buildMembershipRecord` produced is fully overriding, so only a GM who has since flipped a
-  // switch to inheriting ever puts a row in it.
+  // wrote.
   assert.deepEqual(report.inSystemFreezes, []);
 });
 
-// ---------------------------------------------------------------------------
 // The registry declaration — checked, not copied (requirements 15 and 16)
-// ---------------------------------------------------------------------------
 
 test('the 1.34.0 entry declares downgradeTo 1.33.0 and downgradeLosesData FALSE', () => {
   const entry = new MigrationRunner({

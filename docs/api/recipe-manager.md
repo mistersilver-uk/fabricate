@@ -217,23 +217,28 @@ Falls back to a default component icon when the component is not found or has no
 
 **Returns:** `string`
 
-### resolveResultDescription(recipe, componentId, quantity)
+### resolveResultDescription(recipe, componentId, quantity, quantityFormula)
 
-Returns a formatted result description in the form `Nx Name`, where `N` is the quantity and `Name` is resolved via `resolveComponentName`.
+Returns a formatted result description in the form `Nx Name`, where `Name` is resolved via `resolveComponentName`.
+`N` is `quantity` for a fixed result, or the raw expression when `quantityFormula` is supplied, because a rolled amount states its formula and never a resolved number.
 Falls back to "Unknown Component" when the component is not found.
 
 | Parameter | Type | Required | Description |
 |:----------|:-----|:---------|:------------|
 | `recipe` | `Recipe` | Yes | The recipe containing the result |
 | `componentId` | `string \| null` | Yes | The component ID of the result |
-| `quantity` | `number` | No (default `1`) | The result quantity |
+| `quantity` | `number` | No (default `1`) | The result's fixed quantity |
+| `quantityFormula` | `string \| null` | No (default `null`) | The result's rolled amount expression, when the result is rolled rather than fixed |
 
 **Returns:** `string`
 
 ```javascript
 const rm = game.fabricate.getRecipeManager();
-const desc = rm.resolveResultDescription(recipe, 'healing-potion-id', 2);
-console.log(desc); // "2x Healing Potion"
+const fixed = rm.resolveResultDescription(recipe, 'healing-potion-id', 2);
+console.log(fixed); // "2x Healing Potion"
+
+const rolled = rm.resolveResultDescription(recipe, 'healing-potion-id', 1, '1d4+1');
+console.log(rolled); // "1d4+1x Healing Potion"
 ```
 
 ### resolveRecipeIcon(recipe)

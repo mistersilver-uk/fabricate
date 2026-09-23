@@ -1,24 +1,14 @@
 /**
- * Salvage chat output (issue 675): the salvage analogue of craft-chat-output.
- *
- * Covers `_postSalvageChatMessage` directly — the chatOutput gate on/off, the
- * success and failure payloads, broken-tool resolution — plus an integration proof
- * that `salvage()` posts on success but stays silent on a cancelled prompt.
- *
- * The second half covers COMPONENT COMPLICATIONS on the salvage path (issue 1286), and it
- * covers them end-to-end through `salvage()` rather than through the poster alone. That is
- * deliberate: the disclosure guarantee being asserted is that a `gmOnly` complication
- * reaches no player-readable surface, and the salvage RUN RECORD — an actor flag the owning
- * player can read — is one of those surfaces and is written by `salvage()`, not by the
- * card. Asserting only the card would leave the durable half unasserted, which is the
- * failure mode the delta calls out by name.
+ * Salvage chat output (issue 675): the salvage analogue of craft-chat-output. The second half
+ * covers COMPONENT COMPLICATIONS on the salvage path (issue 1286), and it covers them end-to-end
+ * through `salvage()` rather than through the poster alone.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
-import { attachAwardReceipts } from '../src/systems/runHistoryEvidence.js';
+import { attachAwardReceipts, attachRolledAwards } from '../src/systems/runHistoryEvidence.js';
 import { authoredComplications } from '../src/utils/componentComplications.js';
 
 let chatCreated = [];
@@ -100,6 +90,57 @@ test('_postSalvageChatMessage: success posts a salvage card with source, recover
   assert.equal(hammerCount, 1, 'the tool is listed once (spared record skipped, no dup)');
 });
 
+test('1645: a rolled recovery states its roll and rides the evaluated Roll on the message', async () => {
+  setupGame();
+  resetChat();
+  const roll = { total: 2, formula: '1d4-2' };
+  const results = attachRolledAwards(
+    attachAwardReceipts(
+      [{ name: 'Iron Shard' }],
+      [{ name: 'Iron Shard', img: 'icons/shard.png', quantity: 2, rolled: { formula: '1d4-2', total: 2 } }]
+    ),
+    [
+      { resultId: 'r1', componentId: 'shard', formula: '1d4-2', total: 2, quantity: 2,
+        rolled: { formula: '1d4-2', total: 2 }, roll, name: 'Iron Shard', img: 'icons/shard.png' },
+      { resultId: 'r2', componentId: 'dust', formula: '1d4-8', total: -4, quantity: 0,
+        rolled: { formula: '1d4-8', total: -4 }, roll: { total: -4, formula: '1d4-8' },
+        name: 'Iron Dust', img: '' },
+    ]
+  );
+
+  await new CraftingEngine({})._postSalvageChatMessage({
+    success: true,
+    actor: { name: 'Akra' },
+    system: systemWithChat(true),
+    component,
+    consumedQuantity: 1,
+    results,
+    usedTools: [],
+  });
+
+  const { content, rolls } = chatCreated[0];
+  assert.equal(rolls.length, 2, 'every evaluated roll rides along, so the dice sound');
+  assert.ok(content.includes('2× Iron Shard'), 'the recovered stack is the rolled integer');
+  assert.ok(content.includes('FABRICATE.Chat.RolledAmount'), 'stated in the shared card treatment');
+  assert.ok(content.includes('Iron Dust'), 'and an empty recovery is its own row');
+});
+
+test('1645: a fixed salvage recovery carries no rolls key at all', async () => {
+  setupGame();
+  resetChat();
+  await new CraftingEngine({})._postSalvageChatMessage({
+    success: true,
+    actor: { name: 'Akra' },
+    system: systemWithChat(true),
+    component,
+    consumedQuantity: 1,
+    results: attachAwardReceipts([{ name: 'Iron Shard' }], [{ name: 'Iron Shard', quantity: 2 }]),
+    usedTools: [],
+  });
+  assert.ok(!('rolls' in chatCreated[0]), 'no dice were rolled, so the message carries none');
+  assert.ok(!chatCreated[0].content.includes('RolledAmount'), 'and the card states no roll');
+});
+
 test('_postSalvageChatMessage: failure posts the reason and the forfeited source', async () => {
   setupGame();
   resetChat();
@@ -167,17 +208,9 @@ test('_postSalvageChatMessage: a ChatMessage.create failure never throws out of 
   );
 });
 
-// ---------------------------------------------------------------------------
 // Component complications (issue 1286)
-// ---------------------------------------------------------------------------
 
-/**
- * Build the two complications every case below uses, through the REAL normalizer.
- *
- * Hand-written literals would drift from the persisted shape the moment a key moved, and
- * the whole redaction contract is keyed on one of those keys (`visibility`), so a fixture
- * that spelled it slightly wrong would silently make every assertion below vacuous.
- */
+/** Build the two complications every case below uses, through the REAL normalizer. */
 function complicationsFor({ visibility, when, name, description, severity = 'major' }) {
   return authoredComplications([
     {
@@ -280,9 +313,7 @@ test('_postSalvageChatMessage: a suppressed bulk row posts no complication card'
   assert.equal(chatCreated.length, 0, 'suppressed means suppressed');
 });
 
-// ---------------------------------------------------------------------------
 // End-to-end through salvage(): the card, the run record and the return
-// ---------------------------------------------------------------------------
 
 /** A minimal owned item the engine can consume. */
 function stubItem(id, name) {
@@ -326,13 +357,8 @@ function stubActor(items) {
 }
 
 /**
- * Drive a two-stage progressive salvage whose budget covers the first stage only, with
- * whatever complications the caller hung on the two result components.
- *
- * `isGM: true` is not incidental. `visibility` is redacted on the AUDIENCE and never on the
- * acting user's role, so a GM salvaging on a player's behalf must write and post exactly
- * what a player would. Running every case below as a GM is what proves that: a role-keyed
- * filter would pass a player-run test and fail here.
+ * Drive a two-stage progressive salvage whose budget covers the first stage only, with whatever
+ * complications the caller hung on the two result components. `isGM: true` is not incidental.
  */
 async function runProgressiveSalvage({ awardedComplications, missedComplications }) {
   resetChat();

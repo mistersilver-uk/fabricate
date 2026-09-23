@@ -1,22 +1,4 @@
-/**
- * THE GM NOTICES (issue 1363, criterion 11).
- *
- * `worldScopeEntityNotice.js` was extracted from `src/main.js` for a stated reason: nothing in
- * that file can be executed by a unit test, and "a source-text grep can pin a DISPATCH but never
- * a SUM — three semantic mutations to the `1.21.0` notice's arithmetic survived a green suite
- * while it lived inline". The extraction then shipped with no assertion on any clause, so every
- * one of those mutations was available again: omitting the created counts, the merged clause, the
- * transitive-group clause and the refusals clause all survived, and
- * `buildWorldScopeIdentityRemapNotice` — which carries criterion 11's locked-pack and
- * unsafe-`systemId` counts — had none at all.
- *
- * This file asserts the SUMS and the CLAUSES. The two `src/main.js` DISPATCH legs are pinned by
- * source contract at the bottom, on the pattern the `ready`-body call site already uses: an
- * `Array.isArray`-guarded consumer fails SILENT, so the notice simply never appears.
- *
- * Each notice is a concise toast `message` plus a console `detail` (issue 1737): counts and capped
- * names are asserted on the message, explanations and every enumeration on the detail.
- */
+/** THE GM NOTICES (issue 1363, criterion 11). */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -28,16 +10,18 @@ import {
   getHighestRegisteredMigrationVersion,
   MigrationRunner,
 } from '../src/migration/MigrationRunner.js';
-import { buildWorldEssenceMergeRemapNotice } from '../src/migration/remapWorldScopeIdentityFlags.js';
+import { buildWorldEssenceMergeRemapNotice } from '../src/systems/remapWorldScopeIdentityFlags.js';
+import { entrySources } from './helpers/bootstrapEntrySource.js';
+
 import {
   buildWorldEssenceMergeNotice,
   buildWorldScopeEntityNotice,
   buildWorldScopeIdentityRemapNotice,
   describeWorldEssenceMerge,
-} from '../src/migration/worldScopeEntityNotice.js';
+} from '../src/systems/worldScopeEntityNotice.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const MAIN = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
+const MAIN = [entrySources['src/bootstrap/migrations.js'], entrySources['src/main.js']].join('\n');
 const LANG = JSON.parse(readFileSync(resolve(HERE, '..', 'lang', 'en.json'), 'utf8'));
 const EMPTY = Object.freeze({ message: '', detail: '' });
 
@@ -227,9 +211,7 @@ test('the shipped Created toast keeps its View Lab anchor, and the detail keeps 
   assert.match(detail, /c9 → c1 \(sys-b ← sys-a\)/);
 });
 
-// ---------------------------------------------------------------------------
 // The REMAP notice — criterion 11's locked-pack and unsafe-systemId counts
-// ---------------------------------------------------------------------------
 
 test('the remap notice counts the unsafe systemId skips and the detail names them', () => {
   const { message, detail } = buildWorldScopeIdentityRemapNotice(
@@ -278,9 +260,7 @@ test('a failed remap document says INCOMPLETE and names the re-run command in th
   assert.match(detail, /game\.fabricate\.remapWorldScopeIdentityFlags\(\)/);
 });
 
-// ---------------------------------------------------------------------------
 // The `1.34.0` remap notice — the essence half's GM channel
-// ---------------------------------------------------------------------------
 
 test('the essence remap notice counts the refused groups and both skips, and the detail names the ids', () => {
   // `partitionSafeEssencePairs` refuses a whole group whose survivor or any loser is not a safe
@@ -331,19 +311,14 @@ test('each clause of the essence remap notice appears independently of the other
   assert.doesNotMatch(failedOnly, /merged essence set|refused the update/);
 });
 
-// ---------------------------------------------------------------------------
 // The two DISPATCH legs in src/main.js
-// ---------------------------------------------------------------------------
 
 test('src/main.js dispatches BOTH notices, each on the right channel', () => {
   // An omitted dispatch fails SILENT — the consumer is guarded and the notice simply never
   // appears — which is why its PRESENCE is asserted rather than inferred.
   const composeIndex = MAIN.indexOf('buildWorldScopeEntityNotice(worldScopeEntityReport');
   assert.ok(composeIndex > 0, 'the migration notice is composed from the transient report');
-  // ANCHORED TO THIS BLOCK, and the anchoring is the whole point. An unanchored `MAIN` match for
-  // the severity dispatch is satisfied by the 1.21.0 retired-crafting-mod dispatch, which is
-  // byte-identical apart from indentation - so deleting THIS branch, and downgrading every
-  // rename, refusal and prune warning from a permanent WARN to a transient info, stayed green.
+  // ANCHORED TO THIS BLOCK, and the anchoring is the whole point.
   const worldScopeBlock = MAIN.slice(composeIndex, composeIndex + 700);
   assert.match(
     worldScopeBlock,
@@ -375,7 +350,7 @@ test('src/main.js dispatches BOTH notices, each on the right channel', () => {
 
 test('every localization key the two notices reference exists in lang/en.json', () => {
   const source = readFileSync(
-    resolve(HERE, '..', 'src', 'migration', 'worldScopeEntityNotice.js'),
+    resolve(HERE, '..', 'src', 'systems', 'worldScopeEntityNotice.js'),
     'utf8'
   );
   const keys = [...source.matchAll(/'(FABRICATE\.Migration\.WorldScopeEntities\.[A-Za-z]+)'/g)].map(
@@ -390,13 +365,9 @@ test('every localization key the two notices reference exists in lang/en.json', 
   }
 });
 
-// ---------------------------------------------------------------------------
-// The `1.34.0` equivalent-essence merge notice (issue 1654)
-//
-// `adminStore.addEssence` mints an essence id with `crypto.randomUUID()`, so these assertions hold
-// the toast to readable names: no id enumeration, and no `oldId → newId` arrow of the kind the
-// `Renames` clause prints. The ids are console detail.
-// ---------------------------------------------------------------------------
+// The `1.34.0` equivalent-essence merge notice (issue 1654). `adminStore.addEssence` mints an
+// essence id with `crypto.randomUUID()`, so these assertions hold the toast to readable names: no
+// id enumeration, and no `oldId → newId` arrow of the kind the `Renames` clause prints.
 
 /** A merge report with one of everything, in the shape `buildWorldEssenceEquivalence` emits. */
 function mergeReport(overrides = {}) {
@@ -648,10 +619,8 @@ test('src/main.js composes and posts the essence remap notice from the pass summ
 });
 
 test('the 1.34.0 and 1.30.0 remap fallbacks and their lang/en.json strings compose the SAME notices', () => {
-  // Existence is not agreement: the key-exists guards stayed green while an inline English
-  // fallback kept a sentence `lang/en.json` had already been corrected away from. The fallback
-  // fires whenever `game.i18n` cannot resolve a key, so both renderings must match — toast,
-  // overflow clause, pointer and detail alike.
+  // Existence is not agreement: the key-exists guards stayed green while an inline English fallback
+  // kept a sentence `lang/en.json` had already been corrected away from.
   const many = Array.from({ length: 7 }, (unused, index) => ({
     survivorId: `s-${index}`,
     loserIds: [`l-${index}`],
@@ -681,7 +650,7 @@ test('the 1.34.0 and 1.30.0 remap fallbacks and their lang/en.json strings compo
 
 test('every WorldEssenceMerge key the REMAP notice references exists in lang/en.json', () => {
   const source = readFileSync(
-    resolve(HERE, '..', 'src', 'migration', 'remapWorldScopeIdentityFlags.js'),
+    resolve(HERE, '..', 'src', 'systems', 'remapWorldScopeIdentityFlags.js'),
     'utf8'
   );
   const keys = [...source.matchAll(/'(FABRICATE\.Migration\.WorldEssenceMerge\.[A-Za-z]+)'/g)].map(
@@ -699,7 +668,7 @@ test('every WorldEssenceMerge key the REMAP notice references exists in lang/en.
 
 test('every WorldEssenceMerge localization key the notice references exists in lang/en.json', () => {
   const source = readFileSync(
-    resolve(HERE, '..', 'src', 'migration', 'worldScopeEntityNotice.js'),
+    resolve(HERE, '..', 'src', 'systems', 'worldScopeEntityNotice.js'),
     'utf8'
   );
   const keys = [...source.matchAll(/'(FABRICATE\.Migration\.WorldEssenceMerge\.[A-Za-z]+)'/g)].map(

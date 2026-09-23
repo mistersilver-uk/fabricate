@@ -1,38 +1,6 @@
 /**
- * WHAT `INHERITING` MEANS FOR A WORLD THAT ALREADY EXISTS (issue 1372, epic 1357).
- *
- * Issue 1372 retires `## CraftingSystem` requirement 36's blanket claim and makes an INHERITING
- * section resolve to its world default. That is a change to what every non-UI reader answers, so
- * the question that decides whether it may ship is not "does the switch work" - its neighbour
- * `tests/world-scope-inherited-section-resolution.test.js` pins that - but "does any world that
- * exists today move". THE ANSWER IS NO, and this file is the proof, stated over the three states a
- * real world can actually be in.
- *
- * 1. **NEVER WRITTEN.** A world that predates the world-scope corpus has no `fabricate.*Scope`
- *    setting at all. Foundry synthesizes the registered default for an unwritten world setting, so
- *    the store reads `{}` - which is why `isSeeded()` is taken from the RAW payload's key presence
- *    and not from the normalized corpus. With no world half the read seam answers the in-system
- *    array ITSELF, by reference, so there is no section for a switch to decide.
- * 2. **MIGRATED.** `buildMembershipRecord` writes `OVERRIDING_INHERIT` - every section `false` -
- *    for every `(entity, system)` pair the `1.30.0` migration creates. Every section is therefore
- *    OVERRIDING on a migrated world, so every row still answers from the in-system record.
- * 3. **OPTED IN.** A GM flips one section's switch to inheriting. That row, and only that row,
- *    follows the world default. This is the opt-in, and it is the whole point.
- *
- * ── IT RUNS ON REAL PERSISTED DATA, THROUGH A REAL `load()` ──────────────────────────────────
- * The payloads are produced by the REAL `migrateWorldScopeEntities` over the shared adversarial
- * corpus, put into a `Map`-backed settings seam, and read back through the REAL
- * `createEssenceScopeStore().load()`. A hand-written corpus literal would test this file's beliefs
- * about the persisted shape rather than the shape the migration writes, and a store built around a
- * literal would skip `load()`'s raw-key-presence reading - the one thing that distinguishes "never
- * written" from "written empty", which is state 1's whole basis.
- *
- * The BROADEST form of this proof already exists and is not duplicated here:
- * `tests/world-scope-migration-differential.test.js` projects every entity of every scenario
- * BEFORE the migration without the world half and AFTER it THROUGH the read union, and permits
- * only the identity renames the report names. That file is the one that would redden if this
- * change moved a migrated world's behaviour anywhere. What this file adds is the three states
- * NAMED, so a later reader can see which one they are reasoning about.
+ * WHAT `INHERITING` MEANS FOR A WORLD THAT ALREADY EXISTS (issue 1372, epic 1357). 1. **NEVER
+ * WRITTEN.** A world that predates the world-scope corpus has no `fabricate.*Scope` setting at all.
  */
 
 import assert from 'node:assert/strict';

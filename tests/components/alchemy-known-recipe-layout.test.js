@@ -1,23 +1,4 @@
-/*
- * Alchemy "Known recipes" card layout gate (issue 675).
- *
- * The maintainer reported a revealed recipe named "Blade Venom" rendering as its
- * right-hand tail ("nom") with left-clipped essence ids in the Alchemy tab's Known
- * column. happy-dom cannot compute the CSS cascade or overflow, so this gate renders
- * the REAL scoped `<style>` blocks from AlchemyView.svelte (the 3-column grid, whose
- * `.alchemy-view-column { min-width: 0 }` is the constraint that matters) and
- * KnownRecipesColumn.svelte (the card) in Chromium under a faithful stand-in for
- * Foundry V13 core CSS, then measures the rendered name/sig overflow.
- *
- * It proves two things:
- *  1. Bug 2 ("nom") was a SYMPTOM of Bug 1: the name ALWAYS renders fully — even when
- *     the signature is the long, unresolved raw-essence-id string that Bug 1 produced.
- *     Only the sig overflows, and it clips from the RIGHT (ellipsis), never the name.
- *     Once the essence ingredients resolve to "Toxic x2 . Water x1" nothing overflows
- *     the column at all.
- *  2. A genuinely long name clips from the RIGHT with an ellipsis (scrollWidth >
- *     clientWidth, left edge pinned), so a name is never shown as only its tail.
- */
+/* Alchemy "Known recipes" card layout gate (issue 675). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

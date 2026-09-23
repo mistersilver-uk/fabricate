@@ -1,25 +1,4 @@
-/**
- * The ordering rule itself, over BOTH mover shapes (issue 1157, second shape added at 1517).
- *
- * `src/ui/svelte/util/announceAfterFocus.js` is the one place the module decides "move the
- * keyboard first, queue the sentence behind it" — and until this file it had no suite of its own.
- * Every assertion on it was made through a mounted host, which can see the SETTLED state (the
- * sentence eventually arrives) but not the property the module exists for: that a decline is
- * announced IMMEDIATELY and a move is announced LATE. A host test that waits for the delay before
- * reading the region passes either way.
- *
- * THE SECOND SHAPE IS WHY THIS IS WORTH A FILE. The 1157 call sites hand the mover a synchronous
- * `true`/`false`; the validation row action hands it a PROMISE of the element it landed on,
- * because its destination panel does not exist until Svelte has flushed the route just written.
- * Both are read as one question — "did focus move" — by one branch, and that branch is invisible
- * to every mounted suite: delete it and a promise is still a truthy object, so a DECLINED
- * asynchronous move takes the delayed path and announces the promise rather than `null`. Nothing
- * in the repository could see that. The `{shape} x {outcome}` table below can.
- *
- * NO DOM AND NO HAPPY-DOM. The module touches neither; the "element" a mover resolves is only ever
- * passed through to `announce`, so a plain object proves the identity hand-off exactly as a real
- * node would, without a document.
- */
+/** The ordering rule itself, over BOTH mover shapes (issue 1157, second shape added at 1517). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -28,13 +7,7 @@ import {
   announceAfterFocusMove,
 } from '../../src/ui/svelte/util/announceAfterFocus.js';
 
-/**
- * The delay these cells run with, OVERRIDDEN rather than shipped.
- *
- * Short enough that four cells cost a quarter of a second, long enough that "the microtasks and
- * one macrotask turn have drained" cannot be mistaken for it. The shipped number is asserted
- * separately, so a change to it moves one assertion rather than the running time of this file.
- */
+/** The delay these cells run with, OVERRIDDEN rather than shipped. */
 const DELAY = 60;
 
 /** Every queued microtask, plus one macrotask turn — but nothing like `DELAY`. */
@@ -48,7 +21,6 @@ const afterDelay = () => new Promise((resolve) => setTimeout(resolve, DELAY + 40
  *
  * @param {() => boolean|Promise<object|null>} moveFocus
  * @returns {Promise<{early: object[], late: object[]}>} the announce arguments seen before the
- *   delay could have elapsed, and those seen after it.
  */
 async function announcementTiming(moveFocus) {
   const seen = [];
@@ -103,9 +75,7 @@ describe('announceAfterFocus: the sentence is queued behind a move and not behin
   });
 
   it('announces IMMEDIATELY when an asynchronous mover resolves null', async () => {
-    // THE CELL THE BRANCH EXISTS FOR. A promise is a truthy object, so a reader that never
-    // awaited it would take this for a successful move: delayed, and announced with the promise
-    // itself as the "focused element". Both halves are asserted.
+    // THE CELL THE BRANCH EXISTS FOR. A promise is a truthy object.
     const { early, late } = await announcementTiming(async () => null);
     assert.deepEqual(
       early,

@@ -7,6 +7,14 @@ import {
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+// Issue 1510: all three toolbar filters are shared `<Select>`s.
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  selectOptionLabels,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -16,19 +24,19 @@ const harness = createMountedComponentHarness({
   rawModules: [
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     // The creation drop-zone (issue 844) resolves a drop via resolveDropData and
     // wires the drop listeners through the dragDrop action. Omitting either raw
     // module from the allowlist does not fail the mount — it HANGS (# cancelled).
     'src/ui/svelte/util/dropUtils.js',
-    'src/ui/svelte/actions/dragDrop.js'
+    'src/ui/svelte/actions/dragDrop.js',
+    // Issue 1510: the toolbar's three filter vocabularies, an import-free leaf.
+    'src/ui/svelte/apps/manager/booksScrollsSelectOptions.js'
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
-    // ONE chip (issue 883), the shared no-state primitive (issue 785), and the labelled
-    // push-button (issue 1118) both Clear filters controls render.
+    // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     // Issue 1515: the filter bar has a search field now, and it is the shared one.
@@ -43,7 +51,6 @@ const harness = createMountedComponentHarness({
 // Dispatch a Foundry-style drop on a node. getDragEventData (no `foundry` global in
 // the harness) falls back to parsing `dataTransfer.getData('text/plain')`, so a
 // JSON payload here round-trips exactly as a real world/compendium item drag would.
-// Passing `data: null` simulates a drop with no payload.
 function fireDrop(node, data) {
   const raw = data === undefined ? null : JSON.stringify(data);
   const event = new Event('drop', { bubbles: true, cancelable: true });
@@ -91,9 +98,6 @@ describe('BooksScrollsView (mounted)', () => {
     assert.equal(root.querySelectorAll('[data-books-scrolls-item]').length, 3);
     assert.equal(root.querySelector('[data-books-scrolls-name="primer"]').textContent.trim(), "Journeyman's Primer");
     // Type pill: Book (2+ recipes) is neutral, Scroll (1) is neutral, Incomplete (0) is danger.
-    // A multi-recipe item names its own count in the type pill, matching the
-    // Knowledge surface; a single-recipe item stays "Scroll" and an empty one
-    // "Incomplete".
     assert.equal(root.querySelector('[data-books-scrolls-type="primer"]').textContent.trim(), '2 Recipe Book');
     assert.ok(!root.querySelector('[data-books-scrolls-type="primer"]').classList.contains('is-danger'));
     assert.equal(root.querySelector('[data-books-scrolls-type="scroll"]').textContent.trim(), 'Scroll');
@@ -165,7 +169,7 @@ describe('BooksScrollsView (mounted)', () => {
     root.querySelector('[data-books-scrolls-toggle="primer"]').click();
     assert.deepEqual(toggled, { id: 'primer', enabled: false });
 
-    // The blank-window "Create recipe item" dialog is gone (issue 844) — creation is
+    // The blank-window "Create recipe item" dialog is gone (issue 844).
     // the drop-zone below. There is no create button.
     assert.equal(root.querySelector('[data-books-scrolls-create]'), null);
     assert.equal(root.querySelector('[data-books-scrolls-empty-create]'), null);
@@ -234,6 +238,99 @@ describe('BooksScrollsView (mounted)', () => {
       flushSync();
       assert.deepEqual(dropped, []);
       assert.ok(root.querySelector('[data-books-scrolls-drop-error]'), 'expected the inline error note');
+    });
+  });
+
+  // The toolbar's three filters (issue 1510). Two keep the `aria-label` their `<select>` carried;
+  // the limits filter is named by its own conditional caption, so its announced name follows the
+  // visibility mode rather than staying a string the GM never reads.
+  describe('the converted toolbar filters', () => {
+    const LIBRARY = [
+      makeItem(),
+      makeItem({
+        id: 'scroll',
+        resolvedName: 'Scroll of Soul-Ash',
+        derivedType: 'Scroll',
+        enabled: false,
+        caps: { item: { limitUses: false }, learn: { limitLearning: true, learnsAllowed: 2 } },
+        recipes: [{ id: 'r9', name: 'Bind Ash', category: 'Arcana' }]
+      })
+    ];
+
+    const rowIds = (root) =>
+      [...root.querySelectorAll('[data-books-scrolls-item]')].map((row) =>
+        row.getAttribute('data-books-scrolls-item')
+      );
+
+    it('narrows the library by status, and keeps the name its select carried', async () => {
+      const root = await harness.mount({ recipeItems: LIBRARY, visibilityMode: 'knowledge' });
+      const filter = '[data-books-scrolls-status-filter]';
+
+      assert.equal(assertSelectHasResolvedName(root, filter), 'Filter recipe items by status');
+      assert.deepEqual(selectOptionLabels(root, filter), ['All statuses', 'On', 'Off']);
+
+      chooseSelectOption(root, filter, 'disabled');
+      flushSync();
+      assert.equal(selectTriggerText(root, filter), 'Off');
+      assert.deepEqual(rowIds(root), ['scroll']);
+    });
+
+    it('narrows the library by type, over the vocabulary the library itself produces', async () => {
+      const root = await harness.mount({ recipeItems: LIBRARY, visibilityMode: 'knowledge' });
+      const filter = '[data-books-scrolls-type-filter]';
+
+      assert.equal(assertSelectHasResolvedName(root, filter), 'Filter recipe items by type');
+      assert.deepEqual(selectOptionLabels(root, filter), ['All types', 'Book', 'Scroll']);
+
+      chooseSelectOption(root, filter, 'Scroll');
+      flushSync();
+      assert.deepEqual(rowIds(root), ['scroll']);
+    });
+
+    it('narrows the library by limits, and is named by the caption the mode chooses', async () => {
+      const root = await harness.mount({ recipeItems: LIBRARY, visibilityMode: 'knowledge' });
+      const filter = '[data-books-scrolls-cap-filter]';
+
+      // THE NARROWED NAME, BOOKED. Its `<select>` announced "Filter recipe items by limits", which
+      // did not contain the visible caption at all — a WCAG 2.5.3 label-in-name mismatch — so the
+      // trigger is named by the caption instead and the name follows the mode with it.
+      assert.equal(assertSelectHasResolvedName(root, filter), 'Learning');
+      assert.deepEqual(selectOptionLabels(root, filter), [
+        'All',
+        'Limited learning',
+        'Learn freely'
+      ]);
+
+      chooseSelectOption(root, filter, 'limited');
+      flushSync();
+      assert.deepEqual(rowIds(root), ['scroll']);
+    });
+
+    it('re-words the limits filter, its name and its rows in item visibility mode', async () => {
+      const root = await harness.mount({ recipeItems: LIBRARY, visibilityMode: 'item' });
+      const filter = '[data-books-scrolls-cap-filter]';
+
+      assert.equal(assertSelectHasResolvedName(root, filter), 'Uses');
+      assert.deepEqual(selectOptionLabels(root, filter), ['All', 'Limited use', 'Unlimited']);
+    });
+
+    it('renders each filter caption as a span rather than a label around the trigger', async () => {
+      const root = await harness.mount({ recipeItems: LIBRARY, visibilityMode: 'knowledge' });
+
+      for (const hook of [
+        '[data-books-scrolls-status-filter]',
+        '[data-books-scrolls-type-filter]',
+        '[data-books-scrolls-cap-filter]'
+      ]) {
+        const trigger = root.querySelector(hook);
+        assert.ok(Boolean(trigger), `${hook} renders no converted trigger`);
+        assert.ok(
+          !trigger.closest('label'),
+          `${hook} sits inside a caller-rendered <label>, whose caption click would dismiss the ` +
+            'panel and then re-open it'
+        );
+        assert.equal(trigger.closest('.manager-filter').tagName, 'SPAN');
+      }
     });
   });
 

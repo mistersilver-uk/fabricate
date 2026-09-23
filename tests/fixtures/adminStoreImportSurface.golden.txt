@@ -3,14 +3,6 @@ import {
   getCharacterPrerequisitePresetsForFoundrySystem,
   seedCharacterPrerequisitePresets,
 } from '../../../config/characterPrerequisitePresets.js';
-import {
-  getCurrencyPresetsForFoundrySystem,
-  seedCurrencyPresets,
-} from '../../../config/currencyPresets.js';
-import {
-  getDefaultProviderId,
-  getProviderCanonicalUnits,
-} from '../../../config/currencyProviders.js';
 import { getFabricateFlag } from '../../../config/flags.js';
 import {
   getCharacterModifierPresetsForFoundrySystem,
@@ -30,7 +22,7 @@ import {
 import { isGatheringRealmsEnabled } from '../../../systems/gatheringRealms.js';
 import { readLearnedRecipeEntries } from '../../../systems/recipeKeyedFlagEntries.js';
 import { recipeReferencesEssence } from '../../../utils/recipeEssenceReferences.js';
-import { describeEssenceDeleteImpact } from '../../../utils/essenceBulkEditModel.js';
+import { describeEssenceDeleteImpact } from '../../model/essenceBulkEditModel.js';
 import { describeComponentDeleteImpact } from '../../../utils/recipeComponentReferences.js';
 import {
   buildLearnedRecipeActorIndex,
@@ -51,14 +43,8 @@ import {
   planComponentCategoryReassignments,
   planTagRemovals,
   planRecipeTagRemovals,
-} from '../../../utils/vocabularyCascade.js';
-import {
-  canAddCurrencySubUnit,
-  CURRENCY_MACRO_KEYS,
-  normalizeCurrencyUnit,
-  normalizeWorldCurrencyConfig,
-  validateCurrencyProfile,
-} from '../../../systems/currencyProfile.js';
+} from '../../model/vocabularyCascade.js';
+import { normalizeVocabularyKey } from '../../model/vocabularyUsage.js';
 import {
   authoredCheckModifierIds,
   isRollExpression,
@@ -66,18 +52,19 @@ import {
 } from '../../../systems/checkModifierResolver.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
 import {
-  ENVIRONMENT_COMPOSED_COMPOSITION_STATES,
-  ENVIRONMENT_INCLUDED_COMPOSITION_STATES,
   conditionSettingsToCurrent,
-  environmentComposesRecord,
-  resolveGatheringCompositionMode,
+  DEFAULT_GATHERING_CONDITIONS,
 } from '../../../systems/gatheringComposition.js';
-import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
-import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
+import {
+  buildEnvironmentCompositionViewModel,
+  environmentComposesGatheringRecord as _environmentComposesGatheringRecord,
+} from '../../model/environmentComposition.js';
+import { emptyEnvironmentState as _emptyEnvironmentState } from '../../model/environmentValidation.js';
+import { normalizeNodeConfig } from '../../../systems/gatheringNodeConfig.js';
 import { normalizeGatheringResultGroups } from '../../../systems/gatheringResultGroups.js';
 import { Result } from '../../../models/Result.js';
 import { Tool } from '../../../models/Tool.js';
-import { classifyModeChange } from '../../../migration/migrateRecipeForModeChange.js';
+import { classifyModeChange } from '../../../systems/migrateRecipeForModeChange.js';
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
@@ -86,7 +73,7 @@ import {
   localizeRecipeActivationParts,
   localizeRecipePersistenceError,
 } from '../../../utils/recipeActivationMessages.js';
-import { resolveRecipeAccessRoster } from '../../../utils/recipeAccessRoster.js';
+import { resolveRecipeAccessRoster } from '../../model/recipeAccessRoster.js';
 import { authoredFailureOutcome } from '../../../utils/gatheringFailureOutcome.js';
 import {
   activityFailureResultPolicy,
@@ -94,19 +81,14 @@ import {
   permitsFailureResults,
 } from '../../../utils/failureResultPolicy.js';
 import { normalizeRoutedName } from '../../../utils/routedOutcomeKeywords.js';
+import { diceEngine } from '../../../utils/rollFormulaRollability.js';
 import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
 import {
   seedToolRepairRequirements as _seedToolRepairRequirements,
   TOOL_BREAKAGE_AUTHORITIES,
-  TOOL_SECTIONS,
 } from '../../../systems/toolScope.js';
 import { componentsWithResolvedEssences } from '../../../systems/resolvedComponentEssences.js';
-import { resolvedToolsFor } from '../../../systems/scopedEntityReads.js';
-import { findMembership, isSectionInherited } from '../../../systems/scopedDefinitions.js';
-import {
-  defaultKnowledgeTab,
-  projectKnowledgeSnapshot,
-} from '../apps/manager/knowledge/knowledgeStudio.js';
+import { projectKnowledgeSnapshot } from '../apps/manager/knowledge/knowledgeStudio.js';
 import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../util/essenceIcons.js';
 import {
   TIME_OF_DAY_ICONS,
@@ -130,7 +112,15 @@ import {
   clonePlain as _clonePlain,
   fallbackRandomID as _fallbackRandomID,
   normalizeGatheringLibraryTool as _normalizeGatheringLibraryTool,
+  reorderListByIndex as _reorderListByIndex,
 } from './adminStoreInternals.js';
+import { createEnvironmentDraftSection } from './adminEnvironmentDraftSection.js';
+import { createToolDraftSection } from './adminToolDraftSection.js';
+import {
+  createCurrencySection,
+  emptyWorldCurrencyState,
+} from './adminCurrencySection.js';
+import { createKnowledgeSection } from './adminKnowledgeSection.js';
 import {
   buildSelectedSystemViewData as _buildSelectedSystemViewData,
   enrichRecipeItemLibrary as _enrichRecipeItemLibrary,

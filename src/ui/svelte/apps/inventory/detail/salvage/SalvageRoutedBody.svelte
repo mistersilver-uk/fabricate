@@ -26,7 +26,7 @@
   import { resolveCraftingArt } from '../../../../util/craftingArtResolution.js';
   import { localize } from '../../../../util/foundryBridge.js';
   import Chip from '../../../../components/Chip.svelte';
-  import EmptyState from '../../../manager/EmptyState.svelte';
+  import EmptyState from '../../../../components/EmptyState.svelte';
   import Kicker from '../../../../components/Kicker.svelte';
 
   let { salvage = null, result = null } = $props();

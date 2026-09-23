@@ -12,6 +12,8 @@
  *     authoring `enabled`/`values` overrides).
  */
 
+import { trimString as trimmed } from '../utils/scalars.js';
+
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
 import { normalizeWorldCurrencyConfig } from './currencyProfile.js';
 import { normalizeTravelConfig } from './gatheringRealms.js';
@@ -28,7 +30,7 @@ export const FABRICATE_EXPORT_SCHEMA_VERSION = 6;
 
 /**
  * Default current-condition selection used when resetting runtime condition
- * state on export. Mirrors `DEFAULT_GATHERING_CONDITIONS` in adminStore.js.
+ * state on export. Mirrors `DEFAULT_GATHERING_CONDITIONS` in gatheringComposition.js.
  */
 export const DEFAULT_CURRENT_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 
@@ -215,10 +217,6 @@ export function assembleScopedEntityBundle(scopeValue, systemId) {
 
 function isRecord(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function trimmed(value) {
-  return typeof value === 'string' ? value.trim() : '';
 }
 
 /**

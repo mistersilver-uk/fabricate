@@ -1,57 +1,21 @@
 /**
- * Pure recipe readiness + issue evaluation for the recipe editor's Validation
- * tab. Consumes the projected plain recipe (the same shape the admin store
- * builds: `name`, `enabled`, `ingredientSets`, `resultGroups`, `steps`,
- * `toolIds`, `incomplete`, `structureKey`) and returns structured checks/issues
- * with stable ids; the UI layer maps ids to localized copy. No Svelte, Foundry,
- * or store dependencies so it stays unit-testable.
+ * Pure recipe readiness and issue evaluation for the recipe editor's Validation tab. It consumes
+ * the projected plain recipe and returns structured checks and issues with stable ids, which the
+ * UI maps to localized copy; no Svelte, Foundry or store dependency, so it stays unit-testable.
  *
- * AN ISSUE CARRIES TWO INDEPENDENT ADDRESSES, and they answer different questions
- * (issue 1517). `target` is the ROUTE — the editor tab that hosts the gap — and every
- * issue has one. `focusTarget` is the CONTROL: the value of the `data-validation-target`
- * attribute the offending control carries in that tab, which the host resolves, focuses
- * and marks. An issue emits `focusTarget` only when it can name ONE element that is the
- * offending thing; an issue whose subject is the recipe as a whole, or a set that does not
- * exist yet, emits `target` alone and its row action changes route without moving focus.
- * That fallback is STATED rather than silent — the mounted tests assert which of the two a
- * given row is, so a `focusTarget` going missing reds rather than quietly degrading into a
- * tab switch that focuses nothing.
+ * AN ISSUE CARRIES TWO INDEPENDENT ADDRESSES. `target` is the ROUTE — the editor tab hosting the
+ * gap — and every issue has one. `focusTarget` is the CONTROL, the `data-validation-target` value
+ * the offending control carries, emitted only where ONE element IS the offending thing; an issue
+ * about the recipe as a whole, or about a set that does not exist yet, emits `target` alone and
+ * its row action changes route without moving focus. That fallback is STATED rather than silent,
+ * the mounted tests asserting which of the two a given row is. The three addresses are
+ * `recipe-name`, `ingredient-group-<id>` and `result-group-<id>`.
  *
- * The three addresses this file emits, and the files that carry them:
- *
- *  - `recipe-name`               → `RecipeOverviewTab.svelte`'s name input
- *  - `ingredient-group-<id>`     → `RecipeIngredientGroupCard.svelte`'s requirement root
- *  - `result-group-<id>`         → `RecipeResultGroupCard.svelte`'s result-set root
- *
- * The eleven issues this file emits, and which of the two each is:
- *
- *  - `noName`                 → overview,    `recipe-name`
- *  - `duplicateAlternative`   → ingredients, the repeating requirement's card
- *  - `duplicateRequirement`   → ingredients, the SECOND carrier of the repeated signature
- *  - `requirementOverlap`     → ingredients, the LATER of the ambiguous pair
- *  - `unroutedResultGroup`    → results,     the first unrouted result set's card
- *  - `noIngredientSet`        → ingredients, ROUTE ONLY — the step has no set, so there is
- *                               no card to address; the remedy is the tab's own adder
- *  - `noResultGroup`          → results,     ROUTE ONLY, for the same reason
- *  - `unproducedOutcomeTier`  → results,     ROUTE ONLY — the subject is a tier no set
- *                               produces, so no ONE set is the offender
- *  - `alchemyResultSelection` → results,     ROUTE ONLY — the subject is the CARDINALITY
- *                               of the success sets, not any one of them
- *  - `signatureCollision`     → ingredients, ROUTE ONLY — the subject is this recipe
- *                               against another recipe, not a control in this editor
- *  - `disabledIncomplete`     → overview,    ROUTE ONLY — its control is the enable toggle,
- *                               which is DISABLED in exactly the state that raises this
- *
- * A card-addressed issue also falls back to route-only when its group carries no id.
- *
- * They are written as literals on both sides rather than shared through an import. Sharing
- * them would put this module in the closure of every suite that mounts a card that reads it,
- * and `RecipeIngredientGroupCard` alone is mounted by four whose module rosters this change
- * does not own. What holds the two sides together instead is a pair of BEHAVIOURAL gates,
- * one per half: `tests/components/recipe-validation-tab.test.js` reads the address this file
- * hands the row action, and `tests/components/recipe-edit-mounted.test.js` mounts the editor
- * and resolves that address onto a real control. Either half alone would pass while the
- * other drifted, which is the null query this contract exists to prevent.
+ * They are written as literals on both sides rather than imported, which would put this module in
+ * the closure of every suite mounting a card that reads it. A pair of BEHAVIOURAL gates holds the
+ * two sides together instead: `tests/components/recipe-validation-tab.test.js` reads the address
+ * this file hands the row action, and `tests/components/recipe-edit-mounted.test.js` resolves that
+ * address onto a real control. Either half alone would pass while the other drifted.
  *
  * @typedef {{ id: string, satisfied: boolean }} ReadinessCheck
  * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info', blocks?: 'enable', target?: 'ingredients' | 'results' | 'overview', focusTarget?: string, stepId?: string, stepName?: string }} ReadinessIssue
@@ -59,34 +23,23 @@
  */
 
 import { getMatchHandler } from '../../../../../models/match/matchTypes.js';
-
-function trimmed(value) {
-  return typeof value === 'string' ? value.trim() : '';
-}
+import { trimString as trimmed } from '../../../../../utils/scalars.js';
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
 /**
- * Compute a stable match signature for an alternative (option). Used to detect
- * exact-duplicate matches within an OR group or set. Returns null for options
- * with no usable match (an empty component slot or a tags match with no tags).
- *
- * @param {object} option One alternative inside a requirement.
- * @returns {string | null}
+ * A stable match signature for one alternative, used to detect exact duplicates within an OR group
+ * or set. `null` for an option with no usable match.
  */
 function optionSignature(option) {
   return getMatchHandler(option?.match).signature(option?.match);
 }
 
 /**
- * Resolve the recipe's execution steps exactly like the admin store's
- * `_getRecipeExecutionSteps`: explicit `recipe.steps` when non-empty, otherwise
- * one implicit step built from the recipe-level sets/groups/tools.
- *
- * @param {object} recipe Projected plain recipe.
- * @returns {{ id: string, name: string, ingredientSets: object[], resultGroups: object[], toolIds: string[], explicit: boolean }[]}
+ * The recipe's execution steps, exactly as the admin store's `_getRecipeExecutionSteps` resolves
+ * them: explicit `recipe.steps` when non-empty, else one implicit step from the recipe-level sets.
  */
 function getExecutionSteps(recipe) {
   const steps = asArray(recipe?.steps);
@@ -113,62 +66,32 @@ function getExecutionSteps(recipe) {
   ];
 }
 
-/**
- * Build the `{ stepId, stepName }` tag spread carried by per-step issues. Empty
- * for single-step recipes so their issues stay step-agnostic.
- *
- * @param {{ id: string, name: string }} step
- * @param {boolean} isMultiStep
- * @returns {{ stepId: string, stepName: string } | {}}
- */
+/** The `{ stepId, stepName }` spread per-step issues carry; empty for a single-step recipe. */
 function stepTag(step, isMultiStep) {
   return isMultiStep ? { stepId: step.id, stepName: step.name } : {};
 }
 
 /**
- * The `{ focusTarget }` spread, or nothing. An EMPTY address must produce NO key rather
- * than an empty one: the host treats any non-empty string as a control it must resolve, so
- * an id-less group emitting `focusTarget: ''` would ask the host to query for a control
- * that cannot exist, and the row would report as focus-wired while focusing nothing.
- *
- * @param {string} address
- * @returns {{ focusTarget: string } | {}}
+ * The `{ focusTarget }` spread, or nothing. An EMPTY address must produce NO key: the host resolves
+ * any non-empty string, so an id-less group would report as focus-wired while focusing nothing.
  */
 function focusTag(address) {
   return address ? { focusTarget: address } : {};
 }
 
-/**
- * The address of one requirement (OR group) card, or '' when the group carries no id — a
- * draft group the store has not normalized yet, which no card can be addressed by.
- *
- * @param {object} group
- * @returns {string}
- */
+/** One requirement card's address, or '' for a draft group the store has not normalized yet. */
 function ingredientGroupTarget(group) {
   const id = trimmed(group?.id);
   return id ? `ingredient-group-${id}` : '';
 }
 
-/**
- * The address of one result-set card, or '' when the group carries no id.
- *
- * @param {object} group
- * @returns {string}
- */
+/** One result-set card's address, or '' when the group carries no id. */
 function resultGroupTarget(group) {
   const id = trimmed(group?.id);
   return id ? `result-group-${id}` : '';
 }
 
-/**
- * Missing-ingredient-set and missing-result-group issues, one per offending
- * step. Surfaced as blocking, critical issues against their editor tab.
- *
- * @param {object[]} executionSteps
- * @param {boolean} isMultiStep
- * @returns {ReadinessIssue[]}
- */
+/** Missing-set and missing-group issues, one per offending step, blocking and critical. */
 function collectMissingRequirementIssues(executionSteps, isMultiStep) {
   const issues = [];
   for (const step of executionSteps) {
@@ -197,12 +120,8 @@ function collectMissingRequirementIssues(executionSteps, isMultiStep) {
 }
 
 /**
- * Compute a requirement (group) signature: the sorted, `&&`-joined option
- * signatures of the group. Two requirements with the same signature are exact
- * duplicates. Returns null when the group has no usable option signature.
- *
- * @param {object} group One requirement (OR group) inside a set.
- * @returns {string | null}
+ * A requirement's signature: its sorted, `&&`-joined option signatures, so two requirements sharing
+ * one are exact duplicates. `null` when the group has no usable option signature.
  */
 function requirementSignature(group) {
   const signatures = asArray(group?.options).map(optionSignature).filter(Boolean);
@@ -211,21 +130,14 @@ function requirementSignature(group) {
 }
 
 /**
- * Duplicate-match issues for a single ingredient set: a `duplicateAlternative`
- * per OR group that repeats an option signature, plus one `duplicateRequirement`
- * when two requirements in the set share a requirement signature.
- *
- * @param {object} set One ingredient set.
- * @param {object} step Owning execution step.
- * @param {boolean} isMultiStep
- * @returns {ReadinessIssue[]}
+ * Duplicate-match issues for one ingredient set: a `duplicateAlternative` per OR group repeating an
+ * option signature, plus one `duplicateRequirement` when two requirements share a signature.
  */
 function collectSetDuplicateIssues(set, step, isMultiStep) {
   const issues = [];
   const seenSignatures = new Set();
-  // The SECOND group to carry an already-seen signature, which is the one a GM would
-  // delete. The first carrier is the requirement they meant to author, so addressing it
-  // would land the GM on the row that is not the mistake.
+  // The SECOND carrier of an already-seen signature, which is the one a GM would delete: the first
+  // is the requirement they meant to author.
   let repeatedGroup = null;
 
   for (const group of asArray(set?.ingredientGroups)) {
@@ -266,14 +178,8 @@ function collectSetDuplicateIssues(set, step, isMultiStep) {
 }
 
 /**
- * Union of component ids the group's options expand to, against the system
- * component catalogue. A component option expands to its own id; a tag option
- * expands to the ids of components whose tags match; a currency option expands
- * to nothing.
- *
- * @param {object} group One requirement (OR group) inside a set.
- * @param {object[]} systemComponents `{ id, tags }` per managed component.
- * @returns {Set<string>}
+ * The component ids a group's options expand to against the system catalogue: a component option to
+ * its own id, a tag option to every matching component's, and a currency option to nothing.
  */
 function requirementComponentIds(group, systemComponents) {
   const ids = new Set();
@@ -296,17 +202,9 @@ function setsIntersect(a, b) {
 }
 
 /**
- * Overlapping-requirement detection for a single ingredient set. Two DISTINCT
- * requirements (different requirement signatures, so NOT an exact
- * `duplicateRequirement`) whose options expand to intersecting component-id sets
- * are ambiguous: a single component could satisfy both AND'd requirements. Emits
- * at most one `requirementOverlap` warning per set.
- *
- * @param {object} set One ingredient set.
- * @param {object} step Owning execution step.
- * @param {boolean} isMultiStep
- * @param {object[]} systemComponents `{ id, tags }` per managed component.
- * @returns {ReadinessIssue[]}
+ * Overlapping-requirement detection for one set: two DISTINCT requirements whose options expand to
+ * intersecting component-id sets are ambiguous, because a single component could satisfy both AND'd
+ * requirements. At most one `requirementOverlap` warning per set.
  */
 function collectSetOverlapIssues(set, step, isMultiStep, systemComponents) {
   if (systemComponents.length === 0) return [];
@@ -324,8 +222,7 @@ function collectSetOverlapIssues(set, step, isMultiStep, systemComponents) {
 
   for (let i = 0; i < groups.length; i += 1) {
     for (let j = i + 1; j < groups.length; j += 1) {
-      // Skip exact duplicates — those are flagged as duplicateRequirement; don't
-      // double-flag them as an overlap.
+      // Skip exact duplicates, which `duplicateRequirement` already flags.
       if (groups[i].signature !== null && groups[i].signature === groups[j].signature) continue;
       if (setsIntersect(groups[i].ids, groups[j].ids)) {
         return [
@@ -346,15 +243,8 @@ function collectSetOverlapIssues(set, step, isMultiStep, systemComponents) {
   return [];
 }
 
-/**
- * Duplicate-match detection across every step/set: a recipe must not repeat the
- * same component or an identical tag/currency match twice inside one OR group,
- * nor as duplicate requirements within a set.
- *
- * @param {object[]} executionSteps
- * @param {boolean} isMultiStep
- * @returns {ReadinessIssue[]}
- */
+/** Duplicate-match detection across every step and set: no repeated match inside an OR group,
+ *  and no duplicate requirements within a set. */
 function collectDuplicateMatchIssues(executionSteps, isMultiStep) {
   const issues = [];
   for (const step of executionSteps) {
@@ -365,16 +255,8 @@ function collectDuplicateMatchIssues(executionSteps, isMultiStep) {
   return issues;
 }
 
-/**
- * Overlapping-requirement detection across every step/set. Requires the system
- * component catalogue (`{ id, tags }`); with no catalogue (a one-arg evaluator
- * call) tag-vs-component expansion can't be resolved, so it returns nothing.
- *
- * @param {object[]} executionSteps
- * @param {boolean} isMultiStep
- * @param {object[]} systemComponents
- * @returns {ReadinessIssue[]}
- */
+/** Overlapping-requirement detection across every step and set. With no component catalogue —
+ *  the one-arg evaluator call — tag-versus-component expansion cannot resolve, so it is silent. */
 function collectRequirementOverlapIssues(executionSteps, isMultiStep, systemComponents) {
   const issues = [];
   for (const step of executionSteps) {
@@ -386,28 +268,14 @@ function collectRequirementOverlapIssues(executionSteps, isMultiStep, systemComp
 }
 
 /**
- * Routed check-mode authoring warnings. Only meaningful for a recipe whose result
- * routing is the routed `check` provider: the result groups route by the system's
- * routed-check outcome tiers via `ResultGroup.checkOutcomeIds`. Two soft (warning)
- * misconfigurations are surfaced, BUT only for steps with MULTIPLE result groups —
- * a step with exactly one result group needs no mapping (the single-group exemption,
- * mirroring routedByIngredients), so it raises neither warning:
- *  - a result group that lists no VALID assigned outcome tier (empty or only
- *    references to since-deleted tiers) — it can never be routed to, so a check
- *    success silently produces nothing;
- *  - an authored success tier that no result group produces — that outcome resolves
- *    to the distinct `unrouted-tier` misconfiguration at craft time.
- * Both deep-link to the results tab (`target: 'results'`), mirroring the soft
- * `requirementOverlap` warning rather than blocking enable.
+ * Routed check-mode authoring warnings, for the routed `check` provider and only for steps with
+ * MULTIPLE result groups, a single group needing no mapping. Two soft misconfigurations: a group
+ * listing no VALID outcome tier, and an authored success tier no group produces. Both deep-link
+ * to the results tab rather than blocking enable.
  *
- * @param {object[]} executionSteps
- * @param {boolean} isMultiStep
- * @param {RoutedOutcomeTier[]} routedOutcomeTierOptions POLICY-CONDITIONAL `{id,name}`
- *   (issue 1098, decision 7): success-filtered when the crafting failure-result policy
- *   forbids failure results, unfiltered when it permits them. It is passed in rather than
- *   derived here precisely so this validator and the recipe editor's picker read ONE set —
- *   a tier the editor offers can never be one this function calls unroutable.
- * @returns {{ issues: ReadinessIssue[], checks: ReadinessCheck[] }}
+ * `routedOutcomeTierOptions` is POLICY-CONDITIONAL and is passed in rather than derived here, so
+ * this validator and the editor's picker read ONE set and a tier the editor offers can never be
+ * one this function calls unroutable.
  */
 function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTierOptions) {
   const validTierIds = new Set(
@@ -415,21 +283,15 @@ function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTier
   );
   const issues = [];
 
-  // A step with exactly one result group needs no outcome/tier mapping (mirrors
-  // routedByIngredients): the single group is produced on any non-failure outcome,
-  // so it is never "unrouted" and never demands a tier be produced.
+  // A single result group needs no outcome mapping: it is produced on any non-failure outcome.
   const isMultiGroupStep = (step) => asArray(step.resultGroups).length > 1;
 
-  // An unrouted check-mode group: a group whose `checkOutcomeIds` contains no
-  // currently-valid tier id (empty, or only stale references to deleted tiers).
-  // Only multi-result-group steps need mapping, so single-group steps are skipped.
+  // A group whose `checkOutcomeIds` holds no currently-valid tier id, in a multi-group step.
   let hasUnroutedGroup = false;
   for (const step of executionSteps) {
     if (!isMultiGroupStep(step)) continue;
-    // `findIndex` rather than `some`, so the issue can address the FIRST group that is
-    // actually unrouted rather than merely report that one of them is. The INDEX and not
-    // the group, because a null entry in the list is unrouted too and `find` would report
-    // it as absent — `some` did not have that hole and this must not introduce one.
+    // `findIndex` rather than `some`, so the issue addresses the FIRST unrouted group; the INDEX
+    // rather than the group, because a null entry is unrouted too and `find` would report absent.
     const stepResultGroups = asArray(step.resultGroups);
     const unroutedIndex = stepResultGroups.findIndex((group) => {
       const assigned = asArray(group?.checkOutcomeIds).filter((id) => validTierIds.has(id));
@@ -447,10 +309,8 @@ function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTier
     }
   }
 
-  // An unproduced success tier: an authored success tier id that no result group
-  // lists in its `checkOutcomeIds`. Only required when at least one step has
-  // MULTIPLE result groups — a recipe whose every step has a single result group
-  // routes on the single-group exemption and needs no tiers produced.
+  // An authored success tier no result group lists, required only where a step has MULTIPLE
+  // groups: a single-group recipe routes on the exemption and needs no tiers produced.
   const producedTierIds = new Set();
   for (const step of executionSteps) {
     for (const group of asArray(step.resultGroups)) {
@@ -475,34 +335,17 @@ function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTier
 }
 
 /**
- * Alchemy-only enable blockers (issue 549). An alchemy system enables a recipe
- * through {@link RecipeManager#_validateRecipeForActivation}; two of its checks are
- * invisible to the generic readiness list and used to throw only on the enable
- * click:
+ * Alchemy-only enable blockers: two checks the enable path enforces that are invisible to the
+ * generic readiness list and used to throw only on the click.
  *
- *  - the alchemy RESULT-SELECTION rule (the retired `resultSelection.provider`
- *    analog): None/Simple check modes must resolve to exactly one SUCCESS result
- *    set (the reserved `role: 'failure'` group is not a selectable outcome), so an
- *    all-failure or multi-success configuration cannot be enabled. Tiered routes by
- *    the crafting-check outcome, so its result-set cardinality is unconstrained here
- *    (its routing warnings ride the `routingProvider === 'check'` path). Mirrors
- *    `ResolutionModeService.validateRecipe`'s alchemy branch, changing nothing about
- *    what passes/fails — the empty-result-set case stays `noResultGroup`.
- *  - the cross-recipe SIGNATURE-COLLISION rule (issue 547): each conflict is a
- *    reason the alchemy runtime cannot tell this recipe apart from another. The
- *    conflicts are precomputed by the caller via `SignatureValidator` (the same
- *    validator the enable path and `systemValidation` use — no duplication) and
- *    passed in as coded `{ code, params, message }` so the tab can localize them
- *    without leaking ids (issue 550).
+ *  - RESULT SELECTION: None/Simple check modes must resolve to exactly one SUCCESS result set, the
+ *    reserved failure group not being a selectable outcome. Tiered routes by check outcome, so its
+ *    cardinality is unconstrained here, and the empty case stays `noResultGroup`.
+ *  - cross-recipe SIGNATURE COLLISION: each conflict is a reason the alchemy runtime cannot tell
+ *    this recipe from another, precomputed by the caller through the same `SignatureValidator` the
+ *    enable path uses and passed in CODED so the tab localizes without leaking ids.
  *
- * Both are critical, enable-blocking issues. With no alchemy context (every
- * non-alchemy system) this returns nothing, so those systems see no new checks.
- *
- * @param {object} recipe Projected plain recipe.
- * @param {{ checkMode?: string }|null} alchemy Alchemy context, or null for a
- *   non-alchemy system.
- * @param {{ code?: string, params?: object, message?: string }[]} signatureConflicts
- * @returns {{ issues: ReadinessIssue[], checks: ReadinessCheck[] }}
+ * Both are critical and enable-blocking. With no alchemy context this returns nothing.
  */
 function collectAlchemyReadiness(recipe, alchemy, signatureConflicts) {
   const issues = [];
@@ -513,10 +356,8 @@ function collectAlchemyReadiness(recipe, alchemy, signatureConflicts) {
   if ((alchemy.checkMode || 'none') !== 'tiered') {
     const resultGroups = asArray(recipe?.resultGroups);
     const successGroups = resultGroups.filter((group) => group?.role !== 'failure');
-    // The empty case is already spoken to by `hasResultGroup`/`noResultGroup`, so
-    // this check stays silent there (a vacuously-satisfied row next to the failing
-    // `hasResultGroup` row reads contradictory). It only speaks to a PRESENT result
-    // set that does not resolve to a single success group.
+    // The empty case is already `noResultGroup`'s, so this stays silent there — a vacuously
+    // satisfied row beside that failing one reads contradictory — and speaks only to a PRESENT set.
     if (resultGroups.length > 0) {
       const invalid = successGroups.length !== 1;
       if (invalid) {
@@ -549,25 +390,10 @@ function collectAlchemyReadiness(recipe, alchemy, signatureConflicts) {
 }
 
 /**
- * @param {object} recipe Projected plain recipe.
- * @param {object} [options]
- * @param {object[]} [options.systemComponents] Managed components (`{ id, tags }`)
- *   used to expand tag/component matches for overlap detection. Absent (the
- *   one-arg call) → overlap detection no-ops.
- * @param {string|null} [options.routingProvider] The recipe's result-routing
- *   provider (`'check'` for routed check-mode); the routed warnings only fire when
- *   it is `'check'`.
- * @param {RoutedOutcomeTier[]} [options.routedOutcomeTierOptions] The system's
- *   POLICY-CONDITIONAL routed-check outcome tiers (`{id,name}`) — success-filtered under
- *   a forbidding failure-result policy, unfiltered under a permitting one (issue 1098) —
- *   used to flag unrouted groups and unproduced tiers.
- * @param {{ checkMode?: string }|null} [options.alchemy] Alchemy context for an
- *   alchemy system (`{ checkMode }`); null/absent for every other mode. Drives the
- *   alchemy result-selection and signature-collision enable blockers (issue 549).
- * @param {{ code?: string, params?: object, message?: string }[]} [options.signatureConflicts]
- *   Cross-recipe ingredient-signature conflicts touching this recipe, precomputed by
- *   the caller via `SignatureValidator`. Only surfaced when `alchemy` is present.
- * @returns {{ checks: ReadinessCheck[], issues: ReadinessIssue[] }}
+ * Every check and issue for one projected recipe. `options` carries `systemComponents`, whose
+ * absence no-ops overlap detection; `routingProvider`, which gates the routed warnings on `check`;
+ * `routedOutcomeTierOptions`, the system's policy-conditional tiers; and `alchemy` with
+ * `signatureConflicts`, which drive the two enable blockers above and are ignored without it.
  */
 export function evaluateRecipeReadiness(recipe = {}, options = {}) {
   const systemComponents = Array.isArray(options.systemComponents) ? options.systemComponents : [];
@@ -624,24 +450,20 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
   issues.push(...overlapIssues);
   checks.push({ id: 'noRequirementOverlap', satisfied: overlapIssues.length === 0 });
 
-  // Routed check-mode authoring warnings: only meaningful when the recipe routes
-  // its results by the routed `check` provider.
+  // Only meaningful when the recipe routes its results by the routed `check` provider.
   if (routingProvider === 'check') {
     const routed = collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTierOptions);
     issues.push(...routed.issues);
     checks.push(...routed.checks);
   }
 
-  // Alchemy-only enable blockers: the result-selection cardinality rule and the
-  // cross-recipe signature collisions the enable path enforces but the generic
-  // readiness checks never inspect (issue 549).
+  // The two blockers the enable path enforces and the generic readiness checks never inspect.
   const alchemyReadiness = collectAlchemyReadiness(recipe, alchemy, signatureConflicts);
   issues.push(...alchemyReadiness.issues);
   checks.push(...alchemyReadiness.checks);
 
-  // A disabled recipe still saves, but flag that it cannot be enabled until the
-  // critical requirements above are met. The store/model projects `incomplete`;
-  // fall back to the locally computed gaps when the flag is absent.
+  // A disabled recipe still saves, but cannot be ENABLED until the critical requirements above
+  // are met; the projected `incomplete` is preferred, with the local gaps as the fallback.
   const incomplete =
     typeof recipe?.incomplete === 'boolean'
       ? recipe.incomplete
@@ -662,20 +484,13 @@ export function blocksEnable(issues = []) {
 }
 
 /**
- * THE NEGATIVE ISSUE(S) THAT OWN EACH CHECK, so an unsatisfied check can borrow that issue's
- * severity, blocking flag, text and deep-link address.
- *
- * It lived in `RecipeValidationTab.svelte` until issue 1517's docs round. It is domain knowledge
- * — which finding explains which failing check — rather than presentation, and more to the point
- * it is the join TWO screens now need: the tab draws a row per check and the editor shell badges
- * the same state on its tab strip. While the tab owned the map, the shell could not read it and
- * counted `issues` instead, so the two screens answered the same question from two populations.
- *
- * `stepsNamed` IS DELIBERATELY ABSENT, and is the reason {@link recipeValidationRowStates} exists.
- * Nothing here raises an issue for an unnamed step, so that check fails with no owner — which is a
- * perfectly good amber row, and was a warning neither the rail nor the badge could count.
- *
- * @type {Readonly<Record<string, readonly string[]>>}
+ * THE NEGATIVE ISSUE(S) THAT OWN EACH CHECK, so an unsatisfied check borrows that issue's severity,
+ * blocking flag, text and address. It lives here rather than in the tab because it is the join TWO
+ * screens need — the tab draws a row per check and the editor shell badges the same state — and
+ * while the tab owned it the shell counted `issues` instead, so the two answered one question from
+ * two populations. `stepsNamed` IS DELIBERATELY ABSENT, which is why
+ * {@link recipeValidationRowStates} exists: nothing raises an issue for an unnamed step, so that
+ * check fails with no owner, which is a perfectly good amber row.
  */
 export const CHECK_TO_ISSUES = Object.freeze({
   hasName: ['noName'],
@@ -690,14 +505,9 @@ export const CHECK_TO_ISSUES = Object.freeze({
 });
 
 /**
- * One row's status word: `pass`, `warn` or `block`.
- *
- * `blocks: 'enable'` FIRST and severity second, for the reason the environment editor's row
- * builder gives: the block word is literally "Blocks enable", which is what that field says, and
- * an issue that stops a recipe enabling while graded `warning` is a blocker whatever it is called.
- *
- * @param {ReadinessIssue|null} issue
- * @returns {string}
+ * One row's status word. `blocks: 'enable'` FIRST and severity second, because the block word is
+ * literally "Blocks enable" and an issue stopping a recipe enabling while graded `warning` is a
+ * blocker whatever it is called.
  */
 function issueStatus(issue) {
   if (!issue) return 'warn';
@@ -705,21 +515,10 @@ function issueStatus(issue) {
 }
 
 /**
- * EVERY ROW THE VALIDATION SURFACE DRAWS, in render order, as `{ checkId, issue, status }`.
- *
- * ONE DERIVATION, TWO READERS (issue 1517, docs round). `RecipeValidationTab` maps these onto
- * copy — the check's label, the owning issue's sentence, the deep-link address — and takes each
- * row's status VERBATIM; `RecipeEditView` counts them for its tab badge. Neither computes a status
- * of its own, so the badge cannot report a state the tab's own list contradicts, which is the
- * defect this replaced: the badge counted `critical` and `warning` ISSUES while the tab drew a row
- * per CHECK, and an unsatisfied check with no owning issue was drawn amber and counted by nothing.
- *
- * A check row comes first for every check, then one row for each issue no failing check claimed
- * (`disabledIncomplete` is the usual one) — the order the surface receives them in, and therefore
- * the order it groups them in.
- *
- * @param {{checks?: ReadinessCheck[], issues?: ReadinessIssue[]}} readiness
- * @returns {{checkId: string, issue: ReadinessIssue|null, status: string}[]}
+ * EVERY ROW THE VALIDATION SURFACE DRAWS, in render order. ONE DERIVATION, TWO READERS: the tab
+ * maps these onto copy and takes each status VERBATIM, and the editor shell counts them for its tab
+ * badge, so neither computes a status of its own and the badge cannot contradict the tab's own
+ * list. A check row comes first for every check, then one row per issue no failing check claimed.
  */
 export function recipeValidationRowStates(readiness = {}) {
   const checks = Array.isArray(readiness?.checks) ? readiness.checks : [];
@@ -738,12 +537,7 @@ export function recipeValidationRowStates(readiness = {}) {
   return rows;
 }
 
-/**
- * The count rail's three numbers, as a tally of the rows above.
- *
- * @param {{checks?: ReadinessCheck[], issues?: ReadinessIssue[]}} readiness
- * @returns {{passing: number, warnings: number, blocking: number}}
- */
+/** The count rail's three numbers, as a tally of the rows above. */
 export function countRecipeReadiness(readiness = {}) {
   const tally = { passing: 0, warnings: 0, blocking: 0 };
   for (const row of recipeValidationRowStates(readiness)) {

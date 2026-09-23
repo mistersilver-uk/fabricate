@@ -1,9 +1,4 @@
-/**
- * Issue 651 — 1.18.0 retirement of the system-level progressive `allowPlayerReorder`.
- *
- * Covers the strip across all three progressive check blocks, idempotency, tolerance of
- * malformed payloads, the deliberate no-seed decision, and the runner registration.
- */
+/** Issue 651 — 1.18.0 retirement of the system-level progressive `allowPlayerReorder`. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -12,9 +7,7 @@ const { migrateRetireProgressiveAllowPlayerReorder } = await import(
 );
 const { MigrationRunner } = await import('../src/migration/MigrationRunner.js');
 
-// ---------------------------------------------------------------------------
 // The strip — all three progressive blocks
-// ---------------------------------------------------------------------------
 
 test('1.18.0 strips allowPlayerReorder from all three progressive check blocks', () => {
   const { systems } = migrateRetireProgressiveAllowPlayerReorder([
@@ -52,9 +45,7 @@ test('1.18.0 is idempotent — a second run is a no-op', () => {
   ]);
 });
 
-// ---------------------------------------------------------------------------
 // Never throws — every level is guarded
-// ---------------------------------------------------------------------------
 
 test('1.18.0 tolerates malformed payloads without throwing', () => {
   assert.deepEqual(migrateRetireProgressiveAllowPlayerReorder(undefined), { systems: [] });
@@ -74,14 +65,11 @@ test('1.18.0 tolerates malformed payloads without throwing', () => {
   assert.equal(systems[4].salvageCraftingCheck.progressive, 'nope');
 });
 
-// ---------------------------------------------------------------------------
 // The deliberate no-seed decision
-// ---------------------------------------------------------------------------
 
 test('1.18.0 does NOT seed allowPlayerResultReorder onto recipes or salvage', () => {
-  // Seeding would churn stored JSON for zero observable change: the Recipe constructor
-  // and _normalizeSalvage both read an absent key as `true` already. If someone "fixes"
-  // the omission, this test tells them it was a decision.
+  // Seeding would churn stored JSON for zero observable change: the Recipe constructor and
+  // _normalizeSalvage both read an absent key as `true` already.
   const { systems } = migrateRetireProgressiveAllowPlayerReorder([
     {
       id: 'sys',
@@ -94,9 +82,7 @@ test('1.18.0 does NOT seed allowPlayerResultReorder onto recipes or salvage', ()
   assert.ok(!('allowPlayerResultReorder' in systems[0].components[0].salvage));
 });
 
-// ---------------------------------------------------------------------------
 // Runner registration
-// ---------------------------------------------------------------------------
 
 test('the runner applies 1.18.0 and bumps the migration version', async () => {
   const store = new Map([
@@ -152,8 +138,7 @@ test('the 1.18.0 registry entry carries a downgradeTo target', async () => {
   const runner = new MigrationRunner({ getSetting: () => undefined, setSetting: async () => {} });
   const entry = runner._migrations.find((m) => m.version === '1.18.0');
   assert.ok(entry, '1.18.0 is registered');
-  // 1.17.0, not 1.18.0: downgradeTo names the last release BEFORE this migration, whose
-  // schema a downgraded world still finds intact (this only removes a key that release
-  // ignored). 1.17.0 is the essence-ingredient migration, which this one now follows.
+  // 1.17.0, not 1.18.0: downgradeTo names the last release BEFORE this migration, whose schema a
+  // downgraded world still finds intact (this only removes a key that release ignored).
   assert.equal(entry.downgradeTo, '1.17.0');
 });

@@ -6,17 +6,21 @@ nav_order: 7
 
 # Tags & Categories
 
-The **Tags & Categories** screen holds three separate vocabularies for the selected system: recipe categories, component categories, and item tags.
-Each vocabulary has its own tab, so you work on one at a time.
-Each tab shows a count of its custom entries, its own search box, and an add form that checks your entry as you type.
+The **Tags & Categories** screen holds three separate vocabularies for the selected system: recipe categories, component categories, and component tags.
+All three panels are shown at once, with the two category panels side by side and the component tag panel spanning the full width beneath them.
+Each panel shows a count of its entries, its own search box, its own sort control, and an add form that checks your entry as you type.
 As you type, the add form tells you whether the name is ready to add, already taken, or reserved, and for a tag it previews the lowercase text that will be stored.
 
-A panel on the right of the screen gives an at-a-glance count of each vocabulary and the total number of references across all three.
-It also carries a **Reference-safe by default** note, because removing a referenced entry reassigns or strips the records that use it rather than leaving them pointing at something that no longer exists.
+Two entries of one vocabulary that differ only in upper and lower case show as a single row.
+Hover it to see every spelling it stands for, and deleting it removes all of them and reassigns their recipes or components in one step.
+
+Sorting a panel by name or by reference count, and reversing the direction, affects that panel alone.
+The left rail's **Tags & Categories** count adds up what the three panels show, so it includes the reserved **General** row each category panel carries.
 
 ## Recipe categories
 
 Custom recipe categories organize recipe browsing and authoring.
+Categories are flat: there are no parent or child categories, and each recipe picks exactly one.
 The reserved **General** recipe category is always present and is not stored in the custom category list.
 Each recipe category can carry an icon.
 Set it from the **Icon** field when you add the category, or change it later from the icon button on the category's row.
@@ -26,14 +30,15 @@ Recipes in the reserved **General** category show no label, so the default bucke
 A **Category** filter, placed above the crafting-system filter, lets players narrow the list to a single category.
 The filter offers only the categories that appear in the player's visible recipes, sorted alphabetically with **General** pinned last, and its default **All categories** option shows the full list.
 
-Removing a custom recipe category is reference-safe.
+Removing a custom recipe category is reference-safe, as removing an entry from any of the three vocabularies is: the records that use it are reassigned or stripped rather than left pointing at something that no longer exists.
+A category with no recipes deletes in one click, and a category still used by recipes opens the inline confirm strip on that row instead.
 Fabricate asks you to confirm on the row and tells you how many recipes will be reassigned to **General**.
 Confirming reassigns those recipes to **General** so none is left pointing at a category that no longer exists.
 
 ## Component categories
 
 Component categories group your components in the component browser.
-They are managed in the **Component categories** section of the same screen, and they are a **separate vocabulary from recipe categories**.
+They are managed in the **Component categories** panel of the same screen, beside the recipe categories, and they are a **separate vocabulary from recipe categories**.
 The two never mix.
 A component category such as **Reagent** is never offered as a recipe category, and a recipe category is never offered as a component category.
 Keeping them apart is deliberate, so that adding a way to group your components does not add clutter to the recipe browser your players use.
@@ -45,6 +50,7 @@ Every component belongs to exactly one category, and a component you have never 
 There is no uncategorised state.
 
 Removing a custom component category is reference-safe.
+A category with no components deletes in one click, and a category still used by components opens the inline confirm strip on that row instead.
 Fabricate asks you to confirm on the row and tells you how many components will be reassigned to **General**.
 Confirming moves those components to **General** rather than leaving them pointing at a category that no longer exists.
 
@@ -53,18 +59,20 @@ Confirming moves those components to **General** rather than leaving them pointi
 Component tags allow labeling and tag-based ingredient matching.
 Tags are many-valued, so a component can carry as many as you like.
 Tags are always stored in lowercase, so the add form previews the exact text it will save.
+Unlike a category, no tag name is reserved, so a tag called **general** is just an ordinary tag.
 Tags are assigned to components in the component editor only.
 They are not shown on component browser rows and they do not filter the browser, because grouping is what categories are for.
 
 A tag's reference count on this screen includes both the components that carry it and the recipe ingredients that filter on it.
 Removing a tag is reference-safe.
+A tag with no references deletes in one click, and a referenced tag opens the inline confirm strip on that row instead.
 Fabricate asks you to confirm on the row and tells you how many references will lose the tag.
 Confirming strips the tag from every component that carries it and from every recipe ingredient that filters on it, so nothing is left pointing at a tag that no longer exists.
 
 ## World Tags & Categories
 
 Under **World**, the **Tags & Categories** screen holds the same three vocabularies again, but authored once for the whole world instead of once per crafting system: recipe categories, component categories, and component tags.
-All three panels are shown at once, with the two category panels side by side and the component tag panel spanning the full width beneath them, rather than as separate tabs.
+It is laid out exactly like the system screen: the same three panels at once, the two category panels side by side and the component tag panel spanning the full width beneath them.
 The two category vocabularies stay independent of one another here too, so a world recipe category is never offered as a world component category and neither is aliased across the world and system screens.
 
 Each entry's reference count on this screen is counted across the whole world, not just one crafting system, so it adds up every recipe and every component that names the entry in every crafting system you have set up.
@@ -74,7 +82,8 @@ An entry with no references anywhere in the world, and whose removal changes not
 Every other entry asks you to confirm, even one whose reference count reads as zero, because deleting it would still change a category or a tag recorded on the world's shared component defaults.
 The confirmation tells you exactly what changes: how many crafting systems inherit the category from the shared default it clears, how many world-level components lose the tag, or, for a recipe category, that no recipe anywhere is rewritten.
 
-Each panel has its own sort control, so you can order that vocabulary's entries by name or by reference count, and reverse the direction, without affecting the other two panels.
+The per-panel sort control is the same one the system screen carries, so ordering a vocabulary by name or by reference count and reversing the direction works the same way here.
+The system screen remembers each panel's search and sort when you leave it and come back; this screen starts fresh each time you open it.
 
 Each panel's add field refuses a name you have already added to that vocabulary, ignoring case and leading or trailing spaces.
 The two category panels also refuse the reserved **General** category, which is always available without being added or removed as an entry.

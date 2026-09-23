@@ -1,28 +1,6 @@
 /**
  * The Foundry setup → license → auth → launch → join path, shared by every harness that needs a
  * logged-in Foundry page (issue #1088).
- *
- * WHY THIS IS A MODULE AND NOT A COPY. It was extracted from `scripts/foundry-test-run.mjs`, which
- * exports nothing, imports Playwright at top level and calls `main()` on import — so a second
- * harness cannot reuse it by importing that file, and copying it would duplicate ~250 lines
- * (`evaluateJoinControl` alone is 135) straight into SonarCloud's new-code duplication gate. The
- * select-vs-tile join fallback and the license/activation distinction below are also the parts of
- * the boot path that took real effort to get right; re-deriving them for a second caller would be a
- * fresh source of boot flake, not a saving.
- *
- * WHY IT IS SEPARATE FROM `foundryRunIdentity.js` AND FRIENDS — A DELIBERATE EXCEPTION, NOT A
- * VIOLATION. The rest of `scripts/lib/` is Playwright-free by design so `node --test` can import it;
- * `foundryRunIdentity.js`'s header states the rule and its reason (a top-level Playwright import, or
- * an autorun `main()`, launches Chromium under `node --test` and then `process.exit()`s the whole
- * run — the `# cancelled` catastrophe). This module keeps the LETTER of that rule: it imports
- * nothing, Playwright included, and only ever uses a `page` and a `context` it is handed. But it is
- * useless without a live browser and must never be imported by a test, so it is filed apart from the
- * pure derivations rather than mixed in among them. Nothing under `tests/` imports it, and nothing
- * should: its behaviour is verified by running the harnesses, not by a unit test.
- *
- * REPORTING IS INJECTED. The smoke records `results.steps[]` entries and captures screenshots as it
- * boots; the version arm records neither. Both behaviours are supplied by the caller through a
- * reporter, so neither harness's bookkeeping leaks into the other's.
  */
 
 export const JOIN_BUTTON_SELECTOR = 'button:has-text("Join Game Session"), button[name="join"]';
@@ -36,12 +14,7 @@ export const JOIN_USER_TILE_SELECTOR = '[data-user-id]';
  * @property {(message: string) => void} log Progress output.
  */
 
-/**
- * Build a reporter, defaulting every sink to a no-op.
- *
- * @param {Partial<BootReporter>} [overrides]
- * @returns {BootReporter}
- */
+/** Build a reporter, defaulting every sink to a no-op. */
 export function createBootReporter(overrides = {}) {
   return {
     screenshot: async () => {},
@@ -53,12 +26,7 @@ export function createBootReporter(overrides = {}) {
 
 const DEFAULT_REPORTER = createBootReporter();
 
-/**
- * Safely parse a page pathname.
- *
- * @param {string} rawUrl
- * @returns {string}
- */
+/** Safely parse a page pathname. */
 export function getPathname(rawUrl) {
   try {
     return new URL(rawUrl).pathname;
@@ -67,21 +35,7 @@ export function getPathname(rawUrl) {
   }
 }
 
-/**
- * Summarize join-page state for debugging.
- *
- * @param {{
- *   mode?: string | null,
- *   reason?: string | null,
- *   availableUsers?: string[],
- *   selectedLabel?: string,
- *   selectedValue?: string,
- *   joinButtonDisabled?: boolean,
- *   selectionMatches?: boolean
- * }} state
- * @param {string} userLabel
- * @returns {string}
- */
+/** Summarize join-page state for debugging. */
 export function describeJoinState(state, userLabel) {
   /** @type {string[]} */
   const parts = [];
@@ -101,14 +55,7 @@ export function describeJoinState(state, userLabel) {
   return `Join diagnostics for "${userLabel}": ${parts.join('; ') || 'no details available'}.`;
 }
 
-/**
- * Accept the first-run license if Foundry redirects to `/license`.
- *
- * Safe to call on every run; a no-op when the license page is not present.
- *
- * @param {object} page Playwright page.
- * @param {{ reporter?: BootReporter }} [options]
- */
+/** Accept the first-run license if Foundry redirects to `/license`. */
 export async function acceptLicenseIfPresent(page, { reporter = DEFAULT_REPORTER } = {}) {
   if (getPathname(page.url()) !== '/license') {
     reporter.recordStep({ step: 'license-check', passed: true, skipped: true });
@@ -123,10 +70,7 @@ export async function acceptLicenseIfPresent(page, { reporter = DEFAULT_REPORTER
   );
   if ((await checkboxCandidates.count()) === 0) {
     // No EULA checkbox usually means Foundry booted unlicensed and is showing the License Key
-    // Activation page (a license-key text field + Submit Key button) rather than the EULA. That is
-    // an activation/credentials problem, not an EULA one — surface it clearly. Fix: ensure
-    // FOUNDRY_LICENSE_KEY is set and forwarded to the container (docker-compose.foundry.yml) so
-    // felddy activates at boot.
+    // Activation page (a license-key text field + Submit Key button) rather than the EULA.
     const keyActivation = await page
       .locator('input[name="licenseKey"], input[id*="license" i], button:has-text("Submit Key")')
       .count();
@@ -163,12 +107,7 @@ export async function acceptLicenseIfPresent(page, { reporter = DEFAULT_REPORTER
   reporter.recordStep({ step: 'license-accepted', passed: true });
 }
 
-/**
- * Enter the admin key on the `/auth` page if present. Foundry redirects to `/setup` on success.
- *
- * @param {object} page Playwright page.
- * @param {{ adminKey: string, reporter?: BootReporter }} options
- */
+/** Enter the admin key on the `/auth` page if present. Foundry redirects to `/setup` on success. */
 export async function authenticateIfRequired(page, { adminKey, reporter = DEFAULT_REPORTER }) {
   if (getPathname(page.url()) !== '/auth') {
     return;
@@ -190,12 +129,7 @@ export async function authenticateIfRequired(page, { adminKey, reporter = DEFAUL
   reporter.recordStep({ step: 'admin-auth-page', passed: true });
 }
 
-/**
- * Dismiss first-run overlay dialogs on the setup page: telemetry consent, backup tour, etc.
- *
- * @param {object} page Playwright page.
- * @param {{ reporter?: BootReporter }} [options]
- */
+/** Dismiss first-run overlay dialogs on the setup page: telemetry consent, backup tour, etc. */
 export async function dismissFirstRunDialogs(page, { reporter = DEFAULT_REPORTER } = {}) {
   // 1. Telemetry / usage sharing dialog
   try {
@@ -229,27 +163,7 @@ export async function dismissFirstRunDialogs(page, { reporter = DEFAULT_REPORTER
   }
 }
 
-/**
- * Remove anything on the Setup page that swallows pointer events, and report what was removed.
- *
- * Foundry's New User Experience starts a setup tour whose full-viewport `.tour-overlay` intercepts
- * every click, so a perfectly correct selector still times out with Playwright's "element is
- * visible, enabled and stable" message — which reads as a missing control rather than a blocked
- * one. `suppressFoundryTours` seeds `core.tourProgress` pre-boot and normally prevents this
- * entirely; this is the reactive backstop for the setup-side tours that seeding does not reach, and
- * it is cheap enough to call unconditionally.
- *
- * WHAT IT MUST NOT REMOVE, LEARNED THE EXPENSIVE WAY. An earlier version also deleted `#tooltip`,
- * copied from a throwaway probe where it was harmless. It is not harmless: `#tooltip` is
- * Foundry-owned infrastructure that `TooltipManager` holds a live reference to, and pulling it out
- * of the DOM made `TooltipManager.deactivate` throw `Cannot read properties of null (reading
- * 'classList')` — twice, from `SetupTour._postStep`, on the first V13 run that took the setup path.
- * The tooltip is `pointer-events: none` and blocks nothing, so removing it bought exactly nothing
- * and cost two `pageerror`s. Only genuinely click-swallowing overlays belong in the sweep.
- *
- * @param {object} page Playwright page.
- * @returns {Promise<string[]>} What was cleared, for diagnostics.
- */
+/** Remove anything on the Setup page that swallows pointer events, and report what was removed. */
 export async function clearBlockingOverlays(page) {
   return page.evaluate(() => {
     const removed = [];
@@ -274,13 +188,7 @@ export async function clearBlockingOverlays(page) {
   });
 }
 
-/**
- * Evaluate the current join-form state from the page, optionally selecting the target user.
- *
- * @param {object} page Playwright page.
- * @param {string} userLabel
- * @param {'read'|'select'} action
- */
+/** Evaluate the current join-form state from the page, optionally selecting the target user. */
 async function evaluateJoinControl(page, userLabel, action) {
   return page.evaluate(
     ({ selectSelector, tileSelector, userLabel: targetLabel, action: mode }) => {
@@ -424,22 +332,12 @@ async function evaluateJoinControl(page, userLabel, action) {
   );
 }
 
-/**
- * Read the current join-form state from the page.
- *
- * @param {object} page Playwright page.
- * @param {string} userLabel
- */
+/** Read the current join-form state from the page. */
 async function readJoinState(page, userLabel) {
   return evaluateJoinControl(page, userLabel, 'read');
 }
 
-/**
- * Wait until the join UI exposes a selectable user.
- *
- * @param {object} page Playwright page.
- * @param {string} userLabel
- */
+/** Wait until the join UI exposes a selectable user. */
 async function waitForJoinUi(page, userLabel) {
   const joinButton = page.locator(JOIN_BUTTON_SELECTOR).first();
   await joinButton.waitFor({ state: 'visible', timeout: 15_000 });
@@ -453,16 +351,7 @@ async function waitForJoinUi(page, userLabel) {
   throw new Error(lastState?.reason ?? `Join UI did not expose "${userLabel}" within 15000ms.`);
 }
 
-/**
- * Join the running world from the Foundry join page.
- *
- * @param {object} page Playwright page.
- * @param {{
- *   userLabel?: string,
- *   stepName?: string | null,
- *   reporter?: BootReporter
- * }} [options]
- */
+/** Join the running world from the Foundry join page. */
 export async function joinWorldSession(page, options = {}) {
   if (getPathname(page.url()) !== '/join') {
     return;
@@ -535,24 +424,7 @@ export async function joinWorldSession(page, options = {}) {
   }
 }
 
-/**
- * Launch a world from the Foundry setup page and wait for the join (or game) page.
- *
- * Assumes the page is already authenticated and heading for `/setup`; the caller decides whether the
- * world is already running (in which case Foundry never shows `/setup` at all).
- *
- * This body is the full smoke's own launch block, moved verbatim. It deliberately does NOT sweep the
- * DOM with {@link clearBlockingOverlays}: the smoke has never needed to, and adding a step here
- * would change the behaviour of a harness this extraction is supposed to leave untouched. A caller
- * that wants that backstop calls it itself before this — the version arm does.
- *
- * @param {object} page Playwright page.
- * @param {{
- *   worldId: string,
- *   foundryUrl: string,
- *   reporter?: BootReporter
- * }} options
- */
+/** Launch a world from the Foundry setup page and wait for the join (or game) page. */
 export async function launchWorld(page, { worldId, foundryUrl, reporter = DEFAULT_REPORTER }) {
   await page.waitForURL(/\/setup(?:\?.*)?$/, { timeout: 15_000 });
 

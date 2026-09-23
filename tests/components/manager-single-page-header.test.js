@@ -1,45 +1,5 @@
 /**
  * ONE PAGE HEADER PER MANAGER ROUTE (issue 1515).
- *
- * The manager shell draws the page header — breadcrumb, eyebrow, `<h1>` and lede — once, in
- * `CraftingSystemManagerRoot.svelte`, for every route. Six views drew a SECOND one underneath it:
- * a `manager-section-header` carrying its own kicker, its own `<h2 class="manager-title">` and its
- * own `manager-subtitle`, so each of those screens opened with two titles and two ledes stacked
- * about 74px apart. Two of the six sat on ONE route — `system-edit` rendered a tab-gated header in
- * `SystemEditView` and another in `SystemOverviewView` — so that route carried a second header in
- * both of its tabs.
- *
- * Three earlier changes deleted exactly this stack, one route at a time: the recipe library (issue
- * 643), the component directory (issue 676) and the tags route (issue 878). Each left behind a
- * per-route assertion in `manager-mounted.test.js` and nothing that spoke for the routes still
- * carrying one, which is why the pattern kept coming back. This is that missing gate.
- *
- * ── WHY A STANDALONE CHECK RATHER THAN AN EXTENSION ────────────────────────────────────────
- * `manager-layout.test.js` already asserts the absence of the class, inside
- * `assertOneTrackPerGridChild`, and that helper is NOT extendable to these six. It couples four
- * contracts to the same call — no conditional direct children of `.manager-main`, an exact
- * unconditional child count, the header check, and a per-route `grid-template-rows` block the
- * route MUST declare in the sheet. None of the six routes here declares such a block, and the
- * three routes that helper covers are none of these six, so extending its route list would fail
- * on the grid contract for reasons that have nothing to do with page headers. The header clause is
- * therefore stated once more, alone, over its own population, and `assertOneTrackPerGridChild` is
- * left exactly as it is.
- *
- * ── THE HAYSTACK IS SOURCE TEXT ────────────────────────────────────────────────────────────
- * The same haystack that helper reads: each view's own source, sliced from its `<main` tag, which
- * is where a page header would have to sit. The class is checked against the WHOLE file too, so a
- * header hoisted above `<main` into a wrapper cannot slip past the slice. Neither reading needs a
- * mount, and both are exact — the class is either written in the file or it is not.
- *
- * ── WHAT MAKES THIS NOT VACUOUS ────────────────────────────────────────────────────────────
- * An absence gate over an empty corpus passes forever, and this one reads a hand-written list of
- * paths, which is the shape that rots most quietly. Four controls stand against that:
- *
- *   1. Every path is READ, so a renamed or moved view throws rather than being skipped.
- *   2. A floor on the number of files actually scanned, so an emptied list fails rather than
- *      passes.
- *   3. Each file must still render a `.manager-main` `<main>` and produce a non-empty slice, so a
- *      view that stopped being a manager view is reported rather than silently exempted.
  *   4. Each slice must still reach real manager markup — at least one `class="manager-*"` — so a
  *      slice that landed past the end of the template, or on a file whose classes were renamed
  *      wholesale, is reported rather than passing on an absence of markup.
@@ -118,7 +78,7 @@ describe('one page header per manager route', () => {
         `${file} draws a second page header on the ${route} route. The shell already renders the ` +
           `breadcrumb, eyebrow, title and lede for it; this one used to say "${was}". The copy ` +
           'that survives belongs in viewKicker/viewTitle/viewSubtitle in ' +
-          'CraftingSystemManagerRoot.svelte rather than restated here.'
+          'headerModel.svelte.js rather than restated here.'
       );
       assert.equal(
         source.includes('manager-section-header'),
@@ -146,9 +106,7 @@ describe('one page header per manager route', () => {
   });
 
   it('leaves no rule for the deleted class in the shared sheet', () => {
-    // Comments are stripped first: the sheet's own history notes name the class by name — the
-    // `manager-title` block still records that the recipe library once drew a second one — so a
-    // scan that read them would be permanently red for prose rather than for a rule.
+    // Comments are stripped first: the sheet's own history notes name the class by name.
     const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
     const rules = sheet.replace(/\/\*[\s\S]*?\*\//g, '');
 

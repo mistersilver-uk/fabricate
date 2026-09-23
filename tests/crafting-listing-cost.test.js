@@ -1,38 +1,12 @@
 /**
- * The cost guards for the crafting summary/detail split (issue 1075, under #1070).
- *
- * Three properties, each expressed as a COUNT rather than as prose, because the prose
- * versions of all three already existed and none of them could fail:
- *
- * 1. **Summaries are pure.** Building N of them invokes `evaluateCraftability()` and
- *    `resolveIngredientSelection()` zero times — at any N.
- *
- *    The two zeroes are NOT independent evidence, and saying so is the honest framing. In
- *    production the solver is reached only through `RecipeManager.evaluateCraftability`, and
- *    this fixture stubs that manager out entirely — so given the manager count is zero, the
- *    solver count is entailed. What the SET-LEVEL tripwire adds is the one mutation the
- *    manager count cannot see: a summary phase that reached PAST the manager into an
- *    `IngredientSet` directly. That is a real regression and the set-level placement is the
- *    only placement that catches it, but it is narrower than "the solver never ran".
- * 2. **A first-page load is bounded by the PAGE.** The exact-evaluation count for opening
- *    the app and hydrating one page is a function of page size and set count, and is
- *    independent of corpus size. That independence is the criterion: a bound that happened
- *    to hold at 200 recipes and grew at 400 would be a coincidence, not a guarantee.
- * 3. **The corpus-wide visibility pass is not duplicated.** One pass per crafting read, and
- *    zero further passes for every recipe the player then hydrates — the split's most
- *    plausible regression is a detail phase that re-runs the corpus-wide pass to find its
- *    own recipe's access.
- *
- * Every count here is proved NON-VACUOUS in the same test that reads it, by invoking the
- * counted seam directly or by showing the number move on an axis it is supposed to move on.
- * A counter that cannot go up reports a green baseline forever, which is worse than no
- * counter at all because it also reports confidence.
+ * The cost guards for the crafting summary/detail split (issue 1075, under #1070). The two zeroes
+ * are NOT independent evidence, and saying so is the honest framing.
  */
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { CraftingListingBuilder } from '../src/systems/CraftingListingBuilder.js';
+import { CraftingListingBuilder } from '../src/ui/presenters/CraftingListingBuilder.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 
 import { countCalls, createOperationCounters } from './helpers/scale/scaleCounters.js';
@@ -54,13 +28,7 @@ const MILL = Object.freeze({
   components: [{ id: 'c-grain', name: 'Grain', img: 'icons/grain.webp' }],
 });
 
-/**
- * One recipe with `SETS_PER_RECIPE` single-option sets.
- *
- * The sets carry a counted `resolveIngredientSelection` tripwire, because that is where the
- * bounded backtracking solver actually lives — counting only the manager's
- * `evaluateCraftability` would miss a projection that reached past it into a set directly.
- */
+/** One recipe with `SETS_PER_RECIPE` single-option sets. */
 function millRecipe(index, counters) {
   const sets = Array.from({ length: SETS_PER_RECIPE }, (_, setIndex) => {
     const set = {
@@ -207,13 +175,8 @@ describe('summary purity — building N rows costs no exact evaluation', () => {
 });
 
 /**
- * Invoke the tripwire INSTALLED ON THE FIXTURE'S OWN ingredient sets, proving that the
- * wrapper the assertion depends on is intact.
- *
- * Deliberately not a fresh unrelated object with its own `countCalls`: that demonstrates
- * `countCalls` works, which nobody doubts, while leaving the actual question — "is the
- * wrapper still on `millRecipe`'s sets?" — unasked. Delete or misname the `countCalls` call
- * at the fixture and a probe-object control still passes; this one does not.
+ * Invoke the tripwire INSTALLED ON THE FIXTURE'S OWN ingredient sets, proving that the wrapper the
+ * assertion depends on is intact.
  */
 function millRecipeSolverProbe(counters, recipes) {
   const before = counters.get('resolveIngredientSelection');
@@ -244,9 +207,8 @@ describe('first-page cost is bounded by the PAGE, not the corpus', () => {
         assert.ok(detail, 'non-vacuity: every hydration produced a model');
       }
 
-      // One evaluation per ingredient set (the per-option tiles) plus one for the craft
-      // button, per hydrated recipe. Asserted EXACTLY rather than as an upper bound: an
-      // inequality passes for a hydration that quietly stopped evaluating anything.
+      // One evaluation per ingredient set (the per-option tiles) plus one for the craft button, per
+      // hydrated recipe.
       assert.equal(
         counters.get('evaluateCraftability'),
         pageSize * (SETS_PER_RECIPE + 1),
@@ -256,9 +218,7 @@ describe('first-page cost is bounded by the PAGE, not the corpus', () => {
   }
 
   it('is INDEPENDENT of corpus size, which is the actual criterion', () => {
-    // A bound that held at one corpus size and grew at another would be a coincidence. The
-    // page is what must decide the cost, so the same page against a 4x corpus must cost the
-    // same — and the summary half must stay at zero on both.
+    // A bound that held at one corpus size and grew at another would be a coincidence.
     const counts = [500, 2000].map((corpusSize) => {
       const { builder, counters, craftingActor } = millWorld({ corpusSize });
       const listing = builder.buildListing({ craftingActor, viewer: VIEWER });
@@ -273,9 +233,8 @@ describe('first-page cost is bounded by the PAGE, not the corpus', () => {
   });
 
   it('a page the player never opens costs nothing at all', () => {
-    // The regression guard the issue retains rather than adds: filtering, sorting and paging
-    // are pure reads over summaries. They cannot hydrate anything, because hydration is a
-    // separate call the browse path never makes.
+    // The regression guard the issue retains rather than adds: filtering, sorting and paging are
+    // pure reads over summaries.
     const { builder, counters, craftingActor } = millWorld({ corpusSize: 500 });
     const listing = builder.buildListing({ craftingActor, viewer: VIEWER });
 

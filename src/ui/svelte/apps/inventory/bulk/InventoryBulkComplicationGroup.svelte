@@ -9,11 +9,11 @@
   — and never one per complication-bearing RESULT component. The queue sits directly
   below this block, so a block grouped any other way could not be read against it: the
   player would be shown a list of consequences with no way back to the row that carries
-  them. `openspec/specs/ui-integration/spec.md` § Player Salvage Surface rules it.
+  them. `openspec/specs/ui-crafting-app/spec.md` § Player Salvage Surface rules it.
 
   ## IT RE-DERIVES NOTHING, and that is a contract rather than a preference
 
-  Every field is published on the entry by `inventoryStore`'s `bulkRunProjection`:
+  Every field is published on the entry by `inventoryBulkActions`'s `bulkRunProjection`:
   `complications` is `[{ resultId, position, resultName, resultDifficulty, id, name,
   description, severity }]`, already filtered to `visibility: 'visible'`, already
   stripped of `when` / `rollCondition` / `effectRoll` / `macroUuid`, and already

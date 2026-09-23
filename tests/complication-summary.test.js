@@ -1,24 +1,6 @@
 /**
- * `src/utils/complicationSummary.js` — the ONE localized trigger sentence a component
- * complication describes itself with (issue 1286).
- *
- * It is a pure leaf, and until this suite existed it had no suite: it was reached only
- * incidentally, by two mounted Svelte suites that assert the sentence appears in a row
- * body and not what the sentence says. Four separate mutations survived a full green run
- * under that arrangement, and every one of them is a sentence that lies to a GM:
- *
- *  1. ignoring `match: 'all'` — an all-clauses complication describing itself as any-clause,
- *     which inverts the firing rule the GM authored;
- *  2. rendering an unknown comparator as `''` — the malformed operand the normalizer
- *     deliberately PRESERVES so the GM can see and fix it, made invisible again;
- *  3. rendering a NAMED check trigger as the unnamed clause, which makes
- *     `CheckTriggerNamed` dead;
- *  4. returning `''` when nothing is enabled, which kills the one string that tells a GM
- *     their complication can never fire.
- *
- * The GM-facing/player-facing split is enforced elsewhere (`ComplicationSummaryRow` types
- * its body slot per variant), so nothing here asserts it; what it does assert is that this
- * sentence STATES the conditions, which is exactly the fact that split exists to contain.
+ * `src/ui/model/complicationSummary.js` — the ONE localized trigger sentence a component complication
+ * describes itself with (issue 1286).
  */
 
 import assert from 'node:assert/strict';
@@ -27,16 +9,14 @@ import { describe, it } from 'node:test';
 import {
   COMPLICATION_SUMMARY_STRINGS,
   complicationSummary,
-} from '../src/utils/complicationSummary.js';
+} from '../src/ui/model/complicationSummary.js';
 import { authoredComplications } from '../src/utils/componentComplications.js';
 
 let minted = 0;
 
 /**
- * One complication in its NORMALIZED shape — the shape this builder documents as its
- * input — rather than a hand-written literal. A literal would let the summary read a key
- * the normalizer does not actually produce, and both defects the comparator tests below
- * turn on are properties of what the normalizer PRESERVES.
+ * One complication in its NORMALIZED shape — the shape this builder documents as its input — rather
+ * than a hand-written literal.
  */
 function complication(overrides = {}) {
   const { complications } = authoredComplications([overrides], () => `cx${++minted}`);
@@ -44,9 +24,8 @@ function complication(overrides = {}) {
 }
 
 /**
- * A translator that returns a DISTINGUISHABLE template per key, so an assertion cannot be
- * satisfied by the English fallback of some other clause. It also proves the injection
- * point: the caller passes a template and the substitution happens in the module.
+ * A translator that returns a DISTINGUISHABLE template per key, so an assertion cannot be satisfied
+ * by the English fallback of some other clause.
  */
 function tagged(overrides = {}) {
   const byKey = new Map(
@@ -175,10 +154,8 @@ describe('complicationSummary: the roll condition', () => {
   });
 
   it('renders an UNKNOWN comparator as its own id rather than as nothing', () => {
-    // The normalizer preserves a malformed comparator verbatim precisely so a GM can see
-    // and fix it (only the closed vocabularies clamp). A sentence that dropped it would
-    // read "When 1d20 15" — a comparison with no comparison in it — and hide the very
-    // thing preservation exists to surface.
+    // The normalizer preserves a malformed comparator verbatim precisely so a GM can see and fix it
+    // (only the closed vocabularies clamp).
     const authored = complication({
       rollCondition: { enabled: true, expr: '1d20', cmp: 'roughly', value: '15' },
     });
@@ -254,9 +231,7 @@ describe('complicationSummary: the effects tail', () => {
 
 describe('complicationSummary: a complication that can never fire says so', () => {
   it('returns the NO-TRIGGER sentence, never an empty string', () => {
-    // The one string that tells a GM their complication is inert. An empty sentence would
-    // render as a blank row body — indistinguishable from a complication that simply has
-    // a short trigger — and the authoring row would say nothing at all.
+    // The one string that tells a GM their complication is inert.
     const sentence = complicationSummary(complication({}));
     assert.equal(sentence, 'No trigger set — never fires');
     assert.notEqual(sentence, '');
@@ -344,9 +319,8 @@ describe('complicationSummary: the injected translator', () => {
   });
 
   it('leaves a placeholder this builder does not supply VISIBLE rather than emptying it', () => {
-    // A localized template that reaches for a slot the builder never fills is a broken
-    // translation, and it must read as one. Emptying it would silently lose a word from
-    // the middle of a GM's sentence in exactly one language.
+    // A localized template that reaches for a slot the builder never fills is a broken translation,
+    // and it must read as one.
     assert.equal(
       complicationSummary(complication({ when: { stageAwarded: true } }), {
         translate: tagged({ Sentence: 'When {clauses} for {actor}' }),

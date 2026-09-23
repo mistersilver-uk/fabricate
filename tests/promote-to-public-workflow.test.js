@@ -8,12 +8,7 @@ const WORKFLOW = '.github/workflows/promote-to-public.yml';
 
 // A release stays a DRAFT for its whole private life: semantic-release drafts it on the release
 // line, early access publishes it, and the promotion's job 4 un-drafts it as the last irreversible
-// step. GitHub exposes a draft release only to a token with push access, so a job that reads one
-// needs `contents: write` — a read-scoped GITHUB_TOKEN gets a plain 404, which is indistinguishable
-// from "the release does not exist" and fails the promotion on a release that is present and
-// correct. `release.yml`'s assetless-draft assertion documents the same rule at the point the draft
-// is minted. This is the defect that failed the first-ever public promotion: the guard asserted the
-// draft existed while holding `contents: read`, so no version could ever be promoted.
+// step.
 test('every promote-to-public job that reads the release can SEE a draft', () => {
   const jobs = parseJobs(readFileSync(WORKFLOW, 'utf8'));
   const readsARelease = /gh release (?:view|download|edit) /;
@@ -21,9 +16,8 @@ test('every promote-to-public job that reads the release can SEE a draft', () =>
     job.steps.some((step) => readsARelease.test(step.run))
   );
 
-  // Non-vacuity: the sweep must match something, and it must match the guard, whose whole purpose is
-  // to fail EARLY on a missing draft. A guard that stopped asserting the draft would leave the
-  // permission check below trivially true by giving it nothing to check.
+  // Non-vacuity: the sweep must match something, and it must match the guard, whose whole purpose
+  // is to fail EARLY on a missing draft.
   assert.ok(readers.length > 0, 'no job reads a release — the sweep matched nothing');
   assert.ok(
     readers.some(([name]) => name === 'guard'),
@@ -40,15 +34,7 @@ test('every promote-to-public job that reads the release can SEE a draft', () =>
 });
 
 // Node's `execSync` buffers the child's whole stdout and defaults to 1 MiB, and when a child
-// exceeds it Node SIGTERMs the child and throws ENOBUFS. A paginated `gh api` listing is exactly
-// the call that outgrows that default silently: the promotion's notes aggregation reads every
-// release with its full changelog body, which measured 1,286,324 bytes at 190 releases and grows
-// with each one. That failed the first real promotion of v1.9.0 two steps before the un-draft. The
-// buffer therefore has to be stated, not inherited.
-//
-// This matches PER LINE, which is deliberate: the call is one line, and a reformat that split it
-// across lines would make the check pass by matching nothing. The non-vacuity assertion below is
-// what turns that into a loud failure instead of a quiet one.
+// exceeds it Node SIGTERMs the child and throws ENOBUFS.
 test('a paginated gh api call buffered through execSync states its own maxBuffer', () => {
   const source = readFileSync(WORKFLOW, 'utf8');
   const paginatedExecSync = source
@@ -69,26 +55,38 @@ test('a paginated gh api call buffered through execSync states its own maxBuffer
   }
 });
 
-// The Foundry package listing dropped the `v` after v1.2.1 (issue #1462 / #1490). v1.2.1's own
-// module.json says `1.2.1` while its listing reads `v1.2.1`, so the prefix was never in the manifest
-// — it is PRESENTATION, and the registry payload is the one place it belongs.
-//
-// Issue 1407 put it in module.json instead and 1457 then made this payload read the artefact, which
-// coupled them: `release-s3.js` compares the built manifest against the requested version, so every
-// publish after that refused (`version mismatch: requested 1.9.3 built v1.9.3`), stranding v1.9.3
-// and three betas. These assertions pin the separation that keeps both correct.
-test('the registry payload constructs the v, and never re-derives it from the artefact', () => {
+// Foundry compares a version part numerically only when BOTH parts are numeric, so a `v` in the
+// registry identifier string-compares against a bare one and can rank an older release above a
+// newer one (issue #1945). The `v` belongs to the tag and the URLs, never the payload's version.
+test('the registry payload publishes the bare version, checked before the un-draft', () => {
   const source = readFileSync(WORKFLOW, 'utf8');
+  const job = parseJobs(source)['readback-preflight-undraft-register'];
+  assert.ok(job, 'the readback-preflight-undraft-register job is missing');
+  const buildIndex = job.steps.findIndex((step) => step.name === 'Build and validate the registry payload');
+  assert.notEqual(buildIndex, -1, 'the "Build and validate the registry payload" step is missing');
+  const build = job.steps[buildIndex].run;
 
-  assert.match(
-    source,
-    /--arg version "v\$\{VERSION\}"/,
-    'the payload must BUILD the display version from the bare input, so the manifest need not carry a prefix'
+  assert.match(build, /--arg version "\$\{VERSION\}"/, 'the payload must publish the BARE dispatch input');
+  assert.ok(
+    !/--arg version "v/.test(source),
+    'a `v`-prefixed registry version string-compares against a bare one and breaks ordering'
   );
   assert.ok(
     !/--arg version "\$BUILT_VERSION"/.test(source),
     'reading the artefact couples the advertised version to the manifest, which is what broke every publish after #1407'
   );
+
+  const check = build.indexOf(`jq -e --arg v "$VERSION" '.release.version == $v' /tmp/promote/payload.json`);
+  assert.notEqual(check, -1, 'the payload must be checked to carry exactly the promoted version');
+  const write = build.search(/jq -n \\[\s\S]*?> \/tmp\/promote\/payload\.json/);
+  assert.notEqual(write, -1, 'the jq -n payload write is missing');
+  assert.ok(check > write, 'the identity check must read the payload AFTER it is written');
+  const undraftIndex = job.steps.findIndex((step) => /gh release edit "v\$VERSION"[\s\S]*--draft=false/.test(step.run));
+  assert.notEqual(undraftIndex, -1, 'the un-draft step is missing');
+  assert.ok(buildIndex < undraftIndex, 'the payload check must fail before the release is made public');
+
+  // The guard refuses any input that is not bare M.N.P, which is what makes `$VERSION` bare.
+  assert.match(source, /\^\[0-9\]\+\\\.\[0-9\]\+\\\.\[0-9\]\+\$/, 'the guard must still refuse a non-bare input');
 
   // The tag is `v` plus the bare version, so the URLs interpolate the input. `v${BUILT_VERSION}`
   // would be `vv1.9.3` the moment anything reintroduced a prefix into the manifest.
@@ -113,4 +111,64 @@ test('the registry payload constructs the v, and never re-derives it from the ar
     /if \[ "\$BUILT_VERSION" != "\$VERSION" \]; then/,
     'the artefact IS the version being promoted, compared literally now the manifest carries no prefix'
   );
+});
+
+// Tester-group identity is deployment configuration, and early-access is published only from
+// `release` — so a promotion dispatched from `main` can evaluate a prefix no publish has written
+// (issue #1872). The guard diagnoses that, and hangs the remedy on the refusal it explains.
+test('the guard reads the publisher ref config and extends the absent-head refusal with the drift remedy', () => {
+  const guard = parseJobs(readFileSync(WORKFLOW, 'utf8')).guard;
+
+  const captureIndex = guard.steps.findIndex((step) =>
+    /git show origin\/release:release\.s3\.config\.json/.test(step.run)
+  );
+  assert.notEqual(captureIndex, -1, "no step reads origin/release's own release.s3.config.json");
+  const capture = guard.steps[captureIndex];
+  assert.match(
+    capture.run,
+    /git fetch origin ["']?\+?refs\/heads\/release/,
+    'origin/release must be fetched before it is read — a checkout does not guarantee the ref'
+  );
+  const written = /> "\$RUNNER_TEMP\/([\w.-]+)"/.exec(capture.run);
+  assert.ok(written, 'the publisher config must be written under $RUNNER_TEMP, not the checkout');
+
+  const checksIndex = guard.steps.findIndex((step) => step.id === 'checks');
+  assert.ok(captureIndex < checksIndex, 'the capture must precede the step that reads it');
+
+  const checks = guard.steps[checksIndex];
+  assert.ok(
+    String(checks.env.PUBLISHER_CONFIG ?? '').endsWith(`/${written[1]}`),
+    `the guard reads ${checks.env.PUBLISHER_CONFIG}, but the capture writes ${written[1]}`
+  );
+  assert.match(checks.env.PUBLISHER_CONFIG, /\$\{\{\s*runner\.temp\s*\}\}/);
+  assert.match(checks.run, /process\.env\.PUBLISHER_CONFIG/);
+  assert.match(
+    checks.run,
+    /evaluateTesterConfigDrift/,
+    'the guard must import and call the shared drift diagnosis, not restate it inline'
+  );
+
+  const flat = checks.run.replace(/\s+/g, ' ');
+  assert.match(flat, /console\.warn\(`::warning::\$\{drift\.summary\}`\)/, 'drift must be logged');
+  // A drift-driven refusal of its own would block every promotion made while two refs legitimately
+  // disagree. Drift is a diagnosis: it explains why an early-access head is absent.
+  assert.ok(!/fail\(drift\./.test(flat), 'configuration drift must never refuse on its own');
+  for (const conjunct of [/verdict\.kind === 'absent'/, /channel === 'early-access'/, /drift\.drifted/]) {
+    assert.match(flat, conjunct, 'the remedy is hung on the absent-head early-access refusal only');
+  }
+  assert.match(
+    flat,
+    /fail\(verdict\.reason \+ /,
+    'the remedy must EXTEND the registry-lead refusal, not replace the reason it explains'
+  );
+  assert.match(flat, /drift\.remedy/);
+
+  // The diagnosis is advisory, so a malformed publisher config must not hard-fail the guard: the
+  // parse falls back to an empty declaration and says so.
+  assert.match(
+    flat,
+    /try \{ publisherConfig = JSON\.parse\(await readFile\(process\.env\.PUBLISHER_CONFIG, 'utf8'\)\); \} catch/,
+    'an unparseable publisher config would refuse the promotion outright'
+  );
+  assert.match(flat, /catch \(error\) \{ console\.log\( `::notice::/);
 });

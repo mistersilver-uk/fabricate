@@ -4,9 +4,7 @@ import assert from 'node:assert/strict';
 import { migrateUnifyGatheringRegions } from '../src/migration/migrateUnifyGatheringRegions.js';
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -34,9 +32,7 @@ function findRegion(system, id) {
   return (system.gatheringRegions || []).find(r => r.id === id) || null;
 }
 
-// ---------------------------------------------------------------------------
 // Pure transform: core path
-// ---------------------------------------------------------------------------
 
 test('derives a GatheringRegion per vocabulary entry, keyed by crafting-system id', () => {
   const result = migrateUnifyGatheringRegions(baseData());
@@ -95,9 +91,7 @@ test('falls back to the system id when the system has no display name', () => {
   assert.deepEqual(result._unifiedRegionSystems, ['sys-a']);
 });
 
-// ---------------------------------------------------------------------------
 // Idempotency
-// ---------------------------------------------------------------------------
 
 test('running twice is a no-op (second run produces identical output)', () => {
   const first = migrateUnifyGatheringRegions(baseData());
@@ -112,9 +106,7 @@ test('running twice is a no-op (second run produces identical output)', () => {
   assert.equal('_unifiedRegionSystems' in second, false);
 });
 
-// ---------------------------------------------------------------------------
 // Edge cases
-// ---------------------------------------------------------------------------
 
 test('orphan environment.region with no derived region leaves includedRegionIds empty and region inert', () => {
   const data = baseData();
@@ -198,9 +190,7 @@ test('purity: the input objects are not mutated', () => {
   assert.deepEqual(data, snapshot, 'inputs are deep-cloned, never mutated in place');
 });
 
-// ---------------------------------------------------------------------------
 // Through the MigrationRunner: GM notice, transient stripping, version, re-import
-// ---------------------------------------------------------------------------
 
 function makeSettings(initial = {}) {
   const store = new Map(Object.entries({
@@ -238,9 +228,7 @@ test('runner: surfaces the GM-notice system names and never persists the transie
     assert.equal(json.includes('_unifiedRegionSystems'), false);
   }
 
-  // The data transform was actually persisted. 1.27.0 runs after this unification and lifts the
-  // derived realms to the world `travelConfig` (issue 1282), so that is where they land — the
-  // system keeps only its participation flag.
+  // The data transform was actually persisted (issue 1282).
   const savedSystems = settings.store.get('craftingSystems');
   assert.equal(savedSystems[0].gatheringRealms, undefined);
   assert.equal(settings.store.get('travelConfig').realms[0].id, 'north');

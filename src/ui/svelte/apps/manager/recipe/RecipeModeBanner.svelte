@@ -1,43 +1,34 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The banner that heads a recipe editor tab: a medallion, a "<kicker>: <label>" title
-  with an optional scope clause, one explanatory sentence, and an optional action chip
-  that routes somewhere else in the manager.
+  The banner that heads a recipe editor tab: a medallion, a "<kicker>: <label>" title with an
+  optional scope clause, one explanatory sentence, and an optional action chip routing elsewhere
+  in the manager. It exists because a recipe editor keeps being shaped from OUTSIDE the recipe —
+  the system's resolution mode dictates the editor's shape, and its check-modifier rule dictates
+  whether Overview offers a per-recipe modifier control at all — and both answers read the same
+  way: a fact set elsewhere, with a deep link to where it is set.
 
-  It exists because a recipe editor keeps being shaped from OUTSIDE the recipe — the
-  system's resolution mode dictates the editor's shape (one set vs. many, tier routing,
-  alchemy slots), and the system's check-modifier AUTHORITY dictates whether the Overview
-  tab offers a per-recipe modifier control at all (issue 1055). A GM staring at a tab
-  needs to know why, and both answers read the same way: a fact set elsewhere, with a
-  deep link to where it is set.
-
-  FULLY PROP-DRIVEN (issue 1055). It used to own the resolution-mode lookup and its own
-  copy; that made a second instance impossible without forking the component. The caller
-  now supplies the copy — including the resolution-mode call site, which reads the
-  canonical `resolutionModeOptions.js` table itself so there is still exactly one such
-  table in the tree.
+  FULLY PROP-DRIVEN, so a second instance needs no fork: the caller supplies the copy, including
+  the resolution-mode call site, which reads the canonical `resolutionModeOptions.js` table itself
+  so there is still exactly one such table in the tree.
 
   Props:
    - icon: Font Awesome classes for the medallion glyph.
-   - kicker / label: the title reads "<kicker>: <label>"; with no kicker it is just the
-     label. Both arrive ALREADY LOCALIZED — this component authors no copy.
-   - value: the state this banner is reporting, stamped as the `dataAttr` value so a
-     capture case or a smoke step can assert WHICH state is on screen.
-   - scope: the muted "· set for this crafting system" clause. Omitted when empty.
-   - description: the one sentence the banner exists to deliver (clamped to two lines).
-   - tone: `info` (default), `neutral` or `warning`. Colour only — the geometry is
-     identical, which is the point: two banners stacked on one tab must be
-     distinguishable without either of them changing size or position. `info` is the
-     PRIMARY reading ("this is why the editor looks like this"), `neutral` a secondary
-     fact that recedes behind it, and `warning` a state in which the surface below
-     cannot do anything.
-   - actionLabel / actionHint / onAction: the deep-link chip. Rendered only when
-     `onAction` is a function; `actionHint` is its `title`, which must be authored per
-     call site — a hardcoded one describes the wrong destination on the second instance.
-   - dataAttr / actionDataAttr: the capture hooks. `dataAttr` carries `value`, so two
-     banners on one tab MUST NOT share it: their value spaces are disjoint and a shared
-     hook would resolve to whichever rendered first. The defaults are the shipped
-     resolution-mode hooks, so that call site keeps them without restating them.
+   - kicker / label: the title reads "<kicker>: <label>", or just the label. Both arrive ALREADY
+     LOCALIZED — this component authors no copy.
+   - value: the state being reported, stamped as the `dataAttr` value so a capture case can
+     assert WHICH state is on screen.
+   - scope: the muted "· set for this crafting system" clause, omitted when empty.
+   - description: the one sentence the banner exists to deliver, clamped to two lines.
+   - tone: `info` (default), `neutral` or `warning`. COLOUR ONLY — the geometry is identical, so
+     two banners stacked on one tab are distinguishable without either moving. `info` is the
+     primary reading, `neutral` a fact that recedes behind it, `warning` a state in which the
+     surface below can do nothing.
+   - actionLabel / actionHint / onAction: the deep-link chip, rendered only when `onAction` is a
+     function. `actionHint` is its `title` and must be authored per call site, because a
+     hardcoded one describes the wrong destination on the second instance.
+   - dataAttr / actionDataAttr: the capture hooks. `dataAttr` carries `value`, so two banners on
+     one tab MUST NOT share it — their value spaces are disjoint and a shared hook would resolve
+     to whichever rendered first. The defaults are the shipped resolution-mode hooks.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
@@ -57,9 +48,8 @@
     actionDataAttr = 'data-recipe-mode-banner-settings',
   } = $props();
 
-  // Colour families this banner paints, mirroring `Chip`'s tone vocabulary so the two
-  // agree on what `info` / `neutral` / `warning` mean. Anything else falls back to the
-  // default info treatment rather than emitting an unstyled class.
+  // Colour families this banner paints, mirroring `Chip`'s tone vocabulary. Anything else falls
+  // back to info rather than emitting an unstyled class.
   const TONES = new Set(['info', 'neutral', 'warning']);
   const chipTone = $derived(TONES.has(tone) ? tone : 'info');
   const title = $derived(kicker ? `${kicker}: ${label}` : label);
@@ -102,9 +92,8 @@
 </div>
 
 <style>
-  /* The banner is INFO-toned by default, not a plain card: it explains why the editor
-     below it has the shape it has, and a `--fab-surface-soft` panel reads as just another
-     card in a page made of cards. */
+  /* INFO-toned by default rather than a plain card: a `--fab-surface-soft` panel reads as just
+     another card in a page made of cards. */
   .manager-recipe-mode-banner {
     display: flex;
     align-items: center;
@@ -115,10 +104,8 @@
     background: var(--fab-info-soft);
   }
 
-  /* Tone is COLOUR ONLY — edge, medallion and fill. Nothing here moves the geometry,
-     so two stacked banners stay the same shape and differ only in weight. `neutral`
-     recedes (it reports a fact rather than shaping the editor) and `warning` marks a
-     state in which the control the banner replaced could do nothing anyway. */
+  /* Tone is COLOUR ONLY — edge, medallion and fill — so two stacked banners stay the same shape
+     and differ only in weight. */
   .manager-recipe-mode-banner.is-neutral {
     border-color: var(--fab-border);
     background: var(--fab-surface-soft);
@@ -164,7 +151,6 @@
     align-items: baseline;
     gap: var(--fab-space-1);
     margin: 0;
-    /* 0.75rem (~12px) matches the prototype banner title (issue 643 font-size audit). */
     font-size: 0.75rem;
   }
 
@@ -174,28 +160,25 @@
   }
 
   .manager-recipe-mode-banner-scope {
-    /* 0.64rem (~10px) matches the prototype's banner secondary text (issue 643 audit). */
     font-size: 0.64rem;
     font-weight: 400;
   }
 
-  /* The description is the ONE sentence this banner exists to deliver. It used to be
-     `white-space: nowrap` + ellipsis, so at 900px — and for any longer localized
-     string — it was truncated to a few words. It wraps, clamped to two lines. */
+  /* The description WRAPS, clamped to two lines: `nowrap` plus ellipsis truncated it to a few
+     words at 900px and for any longer localized string. */
   .manager-recipe-mode-banner-desc {
     display: -webkit-box;
     margin: 2px 0 0;
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
-    /* 0.64rem (~10px) matches the prototype banner description (issue 643 audit). */
     font-size: 0.64rem;
     line-height: 1.45;
     white-space: normal;
   }
 
-  /* The action is a `Chip` (issue 883), so this component's scoping hash is not on it.
-     Reach it through `:global`, nested under a selector that DOES carry the hash. */
+  /* The action is a `Chip`, so this component's scoping hash is not on it: reach it through
+     `:global`, nested under a selector that DOES carry the hash. */
   .manager-recipe-mode-banner :global(.manager-recipe-mode-banner-action) {
     flex: 0 0 auto;
   }

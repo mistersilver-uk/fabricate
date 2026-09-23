@@ -1,24 +1,4 @@
-/**
- * Issue 1364 (epic 1357, PR 4) — the PURE half of the world-scope entity merge.
- *
- * `src/systems/worldScopeImportMerge.js` states unit-testability as "the reason that matters" for
- * living beside the importer rather than inside it, and this is the suite that cashes that in: a
- * LITERAL CORPUS table over `recheckWorldDefault`, with no importer, no store and no Foundry
- * anywhere in the closure.
- *
- * It exists because the end-to-end acceptance arms cannot reach several of these rules cheaply,
- * and three of them were MEASURED GREEN under their own mutations before this file:
- *
- * - the every-member precondition read as a bare KEY-PRESENCE test, which a hand-authored
- *   `category: ''` walks straight through — the store coerces the blank to ABSENCE, so the
- *   imported system then RESOLVES the world default the precondition was asked to decide;
- * - the reserved-`general` constraint, whose whole removal left every acceptance arm green;
- * - the undecidable-roster rule's ADDRESSABILITY half, which the acceptance suite exercises only
- *   through `repairRequirements` (short-circuited before the check) and `breakage` (no reference
- *   at all), leaving the dotted-value test unreached in both directions.
- *
- * Each case names the mutation that reddens it.
- */
+/** Issue 1364 (epic 1357, PR 4) — the PURE half of the world-scope entity merge. */
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -41,7 +21,6 @@ function member(entityId, systemId, record = {}) {
 /**
  * Run one case against the literal corpus it declares.
  *
- * @param {object} scenario
  * @returns {{record: object|null, declined: Array<{section: string, referenceValue: string}>}}
  */
 function recheck(scenario) {
@@ -59,9 +38,7 @@ function recheck(scenario) {
   });
 }
 
-// ---------------------------------------------------------------------------
 // CONSTRAINT 0 — the every-member precondition is the MIGRATION'S predicate
-// ---------------------------------------------------------------------------
 
 const PRECONDITION_CASES = [
   {
@@ -112,17 +89,12 @@ const PRECONDITION_CASES = [
   },
 ];
 
-// ---------------------------------------------------------------------------
 // CONSTRAINT (a) — the reserved `general` category is never persisted at world scope
-// ---------------------------------------------------------------------------
 
 const RESERVED_CATEGORY_CASES = [
   {
     name: 'the reserved `general` category is DECLINED even when every member authored it',
-    // REDDENS WHEN: the components arm is replaced by an unconditional `{ ok: true }`. Persisting
-    // it would silently reset every inheriting system's category to `general` on the first
-    // resolve, because the world category is absence-preserving and `general` is the implicit
-    // bucket the resolver falls back to.
+    // REDDENS WHEN: the components arm is replaced by an unconditional `{ ok: true }`.
     entityType: 'components',
     record: { id: 'c1', category: 'general' },
     members: [member('c1', 'sys-a', { category: 'general' })],
@@ -131,17 +103,12 @@ const RESERVED_CATEGORY_CASES = [
   },
 ];
 
-// ---------------------------------------------------------------------------
 // The UNDECIDABLE-ROSTER rule — `worldComponentIds === null`
-// ---------------------------------------------------------------------------
 
 const UNDECIDABLE_CASES = [
   {
     name: 'an essence `effectSource` naming a bare component id is declined when the roster is undecidable',
     // REDDENS WHEN: the undecidable branch is written `: true` instead of `: value.includes('.')`.
-    // The acceptance suite cannot see that mutation: its only undecidable arms are
-    // `repairRequirements`, which is refused before the addressability check runs, and
-    // `breakage`, which carries no reference at all.
     entityType: 'essences',
     record: { id: 'fire', effectSource: { sourceComponentId: 'c9' } },
     members: [member('fire', 'sys-a')],
@@ -189,9 +156,7 @@ const UNDECIDABLE_CASES = [
   },
 ];
 
-// ---------------------------------------------------------------------------
 // The DECIDABLE roster — the shipped `isWorldAddressable` predicate
-// ---------------------------------------------------------------------------
 
 const DECIDABLE_CASES = [
   {
@@ -263,15 +228,9 @@ for (const scenario of [
   });
 }
 
-// ---------------------------------------------------------------------------
-// The CORPUS READERS the re-check decides against
-//
-// `recheckWorldDefault` is only as honest as the corpus it is handed, and all four readers below
-// were unexercised: the suite imported one of the module's five functions. The gap was live rather
-// than cosmetic — dropping `mergedEntityIds`' INCOMING leg survives the whole acceptance suite,
-// because its addressability arms deliberately place the component in the DESTINATION alone and
-// the mirror case never existed.
-// ---------------------------------------------------------------------------
+// The CORPUS READERS the re-check decides against. `recheckWorldDefault` is only as honest as the
+// corpus it is handed, and all four readers below were unexercised: the suite imported one of the
+// module's five functions.
 
 /** A slice in the PERSISTED map shape. */
 function mapSlice(subKey, records) {
@@ -299,12 +258,7 @@ test('sliceRecords: reads BOTH shapes and drops anything that is not a record', 
 });
 
 test('mergedEntityIds: unions the DESTINATION and the INCOMING roster', () => {
-  // THE MUTATION THIS EXISTS FOR: iterating `[persistedSlice]` alone. It survives the whole
-  // acceptance suite and would silently DECLINE every world default referencing a component the
-  // payload itself brings — which is the ordinary import, not an edge case.
-  //
-  // REDDENS WHEN: either leg is dropped. The two single-leg arms below are what make that
-  // specific: a union arm alone passes if the surviving leg happens to carry both ids.
+  // THE MUTATION THIS EXISTS FOR: iterating `[persistedSlice]` alone.
   const destination = { entities: [{ id: 'dest' }] };
   const incoming = { entities: [{ id: 'inc' }] };
 
@@ -326,10 +280,6 @@ test('mergedMembershipUnion: the incoming half counts as ONE SYNTHETIC system', 
   // The incoming records are counted under a synthetic token and NEVER under the payload's own
   // system id, because that id names the destination's system in neither mode: copy mode has not
   // minted one yet, and a keep-mode overwrite may have resolved an existing system by NAME.
-  //
-  // REDDENS WHEN: the incoming records carry their own `systemId` through — the token assertion
-  // fails; or when the persisted half is re-tokened too, which would erase the destination's
-  // system boundaries and make the repair-requirements constraint vacuous.
   const union = mergedMembershipUnion(
     { membership: [{ entityId: 'e1', systemId: 'dest-sys' }] },
     { membership: [{ entityId: 'e1', systemId: 'payload-sys' }] }

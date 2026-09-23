@@ -1,23 +1,6 @@
 /**
- * Issue 917 — `essenceAllocation.js`: the shared essence allocator.
- *
- * Three properties here are load-bearing rather than decorative, and each guards a specific
- * silent failure:
- *
- * - **The oracle.** Greedy must fund the block whenever the whole ledger could, or a player is
- *   told a craftable recipe is impossible. It is checked against an independently written
- *   one-pass sum (`sumWholeLedger` below), NOT against a second run of the allocator.
- * - **Input-order invariance.** Foundry collections reorder between reads, so an allocation
- *   that depended on the `carriers` array order would make the requirement rail flap between
- *   renders. The four-key tie-break is a total order precisely to prevent that.
- * - **Irredundancy.** Greedy is not minimal, but no single allocated unit may be individually
- *   removable — that is the property that justifies shipping no shrink pass. If it ever fails,
- *   the printed seed is the evidence a shrink pass would be revisited with.
- *
- * The random cases run through a tiny LCG over a FIXED seed list, and every assertion prints
- * its seed and scenario. The repo has no seeded generator; `Math.random()` in new code is an
- * S2245 MEDIUM vulnerability that fails the SonarCloud gate, and `crypto.getRandomValues` is
- * unreproducible — so a failing case here would be unfixable without the seed.
+ * Issue 917 — `essenceAllocation.js`: the shared essence allocator. The oracle.** Greedy must fund
+ * the block whenever the whole ledger could, or a player is told a craftable recipe is impossible.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -29,9 +12,7 @@ import {
   greedyAllocate,
 } from '../src/utils/essenceAllocation.js';
 
-// ---------------------------------------------------------------------------
 // Seeded generation
-// ---------------------------------------------------------------------------
 
 /** A numerical-recipes LCG. Returns `nextInt(bound)` over `[0, bound)`. */
 function createRandom(seed) {
@@ -53,11 +34,7 @@ const SEEDS = Object.freeze([
   16_180_339, 14_142_135, 8_675_309, 5_551_212,
 ]);
 
-/**
- * Build one random need + ledger. Ranges are deliberately tight so the seed list produces both
- * fundable and unfundable blocks (asserted below), and small enough that a failing scenario
- * prints as something a human can reason about.
- */
+/** Build one random need + ledger. */
 function generateScenario(seed) {
   const nextInt = createRandom(seed);
   const essenceIds = ESSENCE_IDS.slice(0, 1 + nextInt(ESSENCE_IDS.length));
@@ -129,9 +106,7 @@ const CARRIERS = Object.freeze([
   { itemKey: 'emberbloom', perUnit: { ember: 3 }, ownedUnits: 2 },
 ]);
 
-// ---------------------------------------------------------------------------
 // deliveredEssences
-// ---------------------------------------------------------------------------
 
 describe('deliveredEssences', () => {
   const carriers = CARRIERS;
@@ -160,9 +135,7 @@ describe('deliveredEssences', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // allocationShortfall
-// ---------------------------------------------------------------------------
 
 describe('allocationShortfall', () => {
   const carriers = CARRIERS;
@@ -209,9 +182,7 @@ describe('allocationShortfall', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // clampAllocation
-// ---------------------------------------------------------------------------
 
 describe('clampAllocation', () => {
   it('clamps an over-allocation down to the units available', () => {
@@ -246,9 +217,7 @@ describe('clampAllocation', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // greedyAllocate — the pinned orderings
-// ---------------------------------------------------------------------------
 
 describe('greedyAllocate tie-breaks', () => {
   it('allocates a 3-Radiant carrier against a need of 1 (overshoot never filters)', () => {
@@ -323,9 +292,7 @@ describe('greedyAllocate tie-breaks', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // greedyAllocate — the seeded properties
-// ---------------------------------------------------------------------------
 
 describe('greedyAllocate properties over the fixed seed list', () => {
   it('funds the block if and only if the whole ledger could (the oracle)', () => {

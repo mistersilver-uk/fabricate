@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { InventoryListingBuilder } from '../src/systems/InventoryListingBuilder.js';
+import { InventoryListingBuilder } from '../src/ui/presenters/InventoryListingBuilder.js';
 import { findMatchingComponent } from '../src/utils/essenceResolver.js';
 import { component, componentSet, roleItem } from './helpers/componentIdentityFixtures.js';
 import {
@@ -202,10 +202,8 @@ describe('InventoryListingBuilder — one card per unified physical stack (issue
   });
 
   it('joins divergent roles by intersecting documents, scoping each participation to ITS OWN docs', () => {
-    // doc1 backs the component in BOTH systems; doc2 backs it in System A ONLY. Both
-    // resolve to the same-named component and share an actor. They form ONE card whose
-    // System-A participation owns {doc1, doc2} and whose System-B participation owns
-    // {doc1} — B cannot consume doc2's stock.
+    // doc1 backs the component in BOTH systems; doc2 backs it in System A ONLY. Both resolve to the
+    // same-named component and share an actor.
     const systems = [
       salvageSystem(SYS_A, [salvageComponent('cA', 'Air Shard')]),
       salvageSystem(SYS_B, [salvageComponent('cB', 'Air Shard')]),

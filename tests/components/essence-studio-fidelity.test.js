@@ -1,17 +1,4 @@
-/**
- * The GM Essence Studio's PROTOTYPE-FIDELITY contract (issue 1036).
- *
- * Every assertion here exists because the defect it pins shipped, was reviewed, and was
- * not caught — the Stage C review compared SOURCE to the prototype PNGs and could render
- * nothing, and none of these defects is visible in source unless you already know to look
- * for it. They are all geometry or composition, which is exactly what a source read is
- * blind to and what happy-dom cannot compute either: it has no cascade, so a mounted test
- * sees the markup and never the size.
- *
- * So these are SOURCE assertions on purpose, and each one names the rendered symptom it
- * stands for. The rendered proof is the re-captured frame; this file is what stops the
- * frame silently regressing between captures.
- */
+/** The GM Essence Studio's PROTOTYPE-FIDELITY contract (issue 1036). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -26,9 +13,7 @@ const read = (relative) => readFileSync(resolve(repoRoot, relative), 'utf8');
 const colourPopoverSource = read('src/ui/svelte/components/ManagerColorPopover.svelte');
 const browserSource = read('src/ui/svelte/apps/manager/EssenceBrowserView.svelte');
 const rowSource = read('src/ui/svelte/apps/manager/essences/EssenceRow.svelte');
-// The GRID card's anatomy and look now live in the shared studio-library primitive; the
-// essence row supplies the vocabulary and renders it. Assertions about the CARD read here,
-// assertions about the LIST row still read `rowSource`.
+// The GRID card's anatomy and look now live in the shared studio-library primitive.
 const cardSource = read('src/ui/svelte/apps/manager/library/LibraryCard.svelte');
 const bulkPanelSource = read('src/ui/svelte/apps/manager/essences/EssenceBulkEditPanel.svelte');
 // The delete CARD's anatomy and look now live in the shared bulk-delete primitive (issue
@@ -43,11 +28,10 @@ const inspectorSource = read('src/ui/svelte/apps/manager/essences/EssenceBrowser
 const previewSource = read('src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte');
 const studioSource = read('src/ui/svelte/apps/manager/essences/essenceStudio.js');
 const onCraftSource = read('src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte');
-const segmentedControlSource = read('src/ui/svelte/apps/manager/SegmentedControl.svelte');
+const segmentedControlSource = read('src/ui/svelte/components/SegmentedControl.svelte');
 const globalCss = read('styles/fabricate.css');
 
-// The scoped `<style>` block of a component, so an assertion about its CSS cannot be
-// satisfied by a class name mentioned in its markup or in a comment above it.
+// The scoped `<style>` block of a component.
 function styleBlock(source) {
   const start = source.lastIndexOf('<style>');
   assert.ok(start >= 0, 'component should declare a scoped style block');
@@ -58,11 +42,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
   it('sizes the INLINE colour palette instead of letting its container size it', () => {
     const styles = styleBlock(colourPopoverSource);
 
-    // The rendered symptom: the palette took the width of whatever hosted it, and the
-    // global cell is `aspect-ratio: 1`. In the editor's main column that made ten ~165px
-    // SQUARES — taller than every other control on the tab combined — and ~62px squares in
-    // the bulk rail. The prototype draws compact rounded rectangles roughly one control
-    // high.
+    // The rendered symptom: the palette took the width of whatever hosted it.
     assert.ok(
       styles.includes('.manager-color-picker-popover.is-inline .manager-color-preset {'),
       'the inline palette must size its own cell'
@@ -86,8 +66,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       'over auto-fit tracks, which is one row in the editor and two in the rail'
     );
 
-    // The POPOVER call sites are untouched: their 220px width already made the shared
-    // square a ~46px cell, and three surfaces outside this studio render them.
+    // The POPOVER call sites are untouched.
     assert.ok(
       globalCss.includes('grid-template-columns: repeat(4, 1fr);'),
       'the popover keeps the shipped four-column grid'
@@ -117,19 +96,24 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       globalCss.includes('.fabricate-manager .manager-essence-filter-row {'),
       'the row class the shared toolbar wears is authored in the global sheet'
     );
-    assert.equal(
-      (globalCss.match(/\.fabricate-manager \.manager-essence-toolbar select \{/g) || []).length,
-      2,
-      'and so is the select treatment (the shared control font, and the Fabricate select chrome)'
-    );
+    // The sort is the shared `Select`, whose `toolbar` rung paints the trigger, so no rule
+    // anywhere dresses an element-typed select in this bar.
+    for (const [where, css] of [
+      ['the global sheet', globalCss],
+      ['the scoped block', styles],
+    ]) {
+      assert.doesNotMatch(
+        css,
+        /\.manager-essence-toolbar select\b/,
+        `${where} paints no native select in the essence toolbar`
+      );
+    }
   });
 
   it('keeps the grid presentation a level shelf rather than a ragged one', () => {
-    // The rendered symptom: `align-items: start` sized each card to its own copy, so a row
-    // of four ran four different heights with four footers at four different baselines.
+    // The rendered symptom: `align-items: start` sized each card to its own copy.
     assert.ok(
-      // `:global(...)` because the `<ul>` is rendered by `LibraryShelf` now — a scoped
-      // selector would be hashed to the browser view, match nothing, and compile away.
+      // `:global(...)` because the `<ul>` is rendered by `LibraryShelf` now.
       /:global\(\.manager-essences-table\.is-grid\) \{[^}]*align-items: stretch;/s.test(
         styleBlock(browserSource)
       ),
@@ -141,13 +125,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       ),
       'and the card reserves a fixed 2-line description box so every card is the same height regardless of content'
     );
-    // Neither of the two above is SUFFICIENT, which is the whole lesson of the maintainer's
-    // second round: both declarations were already in place while the published frame showed
-    // one card 4px taller than its row siblings. What actually varied was Foundry's `<li>`
-    // margin, which the last card is exempt from. The rendered proof is
-    // `tests/components/essence-grid-card-height.test.js`, which measures the cards in
-    // Chromium; this pins the declaration that test exists to protect, so deleting the rule
-    // fails here with the reason attached rather than only there with a number.
+    // Neither of the two above is SUFFICIENT.
     assert.ok(
       /\.fabricate-manager \.manager-essence-row\.is-card \{[^}]*margin: 0;/s.test(globalCss),
       'and the card zeroes the Foundry li margin that made its last member taller'
@@ -178,8 +156,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
         `${label} must not render a colour chip`
       );
     }
-    // The colour itself is NOT removed — only the word. The tile still carries it in both
-    // presentations, which is what makes this a removal of duplication rather than of state.
+    // The colour itself is NOT removed.
     assert.ok(rowSource.includes('tint={essence.colorToken'), 'the row tile stays tinted');
     assert.ok(
       inspectorSource.includes("tint={essence.colorToken || ''}"),
@@ -188,10 +165,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
   });
 
   it('drops the editor and bulk-panel colour-name caption too (later maintainer feedback)', () => {
-    // The maintainer's follow-up round: no colour-NAME copy anywhere in the essence editor,
-    // "unnecessary overhead for all theme and colour combinations" — reversing the earlier
-    // decision that the editor's palette caption should keep naming the selected swatch.
-    // Both surfaces stop resolving a display name at all.
+    // The maintainer's follow-up round.
     for (const [label, source] of [
       ['editor identity caption', identityTabSource],
       ['bulk edit panel', bulkPanelSource],
@@ -202,8 +176,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
         `${label} must not resolve a colour display name`
       );
     }
-    // The EDITOR's caption keeps the Authored/Unset sentence — it names no colour, only
-    // whether one is set — and drops only the `<strong>` that named the swatch.
+    // The EDITOR's caption keeps the Authored/Unset sentence — it names no colour.
     assert.equal(
       /<strong>\s*\{colourName\}\s*<\/strong>/.test(identityTabSource),
       false,
@@ -214,8 +187,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
         identityTabSource.includes("'FABRICATE.Admin.Manager.Essence.Colour.Unset'"),
       'the Authored/Unset explanatory sentence survives, since it names no colour'
     );
-    // The No-colour vocabulary key stays too — it is the inline palette's `noneLabel`, and
-    // "No colour" names the absence of a colour, not a colour.
+    // The No-colour vocabulary key stays too — it is the inline palette's `noneLabel`.
     assert.ok(
       identityTabSource.includes("'FABRICATE.Admin.Manager.Essence.Colour.None'"),
       'the palette keeps its no-colour cell label'
@@ -224,8 +196,6 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
 
   it('truncates a grid card name rather than letting it re-size its row', () => {
     // The rendered symptom the maintainer named as the mechanism: "name should be truncated".
-    // Equal-height-within-a-row does not cover this — an unclamped name wraps and every card
-    // in the row grows WITH it, which still satisfies "all the same height".
     const styles = styleBlock(cardSource);
     assert.ok(
       /\.fab-library-card-name \{[^}]*white-space: nowrap;/s.test(styles),
@@ -244,9 +214,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       rowSource.includes('nameTitle={essence.name}'),
       'the whole name survives as a title'
     );
-    // LIST rows are untouched: a 76px row beside a clamped description has the width, and
-    // truncating there would hide names the list can show. The card's clamp lives on the
-    // card's OWN class now, so it cannot reach the list row's `.manager-system-name` at all.
+    // LIST rows are untouched: a 76px row beside a clamped description has the width.
     assert.equal(
       /\.manager-system-name \{/.test(styleBlock(rowSource)),
       false,
@@ -295,17 +263,6 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       'and the danger treatment preserved on delete'
     );
     // THE TWO UNFILLED TONES STAY UNFILLED (issue 1372, maintainer parity round 6).
-    //
-    // The rendered symptom the maintainer measured: `Duplicate essence` filled a rung two steps
-    // above the pane its own rail sits on, so a secondary verb read as RAISED where the
-    // prototype's equivalent reads recessed. Unfilled and bounded by `--fab-border` is the
-    // treatment every other card on these screens wears and the one the prototype's own
-    // `← Back` wears, so it is the answer; an exact match is not available, because the
-    // prototype's value sits below the bottom of the ramp and has no token.
-    //
-    // ASSERTED, because this is the fourth parity round on this rail and a fill is the single
-    // easiest declaration to reintroduce while tuning a hover: the hover states directly beneath
-    // these two rules DO carry fills, and a copy-paste between them is all it takes.
     for (const [selector, pattern] of [
       ['neutral', /\.fab-inspector-action \{[^}]*background: transparent;/s],
       ['danger', /\.fab-inspector-action\.is-danger \{[^}]*background: transparent;/s],
@@ -316,13 +273,11 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
           'bounded by --fab-border is what the rail and the prototype both already use'
       );
     }
-    // It must beat Foundry's host button geometry itself, because it is not `.manager-button`
-    // and therefore inherits none of the manager's reset.
+    // It must beat Foundry's host button geometry itself.
     for (const declaration of ['appearance: none;', 'height: auto;', 'font-family: inherit;']) {
       assert.ok(styles.includes(declaration), `the Foundry button reset states ${declaration}`);
     }
-    // Its CSS is co-located, never in the global sheet: required-screenshot detection maps
-    // file paths to views, and a global rule would widen every tweak to a theme-wide frame set.
+    // Its CSS is co-located, never in the global sheet.
     assert.equal(
       globalCss.includes('fab-inspector-action'),
       false,
@@ -331,28 +286,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
   });
 
   it('matches the bulk-delete armed danger button to the inspector-action label size', () => {
-    // The rendered symptom (maintainer feedback): `ArmedDangerButton` renders a bare
-    // `.manager-button`, which carries no font-size of its own, so "Delete N essences" /
-    // armed "Confirm delete" inherited the app's body size — visibly larger than every
-    // other right-rail button, `InspectorActionButton`'s `.fab-inspector-action` (0.72rem)
-    // included. happy-dom cannot compute the cascade, so this is a source assertion; the
-    // rendered proof is the re-captured frame.
-    //
-    // RETARGETED at the primitive (issue 1132). The card extracted to `BulkDeleteCard.svelte`,
-    // and Svelte scoping is per component: this rule HAD to move with the markup or it would
-    // have stopped matching, which is exactly the regression this assertion exists to catch —
-    // in all three studios at once, and invisibly to any source review. Asserting it here is
-    // what makes the move safe rather than what makes it pass.
-    //
-    // RETARGETED AGAIN, and for the SAME failure one level further out (issue 1427). The card's
-    // root `<section>` became an `<InspectorCard>`, so `fab-bulk-delete-card` now rides the
-    // `class` prop onto an element this component does not write and the ancestor half of the
-    // old selector stopped matching. It did so SILENTLY — this component spreads attributes onto
-    // three regular elements, which makes every class selector in its block possibly-matching, so
-    // the compiler emitted the rule with its hash attached and raised no `css_unused_selector`.
-    // The repair moves the whole selector inside `:global()` and chains
-    // `.manager-inspector-card` so the specificity stays at (0,3,0); this assertion follows it,
-    // which is the point of pinning a selector rather than a declaration.
+    // The rendered symptom (maintainer feedback).
     const styles = styleBlock(bulkDeleteCardSource);
     assert.ok(
       /:global\(\.manager-inspector-card\.fab-bulk-delete-card \.manager-button\) \{[^}]*font-size: 0\.72rem;/s.test(
@@ -360,16 +294,13 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       ),
       'the delete card scopes its button to the shared inspector-action label size'
     );
-    // Scoped to the delete card only — the danger/armed colour treatment stays in the
-    // global sheet, untouched.
+    // Scoped to the delete card only.
     assert.equal(
       styles.includes('.manager-button.is-danger'),
       false,
       'the colour treatment is not re-declared here, only the type scale'
     );
     // The impact list's treatment moved with it, and it is the other half of the same frame:
-    // dropped rather than moved, the sentence the GM acts on loses its indent, its colour and
-    // its weight everywhere the card renders.
     assert.ok(
       /\.fab-bulk-delete-impact \{[^}]*padding-left: var\(--fab-space-4\);/s.test(styles),
       'and the impact list keeps its indent'
@@ -380,8 +311,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       ),
       'its secondary colour and its heavier face'
     );
-    // The panel must NOT still be declaring them: a stale copy left behind is a rule that
-    // matches nothing, and it would make this retarget look load-bearing when it was not.
+    // The panel must NOT still be declaring them.
     assert.equal(
       /manager-essence-bulk-(?:delete|impact)/.test(styleBlock(bulkPanelSource)),
       false,
@@ -390,10 +320,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
   });
 
   it('gives the editor icon control a SQUARE tile its column is sized to', () => {
-    // The rendered symptom (maintainer round 3): the round-2 `block` filled the column WIDTH
-    // and kept `size` only as the height, so a widened column stretched the icon tile into a
-    // rectangle. The icon must read as a square, with the column narrowed to that width so
-    // the picker + reset row shrinks to fit beneath it.
+    // The rendered symptom (maintainer round 3).
     const medallionTag = identityTabSource.match(/<Medallion[^>]*\/>/)?.[0] ?? '';
     assert.ok(medallionTag, 'the identity tab renders a Medallion tile');
     assert.equal(
@@ -429,9 +356,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
   });
 
   it('renders a linked active-effect source the way the Tool Studio renders a linked Item', () => {
-    // The rendered symptom, four ways: a raw-uuid sub-line, one square clear button where the
-    // Tool Studio has a grouped pair, a duplicate `Drop or pick` zone under the linked card,
-    // and a macro card whose title and sub-line were the same uuid.
+    // The rendered symptom, four ways: a raw-uuid sub-line.
     assert.ok(
       onCraftSource.includes('kind="essence-source"'),
       'the linked source is the shared ItemDropZone, as ToolOverviewTab is'
@@ -476,10 +401,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
   });
 
   it('stages each bulk axis as one control with its reset on the section label row', () => {
-    // The rendered symptom: three stacked FULL-WIDTH elements per axis — a sub-hint, the
-    // control, and a second full-width `Leave unchanged` button under it — where the
-    // prototype draws one compact row. `BulkEditSection.trailing` is the shipped slot for a
-    // staged-axis control and the Component Studio already uses it for the same meaning.
+    // The rendered symptom: three stacked FULL-WIDTH elements per axis — a sub-hint.
     assert.ok(
       bulkPanelSource.includes('data-essence-bulk-icon-reset'),
       'the icon axis keeps its reset'
@@ -497,25 +419,10 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
         `${hook} must render in its section's trailing slot, not as a full-width button below it`
       );
     }
-    // This used to pin the ABSENCE of `class="manager-button" data-essence-bulk-` — the
-    // defect's exact spelling. That string is now unproducible in this repository, for two
-    // independent reasons: both resets are `Chip`s, and the primitive that renders a manager
-    // button emits its classes from a `.join(' ')` and never writes that literal in markup at
-    // all (issue 1118). A guard that CANNOT fail is worse than one that does: it reports green
-    // for a reason unrelated to the thing it was written to watch.
-    //
-    // So it is retargeted onto what "full width" means now. Issue 1118 took `width: 100%` off
-    // the `dashed` role and gave the primitive an `is-full-width` class emitted by a
-    // `fullWidth` prop, because full width is a statement about the CONTAINER rather than
-    // about the verb. That class, and that prop, are the two ways a reset could go back to
-    // being the stacked full-width button this test exists to keep it from being — and the
-    // check is bound to each reset's own opening tag, so a `fullWidth` on some other control
-    // in the panel cannot satisfy or break it.
+    // This used to pin the ABSENCE of `class="manager-button" data-essence-bulk-`.
     for (const hook of ['data-essence-bulk-icon-reset', 'data-essence-bulk-colour-reset']) {
       const start = bulkPanelSource.lastIndexOf('<', bulkPanelSource.indexOf(hook));
-      // The tag ends at the first `>` that is not the tail of an `=>`: every one of these
-      // controls carries an inline `onclick={() => …}`, so a plain scan to the next `>` would
-      // stop inside the handler and read half the attributes.
+      // The tag ends at the first `>` that is not the tail of an `=>`.
       let end = start;
       do {
         end = bulkPanelSource.indexOf('>', end + 1);
@@ -552,17 +459,13 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       'the tile wrapper is the positioning context for the overlay'
     );
     assert.ok(
-      // The reset became an `<IconButton>` at issue 1422, so `manager-icon-button` is emitted
-      // by the primitive and only the per-site modifier is passed. `data-essence-icon-reset`
-      // is spelled `=""` rather than bare because a bare `data-*` on a COMPONENT tag is the
-      // boolean `true` and would render `="true"`.
+      // The reset became an `<IconButton>` at issue 1422.
       /<IconButton\s+class="manager-essence-icon-reset"\s+data-essence-icon-reset=""/.test(
         identityTabSource
       ),
       'the reset is still the icon-only control, now rendered inside the tile wrapper'
     );
-    // The reset must render BEFORE the actions row closes, i.e. inside the tile, never
-    // beside the picker in `.manager-essence-icon-actions` any more.
+    // The reset must render BEFORE the actions row closes, i.e. inside the tile.
     const tileOpen = identityTabSource.indexOf('<div class="manager-essence-icon-tile">');
     const resetHook = identityTabSource.indexOf('data-essence-icon-reset');
     const actionsOpen = identityTabSource.indexOf('<div class="manager-essence-icon-actions">');
@@ -574,17 +477,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       identityTabSource.includes("ariaLabel={text('FABRICATE.Admin.Manager.Essence.ClearIcon'"),
       'and its label survives as the accessible name'
     );
-    // Hidden by default, and revealed by hover AND by keyboard focus independently — never
-    // hover-only, which would strand a keyboard user with no way to see the control at all.
-    //
-    // The CHILD half of each selector is `:global(...)` as of issue 1422, and pinning that
-    // spelling is the point rather than an accommodation. The reset is an `<IconButton>` now,
-    // so the element carrying `manager-essence-icon-reset` is written by the primitive and
-    // never receives this component's `svelte-<hash>`; the scoped spelling these regexes used
-    // to assert is exactly the dead rule, and the compiler pruned all three of them. The tile
-    // stays scoped because this component does write it. Specificity is unchanged either way:
-    // Svelte compiled the scoped descendant with the hash inside `:where()`, which contributes
-    // nothing.
+    // Hidden by default, and revealed by hover AND by keyboard focus independently.
     assert.ok(
       /\.manager-essence-icon-tile :global\(\.manager-essence-icon-reset\) \{[^}]*opacity: 0;/s.test(
         identityStyles
@@ -597,11 +490,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       ),
       'and reveals on tile hover or button focus-visible, independent of pointer'
     );
-    // The hidden state must hide with `pointer-events`, NOT `visibility: hidden`. A
-    // `visibility: hidden` button is dropped from the tab order, so a keyboard user could
-    // never focus it and the `:focus-visible` reveal above could never fire — the reveal
-    // would be a dead rule and the control hover-only in practice. `opacity: 0` keeps it
-    // focusable; this pins that so a revert to `visibility: hidden` fails here.
+    // The hidden state must hide with `pointer-events`.
     assert.ok(
       /\.manager-essence-icon-tile :global\(\.manager-essence-icon-reset\) \{[^}]*pointer-events: none;/s.test(
         identityStyles
@@ -615,8 +504,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       false,
       'visibility: hidden would strand a keyboard user — the button could never be focused to reveal it'
     );
-    // The actions row is left with the picker alone: no `manager-icon-button` between the
-    // row's own opening and closing tags.
+    // The actions row is left with the picker alone.
     const actionsClose = identityTabSource.indexOf('</div>', actionsOpen);
     const actionsBody = identityTabSource.slice(actionsOpen, actionsClose);
     assert.ok(actionsOpen > 0 && actionsClose > actionsOpen, 'the actions row is found intact');
@@ -632,8 +520,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
   });
 
   it('puts the inspector primary action above its reference cards', () => {
-    // The rendered symptom: `Edit essence` — the loudest control the rail has — sat after
-    // `Source` and `Usage` and fell past the fold at every captured window size.
+    // The rendered symptom: `Edit essence` — the loudest control the rail has.
     const actions = inspectorSource.indexOf('data-essence-section="actions"');
     const source = inspectorSource.indexOf('data-essence-section="source"');
     const usage = inspectorSource.indexOf('data-essence-section="usage"');
@@ -644,20 +531,10 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
   });
 
   it('titles the behaviour list once, and offers no prop with which to title it twice', () => {
-    // The rendered symptom this began as: an `On craft` card heading with an `Effective
-    // behaviour` kicker immediately under it, for one list of three rows — the reference's
-    // single `ON CRAFT` kicker drawn twice. The fix was a `showEffectiveKicker` prop the
-    // browser inspector passed `false`.
-    //
-    // THE PROP IS GONE NOW, WITH ITS ONLY CALLER (issue 1372, maintainer parity round 8). The
-    // inspector draws the reference's `ON CRAFT IN <system>` cards instead, so `showIdentity`,
-    // `showLiveNote` and `showEffectiveKicker` all had zero callers left — configuration that
-    // cannot be reached rather than a capability.
+    // The rendered symptom this began as.
     for (const prop of ['showEffectiveKicker', 'showIdentity', 'showLiveNote']) {
       assert.ok(
-        // `\\s`, not `\s`: this is a TEMPLATE LITERAL, so a single backslash is a string escape
-        // that yields a bare `s` — the pattern was `showIdentitys*=` and matched nothing for four
-        // months, which is the shape of an assertion that passes for the wrong reason (issue #1660).
+        // `\\s`, not `\s`: this is a TEMPLATE LITERAL.
         !new RegExp(`${prop}\\s*=`).test(previewSource),
         `${prop} is declared with no call site that passes it`
       );
@@ -687,8 +564,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       inspectorSource.includes("'FABRICATE.Admin.Manager.Essence.OnCraftIn'"),
       'and its heading names the system'
     );
-    // The PROVENANCE half, at the projection: a card with an inherit map ends in a layer clause,
-    // and one without a membership record ends in nothing rather than inventing one.
+    // The PROVENANCE half, at the projection.
     assert.ok(
       studioSource.includes('SuffixOverridden') && studioSource.includes('SuffixWorldDefault'),
       'the projection reads the same two suffix keys the row summary and the editor already use'
@@ -707,9 +583,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       /^[^/]*?\biconOnly\b/s.test(viewControl.slice(0, viewControl.indexOf('/>'))),
       'the view-mode segmented control opts into the compact variant'
     );
-    // Opt-IN, so the status filter one line above must not have been swept along: "All /
-    // Enabled / Disabled" is a vocabulary, not two glyphs, and it has no icons to fall back
-    // on — an icon-only status filter would render three empty tiles.
+    // Opt-IN, so the status filter one line above must not have been swept along.
     const statusControl = browserSource.slice(
       browserSource.indexOf('options={statusOptions}'),
       browserSource.indexOf('options={viewModeOptions}')
@@ -720,9 +594,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       'the status filter keeps its words — its options are not glyphs'
     );
 
-    // The label is CLIPPED, never removed. The `<label>` IS the radio's accessible name, so
-    // `display: none` (or dropping the span) would leave every tile anonymous to a screen
-    // reader — the defect this variant must not trade the width saving for.
+    // The label is CLIPPED, never removed. The `<label>` IS the radio's accessible name.
     const segmentedStyles = styleBlock(segmentedControlSource);
     const clipRule = segmentedStyles.slice(
       segmentedStyles.indexOf('.manager-segmented.is-icon-only .manager-segment-label {')
@@ -754,10 +626,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       ),
       'the essence row joins the medallion-led rows that drop the inset bar'
     );
-    // And the ticked-row treatment it was already asking for: `EssenceRow` writes
-    // `class:is-bulk-selected`, and until now nothing in either sheet matched it, so a
-    // ticked essence looked exactly like an unticked one in the one studio whose bulk panel
-    // can delete what is ticked.
+    // And the ticked-row treatment it was already asking for.
     assert.ok(
       rowSource.includes('class:is-bulk-selected={bulkSelected}'),
       'the row writes the ticked class'
@@ -783,10 +652,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       /\.fab-library-card-body \{[^}]*align-items: stretch;/s.test(styleBlock(cardSource)),
       'the card identity stretches its children to the card width so their left-aligned content is not centred'
     );
-    // And it must WIN against the shared identity reset, which is `.fabricate-manager
-    // .manager-<studio>-identity` (0,2,0) and would otherwise keep the body a two-column
-    // grid. A component-scoped rule is (0,1,0), so the override is declared in the global
-    // sheet at matching specificity and later in source order.
+    // And it must WIN against the shared identity reset.
     assert.ok(
       /\.fabricate-manager \.fab-library-card-body \{[^}]*flex-direction: column;/s.test(globalCss),
       'the shared sheet re-stacks the card body over the identity reset'

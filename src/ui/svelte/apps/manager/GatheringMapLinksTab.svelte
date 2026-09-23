@@ -9,7 +9,7 @@
   regions".
 -->
 <script>
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import MapRegionLinkPicker from './MapRegionLinkPicker.svelte';
 
@@ -42,63 +42,65 @@
   aria-labelledby="manager-travel-nav-map"
   data-travel-panel="map"
 >
-  {#if !sceneUuid}
-    <EmptyState
-      compact
-      icon="fas fa-map"
-      title={text(
-        'FABRICATE.Admin.Manager.Travel.MapLinks.NoScene',
-        'Activate a scene to link its regions.'
-      )}
-      dataAttr="data-travel-map-links-empty"
-    />
-  {:else if sceneRegions.length === 0}
-    <EmptyState
-      compact
-      icon="fas fa-map-location-dot"
-      title={text(
-        'FABRICATE.Admin.Manager.Travel.MapLinks.NoRegions',
-        'The active scene has no regions.'
-      )}
-      dataAttr="data-travel-map-links-empty"
-    />
-  {:else}
-    <div class="manager-map-link-list" role="list">
-      {#each sceneRegions as sceneRegion (sceneRegion.sceneRegionUuid)}
-        {@const isSelected = sceneRegion.sceneRegionUuid === selectedRegionUuid}
-        <div
-          class={`manager-map-link-row ${isSelected ? 'is-selected' : ''}`}
-          role="listitem"
-          data-manager-map-region-uuid={sceneRegion.sceneRegionUuid}
-        >
+  <div class="manager-table-scroll">
+    {#if !sceneUuid}
+      <EmptyState
+        compact
+        icon="fas fa-map"
+        title={text(
+          'FABRICATE.Admin.Manager.Travel.MapLinks.NoScene',
+          'Activate a scene to link its regions.'
+        )}
+        dataAttr="data-travel-map-links-empty"
+      />
+    {:else if sceneRegions.length === 0}
+      <EmptyState
+        compact
+        icon="fas fa-map-location-dot"
+        title={text(
+          'FABRICATE.Admin.Manager.Travel.MapLinks.NoRegions',
+          'The active scene has no regions.'
+        )}
+        dataAttr="data-travel-map-links-empty"
+      />
+    {:else}
+      <div class="manager-map-link-list" role="list">
+        {#each sceneRegions as sceneRegion (sceneRegion.sceneRegionUuid)}
+          {@const isSelected = sceneRegion.sceneRegionUuid === selectedRegionUuid}
           <div
-            class="manager-map-link-header"
-            role="button"
-            tabindex="0"
-            aria-pressed={isSelected}
-            onclick={() => onSelect(sceneRegion.sceneRegionUuid)}
-            onkeydown={(event) => onRowKeydown(event, sceneRegion.sceneRegionUuid)}
+            class={`manager-map-link-row ${isSelected ? 'is-selected' : ''}`}
+            role="listitem"
+            data-manager-map-region-uuid={sceneRegion.sceneRegionUuid}
           >
-            <span
-              class="manager-map-link-swatch"
-              style={sceneRegion.color ? `background:${sceneRegion.color};` : ''}
-              aria-hidden="true"
-            ></span>
-            <span class="manager-map-link-name">
-              {sceneRegion.name ||
-                text('FABRICATE.Admin.Manager.Travel.MapLinks.UnnamedRegion', 'Unnamed region')}
-            </span>
+            <div
+              class="manager-map-link-header"
+              role="button"
+              tabindex="0"
+              aria-pressed={isSelected}
+              onclick={() => onSelect(sceneRegion.sceneRegionUuid)}
+              onkeydown={(event) => onRowKeydown(event, sceneRegion.sceneRegionUuid)}
+            >
+              <span
+                class="manager-map-link-swatch"
+                style={sceneRegion.color ? `background:${sceneRegion.color};` : ''}
+                aria-hidden="true"
+              ></span>
+              <span class="manager-map-link-name">
+                {sceneRegion.name ||
+                  text('FABRICATE.Admin.Manager.Travel.MapLinks.UnnamedRegion', 'Unnamed region')}
+              </span>
+            </div>
+            <div class="manager-map-link-picker-cell">
+              <MapRegionLinkPicker
+                value={sceneRegion.linkedRegionId}
+                {regions}
+                disabled={saving}
+                onChoose={(regionId) => onSetLink(sceneRegion.sceneRegionUuid, regionId)}
+              />
+            </div>
           </div>
-          <div class="manager-map-link-picker-cell">
-            <MapRegionLinkPicker
-              value={sceneRegion.linkedRegionId}
-              {regions}
-              disabled={saving}
-              onChoose={(regionId) => onSetLink(sceneRegion.sceneRegionUuid, regionId)}
-            />
-          </div>
-        </div>
-      {/each}
-    </div>
-  {/if}
+        {/each}
+      </div>
+    {/if}
+  </div>
 </div>

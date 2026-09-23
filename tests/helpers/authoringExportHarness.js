@@ -1,11 +1,7 @@
 /**
- * Shared harness for the import/export authoring round-trip tests: ONE in-memory
- * settings map + the REAL GatheringEnvironmentStore, so an export reads exactly
- * what an import persisted. Extracted from `authoring-export-roundtrip.test.js`
- * so multiple test files share a single harness and the resolution logic cannot
- * drift (Sonar new-code duplication mitigation).
- *
- * This file is a HELPER, never a `*.test.js`.
+ * Shared harness for the import/export authoring round-trip tests: ONE in-memory settings map + the
+ * REAL GatheringEnvironmentStore, so an export reads exactly what an import persisted. This file is
+ * a HELPER, never a `*.test.js`.
  */
 
 import { buildExportPayload } from '../../src/systems/CraftingSystemExporter.js';
@@ -14,10 +10,8 @@ import { GatheringRealmStore } from '../../src/systems/GatheringRealmStore.js';
 
 export const VERSION = '9.9.9';
 
-// Deterministic, collision-free id generator for the store/importer shims. NOT
-// Math.random: SonarCloud promotes Math.random() (S2245) to a vulnerability that
-// fails the PR gate. A monotonic counter is deterministic and unique, which is
-// all the copy-mode id-rebind path needs.
+// Deterministic, collision-free id generator for the store/importer shims. NOT Math.random:
+// SonarCloud promotes Math.random() (S2245) to a vulnerability that fails the PR gate.
 let idCounter = 0;
 function deterministicId(prefix) {
   idCounter += 1;
@@ -38,14 +32,14 @@ globalThis.fromUuid = globalThis.fromUuid || (async () => null); // all external
  * Stand up the shared single-store harness for a fixture.
  *
  * @param {{ system: object, recipes: object[], environments: object[], gatheringConfig: object, travelConfig?: object, characterLibraries?: object }} fixture
+ * @param {{ simulateSettingChangeReload?: boolean }} [options] `false` stands up a world with NO
+ *   `travelConfig` hook, which is what a headless world and a no-op replicated write both are.
  * @returns {{ settings: Map, getSetting: Function, setSetting: Function, systemManager: object, recipeManager: object, environmentStore: GatheringEnvironmentStore, travelStore: GatheringRealmStore }}
  */
-export function makeHarness(fixture) {
+export function makeHarness(fixture, { simulateSettingChangeReload = true } = {}) {
   const settings = new Map();
   settings.set('gatheringConfig', structuredClone(fixture.gatheringConfig));
-  // The WORLD travel configuration (issue 1282). It is a world SETTING now rather than a field
-  // on the system, so the single shared settings map is where an export reads it from and where
-  // an import writes it back to.
+  // The WORLD travel configuration (issue 1282).
   settings.set('travelConfig', structuredClone(fixture.travelConfig ?? {}));
   settings.set('characterLibraries', structuredClone(fixture.characterLibraries ?? {}));
   // The three WORLD-SCOPE ENTITY settings (issue 1364), seeded from the fixture for the same
@@ -58,10 +52,12 @@ export function makeHarness(fixture) {
   // `settingChangeBridge` does on a `travelConfig` change. Without this the environment store had
   // no `travelStore` at all, so the round trip never exercised realm validation — which is how an
   // import that persisted environments before the realms they cite went unnoticed (issue 1848).
+  // That reload is SIMULATED, so `simulateSettingChangeReload: false` is the world in which no
+  // such hook fires and the write has to reach the store itself (issue 1858).
   let travelStore = null;
   const setSetting = async (key, value) => {
     settings.set(key, structuredClone(value));
-    if (key === 'travelConfig') travelStore?.load?.();
+    if (key === 'travelConfig' && simulateSettingChangeReload) travelStore?.load?.();
   };
   travelStore = new GatheringRealmStore({ getSetting, setSetting });
   // Warm, the way `src/main.js` loads it at startup: a COLD store lazily reads the setting on
@@ -127,16 +123,10 @@ export function makeHarness(fixture) {
 }
 
 /**
- * Faithful reproduction of `src/main.js`'s `game.fabricate.exportSystem` argument
- * resolution: resolve the environment store's FULL global list and the raw
- * `gatheringConfig` setting plus the two WORLD configs (currency, travel), then hand all
- * seven args to `buildExportPayload`. The `?? []` / `|| {}` defaults mirror the public-API
- * path exactly. Pinned to the
- * real `src/main.js` closure by a source-contract guard in
- * `tests/export-system-gathering-bundle.test.js`.
+ * Faithful reproduction of `src/main.js`'s `game.fabricate.exportSystem` argument resolution:
+ * resolve the environment store's FULL global list and the raw `gatheringConfig` setting plus the
+ * two WORLD configs (currency, travel), then hand all seven args to `buildExportPayload`.
  *
- * @param {ReturnType<typeof makeHarness>} h
- * @param {string} systemId
  * @returns {object} export envelope
  */
 export function exportViaPublicApiResolution(h, systemId) {
@@ -166,14 +156,9 @@ export function exportViaPublicApiResolution(h, systemId) {
 }
 
 /**
- * Faithful reproduction of `src/ui/svelte/stores/adminStore.js`'s `exportSystem`
- * argument resolution. Uses the `typeof …list === 'function'` guard idiom the UI
- * path uses; given the same store + settings it must produce an envelope
- * equivalent to {@link exportViaPublicApiResolution}. The two idioms converging is
- * precisely the regression the fix restores.
+ * Faithful reproduction of `src/ui/svelte/stores/adminStore.js`'s `exportSystem` argument
+ * resolution.
  *
- * @param {ReturnType<typeof makeHarness>} h
- * @param {string} systemId
  * @returns {object} export envelope
  */
 export function exportViaAdminStoreResolution(h, systemId) {
@@ -205,11 +190,9 @@ export function exportViaAdminStoreResolution(h, systemId) {
 }
 
 /**
- * Generic current-state export (the public-API resolution), retained for the
- * round-trip test that predates the split.
+ * Generic current-state export (the public-API resolution), retained for the round-trip test that
+ * predates the split.
  *
- * @param {ReturnType<typeof makeHarness>} h
- * @param {string} systemId
  * @returns {object} export envelope
  */
 export function exportCurrent(h, systemId) {

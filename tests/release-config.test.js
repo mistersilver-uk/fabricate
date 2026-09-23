@@ -2,12 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 /**
- * These tests exercise `release.config.js`, whose default export chooses its
- * plugin set from `GITHUB_REF_NAME`. Because ESM caches a module per specifier,
- * every re-import that must re-read the env var uses a DISTINCT `?v=N` query so
- * the module is re-evaluated. The classifier throw is pinned via the PURE
- * `classifyBranch` export — the default export cannot be relied on to throw
- * because it depends on an env var (and falls back to `main` when unset).
+ * These tests exercise `release.config.js`, whose default export chooses its plugin set from
+ * `GITHUB_REF_NAME`.
  */
 
 const CONFIG_URL = new URL('../release.config.js', import.meta.url).href;
@@ -62,9 +58,8 @@ for (const { name, type } of CLASSIFY_CASES) {
   });
 }
 
-// `'1.x'` is load-bearing: it matches the SINGLE-numeric glob `+([0-9]).x`, not
-// the maintenance glob `+([0-9]).+([0-9]).x`. Accepting it would mean the
-// branches glob and the classifier regex have drifted apart, so it MUST throw.
+// `'1.x'` is load-bearing: it matches the SINGLE-numeric glob `+([0-9]).x`, not the maintenance
+// glob `+([0-9]).+([0-9]).x`.
 const CLASSIFY_THROWS = [
   '1.x',
   '1',

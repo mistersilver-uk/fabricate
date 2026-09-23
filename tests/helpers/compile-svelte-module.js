@@ -1,15 +1,4 @@
-/**
- * Shared test helper for loading Svelte 5 runes `.svelte.js` store modules under
- * `node:test`. Svelte runes cannot run un-compiled, so each module is compiled
- * with `compileModule` into a temp tree (whose `node_modules` is a junction back
- * to the repo's) and imported from there. Plain `.js` dependency modules a store
- * imports are copied verbatim into the same temp tree so their relative imports
- * resolve.
- *
- * This boilerplate is identical across store suites; importing it here (rather
- * than re-inlining the compile/symlink/rewrite scaffolding per test file) keeps
- * the SonarCloud new-code duplication gate green.
- */
+/** Shared test helper for loading Svelte 5 runes `.svelte.js` store modules under `node:test`. */
 import {
   readFileSync,
   writeFileSync,
@@ -30,8 +19,6 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 
 // Mirrors the mounted harness's own scanner (`svelte-component-harness.js`): static
 // `import`/`export ... from` specifiers only, which is all the temp tree has to resolve.
-// A dynamic import is deliberately out of scope — none of the modules loaded here uses one,
-// and a regex cannot resolve a computed specifier anyway.
 const STATIC_IMPORT_PATTERN =
   /(?:^|[;\n])\s*(?:import|export)\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/g;
 
@@ -57,8 +44,6 @@ function resolveLocalModule(importerPath, specifier) {
  * Create a temp compiler for a single test suite.
  *
  * @param {string} [prefix] mkdtemp prefix for the temp root.
- * @returns {{ tempRoot: string, compile: Function, copyPlain: Function, load: Function,
- *   loadWithClosure: Function, cleanup: Function }}
  */
 export function createSvelteModuleCompiler(prefix = 'fabricate-svelte-') {
   const tempRoot = mkdtempSync(join(tmpdir(), prefix));
@@ -89,29 +74,9 @@ export function createSvelteModuleCompiler(prefix = 'fabricate-svelte-') {
   }
 
   /**
-   * Copy every plain `.js` module the entry transitively imports, then compile and import
-   * it — the same thing {@link load} does, minus the hand-maintained copy list.
-   *
-   * ## Why this exists
-   *
-   * `load` needs its caller to have already copied each of the entry's dependencies, and a
-   * dependency the store imports but the suite did not copy does not FAIL the suite: the
-   * temp-tree import throws inside `before`, every test is reported `cancelled`, and the
-   * summary still says `fail 0`. So the cost of an omission is a silent gap, and the list
-   * has to be re-audited by hand every time anyone adds an import to a store — which is
-   * exactly the drift that has already bitten this repo's mounted-harness lists.
-   *
-   * Walking the real import graph removes the list, and with it the class of defect. A
-   * suite that deliberately wants a NARROWER tree (to mock a leaf, say) still uses
-   * `copyPlain` + `load` and keeps its explicit list; this is the default, not the only way.
-   *
-   * ## What it deliberately refuses
-   *
-   * Only the ENTRY may be a runes module. `compile` writes to `<path>.js`, so a nested
-   * `.svelte.js` would need its importer's specifier rewritten to match, and a `.svelte`
-   * component needs the mounted harness rather than this one. Both throw here rather than
-   * being copied as if they were plain modules, because the failure mode otherwise is once
-   * again a hang rather than a message.
+   * Copy every plain `.js` module the entry transitively imports and compile every `.svelte.js`
+   * one, then compile and import the entry — the same thing {@link load} does, minus the
+   * hand-maintained copy list.
    *
    * @param {string} entryPath repo-relative path to a `.svelte.js` runes module.
    * @returns {Promise<object>} the module namespace.
@@ -132,14 +97,17 @@ export function createSvelteModuleCompiler(prefix = 'fabricate-svelte-') {
           );
         }
         if (seen.has(importedPath)) continue;
-        if (importedPath.endsWith('.svelte') || importedPath.endsWith('.svelte.js')) {
+        if (importedPath.endsWith('.svelte')) {
           throw new Error(
-            `${importerPath} imports ${importedPath}; loadWithClosure copies plain modules only, ` +
-              'so compile that one explicitly or use the mounted component harness'
+            `${importerPath} imports the component ${importedPath}; loadWithClosure handles ` +
+              'modules only, so use the mounted component harness'
           );
         }
         seen.add(importedPath);
-        copyPlain(importedPath);
+        // A rune module is compiled rather than copied, and still walked: its own plain imports
+        // have to be copied in too (issue 1673).
+        if (importedPath.endsWith('.svelte.js')) compile(importedPath);
+        else copyPlain(importedPath);
         pending.push(importedPath);
       }
     }

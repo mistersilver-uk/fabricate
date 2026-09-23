@@ -1,17 +1,13 @@
 /**
- * Unit tests for T-008: Failure Consumption Policy
- *
- * Tests that CraftingEngine correctly applies consumeIngredientsOnFail and
- * breakToolsOnFail policies on both crafting check failure paths.
+ * Unit tests for T-008: Failure Consumption Policy. Tests that CraftingEngine correctly applies
+ * consumeIngredientsOnFail and breakToolsOnFail policies on both crafting check failure paths.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 
-// ---------------------------------------------------------------------------
 // Globals required for the module to load
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -29,9 +25,7 @@ globalThis.ui = {
   notifications: { info: () => {}, warn: () => {}, error: () => {} }
 };
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Configure globalThis.game with a crafting system that has the given
@@ -97,9 +91,8 @@ function buildFakeItem(id, quantity = 1) {
 }
 
 /**
- * Build a fake library Tool (limitedUses) plus a spy recording whether it was
- * used on the failure-consumption path. The Tool itself is a plain object the
- * RecipeManager test-double resolves via getToolsForSet.
+ * Build a fake library Tool (limitedUses) plus a spy recording whether it was used on the
+ * failure-consumption path.
  */
 function buildFakeTool(componentId = 'tool-1') {
   return {
@@ -110,11 +103,7 @@ function buildFakeTool(componentId = 'tool-1') {
   };
 }
 
-/**
- * Build a minimal fake ingredient set with one ingredient matching one item.
- * matchIngredients() is the method the engine's single-selection resolver
- * (_resolveCraftSelection) calls to build the consumption plan for this stub.
- */
+/** Build a minimal fake ingredient set with one ingredient matching one item. */
 function buildFakeIngredientSet(ingredientItem) {
   const ingredient = { systemItemId: ingredientItem.id, quantity: 1, getDescription: () => ingredientItem.name };
   return {
@@ -127,11 +116,7 @@ function buildFakeIngredientSet(ingredientItem) {
   };
 }
 
-/**
- * Build a minimal recipe-like object. CraftingEngine uses duck-typed recipes
- * in its internal paths; craft() calls recipe.validate() then
- * recipe.getExecutionSteps() (or falls back to recipe.ingredientSets etc.).
- */
+/** Build a minimal recipe-like object. */
 function buildFakeRecipe(ingredientSet, toolIds = []) {
   return {
     id: 'recipe-1',
@@ -153,9 +138,7 @@ function buildFakeRecipe(ingredientSet, toolIds = []) {
   };
 }
 
-/**
- * Build a CraftingEngine with a mock RecipeManager and optional services.
- */
+/** Build a CraftingEngine with a mock RecipeManager and optional services. */
 function buildEngine({ ingredientItem, toolItem, fakeTool, ingredientSet, options = {} } = {}) {
   const mockRecipeManager = {
     canCraft(actors, recipe) {
@@ -183,9 +166,7 @@ function stubCraftingCheck(engine, result) {
   engine._runCraftingCheck = async () => result;
 }
 
-// ---------------------------------------------------------------------------
 // Test Group 1: _getFailureConsumptionPolicy helper
-// ---------------------------------------------------------------------------
 
 test('_getFailureConsumptionPolicy returns spec defaults when recipe has no craftingSystemId', () => {
   setupGame();
@@ -243,9 +224,7 @@ test('_getFailureConsumptionPolicy defaults breakToolsOnFail to false when consu
   assert.equal(policy.breakToolsOnFail, false);
 });
 
-// ---------------------------------------------------------------------------
 // Test Group 2: Failure consumption on crafting check failure — all four flag combos
-// ---------------------------------------------------------------------------
 
 async function runCheckFailureScenario({ consumeIngredientsOnFail, breakToolsOnFail }) {
   setupGame({ consumeIngredientsOnFail, breakToolsOnFail });
@@ -314,9 +293,7 @@ test('craft() does NOT consume ingredients AND does NOT break tools on check fai
   assert.equal(toolUsed.value, false, 'tool should NOT have been used/broken');
 });
 
-// ---------------------------------------------------------------------------
 // Test Group 3: Failure consumption on check result validation failure
-// ---------------------------------------------------------------------------
 
 async function runValidationFailureScenario({ consumeIngredientsOnFail, breakToolsOnFail }) {
   setupGame({ consumeIngredientsOnFail, breakToolsOnFail });
@@ -388,9 +365,7 @@ test('craft() does not consume when policy is false/false and check result valid
   assert.equal(toolUsed.value, false, 'tool should NOT have been used/broken');
 });
 
-// ---------------------------------------------------------------------------
 // Test Group 4: Edge cases
-// ---------------------------------------------------------------------------
 
 test('craft() does not consume on pre-check failure (missing ingredients)', async () => {
   setupGame({ consumeIngredientsOnFail: true, breakToolsOnFail: true });

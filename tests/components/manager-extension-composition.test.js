@@ -3,12 +3,11 @@ import assert from 'node:assert/strict';
 
 import {
   captureCloseOrdering,
+  captureUserHookHandlers,
   withFabricateLifecycleReplay,
 } from '../helpers/extension-composition-harness.js';
 
-// Deliberately NOT Core's four tab ids, and deliberately not four of them: the public seam
-// a companion reaches through `game.fabricate.api` must accept the tab set the companion
-// declares, and a fixture that mirrors Core's list cannot tell the two apart.
+// Deliberately NOT Core's four tab ids, and deliberately not four of them.
 function provider(id = 'downtime') {
   return {
     apiVersion: 1,
@@ -32,15 +31,13 @@ test('the production init/ready replay preserves a provider registered through g
   await withFabricateLifecycleReplay(async ({ world, init, ready }) => {
     let unregister = null;
     try {
-      // Prove the public seam as a companion sees it: init binds `game.fabricate.api`, then a
-      // companion registers before ready rebinds the live global.
+      // Prove the public seam as a companion sees it: init binds `game.fabricate.api`.
       globalThis.game.fabricate = undefined;
       await init();
       const initApi = globalThis.game.fabricate.api.managerExtensions;
       unregister = initApi.registerWorldNavProvider(provider());
 
-      // Model the late-evaluated-entry recovery that `ready` owns: the init-bound facade has
-      // disappeared, but the page-session registry still contains the companion provider.
+      // Model the late-evaluated-entry recovery that `ready` owns.
       globalThis.game.fabricate = { stale: true };
       await ready();
       const readyApi = globalThis.game.fabricate.api.managerExtensions;
@@ -60,8 +57,7 @@ test('the production init/ready replay preserves a provider registered through g
         /already registered/,
         'the provider registered between the actual lifecycle callbacks must survive ready'
       );
-      // A second surface is a second slot, not a conflict: the registry is keyed by surface
-      // id, so a companion claiming a Manager surface Core has never heard of is accepted.
+      // A second surface is a second slot, not a conflict.
       const unregisterOtherSurface = readyApi.registerWorldNavProvider(provider('crew-quarters'));
       unregisterOtherSurface();
 
@@ -94,18 +90,12 @@ test('the production manager closes a mounted companion before ApplicationV2 rem
 /**
  * Close one production manager with a companion navigation guard installed.
  *
- * A helper rather than three inlined `captureCloseOrdering` calls: the three cases below
- * differ only in what the guard answers and what `close` is passed, and three copies of the
- * same eight-line block is the near-identical duplication the SonarCloud gate counts against
- * `tests/**` exactly as it does against `src/`.
- *
  * @param {object} options Scenario inputs.
  * @param {Function} [options.guard] The value the app's registered companion guard returns.
  * @param {object} [options.closeOptions] Options passed to `close()`.
  * @returns {Promise<{lifecycle: Array, asked: string[]}>} What happened, and whether the
- *   companion was consulted at all.
  */
-async function closeWithCompanionGuard({ guard, closeOptions }) {
+async function closeWithCompanionGuard({ guard, coreGuard, closeOptions }) {
   const asked = [];
   const lifecycle = await captureCloseOrdering({
     modulePath: '/src/ui/SvelteCraftingSystemManagerApp.svelte.js',
@@ -114,6 +104,12 @@ async function closeWithCompanionGuard({ guard, closeOptions }) {
     closeOptions,
     prepareApp: (app) => {
       app._unregisterUserHooks = () => {};
+      if (coreGuard) {
+        app._confirmDiscardDirtyToolDraft = () => {
+          asked.push('tool');
+          return coreGuard();
+        };
+      }
       if (!guard) return;
       app._confirmDowntimeCompanionNavigation = () => {
         asked.push('asked');
@@ -151,15 +147,7 @@ test('a companion that allows the close changes nothing about it', async () => {
   ]);
 });
 
-/**
- * THE FORCE EXEMPTION, and why it is not negotiable.
- *
- * Foundry's own lifecycle teardown and the repository's smoke harness both close with
- * `force`, in contexts where no confirmation dialog can be serviced. A guard that ran there
- * would be asking a question nothing can answer — the smoke harness would hang on it, and a
- * Foundry teardown would leave a window that refuses to die. So a forced close skips the
- * companion exactly as it already skips Core's own three dirty-draft guards.
- */
+/** THE FORCE EXEMPTION, and why it is not negotiable. */
 test('a forced close never consults the companion, however dirty it is', async () => {
   const { lifecycle, asked } = await closeWithCompanionGuard({
     guard: () => false,
@@ -171,4 +159,92 @@ test('a forced close never consults the companion, however dirty it is', async (
     ['companion-dispose', true],
     ['application-close', { force: true }, true],
   ]);
+});
+
+/**
+ * Core's own guards can SAVE, so a save landing for a close the companion then refused would have
+ * written world data for a window that stayed open. The companion is therefore asked FIRST.
+ */
+test('asks the companion before the Core guards that can save, and a veto writes nothing', async () => {
+  const { lifecycle, asked } = await closeWithCompanionGuard({
+    guard: () => false,
+    coreGuard: () => true,
+    closeOptions: {},
+  });
+
+  assert.deepEqual(asked, ['asked'], 'the companion answers first, and its veto ends the close');
+  assert.deepEqual(lifecycle, [], 'so the Core guard never runs and the window stays up');
+});
+
+test('reaches the Core guards once the companion allows, still in that order', async () => {
+  const { lifecycle, asked } = await closeWithCompanionGuard({
+    guard: () => true,
+    coreGuard: () => true,
+    closeOptions: {},
+  });
+
+  assert.deepEqual(asked, ['asked', 'tool'], 'companion first, then the Core draft guard');
+  assert.deepEqual(lifecycle, [
+    ['companion-dispose', true],
+    ['application-close', {}, true],
+  ]);
+});
+
+const KNOWLEDGE_STORE_METHODS = Object.freeze([
+  'refreshAccessRosters',
+  'markLearnedRecipeIndexStale',
+  'scheduleKnowledgeRefresh',
+]);
+
+const MANAGER_APP = {
+  modulePath: '/src/ui/SvelteCraftingSystemManagerApp.svelte.js',
+  exportName: 'SvelteCraftingSystemManagerApp',
+};
+
+/**
+ * The polarity and the binding of the Knowledge hook set, which the source contract can only state
+ * as presence: an inverted guard, or a hook bound to the wrong handler, passes that and fails here.
+ */
+test('the production Knowledge hooks refresh for a world actor item, and for nothing else', async () => {
+  const { handlersFor, drainCalls } = await captureUserHookHandlers({
+    ...MANAGER_APP,
+    storeMethods: KNOWLEDGE_STORE_METHODS,
+  });
+
+  const itemHandlers = handlersFor('updateItem');
+  assert.equal(itemHandlers.length, 1, 'one handler owns the owned-item hooks');
+  const [onOwnedItem] = itemHandlers;
+
+  onOwnedItem({ parent: { documentName: 'Actor' } });
+  assert.deepEqual(
+    drainCalls(),
+    ['scheduleKnowledgeRefresh'],
+    "a world actor's item is the only write that refreshes Knowledge"
+  );
+
+  onOwnedItem({ parent: { documentName: 'Actor' }, pack: 'world.recipes' });
+  assert.deepEqual(drainCalls(), [], 'a compendium actor could never change the projection');
+
+  onOwnedItem({ parent: { documentName: 'Item' } });
+  assert.deepEqual(drainCalls(), [], 'and neither could an item embedded in anything but an Actor');
+});
+
+test('the production Actor CRUD hooks reproject the rosters, the index and Knowledge together', async () => {
+  const { handlersFor, drainCalls } = await captureUserHookHandlers({
+    ...MANAGER_APP,
+    storeMethods: KNOWLEDGE_STORE_METHODS,
+  });
+
+  const [onActorCreate] = handlersFor('createActor');
+  onActorCreate({});
+  assert.deepEqual(
+    drainCalls(),
+    ['refreshAccessRosters', 'markLearnedRecipeIndexStale', 'scheduleKnowledgeRefresh'],
+    'an imported Actor carries its items in with no createItem hook, so all three run'
+  );
+  assert.equal(
+    handlersFor('deleteActor')[0],
+    onActorCreate,
+    'and the delete side is bound to the same handler'
+  );
 });

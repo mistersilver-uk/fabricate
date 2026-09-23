@@ -104,7 +104,7 @@ popups match.
 ### 1.3 Base layer (theme-independent)
 
 The non-colour tokens live in the base `:root` of `styles/fabricate.css`.
-The spacing scale is canonically specified in `openspec/specs/ui-integration/spec.md`
+The spacing scale is canonically specified in `openspec/specs/ui-visual-style/spec.md`
 ("Spacing scale") — cite that spec for the numbers rather than re-deriving them here.
 
 ```css
@@ -226,7 +226,7 @@ sans; mono is only for dice formulas and run IDs.
 ## 4. Space, radius and elevation
 
 - **Spacing** (`--fab-space-*`, 4px base): the canonical scale is in
-  `openspec/specs/ui-integration/spec.md`; prefer flex/grid with `gap`.
+  `openspec/specs/ui-visual-style/spec.md`; prefer flex/grid with `gap`.
 - **Radius:** the canonical ladder is in `openspec/specs/design-system/spec.md` — **6** for chips
   at or below 24px, **7** for controls of 26–32px, **9** for controls of 34–38px and for rows and
   wells, **11** for a 44px control and for cards and panels, **999** for pills and tracks.
@@ -284,14 +284,13 @@ Use the expression `{' '}`, which survives the trim.
 
 | Primitive or contract | Shipped source | Reuse for |
 |---|---|---|
-| `EmptyState` | `src/ui/svelte/apps/manager/EmptyState.svelte` | EVERY manager no-state message — a central panel, or `compact` for a sidebar/inline one. Never hand-roll a dashed panel, an icon tile, or a bare "nothing here" sentence |
-| `Callout` | `src/ui/svelte/apps/manager/Callout.svelte` | EVERY manager standing statement — a permanent `info` hint or a conditional `warning` hazard. One shape; tone changes colour only, never geometry or type |
+| `EmptyState` | `src/ui/svelte/components/EmptyState.svelte` | EVERY manager no-state message — a central panel, or `compact` for a sidebar/inline one. Never hand-roll a dashed panel, an icon tile, or a bare "nothing here" sentence |
+| `Callout` | `src/ui/svelte/components/Callout.svelte` | EVERY manager standing statement — a permanent `info` hint or a conditional `warning` hazard. One shape; tone changes colour only, never geometry or type |
 | `ExplainerCard` | `src/ui/svelte/apps/manager/ExplainerCard.svelte` | EVERY side-panel "how this surface works" card — glyph-led card title, glyph-led guidance rows with optional bold lead-ins, an optional trailing row of ghost docs links. It wears `.manager-inspector-card` and `.manager-card-title`, so never restate the card shell or heading scale per surface |
 | `IconFactRow` | `src/ui/svelte/apps/manager/IconFactRow.svelte` | EVERY side-panel derived-fact row — leading accent glyph, bold statement, muted qualifying line. The stacking container owns the list gap; the row owns the well |
 | `Medallion` | `src/ui/svelte/components/Medallion.svelte` | THE art tile, manager and player alike — a record's linked image with a glyph fallback, the canonical surface, radius and sizing, and a `tint` that recolours the glyph only. Player item/recipe imagery and its missing-art fallback resolve through `src/ui/svelte/util/craftingArtResolution.js` and pass the result to this tile; never hand-roll a second thumbnail |
 | `Avatar` | `src/ui/svelte/components/Avatar.svelte` | THE actor portrait — a person, a party, a vehicle or a place — with an INITIALS fallback where the art tile has a glyph one. `shape` is caller-supplied (round for people, rounded-square for the rest) because actor type is system-defined and eligibility comes from a world setting, not a type map; never hand-roll a second portrait tile |
 | `Chip` | `src/ui/svelte/components/Chip.svelte` | EVERY chip and state badge — the pill, its thirteen tones, its six densities and its three emphases. Semantic icon-plus-label state badges are `tone` plus `density`; never hand-roll a local status ramp and never mint a second pill |
-| `DropZone` | `src/ui/svelte/components/DropZone.svelte` | Shared drag/drop activation, disabled state, label, and active-class behavior |
 | `ChanceSlider` | `src/ui/svelte/components/ChanceSlider.svelte` | Synchronized number/range input, normalized value, semantic thumb, value fill, or full-track semantic scale |
 | `CraftButton` | `src/ui/svelte/apps/crafting/CraftButton.svelte` | Player craft-action treatment and disabled/action state |
 | `RollResultBox` | `src/ui/svelte/apps/crafting/detail/RollResultBox.svelte` | Post-roll result hierarchy, total, message, and awarded-item presentation |

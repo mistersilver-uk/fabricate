@@ -1,20 +1,4 @@
-/**
- * The override rule's OWN branches, driven directly through its seams (issue 1371 r20-store3).
- *
- * ── WHY THIS FILE EXISTS BESIDE THE TWO COMPOSITION SUITES ────────────────────────────────────
- * `tests/component-category-normalization.test.js` drives the rule through the standalone editor's
- * save and `tests/stores/admin-store-component-scope.test.js` drives it through the store, so the
- * COMPOSITION is well covered. Its own guards were not: the quality engineer's round-6 mutation run
- * deleted each of the two `Object.hasOwn` short-circuits and each of the two degradation catches
- * and got `tests 932, pass 932` every time (R3, R6). What the deleted guards were holding back is a
- * durable, replicated `inherit.essences: false` write on a bulk edit that staged only `category`
- * and on a save that named only `name`.
- *
- * The seams are HAND-WRITTEN here rather than composed from a real store, which is the point: the
- * rule is a pure decision over three functions, so each branch is one call and a spy list, and a
- * branch that is only reachable from a refused Foundry setting write (or a corpus read that throws)
- * is as cheap to drive as the happy path.
- */
+/** The override rule's OWN branches, driven directly through its seams (issue 1371 r20-store3). */
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -25,17 +9,9 @@ import { setSectionInheritance } from '../../src/systems/scopedDefinitions.js';
 /**
  * The rule over one `(ingot, sys1)` pair, with every seam recorded.
  *
- * The default corpus is the state the `1.32.0` election leaves behind and the one every finding is
- * about: a membership record with no `inherit` map (which READS as inheriting) over a world default
- * that AUTHORED `essences`.
- *
- * @param {object} [options]
  * @param {object|null} [options.corpus] the published component-scope corpus, or a thrower.
- * @param {boolean} [options.corpusThrows]
- * @param {boolean} [options.resolvedThrows]
  * @param {unknown} [options.resolved] what the read union answers for the pair.
  * @param {boolean|Error} [options.flagWrite] `true` accepts, `false` refuses, an Error rejects.
- * @returns {{override: object, switchWrites: Array<[string, string, boolean]>}}
  */
 function makeOverride({
   corpus,
@@ -69,9 +45,7 @@ function makeOverride({
   return { override, switchWrites };
 }
 
-// ---------------------------------------------------------------------------
 // R3 — the two "don't touch what the GM didn't" guards
-// ---------------------------------------------------------------------------
 
 test('1371 r20: a cohort edit with NO essences axis is returned untouched and moves no switch', async () => {
   // Deleting `cohortFor`'s `Object.hasOwn(edit, 'essences')` short-circuit left 932 tests green
@@ -107,9 +81,7 @@ test('1371 r20: an EMPTY staged essence map is still an essence axis, so it over
   assert.deepEqual(switchWrites, [['ingot', 'sys1', false]]);
 });
 
-// ---------------------------------------------------------------------------
 // R6 — the two degradation catches
-// ---------------------------------------------------------------------------
 
 test('1371 r20: a corpus read that THROWS degrades to "nothing is shadowed"', async () => {
   const { override, switchWrites } = makeOverride({ corpusThrows: true });
@@ -133,15 +105,11 @@ test('1371 r20: a read union that THROWS declines the exemption rather than esca
   assert.deepEqual(switchWrites, [['ingot', 'sys1', false]]);
 });
 
-// ---------------------------------------------------------------------------
 // Reviewer round 6, finding 7 — the flip fires only where the write is shadowed
-// ---------------------------------------------------------------------------
 
 test('1371 r20: an UNAUTHORED world section is not shadowing anything, so no switch moves', async () => {
   // `applyInheritedSections` skips an `undefined` world value, so this pair already resolves its
-  // own row. Flipping here opted it out of a world default it had not yet received — and
-  // `ComponentEditView` withholds the inherit offer in exactly this state, so the GM could neither
-  // see nor reverse it.
+  // own row.
   const corpus = {
     entities: [{ id: 'ingot' }],
     defaults: [{ id: 'ingot', category: 'Raw Materials' }],
@@ -184,15 +152,11 @@ test('1371 r20: a pair with no membership record, and one already overriding, mo
   assert.deepEqual(switchWrites, []);
 });
 
-// ---------------------------------------------------------------------------
 // Reviewer round 6, finding 1 — the baseline the editor was seeded from
-// ---------------------------------------------------------------------------
 
 test('1371 r20: a save that restates the STATED BASELINE writes no essences, whatever the union says', async () => {
   // The defect this closes: an editor seeded from the PERSISTED row sends that row back on a save
-  // that touched only a tag. Compared against the resolved map it DIFFERS, so the rule read it as
-  // an authored override, flipped the switch and pinned the dormant map. Compared against the
-  // baseline the editor was actually seeded from it is a restatement, which is what it is.
+  // that touched only a tag.
   const { override, switchWrites } = makeOverride({ resolved: { fire: 2 } });
   const { staged, flipped } = await override.updatesFor(
     'sys1',
@@ -225,9 +189,7 @@ test('1371 r20: with NO baseline stated the resolved map is the fallback', async
   assert.deepEqual(switchWrites, []);
 });
 
-// ---------------------------------------------------------------------------
 // Reviewer round 6, findings 5 and 6 — refusal reporting and rollback
-// ---------------------------------------------------------------------------
 
 test('1371 r20: a REFUSED flag write reports the pair rather than swallowing it', async () => {
   for (const flagWrite of [false, new Error('The requested Setting update was refused')]) {
@@ -286,16 +248,12 @@ test('1371 r20: a rollback whose own write is refused reports nothing and throws
   assert.deepEqual(switchWrites, [['ingot', 'sys1', true]]);
 });
 
-// ---------------------------------------------------------------------------
 // Reviewer round 7, finding 3 — the union's OTHER guard
-// ---------------------------------------------------------------------------
 
 test('1371 r21: a component absent from the world ROSTER is not shadowed, whatever else reads', async () => {
   // `unionScopedDefinitions` needs BOTH halves — `if (!membership || !entity) { push; continue; }`
   // — so a row whose id is not in `corpus.entities` is passed through untouched and neither the
-  // world default nor the switch is consulted for it. `shadowedIn` mirrored the `defaults` guard
-  // and not this one, so it reported such a pair shadowed and spent a durable
-  // `inherit.essences: false` write on a pair whose write was never masked.
+  // world default nor the switch is consulted for it.
   const corpus = {
     entities: [],
     defaults: [{ id: 'ingot', essences: { fire: 2 } }],
@@ -311,24 +269,13 @@ test('1371 r21: a component absent from the world ROSTER is not shadowed, whatev
   assert.deepEqual(switchWrites, [], 'nothing masks the write, so nothing had to move');
 });
 
-// ---------------------------------------------------------------------------
 // Foundry integrator round 7, finding 1 — the rollback restores the RECORD
-// ---------------------------------------------------------------------------
 
 /**
  * The rule over a LIVE membership record, moved by the real `setSectionInheritance`.
  *
- * The other fixtures record the switch writes and stop there, which is exactly how a switch-only
- * rollback read as a restoration: the flip has a SECOND effect on the record — it seeds the
- * record's own `essences` block from the world map — and only the shipped decision function
- * performs it. So this fixture drives that function rather than a stand-in, and the case below
- * asserts against the record itself.
- *
- * @param {object} [options]
  * @param {object} [options.record] the membership record's pre-state.
- * @param {object} [options.worldDefault]
  * @param {boolean} [options.clearRefuses] whether the block-clearing write refuses.
- * @returns {{override: object, recordNow: () => object, clears: string[]}}
  */
 function makeRecordBackedOverride({
   record = { entityId: 'ingot', systemId: 'sys1', inherit: {} },
@@ -361,12 +308,8 @@ function makeRecordBackedOverride({
 }
 
 test('1371 r21: a rollback restores the RECORD, not just the switch it moved', async () => {
-  // Measured before the fix: PRE `{entityId, systemId, inherit: {}}`, POST
-  // `{…, inherit: {essences: true}, essences: {fire: 3}}`. The switch half is benign —
-  // `isSectionInherited` reads `!== false`, so key-absent and `true` are indistinguishable — but
-  // the seeded block is a RETAINED DORMANT OVERRIDE, and `setSectionInherited` does not re-seed
-  // over one. So the GM's next genuine flip-off starts from the map as it stood at the FAILED
-  // save: `{fire: 3}` where the world has since said `{fire: 3, water: 4}`, with no message.
+  // Measured before the fix: PRE `{entityId, systemId, inherit: {}}`, POST `{…, inherit: {essences:
+  // true}, essences: {fire: 3}}`.
   const { override, recordNow, clears } = makeRecordBackedOverride();
   const before = structuredClone(recordNow());
 
@@ -423,9 +366,7 @@ test('1371 r21: a rollback whose CLEARING write is refused reports nothing and t
 });
 
 test('1371 r21: a rollback given BARE IDS restores the switch alone', async () => {
-  // The tolerated shape, for a caller that holds no pre-state. It cannot un-seed, because nothing
-  // told it whether the flip seeded — which is why the verbs report the fact rather than leaving
-  // it to be re-derived from a record that now carries a block either way.
+  // The tolerated shape, for a caller that holds no pre-state.
   const { override, recordNow, clears } = makeRecordBackedOverride();
   await override.updatesFor('sys1', 'ingot', { essences: { fire: 9 } });
   await override.rollback('sys1', ['ingot']);
@@ -433,15 +374,12 @@ test('1371 r21: a rollback given BARE IDS restores the switch alone', async () =
   assert.equal(recordNow().inherit.essences, true, 'the switch is back');
 });
 
-// ---------------------------------------------------------------------------
 // Quality engineer round 7, gap N5 — the cohort is per SYSTEM
-// ---------------------------------------------------------------------------
 
 test('1371 r21: the shadow set is read for THIS system, not for every system holding the pair', async () => {
   // `shadowedIn` walks a corpus whose membership list is every `(entity, system)` pair in the
   // world, so the `record.systemId !== systemId` filter is the only thing keeping one system's
-  // inherit switch from deciding another's write. Deleting it left every fixture green, because
-  // every other corpus in this file holds exactly one system.
+  // inherit switch from deciding another's write.
   const corpus = {
     entities: [{ id: 'ingot' }],
     defaults: [{ id: 'ingot', essences: { fire: 2 } }],

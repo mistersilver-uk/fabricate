@@ -20,7 +20,7 @@ This spec introduces environmental resource acquisition without introducing a se
 
 Related specifications:
 
-- `ui-integration/spec.md` for UI surfaces and workflows
+- the UI surface specs indexed by the Surface Map in `ui-integration/spec.md` for UI surfaces and workflows (the player app is `ui-gathering-app/spec.md`)
 - `resolution-modes/spec.md` for shared routed/progressive concepts
 - `recipes-and-steps/spec.md` for recipe and salvage lifecycle
 - `destructive-changes-and-migrations/spec.md` for clean-up and destructive-change principles
@@ -236,6 +236,7 @@ The legacy `biomes` tag list remains a composition match dimension.
 An environment with none of the location fields (or only empty-after-normalization arrays) is not location-gated and preserves existing behavior.
 The entire location-availability evaluation is additionally gated by `gatheringRealmSettings.enabled`: when the subsystem is disabled (the default), every environment is treated as ungated regardless of these fields.
 `includedRealmIds`/`excludedRealmIds` are validated against the WORLD realm library, and only at save boundaries; load paths never throw on, and never prune, stale ids.
+A save boundary is every write that persists the environment list and not only an authoring save: a runtime `nodeRuntime` write from node depletion, restock or respawn and a runtime `conditions` write go through the same store write, and so prune, warn once, and return the record as persisted on exactly the terms that follow.
 A save rejects a realm id that names no realm only when that write introduces it.
 The baseline a write is measured against is the record as persisted under the same id (for `duplicate`, the persisted source record); `create`, and a list-level save of a record with no persisted counterpart, own every id on the record.
 A stale id the baseline already carried — in whichever of the two lists carried it — is PRUNED instead of rejected, even when the write re-sends it; because environments persist as one world list, a successful environment save prunes every persisted environment's stale ids in the same write and logs, once, the environments and ids it dropped.
@@ -404,7 +405,8 @@ Realm ids referencing *missing* realms become `staleRealmIds` and do not resolve
 The `travelActor` source token slots between the override and unresolved branches without changing the resolver contract.
 4. Clearing an override is a stamped mutation: it sets `mode: "none"`, empties `realmIds`, and updates `updatedAt`/`updatedByUserId`.
 5. Changing current realm refreshes gathering listings but must not retroactively rewrite completed gathering history.
-6. The live `senseSceneRegions` collaborator is injected into `GatheringLocationService` in `src/main.js`; the runtime implementation prefers V13 `TokenDocument#regions` membership with a position hit-test fallback.
+6. The live `senseSceneRegions` collaborator is injected into `GatheringLocationService` in `src/bootstrap/composeServices.js`; the runtime implementation (`senseTravelMarkerRegions` in `src/gatheringBootstrapAdapters.js`) prefers V13 `TokenDocument#regions` membership with a position hit-test fallback.
+Sensing walks the travel actor's concrete tokens on **every** scene (`Actor#getDependentTokens`), never only the evaluating client's viewed canvas: a player's attempt is evaluated on the active GM's client, so the answer must not depend on which scene that GM happens to be viewing.
 The service itself stays Foundry-free, defaulting the collaborator to `() => []`.
 
 ### Environment Location Availability
@@ -655,6 +657,7 @@ A task no longer carries a `region`/`regions` match tag (the inert legacy tag na
 A task whose required `weather` or `timeOfDay` values are not satisfied by the current enabled condition dimensions remains composed by biome, but is not attemptable until the condition gate passes.
 6. Persisted, imported, or seeded drop rows require a `dropRate` integer from 0 to 100, a positive quantity, and a reward target that resolves at the data boundary. `componentId` targets must match a component in the owning crafting system. `itemUuid` targets must resolve through Foundry UUID lookup to an Item document.
 Unresolved editor rows may omit component references while a GM is still authoring the row, but they must not be saved or imported until assigned a valid component or item reference.
+A drop row's quantity is always FIXED: the rolled form is a result amount only, so a drop row carries no amount expression.
 7. Drop row condition modifier values are signed integer percentage-point adjustments.
 Every condition modifier (time-of-day, weather, biome) applies under the single global `rules.dropModifierMode`; the mode is NOT selectable per entry.
 In additive mode matching modifiers are summed into the final drop chance; in multiplicative mode matching modifiers scale it.
@@ -667,6 +670,10 @@ New Manager authoring and d100 runtime behavior use system Gathering Rules once 
 Character modifiers adjust the threshold side of d100 resolution and do not replace task visibility, pass/fail gates, stamina gates, node gates, or tool gates.
 11. A Gathering Task may declare stamina cost, node availability, risk overrides, encounter hooks, and condition or roll modifier providers where the selected gathering economy uses them.
 12. Per-environment overrides remain associated with the environment and must not rewrite the Gathering Task.
+13. A result-group result's rolled amount resolves through the shared result-amount resolver ONCE per attempt, in `plan()`, against the gathering character.
+`create()` awards the planned integer and never resolves again, so the journalled plan and the awarded stack are one roll rather than two.
+An award that reaches `create()` with no parked plan to read resolves there instead, still once.
+A planned amount of zero awards nothing, and the plan still records the roll that produced it.
 
 ## Gathering Tools Library
 
@@ -1497,8 +1504,11 @@ If `environment.sceneUuid` is set:
 
 1. Any user — **including GMs** — may only attempt gathering while viewing that scene.
 This presence gate is additive with the realm/travel and stamina/node gates (which also apply to GMs); it is NOT one of the visibility/inspection restrictions GMs bypass.
+"Viewing" is judged for the **requesting** user (`User#viewedScene`, which Foundry replicates to every client), not for the client evaluating the attempt: a player's start runs on the active GM's client, and the GM's own viewed scene is irrelevant to it.
+The local user, and a remote viewer that has broadcast no scene, fall back to the evaluating client's current scene.
 2. For a non-GM user the selected actor must be player-owned by the acting user.
 3. The selected actor must have at least one token present on the associated scene.
+Presence is read from that scene's token documents (`Actor#getDependentTokens`), so it is judged on that same scene regardless of which scene the evaluating client's own canvas currently views.
 4. If any of the above checks fail, the environment is not attemptable by that user.
 
 If `environment.sceneUuid` is absent, the environment is not scene-gated by this specification.

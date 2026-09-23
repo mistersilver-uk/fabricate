@@ -1,14 +1,4 @@
-/**
- * craftingStore — requirement rail + shared essence pool (issue 917).
- *
- * These claims live in the store, not in a mounted component: the rail's open-slot
- * re-validation, the scope key composition and the re-evaluate guard are all
- * derives over store state, and a mounted test can only prove
- * presentation-given-props. The suite is deliberately separate from
- * `crafting-store.test.js` — it needs a much narrower services fake (one
- * `evaluateSelectedSet` spy and one `craftRecipe` recorder) and copying that file's
- * broad fake would add duplicated lines for no reach.
- */
+/** craftingStore — requirement rail + shared essence pool (issue 917). */
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
@@ -93,12 +83,8 @@ function deliveredRadiant(allocation) {
 }
 
 /**
- * The resolver's answer FOR A GIVEN ALLOCATION, so the rail's numbers are driven by
- * the payload the store actually sent rather than by a constant a dead store could
- * never contradict. It reproduces the two upstream rules this suite leans on: an
- * EMPTY allocation is honoured as empty (`IngredientSet._resolveEssenceBlock` clamps
- * `{}` instead of falling back to its greedy suggestion), and a short allocation is
- * never topped up from unallocated carriers.
+ * The resolver's answer FOR A GIVEN ALLOCATION, so the rail's numbers are driven by the payload the
+ * store actually sent rather than by a constant a dead store could never contradict.
  */
 function evaluateForAllocation({ essenceAllocation }) {
   const allocation = essenceAllocation ?? {};
@@ -141,10 +127,9 @@ function evaluateForAllocation({ essenceAllocation }) {
 }
 
 /**
- * The engine's outcome for a craft carrying a player allocation: it is honoured and
- * never topped up, so a short one comes back blocked with the missing-materials
- * reason rather than quietly drawing a full greedy allocation. A craft carrying NO
- * payload lets the engine allocate for itself and succeeds.
+ * The engine's outcome for a craft carrying a player allocation: it is honoured and never topped
+ * up, so a short one comes back blocked with the missing-materials reason rather than quietly
+ * drawing a full greedy allocation.
  */
 function craftOutcome(options) {
   const payload = options?.ingredientEssenceAllocation ?? null;
@@ -173,9 +158,8 @@ function poolRecipe(overrides = {}) {
 function makeServices({ recipes = [poolRecipe()], recomputed = null } = {}) {
   const calls = { evaluateSelectedSet: [], craftRecipe: [] };
   const services = {
-    // Since issue 1075 the listing carries cheap SUMMARY rows and the rich model is
-    // hydrated per selected recipe. These fixtures are rich models, so they serve as both:
-    // the store filters/paginates the summary facet and hydrates the same object for detail.
+    // Since issue 1075 the listing carries cheap SUMMARY rows and the rich model is hydrated per
+    // selected recipe.
     listCraftingForActor: async () => ({ summaries: recipes, total: recipes.length }),
     hydrateCraftingRecipe: ({ recipeId } = {}) =>
       recipes.find((entry) => entry?.id === recipeId) ?? null,
@@ -206,9 +190,8 @@ async function loadedStore(overrides = {}) {
 }
 
 /**
- * A store whose pool the player has EXPLICITLY emptied: "pick for me" adopts the
- * resolver's suggestion (an edit — they asked for it), then the one allocated carrier
- * is stepped back to zero. The craftability is read so the derive has actually run.
+ * A store whose pool the player has EXPLICITLY emptied: "pick for me" adopts the resolver's
+ * suggestion (an edit — they asked for it), then the one allocated carrier is stepped back to zero.
  */
 async function emptiedStore(overrides = {}) {
   const { store, calls } = await loadedStore({ recomputed: evaluateForAllocation, ...overrides });
@@ -223,13 +206,10 @@ async function emptiedStore(overrides = {}) {
 describe('craftingStore requirement rail and essence pool', () => {
   before(async () => {
     compiler = createSvelteModuleCompiler('fabricate-crafting-slots-');
-    compiler.copyPlain('src/ui/svelte/util/shoppingListAggregator.js');
-    compiler.copyPlain('src/utils/progressiveResultOrder.js');
-    compiler.copyPlain('src/utils/progressiveStageThresholds.js');
-    compiler.copyPlain('src/ui/svelte/util/requirementSlots.js');
-    // Issue 1648: the authority-refusal wording craftingStore falls back to.
-    compiler.copyPlain('src/ui/svelte/util/journalRunReasons.js');
-    ({ createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js'));
+    // The store's real import graph, walked rather than restated (issue 1695).
+    ({ createCraftingStore } = await compiler.loadWithClosure(
+      'src/ui/svelte/stores/craftingStore.svelte.js'
+    ));
   });
 
   after(() => compiler.cleanup());
@@ -269,11 +249,7 @@ describe('craftingStore requirement rail and essence pool', () => {
     });
   });
 
-  // "I cleared every carrier" and "I never touched this" are DIFFERENT intents. The
-  // zeroed carrier's entry is still deleted (no no-op stored), but the SCOPE's entry
-  // remains, so the emptied pool re-evaluates as empty. Sizing the map instead read
-  // `{}` as "no allocation at all" and snapped every bar back to the greedy
-  // suggestion the player had just cleared — the pool's own value going nowhere.
+  // "I cleared every carrier" and "I never touched this" are DIFFERENT intents.
   it('clears an allocation entry at zero and keeps the emptied pool EMPTY', async () => {
     const { store, calls } = await loadedStore({ recomputed: evaluateForAllocation });
     store.setEssenceAllocation(CARRIER, SUGGESTED_UNITS);
@@ -357,9 +333,8 @@ describe('craftingStore requirement rail and essence pool', () => {
     assert.equal(calls.craftRecipe.at(-1).ingredientEssenceAllocation, null);
   });
 
-  // The step id is half the scope key, so an advancing run leaves the emptied pool
-  // behind with the step it belonged to. A marker that followed the player into the
-  // next step would silently un-fund a step they had never touched.
+  // The step id is half the scope key, so an advancing run leaves the emptied pool behind with the
+  // step it belonged to.
   it('does not carry the emptied pool into the next STEP', async () => {
     const recipes = [poolRecipe()];
     const { store, calls } = await emptiedStore({ recipes });
@@ -387,10 +362,7 @@ describe('craftingStore requirement rail and essence pool', () => {
   });
 
   it('keeps a stale allocation key verbatim instead of resolving or dropping it', async () => {
-    // A carrier the player spent or deleted between renders. The store must not try to
-    // look the id up (the payload is an index into the resolver's own ledger, never a
-    // uuid to resolve) and must not silently top the shortfall up from elsewhere: the
-    // model clamps an absent key to zero, and the tiles then say so.
+    // A carrier the player spent or deleted between renders.
     const { store, calls } = await loadedStore();
     store.setEssenceAllocation('Item.deleted', 5);
     flushSync();
@@ -450,11 +422,10 @@ describe('craftingStore requirement rail and essence pool', () => {
     assert.equal(store.openSlotId, ESSENCE_POOL_SLOT_ID, 'and the rail re-derives its default');
   });
 
-  // The collapse behaviour a nullish slot id must NOT have (above): clicking the
-  // OPEN tile again is a distinct COLLAPSE, storing the closed sentinel rather than
-  // forgetting the choice, so a rail with an openable slot can genuinely show none
-  // open — the gap the previous lane's review found and this suite now pins at the
-  // store, not only in the pure resolver.
+  // The collapse behaviour a nullish slot id must NOT have (above): clicking the OPEN tile again is
+  // a distinct COLLAPSE, storing the closed sentinel rather than forgetting the choice, so a rail
+  // with an openable slot can genuinely show none open — the gap the previous lane's review found
+  // and this suite now pins at the store, not only in the pure resolver.
   it('collapses the chooser when the already-open tile is clicked again', async () => {
     const { store } = await loadedStore();
     assert.equal(

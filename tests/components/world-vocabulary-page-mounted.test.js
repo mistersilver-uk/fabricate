@@ -1,48 +1,26 @@
-/**
- * Mounted coverage for the world Tags & Categories screen (issue 1392, epic 1357, PR 7a).
- *
- * ── WHY THE DELETE AFFORDANCE IS ASSERTED ON THE DOM AND NOT ON A PREDICATE ──────────────
- * `VocabularyPanel` renders the one-click delete affordance THREE times — the gate in
- * `requestRemove`, the usage chip (whose else-branch is the muted `Unused` chip) and the delete
- * control's destructive tone — and before this change all three read `row.totalUsage`. The world
- * screen needs a strictly narrower predicate, and the failure mode of rerouting only the GATE is
- * a row that reads `Unused` under a red button and then opens a confirm strip naming four
- * crafting systems: the screen states one thing and does another. No source assertion can see
- * that, because each of the three is correct in isolation. So this file mounts the real page and
- * reads the rendered row.
- *
- * The three rows below are the three states, and the third is the one the whole conjunction
- * exists for: ZERO references, and a deletion that still rewrites four inheriting systems.
- *
- * ── AND WHY THE PROJECTION ARM IS NOT HERE ───────────────────────────────────────────────
- * This file hand-supplies `silentlyDeletable` on its fixture rows, which is exactly what a page
- * receives from the projection — so deleting the COMPUTATION in `projectWorldVocabulary` cannot
- * red anything here, and the panel's default would then silently restore the one-click delete on
- * the one row it must never be offered for. That half is asserted against real stores in
- * `tests/world-vocabulary-store.test.js`.
- */
+/** Mounted coverage for the world Tags & Categories screen (issue 1392, epic 1357, PR 7a). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  openSelectPanel,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-/**
- * Localize out of the SHIPPED `lang/en.json` rather than out of a fixture label map.
- *
- * The page resolves its per-kind copy from a table — one `text()` call site serves all three
- * panels — so it cannot carry a per-kind literal fallback without becoming a second copy of the
- * lang file. That is deliberate, and it is why this suite drives the real strings: the confirm
- * sentences below are the ones a GM reads, and asserting that each renders its numbers is a
- * stronger claim than asserting a hand-written fallback does.
- *
- * The flattening walks the whole tree once and refuses an empty result, because a localizer that
- * resolved nothing would make every copy assertion below pass on the raw key.
- */
+/** Localize out of the SHIPPED `lang/en.json` rather than out of a fixture label map. */
 function installShippedLocalizer() {
   const labels = {};
   const walk = (node, prefix) => {
@@ -69,25 +47,29 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-vocabulary-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
     'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
-    // IconPicker positions its panel through the shared action (issue 1500), which resolves the
-    // manager's clipping boundary from `overlayBounds.js`; both are static imports of the picker,
-    // so the closure validator names them the moment the two trees meet.
+    // IconPicker positions its panel through the shared action (issue 1500).
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
-    'src/utils/managerBrowserViewState.js',
+    'src/ui/model/managerBrowserViewState.js',
     // The page's own pure leaf and the World Vocabulary core it imports. Omitting either does
     // not fail a test: it HANGS the whole file behind one ERR_MODULE_NOT_FOUND, which
     // `node --test` reports as `# cancelled`.
     'src/ui/svelte/apps/manager/scoped/worldVocabularyStudio.js',
+    // The shared shell's own pure leaf (issue 1915), imported by the studio AND by the panel, and
+    // the scalar helper its `inputNormalizer` folds tags with.
+    'src/ui/svelte/apps/manager/vocabularyShell.js',
+    'src/utils/scalars.js',
     'src/systems/worldVocabulary.js',
     'src/utils/componentCategories.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.
@@ -95,17 +77,15 @@ const harness = createMountedComponentHarness({
     'src/utils/recipeCategories.js',
   ],
   compiledModules: [
-    'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconPicker.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
     'src/ui/svelte/apps/manager/VocabularyPanel.svelte',
-    'src/ui/svelte/components/Field.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/components/ManagerToolbar.svelte',
+    'src/ui/svelte/apps/manager/VocabularyShell.svelte',
+    'src/ui/svelte/apps/manager/VocabularyShellPanel.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldVocabularyPage.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldVocabularyPage.svelte',
@@ -116,10 +96,7 @@ function row(id, name, totalUsage, confirmTokens, silentlyDeletable) {
   return { id, name, totalUsage, confirmTokens, silentlyDeletable };
 }
 
-/**
- * The three affordance states, in ONE panel, plus a populated row in each of the other two so
- * the per-panel assertions below are not stated over an empty vocabulary.
- */
+/** The three affordance states, in ONE panel. */
 function vocabulary() {
   return {
     available: true,
@@ -146,7 +123,7 @@ function mountProps(overrides = {}) {
   };
 }
 
-const panelSelector = (kind) => `[data-wvocab-panel="${kind}"]`;
+const panelSelector = (kind) => `[data-vocabulary-panel="${kind}"]`;
 const categoryCard = (root, id) =>
   root.querySelector(`${panelSelector('componentCategories')} [data-component-category-id="${id}"]`);
 
@@ -169,7 +146,6 @@ describe('the world Tags & Categories screen', () => {
       'the released full-width main keeps the accessible name the placeholder supplied'
     );
     // ONE CHILD, because `.manager-main` is `grid-template-rows: minmax(0, 1fr)` on this route:
-    // a second top-level child would take an implicit `auto` row and collapse the explicit one.
     assert.equal(main.children.length, 1, '<main> renders exactly one element child');
     for (const kind of ['componentCategories', 'componentTags', 'recipeCategories']) {
       assert.ok(Boolean(root.querySelector(panelSelector(kind))), `${kind} panel renders`);
@@ -203,8 +179,7 @@ describe('the world Tags & Categories screen', () => {
     root.querySelector('[data-vocabulary-cancel-remove]').click();
     flushSync();
 
-    // ROW 2 — the POSITIVE CONTROL. A "confirm everything" fix, or one that never marks a row
-    // unused, would red here rather than passing quietly.
+    // ROW 2 — the POSITIVE CONTROL. A "confirm everything" fix.
     const unused = categoryCard(root, 'spare');
     assert.ok(
       Boolean(unused.querySelector('.manager-vocabulary-chip-unused')),
@@ -298,9 +273,7 @@ describe('the world Tags & Categories screen', () => {
   it('gives each panel its own row hook, input id and sort label id', async () => {
     const root = await harness.mount(mountProps());
     const rowAttributes = ['data-recipe-category-id', 'data-component-category-id', 'data-component-tag-id'];
-    // THREE PANELS ARE MOUNTED AT ONCE, so what the primitive calls a preference is a
-    // correctness requirement here: one shared hook would match rows in two panels and make
-    // every assertion above, and every capture `expectContained` target, ambiguous.
+    // THREE PANELS ARE MOUNTED AT ONCE.
     for (const attribute of rowAttributes) {
       assert.equal(
         root.querySelectorAll(`[${attribute}]`).length > 0,
@@ -312,19 +285,21 @@ describe('the world Tags & Categories screen', () => {
     assert.equal(new Set(inputIds).size, inputIds.length, 'no two add fields share an id');
     assert.equal(inputIds.length, 3, 'one add field per panel');
 
-    const labels = [...root.querySelectorAll('.wvocab-sort-label')];
+    const labels = [...root.querySelectorAll('.manager-vocabulary-shell-sort-label')];
     assert.equal(labels.length, 3, 'one Sort by label per panel');
     assert.equal(
       new Set(labels.map((label) => label.id)).size,
       3,
       'three copies of one hardcoded id would send every aria-labelledby to the first'
     );
-    for (const select of root.querySelectorAll('select[data-wvocab-sort]')) {
-      const target = root.querySelector(`#${select.getAttribute('aria-labelledby')}`);
-      assert.ok(Boolean(target), 'each sort select names a label that exists');
+    const triggers = [...root.querySelectorAll('[data-vocabulary-sort]')];
+    assert.equal(triggers.length, 3, 'one sort trigger per panel');
+    for (const trigger of triggers) {
+      const target = root.querySelector(`#${trigger.getAttribute('aria-labelledby')}`);
+      assert.ok(Boolean(target), 'each sort trigger names a label that exists');
       assert.equal(
-        target.closest('[data-wvocab-panel]'),
-        select.closest('[data-wvocab-panel]'),
+        target.closest('[data-vocabulary-panel]'),
+        trigger.closest('[data-vocabulary-panel]'),
         'and it is the label inside its OWN panel'
       );
     }
@@ -333,7 +308,7 @@ describe('the world Tags & Categories screen', () => {
   it('renders the direction control as a real toggle that reverses the order', async () => {
     const root = await harness.mount(mountProps());
     const panel = root.querySelector(panelSelector('componentCategories'));
-    const toggle = panel.querySelector('button[data-wvocab-direction]');
+    const toggle = panel.querySelector('button[data-vocabulary-direction]');
     assert.equal(toggle.getAttribute('type'), 'button', 'a bare <button> would submit nothing');
     assert.equal(toggle.getAttribute('aria-pressed'), 'true', 'ascending is the resting state');
     assert.ok(Boolean(toggle.getAttribute('title')), 'the toggle states what it does');
@@ -346,7 +321,7 @@ describe('the world Tags & Categories screen', () => {
     toggle.click();
     flushSync();
     assert.equal(
-      panel.querySelector('button[data-wvocab-direction]').getAttribute('aria-pressed'),
+      panel.querySelector('button[data-vocabulary-direction]').getAttribute('aria-pressed'),
       'false'
     );
     assert.deepEqual(namesNow(), ['Spare', 'Reagent', 'Curios'], 'and the toggle reverses it');
@@ -356,10 +331,8 @@ describe('the world Tags & Categories screen', () => {
     const root = await harness.mount(
       mountProps({ actions: { addEntry: async () => true, removeEntry: async () => false } })
     );
-    // THE REGION IS IN THE DOCUMENT AT MOUNT, AND EMPTY. A live region inserted at the same
-    // moment as its content is not reliably announced: the assistive technology has nothing to
-    // observe the change against. So the element is rendered from the start and filled later.
-    const before = root.querySelector('[data-wvocab-status]');
+    // THE REGION IS IN THE DOCUMENT AT MOUNT.
+    const before = root.querySelector('[data-vocabulary-status]');
     assert.ok(Boolean(before), 'the live region exists before there is anything to announce');
     assert.equal(before.textContent.trim(), '', 'and it is empty until then');
     assert.equal(
@@ -372,15 +345,13 @@ describe('the world Tags & Categories screen', () => {
     await Promise.resolve();
     await Promise.resolve();
     flushSync();
-    const status = root.querySelector('[data-wvocab-status]');
+    const status = root.querySelector('[data-vocabulary-status]');
     assert.equal(status, before, 'the SAME element is filled, never a replacement one');
     assert.ok(status.textContent.trim().length > 0, 'a refused deletion is stated on the page');
   });
 
   it('states the reference count ALONE when a deletion rewrites nothing', async () => {
-    // The common case for both component vocabularies is that nothing cascades, and a single
-    // sentence then reads "clears it from 0 world components, which 0 crafting systems inherit"
-    // — three numbers where the honest answer is one.
+    // The common case for both component vocabularies is that nothing cascades.
     const root = await harness.mount(mountProps());
     categoryCard(root, 'reagent').querySelector('.manager-icon-button').click();
     flushSync();
@@ -419,8 +390,7 @@ describe('the world Tags & Categories screen', () => {
       flushSync();
     };
 
-    // A DUPLICATE, in the OTHER case. De-duplication is on the derived id, so the hint has to
-    // catch `HERB` against the shipped `herb` before the write path refuses it silently.
+    // A DUPLICATE, in the OTHER case. De-duplication is on the derived id.
     type('HERB');
     const blockedHint = panel.querySelector('.manager-vocabulary-hint');
     assert.ok(Boolean(blockedHint), 'the add form states a hint');
@@ -497,10 +467,16 @@ describe('the world Tags & Categories screen', () => {
   it('sorts by References, and the direction toggle reverses that too', async () => {
     const root = await harness.mount(mountProps());
     const panel = root.querySelector(panelSelector('componentCategories'));
-    const select = panel.querySelector('select[data-wvocab-sort]');
-    select.value = 'references';
-    select.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    const sort = `${panelSelector('componentCategories')} [data-vocabulary-sort]`;
+    assert.equal(assertSelectHasResolvedName(root, sort), 'Sort by');
+    assert.equal(root.querySelector(sort).getAttribute('data-select-size'), 'toolbar');
+    assert.ok(
+      openSelectPanel(root, sort).classList.contains('fabricate-select-popover-ticked'),
+      'the sort keys are cousins, so the list keeps its tick column'
+    );
+    assert.deepEqual(selectOptionValues(root, sort), ['name', 'references']);
+    chooseSelectOption(root, sort, 'references');
+    assert.equal(selectTriggerText(root, sort), 'References');
 
     const namesNow = () =>
       [...panel.querySelectorAll('[data-component-category-id] .manager-vocabulary-main strong')].map(
@@ -508,7 +484,7 @@ describe('the world Tags & Categories screen', () => {
       );
     // 0, 0, 3 ascending, with the two zeroes tie-broken by name.
     assert.deepEqual(namesNow(), ['Curios', 'Spare', 'Reagent']);
-    panel.querySelector('button[data-wvocab-direction]').click();
+    panel.querySelector('button[data-vocabulary-direction]').click();
     flushSync();
     assert.deepEqual(namesNow(), ['Reagent', 'Curios', 'Spare']);
   });

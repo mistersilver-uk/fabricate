@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import Chip from '../../components/Chip.svelte';
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
@@ -11,10 +11,12 @@
   import ActionMenu from '../../components/ActionMenu.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import Select from '../../components/Select.svelte';
   import {
     DEFAULT_BROWSER_PAGE_SIZE,
     createSystemsBrowserState,
-  } from '../../../../utils/managerBrowserViewState.js';
+  } from '../../../model/managerBrowserViewState.js';
+  import { createBrowserPageWindow } from './browserListState.svelte.js';
 
   let {
     systems = [],
@@ -64,14 +66,11 @@
     })
   );
   const filtersActive = $derived(normalizedSearchTerm.length > 0 || statusFilter !== 'all');
-  const paginatedSystems = $derived(
-    filteredSystems.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
-  );
+  const page = createBrowserPageWindow({ state: () => ui, rows: () => filteredSystems });
+  const paginatedSystems = $derived(page.pageRows);
 
   $effect(() => {
-    if (pageIndex > 0 && pageIndex * pageSize >= filteredSystems.length) {
-      ui.pageIndex = 0;
-    }
+    page.clampPage();
   });
 
   function text(key, fallback) {
@@ -112,6 +111,12 @@
     ui.searchTerm = '';
     ui.statusFilter = 'all';
   }
+
+  const statusSelectOptions = $derived([
+    { value: 'all', label: text('FABRICATE.Admin.Manager.StatusAll', 'All systems') },
+    { value: 'active', label: text('FABRICATE.Admin.Manager.StatusActive', 'Active') },
+    { value: 'disabled', label: text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') },
+  ]);
 
   // The two commands that left the row's three-button cluster for the overflow menu. Edit stays
   // an `<IconButton>` because it is the row's primary act; Export and Delete are built as data so
@@ -156,20 +161,20 @@
       )}
       ariaLabel={text('FABRICATE.Admin.Manager.SearchLabel', 'Search systems')}
     />
-    <label class="manager-filter">
+    <!-- A `<span>`, not the `<label>` it was: `Select.svelte`'s host invariant, and the trigger
+         keeps the `aria-label` the select carried rather than being named by the caption, which
+         was never its accessible name (issue 1510). -->
+    <span class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
-      <select
+      <Select
+        size="toolbar"
         value={statusFilter}
-        onchange={(event) => (ui.statusFilter = event.currentTarget.value)}
-        aria-label={text('FABRICATE.Admin.Manager.StatusFilterLabel', 'Filter systems by status')}
-      >
-        <option value="all">{text('FABRICATE.Admin.Manager.StatusAll', 'All systems')}</option>
-        <option value="active">{text('FABRICATE.Admin.Manager.StatusActive', 'Active')}</option>
-        <option value="disabled"
-          >{text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled')}</option
-        >
-      </select>
-    </label>
+        options={statusSelectOptions}
+        showTick={false}
+        ariaLabel={text('FABRICATE.Admin.Manager.StatusFilterLabel', 'Filter systems by status')}
+        onChange={(next) => (ui.statusFilter = next)}
+      />
+    </span>
     <Chip
       >{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}')
         .replace('{shown}', filteredSystems.length)

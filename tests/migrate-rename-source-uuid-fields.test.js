@@ -1,12 +1,4 @@
-/**
- * Issue 560 — 1.16.0 rename of the registered-entry source-uuid fields.
- *
- * Covers acceptance (a) migration (per-kind, idempotent, both-shape tolerant),
- * (d) migration-ordering (deriveToolSourceFromComponents new-named + 1.15.0 upcast
- * old-named in the same sequential pass), and (b) round-trip guard-regression pin
- * (a first-class tool whose OWN refs DIFFER from its linked component round-trips
- * unchanged through migrateExportPayload).
- */
+/** Issue 560 — 1.16.0 rename of the registered-entry source-uuid fields. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -19,9 +11,7 @@ const { migrateToolsToFirstClass, deriveToolSourceFromComponents } = await impor
 const { migrateExportPayload } = await import('../src/migration/migrateExportPayload.js');
 const { MigrationRunner } = await import('../src/migration/MigrationRunner.js');
 
-// ---------------------------------------------------------------------------
 // (a) 1.16.0 field rename — per entry kind, idempotent, both-shape tolerant
-// ---------------------------------------------------------------------------
 
 test('1.16.0 renames the three source fields on a COMPONENT entry', () => {
   const { systems } = migrateRenameSourceUuidFields([
@@ -151,9 +141,7 @@ test('1.16.0 does not throw on malformed systems/entries', () => {
   );
 });
 
-// ---------------------------------------------------------------------------
 // (d) migration-ordering: shared deriveToolSourceFromComponents is both-shape
-// ---------------------------------------------------------------------------
 
 test('deriveToolSourceFromComponents derives a tool source from a NEW-named component', () => {
   const component = {
@@ -171,10 +159,8 @@ test('deriveToolSourceFromComponents derives a tool source from a NEW-named comp
 });
 
 test('1.15.0 upcasts an OLD-named component AND 1.16.0 renames it, in one sequential runner pass', async () => {
-  // A world last migrated at 1.14.0 carries OLD-named components and a legacy
-  // componentId-only tool. Running the full runner applies 1.15.0 (derive tool
-  // source from the old-named component) THEN 1.16.0 (rename the component fields),
-  // proving the shared derive helper tolerated the old names ahead of the rename.
+  // A world last migrated at 1.14.0 carries OLD-named components and a legacy componentId-only
+  // tool.
   const store = new Map([
     ['migrationVersion', '1.14.0'],
     [
@@ -209,10 +195,8 @@ test('1.15.0 upcasts an OLD-named component AND 1.16.0 renames it, in one sequen
   assert.ok(!('sourceUuid' in sys.tools[0]));
 });
 
-// ---------------------------------------------------------------------------
-// (b) round-trip guard-regression pin: a first-class tool whose OWN refs DIFFER
-// from its linked component's refs must round-trip UNCHANGED (not re-derived).
-// ---------------------------------------------------------------------------
+// (b) round-trip guard-regression pin: a first-class tool whose OWN refs DIFFER from its linked
+// component's refs must round-trip UNCHANGED (not re-derived).
 
 test('migrateExportPayload does NOT overwrite a NEW-named tool whose own refs differ from its component', () => {
   const payload = {

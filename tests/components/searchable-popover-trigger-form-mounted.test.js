@@ -1,27 +1,4 @@
-/**
- * THE PICKER'S TRIGGER FORMS, AND THE ONE ISSUE 1371 ADDS (`triggerButton`).
- *
- * ── WHY A THIRD FORM EXISTS ─────────────────────────────────────────────────────────────
- * Thirteen call sites used to imitate the manager's push-button with a CLASS STRING —
- * `triggerClass="manager-button …"`, population B in
- * `manager-button-cascade-inventory.test.js` — and each paid for it with a per-site rule in
- * `styles/fabricate.css` restating a height and a corner the primitive already owns. The
- * imitation cannot be completed: `ManagerButton` publishes its rungs against
- * `.manager-button.fab-manager-button.is-size-38`, and `fab-manager-button` is a class only
- * that component writes, so `triggerClass="manager-button is-size-38"` matches nothing at
- * all. The world Component catalogue's `+ Register item` is drawn at 38px by the reference
- * (`proto:570`) and is the first site to need the rung rather than a copy of it.
- *
- * ── WHAT IS ASSERTED HERE, AND WHAT IS ASSERTED ELSEWHERE ───────────────────────────────
- * The CLASS LIST and the popover contract, because those are what the form changes. No
- * geometry: a height read off this mount would be `happy-dom`'s guess with no stylesheet
- * attached, so the measured 38px belongs to the parity run and the reachability belongs here.
- *
- * The DEFAULT is asserted as hard as the new form, and first. A trigger contract is shared by
- * every consumer of the primitive, so "the other consumers are unchanged" is the load-bearing
- * half — the whole-DOM proof over 45 shipped prop shapes lives in the lane handoff, and this
- * is its assertion-shaped residue.
- */
+/** THE PICKER'S TRIGGER FORMS, AND THE ONE ISSUE 1371 ADDS (`triggerButton`). */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -118,8 +95,7 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
   });
 
   it('drops an unrecognised role and rung rather than emitting a dead class', async () => {
-    // The primitive's own closed-set contract, read through this form: a typo must render the
-    // default control, never an `is-*` the sheet does not paint.
+    // The primitive's own closed-set contract, read through this form.
     await mountPicker({ triggerButton: { role: 'lavender', size: '37' } });
     assert.deepEqual(triggerClasses(), ['fabricate-button', 'manager-button', 'fab-manager-button']);
     harness.remount();
@@ -181,9 +157,7 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
   });
 
   it('leaves `triggerChip` in charge where a call site asks for both', async () => {
-    // The forms are branches of one `{#if}`, and the chip is written first. Stating the winner
-    // is what stops a later edit reordering them and silently repainting the recipe editor's
-    // dashed `or…` control as a manager button.
+    // The forms are branches of one `{#if}`.
     await mountPicker({ triggerChip: true, triggerButton: { size: '38' }, triggerClass: 'is-dashed' });
     assert.deepEqual(triggerClasses(), ['manager-chip', 'is-dashed']);
     harness.remount();
@@ -192,22 +166,6 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
   it('BINDS the primitive`s node, which is what lets the panel anchor on the button', () => {
     // Stated at the SOURCE, and the reason is worth keeping because two obvious mounted
     // assertions both prove nothing here.
-    //
-    // Focus does not: `restoreTriggerFocus` falls back to `pickerRoot.querySelector('button')`,
-    // which finds the very same node, so the clause below stays green with the binding removed.
-    // Geometry does not either, for a harness reason rather than a product one: the layout
-    // reads `window.innerWidth`/`innerHeight`, which this DOM does not define, so
-    // `computeIconPickerPopoverLayout` returns null and the panel is written NO inline style at
-    // all — measured, and true of the bare `<button>` form at the assigned base as well.
-    //
-    // What the binding actually buys is the `trigger` the popover hands `use:anchoredPopover`
-    // (issue 1500 replaced this component's own positioning pass with that action):
-    // `triggerElement ?? pickerRoot`, where the root is a `position: relative` block-level
-    // `<div>` that takes its flex slot's width and the button is the control inside it. Under
-    // the action that anchor also resolves the overlay HOST and seeds the clipping-bounds walk,
-    // so the fallback costs more than a rect. That divergence is visible in a real browser and
-    // in the parity run, and nowhere in a mounted tree — so the guard here is that the wiring
-    // exists, and it reds the moment any link in it is dropped.
     const popover = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/components/SearchablePopover.svelte'),
       'utf8'
@@ -223,9 +181,12 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
     );
     assert.match(
       popover,
-      /trigger: triggerElement \?\? pickerRoot,/,
-      'and `anchoredPopover` must be handed THAT state: `triggerButton` is the FORM prop now, ' +
-        'so anchoring on it would hand the action an options object or null'
+      /anchor=\{triggerElement \?\? pickerRoot\}/,
+      'and THAT state must be what the panel is anchored on: `triggerButton` is the FORM prop ' +
+        'now, so anchoring on it would hand the action an options object or null. The panel half ' +
+        'of the same chain — `anchoredPopover`\'s `trigger` being exactly this anchor — is pinned ' +
+        'in `searchable-popover-source-contract.test.js`, which reads both files without adding a ' +
+        'source-pin site'
     );
     assert.match(
       button,
@@ -240,9 +201,7 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
   });
 
   it('returns focus to the trigger on close, through the primitive`s node', async () => {
-    // Weaker than the clause above by design, and kept because it is the behaviour a GM
-    // experiences: the fallback makes it survive the binding's removal, so it guards the
-    // popover's own focus contract rather than the composition.
+    // Weaker than the clause above by design.
     await mountPicker({ triggerButton: { size: '38' } });
     const trigger = harness.target.querySelector('button');
     trigger.click();

@@ -1,36 +1,12 @@
 /**
- * The smoke harness's canvas-readiness predicate, and the harness contract that keeps it in force.
- *
- * WHAT DEFECT THIS PINS (issue #1010)
- * -----------------------------------
- * `scripts/foundry-test-run.mjs` used to wait for `canvas.scene?.id === sceneId` after activating
- * a scene, then immediately create a Tile and two Regions on it. Foundry assigns `Canvas#scene`
- * about sixty lines BEFORE it stands up the render infrastructure those creates need, so the wait
- * resolved mid-draw and each create threw
- * `Cannot read properties of undefined (reading 'INTERFACE')` out of an un-awaited core promise —
- * three `pageerror` entries, no failing step, and a waiver that had been quietly absorbing the
- * v13 spelling of the same throw. `scripts/lib/foundryCanvasReadiness.js` carries the verified
- * 14.365 draw ordering; the tests below drive the predicate through the exact window that used to
- * pass, so the old behaviour cannot come back silently.
- *
- * WHY A SOURCE CONTRACT AS WELL
- * -----------------------------
- * A correct predicate nothing calls fixes nothing, and the failure mode here is a NEW scene switch
- * written the old way rather than an edit to this one. `foundry-test-run.mjs` cannot be imported
- * to check that (it launches Chromium from `main()` on import — the same constraint that put
- * `foundrySmokeSignal.js` in its own module), so the call-site contract is asserted over its source
- * text, comments stripped, with the enumeration asserted alive so it cannot pass vacuously.
+ * The smoke harness's canvas-readiness predicate, and the harness contract that keeps it in force
+ * (issue 1010).
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import { isCanvasReadyForScene } from '../scripts/lib/foundryCanvasReadiness.js';
-
-const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const HARNESS_PATH = path.join(REPO_ROOT, 'scripts', 'foundry-test-run.mjs');
+import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
 
 const SCENE_ID = 'sceneAzureGrove';
 const OTHER_SCENE_ID = 'scenePreviouslyViewed';
@@ -50,7 +26,7 @@ function withCanvas(canvasValue, body) {
 
 /** The harness source with whole-line comments removed, so prose cannot satisfy a code assertion. */
 function harnessCode() {
-  return readFileSync(HARNESS_PATH, 'utf8')
+  return SMOKE_SOURCE
     .split('\n')
     .filter((line) => {
       const trimmed = line.trimStart();
@@ -67,8 +43,7 @@ test('a fully drawn canvas showing the requested scene is ready', () => {
 
 test('the mid-draw window is NOT ready — the exact state that threw in issue #1010', () => {
   // Canvas##draw assigns `#scene = nextScene` (board.mjs:1149) long before `#activateTicker()`
-  // (1209) creates `pendingRenderFlags` and before `#ready = true` (1475). This object is that
-  // window: the scene id already answers, and a placeable created here throws.
+  // (1209) creates `pendingRenderFlags` and before `#ready = true` (1475).
   withCanvas({ ready: false, scene: { id: SCENE_ID } }, () => {
     assert.ok(
       !isCanvasReadyForScene(SCENE_ID),
@@ -110,10 +85,7 @@ test('the predicate demands a boolean true, not a truthy ready', () => {
 });
 
 test('the predicate survives being shipped to the browser as source text', () => {
-  // Playwright does not send the function — it sends `String(fn)` and evaluates it in the page. A
-  // predicate that closed over an import or a module constant would therefore work perfectly here
-  // and throw a ReferenceError in Foundry, where nothing but the harness would ever see it.
-  // Rebuilding it through `new Function` reproduces exactly that loss of scope.
+  // Playwright does not send the function — it sends `String(fn)` and evaluates it in the page.
   const rebuilt = new Function(`return (${String(isCanvasReadyForScene)});`)();
 
   assert.equal(typeof rebuilt, 'function', 'the predicate must stringify back into a function');
@@ -136,7 +108,7 @@ test('the harness routes every scene activation through the readiness helper', (
       ' test; do not delete it — it is what keeps a new scene switch from being written the old way.'
   );
   assert.ok(
-    code.includes("from './lib/foundryCanvasReadiness.js'"),
+    /isCanvasReadyForScene\b[\s\S]{0,40}?from '[^']*foundryCanvasReadiness\.js'/.test(code),
     'the harness no longer imports the shared readiness predicate'
   );
 
@@ -164,8 +136,6 @@ test('placeables are seeded BEFORE their scene is viewed, not after', () => {
   // The ordering is what actually prevents the throw, and it is the half a readiness wait cannot
   // provide: that wait is bounded and tolerant, so on a slow first draw it gives up and the walk
   // creates straight into the open window anyway — observed, not hypothesised (issue #1010).
-  // On a scene that has never been viewed, `scene._view` is null, so `_onCreate` finds no
-  // placeable and never draws one; the layer pass draws them later, after the ticker exists.
   const code = harnessCode();
 
   const seedIndex = code.indexOf("createEmbeddedDocuments('Tile'");

@@ -1,24 +1,6 @@
 /**
- * ONE precedence table for Tool display resolution, shared by every surface that
- * renders a Tool (issue 976).
- *
- * `openspec/specs/data-models/spec.md` `## Tool` requirement 13 fixes a single
- * ordering:
- *
- *   name:        label.trim() -> snapshot `name` -> component `name` -> fallback
- *   image:       snapshot `img` -> component `img` -> icons/svg/item-bag.svg
- *   description: snapshot `description` -> component `description`
- *
- * Three surfaces derive this independently — `toolStudio.js` (Tool Studio),
- * `RecipeToolsSection.svelte` (recipe editor) and `GatheringTaskEditView.svelte`
- * (gathering task editor) — because two of them receive the managed-component
- * lookup in different shapes. Pinning all three against this one table is what
- * stops them drifting again; before 976 two of them omitted the snapshot rung
- * entirely and rendered a placeholder for a fully-populated tool.
- *
- * Cases are deliberately authored so that NO case is satisfied by more than one
- * ordering: `snapshot-outranks-component` fails if the rungs are swapped, and
- * `component-linked-unlabelled` fails if the snapshot rung is dropped.
+ * ONE precedence table for Tool display resolution, shared by every surface that renders a Tool
+ * (issue 976).
  */
 
 /** Foundry's generic "no image" sentinel, and the last resort for a Tool image. */
@@ -46,24 +28,12 @@ export const TOOL_PRECEDENCE_MANAGED_ITEMS = Object.freeze([
 ]);
 
 /**
- * Build one case.
- *
- * Every field of `tool` that a case does not set takes the EMPTY value a real
- * `Tool.toJSON()` emits, so each case states only what it is about. That is also why the
- * table does not repeat a six-key literal per case: doing so tripped SonarCloud's
- * `new_duplicated_lines_density` gate, which counts `tests/**` in full because
- * `sonar.cpd.exclusions` is inert under Automatic Analysis.
- *
- * `expected` defaults to the tool's OWN snapshot, because "the tool's own identity wins"
- * IS the rule under test. A case whose point is that something ELSE wins — the authored
- * label, the linked component, or the fallback — states that expectation explicitly, so
- * the interesting cases are never satisfied by the default.
+ * Build one case. `expected` defaults to the tool's OWN snapshot, because "the tool's own identity
+ * wins" IS the rule under test.
  *
  * @param {string} id Stable case key, used in assertion messages.
  * @param {string} summary What the case proves.
  * @param {object} tool Partial tool; unset fields default to a real tool's empty values.
- * @param {{name?: string|null, img?: string, description?: string}} [expected]
- * @returns {object}
  */
 function precedenceCase(id, summary, tool, expected = {}) {
   const merged = {
@@ -155,19 +125,7 @@ export const TOOL_DISPLAY_PRECEDENCE_CASES = Object.freeze([
   ),
 ]);
 
-/**
- * Reshape a case's tool into the flattened entry `RecipeToolsSection` actually
- * receives.
- *
- * This mirrors the `recipeToolsLibrary` `$derived` in
- * `src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte` exactly: the component
- * lookup happens upstream and arrives as `componentName` / `componentImg`, which is
- * why that component re-derives the ordering instead of importing `toolStudio.js`.
- *
- * @param {object} tool
- * @param {ReadonlyArray<object>} [managedItems]
- * @returns {object}
- */
+/** Reshape a case's tool into the flattened entry `RecipeToolsSection` actually receives. */
 export function flattenToolForRecipeLibrary(tool, managedItems = TOOL_PRECEDENCE_MANAGED_ITEMS) {
   const component =
     (managedItems || []).find((item) => String(item.id) === String(tool?.componentId)) || null;

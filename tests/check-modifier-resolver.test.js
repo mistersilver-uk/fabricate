@@ -27,10 +27,7 @@ const {
 } = await import(RESOLVER_MODULE);
 const { appendCheckModifierTerm } = await import('../src/systems/toolCheckBonus.js');
 
-// The FLAT half of a resolved contribution. Every rule's arithmetic below is asserted
-// through this, because a catalogue of flat entries must reduce exactly as it did before
-// issue 1118 taught the same rules to carry dice; the dice half has its own suite in
-// `tests/check-modifier-dice.test.js`.
+// The FLAT half of a resolved contribution (issue 1118).
 function scalarOf(context, resolveExpression) {
   return resolveCheckModifierContribution(context, resolveExpression).scalar;
 }
@@ -69,10 +66,7 @@ test('normalizeModifierPolicy accepts every offerable rule and nulls everything 
   }
 });
 
-// The pre-1095 spelling, READ and never RE-EMITTED (issue 1095). It is the same
-// new-then-legacy shape `breakToolsOnFail` uses for `consumeCatalystsOnFail`: a world that
-// has not yet run the `1.22.0` migration still resolves and renders correctly, and the
-// first save rewrites the token.
+// The pre-1095 spelling, READ and never RE-EMITTED (issue 1095).
 test('normalizeModifierPolicy reads the legacy byRecipe token as bySubject and never returns it', () => {
   assert.equal(normalizeModifierPolicy('byRecipe'), 'bySubject');
   // The re-emit guard, stated as an assertion rather than as a comment: NOTHING this
@@ -109,13 +103,8 @@ test('policyDefersSelection is true for bySubject and playerPicks only', () => {
   }
 });
 
-// ── the pick cap (issue 1055) ────────────────────────────────────────────────
-//
-// ABSENCE IS UNLIMITED, and every unbounded FORM reports the same `Infinity`, so no
-// caller has to special-case a sentinel. A system that has never been asked the question
-// must not silently acquire a bound that truncates recipe picks already on disk — the
-// `1.20.0` migration, not this function, is where historical `playerPicks` worlds get
-// their `1`.
+// the pick cap (issue 1055). ABSENCE IS UNLIMITED, and every unbounded FORM reports the same
+// `Infinity`, so no caller has to special-case a sentinel.
 test('resolveMaxModifierPicks reports every unbounded form as Infinity', () => {
   for (const maxModifierPicks of [undefined, null, 0, -1, 2.5, Infinity, NaN, '', 'three', {}]) {
     assert.equal(
@@ -149,9 +138,8 @@ test('resolveModifierPolicy reads the system rule and NEVER a recipe override', 
   assert.equal(resolveModifierPolicy({}), 'addAll', 'no rule anywhere → addAll');
   assert.equal(resolveModifierPolicy(null), 'addAll', 'and no context at all → addAll');
   assert.equal(resolveModifierPolicy({ systemPolicy: 'bogus' }), 'addAll');
-  // A legacy `craftingModifier.policy` left on disk by a pre-1055 world stays on disk and
-  // stays UNHONOURED. The invariant lives in the resolver rather than at the authoring
-  // control, so no hand-built context can smuggle a rule override back in.
+  // A legacy `craftingModifier.policy` left on disk by a pre-1055 world stays on disk and stays
+  // UNHONOURED.
   for (const stale of ['addAll', 'highest', 'bySubject', 'playerPicks']) {
     assert.equal(
       resolveModifierPolicy({ systemPolicy: 'highest', subjectPolicy: stale }),
@@ -263,9 +251,8 @@ test('resolveEligibleModifierIds TRUNCATES a bySubject pick to maxModifierPicks,
   );
 });
 
-// The cap bounds the SELECTION, and under `playerPicks` the eligible list is the set of
-// OPTIONS OFFERED rather than a selection — so it is deliberately not truncated here.
-// `buildCheckModifierChoice` carries the bound to the prompt instead.
+// The cap bounds the SELECTION, and under `playerPicks` the eligible list is the set of OPTIONS
+// OFFERED rather than a selection — so it is deliberately not truncated here.
 test('resolveEligibleModifierIds does NOT truncate the playerPicks option list', () => {
   assert.deepEqual(
     resolveEligibleModifierIds({
@@ -279,17 +266,9 @@ test('resolveEligibleModifierIds does NOT truncate the playerPicks option list',
   );
 });
 
-// ── the check's MARK bounds the roll under bySubject (issue 1608) ─────────────
-//
-// `bySubject` hands the SELECTION to the subject, and the check's `defaultModifierIds`
-// is what it may select FROM — the Checks studio's per-row pill reads "Selectable" /
-// "Not selectable" over exactly that list. Before this, `known` was the CATALOGUE alone,
-// so a modifier picked on a recipe and later un-marked on the check went on rolling: the
-// screen said "Not selectable" and the dice disagreed.
-//
-// The subject's stored ids are NOT pruned by any of this. The bound is applied on READ,
-// here, for the same reason the cap is — "a UI control's constraint is never an
-// invariant" — so re-marking the entry restores the roll with no re-authoring.
+// the check's MARK bounds the roll under bySubject (issue 1608). `bySubject` hands the SELECTION to
+// the subject, and the check's `defaultModifierIds` is what it may select FROM — the Checks
+// studio's per-row pill reads "Selectable" / "Not selectable" over exactly that list.
 
 test('resolveEligibleModifierIds: a bySubject pick the check no longer MARKS does not roll', () => {
   const context = {
@@ -379,11 +358,8 @@ test('resolveEligibleModifierIds: the mark bounds bySubject ONLY, and only when 
   }
 });
 
-// ── the one shared context bag (issue 1055) ──────────────────────────────────
-//
-// The engine and the listing builder both build their `@craftingmod` context HERE, so a
-// displayed formula can never disagree with the rolled one. The shape is fixed: the cap
-// key is always present, and `undefined` is what an unbounded system reads as.
+// the one shared context bag (issue 1055). The engine and the listing builder both build their
+// `@craftingmod` context HERE, so a displayed formula can never disagree with the rolled one.
 
 test('buildCheckModifierContext projects the SYSTEM catalogue and the activity selection', () => {
   const system = {
@@ -409,9 +385,7 @@ test('buildCheckModifierContext projects the SYSTEM catalogue and the activity s
   );
 });
 
-// THE ACTIVITY ARGUMENT IS LOAD-BEARING (issue 1095). One catalogue, three selections: an
-// arity-2 call would resolve salvage and gathering against the CRAFTING rule, which is the
-// eval-vs-display defect `CraftingListingBuilder`'s call site exists to prevent.
+// THE ACTIVITY ARGUMENT IS LOAD-BEARING (issue 1095).
 test('buildCheckModifierContext reads a DIFFERENT selection triple per activity', () => {
   const system = {
     modifiers: CATALOGUE,
@@ -505,10 +479,8 @@ test('buildCheckModifierContext keeps the cap key present but undefined when unb
   );
 });
 
-// `catalogue` is an ARRAY rather than `undefined` since issue 1308: the builder resolves the
-// world library through `resolveModifierLibrary`, which always answers with a list. Every
-// consumer already coerced with `Array.isArray(catalogue) ? catalogue : []`, so nothing
-// downstream can tell the two apart.
+// `catalogue` is an ARRAY rather than `undefined` since issue 1308: the builder resolves the world
+// library through `resolveModifierLibrary`, which always answers with a list.
 test('buildCheckModifierContext tolerates a null system, an unknown activity and a null subject', () => {
   assert.deepEqual(buildCheckModifierContext(null, 'crafting', null), {
     activity: 'crafting',
@@ -546,10 +518,7 @@ test('the flat contribution highest returns the max scalar (not a dice pool)', (
   assert.equal(scalar, 4);
 });
 
-// THE BACK-COMPAT GUARANTEE, at the resolver. `playerPicks` sums the BEST LEGAL
-// selection: at a cap of 1 that is exactly `max(...)` — the historical single-pick
-// behaviour every pre-1055 world had — and unbounded it is the plain sum, because
-// picking everything is then legal and optimal.
+// THE BACK-COMPAT GUARANTEE, at the resolver.
 test('the flat contribution playerPicks at cap 1 is byte-identical to highest', () => {
   const context = {
     catalogue: CATALOGUE,
@@ -818,9 +787,8 @@ test('buildCheckModifierChoice ignores a stored recipe set under playerPicks', (
   );
 });
 
-// …and under `bySubject` the recipe's own order IS the eligible-set order, which is what
-// the cap truncates against. A cap of 1 leaves one option, and one option is not a
-// choice, so no descriptor is built at all.
+// …and under `bySubject` the recipe's own order IS the eligible-set order, which is what the cap
+// truncates against.
 test('buildCheckModifierChoice sees the bySubject pick order, capped', () => {
   const context = {
     catalogue: ICON_CATALOGUE,
@@ -930,11 +898,9 @@ test('buildCheckModifierChoice defaults absent label/icon to empty strings', () 
 
 // ── the retired substitution surface ─────────────────────────────────────────
 
-// Deleted, not weakened. `substituteCraftingModifier` and `CRAFTING_MOD_TOKEN` were the
-// whole placeholder mechanism; issue 1094 retires it and the scalar APPENDS instead, so
-// their absence from the module surface IS the behaviour under test. Asserted rather than
-// merely un-imported, because an accidental re-export would otherwise pass unnoticed and
-// hand a future caller a second, substituting path to the same arithmetic.
+// Deleted, not weakened. `substituteCraftingModifier` and `CRAFTING_MOD_TOKEN` were the whole
+// placeholder mechanism; issue 1094 retires it and the scalar APPENDS instead, so their absence
+// from the module surface IS the behaviour under test.
 test('the placeholder substitution surface is GONE from the resolver (issue 1094)', async () => {
   const module = await import(RESOLVER_MODULE);
   assert.equal(module.substituteCraftingModifier, undefined);
@@ -1043,17 +1009,8 @@ test('appendResolvedCheckModifier appends nothing with no context at all (salvag
   assert.equal(appendResolvedCheckModifier('1d20 + 4', actor, null, Roll), '1d20 + 4');
 });
 
-// A7, at THIS layer: a scalar that survives the roll-data evaluator as a plain decimal is
-// appended verbatim, however extreme, because the dice grammar's `Constant` accepts it.
-//
-// The exponent-notation REFUSAL is asserted where the formatter lives
-// (`tests/tool-check-bonus.test.js`), not here, and that split is deliberate rather than a
-// gap: `makeRollDataExpressionEvaluator` cannot produce an exponent value at all. Foundry
-// stringifies `1e-7` into the formula as the literal `1e-7`, and
-// `evaluateNumericExpression`'s `parseNumber` consumes only `[0-9.]`, so it stops at the
-// `e` and returns 1. The exposure is through an INJECTED evaluator and, from issue 1095,
-// through summing N clamped values — both of which reach `appendCheckModifierTerm`
-// directly.
+// A7, at THIS layer: a scalar that survives the roll-data evaluator as a plain decimal is appended
+// verbatim, however extreme, because the dice grammar's `Constant` accepts it (issue 1095).
 test('appendResolvedCheckModifier appends an extreme but plain-decimal scalar verbatim', () => {
   const Roll = stubReplaceRoll();
   const actor = { getRollData: () => ({ big: 1000000000000000 }) };
@@ -1079,12 +1036,10 @@ test('appendResolvedCheckModifier appends a FRACTIONAL scalar, which the grammar
   assert.equal(appendResolvedCheckModifier('1d20', actor, context, Roll), '1d20 + 2.5[Modifiers]');
 });
 
-// ── which check a resolution mode ACTUALLY rolls (issue 1055) ────────────────
-//
-// The five-mode table this selector owns is a hand-maintained mirror of the engine's own
-// slot choices, and three surfaces (the Checks card, the recipe Overview tab, the admin
-// store) read it to decide whether the check-modifier catalogue reaches a roll. Drift here
-// is silent: a mode routed to the wrong slot reports a formula the engine never rolls.
+// which check a resolution mode ACTUALLY rolls (issue 1055). The five-mode table this selector owns
+// is a hand-maintained mirror of the engine's own slot choices, and three surfaces (the Checks
+// card, the recipe Overview tab, the admin store) read it to decide whether the check-modifier
+// catalogue reaches a roll.
 
 const MODE_TABLE = [
   { mode: 'simple', slot: 'simple', requiresCheck: false },
@@ -1181,11 +1136,6 @@ test('resolveActiveCraftingCheckFormula distinguishes the two inert causes', () 
 });
 
 // THE SHIM RUNS BEFORE THE EMPTINESS TEST, asserted with a real `Roll.validate` double.
-// A formula whose only content was the retired placeholder must NOT report usable, reach
-// `evaluateCheckRoll` and throw inside `new Roll('')` as a rolled — consuming — failure.
-//
-// This assertion FAILS against the pre-change reader, which read the raw stored field and
-// reported `checkUsable: true` for exactly this input.
 test('resolveActiveCraftingCheckFormula reports noFormula for a placeholder-only formula', () => {
   const previous = globalThis.Roll;
   globalThis.Roll = class {
@@ -1246,12 +1196,8 @@ test('resolveActiveCraftingCheckFormula defaults an absent mode to simple and to
   assert.equal(empty.rollFormula, '');
 });
 
-// ── per-entry bounds (issue 1095) ────────────────────────────────────────────
-//
-// `min`/`max` clamp the RESOLVED value, AFTER expression evaluation and BEFORE
-// combination — which is what makes a bound mean the same thing under every rule. The
-// alternative (clamping the reduced scalar) would let `addAll` blow past a per-entry cap
-// by summing two entries that each honoured it.
+// per-entry bounds (issue 1095). `min`/`max` clamp the RESOLVED value, AFTER expression evaluation
+// and BEFORE combination — which is what makes a bound mean the same thing under every rule.
 
 const BOUNDED = [
   { id: 'floor', label: 'Floor', expression: '@floor', min: 2 },
@@ -1285,10 +1231,8 @@ test('resolveModifierBounds preserves absence and refuses to coerce a nullish bo
   assert.equal(resolveModifierBounds({ min: 5, max: -1 }).inverted, true);
 });
 
-// A WHITESPACE-ONLY bound is the `''` guard's blind spot: `Number('   ')` is `0`, and `0`
-// is a REAL bound, so an untrimmed read minted a floor of zero out of a field that carries
-// nothing. It is reachable from an import and from a hand-edited world, and its damage is
-// silent — the entry clamps to at least 0 and a negative modifier stops being negative.
+// A WHITESPACE-ONLY bound is the `''` guard's blind spot: `Number(' ')` is `0`, and `0` is a REAL
+// bound, so an untrimmed read minted a floor of zero out of a field that carries nothing.
 test('resolveModifierBounds trims a string bound, so whitespace reads as UNBOUNDED not 0', () => {
   for (const blank of ['   ', '\t', '\n ']) {
     assert.deepEqual(
@@ -1305,10 +1249,8 @@ test('resolveModifierBounds trims a string bound, so whitespace reads as UNBOUND
   assert.equal(clampModifierValue(-5, { min: '   ' }), -5, 'and nothing clamps to a phantom 0');
 });
 
-// A bound only has to be FINITE to be a bound, so `1e21` is one — and it is a bound the
-// dice grammar cannot express. Before this, clamping to it poisoned the SUM, and
-// `appendCheckModifierTerm` then dropped THE WHOLE TERM, so one entry's bound deleted every
-// other modifier's contribution from the roll.
+// A bound only has to be FINITE to be a bound, so `1e21` is one — and it is a bound the dice
+// grammar cannot express.
 test('resolveModifierBounds flags a bound the dice grammar cannot express as unsafe', () => {
   for (const bound of [1e21, '1e21', 1e-7, -1e21]) {
     assert.equal(
@@ -1356,10 +1298,7 @@ test('the flat contribution clamps EACH value before combining, under every rule
   );
 });
 
-// THE CONTAGION IS THE DEFECT, and the assertion is the OTHER entry's survival. With the
-// unsafe bound honoured, `ok` clamps to 3, `bad` clamps to 1e21, the sum is 1e21, and
-// `appendCheckModifierTerm` refuses the whole exponent-notation term — so the well-formed
-// `+3` vanishes from a roll because of a bound on a DIFFERENT entry.
+// THE CONTAGION IS THE DEFECT, and the assertion is the OTHER entry's survival.
 test('an entry with a grammar-inexpressible bound contributes 0 without poisoning the sum', () => {
   const catalogue = [
     { id: 'ok', label: 'Ok', expression: '@ok' },
@@ -1414,10 +1353,7 @@ test('buildCheckModifierChoice offers the CLAMPED value the roll will append', (
 // ── bySubject on all THREE activities (issue 1095) ───────────────────────────
 
 test('bySubject resolves and truncates identically on crafting, salvage and gathering', () => {
-  // Each activity MARKS all three entries. The mark bounds the roll under `bySubject`
-  // (issue 1608), so a mark of `['med']` would drop `herb` and `alch` before the cap ever
-  // counted and this test would be asserting the intersection instead of the truncation it
-  // is named for. Its sibling below pins that the bound itself is per-activity.
+  // Each activity MARKS all three entries (issue 1608).
   const selection = {
     defaultModifierPolicy: 'bySubject',
     defaultModifierIds: ['med', 'alch', 'herb'],
@@ -1447,10 +1383,8 @@ test('bySubject resolves and truncates identically on crafting, salvage and gath
 });
 
 test('the bySubject bound is each activity’s OWN mark, never another activity’s (issue 1608)', () => {
-  // The catalogue is SHARED and the selection is not, so a bound read off the wrong
-  // activity's check is invisible on any screen and silently changes what rolls. Each
-  // activity marks a DIFFERENT single entry here, and the subject picks all three, so the
-  // three activities can only agree if one of them is reading another's mark.
+  // The catalogue is SHARED and the selection is not, so a bound read off the wrong activity's
+  // check is invisible on any screen and silently changes what rolls.
   const system = {
     modifiers: CATALOGUE,
     craftingCheck: { defaultModifierPolicy: 'bySubject', defaultModifierIds: ['med'] },
@@ -1578,22 +1512,7 @@ test('resolveActiveGatheringCheckFormula has no slot under d100 and one under bo
   );
 });
 
-// ── isRollExpression (issue 1117) ────────────────────────────────────────────────
-//
-// ONE library needs ONE classifier. Two lived in the repo while two libraries did, and they
-// were COMPLEMENTARY rather than duplicates: `GatheringRichStateService`'s
-// `/\d\s*d\s*\d|[*\/()]/i` required a digit before the `d`, so it matched `1d6` and missed a
-// bare `d20`; `SystemEditView`'s `/d\d|[*\/()]/` required a word boundary before the `d`,
-// so it matched `d20` and — `1` and `d` both being word characters, leaving no boundary
-// between them — missed `1d6`. Neither was a superset of the other, so one library with two
-// readers would have disagreed about whether the same entry rolls.
-//
-// BOTH HALVES ARE ASSERTED, and that is the point of this test rather than an excess of
-// cases: dropping either alternation leaves the OTHER half's cases green, so a single
-// happy-path assertion would let the union silently collapse back to one of its inputs.
-// Issue 1118 review. `isRollExpression` no longer carries a pattern of its own: it asks
-// `reduceRollExpression`, which OBSERVES dice while it reduces. The pattern disagreed with
-// what actually appends in both directions, and each row below that moved lists which.
+// isRollExpression (issue 1117). ONE library needs ONE classifier.
 test('isRollExpression answers the same question the resolver does', () => {
   for (const rolls of [
     '1d6',
@@ -1614,9 +1533,7 @@ test('isRollExpression answers the same question the resolver does', () => {
     '@prof',
     '3',
     '',
-    // TRUE under the old pattern, which also matched arithmetic GROUPING. None of these
-    // rolls anything, and since issue 1118 the chip carries a roll note beside it — so the
-    // old answer put a sentence about dice on an expression that has none.
+    // TRUE under the old pattern, which also matched arithmetic GROUPING (issue 1118).
     '@a * 2',
     '@a / 2',
     'max(@a, 2)',

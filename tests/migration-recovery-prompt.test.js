@@ -1,12 +1,4 @@
-/**
- * Tests for the pure GM migration-abort recovery prompt builder.
- *
- * Covers spec § "Migration Abort Recovery Guidance" steps 5-7 and
- * § "GM prompt defaults: `Keep existing data` pre-selected".
- *
- * Uses node:test + node:assert/strict. The builder is pure (no Foundry), so the
- * default choice and surfaced remediation are asserted without a DialogV2 runtime.
- */
+/** Tests for the pure GM migration-abort recovery prompt builder. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';

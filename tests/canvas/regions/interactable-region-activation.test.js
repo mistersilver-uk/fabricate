@@ -46,12 +46,8 @@ function taskSystem({ stateOverrides = {} } = {}) {
   };
 }
 
-// --- Visibility decisions (prompt + marker hidden) --------------------------
-//
-// shouldPromptOnEnter / resolveMarkerHidden are VISIBILITY decisions, distinct
-// from evaluateActivationEligibility. Concealed = DISABLED OR explicitly HIDDEN.
-// A LOCKED interactable is VISIBLE: prompt fires + marker visible (the LOCKED
-// denial is enforced at Interact time by validateActivationRequest).
+// Visibility decisions (prompt + marker hidden). shouldPromptOnEnter / resolveMarkerHidden are
+// VISIBILITY decisions, distinct from evaluateActivationEligibility.
 
 function withPresentation(system, presentation) {
   return { ...system, presentation };
@@ -108,20 +104,16 @@ test('resolveMarkerHidden: locked + disabled → disabled wins (hidden)', () => 
 });
 
 test('visibility decisions tolerate a missing/empty system shape (no throw) and treat it as unconfigured/inert', () => {
-  // Since issue 342 a missing/empty system is UNCONFIGURED ⇒ concealed/inert: no
-  // prompt, marker hidden. This is the safe default (an undefined/malformed system
-  // can never be a real configured interactable) and never throws.
+  // Since issue 342 a missing/empty system is UNCONFIGURED ⇒ concealed/inert: no prompt, marker
+  // hidden.
   assert.equal(shouldPromptOnEnter(undefined), false);
   assert.equal(shouldPromptOnEnter({}), false);
   assert.equal(resolveMarkerHidden(undefined), true);
   assert.equal(resolveMarkerHidden({}), true);
 });
 
-// --- Unconfigured interactable is inert (issue 342) -------------------------
-//
-// A `fabricate.interactable` born via the native "+ Add Behavior" path carries the
-// unconfigured sentinels and no real id. It must be concealed (no prompt, hidden
-// marker) and DENIED (never thrown) until a GM configures it.
+// Unconfigured interactable is inert (issue 342). A `fabricate.interactable` born via the native "+
+// Add Behavior" path carries the unconfigured sentinels and no real id.
 
 function unconfiguredToolSystem(overrides = {}) {
   return {
@@ -136,10 +128,7 @@ function unconfiguredToolSystem(overrides = {}) {
   };
 }
 
-// A gatheringTask-TYPED interactable that is still unconfigured. The activation
-// layer must treat it as inert via the same type-agnostic gate as the tool case —
-// a regression that special-cased `interactableType:'tool'` would wrongly let a
-// gatheringTask-typed-but-unconfigured behaviour activate.
+// A gatheringTask-TYPED interactable that is still unconfigured.
 function unconfiguredTaskSystem(overrides = {}) {
   return {
     interactableType: 'gatheringTask',
@@ -166,13 +155,8 @@ test('a configured interactable is unaffected by the unconfigured concealment', 
 });
 
 test('gatheringTask-TYPED unconfigured interactable is inert via the activation layer (type-agnostic gate)', () => {
-  // SAFETY-CRITICAL: the inert-until-configured property must hold for a
-  // gatheringTask-typed behaviour too, not only the tool-typed sentinel. A
-  // regression special-casing interactableType:'tool' would let this through.
-  //
-  // Variant A — both sentinels (the native "+ Add Behavior" default, retyped to
-  // gatheringTask): concealed (no prompt, hidden marker) and DENIED (returned,
-  // never thrown) with the dedicated UNCONFIGURED reason.
+  // SAFETY-CRITICAL: the inert-until-configured property must hold for a gatheringTask-typed
+  // behaviour too, not only the tool-typed sentinel.
   const sentinel = unconfiguredTaskSystem();
   assert.equal(shouldPromptOnEnter(sentinel), false, 'no prompt while unconfigured');
   assert.equal(resolveMarkerHidden(sentinel), true, 'marker hidden while unconfigured');
@@ -192,9 +176,8 @@ test('gatheringTask-TYPED unconfigured interactable is inert via the activation 
     { ok: false, reason: 'UNCONFIGURED' }
   );
 
-  // Variant B — REAL sourceUuid/systemId but the type-appropriate id is missing
-  // (taskId:null for a gatheringTask). Still unconfigured ⇒ same inert/denied
-  // result: a partial identity can never be a real configured interactable.
+  // Variant B — REAL sourceUuid/systemId but the type-appropriate id is missing (taskId:null for a
+  // gatheringTask).
   const partialIdentity = unconfiguredTaskSystem({
     sourceUuid: 'Fabricate.sys.gatheringTask.task1',
     systemId: 'sys',
@@ -261,10 +244,8 @@ test('eligibility: COOLDOWN active when now < lastUsed + seconds', () => {
 });
 
 test('eligibility: a gathering-task interactable has NO per-interactable node gate (env nodeRuntime owns depletion)', () => {
-  // A region-first gathering-task interactable is a pure (environment, task)
-  // shortcut: it carries no per-interactable node pool, so eligibility never trips
-  // on NODE_DEPLETED. Node depletion is enforced by the gathering engine against
-  // the environment's `nodeRuntime[taskId]` when the session opens.
+  // A region-first gathering-task interactable is a pure (environment, task) shortcut: it carries
+  // no per-interactable node pool, so eligibility never trips on NODE_DEPLETED.
   assert.deepEqual(evaluateActivationEligibility(taskSystem(), { now: 0 }), { eligible: true, reason: null });
 });
 

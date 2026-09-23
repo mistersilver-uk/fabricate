@@ -1,52 +1,34 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The Component Studio's COMPLICATIONS authoring section (issue 1286): what goes wrong when
-  this component is produced as a stage of a progressive result.
+  The Component Studio's COMPLICATIONS authoring section: what goes wrong when this component is
+  produced as a stage of a progressive result.
 
-  ## THE SECTION'S OWN VISIBILITY GATE
+  IT GATES ITSELF on the SYSTEM resolving at least one activity progressively — a complication has
+  no moment to fire otherwise, and a card offering a consequence that can never happen is worse than
+  no card. The gate lives here rather than in `ComponentEditView` so there is ONE predicate rather
+  than a prop the host could forget to compute.
 
-  It renders only when the SYSTEM resolves at least one activity progressively. A
-  complication has no moment to fire in a system with no progressive resolution anywhere,
-  and a card offering the GM a consequence that can never happen is worse than no card. The
-  gate lives here rather than in `ComponentEditView` so there is ONE predicate, not a prop
-  the host could forget to compute.
+  THE SUB-LINE IS NOT THE PROTOTYPE'S, which is wrong for the shipped model twice over: a
+  complication fires when this component is PRODUCED as a progressive stage, and not when the
+  component is itself salvaged or spent. That second case is deferred, so the copy discloses it
+  rather than letting a GM author for a moment this build never reaches. It says nothing about
+  player visibility either: `visibility: 'gmOnly'` is a DISCLOSURE guarantee, not a confidentiality
+  one, and the spec and the field documentation are where that limit belongs.
 
-  ## THE SUB-LINE IS NOT THE PROTOTYPE'S
+  IDS ARE MINTED THROUGH AN INJECTED `random`, falling back to `foundry.utils.randomID()`, because
+  the sibling sections' idiom would put a `Math.random()` literal in new code that SonarCloud flags
+  (S2245). The last-resort counter serves a context with neither, where determinism is a feature.
 
-  The prototype says "what can go wrong when this component is gathered, salvaged, or
-  crafted with", which is wrong for the shipped model twice over: a complication fires when
-  this component is PRODUCED as a progressive stage — as a recipe result, a salvage yield or
-  a gathering drop — and NOT when the component is itself salvaged or spent. That second
-  case is real and is deferred to issue 1287, so the copy discloses it rather than letting a GM
-  author a complication for a moment this build never reaches. The string also says nothing
-  about player visibility of world data: `visibility: 'gmOnly'` is a DISCLOSURE guarantee,
-  not a confidentiality one, and the place to state that limit is the spec and the field
-  documentation, not a line of editor chrome that would read as a warning about this
-  component.
-
-  ## IDS ARE MINTED THROUGH AN INJECTED `random`
-
-  Every sibling authoring section mints a client-side id with
-  `typeof random === 'function' ? random() : Math.random().toString(36)...`. Copying that
-  idiom would put a `Math.random()` literal in NEW code, which SonarCloud flags (S2245).
-  This section takes the mint as a prop, falls back to `foundry.utils.randomID()` when the
-  host passes none, and never reaches for `Math.random()` at all. The last-resort counter is
-  for a context with neither — a mounted test, the View Lab — where determinism is a feature
-  rather than a weakness.
-
-  ## WHAT IT DOES NOT OWN
-
-  The draft lives in `ComponentEditView`, which is what makes an edit here dirty the
-  component and survive Save. This section is a controlled component: it never mutates the
-  array it is given, it emits a whole new one, and the only state it keeps is which row is
-  open and what a rejected macro drop should say.
+  The draft lives in `ComponentEditView`, which is what makes an edit here dirty the component and
+  survive Save. This is a controlled component: it never mutates the array it is given, it emits a
+  whole new one, and the only state it keeps is which row is open and what a rejected drop says.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
-  import SegmentedControl from '../SegmentedControl.svelte';
+  import Select from '../../../components/Select.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import ComplicationEffectRow from '../ComplicationEffectRow.svelte';
   import ComplicationSummaryRow from '../ComplicationSummaryRow.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
@@ -58,14 +40,14 @@
     MACRO_DROP_REJECTED_NOT_SCRIPT,
     evaluateMacroDrop,
     resolveMacroName,
-  } from '../../../../../utils/macroReference.js';
+  } from '../../../../model/macroReference.js';
   import {
     COMPLICATION_ACTIVITIES,
     DEFAULT_COMPLICATION_MATCH_MODE,
     DEFAULT_COMPLICATION_SEVERITY,
     DEFAULT_COMPLICATION_VISIBILITY,
   } from '../../../../../utils/componentComplications.js';
-  import { complicationSummary } from '../../../../../utils/complicationSummary.js';
+  import { complicationSummary } from '../../../../model/complicationSummary.js';
   import {
     PREREQUISITE_OPERATORS,
     isValuelessOperator,
@@ -73,15 +55,12 @@
 
   let {
     complications = [],
-    // Whether the SYSTEM resolves each activity progressively. It is the section's gate and
-    // the "· not progressive" annotation on each Applies-to chip: a complication may be
-    // authored for an activity this system does not resolve progressively — it is stored,
-    // and it will not fire — and saying so at authoring time is the whole point of the
-    // annotation.
+    // Whether the SYSTEM resolves each activity progressively: the section's gate, and the
+    // "· not progressive" annotation on each Applies-to chip. A complication may be authored for
+    // an activity this system does not resolve progressively — stored, and never fired.
     activityProgressive = {},
-    // The named triggers on the three progressive check blocks: `{ id, label, activity }`.
-    // A trigger id names a trigger in exactly ONE activity's id space, so the option is
-    // labelled by its OWNING activity or two identically-named triggers are indistinguishable.
+    // The named triggers on the three progressive check blocks. A trigger id lives in exactly ONE
+    // activity's id space, so the option is labelled by its OWNER or two same-named ids collide.
     triggerOptions = [],
     // `viewState.selectedSystem.availableScriptMacros` — already `type === 'script'`-filtered
     // and name-sorted by the store. Deliberately not a new projection.
@@ -156,9 +135,8 @@
     COMPLICATION_ACTIVITIES.some((activity) => activityProgressive?.[activity] === true)
   );
 
-  // FULL key literals per activity rather than a composed `${BASE}.${activity}`:
-  // `tests/ui-lang-keys-resolve.test.js` can only prove a key it can see written down, and a
-  // composed one is a namespace base it admits without ever resolving the leaf.
+  // FULL key literals per activity: `tests/ui-lang-keys-resolve.test.js` can only prove a key it
+  // can see written down, and a composed one is a base it admits without resolving the leaf.
   const ACTIVITY_LABELS = Object.freeze({
     gathering: ['FABRICATE.Admin.Manager.Component.Complications.Activity.gathering', 'Gathering'],
     salvage: ['FABRICATE.Admin.Manager.Component.Complications.Activity.salvage', 'Salvage'],
@@ -190,12 +168,9 @@
   }
 
   /**
-   * A progressive activity pill's `title`, with the count the label suppresses.
-   *
-   * Three FULL key literals rather than one composed key with a `{count}` that also has to
-   * carry the plural: `tests/ui-lang-keys-resolve.test.js` can only prove a key it can see
-   * written down, and the manager's own plural idiom is a sibling `…One` key chosen by
-   * `count === 1` (`ToolsBrowserView`, `ImportFolderMappingModal`).
+   * A progressive activity pill's `title`, with the count the label suppresses. Three FULL key
+   * literals, for the lang-gate reason above, and the manager's plural idiom is a sibling `…One`
+   * key chosen by `count === 1`.
    */
   function countTitle(label, count) {
     if (count === 0) {
@@ -223,15 +198,11 @@
       return {
         activity,
         icon: ACTIVITY_ICONS[activity],
-        // A dimmed `muted` chip, NOT the shipped `is-disabled` tone: that one is joined to
-        // the WARNING family, so "Salvage · n/a" would render amber and read as a hazard
-        // the GM must act on rather than as a fact about the system.
+        // A dimmed `muted` chip, NOT `is-disabled`: that tone is joined to the WARNING family, so
+        // "Salvage · n/a" would read as a hazard rather than a fact about the system.
         tone: progressive ? '' : 'muted',
-        // A ZERO is SUPPRESSED, on the prototype's own rule
-        // (`label + (on ? (n ? ' · ' + n : '') : ' · n/a')`): the pill's job on a
-        // progressive activity is to say the activity resolves progressively, and
-        // "Salvage · 0" spends a counter slot restating the empty state already drawn
-        // below it. The count earns the suffix only once there is one.
+        // A ZERO is SUPPRESSED: the pill's job is to say the activity resolves progressively, and
+        // "Salvage · 0" would restate the empty state already drawn below it.
         label: progressive
           ? count > 0
             ? text(
@@ -245,8 +216,7 @@
               'FABRICATE.Admin.Manager.Component.Complications.ActivityNone',
               '{activity} · n/a'
             ).replace('{activity}', label),
-        // The count the LABEL drops is not lost — the prototype's `title` keeps it
-        // ("… — 2 complications"), which is where a number belongs once the pill itself
+        // The count the LABEL drops is kept in the `title`, where a number belongs once the pill
         // has stopped shouting it.
         title: progressive
           ? countTitle(label, count)
@@ -260,29 +230,21 @@
 
   /** The six NUMERIC comparators, filtered off the shared table rather than hand-listed. */
   const comparatorOptions = $derived(
-    PREREQUISITE_OPERATORS.filter((operator) => !isValuelessOperator(operator.id))
+    PREREQUISITE_OPERATORS.filter((operator) => !isValuelessOperator(operator.id)).map(
+      (operator) => ({ value: operator.id, label: `${operator.symbol} · ${operator.label}` })
+    )
   );
 
   /**
-   * Whether the trigger clause has nothing to offer THIS complication (issue 1286 defect 4).
+   * Whether the trigger clause has nothing to offer THIS complication. An empty `triggerOptions`
+   * means this system's progressive checks declare no named trigger, so the clause can never be
+   * satisfied and offering it gives a GM a checkbox that opens an empty picker.
    *
-   * The section already knows: `triggerOptions` is built from `checkBreakage.triggers` on the
-   * three PROGRESSIVE check blocks, so an empty array means this system's progressive checks
-   * declare no named trigger and the clause can never be satisfied. Offering it anyway gave a
-   * GM a checkbox that opens an empty picker.
-   *
-   * IT IS NOT SIMPLY `triggerOptions.length === 0`, and the second half is the part worth
-   * stating. A complication that ALREADY names a trigger keeps a persisted value: if the
-   * triggers are later deleted from the check, muting the row would strand that value behind
-   * a disabled control — the row would read as unavailable while `when.checkTrigger` stayed
-   * set, and the GM would have no way to clear it. So a complication with an authored
-   * `checkTrigger` stays live and operable whatever the vocabulary now holds; the picker's
-   * existing "Trigger no longer exists" option names the dangling id, and unchecking the row
-   * is what clears it. The unavailable treatment is for the case where there is nothing
-   * authored AND nothing to author with.
-   *
-   * @param {object} complication The authored complication.
-   * @returns {boolean} `true` when the clause is unavailable and must read as such.
+   * IT IS NOT SIMPLY `triggerOptions.length === 0`. A complication that ALREADY names a trigger
+   * keeps a persisted value, and muting the row would strand it behind a disabled control with no
+   * way to clear it. So an authored `checkTrigger` stays live and operable whatever the vocabulary
+   * holds — the picker's "Trigger no longer exists" option names the dangling id, and unchecking
+   * clears it — and the unavailable treatment is for nothing authored AND nothing to author with.
    */
   function triggerClauseUnavailable(complication) {
     return triggerOptions.length === 0 && !complication?.when?.checkTrigger;
@@ -341,11 +303,24 @@
     )
   );
 
-  // Resolve the NAME of every linked macro that the picker's own list does not already
-  // carry — a compendium macro, or one that has since been deleted. The picker list is
-  // consulted first because it is synchronous and covers every world script macro; this
-  // effect exists for the two cases it cannot answer, and `missing` is what paints the
-  // broken-link treatment on the drop zone.
+  /** Named triggers, plus a dangling authored id, which keeps that clause inert rather than invalid. */
+  function triggerOptionsFor(complication) {
+    const named = triggerOptions.map((option) => ({
+      value: option.id,
+      label: option.activity ? `${option.label} · ${activityLabel(option.activity)}` : option.label,
+    }));
+    const authored = complication.when?.checkTrigger;
+    if (!authored || triggerLabelById.has(authored)) return named;
+    const label = text(
+      'FABRICATE.Admin.Manager.Component.Complications.Condition.CheckTrigger.Unknown',
+      'Trigger no longer exists'
+    );
+    return [...named, { value: authored, label }];
+  }
+
+  // Resolve the NAME of every linked macro the picker's own list does not carry — a compendium
+  // macro, or a deleted one. The list is consulted first, being synchronous and covering every
+  // world script macro; `missing` is what paints the broken-link treatment on the drop zone.
   $effect(() => {
     const linked = [
       ...new Set(
@@ -413,10 +388,9 @@
 
   function addComplication() {
     const id = mintId();
-    // Every default here is the MODEL's declared default, not the prototype's seed data:
-    // two defaults for one field is exactly the drift `componentComplications.js` states
-    // its vocabularies to prevent. The one authored choice is `stageMissed`, which is the
-    // condition a GM reaching for a complication is nearly always after.
+    // Every default is the MODEL's, not the prototype's seed data: two defaults for one field is
+    // the drift `componentComplications.js` states its vocabularies to prevent. The one authored
+    // choice is `stageMissed`, the condition a GM reaching for a complication is usually after.
     const complication = {
       id,
       name: text('FABRICATE.Admin.Manager.Component.Complications.NewName', 'New complication'),
@@ -472,19 +446,15 @@
     macroWarning = '';
     patch(id, (entry) => {
       const next = { ...entry };
-      // The key is DELETED rather than written empty: `macroUuid` is absent on a
-      // complication that names no macro, and an empty string would round-trip as a
-      // present-but-blank reference.
+      // DELETED rather than written empty: an empty string round-trips as a blank reference.
       if (uuid) next.macroUuid = uuid;
       else delete next.macroUuid;
       return next;
     });
   }
 
-  // The `type !== 'script'` rejection, on `EssenceEditView`'s authority — it is the shipped
-  // surface for this refusal and the prototype draws none. It cannot live in the drop
-  // predicate: a payload's `type` is the DOCUMENT NAME (`'Macro'`), and the macro's own type
-  // needs `await fromUuid`.
+  // The `type !== 'script'` rejection, on `EssenceEditView`'s authority. It cannot live in the drop
+  // predicate: a payload's `type` is the DOCUMENT NAME, and the macro's own type needs `fromUuid`.
   async function handleMacroDrop(id, data) {
     macroWarning = '';
     const result = await evaluateMacroDrop(resolveDropUuid(data));
@@ -669,14 +639,10 @@
                 {#each ACTIVITY_ORDER as activity (activity)}
                   {@const on = complication.activities?.[activity] === true}
                   {@const progressive = isProgressive(activity)}
-                  <!-- The CHOSEN state and the NOT-PROGRESSIVE state are two independent
-                       axes, exactly as the prototype composes them: its chip is
-                       `background: on ? accent-soft : surface-soft` with
-                       `opacity: prog ? 1 : .6` written OUTSIDE the `on` branch. Collapsing
-                       them into one ternary inverts the warning — the case worth flagging
+                  <!-- The CHOSEN state and the NOT-PROGRESSIVE state are two INDEPENDENT axes.
+                       Collapsing them into one ternary inverts the warning: the case worth flagging
                        is an activity the GM HAS selected and the system will not resolve
-                       progressively, and a single ternary paints exactly that case at full
-                       accent strength while dimming the harmless unselected one. -->
+                       progressively, which a single ternary paints at full accent strength. -->
                   <Chip
                     tag="button"
                     type="button"
@@ -751,28 +717,18 @@
                   />
                 {/each}
 
-                <!-- The trigger clause is a TRIGGER ID, never a boolean: "any trigger fires
-                     any complication" would silently give every already-authored breakage
-                     trigger a fourth effect in every world that has one.
+                <!-- The trigger clause is a TRIGGER ID, never a boolean: "any trigger fires any
+                     complication" would give every authored breakage trigger a fourth effect.
 
-                     UNAVAILABLE IS A STATE OF ITS OWN (issue 1286 defect 4). With no named
-                     trigger anywhere in this system's progressive checks the clause cannot
-                     ever be satisfied, and it used to look and sit in the tab order exactly
-                     like the four conditions above it. The treatment is the one this panel
-                     ALREADY uses for an option a GM may see but cannot use — the Applies-to
-                     chip of a non-progressive activity: `opacity` plus a `title` that says
-                     what is wrong. `opacity` is the prototype's own device and is the one
-                     property that composes with whatever tone the row is already wearing,
-                     which is why the chips use it and why a second `is-*` tone could not.
-
-                     Uninteractable is a REAL `disabled`, never `pointer-events: none`. The
-                     row's `disabled` prop reaches `SelectionCheckbox`'s own `<input>`, so
-                     the control leaves the tab order rather than merely refusing the mouse;
-                     and because the row is off, `ComplicationEffectRow` renders no children
-                     at all, so the picker does not exist to be reached either.
-
-                     The hint is a SIBLING of the row rather than a child of it, so the one
-                     line that has to stay readable is not the line wearing the 0.6. -->
+                     UNAVAILABLE IS A STATE OF ITS OWN. With no named trigger in this system's
+                     progressive checks the clause can never be satisfied, and it used to sit in the
+                     tab order exactly like the four conditions above it. The treatment is the one
+                     this panel already uses for an option a GM may see but cannot use — `opacity`
+                     plus a `title` — because `opacity` composes with whatever tone the row wears
+                     and a second `is-*` tone could not. Uninteractable is a REAL `disabled`, never
+                     `pointer-events: none`, so the control leaves the tab order; and with the row
+                     off, `ComplicationEffectRow` renders no children for the picker to be in. The
+                     hint is a SIBLING, so the line explaining the state is not the dimmed one. -->
                 <div
                   class="fab-complication-trigger"
                   class:is-unavailable={triggerClauseUnavailable(complication)}
@@ -807,37 +763,19 @@
                         next ? triggerOptions[0]?.id || null : null
                       )}
                   >
-                    <select
-                      class="manager-input fab-complication-trigger-select"
+                    <Select
+                      size="toolbar"
+                      class="fab-complication-trigger-select"
                       value={complication.when?.checkTrigger || ''}
-                      data-complication-trigger
-                      aria-label={text(
+                      options={triggerOptionsFor(complication)}
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Component.Complications.Condition.CheckTrigger.Select',
                         'Check trigger'
                       )}
                       disabled={saving}
-                      onchange={(event) =>
-                        setWhen(complication.id, 'checkTrigger', event.currentTarget.value || null)}
-                    >
-                      {#each triggerOptions as option (option.id)}
-                        <option value={option.id}
-                          >{option.label}{option.activity
-                            ? ` · ${activityLabel(option.activity)}`
-                            : ''}</option
-                        >
-                      {/each}
-                      {#if complication.when?.checkTrigger && !triggerLabelById.has(complication.when.checkTrigger)}
-                        <!-- An id that no longer resolves leaves the clause INERT rather than
-                           becoming a validation error, so the authored value is kept and
-                           named instead of being silently rewritten to another trigger. -->
-                        <option value={complication.when.checkTrigger}
-                          >{text(
-                            'FABRICATE.Admin.Manager.Component.Complications.Condition.CheckTrigger.Unknown',
-                            'Trigger no longer exists'
-                          )}</option
-                        >
-                      {/if}
-                    </select>
+                      triggerData={{ 'data-complication-trigger': '' }}
+                      onChange={(next) => setWhen(complication.id, 'checkTrigger', next || null)}
+                    />
                   </ComplicationEffectRow>
                   {#if triggerClauseUnavailable(complication)}
                     <p class="fab-complication-trigger-hint" data-complication-trigger-hint>
@@ -866,32 +804,22 @@
                   dataAttr="data-complication-roll-condition"
                   onToggle={(next) => setNested(complication.id, 'rollCondition', 'enabled', next)}
                 >
-                  <!-- ONE LINE, and it needs a row of its own (issue 1286 defect 1).
+                  <!-- ONE LINE, and it needs a row of its own. The reveal strip is a WRAPPING flex
+                       strip, right for one control and for two and wrong here: under
+                       `appearance: base-select` a comparator select resolves `width: auto` against
+                       its containing block rather than to max-content, so it took the whole 898px
+                       line and pushed the expression and comparand onto their own. The three fields
+                       are ONE sentence — "2d6 + @int ≥ 12" — so they take a nowrap sub-row and the
+                       comparator gets an explicit basis.
 
-                       `.fab-complication-effect-reveal` is a WRAPPING flex strip, which is
-                       right for the trigger clause (one control) and for the effect roll
-                       (two), and wrong here: a comparator select's own intrinsic width is
-                       set by its widest option, and under `appearance: base-select` it
-                       resolves `width: auto` against its containing block rather than to
-                       max-content, so the select alone took the full 898px line and pushed
-                       the expression and the comparand onto lines of their own. The three
-                       fields are ONE sentence — "2d6 + @int ≥ 12" — so they get a nowrap
-                       sub-row that occupies one full line of the strip, and the comparator
-                       is given an explicit basis rather than an intrinsic one.
-
-                       THERE IS NO NARROW BREAKPOINT, and that is a MEASUREMENT rather
-                       than an omission. The manager root is a container-query context, so
-                       one was the obvious reach — but this panel bottoms out: driven from a
-                       1280px manager down to 600px, the strip narrows to 534px and stops,
-                       because the pane carries its own floor. The row's content floor is
-                       260 + 156 + 104 + two 7px gaps = the same 534px, with `min-width: 0`
-                       on every child so it shrinks rather than overflows (measured
-                       `scrollWidth - clientWidth === 0` at 1280/900/760/700/660/600). A
-                       `@container fabricate-manager (max-width: 680px)` rule was written
-                       first and then removed: it fires at a width where the row still has
-                       room, and wrapping there put the three fields on THREE lines rather
-                       than the two it was meant to produce — a worse layout answering a
-                       squeeze that does not happen. -->
+                       THERE IS NO NARROW BREAKPOINT, and that is a MEASUREMENT. Driven from a
+                       1280px manager down to 600px the strip narrows to 534px and stops, because
+                       the pane carries its own floor; the row's content floor is 260 + 156 + 104
+                       plus two 7px gaps — the same 534px — with `min-width: 0` on every child, so
+                       `scrollWidth - clientWidth === 0` throughout. A
+                       `@container fabricate-manager (max-width: 680px)` rule was written and
+                       removed: it fires where the row still has room and wrapped three fields onto
+                       three lines, answering a squeeze that does not happen. -->
                   <div class="fab-complication-condition-row">
                     <input
                       class="manager-input fab-complication-expression"
@@ -912,49 +840,34 @@
                           event.currentTarget.value
                         )}
                     />
-                    <!-- The SIX numeric comparators, filtered off the shared prerequisite
-                         table by `isValuelessOperator` rather than hand-listed: a dice total
-                         has no boolean or existence reading, and an `exists` offered against
-                         a roll total is a complication that always fires. -->
-                    <select
-                      class="manager-input fab-complication-comparator"
+                    <!-- The SIX numeric comparators, filtered off the shared prerequisite table by
+                         `isValuelessOperator`: an `exists` against a roll total always fires. -->
+                    <Select
+                      size="toolbar"
+                      class="fab-complication-comparator"
                       value={complication.rollCondition?.cmp || ''}
-                      data-complication-roll-condition-cmp
-                      aria-label={text(
+                      options={comparatorOptions}
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Component.Complications.RollCondition.Comparator',
                         'Comparison'
                       )}
                       disabled={saving}
-                      onchange={(event) =>
-                        setNested(
-                          complication.id,
-                          'rollCondition',
-                          'cmp',
-                          event.currentTarget.value
-                        )}
-                    >
-                      {#each comparatorOptions as operator (operator.id)}
-                        <option value={operator.id}>{operator.symbol} · {operator.label}</option>
-                      {/each}
-                    </select>
-                    <!-- The comparand is a SIGNED INTEGER STEPPER, not a bare field (issue
-                         1286 defect 3). `min`/`max` are left at the primitive's own `null`
-                         precisely so the field stays signed: a complication that fires when
-                         a modified roll comes out at `-1` is a legitimate authoring, and any
-                         bound here would be a rule this section has no basis to invent.
+                      triggerData={{ 'data-complication-roll-condition-cmp': '' }}
+                      onChange={(next) => setNested(complication.id, 'rollCondition', 'cmp', next)}
+                    />
+                    <!-- A SIGNED INTEGER STEPPER, not a bare field. `min`/`max` stay at the
+                         primitive's `null` so the field stays signed — a complication firing at a
+                         modified `-1` is legitimate authoring, and any bound would be a rule this
+                         section has no basis to invent.
 
-                         `allowUnset` because absence is REAL in the persisted shape — the
-                         normalizer's `text()` renders an unauthored comparand as `''`, and
-                         without it a fresh complication would show a comparand of `0` that
-                         nobody typed. The commit maps back through `String(next)` / `''`,
-                         so the field stays a string on the way out: `componentComplications`
-                         records that the comparand is stored as text, and the operator
-                         vocabulary stays the word tokens (`neq`, never `ne`).
+                         `allowUnset` because absence is REAL in the persisted shape: without it a
+                         fresh complication shows a comparand of `0` nobody typed. The commit maps
+                         back through `String(next)` / `''`, because `componentComplications` stores
+                         the comparand as text and the operator vocabulary is word tokens.
 
-                         A `<div>` wrapper rather than a `<label>`: see the NAMING contract in
-                         `Stepper.svelte` — a `<label>` binds to its first labelable
-                         descendant, which here is the `−` button, so clicking the caption
-                         would DECREMENT. The name arrives through `stepperLabels`. -->
+                         A `<div>` wrapper, not a `<label>`: per `Stepper.svelte`'s NAMING contract
+                         a `<label>` binds to its first labelable descendant — the `−` button — so
+                         clicking the caption would DECREMENT. The name arrives via `stepperLabels`. -->
                     <div class="fab-complication-comparand">
                       <Stepper
                         value={complication.rollCondition?.value ?? ''}
@@ -1028,11 +941,9 @@
                     oninput={(event) =>
                       setNested(complication.id, 'effectRoll', 'expr', event.currentTarget.value)}
                   />
-                  <!-- NOT `.fab-complication-expression`: this field is the sentence the
-                       GM writes for the chat card ("Shrapnel damage"), and it borrowed the
-                       expression's class for its flex sizing and inherited the MONO face
-                       with it. A label is prose, so it takes the host sans; only the dice
-                       expression beside it is mono. -->
+                  <!-- NOT `.fab-complication-expression`: this is the sentence a GM writes for the
+                       chat card, and it borrowed that class for flex sizing and inherited the MONO
+                       face with it. A label is prose; only the dice expression beside it is mono. -->
                   <input
                     class="manager-input fab-complication-effect-label"
                     type="text"
@@ -1067,9 +978,7 @@
                       'Receives the component, the character and the complication. It runs on a GM client.'
                     )}
                   >
-                    <!-- The browse control acts on the WHOLE macro card, so it sits in the
-                         card's head beside its title rather than in the body inline with the
-                         drop zone it is an alternative to. -->
+                    <!-- The browse control acts on the WHOLE macro card, so it sits in the head. -->
                     {#snippet headAction()}
                       <SearchablePopover
                         options={macroPickerOptions}
@@ -1106,12 +1015,9 @@
                       />
                     {/snippet}
                     <div class="fab-complication-macro-controls">
-                      <!-- `ItemDropZone` has no click handler at all — only `use:dragDrop` —
-                           and `SearchablePopover` owns its own trigger and portals to the
-                           manager host. The prototype makes the dashed prompt ITSELF the
-                           trigger; the recorded deviation is that the browse control is a
-                           separate button beside the drop target rather than the target
-                           becoming one. -->
+                      <!-- `ItemDropZone` has no click handler, only `use:dragDrop`, and
+                           `SearchablePopover` owns its own trigger. The recorded deviation from the
+                           prototype is that browse is a separate button beside the drop target. -->
                       <ItemDropZone
                         item={complication.macroUuid
                           ? { name: macroDisplay(complication.macroUuid).name }
@@ -1153,14 +1059,9 @@
       </div>
     {/if}
 
-    <!-- Dashed, and fullWidth: the append-a-row verb at the foot of `.fab-complications-list`,
-         which spans this panel's single-column grid track — the same shape as
-         `RecipeStepsCard`'s "Add a step" and `ComponentEditView`'s "Add result"/"Add group"
-         sites (issue 1118). The bespoke `.fab-complications-add` scoped rule this replaced
-         declared nothing the role and `fullWidth` do not already state — `display`,
-         `align-items` and `justify-content` come from the base `.manager-button` contract,
-         `border-style: dashed` and the icon/label gap from `is-dashed`, and `width: 100%`
-         from `is-full-width` — so it is retired rather than re-chained under `:global(...)`. -->
+    <!-- Dashed and fullWidth: the append-a-row verb, the same shape as `RecipeStepsCard`'s "Add a
+         step". The bespoke scoped rule it replaced declared nothing the role and `fullWidth` do
+         not already state, so it is retired rather than re-chained under `:global(...)`. -->
     <ManagerButton
       role="dashed"
       fullWidth
@@ -1175,9 +1076,8 @@
 {/if}
 
 <style>
-  /* Theme-ROOT tokens only, per `Chip.svelte`'s note: this section wears the manager's
-     `manager-component-panel` shell, but every colour it states itself is a root token so a
-     future read-only reuse outside `.fabricate-manager` does not silently lose them. */
+  /* Theme-ROOT tokens only, per `Chip.svelte`'s note, so a reuse outside `.fabricate-manager`
+     does not silently lose them. */
   .fab-complications-title-glyph {
     margin-right: 7px;
     color: var(--fab-warning);
@@ -1192,22 +1092,16 @@
     justify-content: flex-end;
   }
 
-  /* The hint's MEASURE, from the prototype (`max-width: 460px`). Without it the sentence
-     runs the full width of the panel beside a right-aligned pill cluster, which at the
-     Studio's widths is a ~110-character line — roughly double a readable measure, and the
-     one thing a GM has to read before authoring anything here. */
+  /* The hint's MEASURE. Without it the sentence runs the panel's full width — a ~110-character
+     line, double a readable measure, on the one thing a GM must read before authoring. */
   .fab-complications-hint {
     max-width: 460px;
   }
 
-  /* NO vertical margin on either of these. The section root is `.manager-component-panel`,
-     which is `display: grid; gap: var(--fab-space-3)` — a grid gap and an item margin ADD,
-     so the 9px each of these used to carry rendered as 12 + 9 + 9 = 30px between the list
-     and the Add control while the EMPTY state measured 12 + 9 = 21px: one section
-     disagreeing with itself by 9px, and both two to three times the prototype's own 9px.
-     The panel's gap is the only rhythm here, and it is the same rhythm every sibling panel
-     in the Studio keeps. (The parity harness records no `margin` property, so nothing else
-     would ever have caught this.) */
+  /* NO vertical margin on either. The section root is a grid, and a grid gap and an item margin
+     ADD: the 9px these carried rendered as 30px between the list and the Add control while the
+     EMPTY state measured 21px — one section disagreeing with itself. The panel's gap is the only
+     rhythm here. (The parity harness records no `margin`, so nothing else would have caught it.) */
   .fab-complications-list {
     display: flex;
     flex-direction: column;
@@ -1238,25 +1132,20 @@
     gap: 7px;
   }
 
-  /* The NOT-PROGRESSIVE axis, applied on top of whichever tone the chip's chosen-ness gave
-     it. `opacity` is the prototype's own device and is the one property that composes with
-     a tone instead of replacing it — a second `is-*` tone could not, because a chip has
-     exactly one. `Chip.svelte` declares no `opacity`, so there is nothing here to lose a
-     cascade fight with, and the child combinator off this scoped container is what bounds
-     the `:global` to these three chips.
+  /* The NOT-PROGRESSIVE axis, applied over whichever tone chosen-ness gave the chip. `opacity`
+     composes with a tone instead of replacing it, where a second `is-*` tone could not, because a
+     chip has exactly one; `Chip.svelte` declares none, so there is no cascade fight, and the child
+     combinator off this scoped container bounds the `:global` to these three chips.
 
-     The selector deliberately does not spell the chip's own base class. The hand-rolled-
-     chip ratchet in `manager-layout.test.js` matches that class name ANYWHERE in a manager
-     component file — comments included — and it has reached empty; a styling hook that
-     wrote it would re-open a list whose whole value is that it can only shrink. */
+     The selector deliberately does not spell the chip's own base class: the hand-rolled-chip
+     ratchet in `manager-layout.test.js` matches that name ANYWHERE in a manager component file,
+     comments included, and it has reached empty. */
   .fab-complication-activity-chips > :global(.is-not-progressive) {
     opacity: 0.6;
   }
 
-  /* The annotation is its OWN run, not more of the chip's label: the prototype nests it as
-     `font: 400 9px; color: subtle` beside a 600-weight 11px chip. Concatenated into the
-     chip's text node it inherited the chip's weight and size, so "· not progressive" read
-     as part of the activity's NAME rather than as a note about it. */
+  /* Its OWN run, not more of the chip's label: concatenated into the chip's text node it
+     inherited that weight and size, so "· not progressive" read as part of the activity's NAME. */
   .fab-complication-activity-note {
     margin-left: 2px;
     color: var(--fab-text-subtle);
@@ -1264,31 +1153,19 @@
     font-weight: 400;
   }
 
-  /* The two grouped cards — When and Then — sit one step INSIDE the panel on the recessed
-     surface, which is what separates "the conditions" from "the consequences" without a
-     second heading level.
+  /* The When and Then cards sit one step INSIDE the panel on the recessed surface, which
+     separates the conditions from the consequences without a second heading level.
 
-     THE RAMP STEP IS CHOSEN BY INDEX, NOT BY VALUE, and this is the one call in the section
-     a reader is most likely to want to re-make, so it is recorded rather than left to be
-     re-derived. The prototype's ramp and this one are OFFSET by a step in the middle: the
-     prototype's SECOND step is byte-identical to `--fab-bg-0`, and its FIRST step — the one
-     this card and the section's inputs draw — sits below every surface token any Fabricate
-     theme ships.
-
-     So a by-value re-map has nowhere to send this card. It would have to round up onto
-     `--fab-bg-0`, which is exactly where a by-value re-map also sends the ROW behind it
-     (`ComplicationSummaryRow`), and the two would collapse onto one flat fill — the
-     When/Then cards would stop being distinguishable from the row that contains them, which
-     is the opposite of what re-mapping is meant to recover.
+     THE RAMP STEP IS CHOSEN BY INDEX, NOT BY VALUE, and it is recorded because it is the call a
+     reader is likeliest to want to re-make. The prototype's ramp is OFFSET by a step in the middle
+     — its second step is byte-identical to `--fab-bg-0` and its first sits below every surface
+     token any theme ships — so a by-value re-map would round this card up onto `--fab-bg-0`, which
+     is where it also sends the ROW behind it, collapsing the two onto one flat fill.
 
      Index-aligned they do not collapse, and the STEP is what the eye reads rather than the
-     absolute. The panel is `--fab-surface-soft` composited over the pane, which lands about
-     one step ABOVE `--fab-bg-1`, so panel → row → card reproduces the prototype's own
-     three-step recession: the row-to-card step matches its counterpart to within a couple of
-     levels per channel, and the panel-to-row step is deeper here, not shallower. Adding a
-     darker raw colour instead was ruled out for the studio as a whole in issue 676 (see the
-     mapping note in `styles/fabricate.css`): it would force a new value into all seven themes
-     and rewrite every other theme's ramp contour to correct one step in this one. */
+     absolute: panel → row → card reproduces the prototype's own three-step recession. Adding a
+     darker raw colour was ruled out for the studio as a whole (see the mapping note in
+     `styles/fabricate.css`): it would force a value into all seven themes to correct one step. */
   .fab-complication-card {
     padding: 12px;
     border: 1px solid var(--fab-border);
@@ -1331,25 +1208,20 @@
     flex: 0 0 130px;
   }
 
-  /* The effect roll's LABEL shares the expression's SIZING — it is the elastic field on the
-     same line — and not its face. Stated as its own rule rather than as an `is-*` modifier
-     on the expression, because "an expression that is not in the expression face" is a
-     contradiction a later reader would resolve the wrong way. The face is inherited rather
-     than named: this repository ships serif and mono tokens and no sans one, and the host
-     face is what every other unstyled run in this section already renders in. */
+  /* The effect roll's LABEL shares the expression's SIZING, being the elastic field on the same
+     line, and not its face. Its own rule rather than an `is-*` modifier, because "an expression
+     that is not in the expression face" is a contradiction a reader would resolve the wrong way.
+     The face is inherited: this repository ships serif and mono tokens and no sans one. */
   .fab-complication-effect-label {
     flex: 1 1 180px;
     min-width: 0;
     font-size: 11.5px;
   }
 
-  /* THE DICE-CONDITION SENTENCE, on one line (issue 1286 defect 1).
-
-     `nowrap` and `flex: 1 1 100%` together: the basis makes this take a whole line of the
-     wrapping reveal strip above it, and the nowrap keeps its own three fields on that line.
-     `min-width: 0` on every child is what lets them shrink there rather than overflow — the
-     comparator's intrinsic width is its widest option ("≥ · at least"), which is a floor a
-     flex item only drops below when its automatic minimum size is released. */
+  /* THE DICE-CONDITION SENTENCE, on one line. `nowrap` and `flex: 1 1 100%` together: the basis
+     takes a whole line of the wrapping reveal strip and the nowrap keeps its three fields on it.
+     `min-width: 0` on every child lets them shrink rather than overflow, since a flex item drops
+     below its intrinsic width only once its automatic minimum size is released. */
   .fab-complication-condition-row {
     display: flex;
     flex: 1 1 100%;
@@ -1359,33 +1231,26 @@
     min-width: 0;
   }
 
-  /* An EXPLICIT basis, not `0 0 auto`. Under `appearance: base-select` a select is an
-     ordinary flex container, and `width: auto` on one resolves against its containing block
-     rather than to max-content — measured at the full 898px of the strip, which is what put
-     the other two fields on lines of their own. The width is the six comparator options'
-     own measure plus the picker icon; `flex-shrink: 1` lets it give ground first when the
-     panel narrows, because a truncated "at least" is still readable and a truncated dice
-     expression is not.
-
-     `min-height` matches the free-text baseline's 34px rather than inheriting a height. The
-     select baseline in `styles/fabricate.css` is deliberately PAINT-ONLY — manager selects
-     run 28/32/36px by context and a global floor would grow all of them — so a row that
-     needs its select flush with its inputs says so here. */
-  .fab-complication-comparator {
+  /* The comparator's slot, on the picker root since issue 1510 (the class rides a component tag
+     and the trigger is its grandchild, so only `:global` reaches it). An explicit basis, not
+     `0 0 auto`: the width is the six options' measure plus the glyph, and `flex-shrink: 1` gives
+     ground first, because a truncated "at least" still reads and a truncated dice expression does
+     not. The `toolbar` rung already gives the row's shared 34px. */
+  .fab-complication-condition-row > :global(.fab-complication-comparator) {
     flex: 0 1 156px;
     min-width: 0;
-    min-height: 34px;
+  }
+
+  .fab-complication-condition-row
+    > :global(.fab-complication-comparator .fabricate-select-trigger) {
+    width: 100%;
   }
 
   /* The comparand SLOT. The Stepper is `fill`, so it needs a slot with an intrinsic width to
-     resolve `100%` against — see the `fill` note in `Stepper.svelte`, which records that
-     dropping `fill` does not fix an unsized slot either.
-
-     `--fab-stepper-fill-height` is how the primitive takes a SIZE from its layout context,
-     which its own CSS note permits (a layout context may set the height; what it must never
-     restyle is the primitive's font, border, radius or fill). 34px is the height the
-     expression input and the comparator beside it both stand at, which is the maintainer's
-     requirement that the three controls agree. */
+     resolve `100%` against; `Stepper.svelte`'s own note records that dropping `fill` does not fix
+     an unsized slot either. `--fab-stepper-fill-height` is how the primitive takes a SIZE from its
+     layout context, which its CSS note permits, and the value is the height the expression input
+     and the comparator beside it both stand at. */
   .fab-complication-comparand {
     --fab-stepper-fill-height: 34px;
 
@@ -1393,24 +1258,16 @@
     min-width: 0;
   }
 
-  /* The trigger clause's UNAVAILABLE state (issue 1286 defect 4).
-
-     `opacity`, copied from the Applies-to chips' not-progressive treatment a few rules up,
-     because this panel now has two "you may see it and cannot use it" states and they must
-     read as the same thing. The child combinator off this scoped wrapper is what bounds the
-     `:global` to this one row — `ComplicationEffectRow` declares no `opacity` of its own, so
-     there is no cascade fight here, exactly as with the chips.
-
-     It is applied to the ROW and not to the wrapper, so the hint paragraph beside it keeps
-     full contrast: the one line that explains the state must not be dimmed by it. */
+  /* The trigger clause's UNAVAILABLE state: the same `opacity` the Applies-to chips use a few
+     rules up, because this panel has two "you may see it and cannot use it" states and they must
+     read alike. The child combinator bounds the `:global` to this one row. Applied to the ROW, not
+     the wrapper, so the hint explaining the state keeps full contrast. */
   .fab-complication-trigger.is-unavailable > :global(.fab-complication-effect) {
     opacity: 0.6;
   }
 
-  /* Indented to the reveal strip's own 24px, so it hangs under the row's copy rather than
-     under its checkbox. Subtle rather than the macro card's warning tone: nothing has gone
-     wrong here — the system simply has not been given triggers yet — and the chips' own
-     "· not progressive" note is the precedent for that colour. */
+  /* Indented to the reveal strip's own inset, so it hangs under the row's copy rather than its
+     checkbox. Subtle rather than the macro card's warning tone: nothing has gone wrong. */
   .fab-complication-trigger-hint {
     margin: 6px 0 0 24px;
     color: var(--fab-text-subtle);
@@ -1418,9 +1275,14 @@
     line-height: 1.45;
   }
 
-  .fab-complication-trigger-select {
+  /* The trigger picker's slot and the trigger's width; `:global` for the reason above. */
+  .fab-complication-trigger :global(.fab-complication-trigger-select) {
     flex: 1 1 220px;
     min-width: 0;
+  }
+
+  .fab-complication-trigger :global(.fab-complication-trigger-select .fabricate-select-trigger) {
+    width: 100%;
   }
 
   .fab-complication-macro-controls {
@@ -1430,13 +1292,11 @@
     align-items: center;
   }
 
-  /* The browse trigger, now in the macro card's HEAD. Its type is copied from the manager's
-     existing compact in-header control, `.manager-salvage-stage-edit` in styles/fabricate.css
-     — 0.8125rem at weight 600 with a 0.72rem glyph and no wrapping — rather than invented, so
-     the two read as one treatment. `manager-button`'s default type is sized for a footer
-     action and wrapped "Browse macros" onto two lines beside a title it is meant to sit level
-     with. `white-space: nowrap` is the declaration that actually fixes the wrap; the rest is
-     what keeps it from looking like a different button once it no longer does. */
+  /* The browse trigger, in the macro card's HEAD. Its type is copied from the manager's existing
+     compact in-header control, `.manager-salvage-stage-edit`, rather than invented, so the two read
+     as one treatment: `manager-button`'s default is sized for a footer action and wrapped "Browse
+     macros" onto two lines. `white-space: nowrap` is what fixes the wrap; the rest keeps it from
+     looking like a different button once it no longer does. */
   .fab-complication-macro :global([data-complication-macro-browse]) {
     padding: 4px 9px;
     font-size: 0.8125rem;

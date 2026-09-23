@@ -1,11 +1,5 @@
 /**
  * THE CAPABILITIES THE PICKER'S SPECIMEN NAMES, WIRED (issue 1503).
- *
- * `openspec/specs/design-system/library.html`'s `<SearchPopover>` specimen names capabilities the
- * shipped primitive did not have, and two hand-rolled look-alikes — `IconPicker` and
- * `EssenceSourceSelector` — exist because of exactly that gap. This suite covers the ten the
- * rebuild adds, and each clause is a way for the WIRING to be wrong while the prop is declared:
- *
  *   - the `trigger` snippet hands the primitive the CALLER'S OWN button, which is the element the
  *     panel must anchor to. Without it `anchoredPopover` falls back to the picker ROOT — for the
  *     source picker a whole drag-and-drop shell — and the panel is measured against the wrong box;
@@ -22,30 +16,6 @@
  *     resolved row the icon picker draws above its alphabetical list is a no-query behaviour. The
  *     derivation it replaces short-circuited to the raw array when the query was empty, so a seam
  *     consulted only under a query would silently drop the pin.
- *
- * The arithmetic itself is proved in `tests/util/listbox-navigation.test.js` and the focus model
- * in `tests/components/searchable-popover-keyboard-mounted.test.js`; this suite is about the
- * caller-facing seams.
- *
- * ── WHY A COMPILED FIXTURE CALLER ───────────────────────────────────────────────────────────
- * `tests/fixtures/searchable-popover/CapabilityHost.svelte` is the call site, because the spread
- * rule is a fact about the compiler: only a real `<button …attrs {...attributes}>` puts the
- * caller's own attributes and the primitive's spread through one `set_attributes` call. A snippet
- * synthesized in JavaScript would apply them by hand and prove nothing.
- *
- * ── WHY THE GEOMETRY CLAUSES SYNTHESIZE THEIR BOXES ─────────────────────────────────────────
- * happy-dom lays nothing out: every `getBoundingClientRect` is a zero box, and its globals are
- * FLATTENED onto `globalThis`, which has neither `innerWidth` nor `addEventListener`. Left alone
- * that makes three of this suite's clauses vacuous rather than green — the layout correctly
- * refuses to position anything against a zero-width host, and the action's own
- * `typeof window.addEventListener !== 'function'` guard declines to listen at all.
- *
- * So the geometry clauses state the boxes they are reasoning about — a 1024x768 application host,
- * a 140x30 trigger at (200, 100), and a `bounds` resolver in the documented function form of that
- * prop — exactly as `tests/actions/anchored-popover.test.js` does for the action itself. The
- * panel's INLINE style then becomes readable, which is the ONLY place `horizontalAlign` and
- * `measureListMetrics` are observable: both are consumed inside the layout rather than emitted as
- * markup, and happy-dom cannot compute a cascade to read them back from.
  */
 
 import assert from 'node:assert/strict';
@@ -98,8 +68,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-picker-capabilities-',
   rawModules: SEARCHABLE_POPOVER_RAW_MODULES,
-  // The hoisted popover list — the popover plus the three primitives it renders, `ManagerButton`
-  // among them since issue 1371's trigger form — plus this suite's own host fixture.
+  // The hoisted popover list — the popover plus the three primitives it renders.
   compiledModules: [
     ...SEARCHABLE_POPOVER_COMPILED_MODULES,
     'tests/fixtures/searchable-popover/CapabilityHost.svelte',
@@ -141,12 +110,7 @@ async function openPanel() {
   return panel();
 }
 
-/**
- * Stub one element's box and COUNT the reads.
- *
- * The count is the instrument for two clauses at once: which element the panel is anchored to
- * (only the anchor's box is ever read) and whether a viewport event re-measured.
- */
+/** Stub one element's box and COUNT the reads. */
 function stubRect(element, rect) {
   const reads = { count: 0 };
   element.getBoundingClientRect = () => {
@@ -156,11 +120,7 @@ function stubRect(element, rect) {
   return reads;
 }
 
-/**
- * Give the layout a host, a trigger and a boundary it can answer with.
- *
- * Returns the trigger's read counter, which is the instrument for "which element was measured".
- */
+/** Give the layout a host, a trigger and a boundary it can answer with. */
 function stubGeometry() {
   stubRect(harness.target, HOST_RECT);
   return stubRect(trigger(), TRIGGER_RECT);
@@ -168,12 +128,6 @@ function stubGeometry() {
 
 /**
  * Make `window.addEventListener` a function, so `anchoredPopover` installs its listener pair.
- *
- * The action guards on `typeof window.addEventListener !== 'function'`, and happy-dom's globals
- * are flattened onto `globalThis`, which has no such method — so without this the action listens
- * for nothing and every re-measure clause below would pass by never running. The `resize` half is
- * deliberately a black hole: only the CAPTURE-phase `scroll` listener, which the action installs
- * on the real `document`, is under test here.
  *
  * @returns {() => void} Restores `globalThis`.
  */
@@ -201,12 +155,7 @@ function search(open, term) {
   flushSync();
 }
 
-/**
- * One element's class list, in authored ORDER and without the compiler's own scoping hash.
- *
- * The order is the assertion: `optionClass` is the caller's row class and `option.class` is a
- * fact about the row's DATA, so the second has to come after the first to out-rank it on a tie.
- */
+/** One element's class list, in authored ORDER and without the compiler's own scoping hash. */
 const authoredClasses = (element) =>
   element
     .getAttribute('class')
@@ -671,9 +620,7 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
       const ignoring = stubGeometry();
       const ignoringPanel = await openPanel();
       const before = ignoring.count;
-      // NOT `{ bubbles: true }`: a real `scroll` does not bubble, which is exactly why the action
-      // listens in CAPTURE on `document`. A bubbling stand-in would reach the listener by a route
-      // the product never uses.
+      // NOT `{ bubbles: true }`: a real `scroll` does not bubble.
       ignoringPanel.dispatchEvent(new window.Event('scroll'));
       flushSync();
       assert.equal(
@@ -699,11 +646,6 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
   });
 
   // ── A GATED OPTION, AND THE REASON IT STATES (issue 1504) ─────────────────────────────────
-  //
-  // `openspec/specs/design-system/library.html:661` states the requirement in one line: opacity
-  // alone is not a reason. Before this, a snippet-drawn "disabled" row still selected on click,
-  // which is a lie in the DOM as well as on the screen — the row announced itself as selectable
-  // and behaved as selectable, and the only thing marking it unavailable was its colour.
   describe('a gated option', () => {
     /** Three rows with the middle one gated, so a skip has to cross it in both directions. */
     const GATED = [
@@ -798,9 +740,7 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
     });
 
     it('refuses the Enter that would confirm it, without letting the key escape', async () => {
-      // The cursor's skip scan is not a guarantee: a caller can gate the row the cursor is
-      // already sitting on. So the refusal is stated at the choice rather than trusted to the
-      // arithmetic that usually keeps the cursor away from it.
+      // The cursor's skip scan is not a guarantee.
       chosen.length = 0;
       await mountPicker({ options: [{ id: 'beaker', label: 'Beaker', disabled: true }] });
       const open = await openPanel();
@@ -820,8 +760,7 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
     });
 
     it('states no reason for a row that is not gated', async () => {
-      // A reason for being unavailable on an available row is a lie, so the badge is bound to the
-      // state rather than to the presence of the string.
+      // A reason for being unavailable on an available row is a lie.
       await mountPicker({
         options: [{ id: 'anvil', label: 'Anvil', disabledReason: 'Premium' }],
       });
@@ -888,20 +827,7 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
     });
   });
 
-  /**
-   * THE MULTI-SELECT MODE AND THE STAY-OPEN GATE (issue 1513).
-   *
-   * Two props, both additive and both default-off, and the pair is deliberately not one prop.
-   * `multiple` turns on three things at once because a panel with any two of them lies about
-   * itself: membership-driven `aria-selected`, `aria-multiselectable` on the list, and a panel
-   * that survives a choice. `stayOpen` is the third of those ALONE, for a caller whose chosen
-   * option LEAVES the option set and therefore has no selection to announce.
-   *
-   * WHY THE `aria-selected` CLAUSE READS EXACT STRINGS. The attribute is emitted
-   * unconditionally on every row, so `hasAttribute` is true whatever the expression behind it
-   * is: a defect that marks one row instead of four passes a presence check and passes a
-   * truthiness check on the marked row. Only the whole row-by-row vector can see it.
-   */
+  /** THE MULTI-SELECT MODE AND THE STAY-OPEN GATE (issue 1513). */
   describe('`multiple` and `stayOpen`', () => {
     it('marks EVERY selected option, and announces the list as multi-selectable', async () => {
       await mountPicker({ multiple: true, value: ['beaker', 'dagger'] });
@@ -953,10 +879,7 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
         'and the query is UNCLEARED. `close()` clears it, so the default mode loses the GM`s ' +
           'filter on every choice — which is the whole cost of adding four entries to a set'
       );
-      // `assert.ok(a === b)` rather than `assert.equal`: on failure `node:assert` serialises
-      // the actual value to build its diff and walks a mounted happy-dom element's circular
-      // tree until the heap dies, so a one-line assertion failure surfaces as an OOM and a
-      // `# cancelled` suite with no message.
+      // `assert.ok(a === b)` rather than `assert.equal`.
       assert.ok(document.activeElement === holder, 'focus stays on the holder, not the trigger');
 
       optionRows(panel())[1].click();
@@ -995,28 +918,10 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
       harness.remount();
     });
 
-    /**
-     * THE SELECTED FACE `multiple` OWES ITS ROWS, AND WHY THIS CLAUSE IS NOT MOUNTED.
-     *
-     * `design-system/spec.md` — "A SELECTED face is a FILL and an EDGE" — and its multi-select
-     * scenario requires a tinted fill plus an accent border on each chosen row. The primitive's
-     * shared row painted rest and hover only, so a converted checklist's chosen rows carried the
-     * caller's trailing check glyph and nothing else, and HOVER read stronger than SELECTED.
-     *
-     * A mounted assertion cannot see this: happy-dom computes no cascade, so `getComputedStyle`
-     * on a mounted row answers with the inline style and nothing the stylesheet says. The rule is
-     * read out of the COMPILED CSS instead (`{ css: 'external' }`), which is the same artifact the
-     * browser is handed and therefore the only place a pruned or mis-keyed rule shows up.
-     *
-     * THE KEY IS THE OTHER HALF, and it is what makes this safe for the 23 single-select
-     * importers: the selector hangs on the LISTBOX's `aria-multiselectable`, which the primitive
-     * emits only under `multiple`. Every `aria-selected` rule in the block is checked for a
-     * qualifier for that reason — an unkeyed one would repaint the marked row of every picker in
-     * the product, which is a redesign wearing a bug fix's clothes.
-     */
+    /** THE SELECTED FACE `multiple` OWES ITS ROWS, AND WHY THIS CLAUSE IS NOT MOUNTED. */
     it('paints a fill and an edge on every multi-selected row, keyed on `aria-multiselectable`', () => {
       const { css } = scopedComponentCss(
-        resolve(repoRoot, 'src/ui/svelte/components/SearchablePopover.svelte')
+        resolve(repoRoot, 'src/ui/svelte/components/SearchablePopoverPanel.svelte')
       );
       const flat = css.replaceAll(/\/\*[\s\S]*?\*\//gu, '').replaceAll(/\s+/gu, ' ');
       const rules = [...flat.matchAll(/([^{}]+)\{([^{}]*)\}/gu)].map(([, selector, body]) => ({
@@ -1064,21 +969,7 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
       );
     });
 
-    /**
-     * THE CURSOR CANNOT OUTLIVE A LIST THAT SHRANK UNDER IT.
-     *
-     * `close()` is what used to clear the cursor after every choice; under the gate the panel
-     * survives and the rendered list may get SHORTER while it is open. Two mechanisms answer
-     * that and this clause exercises the second, because the first cannot reach it: the
-     * generation stamp reads `options.length` and both end ids, so it catches a caller that
-     * removes an option — but a caller `filterOptions` SEAM narrows the rendered list from
-     * state of its own with `options` unmoved, and the generation is byte-identical across it.
-     * The range clamp on `activeIndex` is what refuses the stale index there.
-     *
-     * A dangling `aria-activedescendant` is the visible defect: it names a DOM id that resolves
-     * to no element, which is exactly the state the primitive already refuses while its empty
-     * branch renders.
-     */
+    /** THE CURSOR CANNOT OUTLIVE A LIST THAT SHRANK UNDER IT. */
     it('drops a cursor that would point past the end of a list narrowed under an open panel', async () => {
       await mountPicker({ multiple: true, value: [] });
       const open = await openPanel();

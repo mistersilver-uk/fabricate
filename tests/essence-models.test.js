@@ -1,18 +1,4 @@
-/**
- * Issue 1036 — the pure Essence Studio models.
- *
- * Three modules, all leaves: `essenceBulkEditModel.js` (the staged bulk-edit draft),
- * `essenceValidation.js` (the add-new offer projection and the editor's Validation tab) and
- * `essenceBrowserModel.js` (filter → sort → paginate). Plus the two shared extractions this
- * change made — the `unchanged | enable | disable` status axis and the reference predicate —
- * each pinned at the point the extraction could have gone wrong.
- *
- * The bulk-edit projection is table-driven over ALL EIGHT staged/unstaged combinations
- * because two of its keys are FALSY BUT REAL: `colorToken: null` (Clear colour) and
- * `enabled: false` (Disable). A truthiness guard anywhere downstream silently drops the two
- * most ordinary operations the panel offers, and only key PRESENCE distinguishes them from
- * an unstaged axis.
- */
+/** Issue 1036 — the pure Essence Studio models. */
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -30,29 +16,28 @@ import {
   setBulkEssenceIcon,
   setBulkEssenceStatus,
   toBulkEssenceEdit,
-} from '../src/utils/essenceBulkEditModel.js';
+} from '../src/ui/model/essenceBulkEditModel.js';
 import {
   buildEssenceBrowserModel,
   createEssenceBrowserState,
+  describeActiveEssenceFilters,
   essenceStatusCounts,
   filterEssences,
   sortEssences,
-} from '../src/utils/essenceBrowserModel.js';
+} from '../src/ui/model/essenceBrowserModel.js';
 import {
   essenceEditorValidation,
   selectableEssenceOptions,
-} from '../src/utils/essenceValidation.js';
+} from '../src/ui/model/essenceValidation.js';
 import { recipeReferencesEssence } from '../src/utils/recipeEssenceReferences.js';
 import { makeEssenceRow } from './helpers/makeEssenceRow.js';
 import {
   RECIPE_BULK_STATUS_VALUES,
   setBulkRecipeStatus,
   toBulkRecipeEdit,
-} from '../src/utils/recipeBulkEditModel.js';
+} from '../src/ui/model/recipeBulkEditModel.js';
 
-// ---------------------------------------------------------------------------
 // Criterion 10 — the bulk-edit projection is PRESENCE-gated, over all eight combinations
-// ---------------------------------------------------------------------------
 
 /** Build a draft through the REAL setters, so the table cannot drift from the producer. */
 function stage({ icon, colour, status }) {
@@ -134,9 +119,7 @@ describe('1036/10 — toBulkEssenceEdit emits an axis key IFF that axis is stage
   });
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 22 — the shared status axis, after the extraction
-// ---------------------------------------------------------------------------
 
 describe('1036/22 — the extracted unchanged|enable|disable status axis', () => {
   it('is ONE frozen list, shared by the recipe and essence models', () => {
@@ -165,9 +148,7 @@ describe('1036/22 — the extracted unchanged|enable|disable status axis', () =>
   }
 });
 
-// ---------------------------------------------------------------------------
 // The add-new offer projection (the pure half of criteria 2 and 18)
-// ---------------------------------------------------------------------------
 
 describe('1036 — selectableEssenceOptions', () => {
   const OPTIONS = [
@@ -203,9 +184,7 @@ describe('1036 — selectableEssenceOptions', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 23 (the shared reference predicate half)
-// ---------------------------------------------------------------------------
 
 describe('1036/23 — recipeReferencesEssence, extracted for the store and the manager', () => {
   const legacyMapRecipe = { ingredientSets: [{ id: 's1', essences: { fire: 2 } }] };
@@ -247,9 +226,7 @@ describe('1036/23 — recipeReferencesEssence, extracted for the store and the m
   });
 });
 
-// ---------------------------------------------------------------------------
 // The editor's Validation tab
-// ---------------------------------------------------------------------------
 
 describe('1036 — essenceEditorValidation', () => {
   const COMPLETE = {
@@ -285,10 +262,7 @@ describe('1036 — essenceEditorValidation', () => {
     const result = essenceEditorValidation({ ...COMPLETE, colorToken: null });
     assert.equal(check(result, 'colour').valid, true);
     assert.equal(check(result, 'colour').state, 'unset');
-    // The SEVERITY, not just the verdict. `unset` is not one of the three failure states,
-    // so `valid` stays true whatever severity the row carries — which made "a pass, not a
-    // warning" true by accident and a re-classification to `warning` invisible. The tab
-    // renders this value, so it is part of the contract.
+    // The SEVERITY, not just the verdict.
     assert.equal(
       check(result, 'colour').severity,
       'info',
@@ -380,9 +354,7 @@ describe('1036 — essenceEditorValidation', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // The browser model
-// ---------------------------------------------------------------------------
 
 describe('1036 — essenceBrowserModel', () => {
   const ROWS = [
@@ -472,6 +444,14 @@ describe('1036 — essenceBrowserModel', () => {
     assert.deepEqual([model.rangeStart, model.rangeEnd, model.totalCount], [0, 0, 0]);
   });
 
+  it('negative control: an unrecognised source filter matches everything rather than nothing', () => {
+    // Without the allowed-list coercion an unknown value falls through to the broken-source
+    // branch, which would show `water` and `earth` instead of the whole library.
+    assert.equal(filterEssences(ROWS, { source: 'sideways' }).length, ROWS.length);
+    assert.equal(filterEssences(ROWS, { source: '' }).length, ROWS.length);
+    assert.equal(filterEssences(ROWS, {}).length, ROWS.length);
+  });
+
   it('counts each status over every filter EXCEPT the status axis, so a segment says what it would find', () => {
     const model = buildEssenceBrowserModel(ROWS, { status: 'enabled' });
     assert.deepEqual(
@@ -481,36 +461,48 @@ describe('1036 — essenceBrowserModel', () => {
     );
     assert.deepEqual(model.filteredIds, ['air', 'fire'], 'while the rows themselves ARE filtered');
 
-    // The OTHER axes are not widened. `needs-attention` is `water` (disabled) and `earth`
-    // (disabled), so every segment reports what selecting it alongside that source filter
-    // would actually show — 2, 0 and 2 rather than the roster's 4, 2 and 2. This is the
-    // rule `browserGroupCounts.js` states for the library group headers, on a second axis.
+    // The OTHER axes are not widened.
     assert.deepEqual(
       buildEssenceBrowserModel(ROWS, { status: 'enabled', source: 'needs-attention' })
         .statusCounts,
       { all: 2, enabled: 0, disabled: 2 }
     );
   });
+
+  it('charts the active filters as chips, status before source and the search term last', () => {
+    assert.deepEqual(describeActiveEssenceFilters({ status: 'disabled' }), [
+      { id: 'status', value: 'disabled' },
+    ]);
+    assert.deepEqual(
+      describeActiveEssenceFilters({ source: 'linked', status: 'enabled', search: '  ore  ' }),
+      [
+        { id: 'status', value: 'enabled' },
+        { id: 'source', value: 'linked' },
+        { id: 'search', value: 'ore' },
+      ],
+      'the chip row renders in this order, whatever order the state happens to carry'
+    );
+  });
+
+  it('charts nothing for a neutral, empty or absent filter', () => {
+    assert.deepEqual(describeActiveEssenceFilters({ status: 'all', source: 'all' }), []);
+    assert.deepEqual(describeActiveEssenceFilters({ status: '', source: null, search: '   ' }), []);
+    assert.deepEqual(describeActiveEssenceFilters(), []);
+  });
+
+  it('charts the raw filter value, because a chip the GM cannot see is a filter they cannot clear', () => {
+    // The allowed lists coerce the filter to `all`; the chip still reports what the state holds.
+    assert.equal(filterEssences(ROWS, { status: 'sideways' }).length, ROWS.length);
+    assert.deepEqual(describeActiveEssenceFilters({ status: 'sideways' }), [
+      { id: 'status', value: 'sideways' },
+    ]);
+  });
 });
 
-// ---------------------------------------------------------------------------
 // The bulk delete impact statement
-// ---------------------------------------------------------------------------
 
 describe('1036 — describeEssenceDeleteImpact', () => {
-  // The SHARED-CARRIER fixture, deliberately shaped so a sum and a union differ. This
-  // mirrors what `tests/essence-manager-set-apply.test.js` proves the manager does:
-  // essences across SHARED recipes rewrite each referencing recipe ONCE for the whole
-  // selection. Summing per-essence counts would report one more — a sidebar telling the GM
-  // more than the truth. The identities are what make the two answers distinguishable at
-  // all; a counts-only fixture cannot fail this.
-  //
-  // It is built through `makeEssenceRow`, whose rows carry no `deleteBlocked` flag because
-  // the delete is WARNED, not BLOCKED (maintainer round): every selected essence is
-  // deletable regardless of component usage. The fixture still mixes carried rows
-  // (`fire`/`water` carry components) with uncarried ones (`earth`/`air`) so the component
-  // union is exercised over a genuinely mixed selection, and its recipe ids are shared so a
-  // union and a sum differ.
+  // The SHARED-CARRIER fixture, deliberately shaped so a sum and a union differ.
   const SELECTION = [
     makeEssenceRow({
       id: 'fire',
@@ -550,9 +542,8 @@ describe('1036 — describeEssenceDeleteImpact', () => {
   });
 
   it('makes EVERY selected essence deletable, carried or not', () => {
-    // The maintainer's change: a component-carried essence deletes exactly like an
-    // uncarried one, because the cascade strips it from every carrier. No selection is
-    // ever inert on account of component usage.
+    // The maintainer's change: a component-carried essence deletes exactly like an uncarried one,
+    // because the cascade strips it from every carrier.
     const impact = describeEssenceDeleteImpact(SELECTION);
     assert.equal(impact.deletable, 4, 'all four, including the component-carried Fire and Water');
     assert.deepEqual(impact.deletableIds, ['fire', 'water', 'earth', 'air']);

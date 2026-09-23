@@ -1,110 +1,7 @@
 /**
- * The `check-screenshots` gate's composed decision (issue 1133).
- *
- * Every case here drives the REAL `decideScreenshotGate` — ONE call per case, with the ordering, the
- * post-conclusion re-read and the verdict all performed by the product and merely asserted by the
- * test. That is the point rather than a style choice: a suite that itself awaited, itself evaluated
- * and then asserted would prove only that its own fakes returned what they were told, and would stay
- * green with the await deleted from the product.
- *
- * WHAT IS FAKED, AND WHAT IS NOT
- * ------------------------------
- * `runGh`, `sleep` and `now` are faked. The `evaluate` bundle is NOT: it carries the real
- * `isExemptByLabel`, `validateChangedFilesForCheck`, `hasUiChanges` and
- * `explainScreenshotEvidenceFailure` from `scripts/ui-pr-screenshot-evidence.mjs`. That bundle exists
- * to break an ESM cycle, not to be a seam for stubs — stubbing it would make the delegated verdicts
- * a test asserting its own stubs. Importing both the script and the lib here creates no cycle,
- * because the lib imports nothing from the script.
- *
- * THE MUTATION MAP IS THE ACCEPTANCE BAR
- * --------------------------------------
- * Each of the 62 mutations below must flip the named test to FAIL. A test that passes under its
- * mutation is not evidence of the behaviour it claims to cover. The delta's map named 24; the rest
- * are decision points post-implementation review found unpinned, and are listed here so a later
- * revision that removes one without removing its test is visible.
- *
- *   delete the await                                        -> (a)
- *   invert the failure branch                               -> (a), (c), (d)
- *   skip the post-conclusion re-read                        -> (b)
- *   delete the fast path                                    -> (n), (n2)
- *   `Boolean(...)` on --capture-eligible                    -> (q)
- *   graceMs = 0 / locate once                               -> (k)
- *   intersection -> equality                                -> (o)
- *   delete the deadline                                     -> (g1)
- *   delete maxPolls                                         -> (g2)
- *   drop locateCaptureRun's grace give-up                   -> (g3)
- *   drop effectiveDeadline's maxWaitMs ceiling              -> (g4)
- *   drop observeAnchor's once-only guard                    -> (g5)
- *   most-recent-only run selection                          -> (i3)
- *   oldest-run selection                                    -> (i)
- *   drop the pull_requests[].number filter                  -> (i2)
- *   `>=` -> `<=` in the recency reduce                      -> (i4)
- *   `candidates[0]` instead of the recency reduce           -> (i4)
- *   drop the head_branch fallback                           -> (x1)
- *   reject a run when headRepository is empty               -> (x2)
- *   gate-start deadline anchor                              -> (j)
- *   collapse capture-run-failed into capture-published-nothing   -> (l)
- *   collapse capture-run-not-found into no-screenshots-section   -> (k2)
- *   delete step 1 (the exempt label)                        -> (r)
- *   delete step 2 (the changed-files guard)                 -> (s)
- *   always-unarmed step 3                                   -> (a)
- *   always-armed step 3                                     -> (t)
- *   outsideBlock collects every image in the body           -> (u)
- *   adapter: drop the exit-code application                 -> (p)
- *   adapter: restate a bound literal                        -> (p)
- *   adapter: map the base SHA into headSha                  -> (p)
- *   adapter: never forward --await-capture                  -> (p)
- *   adapter: forward the wrong repo                         -> (p)
- *   adapter: forward the wrong capture workflow             -> (p)
- *   adapter: validate --capture-timeout-minutes and discard it   -> (p2)
- *   adapter: forward headBranch empty                       -> (p3)
- *   adapter: forward headRepository empty                   -> (p3)
- *   adapter: forward patches as undefined                   -> (p4)
- *   parseArgs: treat an empty flag value as missing         -> (p5)
- *   adapter: changedFilesRequired always false              -> (p6)
- *   adapter: drop `|| undefined` on --capture-workflow      -> (p7)
- *   parseCaptureTimeoutMs('') -> 0                          -> (p7)
- *   parseCaptureEligible('') -> true                        -> (p8)
- *   parseArgs: drop `next === undefined`                    -> (p9)
- *   parseArgs: drop `next.startsWith('--')`                 -> (p9)
- *   adapter: read an empty --head-sha as a real head        -> (p10)
- *   maxPolls * pollIntervalMs < maxWaitMs                   -> tests/ci-workflow-semantics.test.js
- *   the gate step stops passing --head-sha                  -> tests/ci-workflow-semantics.test.js
- *   judge staleness with no head SHA to judge against       -> (v)
- *   skip the staleness rule when a head SHA IS available    -> (v2)
- *   refuse a legacy key's absent head SHA                   -> (v3)
- *   name a managed block the body does not contain          -> (w)
- *   seek the end delimiter from the body's start            -> (w2)
- *   headPhrase interpolating an empty head SHA              -> (w3)
- *   blame the producer for a run list never read            -> (k3)
- *   widen the superseded pass past `cancelled`              -> (f3)
- *   swallow a failed pull request body read                 -> (z1)
- *   readPullRequestField without its --repo scoping         -> (a)
- *   htmlImageSrc returns ''                                 -> the image-parser test
- *   htmlImageSrc takes the LEFTMOST src                     -> the image-parser test
- *   markdownImageUrl keeps the CommonMark title             -> the image-parser test
- *   drop imageUrlsIn's .filter(Boolean)                     -> the image-parser test
- *   accept a URL the evidence predicate rejects             -> the image-predicate drift test
- *
- * WHY `# cancelled` IS THE RISK HERE AND `# fail` IS NOT ALWAYS ENOUGH
- * --------------------------------------------------------------------
- * Test (g2) freezes the injected clock and lets the producer run never conclude. If the iteration
- * cap were deleted, that loop would spin under a `sleep` that resolves immediately until node:test's
- * `--test-timeout` fires — which reports the file's remaining tests as `# cancelled`, never as
- * `# fail`. Read both counts.
- *
- * WHY (g3), (g4) AND (g5) ASSERT ON THE CLOCK RATHER THAN ON A CODE
- * -----------------------------------------------------------------
- * Three separate bounds stop this gate — the grace give-up, the wall-clock ceiling and the once-only
- * deadline anchor — and each ALONE keeps the job inside the 110-minute `timeout-minutes` that
- * `tests/ci-workflow-semantics.test.js` ties `MAX_WAIT_MS` to. Dropping any one of them still ends
- * at `capture-did-not-conclude` or `capture-run-not-found`, just 20 to 117 minutes later (the
- * iteration cap is all that is left, and it runs 120), and past 110 GitHub kills the job with NO
- * `::error::<code>` at all — an uncoded red, which is the failure this issue exists to remove.
- * A code assertion cannot see that; elapsed time on the injected clock can,
- * so these three read `clock.now()`. Two of them also mutually mask (drop the ceiling and the anchor
- * guard together and the anchored deadline slides forever), which is why each has its own fixture
- * rather than one shared "it terminates" case.
+ * The `check-screenshots` gate's composed decision (issue 1133). THE MUTATION MAP IS THE ACCEPTANCE
+ * BAR -------------------------------------- Each of the 62 mutations below must flip the named
+ * test to FAIL.
  */
 
 import assert from 'node:assert/strict';
@@ -126,6 +23,7 @@ import {
 import {
   FALLBACK_CASE_ID,
   VIEW_LAB_CASES,
+  VIEW_LAB_CASE_FILES,
   hasUiChanges as labHasUiChanges,
   mapChangedFilesToCases,
 } from '../scripts/lib/viewLabCases.js';
@@ -166,11 +64,14 @@ const MS_PER_MINUTE = 60_000;
 const CHANGED_FILES = ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'];
 const EXPECTED_CASE_IDS = mapChangedFilesToCases(CHANGED_FILES).map((viewCase) => viewCase.id);
 
-/** The View Lab case registry, which is both a lab input and a patch-attributable one. */
-const REGISTRY_PATH = 'scripts/lib/viewLabCases.js';
+/** The case file declaring the fallback case: both a lab input and a patch-attributable one. */
+const REGISTRY_PATH = VIEW_LAB_CASE_FILES.map(({ path }) => path).find((path) =>
+  readFileSync(path, 'utf8').includes(`    id: '${FALLBACK_CASE_ID}',`)
+);
+assert.ok(REGISTRY_PATH, `no case file declares ${FALLBACK_CASE_ID} inline`);
 
 /**
- * The 1-based line on which the registry declares the fallback case's id, asserted present so a
+ * The 1-based line on which that file declares the fallback case's id, asserted present so a
  * rename fails loudly instead of quietly turning the patch below into an assertion about line 0.
  *
  * @returns {number} The line number.
@@ -183,12 +84,8 @@ function fallbackCaseIdLine() {
 }
 
 /**
- * A unified diff claiming one line of the registry was just added, with the three lines of context
- * either side that `git` emits.
- *
- * The `+` line carries the file's CURRENT text because case attribution anchors on the window's
- * CONTENT rather than on the hunk header's line numbers — a patch built from invented text would
- * fail to anchor and widen to surface coverage, which is the answer this fixture must not get.
+ * A unified diff claiming one line of that case file was just added, with the three lines of
+ * context either side that `git` emits.
  *
  * @param {number} line The 1-based line to mark as added.
  * @returns {string} The patch.
@@ -204,9 +101,7 @@ function registryPatchAddingLine(line) {
   return [`@@ -${from},${body.length - 1} +${from},${body.length} @@`, ...body].join('\n');
 }
 
-/**
- * The REAL predicates. This is a cycle-avoidance seam, not a test double — see the file header.
- */
+/** The REAL predicates. This is a cycle-avoidance seam, not a test double — see the file header. */
 const REAL_EVALUATE = Object.freeze({
   isExempt: isExemptByLabel,
   validateChangedFiles: validateChangedFilesForCheck,
@@ -278,10 +173,6 @@ function bodyWithBlock({ headSha = HEAD, caseIds = EXPECTED_CASE_IDS } = {}) {
 /**
  * A `gh` fake whose producer run stays `queued` for the first N polls and then runs forever.
  *
- * Shared by (g4) and (g5) rather than spelled out twice: `tests/**` duplication counts against the
- * SonarCloud new-code gate, and the two cases differ only in how long the queue is — which is
- * exactly the variable that decides WHICH bound ends the wait.
- *
  * @param {number} queuedPolls How many polls report the run as `queued`.
  * @returns {object} The fake.
  */
@@ -307,7 +198,6 @@ const HUMAN_PASTED_BODY =
  *
  * @param {object} decision The verdict.
  * @param {string} code The expected code.
- * @returns {void}
  */
 function assertFailedWith(decision, code) {
   assert.equal(decision.exitCode, 1, `expected a failing gate, got: ${decision.message}`);
@@ -330,9 +220,7 @@ describe('decideScreenshotGate', () => {
     assert.equal(decision.waited, true, 'the gate must have actually waited');
     assert.equal(decision.runConclusion, 'success');
     assert.ok(clock.sleepCalls > 0, 'the gate must have slept at least once');
-    // The post-conclusion re-read is SCOPED to this repository. `gh pr view 1133` without `--repo`
-    // resolves the number against whatever remote the runner's checkout points at, which is a
-    // different pull request with the same number — and its body would then decide this gate.
+    // The post-conclusion re-read is SCOPED to this repository.
     assert.deepEqual(
       gh.calls.find((args) => args.includes('body')),
       ['pr', 'view', String(PR), '--repo', REPO, '--json', 'body', '--jq', '.body']
@@ -432,11 +320,8 @@ describe('decideScreenshotGate', () => {
 
   it('(f3) does not pass a FAILED capture as superseded, however far the head has since moved', async () => {
     // The superseded pass is scoped to `cancelled` because a newer push cancels its predecessor's
-    // capture through workflow concurrency — the run produced nothing through no fault of the head it
-    // was drawn for. Any other conclusion means the run RAN for this head, and "the head moved since"
-    // is then not an excuse: widening the pass to any conclusion turns every push that lands during
-    // the check into a green gate with no evidence at all, which is a false green on the busiest
-    // path there is. (f1) cannot see that — its run IS cancelled — so nothing pinned the scoping.
+    // capture through workflow concurrency — the run produced nothing through no fault of the head
+    // it was drawn for.
     const gh = makeGhFake({
       runs: [workflowRun({ conclusion: 'failure' })],
       headOid: NEXT_HEAD,
@@ -480,10 +365,7 @@ describe('decideScreenshotGate', () => {
 
   it('(g3) gives up on a producer that never appears within the grace window, at production bounds', async () => {
     // AT PRODUCTION BOUNDS, on a clock advancing one real poll interval per sleep, so the assertion
-    // is wall-clock minutes rather than fixture units. `locateCaptureRun` carries no wall-clock
-    // ceiling of its own — only this give-up and the iteration cap — so without it a pull request
-    // whose producer never dispatches polls for MAX_POLLS * POLL_INTERVAL_MS (120 minutes), and
-    // the 110-minute job ceiling kills the job before the script can name the problem.
+    // is wall-clock minutes rather than fixture units.
     const gh = makeGhFake({ runs: [], body: '' });
     const clock = makeGateClock({ start: 0, step: POLL_INTERVAL_MS });
 
@@ -503,8 +385,7 @@ describe('decideScreenshotGate', () => {
   it('(g4) stops at its own wall-clock ceiling on a capture that queues for most of it, at production bounds', async () => {
     // The ceiling is the ONLY bound that can end this: the run is queued for 50 minutes, so its
     // anchored deadline (job start + capture timeout + slack) lands at 130 minutes, well past both
-    // the ceiling and the 110-minute job timeout. Queued time does not consume the capture's
-    // budget, but it does consume this gate's.
+    // the ceiling and the 110-minute job timeout.
     const gh = neverConcludingRun((50 * MS_PER_MINUTE) / POLL_INTERVAL_MS);
     const clock = makeGateClock({ start: 0, step: POLL_INTERVAL_MS });
 
@@ -522,12 +403,7 @@ describe('decideScreenshotGate', () => {
   });
 
   it('(g5) anchors the capture deadline ONCE, so a run observed repeatedly cannot push it forward', async () => {
-    // The anchor is recorded at the FIRST non-queued observation. Recording it again on every later
-    // observation would move the deadline forward by one poll interval each time — a deadline that
-    // can never be reached — leaving the wall-clock ceiling as the only bound, 10 minutes later here
-    // and unbounded if the ceiling is dropped too. That mutual masking is why this case queues for
-    // only 10 minutes: the anchored deadline then lands at 90 minutes, strictly inside the ceiling,
-    // so the ceiling cannot stand in for the anchor.
+    // The anchor is recorded at the FIRST non-queued observation.
     const queuedPolls = (10 * MS_PER_MINUTE) / POLL_INTERVAL_MS;
     const deadline = queuedPolls * POLL_INTERVAL_MS + CAPTURE_TIMEOUT_MS + SLACK_MS;
     assert.ok(
@@ -627,10 +503,7 @@ describe('decideScreenshotGate', () => {
   it('(i4) reports the newer of two equally-classed runs, not the one the list happens to lead with', async () => {
     // THE TIE-BREAK ITSELF, which (i) and (i3) do not reach: both of those put their two runs in
     // DIFFERENT terminality classes, so `pending` narrows to a single candidate and the recency
-    // reduce never compares a pair. Two completed runs for one head is the ordinary shape — `opened`
-    // then `reopened`, or a synchronize landing on the same SHA — and there the reduce is the only
-    // thing choosing. Picking the older reports a stale conclusion and points the reader at the
-    // wrong log, which is a wrong-problem red of exactly the kind this issue exists to remove.
+    // reduce never compares a pair.
     const older = workflowRun({
       id: 1,
       conclusion: 'failure',
@@ -656,8 +529,7 @@ describe('decideScreenshotGate', () => {
   it('(x1) narrows an unattached run by head branch, and keeps the one that matches', async () => {
     // The API leaves `pull_requests` empty often enough that the head-branch fallback is load-
     // bearing, and every other fixture here carries an attached number — so the fallback was dead
-    // code as far as this suite could see, and deleting it outright left the suite green. Two runs,
-    // one for this branch and one for somebody else's, on the same head SHA.
+    // code as far as this suite could see, and deleting it outright left the suite green.
     const mine = workflowRun({ id: 1, prNumber: null, htmlUrl: 'https://github.test/run/mine' });
     const theirs = workflowRun({
       id: 2,
@@ -681,9 +553,7 @@ describe('decideScreenshotGate', () => {
 
   it('(x2) still finds the run when the head repository is unknown, as a deleted fork makes it', async () => {
     // `ci.yml` renders `--head-repository ''` when a contributor deletes their fork while the pull
-    // request is open (`head.repo` is then null). An absent narrowing input must narrow NOTHING —
-    // rejecting every run instead would answer `capture-run-not-found` on a pull request whose
-    // producer ran, which is an unskippable red for a reason outside the author's control.
+    // request is open (`head.repo` is then null).
     const gh = makeGhFake({
       runs: [workflowRun({ prNumber: null, headRepository: 'deleted-fork/fabricate' })],
       body: bodyWithBlock(),
@@ -699,18 +569,7 @@ describe('decideScreenshotGate', () => {
   it('(j) tolerates a queue longer than the capture timeout, because the anchor is job start', async () => {
     // Against a gate-start anchor this is a guaranteed fail, and against a `run_started_at` anchor
     // populated DURING the queued phase it is too — which is what makes it discriminate rather than
-    // pass under either reading.
-    //
-    // Both ends of the fixture are DERIVED from the production bounds rather than hand-picked. The
-    // hand-picked queue (5 polls, 50 minutes) stopped exceeding the capture timeout the moment that
-    // timeout was raised to 75 (issue 1594), and a queue that no longer outlasts the timeout tests
-    // nothing at all here; the ceiling assertion is the other end, because a queue long enough to
-    // trip `maxWaitMs` would be ended by the ceiling instead of by the anchor.
-    //
-    // The queue must outlast BOTH readings this case discriminates against: a gate-start anchor
-    // (capture + slack measured from zero) and a `run_started_at` anchor populated while the run is
-    // still queued (that timestamp + capture + slack). Deriving from CAPTURE_TIMEOUT_MS alone leaves
-    // the second reading alive and ties the first exactly, which is no margin at all.
+    // pass under either reading (issue 1594).
     const runStartedAtMs = 60_000;
     const step = 5 * 60_000;
     const mutantDeadline = runStartedAtMs + CAPTURE_TIMEOUT_MS + SLACK_MS;
@@ -896,12 +755,7 @@ describe('decideScreenshotGate', () => {
 
   it('(v) does not call a published block stale when no head SHA was supplied to judge it against', async () => {
     // THE PRE-CHANGE DEFAULT INVOCATION, exactly: no `awaitCapture` and no `headSha`, which is how
-    // `npm run screenshots:ui:check` and every other non-CI caller reach the gate. `headSha` defaults
-    // to `''`, and a published key's SHA segment is never `''`, so a plain equality test classes
-    // EVERY identified frame stale here — turning a body carrying a perfectly good block into
-    // `no-frames-for-this-head`, with an empty SHA interpolated into the prose. Cases (n) and (n2)
-    // cannot see that: one carries a no-evidence body and the other a human-pasted image, and neither
-    // reaches the matcher's head rule at all.
+    // `npm run screenshots:ui:check` and every other non-CI caller reach the gate.
     const gh = makeGhFake({});
     const clock = makeGateClock({});
 
@@ -946,13 +800,9 @@ describe('decideScreenshotGate', () => {
   });
 
   it('(v3) accepts a legacy published key, whose location carries no head SHA to judge', async () => {
-    // The third member of the family, and the one the module's own docstring PROMISES: a key with no
-    // SHA segment answers `headSha: null`, which the matcher must read as "cannot judge THIS FRAME's
-    // head" and fall back to the case-id rule. That is what makes a publish-flag regression degrade
-    // to today's behaviour instead of reddening every UI PR — a false red on every pull request at
-    // once, from a producer-side change no author can see. `classifyPublishedFrameUrl`'s legacy
-    // branch is unit-tested below, but nothing tested that the MATCHER consumes the `null` it emits,
-    // and (v) cannot: (v) supplies no head SHA at all, so it never reaches the per-frame rule.
+    // The third member of the family, and the one the module's own docstring PROMISES: a key with
+    // no SHA segment answers `headSha: null`, which the matcher must read as "cannot judge THIS
+    // FRAME's head" and fall back to the case-id rule.
     const gh = makeGhFake({});
     const clock = makeGateClock({});
 
@@ -972,8 +822,7 @@ describe('decideScreenshotGate', () => {
   it('(w) does not name a managed screenshot block the body does not contain', async () => {
     // `containsImage` in the evaluation bundle accepts an `<img>` with an empty `src`, while
     // `imageUrlsIn` reads no URL out of it — so the gate arrives at the matcher with no missing-
-    // evidence explanation AND no frames, having never seen a managed block. Sending the reader to
-    // look inside a block that is not there is the wrong-problem red this whole issue is about.
+    // evidence explanation AND no frames, having never seen a managed block.
     const gh = makeGhFake({});
     const clock = makeGateClock({});
 
@@ -996,13 +845,7 @@ describe('decideScreenshotGate', () => {
   });
 
   it('(w2) finds the managed block below a stray end delimiter, rather than reading its frames as hand-supplied', async () => {
-    // A hand-edited body can carry an end delimiter ABOVE the real block. Seeking the end delimiter
-    // from the body's start then finds that stray one, the block "does not parse", and its
-    // auto-published frames — still sitting under the block's own `## Screenshots` heading — count as
-    // images OUTSIDE the block, which satisfies the gate OUTRIGHT through the human-pasted precedence
-    // rule with no head or view matching applied. One stray delimiter would launder the previous
-    // head's frames into maintainer-supplied evidence, which is the staleness hole this issue closes,
-    // re-opened by punctuation. The end delimiter is therefore sought from the start delimiter.
+    // A hand-edited body can carry an end delimiter ABOVE the real block.
     const gh = makeGhFake({});
     const clock = makeGateClock({});
     const stale = managedScreenshotBlock({
@@ -1024,10 +867,9 @@ describe('decideScreenshotGate', () => {
   });
 
   it('(w3) names the head in its prose, or says it has none, but never renders a hole in the sentence', async () => {
-    // `headSha` is optional, so every message that quotes it can render `run for ` with nothing after
-    // it — a sentence with a hole in it, which reads as a bug in the gate rather than as a diagnosis
-    // of the pull request. The guard has a docstring promising it never happens and, until this case,
-    // no test: every other fixture here supplies a head SHA.
+    // `headSha` is optional, so every message that quotes it can render `run for ` with nothing
+    // after it — a sentence with a hole in it, which reads as a bug in the gate rather than as a
+    // diagnosis of the pull request.
     const gh = makeGhFake({ runs: [], body: '' });
     const clock = makeGateClock({ start: 0, step: 4_000 });
 
@@ -1044,8 +886,7 @@ describe('decideScreenshotGate', () => {
 
   it('(k3) does not blame the producer for a run list it never managed to read', async () => {
     // A sustained API outage or a rate-limit 403 makes `listCaptureRuns` answer `[]`, which is
-    // byte-identical to "the producer never dispatched". Telling the reader to check whether
-    // pr-screenshots.yml dispatches at all is then the wrong place to look. Still fails closed.
+    // byte-identical to "the producer never dispatched".
     const gh = makeGhFake({ runs: [], body: '' });
     const runGh = (args) => {
       if (args[0] !== 'api') return gh.runGh(args);
@@ -1074,12 +915,8 @@ describe('decideScreenshotGate', () => {
   it('(z1) codes a body it could not read, instead of dying with a bare message', async () => {
     // The body read runs on EVERY awaited run — twice on a cancelled one — so it is the most
     // exercised `gh` call in the module, and it used to throw past the adapter: on a rate-limited
-    // `gh pr view` the required check printed `Failed to read body for pull request #1133: HTTP 403…`
-    // with no `::error::<code>` at all. That is the same uncoded red case (p5) removed one layer up,
-    // reproduced on the hot path — and the runs-list call already treats the SAME API under the SAME
-    // rate limit as a warned, coded failure. It must also NOT be reported as
-    // `capture-published-nothing`: the run may well have published, and that message sends the reader
-    // to an IAM trust policy for what is a rate limit on this gate's own call.
+    // `gh pr view` the required check printed `Failed to read body for pull request #1133: HTTP
+    // 403…` with no `::error::<code>` at all.
     const gh = makeGhFake({ runs: [workflowRun({})], body: '' });
     const runGh = (args) => {
       if (args[0] !== 'pr') return gh.runGh(args);
@@ -1170,7 +1007,6 @@ describe('the check command adapter', () => {
    * @param {object} captured The captured console output.
    * @param {string} code The expected gate code.
    * @param {string} [names] Text the diagnostic must also carry.
-   * @returns {void}
    */
   function assertAnnotated(captured, code, names = '') {
     assert.ok(
@@ -1205,10 +1041,7 @@ describe('the check command adapter', () => {
     assert.ok(queries.length > 0, '--await-capture must be forwarded into the call');
     assert.ok(clock.sleepCalls > 0, 'waited === true when --await-capture is passed');
 
-    // --repo and --capture-workflow reached the call too. The runs query is the ONLY place either
-    // is observable, and asserting the head SHA alone left both free: a gate polling the wrong
-    // repository, or another workflow, waits out its whole budget and reds a pull request whose
-    // producer succeeded — with the same `capture-did-not-conclude` code this case already saw.
+    // repo and --capture-workflow reached the call too.
     assert.ok(
       queries.every((query) =>
         query.startsWith(`repos/${REPO}/actions/workflows/${CAPTURE_WORKFLOW}/runs`)
@@ -1232,10 +1065,7 @@ describe('the check command adapter', () => {
 
   it('(p2) forwards --capture-timeout-minutes as the producer deadline, not merely validating it', async (t) => {
     // The flag was VALIDATED by a test and its value pinned by nothing: an adapter that parsed it
-    // and then passed `undefined` left the whole suite green. The latent failure is exact — raise
-    // `capture`'s own `timeout-minutes` to 90, and `tests/ci-workflow-semantics.test.js` follows the
-    // YAML while the module keeps waiting 75, so every capture past 75 minutes reds
-    // `capture-did-not-conclude`: this issue's symptom under a new code, suite green.
+    // and then passed `undefined` left the whole suite green.
     const paths = cliInputs(t);
     const gh = makeGhFake({
       runs: [workflowRun({ status: 'in_progress', conclusion: null })],
@@ -1271,9 +1101,7 @@ describe('the check command adapter', () => {
 
   it('(p3) forwards --head-branch and --head-repository, so another PR’s run is not adopted', async (t) => {
     // Both are pure run-selection inputs, invisible in the runs query, and each degrades to "narrow
-    // on nothing" when empty — so forwarding either as `''` is silent. Two unattached runs on this
-    // head, one on somebody else's branch and one from a different head repository: forwarding both
-    // flags rejects both runs, and dropping EITHER adopts the run that flag was rejecting.
+    // on nothing" when empty — so forwarding either as `''` is silent.
     const paths = cliInputs(t);
     const gh = makeGhFake({
       runs: [
@@ -1297,9 +1125,7 @@ describe('the check command adapter', () => {
   it('(p4) forwards --patches-file, so the narrowed case selection actually narrows', async (t) => {
     // `--patches-file` is the only input that changes WHICH frames count as evidence, and an
     // adapter that read the file and passed `undefined` was invisible: every other case here
-    // changes files whose selection is patch-independent. A registry change with a patch confined
-    // to one case selects that case; without the patch it widens to surface coverage, which shares
-    // no frame with that one case.
+    // changes files whose selection is patch-independent.
     const patches = { [REGISTRY_PATH]: registryPatchAddingLine(fallbackCaseIdLine()) };
     // The registry ships BESIDE a render file, because the registry alone does not arm this gate —
     // and that is the realistic shape anyway: a case is added in the same push as the view it draws.
@@ -1345,10 +1171,6 @@ describe('the check command adapter', () => {
   it('(p5) reaches a coded verdict on an EMPTY --head-repository, and the exempt label still clears it', async (t) => {
     // `ci.yml` passes `--head-repository "$PR_HEAD_REPO"`, and that variable renders EMPTY when a
     // contributor deletes their fork while the pull request is open (`head.repo` is then null).
-    // Argument parsing treated an empty next token as a MISSING value and threw, so the required
-    // check died with a bare message and no `::error::<code>` — and, because parsing precedes step
-    // 1, not even a maintainer-applied `screenshots-exempt` label could clear it. An unskippable
-    // red for a reason outside the author's control is the failure class this whole issue is about.
     const paths = cliInputs(t, { body: 'No evidence here.' });
     const emptyHeadRepository = ['--repo', REPO, '--head-sha', HEAD, '--head-repository', ''];
     const gh = makeGhFake({});
@@ -1410,11 +1232,7 @@ describe('the check command adapter', () => {
 
   it('(p7) reads an EMPTY --capture-workflow and --capture-timeout-minutes as absent, so the module’s defaults apply', async (t) => {
     // Both branches became REACHABLE when an empty flag value stopped being parsed as a missing one
-    // (case (p5)), and neither was tested. Dropping `|| undefined` sends `''` into the runs query as
-    // `workflows//runs`, which matches no workflow and waits out the whole budget; making
-    // `parseCaptureTimeoutMs('')` answer `0` collapses the deadline to the slack alone, so every UI
-    // pull request reds `capture-did-not-conclude` five minutes in — this issue's own symptom under
-    // the new code.
+    // (case (p5)), and neither was tested.
     const paths = cliInputs(t);
     const gh = makeGhFake({
       runs: [workflowRun({ status: 'in_progress', conclusion: null })],
@@ -1509,16 +1327,9 @@ describe('the check command adapter', () => {
   });
 
   it('(p10) reads an EMPTY --head-sha as “cannot judge head”, and reds the same body once one is supplied', async (t) => {
-    // The two r5 fixes INTERACT here: `--head-sha ''` now parses as a value, and `framesForThisHead`
-    // reads an empty head as "cannot judge", so the staleness rule switches itself off and a body
-    // carrying the PREVIOUS head's block passes. `ci.yml` always populates `$HEAD_SHA` — pinned in
-    // tests/ci-workflow-semantics.test.js, which is the other half of this composition — so the live
-    // gate always takes the judging path.
-    //
-    // Making an explicitly-empty `--head-sha` an ERROR instead was considered and rejected: parsing
-    // precedes step 1, so a throw there is an unskippable red that not even a maintainer-applied
-    // `screenshots-exempt` label can clear, which is precisely the failure class (p5) removed. The
-    // degradation is documented, deliberate, and pinned in BOTH directions here.
+    // The two r5 fixes INTERACT here: `--head-sha ''` now parses as a value, and
+    // `framesForThisHead` reads an empty head as "cannot judge", so the staleness rule switches
+    // itself off and a body carrying the PREVIOUS head's block passes.
     const paths = cliInputs(t, { body: bodyWithBlock({ headSha: PREVIOUS_HEAD }) });
     const gh = makeGhFake({});
     const clock = makeGateClock({});
@@ -1654,10 +1465,7 @@ const IMAGE_MARKUP_SAMPLES = Object.freeze([
 test('the image parser never claims a URL the evidence predicate would not call evidence', () => {
   // `containsImage`/`hasScreenshotEvidence` in `scripts/ui-pr-screenshot-evidence.mjs` and
   // `imageUrlsIn`/`screenshotSections` here are two hand-maintained mirrors of one rule, and the
-  // ESM cycle described in this module's header is why they cannot be one. This is the drift
-  // detector for the direction that would WEAKEN the gate: a URL the parser accepts satisfies the
-  // gate outright through the human-pasted precedence rule, without the predicate being consulted
-  // at all, so a parser that read images the predicate rejects would quietly widen what passes.
+  // ESM cycle described in this module's header is why they cannot be one.
   let withUrls = 0;
   for (const markup of IMAGE_MARKUP_SAMPLES) {
     const body = `## Screenshots\n\n${markup}\n`;
@@ -1675,29 +1483,17 @@ test('the image parser never claims a URL the evidence predicate would not call 
   );
 
   // The OTHER direction is a KNOWN, one-way gap rather than an oversight: the predicate accepts an
-  // empty `src` and an empty target as images while the parser reads no URL out of either. That is
-  // the case (w) diagnostic's whole reason for existing, and it is asserted here so a change that
-  // closes it in either implementation has to come past this test.
+  // empty `src` and an empty target as images while the parser reads no URL out of either.
   const emptySource = '## Screenshots\n\n<img src="">\n';
   assert.equal(hasScreenshotEvidence(emptySource), true);
   assert.deepEqual(parseScreenshotEvidenceImages(emptySource).outsideBlock, []);
 });
 
 /**
- * The producer and this gate arm on two hand-maintained mirrors of one predicate — `hasUiChanges` in
- * `scripts/lib/viewLabCases.js` for `capture`, and `hasUiChanges` in
+ * The producer and this gate arm on two hand-maintained mirrors of one predicate — `hasUiChanges`
+ * in `scripts/lib/viewLabCases.js` for `capture`, and `hasUiChanges` in
  * `scripts/ui-pr-screenshot-evidence.mjs` for `check-screenshots` — despite a workflow comment
- * asserting they are "exactly the same predicate". When they drift, this gate arms, capture skips
- * publishing, and the resulting `capture-published-nothing` message points the reader at IAM and
- * Foundry credentials for what is really a predicate-drift bug. This is the drift detector.
- *
- * It ALSO pins the degenerate-set guard in `matchPublishedFrames` as unreachable: an armed gate
- * implies a non-empty publishable selection today, because selection falls back to a publishable
- * default case.
- *
- * The domain is a fixed enumeration, not random strings: every `matches` source in `VIEW_RECIPES`,
- * every `sourceMatches` source in the View Lab case registry, plus the `lang/`-only and
- * `tests/view-lab/*.css` boundary cases the two predicates are most likely to disagree about.
+ * asserting they are "exactly the same predicate".
  */
 
 /** Regex metacharacters this reducer does not handle; a source still carrying one is skipped. */
@@ -1706,9 +1502,6 @@ const UNREDUCED_METACHARACTER = /[\\[\]()|*+?{}^$]/;
 /**
  * A concrete repository path a `matches` / `sourceMatches` pattern would select, or null when the
  * pattern cannot be reduced to one literally.
- *
- * Returning null rather than guessing is the safe direction: a skipped pattern shrinks the domain,
- * which the non-vacuity floor below then catches if too many are skipped.
  *
  * @param {RegExp} pattern The trigger pattern.
  * @returns {string|null} A path, or null.
@@ -1751,8 +1544,10 @@ test('the gate and the producer arm on the same predicate, and an armed gate sel
     'tests/view-lab/world/labContent.js',
     'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
     'styles/fabricate.css',
-    'src/utils/componentBrowserModel.js',
+    'src/ui/model/componentBrowserModel.js',
+    'src/ui/svelte/util/foundryIconCatalogue.json',
     'scripts/lib/viewLabCases.js',
+    REGISTRY_PATH,
     'docs/README.md',
     'main.js',
   ];
@@ -1778,4 +1573,12 @@ test('the gate and the producer arm on the same predicate, and an armed gate sel
   assert.equal(hasUiChanges(mixed), true);
   assert.equal(labHasUiChanges(mixed), true);
   assert.ok(mapChangedFilesToCases(mixed).length > 0);
+
+  // The catalogue arms the gate as any `src/ui/` path does, so its anchor must admit the `.json`.
+  assert.ok(
+    mapChangedFilesToCases(['src/ui/svelte/util/foundryIconCatalogue.json']).some(
+      (viewCase) => viewCase.id === 'manager-system-edit-lists'
+    ),
+    'the committed icon catalogue must select the case whose frame renders the icon picker'
+  );
 });

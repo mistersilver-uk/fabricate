@@ -1,63 +1,19 @@
 /**
- * THE named-field round-trip test (issue 643 §2b F2).
- *
- * Two recipes are driven through the whole chain, because the draft path has TWO
- * halves and the second one has no other guard:
- *
- *  1. `SILENT_RECIPE` — single-scope: sets, groups and result groups hang off the
- *     recipe itself.
- *  2. `MULTI_STEP_RECIPE` — `complex: true` with a real `steps[]`. A step's
- *     `ingredientSets[]` is the IDENTICAL `IngredientSet` shape (`Recipe._normalizeStep`
- *     builds it with `IngredientSet.fromJSON`) — the same `toolIds`, `essences`,
- *     `resultMapping` and per-option `tagMatch` — and `_buildRecipeList` projects
- *     `steps` WHOLESALE into the draft. The step-scope transformations in
- *     `CraftingSystemManagerRoot.svelte` (`handleEnterMultiStep`,
- *     `handleRevertToSingleStep`, `backfillScopeIds`, `trimScope`) genuinely move
- *     sets between recipe scope and step scope, so a lossy rewrite THERE would be
- *     invisible to a single-scope fixture and would ship green.
- *
- * The fixtures also preserve fields that are inactive or have no affordance in the
- * configured mode. They survive by round-trip even when the current screen cannot
- * author them:
- *
- *   - `Recipe.complex`                                  (a real authoring flag)
- *   - `IngredientSet.toolIds`                           (inactive outside named routed-by-ingredients sets)
- *   - `Ingredient.match.tagMatch: 'all'`                (a control DOES exist — and it sits exactly where the "or..." popover lands)
- *   - a reserved `role: 'failure'` result group         (alchemy Simple)
- *   - `Ingredient.extractEffects` / `effectFilter`
- *   - `Recipe.transferEffects`, `Recipe.teaser`
- *   - `Recipe.isVariable` + `IngredientSet.resultMapping`
- *   - `Recipe.outcomeRouting`                           (legacy map; validated, not read by the live routing path)
- *   - a `currency` ingredient option
- *
- * The Recipe Studio rebuilt the draft/patch path for ingredients, sets, groups and
- * steps — the one realistic vector for dropping any of them. A dropped field here is
- * invisible until a GM's recipe silently stops working.
- *
- * So this drives the REAL chain end to end, with no stand-in for the parts that could
- * lose a field:
- *
- *   real Recipe model  ->  real RecipeManager  ->  the store's real recipe projection
- *   ->  the ROOT's real draft mechanics (a JSON deep clone + a shallow patch spread,
- *       exactly as `cloneRecipeDraft` / `patchRecipeDraft` do)
- *   ->  the store's real `updateRecipe`  ->  back out through `Recipe.toJSON()`.
- *
- * The assertion is byte-for-byte: the persisted JSON after "load, edit an unrelated
- * field, save" must equal the original with ONLY that field changed.
+ * THE named-field round-trip test (issue 643 §2b F2). The assertion is byte-for-byte: the persisted
+ * JSON after "load, edit an unrelated field, save" must equal the original with ONLY that field
+ * changed.
  */
 import { describe, it, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
 
+import { createServices as createSharedServices } from '../helpers/adminStoreServices.js';
+
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');
 const { RecipeManager } = await import('../../src/systems/RecipeManager.js');
 const { Recipe } = await import('../../src/models/Recipe.js');
 
-// Every silent field, on one recipe. A currency option, a per-set toolIds, a
-// tagMatch: 'all' tag alternative, effect extraction, a variable output with its
-// result mapping, a legacy outcomeRouting map, a teaser, and the reserved failure
-// group all coexist here on purpose: the point is that ONE unrelated edit must not
-// disturb ANY of them.
+// Every silent field, on one recipe.
 const SILENT_RECIPE = Object.freeze({
   id: 'r-silent',
   name: 'Philtre of Silence',
@@ -88,12 +44,7 @@ const SILENT_RECIPE = Object.freeze({
   // 4. The legacy routing map: validated on save, not read by the live routing path.
   outcomeRouting: { success: 'grp-success' },
 
-  // 4b. Single-step duration (issue 845). UNLIKE the silent fields above this one HAS a
-  //     UI — the Overview Duration steppers — but the projection must still carry it or
-  //     the editor seeds the control from `undefined` and renders "Instant" on every
-  //     open. The persisted value is never lost (the shallow-merge floor restores it),
-  //     so its loss is DISPLAY-only and is guarded against the projected row, not the
-  //     byte-for-byte round trip.
+  // 4b. Single-step duration (issue 845).
   timeRequirement: { minutes: 0, hours: 2, days: 3, months: 0, years: 0 },
 
   ingredientSets: [
@@ -155,11 +106,7 @@ const SILENT_RECIPE = Object.freeze({
   ],
 });
 
-// The multi-step half of the same guard. Every silent field that has a per-SET or
-// per-OPTION home is re-declared at STEP scope here, because `steps[].ingredientSets[]`
-// is the same `IngredientSet` shape and the projection copies `steps` wholesale: a
-// draft path that flattened, re-keyed or re-built a step's sets could drop exactly
-// these and no screen would show it.
+// The multi-step half of the same guard.
 const MULTI_STEP_RECIPE = Object.freeze({
   id: 'r-steps',
   name: 'Sequence of Silence',
@@ -295,29 +242,14 @@ function createSystem() {
 }
 
 function createServices(recipeManager) {
-  const systems = [createSystem()];
-  return {
-    getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys1' : ''),
-    setSetting: async () => {},
-    getCraftingSystemManager: () => ({
-      getSystems: () => systems,
-      getSystem: (id) => systems.find((system) => system.id === id) || null,
-      getItems: (id) => systems.find((system) => system.id === id)?.items || [],
-    }),
+  return createSharedServices(createSystem(), [], [], {
     getRecipeManager: () => recipeManager,
-    getScriptMacros: () => [],
-    getSceneOptions: () => [],
-    getWorldUsers: () => [],
     getAccessCharacterActors: () => [],
-    localize: (key) => key,
-    notify: { info: () => {}, warn: () => {}, error: () => {} },
-  };
+  });
 }
 
-// The root's draft mechanics, verbatim: `cloneRecipeDraft` is a JSON deep clone of the
-// PROJECTED row, and `patchRecipeDraft` a shallow spread. Reproducing them here (rather
-// than mounting the whole manager) keeps the test focused on the one thing that can
-// lose a field — the projection -> clone -> patch -> save round trip.
+// The root's draft mechanics, verbatim: `cloneRecipeDraft` is a JSON deep clone of the PROJECTED
+// row, and `patchRecipeDraft` a shallow spread.
 function cloneRecipeDraft(source) {
   return source ? JSON.parse(JSON.stringify(source)) : null;
 }
@@ -342,9 +274,8 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
   });
 
   beforeEach(async () => {
-    // RecipeManager._assertGM + save() reach for the Foundry globals; save() is a
-    // settings write we neutralise, because persistence is not what is under test —
-    // the SHAPE that reaches it is.
+    // RecipeManager._assertGM + save() reach for the Foundry globals; save() is a settings write we
+    // neutralise, because persistence is not what is under test — the SHAPE that reaches it is.
     globalThis.game = {
       user: { isGM: true },
       settings: { get: () => [], set: async () => {} },
@@ -393,27 +324,8 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
     );
   });
 
-  // The deepEqual above would catch every one of these, but it would fail as one
-  // opaque diff. These name the field, so a regression reports WHICH silent field the
-  // draft path dropped.
-  //
-  // ---------------------------------------------------------------------------
-  // The MERGE FLOOR, named honestly.
-  //
-  // `complex`, `teaser`, `transferEffects`, `isVariable` and `outcomeRouting` are
-  // TOP-LEVEL scalars, and `RecipeManager.updateRecipe` saves
-  // `{ ...recipe.toJSON(), ...updates, id }` — a SHALLOW merge. A top-level key that
-  // the draft never carried is therefore restored from the persisted record, so these
-  // assertions pin `RecipeManager`'s merge floor, NOT the Studio's draft path: they
-  // cannot fail from a projection or draft-clone regression (three of the five —
-  // `teaser`, `transferEffects`, `isVariable` — are not even in `_buildRecipeList`'s
-  // projection today, and still survive).
-  //
-  // They are kept because the merge floor is itself worth pinning — a `set()` that
-  // replaced rather than merged would silently null every one of them — but the test
-  // says what it guards. What guards the DRAFT path for nested scope is the per-set /
-  // per-option / per-step group below, where the draft really does carry the values.
-  // ---------------------------------------------------------------------------
+  // The deepEqual above would catch every one of these, but it would fail as one opaque diff. These
+  // name the field, so a regression reports WHICH silent field the draft path dropped.
   it('RecipeManager.updateRecipe restores top-level complex/teaser/transferEffects/isVariable/outcomeRouting from the persisted record (the shallow-merge floor, not the draft path)', async () => {
     const draft = patchRecipeDraft(cloneRecipeDraft(projectedRow()), { description: 'Rewritten.' });
     await store.updateRecipe(draft.id, draft, { allowIncomplete: true });
@@ -536,12 +448,7 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
     );
   });
 
-  // The single-step DURATION display guard (issue 845). Unlike the silent fields above,
-  // this loss never reaches persistence (the shallow-merge floor restores a top-level
-  // key the draft omits), so the byte-for-byte round trip cannot see it — the craft time
-  // keeps applying. The defect is that `_buildRecipeList` dropped `timeRequirement` from
-  // the projected row, so the editor's draft seeded the Overview Duration steppers from
-  // `undefined` and rendered "Instant". This asserts the projection carries it.
+  // The single-step DURATION display guard (issue 845).
   it('projects the single-step recipe timeRequirement so the Overview Duration steppers seed (issue 845)', () => {
     const row = projectedRow();
     assert.ok(row, 'the recipe is projected into the browser list');
@@ -552,14 +459,10 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
     );
   });
 
-  // -------------------------------------------------------------------------
-  // The MULTI-STEP half. `steps[].ingredientSets[]` is the same `IngredientSet`
-  // shape as the recipe's own, and `steps` is a NESTED array the shallow merge in
-  // `RecipeManager.updateRecipe` cannot repair: once the draft carries a `steps`
-  // key at all, whatever it holds REPLACES the persisted array wholesale. So unlike
-  // the top-level scalars above, every assertion here really does guard the draft
-  // path — projection → clone → patch → save.
-  // -------------------------------------------------------------------------
+  // The MULTI-STEP half. `steps[].ingredientSets[]` is the same `IngredientSet` shape as the
+  // recipe's own, and `steps` is a NESTED array the shallow merge in `RecipeManager.updateRecipe`
+  // cannot repair: once the draft carries a `steps` key at all, whatever it holds REPLACES the
+  // persisted array wholesale.
   describe('a complex, multi-step recipe (the step-scope draft path)', () => {
     function stepDraft(patch) {
       return patchRecipeDraft(cloneRecipeDraft(projectedRow(MULTI_STEP_RECIPE.id)), patch);

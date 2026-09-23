@@ -1,18 +1,7 @@
 /**
- * Alchemy check-mode INTEGRATION tests (issue 554): drive `craftAlchemy` → the REAL
- * `craft()` pipeline with REALISTIC owned/duplicate-source items (uuid ≠ component
- * source ref; provenance in `_stats.duplicateSource`, matching `alchemy-mode.test.js`)
- * and a REAL `ResolutionModeService`. Only `_runCraftingCheck` is stubbed (to force a
- * pass/fail/tier without a live dice engine); `_resolveAlchemyResultGroups` and
- * `_createResultItems` run for real, so these prove that:
- *   - a matched Simple recipe with a FAILING check does NOT hit the `results:null`
- *     fizzle short-circuit — it routes into the failure path, consumes, produces the
- *     reserved failure group via the REAL `_createResultItems`, LEARNS the recipe, and
- *     returns `disposition: 'produced-on-failure'`;
- *   - Simple PASS, None (always-success), and Tiered-success each produce REAL items.
- *
- * Reverting the `craft()` failure-routing wiring makes the Simple-FAIL test fail (the
- * fizzle path returns `results:null`, no `produced-on-failure`, and no learn).
+ * Alchemy check-mode INTEGRATION tests (issue 554): drive `craftAlchemy` → the REAL `craft()`
+ * pipeline with REALISTIC owned/duplicate-source items (uuid ≠ component source ref; provenance in
+ * `_stats.duplicateSource`, matching `alchemy-mode.test.js`) and a REAL `ResolutionModeService`.
  */
 
 import test from 'node:test';
@@ -25,9 +14,7 @@ import { SignatureValidator } from '../src/systems/SignatureValidator.js';
 import { getItemSourceReferences, getItemMatchUuids } from '../src/utils/sourceUuid.js';
 import { toAlchemyRecords } from './helpers/alchemySubmissionRecords.js';
 
-// ---------------------------------------------------------------------------
 // Globals
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -51,9 +38,7 @@ let _idCounter = 0;
 globalThis.foundry = { utils: { getProperty, setProperty, randomID: () => `id-${++_idCounter}` } };
 globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 
-// ---------------------------------------------------------------------------
 // Fakes (realistic owned item: uuid differs from the component source ref)
-// ---------------------------------------------------------------------------
 
 class FakeItem {
   constructor(id, name, quantity, duplicateSource) {
@@ -110,9 +95,7 @@ function sourceItemFor(name) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Fixtures
-// ---------------------------------------------------------------------------
 
 const EMBER_SRC = 'Compendium.src.Item.emberroot';
 const POTION_SRC = 'Compendium.src.Item.potion';
@@ -295,9 +278,7 @@ async function brew(engine, validator, inputs, options = {}) {
   });
 }
 
-// ===========================================================================
 // None: always success
-// ===========================================================================
 
 test('None: a matched brew always succeeds and produces the single success group (no roll)', async () => {
   const { engine, validator, visibility } = setup({
@@ -313,9 +294,7 @@ test('None: a matched brew always succeeds and produces the single success group
   assert.deepEqual(visibility.learned, ['brew'], 'a matched None brew learns the recipe');
 });
 
-// ===========================================================================
 // Simple: pass → success group; fail → reserved failure group (produced-on-failure)
-// ===========================================================================
 
 test('Simple PASS produces the success group and learns', async () => {
   const { engine, validator, visibility } = setup({ checkMode: 'simple', resultGroups: successAndFailureGroups() });
@@ -388,17 +367,11 @@ test('Simple FAIL with learnOnCraft=false consumes + produces but does NOT learn
   assert.deepEqual(visibility.learned, [], 'learnOnCraft=false grants nothing');
 });
 
-// ===========================================================================
 // Tiered: a success outcome routes to its assigned tier group
-// ===========================================================================
 
-// ===========================================================================
 // Brew is NEVER gated by visibility (issue 563): exercise the REAL
-// RecipeVisibilityService.guardCraftStart (not the {craftable:true} stub) so a
-// NON-revealed recipe under every mode still succeeds + produces for a non-GM.
-// Reverting the `craftable`-decoupling in the alchemy branch makes this fail:
-// guardCraftStart would return craftable:false and craft() would short-circuit.
-// ===========================================================================
+// RecipeVisibilityService.guardCraftStart (not the {craftable:true} stub) so a NON-revealed recipe
+// under every mode still succeeds + produces for a non-GM.
 
 test('brew is never gated by reveal: a non-revealed recipe still brews + produces under every mode (real service)', async () => {
   for (const mode of ['restricted', 'item', 'knowledge', 'global']) {

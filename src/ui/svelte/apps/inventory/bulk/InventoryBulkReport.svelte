@@ -38,7 +38,7 @@
   import { statusChipTone } from '../../../util/statusChipTone.js';
   import Chip from '../../../components/Chip.svelte';
   import Notice from '../../../components/Notice.svelte';
-  import EmptyState from '../../manager/EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import Kicker from '../../../components/Kicker.svelte';
   import InventoryBulkSection from './InventoryBulkSection.svelte';
   import InventoryBulkRow from './InventoryBulkRow.svelte';

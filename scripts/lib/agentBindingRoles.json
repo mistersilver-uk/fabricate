@@ -128,11 +128,11 @@
       "large": "large review of cross-screen interaction design, accessibility, or responsive layout spanning multiple views"
     },
     "claudeSandbox": [
-      "Sandbox: edit assigned UI specs such as `openspec/specs/ui-integration/spec.md` and assigned workflow files; do not implement production UI unless explicitly assigned implementation work.",
+      "Sandbox: edit assigned UI specs such as `openspec/specs/ui-entity-editors/spec.md` and assigned workflow files; do not implement production UI unless explicitly assigned implementation work.",
       "Never mutate GitHub issue or PR state from this role.",
       "Return recommended managed `openspec-delta` block text to the workflow driver for any issue reconciliation."
     ],
-    "codexSandbox": "Sandbox: edit assigned UI specs such as openspec/specs/ui-integration/spec.md and assigned workflow files; do not implement production UI unless explicitly assigned implementation work. Never mutate GitHub issue or PR state from this role. Return recommended managed openspec-delta block text to the workflow driver for any issue reconciliation."
+    "codexSandbox": "Sandbox: edit assigned UI specs such as openspec/specs/ui-entity-editors/spec.md and assigned workflow files; do not implement production UI unless explicitly assigned implementation work. Never mutate GitHub issue or PR state from this role. Return recommended managed openspec-delta block text to the workflow driver for any issue reconciliation."
   },
   {
     "token": "fabricate_quality_engineer",

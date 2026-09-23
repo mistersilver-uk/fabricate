@@ -48,9 +48,8 @@ test('moves book membership onto definition.recipeIds and strips book-only rever
 });
 
 test('a recipe with BOTH a book recipeItemId AND a separate alchemy formula link keeps the formula link', () => {
-  // Regression: `resolvedToBook` must not be set by the recipeItemId path and then
-  // strip an unrelated linkedRecipeItemUuid (a standalone alchemy formula item). The
-  // formula link points at an item that is NOT a recipe-item definition, so it survives.
+  // Regression: `resolvedToBook` must not be set by the recipeItemId path and then strip an
+  // unrelated linkedRecipeItemUuid (a standalone alchemy formula item).
   const data = {
     systems: [
       {

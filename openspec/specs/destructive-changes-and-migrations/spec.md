@@ -9,6 +9,8 @@ Define destructive operations, required confirmations, clean-up behaviour, and m
 - Destructive actions must be explicit and confirmed.
 - Clean-up must be deterministic and idempotent.
 - Invalid references should be removed or marked stale immediately.
+- An empty result group is AUTHORED DATA, not residue, so a cascade may prune only a group it emptied ITSELF (issue 1907).
+  A group that arrived empty — the reserved `role: 'failure'` group, or a non-terminal step's deliberately empty group — is retained by every cascade, the component-reference strip (`stripComponentsFromRecipeJson`) included, because pruning it would turn a valid recipe into one missing a step's result group.
 
 ## Destructive Operations
 
@@ -80,6 +82,9 @@ Deleting a vocabulary entry that records still reference is a confirmed destruct
    A placeholder emptied by the strip is persisted as an incomplete ingredient rather than left naming the deleted tag.
 5. Nothing is left dangling: no recipe or component retains a `category` or tag value that no longer exists in the system vocabulary.
 6. Reassigning every carrying component to `general`, and stripping a deleted tag from every carrying component, each persist as part of the single crafting-systems write that drops the vocabulary entry — never one write per carrying component.
+7. **The unit of deletion is the NORMALIZED key and not the authored spelling** (issue 1397, folded into issue 1915).
+   A system's category vocabularies store case-preserving values, so `Reagent` and `reagent` can both be stored; the screen collapses them to one row, and deleting that row drops EVERY stored spelling folding to its trimmed lower-cased key in the same write.
+   Dropping only the clicked spelling would still reassign the records under both, because every planner in `src/ui/model/vocabularyCascade.js` matches on that same folded key, and would leave the survivor behind as an entry nothing references — which is clause 5's dangling case arriving from the vocabulary side instead of the record side.
 
 ### Delete Essence Definition
 
@@ -95,6 +100,7 @@ It has both a single-essence and a SET form, and the two perform the same cascad
 4. Every recipe referencing the essence — through either the legacy per-set essences map or a first-class essence ingredient option, at recipe level or step level — is rewritten to drop it.
    A group left with no options is dropped, and a set left with no ingredient groups, ingredients or essences is dropped.
 5. A recipe left with no ingredient sets, or with no results, is clamped to disabled.
+   A result group that was ALREADY empty when the cascade ran is retained rather than pruned — the reserved `role: 'failure'` group and a non-terminal step's deliberately empty group are authored data, not residue (issue 1907) — so the cascade never prunes an authored empty group.
 6. Each rewritten recipe is re-saved as an INCOMPLETE authoring shell (`allowIncomplete`), because a recipe stripped of its only requirement is deliberately persisted rather than deleted.
 7. The rewrites run BEFORE the crafting-system write.
    That ordering is only safe because the disabled-essence blocker is an ACTIVATION-only validation and never a persistence one: a persistence-level blocker would abort the cascade partway through, with the essence definitions and component essence maps already mutated in memory and nothing persisted.
@@ -123,6 +129,7 @@ When `features.multiStepRecipes` is disabled for a system that has multi-step re
 1. Existing multi-step recipes are **retained verbatim** in persisted data.
    No recipe is deleted, migrated, reverted, or rewritten, and no active run, learned flag, or per-user preference is cleaned up.
 2. Each such recipe stays **listed and craftable** for every viewer — it is never hidden from the player listing and the crafting guard never rejects it on multi-step grounds.
+   Its player-listing PRODUCES row still resolves the recipe's product step (`ui-crafting-app`, Multi-Step Recipe Presentation), because the projected step count reads AUTHORED structure rather than the feature flag, and the collapsed chain does award that step's results (issue 1907).
 3. A collapsed recipe executes as an **atomic chain**: one craft action runs the authored steps sequentially, back-to-back, in a single call, with no step-triggering UX and no between-step waiting.
    Each step keeps its own consumption, crafting check, tool, and result-creation behaviour, so the chain reuses the existing per-step machinery.
 4. **Time requirements sum into one gate.** When time requirements are enabled, the single atomic action waits behind one gate whose duration is the **sum** of every step's duration; the chain then executes all steps at maturity.
@@ -329,7 +336,7 @@ It MUST be a complete localized sentence rather than a template with a value int
 Because `migrationVersion` is unchanged on abort, the pending migrations re-run automatically on the next world reload after the GM fixes or deletes the failed documents; the fix/retry choice is informational and triggers no same-pass retry.
 
 The prompt's DialogV2 configuration (window title, content mirroring the console guidance, both choices, and the `Keep existing data` default) is produced by a pure builder (`src/migration/migrationRecoveryPrompt.js`) so the default choice is unit-testable without Foundry.
-The runner exposes a `promptRecovery` seam invoked with `{ downgradeTo, documents, label }` on abort; `src/main.js` `_runMigrations` wires the thin Foundry edge that opens DialogV2 from that config.
+The runner exposes a `promptRecovery` seam invoked with `{ downgradeTo, documents, label }` on abort; `src/bootstrap/migrations.js` wires the thin Foundry edge that opens DialogV2 from that config.
 The layout reaches both surfaces from the value the pass already resolved, never from a second read: a re-read at guidance time can report a layout a remote conversion moved mid-pass, and the message must describe the pass that just failed.
 
 ### Migration Notices
@@ -606,9 +613,10 @@ After this migration every such world starts adding those modifiers to every cra
 The same world now rolls `1d20 + 3[Modifiers]`: −3 becomes +3, a 2×scalar swing in the crafter's favour.
 A formula carrying the placeholder twice moves from double-counting to counting once.
 5. **The migration counts and tells the GM.** Per system it counts formulas that were inert for want of the placeholder (scoped to the ACTIVE check slot, and gated on the RESOLVED ELIGIBLE SET being non-empty — `resolveEligibleModifierIds`, not merely a non-empty catalogue, because ids absent from the catalogue are dropped and a system whose set already resolves to nothing has had nothing start applying, so counting it would state a change that did not happen and prescribe a remedy already in force), formulas that placed it subtractively, formulas that carried it more than once, and formulas left UNTOUCHED — which is every formula the decider REFUSES, both the non-additive placements and the additive ones whose residue would be structurally incomplete.
-Those counts ride a transient `data._retiredCraftingModCounts` field that `MigrationRunner.run()` captures and `delete`s before any settings write — a migration cannot add a summary key by returning it, because the pass loop spread-merges a returned value into the DATA payload — and reach the one-time GM notice channel in `src/main.js`, fired only when a count is non-zero and following the shape of the `0.6.0` catalyst and `0.9.0` realm notices.
-The notice's COMPOSITION is not in `src/main.js`: `buildRetiredCraftingModNotice` (in the migration module, beside the counts it reports) owns the totals, the systems list, the clause selection, the join and the severity, and `src/main.js` keeps only the Foundry edge — the GM gate, the localizer, and which notification channel the composed severity selects.
-The lift is not cosmetic: `src/main.js` cannot be imported by a unit test, so everything it holds is covered by source-text greps, which can pin a dispatch but not a sum — three semantic mutations to that arithmetic survived a green suite while it lived inline.
+Those counts ride a transient `data._retiredCraftingModCounts` field that `MigrationRunner.run()` captures and `delete`s before any settings write — a migration cannot add a summary key by returning it, because the pass loop spread-merges a returned value into the DATA payload — and reach the one-time GM notice channel in `src/bootstrap/migrations.js`, fired only when a count is non-zero and following the shape of the `0.6.0` catalyst and `0.9.0` realm notices.
+The notice's COMPOSITION is not in `src/bootstrap/migrations.js`: `buildRetiredCraftingModNotice` (in the migration module, beside the counts it reports) owns the totals, the systems list, the clause selection, the join and the severity, and `src/bootstrap/migrations.js` keeps only the Foundry edge — the GM gate, the localizer, and which notification channel the composed severity selects.
+The lift is not cosmetic: the notice's arithmetic is unit-tested where it lives, while the edge that dispatches it is covered by source-text greps, which can pin a dispatch but not a sum — three semantic mutations to that arithmetic survived a green suite while it lived inline.
+The edge now sits in `src/bootstrap/migrations.js`, a module a unit test can import directly, so those greps (`tests/world-scope-gm-notice.test.js`) are a repointed residual rather than the only coverage reachable.
 `_runMigrations` is gated on `game.users?.activeGM?.id !== game.user?.id`, so the notice is **primary-GM-only**: exactly one client in a multi-GM world posts it, and an assistant GM (who holds `isGM`) never does.
 The toast carries the lead naming the affected systems and, only when a formula was left untouched, the warning that those checks will not roll until rewritten; every non-zero clause is in the console detail (§ Migration Notices).
 **The remedy is spelled out in that console detail, and it names ONE action:** a GM who authored a catalogue and deliberately never spent the placeholder must CLEAR the Default modifiers set (`defaultModifierIds`) on those systems to preserve the previous total.
@@ -642,7 +650,7 @@ The `1.22.0` settings-data migration (`src/migration/migrateSystemCheckModifierC
 4. **It deliberately seeds NOTHING onto a salvage or gathering check that has no block**, matching the no-storage-churn decisions `migrateMaxModifierPicks` and the *Progressive Reorder-Flag Retirement Migration* already record: an absent selection normalizes to `addAll` with an empty id set, which resolves to a scalar of 0 and appends no term.
 5. **The per-system transform is SHARED with the export-payload upcast** (`applySystemCheckModifierCatalogue`), not reimplemented; `migrateExportPayload` applies it branch-independently, and AFTER the `1.21.0` transform, whose inert count reads the catalogue at its pre-move location.
 6. **Mutated setting key:** `craftingSystems`, and only it.
-7. **The runner's ordering is load-bearing and stated, not assumed.** `_runMigrations()` runs before any manager loads persisted data (`src/main.js`) and is gated to the primary GM.
+7. **The runner's ordering is load-bearing and stated, not assumed.** `_runMigrations()` runs before any manager loads persisted data (`src/bootstrap/composeServices.js` orders the phases; the pass itself is `src/bootstrap/migrations.js`) and is gated to the primary GM.
    `_normalizeCraftingCheck` is an ALLOWLIST REBUILD that no longer emits `checkModifiers`, so had any save run first, the catalogue would have been DELETED rather than relocated — silently, with no error and no recoverable copy.
 8. **The downgrade LOSES the catalogue.** `1.21.0`'s `_normalizeCheckModifierConfig` is an allowlist that never saw a system-level `checkModifiers`, so a downgraded world drops it on the first read and every check modifier stops contributing to every roll until a GM re-authors it.
    It is **the first entry in this registry whose downgrade is not lossless**, and the warning is carried in the registry entry's **`label` STRING** — the one string a GM ever reads about this migration, rendered by `migrationRecoveryPrompt` beside the very Downgrade button it is about.
@@ -677,7 +685,7 @@ The `1.23.0` settings-data migration (`src/migration/migrateUnifyModifierLibrari
 8. **The per-system transform is SHARED with the export-payload upcast** (`applyUnifiedModifierLibrary`), not reimplemented; `migrateExportPayload` applies it branch-independently and AFTER `applySystemCheckModifierCatalogue`.
    That order is **observable, not merely symmetrical**: a pre-`1.22.0` bundle carries its catalogue at `craftingCheck.checkModifiers` and this transform reads only the system-level key, so running it first would merge an empty catalogue and then retire it, silently dropping every check modifier in the bundle.
 9. **Mutated setting keys:** `craftingSystems` and `gatheringConfig`.
-10. **The runner's ordering is load-bearing and stated, not assumed.** `_runMigrations()` runs before any manager loads persisted data (`src/main.js`) and is gated to the primary GM.
+10. **The runner's ordering is load-bearing and stated, not assumed.** `_runMigrations()` runs before any manager loads persisted data (`src/bootstrap/composeServices.js` orders the phases; the pass itself is `src/bootstrap/migrations.js`) and is gated to the primary GM.
     Both `CraftingSystemManager._normalizeModifierLibrary` and the gathering config normalizer are ALLOWLIST REBUILDS that no longer emit the old keys, so had any save run first, BOTH libraries would have been DELETED rather than merged — silently, with no error and no recoverable copy.
 11. **The downgrade LOSES BOTH libraries**, and is declared `downgradeLosesData: true` with the loss named in the registry entry's **`label` STRING** — the one string a GM ever reads about this migration, rendered by `migrationRecoveryPrompt` beside the very Downgrade button it is about.
     `1.22.0`'s normalizers are allowlists that never saw `CraftingSystem.modifiers`, so a downgraded world drops the merged library on the first read: every check modifier stops contributing to every roll AND every gathering drop row, event and stamina cost loses the entry it references.
@@ -886,7 +894,7 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
 
 1. **WHY IT IS A FOURTH PASS RATHER THAN A WIDER `1.30.0`.**
    § World-Scope Entity Migration requirement 1 grouped essences by trimmed `id` on the premise that an essence id is a stable semantic slug, and THAT PREMISE IS FALSE.
-   An essence id is MINTED PER SYSTEM by one of two routes — `crypto.randomUUID()` in `adminStore.addEssence`, or a name-derived slug from `mintEssenceId` (`src/ui/svelte/apps/manager/scoped/essenceScoped.js:535-549`) — and `_normalizeEssenceDefinition` then lowercases and per-system-uniquifies whatever it finds (`src/systems/CraftingSystemManager.js:1940-1946`).
+   An essence id is MINTED PER SYSTEM by one of two routes — `crypto.randomUUID()` in `adminStore.addEssence`, or a name-derived slug from `mintEssenceId` (`src/ui/svelte/apps/manager/scoped/essenceScoped.js:535-549`) — and `_normalizeEssenceDefinition` then lowercases and per-system-uniquifies whatever it finds (`src/systems/normalize/essences.js`).
    So two systems' equivalent essences share no id at all on the commonest authoring route, each was lifted to its OWN world essence, and the duplication issue 1654 reports is exactly what `1.30.0` left behind.
    `1.30.0`'s grouping, its id-claim ladder, its refusal fixed point and its donor election are NOT changed here, and a world that has already migrated needs the repair whether or not they ever were — so the repair is a SEPARATE pass, exactly as `1.31.0` and `1.32.0` are.
 2. **THE EQUIVALENCE KEY IS THE CANONICALISED TRIPLE `(name, macro, effectSource)`**, read from the world essence's identity snapshot and from the unanimous RESOLVED value requirement 4 establishes.
@@ -897,14 +905,14 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
    **`enabled` IS DELIBERATELY NOT IN THE KEY.**
    No world default carries it, `resolveEssence` (`src/systems/essenceScope.js`) answers it from the membership record alone, and every member keeps its own across a merge — so per-system resolved behaviour is unchanged by a merge BY CONSTRUCTION rather than by fixture choice.
 2a. **NAME ALONE IS NEVER THE KEY, AND YET FOR THE MODAL ESSENCE THE KEY IS THE NAME AND NOTHING ELSE — DELIBERATELY, AND THIS IS STATED RATHER THAN GLOSSED.**
-    A normalized essence with no property macro and no active-effect source canonicalises to `(name, null, all-null)`, and `_normalizeEssenceDefinition` always emits all four of those fields defaulted to `null` (`src/systems/CraftingSystemManager.js:1956-1959`), so that is the commonest essence there is and the commonest case this pass will meet.
+    A normalized essence with no property macro and no active-effect source canonicalises to `(name, null, all-null)`, and `_normalizeEssenceDefinition` always emits all four of those fields defaulted to `null` (`src/systems/normalize/essences.js`), so that is the commonest essence there is and the commonest case this pass will meet.
     It is the OPPOSITE of what § World-Scope Entity Migration requirement 2 does for two unlinked same-name definitions, and the ASYMMETRY IS THE POINT: that requirement governs components and tools, which HAVE a source item that COULD have proved identity and did not, whereas an essence has no source item at all (requirement 1 of that section) and carries no substance beyond this triple.
     For an essence the triple is the WHOLE OF WHAT THE RECORD IS, not a guess about what it might refer to.
     A canonical section must not be silently false about its own dominant case, which is why the modal case is named here instead of being left to be discovered.
 3. **`1.30.0`'S COMPONENT RE-KEY ORDERING IS LOAD-BEARING HERE.**
    Its requirement 8 re-keys the component ids inside `effectSource` BEFORE the scope payloads are built, so two systems naming the same MERGED world component compare equal at this key.
    Two essences whose AE-source components did NOT merge stay DISTINCT, on the same refusal-to-guess rule, subject to requirement 2a.
-   **AND THE REFUSED CASE CAN MERGE TOO MUCH**, which is why it is refused rather than trusted: `sourceComponentId` is SYSTEM-SCOPED, and for a `(system, 'components')` pair `1.30.0` REFUSED it was never re-keyed into world space at all — `partition` excludes a refused pair outright (`src/migration/worldScopeEntityGrouping.js:307-310`) — so two refused systems carrying a coincidentally equal raw id would merge on a guess.
+   **AND THE REFUSED CASE CAN MERGE TOO MUCH**, which is why it is refused rather than trusted: `sourceComponentId` is SYSTEM-SCOPED, and for a `(system, 'components')` pair `1.30.0` REFUSED it was never re-keyed into world space at all — `partition` excludes a refused pair outright (`src/systems/worldScopeEntityGrouping.js`) — so two refused systems carrying a coincidentally equal raw id would merge on a guess.
    A member whose `sourceComponentId` is NOT a WORLD component id therefore makes its group UNPROVABLE, and the group is REFUSED with reason `unresolvedEffectSourceComponent`.
 4. **CANDIDACY REQUIRES UNANIMITY OVER THE RESOLVED VALUE, AND IS NOT VACUOUS AT ZERO.**
    Every live membership record of a world essence must resolve — through the shipped `resolveEssence`, never through its stored keys — to the SAME `(macro, effectSource)`.
@@ -921,9 +929,9 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
    THREE invariants decide it, and the last two are POST-conditions rather than pre-conditions.
    DISJOINTNESS of the map's image from its key set, or a single simultaneous lookup is not idempotent.
    OUTPUT UNIQUENESS of the ids the `(system, 'essences')` pair emits, because disjointness alone does not forbid an output id colliding with an id in the same pair that was not re-keyed.
-   MEMBERSHIP-KEY UNIQUENESS over the REBUILT membership map, and this third one is not redundant: the first two are evaluated over the IN-SYSTEM definition array — `findRefusals` reads exactly that (`src/migration/worldScopeEntityGrouping.js:617-619`) — and cannot see a world essence holding a membership record for a system with no definition row.
+   MEMBERSHIP-KEY UNIQUENESS over the REBUILT membership map, and this third one is not redundant: the first two are evaluated over the IN-SYSTEM definition array — `findRefusals` reads exactly that (`src/systems/worldScopeEntityGrouping.js`) — and cannot see a world essence holding a membership record for a system with no definition row.
    An intra-system collision is reachable only through imported or hand-edited data, because the same-name guard lives in the authoring store and NOT in the normalizer.
-7. **EVERY REFERENCE THE RE-KEY INVALIDATES IS REWRITTEN, THROUGH THE ONE SHARED WALK** (`src/migration/worldScopeReferenceRewrite.js`), so this pass and the component walk beside it cannot drift.
+7. **EVERY REFERENCE THE RE-KEY INVALIDATES IS REWRITTEN, THROUGH THE ONE SHARED WALK** (`src/systems/worldScopeReferenceRewrite.js`), so this pass and the component walk beside it cannot drift.
    LEAF-VALUE sites: `match.essenceId` at every recipe ingredient-group option and its `alternatives[]` recursion, the same two under `steps[]`, the flat `ingredients[]` alias, and tool `repairRequirements` options in the system slice, the gathering slice AND BOTH HALVES OF THE TOOL SCOPE — `toolScope.membership[].repairRequirements` and `toolScope.defaults[].repairRequirements`.
    **THE TOOL SCOPE IS NOT AN OPTIONAL FOURTH COPY OF THE SYSTEM SLICE, AND IT IS NAMED HERE BECAUSE IT ONCE WAS NOT.**
    `1.30.0` populates both positions itself: `buildMembershipRecord` clones an in-system tool's `repairRequirements` onto every membership record it writes, and § World-Scope Entity Migration's world-default election lifts the donor's whole group array under a CONSTRAINT 4 whose guard checks COMPONENT ids only, so an essence-typed option reaches world scope untouched.
@@ -936,7 +944,7 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
    They are re-keyed by `rekeySystemEssenceIds` in the pass itself, immediately BEFORE it calls the walk, because the walk rewrites REFERENCES to an entity and these two are the entity's OWN identity and the system's roster of them — the boundary `rewriteSystemReferences` already keeps for a component's and an essence's own `id`, where re-keying a definition is the CALLER's decision.
    So neither appears in `WORLD_SCOPE_ESSENCE_REFERENCE_SITES`, and a reader who expects to find them there is reading the wrong list rather than finding a gap.
    KEY-POSITION sites: `systems[].components[].essences`, `componentScope.defaults[].essences`, `componentScope.membership[].essences`, and the legacy `ingredientSets[].essences` at BOTH depths.
-   **THE COMPONENT KEY-POSITION REWRITE IS NOT OPTIONAL**: `_normalizeEssenceQuantities` prunes a key that is not in the Valid Id Basis (`src/systems/CraftingSystemManager.js:2734`), so a missed key is a SILENT DELETION on the next save rather than a dangling reference a reader could report.
+   **THE COMPONENT KEY-POSITION REWRITE IS NOT OPTIONAL**: `_normalizeEssenceQuantities` prunes a key that is not in the Valid Id Basis (`src/systems/normalize/essences.js`), so a missed key is a SILENT DELETION on the next save rather than a dangling reference a reader could report.
    Every other authored key on `essenceScope` is PRESERVED, on the same round-trip promise `readScopePayload` already keeps for the tool scope's fourth sibling.
 8. **A RE-POINTED INHERITING RECORD IS FROZEN AT THE VALUE IT RESOLVES TO TODAY, AT BOTH SCOPES, AND BOTH HALVES ARE REQUIRED.**
    Changing a membership record's `entityId` changes its WORLD PARENT, so a section it was inheriting would otherwise resolve to a different value — or to nothing at all — the moment the re-key lands, and the loser's own world default is deleted with the loser.
@@ -978,7 +986,7 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
    `alchemyDeadEnds` is EXCLUDED here because its signature keys hold COMPONENT ids only — a different reason from the one that excludes `learnedRecipes`, which stays excluded because recipe ids are never re-keyed.
    On a key collision, quantity maps SUM and `essenceEnabled` takes the logical AND.
    **AND THE REWRITTEN CONTAINER IS WRITTEN WITH A FORCED-REPLACEMENT UPDATE — the `==` key prefix Foundry reads as REPLACE-WHOLESALE, which is not the check-trigger comparison operator of the same spelling — AND NEVER WITH A PLAIN MERGE WRITE.**
-   `Document#update` merges inner objects recursively by default and performs NO DELETIONS, so a plain write of a rebuilt map leaves every retired key in place: exactly the case `remapWorldScopeIdentityFlags.js`'s own "No key is ever REMOVED by this pass" docblock (`src/migration/remapWorldScopeIdentityFlags.js:49-56`) explicitly excludes itself from.
+   `Document#update` merges inner objects recursively by default and performs NO DELETIONS, so a plain write of a rebuilt map leaves every retired key in place: exactly the case `remapWorldScopeIdentityFlags.js`'s own "No key is ever REMOVED by this pass" docblock (`src/systems/remapWorldScopeIdentityFlags.js`) explicitly excludes itself from.
    **THE WORKED EXAMPLE IS THE ITEM OVERRIDE AND NOT A RUN CONTAINER**, and the difference is stated because it is ACCIDENTAL rather than designed.
    `flags.fabricate.fabricate.essences` is a plain `{[essenceId]: quantity}` map sitting directly under its container key, so writing `{'fire-b': 3}` over a stored `{'fire-a': 1, 'fire-b': 2}` persists `{'fire-a': 1, 'fire-b': 3}` and the retired key SURVIVES.
    Crafting's prepared-step and execution-effect containers include arrays that are replaced wholesale, but the remapper MUST use its forced-replacement boundary independently of those incidental shapes.

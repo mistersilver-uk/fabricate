@@ -1,20 +1,7 @@
 /**
- * Issue 970 — the startup housekeeping passes must not write to actors this client
- * does not own, and must never be able to prevent `ready`.
- *
- * Fabricate has no socket-to-GM relay: every actor mutation is performed by the
- * acting client. The four cleanup passes in `Fabricate#initialize` walked
- * `game.actors` wholesale and wrote to whatever they found stale, so on a player
- * client they attempted `Actor#update` on characters that player does not own.
- * Foundry refuses those, and `setFabricateFlag` REJECTS on a refused update by
- * design, so the rejection escaped `initialize()` and `this.ready` was never set —
- * after which every facade method threw through `_requireReady()` for the rest of
- * the session, and the ready hook's remaining steps were skipped too.
- *
- * Covered here: the shared write-permission predicate, and the per-pass isolation
- * that keeps any surviving failure from blocking readiness. The per-manager scoping
- * is asserted in `crafting-run-manager`, `salvage-run-manager`, and
- * `recipe-visibility-service`.
+ * Issue 970 — the startup housekeeping passes must not write to actors this client does not own,
+ * and must never be able to prevent `ready`. Fabricate has no socket-to-GM relay: every actor
+ * mutation is performed by the acting client.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,9 +9,7 @@ import assert from 'node:assert/strict';
 import { selectWritableActors } from '../src/systems/writableActors.js';
 import { runStartupMaintenance } from '../src/systems/startupMaintenance.js';
 
-// ---------------------------------------------------------------------------
 // selectWritableActors
-// ---------------------------------------------------------------------------
 
 test('selectWritableActors keeps only the actors this client may update', () => {
   const mine = { id: 'mine', isOwner: true };
@@ -59,9 +44,7 @@ test('selectWritableActors copies rather than filtering in place', () => {
   assert.equal(actors.length, 1, 'the caller’s collection is untouched');
 });
 
-// ---------------------------------------------------------------------------
 // runStartupMaintenance
-// ---------------------------------------------------------------------------
 
 test('runStartupMaintenance runs every pass in order', async () => {
   const order = [];
@@ -108,11 +91,6 @@ test('runStartupMaintenance never rejects, so it can never block readiness', asy
 });
 
 test('runStartupMaintenance tolerates an absent pass list', async () => {
-  // NOT a health signal, and it is worth being explicit about that. The runner returns only
-  // FAILED labels, so `[]` is what a boot that ran nothing at all returns too — this
-  // assertion is green against a Valid Id Basis gate that omits every pass. What the gate
-  // actually emitted is asserted in `tests/startup-valid-id-basis.test.js`, and the
-  // composition site warns when it omits, precisely because this return value cannot tell
-  // the two apart (issue 1224).
+  // NOT a health signal, and it is worth being explicit about that (issue 1224).
   assert.deepEqual(await runStartupMaintenance(undefined), []);
 });

@@ -1,22 +1,18 @@
-/**
- * Issue 651 — `progressiveResultOrder.js`: the D5 reconciliation contract.
- *
- * Progressive awarding spends a roll DOWN the list, so every clause of this contract
- * guards a silent failure: a dropped result silently denies a player an award, and an
- * unranked stage displacing a ranked one silently demotes the player's choice.
- */
+/** Issue 651 — `progressiveResultOrder.js`: the D5 reconciliation contract. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { progressiveOrderKey, applyPlayerResultOrder } = await import(
-  '../src/utils/progressiveResultOrder.js'
-);
+const {
+  progressiveOrderKey,
+  applyPlayerResultOrder,
+  orderDiffersFromAuthored,
+  storedOrderFor,
+  playerStageOrder,
+} = await import('../src/utils/progressiveResultOrder.js');
 
 const r = (id, extra = {}) => ({ id, ...extra });
 
-// ---------------------------------------------------------------------------
 // progressiveOrderKey
-// ---------------------------------------------------------------------------
 
 test('progressiveOrderKey namespaces by scope', () => {
   assert.equal(progressiveOrderKey({ scope: 'recipe', id: 'abc' }), 'recipe:abc');
@@ -41,9 +37,7 @@ test('progressiveOrderKey returns null for an unusable scope or id', () => {
   assert.equal(progressiveOrderKey(), null);
 });
 
-// ---------------------------------------------------------------------------
 // applyPlayerResultOrder — the core contract
-// ---------------------------------------------------------------------------
 
 test('reorders results to match the stored order', () => {
   const results = [r('a'), r('b'), r('c')];
@@ -107,9 +101,7 @@ test('a non-array results input is returned unchanged', () => {
   assert.equal(applyPlayerResultOrder(undefined, ['a']), undefined);
 });
 
-// ---------------------------------------------------------------------------
 // Duplicate ids — first match wins, both sides
-// ---------------------------------------------------------------------------
 
 test('duplicate ids IN THE ORDER: first match wins, no doubling', () => {
   const results = [r('a'), r('b')];
@@ -142,9 +134,7 @@ test('duplicate ids in BOTH the order and results: each mention consumes one cop
   assert.equal(out[2].id, 'b');
 });
 
-// ---------------------------------------------------------------------------
 // Junk tolerance
-// ---------------------------------------------------------------------------
 
 test('an order longer than results is harmless', () => {
   const results = [r('a')];
@@ -200,4 +190,93 @@ test('index-shaped junk does not reorder results that DO have ids', () => {
     out.map((x) => x.id),
     ['a', 'b', 'c']
   );
+});
+
+// The three order helpers issue 1695 lifted out of `inventoryStore.svelte.js`, where they were
+// module-private and only reachable through the store.
+
+// orderDiffersFromAuthored
+
+test('orderDiffersFromAuthored: a moved row differs', () => {
+  const authored = [r('a'), r('b'), r('c')];
+  assert.equal(orderDiffersFromAuthored([authored[2], authored[0], authored[1]], authored), true);
+});
+
+test('orderDiffersFromAuthored: the authored sequence does NOT differ from itself', () => {
+  // Not "a stored order exists": one can name the authored sequence exactly (dragged away and
+  // back), and offering to reset that is a control that does nothing when pressed.
+  const authored = [r('a'), r('b'), r('c')];
+  assert.equal(orderDiffersFromAuthored([...authored], authored), false);
+  assert.equal(orderDiffersFromAuthored(authored, authored), false);
+});
+
+test('orderDiffersFromAuthored: a length mismatch is not a difference', () => {
+  // A rendered list of another length is a different subject, not a reordered one.
+  const authored = [r('a'), r('b'), r('c')];
+  assert.equal(orderDiffersFromAuthored([authored[1], authored[0]], authored), false);
+  assert.equal(orderDiffersFromAuthored([], []), false);
+});
+
+test('orderDiffersFromAuthored: compares by id, so a spread copy at the same position matches', () => {
+  // The threshold recompute spreads every row, so identity comparison would report every
+  // recomputed list as the player's.
+  const authored = [r('a'), r('b')];
+  const recomputed = authored.map((stage) => ({ ...stage, threshold: 1 }));
+  assert.equal(orderDiffersFromAuthored(recomputed, authored), false);
+});
+
+// storedOrderFor
+
+test('storedOrderFor resolves the namespaced key and reads it out of the map', () => {
+  const orders = { 'salvage:sys-1:comp-1': ['b', 'a'], 'recipe:comp-1': ['x'] };
+  assert.deepEqual(storedOrderFor({ scope: 'salvage', id: 'sys-1:comp-1', orders }), ['b', 'a']);
+  assert.deepEqual(storedOrderFor({ scope: 'recipe', id: 'comp-1', orders }), ['x']);
+});
+
+test('storedOrderFor answers null for an unstored subject, an unusable id, or no map', () => {
+  const orders = { 'salvage:sys-1:comp-1': ['b', 'a'] };
+  assert.equal(storedOrderFor({ scope: 'salvage', id: 'sys-2:comp-1', orders }), null);
+  assert.equal(storedOrderFor({ scope: 'salvage', id: null, orders }), null);
+  assert.equal(storedOrderFor({ scope: 'gathering', id: 'sys-1:comp-1', orders }), null);
+  assert.equal(storedOrderFor({ scope: 'salvage', id: 'sys-1:comp-1' }), null);
+  assert.equal(storedOrderFor(), null);
+});
+
+// playerStageOrder
+
+test('playerStageOrder reports a stored order that moved rows as the PLAYER\'S', () => {
+  const stages = [r('a'), r('b'), r('c')];
+  const out = playerStageOrder({ stages }, ['c', 'a']);
+  assert.deepEqual(
+    out.stages.map((x) => x.id),
+    ['c', 'a', 'b']
+  );
+  assert.equal(out.orderIsPlayers, true);
+});
+
+test('playerStageOrder returns its input BY IDENTITY when nothing moved', () => {
+  // The identity assertion downstream state depends on. Mutation: return a fresh array here.
+  const stages = [r('a'), r('b')];
+  for (const stored of [null, undefined, [], ['a', 'b']]) {
+    const out = playerStageOrder({ stages }, stored);
+    assert.equal(out.orderIsPlayers, false, `not the player's for ${JSON.stringify(stored)}`);
+  }
+  assert.equal(playerStageOrder({ stages }, null).stages, stages);
+  assert.equal(playerStageOrder({ stages }, []).stages, stages);
+});
+
+test('playerStageOrder short-circuits a GM-pinned list rather than reconciling it', () => {
+  // Reporting a pinned list as the player's would be a lie the permission itself refutes.
+  const stages = [r('a'), r('b'), r('c')];
+  const out = playerStageOrder({ stages, allowPlayerResultReorder: false }, ['c', 'b', 'a']);
+  assert.equal(out.stages, stages);
+  assert.equal(out.orderIsPlayers, false);
+});
+
+test('playerStageOrder answers an empty list for a subject with no stages', () => {
+  for (const subject of [null, undefined, {}, { stages: 'not-an-array' }, { stages: [] }]) {
+    const out = playerStageOrder(subject, ['a']);
+    assert.deepEqual(out.stages, []);
+    assert.equal(out.orderIsPlayers, false);
+  }
 });

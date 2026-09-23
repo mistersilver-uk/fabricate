@@ -1,22 +1,11 @@
 /**
- * The ONE set of sentences the Checks Studio uses to describe a readiness result (issue
- * 1096).
- *
- * These lived inside `ChecksValidationTab.svelte` while Validation was the only surface that
- * named an issue. It is not any more: a section's warning dot is now explained IN the panel
- * by a `Callout`, and a dot whose sentence is a second copy of Validation's is how one issue
- * comes to be described two different ways on two screens a single click apart.
- *
- * Each entry is `[localizationSuffix, englishFallback]`, resolved against the shared
- * `FABRICATE.Admin.Manager.Checks.Validation.` namespace by {@link checkIssueCopy} /
- * {@link checkTickCopy} — the components keep their own `text()` bridge, because the
- * localization seam belongs to the Svelte layer and this module stays pure.
- *
- * The issue map is PROVEN EXHAUSTIVE against `CHECK_READINESS_ISSUE_IDS` by
- * `tests/checks-readiness.test.js`, in both directions: an id the evaluator can raise with no
- * sentence here would render its raw id to a GM, and a sentence for an id the evaluator
- * cannot raise is copy nobody will ever see.
- */
+ * The ONE set of sentences the Checks Studio uses to describe a readiness result. A section's
+ * warning dot is explained IN the panel by a `Callout`, and a dot whose sentence is a second
+ * copy of the Validation route's is how one issue comes to be described two ways on two screens
+ * a click apart. Each entry is `[localizationSuffix, englishFallback]`, resolved against the
+ * shared `FABRICATE.Admin.Manager.Checks.Validation.` namespace, so this module stays pure; the
+ * issue map is PROVEN EXHAUSTIVE against `CHECK_READINESS_ISSUE_IDS` in both directions by
+ * `tests/checks-readiness.test.js`. */
 
 /** The satisfied/unsatisfied TICKS a check reports. */
 export const CHECK_TICK_LABELS = Object.freeze({
@@ -109,36 +98,24 @@ function copyFor(map, id) {
   return { key: `${NAMESPACE}${meta[0]}`, fallback: meta[1] };
 }
 
-/**
- * The localization key and English fallback for a readiness ISSUE id.
- * @param {string} id A `CHECK_READINESS_ISSUE_IDS` member.
- * @returns {{ key: string, fallback: string }}
- */
+/** The localization key and English fallback for a readiness ISSUE id.
+ *  @param {string} id A `CHECK_READINESS_ISSUE_IDS` member.
+ *  @returns {{ key: string, fallback: string }} */
 export function checkIssueCopy(id) {
   return copyFor(CHECK_ISSUE_LABELS, id);
 }
 
-/**
- * The localization key and English fallback for a readiness TICK id.
- * @param {string} id A check tick id.
- * @returns {{ key: string, fallback: string }}
- */
+/** The localization key and English fallback for a readiness TICK id.
+ *  @param {string} id A check tick id. @returns {{ key: string, fallback: string }} */
 export function checkTickCopy(id) {
   return copyFor(CHECK_TICK_LABELS, id);
 }
 
 /**
- * Interpolate `{name}` placeholders into an already-resolved sentence (issue 1117).
- *
- * Foundry's `i18n.format` does this for a LOCALIZED string, but the fallbacks above are
- * plain module constants that never reach it — a world with no `lang/` entry for a new key
- * would otherwise render a literal `{names}` to the GM. This is deliberately the same
- * `{key}` syntax Foundry uses, so one sentence serves both paths, and it lives here rather
- * than in the two components that need it because a second copy is a duplication-gate
- * finding and a drift risk at once.
- *
- * A sentence with no placeholders, or a call with no data, returns the input unchanged.
- *
+ * Interpolate `{name}` placeholders into an already-resolved sentence. Foundry's `i18n.format`
+ * does this for a LOCALIZED string, but the fallbacks above are module constants that never
+ * reach it, so a world with no `lang/` entry would render a literal `{names}`. Deliberately the
+ * same `{key}` syntax Foundry uses, and here rather than in the two components that need it.
  * @param {string} sentence The resolved sentence.
  * @param {object} [data] Interpolation values.
  * @returns {string}

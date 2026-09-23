@@ -1,23 +1,4 @@
-/**
- * game.fabricate alchemy owner-gate — the P0 non-owner read-leak boundary (issue 569).
- *
- * The player Alchemy read/submit API (`listAlchemyForActor` / `submitAlchemyAttempt`,
- * added in #543 / PR #545) resolves the viewer -> crafting actor through
- * `Fabricate#_resolveCraftingActor` (`src/main.js`): a GM bypasses, an owner passes
- * the real `isGatheringActorSelectableByUser` ownership predicate, and everyone else
- * resolves to `null` — at which point `AlchemyListingBuilder` returns a denied, empty
- * payload rather than another player's revealed recipes, owned inventory, or fizzle
- * memory. That facade-level resolution branch had no direct test; the builder's
- * null-actor fail-closed is covered by `tests/alchemy-listing-builder.test.js`, but
- * the viewer -> actor gate a real bug would breach was not.
- *
- * These tests drive the facade through `tests/helpers/fabricateFacadeHarness.js`
- * (which wires the REAL predicate + builder + submission collector) and assert the
- * owner / non-owner / GM outcomes for both the read and submit paths. The final
- * SOURCE-CONTRACT guard pins the real `src/main.js` gate so weakening it in
- * production (dropping the ownership predicate, the GM bypass, or the fail-closed
- * submit branch) fails this suite even though `main.js` cannot be imported directly.
- */
+/** game.fabricate alchemy owner-gate — the P0 non-owner read-leak boundary (issue 569). */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -26,11 +7,11 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { createFabricateFacadeHarness, makeFacadeActor } from './helpers/fabricateFacadeHarness.js';
+import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
 
-// ---------------------------------------------------------------------------
-// Fixtures — a single alchemy system with two recipes so a non-GM owner sees one
-// learned recipe (+ one undiscovered count) while a GM sees both.
-// ---------------------------------------------------------------------------
+
+// Fixtures — a single alchemy system with two recipes so a non-GM owner sees one learned recipe (+
+// one undiscovered count) while a GM sees both.
 
 function component(id, name) {
   return { id, name, img: `icons/${id}.webp`, registeredItemUuid: null };
@@ -100,9 +81,8 @@ const NON_OWNER = { id: 'player-2', isGM: false };
 const GM = { id: 'gm-1', isGM: true };
 
 /**
- * The target actor: owned by `player-1` only, has learned `vigor`, holds
- * Emberroot/Ashsalt, and carries a private fizzle key in `alchemyDeadEnds`. Every
- * one of those is player-private data the gate must not hand to a non-owner.
+ * The target actor: owned by `player-1` only, has learned `vigor`, holds Emberroot/Ashsalt, and
+ * carries a private fizzle key in `alchemyDeadEnds`.
  */
 function targetActor() {
   return makeFacadeActor('pc', {
@@ -121,9 +101,7 @@ function harnessFor(user) {
   });
 }
 
-// ---------------------------------------------------------------------------
 // listAlchemyForActor — the read path
-// ---------------------------------------------------------------------------
 
 test('listAlchemyForActor: OWNER (non-GM) resolves their own actor and reads the real listing', () => {
   const { facade } = harnessFor(OWNER);
@@ -164,9 +142,8 @@ test('listAlchemyForActor: NON-OWNER (non-GM) is denied — no leaked recipes, i
   assert.deepEqual(listing.components, [], 'no owned inventory leaks');
   assert.deepEqual(listing.fizzleKeys, [], 'no fizzle memory leaks');
 
-  // Belt-and-braces: NONE of the actor's private data appears anywhere in the payload
-  // (the chooser summaries the denied listing still carries are counts + system
-  // identity only). Each token below is unique to the target actor's private state.
+  // Belt-and-braces: NONE of the actor's private data appears anywhere in the payload (the chooser
+  // summaries the denied listing still carries are counts + system identity only).
   const serialized = JSON.stringify(listing);
   assert.ok(!serialized.includes('Elixir of Vigor'), 'learned recipe name must not leak');
   assert.ok(!serialized.includes('vigor'), 'learned recipe id must not leak');
@@ -215,9 +192,7 @@ test('listAlchemyForActor: a persisted (console-supplied) selection cannot be re
   assert.deepEqual(listing.components, []);
 });
 
-// ---------------------------------------------------------------------------
 // submitAlchemyAttempt — the mutating path
-// ---------------------------------------------------------------------------
 
 test('submitAlchemyAttempt: OWNER reaches the crafting engine with their own actor', async () => {
   const { facade, craftAlchemyCalls } = harnessFor(OWNER);
@@ -263,19 +238,10 @@ test('submitAlchemyAttempt: GM viewer reaches the engine (bypass)', async () => 
   assert.equal(result.success, true);
 });
 
-// ---------------------------------------------------------------------------
 // SOURCE-CONTRACT guard — pin the real src/main.js gate.
-//
-// The behaviour tests above wire the REAL ownership predicate + builder, but the
-// facade's viewer -> actor resolver lives in src/main.js (which cannot be imported
-// under `node --test` — it imports the global stylesheet + Svelte UI at load). This
-// guard asserts the real resolver + alchemy facade wiring still enforce the gate, so
-// removing the ownership predicate, the GM bypass, or the fail-closed submit branch
-// fails this suite. Keep it in lockstep with the harness reproduction.
-// ---------------------------------------------------------------------------
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const MAIN_SOURCE = readFileSync(resolve(__dirname, '../src/main.js'), 'utf8');
+const MAIN_SOURCE = entryModuleSource('src/bootstrap/craftingFacade.js');
 
 test('SOURCE CONTRACT: _resolveCraftingActor gates a non-GM viewer through the real ownership predicate', () => {
   assert.ok(
@@ -296,13 +262,15 @@ test('SOURCE CONTRACT: _resolveCraftingActor gates a non-GM viewer through the r
 
 test('SOURCE CONTRACT: listAlchemyForActor threads the owner-gated actor into the leak-safe builder', () => {
   assert.ok(
-    MAIN_SOURCE.includes(
-      'listAlchemyForActor({ actorId = null, craftingSystemId = null, componentSourceActorIds = null } = {}) {'
+    /listAlchemyForActor\(\{\s*actorId = null,\s*craftingSystemId = null,\s*componentSourceActorIds = null,?\s*\} = \{\}\) \{/.test(
+      MAIN_SOURCE
     ),
     'the alchemy read facade exists with the expected signature'
   );
   // It must resolve through the shared owner gate and feed the resolved actor to the builder.
-  const facadeBody = MAIN_SOURCE.slice(MAIN_SOURCE.indexOf('listAlchemyForActor({ actorId'));
+  const facadeStart = MAIN_SOURCE.indexOf('listAlchemyForActor({');
+  assert.notEqual(facadeStart, -1, 'the alchemy read facade is locatable');
+  const facadeBody = MAIN_SOURCE.slice(facadeStart);
   assert.ok(
     facadeBody.includes('this._resolveCraftingSources({'),
     'listAlchemyForActor resolves sources through the shared owner gate'
@@ -315,13 +283,15 @@ test('SOURCE CONTRACT: listAlchemyForActor threads the owner-gated actor into th
 });
 
 test('SOURCE CONTRACT: submitAlchemyAttempt fails closed (disposition:error) when the owner gate denies the actor', () => {
-  const submitBody = MAIN_SOURCE.slice(MAIN_SOURCE.indexOf('async submitAlchemyAttempt({'));
+  const submitStart = MAIN_SOURCE.indexOf('async submitAlchemyAttempt({');
+  assert.notEqual(submitStart, -1, 'the alchemy submit facade is locatable');
+  const submitBody = MAIN_SOURCE.slice(submitStart);
   assert.ok(
     submitBody.includes('this._resolveCraftingSources({'),
     'submitAlchemyAttempt resolves through the shared owner gate'
   );
   assert.ok(
-    /if \(!craftingActor\) \{\s*return \{ success: false, results: null, message: 'No crafting actor selected', disposition: 'error' \};/.test(
+    /if \(!craftingActor\) \{\s*return \{\s*success: false,\s*results: null,\s*message: 'No crafting actor selected',\s*disposition: 'error',?\s*\};/.test(
       submitBody
     ),
     'a denied (null) crafting actor short-circuits to disposition:error before the engine is reached'

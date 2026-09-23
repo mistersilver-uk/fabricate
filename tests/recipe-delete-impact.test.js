@@ -1,21 +1,4 @@
-/**
- * The two shared leaves behind a recipe delete's impact statement (issue 1132).
- *
- * The point of this module existing is that the STATED number and the PERFORMED write
- * are not two models of one operation: `CraftingSystemManager.deleteRecipes` and
- * `adminStore.describeRecipeDelete` count through the SAME functions, so a drift between
- * "2 books & scrolls will lose them" and what the `craftingSystems` write actually does
- * is unrepresentable rather than merely unasserted.
- *
- * Two numbers live here and they are deliberately different questions:
- *
- *   - `affectedIds` — the recipe items that will no longer contain these recipes. It is
- *     BASIS-AWARE and true in both bases, and it is what the GM is shown.
- *   - `prunes` — the definitions whose `recipeIds[]` array is actually rewritten. On a
- *     legacy-basis system this is empty as a THEOREM of `_normalizeSystem`'s inference
- *     (a system whose marker is unset is by construction one where every `recipeIds` is
- *     empty), not because anything here branches on the basis to skip work.
- */
+/** The two shared leaves behind a recipe delete's impact statement (issue 1132). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -134,9 +117,8 @@ describe('planRecipeItemMembershipPrune', () => {
 
 describe('buildLearnedRecipeActorIndex', () => {
   it('is scoped to the writable actors through the SAME selector the cascade uses', () => {
-    // The identity pin (issue 1132): one shared collection carrying a non-owned actor,
-    // which BOTH `selectWritableActors` and the learner index must exclude. If the
-    // cascade is ever narrowed, this fails rather than the count silently over-reporting.
+    // The identity pin (issue 1132): one shared collection carrying a non-owned actor, which BOTH
+    // `selectWritableActors` and the learner index must exclude.
     const actors = [learner('a1', ['r1']), learner('a2', ['r1'], { isOwner: false })];
 
     assert.deepEqual(
@@ -149,12 +131,8 @@ describe('buildLearnedRecipeActorIndex', () => {
   });
 
   it('derives ids at the ENTRY BOUNDARY, so a dotted id agrees with the cascade', () => {
-    // `Document#update` dot-expands a recipe id containing a `.` into a SUBTREE, so the
-    // persisted map's top level holds the id's first segment (`imported`) and never the id.
-    // `cleanupLearnedRecipes` reads through `readLearnedRecipeEntries` and acts on the real
-    // id, so an index derived from `Object.keys` here would state ZERO learners for a recipe
-    // the very same delete then forgets off two characters — the GM surface and the mutation
-    // disagreeing about one actor (issue 1143). This is the ONE derivation.
+    // `Document#update` dot-expands a recipe id containing a `.` into a SUBTREE, so the persisted
+    // map's top level holds the id's first segment (`imported`) and never the id (issue 1143).
     const nested = { imported: { recipe: { one: { learnedAt: 1, sourceItemUuid: null } } } };
     const dottedLearner = (id) => ({
       id,

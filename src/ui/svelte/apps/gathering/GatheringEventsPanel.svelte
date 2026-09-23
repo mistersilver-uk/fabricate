@@ -10,8 +10,8 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import Callout from '../manager/Callout.svelte';
-  import EmptyState from '../manager/EmptyState.svelte';
+  import Callout from '../../components/Callout.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import Kicker from '../../components/Kicker.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import GatheringEventRow from './GatheringEventRow.svelte';

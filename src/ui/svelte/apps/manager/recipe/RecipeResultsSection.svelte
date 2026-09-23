@@ -1,56 +1,45 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Result-groups section for a single recipe scope (recipe-level for single-step
-  recipes, or one step for multi-step). Renders the list of groups via
-  RecipeResultGroupCard and owns the group-level add/remove, forwarding every edit
-  upward as a whole replacement array via `onChange(nextGroups)`. The parent maps
-  that to the scope patch (`{ resultGroups: nextGroups }`), and the store
-  normalizes through `Recipe.fromJSON` (assigning ids to new groups/items). So new
-  groups/items are appended id-less; nothing here hand-assigns ids.
+  Result-groups section for a single recipe scope (the recipe, or one step). It owns the
+  group-level add/remove and forwards every edit upward as a whole replacement array via
+  `onChange(nextGroups)`; the store normalizes through `Recipe.fromJSON`, so new groups and items
+  are appended id-less and nothing here hand-assigns an id.
 
-  Outcome routing / result mapping reference a group by id, and roll-table result
-  selection references a group by name, so every edit path spreads the existing
-  group rather than synthesizing a fresh one over it (see updateSimpleGroup) — that
-  keeps id/name (and any unknown fields) alive across the first edit.
-
-  Empty result groups (and component-less items) are gated at the model/save path
-  (Recipe.validate), not the readiness / Validation tab, so an empty group rendered
-  here mid-edit is expected rather than an oversight.
-
-  `idPrefix` namespaces the `data-recipe-section` marker so single-step vs.
-  per-step instances are distinguishable in tests.
+  Outcome routing references a group by id and roll-table selection by name, so every edit path
+  SPREADS the existing group rather than synthesizing a fresh one over it. Empty groups and
+  component-less items are gated at the model/save path, so one rendered here mid-edit is
+  expected. `idPrefix` namespaces the `data-recipe-section` marker per instance.
 -->
 <script>
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeResultGroupCard from './RecipeResultGroupCard.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
 
   let {
     resultGroups = [],
-    // Alchemy Simple mode (issue 554): render a FIXED two-slot view — a labeled
-    // "On success" result set + a reserved, undeletable "On a failed check" set —
-    // instead of the generic add/remove group list. Decoupled from `complex`.
+    // Alchemy Simple mode: a FIXED two-slot view — a labeled "On success" set plus a reserved,
+    // undeletable "On a failed check" set — instead of the generic add/remove list.
     alchemySimple = false,
     componentOptions = [],
-    // Result routing (routed systems only). `ingredientSets` is this scope's set
-    // list (read to build per-result-set options + current assignments);
-    // `outcomeTierOptions` is the system's routed-check tiers. Ingredient-mode
-    // assignment is written via onAssignIngredientSet(groupId, setId, assigned).
+    // Result routing (routed systems only): `ingredientSets` builds the per-result-set options
+    // and assignments, `outcomeTierOptions` is the system's routed-check tiers.
     routingProvider = null,
     ingredientSets = [],
     outcomeTierOptions = [],
     outcomeTiersDefined = false,
-    // Issue 1098: forwarded to each group card's third empty hint. A tab prop that is not
-    // ALSO forwarded here silently defaults, which is why the whole chain is spelled out.
+    // Forwarded to each group card's third empty hint. A tab prop not ALSO forwarded here
+    // silently defaults, which is why the whole chain is spelled out.
     failureResultsAllowed = false,
-    // Progressive systems award this group's results in order; forwarded to the
-    // group card so it renders drag-reorder handles on the result rows.
+    // Progressive systems award this group's results in order; forwarded to the group card.
     progressive = false,
+    // Whether this scope is the recipe, or the TERMINAL step of a multi-step recipe. Only a
+    // terminal scope must produce, so an empty group elsewhere is legal (issue 1907). Defaults
+    // true so a caller with no step concept keeps today's danger-toned empty panel.
+    isTerminalStep = true,
     onAssignIngredientSet = () => {},
     onChange = () => {},
-    // Deep-link from a progressive row's read-only difficulty badge to the component
-    // editor's Difficulty card.
+    // Deep link from a progressive row's difficulty badge to the component editor.
     onOpenComponent = () => {},
     idPrefix = '',
   } = $props();
@@ -60,8 +49,8 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // Generate an id eagerly at add time (rather than relying on the store's
-  // normalization at save) so a brand-new result set is immediately routable.
+  // An id eagerly at add time, rather than at the store's save normalization, so a brand-new
+  // result set is immediately routable.
   function newId() {
     const random = globalThis.foundry?.utils?.randomID;
     return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
@@ -76,8 +65,8 @@
     return name || `${text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')} ${index + 1}`;
   }
 
-  // Ingredient-set options for one result group: a set already routed to another
-  // group is disabled (a set routes to at most one result group).
+  // Ingredient-set options for one group: a set routes to at most one, so an already-routed
+  // set is disabled.
   function ingredientOptionsFor(group) {
     return sets.map((set, index) => ({
       id: set.id,
@@ -90,8 +79,8 @@
     return sets.filter((set) => set.resultGroupId === group.id).map((set) => set.id);
   }
 
-  // Outcome-tier options for one result group: a tier assigned to another group
-  // (by index, robust for not-yet-saved id-less groups) is disabled.
+  // Outcome-tier options for one group: a tier assigned to another (by INDEX, which an
+  // unsaved id-less group still has) is disabled.
   function tierOptionsFor(index) {
     const elsewhere = new Set(
       groups
@@ -105,24 +94,20 @@
     }));
   }
 
-  // Result routing lives in the group HEAD (the "Produced on outcome" / "Produced by"
-  // assignment), which only renders when the group is chromed — so a routed system
-  // always needs chrome, even for a single group, or it would lose its routing control.
+  // Result routing lives in the group HEAD, which only renders when the group is chromed, so a
+  // routed system always needs chrome or it loses its routing control.
   const isRouted = $derived(routingProvider === 'check' || routingProvider === 'ingredientSet');
 
-  // Rendering complexity is EMERGENT from structure (issue 643): multiple result
-  // groups get the set chrome; a single, NON-routed result group renders CHROMELESS
-  // (no "Set 1" box). Routed modes (check/ingredients) keep chrome regardless of count
-  // so their per-group routing head stays available. No stored Simple/Complex flag.
+  // Rendering complexity is EMERGENT from structure, with no stored Simple/Complex flag: several
+  // groups get the set chrome, a single NON-routed group renders chromeless, and a routed mode
+  // keeps chrome whatever the count so its routing head stays available.
   const effectiveComplex = $derived(groups.length > 1 || isRouted);
 
-  // Simple mode shows exactly one chromeless group bound to the first group. If
-  // none exists yet, synthesize an empty placeholder for editing.
+  // Simple mode binds one chromeless group to the first, synthesizing an empty one if absent.
   const simpleGroup = $derived(groups[0] || { results: [] });
 
-  // Preserve the existing group's id/name (referenced by routing) by spreading it
-  // under the edit. Only synthesize a fresh id-less group when none exists yet —
-  // never write a freshly-synthesized group over an existing one.
+  // Spread the existing group under the edit so its routing-referenced id and name survive, and
+  // synthesize a fresh one ONLY when none exists.
   function updateSimpleGroup(nextGroup) {
     if (groups.length > 0) {
       onChange([{ ...groups[0], ...nextGroup, id: groups[0].id || nextGroup?.id || newId() }]);
@@ -135,11 +120,9 @@
     onChange(groups.map((group, i) => (i === index ? nextGroup : group)));
   }
 
-  // Alchemy Simple two-slot view. The success set is the first non-failure group
-  // (mirroring `simpleGroup`); the failure set is the reserved `role: 'failure'`
-  // group, synthesized empty for display when absent. On either card's edit both
-  // slots are reconstructed (spread-to-preserve id/name like `updateSimpleGroup`),
-  // stamping `role: 'failure'` onto the failure slot — persist-on-first-edit.
+  // Alchemy Simple two-slot view: the success set is the first non-failure group and the failure
+  // set the reserved `role: 'failure'` one, synthesized empty when absent. Either card's edit
+  // reconstructs both slots, spreading to preserve id and name — persist-on-first-edit.
   const alchemySuccessGroup = $derived(
     groups.find((group) => group?.role !== 'failure') || groups[0] || { results: [] }
   );
@@ -179,8 +162,7 @@
 
 <section class="manager-recipe-results-section" data-recipe-section={`${idPrefix}results`}>
   {#if alchemySimple}
-    <!-- Alchemy Simple: exactly two labeled result sets (success + reserved failure);
-         no add-set, no remove on either. -->
+    <!-- Alchemy Simple: two labeled result sets, no add-set and no remove on either. -->
     <div class="manager-recipe-result-set-alchemy-simple" data-recipe-result-alchemy-simple>
       <RecipeResultGroupCard
         group={alchemySuccessGroup}
@@ -209,6 +191,7 @@
         chromeless={true}
         {componentOptions}
         {progressive}
+        {isTerminalStep}
         {onOpenComponent}
         onChange={(nextGroup) => updateSimpleGroup(nextGroup)}
       />
@@ -235,8 +218,8 @@
       </ManagerButton>
     </EmptyState>
   {:else}
-    <!-- Results has NO OR relationship between groups (§C2): the producing group is
-         chosen at craft time by outcome/routing, so no OR divider sits between them. -->
+    <!-- Results has NO OR relationship between groups: the producing one is chosen at craft
+         time by routing, so no OR divider sits between them. -->
     <ul class="manager-recipe-result-groups">
       {#each groups as group, index (group?.id || index)}
         <li class="manager-recipe-result-group-item">
@@ -245,6 +228,7 @@
             {componentOptions}
             {routingProvider}
             {progressive}
+            {isTerminalStep}
             {onOpenComponent}
             ingredientSetOptions={ingredientOptionsFor(group)}
             assignedIngredientSetIds={assignedSetIdsFor(group)}

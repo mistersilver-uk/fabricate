@@ -1,17 +1,6 @@
 /**
- * The manager shell a RENDERED (real-Chromium) suite ships product markup into (issue 1371 r18-list).
- *
- * Two of the manager's rendered geometry suites — the rules list's and the rules editor's — mount a
- * shipped view through the shared harness, collect every scoped `<style>` block in that view's
- * tree, and lay the rendered `innerHTML` out in Chromium under `styles/fabricate.css` inside the
- * `.fabricate-manager > .manager-body` grid it renders in. Both halves are properties of the SHELL,
- * not of either suite, so they live here once: a second copy is the duplication SonarCloud's
- * new-code gate refuses, and a copy that drifts is a suite measuring a shell the product no longer
- * draws.
- *
- * `tests/components/world-component-catalogue-rendered.test.js` carries the arrangement this was
- * lifted from and is deliberately NOT retargeted here: it belongs to the catalogue lane, and a
- * helper that changed its page under it would be a change to a suite this lane does not own.
+ * The manager shell a RENDERED (real-Chromium) suite ships product markup into (issue 1371
+ * r18-list).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -20,16 +9,7 @@ import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { compile } from 'svelte/compiler';
 
-/**
- * Every scoped `<style>` block in a harness's compiled tree, in manifest order.
- *
- * READ OFF THE HARNESS MANIFEST rather than a second hand-written list, so a component added to
- * the screen cannot arrive styled in the browser and unstyled here. A module with no block at all
- * is skipped, and the count is returned so a suite can assert the skip never became "all of them".
- *
- * @param {{repoRoot: string, compiledModules: readonly string[]}} options
- * @returns {{css: string, hashes: string[], blocks: number}}
- */
+/** Every scoped `<style>` block in a harness's compiled tree, in manifest order. */
 export function collectScopedCss({ repoRoot, compiledModules }) {
   const parts = [];
   const hashes = [];
@@ -47,25 +27,12 @@ export function collectScopedCss({ repoRoot, compiledModules }) {
 /**
  * The rendered markup inside the manager shell it ships in.
  *
- * Every mounted view's own root IS `main.manager-main`, so the wrappers here are only what sits
- * above it: the themed area root carrying the route attribute every `[data-manager-view=…]` rule
- * reads, the root's title bar and header (EMPTY, but present — the root is an `auto auto 1fr`
- * grid and the body fills the window only from its third row, so a body that arrived first would
- * be sized to its content and every height measurement below it would be of nothing),
- * `.manager-body`'s column grid, and the rail occupying its first track. `chrome` is a rule set
- * laid BEFORE the module sheet — the place Foundry's own stylesheet sits in the document — and
- * `control` one laid AFTER it, for a suite's reddening arrangement.
- *
- * @param {object} options
  * @param {string} options.fabricateCss the module sheet's text.
  * @param {string} options.view the `data-manager-view` route.
  * @param {string} options.productMarkup the mounted tree's `innerHTML`.
  * @param {string} options.scopedCss the tree's scoped blocks, from `collectScopedCss`.
  * @param {string} [options.chrome] rules laid before the module sheet; `''` for none.
  * @param {string} [options.control] rules laid after every sheet; `''` for the honest page.
- * @param {number} [options.hostWidth]
- * @param {number} [options.hostHeight]
- * @returns {string}
  */
 export function managerShellPage({
   fabricateCss,
@@ -101,37 +68,15 @@ export function managerShellPage({
     </body></html>`;
 }
 
-/*
- * ══ THE SHARED EDITOR FRAME'S RENDERED CONTRACT (issue 1371 r18-frame, maintainer ruling M32) ══
- *
- * The world Component entry and the system component rules editor stand on ONE frame —
+/**
+ * THE SHARED EDITOR FRAME'S RENDERED CONTRACT (issue 1371 r18-frame, maintainer ruling M32). The
+ * world Component entry and the system component rules editor stand on ONE frame —
  * `manager-component-entry-page` / `-column` / `-panel` — and the maintainer's fourth live test
  * ruled on it as one thing: "the tab bar doesn't span the whole central rail and neither does the
- * scroll area". Two rendered suites prove the frame, one per consumer, and the CLAIM is the frame's
- * rather than either screen's, so the measurement, the checks and the reddening arrangements live
- * here once. A check restated per suite is the duplication the SonarCloud new-code gate refuses,
- * and — worse — a check that drifts between the two suites is two screens each proven to a
- * different frame.
- *
- * The geometry, in the ruling's terms and M21's (the catalogue column the maintainer holds up as
- * the shape he wants): the column carries no inset; the tab strip's hairline runs from the
- * column's left edge to the rail's divider and the TAB BAR BEGINS AT THAT EDGE — the first tab's
- * box starts where the column starts, as the catalogue's toolbar begins at its column's edge; the
- * scrolling panel's box is the column's box below the strip; and the cards keep a gutter INSIDE
- * the panel, the catalogue's own `--fab-space-3`, which is also where the tab's label begins, so
- * the tabs and the cards read from one edge as the catalogue's controls and rows do.
+ * scroll area".
  */
 
-/**
- * The frame's boxes, read IN THE PAGE.
- *
- * Serialized into Chromium by `page.evaluate`, so it closes over nothing and reaches for the
- * frame from either consumer's root. Every edge is the border-box edge a GM sees; `panelInner`
- * is the panel's padding box (its scrollbar, where the browser draws one, excluded) so a card's
- * gutter is measured against the edge the card can actually reach.
- *
- * @returns {object}
- */
+/** The frame's boxes, read IN THE PAGE. */
 export function measureEntryFrame() {
   const box = (element) => {
     const rect = element.getBoundingClientRect();
@@ -155,12 +100,8 @@ export function measureEntryFrame() {
     strip: box(strip),
     firstTab: box(firstTab),
     firstTabContent: box(firstTab.firstElementChild),
-    // THE CASCADE FACT the harvested-chrome arms are non-vacuous on (issue 1371 r20-entry3,
-    // Foundry review round 6). The tab is a `<button role="tab">` and `.manager-editor-tab-button`
-    // declares no `justify-content`, so Foundry's own `a.button, button { justify-content: center }`
-    // arbitrates it: `center` under the harvested sheet, `normal` without one. It is a DECLARATION
-    // that resolved rather than a width that happened to differ, which is why it is read here and
-    // not derived from a box.
+    // THE CASCADE FACT the harvested-chrome arms are non-vacuous on (issue 1371 r20-entry3, Foundry
+    // review round 6).
     firstTabJustify: getComputedStyle(firstTab).justifyContent,
     panel: box(panel),
     panelInner: {
@@ -201,37 +142,17 @@ export const ENTRY_FRAME_UNSTRETCHED_RAIL_CONTROL = `
   .fabricate-manager .manager-component-entry-page { align-items: start !important; }
 `;
 
-/**
- * The frame's own container NARROWED below its stacking threshold (issue 1371 r19-entry2).
- *
- * NOT a reddening control: it is a fourth ARRANGEMENT, a state a GM can reach by dragging the
- * manager window in, and the checks over it are ordinary claims about the frame rather than
- * proofs that another claim can fail. The manager window is `resizable: true` with no minimum
- * and opens at 1280x940, which is only sixty pixels above the frame's own
- * `@container fabricate-manager (max-width: 1000px)`.
- *
- * IT NARROWS THE HOST, not the frame, because the container query reads the width of
- * `.fabricate-manager` and nothing else may be simulated: shrinking the host is what a GM's drag
- * does.
- *
- * AND IT GIVES THE PANE A DEFINITE HEIGHT, which is the half that matters and the half this
- * shell does not otherwise supply. A frame whose pane is sized to its own content cannot show
- * this defect at all — every row resolves to its content and both halves survive by accident —
- * so a stacked arrangement measured only at the shell's content height would be a check that
- * cannot fail. 520px is the UX review's own constraint, the height it reproduced the collapse at.
- */
+/** The frame's own container NARROWED below its stacking threshold (issue 1371 r19-entry2). */
 export const ENTRY_FRAME_STACKED_ARRANGEMENT = `
   .probe-host { width: 900px !important; }
   .fabricate-manager .manager-main { height: 520px !important; max-height: 520px !important; }
 `;
 
 /**
- * Lay a suite's page out four times — honest, stacked, then under each reddening arrangement —
- * and return the frame measured in each.
+ * Lay a suite's page out four times — honest, stacked, then under each reddening arrangement — and
+ * return the frame measured in each.
  *
  * @param {(control: string) => string} pageFor the suite's page builder, given the control rules.
- * @param {{width: number, height: number}} viewport
- * @returns {Promise<{honest: object, stacked: object, inset: object, unstretched: object}>}
  */
 export async function measureEntryFrameArrangements(pageFor, viewport) {
   const browser = await chromium.launch();
@@ -253,16 +174,7 @@ export async function measureEntryFrameArrangements(pageFor, viewport) {
 
 const same = (a, b) => Math.abs(a - b) < 0.5;
 
-/**
- * The frame's checks, one `it` each, over `{honest, inset, unstretched, hostHeight}`.
- *
- * A suite runs `for (const [name, check] of ENTRY_FRAME_CHECKS) it(name, () => check(frames))`, so
- * the two consumers are held to the SAME sentences. The two CONTROLS are in the list because a
- * measurement that cannot fail proves nothing: each re-declares one arrangement the maintainer
- * photographed and asserts the frame reports it.
- *
- * @type {ReadonlyArray<[string, (frames: object) => void]>}
- */
+/** The frame's checks, one `it` each, over `{honest, inset, unstretched, hostHeight}`. */
 export const ENTRY_FRAME_CHECKS = Object.freeze([
   [
     'fills the pane to the window’s foot, and the panel scrolls while the column does not',
@@ -393,15 +305,10 @@ export const ENTRY_FRAME_CHECKS = Object.freeze([
   [
     'keeps BOTH halves when it stacks over a pane of a definite height: each keeps its content, the tab strip stays in the column, and the frame scrolls (M26, M32)',
     ({ stacked: { main, column, strip, rail, frameScrolls } }) => {
-      // ── WHY THIS CHECK EXISTS ──────────────────────────────────────────────────────────────
-      // The frame stacks below `@container fabricate-manager (max-width: 1000px)`, and until
-      // r19-entry2 nothing measured the stacked side on either consumer — this suite's own
-      // comment said so, as a reason to stay wide. What it left unmeasured was the rules editor
-      // over a pane with a definite height: its page IS its `main`, which declares
-      // `grid-template-rows: minmax(0, 1fr)` for M26's full-height rail, and a flexible track
-      // takes only what the non-flexible ones leave. The rail's implicit `auto` row left it
-      // nothing, so the content column resolved to `0px` — no tab strip, neither tab, no card —
-      // and `overflow: hidden` on that same element left no scroller to reach any of them.
+      // WHY THIS CHECK EXISTS ────────────────────────────────────────────────────────────── The
+      // frame stacks below `@container fabricate-manager (max-width: 1000px)`, and until r19-entry2
+      // nothing measured the stacked side on either consumer — this suite's own comment said so, as
+      // a reason to stay wide.
       const height = ({ top, bottom }) => bottom - top;
       // The precondition: this arrangement really is the stacked one. Without it every assertion
       // below is also true of the two-column frame, and the check would prove nothing.
@@ -414,12 +321,7 @@ export const ENTRY_FRAME_CHECKS = Object.freeze([
         'the content column collapsed to nothing: the rail took the whole pane and no scroller reaches the form'
       );
       assert.ok(height(rail) > 0, 'the rail collapsed to nothing: the column took the whole pane');
-      // AND NEITHER HALF WAS SQUEEZED INTO THE PANE. This is the assertion that bites, and it is
-      // the sheet's own stacked ruling — the one `.manager-body` states at its 1120px query:
-      // `max-content` tracks cannot be squeezed, so each region keeps its own height and the
-      // container does the scrolling, which is what the stacked reading order always assumed. A
-      // frame that fitted both halves into a definite pane has divided a screenful between them
-      // instead, which is how a `0px` column is reachable at all.
+      // AND NEITHER HALF WAS SQUEEZED INTO THE PANE.
       assert.ok(
         height(column) + height(rail) > height(main) + 1,
         `the two halves fit inside the pane (${Math.round(height(column))}px + ${Math.round(height(rail))}px into ${Math.round(height(main))}px) — the frame divided the pane between them rather than keeping their content`

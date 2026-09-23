@@ -1,12 +1,4 @@
-/**
- * IoTable (issue 917) as the requirement surface's COMPOSITION ROOT.
- *
- * The rail, the single open chooser and the consumption plan are separately
- * covered; what only IoTable can prove is that they compose — that exactly one
- * chooser renders, that it is the RIGHT one for the open slot, that a choice
- * chooser shows only the open group rather than the old stacked list of every
- * group, and that the legacy set-level essence rows are untouched by any of it.
- */
+/** IoTable (issue 917) as the requirement surface's COMPOSITION ROOT. */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -90,11 +82,7 @@ describe('IoTable mounted behavior', () => {
     assert.ok(target.querySelector('[data-recipe-section="consumption-plan"]'));
   });
 
-  // Composition-root wiring, not presentation: the plan panel ACCEPTS a `formatList`
-  // prop and no ancestor of IoTable supplies one, so unless the root itself defaults
-  // it to the bridge's locale-bound joiner the seam is dead — a rendered-but-inert
-  // prop that no rendering assertion can see. Stubbing Foundry's own list-formatter
-  // read proves the real helper is what reaches the panel.
+  // Composition-root wiring, not presentation.
   it('supplies the active language list formatter to the consumption plan', async () => {
     const asked = [];
     globalThis.game.i18n.getListFormatter = (options) => {
@@ -111,8 +99,7 @@ describe('IoTable mounted behavior', () => {
     }
   });
 
-  // The old surface stacked EVERY group's alternatives below the grid at once; the
-  // rail's contract is that the open slot is the single point of interaction.
+  // The old surface stacked EVERY group's alternatives below the grid at once.
   it('shows only the open group when a choice slot is open', async () => {
     const target = await harness.mount({
       craftability: twoChoiceCraftability(),
@@ -177,9 +164,7 @@ describe('IoTable mounted behavior', () => {
     assert.equal(panel.getAttribute('aria-labelledby'), tile.getAttribute('id'));
   });
 
-  // `aria-labelledby` on a roleless `<div>` is not exposed, so the alternatives panel
-  // would be an unnamed generic while the tile's `aria-controls` pointed straight at it.
-  // The essence pool is a real `<section>`; this one has to say so.
+  // `aria-labelledby` on a roleless `<div>` is not exposed.
   it('exposes the alternatives panel as a named region, not a bare div', async () => {
     const target = await harness.mount({
       craftability: twoChoiceCraftability(),
@@ -214,8 +199,7 @@ describe('IoTable mounted behavior', () => {
     assert.deepEqual(calls.at(-1), ['Item.prism-1', 1]);
   });
 
-  // Legacy set-level essences are threshold-only and never consumed, so they cannot
-  // enter the pool and keep their own row presentation (and its pinned selector).
+  // Legacy set-level essences are threshold-only and never consumed.
   it('keeps legacy set-level essence rows out of the rail and out of the pool', async () => {
     const target = await harness.mount({
       craftability: craftability({
@@ -262,8 +246,7 @@ describe('IoTable mounted behavior', () => {
     assert.equal(chipToneOf(have), 'positive', 'a satisfied holding still reads as green');
     assert.equal(chipToneOf(need), 'neutral', 'and the requirement beside it is a plain fact');
     assert.ok(have.classList.contains('is-list'), 'both take the browser row scale');
-    // The word and the count stay two children, so the chip's own gap separates them the way the
-    // retired tag's did rather than collapsing to a space.
+    // The word and the count stay two children.
     assert.equal(have.querySelectorAll('span').length, 2, 'the reading is a word and a count');
     assert.match(have.textContent.replaceAll(/\s+/g, ' ').trim(), /2$/, 'the count is the holding');
   });

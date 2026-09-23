@@ -1,66 +1,6 @@
 /**
- * Issue 1089 — the persistence seam must be INVISIBLE.
- *
- * `RecipeManager` and `CraftingSystemManager` now reach `game.settings` through a
- * `CraftingDefinitionRepository` instead of calling `setSetting` themselves. That is a
- * decoupling with no intended behaviour change, so the acceptance bar is the absence
- * of change — and the existing suites cannot show it, because they assert on the
- * in-memory managers rather than on the bytes that reach storage.
- *
- * Three independent checks, because "nothing changed" is three separate claims and
- * only one of them belongs to the seam. See
- * `tests/helpers/craftingDefinitionWriteScenario.js` for why this replaced a single
- * recorded byte-for-byte snapshot.
- *
- * ## What each part catches, and what it does not
- *
- * **1. Write shape** (checked-in golden, recorded from a pre-seam tree).
- * Catches: a changed number of persistence writes, a changed order, a write against
- * the wrong setting key. This is the write-amplification baseline #1080 must improve
- * on, and the only part that can compare against pre-seam behaviour at all — the
- * other two compare the current tree against itself.
- * Does NOT catch: anything about payload content. Two writes with the right shape and
- * garbage in them pass this.
- *
- * **2. Payload differential** (recomputed live, never recorded).
- * Catches: a stale or cached corpus, a mirrored map whose ordering diverges, a wrong
- * or lossy serializer, `putAll` handed the wrong record set.
- * Does NOT catch: a `put` whose record never reaches the corpus. Under the settings
- * adapter the manager has already inserted the record into its own map before calling
- * `save({ put })`, so the whole-corpus write contains it regardless of what `put`
- * does with it. That case is real, and it is covered where it is actually
- * observable — by the standalone adapter tests and by
- * `DocumentShapedDefinitionRepository` in `crafting-definition-repository.test.js`,
- * both of which insert only through `put`.
- * Also does NOT catch a write count regression: every one of N duplicated writes
- * carries a correct payload. Part 1 is what catches that.
- *
- * **3. Round trip** (assertion).
- * Catches: a key that storage carries but hydration drops, i.e. the whitelist-rebuild
- * failure mode — every normalizer in `CraftingSystemManager` emits an explicit key
- * set, so a key it stops emitting is dropped on the next save.
- * Does NOT catch: a key dropped from BOTH the write and the read path symmetrically,
- * which round-trips cleanly while still losing data.
- *
- * ## The one capability the previous byte snapshot had and this does not
- *
- * A normalizer that stops emitting a key drops it symmetrically, so it changes the
- * bytes without failing any of the three parts above. The old snapshot caught that;
- * this does not.
- *
- * That was measured, not assumed, before making the trade. Deleting
- * `categories: normalizeCustomRecipeCategories(...)` from `_normalizeSystem` leaves
- * this suite green — and turns two other suites red, `componentCategories and
- * categories stay independent vocabularies (AC7)` and `updateSystem REPLACES the whole
- * icon map (removal persists without -=)`. The guarantee is relocated to the layer
- * that owns it, not lost. That is the correct home: what a normalizer emits is a
- * model-layer contract, and this suite is about the persistence seam.
- *
- * The residual risk is a normalizer key with no other coverage at all, which would now
- * be silently droppable. That is a model-layer coverage question and it predates this
- * seam; backstopping it here is what made the snapshot fire on #1131 and #1136, and a
- * fixture that cries wolf gets regenerated reflexively — which costs more than the
- * coverage was worth.
+ * Issue 1089 — the persistence seam must be INVISIBLE. 1. Write shape** (checked-in golden,
+ * recorded from a pre-seam tree).
  */
 
 import assert from 'node:assert/strict';

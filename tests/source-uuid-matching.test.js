@@ -1,24 +1,17 @@
 /**
- * Integration tests for ingredient/tool/recipe-item matching with _stats.compendiumSource (T-087)
- *
- * Covers:
- *   1. ingredientMatchesItem matches item with only _stats.compendiumSource
- *   2. ingredientMatchesItem still matches item with only flags.core.sourceId (legacy)
- *   3. _toolMatchesItem matches item with only _stats.compendiumSource
- *   4. _toolMatchesItem still matches item with only flags.core.sourceId (legacy)
- *   5. "Craftable only" filtering includes recipe when actor has items matched via _stats.compendiumSource
- *   T7. ingredientMatchesItem matches canonical originItemUuid when the live registeredItemUuid differs
- *   T8. _toolMatchesItem matches an item linked only by _stats.duplicateSource (drag-copied world item)
- *   T9. _toolMatchesItem does NOT match on flags.fabricate.mythwrightId alone
+ * Integration tests for ingredient/tool/recipe-item matching with _stats.compendiumSource (T-087).
+ * Covers: 1. ingredientMatchesItem matches item with only _stats.compendiumSource 2.
+ * ingredientMatchesItem still matches item with only flags.core.sourceId (legacy) 3.
+ * _toolMatchesItem matches item with only _stats.compendiumSource 4. _toolMatchesItem still matches
+ * item with only flags.core.sourceId (legacy) 5. "Craftable only" filtering includes recipe when
+ * actor has items matched via _stats.compendiumSource T7.
  */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
 // Foundry globals (minimal shim — getCompendiumSourceUuid will use item.flags.core.sourceId
 // directly when foundry.utils.getProperty is available, so we provide it here)
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -48,9 +41,7 @@ globalThis.game = makeFakeGame();
 
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function makeIngredient(componentId, quantity = 1) {
   return {
@@ -61,9 +52,8 @@ function makeIngredient(componentId, quantity = 1) {
   };
 }
 
-// Issue 561: a first-class Tool carries its OWN source refs (derived from its linked
-// component at migration/registration). Build the tool that the system exposes so the
-// matcher resolves the owned item against the tool's own refs, not through the component.
+// Issue 561: a first-class Tool carries its OWN source refs (derived from its linked component at
+// migration/registration).
 function toolFromComponent(component) {
   return {
     id: `tool-${component.id}`,
@@ -110,9 +100,7 @@ function makeSystemWithComponent(component) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Test 1 — ingredientMatchesItem: _stats.compendiumSource
-// ---------------------------------------------------------------------------
 
 test('T1 - ingredientMatchesItem: matches item that only has _stats.compendiumSource', () => {
   const registeredItemUuid = 'Compendium.world.items.abc';
@@ -135,9 +123,7 @@ test('T1 - ingredientMatchesItem: matches item that only has _stats.compendiumSo
   assert.equal(manager.ingredientMatchesItem(recipe, ingredient, item), true);
 });
 
-// ---------------------------------------------------------------------------
 // Test 2 — ingredientMatchesItem: legacy flags.core.sourceId still works
-// ---------------------------------------------------------------------------
 
 test('T2 - ingredientMatchesItem: matches item with only flags.core.sourceId (legacy)', () => {
   const registeredItemUuid = 'Compendium.world.items.legacy';
@@ -158,9 +144,7 @@ test('T2 - ingredientMatchesItem: matches item with only flags.core.sourceId (le
   assert.equal(manager.ingredientMatchesItem(recipe, ingredient, item), true);
 });
 
-// ---------------------------------------------------------------------------
 // Test 3 — _toolMatchesItem: _stats.compendiumSource
-// ---------------------------------------------------------------------------
 
 test('T3 - _toolMatchesItem: matches item that only has _stats.compendiumSource', () => {
   const registeredItemUuid = 'Compendium.world.items.catalyst';
@@ -181,9 +165,7 @@ test('T3 - _toolMatchesItem: matches item that only has _stats.compendiumSource'
   assert.equal(manager.toolMatchesItem(recipe, tool, item), true);
 });
 
-// ---------------------------------------------------------------------------
 // Test 4 — _toolMatchesItem: legacy flags.core.sourceId still works
-// ---------------------------------------------------------------------------
 
 test('T4 - _toolMatchesItem: matches item with only flags.core.sourceId (legacy)', () => {
   const registeredItemUuid = 'Compendium.world.items.legacycat';
@@ -203,9 +185,7 @@ test('T4 - _toolMatchesItem: matches item with only flags.core.sourceId (legacy)
   assert.equal(manager.toolMatchesItem(recipe, tool, item), true);
 });
 
-// ---------------------------------------------------------------------------
 // Test 5 — ingredientMatchesItem does NOT match when source UUIDs differ
-// ---------------------------------------------------------------------------
 
 test('T5 - ingredientMatchesItem: no match when compendiumSource differs from component registeredItemUuid', () => {
   const system = makeSystem('comp-5', 'Compendium.world.items.correct');
@@ -226,9 +206,7 @@ test('T5 - ingredientMatchesItem: no match when compendiumSource differs from co
   assert.equal(manager.ingredientMatchesItem(recipe, ingredient, item), false);
 });
 
-// ---------------------------------------------------------------------------
 // Test 6 — _toolMatchesItem does NOT match when source UUIDs differ
-// ---------------------------------------------------------------------------
 
 test('T6 - _toolMatchesItem: no match when compendiumSource differs from component registeredItemUuid', () => {
   const system = makeSystem('cat-6', 'Compendium.world.items.correct');
@@ -248,9 +226,7 @@ test('T6 - _toolMatchesItem: no match when compendiumSource differs from compone
   assert.equal(manager.toolMatchesItem(recipe, tool, item), false);
 });
 
-// ---------------------------------------------------------------------------
 // Test 8 — duplicate-source-only item matches a catalyst via originItemUuid
-// ---------------------------------------------------------------------------
 
 test('T8 - toolMatchesItem: matches item linked only by _stats.duplicateSource', () => {
   const system = makeSystemWithComponent({
@@ -276,9 +252,7 @@ test('T8 - toolMatchesItem: matches item linked only by _stats.duplicateSource',
   assert.equal(manager.toolMatchesItem(recipe, tool, item), true);
 });
 
-// ---------------------------------------------------------------------------
 // Test 9 — mythwrightId-only item with an unrelated name does NOT match
-// ---------------------------------------------------------------------------
 
 test('T9 - toolMatchesItem: does NOT match on flags.fabricate.mythwrightId with an unrelated name', () => {
   const system = makeSystemWithComponent({
@@ -293,8 +267,7 @@ test('T9 - toolMatchesItem: does NOT match on flags.fabricate.mythwrightId with 
   const recipe = makeRecipe();
   const tool = makeTool('cat-9');
 
-  // Neither the source UUIDs nor the name match — a mythwrightId flag alone is not
-  // a match signal.
+  // Neither the source UUIDs nor the name match — a mythwrightId flag alone is not a match signal.
   const item = {
     uuid: 'Item.actor-seeded',
     _stats: {},

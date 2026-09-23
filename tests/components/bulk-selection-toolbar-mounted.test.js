@@ -1,43 +1,10 @@
-/**
- * The manager's ONE multi-select toolbar (issue 772, extracted for issue 1010).
- *
- * Two things are asserted here, and only one of them is about this component's own
- * behaviour.
- *
- * 1. THE `:global()` CONTRACT, which no other gate in this repository can see.
- *
- *    The toolbar draws the page box's focus ring itself, because it passes
- *    `wrapper="contents"` and so opts out of the ring `SelectionCheckbox` scopes to the
- *    `<label>` IT renders. That rule reaches across a component boundary:
- *
- *      .fab-bulk-selection-all
- *        :global(.fab-selection-input:focus-visible + .fab-selection-check)
- *
- *    Before issue 924 the `input` half sat OUTSIDE the `:global()`, the compiler pruned the
- *    whole rule as unused, and the ring was dead in every shipped build. That failure was
- *    LOUD — `css_unused_selector`, which `scripts/check-svelte-warnings.mjs` exits 1 on —
- *    and the fix made the SAME breakage SILENT, because nothing analyses the contents of a
- *    `:global()`: Svelte's unused-selector analysis stops at it, Stylelint excludes
- *    `.svelte` entirely, and SonarCloud indexes none of it.
- *
- *    So adjacency alone is not enough. Adjacency proves the DOM still has the shape the
- *    rule needs; it cannot see a typo INSIDE the `:global()`, which would leave a
- *    live-looking rule matching nothing. The drift assertion below therefore re-reads the
- *    class tokens out of the selector itself and demands each one still appear in
- *    `SelectionCheckbox`'s markup, so a rename on either side of the boundary fails here.
- *
- * 2. THE PARAMETERS. The row class and all five `data-*` hooks are props, defaulted to the
- *    Component Studio's strings so the shipped call site, the smoke selectors
- *    (`scripts/foundry-test-run.mjs`) and the view-lab cases resolve unchanged. That
- *    default is a compatibility contract, not an implementation detail, so it is pinned —
- *    and so is the override, because a primitive whose hooks silently ignored a caller
- *    would look fine on the studio it was extracted from.
- */
+/** The manager's ONE multi-select toolbar (issue 772, extracted for issue 1010). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const TOOLBAR_PATH = 'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte';
@@ -46,7 +13,7 @@ const CHECKBOX_PATH = 'src/ui/svelte/components/SelectionCheckbox.svelte';
 const toolbar = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-bulk-selection-toolbar-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
   compiledModules: [CHECKBOX_PATH, TOOLBAR_PATH],
   componentPath: TOOLBAR_PATH
 });
@@ -62,15 +29,7 @@ function styleBlockOf(source) {
     .replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
-/**
- * An element's classes with Svelte's own scoping class removed.
- *
- * The root row carries one. It did NOT before issue 1010, because its class attribute was a
- * static literal the compiler could prove no scoped selector matched; making the row class a
- * PROP makes the attribute dynamic, and the compiler then adds the hash conservatively. It
- * is inert — this component declares no rule that could match the row — but it is real, so
- * the assertions state what the row must carry rather than pretending the set is unchanged.
- */
+/** An element's classes with Svelte's own scoping class removed. */
 function authoredClasses(element) {
   return [...element.classList].filter((token) => !token.startsWith('svelte-')).sort();
 }
@@ -100,8 +59,7 @@ describe('BulkSelectionToolbar cross-boundary focus ring (issue 924 / 1010)', ()
     const globalSelectors = [...styleBlockOf(readRepoFile(TOOLBAR_PATH)).matchAll(/:global\(([^)]+)\)/g)]
       .map(([, selector]) => selector);
 
-    // Teeth first: if the extraction ever drops the rule, the loop below would iterate an
-    // empty set and pass while the ring was gone.
+    // Teeth first: if the extraction ever drops the rule.
     assert.equal(
       globalSelectors.length,
       1,
@@ -140,8 +98,7 @@ describe('BulkSelectionToolbar cross-boundary focus ring (issue 924 / 1010)', ()
         ' the real control under that class inside this host'
     );
 
-    // `nextElementSibling` skips the comment anchors Svelte interleaves, which is exactly why
-    // the rule uses `+` rather than a descendant combinator.
+    // `nextElementSibling` skips the comment anchors Svelte interleaves.
     const box = input.nextElementSibling;
     assert.ok(
       box?.classList.contains('fab-selection-check'),
@@ -209,8 +166,7 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
       assert.ok(Boolean(root.querySelector(`[${hook}]`)), `${hook} should be rendered`);
     }
 
-    // The defaults must be GONE, not merely joined by the overrides: a primitive that
-    // emitted both would let one studio's screenshot walk photograph the other's toolbar.
+    // The defaults must be GONE, not merely joined by the overrides.
     for (const shipped of [
       'data-component-selection-toolbar',
       'data-component-select-all-page',
@@ -256,13 +212,7 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
   });
 
   it('draws the two actions as bare type only when asked, glyph and underline together', async () => {
-    // `proto:595` is a bare clickable span in `--info` with NO border; `proto:596` is the same
-    // shape in `--subtle` with NO glyph. The `fa-xmark` this component draws is not invented —
-    // `proto:626` is the INSPECTOR PANEL's Clear and it carries one — it is the panel's treatment
-    // borrowed for the band, where the reference states the plainer one.
-    //
-    // BOTH HALVES ON ONE PROP, and both directions asserted: a variant that dropped the glyph and
-    // kept the underline would satisfy either clause on its own.
+    // `proto:595` is a bare clickable span in `--info` with NO border.
     const shipped = await toolbar.mount({ count: 3, showSelectAllResults: true });
     assert.ok(
       Boolean(shipped.querySelector('.fab-bulk-selection-clear i')),
@@ -300,17 +250,13 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
   });
 
   it('draws the count glyph the caller names, and defaults to the studios’ own', async () => {
-    // ── THE COUNT IS A THIRD OBJECT, NOT A THIRD ACTION ──────────────────────────────────────
+    // ── THE COUNT IS A THIRD OBJECT.
     // `proto:593` draws the band's count as `700 11px var(--sans)` in `--accent` behind a
     // `fa-solid fa-check-double` at `font-size:10px; margin-right:6px`. Measured in Chromium
     // against the production layering, everything but the glyph already matches: 10.88px / 700 /
     // `#E8C6A7`, and a 6px optical gap from `--fab-space-chip`. The one real divergence is WHICH
     // GLYPH, and that is markup — no stylesheet can swap an element the template renders, which
     // is why this is a prop and not a rule.
-    //
-    // A PROP OF ITS OWN rather than a third clause on `bareActions`: see the note beside
-    // `countIcon`'s declaration. Both directions are asserted, because a component that ignored
-    // the prop and one that hard-coded the design's glyph for everybody each satisfy one clause.
     const shipped = await toolbar.mount({ count: 2 });
     const shippedGlyph = shipped.querySelector('.fab-bulk-selection-count > i');
     assert.ok(Boolean(shippedGlyph), 'the count lost its leading glyph outright');
@@ -329,8 +275,7 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
       ['fa-check-double', 'fa-solid'],
       'the caller names a glyph and the count draws the shipped one anyway'
     );
-    // STILL DECORATIVE. The count's accessible name is the `N selected` text beside it; a glyph
-    // that lost `aria-hidden` would be announced as an unnamed image in the middle of it.
+    // STILL DECORATIVE. The count's accessible name is the `N selected` text beside it.
     assert.equal(bandGlyph.getAttribute('aria-hidden'), 'true', 'the glyph is decoration');
     // AND THE LABEL SURVIVES THE SWAP, which is the edit next to it in any future diff.
     assert.match(band.querySelector('.fab-bulk-selection-count').textContent, /2 selected/);
@@ -370,10 +315,7 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
   });
 
   it('drops the master box and names the SHOWN rows under selectAllScope="shown"', async () => {
-    // `proto:592-596` draws a count, a standing sentence, one `Select all {n} shown` and Clear —
-    // no master box anywhere, and its one action selects the rows on screen. Both halves are one
-    // ruling, so both are asserted together: a variant that dropped the box and kept `results`
-    // would offer the filtered set with no way to take the page.
+    // `proto:592-596` draws a count, a standing sentence.
     const root = await toolbar.mount({
       pageSelectionState: 'some',
       count: 3,
@@ -394,8 +336,7 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
       'Select all 9 shown',
       'the one remaining action still names `results`, which is not the population it now takes'
     );
-    // The count, the hint and Clear are untouched by the scope: it is a ruling about the
-    // select-all pair and nothing else.
+    // The count, the hint and Clear are untouched by the scope.
     assert.match(
       root.querySelector('[data-component-selection-count]').textContent,
       /3 selected/,
@@ -405,19 +346,14 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
   });
 
   it('renders NOTHING under "shown" while the selection is empty, rather than an empty row', async () => {
-    // Everything except the box lives behind `count > 0`, so suppressing the box leaves a
-    // bordered, padded row with no children — `.is-selection` in the global sheet gives that row
-    // its metrics and its hairline, so it is visible. `proto:591` gates the whole band on the
-    // selection for exactly this reason.
+    // Everything except the box lives behind `count > 0`.
     const empty = await toolbar.mount({ count: 0, selectAllScope: 'shown' });
     assert.ok(
       !empty.querySelector('[data-component-selection-toolbar]'),
       'an empty band still renders its bordered row with nothing inside it'
     );
 
-    // AND THE DEFAULT STILL RENDERS AT ZERO, which is the assertion that keeps the one above
-    // from being a licence to delete the band: the shipped studios show the box at zero selection
-    // because the box is how a selection starts.
+    // AND THE DEFAULT STILL RENDERS AT ZERO.
     const shipped = await toolbar.mount({ count: 0 });
     assert.ok(
       Boolean(shipped.querySelector('[data-component-selection-toolbar]')),
@@ -426,8 +362,7 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
   });
 
   it('renders the shipped band for an unrecognised scope rather than deleting its box', async () => {
-    // The closed-set contract `Chip`'s tone and `ManagerButton`'s role both state: a typo shows
-    // up as the default, never as a silently missing control.
+    // The closed-set contract `Chip`'s tone and `ManagerButton`'s role both state.
     for (const selectAllScope of ['results', 'Shown', 'page', '', undefined]) {
       const root = await toolbar.mount({ count: 2, selectAllScope });
       assert.ok(
@@ -444,14 +379,6 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
     // element and never that the margin moved. The real geometry is measured in a browser by
     // `scoped-list-inspector-geometry.test.js`. What is pinned HERE is the thing that measurement
     // cannot see: WHICH FILE the two declarations are written in.
-    //
-    // `styles/fabricate.css` ships at `layer(modules)` — `module.json` gives it no explicit layer
-    // and Foundry imports an unlayered module sheet there, which `tests/view-lab/cascade.css`
-    // reproduces. This component's scoped block is injected unlayered at runtime, and an
-    // unlayered declaration beats a layered one whatever the specificity. So the obvious
-    // authoring of this rule — a higher-specificity selector in the global sheet — is emitted,
-    // matches, and has its declaration silently discarded. It was written that way first and the
-    // View Lab is what caught it.
     const source = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte'),
       'utf8'
@@ -461,19 +388,14 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
       /\.fab-bulk-selection-link\.is-trailing\s*\{[^}]*margin-left:\s*auto/,
       'the trailing-group margin is not in this component’s scoped block'
     );
-    // AND THE SECOND HALF, which is the one an eye skips: two flex items each carrying
-    // `margin-left: auto` SPLIT the free space rather than both moving right, so `Clear` has to
-    // give its own back or the pair sits half a band apart.
+    // AND THE SECOND HALF, which is the one an eye skips.
     assert.match(
       source,
       /\.fab-bulk-selection-link\.is-trailing\s*\+\s*\.fab-bulk-selection-clear\s*\{[^}]*margin-left:\s*0/,
       '`Clear` keeps its own auto margin beside a trailing link, so the free space splits'
     );
 
-    // COMMENTS STRIPPED FIRST, and that is not tidiness: the sheet's own note about this rule
-    // NAMES both selectors, so a comment-blind scan reports the explanation as the violation and
-    // the guard can never go green. It also has to still bite, so `fails on a real rule` below is
-    // the negative half.
+    // COMMENTS STRIPPED FIRST, and that is not tidiness.
     const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8').replace(
       /\/\*[\s\S]*?\*\//g,
       ''

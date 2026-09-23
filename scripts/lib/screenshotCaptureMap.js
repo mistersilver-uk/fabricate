@@ -1,43 +1,15 @@
 /**
- * screenshotCaptureMap.js
- *
- * Pure (playwright-free, no `main()` autorun) registration map for the live-Foundry
- * screenshot capture walk in `scripts/foundry-test-run.mjs`. It is the label →
- * capture-routine METADATA — which smoke label is produced by which walk phase, in
- * which relative order, and its behavioral-state class — NOT the browser-driving
- * routine bodies. The harness imports it to scope a `screenshots`-profile run to the
- * views a PR affects (skip a phase whose labels are all off-target); the unit tests
- * import it to prove scoping/reachability/ordering WITHOUT booting Foundry.
- *
- * WHY a separate module (issue #826): `foundry-test-run.mjs` top-level-imports
- * playwright AND autoruns `main()` with no `import.meta.url` guard, so importing it in
- * `node:test` launches Chromium then `process.exit()`s — killing the whole `node --test`
- * run (the `# cancelled` catastrophe). Nothing here imports playwright or runs on load.
- *
- * DRIFT GUARD: this is a hand-maintained mirror of the harness's `screenshot(page,
- * '<label>')` calls and of `VIEW_RECIPES` in `scripts/ui-pr-screenshot-evidence.mjs`.
- * `tests/screenshot-capture-scoping.test.js` fails when they drift — every capturable
- * label here must appear as a string literal in the harness source, and every
- * `VIEW_RECIPES` smoke label must be reachable here.
+ * Pure (playwright-free, no `main()` autorun) registration map for the live-Foundry screenshot
+ * capture walk in `scripts/foundry-test-run.mjs`.
  */
 
-// Walk phases that emit screenshots. `boot-and-join`/`phase-B`/`phase-C` emit only
-// health frames that no PR view maps, so the two view-bearing phases are the scoping
-// unit: `phase-D0` (the Crafting System Manager walk) and `phase-E` (the player apps +
-// persisted-state craft/journal frames).
+// Walk phases that emit screenshots.
 export const CAPTURE_PHASE_D0 = 'phase-D0';
 export const CAPTURE_PHASE_E = 'phase-E';
 
 /**
- * Behavioral-state classes (issue #826 Design B). ILLUSTRATIVE metadata, not a
- * scoping key: the capture bodies live in the harness. Recorded here so a future
- * per-view runner (and a reviewer) can see which frames read persisted world state vs
- * an ephemeral post-click dialog.
- *
- * - Class A (persisted-state): rendered from world-DB state a live craft/import
- *   produces (run-history flag, crafted item, chat message).
- * - Class B (ephemeral in-session UI): exists only after a live click; not
- *   representable in any world DB, so its routine must retain the inline interaction.
+ * Behavioral-state classes (issue #826 Design B). illustrative metadata, not a scoping key: the
+ * capture bodies live in the harness.
  */
 export const CLASS_A_LABELS = Object.freeze(
   new Set([
@@ -51,20 +23,13 @@ export const CLASS_A_LABELS = Object.freeze(
 
 export const CLASS_B_LABELS = Object.freeze(
   new Set([
-    // The interactive crafting-check roll prompt. Captured by
-    // `handleRollPromptIfPresent` between the Craft click and the run summary, so its
-    // label reaches `screenshot()` through a parameter rather than a literal
-    // `screenshot(page, '<label>')` call — which is why it went unregistered here
-    // until issue 855.
+    // The interactive crafting-check roll prompt.
     'player-crafting-roll-prompt',
     'player-crafting-run-summary',
     'player-crafting-roll-result',
     'player-crafting-alternatives-switched',
-    // The requirement-rail states that live in the STORE rather than the world DB
-    // (issue 917): which chooser is open, and how many units of each carrier the
-    // player has allocated. `player-crafting-tag-unmatched` is deliberately absent —
-    // it is the all-fixed rail with every chooser closed, so it renders purely from
-    // seeded world state and needs no interaction to reach.
+    // The requirement-rail states that live in the store rather than the world db (issue 917):
+    // which chooser is open, and how many units of each carrier the player has allocated.
     'player-crafting-slot-rail',
     'player-crafting-essence-pool',
     'player-crafting-pick-for-me',
@@ -84,15 +49,7 @@ export const CLASS_B_LABELS = Object.freeze(
   ])
 );
 
-/**
- * Every `VIEW_RECIPES` smoke label, in the harness's capture (walk) order. `collect`
- * (`scripts/ui-pr-screenshot-evidence.mjs`) picks `candidates[0]` from a FILENAME sort
- * of `screenshot-<counter>-<label>.png`, i.e. the lowest capture counter among a view's
- * labels — so the relative order here is load-bearing: a scoped run renumbers the
- * counter, but because it only FILTERS which labels are written (never reorders), the
- * per-view first-captured label is preserved and `candidates[0]` still selects it.
- * @type {readonly string[]}
- */
+/** Every `VIEW_RECIPES` smoke label, in the harness's capture (walk) order. */
 export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   // ── phase-D0: Crafting System Manager walk ─────────────────────────
   'manager-recipes-editor-roundtrip',
@@ -109,10 +66,9 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'currency-macro',
   'currency-actor-inventory',
   'manager-recipes-normal',
-  // Issue 1010 — the Recipe Studio's bulk-edit states, captured immediately after the plain
-  // browser frame so `manager-recipes` keeps winning its own `candidates[0]` with
-  // `manager-recipes-normal` (the lowest capture counter among that view's three labels).
-  // Inside the `recipes` section span, so a recipe-only PR scopes to that section alone.
+  // Issue 1010 — the Recipe Studio's bulk-edit states, captured immediately after the plain browser
+  // frame so `manager-recipes` keeps winning its own `candidates[0]` with `manager-recipes-normal`
+  // (the lowest capture counter among that view's three labels).
   'manager-recipes-bulk-edit',
   'manager-recipes-bulk-edit-unstaged',
   'manager-recipes-bulk-edit-blocked',
@@ -239,10 +195,7 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'player-crafting-essence-legacy',
   'player-crafting-essence-ingredient',
   'player-crafting-essence-shopping',
-  // The requirement-rail redesign (issue 917), in walk order. Each is its OWN
-  // `VIEW_RECIPES` entry rather than an extra label on `player-crafting`, because
-  // `collect` publishes only `candidates[0]` per view id — appending them there would
-  // publish one arbitrary frame forever and none of these states would reach a PR.
+  // The requirement-rail redesign (issue 917), in walk order.
   'player-crafting-slot-rail',
   'player-crafting-tag-unmatched',
   'player-crafting-essence-pool',
@@ -265,15 +218,7 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
 
 const CAPTURE_ORDER_INDEX = new Map(SCREENSHOT_CAPTURE_ORDER.map((label, index) => [label, index]));
 
-/**
- * The phase that produces `label`, derived from its stable prefix. Manager /
- * currency / interactable frames belong to the `phase-D0` manager walk; player /
- * craft / journal / app-shell frames belong to `phase-E`. Deriving from the prefix
- * (rather than a second hand-maintained table) keeps the mapping self-consistent; the
- * one function-hosted exception is pinned explicitly.
- * @param {string} label
- * @returns {'phase-D0' | 'phase-E'}
- */
+/** The phase that produces `label`, derived from its stable prefix. */
 export function phaseForCaptureLabel(label) {
   if (label === 'manager-recipes-editor-roundtrip') return CAPTURE_PHASE_D0;
   if (
@@ -293,11 +238,8 @@ export function isCapturableLabel(label) {
 }
 
 /**
- * The capture-counter ordinal for `label` (its index in the walk). Lower sorts first
- * in `collect`'s filename sort, so this is what makes a view's intended frame win
- * `candidates[0]`. Returns -1 for an unknown label.
- * @param {string} label
- * @returns {number}
+ * The capture-counter ordinal for `label` (its index in the walk). Lower sorts first in `collect`'s
+ * filename sort, so this is what makes a view's intended frame win `candidates[0]`.
  */
 export function captureOrderIndex(label) {
   return CAPTURE_ORDER_INDEX.has(label) ? CAPTURE_ORDER_INDEX.get(label) : -1;
@@ -305,10 +247,7 @@ export function captureOrderIndex(label) {
 
 /**
  * The set of view-bearing phases a scoped run must execute to produce every label in
- * `targetLabels`. Unknown labels are ignored (they carry no phase); an empty set
- * yields an empty set (the caller then treats it as "capture everything").
- * @param {Iterable<string>} targetLabels
- * @returns {Set<string>}
+ * `targetLabels`.
  */
 export function phasesForTargetLabels(targetLabels) {
   const phases = new Set();
@@ -318,64 +257,14 @@ export function phasesForTargetLabels(targetLabels) {
   return phases;
 }
 
-/**
- * Whether the `phase-E` player/craft walk is needed for `targetLabels`. `phase-E` is
- * the LAST view-bearing phase (only cleanup follows) and nothing earlier depends on
- * its side effects, so it is safe to skip when no target label maps to it. `phase-D0`
- * is NOT symmetrically skippable: `phase-E`'s player views read fixtures seeded inside
- * `phase-D0`, so a wholesale D0 skip would strand those seeds (deferred to the
- * follow-on that hoists the seed prerequisites).
- * @param {Iterable<string>} targetLabels
- * @returns {boolean}
- */
+/** Whether the `phase-E` player/craft walk is needed for `targetLabels`. */
 export function isPhaseNeededForTargets(phase, targetLabels) {
   return phasesForTargetLabels(targetLabels).has(phase);
 }
 
 /**
- * ── Phase-D0 intra-phase collapse (issue #826 increment 2) ─────────────────────
- *
  * `phase-D0` (the Crafting System Manager walk) cannot be skipped wholesale (see
- * `isPhaseNeededForTargets`) because its opening SPINE seeds fixtures a later
- * `phase-E` reads. But its body is a sequence of contiguous capture SECTIONS, and
- * measured `viewTimings` show D0 at ~64% of the walk. A scoped `screenshots` run
- * therefore skips the navigate+settle+capture work of any SECTION whose labels are
- * all off-target, keeping only the always-run spine + the sections a PR touches.
- *
- * SAFETY MODEL (why a whole-section skip cannot publish a wrong frame):
- * - The spine (`D0_SPINE_LABELS`) ALWAYS runs — it opens the manager, selects the
- *   smoke system, seeds the gathering library + travel/realm fixtures `phase-E`
- *   needs, and enables the persisted currency config a downstream view may read. It
- *   is the baseline every section re-navigates from.
- * - Each skippable section re-enters via ABSOLUTE manager navigation (a nav-parent /
- *   nav-button click or `openManager*` helper — never a relative move off the prior
- *   section's position), so a section never depends on an upstream section's UI
- *   state; and each section is persisted-NET-ZERO: it either only captures, or it
- *   mutates shared state and restores it INLINE (the multi-step feature toggle's
- *   `finally`, the issue-800 description-repair restore, the gathering-economy
- *   revert, every system switch's re-select, the import "(Copy)" deletion). Skipping
- *   a whole section skips the mutation AND its inline restore together, leaving world
- *   state exactly as if the section never ran — so no co-scoped reader is
- *   contaminated. (Section granularity is why the multi-step `finally` needs no
- *   per-routine split: the enabled-state frames, the toggle, and the restore are all
- *   inside ONE section and either all run or all skip.)
- *
- * These lists are the MAPPED (`VIEW_RECIPES`) labels only; unmapped ride-along frames
- * (e.g. `manager-system-overview`) are produced only when their section runs and are
- * never a PR target, so they need no entry here. `tests/screenshot-capture-scoping.js`
- * proves spine + sections PARTITION every mapped D0 label (nothing unguarded).
- */
-/**
- * The inclusive `[fromLabel, toLabel]` slice of `SCREENSHOT_CAPTURE_ORDER`. The spine
- * and section label lists are DERIVED from these boundary markers rather than
- * re-listing every label, so each label string lives exactly once (in the capture
- * order) — the single source of truth. Re-listing them here instead would duplicate
- * ~70 label strings the new-code duplication gate rejects, and would drift silently
- * from the capture order. Throws on an unknown or inverted boundary (a fail-loud
- * mis-edit guard).
- * @param {string} fromLabel
- * @param {string} toLabel
- * @returns {string[]}
+ * `isPhaseNeededForTargets`) because its opening spine seeds fixtures a later `phase-E` reads.
  */
 function captureOrderSlice(fromLabel, toLabel) {
   const from = CAPTURE_ORDER_INDEX.get(fromLabel);
@@ -390,17 +279,7 @@ export const D0_SPINE_LABELS = Object.freeze(
   captureOrderSlice('manager-default-selection', 'currency-actor-inventory')
 );
 
-/**
- * The ordered, contiguous, independently-skippable D0 capture sections. Each `name`
- * is the token the harness passes to its `shouldRunScreenshotSection` guard; `labels`
- * are that section's mapped capture labels, DERIVED (see `captureOrderSlice`) from the
- * section's contiguous `[from, to]` span in the capture order. A section runs iff
- * scoping is inactive (rc/ci/full — the guard short-circuits true) OR at least one of
- * its labels is in the PR target set. `extra` carries a label the walk captures OUT of
- * its section's contiguous span: the recipe-editor roundtrip is hoisted to the front of
- * the capture order (for `candidates[0]`) but belongs to the recipes section.
- * @type {readonly {name: string, labels: readonly string[]}[]}
- */
+/** The ordered, contiguous, independently-skippable D0 capture sections. */
 const D0_SECTION_SPANS = [
   {
     name: 'recipes',
@@ -429,10 +308,7 @@ const D0_SECTION_SPANS = [
     to: 'manager-tool-stress-wrapping-680',
   },
   {
-    // The GM Knowledge surface (issue 785). Its fixture writes real actor flags,
-    // creates world Items + recipe-item definitions and grants owned copies, and its
-    // `finally` restore undoes all of it — so skipping the section skips the mutation
-    // AND its restore together, exactly like the Tool Studio section above.
+    // The GM Knowledge surface (issue 785).
     name: 'knowledge',
     from: 'manager-knowledge-owned-copies',
     to: 'manager-knowledge-narrow',
@@ -461,14 +337,8 @@ export const D0_SKIPPABLE_SECTIONS = Object.freeze(
 const D0_SECTION_LABELS_BY_NAME = new Map(D0_SKIPPABLE_SECTIONS.map((s) => [s.name, s.labels]));
 
 /**
- * Whether the named D0 section must run to satisfy `targetLabels` — i.e. any of the
- * section's mapped labels is in the target set. Pure: the harness composes it with
- * its own `SCREENSHOT_SCOPING_ACTIVE` short-circuit (rc/ci/full always run every
- * section). An unknown section name returns `true` (fail-safe: never silently skip a
- * section the harness knows about but the map does not).
- * @param {string} sectionName
- * @param {Iterable<string>} targetLabels
- * @returns {boolean}
+ * Whether the named D0 section must run to satisfy `targetLabels` — i.e. any of the section's
+ * mapped labels is in the target set.
  */
 export function isD0SectionNeededForTargets(sectionName, targetLabels) {
   const labels = D0_SECTION_LABELS_BY_NAME.get(sectionName);

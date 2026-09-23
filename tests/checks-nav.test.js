@@ -1,12 +1,4 @@
-/**
- * The Checks rail GROUP model (issue 1096).
- *
- * `Checks` stopped being one flat rail button holding four tabs and became an expandable
- * group whose four children are ROUTES. This suite pins the model that decision rests on:
- * which children are visible, what each badge counts, what the parent badge sums, where the
- * retained `checks` id redirects to, and — the one that would otherwise rot silently — that
- * `CHECKS_VIEWS` holds `data-manager-view` strings rather than nav-item ids.
- */
+/** The Checks rail GROUP model (issue 1096). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

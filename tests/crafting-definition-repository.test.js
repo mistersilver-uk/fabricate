@@ -1,13 +1,4 @@
-/**
- * Issue 1089 — the crafting-definition repository seam.
- *
- * The byte-level proof that this changed nothing lives in
- * `crafting-definition-persistence-equivalence.test.js`. This suite covers the rest of
- * the issue's acceptance criteria: that no production code outside the adapter still
- * reaches the two setting keys, that the repository is injectable and countable, that
- * a single-record mutation costs exactly one write, and that the interface really is
- * expressible by the other candidate backend rather than only claimed to be.
- */
+/** Issue 1089 — the crafting-definition repository seam. */
 
 import assert from 'node:assert/strict';
 import { describe, it, beforeEach } from 'node:test';
@@ -33,11 +24,8 @@ const { CraftingSystemManager } = await import('../src/systems/CraftingSystemMan
 const { Recipe } = await import('../src/models/Recipe.js');
 
 /**
- * `getSetting(SETTING_KEYS.RECIPES)` and friends — the thing the acceptance criterion
- * actually forbids, as opposed to merely naming a key.
- *
- * Matches `_getSetting`/`this._setSetting` too, deliberately: an injected accessor
- * reaching the same key is the same coupling wearing a seam.
+ * `getSetting(SETTING_KEYS.RECIPES)` and friends — the thing the acceptance criterion actually
+ * forbids, as opposed to merely naming a key.
  */
 const KEY_ACCESS = /\b_?(?:get|set)Setting\(\s*SETTING_KEYS\.(?:RECIPES|CRAFTING_SYSTEMS)\b/;
 
@@ -45,12 +33,8 @@ const KEY_ACCESS = /\b_?(?:get|set)Setting\(\s*SETTING_KEYS\.(?:RECIPES|CRAFTING
 const KEY_ACCESS_ALLOWLIST = new Set([
   // The adapter. The only production write path for these two keys.
   'src/systems/SettingsCraftingDefinitionRepository.js',
-  // Owned by #1080: ~36 registered migrations rewrite the raw settings corpus through
-  // their own injected `_getSetting`/`_setSetting` seams, and they run BEFORE either
-  // manager initializes. Routing them through the repository would put a hydrating,
-  // normalizing layer underneath migrations whose whole job is to fix data the
-  // normalizers cannot yet read — and a migration that silently reads nothing is a
-  // data-loss bug no test catches.
+  // Owned by #1080: ~36 registered migrations rewrite the raw settings corpus through their own
+  // injected `_getSetting`/`_setSetting` seams, and they run BEFORE either manager initializes.
   'src/migration/MigrationRunner.js',
   // Adding a module here is a deliberate act: the point of this list is that every
   // legacy-key reader is enumerated and justified rather than merely permitted.

@@ -1,132 +1,75 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The GM recipe browser's BULK EDIT panel (issue 1010). It renders in the shell's existing
-  `.manager-inspector` column and REPLACES `RecipeBrowserInspector` for as long as the
-  selection is non-empty — the same `> 0` threshold, and for the same reason, that
-  `ComponentBulkEditPanel` records: one ticked box is already a bulk edit, and making the
-  GM tick a second one before the panel appears hides the whole feature behind an
-  unexplained threshold.
+  The GM recipe browser's BULK EDIT panel. It renders in the shell's `.manager-inspector` column and
+  REPLACES `RecipeBrowserInspector` while the selection is non-empty, on the `> 0` threshold
+  `ComponentBulkEditPanel` records. It lives under the BROWSER's directory, which
+  `scripts/ui-pr-screenshot-evidence.mjs` globs for the `manager-recipes` views, and NOT under
+  `recipe/`, which is the EDITOR's and would republish five editor frames and never the browser one.
+  See `openspec/specs/ui-visual-style/spec.md` → "Bulk edit panels" for the shared contract.
 
-  It lives under `apps/manager/recipes/` — the BROWSER's directory, which
-  `scripts/ui-pr-screenshot-evidence.mjs` globs for the `manager-recipes` views — and NOT
-  under `recipe/`, which is the EDITOR's: a browser-side component placed there would
-  republish the five recipe-EDITOR frames and never the browser frame.
+  Its CHROME is the shared `BulkEditPanelShell` / `BulkEditSection` / `BulkEditSelect` primitives,
+  so this panel and the Component Studio's render the same controls rather than two implementations
+  of one meaning. What is here is about RECIPES: the category, status, lock, check-tier and book axes.
 
-  Its CHROME is not its own. The header, hero, section headings, staged select and Apply
-  are the shared `BulkEditPanelShell` / `BulkEditSection` / `BulkEditSelect` primitives
-  under `apps/manager/`, so this panel and the Component Studio's render the same controls
-  rather than two implementations of one meaning. What is here is what is genuinely about
-  RECIPES: the category, status, lock, check-tier and recipe-book axes.
+  THE BOOK AXIS IS A PICKER, NOT A CHIP RUN, and the divergence from the Component Studio is
+  maintainer-decided: a chip per book stops being readable at the eight-plus recipe items a real
+  system carries, where a tag vocabulary is small and flat by nature. So it is a SEARCH AND PICK
+  control over one book at a time, with a STAGED LIST accumulating the answers. The divergence is
+  confined to the staged AXIS — the chrome and the staged SHAPE are unchanged, and one book on
+  screen is a property of the CONTROL, never of the staged set. Accepted consequence: Edit and
+  Duplicate live only in `RecipeBrowserInspector`, so ticking one box hides them until the selection
+  clears, with `Clear selection` as the documented escape. Delete is not in that list, because the
+  swap was making the one DESTRUCTIVE affordance harder to reach exactly when a GM had selected the
+  rows they wanted rid of.
 
-  ── THE BOOK AXIS IS A PICKER, NOT A CHIP RUN ─────────────────────────────────────
-  The Component Studio stages its many-valued axis (tags) as a flat run of tri-state chips.
-  This one deliberately does not, and the divergence is maintainer-decided (issue 1010): a
-  chip per book stops being readable at the eight-plus recipe items a real system carries,
-  where a system's tag vocabulary is small and flat by nature. So the axis is a SEARCH AND
-  PICK control — trigger, searchable option list, pick card with Add and Remove — over one
-  book at a time, with a STAGED LIST below it accumulating the answers.
+  THE BULK DELETE IS ARMED, AND IT IS PAIRED WITH AN IMPACT STATEMENT. `AGENTS.md` reserves
+  `confirmDialog` for bulk actions EXCEPT where the panel states the pending impact in view before
+  the control is armed. Do not substitute a `confirmDialog`, and do not remove the impact list and
+  leave the arm: the carve-out is the pair, not the button. The impact list is the immediately
+  preceding sibling INSIDE the same card, so no scroll position reaches the arm without it. The card
+  is the shared `BulkDeleteCard`; what is left here is the four sentences, the standing hint and the
+  impact prop.
 
-  The divergence is confined to the staged AXIS. The chrome above stays common, and so does
-  the staged SHAPE: `bookAdd[]` / `bookRemove[]`, `toBulkRecipeEdit`'s `addBookIds` /
-  `removeBookIds`, and the write primitive's books-not-recipes iteration are all unchanged.
-  One book on screen is a property of the CONTROL, never of the staged set.
+  THE STANDING HINT IS NOT A COUNT, which is why it always renders. Deleting a recipe is
+  irreversible in a way deleting a component is not: an orphan learned entry frees no budget, a
+  `total` pool key is unreconstructable once the recipe is gone, and a recreated recipe has a new id
+  the spent scroll can no longer teach. A GM reading "will forget" would read it as re-teachable.
 
-  Consequence, accepted and recorded: Edit and Duplicate live ONLY in
-  `RecipeBrowserInspector`, so ticking one box hides them until the selection clears.
-  `Clear selection` is the documented escape and is the first control in the header. DELETE
-  is no longer in that list — issue 1132 gave the panel its own set delete, because the swap
-  was making the one DESTRUCTIVE affordance harder to reach at exactly the moment a GM had
-  selected the rows they wanted rid of. Edit and Duplicate stay out: neither is destructive,
-  and neither has an impact worth stating, which is what the arm below is paired with.
+  NOTHING IS WRITTEN UNTIL APPLY. Every control stages into a draft the CALLER owns — the manager
+  root, because this panel is unmounted the moment the selection empties and a panel-owned draft
+  would be destroyed by the transition meant to DISCARD it. The helpers in `recipeBulkEditModel.js`
+  are IMMUTABLE, so every mutator reassigns through `onDraftChange`; an in-place call would compile,
+  run and silently do nothing.
 
-  ── THE BULK DELETE IS ARMED, AND IT IS PAIRED WITH AN IMPACT STATEMENT ───────────
-  `AGENTS.md` reserves `confirmDialog` for bulk actions EXCEPT where the panel states the
-  impact of the pending action in view before the control is armed. This card does, so it
-  arms. Do not substitute a `confirmDialog`, and do not remove the impact list and leave the
-  arm — the carve-out is the pair, not the button. Measured at the shipped 1280x940 the whole
-  card is in the first visible state with rail to spare, and on a short rail the impact list
-  is the immediately preceding sibling of the control INSIDE the same card, so no scroll
-  position exists in which the arm is reachable and the statement is not on screen.
+  THE CHECK-TIER AXIS CARRIES THREE INSTRUCTIONS and the select never collapses two of them:
+  `Leave unchanged` omits `checkTierId` from the write, `Default DC` writes `null`, and a named tier
+  writes its id. The model owns both sentinels — and records that the single-recipe editor gives
+  `''` the OPPOSITE meaning. Where the system carries no recipe-level tier at all, the panel STATES
+  which of the six cases it is in place of the control, because a hidden axis reads as a missing
+  feature; that is not the same fact as having no usable check, which the row's pill reports.
 
-  The card is the shared `BulkDeleteCard` primitive, which is where the pairing, the
-  description association, the live region, the zero-row gate, the busy face and the scoped
-  CSS live. The `data-recipe-bulk-*` hook names follow this panel's existing convention as
-  `*Attr` overrides. What is left here is what is about RECIPES: the four sentences, the
-  standing hint, and the impact prop.
+  THE BLOCKED-ENABLE FORECAST IS A LOWER BOUND, counted from the SAME predicate the row's
+  `Can't enable` pill reads, so the pilled and counted rows are one set by construction. It cannot
+  see collisions the batch itself creates, so the copy hedges and names the post-apply notification
+  as the authority — honestly only while the bound is BELOW the maximum, hence `blockedWarningText`.
 
-  THE STANDING HINT IS NOT A COUNT, and that is why it is always rendered. Deleting a recipe
-  is irreversible in a way deleting a component is not: `cleanupLearnedRecipes` forgets with
-  `freeLearnBudget: false`, and an orphan entry frees nothing regardless, because a `total`
-  pool key is unreconstructable once the recipe is gone. A character who learned from a
-  scroll loses the knowledge AND the spent slot, and a recreated recipe has a new id that the
-  spent scroll can no longer teach. A GM reading "will forget" has every reason to read it as
-  re-teachable.
-
-  ── NOTHING IS WRITTEN UNTIL APPLY ────────────────────────────────────────────────
-  Every control stages into a draft the CALLER owns — the manager root, because this panel
-  is unmounted the moment the selection empties and a panel-owned draft would be destroyed
-  by the very transition meant to DISCARD it. The draft helpers in `recipeBulkEditModel.js`
-  are IMMUTABLE — each returns a NEW draft — so every mutator here reassigns through
-  `onDraftChange`. An in-place call would compile, run, and silently do nothing.
-
-  ── THE THREE INSTRUCTIONS OF THE CHECK-TIER AXIS ─────────────────────────────────
-  `Leave unchanged`, `Default DC` and a named tier are three distinct instructions and the
-  select never collapses two of them: the first omits `checkTierId` from the write, the
-  second writes `null`. The model owns both sentinels (and records that the shipped
-  single-recipe editor gives `''` the OPPOSITE meaning); this component only renders them.
-
-  When the system's crafting check carries no recipe-level tier at all, the panel STATES
-  which of the six cases it is, in place of the control, rather than hiding the section —
-  a hidden axis reads as a missing feature. That is not the same fact as the system having
-  no usable check at all, which the row's own `No check` pill already reports.
-
-  ── THE BLOCKED-ENABLE FORECAST IS A LOWER BOUND ──────────────────────────────────
-  `blockedCount` is counted from the SAME predicate the row's `Can't enable` pill reads, so
-  the pilled rows and the counted rows are one set by construction. It cannot see collisions
-  the batch itself creates, so the copy says "At least" and names the post-apply notification
-  as the authority for the exact number. The bound is only honest while it is BELOW the
-  maximum, so the copy has three branches — see `blockedWarningText`.
-
-  Props:
-   - count: how many recipes the apply will write to.
-   - categoryOptions: the system's effective recipe categories, as plain names — the
-     single-recipe editor's own list, NOT the browser filter's `{name, count}` tally: a
-     count of the recipes currently IN a category says nothing about it as an assignment
-     target, and an in-use-only list would make an authored-but-unused category unreachable.
-   - checkTierAxis: `describeRecipeCheckTierAxis(...)` output, `{available, reason}`.
-   - checkTierOptions: the system's authored `{id, name, dc}` tiers, from the SAME derived
-     the single-recipe editor's dropdown reads.
-   - books: the system's AUTHORED recipe-item definitions — `selectedSystem.recipeItemDefinitions`
-     — never a vocabulary derived from the books the selected recipes are already in. A book
-     holding zero recipes would be invisible to the latter, and it is unreachable as an Add
-     target exactly when it is the commonest reason to open this control.
-   - bookMembership: `Map<bookId, number>` — how many of the SELECTED recipes each book
-     holds. Derived by the caller from the projected rows' `recipeItemIds`, which is
-     basis-aware; see `countRecipeBookMembership` for why a count read off
-     `definition.recipeIds` would be wrong on every legacy-basis world.
-   - blockedCount: how many selected recipes activation would currently refuse.
-   - draft / onDraftChange(next): the staged edit, owned by the caller.
-   - applying: an in-flight apply; the panel goes inert rather than double-writing.
-   - onClearSelection() / onApply().
-   - deleting: an in-flight delete; the card renders its busy face. It is the CALLER's own
-     flag and never derived from `deleteArmed` — see `BulkDeleteCard` for the blur race.
-   - deleteArmed: whether the set delete holds its armed token. The OWNER clears it on any
-     change to the selection — an arm is a statement about a SPECIFIC set.
-   - deleteImpact: `adminStore.describeRecipeDelete(...)` output, supplied by the owner
-     rather than derived here. None of its three numbers is available from the projected
-     rows: the learner count needs actor flags and the recipe-item count needs the system's
-     definitions with its membership basis.
-   - deleteOutcome: an OPTIONAL sentence announcing what a finished delete did when it left
-     this card mounted — a refused or no-op write, in practice. The owner sets it and clears
-     it on the next arm; the card announces it through its live region and puts focus back on
-     the control the confirm's own `disabled` moved to `document.body`.
-   - onArmDelete() / onDisarmDelete() / onDelete(ids).
+  Props: count; categoryOptions (the single-recipe editor's own list, NOT the browser filter's
+  `{name, count}` tally, which would make an authored-but-unused category unreachable);
+  checkTierAxis; checkTierOptions (the SAME derived the single-recipe editor reads); books (the
+  system's AUTHORED definitions, never a vocabulary derived from the books the selection is already
+  in, which would hide the empty book that is the commonest Add target); bookMembership
+  (`Map<bookId, number>` over the SELECTED recipes, basis-aware — see `countRecipeBookMembership`);
+  blockedCount; draft / onDraftChange(next); applying; onClearSelection; onApply; deleting (the
+  CALLER's own flag, never derived from `deleteArmed` — see `BulkDeleteCard` for the blur race);
+  deleteArmed (the OWNER clears it on any selection change — an arm is about a SPECIFIC set);
+  deleteImpact (`adminStore.describeRecipeDelete(...)`, supplied by the owner because none of its
+  three numbers is available from the projected rows); deleteOutcome (an OPTIONAL sentence for a
+  refused or no-op write); onArmDelete, onDisarmDelete, onDelete(ids).
 -->
 <script>
   import BulkDeleteCard from '../BulkDeleteCard.svelte';
-  import Callout from '../Callout.svelte';
+  import Callout from '../../../components/Callout.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
-  import SegmentedControl from '../SegmentedControl.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
   import BulkEditSection from '../BulkEditSection.svelte';
   import BulkEditSelect from '../BulkEditSelect.svelte';
@@ -146,7 +89,7 @@
     setBulkRecipeCheckTier,
     setBulkRecipeLock,
     setBulkRecipeStatus,
-  } from '../../../../../utils/recipeBulkEditModel.js';
+  } from '../../../../model/recipeBulkEditModel.js';
 
   let {
     count = 0,
@@ -170,14 +113,10 @@
     onDelete = () => {},
   } = $props();
 
-  // Which book the pick card is composing. PANEL-LOCAL VIEW STATE, not a staged edit: it
-  // names no instruction, survives no apply, and belongs in the draft as little as a
-  // scroll position does. The draft it composes into is still the caller's.
-  //
-  // It is an ID rather than the object, so a republished projection (phase 2 resolves each
-  // book's real name and art) re-resolves through `books` instead of pinning a stale
-  // snapshot — and a book that leaves the vocabulary simply stops resolving, which returns
-  // the trigger without an effect to clean up after it.
+  // Which book the pick card is composing: PANEL-LOCAL VIEW STATE, not a staged edit — it names no
+  // instruction and survives no apply. An ID rather than the object, so a republished projection
+  // re-resolves through `books` instead of pinning a stale snapshot, and a book that leaves the
+  // vocabulary stops resolving and returns the trigger with no effect to clean up after.
   let pickedBookId = $state('');
 
   function text(key, fallback) {
@@ -215,14 +154,10 @@
         })
   );
 
-  // ── The set delete (issue 1132) ──────────────────────────────────────────────────
-  // Normalized once so every label below reads numbers rather than optional chains, and so
-  // an absent prop renders the disabled zero card instead of `NaN recipes`.
-  //
-  // `deletable` is NOT `count`. A selected id that no longer resolves in the recipe map is
-  // pruned from the browser's selection only when the projection republishes — a different
-  // moment from the click — and `RecipeManager.deleteRecipe` throws for such an id, so the
-  // card states, and the button deletes, the ids that resolve.
+  // Normalized once, so every label reads numbers rather than optional chains and an absent prop
+  // renders the disabled zero card instead of `NaN recipes`. `deletable` is NOT `count`: a selected
+  // id that no longer resolves is pruned only when the projection republishes, a different moment
+  // from the click, and `RecipeManager.deleteRecipe` throws for it.
   const impact = $derived({
     deletable: Number(deleteImpact?.deletable) || 0,
     deletableIds: Array.isArray(deleteImpact?.deletableIds) ? deleteImpact.deletableIds : [],
@@ -246,9 +181,8 @@
           count: impact.deletable,
         })
   );
-  // The SUBJECT row, which carries no `count` and therefore always renders: it is the
-  // statement of what the button does, and a card that states nothing has lost the pairing
-  // the arm depends on.
+  // The SUBJECT row carries no `count` and always renders: a card that states nothing has lost
+  // the pairing the arm depends on.
   const impactRecipesLabel = $derived(
     impact.deletable === 1
       ? text(
@@ -261,41 +195,20 @@
           { count: impact.deletable }
         )
   );
-  // ── ONE COUNTABLE NOUN FOR ONE COUNT, ACROSS ALL FOUR SURFACES ───────────────────
-  // The recipe-item figure is named `books & scrolls` / `book or scroll` on the card, in
-  // the armed accessible name, in the completion toast and in the singular delete dialog.
-  // It had been split — the card said one thing and the other three said "recipe item(s)"
-  // — and the aria/visible pair was the worst of it: `aria-describedby` points AT this
-  // list, so a screen-reader user heard "2 recipe item(s)" as the name of a control
-  // described by a row reading "2 books & scrolls", which is a WCAG 2.5.3 smell.
+  // ONE COUNTABLE NOUN FOR ONE COUNT, ACROSS ALL FOUR SURFACES: the recipe-item figure is named
+  // `books & scrolls` on the card, in the armed accessible name, in the completion toast and in the
+  // singular delete dialog. `aria-describedby` points AT this list, so a split between the aria and
+  // the visible text is a WCAG 2.5.3 smell. The DISPLAY name won rather than the canonical noun
+  // because every other item-referring string in the Recipe lang namespace already says it;
+  // `recipe item` remains canonical in `openspec/` and in every identifier, as `ui-system-studio`'s
+  // Books & Scrolls section requires.
   //
-  // The display name won rather than the canonical noun, and the corpus is why. Every
-  // other item-referring string under the Recipe lang namespace already says it —
-  // `BookPick`, `BookSearch`/`BookSearchOne`, `BookNoMatch`, `BookClearPick`,
-  // `AppliedBooks*`, the editor's `Not in any book or scroll` — so naming it `recipe item`
-  // here would have swapped a four-surface split for a one-against-ten split inside the
-  // studio's own namespace. `recipe item` remains the canonical noun in `openspec/` and in
-  // every identifier, exactly as `ui-integration`'s Books & Scrolls section requires.
-  //
-  // The multi-count strings say "{items} of your books & scrolls" rather than an "(s)"
-  // form: "1 of your books & scrolls" is grammatical, so the display name survives into
-  // the strings that carry two or three counts without needing "book(s) or scroll(s)".
-  //
-  // THE TWO CONSEQUENCE ROWS CARRY NO PRONOUN FOR THE RECIPES, and that is a correction to
-  // issue 1132's authored copy rather than a style preference. The delta authored
-  // "1 book or scroll will lose it." / "{count} books & scrolls will lose them.", branching
-  // on the ITEM count while the pronoun agrees with the RECIPE count — so a perfectly
-  // ordinary selection of three recipes that share one book rendered "3 recipes will be
-  // deleted. 1 book or scroll will lose it." Branching on both counts would need a 2x2 key
-  // matrix per row, which is exactly what the `(s)` idiom exists here to avoid. Naming the
-  // consequence without a pronoun is correct in every combination, keeps one `…One` sibling
-  // per row, and reads as the parallel consequence list the card is.
-  //
-  // Both rows are FUTURE and subject-less. "Removed from 1 book or scroll." above a button
-  // that has not been pressed reads as current state, one line under a subject row that
-  // correctly says "will be deleted"; "Will be removed from…" cannot. The elided subject is
-  // the device that keeps them count-neutral — "The recipes will be removed from…" re-opens
-  // the same 2x2 matrix on the subject.
+  // THE TWO CONSEQUENCE ROWS CARRY NO PRONOUN FOR THE RECIPES. Branching the pronoun on the ITEM
+  // count while it agrees with the RECIPE count rendered "3 recipes will be deleted. 1 book or
+  // scroll will lose it."; branching on both would need a 2x2 key matrix per row. Naming the
+  // consequence without a pronoun is correct in every combination and keeps one `…One` sibling per
+  // row. Both rows are FUTURE and subject-less, because "Removed from 1 book or scroll." under a
+  // button nobody has pressed reads as current state, and a stated subject re-opens the matrix.
   const impactItemsLabel = $derived(
     impact.recipeItemsAffected === 1
       ? text(
@@ -308,18 +221,13 @@
           { count: impact.recipeItemsAffected }
         )
   );
-  // The qualifier is the loudest thing on the card and is deliberately part of the ROW
-  // rather than a separate sentence: the learn slot is spent by the same act the number
-  // counts, so a GM who reads the number has read the consequence.
+  // The qualifier is part of the ROW rather than a separate sentence: the learn slot is spent by
+  // the same act the number counts, so a GM who reads the number has read the consequence.
   //
-  // NEITHER HALF OF THE QUALIFIER MAY AGREE WITH A COUNT THIS ROW DOES NOT BRANCH ON. The
-  // row branches on the LEARNER count, and the authored copy carried two words that agree
-  // with other counts: "cannot teach it again" pronominalized the RECIPES (three selected
-  // recipes, one book, and "it" names one of three), and "their learn slot(s)" agrees with
-  // the number of slots each character spent, which is the number of selected recipes they
-  // had learned — one character who learned three of them loses three slots and still read
-  // the singular branch. "a deleted recipe" and the generic-plural rule statement are both
-  // true at every combination of the three counts.
+  // NEITHER HALF OF IT MAY AGREE WITH A COUNT THIS ROW DOES NOT BRANCH ON. The row branches on the
+  // LEARNER count, and the authored copy carried two words agreeing with other counts — one
+  // pronominalizing the RECIPES, one the slots each character spent. The wording here is true at
+  // every combination of the three counts.
   const impactLearnersLabel = $derived(
     impact.learnersAffected === 1
       ? text(
@@ -332,11 +240,8 @@
           { count: impact.learnersAffected }
         )
   );
-  // WCAG 2.5.3 Label in Name: the accessible name must CONTAIN the visible label, so a
-  // speech-input user can activate the control by saying what they can read. The armed
-  // button reads `Confirm delete`, so the name OPENS with that exact string and the counts
-  // follow it. The idle pair needs no reordering: its `…DeleteAria*` sibling is the visible
-  // label verbatim.
+  // WCAG 2.5.3 Label in Name: the accessible name must CONTAIN the visible label, so the armed
+  // name OPENS with `Confirm delete` and the counts follow. The idle pair needs no reordering.
   const deleteArmedAriaLabel = $derived(
     format(
       'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteConfirmAria',
@@ -355,30 +260,24 @@
       { count: impact.deletable }
     )
   );
-  // Three sentences, three different questions, and the last two are gated on their own
-  // count by the card. Zero is omitted rather than stated as zero: "0 books & scrolls will
-  // lose them." is noise on the commonest selection there is and it buries the one number
-  // that always matters.
+  // Three sentences, three questions; the last two are gated on their own count, because
+  // "0 books & scrolls will lose them." buries the one number that always matters.
   const deleteImpactRows = $derived([
     { key: 'recipes', text: impactRecipesLabel },
     { key: 'items', text: impactItemsLabel, count: impact.recipeItemsAffected },
     { key: 'learners', text: impactLearnersLabel, count: impact.learnersAffected },
   ]);
 
-  // `Leave unchanged`, shared with the Component Studio's category sentinel: it is
-  // noun-free, both panels render it, and the recipe panel alone renders it TWICE. Its
-  // neighbour `Unchanged` (the segment word below) is deliberately a DIFFERENT string —
-  // see the note carried on both keys in `ComponentBulkEditPanel.svelte`.
+  // `Leave unchanged`, shared with the Component Studio's category sentinel. Its neighbour
+  // `Unchanged` (the segment word) is deliberately a DIFFERENT string.
   const leaveUnchangedLabel = $derived(
     text('FABRICATE.Admin.Manager.BulkEdit.CategoryUnchanged', 'Leave unchanged')
   );
 
   /**
-   * The category axis as the shared select's option list (issue 1504).
-   *
-   * The sentinel is FIRST and carries the empty string, which is the model's `Leave unchanged`
-   * and this axis's only affordance for unstaging. The shared control gives that row a
-   * non-empty `data-popover-option` of its own, so the panel's default row is addressable by a
+   * The category axis as the shared select's option list. The sentinel is FIRST and carries the
+   * empty string — the model's `Leave unchanged`, and this axis's only unstaging affordance. The
+   * shared control gives that row a non-empty `data-popover-option`, so it is addressable by a
    * capture step and a mounted test rather than being the one row with no handle.
    */
   const categorySelectOptions = $derived([
@@ -398,26 +297,17 @@
   );
 
   /**
-   * The check-tier axis as the shared select's option list, GROUPED and HINTED (issue 1504).
+   * The check-tier axis as the shared select's option list, GROUPED and HINTED. THIS IS THE ONE
+   * LIST IN THIS PANEL THAT IS NOT A FLAT VOCABULARY, which is why it earns the grouped shape: it
+   * mixes two INSTRUCTIONS with the system's authored tiers, and `Default DC` is a real instruction
+   * clearing every selected recipe rather than a second way of saying "leave alone".
    *
-   * THIS IS THE ONE LIST IN THIS PANEL THAT IS NOT A FLAT VOCABULARY, and that is why it is
-   * the one that earns the design's grouped shape. It mixes two INSTRUCTIONS with the system's
-   * authored tiers: `Leave unchanged` stages nothing, and `Default DC` is a real instruction
-   * that clears every selected recipe to the system's default — not a second way of saying
-   * "leave alone". A GM reading `Leave unchanged`, `Default DC`, `Standard (DC 15)` as one flat
-   * run has to infer which two of those are verbs.
-   *
-   * So the two instructions carry a `group` of their own, authored FIRST because `Select`
-   * derives its bucket order from first appearance, and each carries its own `hint` — the
-   * second line the design draws under a grouped row's label. The tiers take the second group.
-   *
-   * BOTH GROUP VALUES ARE LOCALIZED, because the value IS the heading text the shared panel
-   * renders. That also makes `data-popover-group` locale-dependent, so nothing may key off it:
-   * a row's identity handle is `data-popover-option`.
-   *
-   * `showTick` is TRUE here against the specimen's own grouped caption, as the caller's
-   * judgement: with two instructions beside named tiers the trigger's label alone does not say
-   * which of the two kinds is live.
+   * The two instructions carry a `group` of their own, authored FIRST because `Select` derives its
+   * bucket order from first appearance, each with its own `hint`. BOTH GROUP VALUES ARE LOCALIZED,
+   * because the value IS the heading text — which makes `data-popover-group` locale-dependent, so
+   * nothing may key off it and a row's identity handle is `data-popover-option`. `showTick` is TRUE
+   * as the caller's judgement: with instructions beside named tiers the label alone does not say
+   * which kind is live.
    */
   const checkTierSelectOptions = $derived([
     {
@@ -445,18 +335,14 @@
     })),
   ]);
 
-  // The section heading, and the accessible name of the staged list under it, so the group
-  // name and the heading a sighted GM reads are one string. `recipe item` remains the
-  // canonical spec noun; `Books & scrolls` is the display name the manager's own navigation
-  // already uses for the same vocabulary, so the panel names it as the GM finds it.
+  // The section heading and the staged list's accessible name, so both read as one string.
+  // `recipe item` remains the canonical spec noun; this is the display name the rail already uses.
   const booksLabel = $derived(
     text('FABRICATE.Admin.Manager.Recipe.BulkEdit.Books', 'Books & scrolls')
   );
 
-  // The two segmented axes are the same control with different words, so the segment table
-  // is data and the option list is built once. `disabled` rides the option itself rather
-  // than a class: `SegmentedControl.select()` guards only `next !== value`, so a
-  // dimmed-but-live segment would still stage an edit mid-apply.
+  // Two segmented axes, one control with different words, so the table is data. `disabled` rides
+  // the option rather than a class: `SegmentedControl.select()` guards only `next !== value`.
   const STATUS_SEGMENT_LABELS = {
     unchanged: ['FABRICATE.Admin.Manager.BulkEdit.Unchanged', 'Unchanged'],
     enable: ['FABRICATE.Admin.Manager.BulkEdit.StatusEnable', 'Enable'],
@@ -484,9 +370,8 @@
     segmentOptions(RECIPE_BULK_LOCK_VALUES, LOCK_SEGMENT_LABELS, inert)
   );
 
-  // Six cases, six messages, keyed by the model's own `reason`. A table rather than a
-  // chain of `{:else if}` blocks, so adding a reason to the model without a message here
-  // renders an empty strip instead of silently falling through to the wrong one.
+  // Six cases keyed by the model's own `reason`, as a table rather than an `{:else if}` chain, so
+  // a new reason with no message renders an empty strip instead of the wrong one.
   const CHECK_TIER_REASON_MESSAGES = {
     progressive: [
       'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierProgressive',
@@ -522,28 +407,18 @@
   });
   const checkTierValue = $derived(bulkRecipeCheckTierSelectValue(draft));
 
-  // The pre-flight hazard, and the ONLY tinted strip this panel spends on the Status axis:
-  // its standing sub-hint is a sub-hint precisely so the warning is the one thing tinted.
-  // The `enable` term is load-bearing rather than redundant with a zero count — a caller
-  // that handed this panel a raw blocked tally would otherwise paint the hazard under
-  // `Disable`, where nothing can be refused.
+  // The pre-flight hazard, and the ONLY tinted strip the Status axis spends. The `enable` term is
+  // load-bearing rather than redundant with a zero count: a raw blocked tally would otherwise paint
+  // the hazard under `Disable`, where nothing can be refused.
   const showBlockedWarning = $derived(stagedStatus === 'enable' && blockedCount > 0);
 
-  // THREE branches, because "at least {n} of {total}" is only honest while `n < total`.
-  // The forecast is a lower bound: it sees every recipe activation would refuse today, but
-  // not the collisions the batch itself creates, so the real figure can only be higher.
-  // Once the bound EQUALS the maximum there is no headroom left for it to be a bound of —
-  // "At least 3 of 3", reachable by selecting three drafts and staging Enable, reads as a
-  // copy bug rather than as a hedge. Each branch is exact or hedged as the arithmetic
-  // actually permits:
+  // THREE branches, because "at least {n} of {total}" is only honest while `n < total`; at the
+  // maximum — three drafts, staging Enable — it reads as a copy bug rather than a hedge.
   //
   //  - one selected recipe        exact: a batch of one has no intra-batch collision;
-  //  - every selected one blocked exact: the bound is already the maximum, nothing the
-  //                               write does can improve it;
-  //  - otherwise                  a genuine lower bound, and it names the post-apply
-  //                               report as the authority for the exact number, which
-  //                               turns the hedge into a promise rather than a shrug.
-  //                               That authority already exists as `AppliedBlocked`.
+  //  - every selected one blocked exact: the bound is already the maximum;
+  //  - otherwise                  a genuine lower bound, naming the post-apply report as the
+  //                               authority, which turns the hedge into a promise.
   const blockedWarningText = $derived.by(() => {
     if (count === 1) {
       return text(
@@ -568,41 +443,27 @@
 
   // ── The book axis ────────────────────────────────────────────────────────────────
 
-  // `books` is `selectedSystem.recipeItemDefinitions`, the PROJECTION — and the projection
-  // emits `resolvedName`, never a bare `name`. That holds in both publishes the panel can
-  // render against: `_projectRecipeItemDefinitionSync` sets it from the stored name or a
-  // uuid-derived label in the synchronous phase-1 publish, and `_enrichRecipeItemLibrary`
-  // overwrites it with the linked world item's name in the phase-2 one. So a
-  // `name`-first chain falls straight through to the id and paints `sm-book` where the GM
-  // wrote "Forgecraft Folio".
-  //
-  // The chain is `CraftingSystemManagerRoot.recipeItemSourceSnapshot`'s, which is how the
-  // rest of the manager labels a recipe-item definition; `id` is appended as a last resort
-  // because an unnamed option is neither readable nor nameable by speech input.
+  // `books` is the PROJECTION, which emits `resolvedName` and never a bare `name`, in BOTH
+  // publishes the panel can render against — so a `name`-first chain falls through to the id and
+  // paints `sm-book` where the GM wrote "Forgecraft Folio". The chain is
+  // `CraftingSystemManagerRoot.recipeItemSourceSnapshot`'s, with `id` as a last resort because an
+  // unnamed option is neither readable nor nameable by speech input.
   function bookLabel(book) {
     return book?.resolvedName || book?.name || book?.id || '';
   }
 
-  // How many of the SELECTED recipes this book holds. Read from the caller's basis-aware
-  // map, NEVER from `book.recipeIds`: while a system's membership-basis marker is unset,
-  // membership resolves through the legacy `recipe.recipeItemId` scalar and a book that
-  // holds every selected recipe still carries an EMPTY `recipeIds`. Counting from the
-  // definition would report "holds none selected", disable Remove, and make this axis
-  // unusable on exactly the worlds that most need it.
-  //
-  // Clamped to the selection size so a stale or over-counted map can never render the
-  // arithmetically impossible "holds 5 of 3 selected".
+  // How many of the SELECTED recipes this book holds, from the caller's basis-aware map and NEVER
+  // from `book.recipeIds`: while the membership-basis marker is unset, membership resolves through
+  // the legacy scalar and a book holding every selected recipe still carries an EMPTY `recipeIds`,
+  // which would disable Remove on exactly the worlds that most need this axis. Clamped to the
+  // selection size, so a stale map cannot render "holds 5 of 3 selected".
   function holdsCount(bookId) {
     return Math.min(Number(bookMembership?.get?.(bookId)) || 0, count);
   }
 
-  // The `kind` half of an option's second line. `derivedType` is `Book` / `Scroll` /
-  // `Incomplete`, and the third is deliberately NOT surfaced: the synchronous phase-1
-  // publish emits it for EVERY book unconditionally (it derives from a hard-coded zero
-  // recipe count), so it is not a fact this control can trust, and it names a validation
-  // state rather than a kind. A book holding no recipes yet is the commonest Add target
-  // there is; labelling it `Incomplete` in the very control that fixes it would be both
-  // unhelpful and, one publish out of two, untrue.
+  // The `kind` half of an option's second line. `Incomplete` is deliberately NOT surfaced: the
+  // synchronous publish emits it for EVERY book unconditionally, so it is untrue one publish in
+  // two, and it names a validation state rather than a kind — on the commonest Add target there is.
   function bookKind(book) {
     const type = String(book?.derivedType || '');
     if (type === 'Book') {
@@ -614,9 +475,8 @@
     return text('FABRICATE.Admin.Manager.Recipe.BulkEdit.BookKindItem', 'Recipe item');
   }
 
-  // "holds none of the 12 selected" / "holds all 12 selected" / "holds 3 of 12 selected".
-  // Three whole sentences rather than one with an interchangeable number, because the two
-  // extremes are the ones the GM acts on and "holds 0 of 12" reads as a broken template.
+  // Three whole sentences rather than one with an interchangeable number: the two extremes are
+  // what the GM acts on, and "holds 0 of 12" reads as a broken template.
   function bookHolds(bookId) {
     const holds = holdsCount(bookId);
     if (holds === 0) {
@@ -658,12 +518,9 @@
     return op === 'add' ? addWord : removeWord;
   }
 
-  // The whole authored vocabulary, every time. `SearchablePopover` filters it by the search
-  // term and lists ALL of it while the term is empty — which is the correction to the
-  // prototype, whose results list is empty until the GM types and therefore shows nothing
-  // at all on a system with four books. Nothing is capped either: the popover's option list
-  // SCROLLS, so a cap would hide books that scrolling already reaches and reintroduce the
-  // unreachable-Add-target defect the authored vocabulary exists to prevent.
+  // The whole authored vocabulary, every time: `SearchablePopover` lists all of it while the term
+  // is empty, correcting the prototype, whose list is empty until the GM types. Nothing is capped
+  // either — the option list SCROLLS, so a cap would re-create the unreachable-Add-target defect.
   const bookOptions = $derived(
     books.map((book) => {
       const op = bulkRecipeBookOp(draft, book.id);
@@ -687,13 +544,10 @@
   const pickedHolds = $derived(pickedBook ? holdsCount(pickedBook.id) : 0);
   const pickedMissing = $derived(pickedBook ? count - pickedHolds : 0);
 
-  // Labelled with the count actually AFFECTED, not with the selection size. The prototype
-  // names the whole selection on both buttons while deriving their disabled state from the
-  // missing/present counts, so `Add 5` can sit enabled over a book only two recipes are
-  // missing — the number on the control and the number it writes disagree.
-  //
-  // At zero the count is dropped rather than rendered: `Add 0` on a disabled control states
-  // a quantity where the honest statement is that there is nothing to do.
+  // Labelled with the count actually AFFECTED, not the selection size: the prototype names the
+  // whole selection while deriving `disabled` from the missing/present counts, so its label and its
+  // write disagree. At zero the count is dropped, since `Add 0` states a quantity where the honest
+  // statement is that there is nothing to do.
   function opButtonLabel(op, affected) {
     if (affected === 0) return opWord(op);
     if (op === 'add') {
@@ -706,10 +560,8 @@
     });
   }
 
-  // The accessible name OPENS with the visible label and then states the action, which is
-  // WCAG 2.5.3 Label in Name — a speech-input user says what they can read. No
-  // `aria-pressed`: these are one-shot actions that stage an op and hand the panel back to
-  // the trigger, and the staged list below is what reports (and undoes) the result.
+  // The name OPENS with the visible label, per WCAG 2.5.3 Label in Name. No `aria-pressed`: these
+  // are one-shot actions, and the staged list below is what reports and undoes the result.
   function opActionLabel(op, affected, book) {
     const name = bookLabel(book);
     if (op === 'add') {
@@ -740,13 +592,10 @@
     );
   }
 
-  // THE STAGED LIST. The prototype computes this list and never renders it, which leaves a
-  // one-book-at-a-time control with no record of what the other books were told to do — so
-  // the accumulating draft is invisible right up until Apply. It is the confirmation, the
-  // undo, and the only surface on which a mixed add/remove draft can be read at all.
-  //
-  // Sorted by name so the list is stable under re-staging rather than ordered by the
-  // accident of which book the GM happened to pick first.
+  // THE STAGED LIST, which the prototype computes and never renders — leaving a one-book-at-a-time
+  // control with no record of what the other books were told to do. It is the confirmation, the
+  // undo, and the only surface a mixed add/remove draft can be read on. Sorted by name, so it is
+  // stable under re-staging rather than ordered by which book the GM picked first.
   const stagedBooks = $derived.by(() =>
     books
       .filter((book) => bulkRecipeBookOp(draft, book.id) !== 'none')
@@ -760,9 +609,8 @@
           name: bookLabel(book),
           opLabel: opWord(op),
           icon: op === 'add' ? 'fas fa-plus' : 'fas fa-minus',
-          // "no change" is a real and reachable outcome — staging Add on a book that
-          // already holds every selected recipe — and stating it here is the only warning
-          // the GM gets before Apply reports nothing happened.
+          // "no change" is reachable — Add on a book that already holds every selected recipe —
+          // and this is the only warning before Apply reports nothing happened.
           countLabel: stagedCountLabel(affected),
           unstageLabel: format(
             'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookUnstage',
@@ -831,40 +679,28 @@
     onDraftChange(setBulkRecipeCheckTier(draft, value));
   }
 
-  // ── Focus across a destructive re-render ─────────────────────────────────────────
+  // FOCUS ACROSS A DESTRUCTIVE RE-RENDER. Every gesture on this axis destroys the control holding
+  // focus — choosing unmounts the popover, Add/Remove/clear replace the card with the trigger, and
+  // unstaging removes its own row — and a destroyed node's focus falls to `document.body`, so a
+  // keyboard-only GM staging three books would tab in from the top of the Foundry document six
+  // extra times. The retired chip run cycled IN PLACE and kept focus, so leaving this unhandled
+  // would undercut the property the redesign exists to improve.
   //
-  // EVERY gesture on this axis destroys the control that was holding focus: choosing an
-  // option unmounts the popover, Add / Remove / the pick-card clear replace the card with
-  // the trigger, and unstaging removes its own row. A destroyed node's focus falls to
-  // `document.body`, so a keyboard-only GM staging three books would tab back in from the
-  // top of the Foundry document six extra times. The retired chip run had no such cost — a
-  // chip cycles IN PLACE and keeps focus — so leaving it unhandled would undercut the exact
-  // property this redesign exists to improve.
+  // `SearchablePopover.close()` owns the same idiom, and its own restore correctly DECLINES here:
+  // `onChoose` writes `pickedBookId` first, so by the time it runs its trigger is unmounted and
+  // nothing took its place. These helpers are what takes its place, copying that idiom exactly —
+  // `queueMicrotask` plus an optional-chained, connection-guarded `focus()`, which works because
+  // the state write scheduling the re-render happens BEFORE the call.
   //
-  // `SearchablePopover.close()` already owns this idiom, and its restore correctly DECLINES
-  // here rather than being broken: `onChoose` writes `pickedBookId` first, so Svelte's flush
-  // microtask is enqueued ahead of the popover's, and by the time the restore runs its
-  // trigger has been unmounted by the `{:else}` swap. Nothing took its place. These helpers
-  // are what takes its place, and they copy that idiom exactly — `queueMicrotask` plus an
-  // optional-chained, connection-guarded `focus()`.
-  //
-  // `queueMicrotask` works for the same reason it works there: the state write that
-  // schedules Svelte's re-render happens BEFORE the call, so Svelte's flush is already ahead
-  // of this callback in the queue and the node being focused is the newly rendered one.
-  //
-  // The target is found by QUERY rather than by a binding, because the whole point is that
-  // the node did not exist when the gesture started — there is nothing to have bound. The
-  // query is anchored on this panel's own hook, so it can never reach the Component Studio's
-  // panel; the attribute name is declared ONCE here and handed to the shell below, so the
-  // anchor and the rendered hook cannot drift into a query that matches nothing.
+  // The target is found by QUERY rather than a binding, because the node did not exist when the
+  // gesture started. The query is anchored on this panel's own hook, declared ONCE here and handed
+  // to the shell, so the anchor and the rendered hook cannot drift apart.
   const PANEL_ATTR = 'data-recipe-bulk-panel';
   const PANEL_HOOK = `[${PANEL_ATTR}]`;
   const BOOK_TRIGGER = '.fab-bulk-book-trigger';
 
-  // First candidate that exists, is still attached and is not disabled. Every hop is
-  // guarded: a candidate may never have rendered, may have been detached again by a
-  // republished projection, or may be dead under an in-flight apply — in which case focus
-  // is left where it is rather than parked on an inert control.
+  // First candidate that exists, is attached and is not disabled; otherwise focus is left where it
+  // is rather than parked on an inert control.
   function focusAfterRerender(selectors) {
     queueMicrotask(() => {
       if (typeof document === 'undefined') return;
@@ -877,9 +713,7 @@
     });
   }
 
-  // The picker has just closed with focus inside it. Land on the action the GM opened it to
-  // press; Remove when the book already holds every selected recipe and Add is therefore
-  // dead, and the clear when an in-flight apply has deadened both.
+  // The picker has closed with focus inside it: land on the action the GM opened it to press.
   function pickBook(bookId) {
     pickedBookId = bookId;
     focusAfterRerender([
@@ -894,15 +728,11 @@
     focusAfterRerender([BOOK_TRIGGER]);
   }
 
-  // Staging CLEARS the pick, deliberately, and this is the one place this control departs
-  // from the prototype's behaviour rather than its defects. The prototype keeps the book
-  // picked, which leaves two surfaces claiming authority over one fact — an active Add
-  // button and a staged row — and makes every subsequent book cost an extra dismissal. With
-  // the staged list rendered, the row IS the confirmation and carries the undo, so the pick
-  // card is a transient composer: pick, act, and the trigger is back for the next book.
-  //
-  // Focus follows the gesture to that row's own undo, which is where the GM's attention
-  // already is. The trigger is the fallback for a staging that renders no row at all.
+  // Staging CLEARS the pick, the one place this control departs from the prototype's BEHAVIOUR
+  // rather than its defects: keeping the book picked leaves two surfaces claiming authority over
+  // one fact and costs an extra dismissal per book. With the staged list rendered, the row IS the
+  // confirmation and carries the undo, so the pick card is a transient composer. Focus follows the
+  // gesture to that row's undo, with the trigger as the fallback when no row renders.
   function stageBook(op) {
     if (!pickedBook) return;
     const bookId = pickedBook.id;
@@ -911,9 +741,8 @@
     focusAfterRerender([`[data-recipe-bulk-book-unstage="${bookId}"]`, BOOK_TRIGGER]);
   }
 
-  // The neighbour is read from the sorted list BEFORE the mutation, because afterwards this
-  // row is gone and its position with it: the row that takes its place, then the row above
-  // it when it was the last one, then the trigger once the list empties entirely.
+  // Read BEFORE the mutation, because afterwards this row and its position are gone: the row that
+  // takes its place, then the row above when it was last, then the trigger once the list empties.
   function unstageBook(bookId) {
     const order = stagedBooks.map((entry) => entry.id);
     const index = order.indexOf(bookId);
@@ -926,14 +755,10 @@
 </script>
 
 <!--
-  The axes are emitted as SIBLING flex items of the shell's panel, not wrapped: the shell's
-  uniform `gap` is the panel's rhythm and a wrapper per section would re-space the rail.
-  Each section reads label row -> sub-hint -> control, which is the shipped order; a
-  conditional Callout goes BELOW its control, where it comments on a staged choice.
-
-  Every hook name is an OVERRIDE. The primitives default to the Component Studio's strings
-  so its smoke selectors and view-lab cases kept working through the extraction, so this
-  studio must name its own or both browsers would answer to one set of hooks.
+  The axes are SIBLING flex items of the shell's panel, not wrapped: the shell's uniform `gap` is
+  the rhythm and a wrapper per section would re-space the rail. Each section reads label row →
+  sub-hint → control, and a conditional Callout goes BELOW its control. Every hook name is an
+  OVERRIDE, because the primitives default to the Component Studio's strings.
 -->
 <BulkEditPanelShell
   heading={headingLabel}
@@ -959,12 +784,8 @@
     onChange={(value) => setCategory(value)}
   />
 
-  <!--
-    The standing sub-hint states the RULE; the Callout below the control states the COUNT.
-    They share a meaning and deliberately not their words — the shipped essence pair models
-    the same split — and this one is worded to still read under `Disable` and `Unchanged`,
-    where nothing is being refused but the rule still holds.
-  -->
+  <!-- The standing sub-hint states the RULE and the Callout below the control states the COUNT,
+       deliberately not in the same words; this one still reads under `Disable` and `Unchanged`. -->
   <BulkEditSection
     label={text('FABRICATE.Admin.Manager.Recipe.Status', 'Status')}
     subhint={text(
@@ -972,13 +793,9 @@
       'Enabling is gated by the activation check, so a refused recipe is left switched off.'
     )}
   />
-  <!--
-    `fill` on both segmented axes: the shipped default is a content-hugging track, which
-    would float two small tiles at the left of a rail whose other controls are full-width
-    selects. `variant` is deliberately NOT used — these segments are staged INTENTIONS
-    rather than outcomes, and tinting `Disable` as a hazard would make an ordinary bulk
-    retire read like the genuine one the warning strip below is spending its colour on.
-  -->
+  <!-- `fill` on both segmented axes, because the content-hugging default would float two small
+       tiles beside full-width selects. `variant` is deliberately NOT used: these segments are
+       staged INTENTIONS, and tinting `Disable` would spend the colour the warning strip needs. -->
   <SegmentedControl
     options={statusSegments}
     value={stagedStatus}
@@ -1010,11 +827,8 @@
     onChange={(value) => setLock(value)}
   />
 
-  <!--
-    The sub-hint renders ONLY in the available branch. Outside it a progressive system
-    would state "The DC these recipes roll against" directly above a Callout saying there
-    is no recipe-level check tier at all — two contradicting sentences, one above the other.
-  -->
+  <!-- ONLY in the available branch: outside it the sub-hint would sit directly above a Callout
+       saying there is no recipe-level check tier at all. -->
   <BulkEditSection
     label={text('FABRICATE.Admin.Manager.Recipe.CheckTier', 'Check tier')}
     subhint={checkTierAvailable
@@ -1025,10 +839,8 @@
       : ''}
   />
   {#if checkTierAvailable}
-    <!-- GROUPED, HINTED AND TICKED — the only list in this panel that is not a flat vocabulary.
-         `checkTierSelectOptions` carries the reasoning; the short version is that two of these
-         rows are INSTRUCTIONS and the rest are the system's authored tiers, and a GM should not
-         have to infer which is which from a flat run. -->
+    <!-- GROUPED, HINTED AND TICKED: two rows are INSTRUCTIONS and the rest are authored tiers.
+         `checkTierSelectOptions` carries the reasoning. -->
     <BulkEditSelect
       data-recipe-bulk-check-tier=""
       value={checkTierValue}
@@ -1039,8 +851,7 @@
       onChange={(value) => setCheckTier(value)}
     />
   {:else}
-    <!-- INFO stands (issue 1505): the message reports why THIS selection has no check tier
-         to set, which is live state rather than documentation. -->
+    <!-- INFO stands: it reports why THIS selection has no tier to set, which is live state. -->
     <Callout
       tone="info"
       text={checkTierMessage}
@@ -1049,11 +860,8 @@
     />
   {/if}
 
-  <!--
-    The hint on the label row swaps from the instruction to a running tally the moment
-    anything is staged, so the section heading itself reports the accumulating draft — the
-    one line of the panel a GM scrolling past the picker will still read.
-  -->
+  <!-- The label row's hint swaps to a running tally once anything is staged, so the heading itself
+       reports the accumulating draft. -->
   <BulkEditSection
     label={booksLabel}
     hint={booksHint}
@@ -1067,12 +875,8 @@
   />
   {#if books.length > 0}
     {#if pickedBook}
-      <!--
-        The PICK CARD. One book, its membership against the selection, and the two
-        instructions that can be given about it. It REPLACES the trigger rather than
-        sitting under it: the search and the composer are two steps of one gesture, and
-        showing both would put two book-shaped controls in a 300px rail.
-      -->
+      <!-- The PICK CARD: one book, its membership, and the two instructions about it. It REPLACES
+           the trigger, because showing both would put two book-shaped controls in a 300px rail. -->
       <div class="fab-bulk-book-pick" data-recipe-bulk-book-pick={pickedBook.id}>
         <div class="fab-bulk-book-pick-head">
           <span class="fab-bulk-book-pick-art" aria-hidden="true">
@@ -1100,11 +904,8 @@
             <i class="fas fa-xmark" aria-hidden="true"></i>
           </button>
         </div>
-        <!--
-          Two REAL buttons side by side, each disabled when its own count is zero: Add is
-          dead once every selected recipe already holds the book, Remove once none of them
-          does. The counts are the affected ones, so the label and the write agree.
-        -->
+        <!-- Two REAL buttons, each disabled when its own count is zero. The counts are the
+             AFFECTED ones, so the label and the write agree. -->
         <div class="fab-bulk-book-pick-actions">
           <button
             type="button"
@@ -1129,17 +930,11 @@
         </div>
       </div>
     {:else}
-      <!--
-        The shipped `SearchablePopover`, not a hand-rolled search field: it already owns the
-        search input, the option rows, outside-click and Escape dismissal, focus restoration
-        to the trigger on a DISMISSAL, and a portal past the manager panel's
-        `overflow: hidden`. Its option list SCROLLS, which is what lets this control offer
-        the whole authored vocabulary with no cap and no "keep typing to narrow" affordance.
-
-        Restoration on a CHOICE is this component's, not the popover's, and deliberately so:
-        choosing replaces the trigger with the pick card, so there is nothing for the popover
-        to restore to and its guard correctly declines. See `focusAfterRerender` above.
-      -->
+      <!-- The shipped `SearchablePopover`, not a hand-rolled search field: it owns the input, the
+           rows, outside-click and Escape dismissal, focus restoration on a DISMISSAL, and a portal
+           past the panel's `overflow: hidden`, and its list SCROLLS. Restoration on a CHOICE is
+           this component's, because choosing replaces the trigger and the popover's guard correctly
+           declines — see `focusAfterRerender` above. -->
       <SearchablePopover
         options={bookOptions}
         disabled={inert}
@@ -1165,11 +960,8 @@
       />
     {/if}
     {#if stagedBooks.length > 0}
-      <!--
-        The staged list. A LIST rather than a chip row: these are rows of record, each
-        carrying an operation, an affected count and its own undo, and each is read down the
-        rail rather than scanned across it.
-      -->
+      <!-- A LIST rather than a chip row: rows of record, each carrying an operation, an affected
+           count and its own undo, read down the rail rather than scanned across it. -->
       <ul class="fab-bulk-book-staged" aria-label={booksLabel} data-recipe-bulk-books-staged>
         {#each stagedBooks as entry (entry.id)}
           <li
@@ -1202,16 +994,14 @@
 </BulkEditPanelShell>
 
 <!--
-  The DELETE block sits below the shell rather than inside it: the shell's Apply is the
-  panel's primary action, and a destructive action inside the same card would read as a
-  second way of applying the staged edit. The Essence and Component Studios' cards are the
-  twins. The accepted consequence is that Apply's sticky dock now clamps to the panel's own
-  box rather than the rail's bottom edge — see the enumeration in `BulkEditPanelShell`'s
-  dock comment and its gate in `tests/components/bulk-edit-dock-pinning.test.js`.
+  The DELETE block sits BELOW the shell: the shell's Apply is the panel's primary action, and a
+  destructive action in the same card would read as a second way of applying the staged edit. The
+  accepted consequence is that Apply's sticky dock clamps to the panel's own box — see
+  `BulkEditPanelShell`'s dock comment and `tests/components/bulk-edit-dock-pinning.test.js`.
 
-  `busy` is the caller's own `deleting` flag and is NOT folded into `disabled` here: the card
-  needs to tell an in-flight write apart from an inert one to render its third face at all.
-  `applying` still inerts the control, because a staged apply and a delete must not race.
+  `busy` is the caller's own `deleting` flag and is NOT folded into `disabled`, because the card
+  must tell an in-flight write from an inert one to render its third face. `applying` still inerts
+  the control, since a staged apply and a delete must not race.
 -->
 <BulkDeleteCard
   token="delete-recipes"
@@ -1245,13 +1035,10 @@
 />
 
 <style>
-  /* THEME-ROOT tokens only. The reason once recorded here — that living under
-     `apps/manager/` puts an area-scoped `--fab-manager-*` property in scope — has LAPSED:
-     a scoped `<style>` may not reach one from ANY directory (design-system spec, *The token
-     namespace is one generation and names its purpose*). It sits here rather than in
-     `styles/fabricate.css` so `VIEW_RECIPES` in `scripts/ui-pr-screenshot-evidence.mjs`
-     routes a change to the views that actually render it, exactly as `BulkEditSection`
-     records for the same reason. */
+  /* THEME-ROOT tokens only: a scoped `<style>` may not reach an area-scoped `--fab-manager-*`
+     property from any directory (`openspec/specs/design-system/spec.md`, "The token namespace is
+     one generation and names its purpose"). It sits here rather than in `styles/fabricate.css` so
+     `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the views that render it. */
 
   /* ── The pick card ─────────────────────────────────────────────────────────────── */
   .fab-bulk-book-pick {
@@ -1318,9 +1105,8 @@
     white-space: nowrap;
   }
 
-  /* Foundry's global `button` rule centres content and pins a fixed height; every button
-     in this block therefore restates height and alignment (see the CSS override map in
-     `CONTRIBUTING.md`). */
+  /* Foundry's global `button` rule centres content and pins a height, so every button here
+     restates both (see the CSS override map in `CONTRIBUTING.md`). */
   .fab-bulk-book-pick-clear,
   .fab-bulk-book-unstage {
     display: flex;
@@ -1379,9 +1165,8 @@
     color: var(--fab-danger-text);
   }
 
-  /* `.is-disabled` is the repo's component-scoped state convention, but these controls
-     carry the real `disabled` attribute — the styling hangs off that rather than off a
-     generic class, so a dimmed control is inert by construction. */
+  /* These controls carry the real `disabled` attribute and the styling hangs off it rather than
+     off `.is-disabled`, so a dimmed control is inert by construction. */
   .fab-bulk-book-op:disabled,
   .fab-bulk-book-pick-clear:disabled,
   .fab-bulk-book-unstage:disabled {

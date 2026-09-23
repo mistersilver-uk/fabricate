@@ -1,23 +1,6 @@
 /**
- * `applyBulkChatVisibility` — the ONE Foundry-version edge that decides whether a blind
- * bulk run's result table is whispered or published (issue 859).
- *
- * ## Why this suite exists at all
- *
- * `ChatMessage#_preCreate` maps the legacy `rollMode` CREATE OPTION inside
- * `if (this.isRoll)`, and `isRoll` is `rolls.length > 0`. The aggregated bulk card
- * carries no rolls, so `create(data, { rollMode: 'blindroll' })` maps nothing, never
- * reaches an applier, and posts PUBLICLY. This module is what stops that — and it is a
- * real importable module rather than a private helper in `src/main.js` (which cannot be
- * imported under `node --test`) precisely so this can be a behaviour pin rather than a
- * hand-mirrored copy of the mapping.
- *
- * ## What is asserted is the TOKEN EACH APPLIER RECEIVES
- *
- * V13 and V14 have DISJOINT vocabularies, and crossing them fails two different ways: a
- * legacy key handed to V14's `applyMode` THROWS, and a V14 key handed to V13's
- * `applyRollMode` silently posts public. Asserting only "an applier was called" would
- * pass against either failure.
+ * `applyBulkChatVisibility` — the ONE Foundry-version edge that decides whether a blind bulk run's
+ * result table is whispered or published (issue 859).
  */
 
 import { describe, it } from 'node:test';
@@ -29,15 +12,8 @@ import {
 } from '../src/systems/bulkChatVisibility.js';
 
 /**
- * Install a `ChatMessage` global exposing EXACTLY one of the two appliers, and record
- * every `(method, token)` pair either receives.
- *
- * `applyMode` is a STATIC on V14 and absent on V13, which is what the module's capability
- * probe reads — so "which Foundry am I on" is modelled here as "which static exists",
- * the same fact the probe uses.
- *
- * @param {'v13'|'v14'} version
- * @returns {{calls: Array<[string, string]>, restore: () => void}}
+ * Install a `ChatMessage` global exposing EXACTLY one of the two appliers, and record every
+ * `(method, token)` pair either receives.
  */
 function stubChatMessage(version) {
   const original = globalThis.ChatMessage;
@@ -82,9 +58,7 @@ function applyUnder(version, rollMode, chatData = { speaker: { actor: 'Actor.a1'
 
 describe('applyBulkChatVisibility: the token each applier branch receives', () => {
   it('reproduces the known-good probe output across both versions', () => {
-    // The four-row probe recorded when this edge was built. It is asserted as ONE
-    // deep-equal so a change to any of the four — the method chosen, or the vocabulary
-    // handed to it — reds a single, readable assertion.
+    // The four-row probe recorded when this edge was built.
     const probe = [
       ...applyUnder('v14', 'blindroll').calls,
       ...applyUnder('v14', 'ic').calls,
@@ -138,11 +112,7 @@ describe('applyBulkChatVisibility: the token each applier branch receives', () =
 
 describe('applyBulkChatVisibility: unknown tokens pass through, never default', () => {
   it('passes an unmapped token to V14 verbatim', () => {
-    // Mirrors `Roll._mapLegacyRollMode`'s own `|| rollMode`. This matters on the
-    // NO-PROMPT path: with nothing to prompt about there is no decision, the token falls
-    // back to the client's `core.rollMode`, and V14's shim returns `'ic'` verbatim for a
-    // user set to In-Character. `ic` is a real `CONFIG.ChatMessage.modes` key, so
-    // pass-through is correct.
+    // Mirrors `Roll._mapLegacyRollMode`'s own `|| rollMode`.
     assert.deepEqual(applyUnder('v14', 'ic').calls, [['applyMode', 'ic']]);
     assert.deepEqual(applyUnder('v14', 'roll').calls, [['applyMode', 'roll']]);
   });
@@ -191,12 +161,8 @@ describe('applyBulkChatVisibility: it mutates in place, as both core appliers do
 
   it('THROWS when a build exposes neither applier, rather than passing the data through', () => {
     // Fail CLOSED. A build exposing neither applier cannot establish visibility at all, and
-    // returning `chatData` untouched would hand the caller data that core then creates under
-    // its own default — which is PUBLIC. A future rename of `applyRollMode` would therefore
-    // have turned a whispered GM complication card, and a blind bulk run's whole result
-    // table, into table-wide chat with no error anywhere. Every call site already runs inside
-    // a `try`/`catch` that logs and posts nothing, so the throw costs a card and never an
-    // award.
+    // returning `chatData` untouched would hand the caller data that core then creates under its
+    // own default — which is PUBLIC.
     const original = globalThis.ChatMessage;
     globalThis.ChatMessage = {};
     try {
@@ -217,9 +183,8 @@ describe('applyBulkChatVisibility: it mutates in place, as both core appliers do
 describe('applyBulkChatVisibility: the probe cannot be fooled by a subclass', () => {
   it('reads `applyMode` off a subclassed document class, which INHERITS the static', () => {
     // `CONFIG.ChatMessage.documentClass` is routinely subclassed by systems and modules.
-    // `applyMode` is a static, so a subclass inherits it — and the probe therefore still
-    // reads V14 correctly. A probe on an instance method, or on `own` properties, would
-    // read a subclassed V14 world as V13 and hand it a legacy key, which throws.
+    // `applyMode` is a static, so a subclass inherits it — and the probe therefore still reads V14
+    // correctly.
     const original = globalThis.ChatMessage;
     const calls = [];
     class CoreChatMessage {

@@ -1,21 +1,8 @@
 /**
- * The `fabricate.interactable` Region Behaviour data model + its registration
- * edge.
- *
- * This is the thin Foundry edge. The base class
- * `foundry.data.regionBehaviors.RegionBehaviorType` does NOT exist in the Node
- * test environment, so this module is import-safe by construction: NOTHING is
- * subclassed at module top level. Instead we export a factory
- * (`createInteractableRegionBehaviorClass`) that takes the base class + the
- * `fields` namespace as injected dependencies, and a defensive resolver
- * (`registerInteractableRegionBehavior`) that reads those off `globalThis` only
- * when actually called in a live Foundry `init`.
- *
- * The schema + system shaping live in the PURE `interactableRegionFlags.js`; this
- * module only wires the class + the CONFIG registration. The `static events`
- * handlers delegate to an `InteractableManager.instance` seam whose
- * `onRegionEnter` / `onRegionExit` methods are added in Phase 1c — they are
- * optional-chained so registering this behaviour now is a safe no-op.
+ * The `fabricate.interactable` behaviour class and its CONFIG registration — the thin edge over
+ * the pure schema in `interactableRegionFlags.js`.
+ * IMPORT-SAFE BY CONSTRUCTION: `RegionBehaviorType` does not exist under Node, so nothing is
+ * subclassed at module top level and `globalThis` is read only inside a live `init`.
  */
 
 import {
@@ -27,20 +14,8 @@ const DEFAULT_ICON = 'fas fa-mortar-pestle';
 const DEFAULT_LABEL = 'FABRICATE.Canvas.Interactable.BehaviorLabel';
 
 /**
- * Build a `RegionBehaviorType` subclass for the `fabricate.interactable` subtype.
- * Pure-ish factory: the base class + `fields` namespace are injected, so it never
- * touches `globalThis`. Returns the subclass (not an instance).
- *
- * The returned class:
- *  - `static defineSchema()` → `buildInteractableBehaviorSchema(fields)`.
- *  - `static events` → `tokenEnter` / `tokenExit` async handlers that defensively
- *    delegate to `InteractableManager.instance?.onRegionEnter?.(event)` /
- *    `onRegionExit?.(event)` (a Phase-1c seam) and never throw.
- *
- * @param {object} params
- * @param {Function} params.RegionBehaviorType  The Foundry base class.
- * @param {object} params.fields                The `foundry.data.fields` namespace.
- * @returns {Function} The subclass.
+ * Build the subclass, base class and `fields` injected so it never touches `globalThis`. Its
+ * `static events` handlers delegate to the `InteractableManager.instance` seam and never throw.
  */
 export function createInteractableRegionBehaviorClass({ RegionBehaviorType, fields } = {}) {
   if (typeof RegionBehaviorType !== 'function') {
@@ -53,24 +28,15 @@ export function createInteractableRegionBehaviorClass({ RegionBehaviorType, fiel
   }
 
   class FabricateInteractableRegionBehavior extends RegionBehaviorType {
-    // V13 DataModel field localisation: the core schema-driven sheet
-    // (`RegionBehaviorConfig`) labels each field from
-    // `<PREFIX>.FIELDS.<fieldPath>.label` / `.hint`. Without a prefix our fields
-    // render as a stack of bare, unlabeled inputs. The keys live in `lang/en.json`
-    // under this prefix. The rich `InteractableConfigApp` remains the primary GM
-    // editor; this only stops the core sheet from rendering malformed.
+    // The core schema-driven sheet labels each field from `<PREFIX>.FIELDS.<fieldPath>`; without
+    // a prefix its fields render as a stack of bare unlabeled inputs.
     static LOCALIZATION_PREFIXES = ['FABRICATE.RegionBehavior.Interactable'];
 
     static defineSchema() {
       const schema = buildInteractableBehaviorSchema(fields);
-      // SUBSCRIPTION (not dispatch): a V13 RegionBehaviorType only RECEIVES region
-      // events whose names are in its instance `events: Set<string>`, which Foundry
-      // populates from a schema field built by the base static
-      // `_createEventsField({ events, initial })`. Without this field the behaviour
-      // subscribes to nothing and the `static events` handlers below never fire.
-      // `events` restricts the selectable set; `initial` is the default-subscribed
-      // set. Resolved defensively so a missing/renamed API degrades to "no events
-      // field" rather than throwing (keeps the module import-safe).
+      // SUBSCRIPTION, not dispatch: a V13 behaviour only RECEIVES events named in the instance
+      // `events` Set Foundry populates from this field. Without it the handlers never fire.
+      // Resolved defensively so a renamed API degrades to "no events field".
       if (typeof RegionBehaviorType._createEventsField === 'function') {
         const subscribedEvents = ['tokenEnter', 'tokenExit'];
         schema.events = RegionBehaviorType._createEventsField({
@@ -82,18 +48,11 @@ export function createInteractableRegionBehaviorClass({ RegionBehaviorType, fiel
     }
 
     static events = {
-      // Region behaviour event handlers run on EVERY connected client. In V13 a
-      // `RegionBehaviorType` `static events` handler is invoked with `this` bound
-      // to the DATA MODEL (the behaviour `system`), NOT the RegionBehavior
-      // document — so `this.type` / `this.system` are undefined here. The manager
-      // seam needs the DOCUMENT (it reads `document.type === 'fabricate.interactable'`,
-      // `document.system`, `document.parent` (the Region), and `Region.parent`
-      // (the Scene)), so we pass the parent document via the base getter
-      // `this.behavior` (fallback `this.parent`, then `this` for non-V13 fakes).
-      // Without this the manager's `isInteractableRegionBehavior` /
-      // `readInteractableBehaviorSystem` see `undefined` type/system and bail
-      // before the prompt is shown. These handlers stay thin + no-throw so an
-      // undefined manager is a safe no-op.
+      // A V13 `static events` handler binds `this` to the DATA MODEL, not the document, so
+      // `this.type` and `this.system` are undefined. The manager seam needs the DOCUMENT (for
+      // `type`, `system`, the parent Region and its Scene), so pass the base getter
+      // `this.behavior`, falling back to `this.parent` then `this` for non-V13 fakes.
+      // These run on EVERY connected client, so they stay thin and no-throw.
       tokenEnter: async function tokenEnter(event) {
         try {
           const manager =
@@ -120,20 +79,7 @@ export function createInteractableRegionBehaviorClass({ RegionBehaviorType, fiel
   return FabricateInteractableRegionBehavior;
 }
 
-/**
- * Mutate a CONFIG object to register the behaviour data model + its type
- * icon/label. PURE (a fake config is enough to test): assigns into
- * `config.RegionBehavior.dataModels` / `typeIcons` / `typeLabels`. Idempotent —
- * skips the assignment when the subtype is already registered. Returns the class
- * that is registered (the existing one when already present).
- *
- * @param {object} config  A `CONFIG`-shaped object with a `RegionBehavior` block.
- * @param {Function} Class  The behaviour subclass to register.
- * @param {object} [opts]
- * @param {string} [opts.icon]
- * @param {string} [opts.label]
- * @returns {Function|null}
- */
+/** Assign the model, icon and label into a `CONFIG`-shaped object. Idempotent; a fake tests it. */
 export function assignInteractableBehaviorRegistration(
   config,
   Class,
@@ -157,21 +103,8 @@ export function assignInteractableBehaviorRegistration(
 }
 
 /**
- * Register the `fabricate.interactable` behaviour data model in a live Foundry
- * `init`. EDGE + defensive + idempotent + import-safe (no top-level globalThis
- * access — all resolution happens inside this function when called).
- *
- * Resolves `RegionBehaviorType` + `fields` from injected `deps` first, then from
- * `globalThis.foundry.data.*`. If either is missing, or the config has no
- * `RegionBehavior.dataModels` block, it is a no-op returning `null`.
- *
- * @param {object} [config]  Defaults to `globalThis.CONFIG`.
- * @param {object} [deps]
- * @param {Function} [deps.RegionBehaviorType]
- * @param {object} [deps.fields]
- * @param {string} [deps.icon]
- * @param {string} [deps.label]
- * @returns {Function|null} The registered class, or `null` when it could not register.
+ * EDGE. Register during a live `init`, resolving from `deps` then `globalThis.foundry.data.*`.
+ * Defensive, idempotent and import-safe: a missing dependency is a no-op returning null.
  */
 export function registerInteractableRegionBehavior(config = globalThis.CONFIG, deps = {}) {
   const RegionBehaviorType =
@@ -185,7 +118,7 @@ export function registerInteractableRegionBehavior(config = globalThis.CONFIG, d
     return null;
   }
 
-  // Idempotent: if already registered, return the existing class without rebuilding.
+  // Idempotent: an already-registered subtype returns its existing class without rebuilding.
   const existing = config.RegionBehavior.dataModels[INTERACTABLE_BEHAVIOR_SUBTYPE];
   if (existing) return existing;
 

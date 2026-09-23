@@ -1,19 +1,6 @@
 /**
- * The modifier expression suggestion chips (issue 1096).
- *
- * Two things are pinned here, and the FIRST is the one that matters. A suggestion row is
- * only useful if it offers paths the ACTIVE world actually defines: `@abilities.wis.mod`
- * resolves in `dnd5e` and to nothing at all in `pf2e`, where the same value is
- * `@actor.system.abilities.wis.mod`. A hard-coded row would therefore be silently wrong in
- * every world but one, which is why the system-specific half is derived from the same
- * per-Foundry-system bundle the card's `Seed presets` button seeds from.
- *
- * The ORACLE is deliberately not the derivation. Asserting "the dnd5e chips equal
- * `getCharacterModifierPresetsForFoundrySystem('dnd5e')` filtered by id" would restate the
- * implementation and pass for any bundle at all, including an empty one. So the expected
- * roll-data paths are written out literally: the test knows what `dnd5e` and `pf2e` call a
- * wisdom modifier, and a change that stopped consulting the world would have to disagree
- * with one of them.
+ * The modifier expression suggestion chips (issue 1096). Two things are pinned here, and the FIRST
+ * is the one that matters.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -101,9 +88,8 @@ test('the row leads with the system-specific terms and every chip carries a dist
   );
 });
 
-// ── Appending ────────────────────────────────────────────────────────────────────────────
-// The chips BUILD an expression, so the join is the behaviour. Each case below is a way the
-// naive `${current} + ${term}` produces something Foundry's Roll grammar rejects.
+// Appending ──────────────────────────────────────────────────────────────────────────── The chips
+// BUILD an expression, so the join is the behaviour.
 const APPEND_CASES = [
   {
     name: 'joins two terms with a single +',

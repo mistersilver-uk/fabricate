@@ -1,18 +1,4 @@
-/**
- * Issue 651 — the salvage GM surface in `ComponentEditView`.
- *
- * The reorder-permission toggle card, and the two traps that make a control here
- * silently useless (F4):
- *
- *  1. `salvageSignature()` is the allowlist driving `isDirty()`. A field it does not
- *     see never marks the editor dirty, so SAVE NEVER ENABLES and the GM's toggle is
- *     discarded on exit — with persistence working perfectly the whole time.
- *  2. `cloneSalvage(null)` spreads `{}`, so without a default the switch renders OFF
- *     against a default-on spec.
- *
- * Plus D3's non-severable condition: ordinals + a read-only difficulty badge on the
- * progressive salvage result list, so the card governs something the GM can see.
- */
+/** Issue 651 — the salvage GM surface in `ComponentEditView`. */
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
@@ -50,8 +36,7 @@ const cardHarness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-toggle-card-',
   rawModules: [],
   compiledModules: [
-    // `ToggleCard` composes the shared switch (issue 1040), so this second harness needs it
-    // too — omitting it HANGS this suite as `# cancelled` rather than failing it.
+    // `ToggleCard` composes the shared switch (issue 1040).
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/ToggleCard.svelte',
   ],
@@ -95,9 +80,7 @@ function props(overrides = {}) {
 
 const card = (target) => target.querySelector('[data-recipe-section="salvage-allow-player-result-reorder"]');
 const toggle = (target) => card(target).querySelector('[data-recipe-field="salvageAllowPlayerResultReorder"]');
-// The Save button lives in the PARENT's header, gated on the dirty state this view
-// emits. `onDirtyChange(true)` is therefore literally what enables Save, and
-// `onDraftChange`'s summary carries the `updates` payload the parent persists.
+// The Save button lives in the PARENT's header.
 function trackDirty(overrides = {}) {
   const dirtyEvents = [];
   const drafts = [];
@@ -164,16 +147,6 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
 
   /*
    * THE ONE ASSERTION IN THIS REPOSITORY THAT READS THE STATUS CARD'S RENDERED ROOT (issue 1509).
-   *
-   * Every other guard on this family reads SOURCE TEXT: the area-scope gate reads the component's
-   * `` class={`…`} `` template, the sheet census reads the selectors, the fixture clauses read
-   * strings in `tests/`. All of them are satisfied by a component that WRITES
-   * `fabricate-toggle-card` in that template and stops rendering it on its root element -- at
-   * which point every one of the ten re-rooted rules in `styles/fabricate.css` matches nothing
-   * and the card draws as an unstyled div in every host, the manager included.
-   *
-   * THIS suite rather than one of the other seven callers', because this is the one that mounts
-   * `ToggleCard` DIRECTLY, so the reading is of the primitive's own output and not of a caller's.
    */
   it('writes `fabricate-toggle-card` first on its root div, ahead of its own card class', async () => {
     const target = await mountCard({ variant: 'is-enabled' });
@@ -192,11 +165,6 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
 
   it('writes it on the ROOT div and not on the copy column inside it', async () => {
     // THE MUTATION CONTROL'S TARGET, stated as an assertion so the control has something to flip.
-    // Moving the `fabricate-toggle-card` literal off the root template and into the copy column's
-    // class leaves it in the markup, so it stays in the area-scope gate's `written` set and
-    // `rootless`, `gated` and the emission clause all stay green. Only a reading of WHICH element
-    // carries it can see that move -- and it is the difference between a root that is an ancestor
-    // of the glyph, the copy and both lines and one that is a sibling of the glyph.
     const target = await mountCard();
     const copy = target.querySelector('.manager-recipe-status-copy');
     assert.ok(Boolean(copy), 'the copy column must render, or this control has no subject');
@@ -214,12 +182,7 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
   });
 
   it('the switch it COMPOSES keeps its own root and takes none of this family`s', async () => {
-    // The card owns the glyph, the copy and the state class; `StatusToggle` owns the track, the
-    // knob and the reading. Both roots are on the page and neither is on the other's element,
-    // which is the rendered half of the standing invariant
-    // `searchable-popover-area-scope.test.js` asserts over the sheet: no selector may combine
-    // this family with `manager-status-toggle*`, because each root is an APPLICATION root by name
-    // to the other primitive's entry.
+    // The card owns the glyph, the copy and the state class; `StatusToggle` owns the track.
     const target = await mountCard();
     const button = target.querySelector('button.manager-status-toggle');
     assert.ok(Boolean(button), 'the composed switch must render');
@@ -259,13 +222,6 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   it('renders the card ON when allowPlayerResultReorder is absent (the cloneSalvage default)', async () => {
     // `cloneSalvage` spreads the source → an absent field stays absent. Without the
     // default the switch renders off against a default-on spec.
-    //
-    // UPDATED for issue 676: this used to mount `salvage: null`, but `null` now
-    // normalizes to salvage DISABLED (decision 6), and the reorder card is part of the
-    // chrome Ruling A collapses when salvage is off — so the card no longer exists on
-    // that fixture and `card(target).classList` threw on undefined. The fixture now
-    // carries an ENABLED salvage with the reorder key absent, which is what this test
-    // was always actually about.
     const target = await harness.mount(
       props({ component: { salvage: { enabled: true, resultGroups: RESULT_GROUPS } } })
     );
@@ -276,10 +232,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   });
 
   it('Ruling A: salvage: null collapses the reorder chrome but keeps the group editor', async () => {
-    // `salvage: null` normalizes to disabled (decision 6), so the reorder card — which
-    // only has meaning once salvage RUNS — collapses. The result-group editor must NOT,
-    // because it owns `data-add-salvage-group`, the ONLY add-group control in the
-    // codebase. Hide that and enabling salvage becomes impossible forever.
+    // `salvage: null` normalizes to disabled (decision 6), so the reorder card.
     const target = await harness.mount(props({ component: { salvage: null } }));
     assert.equal(card(target), null, 'the reorder chrome collapses when salvage is off');
     assert.ok(
@@ -290,8 +243,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   });
 
   it('renders the card OFF for an authored false', async () => {
-    // Only a `false` fixture can fail — a `true` fixture reads green through a dropped
-    // default, because the default re-supplies true.
+    // Only a `false` fixture can fail.
     const target = await harness.mount(
       props({ component: { salvage: { enabled: true, allowPlayerResultReorder: false, resultGroups: RESULT_GROUPS } } })
     );
@@ -317,8 +269,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   });
 
   it('F4: toggling BACK to the persisted value returns the editor to clean', async () => {
-    // The signature is a real comparison against the persisted salvage, not a
-    // one-way "something happened" latch.
+    // The signature is a real comparison against the persisted salvage.
     const { dirtyEvents, props: mountProps } = trackDirty();
     const target = await harness.mount(mountProps);
 
@@ -365,10 +316,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   // ── D9: the card must stay a byte-faithful extraction ────────────────────
 
   it('D9: the card reproduces the Overview status-card element tree', async () => {
-    // Issue 658 retrofits the Overview Enabled/Locked cards onto this component, and that
-    // is only a no-op DOM diff while the structure matches. If this drifts, the retrofit
-    // stops being a no-op and this becomes a third source of truth rather than the second
-    // being retired.
+    // Issue 658 retrofits the Overview Enabled/Locked cards onto this component.
     const target = await harness.mount(props());
     const node = card(target);
     assert.ok(node.classList.contains('manager-recipe-status-card'));
@@ -385,21 +333,72 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   });
 
   it('D9: an unset toggleTitle emits NO title attribute, not an empty one', async () => {
-    // The Overview Enabled card's tooltip is conditional (`... : undefined`), and it is
-    // the only explanation a GM gets for why that switch is disabled when validation
-    // blocks enabling. `toggleTitle` exists so the retrofit can carry it; the falsy
-    // branch must reproduce the `undefined` branch exactly, since an empty string would
-    // render a present-but-blank tooltip.
+    // The Overview Enabled card's tooltip is conditional (`... : undefined`).
     const target = await harness.mount(props());
     assert.equal(toggle(target).hasAttribute('title'), false);
   });
 
   // ── D3's condition: ordinals + read-only difficulty badge ────────────────
 
+  // The adder is the list's own footer, and reachable at zero (issue 1512). Both halves are
+  // asserted, because a change satisfying only the first ships an empty state that says "add one"
+  // with nothing to press — so the empty branch's control is CLICKED and its effect read.
+  it('renders the stage adder as the list footer, and after the empty message at zero', async () => {
+    const populated = await harness.mount(props());
+    assert.equal(
+      populated.querySelectorAll('[data-add-salvage-result]').length,
+      1,
+      'the adder is defined ONCE: two definitions render two controls in the populated state'
+    );
+    const footerAdd = populated.querySelector('[data-add-salvage-result]');
+    assert.ok(
+      Boolean(footerAdd.closest('.fabricate-sortable-list')),
+      'with stages, the adder is the list`s last child rather than a sibling of the list'
+    );
+    harness.remount();
+
+    const empty = await harness.mount(
+      props({ component: { salvage: { enabled: true, resultGroups: [] } } })
+    );
+    const emptyAdd = empty.querySelector('[data-add-salvage-result]');
+    assert.ok(Boolean(emptyAdd), 'and the adder is still reachable with no stages at all');
+    assert.ok(
+      !emptyAdd.closest('.fabricate-sortable-list'),
+      'following the message it now sits under, because there is no list to be a footer of'
+    );
+    emptyAdd.click();
+    await flushRender();
+    assert.ok(
+      Boolean(empty.querySelector('[data-salvage-result]')),
+      'and pressing it adds the first stage, which is what presence alone would not prove'
+    );
+    harness.remount();
+  });
+
+  // The one converted list inside a `<form>`: a control without `type="button"` submits the draft
+  // on a keyboard move, so every control the list draws declares it.
+  it('gives the list`s grip, rocker and remove an explicit button type', async () => {
+    const target = await harness.mount(props());
+    const row = target.querySelector('[data-salvage-result="res-1"]');
+    const controls = [
+      row.querySelector('[data-sortable-grip]'),
+      row.querySelector('[data-sortable-move="up"]'),
+      row.querySelector('[data-sortable-move="down"]'),
+      row.querySelector('[data-remove-salvage-result]'),
+    ];
+    assert.ok(controls.every(Boolean), 'the row draws all four controls');
+    for (const control of controls) {
+      assert.equal(control.getAttribute('type'), 'button', control.getAttribute('aria-label'));
+      assert.equal(control.getAttribute('data-keyboard-focus'), 'true');
+    }
+    harness.remount();
+  });
+
   it('D3: progressive salvage result rows render ordinals', async () => {
     // Without these the card governs a list whose order the GM cannot see.
     const target = await harness.mount(props());
-    const ordinals = [...target.querySelectorAll('[data-salvage-result-ordinal]')];
+    // The badge is the shared ordered list's as of issue 1512, so it carries the list's hook.
+    const ordinals = [...target.querySelectorAll('[data-sortable-ordinal]')];
     assert.deepEqual(
       ordinals.map((node) => node.textContent.trim()),
       ['1', '2'],
@@ -436,33 +435,14 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     );
     const badge = target.querySelector('[data-salvage-result-difficulty]');
     assert.equal(badge.getAttribute('data-salvage-result-difficulty'), '');
-    // This asserted /DC\s+—/ — the component's FALLBACK literal, which nothing ever
-    // rendered: `lang/en.json` resolves `SalvageEditor.DifficultyUnset` to "No
-    // difficulty", so production always said that and only a test with no i18n loaded
-    // ever saw "DC —". The test's own NAME recorded the real intent all along. Issue 676
-    // aligned the fallback to the lang value, and the recipe stage row now reads the
-    // same. The POINT of the test is unchanged and is asserted explicitly below: an
-    // unset difficulty must never render as a DC of 0, which is a real, meaningful, and
-    // completely wrong value.
+    // This asserted /DC\s+—/ — the component's FALLBACK literal.
     assert.match(badge.textContent, /No difficulty/);
     assert.doesNotMatch(badge.textContent, /\b0\b/, 'an unset difficulty is never DC 0');
     harness.remount();
   });
 
   it('progressive salvage has NO quantity stepper — the engine forces quantity 1', async () => {
-    // This test was the exact REVERSE until issue 676, and the reversal is the record of
-    // a real fix rather than a change of mind. It used to say: do not delete this control,
-    // because salvage — unlike recipes — genuinely honoured the authored quantity, so
-    // hiding it would conceal a live field a GM could no longer see or edit. It ended
-    // "if salvage should become quantity-less, the ENGINE must change first".
-    //
-    // The engine changed first. `CraftingEngine._resolveSalvageResultGroups` now forces
-    // `quantity: 1` on every awarded progressive entry, exactly as
-    // `ResolutionModeService._resolveProgressive` always has for recipes — because
-    // progressive is an ordered list of INDIVIDUAL results whose award loop charges one
-    // difficulty and awards one entry. `tests/salvage-engine.test.js` pins both halves
-    // (the resolver AND the item actually created), so this control is now genuinely dead
-    // UI in progressive mode rather than a window onto working behaviour.
+    // This test was the exact REVERSE until issue 676.
     const target = await harness.mount(props());
     assert.equal(
       target.querySelector('[data-salvage-result-quantity]'),
@@ -473,11 +453,6 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   });
 
   // ── THE READ-ONLY COMPLICATION STRIP (issue 1286) ───────────────────────────────────
-  //
-  // A progressive salvage row produces the component it names, so what the GM has said goes
-  // WRONG when that component is produced belongs on the row. It is read-only and links out,
-  // taking the difficulty badge's doctrine wholesale: the complications belong to the
-  // referenced component, whose own editor owns their save lifecycle.
 
   const COMPLICATION = Object.freeze({
     id: 'cx-1',
@@ -489,8 +464,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     effectRoll: { enabled: true, expr: '2d6' },
   });
 
-  // A yield carrying complications, one of which is enabled for salvage and one only for
-  // crafting. Both halves matter: the strip must show the first and withhold the second.
+  // A yield carrying complications.
   const COMPLICATED_OPTIONS = [
     {
       id: 'cmp-scrap',
@@ -538,7 +512,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
 
   it('1286: a stage whose yield authors salvage complications grows a strip; one that does not, does not', async () => {
     const target = await harness.mount(complicatedProps());
-    const list = target.querySelector('.manager-salvage-stage-list');
+    const list = target.querySelector('.fabricate-sortable-list');
     const found = strips(target);
     assert.equal(found.length, 1, 'only the yield that authors one gets a strip');
     assert.equal(
@@ -547,63 +521,52 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
       'and it is bound to the component that owns the complications'
     );
 
-    // THE PLACEMENT RULING (issue 1286): the band is INSIDE the stage row, so the two draw
-    // as ONE card the way the Recipe Studio's do. It used to be the list's next sibling —
-    // the Component Studio prototype's detached treatment — and the maintainer superseded
-    // that. What made the sibling shape attractive is still true and is still honoured:
-    // `.manager-salvage-stage-row` is JOINED with the Recipe Studio's
-    // `.manager-recipe-result-row.is-reorderable`, so nothing here relaxes that rule. The
-    // row turns into a column only under `:has(.manager-salvage-stage-complications)`, which
-    // a band-less row cannot match — the assertion below this one is what pins that.
+    // THE PLACEMENT RULING (issue 1286): the band is INSIDE the stage row, and the shared list is
+    // what draws that shape as of issue 1512 — the band is the row's BODY, the line's own sibling.
     const row = target.querySelector('[data-salvage-result="res-1"]');
-    // `assert.ok` on the identity, never `assert.equal(node, node)`: on failure
-    // `node:assert` serialises a mounted element's circular tree to build its diff and the
-    // heap dies, which surfaces as a `# cancelled` suite with no message at all.
+    // `assert.ok` on the identity, never `assert.equal(node, node)`.
     assert.ok(found[0].closest('.manager-salvage-stage-row') === row, 'the band is in the row');
     assert.ok(
-      [...list.children].every((child) => child.matches('.manager-salvage-stage-row')),
-      'and the list itself holds nothing but stage rows, so no band is a stage of its own'
+      [...list.children].every(
+        (child) => child.matches('.manager-salvage-stage-row') || child.matches('.manager-salvage-stage-add')
+      ),
+      'and the list holds nothing but stage rows and its own footer, so no band is a stage itself'
     );
-    // The row's own controls moved into `.manager-salvage-stage-line`, which is what lets the
-    // row shed its padding to the line and let the band bleed. The band is NOT in that line:
-    // it is the line's sibling, or its `border-top` could never be the card's divider.
-    const line = row.querySelector('.manager-salvage-stage-line');
-    assert.ok(line, 'the row wraps its own controls in a line');
+    const line = row.querySelector('.fabricate-sortable-list-line');
+    assert.ok(Boolean(line), 'the row wraps its own controls in the list`s line');
     assert.ok(
       line.querySelector('[data-salvage-result-edit]') &&
         line.querySelector('[data-salvage-result-difficulty]'),
       "the row's picker cluster and its trailing controls are the LINE's children"
     );
     assert.ok(
-      found[0].parentElement === row,
-      "and the band is the row's own child, beside that line rather than inside it"
+      found[0].closest('.fabricate-sortable-list-body').parentElement === row,
+      "and the band sits in the row's own BODY, beside that line rather than inside it"
     );
-    // Not a stage: it annotates the one above it, and announcing it as a stage would have a
-    // screen reader count one more stage than the award loop ever spends down.
+    // Not a stage: it annotates the one above it.
     assert.equal(found[0].getAttribute('role'), 'presentation');
     harness.remount();
   });
 
   it('1286: a stage row with no complications grows no wrapper state, so it is unchanged', async () => {
-    // The constraint the attached band had to respect: `.manager-salvage-stage-row` is JOINED
-    // with `.manager-recipe-result-row.is-reorderable` in styles/fabricate.css, so anything
-    // that re-shaped the row itself would have moved every progressive stage row in BOTH
-    // studios. Everything the band needs is scoped to `:has(.manager-salvage-stage-complications)`,
-    // and this pins the DOM half of that: the second stage draws no band, so it cannot match.
+    // The constraint the attached band had to respect.
     const target = await harness.mount(complicatedProps());
     const plain = target.querySelector('[data-salvage-result="res-2"]');
     assert.ok(plain, 'the yield that authors no complication still renders its stage');
     assert.equal(
       plain.querySelectorAll('[data-salvage-stage-complications]').length,
       0,
-      'and draws no band, so the `:has()` that re-shapes the row cannot match it'
+      'and draws no band at all'
     );
-    // `display: contents` on the line is what keeps this row's flex items the ROW's own. The
-    // markup is identical for both rows; only the band's presence differs.
+    // ONE row anatomy for every row (issue 1512): the list's line and body are always present, and
+    // the `:has()` rules and the `display: contents` wrapper that bought that by hand are retired.
     assert.ok(
-      plain.querySelector('.manager-salvage-stage-line'),
+      plain.querySelector('.fabricate-sortable-list-line'),
       'the line wraps its controls exactly as the banded row does'
     );
+    const emptyBody = plain.querySelector('.fabricate-sortable-list-body');
+    assert.ok(Boolean(emptyBody), 'and the body is present too');
+    assert.equal(emptyBody.textContent.trim(), '', 'drawing nothing until there is a band');
     harness.remount();
   });
 
@@ -621,8 +584,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
       /The spring lets go/,
       'the row names the complication'
     );
-    // The GM body is the generated TRIGGER SENTENCE — the fact a player must never be shown,
-    // and the fact a GM most needs on a read-only strip.
+    // The GM body is the generated TRIGGER SENTENCE.
     assert.match(
       rows[0].textContent,
       /When the award is missed/,
@@ -633,10 +595,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   });
 
   it('1286: the strip is fed the UNREDACTED authored list, so a gmOnly complication still shows', async () => {
-    // The trap this pins: feeding the strip `forecastComplications` — which filters to
-    // `visibility: "visible"` — reads as a working surface right up until a GM authors a
-    // complication with the DEFAULT visibility, which is `gmOnly`. Then the GM's own screen
-    // shows nothing, and every fixture that happened to use `visible` still passed.
+    // The trap this pins: feeding the strip `forecastComplications`.
     const target = await harness.mount(complicatedProps());
     const row = strips(target)[0].querySelector('[data-salvage-stage-complication="cx-1"]');
     assert.ok(row, 'the gmOnly complication renders on the GM strip');
@@ -681,8 +640,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     );
     const edit = strip.querySelector('[data-salvage-stage-complications-edit]');
     assert.ok(edit, 'the deep-link is the only route to changing any of this');
-    // Distinguishable from the ROW's own Edit link, which targets the same component for its
-    // DC: two buttons on one stage with the same accessible name would be unusable.
+    // Distinguishable from the ROW's own Edit link.
     assert.match(edit.getAttribute('aria-label'), /complications/i);
     assert.match(edit.getAttribute('aria-label'), /Scrap Metal/);
     edit.click();
@@ -738,13 +696,19 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   });
 
   it('a yield row picks its component through the searchable popover, showing image AND name', async () => {
-    // The native <select> could show a component's name but never its art, so the GM
-    // picked yields from a text list on a surface where every other component is shown
-    // with its image. The trigger wraps BOTH facts as one target.
+    // The native <select> could show a component's name but never its art.
     const target = await harness.mount(props());
     const field = target.querySelector('[data-salvage-result-component]');
     assert.ok(field, 'the row still exposes its component field');
-    assert.equal(field.querySelector('select'), null, 'the native select is gone');
+    // WHICH APP-DRAWN PICKER, rather than "not a native select" (issue 1510). This editor renders
+    // no native select at all now, so the old `!querySelector('select')` was satisfied by any tree
+    // at all. The two pickers are told apart by what their trigger announces — the searchable
+    // popover a `dialog`, the shared one-of-N `Select` a `listbox` — and only the first can draw a
+    // component's art, which is the whole reason this field is the one it is.
+    assert.ok(
+      !field.querySelector('.fabricate-select-trigger'),
+      'the field is not the shared one-of-N picker, which shows a label and no image'
+    );
     const trigger = field.querySelector('button.manager-salvage-component-trigger');
     assert.ok(trigger, 'the field is a popover trigger');
     assert.equal(trigger.getAttribute('aria-haspopup'), 'dialog');
@@ -778,9 +742,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   // ── issue 764: the Simple-mode single-success-group cap ───────────────────
 
   it('Simple mode HIDES Add group at the one-success-group cap and shows the required hint', async () => {
-    // RESULT_GROUPS carries one success group, so Simple mode is at its cap: the only
-    // add-group affordance is gone and the required hint explains why. The invariant is
-    // the normalizer clamp; this is UX only.
+    // RESULT_GROUPS carries one success group, so Simple mode is at its cap.
     const target = await harness.mount(props({ salvageResolutionMode: 'simple' }));
     assert.equal(
       target.querySelector('[data-add-salvage-group]'),
@@ -808,21 +770,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     harness.remount();
   });
 
-  // ── The three salvage adds are `dashed`, and the sweep found them painted neutral ──────
-  //
-  // Audit rows 22-24 (issue 1118). Each of the three sits at the FOOT of the list it appends
-  // to — a result at the foot of a group, a group at the foot of the group list — which is
-  // the whole meaning of the `dashed` role: a dashed outline reads as an empty slot waiting
-  // to be filled, and a solid button does not. They shipped as bare `manager-button`s, so the
-  // salvage editor showed solid secondary buttons where the recipe studio's identical verbs
-  // show dashed ones.
-  //
-  // `fullWidth` is the delta's per-row ruling for these three specifically, and it is a
-  // statement about the CONTAINER rather than the verb: each is the last child of a
-  // full-width list. `dashed` deliberately no longer implies it — six of the sweep's ten
-  // dashed sites are in wrapping flex rows where a pinned `width: 100%` stacked a four-up row
-  // into four rows.
-  //
+  // ── The three salvage adds are `dashed`.
   // Bound to the controls' own hooks, and the negative half names what must NOT have the
   // role: `[data-salvage-manage-presets]` is a neutral link in the same editor, and it is the
   // control a "does is-dashed appear in this card" assertion would have accepted.
@@ -875,8 +823,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   });
 
   it('Simple cap counts SUCCESS groups — a legacy reserved failure row is preserved, not blanked', async () => {
-    // One success group + one reserved `role: 'failure'` group: the cap counts success
-    // groups (1 → capped) but the failure row's stored data must survive and render.
+    // One success group + one reserved `role: 'failure'` group.
     const target = await harness.mount(
       props({
         salvageResolutionMode: 'simple',
@@ -902,25 +849,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   });
 });
 
-/*
- * Issue 772, acceptance 15 — the editor's essences section after the extraction.
- *
- * Until this block existed the editor's essence card had NO seam anywhere: none of
- * `data-component-edit-essence`, `data-component-essence-active`, the retired quantity
- * class or the Increment/Decrement/Quantity aria labels appeared in a single file under
- * `tests/`, and no step in `scripts/foundry-test-run.mjs` drove them. So extracting the
- * card into `EssenceQuantityCard` and replacing its raw `<input type="number">` +
- * `manager-icon-button` −/+ with the shared `Stepper` broke nothing AND proved nothing,
- * while changing the keyboard, clamp and commit behaviour of the control underneath.
- *
- * This lands the seam rather than the coverage gap: the card still READS a persisted
- * quantity, still INCREMENTS, still DECREMENTS and still CLEARS, and each of those still
- * reaches the draft the parent saves.
- *
- * It lives in this suite because this suite already mounts `ComponentEditView` and already
- * carries the compiled-module entry the extraction forces; a fourth `ComponentEditView`
- * harness would be a fourth copy of the same 40-line setup.
- */
+/* Issue 772, acceptance 15 — the editor's essences section after the extraction. */
 describe('ComponentEditView — the extracted essence quantity card (issue 772)', () => {
   before(() => harness.setup());
   after(() => harness.teardown());
@@ -943,8 +872,7 @@ describe('ComponentEditView — the extracted essence quantity card (issue 772)'
     const earth = cardFor(target, 'earth');
     assert.ok(fire && earth, 'one card per system essence');
 
-    // The value is READ from the component, not defaulted. A card that renders 0 for a
-    // persisted 2 would save a silent clear on the next unrelated edit.
+    // The value is READ from the component.
     assert.equal(stepperInput(fire).value, '2');
     assert.equal(stepperInput(earth).value, '0');
 
@@ -956,8 +884,7 @@ describe('ComponentEditView — the extracted essence quantity card (issue 772)'
 
     // The identity half is still identity-FIRST, with the essence's own icon.
     assert.equal(fire.querySelector('.manager-component-essence-name').textContent, 'Fire');
-    // issue 1371 r18-colour (M29): the tile is the shared glyph-chip `Medallion`, so the glyph sits
-    // inside it rather than inside the card's retired own span.
+    // issue 1371 r18-colour (M29): the tile is the shared glyph-chip `Medallion`.
     assert.ok(fire.querySelector('[data-medallion="glyph"] i.fa-fire'));
 
     harness.remount();
@@ -984,8 +911,7 @@ describe('ComponentEditView — the extracted essence quantity card (issue 772)'
     assert.equal(stepperInput(cardFor(target, 'fire')).value, '1');
     assert.equal(drafts.at(-1).updates.essences.fire, 1);
 
-    // Clearing to zero DROPS the key rather than persisting a zero, which is what
-    // `buildUpdates` has always done — and the card recedes again.
+    // Clearing to zero DROPS the key rather than persisting a zero.
     cardFor(target, 'fire').querySelector('[data-stepper-decrement]').click();
     await flushRender();
     assert.equal(stepperInput(cardFor(target, 'fire')).value, '0');
@@ -1003,9 +929,7 @@ describe('ComponentEditView — the extracted essence quantity card (issue 772)'
     const { drafts, props: mountProps } = trackDirty(ESSENCE_OVERRIDES);
     const target = await harness.mount(mountProps);
 
-    // `Stepper` disables − at its `min`, so a zero card cannot be driven negative. This is
-    // the behaviour the raw `<input type="number">` did NOT have: `min="0"` is advisory on
-    // a typed entry and the old −/+ buttons clamped in the view's own handler instead.
+    // `Stepper` disables − at its `min`.
     assert.equal(cardFor(target, 'earth').querySelector('[data-stepper-decrement]').disabled, true);
 
     const input = stepperInput(cardFor(target, 'earth'));
@@ -1076,9 +1000,7 @@ describe('ComponentEditView — the extracted essence quantity card (issue 772)'
     });
     const target = await harness.mount(mountProps);
 
-    // Edit an UNRELATED essence. The save payload is rebuilt from the whole draft, so if the
-    // offer filter had narrowed the draft rather than the render, this ordinary edit would
-    // silently delete the disabled essence's authored 3.
+    // Edit an UNRELATED essence. The save payload is rebuilt from the whole draft.
     cardFor(target, 'earth').querySelector('[data-stepper-increment]').click();
     await flushRender();
 

@@ -1,27 +1,12 @@
-/**
- * THE ONE-SHOT VERSION ADVANCES THAT CONSUME A MIGRATION'S OUTPUT (issue 1363).
- *
- * `1.30.0` bumps `COMPONENT_FLAG_STAMP_TARGET` and `TOOL_FLAG_STAMP_TARGET` 1 -> 2 precisely so
- * the two source-side auto-stamps RE-RUN and repair every source Item whose
- * `roles[<systemId>].componentId` / `.toolId` names an id the migration re-keyed. That makes
- * them one-shots that CONSUME a migration's output, and the migration's deferred branch RETURNS
- * NORMALLY — so both stamps run on the SAME BOOT as a torn migration, against the OLD ids,
- * change nothing, and an unconditional version advance then gates them off FOREVER.
- *
- * Nothing else would ever repair those Items: `remapWorldScopeIdentityFlags` walks actors, not
- * sources, and every later drag copies the stale flag onto an owned item that
- * `restampOwnedItemComponentIdentity` refuses because it already carries a durable identity
- * flag.
- *
- * **The stamp targets had NO test coverage at all before this file.** The bump was load-bearing
- * and unasserted.
- */
+/** THE ONE-SHOT VERSION ADVANCES THAT CONSUME A MIGRATION'S OUTPUT (issue 1363). */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { entrySources } from './helpers/bootstrapEntrySource.js';
+
 
 import {
   COMPONENT_FLAG_STAMP_TARGET,
@@ -36,10 +21,10 @@ import {
   remapCompletedCleanly,
   WORLD_ESSENCE_MERGE_RETIRED_LEG,
   WORLD_ESSENCE_MERGE_SYSTEMS_LEG,
-} from '../src/migration/remapWorldScopeIdentityFlags.js';
+} from '../src/systems/remapWorldScopeIdentityFlags.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const MAIN = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
+const MAIN = [entrySources['src/main.js'], entrySources['src/bootstrap/Fabricate.js']].join('\n');
 
 /** The body of one named `async function` in `src/main.js`. */
 function bodyOf(name) {
@@ -77,10 +62,7 @@ for (const [pass, versionKey] of [
   ['runToolFlagAutoStamp', 'TOOL_FLAG_STAMP_VERSION'],
 ]) {
   test(`${pass} WITHHOLDS its version advance while the 1.30.0 migration has not completed`, () => {
-    // DELETING THE GUARD MUST FLIP THIS TO FAIL. There is no seam to drive these passes
-    // through — `src/main.js` imports the global stylesheet and Svelte roots at module load,
-    // so it cannot be imported under `node --test` at all — and that is exactly why the
-    // property is asserted on the source text rather than left uncovered, as it was.
+    // DELETING THE GUARD MUST FLIP THIS TO FAIL.
     const body = bodyOf(pass);
     const guardIndex = body.indexOf('if (!mayClearWorldScopeRekeyMap(');
     const advanceIndex = body.indexOf(`SETTING_KEYS.${versionKey}, `);
@@ -102,9 +84,8 @@ for (const [pass, versionKey] of [
 }
 
 test('the gate is the SAME predicate the remap uses, so the three passes cannot drift', () => {
-  // One spelling, in the pure module, on `compareSemver`. A second hand-rolled `>=` on what is
-  // a STRING setting is the defect this whole gate exists to avoid.
-  // The import line carries no `(`, so this counts CALL SITES and nothing else.
+  // One spelling, in the pure module, on `compareSemver`. A second hand-rolled `>=` on what is a
+  // STRING setting is the defect this whole gate exists to avoid.
   const callSites = MAIN.match(/mayClearWorldScopeRekeyMap\(/g) ?? [];
   assert.equal(callSites.length, 3, 'exactly three: both stamps and the remap');
   assert.equal(mayClearWorldScopeRekeyMap('1.29.0'), false);
@@ -125,17 +106,12 @@ test('a world with NOTHING to re-key still advances the remap version, so it sto
   );
 });
 
-// ---------------------------------------------------------------------------
 // The PUBLIC recovery action, and the second withhold that makes it reachable
-// ---------------------------------------------------------------------------
 
 test('the recovery action is ACTIVE-GM ONLY, matching the boot pass', () => {
   // NOT A PERMISSION CHECK BUT A SINGLE-WRITER RULE, and it has to be here rather than inherited:
-  // the method calls `applyWorldScopeIdentityFlagRemap` DIRECTLY, which carries no gate of its
-  // own, so it bypasses the one inside `runWorldScopeIdentityFlagRemap`. `game.fabricate` is
-  // bound on every client and the pass walks the UNFILTERED actor collection, so a player
-  // invoking it would have every write it does not own rejected by the server — one red toast
-  // per refusal, each one mis-booked as a locked-pack skip.
+  // the method calls `applyWorldScopeIdentityFlagRemap` DIRECTLY, which carries no gate of its own,
+  // so it bypasses the one inside `runWorldScopeIdentityFlagRemap`.
   const body = methodBodyOf('remapWorldScopeIdentityFlags');
   const gateIndex = body.indexOf('game.users?.activeGM?.id !== game.user?.id');
   const applyIndex = body.indexOf('applyWorldScopeIdentityFlagRemap(');
@@ -186,13 +162,8 @@ test('a PARTIAL remap withholds the clear AND the version advance', () => {
   assert.match(body.slice(withholdIndex, clearIndex), /return;/);
 });
 
-// ---------------------------------------------------------------------------
-// The `1.34.0` essence-merge one-shot (issue 1654)
-//
-// A second decision record with a second Number version, so a world that has consumed one may
-// still owe the other. Its gates mirror the `1.30.0` pair above, and "mirrors it" is a claim a
-// refactor can quietly falsify.
-// ---------------------------------------------------------------------------
+// The `1.34.0` essence-merge one-shot (issue 1654). A second decision record with a second Number
+// version, so a world that has consumed one may still owe the other.
 
 test('the essence one-shot has its OWN target, and its clear gate is never a lexicographic compare', () => {
   assert.equal(WORLD_ESSENCE_MERGE_FLAG_TARGET, 1);

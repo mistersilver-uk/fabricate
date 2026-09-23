@@ -1,16 +1,5 @@
 /**
  * `decomposeBaseAmount` — a terminal-base-unit figure said the way a table says it (issue 1342).
- *
- * The pooled consume settles and reports every payer's share in the world's TERMINAL BASE UNIT,
- * for the over-charging reason `consumePooledCurrency` states in full, while the ledger row beside
- * it echoes the caller's own denomination. A companion drawing the two together was therefore
- * printing copper beside a cost asked for in gold. This function closes that, and it must be exact
- * in integers rather than approximately right: a coin count that does not sum back to the amount
- * debited is a chat card contradicting a character sheet.
- *
- * Every case here is about the arithmetic alone. The publication of `unitId`/`share` through the
- * contract boundary is pinned by `companion-pooled-holdings-contract.test.js`, and the end-to-end
- * settlement by `companion-pooled-consumption.test.js`.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';

@@ -1,7 +1,5 @@
-// Unit tests for routedSuccessTierOptions — the pure helper that builds the recipe
-// editor's check-mode result-set assignment options from a routed crafting check.
-// Extracted from CraftingSystemManagerRoot's recipeRoutedOutcomeTierOptions derived
-// so the success===true filter is provable without mounting the component.
+// Unit tests for routedSuccessTierOptions — the pure helper that builds the recipe editor's
+// check-mode result-set assignment options from a routed crafting check.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -121,10 +119,8 @@ test('routedHasOutcomeTiers: tiers without an id do not count', () => {
   assert.equal(routedHasOutcomeTiers({ type: 'relative', relativeOutcomes: null }), false);
 });
 
-// ---------------------------------------------------------------------------
-// routedOutcomeTierNames — ALL non-empty active-type tier names (success AND
-// failure), shared by the salvage routing UI and salvage validation.
-// ---------------------------------------------------------------------------
+// routedOutcomeTierNames — ALL non-empty active-type tier names (success AND failure), shared by
+// the salvage routing UI and salvage validation.
 
 test('tier names — null/undefined routed config yields no names', () => {
   assert.deepEqual(routedOutcomeTierNames(null), []);

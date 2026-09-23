@@ -1,29 +1,18 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  World > Rules & Resources > Modifiers.
+  World > Rules & Resources > Modifiers: the WORLD-scope pool of reusable actor-driven modifiers
+  every system's checks, gathering drop rows and events select from, and the ONE surface that
+  authors it. Deliberately gated on NO feature flag — a check modifier feeds a crafting or salvage
+  roll, so gating the only place they can be written would make them unauthorable.
 
-  The modifier library is WORLD scope (issue 1308), not per crafting system: one pool of
-  reusable actor-driven modifiers that every system's checks, gathering drop rows and events
-  select from. It is the ONE authoring surface for that pool — the Checks screen only chooses
-  which of these apply and how — and it is NOT gated on any feature flag, because a check
-  modifier feeds a crafting or salvage roll and gating the only place they can be written on
-  an unrelated flag would make them unauthorable.
-
-  This markup is the accordion that used to live inside SystemEditView's Settings tab, moved
-  wholesale rather than redesigned (issue 1311), exactly as the currency editor moved before
-  it. Two things did NOT come with it. The whole-section collapse toggle is gone: on the
-  Settings tab collapsing yielded space to the sibling cards below it, and as a whole route
-  there is nothing to make room for, so the same control would only blank the page. And the
-  "every system" scope chip is gone with it, because the World rail now states the scope
-  itself rather than the card having to admit it.
-
-  GM-only by construction: the whole crafting manager admin is GM-scoped.
+  The accordion moved wholesale off SystemEditView's Settings tab. Two things did not come with it:
+  the whole-section collapse, which as a whole route would only blank the page, and the "every
+  system" scope chip, because the World rail now states the scope itself.
 -->
 <script>
   import Field from '../../../components/Field.svelte';
   import { tick } from 'svelte';
   import Chip from '../../../components/Chip.svelte';
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
   import IconPicker from '../../../components/IconPicker.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';

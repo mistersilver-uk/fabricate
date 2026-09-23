@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -18,7 +19,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-check-formula-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/config/modifierExpressionSuggestions.js',
     'src/config/gatheringCharacterModifierPresets.js',
@@ -139,11 +140,6 @@ describe('the formula card states what a roll actually resolves to (issue 1096)'
 });
 
 // ── The suggestion chips, THROUGH THE RENDERED CONTROL ────────────────────────────────
-//
-// Added after an audit of this change's controls asked which of them a test actually
-// CLICKS. This one was asserted by presence only: `appendToken` was reachable by reading the
-// source and by nothing else, which is the same exposure that let a preset button be
-// reported inert with a green proof beside it.
 describe('a suggestion chip appends its term when CLICKED', () => {
   it('appends to an authored formula with a joining +', async () => {
     const emitted = [];

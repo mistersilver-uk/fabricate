@@ -82,7 +82,6 @@ examples/macros/08-import-recipes.js
 module.json
 scripts/foundry-setup-data.mjs
 scripts/foundry-test-down.mjs
-scripts/foundry-test-run.mjs
 scripts/foundry-test-up.mjs
 scripts/foundry-test.mjs
 scripts/foundry/create-mythwright-dnd5e.js
@@ -103,7 +102,6 @@ src/ui/InteractableBrowserApp.svelte.js
 src/ui/InteractableConfigApp.svelte.js
 src/ui/InteractablesManagerApp.svelte.js
 src/ui/InteractionPromptApp.svelte.js
-src/ui/SvelteCraftingSystemManagerApp.svelte.js
 src/ui/SvelteFabricateApp.svelte.js
 src/ui/appFactory.js
 src/ui/compendiumDirectoryContext.js
@@ -134,7 +132,6 @@ src/ui/svelte/stores/adminComponentRowProjection.js
 src/ui/svelte/stores/adminRecipeRowProjection.js
 src/ui/svelte/stores/adminStore.js
 src/ui/svelte/stores/alchemyStore.svelte.js
-src/ui/svelte/stores/craftingStore.svelte.js
 src/ui/svelte/util/alchemyTabAvailability.js
 src/ui/svelte/util/autoFillResolver.js
 src/ui/svelte/util/componentEditor.js

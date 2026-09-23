@@ -1,34 +1,18 @@
 /**
- * Mounted coverage for the Tags & Categories screen (issue 924).
- *
- * The view had NO test file of its own — it appeared only as a harness fixture inside
- * `manager-mounted.test.js` — so nothing asserted the tab semantics its keyboard handler
- * depends on. That mattered when the compiler's
- * `a11y_no_noninteractive_element_to_interactive_role` warnings on its `<nav>` and
- * `<section>` were fixed: the elements changed, the ROLES deliberately did not, and
- * `handleTabKeydown` resolves the strip with `.closest('[role="tablist"]')`. A source-string
- * assertion cannot observe that traversal, so the keyboard half of this file dispatches real
- * `KeyboardEvent`s and reads `document.activeElement`.
- *
- * Built on the shared mount harness rather than inlined boilerplate — an inlined mount trips
- * SonarCloud's new-code duplication threshold.
- *
- * ── ISSUE 1429 MOVED THE STRIP AND THIS FILE DELIBERATELY DID NOT MOVE WITH IT ──────────
- * The tablist is `VocabularyTabs` -> `EditorTabs` now, not markup this view authors. Every
- * clause below still mounts THIS view and reads the rendered DOM, which is the point: a
- * conversion is exactly the change under which a suite that had been asserting on the view's
- * own source, or on a hand-written copy of its markup, would keep passing while the product
- * stopped emitting it. Mounting the real tree is what makes the roving `tabindex`, the
- * `aria-selected` binding and the Arrow/Home/End traversal observable across the seam — and
- * the traversal in particular is now `EditorTabs`' `parentElement`/`[role="tab"]` walk rather
- * than this view's old `.closest('[role="tablist"]')`, so the CONTRACT is asserted here while
- * the mechanism belongs to the primitive.
+ * Mounted coverage for the system Tags & Categories screen (issues 924, 1915). The tabs are gone:
+ * the three vocabularies mount SIMULTANEOUSLY through the shared vocabulary shell, so what this
+ * file proves is that they are all present, independently sorted, and cannot reach each other.
  */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
+import { chooseSelectOption, selectTriggerText } from '../helpers/select-control.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -36,272 +20,375 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-tags-categories-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
-  'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
-    // Each vocabulary panel's lifted search term (issue 1438).
-    'src/utils/managerBrowserViewState.js',
+    // Each vocabulary panel's lifted search term and sort pair (issues 1438, 1915).
+    'src/ui/model/managerBrowserViewState.js',
+    'src/utils/scalars.js',
+    // The shared shell's pure leaf and this screen's presentation model (issue 1915).
+    'src/ui/svelte/apps/manager/vocabularyShell.js',
+    'src/ui/svelte/apps/manager/systemVocabularyStudio.js',
   ],
   compiledModules: [
     // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled)
     // rather than failing it, so the whole static closure is declared.
-    'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    // Each panel's sort is a `Select`, whose closure also carries `ManagerButton` for
+    // VocabularyPanel`s confirm pair and InlineVocabularyAdd`s Add.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconPicker.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
     'src/ui/svelte/apps/manager/VocabularyPanel.svelte',
-    'src/ui/svelte/components/Field.svelte',
-    // THE manager's labelled push-button (issue 1118). VocabularyPanel`s confirm pair and InlineVocabularyAdd`s Add render it.
-    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
-    // The strip, extracted from this view in issue 1429, and the primitive it wraps. Both are
-    // rendered by the tree under test, and a rendered `.svelte` the harness omits HANGS the
-    // suite (`# cancelled`) rather than failing it.
-    'src/ui/svelte/components/EditorTabs.svelte',
-    'src/ui/svelte/apps/manager/VocabularyTabs.svelte',
+    // The shared shell and the sort toolbar it hangs each panel's controls on (issue 1915). The
+    // tab strip and `EditorTabs` behind it left this tree with the tabs.
+    'src/ui/svelte/components/ManagerToolbar.svelte',
+    'src/ui/svelte/apps/manager/VocabularyShell.svelte',
+    'src/ui/svelte/apps/manager/VocabularyShellPanel.svelte',
     'src/ui/svelte/apps/manager/TagsCategoriesView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte',
 });
 
-const TABS = ['recipe', 'component', 'tag'];
+const KINDS = ['recipeCategories', 'componentCategories', 'componentTags'];
+const panelSelector = (kind) => `[data-vocabulary-panel="${kind}"]`;
+const RECIPE_CATEGORY_SORT = `${panelSelector('recipeCategories')} [data-vocabulary-sort]`;
+
+function row(id, name, totalUsage = 0) {
+  return { id, name, totalUsage };
+}
 
 function mountProps(overrides = {}) {
   return {
+    // Name order and reference order DISAGREE, so a sort assertion can tell them apart.
     categoryRows: [
-      { id: 'general', name: 'General' },
-      { id: 'potions', name: 'Potions' },
+      row('general', 'General'),
+      row('potions', 'Potions', 1),
+      row('alloys', 'Alloys', 5),
     ],
-    componentCategoryRows: [{ id: 'general', name: 'General' }],
-    tagRows: [{ id: 'herb', name: 'herb' }],
-    counts: { recipeCategories: 2, componentCategories: 1, itemTags: 1 },
-    activeTab: 'recipe',
+    componentCategoryRows: [row('general', 'General'), row('reagent', 'Reagent', 2)],
+    tagRows: [row('herb', 'herb', 5), row('ash', 'ash')],
     ...overrides,
   };
 }
 
-function tabButton(root, id) {
-  return root.querySelector(`#vocabulary-tab-${id}`);
-}
-
-/** Dispatch a real keydown on a tab button, exactly as a keyboard user would produce it. */
-function pressOn(element, key) {
-  element.dispatchEvent(
-    new globalThis.window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
-  );
-  flushSync();
-}
+const namesIn = (root, kind, rowAttr) =>
+  [
+    ...root.querySelectorAll(
+      `${panelSelector(kind)} [${rowAttr}]:not(.is-locked) .manager-vocabulary-main strong`
+    ),
+  ].map((element) => element.textContent);
 
 describe('TagsCategoriesView (mounted)', () => {
   before(harness.setup);
   after(harness.teardown);
   afterEach(harness.remount);
 
-  it('renders the tab strip as a plain element carrying role="tablist"', async () => {
+  it('mounts all three vocabularies at once, with no tab machinery left', async () => {
     const root = await harness.mount(mountProps());
 
-    const strip = root.querySelector('.manager-vocabulary-tabs');
-    assert.ok(strip, 'the tab strip renders');
+    for (const kind of KINDS) {
+      assert.ok(Boolean(root.querySelector(panelSelector(kind))), `${kind} panel renders`);
+    }
+    // THE RETIREMENT, STATED AS AN ABSENCE. A strip left behind would keep two of the three
+    // vocabularies hidden and every assertion below would be about the one on screen.
     assert.equal(
-      strip.getAttribute('role'),
-      'tablist',
-      'the ROLE is load-bearing — handleTabKeydown resolves the strip by it — and survives'
+      root.querySelectorAll('[role="tablist"], [role="tab"], [role="tabpanel"]').length,
+      0,
+      'the tab strip and its panel wrapper are gone, roles included'
     );
-    assert.equal(
-      strip.tagName,
-      'DIV',
-      'the ELEMENT is what warned: role="tablist" on a <nav> overrides its navigation landmark'
+    assert.ok(
+      !root.querySelector('.manager-vocabulary-tabs, .manager-tags-categories-workspace'),
+      'and so are both of the classes the stylesheet drew them with'
     );
-    assert.ok(strip.getAttribute('aria-label'), 'the strip keeps an accessible name');
+
+    const main = root.querySelector('main.manager-main.manager-tags-categories');
+    assert.ok(Boolean(main), 'the route keeps its own page hook');
+    // ONE CHILD, because `.manager-main` is `grid-template-rows: minmax(0, 1fr)` on this route.
+    assert.equal(main.children.length, 1, '<main> renders exactly one element child');
   });
 
-  it('names each tab and wires it to its panel, with a roving tabindex', async () => {
-    const root = await harness.mount(mountProps({ activeTab: 'component' }));
+  it('names exactly three vocabulary regions, one per panel', async () => {
+    const root = await harness.mount(mountProps());
 
-    for (const id of TABS) {
-      const tab = tabButton(root, id);
-      assert.ok(tab, `the ${id} tab renders`);
-      assert.equal(tab.getAttribute('role'), 'tab');
-      assert.equal(tab.getAttribute('aria-controls'), `vocabulary-panel-${id}`);
-      assert.equal(tab.getAttribute('aria-selected'), String(id === 'component'));
+    const regions = [...root.querySelectorAll('section.manager-vocabulary-panel[aria-label]')];
+    assert.equal(regions.length, 3, 'one named region per vocabulary');
+    assert.equal(
+      new Set(regions.map((region) => region.getAttribute('aria-label'))).size,
+      3,
+      'three identical names would mean the per-kind copy table had collapsed to one entry'
+    );
+    for (const kind of KINDS) {
       assert.equal(
-        tab.getAttribute('tabindex'),
-        id === 'component' ? '0' : '-1',
-        'exactly the active tab is in the tab order (roving tabindex)'
+        root.querySelector(panelSelector(kind)).getAttribute('aria-label'),
+        null,
+        'the shell panel carries no name of its own: the primitive inside it is the landmark, ' +
+          'and two nested named regions would announce the same vocabulary twice'
       );
     }
   });
 
-  // THE ONE INTENTIONAL RENDERED CHANGE in issue 1429's conversion, asserted positively rather
-  // than left to a parity comparison. A parity harness cannot see this on its own: reverting the
-  // vehicle makes the converted strip byte-identical to the strip it replaced, so the comparison
-  // reports parity precisely when the correction is missing.
-  it('draws each vocabulary count on the record-count vehicle, not through a chip', async () => {
-    const root = await harness.mount(
-      mountProps({ counts: { recipeCategories: 4, componentCategories: 11, itemTags: 2 } })
-    );
+  it('gives each panel its own row hook, add field and sort-label id', async () => {
+    const root = await harness.mount(mountProps());
 
-    const expected = { recipe: '4', component: '11', tag: '2' };
-    for (const id of TABS) {
-      const tab = tabButton(root, id);
-      const count = tab.querySelector('.manager-editor-tab-count');
-      assert.ok(Boolean(count), `the ${id} tab draws its record count`);
-      assert.equal(count.textContent.trim(), expected[id]);
+    for (const [kind, rowAttr] of [
+      ['recipeCategories', 'data-category-id'],
+      ['componentCategories', 'data-component-category-id'],
+      ['componentTags', 'data-tag-id'],
+    ]) {
       assert.ok(
-        !tab.querySelector('.manager-editor-tab-badge'),
-        `the ${id} tab must not draw a RECORD COUNT through the issue-summary chip: the Rail ` +
-          'Marker Family forbids substituting one vehicle for another, and this strip drew a ' +
-          'neutral chip until issue 1429'
+        root.querySelector(`${panelSelector(kind)} [${rowAttr}]`),
+        `${rowAttr} resolves rows inside its own panel`
       );
-      assert.ok(
-        !tab.querySelector('.manager-chip'),
-        `the ${id} tab count is a bare mono numeral, so no chip element may remain`
+    }
+    const inputIds = [...root.querySelectorAll('input[id^="manager-"]')].map((el) => el.id);
+    assert.equal(new Set(inputIds).size, inputIds.length, 'no two add fields share an id');
+
+    const labels = [...root.querySelectorAll('.manager-vocabulary-shell-sort-label')];
+    assert.equal(labels.length, 3, 'one Sort by label per panel');
+    const triggers = [...root.querySelectorAll('[data-vocabulary-sort]')];
+    assert.equal(triggers.length, 3, 'one sort trigger per panel');
+    for (const trigger of triggers) {
+      const target = root.querySelector(`#${trigger.getAttribute('aria-labelledby')}`);
+      assert.ok(Boolean(target), 'each sort trigger names a label that exists');
+      assert.equal(
+        target.closest('[data-vocabulary-panel]'),
+        trigger.closest('[data-vocabulary-panel]'),
+        'and it is the label inside its OWN panel'
       );
     }
   });
 
-  // The zero is the OTHER thing a sweep could have taken silently. `EditorTabs` suppresses a
-  // falsy mark by default; this strip has always stated its zero, so `VocabularyTabs` passes
-  // `suppressZero: false` and the behaviour is pinned here rather than left to a default.
-  it('states a record count of zero rather than omitting it', async () => {
-    const root = await harness.mount(
-      mountProps({ counts: { recipeCategories: 0, componentCategories: 0, itemTags: 0 } })
-    );
+  it('sorts one panel by references without touching the others', async () => {
+    // UNBOUND, which is the isolated-mount path: with no lifted slot the panel falls back to its
+    // own `$state`, and that fallback is what makes these controls reactive outside the root.
+    const root = await harness.mount(mountProps());
+    assert.deepEqual(namesIn(root, 'recipeCategories', 'data-category-id'), ['Alloys', 'Potions']);
 
-    for (const id of TABS) {
-      const count = tabButton(root, id).querySelector('.manager-editor-tab-count');
-      assert.ok(Boolean(count), `the ${id} tab still renders a mark at zero`);
-      assert.equal(count.textContent.trim(), '0', 'the zero is stated, not suppressed');
-    }
-  });
-
-  it('renders the panel as a plain element named by its own tab', async () => {
-    const root = await harness.mount(mountProps({ activeTab: 'tag' }));
-
-    const panel = root.querySelector('.manager-tags-categories-workspace');
-    assert.equal(panel.getAttribute('role'), 'tabpanel');
-    assert.equal(
-      panel.tagName,
-      'DIV',
-      'a <section> with an aria-label is promoted to the region landmark, which tabpanel' +
-        ' then overrides — that is what the compiler reported'
-    );
-    assert.equal(panel.getAttribute('id'), 'vocabulary-panel-tag');
-    assert.equal(
-      panel.getAttribute('aria-labelledby'),
-      'vocabulary-tab-tag',
-      'the panel is named by the tab that opened it, matching KnowledgeView/RecipeEditView'
-    );
-    assert.equal(
-      panel.getAttribute('aria-label'),
-      null,
-      'the standalone label is gone — its lang leaf was deleted with it'
-    );
-    assert.equal(
-      tabButton(root, 'tag').getAttribute('aria-controls'),
-      panel.getAttribute('id'),
-      'the tab and its panel reference each other'
-    );
-  });
-
-  // The acceptance-criterion test: this traverses `.closest('[role="tablist"]')` at runtime,
-  // which only a mounted DOM test can observe. It is why the role could not simply be dropped
-  // along with the element.
-  it('moves focus along the strip on Arrow/Home/End and reports the next tab', async () => {
-    const changes = [];
-    const root = await harness.mount(
-      mountProps({ onTabChange: (id) => changes.push(id) })
-    );
-    const activeElement = () => root.ownerDocument.activeElement;
-    // The focused tab BY ID, never the element itself. `assert.equal` on two mounted happy-dom
-    // nodes serialises their circular trees to build a failure diff and kills the heap, so a
-    // one-line focus regression surfaces as a `# cancelled` suite with no message —
-    // indistinguishable from a missing harness allowlist entry. Proved by mutating
-    // `EditorTabs`' `Home` branch, which took this suite from a clean red to a two-minute hang.
-    // An id string diffs in one line and names the tab that took focus.
-    const focusedTab = () => activeElement()?.getAttribute('data-vocabulary-tab') ?? null;
-
-    const recipe = tabButton(root, 'recipe');
-    recipe.focus();
-    assert.equal(focusedTab(), 'recipe', 'the active tab takes focus');
-
-    pressOn(recipe, 'ArrowRight');
-    assert.equal(focusedTab(), 'component', 'ArrowRight moves right');
-
-    pressOn(activeElement(), 'ArrowRight');
-    assert.equal(focusedTab(), 'tag', 'and again');
-
-    pressOn(activeElement(), 'ArrowRight');
-    assert.equal(focusedTab(), 'recipe', 'ArrowRight wraps at the end');
-
-    pressOn(activeElement(), 'ArrowLeft');
-    assert.equal(focusedTab(), 'tag', 'ArrowLeft wraps at the start');
-
-    pressOn(activeElement(), 'Home');
-    assert.equal(focusedTab(), 'recipe', 'Home goes to the first tab');
-
-    pressOn(activeElement(), 'End');
-    assert.equal(focusedTab(), 'tag', 'End goes to the last tab');
-
+    chooseSelectOption(root, RECIPE_CATEGORY_SORT, 'references');
     assert.deepEqual(
-      changes,
-      ['component', 'tag', 'recipe', 'tag', 'recipe', 'tag'],
-      'every focus move also reports the new tab to the owning root'
-    );
-  });
-
-  it('ignores keys that are not part of the strip contract', async () => {
-    const changes = [];
-    const root = await harness.mount(
-      mountProps({ onTabChange: (id) => changes.push(id) })
+      namesIn(root, 'recipeCategories', 'data-category-id'),
+      ['Potions', 'Alloys'],
+      '1 then 5 ascending, which is the REVERSE of the name order the same rows start in'
     );
 
-    const recipe = tabButton(root, 'recipe');
-    recipe.focus();
-    pressOn(recipe, 'ArrowDown');
-    pressOn(recipe, 'a');
+    const toggle = () =>
+      root.querySelector(`${panelSelector('recipeCategories')} button[data-vocabulary-direction]`);
+    assert.equal(toggle().getAttribute('aria-pressed'), 'true', 'ascending is the resting state');
+    toggle().click();
+    flushSync();
+    assert.deepEqual(namesIn(root, 'recipeCategories', 'data-category-id'), ['Alloys', 'Potions']);
+    assert.equal(toggle().getAttribute('aria-pressed'), 'false');
 
-    assert.deepEqual(changes, [], 'no tab change');
+    // THE NEIGHBOURS ARE UNMOVED. Three panels share one screen, so a sort written to the wrong
+    // slot would reorder a vocabulary nobody touched.
+    assert.deepEqual(namesIn(root, 'componentTags', 'data-tag-id'), ['#ash', '#herb']);
     assert.equal(
-      root.ownerDocument.activeElement?.getAttribute('data-vocabulary-tab') ?? null,
-      'recipe',
-      'focus stays put'
+      root
+        .querySelector(`${panelSelector('componentTags')} button[data-vocabulary-direction]`)
+        .getAttribute('aria-pressed'),
+      'true',
+      'and its direction toggle is still at rest'
     );
   });
 
-  it('switches the rendered vocabulary panel with the active tab', async () => {
-    const recipeRoot = await harness.mount(mountProps({ activeTab: 'recipe' }));
-    assert.match(recipeRoot.textContent, /Recipe categories/);
+  it('writes the sort into the lifted slot and reads it back, so it survives the route trip', async () => {
+    // THE HALF THE ROUTE TRIP DEPENDS ON, asserted on the OBJECT rather than through a remount:
+    // the slot is the root's own `$state` in the product, and a plain object here would not be
+    // reactive - but the write and the read are what make the trip work, and both are observable.
+    const lifted = { searchTerm: '', sortKey: 'name', sortDirection: 'asc' };
+    const root = await harness.mount(mountProps({ recipeCategoryBrowserState: lifted }));
+
+    chooseSelectOption(root, RECIPE_CATEGORY_SORT, 'references');
+    root
+      .querySelector(`${panelSelector('recipeCategories')} button[data-vocabulary-direction]`)
+      .click();
+    flushSync();
+    assert.deepEqual(
+      lifted,
+      { searchTerm: '', sortKey: 'references', sortDirection: 'desc' },
+      'both axes are written into the slot the root owns, beside the search term'
+    );
 
     await harness.remount();
-    const tagRoot = await harness.mount(mountProps({ activeTab: 'tag' }));
-    assert.match(tagRoot.textContent, /Component tags/);
+    const returned = await harness.mount(mountProps({ recipeCategoryBrowserState: lifted }));
+    assert.deepEqual(
+      namesIn(returned, 'recipeCategories', 'data-category-id'),
+      ['Alloys', 'Potions'],
+      'and a fresh mount against that slot comes back sorted by references, descending'
+    );
     assert.equal(
-      tagRoot.querySelector('.manager-tags-categories-workspace').getAttribute('id'),
-      'vocabulary-panel-tag'
+      returned
+        .querySelector(`${panelSelector('recipeCategories')} button[data-vocabulary-direction]`)
+        .getAttribute('aria-pressed'),
+      'false',
+      'with the toggle stating the direction it is actually sorting in'
+    );
+    assert.equal(
+      selectTriggerText(returned, RECIPE_CATEGORY_SORT),
+      'References',
+      'and the select showing the key it is actually sorting on'
     );
   });
 
-  it('fires onTabChange when a tab is clicked', async () => {
-    const changes = [];
+  it('locks General and offers the icon picker on the two CATEGORY panels only', async () => {
+    const root = await harness.mount(mountProps());
+
+    for (const kind of ['recipeCategories', 'componentCategories']) {
+      const panel = root.querySelector(panelSelector(kind));
+      const locked = panel.querySelector('.manager-vocabulary-card.is-locked');
+      assert.ok(Boolean(locked), `${kind} renders the reserved General row`);
+      assert.match(locked.textContent, /General/);
+      assert.ok(
+        !locked.querySelector('.fabricate-icon-button'),
+        'and the reserved row offers no delete control'
+      );
+      assert.ok(
+        Boolean(panel.querySelector('[data-vocabulary-icon-picker]')),
+        `${kind} rows carry the persisted per-row icon picker`
+      );
+    }
+
+    const tags = root.querySelector(panelSelector('componentTags'));
+    assert.ok(
+      !tags.querySelector('.manager-vocabulary-card.is-locked'),
+      'component tags have no reserved bucket, so nothing is locked'
+    );
+    assert.ok(
+      !tags.querySelector('[data-vocabulary-icon-picker]'),
+      'and no tag row carries a persisted icon'
+    );
+    assert.ok(
+      Boolean(tags.querySelector('.manager-vocabulary-icon.is-decorative')),
+      'it takes the fixed decorative tile instead'
+    );
+    assert.match(
+      tags.querySelector('[data-tag-id="herb"] .manager-vocabulary-main strong').textContent,
+      /^#herb$/,
+      'the # is DISPLAY only, and the tag panel is the one that draws it'
+    );
+  });
+
+  it('renders a tag literally named `general`, which reserves no bucket here (issue 1397)', async () => {
+    // The two CATEGORY vocabularies prepend a locked General row, so their builders drop the key.
+    // The tag vocabulary has no reserved bucket: a `general` tag is stored, referenced and counted
+    // like any other, and dropping it left the GM a tag they could see the effects of but not
+    // manage, with the add form answering `Ready to add` forever.
     const root = await harness.mount(
-      mountProps({ onTabChange: (id) => changes.push(id) })
+      mountProps({ tagRows: [row('general', 'general', 3), row('herb', 'herb', 1)] })
     );
 
-    tabButton(root, 'component').click();
+    const tags = root.querySelector(panelSelector('componentTags'));
+    assert.ok(
+      Boolean(tags.querySelector('[data-tag-id="general"]')),
+      'the `general` tag keeps its row'
+    );
+    assert.deepEqual(namesIn(root, 'componentTags', 'data-tag-id'), ['#general', '#herb']);
+    assert.ok(
+      !tags.querySelector('.manager-vocabulary-card.is-locked'),
+      'and it is an ordinary removable entry, not a reserved row'
+    );
+  });
+
+  it('names every spelling a collapsed row stands for, and only on a collapsed row', async () => {
+    const root = await harness.mount(
+      mountProps({
+        categoryRows: [
+          { id: 'general', name: 'General', totalUsage: 0 },
+          { id: 'potions', name: 'Potions', title: 'Potions, potions', totalUsage: 1 },
+          { id: 'alloys', name: 'Alloys', title: '', totalUsage: 5 },
+        ],
+      })
+    );
+
+    const mainOf = (id) =>
+      root.querySelector(`${panelSelector('recipeCategories')} [data-category-id="${id}"] .manager-vocabulary-main`);
+    assert.equal(
+      mainOf('potions').getAttribute('title'),
+      'Potions, potions',
+      'the collapsed row discloses both spellings it stands for'
+    );
+    // Pointer-only, so it must not become a tooltip on every row: a name the GM can already read
+    // repeated under the cursor is noise, and the empty string is what the builders pass.
+    assert.ok(
+      !mainOf('alloys').hasAttribute('title'),
+      'a single-spelling row carries no `title` attribute at all'
+    );
+  });
+
+  it('arms a delete in one panel and leaves every other panel unarmed', async () => {
+    const root = await harness.mount(mountProps());
+
+    root
+      .querySelector(`${panelSelector('componentCategories')} [data-component-category-id="reagent"] .fabricate-icon-button`)
+      .click();
     flushSync();
-    assert.deepEqual(changes, ['component']);
+
+    assert.ok(
+      Boolean(root.querySelector('[data-vocabulary-confirm="reagent"]')),
+      'the row the GM armed opens its confirm strip'
+    );
+    assert.equal(
+      root.querySelectorAll('[data-vocabulary-confirm]').length,
+      1,
+      'and it is the ONLY armed strip on the screen: `pendingRemovalId` is component-local, so ' +
+        'three panels sharing one arm would offer three deletes for one click'
+    );
+    for (const kind of ['recipeCategories', 'componentTags']) {
+      assert.ok(
+        !root.querySelector(`${panelSelector(kind)} [data-vocabulary-confirm]`),
+        `${kind} stays unarmed`
+      );
+    }
+  });
+
+  it('routes each panel’s add and remove to that vocabulary’s own writer', async () => {
+    const calls = [];
+    const record = (name) => (value) => calls.push(`${name}:${value}`);
+    const root = await harness.mount(
+      mountProps({
+        onAddCategory: record('addCategory'),
+        onAddComponentCategory: record('addComponentCategory'),
+        onAddTag: record('addTag'),
+        onRemoveTag: record('removeTag'),
+      })
+    );
+
+    const input = root.querySelector('input#manager-tag-add');
+    input.value = '  Moss  ';
+    input.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    flushSync();
+    root
+      .querySelector(`${panelSelector('componentTags')} [data-inline-vocabulary-add]`)
+      .dispatchEvent(new globalThis.Event('submit', { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+    flushSync();
+    // NORMALIZED, and routed to the TAG writer rather than to either category writer.
+    assert.deepEqual(calls, ['addTag:moss']);
+
+    // A REFERENCED row, so the two-step confirm is the path under test; an unreferenced one
+    // deletes on the first click and would never reach the confirm pair.
+    const herb = root.querySelector(`${panelSelector('componentTags')} [data-tag-id="herb"]`);
+    herb.querySelector('.fabricate-icon-button').click();
+    flushSync();
+    root.querySelector('[data-vocabulary-confirm-remove]').click();
+    flushSync();
+    assert.deepEqual(
+      calls,
+      ['addTag:moss', 'removeTag:herb'],
+      'the remove carries the row NAME, not the `#herb` the panel DISPLAYS'
+    );
   });
 });

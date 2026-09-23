@@ -1,11 +1,7 @@
 /**
  * Settings coverage for the player-cancel refund policy (issue 848).
- *
- * `features.refundOnPlayerCancel` is a per-system GM toggle that decides whether a
- * player self-cancelling an in-progress craft gets their consumed inputs back. It is
- * a real default-ON toggle (mirroring `features.salvage`): default true, an explicit
- * false is honoured. This pins the normalizer default + honouring; the adminStore
- * selectedSystem projection is pinned in tests/stores/adminStore.test.js.
+ * `features.refundOnPlayerCancel` is a per-system GM toggle that decides whether a player
+ * self-cancelling an in-progress craft gets their consumed inputs back.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,14 +1,14 @@
 /**
- * Disabling the multi-step feature (issue 710) is NON-destructive and behaviour-
- * changing, so `adminStore.toggleFeature('multiStepRecipes', false)` opens a
- * warning/confirm dialog when the system has multi-step recipes: only on confirm
- * does the toggle persist, the step data is never rewritten, and enabling never
- * prompts. These tests drive the store's public toggle through a mock service graph.
+ * Disabling the multi-step feature (issue 710) is NON-destructive and behaviour- changing, so
+ * `adminStore.toggleFeature('multiStepRecipes', false)` opens a warning/confirm dialog when the
+ * system has multi-step recipes: only on confirm does the toggle persist, the step data is never
+ * rewritten, and enabling never prompts.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
+import { createServices } from '../helpers/adminStoreServices.js';
 
 function multiStepRecipe(id) {
   return {
@@ -46,38 +46,15 @@ function buildStore({ recipes, confirmResult = true }) {
   };
   const updateCalls = [];
   const confirmCalls = [];
-  const settings = { lastManagedCraftingSystem: 'sys-ms' };
 
-  const services = {
-    getSetting: (key) => settings[key] ?? '',
-    setSetting: async (key, value) => {
-      settings[key] = value;
-    },
-    getCraftingSystemManager: () => ({
-      getSystems: () => [system],
-      getSystem: (id) => (id === system.id ? system : null),
-      getItems: () => [],
-      updateSystem: async (id, updates) => {
-        updateCalls.push({ id, updates });
-        return system;
-      },
-    }),
-    getRecipeManager: () => ({
-      getRecipes: (filter) =>
-        filter?.craftingSystemId === system.id || !filter?.craftingSystemId ? recipes : [],
-      getRecipe: (id) => recipes.find((r) => r.id === id) || null,
-    }),
-    getScriptMacros: () => [],
-    notify: { info: () => {}, warn: () => {}, error: () => {} },
-    confirmDialog: async (options) => {
-      confirmCalls.push(options);
-      return confirmResult;
-    },
-    localize: (key) => key,
+  const services = createServices(system, recipes, [], {
+    settings: { lastManagedCraftingSystem: 'sys-ms' },
+    systemWrites: updateCalls,
+    dialogCapture: { confirmations: confirmCalls, confirm: confirmResult },
     copyToClipboard: async () => {},
     openRecipeEditor: () => {},
     renderImportDialog: async () => {},
-  };
+  });
 
   return { store: createAdminStore(services), updateCalls, confirmCalls, recipes };
 }

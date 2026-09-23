@@ -1,16 +1,5 @@
 /**
- * `src/ui/svelte/util/managerColorTokens.js` — the manager's ONE colour vocabulary
- * (issue 1036).
- *
- * The palette, its ORDER and its names were written out three times before this module
- * existed: in `ManagerColorPopover`'s presets, in `ManagerColorPicker`'s `normalizedToken`,
- * and again in that file's swatch helper. Two of the three could drift apart without any
- * gate noticing, and the visible symptom would be a trigger painting one colour while the
- * popover it opens marks another.
- *
- * The labels are also the entire screen-reader surface of a colour cell — they serve as both
- * `aria-label` and `title` — so they carry real localization keys rather than derived
- * English.
+ * `src/ui/svelte/util/managerColorTokens.js` — the manager's ONE colour vocabulary (issue 1036).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -74,9 +63,8 @@ test('1036: every token has a real lang key, and the label falls back to English
 });
 
 test('1036: the label is a real localization, not a capitalized token', () => {
-  // Before this change the name was derived by `charAt(0).toUpperCase()`, which made "Sage"
-  // the most-repeated untranslated string on the essence Identity tab. The guard is that a
-  // localizer's answer is USED, even when it looks nothing like the token.
+  // Before this change the name was derived by `charAt(0).toUpperCase()`, which made "Sage" the
+  // most-repeated untranslated string on the essence Identity tab.
   assert.equal(
     managerColorTokenLabel('rose', () => 'Rosé foncé'),
     'Rosé foncé'
@@ -95,9 +83,7 @@ test('1036: both spellings of a token normalize to the same key', () => {
 });
 
 test('1036: the module is import-free, so it can be added to a mount harness alone', () => {
-  // Every harness that compiles either colour component must copy this module verbatim. A
-  // leaf with dependencies would propagate that obligation silently — and an omitted raw
-  // module HANGS a hand-rolled harness rather than failing it.
+  // Every harness that compiles either colour component must copy this module verbatim.
   const source = readFileSync(
     join(ROOT, 'src', 'ui', 'svelte', 'util', 'managerColorTokens.js'),
     'utf8'

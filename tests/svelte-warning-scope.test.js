@@ -1,38 +1,7 @@
 /**
- * Guard: the Svelte compiler-warning gate must actually reach every component, and must
- * actually fail on a warning.
- *
- * Issue 924 installed two halves of one gate — `onwarn` in `svelte.config.js`, which fails
- * `npm run build`, and `scripts/check-svelte-warnings.mjs`, the sweep CI runs over every
- * `src/**\/*.svelte`. Both are one edit away from going vacuous, and this programme has already
- * shipped a gate that reported success while inspecting nothing once (`.prettierignore` carried
- * a `*.svelte` entry, so `format:check` matched zero files and exited 0 — see
- * `tests/prettier-svelte-scope.test.js`, which this file mirrors).
- *
- * The four ways back, and which of them this covers:
- *
- *   - The sweep stops finding components (a moved root, a walker that lost its recursion). The
- *     script itself exits 2 on an empty walk rather than reporting clean; this pins the count as
- *     non-trivial so a walk that finds SOME files but not most of them is still caught.
- *   - The sweep stops failing on a warning. Driven end to end below against a fixture tree
- *     holding one deliberately warning-bearing component: a gate whose detection is never
- *     exercised is one refactor away from being a no-op.
- *   - CI stops running it. The `lint` job is parsed out of `.github/workflows/ci.yml` and the
- *     invocation asserted, and the npm script it names is asserted to invoke the real file.
- *   - The sweep and `onwarn` drift apart on compiler options, which would make a disagreement
- *     between them ambiguous — graph reachability, or config drift? Both read `svelte.config.js`
- *     through `scripts/lib/svelteCompilerWarnings.js`; that is asserted here, along with the one
- *     documented override (`compare-svelte-render.mjs`'s `css: 'external'`) being provably
- *     warning-neutral rather than merely claimed to be.
- *
- * A NOTE ON WHAT "PROVABLY" HAS TO MEAN HERE, because the first version of that last assertion
- * got it wrong. It compiled a REAL component under both option sets and compared the codes —
- * but every component under `src/` has zero warnings (the sibling assertion above is exactly
- * that bar), so both sides were `[]` and it read `assert.deepEqual([], [])`. Not incidentally
- * vacuous: structurally vacuous forever, guaranteed by the gate shipping beside it. Evidence
- * about a warning set has to be taken over a source that WARNS, and it has to show the override
- * was applied at all — otherwise a `compileComponent` that silently dropped its `overrides`
- * argument, the exact regression the override needs guarding against, would keep it green.
+ * Guard: the Svelte compiler-warning gate must actually reach every component, and must actually
+ * fail on a warning. The sweep stops finding components (a moved root, a walker that lost its
+ * recursion) (issue 924).
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -68,23 +37,11 @@ const packageJson = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'),
 const workflow = readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8');
 const viteConfigSource = readFileSync(path.join(repoRoot, 'vite.config.js'), 'utf8');
 
-/**
- * A component that warns, and one that does not.
- *
- * `a11y_no_noninteractive_element_to_interactive_role` is chosen because it is one of the
- * classes issue 924 cleared, so this fixture also documents what the gate was installed for.
- */
+/** A component that warns, and one that does not (issue 924). */
 const WARNING_COMPONENT = '<ul><li role="button" tabindex="0">warns</li></ul>\n';
 const CLEAN_COMPONENT = '<ul><li>clean</li></ul>\n';
 
-/**
- * A component that does not COMPILE, which is a different failure from one that warns.
- *
- * `scanComponentWarnings` turns a compiler throw into a synthetic `compile_error` finding
- * rather than skipping the file, so a sweep can never come back clean because it could not
- * read something. Untested, that rescue is one `continue` away from being the silent skip it
- * exists to prevent.
- */
+/** A component that does not COMPILE, which is a different failure from one that warns. */
 const UNCOMPILABLE_COMPONENT = '<div>never closed\n';
 
 /** Run the real sweep over a throwaway source root. */
@@ -117,8 +74,7 @@ function withFixtureRoot(sources, run) {
 
 describe('the Svelte compiler-warning gate covers every component', () => {
   // Without this the sweep could pass by finding almost nothing — the same vacuity in a new
-  // costume. Pinned as a floor rather than an exact count so adding a component is not a
-  // failure; the count is ~246 today.
+  // costume.
   it('finds a non-trivial number of components to compile', () => {
     assert.ok(
       components.length > 100,
@@ -192,10 +148,7 @@ describe('the sweep actually fails on a warning', () => {
 
 describe('the gate is wired into CI and into npm', () => {
   it('runs the sweep as a step of the lint job', () => {
-    // BOTH anchors are checked before the slice. `indexOf` returns -1 for a job that was
-    // renamed or removed, and `slice(start, -1)` does not fail — it widens to the rest of the
-    // file, whereupon a step in ANY later job would satisfy the assertion below and this would
-    // stop being about the lint job at all.
+    // BOTH anchors are checked before the slice.
     const start = workflow.indexOf('\n  lint:');
     const end = workflow.indexOf('\n  validate-bindings:');
     assert.ok(start > -1, 'could not locate the lint job in ci.yml');
@@ -217,12 +170,8 @@ describe('the gate is wired into CI and into npm', () => {
     assert.equal(packageJson.scripts?.[sweepNpmScript], `node ${sweepScript}`);
   });
 
-  // `lint` and `format:check` are globs over the repository since issue #1660, so these two
-  // files are covered by default rather than by being named. What can still take them back out
-  // is an exclusion — an ESLint `ignores` entry, a `.prettierignore` line, or a slide into
-  // `eslint.debt.js` — and an exclusion is exactly as silent as the omission that let a new BUG
-  // and VULNERABILITY reach SonarCloud in issue 933. So the requirement is stated here, where
-  // someone adding to THIS gate is reading, against the thing that can actually change.
+  // `lint` and `format:check` are globs over the repository since issue #1660, so these two files
+  // are covered by default rather than by being named.
   it('keeps its own scripts/ files inside the lint and format gates', async () => {
     const eslint = new ESLint();
     const baselined = new Set(Object.keys(ESLINT_DEBT.scripts));
@@ -257,10 +206,7 @@ describe('the sweep and onwarn cannot drift apart on compiler options', () => {
   });
 
   // `compilerOptions` is spread wholesale by BOTH halves, so anything added to it lands in the
-  // sweep, the build AND the whole-tree assertion above at once. `warningFilter` is the key
-  // that turns all three clean while they check nothing: one line, no gate objecting, and no
-  // pointer back to the code it silences. The config already states the no-allowlist rule in
-  // prose next to `onwarn`; this is that rule with an exit code.
+  // sweep, the build AND the whole-tree assertion above at once.
   it('carries no warningFilter — the no-allowlist rule is enforced, not just stated', () => {
     assert.ok(
       !Object.hasOwn(svelteConfig.compilerOptions, 'warningFilter'),
@@ -270,19 +216,8 @@ describe('the sweep and onwarn cannot drift apart on compiler options', () => {
     );
   });
 
-  // The ONE way the "never config drift" claim can fail, and it is outside `compilerOptions`.
-  //
-  // `@sveltejs/vite-plugin-svelte` filters `css_unused_selector` out of the warning list
-  // BEFORE `onwarn` is called whenever `emitCss` is false (`ignoreCompilerWarning` in
-  // `src/utils/log.js`). `emitCss` is a PLUGIN option, not a compiler option, so the shared
-  // read of `compilerOptions` does not cover it — and it is the natural-looking companion to
-  // `css: 'injected'`, because the plugin derives that same value from it by default. Set it
-  // false and the build stops reporting the exact class that motivated issue 924 while the
-  // sweep, which never goes near the plugin, keeps reporting it.
-  //
-  // In this plugin version a root-level `emitCss` in `svelte.config.js` THROWS ("Move the
-  // following options into 'vitePlugin:{...}'"), so the two silent routes are the
-  // `vitePlugin` block here and an inline argument to `svelte()` in `vite.config.js`.
+  // The ONE way the "never config drift" claim can fail, and it is outside `compilerOptions` (issue
+  // 924).
   it('leaves emitCss at its default on both surfaces that can set it', () => {
     assert.ok(
       !Object.hasOwn(svelteConfig, 'emitCss') && !Object.hasOwn(svelteConfig.vitePlugin ?? {}, 'emitCss'),
@@ -313,21 +248,9 @@ describe('the sweep and onwarn cannot drift apart on compiler options', () => {
     );
   });
 
-  // The prose claim that `compare-svelte-render.mjs`'s `css: 'external'` override cannot move
-  // the warning set, converted into evidence.
-  //
-  // Two things have to be shown, and the first is the one the original version of this test
-  // missed. (1) THE OVERRIDE IS ACTUALLY APPLIED: `external` returns the stylesheet in
-  // `result.css` and `injected` returns `null` there, so that field is a direct observation of
-  // which option took effect — and it is the very signal `compare-svelte-render.mjs` overrides
-  // for. Without it, a `compileComponent` that ignored its `overrides` argument would compile
-  // both sides identically and every comparison below would pass by construction. (2) GIVEN IT
-  // IS APPLIED, THE WARNING SETS AGREE — over sources that actually warn, one per analysis
-  // family, each pinned to its expected code so neither side can go quietly empty.
-  //
-  // The direction that matters most is `external` DROPPING a class: that would make
-  // `compare-svelte-render.mjs`'s `svelte_compiler_warnings=N over M files` line understate,
-  // silently, and issue 924's baseline figure came from exactly that line.
+  // The prose claim that `compare-svelte-render.mjs`'s `css: 'external'` override cannot move the
+  // warning set, converted into evidence. Two things have to be shown, and the first is the one the
+  // original version of this test missed (issue 924).
   describe('the one permitted css override is warning-neutral', () => {
     const codesOf = (source, options) =>
       compileComponent(source, 'Probe.svelte', options)
@@ -394,9 +317,7 @@ describe('the sweep and onwarn cannot drift apart on compiler options', () => {
       ]);
     });
 
-    // Kept as a smoke over the shape the gate actually runs against. It is NOT the evidence:
-    // every component under `src/` is warning-free by the bar asserted above, so both sides
-    // are `[]` here by construction and this can only catch a compile that THROWS.
+    // Kept as a smoke over the shape the gate actually runs against.
     it('compiles a real component both ways without either side throwing', () => {
       const file = 'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte';
       const source = readFileSync(path.join(repoRoot, file), 'utf8');

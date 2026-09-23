@@ -5,12 +5,8 @@ import { createNavTabBadgeStore, resolveNavTabBadge } from '../src/ui/navTabBadg
 
 // This file exists for the reason `tests/extension-registry.test.js` does for its sibling:
 // `tests/manager-extensions.test.js` — the regression proof for issue 1302, which must stay
-// untouched — never constructs `createNavTabBadgeStore` directly, only ever reaching it
-// through `createManagerExtensionsRegistry`. The module's own header claims its whole
-// lifetime — validation ordering, liveness, per-tab keying, the surface drop and
-// fault-contained publication — is unit-testable without mounting a component tree, "exactly
-// as `routeChromeChannel.js` and `extensionRegistry.js` are". Those two have their own edges
-// pinned in their own files; this one gets the same treatment here.
+// untouched — never constructs `createNavTabBadgeStore` directly, only ever reaching it through
+// `createManagerExtensionsRegistry`.
 
 // A minimal but real `normalizeBadge`: it mints a FRESH frozen object per call, which is what
 // the store's own `sameBadge` dedupe exists to see through — a stub returning the same
@@ -141,9 +137,7 @@ test('retainSurfaces drops every surface absent from the kept set, and publishes
   );
 });
 
-// ---------------------------------------------------------------------------------------
 // The five edges this file exists to close: each is named for the mutation that survived it.
-// ---------------------------------------------------------------------------------------
 
 test('subscribe validates its surface id and its listener before storing either', () => {
   const { store } = storeUnder();

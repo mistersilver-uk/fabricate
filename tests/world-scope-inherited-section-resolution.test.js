@@ -1,29 +1,4 @@
-/**
- * AN INHERITING SYSTEM FOLLOWS ITS WORLD DEFAULT (issue 1372, epic 1357).
- *
- * The maintainer ruling that retires `## CraftingSystem` requirement 36's blanket claim. Before
- * it, `unionScopedDefinitions` re-spread the whole in-system record LAST, so the membership
- * record's `inherit` map decided nothing at read time: a GM who marked a section `Inherited` and
- * then edited that world default changed nothing, while the system rules editor rendered
- * `Inheriting` with a `World default: …` line and the rules list rendered an `Inherits world
- * defaults` pill. The claim was true at the instant the switch was flipped and false the moment
- * the world default moved.
- *
- * WHAT THIS FILE PINS is the whole of the new rule and both halves of its compatibility answer,
- * because the two are inseparable: the switch has to decide, AND no existing world may move.
- *
- * THE SECTION-COVERAGE ARM IS BEHAVIOURAL, NOT A KEY-SET COMPARISON. `INHERITED_SECTION_WRITERS`
- * is module-private on purpose, so the guard drives every section each scope DECLARES and asserts
- * the merged row actually changed. A section added to a scope with no writer beside it would
- * silently stop inheriting - the exact defect this change removes - and a key-set assertion over
- * an exported table would pass the moment someone added the key without a working projection.
- *
- * MUTATION PROOF. Reverting `applyInheritedSections` to a no-op reddens every arm of `the inherit
- * switch decides which layer answers a section` and the coverage arm; deleting the `inherited`
- * guard inside it reddens `an OVERRIDING section still answers from the in-system record`;
- * changing its `value === undefined` guard to a truthiness test reddens the two `clears` arms.
- * Each was run and produced `not ok` before this file was committed.
- */
+/** AN INHERITING SYSTEM FOLLOWS ITS WORLD DEFAULT (issue 1372, epic 1357). */
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -112,13 +87,10 @@ const SCOPES = Object.freeze([
       componentId: 'anvil',
       breakage: { mode: 'system' },
       onBreak: { action: 'system' },
-      // `prerequisites` and `bonus` are the two sections issue 1373 added to `TOOL_SECTIONS`,
-      // and they are READ HERE ON THE SHIPPED FIELD NAMES: a normalized `Tool` carries them
-      // under exactly the section name, which `toolCheckBonus.js` reads as
-      // `tool.prerequisites.gateMode` and `tool.bonus.expression`. That coincidence is the
-      // reason this arm exists rather than a key-set comparison — a writer guessed from the
-      // section name is correct for these two and wrong for the essence's two, so only driving
-      // the read can tell the two cases apart.
+      // `prerequisites` and `bonus` are the two sections issue 1373 added to `TOOL_SECTIONS`, and
+      // they are READ HERE ON THE SHIPPED FIELD NAMES: a normalized `Tool` carries them under
+      // exactly the section name, which `toolCheckBonus.js` reads as `tool.prerequisites.gateMode`
+      // and `tool.bonus.expression`.
       prerequisites: { enabled: true, ids: ['system-prereq'], gateMode: 'bonus' },
       bonus: { enabled: true, expression: '1d4' },
     },
@@ -169,9 +141,7 @@ describe('the inherit switch decides which layer answers a section', () => {
       });
 
       it(`a ${scope.entityType} row OVERRIDING ${section} still answers from the in-system record`, () => {
-        // THE HALF THAT PROTECTS EVERY GM EDIT. No shipped editor writes a membership section
-        // block, and the migration froze it at `1.30.0`, so an overriding section that answered
-        // from the membership record would revert every post-migration edit on the next read.
+        // THE HALF THAT PROTECTS EVERY GM EDIT.
         const row = unionOne({
           entityType: scope.entityType,
           resolve: scope.resolve,
@@ -322,10 +292,9 @@ describe('the three NON-section keys are not switched by this rule', () => {
 
 describe('no existing world moves, and both halves of that answer are pinned', () => {
   it('a MIGRATION-SHAPED membership record resolves every section to the in-system value', () => {
-    // `buildMembershipRecord` is the migration's own builder, called here rather than
-    // hand-shaped: it writes `OVERRIDING_INHERIT` - every section `false` - so every row on a
-    // migrated world still answers from the in-system record whatever the world defaults say.
-    // A change to that builder that started minting inheriting records reddens this.
+    // `buildMembershipRecord` is the migration's own builder, called here rather than hand-shaped:
+    // it writes `OVERRIDING_INHERIT` - every section `false` - so every row on a migrated world
+    // still answers from the in-system record whatever the world defaults say.
     const legacy = {
       id: 'fire',
       name: 'Fire',

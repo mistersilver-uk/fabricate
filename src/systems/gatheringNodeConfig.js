@@ -29,7 +29,7 @@
  * environment store, the rich-state runtime, and the admin UI store all agree.
  */
 
-import { cloneJson } from '../utils/scalars.js';
+import { cloneJson, numberOrNull } from '../utils/scalars.js';
 
 export const VALID_DEPLETION_TIMINGS = new Set(['onStart', 'onSuccess']);
 export const VALID_RESPAWN_POLICIES = new Set(['manual', 'overTime', 'nonRegenerating']);
@@ -47,12 +47,6 @@ const LEGACY_RESPAWN_POLICY_MAP = Object.freeze({
   probability: { policy: 'overTime', gainMode: 'chance' },
   manualAndElapsedTime: { policy: 'overTime', gainMode: 'chance' },
 });
-
-function numberOrNull(value) {
-  if (value == null || value === '') return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
 
 /**
  * Normalize a node respawn block. Unknown policies fall back to `manual`;

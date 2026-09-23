@@ -1,19 +1,4 @@
-/**
- * Combined defects 2 + 3 (issue 675), exercised through a REAL inventoryStore so
- * the post-salvage reload is genuine rather than stubbed:
- *
- *  - Defect 2: after a salvage roll the inspector must STAY on the Salvage tab. The
- *    reload hands the component a new item object with the SAME key; the tab reset
- *    must key on the key, not the object reference, or the player is dropped onto
- *    Info while the success ribbon sits on Salvage.
- *  - Defect 3: after salvaging the LAST copy the header must read honestly ("None
- *    remaining", not a stale "1 total") and the footer must NOT offer "Salvage
- *    again" — there is nothing left to break down. The success ribbon still shows.
- *
- * A real store makes both fall out of the same reload: it holds the salvaged row
- * selected, carries the true post-salvage remaining (0) onto it, and produces a new
- * same-key item object — the exact conditions the two fixes must survive together.
- */
+/** Combined defects 2 + 3 (issue 675). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -27,6 +12,7 @@ import {
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -38,30 +24,36 @@ const harness = createMountedComponentHarness({
     ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/craftingArtResolution.js',
     // The essence colour fold, shared by the card tile, its pips and the inspector.
     'src/ui/svelte/util/essenceTint.js',
+    'src/ui/svelte/util/bookRecipeBrowse.js',
+    'src/ui/svelte/util/disclosurePhrase.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
-    // The REAL store imports these two leaves (unlike the mocked-store suite); they
-    // are import-free, so copying them verbatim resolves the compiled store's graph.
+    // The pure yield projection the bulk sub-store reads (issue 1695).
+    'src/ui/svelte/util/salvageYieldRows.js',
+    // The REAL store imports these two leaves (unlike the mocked-store suite).
     'src/utils/progressiveResultOrder.js',
     'src/utils/progressiveStageThresholds.js',
-    // And these three since issue 1286: the store marks the fired complication tense onto
-    // the stage rows through `progressiveStageComplications`, whose own closure is
-    // `complicationPlan` -> `componentComplications`.
+    // And these three since issue 1286.
     'src/utils/progressiveStageComplications.js',
     'src/utils/complicationPlan.js',
     'src/utils/componentComplications.js',
   ],
-  runeModules: ['src/ui/svelte/stores/inventoryStore.svelte.js'],
+  runeModules: [
+    'src/ui/svelte/stores/browseListing.svelte.js',
+    'src/ui/svelte/stores/playerResultOrder.svelte.js',
+    // The two sub-stores the browse store composes (issue 1695). An omission HANGS this suite
+    // (# cancelled) rather than failing it, which is why the closure validator names them.
+    'src/ui/svelte/stores/inventoryBulkActions.svelte.js',
+    'src/ui/svelte/stores/inventorySalvageExecution.svelte.js',
+    'src/ui/svelte/stores/inventoryStore.svelte.js',
+  ],
   compiledModules: [
-    // The player window's own shared roster (issue 1514), spread rather than listed: this tree
-    // renders the not-yet-ready chrome, the record tile, the portrait and the kind filter's
-    // segmented track, and a manifest that named each would insert lines into a block Sonar
-    // already reads as duplicated across these suites. See `PLAYER_APP_COMPILED_MODULES`.
+    // The player window's own shared roster (issue 1514), spread rather than listed.
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
@@ -76,9 +68,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
     // The shared complication summary row and the leaf it renders (issue 1286).
-    // `ProgressiveStageList` draws the per-stage complication band through it, and `Chip` is
-    // already above via the `SELECT_COMPILED_MODULES` spread — so omitting either HANGS this
-    // suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
@@ -156,6 +145,29 @@ function salvageRow() {
   };
 }
 
+/**
+ * The PROGRESSIVE variant of that row (issue 1695). Only a progressive, reorderable stage list
+ * renders the Reset affordance and the reorder live region, and no View Lab case reaches either
+ * state, so the two tests at the end of this file are their only pins.
+ */
+function progressiveSalvageRow() {
+  const base = salvageRow();
+  return {
+    ...base,
+    salvage: {
+      ...base.salvage,
+      mode: 'progressive',
+      checkUsable: true,
+      results: [],
+      awardMode: 'equal',
+      stages: [
+        { id: 's1', componentId: 'c2', name: 'Iron Shard', img: null, difficulty: 2, threshold: 2 },
+        { id: 's2', componentId: 'c3', name: 'Slag', img: null, difficulty: 3, threshold: 5 },
+      ],
+    },
+  };
+}
+
 // A second, unrelated owned item so the listing is never EMPTY after the last copy
 // of the salvaged component leaves it (an empty listing would render the no-items
 // state and hide the inspector entirely). This mirrors reality and the store's own
@@ -183,9 +195,9 @@ function otherRow() {
   };
 }
 
-function makeServices() {
+function makeServices(overrides = {}) {
   // Single copy of the salvage row; salvaging it drops it from the listing.
-  let rows = [salvageRow(), otherRow()];
+  let rows = overrides.rows ?? [salvageRow(), otherRow()];
   const services = {
     getSelectedCraftingActorId: () => 'hero',
     setSelectedCraftingActorId: () => {},
@@ -201,6 +213,7 @@ function makeServices() {
     craftingSources: { load: () => {}, setCraftingActor: () => {}, selectedSourceIds: [] },
     actorBar: { selectedActorId: 'hero' },
     navigateToCraftingRecipe: () => {},
+    ...overrides.services,
   };
   return services;
 }
@@ -273,11 +286,7 @@ describe('InventoryView — salvage reload keeps the tab and reads the remaining
     assert.doesNotMatch(total.textContent, /Total:/, 'never the stale counted "N total"');
   });
 
-  // Issue 675 (re-report): the previous fix tried to PREVENT the tab reset, which
-  // assumed the inspector instance never remounts. In the real Foundry flow the roll
-  // dialog can remount it, and the bounce returned. The robust fix actively OPENS
-  // Salvage when a held result is present on a fresh mount — this test tears the tree
-  // down and remounts against the SAME store to prove it survives that remount.
+  // Issue 675 (re-report): the previous fix tried to PREVENT the tab reset.
   it('reopens Salvage on a REMOUNT while a result is held (survives a dialog-driven remount)', async () => {
     const services = makeServices();
     services.inventory = createInventoryStore({ services });
@@ -312,13 +321,7 @@ describe('InventoryView — salvage reload keeps the tab and reads the remaining
     );
   });
 
-  // -------------------------------------------------------------------------
   // Bulk salvage (issue 859), driven through the SAME real store.
-  //
-  // The mocked-store suite pins the panel's markup from props; this one pins the
-  // GESTURE — shift-click, Shift+Enter and Escape actually moving the real store's
-  // selection and the view re-rendering off it. A POJO store cannot show that at all.
-  // -------------------------------------------------------------------------
 
   /** Dispatch a real bubbling event on `node` with the modifier keys set. */
   function fire(node, type, init = {}) {
@@ -426,12 +429,74 @@ describe('InventoryView — salvage reload keeps the tab and reads the remaining
     );
   });
 
+  // The two order states no View Lab case reaches (issue 1695). A frame can photograph a stage
+  // list, but not the Reset control's enablement or the live region a rejected write writes into,
+  // so each is pinned here by name instead.
+
+  /** Mount over a real store holding the PROGRESSIVE row, with its Salvage tab open. */
+  async function mountWithProgressiveSalvage(services) {
+    services.inventory = createInventoryStore({ services });
+    const target = await harness.mount({ services });
+    await settle();
+    services.inventory.select('sys:c1');
+    await settle();
+    target.querySelector('[data-inventory-detail-tab="salvage"]').click();
+    await settle();
+    return target;
+  }
+
+  it('Reset is ENABLED only once the rendered order is the player\'s own', async () => {
+    const services = makeServices({ rows: [progressiveSalvageRow(), otherRow()] });
+    const target = await mountWithProgressiveSalvage(services);
+
+    const reset = target.querySelector('[data-inventory-salvage-reorder-reset]');
+    assert.ok(Boolean(reset), 'the reorderable stage list offers Reset');
+    assert.equal(reset.disabled, true, 'disabled — not hidden — while the order is still the GM’s');
+
+    target.querySelector('[data-progressive-stage-move-down]').click();
+    await settle();
+
+    assert.equal(services.inventory.salvageOrderIsCustom, true, 'the store sees a custom order');
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-reorder-reset]').disabled,
+      false,
+      'and the control the player needs to undo it is now pressable'
+    );
+  });
+
+  it('a REJECTED order write announces its revert through the stage list live region', async () => {
+    const services = makeServices({
+      rows: [progressiveSalvageRow(), otherRow()],
+      services: {
+        setProgressiveResultOrder: async () => {
+          throw new Error('setting rejected');
+        },
+        progressiveOrderRevertMessage: () => 'Could not save your order. Restored the last saved order.',
+      },
+    });
+    const target = await mountWithProgressiveSalvage(services);
+
+    target.querySelector('[data-progressive-stage-move-down]').click();
+    await settle();
+    await services.inventory.flushSalvageOrder();
+    await settle();
+
+    assert.equal(
+      target.querySelector('[data-progressive-stage-status]').textContent.trim(),
+      'Could not save your order. Restored the last saved order.',
+      'a keyboard user reordering by chevron never looks at a toast, so the revert lands here'
+    );
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-progressive-stage]')].map((row) =>
+        row.getAttribute('data-progressive-stage')
+      ),
+      ['s1', 's2'],
+      'and the rows are back in the GM’s authored order'
+    );
+  });
+
   it('InventoryDetail imports NOTHING from the bulk tree — the router bypass', async () => {
-    // The same assertion the mocked-store suite makes, restated HERE because this suite
-    // is the one whose `compiledModules` list would have to grow if the bypass were ever
-    // routed through `InventoryDetail`: a `{#if}` in a router does not keep a branch out
-    // of the compiled module's STATIC imports, so the bulk tree would silently join
-    // `recipe-item-editor-mounted` and `manager-mounted`'s graphs too.
+    // The same assertion the mocked-store suite makes.
     const { readFileSync } = await import('node:fs');
     const detail = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/inventory/InventoryDetail.svelte'),

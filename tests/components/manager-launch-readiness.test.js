@@ -1,27 +1,6 @@
 /**
  * Regression — the Crafting System Manager must not stall on "still loading" after
  * a missed `init` hook, and its deferred-open gate must be replay-safe.
- *
- * Real-world failure (Vite dev, esp. with DevTools open): the source module evaluated
- * AFTER Foundry's `init` event, so the `init` hook callback — the ONLY place that set
- * `game.fabricate` — never ran. The `ready` hook still ran, logged "Fabricate | Ready"
- * and fired the one-shot `fabricate.ready` Hook. By the time the GM clicked the
- * manager button, `game.fabricate` was undefined AND the readiness Hook was spent, so
- * `show()` warned, latched `_pendingReadyOpen`, and every later click repeated the
- * warning forever.
- *
- * Two fixes, pinned here:
- *  1. `main.js` binds the global from BOTH `init` and `ready` (idempotent helper), so
- *     a missed `init` can no longer leave `game.fabricate` undefined.
- *  2. `show()` prefers the replay-safe `whenReady()` promise (resolves even if startup
- *     already finished) and clears the latch + re-checks readiness before opening, so
- *     a spent/early/stale signal can never permanently latch the gate.
- *
- * The real classes extend `SvelteApplicationMixin(ApplicationV2)` / import `.svelte`
- * roots, so they cannot be `new`'d under `node:test`. As with the sibling
- * `interactable-browser-app-show` suite, this pins the contract two ways: a faithful
- * re-implementation harness driven by a fake, plus source-drift guards on the shipped
- * code.
  */
 
 import test from 'node:test';
@@ -30,19 +9,20 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { entrySources } from '../helpers/bootstrapEntrySource.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appSource = readFileSync(
   resolve(__dirname, '../../src/ui/SvelteCraftingSystemManagerApp.svelte.js'),
   'utf8'
 );
-const mainSource = readFileSync(resolve(__dirname, '../../src/main.js'), 'utf8');
+const mainSource = [
+  entrySources['src/bootstrap/publicApi.js'],
+  entrySources['src/bootstrap/Fabricate.js'],
+  entrySources['src/bootstrap/composeServices.js'],
+].join('\n');
 
-/**
- * A faithful harness mirroring the static `show()` deferred-open decision: a fake
- * `game.fabricate` whose readiness flag and `whenReady()` promise can be flipped
- * independently (so we can model the "promise resolved but not yet ready" stale
- * signal), and a fake app that counts constructs/renders.
- */
+/** A faithful harness mirroring the static `show()` deferred-open decision. */
 function makeHarness({ readyAtStart = false } = {}) {
   let constructs = 0;
   let resolveReady;
@@ -132,8 +112,7 @@ test('deferred open fires once Fabricate finishes startup (whenReady resolves)',
 });
 
 test('a launch when startup already finished opens immediately (replay-safe)', () => {
-  // The spent-Hook scenario: by click time, readiness is already true. The old
-  // one-shot Hook would never fire again; the direct readiness check opens now.
+  // The spent-Hook scenario: by click time.
   const h = makeHarness({ readyAtStart: true });
 
   const app = h.FakeApp.show();
@@ -168,7 +147,7 @@ test('the shipped show() prefers the replay-safe whenReady() promise (guards dri
     appSource.includes('game?.fabricate?.whenReady'),
     'show() should consult the replay-safe readiness promise'
   );
-  // The Hook remains only as a fallback (also asserted by the manager contract suite).
+  // The Hook remains only as a fallback, and this file is now its only assertion.
   assert.ok(
     appSource.includes("hooks.once('fabricate.ready', openWhenReady)"),
     'the one-shot Hook is retained as a fallback'
@@ -189,18 +168,15 @@ test('main.js binds game.fabricate from BOTH init and ready via an idempotent he
     mainSource.includes('function bindFabricateGlobal('),
     'the global binding is extracted into a reusable helper'
   );
-  // The ready hook must re-bind before initialize(), the backstop for a missed init.
-  assert.match(
-    mainSource,
-    /Hooks\.once\('ready', async \(\) => \{[\s\S]*?bindFabricateGlobal\(\);[\s\S]*?await fabricate\.initialize\(\);/,
-    'the ready hook re-binds the global before initialize()'
-  );
+  // The `ready`-body order — the re-bind ahead of `initialize()` — is pinned behaviourally by
+  // `tests/bootstrap/fabricate-boot-contract.test.js`'s 29-entry hook array and composition log,
+  // which a source regex over one file could not follow across `src/bootstrap/` (issue 1715).
 });
 
 test('initialize() resolves the replay-safe readiness promise (guards drift)', () => {
   assert.match(
     mainSource,
-    /this\.ready = true;\s*\n\s*this\._resolveReady\?\.\(\);/,
+    /fabricate\.ready = true;\s*\n\s*fabricate\._resolveReady\?\.\(\);/,
     'completing startup settles the whenReady() promise'
   );
   assert.ok(

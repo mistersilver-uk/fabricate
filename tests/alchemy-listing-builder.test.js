@@ -1,12 +1,4 @@
-/**
- * AlchemyListingBuilder — leak-safe projection for the player Alchemy workbench.
- *
- * Covers: projection correctness (learned recipes, owned components, fizzle keys,
- * chooser summaries), the LEAK INVARIANT (a non-GM projection carries no
- * undiscovered name/signature/result — only the count), the undiscovered ->
- * untried count path, GM bypass, and the non-owner read-leak guard (a null
- * crafting actor -> denied, empty listing).
- */
+/** AlchemyListingBuilder — leak-safe projection for the player Alchemy workbench. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,13 +14,11 @@ globalThis.foundry = {
   utils: { randomID: () => `id-${Math.random().toString(36).slice(2)}`, getProperty },
 };
 
-const { AlchemyListingBuilder } = await import('../src/systems/AlchemyListingBuilder.js');
+const { AlchemyListingBuilder } = await import('../src/ui/presenters/AlchemyListingBuilder.js');
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
 const { canonicalSignatureKey } = await import('../src/utils/alchemySignatureKey.js');
 
-// ---------------------------------------------------------------------------
 // Fixtures
-// ---------------------------------------------------------------------------
 
 function component(id, name) {
   return { id, name, img: `icons/${id}.webp`, registeredItemUuid: null };
@@ -131,10 +121,8 @@ function build(systems, options) {
 }
 
 /**
- * A stub reveal collaborator: `revealFn({ recipe, viewer, craftingActor,
- * componentSourceActors })` decides `visible`. `craftable` is always true (the
- * builder must read `visible`, NEVER `craftable`). Records calls so a test can
- * assert the threaded `componentSourceActors`.
+ * A stub reveal collaborator: `revealFn({ recipe, viewer, craftingActor, componentSourceActors })`
+ * decides `visible`.
  */
 function stubVisibility(revealFn) {
   return {
@@ -152,9 +140,7 @@ function buildWithVisibility(systems, options, recipeVisibility) {
   return builder.buildListing(options);
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 const COMPONENTS = [
   component('emberroot', 'Emberroot'),
@@ -226,10 +212,8 @@ test('a rich signature (alternatives + essence) is projected but NOT reducible t
 });
 
 test('an essence-type ingredient option projects the essence NAME + AMOUNT + icon, never the raw id', () => {
-  // The real "Blade Venom" shape (issue 675): ONE ingredient set with TWO groups,
-  // each a single ESSENCE option (componentId null). Historically the card showed
-  // the raw essence id at ×option.quantity; the projection must resolve the
-  // essence's name/icon and surface match.amount as the display quantity.
+  // The real "Blade Venom" shape (issue 675): ONE ingredient set with TWO groups, each a single
+  // ESSENCE option (componentId null).
   const bladeVenom = {
     id: 'blade-venom',
     name: 'Blade Venom',
@@ -381,9 +365,6 @@ test('chooser summaries span every enabled alchemy system with N known . M total
 
 test('a resolved actor with no discipline chosen (>1 systems) is NOT no-actor and carries selectedActorId', () => {
   // Regression: the empty (chooser) listing must report the resolved actor.
-  // AlchemyView checks no-actor BEFORE needsChooser, and a null selectedActorId
-  // reads as no-actor — which made the discipline chooser unreachable whenever an
-  // actor was selected but no discipline chosen yet.
   const a = singleSystemSetup();
   const potion = plainRecipe('potion', 'Healing Potion', 'sys-b', { emberroot: 2 }, 'springwater', 1);
   const systemB = makeSystem('sys-b', 'Distillation', [potion], COMPONENTS);
@@ -434,10 +415,8 @@ test('the concrete reduction key matches the shared canonical signature-key help
   assert.equal(canonicalSignatureKey(vigor.concrete), 'emberroot:1|springwater:2');
 });
 
-// ---------------------------------------------------------------------------
-// Reveal-not-gate: the builder routes reveal through the injected recipeVisibility
-// collaborator's `visible` signal, NEVER `craftable` (issue 563)
-// ---------------------------------------------------------------------------
+// Reveal-not-gate: the builder routes reveal through the injected recipeVisibility collaborator's
+// `visible` signal, NEVER `craftable` (issue 563)
 
 test('routes reveal through the collaborator (not the learned map): reveals exactly the admitted subset', () => {
   const { system, recipes } = singleSystemSetup();
@@ -533,9 +512,8 @@ test('a recipe revealed by BOTH grant and brew is projected/counted exactly once
 test('LEAK INVARIANT (generalized): a non-revealed recipe leaks no name/signature/result', () => {
   const { system, recipes } = singleSystemSetup();
   const actor = makeActor('pc', { learned: { toxin: {} } });
-  // Even though the actor "learned" toxin, the collaborator does NOT reveal it
-  // (mode-specific un-reveal, e.g. an item-mode book that was dropped). It must be
-  // count-only, with no identity in the serialized payload.
+  // Even though the actor "learned" toxin, the collaborator does NOT reveal it (mode-specific
+  // un-reveal, e.g. an item-mode book that was dropped).
   const vis = stubVisibility(({ recipe }) => recipe.id === 'vigor');
   const listing = buildWithVisibility([{ system, recipes }], {
     craftingActor: actor,
@@ -637,9 +615,7 @@ test('decoupling edge (real service): learnOnCraft:false + a held book is REVEAL
   assert.equal(globalListing.undiscoveredCount, 2, 'both recipes stay count-only under global');
 });
 
-// ---------------------------------------------------------------------------
 // Component essence projection (issue 563 addendum)
-// ---------------------------------------------------------------------------
 
 test('_projectOwnedComponents surfaces resolved essences when the system has essences enabled', () => {
   const emberEss = { ...component('emberroot', 'Emberroot'), essences: { fire: 2 } };
@@ -680,9 +656,7 @@ test('_projectOwnedComponents omits essences when the system has essences disabl
   assert.deepEqual(ember.essences, [], 'essences are omitted when the system disables essences');
 });
 
-// ---------------------------------------------------------------------------
 // Reserved failure-group leak invariant + checkMode projection (issue 554)
-// ---------------------------------------------------------------------------
 
 const SECRET_COMPONENT = component('sludge', 'Toxic Sludge');
 
@@ -772,11 +746,8 @@ test('Tiered projection surfaces the top success tier group and carries checkMod
   assert.equal(projected.result.componentId, 'quicksilver');
 });
 
-// ---------------------------------------------------------------------------
-// Essence-only recipes: `essenceRequirement` lets the store resolve
-// ready/assembling for a recipe identified by essence totals rather than by
-// named components. Mixed group+essence sets stay null (fail safe to `untried`).
-// ---------------------------------------------------------------------------
+// Essence-only recipes: `essenceRequirement` lets the store resolve ready/assembling for a recipe
+// identified by essence totals rather than by named components.
 
 function essenceSystem(recipes, components) {
   return {

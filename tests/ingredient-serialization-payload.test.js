@@ -1,30 +1,4 @@
-/**
- * Serialized ingredient payload contract (issue 1135).
- *
- * A recipe is rewritten whole on every mutation, replicated to every client, and stringified
- * twice more by `RecipeManager.reload()`'s change comparison, so anything the ingredient
- * subtree emits is paid on every write by every client. Three things it used to emit carry
- * no information:
- *
- *   - `IngredientSet`'s flat `ingredients` alias, a first-option-per-group projection of
- *     `ingredientGroups` — 19.89% of a simple corpus, 21.13% of a rich one;
- *   - `Ingredient`'s `systemItemId`, a byte-for-byte duplicate of `componentId` on the SAME
- *     object;
- *   - the set- and option-level fields whose value is the one the constructor rebuilds from
- *     absence. The option-level ones dominate, because they are paid once per option, per
- *     group, per set: 19.66% of a simple corpus and 47.55% of a rich one.
- *
- * The whole change is WRITE-side, and this suite is the proof:
- *   - both aliases are no longer emitted but are still READ, permanently, and a payload
- *     carrying only the legacy shape survives a full save cycle with every option intact;
- *   - the two omission tables are hand-maintained mirrors of their constructors, so each is
- *     checked mechanically against a maximal and a minimal model rather than by eye;
- *   - the reduction is measured against the pre-retirement shape DERIVED FROM THE LIVE
- *     MODEL, recursing through step, set, group, option and `alternatives`, so the floor
- *     cannot drift away from the tables as fields are added;
- *   - the three production writers that would otherwise re-introduce the alias are pinned,
- *     including the one shape whose flat array is its ONLY ingredient data.
- */
+/** Serialized ingredient payload contract (issue 1135). */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -41,16 +15,11 @@ const { IngredientSet, INGREDIENT_SET_OMITTED_WHEN_DEFAULT } = await import(
 const { Recipe } = await import('../src/models/Recipe.js');
 const { ingredientSetToolsAreActive } = await import('../src/systems/toolCheckBonus.js');
 const { stripComponentsFromRecipeJson } = await import('../src/utils/recipeComponentReferences.js');
-const { planRecipeTagRemovals } = await import('../src/utils/vocabularyCascade.js');
+const { planRecipeTagRemovals } = await import('../src/ui/model/vocabularyCascade.js');
 
 const METADATA = { created: 1, modified: 2, author: 'GM', version: '1.0.0' };
 
-/**
- * An option whose every omittable field carries a NON-default value.
- *
- * Built through `fromJSON`, not `new Ingredient`, because only `fromJSON` hydrates
- * `alternatives` into `Ingredient` instances — the constructor keeps whatever it is handed.
- */
+/** An option whose every omittable field carries a NON-default value. */
 function maximalOption() {
   return Ingredient.fromJSON({
     match: { type: 'component', componentId: 'c-max' },
@@ -62,13 +31,7 @@ function maximalOption() {
   });
 }
 
-/**
- * A tag-matching option, whose `tag` is derived from the match.
- *
- * A single fixture cannot carry BOTH a non-null `componentId` and a non-null `tag`: the
- * constructor derives each from a different `match.type`, so they are mutually exclusive for
- * an authored option. The emittability guard therefore unions the two.
- */
+/** A tag-matching option, whose `tag` is derived from the match. */
 function maximalTagOption() {
   return Ingredient.fromJSON({ match: { type: 'tags', tags: ['metal', 'ore'], tagMatch: 'all' } });
 }
@@ -99,9 +62,7 @@ function minimalSet() {
   });
 }
 
-// ---------------------------------------------------------------------------
 // The two retired write aliases
-// ---------------------------------------------------------------------------
 
 test('1135: Ingredient.toJSON no longer emits the systemItemId duplicate', () => {
   const json = maximalOption().toJSON();
@@ -112,9 +73,7 @@ test('1135: Ingredient.toJSON no longer emits the systemItemId duplicate', () =>
 });
 
 test('1135: an option carrying ONLY systemItemId still hydrates its component reference', () => {
-  // THE READ PATH, which is the half that never changes. Every read fallback in
-  // `match/matchTypes.js` stays, because a world or an exported system file authored before
-  // the retirement carries the alias as its only component reference.
+  // THE READ PATH, which is the half that never changes.
   const restored = Ingredient.fromJSON({ systemItemId: 'c-legacy', quantity: 2 });
 
   assert.equal(restored.componentId, 'c-legacy', 'the alias is still read');
@@ -188,9 +147,7 @@ test('1135: a set carrying BOTH shapes keeps the canonical groups, not the alias
   assert.ok(!('ingredients' in restored.toJSON()), 'and the stale alias is not written back');
 });
 
-// ---------------------------------------------------------------------------
 // The omitted defaults — mechanical guards over the two hand-maintained tables
-// ---------------------------------------------------------------------------
 
 test('1135: every INGREDIENT_OMITTED_WHEN_DEFAULT key is a field toJSON can emit', () => {
   // Catches a typo'd or renamed key, which would otherwise sit in the table forever matching
@@ -212,9 +169,8 @@ test('1135: a fully defaulted option omits every key in the ingredient table', (
 });
 
 test('1135: a fully defaulted option emits EXACTLY the un-omittable field set', () => {
-  // The table-driven guards above are both scoped BY the table, so neither can see a key
-  // DELETED from it. This pins the other side of the same fact — the literal key set on the
-  // wire — so growing it needs a deliberate edit here.
+  // The table-driven guards above are both scoped BY the table, so neither can see a key DELETED
+  // from it.
   assert.deepEqual(Object.keys(minimalOption().toJSON()).sort((a, b) => a.localeCompare(b)), [
     'match',
     'quantity',
@@ -247,10 +203,9 @@ test('1135: a fully defaulted set emits EXACTLY the un-omittable field set', () 
 });
 
 test('1135: a group emits EXACTLY {id, name, options} and omits none of its own keys', () => {
-  // IngredientGroup requirement 5: the group level has NO omission table, because none of
-  // its three keys has a reconstructible default worth omitting — the whole group-level
-  // saving comes from its options. Nothing pinned that, so a field added to
-  // `IngredientGroup.toJSON` would be paid once per group, per set, per recipe unnoticed.
+  // IngredientGroup requirement 5: the group level has NO omission table, because none of its three
+  // keys has a reconstructible default worth omitting — the whole group-level saving comes from its
+  // options.
   const [group] = maximalSet().toJSON().ingredientGroups;
 
   assert.deepEqual(Object.keys(group).sort((a, b) => a.localeCompare(b)), [
@@ -258,10 +213,7 @@ test('1135: a group emits EXACTLY {id, name, options} and omits none of its own 
     'name',
     'options',
   ]);
-  // An UNNAMED group emits the same three keys. Both set fixtures author a group name, so
-  // without this the assertion above could not tell "no omission table" from "the fixture
-  // happened to author every key" — and `name` is the one group key a future table would
-  // reach for, since `''` is exactly what the constructor rebuilds from absence.
+  // An UNNAMED group emits the same three keys.
   const unnamed = new IngredientSet({
     id: 'set-unnamed-group',
     ingredientGroups: [{ id: 'grp-unnamed', options: [minimalOption().toJSON()] }],
@@ -333,20 +285,7 @@ test('1135: a nested alternative is filtered by the same table as its parent opt
 
 test('1135: the semantic reader of set.name answers the same for absence and ""', () => {
   // `ingredientSetToolsAreActive` treats a non-empty set name as "tools are active" — the
-  // `enabled`-shaped hazard exactly. The omission is safe only because the written default
-  // `''` is already the falsy side of that predicate; a non-empty sentinel default would
-  // have deactivated every set's tools.
-  //
-  // The REAL predicate is called rather than restated here, because a restatement pins the
-  // model's default and not the reader: with `String(name ?? 'unnamed')` in
-  // `toolCheckBonus.js` an OMITTED name would read ACTIVE while a written `''` read
-  // INACTIVE, and a test asserting only `String(json.name ?? '').trim() === ''` still
-  // passes. `adminRecipeRowProjection` calls this predicate on a raw `toJSON()` set, so
-  // that drift would silently turn every unnamed set's `toolIds` into hard requirements.
-  //
-  // The system carries `routedByIngredients` so the predicate's FIRST clause cannot
-  // short-circuit the comparison into vacuity, and the named set is the positive control
-  // that proves the predicate can still answer `true` at all.
+  // `enabled`-shaped hazard exactly.
   const routed = { resolutionMode: 'routedByIngredients' };
   const json = minimalSet().toJSON();
 
@@ -369,9 +308,7 @@ test('1135: the semantic reader of set.name answers the same for absence and ""'
   assert.equal(IngredientSet.fromJSON(json).name, '', 'which is what the constructor rebuilds');
 });
 
-// ---------------------------------------------------------------------------
 // The result-group default (Recipe requirement 18, nested row)
-// ---------------------------------------------------------------------------
 
 test('1135: an empty checkOutcomeIds is omitted from both result-group emitters', () => {
   const recipe = new Recipe({
@@ -401,11 +338,9 @@ test('1135: an empty checkOutcomeIds is omitted from both result-group emitters'
 });
 
 test('1135: a defaulted result group emits EXACTLY the un-omittable field set', () => {
-  // The omission test above is scoped to `checkOutcomeIds`, and tests 17/19 plus the
-  // round-trips catch a DROPPED field — but nothing caught an ADDED one, unlike the option
-  // (`a fully defaulted option emits EXACTLY…`) and set equivalents. `serializeResultGroup`
-  // is shared by the recipe-level and step-level emitters, so both are pinned here rather
-  // than trusting the sharing to hold.
+  // The omission test above is scoped to `checkOutcomeIds`, and tests 17/19 plus the round-trips
+  // catch a DROPPED field — but nothing caught an ADDED one, unlike the option (`a fully defaulted
+  // option emits EXACTLY…`) and set equivalents.
   const recipe = new Recipe({
     id: 'r-group-keys',
     name: 'Group Keys',
@@ -478,9 +413,7 @@ test('1135: a failure-role result group keeps its role alongside the omitted def
   assert.ok(!('checkOutcomeIds' in json.resultGroups[0]));
 });
 
-// ---------------------------------------------------------------------------
 // The three production writers that would otherwise put the alias straight back
-// ---------------------------------------------------------------------------
 
 /** A recipe json whose single set is authored with groups. */
 function groupedRecipeJson(componentIds) {
@@ -634,21 +567,11 @@ test('1135: the tag cascade still filters a FLAT-authored set in place', () => {
   );
 });
 
-// ---------------------------------------------------------------------------
 // Measured reduction on two fixed corpora
-// ---------------------------------------------------------------------------
 
 /**
- * The option payload written before this change: the current one, plus every key the
- * ingredient table now omits, plus the `systemItemId` duplicate, recursing through
- * `alternatives`.
- *
- * EVERY reinstated value comes from the live instance and never from a literal, which is the
- * whole point of the shape: a hand-written default here would let the table and the floor
- * drift apart, which is the failure mode this test exists to prevent.
- *
- * @param {import('../src/models/Ingredient.js').Ingredient} option
- * @returns {Record<string, unknown>}
+ * The option payload written before this change: the current one, plus every key the ingredient
+ * table now omits, plus the `systemItemId` duplicate, recursing through `alternatives`.
  */
 function preRetirementOption(option) {
   const payload = { ...option.toJSON() };
@@ -666,10 +589,8 @@ function preRetirementGroup(group) {
 }
 
 /**
- * The set payload written before this change: the current one, plus every key the set table
- * now omits, plus the flat `ingredients` alias, over pre-retirement groups and options.
- * @param {import('../src/models/IngredientSet.js').IngredientSet} set
- * @returns {Record<string, unknown>}
+ * The set payload written before this change: the current one, plus every key the set table now
+ * omits, plus the flat `ingredients` alias, over pre-retirement groups and options.
  */
 function preRetirementSet(set) {
   const payload = { ...set.toJSON() };
@@ -693,24 +614,8 @@ function preRetirementResultGroup(group) {
 }
 
 /**
- * The whole recipe payload written before this change, INCLUDING the per-step subtree.
- *
- * The step recursion is inert on both corpora below, since neither authors a step — but a
- * floor that silently weakens is worse than one that fails. Without it, a corpus that later
- * gained a step would move its whole `steps[]` ingredient and result payload from the
- * `before` side to neither side, understating the reduction and letting the asserted floor
- * pass on a smaller real win than it claims to measure.
- *
- * `toJSON` maps `this.steps` 1:1 and in order, so the index resolves each serialized step
- * back to the live one whose sets and result groups are the INSTANCES the two reinstatement
- * helpers read their omitted values off.
- *
- * The key is written back only when the recipe HAS a step, and that is not a tidiness
- * detail. `steps: []` is omitted by `RECIPE_OMITTED_WHEN_DEFAULT`, which is issue 1087's
- * recipe-level table and not this change's — so writing the empty array onto the `before`
- * side would credit another issue's 11 bytes per recipe to this one and inflate both
- * measured floors. `ingredientSets` and `resultGroups` need no such guard: both are
- * deliberately absent from that table and are always emitted.
+ * The whole recipe payload written before this change, INCLUDING the per-step subtree. The key is
+ * written back only when the recipe HAS a step, and that is not a tidiness detail (issue 1087).
  */
 function preRetirementRecipe(recipe) {
   const json = recipe.toJSON();
@@ -850,9 +755,8 @@ test('1135: a RICH-shaped corpus serializes at least 50% smaller than the pre-re
 });
 
 test('1135: the pre-retirement shape reinstates the STEP subtree, not just recipe level', () => {
-  // Neither corpus authors a step, so the step recursion above is inert TODAY and this is
-  // the only thing holding it live. Measuring a corpus that gained a step against a
-  // recipe-level-only `before` would understate the reduction and quietly weaken the floor.
+  // Neither corpus authors a step, so the step recursion above is inert TODAY and this is the only
+  // thing holding it live.
   const recipe = new Recipe({
     id: 'r-stepped',
     name: 'Stepped',

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { routedRoll, routedSystemCheck, terminalHistoryRunManager } from './helpers/gathering.js';
+import { seededRollClass, withRoll } from './helpers/seededRoll.js';
 
 const viewer = { id: 'user-1', isGM: false };
 const gmViewer = { id: 'gm-1', isGM: true };
@@ -268,10 +269,8 @@ test('startAttempt resolves a fully guarded immediate task into terminal history
   assert.deepEqual(calls.createWaitingRun, []);
 });
 
-// Mutation control for the settlement linkage: the record the writer created is
-// empty of awards, so only the SAME-record settlement can put the actual receipts
-// into history and into the response. Dropping the settleHistory call, or aiming it
-// at any other run id, fails here rather than silently reporting an award-free run.
+// Mutation control for the settlement linkage: the record the writer created is empty of awards, so
+// only the SAME-record settlement can put the actual receipts into history and into the response.
 test('startAttempt settles the actual awards into the terminal record it created', async () => {
   const calls = {};
   const immediateTask = task({
@@ -363,11 +362,8 @@ test('startAttempt creates one waitingTime run for a fully guarded timed task', 
   assert.equal(waitingRunData.craftingSystemId, 'system-a');
   assert.equal(waitingRunData.environmentId, 'env-a');
   assert.equal(waitingRunData.taskId, 'timed-task');
-  // Load-bearing (issue 1288): a WAITING run is the only run a relayed blind start
-  // creates, and it is created on the ELECTED GM's client. Without the requesting
-  // viewer's id here the run manager's ambient fallback stamps the GM, and
-  // `getGatheringRunViewer` reads that back at maturity as a GM viewer — which
-  // un-blinds the terminal history written to the player's own actor flag.
+  // Load-bearing (issue 1288): a WAITING run is the only run a relayed blind start creates, and it
+  // is created on the ELECTED GM's client.
   assert.equal(waitingRunData.userId, viewer.id);
   // All non-blind timed tasks carry their start-time runtime contract so later live
   // authoring edits cannot change the mode or yields at maturity (#1650).
@@ -512,11 +508,9 @@ test('startAttempt rejects disabled gathering systems before record guards', asy
   assertNoRunMutation(calls);
 });
 
-// A `blocks: 'system'` gathering system (issue 429): gathering is ENABLED, so it
-// passes the pre-existing features.gathering guard, but multi-step recipes left on
-// in alchemy mode is a structural system-validation blocker (needs no recipes to
-// fire). The start-path system-validity guard must reject a non-GM attempt while a
-// GM bypasses it.
+// A `blocks: 'system'` gathering system (issue 429): gathering is ENABLED, so it passes the
+// pre-existing features.gathering guard, but multi-step recipes left on in alchemy mode is a
+// structural system-validation blocker (needs no recipes to fire).
 const blockedGatheringSystem = {
   id: 'system-a',
   enabled: true,
@@ -811,6 +805,23 @@ test('startAttempt rejects task misconfiguration after tools but before run writ
   assertNoRunMutation(calls);
 });
 
+test('1645: startAttempt rejects a rolled result amount that can never award anything', async () => {
+  const { Roll } = seededRollClass({ maxima: { '1d4+1': 5, '1d4 - 10': -6 } });
+  const rolledTask = quantityFormula => task({
+    resultGroups: [{ id: 'group-a', name: 'Iron', results: [{ id: 'ore', componentId: 'ore', quantity: 1, quantityFormula }] }]
+  });
+  await withRoll(Roll, async () => {
+    const start = quantityFormula => makeEngine({ environments: [environment({ tasks: [rolledTask(quantityFormula)] })] })
+      .startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+    const refused = await start('1d4 - 10');
+    assert.equal(refused.accepted, false);
+    assert.deepEqual(codes(refused), ['TASK_MISCONFIGURED']);
+    assert.deepEqual(refused.blockedReasons[0].data.errors, ['Gathering result quantity formula can never award a positive amount']);
+    assert.equal((await start('1d4+1')).accepted, true, 'a rollable amount starts');
+  });
+});
+
 test('startAttempt rejects timed task misconfiguration before waiting run creation', async () => {
   const calls = {};
   const engine = makeEngine({
@@ -850,11 +861,7 @@ test('startAttempt rejects invalid timed task gate before waiting run creation',
   assert.deepEqual(calls.createWaitingRun, []);
 });
 
-// "No duration" is authoring, not misconfiguration. The editor persists an empty or
-// all-zero `timeRequirement` once a duration has been opened and cleared back to nothing,
-// and the engine used to read the mere PRESENCE of the key as "this task is timed" —
-// so it demanded a positive field, found none, and blocked the player on a task whose
-// configuration was entirely valid.
+// "No duration" is authoring, not misconfiguration.
 for (const [label, timeRequirement] of [
   ['an empty object', {}],
   ['an all-zero object', { minutes: 0, hours: 0, days: 0, months: 0, years: 0 }]

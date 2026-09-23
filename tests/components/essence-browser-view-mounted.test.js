@@ -1,6 +1,5 @@
 /**
  * `EssenceBrowserView` mounted, in isolation (issue 1036).
- *
  * Two things are proved here that the manager-root suite cannot: the browser's own
  * multi-select contract — instantiated as the THIRD studio through the shared
  * `browserBulkSelectionCases.js` rather than copied a third time — and the row/card state
@@ -19,26 +18,45 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { chipToneOf } from '../helpers/chipTone.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
-import { createEssenceBrowserState } from '../../src/utils/essenceBrowserModel.js';
+import { describeBrowserListState } from '../helpers/browserListStateCases.js';
+import { createEssenceBrowserState } from '../../src/ui/model/essenceBrowserModel.js';
 import { makeEssenceRow } from '../helpers/makeEssenceRow.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  openSelectPanel,
+  selectOptionValues,
+} from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-essence-browser-',
+  // The selection wiring is a runes composable (issue 1706), so it is COMPILED rather than copied;
+  // copied verbatim it throws `ReferenceError: $state is not defined`.
+  // ... and the browse-list wiring is a second one (issue 1716), reached through the view.
+  runeModules: [
+    'src/ui/svelte/apps/manager/bulkSelection.svelte.js',
+    'src/ui/svelte/apps/manager/browserListState.svelte.js',
+  ],
   rawModules: [
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/managerColorTokens.js',
-    'src/utils/essenceBrowserModel.js',
-    'src/utils/essenceBulkEditModel.js',
+    // The lifted browse state's default page size, which the browse-list composable reads.
+    'src/ui/model/managerBrowserViewState.js',
+    'src/ui/model/essenceBrowserModel.js',
+    // ... which since issue 1688 runs on the shared adapter-driven pipeline.
+    'src/ui/model/entityBrowserModel.js',
+    'src/ui/model/essenceBulkEditModel.js',
     'src/utils/bulkSelectionModel.js',
-    'src/utils/browserGroupCounts.js',
-    'src/utils/browserPagination.js',
-    'src/utils/essenceValidation.js',
+    'src/ui/model/browserGroupCounts.js',
+    'src/ui/model/browserPagination.js',
+    'src/ui/model/essenceValidation.js',
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',
     // The essence world-scope presentation leaf (issue 1372). `EssenceBrowserView` reads the
     // three-state membership answer and the inherit suffix from it; it imports nothing, so this
@@ -47,11 +65,6 @@ const harness = createMountedComponentHarness({
     // The scope-to-section mapping (issue 1372). `EssenceBrowserView` reads ONE function from it,
     // `scopedSectionLabel`, and unlike `essenceScoped.js` this one is not a leaf: it reaches the
     // world-scope projection, which reaches the scope vocabularies and the grouping migration.
-    // The seven entries below are that closure, and the harness reports only its frontier, so
-    // they were converged by re-running rather than read off the import graph. Seven modules to
-    // render a browser row is worth noticing rather than normalising — the label is presentation
-    // and could live in a UI-free leaf beside `essenceScoped.js`, which is what keeps that one
-    // entry to a single line. Left as-is here because the import is issue 1372's to place.
     'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
     'src/systems/toolScope.js',
     'src/ui/svelte/stores/worldScopeProjection.js',
@@ -60,12 +73,12 @@ const harness = createMountedComponentHarness({
     // shipped counter. The harness validates this closure and names the miss, unlike the
     // hand-rolled trees elsewhere.
     'src/systems/worldVocabulary.js',
-    'src/utils/vocabularyUsage.js',
+    'src/ui/model/vocabularyUsage.js',
     'src/utils/componentCategories.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.
     'src/utils/categoryNormalization.js',
     'src/utils/recipeCategories.js',
-    'src/migration/worldScopeEntityGrouping.js',
+    'src/systems/worldScopeEntityGrouping.js',
     'src/systems/componentScope.js',
     'src/systems/essenceScope.js',
     'src/systems/scopedDefinitionStore.js',
@@ -73,12 +86,10 @@ const harness = createMountedComponentHarness({
     'src/systems/scopedDefinitions.js',
   ],
   compiledModules: [
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
-    // ONE labelled push-button (issue 1118): the sort-direction toggle and the filtered empty
-    // state's Clear filters both render it.
+    // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
@@ -100,9 +111,7 @@ const CONFIGURED_DISABLED = makeEssenceRow({
   name: 'Aether',
   colorToken: 'lavender',
   enabled: false,
-  // A WORKING source, stated: the pill tones itself on a non-`linked` state, so a row
-  // claiming effect transfer without saying whether it resolves would be the broken case
-  // while reading as the healthy one.
+  // A WORKING source, stated: the pill tones itself on a non-`linked` state.
   sourceState: 'linked',
   sourceName: 'Flawless Ruby',
   hasEffectTransfer: true,
@@ -113,6 +122,18 @@ const CONFIGURED_DISABLED = makeEssenceRow({
   deleteRewritesRecipes: true,
 });
 const PLAIN_ENABLED = makeEssenceRow({ id: 'water', name: 'Water' });
+
+// A world catalogue this system has adopted none of, which is what renders the membership segment.
+const WORLD_ONLY_SCOPE = {
+  available: true,
+  entityType: 'essence',
+  enableable: true,
+  entries: [
+    { id: 'aether', entity: { name: 'Aether' }, systems: [] },
+    { id: 'water', entity: { name: 'Water' }, systems: [] },
+  ],
+};
+
 
 function props(essences, extra = {}) {
   return {
@@ -133,8 +154,7 @@ function vocabularyOf(root, id) {
     capabilities: [...row.querySelectorAll('[data-essence-capability]')].map(
       (pill) => pill.dataset.essenceCapability
     ),
-    // The pill's HEALTH, not only its presence: `hasEffectTransfer` means a source is
-    // configured, which a dead link still is.
+    // The pill's HEALTH, not only its presence.
     capabilityStates: [...row.querySelectorAll('[data-essence-capability]')].map(
       (pill) => pill.dataset.essenceCapabilityState
     ),
@@ -144,21 +164,16 @@ function vocabularyOf(root, id) {
     // colour is upkeep with no reader. The STATE did not go with it, so this reads it where
     // it actually lives now, and the grid must still carry it.
     colour: row.querySelector('[data-medallion-tint]')?.dataset.medallionTint || '',
-    // And the chip must not come back: it is the one piece of vocabulary this redesign
-    // deliberately REMOVED, so a re-added one has to fail rather than pass as "more state".
+    // And the chip must not come back.
     colourChip: Boolean(row.querySelector('[data-essence-colour]')),
     disabledWord: row.textContent.includes('Disabled'),
-    // The component count renders PLAINLY now (issue 1036, maintainer round): deletion is
-    // warned, not blocked, so there is no padlock on this number and the grid must match.
+    // The component count renders PLAINLY now (issue 1036, maintainer round).
     components: row.querySelector('[data-essence-usage-components]').textContent.trim(),
     recipes: row.querySelector('[data-essence-usage-recipes]').textContent.trim(),
   };
 }
 
-// TOP-LEVEL, not inside a describe: the shared multi-select cases at the foot of this file
-// register their own `describe` and mount through the same harness, so the temp tree has to
-// exist before ANY suite in the file runs. A per-describe `before` would leave those cases
-// mounting against no document at all.
+// TOP-LEVEL, not inside a describe.
 before(async () => {
   await harness.setup();
 });
@@ -188,9 +203,7 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
       'the grid card removes no state; that is what makes the toggle a PRESENTATION toggle'
     );
 
-    // The card ACTIONS live in a divided footer now (issue 1036, maintainer round): the
-    // prototype's grid card carries the enable toggle and the edit pencil in the card itself,
-    // not only in the inspector. The selection box stays too, pinned to the top-right corner.
+    // The card ACTIONS live in a divided footer now (issue 1036, maintainer round).
     assert.ok(
       root.querySelector('[data-essence-edit="aether"]'),
       'the grid card footer carries the edit pencil'
@@ -252,15 +265,6 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
     // ── THE TOOLBAR'S WEIGHT IS THE ASSERTION (issue 1372, maintainer parity round 8) ────────
     // The reference's bar carries a search field and exactly one filter — `In this system (n) |
     // All world essences (n)` (`tmp/proto/essence-rules.png`). This bar carried four controls:
-    // a status segment, the membership pair, the presentation toggle and an `All sources`
-    // select. The two filters that are gone are asserted ABSENT by their own hooks, and the two
-    // that remain are asserted PRESENT — a test that only counted `SegmentedControl`s would pass
-    // over the source `<select>`, which is not one.
-    //
-    // THE MEMBERSHIP PAIR NEEDS A WORLD CORPUS, so it is asserted over a mount that has one.
-    // Without `scope.available` it is correctly withheld — a control offering `All world
-    // essences` over an unreadable corpus reports every essence as absent from this system —
-    // and asserting its absence here would measure the fixture rather than the bar.
     const scope = {
       available: true,
       entityType: 'essence',
@@ -305,23 +309,7 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
     // the membership segment OR by the zero state's own button — the one route in the product to
     // adopting one. This studio is already correct, because `isEmpty` is fed `listCards`, which
     // is `essenceCards` PLUS `absentCards`.
-    //
-    // Zero members is the only place those two can disagree, so the sibling case above — which
-    // mounts two adopted essences — cannot fail on this defect however the predicate is written.
-    // Without this case, "essences happen to be right" is all that is held.
-    const root = await harness.mount(
-      props([], {
-        scope: {
-          available: true,
-          entityType: 'essence',
-          enableable: true,
-          entries: [
-            { id: 'aether', entity: { name: 'Aether' }, systems: [] },
-            { id: 'water', entity: { name: 'Water' }, systems: [] },
-          ],
-        },
-      })
-    );
+    const root = await harness.mount(props([], { scope: WORLD_ONLY_SCOPE }));
 
     assert.equal(
       root.querySelectorAll('.manager-essence-row').length,
@@ -346,11 +334,6 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
     // pill's ramp at all, so `is-neutral` matched no rule and the badge rendered with the base
     // `border: 1px solid transparent` and no fill: a bare dot and some small text beside a
     // bordered, filled pill on the world catalogue one click away.
-    //
-    // The badge is a `Chip` since issue 1506, and the same claim is read off the class the chip
-    // paints its tone with: `chipToneOf` answers `null` for a chip wearing a tone the component
-    // drops, which is what keeps "the tone it resolves to is one the chip paints" measurable
-    // rather than invisible.
     const root = await harness.mount(props([CONFIGURED_DISABLED, PLAIN_ENABLED]));
     const pill = root.querySelector(
       '.manager-essence-row[data-essence-id="aether"] .manager-chip'
@@ -387,7 +370,6 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
   it('labels that control `Edit rules` and marks it as leaving the screen', async () => {
     // `proto:1576`. The prototype's system essence-rules row ends in a LABELLED pill carrying
     // the external-link glyph, because the words are what say which layer the control opens:
-    // this screen edits ONE system's rules for a world-shared essence.
     const root = await harness.mount(props([CONFIGURED_DISABLED]));
     const row = root.querySelector('.manager-essence-row[data-essence-id="aether"]');
     const edit = row.querySelector('[data-essence-edit="aether"]');
@@ -410,7 +392,7 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
       'Edit rules for Aether',
       'the labelled variant names the essence AND the layer it opens'
     );
-    // NON-VACUITY, and the reason the label could not simply replace the class: the Foundry
+    // NON-VACUITY, and the reason the label could not simply replace the class.
     // smoke reaches this control as `.manager-icon-button[title*="Edit" i]` behind a
     // `count() > 0` guard, so a lost class or a retitled control would stop producing the
     // `manager-essence-edit-first-state` frame WITHOUT failing anything.
@@ -422,8 +404,7 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
       edit.getAttribute('title').startsWith('Edit'),
       'and its title still leads with Edit, which is what the smoke matches on'
     );
-    // The GRID card keeps the pencil: its footer is a two-slot strip with no room for a
-    // phrase, and the prototype draws no grid presentation for this screen to copy.
+    // The GRID card keeps the pencil.
     root.querySelector('[data-essence-view-option="grid"] input').click();
     flushSync();
     const card = root.querySelector('.manager-essence-row[data-essence-id="aether"]');
@@ -435,9 +416,7 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
       !card.textContent.includes('Edit rules'),
       'and does not carry the phrase, so the two presentations differ deliberately'
     );
-    // The card's pencil has NO visible text at all, so here the accessible name is the only
-    // thing naming the control — and it takes the other branch of the same ternary, which is
-    // what makes this a second reading of the prop rather than a repeat of the first.
+    // The card's pencil has NO visible text at all.
     assert.equal(
       card.querySelector('[data-essence-edit="aether"]').getAttribute('aria-label'),
       'Edit Aether',
@@ -467,9 +446,7 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
       'the bar answers how many the filters left, and how much of the world this system holds'
     );
 
-    // THE NEGATIVE HALF. An unreadable corpus cannot answer `M of K`, and answering it anyway
-    // would report every essence as absent from this system — a false statement rather than an
-    // unavailable one. The bar returns to the range, which is always answerable.
+    // THE NEGATIVE HALF. An unreadable corpus cannot answer `M of K`.
     const noCorpus = await harness.mount(props([CONFIGURED_DISABLED, PLAIN_ENABLED]));
     assert.equal(
       noCorpus.querySelector('[data-essence-count]').textContent.replaceAll(/\s+/g, ' ').trim(),
@@ -497,8 +474,6 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
 });
 
 // The THIRD studio on the shared multi-select contract. It declares no `grouped` fixture:
-// essences have no category vocabulary, so there is no collapse to hide rows behind, and
-// the shared case degrades to its flat form rather than being skipped.
 describeBrowserBulkSelection({
   label: 'EssenceBrowserView',
   prefix: 'essence',
@@ -512,8 +487,7 @@ describeBrowserBulkSelection({
     Array.from({ length: count }, (_, index) =>
       makeEssenceRow({
         id: `f${index + 1}`,
-        // Zero-padded so name-ascending order is also numeric order, which is what makes
-        // `flatId(1)` reliably the first row of page 1.
+        // Zero-padded so name-ascending order is also numeric order.
         name: `Flux ${String(index + 1).padStart(2, '0')}`,
       })
     ),
@@ -524,4 +498,69 @@ describeBrowserBulkSelection({
     count: 2,
     why: 'the cluster holds the enable toggle and the Edit rules button — and the selection control must NOT join them, because the Foundry smoke walk reaches the row actions through button selectors',
   },
+});
+
+describeBrowserListState({
+  label: 'EssenceBrowserView',
+  harness,
+  props: ({ rowCount, selectedSystemId, browserState }) =>
+    props(
+      Array.from({ length: rowCount }, (_, index) =>
+        makeEssenceRow({ id: `f${index + 1}`, name: `Flux ${index + 1}` })
+      ),
+      { selectedSystemId, browserState }
+    ),
+  // The search term and the source cohort both name this system's records.
+  resetAxes: { searchTerm: ['flux', ''], sourceFilter: ['world', 'all'], pageIndex: [1, 0] },
+  // Status, sort, view mode and page size are preferences the switch leaves alone.
+  preservedAxes: { statusFilter: 'disabled', sortKey: 'source', viewMode: 'grid', pageSize: 5 },
+});
+
+describe('EssenceBrowserView membership axis (issue 1716)', () => {
+  it('returns the membership axis to this system on a genuine switch', async () => {
+    // The axis is component-local, so no lifted state carries it and only the callback can
+    // return it; it names this system's records, for the source filter's own reason.
+    const root = await harness.mount(
+      props([], { scope: WORLD_ONLY_SCOPE, selectedSystemId: 'sys-first' })
+    );
+
+    root.querySelector('[data-essence-membership-option="all"] input').click();
+    flushSync();
+    assert.ok(
+      root.querySelector('[data-essence-membership-option="all"] input').checked,
+      'the control: the GM widened the axis past this system'
+    );
+
+    await harness.setProps({ selectedSystemId: 'sys-switched' });
+
+    assert.ok(
+      root.querySelector('[data-essence-membership-option="in"] input').checked,
+      'a switch narrows the axis back, or it keeps naming a system the rows no longer come from'
+    );
+    harness.remount();
+  });
+});
+
+describe('EssenceBrowserView sort (issue 1510)', () => {
+  it('names the converted sort trigger and orders the rows by the key it chooses', async () => {
+    // Aether is used by two components and Water by none, so the usage order inverts the name order.
+    const root = await harness.mount(props([CONFIGURED_DISABLED, PLAIN_ENABLED]));
+    const SORT = '[data-essence-sort]';
+    const rows = () =>
+      [...root.querySelectorAll(':scope .manager-essence-row')].map((row) => row.dataset.essenceId);
+
+    assert.equal(assertSelectHasResolvedName(root, SORT), 'Sort essences');
+    assert.equal(root.querySelector(SORT).getAttribute('data-select-size'), 'toolbar');
+    assert.ok(
+      openSelectPanel(root, SORT).classList.contains('fabricate-select-popover-ticked'),
+      'the sort keys are cousins, so the list keeps its tick column'
+    );
+    assert.deepEqual(selectOptionValues(root, SORT), ['name', 'status', 'components', 'recipes']);
+
+    assert.deepEqual(rows(), ['aether', 'water'], 'by name');
+    chooseSelectOption(root, SORT, 'components');
+    assert.deepEqual(rows(), ['water', 'aether'], 'by component usage, none before two');
+    chooseSelectOption(root, SORT, 'name');
+    assert.deepEqual(rows(), ['aether', 'water'], 'and back by name');
+  });
 });

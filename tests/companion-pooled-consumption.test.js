@@ -1,32 +1,4 @@
-/**
- * `consumePooledHoldings`' behaviour — the pooled holdings CONSUME (issue 1342, Phase 5).
- *
- * It is the only companion member that removes value, and the claims worth a suite of their own
- * are the ones where a plausible implementation quietly destroys a player's inventory:
- *
- *   1. **Nothing is written until everything is priced.** One cost the pool cannot cover refuses
- *      the whole call with every row reporting `attempted: false`, and the actors' item lists are
- *      untouched. The currency half of that pre-check runs BEFORE the component arm writes, which
- *      is the whole reason a `macro` world with no `increment` macro can be refused "having
- *      written nothing" rather than "having written and un-written".
- *   2. **The rollback actually rolls back.** A reduction is restored to the value the plan read,
- *      a deletion is re-created with its own `_id` — and therefore its UUID — and only the
- *      documents the delete ANSWERED with are re-created, because core rejects a `keepId` create
- *      onto an id the collection still holds. Every one of those is driven here by a write that
- *      FAILS, never by a spy that agrees.
- *   3. **A failed give-back stays visible.** The answer shape carries no `wroteNothing` field, so
- *      the ledger is the only place the truth can live: a restored row reports `takes: []` and an
- *      unrestored one keeps its lines, which is what makes `consumed` "what is still missing".
- *
- * **The fakes can REFUSE.** A Foundry document write fails silently far more often than it
- * rejects — `deleteEmbeddedDocuments` resolves fewer documents than it was given ids for when a
- * `preDelete` hook declines one, and `updateEmbeddedDocuments` DROPS an update whose diff is empty
- * — so the actor fake models both, plus `keepId`'s real semantics and core's collision throw. A
- * fake that always says yes cannot see a missing guard.
- *
- * **The suite configures a NON-DEFAULT stack-quantity path for its whole file**, so that a write
- * hardcoding the near-universal default would fail here rather than pass everywhere.
- */
+/** `consumePooledHoldings`' behaviour — the pooled holdings CONSUME (issue 1342, Phase 5). */
 
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
@@ -71,9 +43,7 @@ const QUANTITY_PATH = 'system.count.value';
 before(() => configureItemStackQuantityPath(QUANTITY_PATH));
 after(() => resetItemStackQuantityPath());
 
-// ---------------------------------------------------------------------------
 // Fixtures
-// ---------------------------------------------------------------------------
 
 /** Write a flattened `{ 'a.b.c': value }` update payload onto a fake document. */
 function applyFlattened(target, update) {
@@ -116,27 +86,7 @@ function makeItem(actor, id, componentId, quantity, { snapshotable = true, syste
   return item;
 }
 
-/**
- * An actor that owns items and coins and can REFUSE a write.
- *
- * It extends the shared currency fixture rather than restating a coin actor, so the currency arm
- * runs against exactly the actor the pooled currency suite proved the debit against.
- *
- * `createEmbeddedDocuments` models the two `keepId` behaviours the restore depends on, verified
- * against the v14.365 server backend: an id is regenerated unless `keepId` AND an `_id` are both
- * supplied, and a create onto an id the collection still holds is REJECTED.
- *
- * **A silent refusal and a REJECTION are different failures, and both are modelled.** `deny*`
- * answers `[]` having written nothing, which is what a refusing `preDelete` hook or an empty
- * diff produces; `reject*` throws, which is what `collection.get(id, {strict: true})` does for an
- * id that vanished between the plan and the write, and it rejects the WHOLE batch rather than
- * shortening it. Telling those apart is the entire claim `callActorWrite` makes, and without a
- * rejecting fake its `catch` could be deleted with this file still green.
- *
- * `answersIds` is the third shape a real write can answer in. `writtenIds` reads
- * `typeof entry === 'string' ? entry : entry?.id` precisely because a write can answer bare ids,
- * and no fixture drove that branch either.
- */
+/** An actor that owns items and coins and can REFUSE a write. */
 class ConsumptionActor extends PooledActorFake {
   constructor(name, currency = {}) {
     super(name, currency);
@@ -258,13 +208,6 @@ const stackOf = (item) => item.system.count.value;
 
 /**
  * Run one call with `console.error` captured, so a logged throw is provable rather than assumed.
- *
- * Every guard this file drives that catches something also REPORTS it, and asserting the report
- * is what separates "the catch ran" from "the call happened to answer the same way for another
- * reason" — which is exactly the distinction the parentless-take case below could not make.
- *
- * @param {() => Promise<object>} run
- * @returns {Promise<{result: object, errors: Array<Array<*>>}>}
  */
 async function withCapturedErrors(run) {
   const errors = [];
@@ -286,9 +229,7 @@ function assertConsumeAnswer(result, outcome) {
   assertMessageDataCovers(result, `the ${outcome} answer`);
 }
 
-// ---------------------------------------------------------------------------
 // The gates, none of which reach a cost at all
-// ---------------------------------------------------------------------------
 
 describe('the gates that refuse before a single cost is read', () => {
   it('refuses an undeclared or unrecognised call site, and a broadcast this client is not elected for', async () => {
@@ -346,9 +287,7 @@ describe('the gates that refuse before a single cost is read', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // The pre-check: every refusal below writes nothing
-// ---------------------------------------------------------------------------
 
 describe('the whole-call pre-check', () => {
   it('gives every unresolvable cost its own row token and reports the rest as notAttempted', async () => {
@@ -445,9 +384,7 @@ describe('the whole-call pre-check', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // The component arm
-// ---------------------------------------------------------------------------
 
 describe('the component arm', () => {
   it('batches one update and one delete per actor, and names every document that paid', async () => {
@@ -532,9 +469,7 @@ describe('the component arm', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // The rollback
-// ---------------------------------------------------------------------------
 
 describe('the rollback', () => {
   it('restores a reduced stack to the value the plan read when a later delete is refused', async () => {
@@ -651,10 +586,9 @@ describe('the rollback', () => {
   it('refuses a reduction whose configured path resolves an object, before writing it', async () => {
     const actors = [new ConsumptionActor('Idrin')];
     const item = makeItem(actors[0], 'i1', 'hide', 5);
-    // A structured value at the configured path that still COERCES to a number, which is the
-    // only shape that reaches the reduction branch at all: anything the drain reads as NaN
-    // prices the stack at one and takes the delete branch instead. The accessor warns and
-    // refuses the write rather than replacing the structure with a bare count.
+    // A structured value at the configured path that still COERCES to a number, which is the only
+    // shape that reaches the reduction branch at all: anything the drain reads as NaN prices the
+    // stack at one and takes the delete branch instead.
     item.system.count.value = [5];
 
     const result = await take(actors, [componentCost('hide', 1)]);
@@ -665,9 +599,7 @@ describe('the rollback', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // The currency arm
-// ---------------------------------------------------------------------------
 
 describe('the currency arm', () => {
   const macroWorldWithoutIncrement = {
@@ -888,16 +820,11 @@ describe('the currency arm', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // The guards no fixture used to reach
-// ---------------------------------------------------------------------------
 
 describe('the guards between a plan and a write', () => {
   it('refuses a pool that is not a SET, and one whose entries cannot be echoed', async () => {
-    // The repeat is the one that costs a player items rather than merely refusing. One actor
-    // holding a stack of five, addressed twice, reads as ten: the drain then plans five from
-    // the stack AND three from the same stack, both writes succeed, and the ledger publishes
-    // `consumed: 8` for five units that left a sheet. Nothing fails, so nothing rolls back.
+    // The repeat is the one that costs a player items rather than merely refusing.
     const idrin = new ConsumptionActor('Idrin');
     makeItem(idrin, 'i1', 'hide', 5);
     const sera = new ConsumptionActor('Sera');
@@ -905,10 +832,7 @@ describe('the guards between a plan and a write', () => {
     for (const [label, pool] of [
       ['the same document twice', [idrin, idrin]],
       ['a repeat buried in a larger party', [idrin, sera, idrin]],
-      // The READ's floor has always required a `uuid`; this one only required an object. The
-      // echo is built from `actor?.uuid` and the contract FILTERS OUT anything that is not a
-      // string, so an entry without one is silently dropped from `actorUuids` — leaving a
-      // caller pooled over a set it cannot see, on the member that deletes.
+      // The READ's floor has always required a `uuid`; this one only required an object.
       ['an entry with no uuid at all', [idrin, { items: [] }]],
       ['an entry whose uuid is empty', [idrin, { uuid: '', items: [] }]],
     ]) {
@@ -922,18 +846,7 @@ describe('the guards between a plan and a write', () => {
   });
 
   it('refuses a take with no owning document as notAttempted, never as an issued write', async () => {
-    // `planFirstFitDrain` records `parent: null` for an item with no owner. This case pins the
-    // OUTCOME rather than one guard, and the distinction is measured rather than cautious:
-    // `takeComponentBucket`'s `if (!group.parent) return false` is REDUNDANT here. Removing it
-    // alone leaves this suite green, and so does removing it together with `callActorWrite`'s
-    // absent-method floor — only removing those two AND `callActorWrite`'s `catch` reds, because
-    // each in turn normalises a write against `null` into "answered nothing". So no test can
-    // distinguish the guard; what is worth asserting is the behaviour all three defend, and no
-    // comment here should claim otherwise.
-    //
-    // The row's token is the second claim, and that one is NOT redundant: nothing was written,
-    // so `consumeFailed` — from which the contract DERIVES `attempted: true` — would tell a
-    // caller writes went out and were all given back.
+    // `planFirstFitDrain` records `parent: null` for an item with no owner.
     const idrin = new ConsumptionActor('Idrin');
     const orphan = makeItem(idrin, 'i1', 'hide', 5);
     orphan.parent = null;
@@ -948,9 +861,8 @@ describe('the guards between a plan and a write', () => {
   });
 
   it('publishes notAttempted for a bucket refused before its first write, and consumeFailed after one', async () => {
-    // The two halves of the same rule, side by side, because only the pair proves the branch is
-    // a branch. `ATTEMPTED_CONSUME_OUTCOMES` derives `attempted` from the token, and its own doc
-    // says the token means A WRITE WAS ISSUED.
+    // The two halves of the same rule, side by side, because only the pair proves the branch is a
+    // branch.
     const refused = new ConsumptionActor('Idrin');
     const item = makeItem(refused, 'i1', 'hide', 5);
     // A structured value at the configured path that still coerces to a number: `reduceStacks`
@@ -974,9 +886,8 @@ describe('the guards between a plan and a write', () => {
   });
 
   it('reads a write that answers bare IDS exactly as one that answers documents', async () => {
-    // `writtenIds` is `typeof entry === 'string' ? entry : entry?.id`, and nothing drove the
-    // first half. A write answering ids that this member read as documents would judge every
-    // successful write a failure and roll back a take that actually happened.
+    // `writtenIds` is `typeof entry === 'string' ? entry : entry?.id`, and nothing drove the first
+    // half.
     const idrin = new ConsumptionActor('Idrin');
     makeItem(idrin, 'i1', 'hide', 3);
     makeItem(idrin, 'i2', 'hide', 5);
@@ -992,10 +903,7 @@ describe('the guards between a plan and a write', () => {
   });
 
   it('treats a REJECTED write as a failed one, and gives back what the earlier write moved', async () => {
-    // A silent short answer and a rejection are different failures. `deny*` covers the first;
-    // this is the second, and it is what `collection.get(id, {strict: true})` does for an id
-    // that vanished between the plan and the write — it rejects the WHOLE batch. Without a
-    // rejecting fake, `callActorWrite`'s `catch` could be deleted with this file still green.
+    // A silent short answer and a rejection are different failures.
     const idrin = new ConsumptionActor('Idrin');
     makeItem(idrin, 'i1', 'hide', 3);
     makeItem(idrin, 'i2', 'hide', 5);
@@ -1016,17 +924,13 @@ describe('the guards between a plan and a write', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // The candidate list, whose two stated properties no fixture could see
-// ---------------------------------------------------------------------------
 
 describe('the candidate list a component cost drains', () => {
   it('drops an item the resolver returns that NOBODY in the pool owns', async () => {
-    // Membership is tested by object IDENTITY against the pooled item order, and the property
-    // is invisible to the default seam — `actor.items.filter(...)` is an order-preserving
-    // subsequence, so the filter is the identity function on every other fixture in this file.
-    // A resolver that answers a document outside the pool is not hypothetical: the shipped
-    // matcher is handed a system and a component and reads durable roles off items.
+    // Membership is tested by object IDENTITY against the pooled item order, and the property is
+    // invisible to the default seam — `actor.items.filter(...)` is an order-preserving subsequence,
+    // so the filter is the identity function on every other fixture in this file.
     const outsider = new ConsumptionActor('Outsider');
     const stranger = makeItem(outsider, 'x1', 'hide', 3);
     const idrin = new ConsumptionActor('Idrin');
@@ -1050,8 +954,7 @@ describe('the candidate list a component cost drains', () => {
 
   it('drains in the POOLED order even when the resolver answers a different one', async () => {
     // The order is `pooledItemOrder`'s and nothing else's, because first-fit means whoever comes
-    // first pays first — so which DOCUMENT is destroyed depends on it. Re-deriving it from the
-    // resolver's answer would let a read and a consume destroy different documents.
+    // first pays first — so which DOCUMENT is destroyed depends on it.
     const idrin = new ConsumptionActor('Idrin');
     makeItem(idrin, 'i1', 'hide', 3);
     makeItem(idrin, 'i2', 'hide', 3);
@@ -1078,9 +981,7 @@ describe('the candidate list a component cost drains', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Two currency costs on one balance
-// ---------------------------------------------------------------------------
 
 describe('two currency costs drawing on one balance', () => {
   /** A spender that fails the test if it is ever asked to move coin. */
@@ -1093,11 +994,8 @@ describe('two currency costs drawing on one balance', () => {
   });
 
   it('sums two costs in ONE unit before deciding, exactly as the component arm does', async () => {
-    // The component arm has always bucketed two costs naming one component and summed them
-    // before planning. The currency arm priced each row against the WHOLE balance, so a pool of
-    // 3 gp answered "yes" twice to two 2 gp costs — and the call then DEBITED the first, refused
-    // the second, credited the first back, and published `insufficient`. That token is in the
-    // documented zero-mutation set and its shipped string says "so nothing was taken".
+    // The component arm has always bucketed two costs naming one component and summed them before
+    // planning.
     const idrin = new ConsumptionActor('Idrin', { gp: 3 });
 
     const result = await take(
@@ -1153,9 +1051,7 @@ describe('two currency costs drawing on one balance', () => {
 
   it('answers insufficient when the pool moves between the pre-check and the settle', async () => {
     // The one route to a CALL-level `insufficient` that the pre-check cannot take, because the
-    // pre-check already passed. The read is not a lease and the module says so; this is what
-    // that costs, and the answer must still be `insufficient` rather than `consumeFailed` —
-    // the pool was short, which is a different thing from a mechanism that broke.
+    // pre-check already passed.
     const idrin = new ConsumptionActor('Idrin', { gp: 5 });
     makeItem(idrin, 'i1', 'hide', 2);
     let reads = 0;
@@ -1182,17 +1078,12 @@ describe('two currency costs drawing on one balance', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // A stable member may not throw
-// ---------------------------------------------------------------------------
 
 describe('a seam that THROWS', () => {
   it('becomes a refusal, on every bare seam the pre-check reaches', async () => {
-    // `callActorWrite` and `unwind` carried the only `try`s in this module, so every other seam
-    // was bare — and optional chaining guards an ABSENT method, never a throwing one. The
-    // reachability is not theoretical: the facade binds `findComponentItems` to the shipped
-    // `CraftingEngine.findComponentItems`, whose first statement is `[...actor.items]`, which is
-    // a TypeError for any resolved document whose `items` is not iterable.
+    // `callActorWrite` and `unwind` carried the only `try`s in this module, so every other seam was
+    // bare — and optional chaining guards an ABSENT method, never a throwing one.
     const boom = () => {
       throw new TypeError('actor.items is not iterable');
     };
@@ -1225,9 +1116,7 @@ describe('a seam that THROWS', () => {
   });
 
   it('UNWINDS what it already took before it publishes the refusal', async () => {
-    // A throw between two writes is exactly the state the undo stack exists for. A guard that
-    // merely caught and published would leave a player short of the components this call
-    // deleted while telling its caller nothing was consumed.
+    // A throw between two writes is exactly the state the undo stack exists for.
     const idrin = new ConsumptionActor('Idrin', { gp: 5 });
     makeItem(idrin, 'i1', 'hide', 2);
     let componentsWritten = false;
@@ -1258,11 +1147,8 @@ describe('a seam that THROWS', () => {
   });
 
   it('keeps a row outstanding when the GIVE-BACK itself throws', async () => {
-    // `unwind`'s own `catch`, which nothing reached: every undo step runs through
-    // `callActorWrite`, which catches for itself. The currency give-back does not — it goes
-    // through the published `creditWorldCurrency`, which resolves the world ladder afresh. A
-    // give-back that throws must leave the row's take lines standing, because those lines are
-    // the only record that the coin is genuinely still gone.
+    // `unwind`'s own `catch`, which nothing reached: every undo step runs through `callActorWrite`,
+    // which catches for itself.
     const idrin = new ConsumptionActor('Idrin', { gp: 3 });
     let spends = 0;
     let unwinding = false;

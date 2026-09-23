@@ -1,63 +1,30 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The essence editor's TWO BEHAVIOUR CARDS: what this essence carries onto a crafted result in
-  THIS crafting system — an active-effect source, and a macro that runs on craft.
+  The essence editor's TWO BEHAVIOUR CARDS: what this essence carries onto a crafted result in THIS
+  crafting system — an active-effect source, and a macro that runs on craft. It is the body of the
+  `Essence rules` tab for a catalogued essence and of the `On craft` tab for a CREATE draft, with
+  `scoped` carrying the difference and nothing else.
 
-  It is the body of the `Essence rules` tab for an essence the world catalogue holds, and the body
-  of the shipped `On craft` tab for a CREATE draft, which has no shared definition. The difference
-  between the two is carried by `scoped` and nothing else; see its declaration.
+  ONE CARD WHEN LINKED, THE PICKER WHEN NOT, so the linked state looks as the Tool Studio's does.
+  UNLINKED keeps `EssenceSourceSelector` because only the PICKER can offer the in-system component
+  list: an essence source is a managed COMPONENT id, not a document uuid. Both states hand the drop
+  handler the same raw Item payload, which the root resolves to a component.
 
-  ── ONE CARD WHEN LINKED, THE PICKER WHEN NOT (issue 1036, maintainer round 2) ────
-  The maintainer's ruling: "the linked item active effect source needs to appear the same way
-  a linked item in the tool studio editor view does". The Tool Studio renders exactly one
-  control for this — an `ItemDropZone` that IS the drop target in both states — so this tab
-  does the same:
+  EACH CARD CARRIES ITS OWN INHERIT SWITCH, in a bordered row between the card's explanation and its
+  value: the switch decides whether the value below it is this system's to change, and a GM reading
+  a locked value must find the control that unlocks it without leaving the card. `InheritRow`
+  renders the pair as a set, so this file asks for ONE section at a time.
 
-   - LINKED  -> `ItemDropZone`: the item image, the item name in bold, its ADDRESS on a mono
-                line, an instructional sub-line, and the grouped copy-uuid / unlink icon pair
-                right-aligned.
-   - UNLINKED -> `EssenceSourceSelector`, which is the drop-or-PICK affordance.
+  BOTH SECTIONS ARE GATED on their own system feature, and with both off the tab renders an
+  explanatory empty state rather than a blank panel that reads as a broken screen. SUPPRESSION IS A
+  STATE ON THE SECTION, NOT A REMOVAL, because a GM must see and change a link doing nothing.
 
-  `ItemDropZone` itself is UNCHANGED except for the optional address line issue 1372 adds. It
-  already accepts a `documentType`, a `subline`, and a `state`, and it already renders the
-  grouped actions; nothing about its other consumers moves. The essence source is still a
-  managed COMPONENT id rather than a document uuid, and that is why the UNLINKED state stays
-  `EssenceSourceSelector`: only the picker can offer the in-system component list. What the
-  drop handler receives is the same raw Item payload in both states, which the root already
-  resolves to a component.
-
-  ── EACH CARD CARRIES ITS OWN INHERIT SWITCH (issue 1372, maintainer parity round 7) ──
-  The two switches used to sit together in a band ABOVE the tab strip, sharing one grey slab with
-  the enable toggle and the remove action. The reference puts each switch INSIDE the card it
-  governs, in a bordered row between the card's explanation and its value, and that placement is
-  the point: the switch decides whether the value below it is this system's to change, and a GM
-  reading a locked value has to find the control that unlocks it without leaving the card.
-
-  `InheritRow` renders the pair as a set, so this file asks it for ONE section at a time and
-  supplies the head sentence, because the section's name is already the card's title one line up.
-
-  ── BOTH SECTIONS ARE GATED, AND THE BOTH-OFF STATE IS EXPLAINED ──────────────────
-  `features.effectTransfer` and `features.propertyMacros` gate their own sections. With both
-  off the tab renders an explanatory empty state rather than an empty tab: a blank panel
-  reads as a broken screen, where a sentence naming the two system settings reads as a
-  configuration fact.
-
-  ── SUPPRESSION IS A STATE ON THE SECTION, NOT A REMOVAL ──────────────────────────
-  For a DISABLED essence each section's pill reads `Suppressed` and its sub-line says why.
-  The linked cards still render — a GM must be able to see, and change, the link that is
-  currently doing nothing.
-
-  ── THE `type !== 'script'` REJECTION LIVES IN THE DROP HANDLER ───────────────────
-  Not in the drop predicate: a payload's `type` is the DOCUMENT NAME (`'Macro'`), and the
-  macro's own type needs `await fromUuid`. Foundry defaults a NEW Macro to `type: 'chat'`,
-  so a GM who pastes JavaScript into a fresh macro without changing its type produces
-  exactly the payload this rejects. The check itself is `evaluateMacroDrop` in
-  `src/utils/macroReference.js`; the WARNING is this surface's, because the copy belongs to
-  the surface rather than to the check.
+  THE `type !== 'script'` REJECTION LIVES IN THE DROP HANDLER, not the predicate: a payload's `type`
+  is the DOCUMENT NAME and the macro's own type needs `await fromUuid`. The check is
+  `evaluateMacroDrop`; the WARNING is this surface's.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import EssenceSourceSelector from '../../../components/EssenceSourceSelector.svelte';
   import ExplainerCard from '../ExplainerCard.svelte';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
@@ -77,39 +44,26 @@
     effectTransferEnabled = false,
     propertyMacrosEnabled = false,
     saving = false,
-    // ── THE WORLD-SCOPE LOCK (issue 1372) ──────────────────────────────────────────────────
-    // `{effectSource: boolean, macro: boolean}` — whether this system INHERITS that section from
-    // the world default. While it does, this system does not own the value, so the editor must
-    // not present an edit affordance for it: the card renders read-only, the drop zone and the
-    // picker are not drawn, and the unlink control is absent. Turning the section's inherit
-    // switch off is the one action that unlocks it, and that switch is the row inside the same
-    // card. Defaults to all-false, so a create draft renders exactly as the shipped editor did.
+    // THE WORLD-SCOPE LOCK: whether this system INHERITS each section from the world default.
+    // While it does, this system does not own the value, so the card renders read-only with no
+    // drop zone, picker or unlink — their absence IS the lock — and the section's own inherit
+    // switch is the one action that unlocks it. Defaults to all-false for a create draft.
     lockedSections = {},
-    // `{[section]: string}` — the one-line summary of what each section resolves to. It is the
-    // inherit row's note; without it a row says "Inheriting the world default" and never says
-    // what is being inherited, and a row-count assertion passes green over every note empty.
+    // The one-line summary of what each section resolves to: without it a row says "Inheriting the
+    // world default" and never says what, while a row-count assertion passes green.
     inheritNotes = {},
-    // ── WHAT A LOCKED CARD RENDERS (issue 1372) ────────────────────────────────────────────
-    // `{sourceName, sourceUuid, macroUuid, macroName}` — the WORLD DEFAULT, resolved by the
-    // editor, which is the half that holds the world entry. A locked card wears a `World default`
-    // pill, and before this prop existed it rendered the DRAFT's own source and macro underneath
-    // it: the same two fields the unlocked card edits, relabelled as the world's. That read as
-    // correct for as long as no card could be locked at all, and became visible the moment the
-    // lab world seeded an inheriting section. It is used ONLY by the two locked branches, so an
-    // unlocked card is byte-identical to what it rendered before.
+    // WHAT A LOCKED CARD RENDERS: the WORLD DEFAULT, resolved by the editor, which holds the world
+    // entry. Without it a locked card wore a `World default` pill over the DRAFT's own source and
+    // macro — the fields the unlocked card edits, relabelled as the world's. Used ONLY by the two
+    // locked branches, so an unlocked card is byte-identical to before.
     worldDefaults = {},
-    // WHETHER THIS ESSENCE HAS A SHARED WORLD DEFINITION. `true` is the system Essence Rules
-    // screen: each card carries its own inherit switch and the tab drops the explainer, because
-    // the cards state their own meaning and the tab is no longer one third of an editor. `false`
-    // is the CREATE draft, which has no world record, no sections to inherit and therefore no
-    // switches — and keeps the explainer, which is the only place a first-time GM is told what an
-    // essence can carry at all.
+    // WHETHER THIS ESSENCE HAS A SHARED WORLD DEFINITION. `true` is the rules screen, where each
+    // card carries its own switch and the tab drops the explainer; `false` is the CREATE draft,
+    // which has no sections to inherit and keeps the explainer a first-time GM needs.
     scoped = false,
-    // WHETHER THIS SYSTEM HAS A MEMBERSHIP RECORD to write an inherit switch onto. It is
-    // separate from `scoped` because the two states differ: an essence with a shared definition
-    // that this system has NOT adopted still gets the rules screen's copy and its callout, but
-    // has no record for a switch to write to, and a switch that wrote to nothing would report a
-    // state it could not hold.
+    // WHETHER THIS SYSTEM HAS A MEMBERSHIP RECORD to write a switch onto — separate from `scoped`,
+    // because an unadopted essence still gets the rules screen's copy while a switch would write
+    // to nothing and report a state it could not hold.
     inheritable = false,
     // The membership record's `inherit` map, read by `InheritRow`. An ABSENT key reads as
     // inheriting, matching `isSectionInherited`.
@@ -166,10 +120,9 @@
     )
   );
 
-  // ONE pill shape for both sections. SUPPRESSION OUTRANKS INHERITANCE, because a disabled
-  // essence carries nothing at all and where the value came from is the smaller fact; an
-  // INHERITED section then reports the world default, which is what the reference's macro card
-  // states; and only a section this system owns reports its own two states.
+  // ONE pill shape for both sections. SUPPRESSION OUTRANKS INHERITANCE, because a disabled essence
+  // carries nothing at all; an inherited section then reports the world default, and only a section
+  // this system owns reports its own two states.
   function sectionPill(locked, configured, configuredLabel, emptyLabel) {
     if (configured && disabledEssence) {
       return {
@@ -185,10 +138,9 @@
 
   const macroItem = $derived(macroUuid ? { name: macroName || macroUuid, img: '' } : null);
 
-  // The linked source, in the shape `ItemDropZone` renders. `img` is what makes the card show
-  // the real item art rather than the empty-drop glyph, so an unresolved link (a stored name
-  // with no component behind it) deliberately yields a card with the fallback bag icon rather
-  // than no card at all — the GM must be able to see and clear a link that no longer resolves.
+  // The linked source in `ItemDropZone`'s shape. `img` is what shows real item art rather than the
+  // empty-drop glyph, so an unresolved link yields a fallback-icon card rather than no card: the
+  // GM must be able to see and clear a link that no longer resolves.
   const sourceLinked = $derived(Boolean(selectedSource || sourceComponentId || storedSourceName));
   const sourceItem = $derived(
     sourceLinked
@@ -236,9 +188,8 @@
 
 <div class="manager-essence-tab-stack" data-essence-tab-panel={scoped ? 'rules' : 'oncraft'}>
   {#if !scoped}
-    <!-- THE CREATE DRAFT'S PRIMER. It is dropped on the rules screen, where each card carries
-         its own explanatory line and the shared-definition callout above them says which layer
-         is which — three sentences of the same subject stated twice. -->
+    <!-- THE CREATE DRAFT'S PRIMER, dropped on the rules screen where each card explains itself
+         and the shared-definition callout says which layer is which. -->
     <ExplainerCard
       icon="fas fa-circle-question"
       title={text(
@@ -268,12 +219,10 @@
   {/if}
 
   {#if effectTransferEnabled}
-    <!-- THE CONTROL HALF of the validation row action (issue 1517). The `source` warning — and
-         its system-scope twin — is about this card as a whole: the value is reached through a
-         drop zone, a picker or a locked read-only tile depending on state, and no one of the
-         three is present in every failing state. So the card is the destination and
-         `essenceStudio.js` addresses it as `essence-source`. It declares BOTH the tabindex that
-         makes the focus real and the attribute that tells Foundry the window is focused. -->
+    <!-- THE CONTROL HALF of the validation row action. The `source` warning is about this card as
+         a WHOLE: the value is reached through a drop zone, a picker or a locked tile by state, and
+         none of the three is present in every failing state, so the card is the destination. It
+         declares both the tabindex that makes focus real and the attribute Foundry reads. -->
     <section
       class="manager-edit-card"
       data-essence-section="effect-source"
@@ -318,15 +267,9 @@
       {/if}
 
       {#if sourceLocked}
-        <!-- LOCKED: this system inherits the section, so it does not own the value. A read-only
-             tile states what resolves and where it came from, and draws no drop target, no
-             picker and no unlink — the absence of `[data-scoped-source-unlink]` IS the lock.
-
-             NESTED RATHER THAN FLATTENED INTO ONE `{:else if}` CHAIN, deliberately. The
-             linked/unlinked pair below is pinned by `essence-studio-fidelity.test.js` as
-             `{#if sourceLinked}` with the drop-or-pick zone strictly after its `{:else}` — the
-             assertion that stopped the zone rendering twice — and folding this branch into that
-             chain would rewrite the very structure that pin exists to hold. -->
+        <!-- LOCKED: a read-only tile states what resolves and whence, drawing no drop target,
+             picker or unlink — that absence IS the lock. NESTED rather than flattened into one
+             `{:else if}` chain, whose shape `essence-studio-fidelity.test.js` pins. -->
         <div class="manager-essence-locked-card" data-scoped-source-locked="effectSource">
           <span class="manager-essence-locked-glyph" aria-hidden="true"
             ><i class="fas fa-wand-magic-sparkles"></i></span
@@ -343,11 +286,9 @@
         </div>
       {:else}
         {#if sourceLinked}
-          <!-- The Tool Studio's linked card, from the same primitive `ToolOverviewTab` renders.
-             The sub-line is the INSTRUCTION, not the uuid: the card is itself the drop
-             target, and telling the GM so is the thing the uuid was occupying the line
-             instead of doing. The address has its own mono line above it since issue 1372,
-             which is the reference's own three-line tile. -->
+          <!-- The Tool Studio's linked card, from the same primitive. The sub-line is the
+             INSTRUCTION, not the uuid: the card IS the drop target, and the address has its own
+             mono line above it. -->
           <ItemDropZone
             item={sourceItem}
             kind="essence-source"
@@ -373,10 +314,9 @@
             unlinkAttr="data-scoped-source-unlink"
           />
         {:else}
-          <!-- UNLINKED only. `EssenceSourceSelector` is the drop-or-PICK affordance, and the
-             pick half is why it survives at all: an essence source is an in-system managed
-             component, so there is a list to choose from that a document drop zone cannot
-             offer. Rendering it BESIDE the linked card is what said the same thing twice. -->
+          <!-- UNLINKED only. The PICK half is why `EssenceSourceSelector` survives: an essence
+             source is an in-system managed component, so there is a list a document drop zone
+             cannot offer. Rendering it beside the linked card said the same thing twice. -->
           <div class="manager-essence-source-drop-zone">
             <EssenceSourceSelector
               value={null}
@@ -437,18 +377,12 @@
         </div>
       {/if}
 
-      <!-- `documentType="Macro"` is what makes the shared drop zone accept a Macro rather
-           than an Item, and `state="missing"` is what paints an unresolvable link as
-           broken. A broken macro link is otherwise indistinguishable from a working one:
-           at craft time an unresolvable uuid is logged and SKIPPED SILENTLY, deliberately,
-           because a toast would fire once per essence per result on the crafting player's
-           screen for a GM-side authoring defect. -->
-      <!-- `hint` is the INSTRUCTION, not the uuid (issue 1036, maintainer round 2). It was
-           `macroUuid`, and `macroItem.name` falls back to the same uuid when the macro does
-           not resolve — which is precisely the lab's state — so the card rendered
-           `Macro.lab-aether-binding` as its title AND again as its sub-line. The Tool Studio
-           gives that line to a useful sentence, so this does too; the address is the mono
-           line issue 1372 adds, which is a different slot from the sub-line. -->
+      <!-- `documentType="Macro"` makes the shared drop zone accept a Macro, and `state="missing"`
+           paints an unresolvable link as broken — otherwise indistinguishable from a working one,
+           since at craft time such a uuid is logged and SKIPPED SILENTLY rather than toasting a
+           player once per essence per result for a GM-side defect. -->
+      <!-- `hint` is the INSTRUCTION, not the uuid, which `macroItem.name` falls back to when the
+           macro does not resolve, so the card rendered it as title AND sub-line. -->
       {#if macroLocked}
         <!-- LOCKED, for the same reason and with the same consequence as the source card. -->
         <div class="manager-essence-locked-card" data-scoped-macro-locked="macro">
@@ -510,15 +444,10 @@
 </div>
 
 <style>
-  /* THE INHERIT SWITCH'S OWN BOX. `InheritRow` renders a bare stacked row — head, note, switch —
-     which is the right shape for a group of them under a heading. Inside a card it needs to read
-     as a control strip rather than as more of the card's copy, so this slot gives it the
-     reference's bordered row with the switch pulled to the trailing edge.
-
-     `:global(...)` on every child selector because those elements are rendered by `InheritRow`,
-     not by this component, and a scoped selector would carry this file's `svelte-<hash>` and
-     match nothing. The SLOT keeps its scoping, so none of this escapes into another caller of
-     the same row. */
+  /* THE INHERIT SWITCH'S OWN BOX: `InheritRow` renders a bare stacked row, right under a heading
+     and wrong inside a card, so this slot gives it a bordered strip with the switch at the trailing
+     edge. `:global(...)` on every child, because `InheritRow` writes those elements; the SLOT keeps
+     its scoping, so none of it escapes. */
   .manager-essence-inherit-slot {
     min-width: 0;
   }
@@ -544,10 +473,8 @@
     grid-row: 1 / -1;
   }
 
-  /* THE LOCKED VALUE TILE. Static class names, so Svelte can prove each selector is used and
-     `lint:svelte:warnings` stays at zero. It is deliberately NOT `ItemDropZone`: that primitive
-     is a drop target in both of its states, and an inherited section must present no edit
-     affordance at all. */
+  /* THE LOCKED VALUE TILE, deliberately NOT `ItemDropZone`, which is a drop target in both of its
+     states where an inherited section must present no edit affordance at all. */
   .manager-essence-locked-card {
     display: flex;
     align-items: center;
@@ -600,11 +527,8 @@
     gap: var(--fab-space-3);
   }
 
-  /* SENTENCE CASE, AT FULL INK. See `SharedDefinitionCallout.svelte`'s twin of this rule for the
-     whole argument: `.manager-card-title` is the manager's uppercase micro-label, the reference
-     draws these two as `Active effect source` and `Macro on craft`, and the Checks Studio already
-     set the precedent for retiring the treatment per-card rather than globally. Compounded so the
-     rule is (0,3,0) against the global's (0,2,0). */
+  /* SENTENCE CASE, AT FULL INK — see `SharedDefinitionCallout.svelte`'s twin for the argument.
+     Compounded so the rule is (0,3,0) against the global's (0,2,0). */
   .manager-card-title.manager-essence-card-title {
     color: var(--fab-text);
     font-size: 0.86rem;

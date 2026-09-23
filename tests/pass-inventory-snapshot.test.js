@@ -1,24 +1,4 @@
-/**
- * The ONE per-pass inventory snapshot (issue 1228, under #1070).
- *
- * #1077 shipped two production snapshots that injected DISJOINT collaborator sets, so a
- * snapshot built for one path silently answered the other one wrongly. This file proves three
- * things, in this order, because the third is worthless without the second:
- *
- * 1. **The hazard was real, in both directions.** Both half-snapshots are constructed here and
- *    handed the question they were not built for, and the resulting wrong answers are asserted
- *    as VALUES. Without this the tests below would be a description of a fix rather than
- *    evidence of one.
- * 2. **The two directions fail differently, and that asymmetry is the whole reason the
- *    unification is worth doing.** A visibility-shaped snapshot handed to the tallies path
- *    answers `available: false` for a recipe the actor can plainly make — wrong, but loud. A
- *    tallies-shaped snapshot handed to the visibility path returns every held document
- *    unfiltered and the per-recipe matcher then produces the IDENTICAL answer — the #1077
- *    defect reinstated with every correctness assertion green.
- * 3. **Unification changes no answer.** The unified snapshot's answers are compared to the two
- *    pre-unification shapes' CORRECT answers, field by field, rather than merely asserted to
- *    be sensible.
- */
+/** The ONE per-pass inventory snapshot (issue 1228, under #1070). */
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -99,11 +79,8 @@ const LEGACY_RECIPE = {
 const resolveComponent = (item) => COMPONENTS.find((entry) => entry.name === item.name) ?? null;
 
 /**
- * One crafting actor holding: the member book, the legacy book, three units of Iron, and
- * `mundane` documents that resolve to nothing at all.
- *
- * The mundane majority is load bearing rather than realism dressing — it is the entire gap
- * between "the matcher was offered the books" and "the matcher was offered the inventory".
+ * One crafting actor holding: the member book, the legacy book, three units of Iron, and `mundane`
+ * documents that resolve to nothing at all.
  */
 function makeWorld({ mundane = 6 } = {}) {
   const items = [
@@ -120,9 +97,7 @@ function makeWorld({ mundane = 6 } = {}) {
 const uuidsOf = (entries) => entries.map((entry) => entry.item.uuid);
 const mapToObject = (map) => Object.fromEntries([...map.entries()].sort());
 
-// ---------------------------------------------------------------------------
 // 1. The hazard, constructed and measured in both directions
-// ---------------------------------------------------------------------------
 
 describe('the two pre-unification half-snapshots answer the other path WRONGLY', () => {
   it('a tallies-shaped snapshot offers the visibility path every held document — silently', () => {
@@ -164,9 +139,7 @@ describe('the two pre-unification half-snapshots answer the other path WRONGLY',
   });
 });
 
-// ---------------------------------------------------------------------------
 // 2. The unified snapshot answers both, and answers them the same way
-// ---------------------------------------------------------------------------
 
 describe('the unified pass snapshot serves both consumers from ONE value', () => {
   it('filters the visibility offer AND resolves the tallies, from the same snapshot', () => {
@@ -222,9 +195,7 @@ describe('the unified pass snapshot serves both consumers from ONE value', () =>
   });
 });
 
-// ---------------------------------------------------------------------------
 // 3. The legacy book link, now owned by the snapshot rather than by one caller
-// ---------------------------------------------------------------------------
 
 describe('the candidate superset carries every legacy book link in the pass', () => {
   it('offers the book of a recipe that carries ONLY linkedRecipeItemUuid', () => {
@@ -260,9 +231,7 @@ describe('the candidate superset carries every legacy book link in the pass', ()
   });
 });
 
-// ---------------------------------------------------------------------------
 // 4. Every production builder produces the SAME kind of value
-// ---------------------------------------------------------------------------
 
 describe('every production pass snapshot is a complete one', () => {
   const READ_API = ['heldItems', 'recipeItemCandidates', 'componentTallies'];
@@ -281,18 +250,11 @@ describe('every production pass snapshot is a complete one', () => {
   });
 
   it('cannot be built without the recipe-item matcher', () => {
-    // BEHAVIOURAL, not textual. An earlier draft asserted on the module source — that the
-    // matcher is passed and is not a parameter — and both halves were fragile in ways that
-    // matter in a repository with this one's history of checks that observe nothing: the
-    // first breaks on any Prettier reflow splitting the property across lines, and the second
-    // passes for an undefaulted destructured parameter (`matchesRecipeItem,`). They held only
-    // because each covered the other's gap.
-    //
-    // The discriminator below needs neither. A system that authors NO recipe-item definitions
-    // can have no book candidates, so a snapshot holding the matcher answers the empty set
-    // without walking the inventory at all; a snapshot with no matcher has nothing to filter
-    // with and falls back to offering every held document. The two answers differ on exactly
-    // the collaborator under test, over a fixture in which no item need match anything.
+    // BEHAVIOURAL, not textual. An earlier draft asserted on the module source — that the matcher
+    // is passed and is not a parameter — and both halves were fragile in ways that matter in a
+    // repository with this one's history of checks that observe nothing: the first breaks on any
+    // Prettier reflow splitting the property across lines, and the second passes for an undefaulted
+    // destructured parameter (`matchesRecipeItem,`).
     const world = makeWorld();
     const bookless = { id: 'sys-bookless', components: COMPONENTS, recipeItemDefinitions: [] };
 

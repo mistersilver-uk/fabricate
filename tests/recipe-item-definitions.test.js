@@ -56,9 +56,8 @@ test('_normalizeComponentDescription does not stringify unknown objects', () => 
 });
 
 test('_normalizeComponentDescription NORMALIZES stored text and resolves nothing (issue 800)', () => {
-  // The synchronous normalizer is reached from `_normalizeComponent` across nine call
-  // sites and deliberately stays synchronous: resolution happens only at the async
-  // ingestion boundaries.
+  // The synchronous normalizer is reached from `_normalizeComponent` across nine call sites and
+  // deliberately stays synchronous: resolution happens only at the async ingestion boundaries.
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
 
   // It NORMALIZES: markup is stripped and an unregistered LABELLED directive falls
@@ -76,9 +75,8 @@ test('_normalizeComponentDescription NORMALIZES stored text and resolves nothing
   assert.equal(manager._normalizeComponentDescription(labelless), labelless);
 });
 
-// `_extractSourceDescription` is ASYNC since issue 800 — it awaits the `enrichToHtml`
-// seam before normalizing. That signature change is the reason this suite legitimately
-// changes; the CONSTRUCTOR change is the one that must be invisible to existing tests.
+// `_extractSourceDescription` is ASYNC since issue 800 — it awaits the `enrichToHtml` seam before
+// normalizing.
 test('_extractSourceDescription skips object fallback text instead of returning object strings', async () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
 
@@ -104,9 +102,7 @@ test('_extractSourceDescription skips object fallback text instead of returning 
   );
 });
 
-// ---------------------------------------------------------------------------
 // System-wide recipe visibility strategy (issue 511) — caps moved off knowledge
-// ---------------------------------------------------------------------------
 
 test('_normalizeRecipeVisibility keeps only strategy fields (mode + dragDropEnabled); caps are gone', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
@@ -129,9 +125,7 @@ test('_normalizeRecipeVisibility keeps only strategy fields (mode + dragDropEnab
   assert.equal('limitRecipes' in normalized.knowledge.learn, false);
 });
 
-// ---------------------------------------------------------------------------
 // Flat system-level visibility strategy enum (issue 511, PR-B)
-// ---------------------------------------------------------------------------
 
 test('_normalizeVisibilityMode passes through the four valid modes', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
@@ -163,9 +157,7 @@ test('_normalizeSystem emits visibilityMode (default knowledge, valid pass-throu
   );
 });
 
-// ---------------------------------------------------------------------------
 // Per-recipe-item caps (issue 511) — model normalization
-// ---------------------------------------------------------------------------
 
 test('_normalizeRecipeItemDefinition seeds an uncapped caps block when none is authored', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
@@ -201,9 +193,7 @@ test('_normalizeRecipeItemDefinition seeds an uncapped caps block when none is a
   assert.equal(def.enabled, true);
 });
 
-// ---------------------------------------------------------------------------
 // Expanded recipe-item model (issue 511, PR-B) — enabled + whenSpent/learningMode
-// ---------------------------------------------------------------------------
 
 test('_normalizeRecipeItemDefinition round-trips enabled:false and defaults it to true', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
@@ -515,10 +505,7 @@ test('migrateLegacyRecipeItems reuses one recipe item definition for shared lega
   assert.equal(recipesSaved, true);
 });
 
-// Issue 978. A manager save persisted `containingDefinitions[0]` onto the recipe. Book
-// membership lives on the definition, so for a recipe that IS a member through
-// `recipeIds[]` the scalar is noise that arms the four legacy image resolvers (issue 887).
-// The same un-gated pass that mints-and-stamps the alchemy cohort now clears it.
+// Issue 978. A manager save persisted `containingDefinitions[0]` onto the recipe.
 test('migrateLegacyRecipeItems clears a leaked recipeItemId but spares the alchemy cohort', async () => {
   let recipesSaved = false;
   const recipes = [
@@ -787,11 +774,9 @@ test('RecipeVisibilityService matches recipeItemId through the system recipe ite
   assert.equal(service._isMatchingRecipeItem(recipe, item), true);
 });
 
-// `_migrateLegacyRecipeItems` runs from `initialize()` — BEFORE runStartupMaintenance's
-// error isolation and before `ready` is set — and its two saves write the
-// `craftingSystems` and `recipes` WORLD settings. On a player client that rejection
-// escapes `initialize()`, so `initialized` never flips and every facade method throws
-// through `_requireReady()` for the whole session (the issue-970 failure mode).
+// `_migrateLegacyRecipeItems` runs from `initialize()` — BEFORE runStartupMaintenance's error
+// isolation and before `ready` is set — and its two saves write the `craftingSystems` and `recipes`
+// WORLD settings.
 
 function legacyMigrationFixture() {
   const saves = { systems: 0, recipes: 0 };

@@ -1,16 +1,12 @@
 /**
- * Ratchets the oversized files and functions under `src/` (issue 1659), so every Phase 4 and 5
- * extraction lowers a number rather than reporting a win nothing checked.
- *
- * Lines are PHYSICAL, comments and blanks included, which is the measure the issue's own figures
- * use. A change that only edits comments can therefore push a unit across a threshold; it re-pins
- * here in the same commit.
+ * Bounds the oversized files and functions under `src/` (issue 1659), so a unit this epic exists
+ * to shrink cannot grow materially, and a unit that shrinks costs no ledger edit (issue 1914).
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 
-import { byCodePoint, pinnedLedgerGate } from './helpers/ratchetBaseline.js';
+import { byCodePoint, ceilingLedgerGate } from './helpers/ratchetBaseline.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 import {
   FILE_THRESHOLDS,
@@ -22,19 +18,25 @@ import {
 
 const LEDGER_PATH = resolve(import.meta.dirname, 'file-size-ledger.txt');
 
-const REGENERATE =
-  'UPDATE_FILE_SIZE_LEDGER=1 node --conditions=browser --test ' +
-  'tests/file-size-ledger.test.js, then review the diff';
+const RUN = 'node --conditions=browser --test tests/file-size-ledger.test.js';
 
 const SCANNED_EXTENSIONS = Object.freeze(['.js', '.mjs', '.svelte']);
 
+/** Below this the scan is truncated rather than clean; `src/` holds ~840 scanned files. */
+const SCAN_FLOOR = 501;
+
+/** Enough rows that a truncated scan cannot regenerate the ledger down to a handful. */
+const ROW_FLOOR = 150;
+
+/** A file row rounds to fifty lines, a function row to ten; both after five percent of headroom. */
+function ceilingFor(key, lines) {
+  const step = key.includes('::') ? 10 : 50;
+  return Math.ceil((lines * 1.05) / step) * step;
+}
+
 const extensionOf = (file) => file.slice(file.lastIndexOf('.'));
 
-/**
- * `path` for an oversized file, `path::qualified>symbol` for an oversized function. A component's
- * file size is the whole file — markup, script and style — matching the figures the issue quotes,
- * while its functions are read from the script blocks.
- */
+/** `path` for an oversized file, `path::qualified>symbol` for an oversized function. */
 function buildLedger() {
   const corpus = collectSources(resolve(repoRoot, 'src'), { extensions: [...SCANNED_EXTENSIONS] });
   const entries = [];
@@ -63,25 +65,34 @@ function buildLedger() {
       if (unit.lines > FUNCTION_THRESHOLD) entries.push([`${file}::${unit.symbol}`, unit.lines]);
     }
   }
-  return Object.fromEntries(entries.sort(([left], [right]) => byCodePoint(left, right)));
+  return {
+    observed: Object.fromEntries(entries.sort(([left], [right]) => byCodePoint(left, right))),
+    scanned: Object.keys(corpus).length,
+  };
 }
 
-const gate = pinnedLedgerGate({
+const gate = ceilingLedgerGate({
   test,
   assert,
-  title: 'the file-size ledger matches the pinned baseline exactly',
+  title: 'no oversized file or function under `src/` is past its ledger ceiling',
   ledgerPath: LEDGER_PATH,
-  regenerateEnv: 'UPDATE_FILE_SIZE_LEDGER',
+  updateEnv: 'UPDATE_FILE_SIZE_LEDGER',
+  tightenEnv: 'TIGHTEN_FILE_SIZE_LEDGER',
   build: buildLedger,
-  subject: 'oversized files and functions',
-  regenerate: REGENERATE,
-  structuralHint:
-    'A unit appears when it crosses its threshold and vanishes when it falls below; an ' +
-    'extraction is expected to remove entries, and adding one needs a reason. A `#N` suffix ' +
-    'is positional among same-named functions, so an added or removed sibling renumbers those ' +
-    'after it: a matched added/removed pair at the same line count is that renumber, not debt.',
-  roseHint: 'means a unit this epic exists to shrink has grown instead',
-  fellHint: 'needs the ledger lowered to bank the extraction',
+  ceiling: ceilingFor,
+  shrink: 'allow',
+  floor: SCAN_FLOOR,
+  wording: {
+    subject: 'oversized files and functions',
+    update: `UPDATE_FILE_SIZE_LEDGER=1 ${RUN}`,
+    tighten: `TIGHTEN_FILE_SIZE_LEDGER=1 ${RUN}`,
+    addedHint:
+      'A unit with no row has just crossed its threshold, and adding to the nearest large file ' +
+      'instead of extracting one is the shape this gate exists to catch. A `#N` suffix is ' +
+      'positional among same-named functions, so an added or removed sibling renumbers those ' +
+      'after it: a new row matching a dropped one at the same size is that renumber, not debt.',
+    staleHint: 'A row vanishes when its unit falls below the threshold, which is a win.',
+  },
 });
 
 test('the thresholds are the two the issue states, and exclusive', () => {
@@ -220,43 +231,28 @@ test('an inline handler in the markup is measured, not only the script blocks', 
   assert.equal(measured[0].lines, 3);
 });
 
+test('the headroom is proportional, so it is five percent of the unit at any size', () => {
+  // A fixed grid would hand a just-crossed file most of a step for free and the largest file
+  // almost nothing; these four are the sizes the ledger actually holds.
+  assert.equal(ceilingFor('a.svelte', 502), 550);
+  assert.equal(ceilingFor('a.js', 819), 900);
+  assert.equal(ceilingFor('src/main.js', 16609), 17450);
+  assert.equal(ceilingFor('a.js::fn', 101), 110);
+  assert.ok(ceilingFor('a.js', 800) > 800, 'a ceiling is never below the unit it bounds');
+});
+
 test('the ledger reports the two figures epic 1656 tracks', (t) => {
-  // The one pair a reviewer can check against the issue without reading 229 rows.
+  // The pair a reviewer checks against the issue without reading the rows. Floored rather than
+  // pinned: the exact targets live on #1656, and pinning them here is a second conflict site.
   if (gate.regenerated()) return t.skip('this run rewrote the ledger');
-  const keys = Object.keys(gate.pinned());
+  // Read off the SCAN, not the committed file: a scan that stopped matching leaves the ledger
+  // byte-identical, so a floor read off the file clears while nothing at all was measured.
+  const keys = Object.keys(gate.current().observed);
   const files = keys.filter((key) => !key.includes('::')).length;
-  // 127/124 as of issue 1648. `src/systems/journalRunAuthority.js` crossed the 800-line file
-  // threshold at 820, and `createFoundryJournalRunAuthority` crossed the 100-line function
-  // threshold at 113, when the claim-release repair taught `deleteClaim` to tolerate a page the
-  // server has already removed — `entry.pages` is broadcast-fed, so a stale local copy made
-  // `deleteEmbeddedDocuments` throw and stranded a run.
-  //
-  // Recorded as debt rather than absorbed: the epic tracks these two figures so a rise is
-  // visible, and this one is. The obvious remedy is to re-home the three claim-PAGE adapters
-  // (`createClaim`/`readClaim`/`deleteClaim`) beside arbitration in `journalRunLedger.js`,
-  // which is where the knowledge that a claim is an embedded page with a fixed `_id` belongs;
-  // that is a pure move and it takes the file back under. It is deliberately NOT bundled into
-  // the defect fix a blocked maintainer was waiting on.
-  // 128 as of the consumption-record repair: `src/ui/svelte/apps/journal/StepDetails.svelte`
-  // crossed at 535. A started stage now renders its recorded RECEIPT where it used to render a
-  // live held-against-needed probe of an inventory the stage had already emptied, so the file
-  // carries both surfaces and the rule that picks between them.
-  //
-  // Recorded as debt rather than absorbed, and the remedy is the seam the change already drew:
-  // the receipt is a self-contained surface reading `consumptionRecord` alone, so it lifts into
-  // its own component without a prop thread back. That move also gains it a mount test of its
-  // own, which the block cannot have while it is one branch inside a larger file. Not bundled
-  // here, because a blocked maintainer is waiting on the defect this commit fixes, and a new
-  // `.svelte` child additionally has to join `writeCompiledSvelte` and four mount harnesses.
-  // 126 after merging origin/main, which condensed 38 component headers and took Chip and
-  // IconButton back under the .svelte threshold -- two of this branch's entries removed by
-  // someone else's work rather than by ours.
-  // 127 after the 1.9.7 hotfix (#1848): `src/systems/GatheringEnvironmentStore.js` crossed at
-  // 858 when a save learned to prune a stale realm id the persisted record already carried
-  // instead of rejecting every environment write. Recorded as debt rather than absorbed, because
-  // the change shipped from the hotfix line and a restructure there widens a `fix:`-only
-  // release; the remedy is to lift the realm-membership baseline and prune helpers into their
-  // own module, tracked on #1858.
-  assert.equal(files, 127, 'oversized files');
-  assert.equal(keys.length - files, 124, 'oversized functions');
+  t.diagnostic(`${files} oversized files and ${keys.length - files} oversized functions`);
+  assert.ok(
+    keys.length > ROW_FLOOR,
+    `only ${keys.length} units measured, below the floor of ${ROW_FLOOR}; a truncated scan ` +
+      'would look exactly like this'
+  );
 });

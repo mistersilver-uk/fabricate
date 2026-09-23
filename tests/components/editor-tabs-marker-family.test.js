@@ -1,43 +1,18 @@
-/**
- * The Rail Marker Family, as a capability of the manager's ONE editor tab strip.
- *
- * `DOMAIN.md`'s **Rail Marker Family** and design-system `spec.md`'s "Near-neighbour
- * primitives are routed by a stated rule" both say the same thing: the family is FOUR marks
- * that MUST NOT be substituted for one another, and which mark a strip draws is decided by
- * what the mark MEANS, never by which strip it sits in. Before issue 1429 `EditorTabs` could
- * draw exactly one of them — the issue-summary chip — so a caller with a record count had two
- * options, both wrong: draw the count as a chip (`KnowledgeTabs` did, and that is the
- * substitution the spec forbids by name) or keep a second hand-rolled strip
- * (`ChecksEditorTabs` did, and it was RIGHT about the marks while the primitive was too
- * narrow to express them).
- *
- * So the vehicle is a property of the MARK and the drawing belongs to the primitive. These
- * assertions are the closure property: a caller names a vehicle, and there is no route by
- * which it can supply a drawing of its own.
- *
- * WHY THE DOT'S ACCESSIBLE NAME IS ASSERTED AS A PRECONDITION OF RENDERING AT ALL
- * ------------------------------------------------------------------------------
- * The dot carries no text. `styles/fabricate.css` states the rule in the rail's own marker
- * block — "Distinguishing 2 from 3 by colour alone would fail every GM who cannot separate
- * them, so the difference is carried by shape and by name and only reinforced by colour" — so
- * a dot with no name is not a degraded mark, it is an unreadable one. The primitive drops it
- * rather than emitting it, on the same rule `Chip` drops an unknown tone.
- */
+/** The Rail Marker Family, as a capability of the manager's ONE editor tab strip. */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-editor-tabs-family-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
   compiledModules: [
-    // The manager's ONE chip (issue 883), which is how the strip draws the ISSUE-SUMMARY
-    // vehicle. A `.svelte` the tree renders but the harness omits HANGS the suite
-    // (# cancelled) rather than failing it.
+    // The manager's ONE chip (issue 883).
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/EditorTabs.svelte',
   ],
@@ -76,18 +51,7 @@ function marksOn(button) {
 }
 
 describe('EditorTabs emits the namespace root its rules are anchored on (issue 1509)', () => {
-  /*
-   * THE ONE ASSERTION IN THIS REPOSITORY THAT READS THE RENDERED ROOT.
-   *
-   * Every other guard on this family reads SOURCE TEXT: the area-scope gate reads the markup and
-   * the frozen class map, the sheet census reads the selectors, the fixture clauses read strings
-   * in `tests/`. All of them are satisfied by a component that DECLARES `fabricate-tabs` and
-   * stops rendering it on its root element — at which point every re-rooted rule in the sheet
-   * matches nothing and the strip draws unstyled in every host, including the manager.
-   *
-   * So this is read off the mounted DOM, in the shape `manager-button-mounted.test.js:83` uses,
-   * in the suite that already mounts this component.
-   */
+  /* THE ONE ASSERTION IN THIS REPOSITORY THAT READS THE RENDERED ROOT. */
   it('writes `fabricate-tabs` on the tablist, ahead of the caller`s container class', async () => {
     const root = await harness.mount({ tabs: TABS, activeTab: 'roll' });
     const tablist = root.querySelector('[role="tablist"]');
@@ -102,11 +66,7 @@ describe('EditorTabs emits the namespace root its rules are anchored on (issue 1
   });
 
   it('keeps the root when a caller supplies its own container class', async () => {
-    // THE CALLER VOCABULARY IS THE POINT, not an extra case. Nine wrappers pass a
-    // `containerClass` of their own — `manager-environment-tabs`, `manager-tool-editor-tabs`,
-    // `manager-editor-tabs manager-knowledge-tabs` — and the root is written AHEAD of whatever
-    // they pass rather than as one of the values they could replace. A root a caller can drop is
-    // a root the sheet cannot rely on.
+    // THE CALLER VOCABULARY IS THE POINT.
     const root = await harness.mount({
       tabs: TABS,
       activeTab: 'roll',
@@ -327,27 +287,7 @@ describe('EditorTabs draws the Rail Marker Family (issue 1429)', () => {
   });
 });
 
-/**
- * THE PASS MARK IS A LABEL (issue 1372, maintainer parity round 8), and the family takes NO glyph
- * from a caller at all.
- *
- * The scoped entry editors' Validation tab reads `Validation` plus a tick when everything passes,
- * because the other two outcomes are counts and a chip reading `0` states the opposite of what it
- * means. That tick briefly arrived as an `icon` property on the mark, defended as "a property of
- * the chip, not a fourth vehicle" — but a call site passing `fas fa-check` IS a call site choosing
- * a shape, which is the one thing the family's closure forbids.
- *
- * The reference settles it: its tab badge is ONE pill in two states,
- * `badge: iss.block.length ? String(iss.block.length) : '✓'` (`proto:6221`-`6223`), a numeral
- * or a tick CHARACTER in the same box, toned danger or recessive. So the pass mark was never a
- * glyph and never a fourth vehicle — it is the issue chip's own LABEL.
- *
- * WHY THIS FILE PINS IT
- * ---------------------
- * The `icon` property is gone, and an absence is exactly what a mounted render cannot notice on
- * its own: a re-added `icon` would render a glyph and every other assertion in this suite would
- * still pass. So the ban is asserted here, beside the emptiness rules it used to interact with.
- */
+/** THE PASS MARK IS A LABEL (issue 1372, maintainer parity round 8). */
 describe('EditorTabs takes no glyph from a caller (issue 1372)', () => {
   it('draws a tick as the ISSUE chip label, in the same box a count uses', async () => {
     const root = await harness.mount({

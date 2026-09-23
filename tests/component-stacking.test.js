@@ -1,14 +1,6 @@
 /**
- * Issue 858 — created components stack onto a matching inventory item instead of
- * spawning duplicate stacks.
- *
- * Two layers:
- *  1. The pure create-vs-update seam {@link createOrStackComponentItem}: with a
- *     stubbed actor/item, it CREATES when nothing matches and UPDATES the existing
- *     item's quantity (never creating) when a match is supplied.
- *  2. The salvage engine end-to-end: recovering a component the actor ALREADY holds
- *     (resolved by durable component identity) increments that item's quantity and
- *     creates NO new item; recovering one with no match creates a single new item.
+ * Issue 858 — created components stack onto a matching inventory item instead of spawning duplicate
+ * stacks.
  */
 
 import assert from 'node:assert/strict';
@@ -22,9 +14,7 @@ import {
   createOrStackComponentItem,
 } from '../src/systems/componentStacking.js';
 
-// ---------------------------------------------------------------------------
 // Foundry-ish globals (dotted get/set only; no cascade needed here)
-// ---------------------------------------------------------------------------
 
 function getProperty(obj, path) {
   if (!obj || !path) return undefined;
@@ -94,9 +84,7 @@ test('native salvage retains a confirmed consumption prefix and refuses the same
   assert.equal(actor.createdItems.length, 0);
 });
 
-// ---------------------------------------------------------------------------
 // Builders
-// ---------------------------------------------------------------------------
 
 /**
  * @param {object} [opts]
@@ -200,9 +188,7 @@ function setupSalvageGame(system, actor) {
   return salvageRunManager;
 }
 
-// ---------------------------------------------------------------------------
 // 1. Pure create-vs-update seam
-// ---------------------------------------------------------------------------
 
 test('createOrStackComponentItem creates a new item when no match is supplied', async () => {
   const actor = makeActor('a1');
@@ -270,9 +256,7 @@ test('awardedQuantityOf prefers the award tag and falls back to the item quantit
   assert.equal(awardedQuantityOf(untagged), 7, 'falls back to the item quantity');
 });
 
-// ---------------------------------------------------------------------------
 // 2. Salvage engine end-to-end
-// ---------------------------------------------------------------------------
 
 function makeSalvageWorld({ existingRecovered = null, recoverQuantity = 2 } = {}) {
   const systemId = 'sys-1';

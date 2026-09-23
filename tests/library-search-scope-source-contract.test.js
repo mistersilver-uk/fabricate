@@ -1,28 +1,6 @@
 /**
- * The library-search route-scope contract (issue 1462).
- *
- * The manager clears the store-backed library searches whenever the GM's navigation SCOPE
- * changes, where the scope is `browserViewForScopeChange` — the same browser/detail-editor
- * map a crafting-system scope change already uses. That map is what makes the one preserved
- * round trip (a browser and its own detail editor) fall out of an existing structure rather
- * than a second hand-maintained list.
- *
- * The property pinned here is the one a first draft of that feature violated:
- *
- *   a route that WRITES a library search must not share a search scope with any other
- *   reachable route, except the detail editor the map deliberately pairs it with.
- *
- * The draft wrapped the scope in a `SEARCH_SCOPED_BROWSERS` set and returned `null` for
- * anything outside it, which collapsed EVERY non-library route onto one shared scope. So
- * `access` — which renders its own recipe search box and writes the shared term — sat at the
- * same scope as `tags`, the two never compared unequal, and Access -> Tags & Categories
- * cleared nothing. Tags counts vocabulary references over the filtered recipe rows, and a
- * referenced entry that reads `Unused` there deletes in ONE click with no confirm strip.
- *
- * This is a SOURCE scan because `searchScopeForView` and `SCOPE_BROWSER_BY_VIEW` are private
- * to the root component and cannot be imported. It is written to fail loudly rather than
- * quietly: every derived collection is asserted non-empty first, because a mechanical grep
- * that matches nothing passes in silence and this repository has shipped that.
+ * The library-search route-scope contract (issue 1462). The property pinned here is the one a first
+ * draft of that feature violated:
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -63,12 +41,7 @@ function reachableRoutes() {
   return [...new Set([...guards, ...Object.keys(SCOPE_BY_VIEW)])].sort();
 }
 
-/**
- * Every route that WRITES a store-backed library search, with the term it writes.
- *
- * The owning route is the nearest preceding `currentView === '…'` guard, which is how the
- * router's `{:else if}` chain expresses "this route renders this surface".
- */
+/** Every route that WRITES a store-backed library search, with the term it writes. */
 function searchWriterRoutes() {
   const guards = [...source.matchAll(/currentView === '([a-z0-9-]+)'/g)].map((m) => ({
     route: m[1],
@@ -86,10 +59,7 @@ function searchWriterRoutes() {
 }
 
 describe('manager library-search route scope', () => {
-  // An EXACT set, not a subset, and deliberately so. A fourth surface binding one of these
-  // pairs is exactly the change that has to re-answer the question below, so it fails here
-  // and is added in the same commit. It also proves the scan is not vacuous: a grep that
-  // silently stopped matching would empty this and fail, rather than pass.
+  // An EXACT set, not a subset, and deliberately so.
   const EXPECTED_WRITERS = [
     { route: 'access', term: 'setRecipeSearch' },
     { route: 'components', term: 'setItemSearch' },
@@ -101,15 +71,9 @@ describe('manager library-search route scope', () => {
       ? left.term.localeCompare(right.term)
       : left.route.localeCompare(right.route);
 
-  // THE ASSERTION THAT KEEPS THE OTHERS HONEST.
-  //
-  // Everything below MODELS `searchScopeForView` from `SCOPE_BROWSER_BY_VIEW`, and that model
-  // is sound only while the real function is exactly `browserViewForScopeChange`. The draft
-  // that shipped the defect wrapped it in a `SEARCH_SCOPED_BROWSERS` set returning `null` for
-  // anything outside two routes — a change a map-derived model cannot see at all, which would
-  // leave every case here passing over the exact defect they exist to catch. So the bodies of
-  // both functions are pinned verbatim: a wrapper, a set, or any second source of truth about
-  // which routes own a search fails HERE, loudly, instead of going quiet everywhere else.
+  // THE ASSERTION THAT KEEPS THE OTHERS HONEST. Everything below MODELS `searchScopeForView` from
+  // `SCOPE_BROWSER_BY_VIEW`, and that model is sound only while the real function is exactly
+  // `browserViewForScopeChange`.
   it('derives the scope from the browser map alone, with no second source of truth', () => {
     const scopeBody = source.match(/function searchScopeForView\(view\) \{([\s\S]*?)\n {2}\}/);
     assert.ok(scopeBody, 'searchScopeForView is still a declared function in the root');

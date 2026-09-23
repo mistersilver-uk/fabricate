@@ -1,0 +1,11 @@
+manager-essences-normal
+manager-essences-stacked
+manager-essences-disabled-in-use
+manager-essences-source-picker
+manager-essences-grid
+manager-essences-bulk-edit
+manager-essences-bulk-delete-armed
+manager-essence-edit-first-state
+manager-essence-edit-on-craft
+manager-essence-edit-validation
+manager-essences-membership-all

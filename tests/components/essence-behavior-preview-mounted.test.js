@@ -1,18 +1,11 @@
-/**
- * `EssenceBehaviorPreview` mounted, in isolation (issue 1036, maintainer round 3).
- *
- * The round-3 note replaced the schematic swatch-chip samples ("On a component", "As a
- * recipe input") with the REAL player `InventoryItemCard`, mounted twice from synthetic rows
- * — the essence's own inventory tile and a fake carrying component. This suite pins that the
- * "How players see it" card mounts both real tiles without cancelling, and that the inspector
- * path (`showIdentity={false}`) mounts NO card, so that surface is unaffected.
- */
+/** `EssenceBehaviorPreview` mounted, in isolation (issue 1036, maintainer round 3). */
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { makeEssenceRow } from '../helpers/makeEssenceRow.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -20,7 +13,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-essence-preview-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     // The preview builds its two synthetic tiles with this pure helper, which imports nothing.
     'src/ui/svelte/util/essencePreviewRow.js',
@@ -29,12 +22,11 @@ const harness = createMountedComponentHarness({
     // The essence colour fold, shared by the card tile, its pips and the inspector.
     'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',
-    'src/utils/essenceValidation.js',
+    'src/ui/model/essenceValidation.js',
+    'src/utils/scalars.js',
   ],
   compiledModules: [
-    // `Chip.svelte` travels with it since issue 1371: `IconFactRow` renders the manager's ONE
-    // chip for its trailing badge, so it is now in the row's STATIC closure. Omitting it does
-    // not fail a suite, it HANGS it and reports `# cancelled`.
+    // `Chip.svelte` travels with it since issue 1371.
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/Chip.svelte',
     // The REAL player tile the "How players see it" card mounts for both samples. A `.svelte` in
@@ -92,9 +84,7 @@ describe('EssenceBehaviorPreview — "How players see it" mounts the real player
     );
     assert.ok(root.querySelector('[data-essence-preview-live]'), 'and the live-update note');
 
-    // Issue 1036 round 4: both real tiles are mounted `interactive={false}` — a preview, not
-    // a control. Neither `onSelect` nor `onBulkToggle` is wired here, so a focusable,
-    // keyboard-operable, aria-pressed button would be a no-op trap in the editor's tab order.
+    // Issue 1036 round 4: both real tiles are mounted `interactive={false}` — a preview.
     const appears = root.querySelector('[data-essence-preview-appears]');
     assert.equal(
       appears.querySelector('button'),
@@ -118,9 +108,7 @@ describe('EssenceBehaviorPreview — "How players see it" mounts the real player
   });
 
   it('tints the preview essence tile to the essence colour when one is chosen', async () => {
-    // Issue 1036: the preview mounts the REAL player tile, so a coloured essence's tile paints
-    // its glyph in the chosen colour here exactly as it does in the player app — the
-    // `colorToken` reaches `buildEssencePreviewRow`, which shapes it onto the mounted row.
+    // Issue 1036: the preview mounts the REAL player tile.
     const root = await harness.mount({
       essence: makeEssenceRow({ id: 'fire', name: 'Fire', colorToken: '--fab-tag-mauve' }),
     });
@@ -200,19 +188,13 @@ describe('EssenceBehaviorPreview — "How players see it" mounts the real player
     // `showIdentity` / `showLiveNote` / `showEffectiveKicker` existed for ONE caller, the
     // browser inspector, which passed all three `false`. That rail draws the reference's
     // `ON CRAFT IN <system>` cards now, so all three props had zero callers and are removed.
-    //
-    // Passing them anyway is the NEGATIVE CONTROL: a runes `$props()` destructure without a
-    // rest ignores an undeclared key, so a panel that still hid its card here would mean a
-    // prop had survived under another name.
     const root = await harness.mount({
       essence: makeEssenceRow({ id: 'fire', name: 'Fire' }),
       showIdentity: false,
       showLiveNote: false,
       showEffectiveKicker: false,
     });
-    // `assert.ok(!el)`, never `assert.equal(el, null)`: on failure `node:assert` serialises a
-    // mounted happy-dom element's circular tree to build its diff and the heap dies, which
-    // surfaces as a `# cancelled` suite with no message.
+    // `assert.ok(!el)`, never `assert.equal(el, null)`.
     assert.ok(Boolean(root.querySelector('[data-essence-preview-appears]')), 'the card renders');
     assert.ok(Boolean(root.querySelector('.inventory-card')), 'and the real player tiles mount');
     assert.ok(Boolean(root.querySelector('[data-essence-preview-live]')), 'and the live note');
@@ -251,8 +233,7 @@ describe('EssenceBehaviorPreview — "How players see it" mounts the real player
     assert.match(worldRows.join(' | '), /Runs on craft in every system that inherits/);
     harness.remount();
 
-    // NEGATIVE CONTROL: the system-scope wording is untouched, so the branch is a distinction
-    // rather than a rewrite of both.
+    // NEGATIVE CONTROL: the system-scope wording is untouched.
     const system = await harness.mount(shared);
     const systemRows = [...system.querySelectorAll('[data-essence-preview-rule]')]
       .map((row) => row.textContent.replace(/\s+/g, ' ').trim())

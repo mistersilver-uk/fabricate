@@ -1,20 +1,5 @@
 #!/usr/bin/env node
-/**
- * Visual-parity EXTRACTOR — record a prototype's computed styles into a fixture.
- *
- *   node scripts/visual-parity/extract.mjs --spec <spec.mjs> --out <fixture.json>
- *
- * Screen-agnostic: everything about WHICH prototype, WHICH screens and WHICH regions lives in
- * the spec, which is a development-time artefact and is not committed. See `README.md` in this
- * directory for the spec schema and for the traps this harness exists to avoid.
- *
- * ── Why computed styles and not screenshots ──────────────────────────────────────────────
- * A prototype is usually a fixed-width mockup and the real app is not, so a pixel diff cannot
- * survive the comparison and every attempt to eyeball one fails. Each side is measured at its
- * OWN natural width and only width-invariant properties are recorded — colours, type, borders,
- * radii, padding, gaps and fixed control geometry — so the two widths never enter the
- * comparison. A value that IS width-derived is recorded as an exemption rather than a number.
- */
+/** Visual-parity extractor — record a prototype's computed styles into a fixture. */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -45,10 +30,8 @@ async function main() {
 
   const propertyGroups = { ...DEFAULT_PROPERTY_GROUPS, ...spec.propertyGroups };
   const resolvedOut = resolve(process.cwd(), outPath);
-  // Exemptions are HAND-AUTHORED and live in the fixture beside the measurement they suspend,
-  // so a reader of one region sees both. They are CARRIED ACROSS a regeneration rather than
-  // rewritten, because losing them silently is exactly the failure the fixture exists to
-  // prevent: the gate would come back one property narrower, and green.
+  // Exemptions are hand-authored and live in the fixture beside the measurement they suspend, so a
+  // reader of one region sees both.
   const previous = existsSync(resolvedOut) ? JSON.parse(readFileSync(resolvedOut, 'utf8')) : null;
   const carried = Object.fromEntries(
     Object.entries(previous?.regions ?? {})
@@ -85,9 +68,7 @@ async function main() {
 
     for (const [screen, regions] of byScreen) {
       await spec.navigate(page, screen);
-      // ALIGNMENT is DERIVED, never declared. The fixture records which edges this prototype
-      // actually shares between a group's members, so the comparison can only ever demand an
-      // alignment the design draws — and stops demanding it the moment the design stops.
+      // Alignment is derived, never declared.
       const groups = (spec.alignments ?? []).filter(
         (group) => (group.measuredOn ?? group.screen) === screen
       );
@@ -101,14 +82,7 @@ async function main() {
               {
                 locator: region.locator,
                 groups: region.groups,
-                // The EXPLICIT property list, when a region declares one. `propertiesOf` in
-                // `lib/page-runtime.js` reads `entry.properties` in preference to `groups`,
-                // and `compare.mjs` already measures the subject on exactly the properties the
-                // fixture holds — so a region that widened its set here was measured on the
-                // groups alone, recorded the narrower set, and the comparison then asserted
-                // that narrower set on both sides. The extension went missing without a word,
-                // which is the worst way for a gate to lose an assertion: the spec said it
-                // measured `marginTop`, the run agreed it was green, and nothing measured it.
+                // The explicit property list, when a region declares one.
                 properties: region.properties,
                 effectiveBackground: region.effectiveBackground === true,
               },

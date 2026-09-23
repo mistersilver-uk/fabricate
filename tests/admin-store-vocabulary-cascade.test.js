@@ -1,17 +1,11 @@
-/**
- * Cascade-safe vocabulary deletion + per-category icon persistence in adminStore
- * (issue 689). Deleting a referenced recipe/component category reassigns the
- * affected records to `general`; deleting a referenced tag strips it from every
- * component that carries it; category icons round-trip through the store's write
- * ops. The mock manager tracks the record + system writes the store issues.
- */
+/** Cascade-safe vocabulary deletion + per-category icon persistence in adminStore (issue 689). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createAdminStore } from '../src/ui/svelte/stores/adminStore.js';
+import { createServices as createSharedServices } from './helpers/adminStoreServices.js';
 
 function createServices() {
-  const store = {};
   const system = {
     id: 'sys1',
     name: 'System One',
@@ -36,6 +30,7 @@ function createServices() {
     img: 'icons/svg/item-bag.svg',
     description: '',
     category,
+    craftingSystemId: system.id,
     steps: [],
     ingredientSets,
     resultGroups: [],
@@ -80,34 +75,23 @@ function createServices() {
       return system;
     },
   };
-  const recipeManager = {
-    getRecipes: () => recipes,
-    getRecipe: (id) => recipes.find((r) => r.id === id) || null,
+  return createSharedServices(system, recipes, [], {
+    settings: {},
     updateRecipe: async (id, updates = {}) => {
       recipeWrites.push([id, updates]);
       const recipe = recipes.find((r) => r.id === id);
       if (recipe) Object.assign(recipe, updates);
       return recipe;
     },
-  };
-  return {
-    getSetting: (key) => store[key] ?? null,
-    setSetting: async (key, value) => {
-      store[key] = value;
-    },
     getCraftingSystemManager: () => systemManager,
-    getRecipeManager: () => recipeManager,
     getGatheringEnvironmentStore: () => ({ list: () => [], save: async () => true }),
     getFoundrySystemId: () => 'dnd5e',
-    getScriptMacros: () => [],
-    getSceneOptions: () => [],
-    notify: { info: () => {}, warn: () => {}, error: () => {} },
     confirmDialog: async () => true,
-    localize: (key) => key,
     _system: system,
+    _recipes: recipes,
     _itemWrites: itemWrites,
     _recipeWrites: recipeWrites,
-  };
+  });
 }
 
 async function storeFor() {
@@ -160,6 +144,52 @@ describe('adminStore vocabulary cascade + icons (issue 689)', () => {
         { ingredientSets: [{ ingredientGroups: [{ options: [{ match: { type: 'tags', tags: [] } }] }] }] },
       ],
     ]);
+    assert.deepEqual(services._system.itemTags, ['herb']);
+  });
+});
+
+describe('deleting the row a case-only pair collapsed to (issue 1397)', () => {
+  // The screen renders one row per normalized key, so one click has to answer for every spelling
+  // behind it. The cascade planners already match case-insensitively; before this fix the
+  // vocabulary write filtered on the exact string, so the records under BOTH spellings were
+  // reassigned while one spelling stayed on disk and came back as an orphaned `Unused` row.
+
+  it('removes every recipe-category spelling that collapses to the deleted key', async () => {
+    const { store, services } = await storeFor();
+    services._system.categories = ['Potions', 'potions'];
+    services._recipes[1].category = 'potions';
+
+    await store.removeCategory('Potions');
+
+    assert.deepEqual(services._system.categories, []);
+    assert.deepEqual(
+      services._recipeWrites.map(([id, updates]) => [id, updates.category]),
+      [
+        ['r1', 'general'],
+        ['r2', 'general'],
+      ],
+      'the recipes under BOTH spellings were reassigned, which is what makes leaving one stored ' +
+        'incoherent rather than merely untidy'
+    );
+  });
+
+  it('removes every component-category spelling that collapses to the deleted key', async () => {
+    const { store, services } = await storeFor();
+    services._system.componentCategories = ['Reagent', 'reagent'];
+    services._system.components[1].category = 'reagent';
+
+    await store.removeComponentCategory('Reagent');
+
+    assert.deepEqual(services._system.componentCategories, []);
+    assert.deepEqual(services._itemWrites.map(([id]) => id), ['c1', 'c2']);
+  });
+
+  it('removes every tag spelling that collapses to the deleted key', async () => {
+    const { store, services } = await storeFor();
+    services._system.itemTags = ['ore', 'ORE', 'herb'];
+
+    await store.removeTag('ore');
+
     assert.deepEqual(services._system.itemTags, ['herb']);
   });
 });

@@ -1,14 +1,4 @@
-/**
- * `EssenceEditView` mounted, in isolation (issue 1036).
- *
- * The editor's two async behaviours are what this suite exists for, because neither is
- * reachable from the manager-root suite's fixtures: the `type !== 'script'` rejection on a
- * dropped macro — which Stage B shipped as a checked leaf but deliberately left unwired —
- * and the resolution of a linked macro's display NAME, including the missing state.
- *
- * It also pins the tab strip's badges, which are the editor's only at-a-glance report of
- * what is configured and what is unfinished.
- */
+/** `EssenceEditView` mounted, in isolation (issue 1036). */
 import { after, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -21,6 +11,7 @@ import {
   describeValidationAddressPairing,
   describeValidationHostContract,
 } from '../helpers/validationAddressContracts.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -28,14 +19,16 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-essence-edit-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/managerColorTokens.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
+  'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
@@ -43,17 +36,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/actions/dragDrop.js',
-    'src/utils/macroReference.js',
-    'src/utils/essenceValidation.js',
-    // RecipeItemEditor/ToolEditView/EssenceEditView resolve, focus and mark the control a
-    // validation row addresses through this pure leaf (issue 1517). This harness validates its
-    // dependency graph, so an omission throws a named "add it to rawModules" error rather than
-    // hanging — but the error arrives from `before()`, which reports as `# cancelled`.
+    'src/ui/model/macroReference.js',
+    'src/ui/model/essenceValidation.js',
+    // RecipeItemEditor/ToolEditView/EssenceEditView resolve.
     'src/ui/svelte/apps/manager/validationFocus.js',
-    // …and the announcement half beside it (issue 1517, review r1): the panel fallback for a
-    // route-only row, the control's accessible name, and the handoff to the module's shared
-    // "move focus, then announce" ordering rule — which is why `util/announceAfterFocus.js` is
-    // a raw module here too. It was five copies inside five hosts before it was one leaf.
+    // …and the announcement half beside it (issue 1517, review r1).
     'src/ui/svelte/apps/manager/validationAnnouncement.js',
     'src/ui/svelte/util/announceAfterFocus.js',
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',
@@ -75,7 +62,7 @@ const harness = createMountedComponentHarness({
     // shipped counter. The harness validates this closure and names the miss, unlike the
     // hand-rolled trees elsewhere.
     'src/systems/worldVocabulary.js',
-    'src/utils/vocabularyUsage.js',
+    'src/ui/model/vocabularyUsage.js',
     'src/utils/componentCategories.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.
     'src/utils/categoryNormalization.js',
@@ -86,7 +73,7 @@ const harness = createMountedComponentHarness({
     'src/systems/scopedDefinitions.js',
     'src/systems/scopedDefinitionStore.js',
     'src/utils/scalars.js',
-    'src/migration/worldScopeEntityGrouping.js',
+    'src/systems/worldScopeEntityGrouping.js',
     'src/utils/definitionIndex.js',
     'src/utils/sourceReferenceUnion.js',
   ],
@@ -100,8 +87,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/Callout.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/Callout.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
@@ -122,6 +109,7 @@ const harness = createMountedComponentHarness({
     // `EssenceSourceSelector` are `SearchablePopover` call sites, so the primitive is a STATIC
     // import of this tree; omitting it throws in `before()` and reports `# cancelled`.
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/EssenceSourceSelector.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceEditorTabs.svelte',
     'src/ui/svelte/components/EditorTabs.svelte',
@@ -220,10 +208,7 @@ describe('1036/7 EssenceEditView — the dropped macro must be a SCRIPT macro', 
   });
 
   it('REFUSES a chat macro and says why', async () => {
-    // Foundry defaults a NEW Macro to `type: 'chat'`, and `command` is a required
-    // StringField on BOTH types — so a GM who pastes JavaScript into a fresh macro without
-    // changing its type produces exactly this payload. `MacroExecutor.run` guards only that
-    // `command` is a string, so nothing further down would catch it.
+    // Foundry defaults a NEW Macro to `type: 'chat'`.
     globalThis.fromUuid = async () => ({ name: 'Pasted Script', type: 'chat', command: 'x' });
 
     const root = await harness.mount(props({ essence: makeEssenceRow({ id: 'new' }) }));
@@ -277,11 +262,7 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
       'the linked card still renders: suppression is a state ON the section, not a removal'
     );
 
-    // Negative control, driven through the LIVE draft rather than through a new prop: the
-    // editor re-seeds only when the essence IDENTITY changes, which is what stops a store
-    // refresh discarding the GM's in-progress edits. Flipping the Enabled row is therefore
-    // both the honest control and a second fact — the suppression follows the draft, not the
-    // persisted definition.
+    // Negative control, driven through the LIVE draft rather than through a new prop.
     openTab(root, 'identity');
     root.querySelector('[data-recipe-field="essence-enabled"]').click();
     flushSync();
@@ -306,7 +287,7 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
     harness.remount();
   });
 
-  // The maintainer's round-2 ruling: "the linked item active effect source needs to appear
+  // The maintainer's round-2 ruling.
   // the same way a linked item in the tool studio editor view does". Four defects were named
   // off `manager-essence-edit-on-craft.png`, and each has an assertion here, because every
   // one of them is invisible in source unless you already know to look.
@@ -356,8 +337,7 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
       'no second drop zone says the same thing twice under the linked card'
     );
 
-    // ...and the picker returns the moment the link is gone, because an essence source is an
-    // in-system COMPONENT and the pick half is the only route to that list.
+    // ...and the picker returns the moment the link is gone.
     actions[1].click();
     flushSync();
     assert.equal(
@@ -374,7 +354,7 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
     harness.remount();
   });
 
-  // 4. the property macro card had the SAME defect in a worse form: `macroName` falls back to
+  // 4. the property macro card had the SAME defect in a worse form.
   //    the uuid when the macro does not resolve, and `hint` was the uuid too, so the card
   //    printed `Macro.lab-aether-binding` as its title AND again as its sub-line.
   it('gives the property macro card an instruction rather than repeating its own uuid', async () => {
@@ -461,19 +441,12 @@ describe('1036 EssenceEditView — tab badges', () => {
       'this tab is the GM ONLY route to the fact — craft time logs and skips it silently'
     );
 
-    // Unset colour is a PASS, not a warning: an unset essence renders in the theme accent
-    // by design. The negative control is the macro row above, which does fail.
+    // Unset colour is a PASS, not a warning.
     const colourRow = root.querySelector('[data-essence-validation-check="colour"]');
     assert.ok(!/WARNING/i.test(colourRow.textContent), 'the colour row never warns');
     harness.remount();
   });
   // ── THE WORLD-SCOPE LOCK (issue 1372, criterion 10) ─────────────────────────────────────────
-  //
-  // BOTH DIRECTIONS ARE EXERCISED IN ONE TEST, and that pairing is the whole point. The lock is
-  // observable ONLY as an absence, and an absence assertion against a hook nothing renders passes
-  // on a tree where the lock was never built — so the same mount asserts the OVERRIDDEN section's
-  // unlink control EXISTS. One inherited and one overridden in one render also makes the failure
-  // "locked both" distinguishable from "locked neither", which a single-section fixture cannot do.
 
   /**
    * A world essence scope projection with one membership record whose two sections differ.
@@ -532,9 +505,7 @@ describe('1036 EssenceEditView — tab badges', () => {
     );
     for (let i = 0; i < 6; i += 1) await Promise.resolve();
     flushSync();
-    // The rules screen's first tab IS the rules tab, so this is a no-op re-selection rather than
-    // a navigation — asserted through `openTab` all the same, because a strip that stopped
-    // rendering the tab would fail here rather than silently photographing another panel.
+    // The rules screen's first tab IS the rules tab.
     openTab(root, 'rules');
 
     // THE NEGATIVE HALF: the inherited section presents no edit affordance at all.
@@ -548,8 +519,7 @@ describe('1036 EssenceEditView — tab badges', () => {
       'and it renders a read-only card in its place rather than nothing at all'
     );
 
-    // THE POSITIVE HALF, IN THE SAME RENDER: the OVERRIDDEN section is fully editable, which is
-    // what makes the absence above a measurement rather than a selector that matches nothing.
+    // THE POSITIVE HALF, IN THE SAME RENDER: the OVERRIDDEN section is fully editable.
     assert.ok(
       root.querySelector('[data-scoped-macro-unlink]'),
       'the overridden macro section keeps its unlink'
@@ -567,8 +537,7 @@ describe('1036 EssenceEditView — tab badges', () => {
     flushSync();
     openTab(root, 'rules');
 
-    // The mirror image of the test above, on the same component and the same fixture shape. A
-    // lock that never lifted would satisfy the negative half of that test forever.
+    // The mirror image of the test above.
     assert.ok(root.querySelector('[data-scoped-source-unlink]'));
     assert.equal(root.querySelector('[data-scoped-source-locked]'), null);
     assert.equal(root.querySelector('[data-scoped-macro-unlink]'), null);
@@ -592,9 +561,7 @@ describe('1036 EssenceEditView — tab badges', () => {
       root.querySelector('[data-scoped-membership-add]'),
       'and the one action that changes that is on screen'
     );
-    // NON-VACUITY: the inherit switches are NOT drawn for a non-member, because there is no
-    // record for them to write to — a switch that wrote to nothing would report a state it
-    // could not hold.
+    // NON-VACUITY: the inherit switches are NOT drawn for a non-member.
     assert.equal(root.querySelector('[data-scoped-inherit-toggle="effectSource"]'), null);
     harness.remount();
   });
@@ -622,8 +589,7 @@ describe('1036 EssenceEditView — tab badges', () => {
 
 describe('1372 EssenceEditView — the system Essence Rules screen', () => {
   /**
-   * The same projection shape the lock tests above use, restated here so this block can vary the
-   * membership roster it needs without perturbing theirs.
+   * The same projection shape the lock tests above use.
    *
    * @param {{effectSource?: boolean, macro?: boolean}} [inherited]
    * @param {boolean} [member]
@@ -699,15 +665,6 @@ describe('1372 EssenceEditView — the system Essence Rules screen', () => {
   }
 
   // ── IDENTITY MUST BE IMPOSSIBLE TO EDIT FROM A SYSTEM ───────────────────────────────────────
-  //
-  // This is a MODEL rule, not a layout preference: a world record holds identity and every system
-  // holding the essence resolves the same one, so a name field here renames it in every other
-  // system from a screen titled with one of them.
-  //
-  // THE ABSENCES ARE PAIRED WITH A POSITIVE, because an absence assertion against a hook nothing
-  // renders passes on a tree where the control was never built at all — and the create-draft test
-  // below is that pair's second half: every selector asserted absent here resolves there, on the
-  // same component.
   it('renders no identity control at all, and a two-tab strip with no Identity tab', async () => {
     const root = await mountRules();
 
@@ -812,8 +769,7 @@ describe('1372 EssenceEditView — the system Essence Rules screen', () => {
       macroCard.querySelector('[data-scoped-inherit-toggle="macro"]'),
       'and the macro switch is in the macro card'
     );
-    // THE CROSS-CHECK, which is what stops both cards rendering the whole row set: neither card
-    // may carry the other's switch.
+    // THE CROSS-CHECK, which is what stops both cards rendering the whole row set.
     assert.ok(!sourceCard.querySelector('[data-scoped-inherit-toggle="macro"]'));
     assert.ok(!macroCard.querySelector('[data-scoped-inherit-toggle="effectSource"]'));
 
@@ -871,12 +827,10 @@ describe('1372 EssenceEditView — the system Essence Rules screen', () => {
       'and never offers the SOURCE system as a destination'
     );
 
-    // Nothing is copied until a destination is ticked, because `copyMembership` refuses an empty
-    // target list and reports nothing — a button that silently did nothing on every press.
+    // Nothing is copied until a destination is ticked.
     assert.equal(root.querySelector('[data-scoped-copy-rules-confirm]').disabled, true);
 
-    // The hook lands on the `<input>` itself: `SelectionCheckbox` spreads its rest props onto
-    // the control, not onto the label wrapping it.
+    // The hook lands on the `<input>` itself.
     picker.querySelector('input[data-scoped-copy-rules-target="sys-c"]').click();
     flushSync();
     root.querySelector('[data-scoped-copy-rules-confirm]').click();
@@ -891,14 +845,6 @@ describe('1372 EssenceEditView — the system Essence Rules screen', () => {
   });
 
   // ── THE READ OVERLAY MUST NOT LEAK INTO A WRITE (issue 1371 r19-store2) ──────────────────────
-  //
-  // M29 overlays the WORLD essence colour onto the projection every system-scope screen reads, and
-  // this editor seeded `colorToken` from that projection and sent it on EVERY save. On the rules
-  // screen there is no colour control at all, so an unrelated save silently persisted the world's
-  // colour onto this system's own stored row — durably, into a world setting replicated to every
-  // client, and invisibly, because the overlay then drew the world colour over it. It surfaced
-  // only when the GM cleared the world colour, at which point the row answered the world's OLD
-  // colour rather than its own.
 
   it('sends NO colorToken from the rules screen, where the colour has no control at all', async () => {
     const saves = [];
@@ -933,10 +879,7 @@ describe('1372 EssenceEditView — the system Essence Rules screen', () => {
   });
 
   it('but a GM edit of the colour IS sent, and clearing one still persists as nothing', async () => {
-    // THE LATCH'S OTHER HALF, and the reason it is a latch rather than a dirty comparison: an
-    // essence the world corpus does not hold renders the identity screen, where the colour is
-    // this system's to author. `''` is the cleared state and must reach the store, which is why
-    // `onColourChange` sets the latch on the CLEAR path too.
+    // THE LATCH'S OTHER HALF, and the reason it is a latch rather than a dirty comparison.
     const saves = [];
     globalThis.fromUuid = async () => null;
     const root = await harness.mount(
@@ -972,8 +915,7 @@ describe('1372 EssenceEditView — the system Essence Rules screen', () => {
 
     assert.ok(root.querySelector('[data-essence-scope-state="no-membership"]'));
     assert.ok(root.querySelector('[data-scoped-membership-add]'));
-    // The callout still renders — the essence HAS a shared definition, this system merely has no
-    // rules for it — and nothing that would write a record it does not have does.
+    // The callout still renders — the essence HAS a shared definition.
     assert.ok(root.querySelector('[data-scoped-shared-definition]'));
     assert.ok(
       !root.querySelector('[data-recipe-section="enabled"]'),
@@ -986,21 +928,6 @@ describe('1372 EssenceEditView — the system Essence Rules screen', () => {
 });
 
 // ── THE ROW ACTION MOVES FOCUS, AND SAYS SO (issue 1517) ────────────────────────────────────
-//
-// A validation row carries two independent addresses: `target`, the ROUTE, and `focusTarget`,
-// the CONTROL — the value of a `data-validation-target` attribute the offending control carries.
-// The editor sets the route synchronously and FIRST, then hands over to
-// `validationAnnouncement.js`, which moves focus and writes the announcement FROM the element
-// that resolved — behind the module's shared "move focus, then announce" delay.
-//
-// EVERY FOCUS ASSERTION BELOW ALSO READS THE FOCUSABILITY OFF THE DOM, and that is not
-// belt-and-braces. happy-dom focuses ANYTHING — `.focus()` on a bare `<div>` sets
-// `document.activeElement` — so "the destination holds focus" is vacuous on its own, with a named
-// mutation: delete `tabindex="-1"` from a card root and keep `data-keyboard-focus`, and an
-// `activeElement`-only assertion still passes while a real browser focuses nothing. The attribute
-// is read with `getAttribute` and the tag with `tagName`, NEVER by calling `isFocusable` —
-// re-using the helper as its own oracle would give the refusal path and the assertion that proves
-// it a single point of failure.
 describe('EssenceEditView — the validation row action reaches the control (issue 1517)', () => {
   // Blank description (a warning row whose control is one field) plus a source that names a
   // component this system does not hold (a warning row whose control is a whole card). Two rows,
@@ -1028,9 +955,7 @@ describe('EssenceEditView — the validation row action reaches the control (iss
     );
     assert.ok(Boolean(button), `the ${checkId} row renders a View button`);
     button.click();
-    // NO `flushSync` BEFORE THE AWAIT, deliberately. The whole mechanism is that the route
-    // assignment's own flush is queued as a microtask BEFORE the helper's, so draining
-    // microtasks is what proves the ordering rather than a synchronous flush papering over it.
+    // NO `flushSync` BEFORE THE AWAIT.
     for (let i = 0; i < 6; i += 1) await Promise.resolve();
     flushSync();
     return button;
@@ -1041,7 +966,6 @@ describe('EssenceEditView — the validation row action reaches the control (iss
    * 1517's review round). A `polite` region is queued speech and a focus change CANCELS queued
    * speech, so the sentence is written after the move — the rule
    * `src/ui/svelte/util/announceAfterFocus.js` owns for the whole module. The delay is IMPORTED:
-   * a local copy would silently start asserting the un-delayed state the moment the rule changed.
    */
   async function flushAnnouncement() {
     await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_AFTER_FOCUS_MS + 40));
@@ -1049,8 +973,7 @@ describe('EssenceEditView — the validation row action reaches the control (iss
   }
 
   it('hosts the live region OUTSIDE the tab chain, so the route change cannot unmount it', async () => {
-    // The defect this shape exists to prevent: the validation surface is inside the tab chain,
-    // so activating a row action unmounts the region in the same update that was to announce.
+    // The defect this shape exists to prevent.
     const root = await harness.mount(props({ essence: BROKEN }));
     assert.ok(
       Boolean(root.querySelector('[data-essence-issue-announcement]')),
@@ -1114,9 +1037,7 @@ describe('EssenceEditView — the validation row action reaches the control (iss
     const card = root.querySelector('[data-validation-target="essence-source"]');
     assert.ok(Boolean(card), 'the effect-source card carries its own address');
     assertIs(document.activeElement, card, 'and it holds focus');
-    // Read off the DOM. A card root is NOT natively focusable, so it must declare both — the
-    // tabindex that makes the focus real and the attribute that tells Foundry the window is
-    // focused, without which Space pauses the game and the arrows pan the canvas.
+    // Read off the DOM. A card root is NOT natively focusable, so it must declare both.
     assert.equal(card.getAttribute('tabindex'), '-1');
     assert.equal(card.getAttribute('data-keyboard-focus'), 'true');
     assert.equal(card.getAttribute('data-validation-focused'), '');
@@ -1131,21 +1052,7 @@ describe('EssenceEditView — the validation row action reaches the control (iss
   });
 
   it('declares the tab panel as the ROUTE-ONLY row\'s focus destination', async () => {
-    // FOUR OF THIS EDITOR'S CHECKS ARE ABOUT THE RECORD rather than about one control — whether
-    // this system has rules for the essence at all, whether it is enabled here, whether anything
-    // carries it — so they emit a route and no control. Activating one unmounts the Validation
-    // panel the button was in, so with nothing to fall back to focus lands on `<body>`, where
-    // every Foundry keybinding is live: Space pauses the game, the arrows pan the canvas behind
-    // the window, Tab walks out of the application.
-    //
-    // THE ATTRIBUTES ARE THE ASSERTION HERE, and the wiring that uses them is read from source by
-    // `describeValidationHostContract`'s `fallbackPanel:` clause below. All four of those checks
-    // belong to the SYSTEM-SCOPE screen, which this suite has no fixture for — the world editor
-    // it does mount emits a control address for every failing row — so the end-to-end move is
-    // proved on the recipe and Tool editors, whose route-only rows are reachable from a props
-    // literal. What can be proved here is that the destination those hosts fall back to is real
-    // on this one too: happy-dom focuses anything, so a panel missing `tabindex` would still
-    // "hold focus" in a mounted assertion while a real browser moved nothing.
+    // FOUR OF THIS EDITOR'S CHECKS ARE ABOUT THE RECORD rather than about one control.
     const root = await harness.mount(props({ essence: BROKEN }));
     openTab(root, 'validation');
 
@@ -1157,8 +1064,7 @@ describe('EssenceEditView — the validation row action reaches the control (iss
   });
 
   it('drops the mark once focus moves elsewhere', async () => {
-    // A LEAKED MARK IS THE DEFECT INVERTED: a permanent accent outline on the last-focused
-    // control, which outlives the interaction instead of merely missing during it.
+    // A LEAKED MARK IS THE DEFECT INVERTED.
     const root = await harness.mount(props({ essence: BROKEN }));
     openTab(root, 'validation');
     await activateIssueView(root, 'description');
@@ -1192,19 +1098,6 @@ describe('EssenceEditView — the validation row action reaches the control (iss
   });
 });
 // ── THE PAIR, AND THE HOST THAT JOINS IT (issue 1517, review r1) ────────────────────────────
-//
-// Both contracts below are registered from `tests/helpers/validationAddressContracts.js`, driven
-// by THIS editor's facts: the producer's own address table, the destination declared for each
-// address it emits, and the host's own route call. The machinery those facts feed — the comment
-// stripping that keeps a scan from finding an address in the sentence explaining it, both
-// attribute spellings, the focusability read that a mounted assertion cannot make, and the
-// ordering — is written once there and explained in its docblock.
-//
-// IT WAS REGISTERED FOR TWO OF THE FIVE SURFACES AND IS NOW REGISTERED FOR FOUR. Nothing read
-// this producer's table against the tabs that carry it, so deleting `tabindex="-1"` from the
-// identity panel, or deleting `data-validation-target="essence-macro"` from the on-craft macro
-// card, left every suite green: the mounted clauses above cover the two addresses their fixture
-// reaches, and happy-dom focuses anything, so neither could see it.
 describeValidationAddressPairing({
   title: 'every essence address the producer emits is carried by a real control',
   producerFile: 'essences/essenceStudio.js',
@@ -1213,11 +1106,7 @@ describeValidationAddressPairing({
   addressPattern: /'([^']+)'/gu,
   expectedAddressCount: 6,
   expectation: 'the four identity controls and the two on-craft cards',
-  // WHICH FILE IS SUPPOSED TO CARRY WHICH ADDRESS. This is the half a producer cannot check: an
-  // address no control carries is a View button that changes tab and focuses nothing, and neither
-  // half alone can see it. `systemEffectSource` and `systemMacro` reuse the two on-craft
-  // addresses, because they ARE those two cards read at system scope, so eight table entries are
-  // six distinct addresses.
+  // WHICH FILE IS SUPPOSED TO CARRY WHICH ADDRESS. This is the half a producer cannot check.
   destinations: {
     'essence-name': 'essences/EssenceIdentityTab.svelte',
     'essence-description': 'essences/EssenceIdentityTab.svelte',

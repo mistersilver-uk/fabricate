@@ -1,21 +1,11 @@
-/**
- * Tests for the 0.7.0 tool-reconciliation migration
- * (src/migration/migrateToolsToSystem.js).
- *
- * Moves UI-authored library tools from gatheringConfig.systems[id].tools onto the
- * owning crafting system's `tools` (the single canonical source), dedupes by id
- * (existing system tool wins), clears the gathering-config copy, and is pure +
- * idempotent + version-gated through the MigrationRunner.
- */
+/** Tests for the 0.7.0 tool-reconciliation migration (src/migration/migrateToolsToSystem.js). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { migrateToolsToSystem } from '../src/migration/migrateToolsToSystem.js';
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
 
-// ---------------------------------------------------------------------------
 // Pure function
-// ---------------------------------------------------------------------------
 
 test('moves gatheringConfig-only tools onto the matching system and clears the config copy', () => {
   const systems = [{ id: 'sys-1', tools: [] }];
@@ -84,9 +74,7 @@ test('no-ops when there are no gathering-config systems', () => {
   assert.deepEqual(result.systems[0].tools, []);
 });
 
-// ---------------------------------------------------------------------------
 // MigrationRunner integration (version gate + persistence)
-// ---------------------------------------------------------------------------
 
 function makeSettings(initial = {}) {
   const store = new Map(Object.entries(initial));
@@ -128,10 +116,7 @@ test('version gate: 0.7.0 is NOT re-applied when migrationVersion is already 0.7
 
   await runner.run();
 
-  // The 0.7.0 tool-reconciliation is gated out (config tools untouched). The
-  // later 0.8.0 economy-toggle and 0.9.0 region-unification migrations are still
-  // pending and run, but with no legacy economy `mode` and no region vocabulary
-  // to rewrite they are data no-ops — only the version bumps.
+  // The 0.7.0 tool-reconciliation is gated out (config tools untouched).
   const config = settings.store.get('gatheringConfig');
   assert.ok('tools' in config.systems['sys-1'], 'config tools untouched when the 0.7.0 gate blocks the run');
   const setKeys = settings.calls.set.map(c => c.key);

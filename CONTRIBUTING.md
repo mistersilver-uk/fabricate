@@ -159,6 +159,7 @@ An absent or `unknown` provenance counts as an unidentified build and never sati
 Re-run it from the SAME commit.
 A target already written from this build is recognised by its provenance and skipped, and only the unwritten targets are completed — the resume path in the **Publish completeness** requirement.
 For a push-triggered stable release, re-dispatch `release.yml` via `workflow_dispatch` with `--ref` set to the branch that produced the tag and the already-minted `tag` supplied; for any channel, `release-s3.yml` can be dispatched directly with the same `tag` and `channel`.
+A `release-s3.yml` dispatch publishes the tag's bytes under the dispatch ref's deployment configuration, because the workflow captures `release.s3.config.json` from the ref it runs on before checking the tag out; dispatch from the ref carrying the tester configuration you intend to publish under, and expect a named refusal when the tag's `scripts/release-s3.js` predates `--config` (issue #1872).
 
 Do NOT reach for `--overwrite` to get past a failed publish.
 `--overwrite` replaces the bytes of a version a target already advertises, and a version's published artefacts are immutable — clients already on it never re-fetch, and any CDN holding the immutable zip pins the old bytes — so overwriting splits one version string across two different builds.
@@ -303,7 +304,7 @@ src/ui/svelte/
 │   └── editor/
 │       └── RecipeEditorRoot.svelte  # GM recipe editor
 ├── components/                  # Shared/reusable components
-│   └── DropZone.svelte
+│   └── ItemDropZone.svelte
 ├── stores/                      # Reactive state (one per app surface)
 │   ├── craftingStore.js
 │   ├── adminStore.js
@@ -587,6 +588,7 @@ It exists because PR screenshot evidence should not cost a container boot and a 
 npm run viewlab:chrome:harvest              # one-off; see below
 node scripts/view-lab-screenshots.mjs apps  # every registry case -> ui-screenshot-artifact/apps/
 npm run viewlab:index                       # regenerate the evidence index on its own
+npm run viewlab:totals                      # regenerate the registry totals in scripts/README.md
 ```
 
 The window chrome is Foundry's own, harvested from the release archive `npm run test:foundry:up` already caches under `.foundry-e2e/cache/`.
@@ -599,24 +601,25 @@ Pass `--clean` to force a full reset.
 The same directory also carries a self-contained `index.html`, grouped by application and area with a multi-tag filter, written automatically at the end of every capture.
 It shows the lab's own frames only, never a smoke label, because it is not a comparison.
 
-Cases live in `scripts/lib/viewLabCases.js`.
+Cases live in `scripts/lib/view-lab-cases/`.
 A case names a window, the state to drive it to, and the `sourceMatches` patterns that select it from a changed-file set.
 Every manager case declares `expectView`, which the capture asserts against the app's actual route before taking the frame — without it a mis-click silently screenshots the wrong screen.
 
 A case also declares `reaches`: `exact` when the frame lands on its smoke counterpart's own condition, `window` when it reaches the right application window but not that condition (known remaining work), and `beyond` for a condition the live smoke never walks at all — the routed recipe resolution modes, the visibility modes it does not visit, Foundry's light application theme.
 A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
 A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in `scripts/README.md`, not by a per-case comment.
-As of this writing the registry holds 485 cases: 148 `exact`, 8 `window`, 329 `beyond`.
+How many cases the registry holds, how they split across the three claims, and how many of them surface coverage selects are generated into `scripts/README.md` from the registry itself.
+Adding or removing a case means running `npm run viewlab:totals`; `npm test` reds if you forget.
 
 A change to the lab's own inputs is attributed rather than treated like an ordinary render-file change.
-By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, one per single-screen canvas window, plus the light-theme pair — which is 48 of the 485 publishable cases.
+By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, one per single-screen canvas window, plus the light-theme pair.
 A shared input can alter any frame at once, so the selection has to be wide; what it has to PROVE is that the lab still boots, still mounts both windows and still reaches and photographs every route and tab, and that is what coverage answers.
 It deliberately does not re-photograph every state of every screen: a state is evidence about the files that draw it, those files select it themselves, and 247 frames on every lab-infrastructure PR was a twenty-five minute job producing a wall nobody read.
 A route's own internal tabs — the Recipe editor's Results tab, the Tool editor's Requirements tab — fold into their route's single frame, so they are deferred alongside detailed states rather than covered.
 Coverage is derived (`LAB_SURFACE_CASES`), never listed, so a route added tomorrow is covered without anyone remembering; each surface is represented by a default-geometry, dialog-free, least-driven frame of it, which in practice is that screen's own `*-normal` case.
 Where a lab input ships alongside render files, the two selections are unioned — coverage does not contain the detailed frames those files select.
 Five inputs narrow below coverage.
-A patch to `scripts/lib/viewLabCases.js` selects only the case literals its hunks fall inside.
+A patch to `scripts/lib/view-lab-cases/` selects only the case literals its hunks fall inside.
 A patch to `tests/view-lab/mount.js` selects only the cases the marked regions it falls inside can render — the four player-only blocks are marked in the file rather than found by column, because two of them sit inside functions the manager window runs too.
 A change to `scripts/lib/viewLabLayoutAssertion.js` selects only the cases declaring `expectLayout`, whole-file, since every path through that helper validates those and no others.
 A patch to `tests/view-lab/world/labActors.js` selects only the cases that can render what the touched fixture table feeds: player cases alone for `INVENTORIES` and `BROKEN_STACKS`, and player cases plus the manager cases whose own `sourceMatches` claim a Knowledge or Books & Scrolls render file for `RECIPE_ITEM_COPIES` and `LEARNED_RECIPES`.
@@ -834,8 +837,10 @@ This is defense-in-depth: semantic-release also refuses the collision (`EINVALID
 **Route 1 — cut a hotfix line.**
 
 1. Cut `N.N.x` from the **public tag**, never from `release` or `main`: `git branch 1.4.x v1.4.0`.
+Pushing that branch publishes nothing by itself: `release.yml`'s classifier tells apart semantic-release's `success` lifecycle re-adding the already-released base version to the new channel from a genuine mint, and only a genuine mint is published (issue #1864).
 2. Land **`fix:` commits only**; a `feat:` hard-fails with `EINVALIDNEXTVERSION`, the guard rail that keeps feature work off the line.
 3. `release.yml` mints the draft release and publishes the hotfix's own channel (`1.4.x`), never `early-access`.
+   That happens on the first `fix:` you push, not on the bare cut: until then the line's channel has no head, and a `release.yml` run with `publish-s3`, `verify-publish` and `forward-port` skipped is the expected outcome of cutting the line, not a failed release (issue #1864).
 4. Promote it with `promote-to-public.yml`, passing `source_channel: 1.4.x`.
 5. Bring the fix back into `release` through a **reviewed pull request based on `release`**, merged with a **merge commit** (never a squash); the automation's forward-port then carries it on to `main`.
 6. Delete the hotfix branch once the fix has landed in `release`.

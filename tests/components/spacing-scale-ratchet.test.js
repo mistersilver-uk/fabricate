@@ -1,52 +1,15 @@
 /**
  * The spacing scale is a rule the product can be checked against (issue 1448).
- *
- * `openspec/specs/ui-integration/spec.md` has made the 4px spacing scale normative under its
+ * `openspec/specs/ui-visual-style/spec.md` has made the 4px spacing scale normative under its
  * "Spacing scale" section since the design system landed — padding, margin and gap "must derive
  * from a shared 4px-based spacing scale ... rather than from raw pixel literals" — and NOTHING
  * checked it. Worse, half the corpus could not have been checked by the tool that would normally
  * do it: `npm run lint:css` globs `styles/**` and Svelte scoped `<style>` blocks are not in it,
  * so the 1642 spacing declarations most likely to drift were entirely unlinted. Measured against
  * that silence: 932 raw literals across 620 (file, property, value) keys in 115 files.
- *
- * This gate FREEZES that. It does not require the whole corpus to be tokenized in one change,
- * and it cannot decide on its own that a given literal is wrong — the spec exempts two bands and
- * a value scanner cannot tell a 36px icon clearance from a careless 36px gap. What it can do,
- * and does, is make every NEW literal an edit to a pinned number that a reviewer has to accept.
- *
- * `tests/helpers/styleBlockScan.js` names this gate as its second customer, and it is the
- * customer `scanPixelDeclarations` was generalised for: the height ladder bans three named
- * values, this bans every value outside two exempt bands, and enumerating "every number except
- * these" as a list means choosing a ceiling nobody would notice being stepped over.
- *
  * -- WHAT MAKES THIS NOT VACUOUS -----------------------------------------------------------
  * An absence gate over an empty corpus passes forever. Five independent controls stand against
  * that, and they are independent on purpose rather than five spellings of one floor:
- *
- *   1. PER-CORPUS declaration floors. One total has slack and cannot see a partial loss — break
- *      the `<style>` extractor and 1642 declarations vanish while 1737 remain, which a combined
- *      floor of, say, 3000 would sail past. This is the control the broken-extractor mutation is
- *      aimed at, because a broken extractor otherwise reports a CLEANER tree rather than a
- *      failure.
- *   2. THE PUBLISHED SCALE IS STILL IN USE, per corpus. This is a population the gate is not
- *      asserting the absence of, so it stays alive when the findings do not, and it is the
- *      control that notices a corpus being read but its `var()` references stopping.
- *   3. RESOLUTION IS RUNNING, and the scale is what is held opaque. A control scan with every
- *      definition visible must reach depth 1 and must find strictly MORE than the opaque scan.
- *      If resolution silently stopped, both halves read the same and this reds while every other
- *      assertion here still passes.
- *   4. BOTH EXEMPT BANDS ARE LIVE. A predicate that quietly matched everything, or nothing,
- *      would move the ratchet wholesale; this names the two bands separately so the direction is
- *      readable rather than arriving as 900 vanished rows.
- *   5. The ratchet itself fails on a SHRINK as well as a growth, so quietly paying one down
- *      without banking it is a failure rather than a free slot for the next author.
- *
- * -- THE SPEC HALF -------------------------------------------------------------------------
- * Short distinctive FRAGMENTS plus the numerals, following `control-height-ladder.test.js` and
- * `flat-ui-style-contract.test.js`. A whole-sentence match reds on a typo fix; a loose match
- * passes a reworded sentence that has quietly widened the exempt band from 34-42 to 24-64. That
- * is not a hypothetical failure mode, it is the CHEAPEST one: the least-effort way to green a
- * spacing failure is not to edit this file, it is to widen a sentence in a spec nobody diffs.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -77,18 +40,7 @@ import {
   isSpacingScaleToken,
 } from './spacing-known-literals.js';
 
-/**
- * Floors with deliberate headroom below the roughly 1445 and 1642 they were chosen against, so
- * deleting a screen does not red this while a broken extractor — which takes a corpus to
- * roughly zero — still does. These are the enforced figures; the reference counts they quote
- * are not, and say so.
- *
- * The stylesheet floor was 1550 against 1737 until issue 1498 deleted the 367 rule blocks that
- * matched no element, at base `0eff5b36e`, taking the corpus to 1445 and breaching it. It is
- * RE-DERIVED at the ratio it was originally chosen at — 1550/1737 of 1445 is 1289 — rather than
- * lowered to whatever clears the new count, so the headroom it was given still means the same
- * thing: a corpus that has shrunk by a tenth is a scan that has stopped reading the sheet.
- */
+/** Floors with deliberate headroom below the roughly 1445 and 1642 they were chosen against. */
 const STYLESHEET_SPACING_DECLARATION_FLOOR = 1289;
 const SVELTE_SPACING_DECLARATION_FLOOR = 1450;
 
@@ -101,16 +53,14 @@ function scan() {
     const opaqueProperty = isSpacingScaleToken;
     cached = {
       corpus,
-      // The debt: every literal the spec does not exempt, with the published scale held opaque
-      // because deriving from it is what the spec asks for.
+      // The debt: every literal the spec does not exempt.
       raw: scanPixelDeclarations({
         corpus,
         properties: SCANNED_SPACING_PROPERTIES,
         accept: (pixels) => !isExemptSpacingPixels(pixels),
         opaqueProperty,
       }),
-      // The complement, over the same corpus and the same definitions, so control 4 is reading
-      // the predicate this gate actually runs rather than a second copy of it.
+      // The complement, over the same corpus and the same definitions.
       exempt: scanPixelDeclarations({
         corpus,
         properties: SCANNED_SPACING_PROPERTIES,
@@ -134,12 +84,12 @@ const isStylesheet = (record) => record.file.startsWith('styles/');
 
 /** The `### Spacing scale` section that owns the rule, so a fragment cannot match elsewhere. */
 function spacingRequirement() {
-  const spec = readFileSync(join(repoRoot, 'openspec/specs/ui-integration/spec.md'), 'utf8');
+  const spec = readFileSync(join(repoRoot, 'openspec/specs/ui-visual-style/spec.md'), 'utf8');
   const heading = '### Spacing scale';
   const start = spec.indexOf(heading);
   assert.ok(
     start !== -1,
-    'the ui-integration spec no longer carries a "Spacing scale" section. This gate exists only ' +
+    'the ui-visual-style spec no longer carries a "Spacing scale" section. This gate exists only ' +
       'to enforce that rule — if it has been renamed, retarget this test; if it has been dropped, ' +
       'delete this gate deliberately rather than leaving it policing a rule the specs no longer ' +
       'make.'
@@ -161,9 +111,7 @@ test('the spacing scale this gate enforces is still the spec’s', () => {
       'authority'
   );
 
-  // The exemptions, asserted FROM this gate's own constants, so widening a predicate here
-  // without widening the spec — or widening the spec without this — is a failure either way.
-  // Widening BOTH is still possible and is exactly what should require two visible edits.
+  // The exemptions, asserted FROM this gate's own constants.
   assert.ok(
     requirement.includes('Documented literal exemptions that must NOT be tokenized'),
     'the spec no longer documents any literal exemption, so the two predicates in ' +
@@ -195,7 +143,7 @@ test('the spacing scale this gate enforces is still the spec’s', () => {
 test('every spacing property spelling is scanned, including the logical longhands', () => {
   const scanned = new Set(SCANNED_SPACING_PROPERTIES);
 
-  // The logical longhands contribute ZERO occurrences today, which is exactly why they need a
+  // The logical longhands contribute ZERO occurrences today.
   // structural guard: nothing in the baseline would notice them being dropped from the list, and
   // a rewrite that switched `padding-left` for `padding-inline-start` would then walk straight
   // around the gate carrying its literals with it.
@@ -266,8 +214,6 @@ test('the published spacing scale is still in use in BOTH corpora', () => {
   }
 
   // THE FILTER IS WHAT MAKES THIS A CONTROL ON THE SCALE rather than on `var()` in general.
-  // Drop it and the counts below are satisfied by any custom property at all, at which point
-  // this stops saying anything the declaration floors did not already say.
   assert.ok(
     [...names].every(isSpacingScaleToken),
     `a name counted here is not a \`${SPACING_SCALE_PREFIX}\` token, so "the scale is in use" is ` +
@@ -347,16 +293,12 @@ test('both documented exemptions are live, and nothing else is exempt', () => {
     stray.map((record) => `${record.file}:${record.line} ${record.property} ${record.value}px`),
     [],
     'a value outside both documented bands is being treated as exempt, so the predicate has been ' +
-      'widened past what `openspec/specs/ui-integration/spec.md` publishes'
+      'widened past what `openspec/specs/ui-visual-style/spec.md` publishes'
   );
 });
 
 /**
- * WHAT THIS RATCHET DOES NOT SEE, stated rather than inferred from the name: it reads CSS
- * declarations in `styles/**` and in Svelte scoped `<style>` blocks, and nothing else. A literal
- * markup attribute — `style="padding: 7px"` — and a JS `element.style.gap = '7px'` are both raw
- * spacing the gate is blind to.
- *
+ * WHAT THIS RATCHET DOES NOT SEE, stated rather than inferred from the name.
  * The live shape of that gap has TWO forms, and the worked example is re-pointed at a surviving
  * one: `apps/inventory/detail/InventoryDetailHeader.svelte` sets `--inventory-detail-thumb-size`
  * in markup from a JS prop and reads it back in a scanned declaration, and `components/Medallion`
@@ -385,7 +327,7 @@ test('no new raw spacing literal has been introduced', () => {
     floor: STYLESHEET_SPACING_DECLARATION_FLOOR + SVELTE_SPACING_DECLARATION_FLOOR,
     guidance:
       'Padding, margin and gap MUST derive from the published spacing scale — see the "Spacing ' +
-      'scale" section of `openspec/specs/ui-integration/spec.md`. Use the numeric tokens ' +
+      'scale" section of `openspec/specs/ui-visual-style/spec.md`. Use the numeric tokens ' +
       `(\`${SPACING_SCALE_PREFIX}-1\` through \`${SPACING_SCALE_PREFIX}-6\`, plus ` +
       `\`${SPACING_SCALE_PREFIX}-2xs\` and \`${SPACING_SCALE_PREFIX}-chip\`); this baseline is ` +
       'the debt already owed, not a permission to add to it. The nearest step is almost always ' +
@@ -401,12 +343,6 @@ test('no raw spacing literal has been laundered into a private token', () => {
   // `--inset: 8px; padding: var(--inset)` and the file, property, value and COUNT are all
   // unchanged — only the text moves. Resolution is what keeps the occurrence findable at all;
   // this is what keeps it from being reported as unchanged while the debt was laundered.
-  //
-  // It is an EMPTY set today rather than a baseline, which is a fact about the tree: no spacing
-  // declaration in this corpus reaches a pixel value through a non-scale custom property. If one
-  // ever should — a private token that genuinely is not spacing rhythm — the honest change is to
-  // widen this test deliberately with a note per row, in the shape
-  // `control-height-ladder.test.js` uses, not to delete it.
   const laundered = raw.occurrences
     .filter((record) => !pixelValuesIn(record.raw).includes(record.value))
     .map(

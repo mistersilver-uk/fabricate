@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
 import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
+import { deletedKey, forEachDeletionForm, recordWrite } from './helpers/forcedDeletion.js';
 import {
   insertTerminalRuns,
   assertCappedMostRecentFirst,
@@ -23,9 +24,7 @@ class FakeActor {
     this.name = name;
     this.uuid = `Actor.${name.replace(/\s+/g, '-')}`;
     this._flags = {};
-    // A real Foundry actor always answers this. The startup cleanup passes only
-    // touch actors THIS client may write (issue 970), so a fixture that omitted it
-    // would be silently skipped rather than exercised.
+    // A real Foundry actor always answers this (issue 970).
     this.isOwner = isOwner;
   }
 
@@ -377,9 +376,8 @@ test('CraftingRunManager freezes and resumes v1 gates while preserving legacy wo
   assert.equal(resumed.pausedDurationSeconds, 100);
   assert.equal(resumed.pauseState, null);
   assert.equal(resumed.runRevision, 3);
-  // The container persists through a MERGING flag write, which never removes a key deleted from
-  // a nested object. A resume that only deleted `pauseState` left the stored run paused at the
-  // resumed revision, so the next pause refused with RUN_ALREADY_PAUSED and deadlocked the run.
+  // The container persists through a MERGING flag write, which never removes a key deleted from a
+  // nested object.
   manager.invalidateCache(actor.id);
   assert.equal(manager.getActiveRun(actor, run.id).pauseState, null);
   const repaused = await manager.pauseRun(actor, run.id, { expectedRevision: 3 });
@@ -597,56 +595,64 @@ test('CraftingRunManager.completeRun never archives a duplicate history id (lega
   );
 });
 
-// Foundry's setFlag performs a RECURSIVE MERGE that never removes keys deleted
-// from an object, so a run removed from `active` would linger in the stored flag
-// and resurrect on reload. This actor reproduces that merge (and the `-=` deletion
-// that `_persist` must issue to counter it); the default FakeActor.setFlag simply
-// replaces the value and cannot catch the regression.
+// Foundry's setFlag performs a RECURSIVE MERGE that never removes keys deleted from an object, so a
+// run removed from `active` would linger in the stored flag and resurrect on reload.
 class MergeActor {
   constructor(name = 'Merge') {
     this.id = `id-${name}`;
     this.name = name;
     this.uuid = `Actor.${name}`;
     this._stored = null; // the persisted craftingRuns container
-    this.updateCalls = [];
+    this.setFlagCalls = [];
   }
 
   getFlag(_scope, key) {
     return String(key).endsWith('craftingRuns') ? this._stored : undefined;
   }
 
-  async setFlag(_scope, _key, value) {
-    // Recursive-merge `active` (never deletes), replace `history` (array replace).
-    const priorActive = this._stored?.active ?? {};
+  async setFlag(scope, key, value) {
+    recordWrite(this.setFlagCalls, value, { scope, key, value });
+    // Merge `active` (never deletes an omitted run), replace `history` (array replace).
+    const active = { ...(this._stored?.active ?? {}) };
+    for (const [id, run] of Object.entries(value?.active ?? {})) {
+      const deleted = deletedKey(id, run);
+      if (deleted !== null) delete active[deleted];
+      else active[id] = run;
+    }
     this._stored = {
-      active: { ...priorActive, ...(value?.active ?? {}) },
+      active,
       history: Array.isArray(value?.history) ? value.history : (this._stored?.history ?? []),
     };
-    for (const key of Object.keys(value?.active ?? {})) if (key.startsWith('-=')) { delete this._stored.active[key.slice(2)]; delete this._stored.active[key]; }
     return this;
-  }
-
-  async update(data) {
-    this.updateCalls.push(data);
-    for (const path of Object.keys(data)) {
-      const match = /craftingRuns\.active\.-=(.+)$/.exec(path);
-      if (match && this._stored?.active) delete this._stored.active[match[1]];
-    }
   }
 }
 
-test('CraftingRunManager._persist deletes removed active runs from the stored flag (setFlag merge cannot)', async () => {
+// The V13 write list for one create-then-complete (issue 1842 characterisation).
+function persistWriteGolden(run) {
+  const terminal = { ...run, status: 'succeeded', finishedAt: 1000, currentStepIndex: null };
+  const write = (value) => ({ scope: 'fabricate', key: 'fabricate.craftingRuns', value });
+  return [
+    write({ active: { [run.id]: run }, history: [] }),
+    write({ active: { [`-=${run.id}`]: null }, history: [terminal] }),
+  ];
+}
+
+forEachDeletionForm('CraftingRunManager._persist deletes removed active runs from the stored flag (setFlag merge cannot)', async (deletion) => {
   setupGlobals();
+  deletion.apply();
   const manager = new CraftingRunManager();
   const actor = new MergeActor();
 
   const run = await manager.createRun(actor, singleStepRecipe('m'), [actor], 'user-1');
   assert.ok(actor._stored.active[run.id], 'the new run persisted into the stored active map');
+  const golden = persistWriteGolden(JSON.parse(JSON.stringify(run)));
 
   // Simulate a reload: drop the in-memory cache so completion re-reads the flag.
   manager.invalidateCache();
   await manager.completeRun(actor, run, 'succeeded');
 
+  assert.deepEqual(actor.setFlagCalls, deletion.expect(golden));
+  deletion.assertOperators(actor.setFlagCalls, 1);
   assert.ok(
     !actor._stored.active[run.id],
     'the completed run is actually removed from the stored active map (not just in memory)'
@@ -811,19 +817,9 @@ test('CraftingRunManager: discardRun removes from active WITHOUT archiving to hi
   assert.equal(await manager.discardRun(actor, 'no-such-id'), null, 'unknown id returns null');
 });
 
-// --- Spec 002 (Data Models) "CraftingRun Requirements" invariants ---------
-// Rule 4: `finishedAt` is required for terminal statuses (`succeeded`, `failed`,
-//   `cancelled`) and must be absent for non-terminal statuses (`inProgress`,
-//   `waitingTime`).
-// Rule 2: `currentStepIndex` must be `null` for terminal statuses.
-// `completeRun` is the sole funnel through which every terminal transition
-// passes, so these guards pin all three terminal paths against it.
-//
-// NOTE ON "absent": the model represents an unfinished run as `finishedAt:
-// undefined` (an own key with an undefined value), not a missing key. The
-// normative meaning of "absent" here is "carries no finish timestamp", so these
-// tests assert `=== undefined`, NOT key-absence. Asserting the key were missing
-// would wrongly fail against the model's own `createRun` shape.
+// Spec 002 (Data Models) "CraftingRun Requirements" invariants --------- Rule 4: `finishedAt` is
+// required for terminal statuses (`succeeded`, `failed`, `cancelled`) and must be absent for
+// non-terminal statuses (`inProgress`, `waitingTime`).
 const TERMINAL_PATHS = {
   succeeded: (manager, actor, run) => manager.completeStepSuccess(actor, run, 0, {}),
   failed: (manager, actor, run) => manager.completeStepFailure(actor, run, 0, 'check failed'),
@@ -926,9 +922,7 @@ test('CraftingRunManager: currentStepIndex is null for terminal statuses and non
 });
 
 test('CraftingRunManager: a terminal run finishing at world time 0 records finishedAt=0 (present, not absent) (spec 002 rule 4)', async () => {
-  // Precision guard: world time 0 is a valid, PRESENT finish timestamp. A naive
-  // truthy check (`if (finishedAt)`) would misread 0 as absent and mis-order
-  // history by finish time, so pin that 0 is distinct from undefined.
+  // Precision guard: world time 0 is a valid, PRESENT finish timestamp.
   setupGlobals(0);
   const manager = new CraftingRunManager();
   const actor = new FakeActor('ZeroTime');
@@ -1131,11 +1125,8 @@ test('CraftingRunManager: cleanupInvalidRuns keeps a fizzle on a valid system, p
   );
 });
 
-// Issue 970: both startup cleanup passes run on EVERY client and write directly to
-// actor documents (there is no GM relay). A player owns only their own characters,
-// so an un-filtered walk had them attempt `Actor#update` on every other character in
-// the world; Foundry refuses it, `setFabricateFlag` rejects by design, and the
-// rejection propagated out of `initialize()` before `ready` was ever set.
+// Issue 970: both startup cleanup passes run on EVERY client and write directly to actor documents
+// (there is no GM relay).
 test('CraftingRunManager: the startup cleanup passes skip actors this client cannot write', async () => {
   setupGlobals();
   const manager = new CraftingRunManager();

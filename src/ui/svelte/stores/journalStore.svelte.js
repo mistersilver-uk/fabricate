@@ -4,6 +4,8 @@ import {
   resolvedFailureMessage,
 } from '../util/journalRunReasons.js';
 
+import { createPageWindow } from './browseListing.svelte.js';
+
 const PAGE_SIZES = Object.freeze([4, 6, 12, 25]);
 const RECENT_TERMINAL_LIMIT = 3;
 const KIND_FILTERS = new Set(['all', 'crafting', 'alchemy', 'gathering', 'salvage']);
@@ -22,7 +24,6 @@ const ACTIVE_STATUS_MEMBERS = Object.freeze({
 });
 
 /**
- * Active and Finished have independent pages and sorts, with shared search/kind filtering.
  * Status counts use the kind cohort before search, status filtering or paging.
  * Native run keys retain selected detail off-page or filtered out until removal/dismissal.
  */
@@ -37,10 +38,6 @@ export function createJournalStore({ services } = {}) {
   let activeStatusFilter = $state('all');
   let activeSort = $state('soonestReady');
   let historySort = $state('newest');
-  let activePage = $state(0);
-  let activePageSize = $state(PAGE_SIZES[0]);
-  let historyPage = $state(0);
-  let historyPageSize = $state(PAGE_SIZES[0]);
   let busyRunId = $state('');
   let busyRunKey = $state('');
   let commandError = $state(null);
@@ -81,13 +78,17 @@ export function createJournalStore({ services } = {}) {
       .sort(historySort === 'oldest' ? compareOldestFinished : compareNewestFinished)
   );
 
-  const activePageItems = $derived.by(() => {
-    const start = activePage * activePageSize;
-    return activeRuns.slice(start, start + activePageSize);
+  const activeWindow = createPageWindow({
+    items: () => activeRuns,
+    defaultPageSize: PAGE_SIZES[0],
+    pageSizes: PAGE_SIZES,
+    clamp: 'write',
   });
-  const historyPageItems = $derived.by(() => {
-    const start = historyPage * historyPageSize;
-    return sortedHistory.slice(start, start + historyPageSize);
+  const historyWindow = createPageWindow({
+    items: () => sortedHistory,
+    defaultPageSize: PAGE_SIZES[0],
+    pageSizes: PAGE_SIZES,
+    clamp: 'write',
   });
   const recentTerminalRuns = $derived.by(() =>
     [...allHistoryRuns].sort(compareNewestFinished).slice(0, RECENT_TERMINAL_LIMIT)
@@ -166,8 +167,8 @@ export function createJournalStore({ services } = {}) {
   }
 
   function clampPages() {
-    activePage = clampPage(activePage, activePageSize, activeRuns.length);
-    historyPage = clampPage(historyPage, historyPageSize, sortedHistory.length);
+    activeWindow.clampPage();
+    historyWindow.clampPage();
   }
 
   function select(runOrId, runType = null) {
@@ -181,53 +182,31 @@ export function createJournalStore({ services } = {}) {
 
   function setSearch(next) {
     search = String(next ?? '').trim();
-    activePage = 0;
-    historyPage = 0;
+    activeWindow.resetPage();
+    historyWindow.resetPage();
   }
 
   function setKindFilter(next) {
     if (!KIND_FILTERS.has(next)) return;
     kindFilter = next;
-    activePage = 0;
-    historyPage = 0;
+    activeWindow.resetPage();
+    historyWindow.resetPage();
   }
 
   function setActiveStatusFilter(next) {
     if (!ACTIVE_STATUS_FILTERS.has(next)) return;
     activeStatusFilter = next;
-    activePage = 0;
+    activeWindow.resetPage();
   }
 
   function setActiveSort(next) {
     if (next === 'soonestReady' || next === 'newest') activeSort = next;
-    activePage = 0;
+    activeWindow.resetPage();
   }
 
   function setHistorySort(next) {
     if (next === 'newest' || next === 'oldest') historySort = next;
-    historyPage = 0;
-  }
-
-  function setActivePage(next) {
-    activePage = clampPage(next, activePageSize, activeRuns.length);
-  }
-
-  function setHistoryPage(next) {
-    historyPage = clampPage(next, historyPageSize, sortedHistory.length);
-  }
-
-  function setActivePageSize(next) {
-    const size = Number(next);
-    if (!PAGE_SIZES.includes(size)) return;
-    activePageSize = size;
-    activePage = 0;
-  }
-
-  function setHistoryPageSize(next) {
-    const size = Number(next);
-    if (!PAGE_SIZES.includes(size)) return;
-    historyPageSize = size;
-    historyPage = 0;
+    historyWindow.resetPage();
   }
 
   // Browsing is transient and never overwrites the executable stage.
@@ -492,16 +471,16 @@ export function createJournalStore({ services } = {}) {
       return historySort;
     },
     get activePage() {
-      return activePage;
+      return activeWindow.page;
     },
     get activePageSize() {
-      return activePageSize;
+      return activeWindow.pageSize;
     },
     get historyPage() {
-      return historyPage;
+      return historyWindow.page;
     },
     get historyPageSize() {
-      return historyPageSize;
+      return historyWindow.pageSize;
     },
     get pageSizes() {
       return PAGE_SIZES;
@@ -534,13 +513,13 @@ export function createJournalStore({ services } = {}) {
       return activeRuns;
     },
     get activePageItems() {
-      return activePageItems;
+      return activeWindow.pageItems;
     },
     get activeCount() {
       return activeRuns.length;
     },
     get historyPageItems() {
-      return historyPageItems;
+      return historyWindow.pageItems;
     },
     get historyCount() {
       return sortedHistory.length;
@@ -567,10 +546,10 @@ export function createJournalStore({ services } = {}) {
     setActiveStatusFilter,
     setActiveSort,
     setHistorySort,
-    setActivePage,
-    setActivePageSize,
-    setHistoryPage,
-    setHistoryPageSize,
+    setActivePage: activeWindow.setPage,
+    setActivePageSize: activeWindow.setPageSize,
+    setHistoryPage: historyWindow.setPage,
+    setHistoryPageSize: historyWindow.setPageSize,
     viewStage,
     returnToCurrentStage,
     retryCommandError,
@@ -656,12 +635,6 @@ function normalizeStageIndex(run, value) {
   const upper = Math.max(0, (run?.steps?.length ?? 1) - 1);
   const index = Math.trunc(Number(value) || 0);
   return Math.min(upper, Math.max(0, index));
-}
-
-function clampPage(value, pageSize, itemCount) {
-  const requested = Math.max(0, Math.trunc(Number(value) || 0));
-  const last = Math.max(0, Math.ceil(itemCount / pageSize) - 1);
-  return Math.min(requested, last);
 }
 
 function normalizeRevision(value) {

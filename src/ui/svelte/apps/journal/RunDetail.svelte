@@ -4,7 +4,7 @@
   import { formatAuthoredDuration, formatDurationHMS } from '../../util/formatDuration.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import { worldTimeLabel } from '../../util/worldTimeLabel.js';
-  import Callout from '../manager/Callout.svelte';
+  import Callout from '../../components/Callout.svelte';
   import Chip from '../../components/Chip.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
   import Medallion from '../../components/Medallion.svelte';

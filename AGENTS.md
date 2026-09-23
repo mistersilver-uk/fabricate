@@ -21,8 +21,7 @@ See `openspec/README.md` for the block format and rules.
 - Non-trivial UI plans include a `Reference surfaces / reuse inventory` and follow `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`.
 - **Batch siblings that share an exact-count ledger.** Two issues whose planned path sets both touch the same pinned ledger — `tests/components/design-system-known-debt.json`, `tests/components/selector-repetition-baseline.json`, `tests/components/spacing-known-literals.json`, `tests/components/control-height-known-literals.js`, or the View Lab registry-total prose that `tests/view-lab-cases.test.js` pins — are planned as ONE delta and delivered as one PR chain, with the phases ordered so each commit boundary re-derives the pins once.
 Planned separately, every one of those PRs restacks onto the other's merge and re-derives the same pins again, which is pure overhead with no review value.
-The four ratchet ledgers issue #1656 added are covered by the same rule: `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`, `tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt`.
-`tests/comment-share-ledger.txt` collides the most widely because it buckets per directory rather than per file, so two lanes touching comments in unrelated trees still rewrite the same rows — a lane that edited only `tests/` moved two of them.
+The four ratchet ledgers issue #1656 added — `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`, `tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` — are ceiling gates whose rows change only when a unit crosses its ceiling, so lanes that share them no longer need one rail (issue #1914).
 
 ### OpenSpec
 
@@ -193,6 +192,9 @@ package.json
 package-lock.json
 src/main.js
 src/migration/**
+src/systems/remapWorldScopeIdentityFlags.js
+src/systems/restampOwnedItemComponentIdentity.js
+src/systems/worldScopeReferenceRewrite.js
 scripts/**
 .github/workflows/**
 release.config.js
@@ -471,8 +473,9 @@ Do NOT run it to photograph a view the registry already covers: the `screenshots
 - UI-changing PRs (files under `src/ui/`, `styles/`, or any `*.svelte`/`*.css`) must include screenshot evidence for the relevant changed views before opening or updating the PR; a `lang/` change requires screenshots only when the same PR also changes one of those render files.
 Evidence is always a FULL APPLICATION WINDOW — never a component on a blank page.
 Each case pins the size its smoke counterpart photographs rather than the app's declared `DEFAULT_OPTIONS.position`: the two differ (the smoke shoots the manager at 1280x820, not its declared 1280x940), and responsive cases deliberately pin narrower geometry, so the registry spans twelve sizes and the size is a per-case fact rather than a per-app one.
-- For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`) — which is the normal case, at 485 cases across five windows — the **View Lab** is the producer, and it is what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.
-Selection is targeted, and no single changed file selects the whole registry: a render file selects the cases whose `sourceMatches` claim it, a broad shared primitive or stylesheet selects a small representative set, and a change to one of the lab's OWN inputs (fixture world, capture driver, registry shared code) selects **surface coverage** — one frame of every route and tab the lab renders, 48 cases — rather than every state of every screen.
+- For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`) — which is the normal case — the **View Lab** is the producer, and it is what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.
+How many cases that is, and how many of them surface coverage selects, are generated into `scripts/README.md` rather than quoted here.
+Selection is targeted, and no single changed file selects the whole registry: a render file selects the cases whose `sourceMatches` claim it, a broad shared primitive or stylesheet selects a small representative set, and a change to one of the lab's OWN inputs (fixture world, capture driver, registry shared code) selects **surface coverage** — one frame of every route and tab the lab renders — rather than every state of every screen.
 A detailed state is captured when the files that govern it change; if you need one alongside such a change, name its case id in the run rather than widening the selection.
 Measured at a 155-frame registry: ~5.6s per frame locally (14 min for that whole corpus), a five-case subset in 36s, one case in 22s — against ~31s per frame for the smoke's `screenshots` profile.
 The per-frame rate is the durable figure; the whole-corpus total scales with the registry.
@@ -485,14 +488,14 @@ Where a View Lab frame and a smoke frame of the same view disagree, the smoke fr
 For a view the registry does not cover, the smoke is also the producer:
 use `npm run screenshots:ui:plan -- --base origin/main` to identify expected views, run the scoped `screenshots` profile (`npm run test:foundry:screenshots -- --target-labels=$(npm run --silent screenshots:ui:targets -- --base origin/main)`) to produce real Foundry screenshots for only the changed-file-affected views under `test-results/`, `npm run screenshots:ui -- --base origin/main --pr <number>` to collect the relevant smoke artifacts into `tmp/pr-screenshots/<number>/`, then `npm run screenshots:ui:publish -- --pr <number>` to upload them to S3 (under `pr-screenshots/<number>/`) and embed the returned `![pr-<number> ...]` image markdown into a managed block in the PR body's `Screenshots (if applicable)` section, then `npm run screenshots:ui:clean -- --pr <number>` so PR-scoped screenshots are not committed as repository assets.
 The reduced `rc`/`ci` smoke stays the CI/release gate and `full` remains the occasional outer-loop suite; do NOT run the `full` (or `screenshots`) smoke profile on a GitHub Actions runner — generation is local.
-The evidence must DEMONSTRATE the change, not merely clear the gate: at least one published frame must show the changed state itself, and when that state is not reachable by the existing capture walk in `scripts/foundry-test-run.mjs` or by a registry case, the branch adds one that reaches it rather than publishing an unrelated frame.
+The evidence must DEMONSTRATE the change, not merely clear the gate: at least one published frame must show the changed state itself, and when that state is not reachable by the existing capture walk in `scripts/foundry-smoke/scenarios/` or by a registry case, the branch adds one that reaches it rather than publishing an unrelated frame.
 A View Lab case that navigates must declare `expectView`; the capture asserts the app reached that route and fails rather than screenshotting whichever screen it landed on.
 The `check-screenshots` gate cannot be self-satisfied: there is no `SCREENSHOTS_NEEDED:` bypass.
 It also now awaits the `capture` job in `pr-screenshots.yml` for this PR's own head SHA before deciding, then re-reads the live PR body those frames were published into, so a first push no longer reds by construction on a body the producer has not written yet.
 If capture is genuinely impossible, only a maintainer may apply the `screenshots-exempt` label (agents must never apply it).
 An explicit issue-specific maintainer instruction may replace automated screenshot production, but it leaves agent visual approval pending and does not itself satisfy or waive `check-screenshots`; qualifying maintainer-provided evidence or the maintainer label is still required.
 - Smoke screenshot fixture data should use Foundry VTT core or dnd5e non-SVG raster icon paths directly when previews need imagery; do not invent custom SVG preview art.
-- The smoke harness Phase D0 (`screenshot-manager` step in `scripts/foundry-test-run.mjs`) pins many selectors by class, `.nth(N)` index, and visible button text.
+- The smoke harness Phase D0 (`screenshot-manager` step in `scripts/foundry-smoke/scenarios/`) pins many selectors by class, `.nth(N)` index, and visible button text.
 When changing any manager UI surface — environment row markup, env-edit view, composition list, header actions — grep the harness for the changed classes / text before declaring the change done.
 See the "Foundry integration (smoke) tests" section in `CONTRIBUTING.md`.
 
@@ -501,9 +504,21 @@ See the "Foundry integration (smoke) tests" section in `CONTRIBUTING.md`.
 - Use `node scripts/latest-module-versions.mjs --profile fabricate-beta` to query the current latest beta manifest versions for Fabricate and the premium sibling modules; substitute another `--profile <name>` when the local AWS profile differs.
 The script reads `release.s3.config.json` plus `../fabricate-premium/release.config.json`, uses exact S3 `GetObject` reads for `modules/<moduleId>/<channel>/latest/module.json`, and does not require `s3:ListBucket`.
 Useful flags: `--json`, `--include <moduleId>`, `--bucket <name>`, `--channel <name>`, `--premium-config <path>`, and `--no-premium`.
+- `node scripts/rotate-tester-secrets.mjs` rotates every tester path segment in one pass, across this repository and the premium sibling.
+It reads both committed release configs to derive which repository secrets each tester group's segment is written to, so no Patreon tier name is hard-coded here.
+It is **dry-run by default** and writes nothing until `--apply`; `--group <name>` narrows to one group, and refuses when that group's secret also serves groups you did not name.
+Useful flags: `--group <name>`, `--config <path>`, and `--premium-config <path>` when the premium sibling is not checked out beside this repository.
+`--no-premium` inspects this repository alone and is **refused together with `--apply`**, because rotating one repository leaves the other on the old segment and splits one cohort across two prefixes.
+Rotation is a cohort migration, never hygiene: it deletes nothing and republishes nothing, so every superseded prefix keeps serving its last manifest and the cohort on it silently stops receiving updates rather than failing.
+Under `--apply` it prints one full `testers/<group>/<segment>/<moduleId>/module.json` URL per rotated group and module, so the report pastes into the patron announcement as-is; `gh` cannot read a secret back, so it is also the only record of where each cohort now lives.
+Pair each run with the patron announcement carrying those URLs.
+It is deliberately absent from `package.json` and from every workflow, because it mutates repository secrets in two repositories and must stay a deliberate local act.
+It resolves `gh` to one absolute path before running it rather than searching `PATH` at spawn time; set `GH_BIN` to an absolute path for a non-standard install, and a relative `GH_BIN` is refused.
 - `node scripts/release-s3.js --channel <name>` publishes a built `dist/` to one channel's S3 targets: `beta` (closed testers, the default), `early-access` (patrons), `public` (everyone + the Foundry registry), or a hotfix line's own channel.
 `--channel early-access` and `--channel public` are the private-patron and public targets; each private channel derives its tester URLs from its own path secret, and a channel that declares tester groups with no secret set refuses to publish.
 Pair with `--dry-run` to print every planned key and URL without writing, and `--check-heads` to read each target's head and the monotonic-head guard verdict without publishing (note `--check-heads` is head-ordering only — it stages no build, so it does NOT evaluate the same-version resume/provenance decision, which needs a real publish).
+Every CI workflow that checks out a release tag passes an explicit `--config` captured from the workflow ref before that checkout, because a tester group's identity is deployment configuration and not a property of the released bytes.
+Run locally with no `--config`, it reads the checkout's own `release.s3.config.json`, and an operator may pass `--config <path>` explicitly to publish an old tag under current configuration.
 The three-channel model these serve is specified in `openspec/specs/release-and-distribution/spec.md`.
 - `release-s3.js` publishes through a **provenance guard**, not a byte check (the built zip is not byte-reproducible across builds).
 Every versioned zip carries `(fabricate-version, fabricate-source-sha, fabricate-build-profile)` metadata — pass `--source-sha` explicitly, since `GITHUB_SHA` is stale after a `git checkout <tag>`; manifest writes are conditional (`IfMatch`) and every write is read back.
@@ -522,6 +537,10 @@ The immutability, completeness, and one-build-per-publish contracts are specifie
 - Svelte is the only UI templating system.
 Do not add or reintroduce Handlebars templates.
 - UI shells live in `src/ui/*.js` and `src/ui/*.svelte.js`.
+- `src/ui/model/` holds the Foundry-free view models the UI owns — pure filtering, sorting, pagination, selection and validation logic with no Foundry global and no importer outside `src/ui/`.
+- `src/ui/presenters/` holds the modules that render a chat card or build a read-side row model for a UI surface.
+Unlike `src/ui/model/`, these may have importers outside `src/ui/` — the crafting, gathering and bulk-salvage engines, and `src/main.js`, which drives four of them behind the `game.fabricate` facade.
+Several own a canonical disclosure rule (teaser redaction, blind-run secrecy, summary audience), so a change here can be a requirement change rather than a cosmetic one.
 - Svelte UI components live in `src/ui/svelte/apps/` and `src/ui/svelte/components/`.
 - Svelte stores live in `src/ui/svelte/stores/`.
 - Domain and runtime logic lives under `src/models/`, `src/systems/`, `src/utils/`, `src/integrations/`, `src/config/`, and related `src/` modules.
@@ -585,7 +604,9 @@ This workflow produced each of these shapes repeatedly, and each already has a r
 - An issue delta, lane brief, or handover that runs to tens of kilobytes, answered by stating the decision rather than how it was reached.
 - A file or component header longer than [`.agents/component-header-template.md`](.agents/component-header-template.md).
 
-Each ledger is a ratchet, so the rule is to leave its number lower than you found it, never to spend up to it.
+Each ledger is a ceiling rather than an exact count, so a unit that stays under its row costs no ledger edit at all; a ceiling is raised in a feature PR only with the reason stated in the PR, and lowered by this epic's sweeps with `TIGHTEN_<X>_LEDGER=1`.
+A ceiling gate cannot tell that a condensation sweep finished, so a PR whose stated purpose is condensation, extraction or pin conversion runs that tighten mode for every ledger it moves and commits the result, and a reviewer treats a sweep PR that leaves those ledgers byte-identical as `NEEDS_CHANGES`.
+`tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` carry no headroom, because one more pin or bare read is never the same debt as the last one, so there the gate enforces that obligation itself: a row left above the unit it bounds fails as `SLACK` and is banked with the tighten mode in the same PR that earned it.
 
 ## FoundryVTT Notes and Architecture Pointers
 

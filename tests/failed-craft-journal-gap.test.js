@@ -1,27 +1,14 @@
-/**
- * DIAGNOSIS repro (issue: immediate check-failure craft missing from the Journal
- * History). Drives the FULL CraftingEngine.craft() with the REAL CraftingRunManager
- * and a faithful Foundry-like actor (setFlag deep-merge + update `-=` deletion), for
- * a single-step IMMEDIATE (untimed) craft whose crafting check FAILS. Asserts the
- * actor's persisted craftingRuns flag has a `failed` history entry, and that the
- * RunJournalBuilder projects it to a visible GM entry.
- *
- * Permanent regression suite for issues 733 + 739: test 3 reproduces the stale-cache
- * clobber (a second writer's timed-resume `_persist` dropping an immediate failure from
- * history, surviving a restart) and is GREEN only with document-coherent persistence.
- */
+/** DIAGNOSIS repro (issue: immediate check-failure craft missing from the Journal History). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
-import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
+import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 
-// ---------------------------------------------------------------------------
-// Faithful foundry.utils: getProperty / setProperty / expandObject / mergeObject
-// with `-=` deletion, so setFlag + update behave like the Foundry document layer.
-// ---------------------------------------------------------------------------
+// Faithful foundry.utils: getProperty / setProperty / expandObject / mergeObject with `-=`
+// deletion, so setFlag + update behave like the Foundry document layer.
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -89,9 +76,7 @@ globalThis.foundry = {
 };
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
 
-// ---------------------------------------------------------------------------
 // Faithful actor: real flag document semantics.
-// ---------------------------------------------------------------------------
 
 function makeActor({ id = 'actor-1', items = [] } = {}) {
   const createdItems = [];
@@ -395,21 +380,8 @@ test('ENGINE: interactive deferred failure survives a concurrent world-time tick
   assert.equal(projection.history.length, 1, 'deferred failed run projects to a visible entry');
 });
 
-// ---------------------------------------------------------------------------
-// ROOT CAUSE: CraftingRunManager's write-through `_cache` is never invalidated
-// (`invalidateCache` has ZERO callers in src/). Any SECOND writer to the same
-// actor's `craftingRuns` flag whose cache predates a run persists a STALE
-// container and silently CLOBBERS that run from the persisted document. This
-// survives a world restart because the document itself is overwritten.
-//
-// Mirrors the maintainer's world exactly:
-//   - client/manager A writes the immediate "Embercap" check-FAILURE to the doc
-//   - client/manager B (primary-GM cache seeded BEFORE that write, holding a
-//     maturing timed "Forge Breastplate" run) resumes the timed run on a
-//     world-time tick; its _persist writes B's stale container back, dropping
-//     Embercap while Forge (the run whose resume did the write) survives.
-//   - after restart, a fresh manager reads the doc: Forge present, Embercap gone.
-// ---------------------------------------------------------------------------
+// ROOT CAUSE: CraftingRunManager's write-through `_cache` is never invalidated (`invalidateCache`
+// has ZERO callers in src/).
 test('ROOT CAUSE: a stale-cache timed-resume _persist clobbers an immediate failure from history (survives restart)', async () => {
   const system = makeSystem();
   // Two managers = two clients (or a rebuilt manager) sharing ONE actor document.

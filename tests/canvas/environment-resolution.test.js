@@ -1,8 +1,6 @@
 /**
- * Pure-decision coverage for the on-drop environment-resolution precedence
- * (Phase 6): Scene Region auto-detect → task default → GM dialog, with the Alt
- * override forcing the dialog. The region hit-test and the dialog are seams
- * supplied by the caller, so this exercises only the decision.
+ * Pure-decision coverage for the on-drop environment-resolution precedence (Phase 6): Scene Region
+ * auto-detect → task default → GM dialog, with the Alt override forcing the dialog.
  */
 
 import test from 'node:test';

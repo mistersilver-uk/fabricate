@@ -86,9 +86,7 @@ describe('CraftingSystemManager.reload', () => {
 
     assert.equal(mgr.getSystems().length, 1);
     assert.equal(mgr.getSystem('s2'), null);
-    // The delete leg of the narrow advance. `revisionTokens` names delete among the mutations
-    // that MUST advance the narrow scope, and asserting only the ids and the count leaves an
-    // advance that walked changed-and-added entries alone indistinguishable from a correct one.
+    // The delete leg of the narrow advance.
     assert.notEqual(
       mgr.revision(REVISION_SCOPES.system('s2')),
       before.s2,

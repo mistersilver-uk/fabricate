@@ -1,33 +1,4 @@
-/*
- * THE SCOPED CATALOGUE'S INSPECTOR COLUMN, MEASURED ON BOTH SIDES OF ITS CONTAINER QUERY
- * (issue 1380, epic 1357).
- *
- * ── WHY THIS IS NOT A MOUNTED TEST ────────────────────────────────────────────────────────────
- * happy-dom computes no cascade and no layout, so a mounted suite can state that the inspector
- * EXISTS but never that it sits beside the list at 300px, and never that it stacks under the list
- * when the column narrows. A container query is exactly the kind of rule a source read cannot
- * evaluate: `@container (max-width: 760px)` is answered by the layout engine or by nothing.
- *
- * ── A ONE-WIDTH HARNESS REPORTS A BREAKPOINT THAT IS NOT THERE ────────────────────────────────
- * Both sides are measured, at REAL manager column widths, and the container's own width is
- * asserted to be on the expected side of the threshold before either geometry assertion runs. A
- * harness sized so that both cases land on one side of the query passes whatever the rule says —
- * including a rule that was deleted.
- *
- * ── THE MARKUP IS THE PRODUCT'S ───────────────────────────────────────────────────────────────
- * The shell is mounted through `createMountedComponentHarness` and its real rendered `innerHTML`
- * is shipped into Chromium, so deleting the inspector region from the frame empties this gate's
- * markup and it fails on the spot rather than measuring a fixture nothing renders. The two
- * stylesheets are both load-bearing and in opposite directions: `.manager-body`'s grid and the
- * `manager-scoped-list-*` row rules are in the global sheet, while the frame's grid tracks and
- * its container query live in its scoped `<style>` and appear nowhere in that file.
- *
- * ── THE WRAPPER LEVELS ARE THE SHIPPED ONES ───────────────────────────────────────────────────
- * All seven world scoped routes are classified `full-width-2-track`, so `.manager-body` is a
- * 220px rail plus `main` and the shared aside is suppressed. The two probe widths below are the
- * whole window; `main` is what is left after the rail, and that is what the frame's container
- * query actually measures.
- */
+/* THE SCOPED CATALOGUE'S INSPECTOR COLUMN. */
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -44,6 +15,7 @@ import {
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import { chooseSelectOption } from '../helpers/select-control.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const SHELL = 'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte';
@@ -52,13 +24,7 @@ const FRAME = 'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte
 const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 const frameCss = scopedComponentCss(resolve(repoRoot, FRAME));
 const shellCss = scopedComponentCss(resolve(repoRoot, SHELL));
-/**
- * The selection band's own children (issue 1373, maintainer feedback round 4).
- *
- * `BulkSelectionToolbar` paints the count, the standing hint and the two text actions in its OWN
- * scoped block, and the band case below measures where those actions sit. Without this sheet the
- * band renders as unstyled text runs and the case would measure a layout no build produces.
- */
+/** The selection band's own children (issue 1373, maintainer feedback round 4). */
 const selectionToolbarCss = scopedComponentCss(
   resolve(repoRoot, 'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte')
 );
@@ -69,13 +35,7 @@ const THRESHOLD_PX = Number(
 );
 /** The manager rail's width, which `main` does not get. */
 const RAIL_PX = 220;
-/**
- * The inspector column's declared width, matching the shared aside it stands in for.
- *
- * READ FROM THE FRAME, like the threshold above it, because the hardcoded copy is what let this
- * drift: the constant said 300 while the system scope's aside moved to 340 (issue 1373's parity
- * round), so the two scopes' inspectors were 40px apart and this test asserted the gap was right.
- */
+/** The inspector column's declared width, matching the shared aside it stands in for. */
 const INSPECTOR_PX = Number(
   /\.manager-scoped-list-layout\.has-inspector\s*\{[^}]*?minmax\(0,\s*1fr\)\s+(\d+)px/s.exec(
     readFileSync(resolve(repoRoot, FRAME), 'utf8')
@@ -83,37 +43,13 @@ const INSPECTOR_PX = Number(
 );
 /** Sub-pixel tolerance; every defect this catches moves an edge by hundreds of pixels. */
 const EPSILON_PX = 1;
-/**
- * MORE ROWS THAN THE VIEWPORT HOLDS, and the count is load-bearing.
- *
- * This fixture rendered four rows, which is short enough that the whole column fits the viewport
- * — and a frame that never passes its height down is indistinguishable from one that does when
- * nothing overflows. At 25 the list is taller than the window, which is the ordinary case for a
- * world catalogue and the only one in which "the inspector is a bounded, scrollable column"
- * differs from "the inspector is a panel spanning the whole scroll region".
- *
- * IT IS NO LONGER ONE PAGE, and the fixture therefore DRIVES the size control to show all of it
- * (issue 1373, maintainer feedback round 2). The default window is ten rows now — an eleven-row
- * catalogue has to draw a pager, which a twenty-five-row window made impossible — so twenty-five
- * entities render ten rows and about 712px inside a 900px host, and the overflow every case below
- * measures simply is not there. The probe does what a GM does: opens the corpus, then picks the
- * bigger page size. Its own precondition assertion is what would catch this drifting again.
- */
+/** MORE ROWS THAN THE VIEWPORT HOLDS, and the count is load-bearing. */
 const ROW_COUNT = 25;
 /** The size the tall fixture is driven to, so all {@link ROW_COUNT} rows render at once. */
 const TALL_PAGE_SIZE = 25;
 /** The manager host's height, so the column has a definite one to be bounded by. */
 const HOST_HEIGHT_PX = 900;
-/**
- * A TALLER host for the short-but-multi-page probe, and the extra height is load-bearing.
- *
- * The foot pager renders only past one page since issue 1372, so the only fixture that draws one
- * AND leaves the column any slack is a list of more than one page whose FIRST page is short. The
- * smallest page size the pager offers is ten rows, which is around 500px of list — enough to fill
- * a 900px column once the toolbar and the pager are on it, and a fixture with no slack proves
- * nothing about who takes it. Every case below asserts its own slack precondition before
- * measuring, so a wrong value here reds rather than passing quietly.
- */
+/** A TALLER host for the short-but-multi-page probe, and the extra height is load-bearing. */
 const TALL_HOST_HEIGHT_PX = 1400;
 /** Entities in the short-but-multi-page fixture: more than one default page, driven down to ten. */
 const PAGED_ROW_COUNT = 26;
@@ -125,15 +61,7 @@ const PAGED_PAGE_SIZE = 10;
 const WIDE_WINDOW_PX = 1400;
 const NARROW_WINDOW_PX = 900;
 
-/**
- * The window the world catalogues are photographed at, and the width the toolbar case below
- * measures (issue 1373, maintainer feedback round 3).
- *
- * NOT {@link WIDE_WINDOW_PX}. A 1400px window gives the list column about 120px more than the
- * lab's, which is enough slack to hide a wrapping toolbar entirely — so a case measured only
- * there would report a single row while the published frame showed two. This is the View Lab's
- * own `position.width` for every `world-tool-catalogue-*` case.
- */
+/** The window the world catalogues are photographed at. */
 const CATALOGUE_WINDOW_PX = 1280;
 /** The world Tools Catalogue's own corpus size: eleven records over a ten-row page. */
 const SELECTION_ROW_COUNT = 11;
@@ -146,25 +74,12 @@ const laneInspectorBody = createRawSnippet(() => ({
   render: () => `<p data-lane-inspector-body>The lane's own panel.</p>`,
 }));
 
-/**
- * A lane's `bulk` panel, standing in for `ToolCatalogueBulkPanel` (issue 1373, round 4).
- *
- * The selection fixture needs one because the band's standing hint — `Bulk actions are in the
- * inspector →` — is rendered only for `bulk && inspectorBody`, which is the frame refusing to
- * point at a rail that is not carrying a bulk panel. Without it the band draws its count and its
- * two actions and the case measures a narrower register than the screen ships.
- */
+/** A lane's `bulk` panel, standing in for `ToolCatalogueBulkPanel` (issue 1373, round 4). */
 const laneBulkBody = createRawSnippet(() => ({
   render: () => `<p data-lane-bulk-body>The lane's own bulk panel.</p>`,
 }));
 
-/**
- * A lane's `listLead`, standing in for the world Tool catalogue's create-from-drop zone.
- *
- * Deliberately a plain block with a stated height rather than the real `ItemDropZone`: what the
- * case below measures is the SEPARATION the frame gives whatever a lane puts there, and a fixture
- * that composed the real zone would be measuring that component's own margins as well.
- */
+/** A lane's `listLead`, standing in for the world Tool catalogue's create-from-drop zone. */
 const laneListLead = createRawSnippet(() => ({
   render: () => `<div data-lane-list-lead style="height:60px">Drop zone</div>`,
 }));
@@ -177,7 +92,7 @@ const harness = createMountedComponentHarness({
     ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
     'src/ui/svelte/stores/worldScopeProjection.js',
     // Issue 1392 (epic 1357, PR 7a): `worldScopeProjection.js` counts the World Vocabulary's
@@ -185,7 +100,7 @@ const harness = createMountedComponentHarness({
     // shipped counter. The harness validates this closure and names the miss, unlike the
     // hand-rolled trees elsewhere.
     'src/systems/worldVocabulary.js',
-    'src/utils/vocabularyUsage.js',
+    'src/ui/model/vocabularyUsage.js',
     'src/utils/componentCategories.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.
     'src/utils/categoryNormalization.js',
@@ -196,17 +111,17 @@ const harness = createMountedComponentHarness({
     'src/systems/scopedDefinitions.js',
     'src/systems/scopedDefinitionStore.js',
     'src/utils/scalars.js',
-    'src/migration/worldScopeEntityGrouping.js',
+    'src/systems/worldScopeEntityGrouping.js',
     'src/utils/definitionIndex.js',
     'src/utils/sourceReferenceUnion.js',
-    'src/utils/browserPagination.js',
+    'src/ui/model/browserPagination.js',
     'src/utils/bulkSelectionModel.js',
-    'src/utils/scopedEntityListModel.js',
+    'src/ui/model/scopedEntityListModel.js',
     // The frame's lifted view-state (issue 1438).
-    'src/utils/managerBrowserViewState.js',
+    'src/ui/model/managerBrowserViewState.js',
   ],
   compiledModules: [
-    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
@@ -222,7 +137,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
     // The shared frame's membership filter is a segmented track since issue 1373.
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     SHELL,
   ],
   componentPath: SHELL,
@@ -235,13 +150,6 @@ function page(productMarkup, windowWidth, hostHeight = HOST_HEIGHT_PX) {
   // that verbatim and is the reference for it. A Svelte scoped block is injected as an ordinary
   // unlayered `<style>` at runtime, and an unlayered declaration beats a layered one WHATEVER the
   // specificity.
-  //
-  // This harness used to load all four sheets flat, which inverts that for every pair where the
-  // two files touch the same property: a rule in the global sheet that production never applies
-  // measured here as if it did. That is not hypothetical — it is exactly how a `margin-left` moved
-  // in this sheet passed a browser measurement and then did nothing in the lab (issue 1373,
-  // maintainer feedback round 4). The wrapper is one line and it makes this page's cascade the
-  // shipped one.
   return `<!doctype html><html><head><meta charset="utf-8">
     <style>@layer modules { ${fabricateCss} }</style>
     <style>${frameCss.css}</style>
@@ -281,8 +189,7 @@ function measure() {
   return {
     frameRendered: true,
     inspectorRendered: true,
-    // The height chain. `frameHeight` is what `.manager-main` handed down; `inspectorHeight` is
-    // what the inspector took. They diverge by the whole overflow when the frame is a block box.
+    // The height chain. `frameHeight` is what `.manager-main` handed down.
     frameHeight: frameBox.height,
     inspectorHeight: inspectorBox.height,
     rowsHeight: rowsRegion ? rowsRegion.getBoundingClientRect().height : 0,
@@ -341,9 +248,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       selectedId: 'component-0',
       inspectorBody: laneInspectorBody,
     });
-    // DRIVEN TO A SIZE THAT SHOWS THE WHOLE CORPUS. See `ROW_COUNT`: at the ten-row default this
-    // fixture renders one short page and nothing overflows, so the bounded-column assertions
-    // below would all be measuring a column that never needed bounding.
+    // DRIVEN TO A SIZE THAT SHOWS THE WHOLE CORPUS. See `ROW_COUNT`.
     const tallSizeSelect = target.querySelector(
       '.manager-scoped-list-column [data-pagination-size]'
     );
@@ -424,14 +329,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
     });
     leadMarkup = leadTarget.innerHTML;
 
-    // THE SHORT-BUT-MULTI-PAGE FIXTURE, built by DRIVING the control rather than by a prop: the
-    // frame owns its own page size and exposes no way in, so the probe does what a GM does —
-    // opens a corpus that pages, then picks the smallest size. Twenty-six entities is three pages
-    // at the ten-row default, which is what makes the size selector reachable at all.
-    //
-    // The drive is IDEMPOTENT since the default window became ten (issue 1373, feedback round 2)
-    // and is kept rather than deleted: it states the size this case's arithmetic depends on, and
-    // it is what would keep this fixture at ten rows if the default moved again.
+    // THE SHORT-BUT-MULTI-PAGE FIXTURE, built by DRIVING the control rather than by a prop.
     const pagedTarget = await harness.mount({
       scope: projectWorldScopeEntity({
         entityType: 'component',
@@ -474,9 +372,6 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
     // the lab's own window width. In that state the row carries four MORE controls than at rest
     // (the divider, `4 selected`, `Select all 11 results` and `Clear`), and the shipped row wrapped
     // `Asc` onto a second line by itself with the result count stranded beside it.
-    //
-    // Driven by ticking real boxes rather than by a prop, because selection is the frame's own
-    // state and it exposes no way in — the same reason the paged fixture drives its size select.
     const selectionTarget = await harness.mount({
       scope: projectWorldScopeEntity({
         entityType: 'tool',
@@ -583,11 +478,6 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
   /**
    * Measure one short-list probe's column.
    *
-   * `.manager-pagination` is resolved INSIDE `.manager-scoped-list-column`, never from the
-   * document. The catalogue shell's inspector renders its OWN persistent pager over the system
-   * list, so a document-wide lookup silently answers about the inspector's pager the moment the
-   * foot one is absent — which is exactly the state this file now measures.
-   *
    * @param {string} productMarkup
    * @param {number} windowWidth
    * @param {number} hostHeight
@@ -626,15 +516,6 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
 
   /**
    * Measure the list toolbar's filter row as a FLEX LINE COUNT (issue 1373, round 3).
-   *
-   * ── WHY THE ROW'S HEIGHT IS THE ASSERTION AND ITEM TOPS ARE ONLY DIAGNOSTICS ──────────────
-   * The row is `align-items: center`, so every item on one line has a different `top` — a
-   * 34px search field and a 16px divider centred together share a line and differ by 9px at
-   * the top edge. Counting distinct tops therefore reports several "lines" for a row that has
-   * exactly one. A single-line flex row is as tall as its tallest item; a wrapped one is the
-   * sum of its lines plus the row gap, which on this row is a ~40px step. So the height
-   * against the tallest item is the claim, and the per-item centres are carried alongside it
-   * purely so a failure says WHICH control fell through.
    *
    * @param {string} productMarkup
    * @param {number} windowWidth
@@ -700,16 +581,12 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
         items: described,
         centres: [...new Set(described.map((item) => item.centre))].sort((a, b) => a - b),
         searchWidth: search ? Math.round(search.getBoundingClientRect().width) : 0,
-        // The register's four controls, asked for on BOTH sides of the boundary: "the band holds
-        // them" and "the filter row does not" are two different claims and a construction that
-        // renders them in both places satisfies only the first.
+        // The register's four controls, asked for on BOTH sides of the boundary.
         rowHolds: holds(row),
         band: {
           rendered: Boolean(band),
           display: bandStyle ? bandStyle.display : '',
-          // A `display: contents` box has no geometry at all, so every number below is zero for
-          // the flattened construction — which is what makes "the band is a box under the row"
-          // fail loudly rather than measure a phantom.
+          // A `display: contents` box has no geometry at all.
           top: bandBox ? Math.round(bandBox.top) : 0,
           height: bandBox ? Math.round(bandBox.height) : 0,
           width: bandBox ? Math.round(bandBox.width) : 0,
@@ -781,15 +658,6 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
     // it on, so the layout inside is content-sized, every `overflow-y: auto` in the component is
     // inert, and the inspector becomes a panel as tall as the whole list — measured at 1957px
     // holding 175px of content, reporting `canScroll: false`.
-    //
-    // The cost is the affordance, not a scrollbar: with the aside spanning the entire scroll
-    // region it is never out of view, so `inspect()`'s focus call scrolls the page by a pixel
-    // and the identity header, the inheriting-system counts and every Add / Remove / Enable
-    // control stay about a thousand pixels above the fold. The `.is-selected` ring on the row is
-    // the only feedback a GM gets.
-    //
-    // Four rows fit the viewport, so none of that is visible to a short fixture. This asserts
-    // the overflow EXISTS first, for exactly that reason.
     const box = await measureAt(WIDE_WINDOW_PX);
     assert.equal(box.inspectorRendered, true);
     assert.ok(
@@ -862,9 +730,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
   });
 
   it('reserves NO inspector track on the unavailable branch', async () => {
-    // The unavailable branch renders ONE callout and no inspector, so a two-track grid there
-    // paints a 300px void beside a warning. Measured before the fix: the layout was
-    // `836px 300px` and the callout stopped 312px short of the frame's right edge.
+    // The unavailable branch renders ONE callout and no inspector.
     const box = await measureUnavailable(WIDE_WINDOW_PX);
     assert.equal(box.rendered, true, 'the unavailable callout is absent from the page');
     assert.equal(
@@ -880,16 +746,12 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
   });
 
   it('gives the ROWS REGION the slack on a short list rather than sizing it to its content', async () => {
-    // WHAT THE ROWS REGION'S `flex: 1 1 auto` ACTUALLY BUYS, measured rather than assumed. With
+    // WHAT THE ROWS REGION'S `flex: 1 1 auto` ACTUALLY BUYS.
     // a list taller than the column every child is shrinking, so the declaration changes nothing
     // and the overflow case above cannot see it — it survived a mutation run for exactly that
     // reason. Its effect appears on a SHORT list: without it the rows region is content-sized and
     // whatever sits under it rides directly beneath the last row, moving up and down the screen
     // as a filter changes how many rows there are.
-    //
-    // THIS FIXTURE DRAWS NO PAGER AT ALL since issue 1372 — one row is one page — so the claim is
-    // stated about the region itself: it reaches the foot of the column while the LIST inside it
-    // stops far short. That is the same declaration, read without needing something below it.
     const box = await measureShortColumn(shortMarkup, WIDE_WINDOW_PX, HOST_HEIGHT_PX);
     assert.equal(box.rendered, true);
     assert.equal(
@@ -939,14 +801,6 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
     // by the assertion above, because a pager that fills the column also ends at the column's
     // foot. The slack belongs to the rows region — that is what puts the footer at the bottom
     // rather than making the footer tall — so it is stated separately.
-    //
-    // IT IS BOUNDED AGAINST A ROW, and that is a correction rather than a flourish. This was
-    // `rowsHeight > paginationHeight * 2`, which on this fixture PASSES the very mutation it was
-    // written for: with both children growing they split the slack, and 976px of rows against a
-    // 309px pager clears that bound comfortably while the pager is seven times its own content
-    // height. A row is the fixture's own measure of what one line of this list costs, so "the
-    // pager is chrome, not as tall as a row and a half" is a claim about the pager itself —
-    // measured at 45px against a 71px row, and at 309px under the mutation.
     const rowHeight = box.listHeight / PAGED_PAGE_SIZE;
     assert.ok(
       rowHeight > 0,
@@ -967,19 +821,9 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
     // `11 of 11 tools` pushed right of it. Every UNSELECTED frame of the same screen draws that
     // toolbar as one row, and so does the reference (`proto:1970`), so the wrap is a state the
     // screen enters rather than a width it ran out of.
-    //
-    // The search field is the control that yields: it is the only flexible item in the row, and
-    // shrinking it changes nothing at rest — with one grow-able item the final width is the
-    // container minus everything else, whatever the basis is. The basis only decides where the
-    // row BREAKS.
     const box = await measureToolbarLines(selectionMarkup, CATALOGUE_WINDOW_PX);
     assert.equal(box.rendered, true, 'the selection fixture rendered no list filter row');
-    // THE PRECONDITION IS NOW THE SELECTION ITSELF, not a count of items in this row (issue
-    // 1373, round 4). Round 3 kept the register flattened into the filter row and asserted at
-    // least nine flex items here; the register is its own band now, so the row is back to its
-    // resting five and a nine-item floor would fail on the fix rather than on the defect. What
-    // still has to be true for this case to mean anything is that a selection is ACTIVE — which
-    // the band renders, and the sibling case below measures.
+    // THE PRECONDITION IS NOW THE SELECTION ITSELF.
     assert.equal(
       box.band.rendered,
       true,
@@ -1011,10 +855,6 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
     // count, with NO selection affordance in it at all — and `proto:591`-`597` puts the selection
     // state in a SEPARATE band directly beneath that row, rendered only while a selection is
     // active and painted `--accent-soft` inside an `--accent-border` edge.
-    //
-    // So the row never changes composition and never needs to yield anything. That is two
-    // claims, and both are measured against the SAME MOUNT at rest and selected: a selected-only
-    // measurement can say the row fits and still be describing a row that grew and shrank.
     const resting = await measureToolbarLines(selectionRestingMarkup, CATALOGUE_WINDOW_PX);
     const selected = await measureToolbarLines(selectionMarkup, CATALOGUE_WINDOW_PX);
     assert.equal(resting.rendered, true, 'the resting fixture rendered no list filter row');
@@ -1057,9 +897,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
         'the enclosed band'
     );
 
-    // 3 · THE REGISTER MOVED, rather than being drawn twice. Both halves are asserted: a
-    // construction that renders the count in the band AND leaves it in the row satisfies the
-    // first clause alone.
+    // 3 · THE REGISTER MOVED, rather than being drawn twice. Both halves are asserted.
     assert.deepEqual(
       selected.band.holds,
       { pageBox: true, count: true, results: true, clear: true },
@@ -1072,23 +910,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
         'selection state — which is exactly what `proto:1970` does not do'
     );
 
-    // 4 · THE TWO TEXT ACTIONS ARE AT THE TRAILING EDGE, TOGETHER. `proto:595`-`596` puts the
-    // auto margin on `Select all N results` with `Clear` directly after it; the shipped primitive
-    // puts it on `Clear` alone, which in a band carrying the standing hint leaves the link jammed
-    // against that sentence with the whole gap after it.
-    //
-    // MEASURED AS THREE EDGES, because the pixel number a `margin-left: auto` reports is
-    // plausible under every wrong arrangement: put the auto margin on BOTH and the gap splits in
-    // half, which is a real number in the right units that looks like nothing is wrong. The claim
-    // is the ORDER of the gaps — a wide one before the link, a hairline one between the link and
-    // `Clear` — checked against the band's own width so a narrow band cannot satisfy it by having
-    // no gap anywhere.
-    //
-    // IT IS ALSO THE CLAUSE THAT ANSWERS FOR THE CASCADE. This grouping lives in
-    // `BulkSelectionToolbar`'s scoped block rather than in `styles/fabricate.css`, because that
-    // sheet ships at `layer(modules)` and loses to an unlayered component rule whatever its
-    // specificity. `page()` above layers the sheet for exactly that reason, so an attempt to move
-    // this back into the global sheet fails here instead of passing and doing nothing.
+    // 4 · THE TWO TEXT ACTIONS ARE AT THE TRAILING EDGE.
     const edges = selected.band.edges;
     assert.ok(
       Boolean(edges.hint && edges.results && edges.clear && edges.band),

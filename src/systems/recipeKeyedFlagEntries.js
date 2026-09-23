@@ -177,18 +177,19 @@ export function readDiscoveryProgressEntries(discoveryMap) {
 }
 
 /**
- * Whether one id can be removed by a batched `-=<id>` deletion key WITHOUT destroying
+ * Whether one id can be removed by a batched per-id forced deletion WITHOUT destroying
  * anything else, or whether it has to route to the two-step delete-then-rebuild.
  *
  * Two things disqualify it, and the second is NOT the dotted-id case (issue 1143):
  *
- * 1. The id is not a safe flag-key segment, so `-=<id>` cannot address it at all —
+ * 1. The id is not a safe flag-key segment, so no deletion entry can address it at all —
  *    `expandObject` re-splits the deletion key and it lands somewhere else entirely.
  * 2. Another entry NESTS INSIDE it. Ids `a` and `a.b` are persisted as
- *    `{a: {learnedAt, sourceItemUuid, b: {…}}}`, so `-=a` is a perfectly well-formed
- *    deletion key that removes the whole node — recipe `a.b` included. `a` is a safe
- *    segment, so a safe/unsafe test alone waves this straight through and destroys a
- *    surviving learner's entry exactly as the top-level id derivation did.
+ *    `{a: {learnedAt, sourceItemUuid, b: {…}}}`, so deleting `a` (`-=a` on V13, the operator
+ *    at `a` on V14) is perfectly well-formed and removes the whole node — recipe `a.b`
+ *    included. `a` is a safe segment, so a safe/unsafe test alone waves this straight
+ *    through and destroys a surviving learner's entry exactly as the top-level id
+ *    derivation did.
  *
  * The check is deliberately conservative about (2): it disqualifies the id whenever any
  * descendant entry exists, even one the same call is also clearing. The rebuild path

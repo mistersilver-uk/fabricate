@@ -1,38 +1,12 @@
 /**
- * Migration 1.0.0: rename the gathering "Hazard" concept to "Event".
- *
- * Rewrites every persisted hazard-derived key/value to its event equivalent so a
- * world saved on the old schema loads cleanly after the source rename. The
- * mechanic is unchanged — only the ubiquitous-language term and the names/values
- * derived from it change:
- *
- * 1. `gatheringConfig.systems[sysId]`:
- *    - collection `hazards` → `events`;
- *    - rules `hazardSelectionMode/hazardLimit/hazardPolicy/hazardVisibility` → `event*`;
- *    - each event record field `hazardModifier` → `eventModifier`.
- * 2. `environments[*]`:
- *    - `enabledHazardIds/disabledHazardIds/forcedHazardIds` → `*EventIds`;
- *    - `hazardOrder` → `eventOrder`;
- *    - `hazardSelectionMode/hazardPolicy` → `event*`;
- *    - `hazardDropRateAdjustments(Enabled)` → `eventDropRateAdjustments(Enabled)`.
- * 3. Stored policy values `successWithHazard` / `failureWithHazard` →
- *    `successWithEvent` / `failureWithEvent` (rules and per-environment).
- * 4. `systems[*].gatheringRegions[*].modifiers[*]`: kind value `hazardChance` →
- *    `eventChance` (the modifier knob that adjusts event chance).
- *
- * Deliberately UNCHANGED (these are NOT the Event concept):
- * - the default-image literal `icons/svg/hazard.svg` (a Foundry core asset);
- * - the danger axis (`dangerTags`, `dangerLevel`, the `hazardous` danger tier);
- * - the d100 failure-result keyword `hazard` (a failure alias, not an Event).
- *
- * Pure function: no I/O, no Foundry calls, deep-clones its inputs. Idempotent —
- * every rename guards on "old key present AND new key absent", and a value remap
- * fires only for a known legacy string, so a second run is a no-op. A stale
- * legacy key left alongside an already-present new key is left inert (no clobber,
- * no drop). Runs at the new highest version (1.0.0), after all prior migrations.
+ * `1.0.0` — rename the gathering "Hazard" concept to "Event" across every persisted key and value,
+ * so a world saved on the old schema loads cleanly. The mechanic is unchanged.
+ * DELIBERATELY UNCHANGED, none of them being the Event concept: the core asset `hazard.svg`, the
+ * danger axis, and the d100 failure-result keyword `hazard`. Pure and idempotent — every rename
+ * guards on "old key present AND new key absent", so a stale key beside a new one is left inert.
  */
 
-import { isPlainObject, clone, renameKey } from './migrationHelpers.js';
+import { isPlainObject, clone, renameKey, forEachSystem } from './migrationHelpers.js';
 
 const POLICY_VALUE_REMAP = {
   successWithHazard: 'successWithEvent',
@@ -40,12 +14,8 @@ const POLICY_VALUE_REMAP = {
 };
 
 /**
- * Coerce a legacy policy value on a plain object's `key` to its event equivalent.
- * Only the two known legacy strings are remapped; anything else is left as-is
- * (idempotent — already-event values are untouched).
- *
- * @param {object} obj
- * @param {string} key
+ * Coerce a legacy policy value to its event equivalent. Only the two known legacy strings are
+ * remapped, so an already-event value is untouched.
  */
 function remapPolicyValue(obj, key) {
   if (!isPlainObject(obj)) return;
@@ -58,11 +28,7 @@ function remapPolicyValue(obj, key) {
   }
 }
 
-/**
- * Rename the rule keys/values on a system or environment rules-bearing object.
- *
- * @param {object} obj
- */
+/** Rename the rule keys and values on a system or environment rules-bearing object. */
 function migrateRuleKeys(obj) {
   if (!isPlainObject(obj)) return;
   renameKey(obj, 'hazardSelectionMode', 'eventSelectionMode');
@@ -72,12 +38,7 @@ function migrateRuleKeys(obj) {
   remapPolicyValue(obj, 'eventPolicy');
 }
 
-/**
- * Run the hazard→event rename over the runner's one-pass data bundle.
- *
- * @param {{ systems?: object[], gatheringConfig?: object, environments?: object[] }} data
- * @returns {{ systems: object[], gatheringConfig: object, environments: object[] }}
- */
+/** Run the hazard-to-event rename over the runner's bundle. */
 export function migrateRenameGatheringHazardsToEvents(data = {}) {
   const systems = Array.isArray(data?.systems) ? clone(data.systems) : [];
   const gatheringConfig = isPlainObject(data?.gatheringConfig)
@@ -116,10 +77,9 @@ export function migrateRenameGatheringHazardsToEvents(data = {}) {
   }
 
   // 4. Crafting-system region modifiers: kind value hazardChance → eventChance.
-  for (const system of systems) {
-    if (!isPlainObject(system)) continue;
+  forEachSystem(systems, (system) => {
     const regions = system.gatheringRegions;
-    if (!Array.isArray(regions)) continue;
+    if (!Array.isArray(regions)) return;
     for (const region of regions) {
       if (!isPlainObject(region)) continue;
       const modifiers = region.modifiers;
@@ -130,7 +90,7 @@ export function migrateRenameGatheringHazardsToEvents(data = {}) {
         }
       }
     }
-  }
+  });
 
   return { systems, gatheringConfig, environments };
 }

@@ -1,25 +1,4 @@
-/**
- * Tests for CraftingSystemExporter service.
- *
- * Tests:
- *   1. buildExportPayload: produces correct envelope with version and timestamp
- *   2. buildExportPayload: replaces craftingSystemId with __SYSTEM_ID__ placeholder
- *   3. buildExportPayload: strips transitional aliases from system
- *   4. buildExportPayload: throws on missing system
- *   5. buildExportPayload: does not mutate original inputs
- *   6. validateImportData: accepts valid export data
- *   7. validateImportData: rejects non-object input
- *   8. validateImportData: rejects missing system field
- *   9. validateImportData: rejects system without name
- *  10. validateImportData: warns on missing fabricateVersion
- *  11. validateImportData: rejects non-array recipes
- *  12. validateImportData: warns on recipe without name
- *  13. prepareForImport: keep mode preserves IDs
- *  14. prepareForImport: copy mode strips the system ID, appends "(Copy)", regenerates recipe IDs
- *  15. prepareForImport: does not mutate original data
- *  16. makeExportFilename: generates slug from system name
- *  17. makeExportFilename: handles special characters
- */
+/** Tests for CraftingSystemExporter service. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -33,9 +12,7 @@ const {
 const { FABRICATE_EXPORT_SCHEMA_VERSION } = await import('../src/systems/authoringExport.js');
 const { emptyCopyOptions } = await import('./helpers/worldEntityIndex.js');
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function makeSystem(overrides = {}) {
   return {
@@ -82,9 +59,7 @@ function makeRecipe(overrides = {}) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // buildExportPayload
-// ---------------------------------------------------------------------------
 
 test('buildExportPayload: produces correct envelope', () => {
   const system = makeSystem();
@@ -192,9 +167,7 @@ test('buildExportPayload: does not mutate original inputs', () => {
   assert.ok(system.items !== undefined, 'Original system aliases should remain');
 });
 
-// ---------------------------------------------------------------------------
 // validateImportData
-// ---------------------------------------------------------------------------
 
 test('validateImportData: accepts valid export data', () => {
   const data = {
@@ -280,9 +253,7 @@ test('validateImportData: reports invalid recipe objects', () => {
   assert.ok(result.errors.some(e => e.includes('index 1')));
 });
 
-// ---------------------------------------------------------------------------
 // prepareForImport
-// ---------------------------------------------------------------------------
 
 test('prepareForImport: keep mode preserves IDs', () => {
   const data = {
@@ -294,6 +265,20 @@ test('prepareForImport: keep mode preserves IDs', () => {
 
   assert.equal(prepared.system.id, 'sys-1');
   assert.equal(prepared.recipes[0].id, 'r1');
+});
+
+test('prepareForImport: carries a case-only duplicate vocabulary through UNNORMALIZED', () => {
+  // Issue 1397 is fixed at the DISPLAY layer and nowhere else. Storage and transport stay
+  // case-preserving, so `Potions` and `potions` are two entries here and remain two after an
+  // import; the screen collapses them to one row and issue 1411 owns reconciling the two halves.
+  const data = {
+    system: { id: 'sys-1', name: 'Test', categories: ['Potions', 'potions'], itemTags: ['herb'] },
+    recipes: []
+  };
+
+  const prepared = prepareForImport(data, 'keep');
+
+  assert.deepEqual(prepared.system.categories, ['Potions', 'potions']);
 });
 
 test('prepareForImport: copy mode strips the system ID, appends "(Copy)", and regenerates recipe IDs', () => {
@@ -333,9 +318,7 @@ test('prepareForImport: handles missing recipes', () => {
   assert.equal(prepared.recipes.length, 0);
 });
 
-// ---------------------------------------------------------------------------
 // makeExportFilename
-// ---------------------------------------------------------------------------
 
 test('makeExportFilename: generates slug from system name', () => {
   const filename = makeExportFilename('Example System');
@@ -367,9 +350,7 @@ test('makeExportFilename: includes date in ISO format', () => {
   assert.ok(dateMatch, 'Filename should contain ISO date');
 });
 
-// ---------------------------------------------------------------------------
 // Gathering realms ride-along (export + import validation)
-// ---------------------------------------------------------------------------
 
 test('buildExportPayload: includes gatheringRealms on the system payload', () => {
   const system = makeSystem({
@@ -409,9 +390,7 @@ test('validateImportData: accepts the legacy gatheringRegions key on read (pre-1
   assert.ok(result.errors.some(e => e.includes('gatheringRealms')), 'reports under the canonical realm name');
 });
 
-// ---------------------------------------------------------------------------
-// #492 — schema v2 envelope + gathering authoring bundle
-// ---------------------------------------------------------------------------
+// 492 — schema v2 envelope + gathering authoring bundle
 
 test('buildExportPayload: writes the explicit schemaVersion + runtimeStateIncluded markers', () => {
   const payload = buildExportPayload(makeSystem(), [], '1.0.0');

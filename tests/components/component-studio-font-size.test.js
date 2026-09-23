@@ -1,64 +1,4 @@
-/*
- * Component Studio font-size gate (issue 676) — the sibling of
- * `recipe-studio-font-size.test.js`.
- *
- * happy-dom cannot compute the CSS cascade, so a mounted test can never prove the
- * RENDERED font-size. This gate renders the real Component Studio classes in Chromium
- * under a minimal-but-faithful stand-in for Foundry V13 core CSS (tests/fixtures/
- * foundry-core-min.css — the @layer reset + 14px app base) plus the real
- * styles/fabricate.css, and asserts the computed px per role.
- *
- * It also proves the cascade context: a bare <input> inherits the 14px Foundry app
- * base (the bleed baseline). A studio role landing on 14 is the signature of a rule
- * that stopped applying and let Foundry's default through.
- *
- * ── THE PHASE 0 RESOLVED SCALE ───────────────────────────────────────────────────
- * The brief's §2 type scale contains RANGES ("eyebrow labels 700 9–9.5px",
- * "filter/sort selects 500 11.5–12px", "micro-labels 700 7.5–8.5px") and then resolves
- * them with "read it off the prototype". A gate needs ONE number per role, and if the
- * implementer picks, the guess acquires the authority of a committed test forever.
- *
- * So the ranges were resolved ONCE, by extracting the prototype's own declarations
- * (`tmp/GM Component Studio.html`). Its resolved per-role scale is:
- *
- *   browser page title (h2)        600 22px   serif
- *   browser page subtitle          400 12.5px sans
- *   breadcrumb                     600 11px   sans
- *   rail eyebrow ("GM MANAGEMENT") 700 9px    sans, letter-spacing .14em
- *   toolbar micro-label            700 8.5px  sans, letter-spacing .08em
- *   filter / sort select           500 11.5px sans
- *   search input                   400 12.5px sans
- *   row name                       600 13.5px serif
- *   row description                400 11px   sans
- *   row badge / chip               600 9px    sans
- *   panel title (h3)               600 14px   serif
- *   panel sub (p)                  400 10px   sans
- *   editor title (h2)              600 20px   serif
- *   primary button                 700 12.5px sans
- *
- * That is the DESIGN INTENT. What this gate pins is what Fabricate RENDERS, because
- * the studio is built from Fabricate's existing shared manager classes (`.manager-title`,
- * `.manager-chip`, `.manager-system-name`, …) whose rem-based sizes are already
- * established and shared with six other editors. Decision 1 accepts small drift from
- * the prototype for exactly this reason: re-authoring those shared sizes to hit the
- * prototype's px exactly would silently re-type every other manager surface.
- *
- * The EXPECTED map below is therefore measured from the real cascade and cross-checked
- * against the scale above; each entry notes the prototype target it corresponds to.
- * Change a size on purpose -> update this map on purpose.
- *
- * ── THE FIXTURE IS A MIRROR, AND MIRRORS ROT ─────────────────────────────────────
- * The fixture below is hand-maintained markup standing in for the real components. That
- * makes this gate able to measure a cascade the DOM can't — and able to go on happily
- * measuring markup the product no longer renders. It did exactly that: it pinned a
- * `.manager-filter` span and a `.manager-button.manager-component-group-toggle` (a class
- * with no CSS anywhere), and its own comments recorded the resulting drift as if it were
- * a finding rather than a defect. Issue 676 rebuilt the browser on the Recipe Studio's
- * toolbar and this fixture was re-derived from the shipped markup and re-measured.
- *
- * So: when you change the Component Studio's markup, UPDATE THIS FIXTURE FIRST, then
- * re-measure. A green run against stale fixture markup proves nothing at all.
- */
+/* Component Studio font-size gate (issue 676). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -70,9 +10,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
 const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 
-// One representative element per role, using the exact Component Studio classes,
-// wrapped in the Foundry app shell so `.application`'s 14px base + the @layer reset
-// apply. Both routes are represented: the browser list and the editor column.
+// One representative element per role.
 const FIXTURE = `
   <div class="application theme-dark">
     <section class="window-content">
@@ -82,10 +20,12 @@ const FIXTURE = `
             <label class="fabricate-search manager-search">
               <input type="search" data-m="search" value="iron">
             </label>
-            <select class="manager-component-essence-filter" data-m="essence-select"><option>All essences</option></select>
+            <!-- The toolbar controls are the shared Select, drawn as it renders: the picker ROOT
+                 carrying the caller class, the trigger nested inside it. -->
+            <div class="fabricate-picker manager-travel-picker fabricate-select manager-component-essence-filter is-size-38"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" data-m="essence-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter components by essence"><span class="manager-travel-picker-value fabricate-select-value">All essences</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
           </div>
           <div class="manager-component-filter-row is-secondary">
-            <select class="manager-component-category-filter" data-m="filter-select"><option>All categories (4)</option></select>
+            <div class="fabricate-picker manager-travel-picker fabricate-select manager-component-category-filter is-size-38"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" data-m="filter-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter components by category"><span class="manager-travel-picker-value fabricate-select-value">All categories</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
             <span class="manager-component-filter-divider"></span>
             <div class="manager-component-filter-field">
               <span class="manager-component-filter-label" data-m="filter-label">Group by category</span>
@@ -96,7 +36,7 @@ const FIXTURE = `
             <span class="manager-component-filter-divider"></span>
             <div class="manager-component-filter-field">
               <span class="manager-component-filter-label">Sort by</span>
-              <select data-m="sort-select"><option>Name</option></select>
+              <div class="fabricate-picker manager-travel-picker fabricate-select"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" data-m="sort-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Sort components"><span class="manager-travel-picker-value fabricate-select-value">Name</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
               <!-- Carries fab-manager-button because the shipped control does (issue 1118):
                    ComponentsBrowserView renders this toggle through ManagerButton, and the
                    .manager-button.manager-component-sort-direction rule was chained onto the
@@ -315,7 +255,21 @@ const FIXTURE = `
                 <h3 data-m="panel-title">Category</h3>
                 <p class="manager-muted" data-m="panel-sub">Groups this component in the browser.</p>
               </div>
-              <select class="manager-input manager-component-category-select" data-m="field-select"><option>General</option></select>
+              <!-- The shared Select since issue 1510, drawn as the bulk axis above is: the picker
+                   root carries the caller's class and the trigger carries the rung, so the rule
+                   this role measures has to reach a button rather than a select. (No backticks in
+                   here: this markup is a template literal.) -->
+              <div class="fabricate-picker manager-travel-picker fabricate-select manager-component-category-select">
+                <button
+                  type="button"
+                  class="fabricate-select-trigger fabricate-select-trigger-form"
+                  data-m="field-select"
+                  role="combobox"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-label="Component category"
+                ><span class="manager-travel-picker-value fabricate-select-value">General</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+              </div>
             </div>
           </section>
           <section class="manager-component-panel" data-salvage-section>
@@ -329,9 +283,11 @@ const FIXTURE = `
             </div>
             <div class="fabricate-field manager-field">
               <span class="manager-component-readonly-label" data-m="readonly-label"><span>Results</span></span>
-              <ul class="manager-salvage-stage-list">
-                <li class="manager-salvage-stage-row">
-                  <span class="manager-salvage-result-ordinal" data-m="stage-ordinal">1</span>
+              <ul class="fabricate-sortable-list">
+                <li class="fabricate-sortable-list-row manager-salvage-stage-row">
+                 <div class="fabricate-sortable-list-line">
+                  <button type="button" class="fabricate-icon-button manager-icon-button is-size-24 fabricate-sortable-list-grip"><i class="fas fa-grip-vertical" data-m="stage-grip"></i></button>
+                  <span class="fabricate-sortable-list-ordinal" data-m="stage-ordinal">1</span>
                   <span class="manager-salvage-component-field">
                     <span class="fabricate-picker manager-travel-picker manager-salvage-component-picker">
                       <button type="button" class="fabricate-button manager-button manager-salvage-component-trigger" data-m="stage-picker">
@@ -343,9 +299,10 @@ const FIXTURE = `
                   </span>
                   <span class="manager-salvage-result-difficulty" data-m="stage-dc">DC 8</span>
                   <button class="manager-salvage-stage-edit" data-m="stage-edit"><span>Edit</span></button>
-                  <span class="manager-salvage-stage-reorder">
-                    <button class="manager-salvage-stage-move" data-m="stage-move"><i class="fas fa-chevron-up"></i></button>
+                  <span class="fabricate-sortable-list-rocker">
+                    <button type="button" class="fabricate-icon-button manager-icon-button is-size-24 fabricate-sortable-list-move"><i class="fas fa-chevron-up" data-m="stage-move"></i></button>
                   </span>
+                 </div>
                 </li>
               </ul>
             </div>
@@ -364,24 +321,7 @@ const FIXTURE = `
     </section>
   </div>`;
 
-// See the twin note in `recipe-studio-font-size.test.js`: the chip's appearance moved into
-// `Chip.svelte`'s scoped block (issue 883), so this gate reproduces Svelte's real delivery
-// — the component's compiled CSS appended after the global sheet, and the real scoping hash
-// on the fixture's elements — rather than dropping those roles and losing the coverage.
-//
-// Issue 772 added four more scoped components to this studio (the selection box, the
-// selection toolbar, the extracted essence card and the bulk edit panel), and every one of
-// them needs BOTH halves of the treatment: appending the CSS without the hash class makes
-// the rules match nothing, and adding the hash without the real ordering proves the wrong
-// winner. A role that gets neither silently measures Foundry's 14px app base and trips the
-// anti-bleed loop at the end of this file.
-//
-// Issue 1010 split the toolbar and the panel's chrome into four shared primitives under
-// `apps/manager/`, so the list below grew rather than moved: the panel still owns the
-// essence grid and the DC row, while the header, hero, section scales, select and Apply are
-// emitted by their own components and therefore carry their own scope hashes. Miss one and
-// its roles fall to 14px — which is why no `EXPECTED` value needed touching to make this
-// pass, and why a green run is evidence the extraction preserved the cascade.
+// See the twin note in `recipe-studio-font-size.test.js`.
 const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
@@ -389,10 +329,7 @@ const SCOPED_COMPONENTS = [
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
-  // `BulkEditSelect.svelte` is NOT here any more (issue 1504): it has no `<style>` block at
-  // all now, and `scopedComponentCss` refuses a component that emits none rather than pairing
-  // the fixture with an empty string. Its control's whole appearance is the `.fabricate-select*`
-  // family in `styles/fabricate.css`, which this page already loads.
+  // `BulkEditSelect.svelte` is NOT here any more (issue 1504).
   'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
   'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
 ].map((componentPath) => scopedComponentCss(resolve(repoRoot, componentPath)));
@@ -437,12 +374,10 @@ const EXPECTED = {
   // it. Route-scoped in the sheet, so the Recipe Studio's and the Essence library's labels are
   // untouched at 8.8 — which is why this fixture's root carries `data-manager-view="components"`.
   'filter-label': 8.5, // proto:1062 toolbar micro-label 8.5px @ .08em (was 8.8, and 12.48 before)
-  // 0.72rem. These were 14 — Foundry's app base bleeding through — because the Component
-  // Studio's own bleed patch covers `.manager-search input` and `.manager-toolbar
-  // .manager-button` but NOT `select`, and the browser's selects had no font-size rule
-  // at all. Joining `.manager-component-toolbar select` to the recipe rule closed it.
-  // The two FILTER selects moved to the reference's own 12px at issue 1371 r11 (F-K); the SORT
-  // select did not, because the reference draws that one at 11.5px (`proto:1066`) against the
+  // 0.72rem, the shared `Select`'s `toolbar` rung, which states the literal on the trigger
+  // itself rather than leaving it to inherit Foundry's 14px app base.
+  // The two FILTER triggers take the reference's own 12px (issue 1371 r11, F-K); the SORT
+  // trigger does not, because the reference draws that one at 11.5px (`proto:1066`) against the
   // shipped 11.52px and a fiftieth of a pixel is rounding rather than drift. Three selects in one
   // bar with two pinned sizes is the reference's own arrangement, not an oversight.
   'filter-select': 12, // proto:1054 — the category filter (was 11.52)
@@ -463,9 +398,7 @@ const EXPECTED = {
   // (The cite read `proto:1084`, which is the row's bulk-select checkbox, until issue 1371
   // revision 8; a cite nobody can check is a pin taken on trust.)
   'row-name': 13.5,
-  // `proto:1088` (`font:400 11px var(--sans)`) — the C5 rebuild writes the row description at
-  // the reference's own 11px. The pin read 12.48 while its own comment named 11. (The cite
-  // read `proto:1087`, which is the 13.5px serif NAME line above, until revision 8.)
+  // `proto:1088` (`font:400 11px var(--sans)`).
   'row-description': 11,
   'row-badge': 9.92, // 0.62rem — prototype row badge/chip 9px sans (was 12)
   'row-difficulty': 9.92, // same chip family
@@ -484,46 +417,22 @@ const EXPECTED = {
   'panel-title': 16, // 1rem — prototype panel h3 14px serif
   'panel-sub': 12.48, // 0.78rem — prototype panel sub 10px sans
   'readonly-label': 13.12, // 0.82rem — a section micro-label inside a panel
-  // 12px, RETARGETED (issue 1371). The role used to measure a
-  // `.manager-component-inline-control` floated into the panel's heading row, and the
-  // reference gives the Category select a card of its own (`proto:1322`), so the D-parts
-  // rebuild moved it into the card body as `.manager-component-category-select` and the old
-  // class is emitted nowhere. The role follows the control rather than the retired markup:
-  // the fixture names what `ComponentEditView` renders today, and the new rule states 12px
-  // itself, so the anti-bleed loop below still proves the size is stated and not inherited.
-  // (px, not rem: a font size is a literal — `design-system/spec.md:218-222`.)
-  'field-select': 12,
-  // ── The identity STRIP (issue 676, rebuilt at 1371). It is display, not a form: the
-  // read-only boxed Name/Description fields it replaced are gone, and with them
-  // `readonly-value`.
-  //
-  // FOUR MORE ROLES RETIRED THE SAME WAY AT ISSUE 1371, and they are named here rather than
-  // silently dropped, because a role that leaves this map with no note reads as coverage
-  // someone chose to give up:
-  //
-  //   `identity-lock`        the lock badge; the strip states provenance in the world pill
-  //                          and the note now, and no source emits the class.
-  //   `identity-description` the description paragraph; the rebuilt strip carries the name
-  //                          row and the attribution note only.
-  //   `drop-target`          the 186px dashed source drop target; replacing a source is the
-  //                          shared `ItemDropZone` primitive's job now.
-  //   `info-banner`          the hand-rolled roll-budget strip; `proto:1374` is the shared
-  //                          `Callout`, which `ComponentEditView` renders instead.
-  //
-  // Each of the four had its rule DELETED from `styles/fabricate.css` in the same change,
-  // because nothing under `src/` emitted the class any more. Keeping the pins would have
-  // meant a fixture drawing markup the product does not render, measured against rules that
-  // paint nothing — the rot this gate exists to catch, wearing the gate's own clothes.
-  // 0.94rem. `proto:1313` is `font:600 15px var(--serif)`: the D3 rebuild reads the identity
-  // name off the callout, where the retired strip had sized it as a page-level heading.
+  // 12.5px, the shared `<Select>`'s `form` rung, and a REAL change (issue 1510). It was 12 — the
+  // literal `.manager-component-category-select` stated for the native control it painted, which
+  // has no carrier now that the card's one control is the shared picker. The role still follows
+  // the control rather than the markup: the fixture draws the trigger the product draws, and the
+  // rung states the size itself, so the anti-bleed loop below still proves it is stated rather
+  // than inherited. (px, not rem: a font size is a literal — `design-system/spec.md:218-222`.)
+  'field-select': 12.5,
+  // ── The identity STRIP (issue 676, rebuilt at 1371). It is display, not a form.
   'identity-name': 15.04,
-  // 0.72rem. `proto:1314` is `font:400 11.5px/1.55 var(--sans)`: the note is the attribution
-  // SENTENCE now, prose rather than a glyph-led hint, so it reads a rung above a micro-label.
+  // 0.72rem. `proto:1314` is `font:400 11.5px/1.55 var(--sans)`.
   'identity-note': 11.52,
   // ── The salvage panel.
   'salvage-mode-pill': 9.92, // 0.62rem — prototype mode pill 9.5px sans (was 12)
   'micro-label': 8.48, // 0.53rem @ .08em — prototype "ENABLED" eyebrow 8.5px. Near-exact.
-  'stage-ordinal': 10.88, // 0.68rem mono — prototype order badge 11px mono. Near-exact.
+  // The ordinal badge is the shared ordered list's as of issue 1512, at the specimen's 10px mono.
+  'stage-ordinal': 10,
   // The yield picker replaced the stage row's native <select> (issue 676). It measures the
   // SAME 13.12 the select did — the `.manager-field`'s 0.82rem, inherited — so swapping a
   // native control for a popover trigger re-typed nothing. That is the point of checking:
@@ -536,7 +445,9 @@ const EXPECTED = {
   // again from 0.72rem: it now MATCHES `stage-dc`, so the read-only fact and the control
   // that changes it read as one pair rather than a number with a speck beside it.
   'stage-edit': 13, // 0.8125rem — deliberately identical to stage-dc
-  'stage-move': 10.88, // 0.68rem — the reorder chevron glyph; reorder IS the authoring act
+  // The rocker and the grip are the list's controls too: 9px for the chevron, 14px for the grip — the specimen draws its grip at 14px and the rocker and ordinal ship in px, so a rem grip alone would rescale under Foundry's font-size setting.
+  'stage-move': 9,
+  'stage-grip': 14,
   // The editor's tag pill converged on the shared `Chip` (issue 772), so it MOVED from
   // 11.2 (its own 0.7rem, near-exact against the prototype's 11px pill) to the one chip
   // scale it now shares with every other chip on this screen. That is the declared cost of
@@ -586,8 +497,7 @@ const EXPECTED = {
   // 0.78rem, matching `.manager-component-browser-inspector-edit` — the button this one
   // SWAPS PLACES with in the rail's bottom slot. The swap must not re-type the slot.
   'bulk-apply': 12.48,
-  // The cascade context. A bare control inherits Foundry's 14px app base; any role
-  // above landing on 14 means its rule stopped applying and Foundry bled through.
+  // The cascade context. A bare control inherits Foundry's 14px app base.
   'bleed-baseline': 14,
 };
 
@@ -625,8 +535,10 @@ test('component studio font-sizes are pinned under real Foundry core CSS', async
     }
 
     // Every studio role except the deliberate baseline must be free of the bleed.
+    // The grip is the one studio role whose declared figure IS 14px (the specimen's, issue
+    // 1512), so the guard cannot tell its rule from the base and the pin above carries it.
     for (const [role, box] of Object.entries(measured)) {
-      if (role === 'bleed-baseline') continue;
+      if (role === 'bleed-baseline' || role === 'stage-grip') continue;
       assert.notEqual(
         box.fontSize,
         14,
@@ -640,8 +552,6 @@ test('component studio font-sizes are pinned under real Foundry core CSS', async
     // boxes rather than as two independent constants: the values come from different
     // mechanisms (a global rule in styles/fabricate.css vs BulkEditPanelShell.svelte's
     // scoped block), so only a comparison can catch a cascade change that moves one side.
-    // Wrapping Apply in the sticky dock is exactly such a change, which is why it is
-    // pinned here rather than assumed.
     assert.equal(
       measured['bulk-apply'].minHeight,
       measured['inspector-edit'].minHeight,
@@ -662,4 +572,21 @@ test('component studio font-sizes are pinned under real Foundry core CSS', async
   } finally {
     await browser.close();
   }
+});
+
+test('the category fixture spells `-form`, matching the product Select that declares no size', () => {
+  const editViewSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte'),
+    'utf8'
+  );
+  const tagStart = editViewSource.indexOf('class="manager-component-category-select"');
+  assert.notEqual(tagStart, -1, 'the category `<Select>` call site moved or was renamed');
+  const openStart = editViewSource.lastIndexOf('<Select', tagStart);
+  const openEnd = editViewSource.indexOf('>', tagStart);
+  const tag = editViewSource.slice(openStart, openEnd);
+  assert.ok(
+    !/\bsize=/.test(tag),
+    'the category `<Select>` must declare no `size`, so it falls to the `form` rung the ' +
+      '`field-select` fixture (12.5px, `-form`) actually measures'
+  );
 });

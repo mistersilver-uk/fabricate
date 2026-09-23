@@ -2,109 +2,38 @@
 <!--
   The world Component Catalogue's BULK EDIT panel (issue 1371, epic 1357).
 
-  ── FOUR STAGING GROUPS, AND WHAT EACH ONE IS FOR ─────────────────────────────────────────────
-  A world component has exactly three axes whose value is closed and means the same thing for
-  every component in a selection: which systems hold it, its world category, and its world tags.
-  Membership takes TWO groups rather than one — a direction and a set of systems — because `Add
-  to` and `Remove from` are one keystroke apart and destructive in one direction only, so the
-  direction is staged on its own track with its own sentence rather than folded into the picker.
+  FOUR STAGING GROUPS. A world component has three axes whose value is closed and means the same
+  thing across a selection: which systems hold it, its world category and its world tags.
+  Membership takes TWO groups — a direction and a set — because `Add to` and `Remove from` are
+  one keystroke apart and destructive in one direction only. Identity is NOT here, and the panel
+  says so rather than leaving a short panel to read as an unfinished one.
 
-  Identity is NOT here, and the panel says so rather than leaving a short panel to be read as an
-  unfinished one: a name, an image, a description and a source link are per component by nature,
-  and one of them written across a selection is a worse answer than no control.
+  EACH GROUP IS AN INLINE INSET, NOT A POPOVER TRIGGER (`proto:628`-`697`): a popover hides the
+  corpus behind a click, so a GM cannot see that a search matched nothing or read a staged row
+  beside an unstaged one. The three insets are ONE snippet parameterised by a descriptor, which
+  is also what keeps them off the SonarCloud duplication gate.
 
-  ── EACH GROUP IS AN INLINE INSET, NOT A POPOVER TRIGGER (gap-list rows 43-45) ────────────────
-  It shipped as three `Pick a … ▾` buttons opening `SearchablePopover`. `proto:628`-`697` draws
-  the same object three times INLINE instead: a recessed card holding a 28px search well, a fixed
-  window of rows, and a pager. The two forms are not interchangeable at this size — a popover
-  hides the corpus behind a click, so a GM cannot see that a search matched nothing, cannot see
-  how many systems there are, and cannot read a staged row and an unstaged one side by side. The
-  panel is 326px of column that is otherwise empty; the reference spends it on showing the set.
+  THE PANEL STAGES; THE PAGE WRITES. `onApply` hands the owner a staged instruction and nothing
+  else, because every write is a read-modify-write of the whole payload and they have to run
+  SEQUENTIALLY behind one in-flight flag. THE DOCK NAMES THE WRITE, which
+  `design-system/spec.md:434` requires of a bulk commit action. The chrome is the shipped
+  primitives throughout, and the geometry is the reference's on the published rungs (M24).
 
-  The three insets are ONE snippet parameterised by a descriptor, not three blocks: they differ
-  only in what a row means when it is clicked, and three near-identical blocks are what the
-  SonarCloud duplication gate reads them as.
-
-  ── THE REFERENCE'S BULK DELETE IS NOW BUILT (gap-list row 47) ────────────────────────────────
-  It was withheld on the reasoning that the catalogue row offers no destructive verb, so a bulk
-  delete would put the most destructive verb in the product on the surface with the least context.
-  `proto:684`-`688` pins one anyway, with a consequence note under it, and the maintainer's M10
-  ruling builds every row of this panel. What makes it safe is the shipped two-step:
-  `ArmedDangerButton` arms, states the count in its armed label, and only then writes — the same
-  idiom every other delete in this manager uses. The PAGE owns the write and the sequencing, as it
-  does for every other axis here.
-
-  ── THE PANEL STAGES; THE PAGE WRITES ────────────────────────────────────────────────────────
-  `onApply` hands the OWNER a staged instruction and nothing else. Every write is a read-modify-
-  write of the whole world component payload and every landed write is a replicated setting
-  update, so they have to run SEQUENTIALLY behind one in-flight flag — which is the page's
-  concern, not this component's. Staging here and writing there is also what lets the mounted
-  criterion assert the forwarded ACTION NAME and argument list without reaching inside the panel.
-
-  ── THE DOCK NAMES THE WRITE ─────────────────────────────────────────────────────────────────
-  The membership group is N components by M systems, so a selection of twelve across three systems
-  is thirty-six replicated writes. `Apply 2 changes` named neither the records nor the verb;
-  `componentBulkApplyLabel` names both, which `design-system/spec.md:434` requires of a bulk
-  commit action.
-
-  ── THE CHROME IS THE SHIPPED PRIMITIVES ─────────────────────────────────────────────────────
-  `BulkEditPanelShell` owns the eyebrow, the Clear, the count hero and the Apply dock;
-  `BulkEditSection` owns each axis label row; `SegmentedControl` owns the direction track;
-  `ArmedDangerButton` owns the two-step delete; `Chip` owns the staged tag run.
-
-  ── THE GEOMETRY IS THE REFERENCE'S, ON THE PUBLISHED RUNGS (issue 1371 r16-cat, M24) ────────
-  "incorrect sizing/geometry as compared to the prototype. Ensure the rows and chips in the bulk
-  editor are the correct dimensions and the buttons and spacing are too." Measured in Chromium on
-  both documents before a value was written: the reference's SYSTEM row (`proto:5273`) is a 33px
-  row — `7px 9px` around a 15px check box, radius 8 — and its category and tag rows (`proto:5296`,
-  `proto:5330`) are 27px, `6px 9px` around 10.5px sans type on a 7px corner; this panel drew all
-  three at 24px with a 9px glyph where the box is. So: system rows on the 30 rung with a 16px box,
-  category and tag rows on the 28 rung, the box's radius 5 on the ladder's 6, the row corners on
-  7 (the 26-32px band; the reference's 8 is on no rung). The staged chip is `Chip`'s inspector
-  density (`proto:5313`, `4px 9px` on a 999 corner); the direction track is `SegmentedControl`'s
-  accent tone (`proto:5155`, the chosen segment filled, the idle one bare); the inset pager pads
-  `6px 8px` around 22px buttons (`proto:5200`); the dock's delete takes the entry's own 34px /
-  radius 9 / 11px rule from the sheet; and the dock bleeds by `space-4` so it spans the frame's
-  inspector column (`proto:791`, with the frame's `flushBulkDock` handing the scroller the inset).
-
-  Props:
-   - count: how many rows are ticked. Pre-counted by the frame; the panel only words it.
-   - systems: `{id, name}[]`, the crafting-system roster.
-   - categoryOptions: the world vocabulary's categories, with the reserved bucket already refused
-     by the caller (issue 1371 r14-cat, maintainer ruling M18) — never the union of what the
-     records carry, which on a migrated world is the systems' list.
-   - tagOptions: the world vocabulary's tags, from the same store. A tag authored there and
-     applied to no component yet is offered, and the empty sentence below is reached only when
-     the world has authored none.
-   - essences: the WORLD essence catalogue's roster, `{id, name, icon?, colorToken?}[]` (issue 1371
-     r16-cat, maintainer ruling M25). The `Essence values` group offers one row per entry; an
-     empty roster draws the sentence naming the catalogue where an essence is minted.
-   - selectedIds: the ticked world component ids, which the essence group needs beyond `count`:
-     the `n/N` it draws is how many of THESE already carry each essence in some system's rules,
-     and the write count the dock names is how many `(system, map)` batches the staged values
-     resolve to over them. Both are read off `systems`, which is the raw roster.
-   - applying: an in-flight write. Inerts every control and the Apply.
-   - deleting: an in-flight bulk delete. Inerts the same set, and puts the danger control into its
-     own busy state rather than into the Apply's.
-   - onClearSelection(): drop the whole selection.
-   - onApply(staged): `{mode, systemIds, category, addTags, removeTags, essences}`. Never called
-     with an empty instruction — Apply is genuinely disabled until an axis is staged, so a GM
-     cannot fire a no-op write and read success from it. `essences` is `essenceId -> quantity`
-     with `0` meaning strip; the PAGE resolves it into per-system writes.
-   - onDelete(): delete every selected component. Called only from the ARMED state of the shipped
-     two-step control; `null` withholds the control entirely, so a call site with no delete leg
-     offers no dead affordance.
+  `onApply(staged)` is never called with an empty instruction — Apply is disabled until an axis
+  is staged. `essences` is `essenceId -> quantity` with `0` meaning strip, resolved into
+  per-system writes by the page. `onDelete()` is called only from the ARMED state of the shipped
+  two-step control, and `null` withholds the control rather than offering a dead affordance.
 -->
 <script>
   import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
   import BulkEditSection from '../BulkEditSection.svelte';
   import BulkStagingInset from '../BulkStagingInset.svelte';
-  import Callout from '../Callout.svelte';
+  import Callout from '../../../components/Callout.svelte';
   import Chip from '../../../components/Chip.svelte';
-  import SegmentedControl from '../SegmentedControl.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import { paginateRows } from '../../../../../utils/browserPagination.js';
+  import { paginateRows } from '../../../../model/browserPagination.js';
   import {
     componentBulkApplyLabel,
     componentBulkDeleteNote,
@@ -116,26 +45,14 @@
   } from './componentScoped.js';
 
   /**
-   * One staging inset's visible page: the rows that survive its search, windowed.
+   * One staging inset's visible page: the rows that survive its search, windowed. SHARED BY ALL
+   * THREE INSETS, so the predicate, the window size and the range sentence cannot drift.
    *
-   * SHARED BY ALL THREE INSETS (`proto:628`-`697` draws the same object three times), so the
-   * search predicate, the window size and the range sentence cannot drift between systems,
-   * categories and tags. `paginateRows` owns the arithmetic and the clamp; this owns only the
-   * search and the words.
-   *
-   * IT LIVES HERE RATHER THAN IN `componentScoped.js`, AND THE ADDRESS IS THE POINT. That module
+   * IT LIVES HERE RATHER THAN IN `componentScoped.js`, AND THE ADDRESS IS THE POINT: that module
    * is the import-free leaf `ComponentEditView.svelte` pulls in, so every module it imports has
-   * to appear in every mounted manifest that renders the component editor — and a missing
-   * manifest entry is reported as `# cancelled`, not `# fail`. Holding the one paginated helper
-   * beside its only caller keeps the pagination leaf inside the CATALOGUE's own closure, where
-   * `SCOPED_LIST_RAW_MODULES` already carries it for the list frame. It is still a pure function
-   * of its arguments, so nothing about it changed except which graph it is in.
-   *
-   * @param {Array<{id: string, name: string}>} items
-   * @param {{query: string, pageIndex: number, pageSize?: number}} view
-   * @param {(key: string, fallback: string, data?: object) => string} say
-   * @returns {{rows: Array<object>, pageIndex: number, pageCount: number, rangeStart: number,
-   *   rangeEnd: number, total: number}}
+   * to appear in every mounted manifest — and a missing entry reads as `# cancelled`, not
+   * `# fail`. Holding it beside its only caller keeps the pagination leaf in the CATALOGUE's
+   * own closure.
    */
   function componentBulkPickerPage(items, { query, pageIndex, pageSize = 5 }) {
     const needle = String(query ?? '')
@@ -149,8 +66,8 @@
           .includes(needle)
     );
     const page = paginateRows(matched, { pageIndex, pageSize }, pageSize);
-    // THE SHAPE `BulkStagingInset` WORDS: it owns the range and page sentences (the reference's
-    // `Page 1 of 5`), so the caller hands numbers, never strings.
+    // THE SHAPE `BulkStagingInset` WORDS: it owns the range and page sentences, so the caller
+    // hands numbers, never strings.
     return {
       rows: page.rows,
       pageIndex: page.pageIndex,
@@ -167,10 +84,9 @@
     categoryOptions = [],
     tagOptions = [],
     essences = [],
-    // THE PROJECTED ENTRIES, for the essence group's two facts (issue 1371 r18-entry, M31): the
-    // `n/N` counts records whose WORLD map carries an essence, and the write count is one world
-    // write per record whose map the staged values change. Only the page holds the projection, as
-    // for `deletePlan`; the staged map is this panel's, so the plan is resolved here.
+    // THE PROJECTED ENTRIES, for the essence group's two facts (M31): the `n/N` counts records
+    // whose WORLD map carries an essence, and the write count is one world write per changed
+    // record. Only the page holds the projection; the staged map is this panel's.
     entries = [],
     selectedIds = [],
     applying = false,
@@ -178,11 +94,9 @@
     onClearSelection = () => {},
     onApply = () => {},
     onDelete = null,
-    // WHICH OF THE SELECTION THE DELETE MAY TOUCH (epic decision 7). `{deletable, blocked}` from
-    // `componentBulkDeletePlan`, computed by the page because only the page holds the projected
-    // entries. `null` means "every selected component is free", which is what the panel assumed
-    // before the refusal existed, so a call site that has not been taught the plan behaves as it
-    // did rather than silently withholding a delete.
+    // WHICH OF THE SELECTION THE DELETE MAY TOUCH (epic decision 7), computed by the page because
+    // only it holds the projected entries. `null` means "every selected component is free", so a
+    // call site not yet taught the plan behaves as it did rather than withholding a delete.
     deletePlan = null,
   } = $props();
 
@@ -191,9 +105,8 @@
   /** The category picker's own CLEAR value, distinct from leaving it unchanged. */
   const NO_CATEGORY = 'none';
 
-  // THE PANEL'S OWN STATE, safe to hold here precisely because the frame renders this snippet
-  // only while the selection is non-empty: clearing the selection unmounts the panel, so a staged
-  // instruction can never outlive the set it was staged against.
+  // THE PANEL'S OWN STATE, safe here because the frame renders this snippet only while the
+  // selection is non-empty, so a staged instruction cannot outlive the set it was staged against.
   let mode = $state(UNCHANGED);
   let stagedSystemIds = $state([]);
   let stagedCategory = $state(UNCHANGED);
@@ -204,16 +117,9 @@
 
   /**
    * One inset's VIEW — its search and its page — behind the one pair of handlers every inset
-   * binds (issue 1371 r17-b, quality N1). Four insets bound Four hand-written copies of the same
-   * two closures, and a no-op in any one of them shipped green: with one factory there is one
-   * binding per inset to prove, and the seven-row mounts in the suite press each inset's pager
-   * and well through it. A query resets the page, because a search over a moved window would
-   * show its second page of matches first. The view is the inset's VIEW rather than its
-   * instruction: it is deliberately no part of what `onApply` hands over, and a Clear un-stages
-   * the instruction and leaves the window where the GM left it.
-   *
-   * @returns {{query: string, page: number, onQuery: (next: string) => void,
-   *   onPage: (next: number) => void}}
+   * binds. Four hand-written copies of the same two closures shipped green with a no-op in one;
+   * with a factory there is one binding per inset to prove. A query resets the page. The view is
+   * deliberately no part of what `onApply` hands over, so a Clear leaves the window as it was.
    */
   function insetView() {
     const view = $state({ query: '', page: 0 });
@@ -268,9 +174,8 @@
     (membershipStaged || categoryStaged || tagsStaged || essencesStaged) && !inert
   );
 
-  // THE ESSENCE AXIS'S TWO FACTS, READ OFF EACH RECORD'S WORLD MAP (issue 1371 r18-entry, M31):
-  // how many of the selection carry each essence on their world section, and the world writes the
-  // staged values resolve to — one per record whose map changes, which is what the page runs.
+  // THE ESSENCE AXIS'S TWO FACTS, READ OFF EACH RECORD'S WORLD MAP (M31): how many of the
+  // selection carry each essence, and one world write per record whose map changes.
   const selectedComponentIds = $derived(
     (Array.isArray(selectedIds) ? selectedIds : []).map((id) => String(id))
   );
@@ -281,11 +186,9 @@
     componentBulkEssencePlan(selectedComponentIds, stagedEssences, { entries, systems })
   );
 
-  // THE ESSENCE ROSTER, worded for the shared inset's `stepper` kind: each row carries the
-  // staged value (`null` while unchanged), its three-state word for the hook, and how many of the
-  // selection already carry it. `min: null`, deliberately: the reference's `−` below zero returns a
-  // row to unchanged (`proto:5631`), which the inset reports as a negative step and
-  // `stageEssenceStep` reads as an unstage.
+  // THE ESSENCE ROSTER, worded for the shared inset's `stepper` kind. `min: null`, deliberately:
+  // the reference's `−` below zero returns a row to unchanged (`proto:5631`), which the inset
+  // reports as a negative step and `stageEssenceStep` reads as an unstage.
   const essenceRoster = $derived(
     (Array.isArray(essences) ? essences : []).map((essence) => ({
       id: String(essence?.id ?? ''),
@@ -355,18 +258,14 @@
   );
 
   /**
-   * THE DELETE'S THREE FACTS, ALL READ OFF ONE PLAN (epic decision 7).
-   *
-   * A selection with nothing held resolves to `{deletable: <all of them>, blocked: []}`, which is
-   * what a `null` plan is normalised to — so the counts, the labels and the note are all exactly
-   * what they were before the refusal existed on any selection that would not have been refused.
+   * THE DELETE'S THREE FACTS, ALL READ OFF ONE PLAN (epic decision 7). A selection with nothing
+   * held normalises to the whole selection, so the counts, labels and note are what they were.
    */
   const plan = $derived({
     deletable: Array.isArray(deletePlan?.deletable) ? deletePlan.deletable : null,
     blocked: Array.isArray(deletePlan?.blocked) ? deletePlan.blocked : [],
   });
-  // The COUNT THE DELETE WOULD ACTUALLY WRITE, which is what both labels say and what the note
-  // counts. Without a plan it is the whole selection.
+  // The COUNT THE DELETE WOULD ACTUALLY WRITE, which both labels say and the note counts.
   const deletableCount = $derived(plan.deletable === null ? count : plan.deletable.length);
   const deleteNote = $derived(
     componentBulkDeleteNote(
@@ -379,12 +278,9 @@
   );
 
   /**
-   * THE IDLE VERB, WHICH PROMISES NOTHING IT WILL NOT DO.
-   *
-   * Counted where a count is true, and uncounted where nothing can go — `Delete 0 components…`
-   * is a promise of an outcome and `Delete 2 components…` over a fully-held selection is a false
-   * one. The entry's idle verb is the uncounted `Delete entry` for the same reason; this is its
-   * plural.
+   * THE IDLE VERB, WHICH PROMISES NOTHING IT WILL NOT DO: counted where a count is true and
+   * uncounted where nothing can go, since `Delete 0 components…` promises an outcome and
+   * `Delete 2 components…` over a fully-held selection promises a false one.
    */
   const deleteLabel = $derived(
     deleteNote.refused
@@ -401,21 +297,13 @@
   );
 
   /**
-   * THE ARMED LABEL BRANCHES, AND THE CONTROL NEVER GOES `disabled`.
-   *
-   * `ui-integration/spec.md` `### Scoped entity editor patterns` requirement 16 states both halves
-   * and states why: "the armed control stays ENABLED — a disabled button satisfies any assertion
-   * that the delete did not happen while leaving the GM no explanation at all", and "the armed
-   * label itself branches: `Confirm delete` where the delete will happen, `Cannot delete` where it
-   * is refused, so the second press states the outcome before it is taken."
-   *
-   * The world Component entry's danger card is the shipped reading of that requirement, and this
-   * is the same reading on the bulk panel — one record has to refuse the same way whichever screen
-   * a GM reaches it from, which is the whole point of extending the refusal here.
+   * THE ARMED LABEL BRANCHES, AND THE CONTROL NEVER GOES `disabled` — `ui-world-scope/spec.md`
+   * `## Scoped entity editor patterns` requirement 16 states both halves and why: a disabled
+   * button satisfies any assertion that the delete did not happen while explaining nothing, and
+   * the armed label is what states the outcome before the second press takes it.
    */
   const deleteArmedLabel = $derived(
-    // The ARMED accessible name below carries the same sentence the note states, so the two
-    // cannot disagree — requirement 16's own rule, and what the entry's danger card already does.
+    // The ARMED accessible name carries the same sentence the note states, so the two agree.
     deleteNote.refused
       ? text('FABRICATE.Admin.Manager.Scoped.Component.DeleteBlocked', 'Cannot delete')
       : phrase(
@@ -425,10 +313,8 @@
         )
   );
 
-  // BUILT FROM THE MODEL, NOT RE-DECLARED BESIDE IT (issue 1371, round 2). The panel used to
-  // spell the same two labels and both mode notes inline while `componentBulkMembershipModes`
-  // stated them in the model with no consumer anywhere — two implementations of one meaning, and
-  // the one the delta said the mounted criterion would read was the dead one.
+  // BUILT FROM THE MODEL, NOT RE-DECLARED BESIDE IT: the panel used to spell both labels and both
+  // notes inline while the model stated them with no consumer — two implementations of one meaning.
   const membershipModes = $derived(componentBulkMembershipModes(phrase));
   const modeSegments = $derived(
     membershipModes.map((entry) => ({
@@ -439,9 +325,8 @@
     }))
   );
 
-  // WHAT THE STAGED DIRECTION WILL DO. `Add to` and `Remove from` alone restate the highlighted
-  // segment; these state the blast radius, which is the fact a GM is deciding on — and the
-  // removal sentence is the one that has to be unambiguous.
+  // WHAT THE STAGED DIRECTION WILL DO: `Add to` and `Remove from` alone restate the highlighted
+  // segment, where these state the blast radius a GM is deciding on.
   const modeNote = $derived(
     membershipModes.find((candidate) => candidate.id === mode)?.note ??
       text(
@@ -450,9 +335,8 @@
       )
   );
 
-  // ── THE THREE INSETS, EACH AS ONE DESCRIPTOR ────────────────────────────────────────────────
-  // The snippet below renders whichever it is handed, so what differs between systems, categories
-  // and tags is exactly this data and nothing about the markup.
+  // THE THREE INSETS, EACH AS ONE DESCRIPTOR: the snippet below renders whichever it is handed,
+  // so what differs between systems, categories and tags is this data and nothing about markup.
   const systemItems = $derived(
     (Array.isArray(systems) ? systems : []).map((system) => ({
       id: String(system?.id ?? ''),
@@ -507,14 +391,13 @@
       'FABRICATE.Admin.Manager.Scoped.Component.BulkSystemNoMatch',
       'No crafting system matches that search.'
     ),
-    // THE DIRECTION GATES THE SET, not the other way round: staging systems under `Unchanged`
-    // would compose an instruction with a target and no verb.
+    // THE DIRECTION GATES THE SET: staging systems under `Unchanged` would compose an instruction
+    // with a target and no verb.
     disabled: mode === UNCHANGED,
     page: systemPageView,
     onPage: systemView.onPage,
     onChoose: (id) => toggleSystem(id),
-    // THE ROW'S LEADING EDGE IS A CHECK BOX, NOT A GLYPH (`proto:5273`, M24): `check` is the
-    // shared inset's kind for it, and the staged state fills the box.
+    // THE ROW'S LEADING EDGE IS A CHECK BOX, NOT A GLYPH (`proto:5273`, M24).
     kind: 'check',
     rows: systemPageView.rows.map((item) => ({
       id: item.id,
@@ -580,9 +463,8 @@
       : [...stagedSystemIds, systemId];
   }
 
-  // THREE STATES, CYCLED IN ONE DIRECTION: unchanged, add, remove. A row that only toggled
-  // would give a GM no way back to "leave this tag alone" once they had touched it, which on a
-  // panel whose whole point is a partial instruction is the one state that must stay reachable.
+  // THREE STATES, CYCLED IN ONE DIRECTION: unchanged, add, remove. A row that only toggled would
+  // leave no way back to "leave this tag alone" on a panel whose point is a partial instruction.
   function cycleTag(tag) {
     if (inert || !tag) return;
     const next = { ...stagedTags };
@@ -592,11 +474,9 @@
     stagedTags = next;
   }
 
-  // THE TWO DIRECTIONS MUST NOT LOOK ALIKE (issue 1371, round 2). `muted` and `neutral` differ
-  // only in their ink token — same border, no fill on either — so "staged for removal" and "leave
-  // alone" were the same chip, on the one panel whose own header says the directions are one
-  // keystroke apart and destructive in one of them. `warning` is the family that means "this will
-  // take something away", and the glyph carries the state where colour alone should not.
+  // THE TWO DIRECTIONS MUST NOT LOOK ALIKE. `muted` and `neutral` differ only in their ink token,
+  // so "staged for removal" and "leave alone" were the same chip; `warning` is the family that
+  // means "this will take something away", and the glyph carries the state where colour cannot.
   function tagTone(tag) {
     if (stagedTags[tag] === 'add') return 'info';
     if (stagedTags[tag] === 'remove') return 'warning';
@@ -615,12 +495,7 @@
       : text('FABRICATE.Admin.Manager.Scoped.Component.BulkTagAddShort', 'Add');
   }
 
-  /**
-   * One chip's accessible name, which is where the DIRECTION lives.
-   *
-   * @param {string} tag
-   * @returns {string}
-   */
+  /** One chip's accessible name, which is where the DIRECTION lives. */
   function tagAria(tag) {
     if (stagedTags[tag] === 'add') {
       return phrase(
@@ -643,13 +518,7 @@
     );
   }
 
-  /**
-   * Stage one essence's value, or unstage it (M25). The inset walks the three states; this owns
-   * the map.
-   *
-   * @param {string} essenceId
-   * @param {number|null} value `null` unstages.
-   */
+  /** Stage one essence's value, or unstage it (M25); the inset walks the states, this owns the map. */
   function stageEssence(essenceId, value) {
     if (inert || !essenceId) return;
     const next = { ...stagedEssences };
@@ -660,10 +529,7 @@
 
   /**
    * The shared inset's stepper report, read as the reference reads its own (`proto:5629-5631`):
-   * a cleared field or a step below zero is an UNSTAGE, `0` is a STRIP, anything above is a value.
-   *
-   * @param {string} essenceId
-   * @param {number|null} next
+   * a cleared field or a step below zero UNSTAGES, `0` STRIPS, anything above is a value.
    */
   function stageEssenceStep(essenceId, next) {
     if (next === null || next === undefined || Number(next) < 0) stageEssence(essenceId, null);
@@ -689,18 +555,11 @@
 </script>
 
 <!--
-  THE THREE PER-SITE PARAMETERS THIS PANEL ASKS `BulkEditPanelShell` FOR (gap-list rows 38, 39,
-  47). Each was a marker here for one revision while the shell grew the seam, and each defaults to
-  what ships, so the Component, Recipe and Essence Studios are untouched.
-
-   - `clearLabel`: `proto:626` reads `Clear` where the shell reads `Clear selection`. The action
-     stands under a `BULK EDIT` eyebrow in a rail showing nothing but the selection, so
-     "selection" is the only thing it could be clearing.
-   - `hint`: `proto:628` names the staging THIS panel offers, where the shell's noun-free default
-     says only that changes are staged.
-   - `dockFoot`: the danger leg, which `proto:686`-`688` pins INSIDE the dock under the primary
-     action. It rendered as the panel's last content instead — the right reading order in the
-     wrong box, a scrolling sibling of a pinned dock.
+  THE THREE PER-SITE PARAMETERS THIS PANEL ASKS `BulkEditPanelShell` FOR, each defaulting to what
+  ships so the Component, Recipe and Essence Studios are untouched: `clearLabel` (`proto:626`
+  reads `Clear`, and the selection is the only thing it could clear), `hint` (naming the staging
+  THIS panel offers), and `dockFoot` (the danger leg, which `proto:686`-`688` pins INSIDE the dock
+  and which rendered as the panel's last content — the right reading order in the wrong box).
 -->
 <BulkEditPanelShell
   heading={headingLabel}
@@ -721,23 +580,12 @@
   dockFoot={onDelete ? componentBulkDanger : undefined}
 >
   <!--
-    THE STANDING EXPLANATION IS SECOND, DIRECTLY UNDER THE REGISTER (gap-list row 40).
-
-    `proto:618` puts it there and the panel put it last, immediately above the Apply dock — which
-    inverts what it is for: it says what CANNOT be bulk-edited, so it belongs before the groups a
-    GM is about to read rather than after the decision they have already made.
-
-    INFO IS RETAINED AND THE JUDGEMENT IS RECORDED (issue 1505). Re-read against the widened
-    tone union, whose rule is that the tint is opt-in and reached only for a note about LIVE
-    STATE: this is the standing explanation of what bulk cannot change, which that reading
-    would put at neutral. `proto:618` asks for the tint here and `proto:1110` asks for it on the
-    per-system twin at `components/ComponentBulkEditPanel.svelte` — those two are the
-    PROTOTYPE-ANCHORED copies of this note. The other two panels that carry it,
-    `essences/EssenceBulkEditPanel.svelte` and `scoped/ToolCatalogueBulkPanel.svelte`, have no
-    such anchor and this change already quieted both. The recipe bulk panel carries no standing
-    note of this kind at all; its one `info` callout is the conditional check-tier message, which
-    stands as live state. So the open question is only whether a prototype anchor outranks the
-    tone rule, and that is issue 1580's; this pair moves together under it or not at all.
+    THE STANDING EXPLANATION IS SECOND, DIRECTLY UNDER THE REGISTER (`proto:618`): it says what
+    CANNOT be bulk-edited, so it belongs before the groups a GM is about to read rather than after
+    the decision they have made. INFO IS RETAINED AND THE JUDGEMENT IS RECORDED (issue 1505): the
+    widened tone union would put a standing note at neutral, but `proto:618` and `proto:1110` ask
+    for the tint on this note and its per-system twin. Whether a prototype anchor outranks the
+    tone rule is issue 1580's question, and this pair moves under it or not at all.
   -->
   <Callout
     tone="info"
@@ -764,9 +612,8 @@
       if (!inert) mode = next;
     }}
   />
-  <!-- BELOW the control, which is where `proto:625` writes it: the note describes what the
-       chosen direction will do, so it reads as a consequence of the track above rather than as
-       an instruction about a control the GM has not reached yet. -->
+  <!-- BELOW the control, where `proto:625` writes it: the note describes what the chosen direction
+       will do, so it reads as a consequence rather than an instruction about an unreached control. -->
   <p class="fab-bulk-component-note" data-world-component-bulk-mode-state={mode}>{modeNote}</p>
 
   <BulkEditSection
@@ -807,17 +654,13 @@
     trailing={tagsStaged ? clearTags : undefined}
   />
   {#if tagsStaged}
-    <!-- THE STAGED RUN, above the inset exactly as `proto:706` draws it. It is the one place the
-         DIRECTION is painted rather than merely listed, which is why the chips survive the move
-         to an inset: a run of two tones says at a glance what a column of rows says one row at a
-         time. -->
+    <!-- THE STAGED RUN, above the inset exactly as `proto:706` draws it: the one place the
+         DIRECTION is painted rather than listed, which is why the chips survive the move. -->
     <div class="fab-bulk-component-chips" data-world-component-bulk-tags>
       {#each [...addTags, ...removeTags] as tag (tag)}
-        <!--
-          `aria-pressed` REPORTS STAGED-VERSUS-UNSTAGED AND NOTHING ELSE, because that is the only
-          thing a two-state attribute can honestly say about a three-state control. The DIRECTION
-          is in the accessible NAME, which has room for it.
-        -->
+        <!-- `aria-pressed` REPORTS STAGED-VERSUS-UNSTAGED AND NOTHING ELSE, which is all a
+             two-state attribute can honestly say about a three-state control. The DIRECTION is
+             in the accessible NAME, which has room for it. -->
         <Chip
           tag="button"
           type="button"
@@ -845,16 +688,10 @@
   {/if}
 
   <!--
-    THE ESSENCE VALUES GROUP (issue 1371 r16-cat, maintainer ruling M25), drawn by the inset the
-    system panel also draws — `proto:1180-1216` on the system panel is the reference for both.
-
-    IT WRITES THE WORLD SECTION (issue 1371 r18-entry, maintainer ruling M31, superseding M25's
-    route). The world record carries an `essences` section beside `category` now, so this group's
-    write is each selected record's WORLD map — one `updateWorldDefaultSection(id, 'essences', map)`
-    per record whose map changes (`componentBulkEssencePlan`), which every system that inherits the
-    section follows at once and a system that overrides keeps its own. M25's write went into each
-    component's IN-SYSTEM rules, which no world screen reads — "even the bulk edit does not seem to
-    persist or be visible anywhere" was that write landing where nothing looked. The note says so.
+    THE ESSENCE VALUES GROUP (M25), drawn by the inset the system panel also draws. IT WRITES THE
+    WORLD SECTION (M31, superseding M25's route): one `updateWorldDefaultSection(id, 'essences',
+    map)` per record whose map changes, which every inheriting system follows at once. M25's write
+    went into each component's IN-SYSTEM rules, which no world screen reads.
   -->
   <BulkEditSection
     label={text('FABRICATE.Admin.Manager.BulkEdit.EssenceValues', 'Essence values')}
@@ -863,9 +700,8 @@
   />
   {#if essenceRoster.length > 0}
     {#if stagedEssenceIds.length > 0}
-      <!-- THE STAGED RUN, above the inset exactly as `proto:1189` draws it: the one place the
-           DIRECTION is painted rather than listed — a `positive` chip for a value, a `danger` chip
-           reading `removed` for a strip. A chip is a button, and the click unstages. -->
+      <!-- THE STAGED RUN, above the inset as `proto:1189` draws it: a `positive` chip for a value,
+           a `danger` chip reading `removed` for a strip. A chip is a button, and the click unstages. -->
       <div class="fab-bulk-component-chips" data-world-component-bulk-essence-chips>
         {#each stagedEssenceIds as id (id)}
           {@const essence = essenceRoster.find((candidate) => candidate.id === id)}
@@ -933,38 +769,21 @@
 
 <!--
   EVERY `<button>` BELOW DECLARES `data-keyboard-focus="true"`, AND IT IS NOT DECORATION.
-
-  Foundry's `KeyboardManager#hasFocus` recognises a BUTTON only when it has an ancestor `<form>`
-  — it literally returns `!!focused.form` — and this route renders no form at all. So while one
-  of these six held focus the window read as UNFOCUSED and every core keybinding stayed live:
-  Space pauses the game, the arrows pan the canvas behind the manager. A bulk panel is worked from
-  the keyboard the moment a GM tabs into a picker's rows and its pager, which is exactly the shape
-  most likely to be holding focus when a key is pressed.
-
-  `tests/design-system-keyboard-focus.test.js` is the gate, and the answer is the declaration
-  rather than a baseline row: all six arrived with this panel, so they are new debt and not
-  inherited debt. `WorldComponentCataloguePage.svelte`'s vocabulary exit already does the same.
+  `KeyboardManager#hasFocus` returns `!!focused.form` for a BUTTON and this route renders no form,
+  so while one of these held focus the window read as UNFOCUSED and every core keybinding stayed
+  live: Space pauses the game, the arrows pan the canvas behind the manager.
+  `tests/design-system-keyboard-focus.test.js` is the gate, and all six arrived with this panel.
 -->
 <!--
-  THE DANGER LEG, IN THE DOCK (gap-list row 47).
+  THE DANGER LEG, IN THE DOCK. `proto:686`-`688` pins the destructive verb and its consequence
+  note INSIDE the pinned dock; it shipped as the panel's last CONTENT, so a GM who had scrolled
+  could have the Apply in front of them and the delete somewhere above. The sibling card and the
+  dock foot are alternatives, not a pair.
 
-  `proto:686`-`688` pins the destructive verb and its consequence note INSIDE the pinned dock,
-  under the primary action, on the dock's own column rhythm. It shipped as the panel's last
-  CONTENT — the right reading order in the wrong box, a scrolling sibling of a pinned dock, so a
-  GM who had scrolled the staging groups could have the Apply in front of them and the delete
-  somewhere above. `dockFoot` is the shell's own slot for it, and the sibling card and the dock
-  foot are alternatives rather than a pair: rendering both would draw the control twice.
-
-  IT REFUSES WHAT THE ENTRY REFUSES (epic decision 7). The world Component entry will not delete a
-  record any system still has rules for, and this panel used to delete exactly those records
-  without asking — the same record undeletable one screen away and deletable in a tick-box, on the
-  path a GM reaches with a page of rows selected. The plan splits the selection: the button counts
-  and writes only the free ones, and the note NAMES the held ones and the systems holding them.
-
-  THE CONTROL STAYS ENABLED EVEN WHEN NOTHING CAN GO, which is `ui-integration/spec.md`
-  requirement 16's own rule — a disabled button satisfies any assertion that the delete did not
-  happen while leaving the GM no explanation at all — so the ARMED label is what states the
-  outcome, in the entry's own words.
+  IT REFUSES WHAT THE ENTRY REFUSES (epic decision 7): the plan splits the selection, the button
+  counts and writes only the free records, and the note NAMES the held ones and their systems.
+  THE CONTROL STAYS ENABLED EVEN WHEN NOTHING CAN GO, which is requirement 16's own rule, so the
+  ARMED label is what states the outcome.
 -->
 {#snippet componentBulkDanger()}
   <div class="fab-bulk-component-danger" data-world-component-bulk-danger>
@@ -1049,12 +868,9 @@
 {/snippet}
 
 <!--
-  ONE INSET, RENDERED THREE TIMES (`proto:628`-`697`), AND IT IS `BulkStagingInset`'S (issue 1371
-  r16-cat, M24/M25): the search well, the fixed row window, the pager AND the rows are the shared
-  component's, drawn from this panel's descriptors — a `check` row for a system, a `radio` row for
-  a category, a `tri` row for a tag — so the two bulk panels are the same object over different
-  data. What is this panel's is the DESCRIPTOR: what a row means, what pressing it does, and what
-  it says when it is staged.
+  ONE INSET, RENDERED THREE TIMES (`proto:628`-`697`), AND IT IS `BulkStagingInset`'S: the search
+  well, the row window, the pager and the rows are the shared component's, drawn from this panel's
+  descriptors — what a row means, what pressing it does, and what it says when it is staged.
 -->
 {#snippet stagingInset(inset)}
   <BulkStagingInset
@@ -1077,8 +893,7 @@
 {/snippet}
 
 <style>
-  /* STATIC class names, so Svelte can prove each selector is used and `lint:svelte:warnings`
-     stays at zero. */
+  /* STATIC class names, so `lint:svelte:warnings` stays at zero. */
   .fab-bulk-component-chips {
     display: flex;
     flex-wrap: wrap;
@@ -1099,8 +914,7 @@
     line-height: 1.5;
   }
 
-  /* A group head's trailing Clear: bare type, like the selection band's pair, with Foundry's
-     host button geometry reset explicitly as `Chip` and the panel's own Clear both do. */
+  /* A group head's trailing Clear: bare type, with Foundry's host button geometry reset. */
   .fab-bulk-component-clear {
     appearance: none;
     width: auto;
@@ -1127,13 +941,9 @@
     outline-offset: 2px;
   }
 
-  /* THE DANGER LEG NOW RENDERS INSIDE THE SHELL'S DOCK, and this rule still reaches it: a
-     snippet carries the scope hash of the component that DEFINES it, not of the one that renders
-     it, so `dockFoot` is styled from here exactly as it was when it stood as a sibling.
-
-     It states no spacing above itself. The dock's own `has-foot` column rhythm owns the gap
-     between the Apply and this leg — restating it here would be a second source of truth for one
-     value, and it would compose with the dock's rather than replace it. */
+  /* THE DANGER LEG RENDERS INSIDE THE SHELL'S DOCK, and this rule still reaches it: a snippet
+     carries the scope hash of the component that DEFINES it, not of the one that renders it. It
+     states no spacing above itself, because the dock's own `has-foot` rhythm owns that gap. */
   .fab-bulk-component-danger {
     display: flex;
     flex-direction: column;

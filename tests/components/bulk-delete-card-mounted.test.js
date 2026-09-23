@@ -1,25 +1,4 @@
-/**
- * `BulkDeleteCard` mounted, in isolation (issue 1132).
- *
- * The card was extracted because five behaviours had been implemented once, implemented twice
- * and were about to be implemented a third time — zero-row gating, the description
- * association, the live region, the label-in-name rule and the busy state. The studios' own
- * suites prove each studio still WIRES the card; this file is what proves the behaviours
- * themselves, once, so a fourth studio inherits them rather than re-deriving them.
- *
- * Two of them are cheap to get wrong in ways no studio suite would see:
- *
- *  - THE SUBJECT ROW IS EXEMPT FROM THE ZERO GATE. Gate all the rows and a fully stale
- *    selection renders a heading, no rows, and a disabled button with nothing on screen saying
- *    why — on either studio that carries no standing hint, which is both of the converted ones.
- *  - THE BUSY FACE IS NOT DERIVED FROM `armed`. Disabling a focused button fires blur in
- *    Chromium and Firefox, `ArmedDangerButton` disarms on blur, and happy-dom does not fire
- *    that blur at all. So the state a real browser produces mid-write — `busy` true and `armed`
- *    already false — is a state happy-dom will never reach on its own, and a suite that only
- *    clicked its way there would pass on an implementation that reads `Delete 3 recipes` for
- *    the whole write. It is therefore asserted DIRECTLY, as props, plus a blur dispatched by
- *    hand: between them they reproduce both halves of the browser behaviour the engine omits.
- */
+/** `BulkDeleteCard` mounted, in isolation (issue 1132). */
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -34,8 +13,7 @@ const CARD_PATH = 'src/ui/svelte/apps/manager/BulkDeleteCard.svelte';
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-bulk-delete-card-',
-  // The card's ONE shared leaf (issue 1157): the "move the keyboard, then announce" ordering
-  // rule it shares with the manager root, which is why it is a module rather than two copies.
+  // The card's ONE shared leaf (issue 1157).
   rawModules: ['src/ui/svelte/util/announceAfterFocus.js'],
   compiledModules: [
     'src/ui/svelte/components/ArmedDangerButton.svelte',
@@ -47,10 +25,7 @@ const harness = createMountedComponentHarness({
   componentPath: CARD_PATH,
 });
 
-/**
- * The Recipe Studio's shape — three rows, a standing hint and all three faces — because it is
- * the caller that exercises every prop. The two converted studios are narrower cases of it.
- */
+/** The Recipe Studio's shape — three rows, a standing hint and all three faces. */
 function props(overrides = {}) {
   return {
     token: 'delete-recipes',
@@ -78,9 +53,6 @@ function props(overrides = {}) {
 /**
  * Wait past the delay the outcome sentence spends queued behind the focus utterance
  * (issue 1157), then flush the render that state write schedules.
- *
- * The delay is IMPORTED rather than restated: a local copy of the number would silently
- * start asserting the un-delayed state the moment the rule changed its mind about it.
  */
 async function settleAnnouncement() {
   await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_AFTER_FOCUS_MS + 40));
@@ -100,8 +72,7 @@ after(() => harness.teardown());
 
 describe('1132 BulkDeleteCard — the impact statement', () => {
   it('renders every row it is given, with its key as the hook VALUE', async () => {
-    // The per-row hook is VALUED, not bare, and four suites query it by key. A `rows: string[]`
-    // prop could not have emitted it, which is why the shape is `{ key, text }`.
+    // The per-row hook is VALUED, not bare.
     const root = await harness.mount(props());
 
     assert.equal(row(root, 'recipes').textContent.trim(), '3 recipes will be deleted.');
@@ -186,9 +157,7 @@ describe('1132 BulkDeleteCard — the impact statement', () => {
 
 describe('1132 BulkDeleteCard — the accessibility wiring', () => {
   it('associates the impact list with the control, by an id DERIVED from the token', async () => {
-    // Proximity is not association. And the id cannot be a literal: one component now renders
-    // in three panels, and a manager view can hold more than one card at a time, so two cards
-    // with a hardcoded id would have the second's button describing the first's list.
+    // Proximity is not association. And the id cannot be a literal.
     const root = await harness.mount(props());
     const described = button(root).getAttribute('aria-describedby');
 
@@ -198,8 +167,7 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
     assert.ok(Boolean(list), 'which resolves to an element inside the card');
     assert.equal(list.getAttribute('data-recipe-bulk-impact'), '');
 
-    // The derivation, proved by moving the token rather than by reading the source: a hardcoded
-    // id would be unchanged here, and two such cards would collide in one document.
+    // The derivation, proved by moving the token rather than by reading the source.
     await harness.setProps(props({ token: 'delete-components' }));
     const moved = button(root).getAttribute('aria-describedby');
     assert.notEqual(moved, described, 'a second card under a different token gets a different id');
@@ -235,10 +203,7 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
     harness.remount();
   });
 
-  // ESCAPE AND CLICK-AWAY BOTH DISARM WHILE THE BUTTON HOLDS FOCUS, changing its accessible
-  // name under it — which is the exact condition this region exists for. Emptying a region
-  // announces nothing, so the one gesture that CANCELS a destructive action was the only one
-  // that said nothing at all (issue 1132, review round).
+  // ESCAPE AND CLICK-AWAY BOTH DISARM WHILE THE BUTTON HOLDS FOCUS.
   it('announces the CANCELLATION on disarm when the caller supplies the sentence', async () => {
     const cancelled = props({ disarmedAnnouncement: 'Delete cancelled. Nothing was deleted.' });
     const root = await harness.mount(cancelled);
@@ -257,8 +222,7 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
   });
 
   it('does NOT read a confirmed delete as a cancellation', async () => {
-    // The trap in tracking "was armed": confirming takes the control armed → busy → idle, so
-    // a naive trailing-idle rule announces "Delete cancelled." over a delete that happened.
+    // The trap in tracking "was armed": confirming takes the control armed → busy → idle.
     const cancelled = props({ disarmedAnnouncement: 'Delete cancelled. Nothing was deleted.' });
     const root = await harness.mount({ ...cancelled, armed: true });
     assert.match(live(root).textContent, /Activate again/);
@@ -275,22 +239,15 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
     harness.remount();
   });
 
-  // CONFIRMING DISABLES THE CONTROL, WHICH MOVES FOCUS TO `document.body`. Re-enabling it
-  // does not bring focus back, so on a refused or no-op delete the GM's keyboard is nowhere
-  // and the region — emptied while busy — has said nothing about the outcome. The Foundry
-  // error toast is not a live region this module controls.
+  // CONFIRMING DISABLES THE CONTROL.
   it('announces the OUTCOME of a finished write and takes focus back', async () => {
     const root = await harness.mount(props({ armed: true }));
     button(root).focus();
 
     await harness.setProps(props({ armed: true, busy: true }));
-    // The disable is what moves focus away in a real browser; happy-dom does not fire that
-    // blur, so the post-write state is entered deliberately here, exactly as the busy-face
-    // suite below does. `bulk-delete-busy-focus.test.js` is where the browser fact itself is
-    // measured.
+    // The disable is what moves focus away in a real browser.
     document.body.focus();
-    // ANTI-VACUITY, asserted before the claim it bounds: if focus were still on the control
-    // here, "focus came back" would pass on a card that did nothing at all.
+    // ANTI-VACUITY, asserted before the claim it bounds.
     assert.notEqual(document.activeElement, button(root), 'the write really did drop focus');
 
     await harness.setProps(
@@ -303,9 +260,6 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
     // original order — write the sentence, then move focus — is an announcement the GM may
     // never hear. That is not observable here (no engine in this repo runs a screen reader),
     // but the ORDER is, and it is what the shared rule in `util/announceAfterFocus.js` fixes.
-    //
-    // Deferred a microtask past the flush, because the control is re-enabled in the same one
-    // and `focus()` on a still-disabled button does nothing.
     await Promise.resolve();
     assert.equal(
       document.activeElement,
@@ -324,19 +278,12 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
   });
 
   // ── …BUT ONLY FROM `<body>` (issue 1157) ─────────────────────────────────────────
-  //
-  // The restore above used to be unconditional, so a GM who tabbed into the browser's search
-  // field while the write was running was yanked back out of it the moment the write refused.
-  // `<body>` is where the confirm's own `disabled` leaves the keyboard — that premise is
-  // measured in Chromium by `bulk-delete-busy-focus.test.js` — and it is the only state worth
-  // rescuing; anywhere else is a place the GM chose to be.
   it('leaves focus alone when the GM moved it somewhere else during the write', async () => {
     const root = await harness.mount(props({ armed: true }));
     button(root).focus();
 
     await harness.setProps(props({ armed: true, busy: true }));
-    // The GM tabs away mid-write. A REAL, connected node outside the card, standing for the
-    // browser's search field; `document.body.focus()` is the case the sibling test covers.
+    // The GM tabs away mid-write. A REAL, connected node outside the card.
     const elsewhere = document.createElement('input');
     document.body.appendChild(elsewhere);
     elsewhere.focus();
@@ -369,8 +316,7 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
     await settleAnnouncement();
     assert.equal(live(root).textContent.trim(), 'Failed to delete the selected recipes.');
 
-    // The owner clears the outcome as it arms, which is what stops a stale sentence
-    // out-ranking the armed one.
+    // The owner clears the outcome as it arms.
     await harness.setProps(props({ armed: true, outcomeAnnouncement: '' }));
     assert.match(live(root).textContent, /Activate again/);
     harness.remount();
@@ -408,8 +354,6 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
     // which is defensible for an AT-only string and reads as an un-interpolated template —
     // "1 recipe(s)" — the moment it becomes visible text. Nothing is lost: every count in
     // those names is in the impact list this control is `aria-describedby`-associated with.
-    // The ROW call sites of `ArmedDangerButton` keep their tooltip, where the accessible name
-    // is the only place a sighted user reads which document a two-word "Delete" reaches.
     const root = await harness.mount(props({ armed: true }));
     assert.equal(button(root).getAttribute('title'), null);
     assert.match(
@@ -421,8 +365,7 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
   });
 
   it('carries no state class the stylesheet does not define', async () => {
-    // `is-busy` was the only occurrence of that name under `src/` or `styles/`: a class
-    // implying a treatment that does not exist. `data-busy` is the hook.
+    // `is-busy` was the only occurrence of that name under `src/` or `styles/`.
     const root = await harness.mount(props({ busy: true }));
     assert.equal(button(root).classList.contains('is-busy'), false);
     assert.equal(button(root).getAttribute('data-busy'), 'true');
@@ -491,9 +434,6 @@ describe('1132 BulkDeleteCard — the busy face', () => {
     // and `ArmedDangerButton` disarms on blur — so a browser reaches `busy: true, armed: false`
     // within a frame of the write starting. happy-dom fires no such blur, so this state has to
     // be entered deliberately or the assertion below would never be reached at all.
-    //
-    // A busy face read off `armed` would render "Delete 3 recipes" here: the idle label, on a
-    // disabled button, for the whole duration of a destructive write.
     const root = await harness.mount(props({ armed: false, busy: true }));
 
     assert.equal(
@@ -508,8 +448,6 @@ describe('1132 BulkDeleteCard — the busy face', () => {
 
   it('ignores a blur while busy, so an in-flight write cannot clear the owner\'s arm token', async () => {
     // The other half of the same race, driven by the event happy-dom will not raise on its own.
-    // Without the guard the owner's `deleteArmed` is cleared by the write it is running, and a
-    // failed delete then returns to an idle card with no memory of what the GM confirmed.
     const disarmed = [];
     const root = await harness.mount(
       props({ armed: true, busy: true, onDisarm: (token) => disarmed.push(token) })
@@ -522,8 +460,7 @@ describe('1132 BulkDeleteCard — the busy face', () => {
   });
 
   it('still disarms on blur when it is NOT busy', async () => {
-    // The negative control for the guard above: gating blur unconditionally would break the
-    // shipped "click away to disarm" behaviour every call site of `ArmedDangerButton` relies on.
+    // The negative control for the guard above.
     const disarmed = [];
     const root = await harness.mount(
       props({ armed: true, busy: false, onDisarm: (token) => disarmed.push(token) })

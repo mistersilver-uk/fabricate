@@ -1,13 +1,10 @@
-/**
- * Issue 676 — the GM component library's pure list model.
- *
- * Covers AC1's grouping/filtering half at the model layer.
- */
+/** Issue 676 — the GM component library's pure list model. */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
   COMPONENT_DEFAULT_PAGE_SIZE,
+  buildComponentBrowserModel,
   COMPONENT_ESSENCE_FILTER_ANY,
   COMPONENT_ESSENCE_FILTER_NONE,
   COMPONENT_SORT_KEYS,
@@ -19,8 +16,8 @@ import {
   groupComponentsByCategory,
   paginateComponents,
   sortComponents,
-} from '../../src/utils/componentBrowserModel.js';
-import { countByCategory } from '../../src/utils/browserGroupCounts.js';
+} from '../../src/ui/model/componentBrowserModel.js';
+import { countByCategory } from '../../src/ui/model/browserGroupCounts.js';
 
 const ROWS = [
   { id: 'a', name: 'Iron Ore', category: 'Metal', essences: [{ id: 'earth', name: 'Earth', quantity: 2 }] },
@@ -137,9 +134,7 @@ describe('component browser model (issue 676)', () => {
     ]);
   });
 
-  // The non-grouped path is the byte-identical pre-issue-801 order. These literal
-  // orderings pin BOTH directions per key so a bug injected into the shared
-  // `rowComparator` flips them (rather than a self-comparison against the code).
+  // The non-grouped path is the byte-identical pre-issue-801 order.
   it('pins each sort key in both directions (the flat, non-grouped path)', () => {
     assert.deepEqual(names(sortComponents(ROWS, { key: 'name', direction: 'asc' })), [
       'Copper Ore', 'Glass Vial', 'Iron Ore', 'Sage',
@@ -165,8 +160,6 @@ describe('component browser model (issue 676)', () => {
   });
 
   // Issue 801 — with grouping ON the list is ordered category-major BEFORE pagination.
-  // `compareCategories` (general pinned LAST) is the DIRECTION-INDEPENDENT primary; the
-  // active sort orders rows only within a category.
   describe('category-major grouped ordering (issue 801)', () => {
     it('orders rows category-major with general pinned last, name-ascending within', () => {
       // A name-key sort with categoryMajor groups the rows into their category order
@@ -176,10 +169,7 @@ describe('component browser model (issue 676)', () => {
       ]);
     });
 
-    // The components-only edge: grouping ON + key 'category' + direction 'desc'. The
-    // direction must touch NEITHER the primary (groups stay ascending, general last) NOR
-    // the tiebreak (names ascending) — it would otherwise double-apply and reverse the
-    // very group order the headers render.
+    // The components-only edge: grouping ON + key 'category' + direction 'desc'.
     it('keeps a desc category sort rendering ascending groups (general last), name-asc within', () => {
       assert.deepEqual(names(sortComponents(ROWS, { key: 'category', direction: 'desc', categoryMajor: true })), [
         'Sage', 'Copper Ore', 'Iron Ore', 'Glass Vial',
@@ -270,12 +260,8 @@ describe('component browser model (issue 676)', () => {
     assert.equal(page.pageCount, 1);
   });
 
-  // Issue 1036 review: `paginateComponents` now delegates to the shared `paginateRows`,
-  // and the one input class no pinned test covered was a `pageSize` that is falsy but
-  // NUMERIC. `Number(0)` and `Number(null)` are both finite, so neither reaches the
-  // default — they reach `Math.max(1, 0)` and clamp to a one-row page. Unreachable
-  // through `Pagination.svelte`'s `next > 0` guard, but it is what makes the extraction
-  // self-evidently neutral rather than neutral-by-argument.
+  // Issue 1036 review: `paginateComponents` now delegates to the shared `paginateRows`, and the one
+  // input class no pinned test covered was a `pageSize` that is falsy but NUMERIC.
   it('clamps a zero or null pageSize to one row per page rather than defaulting', () => {
     for (const pageSize of [0, null]) {
       const page = paginateComponents(ROWS, { pageIndex: 0, pageSize });
@@ -293,13 +279,8 @@ describe('component browser model (issue 676)', () => {
   });
 });
 
-// ── issue 1371 r12-list ──────────────────────────────────────────────────────────────────────
-//
-// The system rules list's toolbar draws the reference's THREE essence predicates and its FOUR sort
-// keys. `proto:5533` offers `All essences | Carries any essence | No essences` before the per-essence
-// entries, and `proto:5477-5479` is the predicate for each; `proto:5536` lists the sort keys
-// `Name | Category | Essences | Tags`, and `proto:5485` orders the `Tags` key by tag count and then
-// by name. `Salvage` survives as a recorded subject-only extra.
+// issue 1371 r12-list. The system rules list's toolbar draws the reference's THREE essence
+// predicates and its FOUR sort keys.
 describe('the system rules list draws the reference’s essence predicates and Tags sort (issue 1371 r12-list)', () => {
   it('offers the two predicate sentinels as values no authored essence can collide with', () => {
     // `all` predates them and is the lifted view-state's persisted default; the two new ones take
@@ -361,5 +342,42 @@ describe('the system rules list draws the reference’s essence predicates and T
       'Dust',
       'Ember',
     ]);
+  });
+});
+
+describe('component browser model — the assembled model (issue 1688)', () => {
+  const MIXED = [
+    { id: 'z', name: 'Zinc Ingot', category: 'Metal' },
+    { id: 'a', name: 'Amber', category: 'Gem' },
+    { id: 'm', name: 'Mud' },
+  ];
+
+  it('holds `filtered` unsorted and `sorted` as the whole ordered cohort', () => {
+    const model = buildComponentBrowserModel(MIXED, { sortKey: 'name', pageSize: 2 });
+    assert.deepEqual(names(model.filtered), ['Zinc Ingot', 'Amber', 'Mud'], 'input order kept');
+    assert.deepEqual(names(model.sorted), ['Amber', 'Mud', 'Zinc Ingot']);
+    // `sorted` is the whole cohort, not the page: the view slices its own window out of it.
+    assert.deepEqual(names(model.page), ['Amber', 'Mud']);
+  });
+
+  it('emits no groups when grouping is off, because the view groups its own window', () => {
+    assert.deepEqual(buildComponentBrowserModel(MIXED, { groupByCategory: false }).groups, []);
+    assert.deepEqual(
+      buildComponentBrowserModel(MIXED, { groupByCategory: true }).groups.map(
+        (group) => group.category
+      ),
+      ['Gem', 'Metal', 'general'],
+      'and the reserved bucket stays last when it does group'
+    );
+  });
+
+  it('reads its sort from `sortKey` / `sortDirection`, not from `key` / `direction`', () => {
+    const model = buildComponentBrowserModel(MIXED, {
+      sortKey: 'name',
+      sortDirection: 'desc',
+      key: 'category',
+      direction: 'asc',
+    });
+    assert.deepEqual(names(model.sorted), ['Zinc Ingot', 'Mud', 'Amber']);
   });
 });

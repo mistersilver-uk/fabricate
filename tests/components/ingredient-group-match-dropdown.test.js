@@ -1,19 +1,9 @@
-/**
- * Tests for IngredientGroupCard match type dropdown visibility.
- *
- * When showItemTags=false, the "Match" column (header + cell) should be hidden
- * and the OR-separator colspan should be reduced by 1.
- *
- * When showItemTags=true, the match type <select> should be present with both
- * "Component" and "Tag" options and the full colspan should be used.
- */
+/** Tests for IngredientGroupCard match type dropdown visibility. */
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
-// ---------------------------------------------------------------------------
 // Helpers: build DOM structures mirroring IngredientGroupCard table output
-// ---------------------------------------------------------------------------
 
 /**
  * Build the ingredient options table structure that IngredientGroupCard renders.
@@ -121,9 +111,7 @@ function buildIngredientOptionsTable(group, { showItemTags = false } = {}) {
   return table;
 }
 
-// ---------------------------------------------------------------------------
 // Tests: match column hidden when showItemTags=false
-// ---------------------------------------------------------------------------
 
 describe('IngredientGroupCard match dropdown: showItemTags=false', () => {
   before(() => setupDOM());
@@ -166,9 +154,7 @@ describe('IngredientGroupCard match dropdown: showItemTags=false', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Tests: match column visible when showItemTags=true
-// ---------------------------------------------------------------------------
 
 describe('IngredientGroupCard match dropdown: showItemTags=true', () => {
   before(() => setupDOM());
@@ -221,9 +207,7 @@ describe('IngredientGroupCard match dropdown: showItemTags=true', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Tests: multiple options — OR separators
-// ---------------------------------------------------------------------------
 
 describe('IngredientGroupCard OR separator count', () => {
   before(() => setupDOM());

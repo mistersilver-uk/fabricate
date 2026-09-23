@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -94,9 +95,9 @@ describe('RecordInspector available-node stepper', () => {
     ]) {
       writeCompiledSvelte(component);
     }
-    copyModule('src/ui/svelte/util/foundryBridge.js');
+    for (const modulePath of FOUNDRY_BRIDGE_RAW_MODULES) copyModule(modulePath);
     copyModule('src/gatheringImageDefaults.js');
-    // The per-state tone / glyph / copy map (issue 1321), extracted out of
+    // The per-state tone / glyph / copy map (issue 1321).
     // `CompositionStatePill.svelte`'s own `<script>` so the composition-state vocabulary can
     // be asserted against it. The pill is compiled into this tree above, so this is a STATIC
     // import of the mounted graph; the map is import-free by design, which is why this chip
@@ -182,8 +183,7 @@ describe('RecordInspector available-node stepper', () => {
     assert.equal(nodeSection(), null);
   });
 
-  // issue 301: a nonRegenerating pool can never be restocked, so the GM restock/step
-  // controls are removed entirely — the count is shown read-only with a permanence hint.
+  // issue 301: a nonRegenerating pool can never be restocked.
   it('removes the step controls and shows a read-only count plus the no-restock hint for a nonRegenerating pool', async () => {
     await render({
       entry: taskEntry({ record: { name: 'Vein', img: 'icons/ore.webp', nodes: { enabled: true, max: 5, current: 2, respawn: { policy: 'nonRegenerating' } } } }),

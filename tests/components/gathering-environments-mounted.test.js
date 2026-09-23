@@ -10,14 +10,13 @@ import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 import { chooseSelectOption, selectOptionValues } from '../helpers/select-control.js';
 import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
-// The raw `.js` closure of `SearchablePopover`, which the shared `<Select>` composes
-// (issue 1504). Spread from the harness's own roster rather than copied, so a module added
-// there cannot go missing here.
+// The raw `.js` closure of `SearchablePopover`.
 import {
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -108,9 +107,11 @@ describe('GatheringView mounted behavior', () => {
     mkdirSync(dirname(reasonsDestination), { recursive: true });
     writeFileSync(reasonsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/journalRunReasons.js'), 'utf8'));
 
-    const utilDestination = join(tempRoot, 'src/ui/svelte/util/foundryBridge.js');
-    mkdirSync(dirname(utilDestination), { recursive: true });
-    writeFileSync(utilDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/foundryBridge.js'), 'utf8'));
+    for (const modulePath of FOUNDRY_BRIDGE_RAW_MODULES) {
+      const utilDestination = join(tempRoot, modulePath);
+      mkdirSync(dirname(utilDestination), { recursive: true });
+      writeFileSync(utilDestination, readFileSync(resolve(repoRoot, modulePath), 'utf8'));
+    }
 
     const imageDefaultsDestination = join(tempRoot, 'src/gatheringImageDefaults.js');
     mkdirSync(dirname(imageDefaultsDestination), { recursive: true });
@@ -124,8 +125,10 @@ describe('GatheringView mounted behavior', () => {
     const gatheringFormatDestination = join(tempRoot, 'src/ui/svelte/util/gatheringFormat.js');
     writeFileSync(gatheringFormatDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/gatheringFormat.js'), 'utf8'));
 
-    // GatheringView imports the pure default-selection helper; copy it into the
-    // temp module tree so the compiled component can resolve it at import time.
+    const disclosurePhraseDestination = join(tempRoot, 'src/ui/svelte/util/disclosurePhrase.js');
+    writeFileSync(disclosurePhraseDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/disclosurePhrase.js'), 'utf8'));
+
+    // GatheringView imports the pure default-selection helper.
     const selectionDefaultDestination = join(tempRoot, 'src/ui/svelte/apps/gathering/selectionDefault.js');
     mkdirSync(dirname(selectionDefaultDestination), { recursive: true });
     writeFileSync(
@@ -181,11 +184,7 @@ describe('GatheringView mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
-    // GatheringView now renders the center-column detail tree; compile it too so
-    // the compiled view can resolve its imports at mount time.
-    // `FillBar` joined this tree when issue 1096 rebuilt `ChanceBar` on the shared
-    // primitive `ui-integration/spec.md` names. A hand-rolled harness that omits it HANGS
-    // (# cancelled) rather than failing, which is why the primitive allowlist lists it.
+    // GatheringView now renders the center-column detail tree.
     writeCompiledSvelte('src/ui/svelte/components/FillBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/ChanceBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
@@ -235,9 +234,7 @@ describe('GatheringView mounted behavior', () => {
   });
 
   it('announces the loading root as busy, and does not once the view is ready', async () => {
-    // Asserted on the RENDERED DOM (issue 1514): a composition that declares `aria-busy` and
-    // stops rendering it passes every source-text reader. The loading branch is reached with a
-    // listing promise that never settles, which is the only state in which this view is busy.
+    // Asserted on the RENDERED DOM (issue 1514).
     await mountView({ listGatheringForActor: () => new Promise(() => {}) });
 
     const loadingRoot = target.querySelector('[data-gathering-state="loading"]');
@@ -489,8 +486,7 @@ describe('GatheringView mounted behavior', () => {
 
   it('never auto-selects a locked environment, skipping to the first selectable one', async () => {
     await mountView(makeServices(listing([
-      // Listing order leads with a locked entry; the locked one must never be
-      // auto-selected, and the first SELECTABLE env is chosen instead.
+      // Listing order leads with a locked entry.
       environment({ id: 'env-locked', name: 'Sealed', locked: true }),
       environment({ id: 'env-open', name: 'Open' })
     ])));
@@ -584,8 +580,7 @@ describe('GatheringView mounted behavior', () => {
     assert.equal(card.querySelector('button'), null, 'locked card renders no button');
     assert.equal(card.hasAttribute('tabindex'), false, 'locked card is not focusable');
 
-    // If the (x/y) suffix renders, it must show (0/0) — the locked listing pins
-    // counts to 0, so no real composed count can leak through the suffix.
+    // If the (x/y) suffix renders, it must show (0/0).
     const discovered = card.querySelector('.gathering-env-card-discovered');
     if (discovered) {
       assert.ok(discovered.textContent.includes('(0/0)'), 'discovered suffix, if shown, reads (0/0) with no leak');
@@ -833,8 +828,7 @@ describe('GatheringView mounted behavior', () => {
   });
 
   it('resets to page 0 when a search from a later page shrinks the filtered set past the current offset', async () => {
-    // 10 envs at pageSize 6 -> 2 pages. Advance to page 2, then search a term that
-    // matches only an early environment so the filtered set is far below the page-2 offset.
+    // 10 envs at pageSize 6 -> 2 pages. Advance to page 2.
     await mountView(makeServices(listing(manyEnvironments(10))));
 
     target.querySelector('[data-pagination-next]').click();
@@ -861,10 +855,7 @@ describe('GatheringView mounted behavior', () => {
     flushSync();
     assert.ok(target.querySelector('[data-pagination-page]').textContent.includes('2'), 'on page 2 before resizing');
 
-    // 9 must be a real offered option from [6, 9, 12] — read off the OPEN panel now that the
-    // control draws its own list (issue 1504), and `chooseSelectOption` refuses a value the
-    // control does not offer rather than staging an empty string the way a native `<select>`
-    // silently did.
+    // 9 must be a real offered option from [6, 9, 12].
     assert.ok(
       selectOptionValues(target, '[data-pagination-size]').includes('9'),
       '9 is a selectable per-page option'

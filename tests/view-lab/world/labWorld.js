@@ -1,25 +1,4 @@
-/**
- * Assemble the View Lab's world and boot the REAL Fabricate runtime against it.
- *
- * The important design decision lives here. The lab does not reimplement Fabricate's read side —
- * it seeds `game.settings` with the same shapes production persists, installs the Foundry globals,
- * and then imports `src/main.js` and calls the real `Fabricate.initialize()`. From that point the
- * lab is rendering through the real `CraftingSystemManager`, the real `RecipeManager`, the real
- * `CraftingListingBuilder` / `InventoryListingBuilder` / `AlchemyListingBuilder`, and the real
- * craftability evaluation.
- *
- * That matters for a screenshot specifically: a hand-authored listing payload can only ever show
- * what its author remembered to include, so the frame proves the fixture, not the code. Booting the
- * real facade means a broken projection shows up as a broken frame.
- *
- * Ordering is load-bearing:
- *   1. build the fixture data (pure),
- *   2. install the Foundry globals,
- *   3. ONLY THEN dynamically import `src/main.js` — it registers a dozen hooks at module scope and
- *      would throw against a bare realm,
- *   4. initialize as GM (initialization migrates and writes),
- *   5. flip the viewer for player frames.
- */
+/** Assemble the View Lab's world and boot the REAL Fabricate runtime against it. */
 import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.js';
 import { createLocalizer, toI18nStub } from '../labI18n.js';
 import { JOURNAL_RUN_SOCKET_KIND } from '../../../src/systems/journalRunCommands.js';
@@ -87,14 +66,7 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
   const settings = new Map();
   const put = (key, value) => settings.set(settingsKey(FABRICATE_NAMESPACE, key), value);
   // Membership, component sources and the remembered crafting actor are all PLAYER-CHARACTER
-  // concerns. They were blanket `actors.map(...)` calls, which is safe only while every actor
-  // in the world is a character — and the World > Parties evidence needs one that is not
-  // (`lab-actor-wagon`, a vehicle). A blanket map would have enrolled it as a member of the
-  // enabled `lab-party`, colliding with its role as the second enabled party's travel actor
-  // under `GatheringPartyStore`'s composite-uniqueness invariant, and would have persisted a
-  // wagon as a crafting component source. The lab writes the raw settings map and validation
-  // runs only in `_persist`, so neither would have thrown: an impossible world would have
-  // rendered and published as evidence.
+  // concerns.
   const characterActors = actors.filter((actor) => actor.type === 'character');
   const uuidOf = (id) => actors.find((actor) => actor.id === id)?.uuid ?? null;
 
@@ -105,65 +77,19 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
   put('recipes', content.recipes);
   put('gatheringEnvironments', content.environments);
   put('gatheringConfig', content.gatheringConfig);
-  // The world currency ladder (issue 1278). World scope, like `gatheringConfig`: a crafting
-  // system carries only `requirements.currency.enabled`, so without this the World > Currency
-  // page photographs an empty card and every currency cost renders as a raw unit id.
+  // The world currency ladder (issue 1278).
   put('currencyConfig', content.currencyConfig);
-  // The world travel config (issue 1282). World scope for the same reason the currency ladder
-  // is: a crafting system carries only `gatheringRealmSettings.enabled`, so without this the
-  // World > Travel page photographs an empty realm list and every realm-gated environment
-  // resolves against nothing.
+  // The world travel config (issue 1282).
   put('travelConfig', content.travelConfig);
-  // The WORLD TOOL corpus (issue 1373, epic 1357). World scope, like the currency ladder: a
-  // crafting system carries its own in-system tools, and the world record that is SHARED across
-  // systems lives in its own setting. Without it the world Tools Catalogue photographs its
-  // no-state hero and the world Tool entry is unreachable, because the only way in is a
-  // catalogue row.
+  // The WORLD TOOL corpus (issue 1373, epic 1357).
   put('toolScope', content.toolScope);
-  // The WORLD COMPONENT scope and the WORLD VOCABULARY (issue 1392, epic 1357, PR 7a). Both
-  // beside `toolScope` for its reason and read from `labContent`, where the fixture states what
-  // each record exists to make photographable.
-  //
-  // `componentScope` is a PARTIAL seed, and the partiality is deliberate rather than an omission:
-  // `1.30.0`'s world-scope pass lifts the rest out of the systems on every lab build, and its
-  // per-pair guard skips an entity whose default is already present, so every record seeded here
-  // survives the pass rather than being overwritten by it. Issue 1371 added the `membership` half
-  // this comment once said the key did not carry, for the inheriting-category pair `labContent`
-  // states its reasons on; issue 1392's own world-only record is one of the `entities` beside it.
-  //
-  // ONE `put` FOR THE KEY, and it is this one. Issue 1371 seeded the same literal again below the
-  // `essenceScope` put, which was idempotent and therefore invisible; the capture-registry guard
-  // that reason names resolves a clicked component row against `content.componentScope`, so it
-  // reads the same literal wherever the put sits.
-  //
-  // POSITION AMONG THE PUTS IS COSMETIC. The shim's settings map answers a SEEDED key with its
-  // seed whether or not `registerSettings()` has declared it, so nothing here depends on the
-  // registration landing first. What DOES depend on it is production, where
-  // `ClientSettings#assertSetting` throws on an unregistered key — and that ordering is pinned
-  // by the source-order assertions in `tests/scoped-definition-read-and-basis.test.js`, not by
-  // this file.
+  // The WORLD COMPONENT scope and the WORLD VOCABULARY (issue 1392, epic 1357, PR 7a). POSITION
+  // AMONG THE PUTS IS COSMETIC.
   put('componentScope', content.componentScope);
   put('worldVocabulary', content.worldVocabulary);
-  // FIVE parties, and every one of them earns its place in the World > Parties card list:
-  // the pane is paged at four, searchable once more than one exists, and draws its enable
-  // gate, its unlinked travel-actor tile and its disabled treatment only when a party is in
-  // that state. One party photographed none of it.
-  //
-  // The set is legal under `GatheringPartyStore._validateList`, which is checked here because
-  // the lab does NOT check it: the settings map is written raw and validation runs only in
-  // `_persist`. A travel actor is not required to enable, and an actor uuid
-  // may associate with at most ONE enabled party as member or travel actor;
-  // disabled parties are skipped entirely (`:280`), so they may reuse any actor freely.
-  //
-  //   - `lab-party` — enabled; the three characters; Vosk as travel actor. Content unchanged.
-  //   - `lab-party-long-haul` — enabled, ZERO members, travel actor the vehicle. Its only
-  //     association is the wagon, which no enabled party claims, and it is what makes the
-  //     picker's documented "every world actor" candidate set visible in a frame.
-  //   - three DISABLED parties: one with members, one with neither members nor a travel actor
-  //     (the enable gate closed and the unlinked tile, the two states the prototype has no
-  //     equivalent of), and one named so a literal search for "wagon" matches exactly two of
-  //     the five — this one by NAME and `lab-party-long-haul` by its TRAVEL ACTOR's name,
-  //     which is what the widened filter added and what a name-only filter cannot fake.
+  // FIVE parties, and every one of them earns its place in the World > Parties card list: the pane
+  // is paged at four, searchable once more than one exists, and draws its enable gate, its unlinked
+  // travel-actor tile and its disabled treatment only when a party is in that state.
   put(
     'gatheringParties',
     noParties
@@ -173,16 +99,9 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
             id: 'lab-party',
             name: 'The Ashfall Company',
             // No `craftingSystemId`. Parties are world-level and cross-system by design
-            // (`GatheringPartyStore`), and `_normalizeParty` returns a fixed six-field record that has no
-            // such key — so authoring one asserts a scoping that does not exist and is dropped on read.
-            // It also read as a CONTRADICTION of the frame it feeds: `manager-world-parties-normal`
-            // photographs this herbalism-named party on the system-independent World → Parties path,
-            // correct precisely because the scoping is not real.
-            // `GatheringPartyStore._normalizeParty` reads `memberActorUuids` and `enabled`, and it takes
-            // UUIDs rather than ids. This was authored as `memberActorIds` with bare ids and
-            // `travelActorUuid: null`, so every field normalised away and World → Parties rendered
-            // "Disabled · 0 members" — the ninth instance of the same defect class on this branch: a
-            // shape production does not read, degrading to a default that looks like a rendered state.
+            // (`GatheringPartyStore`), and `_normalizeParty` returns a fixed six-field record that
+            // has no such key — so authoring one asserts a scoping that does not exist and is
+            // dropped on read.
             enabled: true,
             memberActorUuids: characterActors.map((actor) => actor.uuid),
             // A party cannot enable without one. The mule carries the load, which is also why he holds
@@ -219,30 +138,9 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
           },
         ]
   );
-  // ── ONE INHERITING SECTION, seeded so the state can be PHOTOGRAPHED (issue 1372) ───────────
-  //
-  // The lab runs every migration, and `buildMembershipRecord` writes every section OVERRIDING for
-  // every `(entity, system)` pair it creates. So with no seed here every essence in every lab
-  // system is fully overridden, and NO View Lab case can render an inheriting inherit row or a
-  // `· world default` on-craft card — the two states the whole world-scope model exists to
-  // express. Both were unit-covered and neither was in the registry, which is the shape that lets
-  // a regression ship green.
-  //
-  // The seed is the MEMBERSHIP RECORD ALONE. The migration's lift half is gated PER PAIR
-  // (`if (payload.membership[key]) continue;`), so this record survives it, while its defaults
-  // half is gated per ENTITY and therefore still ELECTS `aether`'s world defaults from the donor
-  // system exactly as it would have. Seeding a world default here as well would take that election
-  // out of the frame and put a hand-written value in its place.
-  //
-  // `aether` in `lab-smithing` is the pair, because it is the one the three essence-editor cases
-  // open, and `effectSource` is the section, because `manager-essence-edit-on-craft` documents the
-  // MACRO card's missing state and scrolling to it is how that frame stays distinct from the
-  // first-state frame. Leaving `macro` overridden keeps both of those true, so exactly one row on
-  // one screen changes and it is a row a case already photographs.
-  //
-  // `enabled: false` matches what the migration would have written for this record (`aether` is a
-  // disabled essence), so the catalogue's three-state per-system cell reads `disabled` here as it
-  // did before rather than flipping to `enabled`.
+  // ONE INHERITING SECTION, seeded so the state can be PHOTOGRAPHED (issue 1372). The lab runs
+  // every migration, and `buildMembershipRecord` writes every section OVERRIDING for every
+  // `(entity, system)` pair it creates.
   put('essenceScope', {
     entities: [],
     defaults: {},
@@ -270,35 +168,17 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
   put('gatheringHideUnavailableEnvironments', false);
   put('managerRailCollapsed', false);
   // The smoke world runs with experimental features on, and the manager rail advertises its Graph
-  // placeholder only behind that toggle. Leaving it off gives the lab an eight-row rail where the
-  // smoke has nine - a structural difference in every manager frame.
+  // placeholder only behind that toggle.
   put('experimentalFeatures', experimentalFeatures);
   return settings;
 }
 
 /**
- * Empty the world of Tools ENTIRELY, so the world Tools Catalogue renders its no-state
- * (issue 1373, maintainer feedback round 2).
- *
- * ── WHY CLEARING `toolScope` IS NOT ENOUGH, AND FINDING THAT OUT IS THE POINT ────────────────
- * The lab seeds no `migrationVersion`, so every registered migration runs on every build — and
- * `1.30.0`'s world-scope pass LIFTS each crafting system's own `tools[]` into world records. A
- * world with an empty `toolScope` and three systems carrying eleven tools between them therefore
- * boots with an ELEVEN-ROW catalogue, which is precisely why "there is no empty world tool
- * catalogue" survived two automated parity passes: the state is unreachable from the corpus the
- * fixture authors, and only reachable by removing the tools the migration reads.
- *
- * So all three sources go: the world corpus, every system's library, and the flat roster beside
- * them. `toolIds` references are nulled with them, because a recipe requiring a Tool that no
- * longer exists is a different world state from one that requires none, and this flag is for the
- * catalogue's empty state rather than for a broken-reference frame.
- *
- * The world break mode is KEPT. It is a world setting rather than a Tool, the catalogue's scope
- * band states it whether or not any Tool exists, and an empty catalogue whose one authored
- * control had also been blanked would photograph two absences as one.
+ * Empty the world of Tools ENTIRELY, so the world Tools Catalogue renders its no-state (issue 1373,
+ * maintainer feedback round 2). So all three sources go: the world corpus, every system's library,
+ * and the flat roster beside them.
  *
  * @param {object} content the built lab content, mutated in place.
- * @returns {void}
  */
 function stripTools(content) {
   content.tools = [];
@@ -329,31 +209,10 @@ function stripTools(content) {
 }
 
 /**
- * Remove the world's OWN authored component records, leaving the migration's lifted ones
- * (issue 1540).
- *
- * ── WHY THIS IS A SEPARATE INPUT FROM `clearSystem`, AND NOT PART OF IT ──────────────────────
- * The world component corpus has TWO sources and they are independent. `1.30.0`'s world-scope
- * pass LIFTS one world record out of each crafting system's own `components[]`, so `clearSystem`
- * — a world with no crafting systems — already empties that half. What it cannot touch is the
- * half the fixture AUTHORS: `lab-world-component-curio` is a world-only record no system has
- * adopted, seeded by issue 1392 so the world Tags & Categories screen can photograph a category
- * with `0 references` that is still confirm-gated and a tag whose only reference is a world
- * default. Nothing lifted it, so removing the systems leaves it exactly where it was.
- *
- * Folding this into `clearSystem` would therefore state something false — a world-only record
- * surviving the deletion of every crafting system IS the honest state, and three other cases
- * photograph `clearSystem` worlds that have no quarrel with it. This flag is the other half, and
- * a case that needs a world which has authored nothing at all asks for both.
- *
- * BOTH HALVES OF THE SEED GO, entities and defaults together. The defaults carry the tag `moss`,
- * which is the entire world tag vocabulary the Tool repair route's `+ Tag` picker lists, so a
- * frame of an EMPTY picker needs the defaults gone; and an entity with no default would leave a
- * catalogue row behind, which is what a frame of an EMPTY catalogue cannot have. `membership` is
- * not seeded for this scope at all, so there is none to clear.
+ * Remove the world's OWN authored component records, leaving the migration's lifted ones (issue
+ * 1540).
  *
  * @param {object} content the built lab content, mutated in place.
- * @returns {void}
  */
 function stripAuthoredWorldComponents(content) {
   content.componentScope = { entities: [], defaults: {} };
@@ -379,6 +238,8 @@ function stripAuthoredWorldComponents(content) {
  *   whatever the active scene carries, so "nothing on this scene" is a property of the world
  *   rather than of which behaviour a case opens. See `labInteractables.js` for why the two config
  *   states are seeded behaviours instead.
+ * @param {boolean} [options.noSceneRegions] Give the active scene NO regions, for the Map Region
+ *   Links no-regions empty state. It also skips the interactable seed, which needs a region.
  * @param {string|null} [options.journalCaseState] Focused persisted Journal state for View Lab.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
  */
@@ -392,6 +253,7 @@ export async function buildLabWorld({
   noTools = false,
   noAuthoredWorldComponents = false,
   noInteractables = false,
+  noSceneRegions = false,
   gatheringTaskMode = null,
   journalCaseState = null,
 } = {}) {
@@ -405,8 +267,6 @@ export async function buildLabWorld({
   if (noTools) stripTools(content);
   if (noAuthoredWorldComponents) stripAuthoredWorldComponents(content);
   // A real Manager refresh resolves an empty selection to the first available crafting system.
-  // The dedicated World Parties no-selection case therefore needs the truthful world state that
-  // makes an empty selection stable: no crafting systems, while global Parties and actors remain.
   if (clearSystem) content.systems = [];
   const actors = buildLabActors(content);
   const documents = buildDocumentIndex(content, actors);
@@ -430,14 +290,16 @@ export async function buildLabWorld({
         background: {
           src: `${ICON_BASE}/environment/wilderness/cave-entrance-dwarven-hill.webp`,
         },
-        regions: [
-          {
-            id: 'deep-gate',
-            uuid: 'Scene.lab-map.Region.deep-gate',
-            name: 'Deep Gate Approach',
-            color: '#8b6f47',
-          },
-        ],
+        regions: noSceneRegions
+          ? []
+          : [
+              {
+                id: 'deep-gate',
+                uuid: 'Scene.lab-map.Region.deep-gate',
+                name: 'Deep Gate Approach',
+                color: '#8b6f47',
+              },
+            ],
       },
     ],
     worldTime: LAB_WORLD_TIME,
@@ -446,20 +308,11 @@ export async function buildLabWorld({
   };
 
   // BEFORE the shim, because `installFoundryShim` wraps `world.scenes` in the collection
-  // `game.scenes` exposes and captures `current` / `active` off it. The seeder also replaces the
-  // scene's plain `regions` array with a collection, which is what the two canvas windows'
-  // `_resolveBehavior` walks (`scene.regions.get(id).behaviors.get(id)`).
-  //
-  // A world DELIBERATELY STRIPPED of its sources seeds no interactables, and that is a caller
-  // decision rather than a softening of the seeder. `seedLabInteractables` throws when it cannot
-  // name a gathering task and a Tool, and that throw is correct: it exists to stop a plausible
-  // row publishing while resolving no source at all. But it is only meaningful where a source
-  // COULD have been resolved. `clearSystem` empties `content.systems` and `noTools` strips every
-  // Tool, so under either flag there is nothing for an interactable to name and asking is the
-  // error. Without this, `manager-systems-empty` — which is `clearSystem` — aborts the whole
-  // capture, and one failed case publishes NO frames at all.
+  // `game.scenes` exposes and captures `current` / `active` off it.
   const worldHasInteractableSources = !clearSystem && !noTools;
-  if (!noInteractables && worldHasInteractableSources) seedLabInteractables(world);
+  if (!noInteractables && !noSceneRegions && worldHasInteractableSources) {
+    seedLabInteractables(world);
+  }
 
   const shim = installFoundryShim(world);
   world.shim = shim;
@@ -479,21 +332,7 @@ export async function buildLabWorld({
   globalThis.game.fabricate = fabricate;
   installLabJournalTransport(globalThis.game, fabricate.journalRunCommands);
 
-  // The rest of `Hooks.once('ready')`, called directly.
-  //
-  // `initialize()` is not the whole startup. The ready body also matures world time and runs four
-  // flag auto-stamps, and those are what populate the tier-1 `roles` identity that `sourceUuid.js`
-  // resolves against FIRST — without them every tool and component fell through to the
-  // name-matching tier that production never reaches on a stamped world.
-  //
-  // Called individually rather than by dispatching the `ready` event, which was tried and reverted:
-  // the same body reaches `addModuleButtonsToItemsDirectory`, which injects into Foundry's Items
-  // sidebar and errors when it is absent. The lab has no sidebar by design, and satisfying it would
-  // mean drawing a facsimile of Foundry chrome. Naming the five functions gets the startup work
-  // without the sidebar integration the lab can never honestly satisfy.
-  //
-  // Order matches `src/main.js`: the tool stamp reads refs the component stamp and the migration
-  // runner write, and the owned-item restamp reads what the component stamp produced.
+  // The rest of `Hooks.once('ready')`, called directly. `initialize()` is not the whole startup.
   await runtime.processFabricateWorldTime();
   await runtime.runRecipeItemFlagAutoStamp();
   await runtime.runComponentFlagAutoStamp();
@@ -513,9 +352,6 @@ export async function buildLabWorld({
   // Journal runs. Written after the crafting data exists, because each run resolves to a real
   // recipe - a run pointing at a recipe that is not there renders as a redacted stub and proves
   // nothing about how the journal draws a failed or time-gated run.
-  // Only recipes the PLAYER can see. A run pointing at a recipe the viewer has no access to renders
-  // as "Hidden recipe" — correct behaviour, but it tells you nothing about how a failed or
-  // time-gated run draws, which is the whole point of the journal frames.
   const rememberedIdForVisibility =
     world.settings.get(settingsKey(FABRICATE_NAMESPACE, 'lastCraftingActor')) ??
     world.settings.get(settingsKey(FABRICATE_NAMESPACE, 'lastGatheringActor'));
@@ -537,9 +373,7 @@ export async function buildLabWorld({
       return false;
     }
   });
-  // Onto the actor the JOURNAL resolves, not the lab's own first actor. Under the smoke seed the
-  // crafter is an imported hero and the seed points `lastCraftingActor` at it, so writing runs onto
-  // the lab actor puts them somewhere the journal never looks - it renders empty and nothing says why.
+  // Onto the actor the JOURNAL resolves, not the lab's own first actor.
   const rememberedId =
     world.settings.get(settingsKey(FABRICATE_NAMESPACE, 'lastCraftingActor')) ??
     world.settings.get(settingsKey(FABRICATE_NAMESPACE, 'lastGatheringActor'));
@@ -570,16 +404,7 @@ export async function buildLabWorld({
       fabricate.executeJournalCaseFixtureCommand = controller.execute;
       fabricate.journalCaseFixtureEvents = controller.events;
     }
-    // The in-flight blind run's secret half (issue 901). It is NOT a flag: the drawn task, its
-    // start-time snapshot and its node reservation live in the `gatheringBlindRuns` WORLD setting,
-    // which only a GM may write — that is the integrity boundary the fix draws, and the reason a
-    // GM's Journal can preview the task while the acting player's cannot.
-    //
-    // Written HERE rather than in `seedSettings` because it has to name the journal actor, which is
-    // only resolved above; and after `installLabRunStates` so the run and its secret land together.
-    // The setting map is the same one the shim reads through, so a post-boot write is visible to
-    // `GatheringBlindRunStore` exactly as a GM's own `game.settings.set` would be — and nothing
-    // prunes it, because `prune()` has no caller in `main.js`.
+    // The in-flight blind run's secret half (issue 901).
     const blindRunSecret = buildLabBlindRunSecret({
       actor: journalActor,
       environments: content.environments,
@@ -651,9 +476,8 @@ function createLabRunAuthorityLedger(retainedClaim = false) {
 
 /**
  * The maintainer's own stuck world, in fixture form: a `pause` the lifecycle refused before it
- * wrote anything, recorded `recoveryRequired` with its refusal message, whose claim the
- * authority KEPT. `acquiredAt: 0` puts it far outside the live window, so it reads as retained
- * rather than as a command still running.
+ * wrote anything, recorded `recoveryRequired` with its refusal message, whose claim the authority
+ * KEPT.
  */
 function seedRetainedClaim(ledger) {
   const { claimId, requestId, requestKind, requestStatus, failureReason, failureMessage, claimedAt } =
@@ -691,18 +515,14 @@ function seedRetainedClaim(ledger) {
   ledger.pages.set(page.id, page);
 }
 
-// There is one browser realm in the lab. Serialize server delivery under the elected GM,
-// restoring the initiating viewer BEFORE accepting the reply so the real local prompt and
-// Roll.toMessage handoff retain player authorship. Never manufacture a prompt or a roll result.
+// There is one browser realm in the lab.
 function installLabJournalTransport(game, service) {
   let delivery = Promise.resolve();
   let reply = null;
   const listeners = new Map();
   game.socket = {
-    // Retain the real ready-hook registrations and Socket.IO-style disposal.
-    // Outbound emits do not echo to these local listeners. The virtual remote
-    // GM and the Journal reply below already have one explicit service route;
-    // invoking main's registered router too would duplicate command handling.
+    // Retain the real ready-hook registrations and Socket.IO-style disposal. Outbound emits do not
+    // echo to these local listeners.
     on(channel, listener) {
       const entries = listeners.get(channel) ?? [];
       entries.push(listener);

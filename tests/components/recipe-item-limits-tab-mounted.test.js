@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -10,7 +11,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-item-limits-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     // The Limits tab's "Character prerequisites to learn" picker imports the pure
     // prerequisite engine (issue 544).
@@ -22,8 +23,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Chip.svelte',
     // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
   ],
@@ -99,8 +100,7 @@ describe('RecipeItemLimitsTab (mounted)', () => {
     );
     assert.deepEqual(patches.at(-1), { caps: { learn: { characterPrerequisiteIds: ['p1'] } } });
 
-    // Re-mount with p1 already selected: it shows as a chip, and only the remaining
-    // prerequisite is offered; picking it appends.
+    // Re-mount with p1 already selected: it shows as a chip.
     harness.remount();
     root = await harness.mount({
       ...props,

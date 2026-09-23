@@ -3,10 +3,11 @@ import { access, readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
-const smokeRunSource = await readFile(join(root, 'scripts', 'foundry-test-run.mjs'), 'utf8');
+const smokeRunSource = SMOKE_SOURCE;
 const releaseSource = await readFile(join(root, 'scripts', 'release.js'), 'utf8');
 
 test('Foundry smoke actors are imported from the dnd5e Starter Heroes compendium', () => {
@@ -49,13 +50,7 @@ test('the smoke harness no longer ships or reads bundled actor portraits', async
   );
 });
 
-// Issue 643 §4b: the recipe editor's context rail is MODE-CONDITIONAL. Its restricted
-// (access) branch is only reachable in a `visibilityMode: 'restricted'` system whose
-// recipe actually carries a grant — and the smoke world seeded none of that, so a run
-// would silently capture the Books & Scrolls branch instead and the PR evidence would
-// show the wrong rail. These assertions are the guard: they fail if the fixture is
-// dropped, and the failure names what went missing. Issue 796: the grant also seeds four
-// extra grant-only characters so the Access tab's three-column grid is captured populated.
+// Issue 643 §4b: the recipe editor's context rail is MODE-CONDITIONAL.
 test('the smoke world seeds a restricted-visibility system so the recipe access rail is screenshottable', () => {
   assert.match(
     smokeRunSource,
@@ -64,7 +59,7 @@ test('the smoke world seeds a restricted-visibility system so the recipe access 
   );
   assert.match(
     smokeRunSource,
-    /access: \{\s*characterIds: \[crafterId, travelMemberId, \.\.\.accessGrantActors\.map\(\(a\) => a\.id\)\]\.filter\(Boolean\),\s*playerIds: \[gathererUserId\]\.filter\(Boolean\)\s*\}/,
+    /access: \{[\s\S]{0,400}?characterIds: \[crafterId, travelMemberId, \.\.\.accessGrantActors\.map\(\(a\) => a\.id\)\][\s\S]{0,80}?playerIds: \[gathererUserId\]/,
     'the restricted recipe must carry an access grant naming BOTH characters and a player'
   );
   assert.match(

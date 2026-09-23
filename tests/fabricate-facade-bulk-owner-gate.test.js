@@ -1,38 +1,6 @@
 /**
- * The owner gate on `Fabricate#salvageComponents` / `#destroyComponents` (issue 859).
- *
- * ## Why the ownership pin is a SOURCE contract
- *
- * `src/main.js` imports the global stylesheet and the Svelte UI at module load, so it
- * cannot be imported under `node --test`. `tests/helpers/fabricateFacadeHarness.js`
- * therefore carries a FAITHFUL COPY of the gate, and the source assertions below are what
- * stop that copy drifting from the thing it stands for.
- *
- * ## The pin moved, and where
- *
- * Both facades delegate to `Fabricate#_gateBulkTargets(targets, actorId)`. That is where
- * the literal `target.actorId ?? actorId` lives and where the absent
- * `?? this.getSelectedCraftingActorId()` tail must be guarded — one place to protect
- * rather than two that can drift.
- *
- * ## Bounding strategy, stated
- *
- * Every absence assertion runs against a BOUNDED slice (`mainMethodSource`), never the
- * alchemy suite's `MAIN_SOURCE.slice(indexOf(...))`, which runs to end of file. That
- * distinction is not stylistic here: `_resolveCraftingSources` legitimately exists
- * elsewhere in `src/main.js`, so an unbounded "must not contain `_resolveCraftingSources`"
- * assertion would be permanently red and would have to be deleted rather than fixed. The
- * first test below proves the bound is real by asserting exactly that.
- *
- * ## And what else rides on that slicer
- *
- * Two more `src/main.js` facts are pinned here because this is where the bounded slicer
- * already lives, and because both are invisible to every behavioural test: that each
- * facade FORWARDS its `onProgress` listener into the service call (dropping it freezes
- * the panel at `0 of N` in silence), and that `_postBulkSalvageChatMessage` keeps its
- * speaker → visibility → create order (getting it wrong publishes a blind run's whole
- * result table, or throws for a player whose client default is In-Character). Neither is
- * mirrored into the harness: a hand-copied poster would be evidence about the copy.
+ * The owner gate on `Fabricate#salvageComponents` / `#destroyComponents` (issue 859). Why the
+ * ownership pin is a SOURCE contract
  */
 
 import { describe, it } from 'node:test';
@@ -55,13 +23,10 @@ import {
   makeFacadeActor,
 } from './helpers/fabricateFacadeHarness.js';
 
-// LOCATORS, not assertions: each names the signature `mainMethodSource` slices from, so
-// it has to be the CURRENT one verbatim. An option added to either facade — `onProgress`
-// was — moves the locator and nothing else; the assertions below are about the gate the
-// method delegates to, and each one is re-run unchanged against the new slice.
+// LOCATORS, not assertions: each names the signature `mainMethodSource` slices from, so it has to
+// be the CURRENT one verbatim.
 const GATE = '_gateBulkTargets(targets, actorId) {';
-const SALVAGE =
-  'async salvageComponents({ actorId = null, targets = [], interactive = true, onProgress = null } = {}) {';
+const SALVAGE = 'async salvageComponents({';
 const DESTROY =
   'async destroyComponents({ actorId = null, targets = [], onProgress = null } = {}) {';
 
@@ -79,9 +44,7 @@ describe('the bounded slice is genuinely bounded', () => {
   });
 
   it('proves the bound is load-bearing: `_resolveCraftingSources` DOES live elsewhere', () => {
-    // This is the assertion that justifies the whole helper. An unbounded
-    // `slice(indexOf('_gateBulkTargets'))` carries every later method with it, so the
-    // absence assertions below would be red forever against a perfectly correct source.
+    // This is the assertion that justifies the whole helper.
     assert.ok(
       MAIN_SOURCE.split('_resolveCraftingSources').length - 1 > 5,
       'the crafting/gathering facades legitimately use it many times over'
@@ -180,11 +143,9 @@ describe('both facades delegate to the one gate', () => {
     ['destroyComponents', DESTROY],
   ]) {
     it(`${label} FORWARDS onProgress into the service call`, () => {
-      // Accepting the option and forwarding it are two different edits, and deleting the
-      // forward is silent: the run still completes, the report is still correct, and the
-      // panel's progress bar simply freezes at `0 of N` for the whole run. Nothing else
-      // can see it — the store hands the facade a listener and never hears back, and the
-      // service defaults `onProgress` to `null` and reports nothing.
+      // Accepting the option and forwarding it are two different edits, and deleting the forward is
+      // silent: the run still completes, the report is still correct, and the panel's progress bar
+      // simply freezes at `0 of N` for the whole run.
       const body = mainMethodSource(signature);
       const call = body.indexOf('.run({');
       assert.ok(call > 0, 'the facade delegates to the service');
@@ -201,10 +162,8 @@ describe('both facades delegate to the one gate', () => {
 });
 
 describe('_postBulkSalvageChatMessage: speaker → visibility → create, in that order', () => {
-  // NOT mirrored into the harness: a hand-copied poster would be evidence about the copy
-  // rather than about `src/main.js`. The bounded slicer is the honest tool — the suite
-  // above proves it is genuinely bounded, and proves it throws rather than degrading to
-  // `''` when the signature moves.
+  // NOT mirrored into the harness: a hand-copied poster would be evidence about the copy rather
+  // than about `src/main.js`.
   const POSTER =
     'async _postBulkSalvageChatMessage({ content, rollMode, actorUuid, actorNames = [] }) {';
 
@@ -218,15 +177,9 @@ describe('_postBulkSalvageChatMessage: speaker → visibility → create, in tha
   });
 
   it('has the speaker ON `chatData` BEFORE visibility is applied', () => {
-    // `ChatMessage.applyMode`'s `ic` branch reads `chatData.speaker.actor` unguarded, so
-    // a visibility pass over speaker-less data THROWS for any player whose client default
-    // is In-Character — and takes the whole card with it.
-    //
-    // WHAT IS PINNED IS THE COMPOSED LITERAL, not the bare token. `speaker` first occurs
-    // in its own `const` declaration, which sits above the applier under EVERY reordering
-    // — so `indexOf('speaker') < indexOf(applier)` pins the DECLARATION site and stays
-    // green for a poster that attaches the speaker to `chatData` after the applier has
-    // already run, or never attaches it at all. Both of those are the exact throw above.
+    // `ChatMessage.applyMode`'s `ic` branch reads `chatData.speaker.actor` unguarded, so a
+    // visibility pass over speaker-less data THROWS for any player whose client default is
+    // In-Character — and takes the whole card with it.
     const body = mainMethodSource(POSTER);
     // Key ORDER inside the literal is free; membership is not.
     const composed = /const chatData = \{[^}]*\bspeaker\b[^}]*\};/.exec(body);
@@ -247,10 +200,9 @@ describe('_postBulkSalvageChatMessage: speaker → visibility → create, in tha
   });
 
   it('applies visibility BEFORE create, and never as a create option', () => {
-    // The legacy `rollMode` CREATE OPTION is honoured only for a message carrying rolls,
-    // and this card carries none — so `create(chatData, { rollMode })` would post every
-    // blind bulk card publicly. That exact mutation is what the applier module exists to
-    // prevent.
+    // The legacy `rollMode` CREATE OPTION is honoured only for a message carrying rolls, and this
+    // card carries none — so `create(chatData, { rollMode })` would post every blind bulk card
+    // publicly.
     const body = mainMethodSource(POSTER);
     const visibility = body.indexOf('applyBulkChatVisibility');
     const create = body.indexOf('ChatMessage.create');
@@ -260,9 +212,7 @@ describe('_postBulkSalvageChatMessage: speaker → visibility → create, in tha
   });
 });
 
-// ---------------------------------------------------------------------------
 // Behaviour, through the harness copy the assertions above protect.
-// ---------------------------------------------------------------------------
 
 const ORE = bulkComponent({ id: 'comp-ore', name: 'Iron Ore', img: 'icons/ore.webp' });
 const SYSTEM = bulkSystem({ id: 'sys-a', components: [ORE] });
@@ -314,9 +264,7 @@ describe('salvageComponents: an unresolvable actor is refused, never retargeted'
   });
 
   it('does NOT fall back to the persisted crafting actor for an unresolvable row', async () => {
-    // The behavioural face of the source pin above. The persisted selection names an
-    // actor this user DOES own, so a fallback would resolve — and would silently salvage
-    // that character's Iron Ore instead of refusing.
+    // The behavioural face of the source pin above.
     const owned = makeFacadeActor('a-owned', { ownerUserIds: ['u1'] });
     const foreign = makeFacadeActor('a-foreign', { ownerUserIds: ['u2'] });
     const { facade, salvageCalls } = salvageHarness({
@@ -454,10 +402,7 @@ describe('salvageComponents: an unresolvable actor is refused, never retargeted'
   });
 
   it('threads a progress listener through to the service, over the GATED queue', async () => {
-    // The behavioural face of the forwarding pin above, through the real service. It also
-    // pins the STATED LIMIT: `total` is what the SERVICE was given — this call's targets
-    // minus the rows the gate refused — so a run carrying a refusal finishes below the
-    // caller's own denominator rather than reporting a refusal as work done.
+    // The behavioural face of the forwarding pin above, through the real service.
     const mine = makeFacadeActor('a-mine', { ownerUserIds: ['u1'] });
     const theirs = makeFacadeActor('a-theirs', { ownerUserIds: ['u2'] });
     const { facade } = salvageHarness({
@@ -639,17 +584,11 @@ describe('destroyComponents: the same gate, the same refusal', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // The indexed component lookup (issue 1202)
-// ---------------------------------------------------------------------------
 
 /**
- * `src/main.js` methods whose component lookup must stay index-backed, with the exact
- * signature `mainMethodSource` slices from. Both are on multiplied paths and NEITHER is
- * covered by the bulk scale guard in `tests/runtime-definition-indexes.test.js`, which
- * was measured rather than assumed: with both reverted to `.find()` scans that guard
- * stays 35/35 green and `benchmark:performance --check` reports every profile clean.
- * These pins are the only thing standing between either site and a silent reversion.
+ * `src/main.js` methods whose component lookup must stay index-backed, with the exact signature
+ * `mainMethodSource` slices from.
  */
 const INDEXED_LOOKUPS = [
   ['_buildNotPermittedRow(target) {', 'once per bulk row, before the service is entered'],
@@ -665,7 +604,7 @@ describe('issue 1202 — the multiplied component lookups stay index-backed', ()
     it(`${signature.slice(0, signature.indexOf('('))} resolves through the retained index`, () => {
       const body = mainMethodSource(signature);
       assert.ok(
-        body.includes('findById(getDefinitionIndex('),
+        /findById\(\s*getDefinitionIndex\(/.test(body),
         `${signature} must resolve its component id through the retained index — it runs ` +
           `${multiplier}, so a scan here is an additive rows x components term.`
       );
@@ -679,11 +618,8 @@ describe('issue 1202 — the multiplied component lookups stay index-backed', ()
   }
 
   it('holds the harness mirror to the same contract as the method it copies', () => {
-    // `_buildNotPermittedRow` is reproduced in `fabricateFacadeHarness.js` under a comment
-    // claiming it is a faithful copy. Every other source-contract guard in this file pins
-    // the PRODUCTION text only, so the copy could drift and no test would notice — and in
-    // issue 1202 it did exactly that, staying on a `.find(` scan after production moved to
-    // the index. Behaviourally identical for unique ids, which is what made it invisible.
+    // `_buildNotPermittedRow` is reproduced in `fabricateFacadeHarness.js` under a comment claiming
+    // it is a faithful copy (issue 1202).
     const production = mainMethodSource('_buildNotPermittedRow(target) {');
     const mirror = mainMethodSource('_buildNotPermittedRow(target) {', HARNESS_SOURCE);
 
@@ -699,8 +635,8 @@ describe('issue 1202 — the multiplied component lookups stay index-backed', ()
       ['the harness mirror', mirror],
     ]) {
       assert.ok(
-        body.includes(
-          'findById(getDefinitionIndex(resolvedComponentsFor(system)), target?.componentId)'
+        /findById\(\s*getDefinitionIndex\(resolvedComponentsFor\(system\)\),\s*target\?\.componentId\s*\)/.test(
+          body
         ),
         `${label} must resolve the component through the retained index, or "faithful copy" ` +
           `is a claim the tree does not support.`

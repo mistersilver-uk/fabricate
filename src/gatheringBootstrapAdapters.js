@@ -1,14 +1,9 @@
+import { sceneRegionUuidsContainingToken } from './canvas/regionHitTest.js';
+import { arrayOrEmpty as normalizeList } from './utils/scalars.js';
+
 /**
- * Build the selectable gathering actor adapter used by GatheringEngine.
- *
- * The engine passes an explicit viewer payload during player listing and
- * attempt flows; direct callers fall back to the current Foundry user.
- *
- * @param {object} adapters
- * @param {Function} adapters.getActors Collection getter for `game.actors`.
- * @param {Function} adapters.getCurrentUser Current Foundry user getter.
- * @param {Function} adapters.isSelectable Actor/viewer permission predicate.
- * @returns {Function} Payload-aware actor selection callback.
+ * The selectable gathering actor adapter GatheringEngine uses; the engine passes an explicit viewer,
+ * direct callers falling back to the current user.
  */
 export function createGatheringSelectableActorsGetter({
   getActors,
@@ -22,14 +17,8 @@ export function createGatheringSelectableActorsGetter({
 }
 
 /**
- * Resolve the scene UUID from Foundry token shapes seen across V13 adapters.
- *
- * Production TokenDocument instances expose the scene through `parent`; tests
- * and compatibility callers may still provide `token.scene` or
- * `token.document.parent`.
- *
- * @param {object} token Active token or token-like adapter.
- * @returns {string|null} Scene UUID for the token, when available.
+ * A token's scene UUID across the shapes V13 adapters present: production TokenDocuments expose
+ * `parent`, while tests and compatibility callers may still pass `scene`.
  */
 export function getTokenSceneUuid(token) {
   return token?.parent?.uuid
@@ -39,31 +28,24 @@ export function getTokenSceneUuid(token) {
 }
 
 /**
- * Build the scene-link access gate used by GatheringEngine.
- *
- * Scene links are attemptability gates rather than listing filters: failures
- * return a blocked result so the player app can show a localized reason. The
- * restriction applies to EVERY user, including GMs — additive with the region
- * and stamina/node gates (which also gate GMs). A user may only attempt
- * gathering while viewing the linked scene with at least one of the acting
- * actor's tokens present on it.
- *
- * @param {object} adapters
- * @param {Function} adapters.getCurrentScene Currently viewed/active scene getter.
- * @returns {{canAttempt: Function}} Scene-access handler for the engine.
+ * The scene-link gate: an attemptability gate rather than a listing filter, so a failure returns a
+ * blocked result the player app can localize. It restricts EVERY user including GMs, additively
+ * with the region and stamina gates.
  */
 export function createGatheringSceneAccess({ getCurrentScene } = {}) {
   return {
-    canAttempt({ environment, actor } = {}) {
+    canAttempt({ environment, actor, viewer = null } = {}) {
       const sceneUuid = environment?.sceneUuid;
       if (!sceneUuid) return { allowed: true };
 
-      const currentScene = getCurrentScene?.() ?? null;
+      // The REQUESTING viewer's scene (issue 1912): a player's start is evaluated on the active GM's
+      // client, whose own canvas says nothing about where the player is.
+      const currentScene = getCurrentScene?.(viewer) ?? null;
       if (!currentScene || currentScene.uuid !== sceneUuid) {
         return { allowed: false, code: 'SCENE_TOKEN_BLOCKED', messageKey: 'FABRICATE.Gathering.Blocked.SceneMissing' };
       }
 
-      const token = actor?.getActiveTokens?.(false, true)?.find(token =>
+      const token = getActorTokensOnScenes(actor, [currentScene]).find(token =>
         getTokenSceneUuid(token) === sceneUuid
       ) ?? null;
       if (!token) {
@@ -76,31 +58,66 @@ export function createGatheringSceneAccess({ getCurrentScene } = {}) {
 }
 
 /**
- * Evaluate a gathering formula through Foundry's Roll API when available.
- *
- * This adapter intentionally stays generic: dnd5e and pf2e expression details
- * are supplied by their actor roll data and the active Foundry Roll
- * implementation.
- *
- * Rolls evaluate non-interactively (`allowInteractive: false`): an automated
- * gathering roll never surfaces a manual roll-fulfilment dialog, even on a
- * client configured for manual fulfilment (mirrors the crafting/salvage check).
- *
- * Callsites:
- *  - `kind: 'check'` — gathering check evaluation.
- *  - `kind: 'gate'` — visibility/attempt gates.
- *  - `kind: 'stamina'` / `kind: 'attemptLimit'` — formula-driven economy.
- *  - `kind: 'characterModifier'` — per-row character modifier resolution
- *    (added by the gathering character modifiers feature). The extra
- *    `environment`, `task`, `row`, `event`, `viewer`, and `modifier` keys
- *    on the payload give macros enough context to inspect the surrounding
- *    attempt; this implementation forwards them only when the underlying
- *    Roll engine reads them as part of `actor.getRollData()`.
- *
- * @param {object} payload
- * @param {string|number} payload.expression Formula or literal number to evaluate.
- * @param {Actor} [payload.actor] Actor supplying roll data.
- * @returns {Promise<number|null>} Numeric result, or null for blank/unresolvable expressions.
+ * The scene a gathering VIEWER is looking at, for the scene gate above. A remote viewer's scene is
+ * `User#viewedScene`, which Foundry keeps current on every client through the user-activity socket;
+ * the local user, a viewer that has broadcast no scene, and one naming a scene that is gone all fall
+ * back to this client's current scene, the pre-1912 answer.
+ */
+export function resolveViewerScene({ viewer, currentUser, scenes, currentScene } = {}) {
+  const fallback = () => currentScene?.() ?? null;
+  if (!viewer?.viewedScene || (currentUser?.id && viewer.id === currentUser.id)) return fallback();
+  return scenes?.get?.(viewer.viewedScene) ?? fallback();
+}
+
+/**
+ * An actor's concrete token documents on `scenes`, or on EVERY scene when none are named, whatever
+ * scene this client views (issue 1912). `Actor#getActiveTokens` is scoped to `canvas.scene`, so it
+ * is only the fallback for adapters that lack `getDependentTokens`; production prefers the latter,
+ * unlinked tokens included. `concreteOnly` (14.365+, ignored on V13) drops synthetic tokens as
+ * `getActiveTokens(false, true)` does.
+ */
+export function getActorTokensOnScenes(actor, scenes = null) {
+  const wanted = scenes ? normalizeList(scenes).filter(Boolean) : null;
+  if (typeof actor?.getDependentTokens === 'function') {
+    const options = { linked: false, concreteOnly: true };
+    if (wanted) options.scenes = wanted;
+    return normalizeList(actor.getDependentTokens(options));
+  }
+  const active = normalizeList(actor?.getActiveTokens?.(false, true));
+  if (!wanted) return active;
+  const sceneUuids = new Set(wanted.map(scene => scene?.uuid).filter(Boolean));
+  return active.filter(token => sceneUuids.has(getTokenSceneUuid(token)));
+}
+
+/**
+ * The Scene Region UUIDs a party's travel marker sits inside, over the travel actor's tokens on
+ * every scene — never the canvas alone, since the active GM evaluates a player's start while
+ * viewing whatever scene it likes (issue 1912). Foundry's AUTHORITATIVE `TokenDocument#regions`
+ * membership is preferred, free of the move-animation lag that makes position hit-testing report
+ * the region just left; the hit-test runs only for a token whose membership is unavailable.
+ */
+export function senseTravelMarkerRegions({ actor, hitTest = sceneRegionUuidsContainingToken } = {}) {
+  const uuids = new Set();
+  for (const token of getActorTokensOnScenes(actor)) {
+    const memberRegions = token?.regions;
+    let matched = false;
+    if (memberRegions && typeof memberRegions[Symbol.iterator] === 'function') {
+      for (const region of memberRegions) {
+        if (region?.uuid) { uuids.add(String(region.uuid)); matched = true; }
+      }
+    }
+    if (matched) continue;
+    const scene = token?.parent ?? token?.scene ?? null;
+    for (const uuid of hitTest({ scene, token })) uuids.add(uuid);
+  }
+  return uuids;
+}
+
+/**
+ * Evaluate a gathering formula through Foundry's Roll API, deliberately system-generic: dnd5e and
+ * pf2e detail comes from the actor's roll data. Rolls are non-interactive. `kind` names the callsite
+ * (`check`, `gate`, `stamina`, `attemptLimit`, `characterModifier`), and the extra per-row keys reach
+ * a macro only where the Roll engine reads `actor.getRollData()`.
  */
 export async function evaluateGatheringExpression(payload = {}) {
   const expression = payload?.expression;
@@ -110,11 +127,8 @@ export async function evaluateGatheringExpression(payload = {}) {
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
   if (typeof globalThis.Roll === 'function') {
     const roll = new globalThis.Roll(String(expression), rollData);
-    // Evaluate asynchronously — evaluateSync() rejects dice (and parenthetical
-    // dice counts like "(@abilities.con.mod)d6"). This seam is already async and
-    // every caller awaits it, so async evaluate() is safe and rolls dice.
-    // `allowInteractive: false` keeps an automated gathering roll from surfacing a
-    // manual roll-fulfilment dialog (same footgun as the crafting/salvage check).
+    // Async, not `evaluateSync()`, which rejects dice — and `allowInteractive: false`, so an
+    // automated gathering roll never surfaces a manual roll-fulfilment dialog.
     const evaluated = await roll.evaluate({ allowInteractive: false });
     return evaluated?.total ?? evaluated?.result ?? null;
   }
@@ -123,17 +137,7 @@ export async function evaluateGatheringExpression(payload = {}) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
-/**
- * Replace any caller-supplied gathering viewer with the current Foundry user.
- *
- * Public gathering APIs use this before delegating into the module-internal
- * GatheringEngine so a macro or UI caller cannot spoof GM visibility by
- * passing a different viewer object.
- *
- * @param {object} options Gathering runtime options.
- * @param {Function} getCurrentUser Current Foundry user getter.
- * @returns {object} Options with `viewer` set to the current user.
- */
+/** Replace any caller-supplied viewer with the current Foundry user, so GM visibility cannot be spoofed. */
 export function withCurrentGatheringViewer(options = {}, getCurrentUser = () => globalThis.game?.user) {
   return {
     ...options,
@@ -141,30 +145,14 @@ export function withCurrentGatheringViewer(options = {}, getCurrentUser = () => 
   };
 }
 
-/**
- * Delegate to a module-internal gathering runtime method as the current user.
- *
- * @param {object} runtime Gathering runtime instance.
- * @param {string} methodName Runtime method to call.
- * @param {object} options Method options supplied by the caller.
- * @param {Function} getCurrentUser Current Foundry user getter.
- * @returns {*} The runtime method result, if the method exists.
- */
+/** Delegate to a module-internal gathering runtime method as the current user. */
 export function callGatheringRuntimeWithCurrentViewer(runtime, methodName, options = {}, getCurrentUser = () => globalThis.game?.user) {
   return runtime?.[methodName]?.(withCurrentGatheringViewer(options, getCurrentUser));
 }
 
 /**
- * Run independent world-time processors without letting one failure prevent
- * later processors from being called.
- *
- * The returned promises are useful for tests and diagnostics; production hook
- * callers may intentionally ignore them for fire-and-forget Foundry hooks.
- *
- * @param {Array<{label: string, callback: Function}>} processors Processing callbacks.
- * @param {object} options
- * @param {Function} options.onError Error sink receiving `(label, error)`.
- * @returns {Promise<void>[]} Per-processor settlement promises.
+ * Run independent world-time processors so one failure cannot stop the rest; the promises are
+ * returned for tests and a fire-and-forget hook caller may ignore them.
  */
 export function processWorldTimeCallbacksSafely(processors = [], { onError = defaultWorldTimeProcessorError } = {}) {
   return normalizeList(processors).map(({ label = 'Unknown', callback } = {}) => {
@@ -186,10 +174,6 @@ function normalizeFoundryCollection(collection) {
   if (typeof collection.values === 'function') return Array.from(collection.values());
   if (typeof collection[Symbol.iterator] === 'function') return Array.from(collection);
   return [];
-}
-
-function normalizeList(value) {
-  return Array.isArray(value) ? value : [];
 }
 
 function defaultWorldTimeProcessorError(label, error) {

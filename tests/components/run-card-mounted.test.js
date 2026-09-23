@@ -1,8 +1,4 @@
-// Mounted coverage for RunCard: status chip + data hooks, the world-time
-// countdown (waiting vs ready), the progress bar, selection styling/aria, and
-// click-to-select. Uses the shared createMountedComponentHarness; every rendered
-// .svelte and imported module is registered in the harness allowlist so the
-// suite cannot silently hang as `# cancelled`.
+// Mounted coverage for RunCard: status chip + data hooks.
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -15,6 +11,7 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { makeCraftingRun } from '../helpers/journal-fixtures.js';
 import { chipToneOf } from '../helpers/chipTone.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -25,22 +22,18 @@ const harness = createMountedComponentHarness({
     // Issue 1504/1506: the raw closure the shared `<Select>` reaches through
     // `SearchablePopover`, which the compiled `<Chip>` closure below arrives with.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/formatDuration.js',
     'src/systems/foundryCalendar.js',
     'src/ui/svelte/apps/journal/journalRunStatus.js',
-    // Issue 1506: the run's status is a `<Chip>` now, and the chip tone it wears comes from
-    // the ONE map the retired status vocabularies were routed through.
+    // Issue 1506: the run's status is a `<Chip>` now.
     ...STATUS_TONE_RAW_MODULES
   ],
   compiledModules: [
-    // Issue 1506: the journal's status pill retired into the shared chip, which this list
-    // reaches through the `<Select>` closure rather than by a fourth hand-written literal.
+    // Issue 1506: the journal's status pill retired into the shared chip.
     ...SELECT_COMPILED_MODULES,
-    // The shared primitives this tree draws, as ONE spread (issue 1514). See
-    // `PLAYER_APP_COMPILED_MODULES` in the harness for why it is one roster and not a
-    // list per suite.
+    // The shared primitives this tree draws.
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/components/RunProgress.svelte',
     'src/ui/svelte/apps/journal/RunCard.svelte'
@@ -66,18 +59,13 @@ describe('RunCard mounted behavior', () => {
     // copy of the tone in a `data-*` attribute of its own.
     const chip = card.querySelector('.journal-run-status');
     assert.equal(chip.getAttribute('data-run-status'), 'waiting', 'chip carries the run status');
-    // Issue 1648, D-029: the WORD is `In progress`, not `Waiting`. The projected status is still
-    // carried on the hook, because the filter and the frames select on it — what merged is the
-    // player-facing vocabulary, not the projection.
+    // Issue 1648, D-029: the WORD is `In progress`.
     assert.ok(chip.textContent.includes('Status.inProgress'), 'chip renders the merged label');
     assert.equal(chipToneOf(chip), 'info', 'an unpaused active run wears the in-progress chip');
     assert.ok(chip.classList.contains('is-list'), 'the row pill takes the list density');
   });
 
-  // Issue 1648, D-029/M19. The maintainer's ruling: an unpaused active craft reads `In progress`
-  // whether it is counting the world clock down or sitting between stages. The two badges were
-  // interchangeable to read, so they become ONE badge — identical word AND identical tone AND
-  // identical glyph, because two chips that merely resemble each other have not merged.
+  // Issue 1648, D-029/M19. The maintainer's ruling.
   it('gives a waiting run and an in-progress run the one merged badge', async () => {
     const seen = [];
     for (const derivedStatus of ['waiting', 'inProgress']) {
@@ -103,9 +91,7 @@ describe('RunCard mounted behavior', () => {
   });
 
   it('routes the vocabulary tones the chip does NOT share through the map', async () => {
-    // `ready` and `succeeded` return `tone: 'success'`, which `Chip` does not paint: it DROPS an
-    // unrecognised tone with no class, no error and no other failing test, so a verbatim
-    // conversion would have rendered both as untoned default chips with their green gone.
+    // `ready` and `succeeded` return `tone: 'success'`, which `Chip` does not paint.
     for (const [derivedStatus, tone] of [
       ['ready', 'positive'],
       ['succeeded', 'positive'],
@@ -125,8 +111,6 @@ describe('RunCard mounted behavior', () => {
   });
 
   // Issue 1648, M10. An Active row must say which of the player's runs is waiting on THEM.
-  // The projection's two attention states have their own chip beside the status one, which keeps
-  // the countdown the status chip reports rather than replacing it.
   for (const [label, run, kind, tone] of [
     ['a choice', { awaitingChoice: true }, 'choice', 'accent'],
     ['materials', { actions: { disabledReason: 'selectionRequired' } }, 'materials', 'warning'],
@@ -137,8 +121,7 @@ describe('RunCard mounted behavior', () => {
       assert.equal(chip.getAttribute('data-run-attention'), kind);
       assert.equal(chipToneOf(chip), tone);
       assert.ok(chip.textContent.includes(kind === 'choice' ? 'awaitingChoice' : 'needsMaterials'));
-      // The status chip is still there: what the clock is doing and what the player owes are
-      // two different facts, and the row reports both.
+      // The status chip is still there.
       assert.ok(target.querySelector('.journal-run-status'));
     });
   }
@@ -163,9 +146,7 @@ describe('RunCard mounted behavior', () => {
     assert.ok(target.querySelector('.journal-run-status'), 'beside the status, never instead of it');
   });
 
-  // The chip reads the projection's own "`beginVersionedStage` would commit this" answer, so it
-  // cannot invite a click the command refuses: a stage still short of its materials keeps the
-  // blocked chip it already had.
+  // The chip reads the projection's own "`beginVersionedStage` would commit this" answer.
   it('does not invite a begin the command would refuse', async () => {
     const base = makeCraftingRun();
     const run = {
@@ -210,7 +191,7 @@ describe('RunCard mounted behavior', () => {
     );
   });
 
-  // Issue 1648, M18. Between its stages a multi-step run holds no `timeGate`, and the whole
+  // Issue 1648, M18. Between its stages a multi-step run holds no `timeGate`.
   // timing block was suppressed on that predicate — so `Minor Elixir of Mending`, step 2 of 3,
   // showed nothing where `Build Round Shield` showed a bar. Once both wear one badge (D-029)
   // the bar is the ONLY thing left on the row separating a run counting down from one waiting
@@ -260,10 +241,7 @@ describe('RunCard mounted behavior', () => {
     assert.ok(!target.querySelector('.journal-run-card-timing'));
   });
 
-  // Issue 1648, UX2-6. M18 asked for the rail BETWEEN the stages of a multi-step run, and the
-  // predicate's own comment scopes the no-sequence case correctly. A single-stage craft is the
-  // same lone empty track, asserting a 0% where progress has no meaning: the maintainer's own
-  // unstarted single-step runs are exactly this shape.
+  // Issue 1648, UX2-6. M18 asked for the rail BETWEEN the stages of a multi-step run.
   it('draws no stage rail for an unstarted SINGLE-stage run', async () => {
     const base = makeCraftingRun();
     const target = await harness.mount({
@@ -281,9 +259,7 @@ describe('RunCard mounted behavior', () => {
     assert.ok(!target.querySelector('.journal-run-card-timing'), 'and no timing block around it');
   });
 
-  // The gated single-stage run keeps its bar: there the fraction is a CLOCK reading, which is
-  // meaningful whatever the stage count. Without this the fix above would take the countdown's
-  // own bar away with it.
+  // The gated single-stage run keeps its bar: there the fraction is a CLOCK reading.
   it('keeps the clock bar on a single-stage run that IS counting down', async () => {
     const target = await harness.mount({ run: makeCraftingRun(), now: 500 });
     const progress = target.querySelector('[data-run-progress]');

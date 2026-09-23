@@ -623,10 +623,9 @@ test('CraftingEngine versioned start commits the stage: locked plan, spent input
   });
 });
 
-// An untimed first stage COMMITS at run start like every other first stage (issue 1648, M24):
-// the carve-out that returned success without spending is what left the maintainer seven active
-// runs that had taken nothing. The readiness answer must then come from the started stage, not
-// from a second live probe of the inventory that commit just emptied.
+// An untimed first stage COMMITS at run start like every other first stage (issue 1648, M24): the
+// carve-out that returned success without spending is what left the maintainer seven active runs
+// that had taken nothing.
 test('CraftingEngine commits an immediate stage at start and reads readiness from the commit', async () => {
   const { engine, recipe, runManager } = setupEngineFixture();
   makeCurrentStageImmediate(recipe);
@@ -660,13 +659,8 @@ test('CraftingEngine commits an immediate stage at start and reads readiness fro
   assert.notEqual(persisted.status, 'waitingTime');
 });
 
-// M24: an unresolved stage input must not produce an ACTIVE run that has taken nothing. Each
-// blocker is pinned to the outcome it now reaches — a refusal that creates no run, or a run whose
-// stage is committed — because a test that accepted either would pass on the defect it replaces.
-// The maintainer reached SEVEN active `Smelt Iron from Raw Ore` runs, every one reporting
-// `Needs materials`, by pressing craft repeatedly on a single-step recipe with no honoured time
-// requirement: each press created a run, consumed nothing, and probed the same untouched stock
-// (issue 1648, M24). Starting the same craft twice against stock for one is the exact shape.
+// M24: an unresolved stage input must not produce an ACTIVE run that has taken nothing (issue
+// 1648).
 test('CraftingEngine refuses a second start against stock only one craft can have', async () => {
   const { engine, recipe, recipeManager, runManager } = setupEngineFixture();
   const set = new IngredientSet({ id: 'set-1', ingredientGroups: [
@@ -1080,9 +1074,8 @@ test('CraftingEngine refuses stale route and singleton intent until both materia
   const set = new IngredientSet({ id: 'set-1', ingredientGroups: ['a', 'b'].map((id) => ({
     id, options: [{ quantity: 1, match: { type: 'component', componentId: id } }],
   })) });
-  // A run's FIRST stage commits at start (M24), so an unstarted stage whose selections can still
-  // be repaired is a LATER stage of a multi-step recipe. The opener takes nothing and resolves
-  // immediately, leaving the stale-route stage current, unstarted and editable.
+  // A run's FIRST stage commits at start (M24), so an unstarted stage whose selections can still be
+  // repaired is a LATER stage of a multi-step recipe.
   const opener = new IngredientSet({ id: 'set-0', ingredientGroups: [] });
   recipe.getExecutionSteps = () => [
     { id: 'step-0', ingredientSets: [opener], resultGroups: [], toolIds: [] },
@@ -1226,10 +1219,8 @@ for (const scenario of ['delete-veto', 'update-refusal', 'prefix-then-veto', 'do
       assert.deepEqual(writes, ids, 'ambiguous batches never replay');
       assert.equal(awards, 0);
     } else {
-      // NOTHING was written — the veto/refusal reached no document and no receipt was retained —
-      // so the run this start created goes with the refusal. Left active it would carry a
-      // `recoveryRequired` journal, which refuses every control including cancel, so the player
-      // could never clear it (issue 1648, F1).
+      // NOTHING was written — the veto/refusal reached no document and no receipt was retained — so
+      // the run this start created goes with the refusal (issue 1648).
       const refused = await start();
       assert.equal(refused.success, false, 'a throw during the start commit is a refusal');
       assert.ok(refused.message, 'and it says something');
@@ -1243,9 +1234,8 @@ for (const scenario of ['delete-veto', 'update-refusal', 'prefix-then-veto', 'do
 }
 
 /**
- * A stack-path guard refusal reaches no database at all, so it is the one failure the engine
- * KNOWS wrote nothing. Recording recovery for it strands the run; discarding the plan leaves it
- * ordinary and retryable (issue 1648, F1).
+ * A stack-path guard refusal reaches no database at all, so it is the one failure the engine KNOWS
+ * wrote nothing (issue 1648).
  */
 test('a definite write refusal abandons its plan instead of demanding recovery', async () => {
   const { engine, recipe, recipeManager, runManager } = setupEngineFixture();
@@ -1294,9 +1284,8 @@ test('abandoning a plan is refused once an effect has applied', () => {
 });
 
 /**
- * D-026 moved the SPEND to stage start; it did not repeal the GM's `consumeIngredientsOnFail`.
- * A failed check under that setting hands back what the stage spent, as the legacy path always
- * has (issue 1648, F3/QE2-1).
+ * D-026 moved the SPEND to stage start; it did not repeal the GM's `consumeIngredientsOnFail`
+ * (issue 1648).
  */
 for (const consumeIngredientsOnFail of [false, true]) {
   test(`a failed versioned check returns its start-time spend when the policy forbids consumption (policy=${consumeIngredientsOnFail})`, async () => {

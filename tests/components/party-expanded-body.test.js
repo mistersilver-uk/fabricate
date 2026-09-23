@@ -3,20 +3,20 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-// Migrated off the hand-rolled compiler (issue 1182): the shared harness validates the
-// whole static dependency closure up front, so a `.svelte` the card renders that this
-// list omits fails with a named error instead of hanging the suite (`# cancelled`).
+// Migrated off the hand-rolled compiler (issue 1182).
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-party-body-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
@@ -28,9 +28,10 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     // The manager's ONE chip (issue 883) and ONE no-state primitive (issue 785).
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
     'src/ui/svelte/apps/manager/PartyNameField.svelte',
     'src/ui/svelte/apps/manager/PartyMemberRow.svelte',
@@ -67,10 +68,6 @@ function member(overrides = {}) {
 // it is what an `actor.type === 'character'` filter grows back out of. The fixtures
 // mirror the real projection, so a component that went back to reading `type` would
 // filter everything out rather than pass.
-// The last entry is issue 1024's regression guard and the ONLY fixture shape that can
-// distinguish `isPlayerCharacter === true` from `isPlayerCharacter !== false`: an actor the
-// projection never annotated at all. `isPlayerCharacter: false` is excluded by BOTH
-// predicates, so a suite holding only that shape pins nothing about the strict test.
 const actors = [
   { uuid: 'Actor.a', id: 'a', name: 'Alara', img: 'icons/a.webp', isPlayerCharacter: true },
   { uuid: 'Actor.b', id: 'b', name: 'Bromm', img: '', isPlayerCharacter: true },
@@ -126,16 +123,12 @@ describe('PartyExpandedBody (mounted)', () => {
     assert.equal(pill.getAttribute('aria-describedby'), null);
     assert.equal(root.querySelector('#party-enable-gate-p1'), null, 'no gate hint element');
 
-    // The consequence stays VISIBLE even though the configuration is allowed: the meta
-    // line reports the missing travel actor rather than the card hiding it.
+    // The consequence stays VISIBLE even though the configuration is allowed.
     const meta = root.querySelector('.manager-party-meta').textContent;
     assert.match(meta, /travel actor: none/);
     assert.match(meta, /ignored by current-realm resolution/);
 
-    // The name is the ACTION and names the party; the state is `aria-pressed`. Without an
-    // explicit label the pill's accessible name is its own visible text — "Disabled" —
-    // which changes as the control is used and reads as the control being unavailable,
-    // and nine cards on a page would give nine identically named buttons.
+    // The name is the ACTION and names the party.
     assert.equal(pill.getAttribute('aria-label'), 'Enable Wardens');
 
     pill.click();
@@ -169,8 +162,7 @@ describe('PartyExpandedBody (mounted)', () => {
     assert.equal(trash.getAttribute('aria-label'), 'Delete party');
     trash.click();
     flushSync();
-    // `adminStore.deleteParty` is what titles and names the confirm; the card's job is
-    // to reach it, not to re-implement the prompt.
+    // `adminStore.deleteParty` is what titles and names the confirm.
     assert.deepEqual(deleted, ['p1']);
   });
 
@@ -555,10 +547,7 @@ describe('PartyExpandedBody (mounted)', () => {
     flushSync();
     assert.equal(root.querySelector('[data-manager-party-actor-unlink-footer]'), null);
     assert.ok(root.querySelector('[data-manager-party-actor-unlink="p1"]'));
-    // `.manager-travel-actor-popover` carries NO styling any more — it is purely the hook
-    // `scripts/lib/viewLabCases.js` selects the travel-actor frame on. Nothing else fails
-    // if it is dropped, and one bad View Lab selector fails the whole capture run rather
-    // than one frame, so it is pinned here where it fails immediately and by name.
+    // `.manager-travel-actor-popover` carries NO styling any more.
     assert.ok(
       root.querySelector('.manager-travel-popover.manager-travel-actor-popover'),
       'the picker keeps the View Lab capture hook'
@@ -581,23 +570,14 @@ describe('PartyExpandedBody (mounted)', () => {
         { uuid: 'Actor.v', name: 'Vosk', img: '', isPlayerCharacter: true },
         { uuid: 'Actor.b', name: 'Bromm', img: '', isPlayerCharacter: true },
         { uuid: 'Actor.w', name: 'The Ashfall Wagon', img: '', isPlayerCharacter: false },
-        // The issue-1024 regression guard, and the ONLY fixture shape that separates
-        // `=== true` from `!== false`: an actor the projection never annotated at all.
-        // `isPlayerCharacter: false` above is rejected by BOTH predicates and so pins
-        // nothing about the strict test — without this entry, relaxing the filter to
-        // `!== false` passes every suite while silently making an unannotated actor
-        // travel-actor-eligible.
+        // The issue-1024 regression guard.
         { uuid: 'Actor.u', name: 'Unprojected Ancient', img: '' },
       ],
     });
     root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
     flushSync();
 
-    // The candidate set is the GM-configured player-character types, the same membership
-    // the member picker uses: a world's NPC roster is unbounded, and listing it buries
-    // the handful of actors that could stand for a party. The Wagon is present in
-    // `actorOptions` and absent from the picker, which is the whole assertion — a GM who
-    // wants it eligible adds its type under Player Character Actor Types.
+    // The candidate set is the GM-configured player-character types.
     assert.deepEqual(optionNames(root).sort(), ['Bromm', 'Vosk']);
     const metas = Array.from(root.querySelectorAll('.manager-travel-option-meta')).map((node) =>
       node.textContent.trim()
@@ -617,11 +597,7 @@ describe('PartyExpandedBody (mounted)', () => {
   });
 
   it('still offers the CURRENT travel actor when its type is not a configured one', async () => {
-    // A drop onto the tile is unfiltered, and the GM may have narrowed the configured
-    // types after linking, so a linked-but-ineligible travel actor is reachable state.
-    // Filtering it out of its own picker leaves the GM opening the picker to change the
-    // actor and finding nothing marked, no check, and a count denominator that omits the
-    // actor the tile above is displaying.
+    // A drop onto the tile is unfiltered.
     const root = await mountBody({
       party: makeParty({
         travelActorUuid: 'Actor.w',
@@ -646,8 +622,7 @@ describe('PartyExpandedBody (mounted)', () => {
   });
 
   it('does not offer an ineligible actor that is NOT the current travel actor', async () => {
-    // The negative control for the test above. Without it, "always offer the current
-    // travel actor" could be implemented as "do not filter at all" and still pass.
+    // The negative control for the test above. Without it.
     const root = await mountBody({
       party: makeParty({
         travelActorUuid: 'Actor.b',
@@ -725,10 +700,7 @@ describe('PartyExpandedBody (mounted)', () => {
     search.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
 
-    // The search term lives in `SearchablePopover`'s own state, so a count derived from
-    // the CALLER's option array is inert by construction: the list shrinks to one row
-    // while the header keeps reading "3 of 3" and the published picker frame shows a
-    // live-looking number that can never change.
+    // The search term lives in `SearchablePopover`'s own state.
     assert.deepEqual(optionNames(root), ['The Ashfall Wagon']);
     assert.equal(count(), '1 of 3');
   });
@@ -761,10 +733,7 @@ describe('PartyExpandedBody (mounted)', () => {
     });
     root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
     flushSync();
-    // The inline mode UNMOUNTS its trigger while open, so the bound reference is null when
-    // the close runs and the element focus must return to does not exist yet. The restore
-    // is therefore deferred past the DOM update rather than by a bare microtask, which
-    // would depend on Svelte scheduling its own flush first.
+    // The inline mode UNMOUNTS its trigger while open.
     assert.ok(!root.querySelector('[data-manager-party-actor-trigger="p1"]'), 'trigger unmounted');
 
     root.querySelector('.manager-travel-picker-inline-close').click();
@@ -778,8 +747,7 @@ describe('PartyExpandedBody (mounted)', () => {
     );
     harness.remount();
 
-    // The default mode, whose trigger stays mounted throughout: the same timing change
-    // covers all 19 shipped consumers of the primitive, so it is pinned here too.
+    // The default mode, whose trigger stays mounted throughout.
     root = await mountBody({ systemRealms: [{ id: 'r1', name: 'Northreach', enabled: true }] });
     const trigger = root.querySelector('.manager-travel-parties-override-trigger');
     trigger.click();
@@ -807,10 +775,7 @@ describe('PartyExpandedBody (mounted)', () => {
   });
 
   it('gives the realm-override picker the SAME compact presentation as the actor picker', async () => {
-    // The two pickers sit stacked in one 210px column, so they must read as one kind of
-    // control. Asserted through the DOM the presentation is made of, not by comparing
-    // screenshots: the compact mode class, the shared title/count header, the compact
-    // search row, and rows carrying the compact class.
+    // The two pickers sit stacked in one 210px column.
     const root = await mountBody({
       systemRealms: [
         { id: 'r1', name: 'Northreach', enabled: true },
@@ -832,9 +797,7 @@ describe('PartyExpandedBody (mounted)', () => {
       'the compact search row renders'
     );
 
-    // ORDER, which no `:has()`-based frame selector can assert: the header names and
-    // counts the list, so a search field standing above its own heading would read as
-    // belonging to the popover rather than to the list it filters.
+    // ORDER, which no `:has()`-based frame selector can assert.
     const children = Array.from(popover.children);
     const headerIndex = children.findIndex((node) => node.hasAttribute('data-popover-header'));
     const searchIndex = children.findIndex((node) =>
@@ -869,7 +832,7 @@ describe('PartyExpandedBody (mounted)', () => {
     const column = root.querySelector('.manager-party-travel-col');
     assert.ok(
       Boolean(column.querySelector('.manager-travel-parties-override-trigger')),
-      "ui-integration/spec.md's GM Travel Route layout split pins every editing control to the centre column"
+      "ui-world-scope/spec.md's GM Travel Route layout split pins every editing control to the centre column"
     );
     assert.ok(
       Boolean(column.querySelector('.manager-party-actor-panel')),
@@ -916,11 +879,7 @@ describe('PartyExpandedBody (mounted)', () => {
     );
     harness.remount();
 
-    // The state a REJECTED ADD actually leaves on a zero-member party: the member list is
-    // not rendered (no members) and the add-open button is not rendered (the panel is
-    // open), so both of the anchors above are absent and the message would be orphaned.
-    // This is the case the assertions above cannot reach, and the one the GM is in at the
-    // moment the error appears.
+    // The state a REJECTED ADD actually leaves on a zero-member party.
     const zeroMembers = await mountBody({
       actorOptions: actors,
       memberError: 'This actor already belongs to another enabled party.',

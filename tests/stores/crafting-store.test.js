@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
+import { expectedMemberKinds, storeMemberKinds } from '../helpers/storeMemberKinds.js';
 import { progressiveStageThresholds } from '../../src/utils/progressiveStageThresholds.js';
 import { resolveProgressiveAward } from '../../src/utils/progressiveAward.js';
 
@@ -34,14 +35,9 @@ function makeServices(overrides = {}) {
       calls.listCraftingForActor.push(opts);
       return overrides.listing ?? { summaries: [] };
     },
-    // The DETAIL phase seam (issue 1075). Answers from the registry every `recipe()` below
-    // writes itself into, so it serves the tests that hand `makeServices` a listing AND the
-    // ones that replace `listCraftingForActor` wholesale with a fresh literal.
-    //
-    // COUNTED, because the memo and its per-load wipe are behaviour no returned value can
-    // show: a store that re-hydrated on every derive, or one that never invalidated after a
-    // craft, answers the same object either way. The count is the only observation that
-    // separates them.
+    // The DETAIL phase seam (issue 1075). COUNTED, because the memo and its per-load wipe are
+    // behaviour no returned value can show: a store that re-hydrated on every derive, or one that
+    // never invalidated after a craft, answers the same object either way.
     hydrateCraftingRecipe: (opts = {}) => {
       calls.hydrateCraftingRecipe.push(opts);
       if (typeof overrides.hydrateCraftingRecipe === 'function') {
@@ -84,15 +80,7 @@ function makeServices(overrides = {}) {
   return { services, calls };
 }
 
-/**
- * The rich models the hydration seam answers with, keyed by recipe id (issue 1075).
- *
- * A registry rather than a per-test wiring because several tests replace
- * `listCraftingForActor` with their own literal, and a hydration fixture that could only see
- * `makeServices`'s own listing would answer null for exactly those — leaving the detail-side
- * assertions passing against nothing. Last write per id wins, and every test builds its
- * fixture immediately before loading, so the most recently built shape is the one served.
- */
+/** The rich models the hydration seam answers with, keyed by recipe id (issue 1075). */
 const HYDRATED = new Map();
 
 /** A fixture model that is BOTH the browse summary and the hydrated detail for one recipe. */
@@ -109,32 +97,39 @@ function recipe(id, name, extra = {}) {
 }
 
 /**
- * Compiles the crafting store module with its non-mocked leaf dependencies copied in
- * plain, and returns the loaded `createCraftingStore` factory alongside the compiler
- * (the caller owns `compiler.cleanup()`). Shared by both describe blocks below so
- * neither duplicates the copy list nor reaches into the other's `before`/`after`
- * bindings — each suite gets its own compiler instance under its own tmp prefix.
+ * Loads `createCraftingStore` with its real import graph walked rather than restated, and returns it
+ * alongside the compiler (the caller owns `compiler.cleanup()`).
  *
- * @param {string} prefix Unique tmp-dir prefix for this suite's compiled output.
- * @returns {Promise<{ compiler: object, createCraftingStore: Function }>}
+ * `loadWithClosure`, not `load` plus a hand list: an omission in such a list is reported as
+ * `cancelled` with `fail 0` rather than as a failure (issue 1695).
  */
 async function setupCraftingStoreCompiler(prefix) {
   const compiler = createSvelteModuleCompiler(prefix);
-  compiler.copyPlain('src/ui/svelte/util/shoppingListAggregator.js');
-  // The store reconciles the player's stored stage order through this import-free leaf
-  // (issue 651). A dependency the store imports but the compiler does not copy makes
-  // the whole suite HANG (# cancelled), never fail.
-  compiler.copyPlain('src/utils/progressiveResultOrder.js');
-  // And the threshold helper: the store recomputes thresholds after a reorder.
-  compiler.copyPlain('src/utils/progressiveStageThresholds.js');
-  // The requirement rail's slot projection (issue 917) — same rule again.
-  compiler.copyPlain('src/ui/svelte/util/requirementSlots.js');
-  // The authority-refusal wording the store falls back to when a result carries a
-  // `reason` and no `message` (issue 1648) — same rule again.
-  compiler.copyPlain('src/ui/svelte/util/journalRunReasons.js');
-  const { createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js');
+  const { createCraftingStore } = await compiler.loadWithClosure(
+    'src/ui/svelte/stores/craftingStore.svelte.js'
+  );
   return { compiler, createCraftingStore };
 }
+
+const CRAFTING_STORE_SHAPE = {
+  getters: [
+    'availableCategories', 'availableSystems', 'categoryFilter', 'craftInFlight', 'craftableOnly',
+    'error', 'essenceScopeKey', 'favouriteIds', 'favouritesOnly', 'lastRollResult', 'listing',
+    'loadedOnce', 'loading', 'openSlotId', 'orderAnnouncement', 'orderedProgressiveStages',
+    'page', 'pageCount', 'pageItems', 'pageSize', 'progressiveOrders', 'railSlots', 'search',
+    'selectedCraftability', 'selectedEssenceAllocation', 'selectedIngredientOptions',
+    'selectedIngredientSetId', 'selectedRecipe', 'selectedRecipeId', 'selectedSet',
+    'selectedSummary', 'shoppingAggregate', 'shoppingEntries', 'slotAnnouncement', 'systemFilter',
+    'visibleRecipes', 'worldTimeTick',
+  ],
+  methods: [
+    'addToShoppingList', 'chooseIngredientOption', 'chooseIngredientSet', 'clearShoppingList',
+    'craft', 'decrementShoppingList', 'flushProgressiveOrder', 'load', 'openSlot', 'pickForMe',
+    'removeFromShoppingList', 'reorderProgressiveStage', 'select', 'setCategoryFilter',
+    'setCraftableOnly', 'setEssenceAllocation', 'setFavouritesOnly', 'setPage', 'setPageSize',
+    'setSearch', 'setSystemFilter', 'tickWorldTime', 'toggleFavourite',
+  ],
+};
 
 describe('craftingStore', () => {
   let compiler;
@@ -146,6 +141,14 @@ describe('craftingStore', () => {
 
   after(() => {
     compiler.cleanup();
+  });
+
+  it('returns exactly the 60 public members the crafting view reads, each still a getter', () => {
+    const store = createCraftingStore({ services: makeServices().services });
+    const shape = expectedMemberKinds(CRAFTING_STORE_SHAPE);
+
+    assert.deepEqual(Object.keys(store).sort(), Object.keys(shape));
+    assert.deepEqual(storeMemberKinds(store), shape);
   });
 
   it('load fetches the listing with the current actor + source ids and sets loadedOnce', async () => {
@@ -163,6 +166,32 @@ describe('craftingStore', () => {
       rememberedActorId: 'hero',
       componentSourceActorIds: ['a1', 'a2'],
     });
+  });
+
+  it('seeds the favourites and stage orders BEFORE loadedOnce flips', async () => {
+    const listing = { summaries: [recipe('r1', 'Anvil')] };
+    const { services } = makeServices({ listing, favourites: ['r1'] });
+    const store = createCraftingStore({ services });
+    // Reading `loadedOnce` inside the seams is the only way to see the order: seeding after the
+    // flag pairs the new listing with the old seeds, and every assertion below still passes.
+    const seenAtSeed = [];
+    const favouriteIds = services.getFavouriteRecipeIds;
+    services.getFavouriteRecipeIds = () => {
+      seenAtSeed.push(store.loadedOnce);
+      return favouriteIds();
+    };
+    services.getProgressiveResultOrder = () => {
+      seenAtSeed.push(store.loadedOnce);
+      return { 'recipe:r1': ['a', 'b'] };
+    };
+
+    await store.load();
+    flushSync();
+
+    assert.deepEqual(seenAtSeed, [false, false]);
+    assert.deepEqual(store.favouriteIds, ['r1']);
+    assert.deepEqual(store.progressiveOrders, { 'recipe:r1': ['a', 'b'] });
+    assert.equal(store.loadedOnce, true);
   });
 
   it('records the error message and clears loading when the fetch throws', async () => {
@@ -226,6 +255,15 @@ describe('craftingStore', () => {
     assert.deepEqual(
       store.pageItems.map((entry) => entry.name),
       ['Charlie', 'Delta']
+    );
+
+    store.setPage(99);
+    flushSync();
+    assert.equal(store.page, 99, 'the recipe pager stores the requested index unclamped');
+    assert.deepEqual(
+      store.pageItems.map((entry) => entry.name),
+      ['Echo'],
+      'the clamp happens on read, so an out-of-range page shows the last one'
     );
   });
 
@@ -447,14 +485,8 @@ describe('craftingStore', () => {
     assert.equal(wood.satisfied, false);
   });
 
-  // Issue 1493. Currency affordability is bound to the crafting ACTOR, so an aggregation
-  // that supplies none reports every currency requirement as missing however rich the
-  // player is. Asserted through the aggregate the store publishes — a spy on the third
-  // argument passes on the positional-argument no-op this replaces.
-  //
-  // The fake answers with the actor it was HANDED, so a bare positional actor (whose
-  // `.craftingActor` is undefined) and a missing bag are both distinguishable from the
-  // real thing.
+  // Issue 1493. Currency affordability is bound to the crafting ACTOR, so an aggregation that
+  // supplies none reports every currency requirement as missing however rich the player is.
   function makeActorEchoingManager() {
     return {
       getRecipe: (id) => ({ id, name: `Recipe ${id}` }),
@@ -637,16 +669,9 @@ describe('craftingStore', () => {
     );
   });
 
-  // ── Issue 1648: a failed CHECK is an OUTCOME, not a refusal ────────────────
-  //
-  // The maintainer's instant craft failed its check; the chat card correctly reported
-  // "Crafting Failed · ROLL 4 · CONSUMED ON FAILURE: Sand, Mason's Tools" while the toast
-  // said "Something went wrong while crafting. Nothing was consumed." Both halves of that
-  // sentence were false. The versioned result is what fell through the refusal chain: it
-  // carries `disposition: 'failed'` and NO `message`/`reason`
-  // (`CraftingEngine.js` `versionedTransitionResult` + the stage `outcome()`), so the
-  // generic error was the only text left. `disposition` is the discriminator because only
-  // a stage that RAN mints one.
+  // Issue 1648: a failed CHECK is an OUTCOME, not a refusal. The maintainer's instant craft failed
+  // its check; the chat card correctly reported "Crafting Failed · ROLL 4 · CONSUMED ON FAILURE:
+  // Sand, Mason's Tools" while the toast said "Something went wrong while crafting.
   describe('a resolved failed check', () => {
     // The shape `executePublicCraft` -> `executeCommand` -> `serializedOperationResult`
     // returns for a versioned stage whose check failed. Verbatim: no `message`, no `reason`.
@@ -838,12 +863,8 @@ describe('craftingStore', () => {
       recipeId: 'r1',
       setId: 'r1-set',
       optionOverrides: { g1: { optionIndex: 1, heldItemId: null } },
-      // Issue 917: the re-evaluate is now scoped and carries the essence funding.
-      // A NULL allocation and a null step id are byte-for-byte today's behaviour (the
-      // facade treats both as absent). Null rather than `{}` is load-bearing: the
-      // model reads a supplied allocation as authoritative and never tops it up, so
-      // an empty one means "the player emptied this pool" — sending it for a
-      // choice-only override zeroed every essence bar and blocked the craft.
+      // Issue 917: the re-evaluate is now scoped and carries the essence funding. A NULL allocation
+      // and a null step id are byte-for-byte today's behaviour (the facade treats both as absent).
       essenceAllocation: null,
       stepId: null,
       actorId: 'hero',
@@ -914,13 +935,9 @@ describe('craftingStore', () => {
     assert.equal(store.selectedCraftability.marker, 'baked', 'clearing the last override restores baked');
   });
 
-  // ── Progressive stage order (issue 651) ──────────────────────────────────
-  //
-  // The ordering COMPOSITION lives here, not in the mounted component: craftingStore
-  // is in neither harness list, so a mounted ProgressiveBody test can only prove
-  // presentation-given-props and cannot reach this at all. These also carry the D7/D7a
-  // claims, which are otherwise unfalsifiable and would ship green against a
-  // fire-and-forget write.
+  // Progressive stage order (issue 651). The ordering COMPOSITION lives here, not in the mounted
+  // component: craftingStore is in neither harness list, so a mounted ProgressiveBody test can only
+  // prove presentation-given-props and cannot reach this at all.
 
   const STAGES = [
     { id: 's1', name: 'Rough', difficulty: 2, threshold: 2 },
@@ -1073,11 +1090,38 @@ describe('craftingStore', () => {
     assert.deepEqual(writes[0].order, ['s3', 's1', 's2']);
   });
 
+  it('commits the moved order under the recipe selected when the debounce was ARMED', async () => {
+    // Issue 1695: crafting re-derived the key at flush, so a recipe selection inside the 400 ms
+    // window wrote the moved order under the NEWLY selected recipe's key — user-visible on reload
+    // as recipe B rendering recipe A's order. Salvage was already fixed this way by issue 859.
+    const { services, writes } = makeOrderServices();
+    services.listCraftingForActor = async () => ({
+      summaries: [
+        recipe('ordered-a', 'Blade', { progressiveStages: STAGES, allowPlayerResultReorder: true }),
+        recipe('ordered-b', 'Shield', { progressiveStages: STAGES, allowPlayerResultReorder: true }),
+      ],
+    });
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('ordered-a');
+    flushSync();
+
+    store.reorderProgressiveStage(2, 0, 'Master moved to position 1 of 3');
+    flushSync();
+    store.select('ordered-b');
+    flushSync();
+
+    // Asserted BEFORE the flush: a run whose real 400 ms debounce had already fired would pass
+    // vacuously through the flush's nothing-pending early return.
+    assert.equal(writes.length, 0, 'the debounce had not fired');
+    assert.deepEqual(await store.flushProgressiveOrder(), { ok: true }, 'and it reports the write');
+
+    assert.deepEqual(writes, [{ key: 'recipe:ordered-a', order: ['s3', 's1', 's2'] }]);
+  });
+
   it('D7a: a REJECTED write reverts the rows AND announces the revert', async () => {
-    // The failure this pins: with an optimistic write the row has already moved and the
-    // live region has already announced the new position. A silent failure leaves the
-    // player believing an order that was never stored, while the next craft awards down
-    // the old one — this issue's own defect class at the UI edge.
+    // The failure this pins: with an optimistic write the row has already moved and the live region
+    // has already announced the new position.
     const { services } = makeOrderServices({
       stored: { 'recipe:r1': ['s2', 's1', 's3'] },
       setImpl: () => {
@@ -1170,23 +1214,9 @@ describe('craftingStore', () => {
     );
   });
 
-  // ── Thresholds are POSITIONAL, so a reorder must recompute them ──────────
-  //
-  // The threshold is a CUMULATIVE property of a stage's POSITION in the list the roll is
-  // spent down — not an intrinsic property of the stage. Reordering therefore invalidates
-  // every threshold at or after the move.
-  //
-  // The builder bakes thresholds in AUTHORED order, and `applyPlayerResultOrder` returns
-  // elements ===-identical to its inputs (D5, load-bearing), so a reordered stage carries
-  // its AUTHORED-position threshold with it unless something recomputes. Worked example,
-  // `equal`, authored [A(5), B(3)] -> A>=5, B>=8; move B to the top and the rendered rows
-  // read "B >=8, A >=5" — inverted, with the top row claiming a higher bar than the row
-  // beneath, so the badge argues against the move the player just made. At budget 5 the
-  // engine awards B while the badge claims A: the wrong STAGE, not merely a wrong number.
-  //
-  // These fixtures deliberately DERIVE their thresholds from the helper rather than
-  // hardcoding them — a hardcoded-threshold fixture is exactly how this hid, since it
-  // asserts the value the test author expected instead of the value the award loop implies.
+  // Thresholds are POSITIONAL, so a reorder must recompute them. The threshold is a CUMULATIVE
+  // property of a stage's POSITION in the list the roll is spent down — not an intrinsic property
+  // of the stage.
 
   const COST_OF = (stage) => stage.difficulty ?? NaN;
 
@@ -1266,7 +1296,7 @@ describe('craftingStore', () => {
   });
 
   it('COMPOSED: the displayed threshold agrees with the award loop at every budget', async () => {
-    // The spec requirement in ui-integration §Crafting App (Player), asserted through the
+    // The spec requirement in ui-crafting-app §Progressive Stage List, asserted through the
     // real composition rather than against the helper in isolation.
     const store = thresholdStore([5, 3, 4], 'equal', ['s2', 's3', 's1']);
     await store.load();
@@ -1378,9 +1408,7 @@ describe('craftingStore', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // The detail-hydration mechanism (issue 1075)
-// ---------------------------------------------------------------------------
 
 describe('craftingStore detail hydration', () => {
   let compiler;
@@ -1412,9 +1440,7 @@ describe('craftingStore detail hydration', () => {
     flushSync();
     assert.equal(store.selectedRecipe?.id, 'r1');
 
-    // Re-derive the same selection repeatedly. `selectedRecipe` depends on the page, the
-    // search box and every filter, so without the memo each of these would pay a fresh
-    // round-trip on the browse path this issue exists to keep free.
+    // Re-derive the same selection repeatedly.
     store.setPage(0);
     flushSync();
     void store.selectedRecipe;
@@ -1454,10 +1480,9 @@ describe('craftingStore detail hydration', () => {
   });
 
   it('surfaces a null hydration as null, and still names the row it came from', async () => {
-    // The two shapes are not substitutable: a summary has no `ingredientSets`, no `check` and
-    // no `defaultSetId`, so falling back to it would render a detail panel silently missing
-    // everything instead of an empty one that is visibly wrong. `selectedSummary` is what the
-    // browser list highlights, so it must survive a failed hydration.
+    // The two shapes are not substitutable: a summary has no `ingredientSets`, no `check` and no
+    // `defaultSetId`, so falling back to it would render a detail panel silently missing everything
+    // instead of an empty one that is visibly wrong.
     const { services } = makeServices({
       listing: twoRowListing(),
       hydrateCraftingRecipe: () => null,
@@ -1474,10 +1499,8 @@ describe('craftingStore detail hydration', () => {
   });
 
   it('exposes the summary ROW, which is not the hydrated model', async () => {
-    // Non-vacuity for the assertion above, and the reason `selectedSummary` exists as its
-    // own read: it is the row out of `listing.summaries`, not a passthrough of
-    // `selectedRecipe`. The default fixture makes the two the same object, which would let
-    // a passthrough pass — so this one deliberately hydrates a DIFFERENT object.
+    // Non-vacuity for the assertion above, and the reason `selectedSummary` exists as its own read:
+    // it is the row out of `listing.summaries`, not a passthrough of `selectedRecipe`.
     const { services } = makeServices({
       listing: twoRowListing(),
       hydrateCraftingRecipe: ({ recipeId }) => ({ id: recipeId, name: 'HYDRATED', check: {} }),
@@ -1561,10 +1584,8 @@ describe('craftingStore detail hydration', () => {
     void store.selectedRecipe;
     flushSync();
 
-    // NOT proof of per-id memoisation (the two assertions above already pin that: one
-    // hydration per distinct fallback id). This one stays at 2 because Svelte's own
-    // `$derived` equality skips re-running when its input (the fallback row id) is
-    // unchanged by the 'bello' keystroke, so the store's memo Map is never even consulted.
+    // NOT proof of per-id memoisation (the two assertions above already pin that: one hydration per
+    // distinct fallback id).
     assert.equal(
       calls.hydrateCraftingRecipe.length,
       2,

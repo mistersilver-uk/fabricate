@@ -1,11 +1,5 @@
 /**
- * `BulkSalvageService` — one player gesture, N salvage attempts, one aggregated card
- * (issue 859).
- *
- * The service reaches NO Foundry global (`game`, `ui` and `ChatMessage` do not appear in
- * the module), so every test here drives plain objects through the five injected seams.
- * That is the property being protected as much as the behaviour: a fixture that
- * installed a global would let a future edit reach for one and still pass.
+ * `BulkSalvageService` — one player gesture, N salvage attempts, one aggregated card (issue 859).
  */
 
 import { describe, it } from 'node:test';
@@ -91,9 +85,8 @@ function complicationRequest(overrides = {}) {
 }
 
 describe('classifySalvageOutcome reads the discriminators in the ONE total order', () => {
-  // Two of the three discriminators travel alongside a `success` that CONTRADICTS them,
-  // so the order is behaviour rather than style. Each row below is a real `salvage()`
-  // return shape, not a synthetic one.
+  // Two of the three discriminators travel alongside a `success` that CONTRADICTS them, so the
+  // order is behaviour rather than style.
   const CASES = [
     {
       label: 'a dismissed prompt',
@@ -134,14 +127,8 @@ describe('classifySalvageOutcome reads the discriminators in the ONE total order
 
 describe('BulkSalvageService.run: execution is strictly sequential', () => {
   /**
-   * A salvage seam that READS the shared tool state on entry, yields to the microtask
-   * queue, and MUTATES it on exit.
-   *
-   * The mutation that must flip this test is swapping the service's `for…of`/`await` for
-   * `Promise.all`: under a parallel run both calls enter — and therefore both read
-   * `hammer` — before either reaches its exit, so `comp-hide` sees an intact hammer and
-   * succeeds. Both assertions below (the interleaving log AND the second row's outcome)
-   * change under that one edit.
+   * A salvage seam that READS the shared tool state on entry, yields to the microtask queue, and
+   * MUTATES it on exit.
    */
   function breakingSalvage(log, state) {
     return async (actorUuid, systemId, componentId) => {
@@ -353,11 +340,9 @@ describe('BulkSalvageService.run: every outcome the vocabulary defines', () => {
     assert.deepEqual(waitingRow.results, [], 'nothing recovered');
     assert.deepEqual(waitingRow.consumed, [], 'and nothing consumed');
     assert.equal(posted.length, 1, 'one aggregate card');
-    // Occurrence counting rather than absence: the waiting row DOES belong in the
-    // subjects table (it reached the engine and has something to say), so the claim is
-    // that it appears there and NOWHERE else. The succeeded row is carried alongside as
-    // the negative control — it appears twice, in subjects and in Consumed — so a card
-    // that had simply stopped rendering the lower sections could not pass this.
+    // Occurrence counting rather than absence: the waiting row DOES belong in the subjects table
+    // (it reached the engine and has something to say), so the claim is that it appears there and
+    // NOWHERE else.
     const occurrences = (name) => posted[0].content.split(name).length - 1;
     assert.equal(occurrences('Cave Bone'), 1, 'the time-gated row appears in subjects only');
     assert.equal(occurrences('Iron Ore'), 2, 'a real success appears in subjects AND Consumed');
@@ -463,10 +448,9 @@ describe('BulkSalvageService.run: the selection bound', () => {
   });
 
   it('refuses everything past `maxItems` BY POSITION, and only those', async () => {
-    // Driven through the `maxItems` seam, because the bound is enforced at SELECTION
-    // time (`toggleBulkSelection` refuses the 26th) and the service-side branch is
-    // therefore unreachable through the UI. It is a defensive backstop, and the seam is
-    // what keeps it honest rather than letting it read as an omission.
+    // Driven through the `maxItems` seam, because the bound is enforced at SELECTION time
+    // (`toggleBulkSelection` refuses the 26th) and the service-side branch is therefore unreachable
+    // through the UI.
     const components = [ORE, HIDE, BONE];
     const { seam, calls } = recordingSalvage();
     const service = makeService({
@@ -599,9 +583,8 @@ describe('BulkSalvageService.run: the ONE roll prompt', () => {
   });
 
   it('threads the SAME rollDecision OBJECT into every options bag', async () => {
-    // Object identity, not deep equality: `evaluateCheckRoll` uses the decision verbatim
-    // as the player's `choice`, and a per-item clone would be a place for a per-item
-    // divergence to hide. One answer, one object, N rolls.
+    // Object identity, not deep equality: `evaluateCheckRoll` uses the decision verbatim as the
+    // player's `choice`, and a per-item clone would be a place for a per-item divergence to hide.
     const { seam, calls } = recordingSalvage();
     const service = makeService({
       systems: [usable({ components: [ORE, HIDE, BONE] })],
@@ -660,8 +643,6 @@ describe('BulkSalvageService.run: the ONE roll prompt', () => {
 
   it('sets `suppressChat: true` on EVERY call', async () => {
     // Without this a 10-item run posts the aggregate card PLUS 10 stray per-item cards.
-    // The flag has two engine call sites (the rolled-failure path and the success path)
-    // and a poster-level test cannot see a missed thread, so the assertion is per call.
     const { seam, calls } = recordingSalvage();
     const service = makeService({
       systems: [usable({ components: [ORE, HIDE, BONE] })],
@@ -729,10 +710,6 @@ describe('BulkSalvageService.run: allowAdvantage is all-or-nothing, from the sys
 
   it('agrees with evaluateCheckRoll for a TOOL-BONUSED plain-d20 formula', async () => {
     // The evaluator computes its own `allowAdvantage` as `hasPlainD20(effectiveFormula)`.
-    // A salvage formula carrying a tool bonus is the realistic authored shape, and it is
-    // where a naive `formula === '1d20'` check in the service would disagree with the
-    // evaluator — the dialog would offer Advantage the roll then honours (or the reverse),
-    // with nothing anywhere to catch it. Both halves are asserted, not just the service's.
     const formula = '1d20 + @tools';
     assert.equal(hasPlainD20(formula), true, 'the evaluator would offer advantage');
     const offered = await offeredAdvantage(
@@ -825,9 +802,8 @@ describe('BulkSalvageService.run: a run spanning two actors and two systems', ()
   });
 
   it('hands the poster a NULL actorUuid for a multi-actor run', async () => {
-    // `getSpeaker` with no actor infers from CONTROLLED TOKENS, so a GM with an unrelated
-    // NPC selected would have the card attributed to it. A null uuid is the poster's
-    // signal to build an explicit alias instead.
+    // `getSpeaker` with no actor infers from CONTROLLED TOKENS, so a GM with an unrelated NPC
+    // selected would have the card attributed to it.
     const posted = [];
     const service = makeService({
       systems: [bulkSystem({ components: [ORE, HIDE] })],
@@ -908,7 +884,7 @@ describe('BulkSalvageService.run: what the run hands back', () => {
   it('prefers the run record total over the top-level value for a subject roll', async () => {
     // `salvage()` threads the top-level `value` only on the SUCCESS return, and a
     // progressive forced crit overwrites it with the AWARDING value — so the raw
-    // `data.total` wins wherever a run record carries one (`rollTotalForCard`'s order).
+    // `data.total` wins wherever a run record carries one (`craftCardFields`' order).
     const service = makeService({
       systems: [bulkSystem({ components: [ORE] })],
       salvage: async () => ({
@@ -1080,9 +1056,6 @@ describe('BulkSalvageService.run: the private-roll token reaches the poster', ()
   it('forwards the chosen roll mode, so a BLIND bulk run is not published', async () => {
     // The middle hop of a four-link chain: the prompt returns the token, THIS forwards it,
     // `_postBulkSalvageChatMessage` applies it and `applyBulkChatVisibility` translates it.
-    // Replacing the forward with a literal `null` posts every blindroll/gmroll/selfroll
-    // bulk card PUBLICLY — the dice hidden and the entire result table published to the
-    // table. Nothing else in the chain can notice, because the poster is downstream of it.
     const posted = await postedMessages({
       rollFormula: '1d20 + 3',
       promptRollDecision: async () => ({
@@ -1099,9 +1072,7 @@ describe('BulkSalvageService.run: the private-roll token reaches the poster', ()
 
   it('hands the poster NULL when nothing prompted, rather than inventing a default', async () => {
     // `null` is not "public": it is the poster's signal to fall back to the CLIENT's own
-    // `core.rollMode`. Substituting `publicroll` here would override a player who runs
-    // their whole session whispered. The prompt below WOULD have said `gmroll` — it is
-    // never opened, because the fixture formula is blank and no check is usable.
+    // `core.rollMode`.
     const posted = await postedMessages({
       promptRollDecision: async () => ({ confirmed: true, rollMode: 'gmroll' }),
     });
@@ -1115,9 +1086,8 @@ describe('BulkSalvageService.run: progress ticks over EVERY entry', () => {
   const SEALED = bulkComponent({ id: 'comp-off', name: 'Sealed Vial', salvageEnabled: false });
 
   /**
-   * Run the SAME three-row queue — runnable, pre-flight skip, runnable — with whatever
-   * listener the test supplies, on a service built fresh each time so two runs can be
-   * compared directly.
+   * Run the SAME three-row queue — runnable, pre-flight skip, runnable — with whatever listener the
+   * test supplies, on a service built fresh each time so two runs can be compared directly.
    */
   async function runQueue(onProgress) {
     const { seam, calls } = recordingSalvage();
@@ -1136,10 +1106,7 @@ describe('BulkSalvageService.run: progress ticks over EVERY entry', () => {
   }
 
   it('ticks once per entry, in queue order, a PRE-FLIGHT SKIP included', async () => {
-    // Documented as correctness-critical. The panel marks the rows the player queued, in
-    // this same order, so a counter that ticked only over `runnable` would mark the wrong
-    // rows done AND would stop at `2 of 3` on any run carrying a skip — a progress bar
-    // that never completes for a queue that did.
+    // Documented as correctness-critical.
     const ticks = [];
     const { result } = await runQueue((completed, total) => ticks.push([completed, total]));
 
@@ -1167,11 +1134,7 @@ describe('BulkSalvageService.run: progress ticks over EVERY entry', () => {
   });
 
   it('a THROWING listener never costs the player the rest of the batch', async (t) => {
-    // The safety invariant, and the reason the report is wrapped at all. A bulk run is
-    // mid-flight document mutation — sources consumed, results created, tools broken — by
-    // the time the first tick fires, so a consumer's broken callback must not be able to
-    // abandon the queue. Every tick throws, not just the first, because the guard has to
-    // hold per call rather than once.
+    // The safety invariant, and the reason the report is wrapped at all.
     const logged = silenceErrors(t);
     const ticks = [];
     const control = await runQueue(undefined);
@@ -1227,13 +1190,8 @@ describe('BulkSalvageService.run: complications are batched, not emitted per row
   });
 
   it('relays a 25-row run as ONE message, never 25', async () => {
-    // ONE message because this run is one addressed `(craftingSystemId, actorUuid)` pair,
-    // which is the unit the relay batches by — not because a bulk run relays one whatever
-    // it addresses. A run genuinely spanning pairs relays one per pair, and that is asserted
-    // separately below. What is refused here is a per-ROW relay: at `BULK_MAX_ITEMS` it
-    // would spend 25 units of the sender's budget on a single gesture rather than 1, and the
-    // GM-side limiter (`COMPLICATION_RATE_LIMIT`) is sized against the fanned-out pair
-    // count, not against the row count.
+    // ONE message because this run is one addressed `(craftingSystemId, actorUuid)` pair, which is
+    // the unit the relay batches by — not because a bulk run relays one whatever it addresses.
     const delivered = [];
     // 25 DISTINCT components on ONE system for ONE actor: the pre-flight refuses a repeated
     // `(actor, system, component)` as a duplicate, so a fixture queueing the same target 25
@@ -1304,11 +1262,8 @@ describe('BulkSalvageService.run: complications are batched, not emitted per row
   });
 
   /**
-   * Run `targets`, with every row firing one request that names the system and actor it came
-   * from, and return the relayed messages. Shared by the three batch-key cases below, which
-   * differ ONLY in the `(system, actor)` shape of their targets — written once because
-   * SonarCloud counts `tests/**` for new-code duplication and three near-identical service
-   * fixtures is exactly the block that gate fails on.
+   * Run `targets`, with every row firing one request that names the system and actor it came from,
+   * and return the relayed messages.
    */
   async function relayedMessages({ systems, targets }) {
     const delivered = [];
@@ -1369,14 +1324,7 @@ describe('BulkSalvageService.run: complications are batched, not emitted per row
   });
 
   // The case above varies the system AND the actor together, so it holds for a key built from
-  // either half alone. The two cases below drive the halves SEPARATELY, because collapsing
-  // this key is not bookkeeping: with the actor half gone, a run spanning two actors on one
-  // system relays ONE message whose `actorUuid` is whichever row batched first, carrying the
-  // OTHER actor's requests — so the elected GM re-authorizes actor A and then runs actor B's
-  // complications against A. That is precisely the "authorization decision on the wire" this
-  // grouping exists to prevent (`recipes-and-steps/spec.md` § "The relay payload carries
-  // ADDRESSING ONLY"). With the system half gone, the GM re-reads the authored complication
-  // from the wrong system's record instead.
+  // either half alone.
   it('relays TWO ACTORS on ONE system as two messages, each carrying only its own', async () => {
     const delivered = await relayedMessages({
       systems: [bulkSystem({ id: 'sys-a', components: [ORE, HIDE] })],
@@ -1480,12 +1428,10 @@ describe('BulkSalvageService.run: complications are batched, not emitted per row
   });
 
   it('relays BEFORE the aggregate card is posted, which is only prose until it is asserted', () => {
-    // `run()` states the ordering — "after the award commits, before the chat card is
-    // posted" — as the reason the relay sits where it does, and the relay is fire-and-forget
-    // while the card is awaited, so moving `_deliverComplications` below `_postAggregateCard`
-    // leaves every other assertion in this file green. The ordering is load-bearing: the GM
-    // whisper reports what a resolution did, and a table reading its result card before the
-    // GM has been told is the wrong way round.
+    // `run()` states the ordering — "after the award commits, before the chat card is posted" — as
+    // the reason the relay sits where it does, and the relay is fire-and-forget while the card is
+    // awaited, so moving `_deliverComplications` below `_postAggregateCard` leaves every other
+    // assertion in this file green.
     const source = readFileSync(
       resolve(import.meta.dirname, '../src/systems/BulkSalvageService.js'),
       'utf8'

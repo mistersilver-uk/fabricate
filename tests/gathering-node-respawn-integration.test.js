@@ -128,12 +128,9 @@ describe('node respawn over world time — real store integration (reproduction)
     assert.equal(store.get('env-1').nodeRuntime['lib-1'].current, 2);
   });
 
-  // The user's world may carry a node authored under the pre-0.4.0 respawn schema
-  // (policy elapsedTime/probability/manualAndElapsedTime) that was never migrated —
-  // e.g. a dev world with a stale migrationVersion. Previously normalizeRespawn
-  // coerced any such policy to 'manual' and _respawnNode never fired: a silent
-  // "respawn never works" that matched the report (and is nodes-specific, so
-  // stamina was unaffected). Read-time legacy mapping now keeps respawn working.
+  // The user's world may carry a node authored under the pre-0.4.0 respawn schema (policy
+  // elapsedTime/probability/manualAndElapsedTime) that was never migrated — e.g. a dev world with a
+  // stale migrationVersion.
   it('refills a node whose nodeRuntime still carries a legacy (un-migrated) respawn policy', async () => {
     const { store, richState } = harness({
       policy: 'elapsedTime', intervalSeconds: HOUR, lastEvaluatedWorldTime: null
@@ -144,11 +141,9 @@ describe('node respawn over world time — real store integration (reproduction)
     assert.equal(store.get('env-1').nodeRuntime['lib-1'].current, 2);
   });
 
-  // The actual field-reported bug: a per-environment nodeRuntime entry was seeded
-  // while the library task was still `manual` (intervalAmount 0); the GM later set
-  // the task to `overTime`, but the frozen per-env copy never respawned — and an
-  // emptied pool never re-depletes to refresh it. Respawn now sources config from
-  // the library task, keeping only the runtime count/anchor per environment.
+  // The actual field-reported bug: a per-environment nodeRuntime entry was seeded while the library
+  // task was still `manual` (intervalAmount 0); the GM later set the task to `overTime`, but the
+  // frozen per-env copy never respawned — and an emptied pool never re-depletes to refresh it.
   it('refills when the nodeRuntime entry has STALE respawn config vs the library task', async () => {
     const stale = { policy: 'manual', gainMode: 'guaranteed', chance: 0, amountExpression: '', intervalUnit: 'hours', intervalAmount: 0, lastEvaluatedWorldTime: null };
     const healthy = { policy: 'overTime', gainMode: 'chance', chance: 1, amountExpression: '1d4', intervalUnit: 'hours', intervalAmount: 1 };
@@ -164,12 +159,8 @@ describe('node respawn over world time — real store integration (reproduction)
     assert.equal(after.respawn.policy, 'overTime', 'and self-heals the stored config to match the library');
   });
 
-  // `max` (node capacity) is library CONFIG, not per-environment state — the same
-  // rule the rest of this file applies to respawn policy/interval. A stored
-  // snapshot carrying a different max (seeded by an old depletion, or a legacy
-  // overstock) must NOT shadow the library task's node count, or raising a task's
-  // node count would never take effect in environments that had already gathered
-  // it. The merge uses the library max and clamps the stored current to it.
+  // `max` (node capacity) is library CONFIG, not per-environment state — the same rule the rest of
+  // this file applies to respawn policy/interval.
   it('uses the library max over a stale stored max, clamping current to the library cap', async () => {
     const respawn = { policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1 };
     // Library max is 3 (libraryTask); this environment's stale snapshot says max 12, current 5.

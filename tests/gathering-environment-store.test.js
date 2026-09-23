@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { SETTING_KEYS } from '../src/config/settings.js';
 import { GatheringEnvironmentStore, GatheringEnvironmentValidationError } from '../src/systems/GatheringEnvironmentStore.js';
 import { environmentHasLocationRules } from '../src/systems/gatheringLocation.js';
+import { GatheringNodeService } from '../src/systems/GatheringNodeService.js';
+import { GatheringRichStateService } from '../src/systems/GatheringRichStateService.js';
 
 function makeMemoryStore({
   saved = [],
@@ -111,11 +113,8 @@ function environment(overrides = {}) {
     enabled: true,
     selectionMode: 'targeted',
     sceneUuid: 'Scene.stale',
-    // Manual composition, because that is what `enabledTaskIds` alone means after issue 1315:
-    // the environment composes exactly this picked list. It used to be left mode-less — hence
-    // automatic — and still counted as a task source, because the enable gate consulted
-    // `enabledTaskIds` in any mode. Automatic ignores that list entirely, so the gate now asks
-    // the composition predicate there and this fixture has to say which mode it means.
+    // Manual composition, because that is what `enabledTaskIds` alone means after issue 1315: the
+    // environment composes exactly this picked list.
     compositionMode: 'manual',
     enabledTaskIds: ['lib-task'],
     ...overrides
@@ -183,8 +182,7 @@ test('validation permits an automatic environment backed by a matching library t
   assert.deepEqual(automatic.enabledTaskIds, []);
 
   // Issue 1315: manual composes exactly `enabledTaskIds`, so a force list is not a task source
-  // there — it is not consulted at all. This environment composes nothing, and the gate that
-  // used to accept it did so through a guard that read `forcedTaskIds` in manual mode.
+  // there — it is not consulted at all.
   const manualForced = store.validate(
     environment({
       id: 'env-manual-forced',
@@ -742,9 +740,58 @@ test('deleting a realm mid-session leaves the very next environment save able to
   assert.deepEqual(saved.enabledTaskIds, ['lib-task', 'lib-task-2']);
 });
 
-// ---------------------------------------------------------------------------
+test('a runtime nodeRuntime write through the real node service prunes the whole world and reports once', async () => {
+  // A save boundary is every write that persists the environment list, not only an authoring
+  // save: node depletion, restock and respawn go through `environmentStore.update` too. Driven
+  // through the REAL node service and the REAL store, because a double for either is exactly
+  // the seam that would hide a runtime writer bypassing the repair.
+  const { store, warnings } = staleWorld();
+  store.load();
+  const nodeService = new GatheringNodeService({
+    environmentStore: store,
+    getConfig: () => ({
+      systems: {
+        'system-a': {
+          tasks: [{ id: 'lib-task', nodes: { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } } }]
+        }
+      }
+    })
+  });
+
+  const updated = await nodeService.restockNode({ environmentId: 'env-mine', taskId: 'lib-task', current: 1, max: 3 });
+
+  assert.equal(updated.nodeRuntime['lib-task'].current, 1, 'the runtime write itself landed');
+  assert.deepEqual(updated.includedRealmIds, ['known'], 'the stale id is gone, the surviving realm kept');
+  assert.equal(updated.enabled, true, 'a repair is not a disable');
+  assert.deepEqual(
+    store.get('env-cave').includedRealmIds,
+    [],
+    'the environment nobody touched is repaired by the same write'
+  );
+  assert.equal(warnings.length, 1, 'one write, one report');
+  assert.match(warnings[0], /gone/);
+});
+
+test('a conditions write through the real rich-state service prunes on the same terms', async () => {
+  // The other runtime writer. It reaches the store directly rather than through the node
+  // service, so it is its own path to the save boundary.
+  const { store, warnings } = staleWorld();
+  store.load();
+  const richState = new GatheringRichStateService({ environmentStore: store });
+
+  const updated = await richState.updateConditions({
+    environmentId: 'env-mine',
+    conditions: { weather: 'rain' }
+  });
+
+  assert.equal(updated.conditions.weather, 'rain', 'the conditions write itself landed');
+  assert.deepEqual(updated.includedRealmIds, ['known']);
+  assert.equal(updated.enabled, true);
+  assert.deepEqual(store.get('env-cave').includedRealmIds, []);
+  assert.equal(warnings.length, 1, 'one write, one report');
+});
+
 // Legacy-acceptance fallback on read (imports bypass the 1.0.0 startup migration)
-// ---------------------------------------------------------------------------
 
 test('_normalizeEnvironment accepts legacy hazard-schema keys and values on read', () => {
   const { store } = makeMemoryStore();

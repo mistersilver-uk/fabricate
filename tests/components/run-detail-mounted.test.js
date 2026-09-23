@@ -1,8 +1,4 @@
-// Mounted coverage for RunDetail: the per-column "select a run" empty state, the
-// crafting branch (step timeline + step details + Trigger button gated on
-// readiness), the gathering branch (auto-resolve, no button), and the
-// succeeded-run created-results section. Uses the shared harness with the full
-// RunDetail subtree registered so the suite cannot hang as `# cancelled`.
+// Mounted coverage for RunDetail: the per-column "select a run" empty state.
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -15,11 +11,12 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { makeCraftingRun, makeGatheringRun, makeSucceededRun, createPersistedCraftingHistory, createPersistedGatheringHistory, createPersistedSalvageHistory, createPersistedFizzleHistory, legacyGatheringEvidence } from '../helpers/journal-fixtures.js';
 import { GatheringRichStateService } from '../../src/systems/GatheringRichStateService.js';
-import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
+import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import { GatheringRunManager } from '../../src/systems/GatheringRunManager.js';
 import { GatheringEngine } from '../../src/systems/GatheringEngine.js';
 import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';
 import { IngredientSet } from '../../src/models/IngredientSet.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -30,7 +27,7 @@ const harness = createMountedComponentHarness({
     // Issue 1504/1506: the raw closure the shared `<Select>` reaches through
     // `SearchablePopover`, which the compiled `<Chip>` closure below arrives with.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     // Issue 1648: the shared authority-refusal wording the Journal panels and stores read.
     'src/ui/svelte/util/journalRunReasons.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
@@ -43,17 +40,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/runDetailPresentation.js',
     'src/ui/svelte/apps/journal/stageHeading.js',
     'src/ui/svelte/apps/journal/runRecovery.js',
-    // Issue 1506: the run's status is a `<Chip>` now, and the chip tone it wears comes from
-    // the ONE map the retired status vocabularies were routed through.
+    // Issue 1506: the run's status is a `<Chip>` now.
     ...STATUS_TONE_RAW_MODULES
   ],
   compiledModules: [
-    // Issue 1506: the journal's status pill retired into the shared chip, which this list
-    // reaches through the `<Select>` closure rather than by a fourth hand-written literal.
+    // Issue 1506: the journal's status pill retired into the shared chip.
     ...SELECT_COMPILED_MODULES,
-    // The shared primitives this tree draws, as ONE spread (issue 1514). See
-    // `PLAYER_APP_COMPILED_MODULES` in the harness for why it is one roster and not a
-    // list per suite.
+    // The shared primitives this tree draws.
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
@@ -100,8 +93,7 @@ describe('RunDetail mounted behavior', () => {
   afterEach(() => harness.remount());
   after(() => harness.teardown());
 
-  // Issue 1648, M10. An unbegun stage has no clock, so its status chip reads `inProgress`
-  // whether it needs a choice, needs stock or needs nothing. The header says which.
+  // Issue 1648, M10. An unbegun stage has no clock.
   const stageWaitingOn = (componentId, held) => {
     const route = (id, wanted) => new IngredientSet({ id, name: id,
       ingredientGroups: [{ id: 'metal', name: 'Metal', options: [{ quantity: 1, match: { type: 'component', componentId: wanted } }] }] });
@@ -143,19 +135,12 @@ describe('RunDetail mounted behavior', () => {
   });
 
   it('asks for the one act an unbegun stage it can already meet still needs', async () => {
-    // The SAME selectors the two states above are found by, so what this finds is the
-    // component's answer rather than a selector that never matched anything.
-    //
-    // Issue 1648, U2. This used to assert that NOTHING was claimed here, and that was the
-    // defect: M10 gave the two BLOCKED states a chip each and left the one state requiring an
-    // irreversible click unmarked, so under the merged badge (D-029) a run waiting for the
-    // player to press Begin read exactly like one counting world time down.
+    // The SAME selectors the two states above are found by.
     const settled = await harness.mount({ run: stageWaitingOn('iron',
       [{ id: 'iron', uuid: 'Actor.a.Item.iron', name: 'Iron', system: { quantity: 4 } }]) });
     assert.ok(settled.querySelector('[data-journal-detail]'), 'the run rendered');
     assert.equal(settled.querySelector('[data-run-attention]').dataset.runAttention, 'start');
-    // It is not a refusal and not a choice: nothing is blocked and nothing is unpicked, so the
-    // guidance notice and the blocker banner both stay away.
+    // It is not a refusal and not a choice: nothing is blocked and nothing is unpicked.
     assert.ok(!settled.querySelector('[data-journal-awaiting-choice]'));
     assert.ok(!settled.querySelector('[data-journal-action-blocker]'));
   });
@@ -395,10 +380,7 @@ describe('RunDetail mounted behavior', () => {
   });
 
   it('spans the run-completed evidence across the notice rather than indenting it by the glyph', async () => {
-    // Issue 1648: the consumed/produced grid rendered inside `.fab-notice-body`, so it began
-    // after the notice's 13px glyph column and its gap — the card's own rows sat further right
-    // than the identical rows the stage card draws. It is a sibling band now, at the notice's
-    // own padding box. happy-dom cannot compute the cascade, so this reads the DOM.
+    // Issue 1648: the consumed/produced grid rendered inside `.fab-notice-body`.
     const { model } = await createPersistedCraftingHistory({ stageCount: 1 });
     const target = await harness.mount({ run: model, journal: { commandResult: { runKey: model.key } } });
     const notice = target.querySelector('[data-journal-verdict]');
@@ -412,19 +394,14 @@ describe('RunDetail mounted behavior', () => {
     assert.ok(Boolean(body.querySelector('.fab-notice-title')), 'the title still sits beside the glyph');
   });
 
-  // Issue 1648, M22. `Notice` renders its evidence band whenever the prop is supplied, and a
-  // band that renders nothing still lays out: it is `flex: 1 1 100%`, so it wrapped onto its own
-  // line under a row gap and the notice's bottom padding read visibly deeper than its top. A
-  // MULTI-stage run is exactly that state — its rows belong to the stage cards below it — so the
-  // band is withheld rather than emptied, the same rule M20 applied to the empty essence section.
+  // Issue 1648, M22. `Notice` renders its evidence band whenever the prop is supplied.
   it('withholds the run-completed evidence band when the banner has no rows of its own', async () => {
     const many = await createPersistedCraftingHistory({ stageCount: 2 });
     const multi = await harness.mount({ run: many.model, journal: { commandResult: { runKey: many.model.key } } });
     const multiNotice = multi.querySelector('[data-journal-verdict]');
     assert.ok(Boolean(multiNotice), 'the run still reports that it completed');
     assert.ok(Boolean(multi.querySelector('[data-history-stages]')), 'and its rows are on the stage cards');
-    // `assert.equal` on a happy-dom element OOMs while formatting the diff, so the presence is
-    // reduced to a boolean before it is asserted.
+    // `assert.equal` on a happy-dom element OOMs while formatting the diff.
     assert.ok(!multiNotice.querySelector('.fab-notice-evidence'),
       'so the banner carries no band at all, rather than an empty one that adds a row gap');
 
@@ -611,8 +588,7 @@ describe('RunDetail mounted behavior', () => {
   });
 
   it('keeps a plain paused run on its own titled notice', async () => {
-    // The control for the composition above: with nothing refusing it, a paused run still
-    // reads as "Run paused" with its own detail rather than as a blocker sentence.
+    // The control for the composition above: with nothing refusing it.
     const run = makeCraftingRun({
       derivedStatus: 'paused',
       pauseState: { pausedAt: 100, remainingSeconds: 900 },
@@ -652,9 +628,7 @@ describe('RunDetail mounted behavior', () => {
     const dialogs = [];
     const priorFoundry = globalThis.foundry;
     globalThis.foundry = {
-      // `normalizeDialogOptions` clones its options through `foundry.utils.deepClone`, and its
-      // fallback is `JSON.parse(JSON.stringify(...))` — which DELETES every button callback.
-      // A stub without this renders the dialog and then never resolves.
+      // `normalizeDialogOptions` clones its options through `foundry.utils.deepClone`.
       utils: { deepClone: (value) => ({ ...value }) },
       applications: {
         api: {
@@ -710,8 +684,7 @@ describe('RunDetail mounted behavior', () => {
     assert.equal(detail.getAttribute('data-run-key'), makeCraftingRun().key);
     assert.ok(target.querySelector('[data-stage-nav]'), 'stage navigation rendered');
     assert.ok(target.querySelector('[data-stage-card]'), 'step details rendered');
-    // Issue 1648: required tools are a four-column image-card group, not an invented
-    // "primary tool" fact row with one right-aligned value.
+    // Issue 1648: required tools are a four-column image-card group.
     const tools = target.querySelector('[data-stage-io="tools"]');
     assert.ok(Boolean(tools), 'the stage lists its required tools');
     assert.ok(tools.textContent.includes('Mortar & Pestle'), 'and names the authored tool');
@@ -720,8 +693,7 @@ describe('RunDetail mounted behavior', () => {
       'as a truncated-name image card in the four-column grid'
     );
     assert.ok(target.querySelector('[data-run-action="primary"]'), 'primary action rendered for a crafting run');
-    // The active node (index 0) is time-gated, so it takes the distinct "waiting"
-    // (warning) tone rather than the accent "current" tone; index 1 is pending.
+    // The active node (index 0) is time-gated.
     assert.equal(target.querySelector('[data-stage-card="0"]').getAttribute('data-stage-state'), 'current');
     assert.ok(target.querySelector('[data-stage-nav-index="1"]'));
   });
@@ -758,8 +730,7 @@ describe('RunDetail mounted behavior', () => {
     const target = await harness.mount({ run, now: 0, services: services() });
     assert.ok(!target.querySelector('[data-stage-nav]'), 'single-step run omits navigation');
     assert.ok(!target.querySelector('.fab-stage-card-number'), 'single-step run omits redundant numeral');
-    // M1 (issue 1648): a single-step recipe has no step to name, so no "Step 1" and no step
-    // name either — the run header already says what is being made.
+    // M1 (issue 1648): a single-step recipe has no step to name.
     assert.ok(
       !target.querySelector('.fab-stage-card-name'),
       'single-step run with no authored description omits the step heading entirely'
@@ -858,8 +829,7 @@ describe('RunDetail mounted behavior', () => {
 
   it('disables Trigger while the run is busy even after the gate has matured', async () => {
     const run = makeCraftingRun();
-    // Matured gate (now past availableAt) would normally enable the button, but a
-    // busy advance for this run id keeps it disabled to block re-entrancy.
+    // Matured gate (now past availableAt) would normally enable the button.
     const svc = { journal: { busyRunId: run.id, advance() {} }, getWorldTimeComponents: () => null };
     const target = await mount({ run, now: 2000, services: svc });
     assert.equal(target.querySelector('[data-run-action="primary"]').disabled, true, 'busy → disabled');
@@ -919,9 +889,7 @@ describe('RunDetail mounted behavior', () => {
   });
 
   it('selects the last EXECUTED step for a multi-step run that failed early (issue 738)', async () => {
-    // All recipe steps are pre-created, so an early failure leaves a trailing
-    // `pending` step. The detail must show the executed (failed) step, not the
-    // unreached pending one.
+    // All recipe steps are pre-created.
     const run = makeSucceededRun({
       status: 'failed',
       derivedStatus: 'failed',
@@ -1039,9 +1007,7 @@ describe('RunDetail mounted behavior', () => {
   });
 
   it('renders duplicate-component requirement rows without an each_key crash (issue 738)', async () => {
-    // Two ingredient groups can reference the same component; those rows share a
-    // componentId and each carry a null itemUuid, so a componentId-only key would
-    // collide into a Svelte each_key_duplicate crash.
+    // Two ingredient groups can reference the same component.
     const run = makeSucceededRun({
       currentStep: null,
       steps: [
@@ -1149,8 +1115,7 @@ describe('RunDetail mounted behavior', () => {
     const results = target.querySelector('[data-history-items="produced"]');
     assert.ok(results, 'results section shown for a succeeded run');
     assert.ok(results.textContent.includes('Healing Potion'), 'result name rendered');
-    // The harness's localize stub echoes the key + data, so assert the Quantity
-    // key + the count rather than the rendered "×N" glyph.
+    // The harness's localize stub echoes the key + data.
     const resultText = results.querySelector('.fabricate-list-row-quantity').textContent;
     assert.ok(resultText.includes('Quantity'), 'quantity badge uses the localized quantity key');
     assert.ok(resultText.includes('3'), 'quantity badge shows the produced count');

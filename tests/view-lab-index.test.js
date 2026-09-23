@@ -1,10 +1,4 @@
-/**
- * The index page's pure logic.
- *
- * Lightweight on purpose: no filesystem, no browser, no capture run. What can go wrong here is a
- * mis-grouped frame or an unescaped label, and both still produce a page that LOOKS fine — so these
- * assert the shape rather than the styling.
- */
+/** The index page's pure logic. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -144,8 +138,7 @@ test('frames with no recorded head are not falsely flagged stale', () => {
 
 test('tags come from the case, and every kind is kept', () => {
   // The previous version used only the first two `kinds` entries and discarded the rest, which is
-  // exactly the vocabulary a filter needs. `reaches` joins them because "only the frames that land
-  // on their exact state" is the most common question asked of this page.
+  // exactly the vocabulary a filter needs.
   assert.deepEqual(tagsFor(CASES[0]), ['exact', 'manager', 'recipes']);
   assert.deepEqual(tagsFor(null), ['unregistered'], 'an unexplained PNG is still filterable');
 });

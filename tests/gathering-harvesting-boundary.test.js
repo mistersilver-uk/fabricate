@@ -9,6 +9,19 @@ import { SETTING_KEYS } from '../src/config/settings.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');
 
+// Minimal stubs so the manager module can load without a Foundry runtime.
+let idCounter = 0;
+globalThis.foundry = {
+  utils: {
+    randomID: () => `random-${++idCounter}`,
+    getProperty: () => undefined
+  }
+};
+globalThis.game = { user: { isGM: true } };
+globalThis.ui = { notifications: { warn: () => {}, info: () => {}, error: () => {} } };
+
+const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
+
 test('harvesting has no standalone runtime, app, store, or setting surface', () => {
   const sourceFiles = listFiles(resolve(repoRoot, 'src'))
     .filter(path => ['.js', '.svelte'].includes(extname(path)));
@@ -60,7 +73,9 @@ test('canonical docs keep harvesting modeled through recipes or component salvag
   assert.match(spec, /A salvage definition on the harvested component\./);
   assert.match(domain, /\*\*Harvesting\*\*[\s\S]*recipe or a component salvage definition/);
 
-  assert.match(systemManager, /features\.salvage/);
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  assert.equal(manager._normalizeFeatures({}).salvage, true);
+  assert.equal(manager._normalizeFeatures({ features: { salvage: false } }).salvage, false);
   assert.match(systemManager, /_normalizeSalvage\(salvage = \{\}, options = \{\}\)/);
   assert.match(systemManager, /salvage\.resultGroups/);
 });

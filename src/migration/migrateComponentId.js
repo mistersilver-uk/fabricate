@@ -1,20 +1,15 @@
 /**
- * T-040: Data Migration for systemItemId -> componentId
- *
- * Pure functions that operate on raw JSON arrays (no I/O, no Foundry calls).
- * Safe to run multiple times -- idempotent.
+ * Rename `systemItemId` to `componentId` across recipes and crafting systems, and the
+ * `systemItem` match type to `component`. Pure functions over raw JSON, idempotent, no I/O.
  */
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
+import { mapSystems } from './migrationHelpers.js';
+
+// --- Internal helpers ------------------------------------------------------
 
 /**
- * Rename systemItemId -> componentId on a single object (catalyst or result).
- * - If componentId already exists: preserve it, delete systemItemId.
- * - If only systemItemId exists: copy it to componentId, delete systemItemId.
- * - If neither exists: no-op.
- * Mutates the object in place (caller must have already deep-cloned).
+ * Rename the key on one object, in place: an existing `componentId` is preserved and the old key
+ * deleted. The caller has already deep-cloned.
  */
 function _migrateId(obj) {
   if (obj == null || typeof obj !== 'object') return;
@@ -26,29 +21,21 @@ function _migrateId(obj) {
   }
 }
 
-/**
- * Migrate a catalyst entry (has systemItemId -> componentId).
- */
+/** Migrate a catalyst entry. */
 function _migrateCatalyst(cat) {
   _migrateId(cat);
   return cat;
 }
 
-/**
- * Migrate a result entry (has systemItemId -> componentId).
- */
+/** Migrate a result entry. */
 function _migrateResult(result) {
   _migrateId(result);
   return result;
 }
 
 /**
- * Migrate an ingredient entry recursively.
- * Handles:
- *  - top-level systemItemId -> componentId
- *  - match.systemItemId -> match.componentId
- *  - match.type: "systemItem" -> "component"
- *  - alternatives[] (recursive)
+ * Migrate an ingredient entry: the top-level id, `match.systemItemId`, the `systemItem` match
+ * type, and `alternatives[]` recursively.
  */
 function _migrateIngredient(ing) {
   if (ing == null || typeof ing !== 'object') return ing;
@@ -77,17 +64,13 @@ function _migrateIngredient(ing) {
   return ing;
 }
 
-/**
- * Migrate all catalysts in an array.
- */
+/** Migrate all catalysts in an array. */
 function _migrateCatalysts(catalysts) {
   if (!Array.isArray(catalysts)) return catalysts;
   return catalysts.map(_migrateCatalyst);
 }
 
-/**
- * Migrate all results in a resultGroups array.
- */
+/** Migrate all results in a resultGroups array. */
 function _migrateResultGroups(resultGroups) {
   if (!Array.isArray(resultGroups)) return resultGroups;
   return resultGroups.map((rg) => {
@@ -98,18 +81,13 @@ function _migrateResultGroups(resultGroups) {
   });
 }
 
-/**
- * Migrate a flat results array (top-level recipe.results[]).
- */
+/** Migrate a flat top-level results array. */
 function _migrateResults(results) {
   if (!Array.isArray(results)) return results;
   return results.map(_migrateResult);
 }
 
-/**
- * Migrate ingredients in an ingredientSet.
- * Handles: ingredientGroups[].options[], ingredients[]
- */
+/** Migrate an ingredient set's `ingredientGroups[].options[]` and `ingredients[]`. */
 function _migrateIngredientSet(set) {
   if (set == null || typeof set !== 'object') return set;
 
@@ -133,9 +111,7 @@ function _migrateIngredientSet(set) {
   return set;
 }
 
-/**
- * Migrate a single step object.
- */
+/** Migrate a single step object. */
 function _migrateStep(step) {
   if (step == null || typeof step !== 'object') return step;
 
@@ -154,16 +130,9 @@ function _migrateStep(step) {
   return step;
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
+// --- Public API ------------------------------------------------------------
 
-/**
- * Migrate an array of raw recipe JSON objects.
- * Returns a new deep-cloned and migrated array.
- * @param {Array} recipes
- * @returns {Array}
- */
+/** Migrate raw recipe JSON, answering a new deep-cloned array. */
 export function migrateRecipes(recipes) {
   if (!Array.isArray(recipes)) return recipes;
 
@@ -199,18 +168,11 @@ export function migrateRecipes(recipes) {
   });
 }
 
-/**
- * Migrate an array of raw crafting system JSON objects.
- * Returns a new deep-cloned and migrated array.
- * @param {Array} systems
- * @returns {Array}
- */
+/** Migrate raw crafting-system JSON, answering a new deep-cloned array. */
 export function migrateCraftingSystems(systems) {
   if (!Array.isArray(systems)) return systems;
 
-  return JSON.parse(JSON.stringify(systems)).map((system) => {
-    if (system == null || typeof system !== 'object') return system;
-
+  return mapSystems(JSON.parse(JSON.stringify(systems)), (system) => {
     // Rename managedItems -> components
     if ('managedItems' in system) {
       if (!('components' in system) || system.components == null) {
@@ -240,12 +202,7 @@ export function migrateCraftingSystems(systems) {
   });
 }
 
-/**
- * Convenience wrapper that migrates both recipes and systems.
- * @param {Array} recipes
- * @param {Array} systems
- * @returns {{ recipes: Array, systems: Array }}
- */
+/** Migrate both recipes and systems. */
 export function runComponentIdMigration(recipes, systems) {
   return {
     recipes: migrateRecipes(recipes),

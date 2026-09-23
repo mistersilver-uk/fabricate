@@ -1,40 +1,8 @@
-/**
- * Test doubles for the crafting-definition persistence seam (issue 1089).
- *
- * Two of them, doing two different jobs.
- *
- * {@link CountingDefinitionRepository} is the counting fake the issue's acceptance
- * criteria ask for: it observes every read and write at the seam without patching
- * `game.settings` or replacing a manager method. That matters beyond convenience.
- * Every persistence fake in this suite is omnipotent — a `Map.set` that cannot refuse
- * — so "how many writes did that mutation cost?" has never been answerable except by
- * monkey-patching `save()`, and a monkey-patched `save()` stops being the code under
- * test. Several downstream issues (#1072 in particular) need this count as evidence.
- *
- * {@link DocumentShapedDefinitionRepository} is the more interesting one. It exists to
- * prove mechanically that the interface is expressible by the OTHER candidate backend
- * in #1079 — one Fabricate record per Foundry Document in a world compendium — rather
- * than merely asserting it in a comment. It stores one serialized "document" per
- * record, takes no corpus supplier, and its `readReplicatedSnapshot()` returns `null`
- * exactly as a pack-backed store must (#1088 Q3: on 14.365 a pack write never reaches
- * a client holding only the connect-time index). If a manager can drive it unchanged,
- * the seam really is backend-neutral.
- *
- * This file is deliberately NOT named `*.test.js`: `tests/helpers/` sits outside the
- * `npm test` glob. Both doubles are exercised from inside the glob by
- * `tests/crafting-definition-repository.test.js`.
- */
+/** Test doubles for the crafting-definition persistence seam (issue 1089). */
 
 import { CraftingDefinitionRepository } from '../../src/systems/CraftingDefinitionRepository.js';
 
-/**
- * Wraps a real repository and tallies the operations that reach it.
- *
- * Delegating rather than reimplementing is the point: a standalone counter would be a
- * second implementation of the contract, and a double that is LOOSER than the thing it
- * stands in for produces false passes. Here the counts describe exactly what the real
- * adapter did.
- */
+/** Wraps a real repository and tallies the operations that reach it. */
 export class CountingDefinitionRepository extends CraftingDefinitionRepository {
   /**
    * @param {CraftingDefinitionRepository} delegate
@@ -115,11 +83,8 @@ export class CountingDefinitionRepository extends CraftingDefinitionRepository {
 }
 
 /**
- * A repository shaped like the document-backed candidate in #1079: one stored record
- * per document, addressed by id, with no whole-corpus value anywhere.
- *
- * It takes no `corpus` thunk — it does not need the manager's map, because it can
- * address a record directly. That absence is the whole demonstration.
+ * A repository shaped like the document-backed candidate in #1079: one stored record per document,
+ * addressed by id, with no whole-corpus value anywhere.
  */
 export class DocumentShapedDefinitionRepository extends CraftingDefinitionRepository {
   /**

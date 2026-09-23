@@ -3,7 +3,9 @@ import {
   setSetting as defaultSetSetting,
   SETTING_KEYS,
 } from '../config/settings.js';
-import { cloneJson } from '../utils/scalars.js';
+import { cloneJson, normalizeIdList, stringOrEmpty } from '../utils/scalars.js';
+
+import { SettingsBackedStore } from './SettingsBackedStore.js';
 
 const OVERRIDE_MODES = new Set(['none', 'manual']);
 
@@ -33,7 +35,7 @@ export class GatheringPartyValidationError extends Error {
  * is a single persisted write so a member never momentarily belongs to two
  * enabled parties mid-move.
  */
-export class GatheringPartyStore {
+export class GatheringPartyStore extends SettingsBackedStore {
   constructor({
     getSetting = defaultGetSetting,
     setSetting = defaultSetSetting,
@@ -41,24 +43,20 @@ export class GatheringPartyStore {
     getUserId = null,
     now = null,
   } = {}) {
-    this.getSetting = getSetting;
-    this.setSetting = setSetting;
+    super({ getSetting, setSetting, settingKey: SETTING_KEYS.GATHERING_PARTIES });
     this.randomID = randomID || (() => globalThis.foundry?.utils?.randomID?.());
     this.getUserId = getUserId || (() => globalThis.game?.user?.id || null);
     this.now = now || (() => Date.now());
     this.parties = [];
-    this.loaded = false;
+  }
+
+  _setCache(value) {
+    this.parties = value;
   }
 
   load() {
-    const saved = this.getSetting(SETTING_KEYS.GATHERING_PARTIES);
-    this.parties = this._normalizeList(saved);
-    this.loaded = true;
+    this._publish(this._normalizeList(this._readSetting()));
     return cloneJson(this.parties);
-  }
-
-  _ensureLoaded() {
-    if (!this.loaded) this.load();
   }
 
   list() {
@@ -212,9 +210,7 @@ export class GatheringPartyStore {
     const errors = this._validateList(normalized, parties);
     if (errors.length > 0) throw new GatheringPartyValidationError(errors);
     const payload = cloneJson(normalized);
-    await this.setSetting(SETTING_KEYS.GATHERING_PARTIES, payload);
-    this.parties = normalized;
-    this.loaded = true;
+    await this._writeThenPublish(normalized, payload);
     return cloneJson(payload);
   }
 
@@ -364,11 +360,6 @@ function replaceAt(array, index, value) {
   return next;
 }
 
-function stringOrEmpty(value) {
-  if (value === null || value === undefined) return '';
-  return String(value).trim();
-}
-
 function optionalString(value) {
   if (value === null || value === undefined) return null;
   const normalized = String(value).trim();
@@ -377,9 +368,4 @@ function optionalString(value) {
 
 function trimmedOrDefault(value, fallback) {
   return stringOrEmpty(value) || fallback;
-}
-
-function normalizeIdList(value) {
-  const values = Array.isArray(value) ? value : value ? [value] : [];
-  return [...new Set(values.map((entry) => stringOrEmpty(entry)).filter(Boolean))];
 }

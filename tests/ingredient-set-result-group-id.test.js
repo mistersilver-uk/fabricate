@@ -1,22 +1,14 @@
 /**
- * Unit tests for IngredientSet.resultGroupId field (T-004)
- *
- * Covers:
- *   AC1: Constructor accepts and persists resultGroupId
- *   AC3: toJSON() emits resultGroupId
- *   AC4: Canonical routed + ingredientSet resolution routes correctly via
- *        resultGroupId (the former `mapped` behavior, now canonical).
+ * Unit tests for IngredientSet.resultGroupId field (T-004). Covers: AC1: Constructor accepts and
+ * persists resultGroupId AC3: toJSON() emits resultGroupId AC4: Canonical routed + ingredientSet
+ * resolution routes correctly via resultGroupId (the former `mapped` behavior, now canonical).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
 // Foundry globals required for module load
-// ---------------------------------------------------------------------------
 
-// Minimal Foundry surface this module's import chain touches. Assembled
-// piecewise (rather than one large object literal) so this arrange block stays
-// distinct from the shared stubs in sibling suites.
+// Minimal Foundry surface this module's import chain touches.
 const utils = { randomID: () => `id-${crypto.randomUUID().slice(0, 8)}`, getProperty: () => undefined };
 const HandlebarsApplicationMixin = (Base) => class extends Base {};
 class ApplicationV2 {
@@ -30,16 +22,12 @@ globalThis.game = { user: { isGM: true }, fabricate: null };
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
 globalThis.ChatMessage = { create: () => {}, getSpeaker: () => ({}) };
 
-// ---------------------------------------------------------------------------
 // Imports — must come after globals are set
-// ---------------------------------------------------------------------------
 
 const { IngredientSet } = await import('../src/models/IngredientSet.js');
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 
-// ---------------------------------------------------------------------------
 // Helper builders
-// ---------------------------------------------------------------------------
 
 /**
  * Build a canonical routed crafting system (the former `mapped` shape; routing
@@ -61,9 +49,7 @@ function buildMappedSystem(overrides = {}) {
   };
 }
 
-/**
- * Build a ResolutionModeService backed by the given system.
- */
+/** Build a ResolutionModeService backed by the given system. */
 function buildService(system) {
   const craftingSystemManager = {
     getSystem: (id) => (system && id === system.id ? system : null),
@@ -84,9 +70,7 @@ function buildMappedRecipe(step) {
   };
 }
 
-/**
- * Build a step with two result groups (rg-1, rg-2) and the supplied ingredientSet plain object.
- */
+/** Build a step with two result groups (rg-1, rg-2) and the supplied ingredientSet plain object. */
 function buildStepWithGroups(ingredientSetData = {}) {
   return {
     id: 'step-1',
@@ -100,9 +84,8 @@ function buildStepWithGroups(ingredientSetData = {}) {
 }
 
 /**
- * Arrange a routed + ingredientSet recipe around the given ingredientSet and
- * resolve its result groups. Any extra `resolveResultGroups` args (e.g.
- * `selectedResultGroupId`) are merged into the call.
+ * Arrange a routed + ingredientSet recipe around the given ingredientSet and resolve its result
+ * groups.
  */
 function resolveForIngredientSet(ingredientSet, extraResolveArgs = {}) {
   const service = buildService(buildMappedSystem());
@@ -111,9 +94,7 @@ function resolveForIngredientSet(ingredientSet, extraResolveArgs = {}) {
   return service.resolveResultGroups({ recipe, step, ingredientSet, ...extraResolveArgs });
 }
 
-// ---------------------------------------------------------------------------
 // Group 1 — IngredientSet Constructor and Serialization
-// ---------------------------------------------------------------------------
 
 test('constructor accepts resultGroupId string', () => {
   const set = new IngredientSet({ resultGroupId: 'rg-1' });
@@ -137,11 +118,8 @@ test('toJSON includes resultGroupId when set', () => {
 });
 
 test('1135: toJSON OMITS resultGroupId when null, and absence rebuilds null', () => {
-  // This used to assert the opposite — that the key was always present, even as `null`.
-  // Issue 1135 retired it from the payload: the constructor rebuilds `null` from absence,
-  // and every reader coerces through `set?.resultGroupId || null`
-  // (`ResolutionModeService`'s reference-integrity check is the one that matters), so
-  // nothing distinguishes an omitted key from the written default.
+  // This used to assert the opposite — that the key was always present, even as `null` (issue
+  // 1135).
   const set = new IngredientSet({});
   const json = set.toJSON();
   assert.ok(!Object.prototype.hasOwnProperty.call(json, 'resultGroupId'),
@@ -157,9 +135,7 @@ test('fromJSON round-trip preserves resultGroupId', () => {
   assert.equal(restored.resultGroupId, 'rg-1');
 });
 
-// ---------------------------------------------------------------------------
 // Group 2 — Mapped Mode Resolution via resultGroupId
-// ---------------------------------------------------------------------------
 
 test('routed + ingredientSet uses resultGroupId to select the correct result group', () => {
   const result = resolveForIngredientSet({ id: 'set-1', resultGroupId: 'rg-2', ingredientGroups: [] });

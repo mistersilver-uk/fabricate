@@ -1,18 +1,14 @@
 /**
- * Unit tests for T-009: Implement Essence-Based Effect Transfer per Spec 005
- *
- * Group 1: Effect transfer uses essence-based pipeline (5 tests)
- * Group 2: Old ingredient-level path removed (1 test)
- * Group 3: Edge cases (2 tests)
+ * Unit tests for T-009: Implement Essence-Based Effect Transfer per Spec 005. Group 1: Effect
+ * transfer uses essence-based pipeline (5 tests) Group 2: Old ingredient-level path removed (1
+ * test) Group 3: Edge cases (2 tests)
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 
-// ---------------------------------------------------------------------------
 // Globals required for the modules to load
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -41,13 +37,9 @@ globalThis.ui = {
   notifications: { info: () => {}, warn: () => {}, error: () => {} }
 };
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
-/**
- * Build a minimal CraftingEngine with no-op collaborators.
- */
+/** Build a minimal CraftingEngine with no-op collaborators. */
 function makeEngine() {
   const mockRecipeManager = {
     canCraft: () => ({ canCraft: false }),
@@ -56,9 +48,7 @@ function makeEngine() {
   return new CraftingEngine(mockRecipeManager, null, null);
 }
 
-/**
- * Build a fake consumed item whose fabricate 'essences' flag returns the given map.
- */
+/** Build a fake consumed item whose fabricate 'essences' flag returns the given map. */
 function makeConsumedItem(id, essencesMap = {}) {
   // getFabricateFlag calls document.getFlag('fabricate', normalizeFlagKey(key))
   // normalizeFlagKey('essences') => 'fabricate.essences'
@@ -79,16 +69,12 @@ function makeConsumedItem(id, essencesMap = {}) {
   };
 }
 
-/**
- * Build a fake active effect with toObject() returning a plain data blob.
- */
+/** Build a fake active effect with toObject() returning a plain data blob. */
 function makeEffect(name) {
   return { name, toObject: () => ({ name, changes: [] }) };
 }
 
-/**
- * Build a fake source item (resolved via fromUuid) with the given effects array.
- */
+/** Build a fake source item (resolved via fromUuid) with the given effects array. */
 function makeSourceItem(uuid, effects = []) {
   return { id: uuid, uuid, name: `Source ${uuid}`, effects };
 }
@@ -117,9 +103,7 @@ function setupGame({ essencesEnabled = true, essenceDefinitions = [], components
   return system;
 }
 
-// ---------------------------------------------------------------------------
 // Group 1: Effect transfer uses essence-based pipeline
-// ---------------------------------------------------------------------------
 
 test('T-009-G1-1: effects transferred from essence sourceItemUuid when essences enabled', async () => {
   const effect = makeEffect('Fire Resist');
@@ -341,9 +325,7 @@ test('T-009-G1-5: effects from multiple essence sources are all collected', asyn
   assert.deepEqual(names, ['Fire Resist', 'Ice Resist'], 'effects from both essence sources should be transferred');
 });
 
-// ---------------------------------------------------------------------------
 // Group 2: Old ingredient-level path removed
-// ---------------------------------------------------------------------------
 
 test('T-009-G2-1: ingredient extractEffects=true does NOT cause effect transfer (old path removed)', async () => {
   setupGame({
@@ -389,9 +371,7 @@ test('T-009-G2-1: ingredient extractEffects=true does NOT cause effect transfer 
   assert.equal(createCalled, false, 'extractEffects on ingredient should be ignored — old path is removed');
 });
 
-// ---------------------------------------------------------------------------
 // Group 3: Edge cases
-// ---------------------------------------------------------------------------
 
 test('T-009-G3-1: source item with empty effects array transfers nothing', async () => {
   setupGame({

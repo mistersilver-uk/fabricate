@@ -1,45 +1,33 @@
-/**
- * Shared helpers for the pure, idempotent startup data migrations.
- *
- * Extracted so the rename/cleanup migrations (regions→realms, hazards→events,
- * unify-regions, break-tools-on-fail, …) share one copy instead of each carrying an
- * identical inline definition (product-code duplication is measured by SonarCloud CPD).
- */
+/** Shared helpers for the pure, idempotent startup migrations. */
 
 import { isPlainObject } from '../utils/scalars.js';
 
-/**
- * True when `value` is a non-null, non-array plain object.
- *
- * @param {*} value
- * @returns {boolean}
- */
-/**
- * Structurally deep-clone a JSON-safe value so a migration never mutates its input.
- * `undefined` is returned unchanged.
- *
- * @param {*} value
- * @returns {*}
- */
+/** Deep-clone a JSON-safe value so a migration never mutates its input; `undefined` passes through. */
 export function clone(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
-/**
- * Rename `oldKey` → `newKey` on a plain object in place, but only when `oldKey` is
- * present and `newKey` is absent (idempotent; never clobbers an existing new key). A
- * stale `oldKey` left beside an existing `newKey` is left inert (no clobber, no drop).
- *
- * @param {object} obj
- * @param {string} oldKey
- * @param {string} newKey
- */
+/** Rename in place ONLY when the old key is present and the new one absent, so a stale key is inert. */
 export function renameKey(obj, oldKey, newKey) {
   if (!isPlainObject(obj)) return;
   if (!Object.prototype.hasOwnProperty.call(obj, oldKey)) return;
   if (Object.prototype.hasOwnProperty.call(obj, newKey)) return; // already migrated → leave stale inert
   obj[newKey] = obj[oldKey];
   delete obj[oldKey];
+}
+
+/** Call `fn(system, index)` for each plain-object entry; a non-array and a non-object entry are skipped. Clones nothing. */
+export function forEachSystem(systems, fn) {
+  if (!Array.isArray(systems)) return;
+  for (const [index, system] of systems.entries()) {
+    if (isPlainObject(system)) fn(system, index);
+  }
+}
+
+/** Map plain-object entries through `fn(system, index)`; a non-object entry passes through by reference. */
+export function mapSystems(systems, fn) {
+  if (!Array.isArray(systems)) return [];
+  return systems.map((system, index) => (isPlainObject(system) ? fn(system, index) : system));
 }
 
 export { isPlainObject } from '../utils/scalars.js';

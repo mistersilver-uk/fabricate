@@ -1,61 +1,23 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The world Tools Catalogue's BULK EDIT panel (issue 1373, maintainer feedback round 2).
+  The world Tools Catalogue's BULK EDIT panel (issue 1373). The catalogue always carried the
+  selection and its count; `bulk` is a lane snippet the page never passed, and an `{#if}` on an
+  undefined snippet is silent — so the selection affordance had nothing on the other end of it.
 
-  ── WHAT WAS ACTUALLY WRONG ────────────────────────────────────────────────────────────────────
-  The catalogue's rows have always carried a selection box and its toolbar has always counted the
-  ticks — `4 selected`, with a `Select all` and a `Clear` beside it — and the inspector went on
-  saying `Nothing selected` however many were. The selection was never the problem: the frame
-  renders `{#if bulk && selection.count > 0}` off the SAME `selection` object it hands the
-  toolbar's count, so both halves of that condition read the same tick. The missing half was the
-  second one. `bulk` is a lane snippet, the page passed none, and a `{#if}` on an undefined
-  snippet is silent — so the screen shipped a selection affordance with nothing on the other end
-  of it. This is that other end.
+  ONE AXIS, AND THE OTHERS ARE NAMED RATHER THAN OMITTED. The world master switch is the only
+  property of a world Tool whose value is CLOSED and means the same thing across a selection.
+  `breakage` carries a VALUE, `onBreak`'s third mode names a replacement component world scope
+  cannot address, `prerequisites` is an id list and `bonus` an expression — so the panel states
+  their absence in place. DELETE IS NOT HERE either: the entry editor owns it, with its own armed
+  control and impact statement, and the catalogue row offers no destructive verb at all.
 
-  ── ONE AXIS, AND THE OTHERS ARE NAMED RATHER THAN OMITTED ─────────────────────────────────────
-  The world master switch is the only property of a world Tool whose value is CLOSED and means
-  the same thing for every Tool in a selection, which is what a staged bulk write needs. It is
-  also the one the rows already offer one at a time, so bulk is exactly "that, for the twelve I
-  ticked".
-
-  The four world DEFAULTS are deliberately not here, and the reason is per-section rather than a
-  blanket one:
-
-   - `breakage` carries a VALUE — a percentage, a formula and a threshold, or a use count — so a
-     segment cannot stage it without also staging a number, and one number written across a
-     mixed selection is a worse answer than no control;
-   - `onBreak`'s third mode names a REPLACEMENT COMPONENT, and `toolScope.js` says world scope
-     cannot address a component in an owning system. A control offering two of three modes reads
-     as the whole vocabulary and silently is not;
-   - `prerequisites` is an id LIST and `bonus` is an expression; both are per-Tool by nature.
-
-  The panel says so in place, exactly as the essence bulk panel names its own per-entity axes,
-  rather than leaving their absence to be inferred from a short panel.
-
-  DELETE IS NOT HERE EITHER. The catalogue row offers `Edit tool` and the world switch and no
-  destructive verb at all; deleting a world Tool takes its world defaults and every system's
-  membership record with it, and the entry editor owns that action with its own armed control and
-  its own impact statement. Adding a bulk delete to a screen with no single delete would put the
-  most destructive verb in the product on the surface with the least context for it.
-
-  ── THE CHROME IS THE SHIPPED PRIMITIVES ───────────────────────────────────────────────────────
-  `BulkEditPanelShell` owns the eyebrow, the Clear action, the count hero and the Apply dock;
-  `BulkEditSection` owns the axis label row and its staged chip; `SegmentedControl` owns the
-  track. Nothing here is hand-rolled, which is what keeps this panel the same object a GM already
-  knows from the Component, Recipe and Essence studios.
-
-  Props:
-   - count: how many rows are ticked. Pre-counted by the frame; the panel only words it.
-   - applying: an in-flight write. Inerts the track and the Apply.
-   - onClearSelection(): drop the whole selection.
-   - onApply(status): `'on'` or `'off'`. Never called with `'unchanged'` — Apply is genuinely
-     disabled until an axis is staged, so a GM cannot fire a no-op write and read success from it.
+  `onApply(status)` is `'on'` or `'off'` and never `'unchanged'`: Apply is disabled until staged.
 -->
 <script>
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
   import BulkEditSection from '../BulkEditSection.svelte';
-  import Callout from '../Callout.svelte';
-  import SegmentedControl from '../SegmentedControl.svelte';
+  import Callout from '../../../components/Callout.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let { count = 0, applying = false, onClearSelection = () => {}, onApply = () => {} } = $props();
@@ -63,9 +25,8 @@
   /** The unstaged sentinel, shared by the segment value and the Apply gate. */
   const UNCHANGED = 'unchanged';
 
-  // THE PANEL'S OWN STATE, and it is safe to hold here precisely because the frame renders this
-  // snippet only while the selection is non-empty: clearing the selection unmounts the panel, so
-  // a staged instruction can never outlive the set it was staged against.
+  // THE PANEL'S OWN STATE, safe here because the frame renders this snippet only while the
+  // selection is non-empty, so a staged instruction cannot outlive the set it was staged against.
   let staged = $state(UNCHANGED);
 
   function text(key, fallback) {
@@ -116,9 +77,8 @@
     },
   ]);
 
-  // WHAT THE STAGED INSTRUCTION WILL DO, in the words the world switch itself uses. `On` and
-  // `Off` alone would restate the highlighted segment; these say the blast radius, which is the
-  // fact a GM is deciding on.
+  // WHAT THE STAGED INSTRUCTION WILL DO, in the world switch's own words: `On` and `Off` alone
+  // would restate the highlighted segment rather than the blast radius a GM is deciding on.
   const stagedLabel = $derived(
     {
       on: text(
@@ -167,8 +127,7 @@
     }}
   />
 
-  <!-- NEUTRAL (issue 1505): which settings stay per-Tool is true of every selection, so it
-       is documentation rather than a note about the live one. -->
+  <!-- NEUTRAL (issue 1505): which settings stay per-Tool is true of every selection. -->
   <Callout
     tone="neutral"
     text={text(

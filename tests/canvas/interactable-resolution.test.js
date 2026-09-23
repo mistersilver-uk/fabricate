@@ -1,8 +1,6 @@
 /**
- * Unit coverage for the PURE canvas-interactable helpers: drop classification +
- * spawn-payload shaping (`interactableResolution.js`). The Foundry-bound
- * `InteractableManager` seams are exercised separately in
- * `interactable-manager.test.js`.
+ * Unit coverage for the PURE canvas-interactable helpers: drop classification + spawn-payload
+ * shaping (`interactableResolution.js`).
  */
 
 import test from 'node:test';
@@ -48,9 +46,6 @@ test('buildActiveCanvasTool produces the normalized { componentId, systemId, too
 });
 
 // Issue 1119: the station's identity is its LIBRARY TOOL ID, not the linked component.
-// Requiring a componentId returned null for every item-sourced Tool — the only kind the
-// Tool Studio can author — and the caller answered that null with a silent activation
-// denial, so every Tool station a GM could build was dead on click.
 test('buildActiveCanvasTool builds a payload for an item-sourced tool (no componentId)', () => {
   assert.deepEqual(
     buildActiveCanvasTool({ systemId: 'sysA', toolId: 'tool-1', tool: { componentId: null } }),

@@ -1,42 +1,4 @@
-/**
- * The System Tool Rules LIST screen, measured in a real browser against the design's own
- * declarations (issue 1373).
- *
- * ── WHY A BROWSER, AND WHY A SEPARATE FILE ───────────────────────────────────────────────
- * Every finding this file pins is a CASCADE question or a COMPUTED TYPE question, and neither
- * is answerable from source text. happy-dom does not compute a cascade at all, and the two
- * hazards that produced the defects here are precisely cascade hazards:
- *
- *   1. A `:hover` rule that OUT-SPECIFIES the selected-row rule repaints a chosen row on
- *      pointer-over. Nothing photographs it, no mounted test can see it, and the sheet reads
- *      as though both states are declared.
- *   2. `styles/fabricate.css` is imported at `layer(modules)` while a component's
- *      `css: 'injected'` block is UNLAYERED, so an unlayered declaration beats a layered one
- *      at ANY specificity. A route-scoped rule written in the global sheet against a shared
- *      primitive's own markup therefore compiles, lints, reads correctly and does nothing.
- *
- * So the fixture reproduces the real layering — `@layer modules { <the sheet> }` followed by
- * the components' unlayered scoped blocks, exactly as `tests/view-lab/cascade.css` mirrors
- * Foundry's own view — and stamps the real `svelte-<hash>` classes so specificity matches too.
- * A gate that got either half wrong would prove the wrong winner.
- *
- * ── WHY NOT IN `manager-layout.test.js` ──────────────────────────────────────────────────
- * That file is the repo's general computed-CSS harness and is over ten thousand lines shared
- * by every manager surface. These assertions are one screen's parity contract against one
- * artefact, they arrive as a block, and they are the block a future parity pass on this screen
- * has to re-read. Keeping them together also keeps their fixture together: one page builds the
- * whole toolbar, list and inspector, so a change that moves a row's height cannot pass here by
- * being measured in a fixture that no longer resembles the screen.
- *
- * ── THE VALUES ARE THE DESIGN'S, WITH ONE STATED SUBSTITUTION ────────────────────────────
- * Every figure below carries the `proto:NNNN` line of `tmp/GM Component Catalogue
- * (standalone).html`'s embedded markup it was read off (JSON.parse of line 390). The one
- * systematic departure is CONTROL HEIGHT: `openspec/specs/design-system/spec.md` retires 32,
- * 36 and 40 from the ladder, and `control-height-ladder.test.js` gates that. The design states
- * 32 for every toolbar control on this screen and 36 for the inspector's primary, so each is
- * taken to the nearest surviving rung — 30 and 34 — which preserves the design's own 4px
- * relationship between the two while staying on the published ladder.
- */
+/** The System Tool Rules LIST screen. */
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -59,20 +21,14 @@ const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
-  'src/ui/svelte/apps/manager/EmptyState.svelte',
-  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  'src/ui/svelte/components/EmptyState.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ToolsBrowserView.svelte',
   'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
 ].map((path) => scopedComponentCss(resolve(repoRoot, path)));
 
 /**
  * Stamp every component's real scoping hash onto EVERY element in the fixture.
- *
- * Without a hash the scoped rules match nothing and every measurement below reads the global
- * sheet alone — which is the state these primitives were extracted OUT of, so the gate would
- * report the geometry the screen had two releases ago and call it green.
- *
- * IT IS A BLANKET STAMP, and that is the correction that made this file report the truth.
  * `withScopeHash` adds the hash to elements carrying a named CONTRACT CLASS, which is right
  * for a rule whose key compound is that class — and wrong for every descendant rule, because
  * Svelte compiles `.manager-icon-fact-row strong` to
@@ -81,11 +37,6 @@ const SCOPED_COMPONENTS = [
  * hang it on. Measured: the fact-row title read 12.16px, which is not that rule's 0.76rem at
  * all — it is the inspector card's own inherited size, arriving through a rule that had
  * silently stopped applying.
- *
- * A foreign component's hash on an element is inert: no selector in any of these blocks keys
- * on a hash alone, so every rule still needs its own contract class and its own ancestors to
- * match. What the blanket stamp removes is the fixture's ability to withhold a match that the
- * product would make.
  *
  * @param {string} markup
  * @returns {string}
@@ -103,11 +54,6 @@ function stamped(markup) {
 
 /**
  * The document, layered as Foundry layers it.
- *
- * `@layer modules { … }` around the sheet is not decoration: an unlayered component block
- * beats a layered sheet rule at any specificity, and half the findings this file pins are
- * about which of the two owns a declaration. Flattening the layer here would let a global
- * rule "win" in the gate and lose in the product.
  *
  * @param {string} body
  * @returns {string}
@@ -143,12 +89,6 @@ function documentFor(body) {
 /**
  * One list row, at whichever state the caller names.
  *
- * THE ENABLE SWITCH IS DRAWN AS THE PRIMITIVE DRAWS IT (issue 1515) — the composed class
- * string `StatusToggle.svelte` emits, its `-track` and its `-knob`, in that nesting. Written
- * any other way this fixture would measure the hand-rolled tree the screen no longer renders,
- * which is the stale-copy failure `status-toggle-source-contract.test.js` records for the
- * suites that hand-write this control.
- *
  * @param {string} probe the probe prefix for this row's elements
  * @param {string} extraClass the row's own state classes
  * @param {string} name the Tool's name
@@ -176,7 +116,22 @@ function row(probe, extraClass, name, enabled = false) {
   </article>`;
 }
 
-const LIST_SCREEN = `
+const SIX_ROWS = [
+  row('selected-still', 'is-selected', "Smith's Hammer", true),
+  row('selected-hovered', 'is-selected', "Smith's Anvil"),
+  row('resting', '', 'Bellows'),
+  row('resting-hovered', '', 'Tongs'),
+  row('unadopted-selected', 'is-selected is-unadopted', 'Aegis Crucible'),
+  row('unadopted-resting', 'is-unadopted', 'Star Loom'),
+].join('');
+
+/**
+ * The whole list screen around the rows the caller names.
+ *
+ * @param {string} [rows] the list's row markup
+ * @returns {string} the fixture markup
+ */
+const listScreen = (rows = SIX_ROWS) => `
 <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="tools">
   <div class="manager-body">
     <!-- THE RAIL IS LOAD-BEARING IN THE FIXTURE, not decoration. The manager body on this route
@@ -211,19 +166,14 @@ const LIST_SCREEN = `
         </section>
         <div class="manager-tools-sort-row" data-manager-tools-sort>
           <span class="manager-tools-sort-label" data-probe="sort-label">Sort by</span>
-          <select class="manager-tools-sort-select" data-probe="sort-select"><option>Name</option></select>
+          <div class="fabricate-picker manager-travel-picker fabricate-select manager-tools-sort-select"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-inline" data-probe="sort-select" data-select-size="inline" data-tool-sort-key="" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Sort by"><span class="manager-travel-picker-value fabricate-select-value">Name</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
           <button type="button" class="manager-tools-sort-direction" data-probe="sort-direction"><i class="fas fa-arrow-down-a-z"></i><span>Asc</span></button>
           <span class="manager-tools-result-summary" data-probe="result-count">3 shown</span>
         </div>
         <section class="manager-tools-library-card" data-manager-tools-browser>
           <div class="manager-tools-library-scroll">
             <div class="manager-tools-library-list" role="list">
-              ${row('selected-still', 'is-selected', "Smith's Hammer", true)}
-              ${row('selected-hovered', 'is-selected', "Smith's Anvil")}
-              ${row('resting', '', 'Bellows')}
-              ${row('resting-hovered', '', 'Tongs')}
-              ${row('unadopted-selected', 'is-selected is-unadopted', 'Aegis Crucible')}
-              ${row('unadopted-resting', 'is-unadopted', 'Star Loom')}
+              ${rows}
             </div>
           </div>
         </section>
@@ -262,6 +212,8 @@ const LIST_SCREEN = `
   </div>
 </div>`;
 
+const LIST_SCREEN = listScreen();
+
 let sharedBrowser;
 
 before(async () => {
@@ -292,15 +244,16 @@ async function renderColumn(sections, footState) {
 /**
  * Render the screen once and hand back a reader over it.
  *
+ * @param {string} [markup] the screen to render
  * @returns {Promise<{page: import('playwright').Page, close: () => Promise<void>}>}
  */
-async function renderListScreen() {
+async function renderListScreen(markup = LIST_SCREEN) {
   const context = await sharedBrowser.newContext({
     viewport: { width: 1280, height: 720 },
     deviceScaleFactor: 1,
   });
   const page = await context.newPage();
-  await page.setContent(documentFor(LIST_SCREEN));
+  await page.setContent(documentFor(markup));
   return { page, close: () => context.close() };
 }
 
@@ -337,15 +290,7 @@ const READ_PROBES = () =>
     })
   );
 
-/**
- * Resolve design tokens to the colours Chromium computes for them, so an assertion names the
- * TOKEN rather than freezing one theme's literal into a test — seven themes redefine these
- * ramps, and `theme-colour-contract.test.js` exists because a frozen literal is six wrong
- * colours.
- *
- * A `color` probe rather than `background-color`, because an unset background computes to
- * `rgba(0, 0, 0, 0)` and would silently compare equal to a rule that never applied.
- */
+/** Resolve design tokens to the colours Chromium computes for them. */
 const READ_TOKENS = (names) =>
   Object.fromEntries(
     names.map((token) => {
@@ -360,14 +305,6 @@ const READ_TOKENS = (names) =>
 
 /**
  * The inspector column alone, at a bounded height so it genuinely scrolls.
- *
- * THE HEIGHT IS EXPLICIT AND THE LIST FIXTURE'S IS NOT, deliberately. In the product the body
- * grid takes its row height from the manager shell, which this file does not build; without a
- * bound the aside simply grows and its scroll height equals its client height, so a sticky band
- * is never asked the question this fixture exists to ask. Measured on the first attempt: the
- * aside came out 763px tall inside a 720px viewport, never scrolled, and the band's offset
- * defect still reproduced - but from its natural flow position rather than its stuck one, which
- * is a different question with the same answer and no way to tell them apart.
  *
  * @param {number} sections how many inheritance rows to draw
  * @param {string} footState `member` or `absent`
@@ -403,14 +340,7 @@ function inspectorColumn(sections, footState) {
 </div>`;
 }
 
-/**
- * Scroll the inspector to its end and report where the pinned band actually lands.
- *
- * IT READS THE PAINTED EDGE AND A HIT TEST, not the sticky constraint. A band whose margin box
- * is pinned correctly can still paint short of the column's bottom edge - which is exactly the
- * defect this measures - so geometry alone would not settle it, and `elementFromPoint` a few
- * pixels above the aside's own bottom names whatever is really on top there.
- */
+/** Scroll the inspector to its end and report where the pinned band actually lands. */
 const READ_PINNED_BAND = () => {
   const aside = document.querySelector('[data-probe="aside"]');
   const foot = document.querySelector('[data-probe="foot"]');
@@ -438,18 +368,6 @@ test('the Tools browser writes ONE search field, and it is inside the search car
   // THE FIXTURE ABOVE IS A COPY, AND THIS IS THE DRIFT GUARD BESIDE IT. `LIST_SCREEN` writes
   // two `.manager-tools-library-card` sections and one `.manager-search` by hand, so it goes on
   // measuring the same three rules however the real view is edited. This clause reads the SOURCE.
-  //
-  // WHAT IT PROTECTS. Issue 1508 rewrote the Tools browser's three overrides from
-  // `[data-manager-tools-search] .manager-search…` to
-  // `.manager-tools-library-card .manager-search…` (`styles/fabricate.css:23520`, `:23540`,
-  // `:23549` — re-derived for issue 1515, which deleted rules above them), on a measured
-  // premise: `data-manager-tools-search` and
-  // `.manager-tools-library-card` select the SAME `.manager-search` in this tree, because the
-  // view writes exactly one search field and writes it inside the search card. A SECOND search
-  // field anywhere under a `.manager-tools-library-card` — in the browser card, say — would take
-  // all three rules, where the retired attribute form would have reached none of them. That is a
-  // real geometry change (30px height, 8px corner, 11.5px/500 type) arriving silently, so the
-  // rewrite has to be RE-DECIDED rather than quietly widened.
   const viewPath = 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte';
   const source = readFileSync(resolve(repoRoot, viewPath), 'utf8');
   const styleAt = source.indexOf('<style>');
@@ -489,13 +407,6 @@ test('the Tools browser writes ONE search field, and it is inside the search car
 
 test('the Tools browser renders its search and its filter through the shared bar', () => {
   // THE OTHER HALF OF THE CLAUSE ABOVE, and the reason it is source text rather than geometry.
-  // Issue 1515 moved this screen onto the browse archetype's filter bar, and the bar is a
-  // `<section>` INSIDE the search card rather than the card itself - because the three sheet
-  // rules the clause above protects are written `.manager-tools-library-card .manager-search...`
-  // and the card is where that class is. A later edit that promotes the bar to the card, or
-  // that leaves one of the two controls outside it, reads as tidying and is neither: the first
-  // takes the field out of the class's subtree, and the second puts a filter in the browse
-  // recipe's list band.
   const viewPath = 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte';
   const source = readFileSync(resolve(repoRoot, viewPath), 'utf8');
   const styleAt = source.indexOf('<style>');
@@ -538,10 +449,7 @@ test('the Tools browser renders its search and its filter through the shared bar
       'class assertion left behind would have gone on passing against the deleted markup`s name'
   );
 
-  // THE SEGMENTED CONTROL IS NOT IN THE BAR, and that is a routing decision rather than an
-  // oversight. It authors `breakageSource` on the SYSTEM record - a setting, whose card sits
-  // above the bar - where a filter narrows the list beneath it. A later pass that swept it in
-  // for symmetry would put a writing control in a reading band.
+  // THE SEGMENTED CONTROL IS NOT IN THE BAR.
   const segmentsAt = markup.indexOf('class="manager-tools-authority-segments"');
   assert.ok(segmentsAt >= 0, 'the authority segments were not found, so this proves nothing');
   assert.ok(
@@ -559,10 +467,6 @@ test('the row enable switch is the shared control rather than a copy of it', asy
   // place they would have gone on winning over the primitive's own paint on this one screen,
   // and every source-level gate in the repository would have stayed green: the class is still
   // written, the rules still parse, and the switch still looks like a switch.
-  //
-  // So the assertions below name the FAMILY's declarations. Restore any of the four and the
-  // track computes `block` where the primitive computes a flex box, or the button re-pins to
-  // the 36px the family sizes to content instead; either way this clause reds.
   const { page, close } = await renderListScreen();
   try {
     const measured = await page.evaluate(READ_PROBES);
@@ -578,8 +482,7 @@ test('the row enable switch is the shared control rather than a copy of it', asy
     assert.equal(measured['resting-switch'].width, 34, 'the switch is the family box');
     assert.equal(measured['resting-switch'].height, 24, 'and the family rung');
 
-    // `.fabricate-toggle .manager-status-toggle-track` is an `inline-flex`, blockified to
-    // `flex` as a flex item. The deleted copy declared `display: block`.
+    // `.fabricate-toggle .manager-status-toggle-track` is an `inline-flex`.
     for (const probe of ['resting-switch-track', 'selected-still-switch-track']) {
       assert.equal(measured[probe].display, 'flex', `${probe} is the primitive track box`);
       assert.equal(measured[probe].width, 34, `${probe} is 34px wide`);
@@ -590,9 +493,7 @@ test('the row enable switch is the shared control rather than a copy of it', asy
       assert.equal(measured[probe].height, 14, `${probe} is the family 14px knob`);
     }
 
-    // BOTH POSITIONS COME FROM THE FAMILY'S `--fab-toggle-*` CUSTOM PROPERTIES, which is the
-    // mechanism the deleted rules bypassed by painting the track and knob directly. Named as
-    // tokens rather than as literals, for `theme-colour-contract.test.js`'s reason.
+    // BOTH POSITIONS COME FROM THE FAMILY'S `--fab-toggle-*` CUSTOM PROPERTIES.
     assert.equal(
       measured['selected-still-switch-track'].background,
       tokens['--fab-accent'],
@@ -620,19 +521,6 @@ test('the row enable switch is the shared control rather than a copy of it', asy
 
 test('the fixture layers the sheet the way Foundry does, or it proves nothing', async () => {
   // THE NON-VACUITY CHECK FOR THIS WHOLE FILE. Every measurement below rests on one claim:
-  // `styles/fabricate.css` is a module sheet with no explicit layer, so Foundry imports it at
-  // layer `modules`, while a component's `css: 'injected'` block lands UNLAYERED and therefore
-  // beats it at any specificity. `tests/view-lab/cascade.css` is the reference that states it.
-  //
-  // Flatten that layer in the fixture and nothing here fails: the component CSS is appended
-  // after the sheet, so it usually still wins on source order, and the file goes on reporting
-  // green while having stopped modelling the product. Worse, it would then report a global
-  // rule as WINNING against a primitive's scoped block, which is exactly the silent failure
-  // this arrangement exists to catch - a sibling lane shipped one such rule, measured it green
-  // in a flat harness, and it did nothing in the View Lab.
-  //
-  // So the layer is asserted structurally: the sheet's own style element must hold exactly one
-  // top-level rule, that rule must be a layer block, and it must contain the whole sheet.
   const { page, close } = await renderListScreen();
   try {
     const layering = await page.evaluate(() => {
@@ -703,15 +591,6 @@ test('a chosen row is filled whether or not this system has adopted it', async (
   // — and did NOT discard `border-color`, which `.is-unadopted` never declares. A selected
   // unadopted row therefore drew an accent EDGE with no FILL: degraded selection feedback on
   // exactly the row whose selection is the point of the widened cohort.
-  //
-  // It predates the widening, and was unreachable while the cohort's zero point hid every
-  // ghost row — so it is a pre-existing defect that repair newly surfaces.
-  //
-  // THE FIX IS THE COMPONENT NOT DECLARING `background` AT ALL, so the sheet arbitrates both
-  // states in one layer. A more specific unlayered override is how this file accumulated the
-  // other four, and this case is written so that one would still fail: it asserts the resting
-  // unadopted row is the same fill as the resting ADOPTED row, which a hand-written
-  // `.is-unadopted.is-selected` rule would have to restate a second time to satisfy.
   const { page, close } = await renderListScreen();
   try {
     const measured = await page.evaluate(READ_PROBES);
@@ -740,8 +619,7 @@ test('a chosen row is filled whether or not this system has adopted it', async (
         'is the component ceding the declaration rather than a second override beside it'
     );
 
-    // THE EDGE WAS NEVER THE BROKEN HALF, and asserting it is what names the asymmetry that
-    // made this hard to see: the accent border arrived on a row with no fill at all.
+    // THE EDGE WAS NEVER THE BROKEN HALF.
     assert.equal(measured['selected-still'].borderTopColor, tokens['--fab-accent-border']);
     assert.equal(measured['unadopted-selected'].borderTopColor, tokens['--fab-accent-border']);
     assert.equal(
@@ -764,9 +642,7 @@ test('a chosen row is filled whether or not this system has adopted it', async (
       'a chosen unadopted row keeps its fill under the pointer'
     );
 
-    // AND IT STILL READS AS NOT-ADOPTED, which is the whole reason the rule existed. `opacity`
-    // carries that on its own, so the fill can be ceded to the sheet without the row losing the
-    // one thing it was saying.
+    // AND IT STILL READS AS NOT-ADOPTED.
     const dimmed = await page.evaluate(() =>
       ['unadopted-selected', 'unadopted-resting', 'resting'].map(
         (probe) => getComputedStyle(document.querySelector(`[data-probe="${probe}"]`)).opacity
@@ -787,9 +663,7 @@ test('the Tool Rules toolbar renders the design’s own type and geometry', asyn
   try {
     const measured = await page.evaluate(READ_PROBES);
 
-    // `proto:2512` — the search field states its own type. It declared none, so it inherited
-    // Foundry's 14px `.application` base, which is the trap `styles/fabricate.css:6149` names
-    // for the Component Studio and repairs only for that route.
+    // `proto:2512` — the search field states its own type. It declared none.
     assert.equal(measured.search.fontSize, '11.5px', 'the search field states the design size');
     assert.equal(measured.search.fontWeight, '500', 'and the design weight');
     // `proto:2510` height 32 → the ladder's nearest surviving rung.
@@ -818,12 +692,10 @@ test('the Tool Rules toolbar renders the design’s own type and geometry', asyn
     assert.equal(measured['segment-selected'].borderTopWidth, '1px', 'proto:4864 selected edge');
     assert.equal(measured['segment-label'].fontSize, '10.5px', 'proto:4864 label size');
 
-    // `proto:2536` — the recipes column RESERVES its width, so a `1` and a `12` do not give
-    // two column widths and the buttons down the list line up.
+    // `proto:2536` — the recipes column RESERVES its width.
     assert.equal(measured['selected-still-recipes'].minWidth, '50px', 'proto:2536 min-width');
 
-    // `proto:4872` — the row pill. `Chip.svelte` owns chip geometry, so this is a density
-    // variant on the primitive rather than a caller override; see its docblock.
+    // `proto:4872` — the row pill. `Chip.svelte` owns chip geometry.
     assert.equal(measured['selected-still-chip'].fontSize, '9px', 'proto:4872 chip size');
     assert.equal(measured['selected-still-chip'].fontWeight, '600', 'proto:4872 chip weight');
     assert.equal(measured['selected-still-chip'].lineHeight, '14.4px', 'the canonical list line-height is 1.6');
@@ -834,6 +706,129 @@ test('the Tool Rules toolbar renders the design’s own type and geometry', asyn
   } finally {
     await close();
   }
+});
+
+/**
+ * `.manager-tools-main-content`'s height in the `manager-tool-rules-sorted-desc-1280x720` lab
+ * frame at the issue 1510 pair 3e tip (504.09px). That frame has a pagination footer below the
+ * column and this fixture has none, so the body is bounded to the column's own height.
+ */
+const SORTED_DESC_COLUMN_HEIGHT = 504;
+const EDGE = 0.5;
+const CENTRE_TARGETS = [
+  '[data-probe="search"]',
+  '[data-tool-membership-option="in"]',
+  '[data-tool-membership-option="all"]',
+  '[data-probe="sort-select"]',
+  '[data-probe="sort-direction"]',
+];
+
+/** `count` plain rows, beside the six mixed-state rows the list screen draws by default. */
+const plainRows = (count) =>
+  Array.from({ length: count }, (unused, index) => row(`long-${index}`, '', `Tool ${index}`)).join(
+    ''
+  );
+
+/**
+ * The list screen with the given rows, in a body as tall as the lab frame's column.
+ *
+ * @param {string} rows the list's row markup
+ * @returns {Promise<{page: import('playwright').Page, close: () => Promise<void>}>}
+ */
+async function renderBoundedList(rows) {
+  const rendered = await renderListScreen(listScreen(rows));
+  await rendered.page.addStyleTag({
+    content: `.fabricate-manager .manager-body { height: ${SORTED_DESC_COLUMN_HEIGHT}px; }`,
+  });
+  return rendered;
+}
+
+/** The toolbar stack's boxes, and which controls own the pointer at their centre. */
+const READ_STACK = (targets) => {
+  const element = (selector) => document.querySelector(selector);
+  const box = (selector) => element(selector).getBoundingClientRect().toJSON();
+  const overflows = (selector) => element(selector).scrollHeight > element(selector).clientHeight;
+  const ownsCentre = (selector) => {
+    const { left, top, width, height } = box(selector);
+    const hit = document.elementFromPoint(left + width / 2, top + height / 2);
+    return Boolean(hit) && element(selector).contains(hit);
+  };
+  return {
+    rows: document.querySelectorAll('.manager-tools-row').length,
+    column: box('[data-probe="toolbar-stack"]'),
+    authority: box('[data-probe="authority-card"]'),
+    authorityOverflows: overflows('[data-probe="authority-card"]'),
+    search: box('[data-manager-tools-search]'),
+    bar: box('[data-probe="filter-bar"]'),
+    sort: box('[data-manager-tools-sort]'),
+    list: box('[data-manager-tools-browser]'),
+    listScrolls: overflows('.manager-tools-library-scroll'),
+    centres: Object.fromEntries(targets.map((selector) => [selector, ownsCentre(selector)])),
+  };
+};
+
+/**
+ * Every broken relation in the toolbar stack, so a failure names all of them at once. Only the
+ * list card may give up height: every card above it stays whole and in order.
+ *
+ * @param {ReturnType<typeof READ_STACK>} stack
+ * @returns {string[]} one line per broken relation
+ */
+function brokenStack({ column, authority, authorityOverflows, search, bar, sort, list }) {
+  const barInCard =
+    ['top', 'left'].every((edge) => bar[edge] >= search[edge] - EDGE) &&
+    ['bottom', 'right'].every((edge) => bar[edge] <= search[edge] + EDGE);
+  return [
+    [
+      barInCard,
+      `filter bar (${bar.top}–${bar.bottom}) is not inside the search card (${search.top}–${search.bottom})`,
+    ],
+    [authority.bottom <= search.top + EDGE, 'authority card overlaps the search card'],
+    [!authorityOverflows, 'authority card is cut short of its content'],
+    [bar.bottom <= sort.top + EDGE, `filter bar ends at ${bar.bottom}, below the sort row at ${sort.top}`],
+    [sort.bottom <= list.top + EDGE, 'sort row overlaps the list card'],
+    [list.bottom <= column.bottom + EDGE, `list card ends at ${list.bottom}, past ${column.bottom}`],
+  ]
+    .filter(([holds]) => !holds)
+    .map(([, broken]) => broken);
+}
+
+/**
+ * Render the rows and measure the stack, after the list's own precondition.
+ *
+ * @param {string} rows the list's row markup
+ * @param {number} count how many rows that markup draws
+ * @param {boolean} scrolls whether the list must overflow its scroller
+ * @param {string[]} [targets] controls that must own the pointer at their centre
+ * @returns {Promise<string[]>} every broken relation and every control that lost its centre
+ */
+async function measureBoundedList(rows, count, scrolls, targets = []) {
+  const { page, close } = await renderBoundedList(rows);
+  try {
+    const stack = await page.evaluate(READ_STACK, targets);
+    assert.equal(stack.rows, count, `the list draws ${count} rows`);
+    assert.ok(
+      Math.abs(stack.column.height - SORTED_DESC_COLUMN_HEIGHT) <= EDGE,
+      `the column is the lab frame's height, measured ${stack.column.height}`
+    );
+    assert.equal(stack.listScrolls, scrolls, `the ${count}-row list's scroll precondition`);
+    const lost = Object.keys(stack.centres).filter((selector) => !stack.centres[selector]);
+    return [...brokenStack(stack), ...lost.map((selector) => `${selector} lost its centre`)];
+  } finally {
+    await close();
+  }
+}
+
+test('a long Tool list scrolls inside its card and leaves the toolbar whole (issue 1977)', async () => {
+  assert.deepEqual(await measureBoundedList(plainRows(24), 24, true, CENTRE_TARGETS), []);
+});
+
+test('a six-row Tool list in the same column keeps the toolbar whole (issue 1977)', async () => {
+  assert.deepEqual(await measureBoundedList(SIX_ROWS, 6, true), []);
+});
+
+test('a three-row Tool list that fits is the control for the same stack (issue 1977)', async () => {
+  assert.deepEqual(await measureBoundedList(plainRows(3), 3, false), []);
 });
 
 test('the Tool Rules inspector sits one rung above its pane and states the design’s type', async () => {
@@ -890,8 +885,7 @@ test('the Tool Rules inspector sits one rung above its pane and states the desig
     assert.equal(measured['edit-world'].fontSize, '10.5px', 'proto:2576 label size');
     assert.equal(measured['edit-world-glyph'].fontSize, '9px', 'proto:2576 glyph size');
 
-    // `proto:2578` / `proto:4897` — the primary lives in a pinned band with a top rule, and
-    // it is the design's 36px control taken to the ladder's 34.
+    // `proto:2578` / `proto:4897` — the primary lives in a pinned band with a top rule.
     assert.equal(measured.foot.position, 'sticky', 'proto:2578 pins the band');
     assert.equal(measured.foot.borderTopWidth, '1px', 'proto:2578 border-top');
     assert.equal(measured.primary.height, 34, 'proto:4897 height, on the ladder');
@@ -903,23 +897,7 @@ test('the Tool Rules inspector sits one rung above its pane and states the desig
 });
 
 test('the pinned inspector band paints flush with the bottom of its column', async () => {
-  // S1. `proto:2578` puts the footer OUTSIDE the scroller as a `flex: 0 0 auto` track, so the
-  // design's band owns the column's bottom edge outright. Ours is sticky inside the scroller - a
-  // deliberate departure, because the aside is a single scrolling element and turning it into a
-  // two-track column would re-home its overflow, its inset and the no-selection empty state that
-  // shares it. A departure is only honest if the rendered result is the same.
-  //
-  // IT WAS NOT. The band carries a negative bottom margin so its border box can reach past the
-  // aside's own inset, and a sticky element is pinned by its MARGIN box rather than its border
-  // box - so a negative bottom margin displaces the pinned edge upward by its own magnitude and
-  // the painted edge lands that far short. It does not cancel itself. Measured in this fixture:
-  // 16px of scrolled inheritance row rendering below the band, inside the aside.
-  //
-  // The remedy is the matching sticky inset, which moves the constraint edge down by the same
-  // amount. Dropping the negative margin and keeping the inset is NOT equivalent, and the
-  // short-panel case below is what rejects it: with no negative margin the band cannot reach
-  // past its containing block's content edge at all, so a short panel goes straight back to
-  // leaving a strip of aside beneath it. Both were measured; only this pair is flush in both.
+  // S1. `proto:2578` puts the footer OUTSIDE the scroller as a `flex: 0 0 auto` track.
   const { page, close } = await renderColumn(14, 'member');
   try {
     const band = await page.evaluate(READ_PINNED_BAND);
@@ -937,12 +915,7 @@ test('the pinned inspector band paints flush with the bottom of its column', asy
 });
 
 test('a short inspector leaves the space above the band, not below it', async () => {
-  // The other half of `proto:2578`, and the half a sticky offset can get wrong in the opposite
-  // direction. The design's footer is a flex track, so a short panel simply leaves empty column
-  // between the last card and the band - `tmp/proto/tool-rules.png` shows a tall gap above the
-  // non-member CTA. `margin-top: auto` is what reproduces that here, and it has to keep doing so
-  // once the sticky inset is negative: an offset that pushed the band clear of its containing
-  // block would float it, and a panel with nothing to scroll is where that would show.
+  // The other half of `proto:2578`.
   const { page, close } = await renderColumn(1, 'absent');
   try {
     const band = await page.evaluate(READ_PINNED_BAND);
@@ -959,17 +932,7 @@ test('a short inspector leaves the space above the band, not below it', async ()
 });
 
 test('the inspector CTA keeps the reference emphasis split between its two states', async () => {
-  // S2. `proto:4897` gives the footer's two states different weights: a member gets a SOLID fill
-  // with reversed text, and a Tool this system has no rules for gets a soft tint carrying the
-  // same hue as its foreground. Ours painted both as the identical solid slab, so the one control
-  // that changes meaning between the two panels stopped saying so.
-  //
-  // THE GREEN RULING IS SATISFIED BY THIS RATHER THAN STRAINED BY IT. The maintainer ruled that
-  // our primaries hold the success tone where the design uses its accent; the design's NON-member
-  // treatment is already green, and its whole success family is byte-identical to ours - same
-  // hue, same 16% soft, same 56% border. So the member's solid green stays as the recorded
-  // deviation and the non-member takes the design's own value, and nothing moves toward the
-  // accent in either state.
+  // S2. `proto:4897` gives the footer's two states different weights.
   const solid = await renderColumn(1, 'member');
   let member;
   try {
@@ -999,8 +962,7 @@ test('the inspector CTA keeps the reference emphasis split between its two state
       'proto:4897 non-member edge'
     );
 
-    // The split itself, asserted as a DIFFERENCE and not only as two absolute values: two rules
-    // can each be right about their own state and still be written so that one never applies.
+    // The split itself, asserted as a DIFFERENCE and not only as two absolute values.
     assert.notEqual(absent.background, member.background, 'the two states differ in fill');
     assert.notEqual(absent.color, member.color, 'and in foreground');
     // And the member keeps the ruling's solid green, so this is not a repaint of both.

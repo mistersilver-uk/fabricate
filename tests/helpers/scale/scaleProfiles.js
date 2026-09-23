@@ -1,76 +1,6 @@
 /**
- * The scale-profile registry (issue 1071).
- *
- * A profile is a FIXTURE, not a measurement: `{profile, seed}` in, a complete synthetic world
- * out, with nothing timed and nothing measured. Benchmark cases (`benchmarkCases.js`) then run
- * against a profile. Keeping the two apart is what makes "benchmark generation/setup is
- * excluded from timed regions" enforceable rather than aspirational — the runner builds the
- * fixture, stops, and only then starts the clock.
- *
- * ## The three axes, and why they are separate profiles
- *
- * The corpus-axis profiles scale the CORPUS and hold inventory at a token 20 stacks.
- * `held-inventory` does the exact opposite: it pins the corpus at 20 recipes and varies held
- * stacks across 100 / 500 / 1,000 against the full 5,000-component library. `component-library`
- * (issue 1204) pins BOTH and varies the library across 1,000 / 5,000 / 10,000. That separation
- * is the whole point — a profile that grew two axes together could not attribute a regression
- * to either, and the field failure this programme exists to fix was an inventory-axis failure
- * that every corpus-shaped criterion would have reported as green. The library axis arrived
- * last, and {@link COMPONENT_LIBRARY_SERIES} records why.
- *
- * ## Declared measurement ceilings
- *
- * Five profiles bound an axis rather than running it at the epic's target scale, and each one
- * is bounded for a reason that is recorded on the profile itself so a baseline reader does not
- * have to guess:
- *
- * - `alchemy-signatures` is capped at 2,000 enabled signatures, not 5,000.
- *   `SignatureValidator.validateSystem` is cleanly quadratic; at 5,000 one audit extrapolates
- *   to ~6.1 s, and the PRE-FIX N-audits-per-N-rows behaviour #1074 targets extrapolates to
- *   roughly 8.5 hours for one GM manager open. The "before" number at full scale cannot be
- *   obtained and is not needed: the fix is proved by the comparison counter, not by a clock.
- * - `recipe-graph` bounds both depth and fan-out. `buildRecipeGraph` emits one edge per
- *   (producer, consumer) pair, so an unbounded dense corpus makes the benchmark the pathology
- *   it is measuring; and `layoutGraph`'s cycle-detection DFS is recursive and unguarded, so an
- *   unbounded chain stack-overflows before layout ever gets slow.
- * - `held-inventory` pins the recipe corpus at 6. `evaluateCraftability` is
- *   `recipes × items × components`; measured on this checkout at 1,000 held stacks against
- *   5,000 components it costs ~137 ms PER RECIPE, so a 10,000-recipe player open at full
- *   inventory is a ~23-minute measurement. Six rows is enough to show the series — the counts
- *   are still nine figures — and keeps the drift test's re-derivation inside `npm test`.
- * - `alchemy-knowledge` bounds BOTH its corpus and its inventory, at 500 recipes and 200
- *   stacks. Every other profile bounds one axis so the other can be read as a slope; this one
- *   deliberately does not, because the term it records is the PRODUCT of the two and a profile
- *   that pinned either could not contain it. Its counterpart single-axis series are
- *   `alchemy-signatures` (recipes, no held books) and `held-inventory` (items, no alchemy).
- * - `component-library` pins the corpus at 6 and the inventory at 1,000 stacks for the same
- *   reason one level across: it varies the library and must vary nothing else, and a case that
- *   moved a second axis could not attribute a count to either. Its library goes ABOVE the
- *   epic's 5,000 target rather than below it, because the point of the profile is the SLOPE and
- *   a third point past the target is what fixes one.
- *
- * The corpus axis for the SAME path lives on `simple-corpus` as its own 25 / 50 / 100 row
- * series against a token 20-stack inventory. Two orthogonal series over one code path is what
- * makes a regression attributable to an axis instead of merely visible.
- *
- * ## Foundry-only profiles, and why the sweep must skip them
- *
- * A profile is a fixture, and not every fixture has a headless case worth running. A corpus that
- * exists ONLY to be seeded into a live Foundry world would oblige `benchmarkCases.js` to invent
- * headless cases for it and `benchmarks/baselines/` to carry a committed baseline for them,
- * inside `npm test` — cost with no reader.
- *
- * So a profile MAY declare `foundryOnly` with a reason, which means exactly one thing: the
- * headless BENCHMARK sweep does not run it. Everything else still does. It is built by
- * {@link buildScaleFixture}, it is covered by every fixture-level guard in
- * `tests/benchmark-harness.test.js` (reproducibility, declared scale, serialization), and
- * `tests/benchmark-baseline-drift.test.js` pins the foundry-only SET so the escape hatch cannot
- * quietly widen to a profile that should have had cases. {@link SWEPT_SCALE_PROFILE_NAMES} is
- * the sweep's list; {@link SCALE_PROFILE_NAMES} remains every registered profile.
- *
- * NO profile claims the exemption today. Issue 1255's `granular-corpus` was the only one, and
- * issue 1265 removed it with the storage-arrangement axis it existed for; the pinned set is now
- * empty. The mechanism stays because the pin is what makes re-adding a member a visible edit.
+ * The scale-profile registry (issue 1071). `alchemy-signatures` is capped at 2,000 enabled
+ * signatures, not 5,000.
  */
 import { buildComponentLibrary, buildToolLibrary } from './scaleComponents.js';
 import { INVENTORY_SERIES, buildHeldInventory } from './scaleInventory.js';
@@ -90,11 +20,8 @@ export const DEFAULT_SEED = 1071;
 
 /**
  * The harness version. Bump it when a generator changes shape in a way that legitimately moves
- * every committed count, so a baseline diff carries the reason with it.
- *
- * 2 — `pickDistinct` became a partial Fisher-Yates instead of bounded rejection sampling. Same
- *     contract, different draw sequence, so every component's essence and tag picks moved and
- *     with them every fixture checksum and every downstream count.
+ * every committed count, so a baseline diff carries the reason with it. 2 — `pickDistinct` became a
+ * partial Fisher-Yates instead of bounded rejection sampling.
  */
 export const HARNESS_VERSION = 2;
 
@@ -102,15 +29,8 @@ export const HARNESS_VERSION = 2;
 const CORPUS_AXIS_STACKS = 20;
 
 /**
- * THE COMPONENT-LIBRARY AXIS (issue 1204): the library sizes `component-library` sweeps.
- *
- * The third axis, and until #1204 the one no committed case varied. `held-inventory` varies
- * items against a pinned 5,000-component library and `simple-corpus` varies recipes against the
- * same pinned library, so both hold `components` constant — which means the listing half of
- * #1070's "not proportional to `items x components`" rested on a pinned equality at ONE library
- * size rather than on a series. Two series over one path is what turns
- * `cost = a*components + b*items` from an assertion into two readable slopes.
- * @type {readonly number[]}
+ * THE COMPONENT-LIBRARY AXIS (issue 1204): the library sizes `component-library` sweeps. The third
+ * axis, and until #1204 the one no committed case varied.
  */
 export const COMPONENT_LIBRARY_SERIES = Object.freeze([1000, 5000, 10_000]);
 
@@ -123,14 +43,6 @@ const COMPONENT_LIBRARY_RECIPES = 6;
 /**
  * Every component id one component's SALVAGE block references, which is the only kind of
  * component-to-component reference `buildComponentLibrary` can emit.
- *
- * Both legs are taken from the repository's own enumeration of the salvage sites —
- * `src/systems/importReferenceResolver.js` § "Component salvage result refs + legacy salvage
- * catalysts" remaps `salvage.resultGroups[].results[]` AND `salvage.catalysts[]`, reading a
- * component id from either the bare `componentId` field or a nested `match.componentId`. The
- * catalyst leg cannot fire today because the generator emits no catalysts; it is here so that
- * teaching the generator to emit them cannot silently escape the closure check below, which is
- * the failure mode a hand-maintained mirror of a builder always has.
  *
  * @param {object} entry A generated component.
  * @returns {string[]} The component ids it names, in walk order.
@@ -150,27 +62,10 @@ function salvageComponentRefs(entry) {
 }
 
 /**
- * Assert that a library PREFIX is closed under its own SALVAGE references.
+ * Assert that a library PREFIX is closed under its own SALVAGE references. `buildComponentLibrary`
+ * gives every fourth component a salvage result naming `c-((index + 1) % count)`, where `count` is
+ * the size the library was BUILT at.
  *
- * Salvage rather than "component references" in general, and the narrower claim is the honest
- * one: {@link salvageComponentRefs} is what this checks, and the other component-to-component
- * reference kinds the same resolver remaps (a tool's `componentId`, an essence definition's
- * `sourceComponentId`) are not emitted by `buildComponentLibrary` at all and are not this
- * function's subject.
- *
- * `buildComponentLibrary` gives every fourth component a salvage result naming
- * `c-((index + 1) % count)`, where `count` is the size the library was BUILT at. A prefix of
- * that library therefore dangles a salvage reference whenever its last component is
- * salvage-enabled, and a dangling reference resolves to no component in the inventory
- * listing's by-id library map — a per-series-point behavioural difference with nothing to do
- * with library size, which is precisely what a controlled series must not contain.
- *
- * Today's series bounds cannot produce one (every bound is a multiple of 4, so every prefix
- * ends on an index congruent to 3 and salvage is enabled only on multiples of 4). This makes
- * that a checked property rather than an arithmetic coincidence a later edit to
- * {@link COMPONENT_LIBRARY_SERIES} could silently break.
- *
- * @param {object[]} prefix
  * @returns {object[]} `prefix`, so it can be used inline.
  */
 function libraryPrefixClosedUnderSalvage(prefix) {
@@ -208,14 +103,7 @@ function baseSystem({ systemId, components, tools, overrides = {} }) {
   };
 }
 
-/**
- * Every registered profile.
- *
- * Each entry declares its scale, its fixture CONSTRUCTION (`literal` payloads vs hydrated
- * models — issue 1071 requires this be stated per profile because mixing them silently makes
- * numbers incomparable), whether it needs an `npm ci` (`requiresNodeModules`), and any ceiling
- * it is bounded by.
- */
+/** Every registered profile (issue 1071). */
 export const SCALE_PROFILES = Object.freeze({
   'simple-corpus': {
     description: '10,000 simple recipes over a 5,000-component library; token 20-stack inventory.',
@@ -311,9 +199,8 @@ export const SCALE_PROFILES = Object.freeze({
         random,
         shapeOptions: { bookCount },
       });
-      // The acting character holds HALF the books and has learned a slice of the corpus, so
-      // both knowledge grant paths (`hasMatchedItem` and `hasLearned`) run for real. A
-      // fixture granting everything would make the gate return on its first branch.
+      // The acting character holds HALF the books and has learned a slice of the corpus, so both
+      // knowledge grant paths (`hasMatchedItem` and `hasLearned`) run for real.
       const inventory = buildHeldInventory({
         stacks: CORPUS_AXIS_STACKS,
         components,
@@ -439,11 +326,8 @@ export const SCALE_PROFILES = Object.freeze({
         random,
         shapeOptions: { collidingCount: 50 },
       });
-      // Half the books are held and 100 recipes are brew-discovered, so BOTH reveal branches
-      // run for real. The held half is what makes the item branch reach the candidate walk;
-      // the learned slice is what makes `_projectLearnedRecipe` run at all. Issue 1217 records
-      // that `alchemy-signatures` has neither, which is why its `alchemyListing.buildListing`
-      // case projects zero rows and cannot see this path.
+      // Half the books are held and 100 recipes are brew-discovered, so BOTH reveal branches run
+      // for real (issue 1217).
       const inventory = buildHeldInventory({
         stacks: 200,
         components,
@@ -544,9 +428,7 @@ export const SCALE_PROFILES = Object.freeze({
         random,
         sourceActorCount: 1,
       });
-      // Drawn LAST, after every pre-existing generator. Each of these builders consumes the
-      // shared seeded stream, so inserting the depth axis anywhere earlier would shift every
-      // later draw and move committed checksums that nothing about this axis should touch.
+      // Drawn LAST, after every pre-existing generator.
       const deep = buildGraphChainCorpus({
         count: 20_000,
         systemId: `${BENCH_SYSTEM_ID}c`,
@@ -599,8 +481,6 @@ export const SCALE_PROFILES = Object.freeze({
         random,
       });
       // ONE inventory per series point, all against the SAME library and the SAME corpus.
-      // This is the independence the acceptance criteria require: the only thing that varies
-      // between `series[0]` and `series[2]` is the held-stack count.
       const series = INVENTORY_SERIES.map((stacks) =>
         buildHeldInventory({
           stacks,
@@ -636,9 +516,7 @@ export const SCALE_PROFILES = Object.freeze({
       'one aggregate number. Bounded at 10,000 components because the point is the SLOPE, and a ' +
       'third point already fixes it.',
     scale: {
-      // The library the series is SLICED FROM, which is the largest series point. Declared
-      // under the same key every other profile uses so `benchmark-harness.test.js`'s
-      // "honours its declared scale" check covers this profile too rather than skipping it.
+      // The library the series is SLICED FROM, which is the largest series point.
       components: COMPONENT_LIBRARY_SERIES.at(-1),
       componentSeries: [...COMPONENT_LIBRARY_SERIES],
       recipes: COMPONENT_LIBRARY_RECIPES,
@@ -648,11 +526,7 @@ export const SCALE_PROFILES = Object.freeze({
     },
     build(random) {
       // ONE library, sliced into NESTED prefixes, rather than three independently generated
-      // libraries. Independent libraries would draw different essences and tags at the same
-      // index — so `c-5` would not be the same component at 1,000 and at 10,000 — and a count
-      // that moved across the series could then be blamed on content rather than on size. A
-      // prefix makes the 1,000-component world literally a sub-library of the 10,000-component
-      // one, which is the same discipline held-inventory applies to its inventory series.
+      // libraries.
       const components = buildComponentLibrary({
         count: COMPONENT_LIBRARY_SERIES.at(-1),
         random,
@@ -661,10 +535,8 @@ export const SCALE_PROFILES = Object.freeze({
       const componentSeries = COMPONENT_LIBRARY_SERIES.map((count) =>
         libraryPrefixClosedUnderSalvage(components.slice(0, count))
       );
-      // Corpus and inventory are drawn against the SMALLEST prefix, so every authored
-      // ingredient and every matched stack exists — identically — at every point of the series.
-      // Drawn against the full library they would reference components the smaller points do
-      // not contain, and the series would measure recipe solvability as well as library size.
+      // Corpus and inventory are drawn against the SMALLEST prefix, so every authored ingredient
+      // and every matched stack exists — identically — at every point of the series.
       const smallest = componentSeries[0];
       const recipes = buildRecipeCorpus({
         shape: 'simple',
@@ -697,47 +569,21 @@ export const SCALE_PROFILES = Object.freeze({
 /** Every registered profile name, in a stable order. */
 export const SCALE_PROFILE_NAMES = Object.freeze(Object.keys(SCALE_PROFILES));
 
-/**
- * The profiles that exist to be seeded into a live Foundry world and have NO headless cases.
- *
- * See the module header. Derived from the registry rather than restated, so a profile that
- * declares `foundryOnly` cannot end up on one list and off the other.
- *
- * @type {readonly string[]}
- */
+/** The profiles that exist to be seeded into a live Foundry world and have NO headless cases. */
 export const FOUNDRY_ONLY_SCALE_PROFILE_NAMES = Object.freeze(
   SCALE_PROFILE_NAMES.filter((profile) => SCALE_PROFILES[profile].foundryOnly === true)
 );
 
 /**
  * The profiles the HEADLESS benchmark sweep runs: every registered profile that is not
- * foundry-only.
- *
- * This is the list `scripts/benchmark-performance.mjs` defaults to and the list the committed
- * class-1 baselines are required for. It is deliberately a SUBTRACTION from
- * {@link SCALE_PROFILE_NAMES} rather than a second hand-maintained list: a new profile is swept
- * unless it positively opts out, so forgetting to register one is impossible in the direction
- * that loses coverage.
- *
- * @type {readonly string[]}
+ * foundry-only. This is the list `scripts/benchmark-performance.mjs` defaults to and the list the
+ * committed class-1 baselines are required for.
  */
 export const SWEPT_SCALE_PROFILE_NAMES = Object.freeze(
   SCALE_PROFILE_NAMES.filter((profile) => SCALE_PROFILES[profile].foundryOnly !== true)
 );
 
-/**
- * Build one profile's fixture from `{profile, seed}` and nothing else.
- *
- * @param {object} options
- * @param {string} options.profile
- * @param {number} [options.seed]
- * @returns {{profile: string, seed: number, harnessVersion: number, description: string,
- *   construction: string, requiresNodeModules: boolean, ceiling: string|null,
- *   foundryOnly: boolean, foundryOnlyReason: string|null,
- *   scale: object, system: object, components: object[], tools: object[], recipes: object[],
- *   inventory: object, inventorySeries?: object[], componentSeries?: object[][],
- *   graphs?: object}}
- */
+/** Build one profile's fixture from `{profile, seed}` and nothing else. */
 export function buildScaleFixture({ profile, seed = DEFAULT_SEED }) {
   const definition = SCALE_PROFILES[profile];
   if (!definition) {

@@ -1,46 +1,39 @@
 <!--
   The product's ONE threshold band strip: N ordered, named bands over a value track, with a
-  draggable, keyboard-operable handle on every INTERNAL boundary — so N bands yield N−1 handles and
-  the outermost authored bounds have none. It is a VISUALISATION, never the authority: the numeric
-  `Stepper`s in the tier rows below edit the same state through the same `onChange`.
+  draggable, keyboard-operable handle on every INTERNAL boundary, so N bands yield N−1 handles. It is
+  a VISUALISATION, never the authority: the numeric `Stepper`s in the tier rows below edit the same
+  state through the same `onChange`.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `binding` | `'relative'` \| `'fixed'` \| `'simple'` | `'relative'` | Which authored field a handle writes, emitted as a PATCH rather than a raw index so a caller cannot get the mapping wrong. `relative` writes `{ binding, index: i + 1, dc: <offset against the previewed DC> }`; `fixed` writes the coupled pair as ONE update, `{ binding, index: i, end: v - 1, nextIndex: i + 1, start: v }`, because ranges are inclusive on both ends and the boundary value IS the next band's start; `simple` writes `{ binding, dc: v }`. |
-  | `bands` | `{ id, name, color, ink, from, to?, index? }[]` | `[]` | ABSOLUTE track values, whatever the binding underneath — a strip that also had to read three authored shapes would be three components wearing one name. `to` is derived from the next band's `from` when omitted. `ink` travels with `color` because the two are ONE decision: the name is drawn ON the fill, so whoever picks the fill is the only party that can know what stays readable on it, and the `--fab-text` fallback is right only for a fill chosen against it. Bands are DRAWN in value order and WRITTEN through `index`, the position in the caller's own AUTHORED array — the two differ for a descending tier list, which is a perfectly valid thing for a GM to author, and sorting the authored array instead would reorder their tier rows from a drag. |
-  | `previewDc` / `previewLabel` | number / string | `0` / `''` | The previewed record. Only `relative` reads the DC, to convert absolute ↔ offset; the label is used in the group name and the dual `aria-valuetext`. |
-  | `step` / `pageStep` | numbers | `1` / `5` | The keyboard increments and the snap grid. |
-  | `min` / `max` | numbers or `null` | `null` | Track domain overrides. `simple` passes the DC stepper's own range through these. |
-  | `groupLabel` | string | `'Outcome bands'` | The group's accessible name. |
-  | `boundaryLabel(band, next)` | function | name pair | The accessible name of the handle between two bands. |
-  | `fallbackNote` | string | `''` | Rendered INSTEAD of the strip when the authored set is not contiguous: a gapped or overlapping FIXED set is reachable and a contiguous strip cannot draw it, so rather than lie about the shape the tier rows are left as the only editor. |
-  | `disabled` | boolean | `false` | The handles go inert. |
-  | `dataAttr` / `dataValue` | strings | `''` | The caller's own hook on the root. |
+  | `binding` | `'relative'` \| `'fixed'` \| `'simple'` | `'relative'` | Which authored field a handle writes, emitted as a PATCH rather than a raw index so a caller cannot get the mapping wrong. `relative` writes `{ binding, index: i + 1, dc }`; `fixed` writes the coupled pair as ONE update, `{ binding, index: i, end: v - 1, nextIndex: i + 1, start: v }`, because ranges are inclusive on both ends and the boundary value IS the next band's start; `simple` writes `{ binding, dc: v }`. |
+  | `bands` | `{ id, name, color, ink, from, to?, index? }[]` | `[]` | ABSOLUTE track values, whatever the binding underneath. `to` is derived from the next band's `from` when omitted. `ink` travels with `color` because the two are ONE decision: the name is drawn ON the fill, so whoever picks the fill is the only party that can know what stays readable on it. Bands are DRAWN in value order and WRITTEN through `index`, the position in the caller's own AUTHORED array; the two differ for a descending tier list, and sorting the authored array instead would reorder the tier rows from a drag. |
+  | `previewDc` / `previewLabel` | number / string | `0` / `''` | The previewed record. Only `relative` reads the DC, to convert absolute ↔ offset. |
+  | `step` / `pageStep` / `min` / `max` | numbers or `null` | `1` / `5` / `null` / `null` | The keyboard increments and snap grid, and the track domain overrides `simple` passes the DC stepper's own range through. |
+  | `groupLabel` / `boundaryLabel(band, next)` | string / function | `'Outcome bands'` / name pair | The group's accessible name, and the accessible name of the handle between two bands. |
+  | `fallbackNote` | string | `''` | Rendered INSTEAD of the strip when the authored set is not contiguous: a gapped or overlapping FIXED set is reachable and a contiguous strip cannot draw it, so the tier rows are left as the only editor. |
+  | `disabled` / `dataAttr` / `dataValue` | boolean / strings | `false` / `''` | The handles go inert, and the caller's own hook on the root. |
   | `onChange(patch)` | function | no-op | The authored patch, per binding above. |
 
   Invariants:
-  - NO GRADIENT, AND NO VISUAL-STYLE EXEMPTION CLAIMED. `ui-integration/spec.md` exempts a
-    FULL-TRACK semantic scale from the no-gradients rule; this strip claims none, because per-band
-    identity is the point of the control and a gradient across the track would erase it. A runtime
-    colour applied inline is authored DATA rather than a source literal, so it is outside
+  - NO GRADIENT, AND NO VISUAL-STYLE EXEMPTION CLAIMED: `ui-visual-style/spec.md` exempts a
+    FULL-TRACK semantic scale, and this strip claims none, because per-band identity is the point. A
+    runtime colour applied inline is authored DATA rather than a source literal, so it is outside
     `tests/components/theme-colour-contract.test.js`'s remit, and a band with no authored colour
-    falls back to a theme token through a CLASS, never to a hard-coded value.
-  - `aria-valuenow` CARRIES THE ABSOLUTE NUMBER and `aria-valuetext` CARRIES BOTH READINGS,
-    because in `relative` mode the tier rows author OFFSETS while the strip renders absolutes
-    against a previewed record — so switching records re-announces every handle with no data
-    change.
-  - EVERY BAND KEEPS AT LEAST ONE STEP OF WIDTH, including the first and the last, so the bounds
-    are ONE STEP INSIDE the neighbouring boundaries and one step inside the TRACK at the outermost
-    handles. Without it handle 0 collapses a named tier to nothing, with its focus ring clipped
-    away by the track's `overflow: hidden`. In `relative` mode "one step" is the TIER interval
-    rather than the stepper's increment, which keeps the last band its neighbours' width.
-  - A HANDLE DRAGGED OR KEYED PAST A NEIGHBOUR CLAMPS. It never swaps and never reorders:
-    reordering a tier list from a drag is a data change no undo on this surface can express.
+    falls back to a theme token through a CLASS.
+  - `aria-valuenow` CARRIES THE ABSOLUTE NUMBER and `aria-valuetext` CARRIES BOTH READINGS, because
+    in `relative` mode the tier rows author OFFSETS while the strip renders absolutes against a
+    previewed record — so switching records re-announces every handle with no data change.
+  - EVERY BAND KEEPS AT LEAST ONE STEP OF WIDTH, including the first and the last, so the bounds are
+    one step inside the neighbouring boundaries and one step inside the TRACK at the outermost
+    handles; without it handle 0 collapses a named tier to nothing, with its focus ring clipped away
+    by the track's `overflow: hidden`. In `relative` mode "one step" is the TIER interval.
+  - A HANDLE DRAGGED OR KEYED PAST A NEIGHBOUR CLAMPS. It never swaps and never reorders: reordering
+    a tier list from a drag is a data change no undo on this surface can express.
   - EVERY HANDLE IS A REAL ARIA WIDGET: `role="slider"`, focusable, with a hit area of at least
-    24×24 CSS pixels (WCAG 2.5.8), because the ~2px seam is not a target. The prototype's
-    click-handled bare `<span>` controls are never copied, and a `role="button"` wrapper is never
-    converted into a `<button>`, which would nest buttons and land invalid DOM.
+    24×24 CSS pixels (WCAG 2.5.8), because the ~2px seam is not a target. A `role="button"` wrapper
+    is never converted into a `<button>`, which would nest buttons and land invalid DOM.
 -->
 <script>
   let {
@@ -66,20 +59,12 @@
 
   const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
 
-  // `null` and `''` are ABSENT, not zero: a bare coercion turns every omitted upper edge — which
-  // is how `relative` hands its bands over — into an authored `to: 0`, and the adjacency check
-  // below then reads a contiguous set as gapped and falls back to the note on every frame.
   const numeric = (value) => {
     if (value === null || value === undefined || value === '') return null;
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
   };
 
-  /**
-   * The bands with every derived edge resolved, or `null` when the authored set cannot be
-   * drawn as a contiguous strip. Returning null rather than throwing keeps the fallback a
-   * rendering decision the template makes once.
-   */
   const resolved = $derived.by(() => {
     if (!Array.isArray(bands) || bands.length < 2) return null;
     const rows = bands
@@ -97,8 +82,6 @@
 
     for (let index = 0; index < rows.length - 1; index += 1) {
       if (rows[index + 1].from <= rows[index].from) return null;
-      // An upper edge that does not meet the next lower edge is a GAP. Inclusive ranges meet at
-      // `to + 1`.
       if (rows[index].to !== null && rows[index].to + 1 !== rows[index + 1].from) return null;
     }
     return rows;
@@ -119,11 +102,6 @@
     return { min: low ?? first, max: high ?? derivedMax };
   });
 
-  /**
-   * The value the DRAWN track ends at, which is not always the domain's own maximum: a `fixed`
-   * band owns an INCLUSIVE range, so a band ending at 20 occupies the track up to 21. An explicit
-   * `max` override is respected verbatim.
-   */
   const trackMax = $derived.by(() => {
     if (!resolved || binding !== 'fixed' || numeric(max) !== null) return domain.max;
     return resolved.at(-1).to !== null ? domain.max + 1 : domain.max;
@@ -133,12 +111,6 @@
 
   const percentOf = (value) => ((value - domain.min) / span) * 100;
 
-  /**
-   * The `[lower, upper]` bound a handle may move between; see the header's width invariant. A
-   * degenerate interval — a tier narrower than `step`, which authored data can be — would report
-   * `aria-valuemin` ABOVE `aria-valuemax`, a range no assistive technology can describe, so it
-   * reports the handle's current value for both instead: this handle has nowhere to go.
-   */
   function boundsFor(index) {
     const lower = index === 0 ? domain.min + step : boundaries[index - 1] + step;
     const upper = index === boundaries.length - 1 ? trackMax - step : boundaries[index + 1] - step;
@@ -149,11 +121,6 @@
     return [lower, upper];
   }
 
-  /**
-   * The ANNOUNCED range: the movement range widened to contain the handle's own value, because
-   * `aria-valuenow` outside its own bounds is a slider no assistive technology can read out. The
-   * MOVEMENT clamp is deliberately left narrow.
-   */
   function ariaBoundsFor(index) {
     const [lower, upper] = boundsFor(index);
     const now = boundaries[index];
@@ -208,12 +175,6 @@
     commit(index, next);
   }
 
-  /**
-   * The scale a drag maps against, FROZEN at pointerdown, and one snapshot per gesture: `domain`
-   * is `$derived` from the tier list, so dragging the last handle right raised `domain.max`, which
-   * stretched `span`, which made the same pointer position resolve to a larger value — a feedback
-   * loop that diverged geometrically rather than tracking the pointer.
-   */
   let dragScale = null;
 
   function valueAtClientX(clientX) {
@@ -251,10 +212,6 @@
     dragScale = null;
   }
 
-  /**
-   * The dual reading: the absolute number the tick shows, and the relative one the tier row's
-   * stepper shows for the same state.
-   */
   function valueText(index) {
     const absolute = boundaries[index];
     if (binding !== 'relative') {
@@ -299,8 +256,6 @@
 
       {#each boundaries as boundary, index (index)}
         {@const bounds = ariaBoundsFor(index)}
-        <!-- A real ARIA widget nested INSIDE the track rather than a wrapper converted into a
-             `<button>`, which would nest buttons. -->
         <span
           class="fab-band-strip-handle"
           class:is-dragging={dragIndex === index}
@@ -342,17 +297,11 @@
     width: 100%;
   }
 
-  /* `position: relative` is load-bearing: every band and every handle is placed against the track
-     as a percentage of the value domain, which keeps the drawn seam and the pointer mapping in
-     agreement. */
   .fab-band-strip-track {
     position: relative;
     box-sizing: border-box;
     width: 100%;
 
-    /* Measured from the prototype and pinned by the Checks Studio parity fixture's `band-strip`
-       region. A translucent raised surface let whatever the strip was stacked on show through an
-       unfilled gap. */
     height: 46px;
     overflow: hidden;
     border: 1px solid var(--fab-border);
@@ -360,12 +309,6 @@
     background: var(--fab-bg-0);
   }
 
-  /* SOLID fills with hard edges; see the header. The caller's runtime colour arrives inline as a
-     custom property and is painted from here rather than landing inline as `background`, for two
-     reasons about the value being real: the DECLARED FALLBACK means an unresolvable colour paints
-     the neutral surface rather than nothing at all, since an unset `var()` resolves to the
-     guaranteed-invalid value; and happy-dom's `cssText` parser silently DISCARDS a `color-mix()`
-     written as a `background` value while preserving it verbatim as a custom property. */
   .fab-band-strip-band {
     position: absolute;
     top: 0;
@@ -387,9 +330,6 @@
     border-left: 1px solid var(--fab-border);
   }
 
-  /* A long localized band name truncates rather than wrapping, so it cannot change the strip's
-     height and shove the tier rows' steppers down the page. The ink arrives inline as a custom
-     property for the same two reasons the fill does. */
   .fab-band-strip-band-name {
     max-width: 100%;
     overflow: hidden;
@@ -400,8 +340,6 @@
     white-space: nowrap;
   }
 
-  /* WCAG 2.5.8: a 24x24 target centred on the seam. The visible grip is narrower on purpose —
-     the hit area is what the pointer needs, the grip is what the eye needs. */
   .fab-band-strip-handle {
     position: absolute;
     top: 50%;

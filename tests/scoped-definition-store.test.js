@@ -1,16 +1,7 @@
 /**
- * The world-scope entity STORE contract (issue 1359, part of epic 1357).
- *
- * ONE PARAMETERIZED CONTRACT, CALLED ONCE PER KEY, on #1358's `tests/scoped-definitions.test.js`
- * precedent — not three near-duplicate suites. SonarCloud counts `tests/**` duplication against the
- * new-code gate and does not honour `sonar.cpd.exclusions`, so three copies of a store suite would
- * fail the gate while proving exactly what one parameterized run proves.
- *
- * WHAT THIS SUITE IS FOR. Every property asserted here is one the Valid Id Basis depends on. A
- * store that reported `isSeeded()` from the NORMALIZED value instead of the raw payload, or that
- * threw on an unreadable setting, or that published its cache after the write rather than before,
- * would still pass a "does it round-trip" test and would still destroy a corpus. So the cases are
- * organised by the failure they prevent rather than by the method they call.
+ * The world-scope entity STORE contract (issue 1359, part of epic 1357). ONE PARAMETERIZED
+ * CONTRACT, CALLED ONCE PER KEY, on #1358's `tests/scoped-definitions.test.js` precedent — not
+ * three near-duplicate suites.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -63,17 +54,7 @@ function settingsSeam(initial = {}) {
   };
 }
 
-/**
- * A DISTINCT, NON-DEFAULT, NON-EMPTY payload for one scope.
- *
- * `suffix` makes each key's seeded content different from the others', which is what criterion 5's
- * independence check needs: three identical payloads would compare "unchanged" even if a write had
- * clobbered all three.
- *
- * @param {object} scope
- * @param {string} suffix
- * @returns {object}
- */
+/** A DISTINCT, NON-DEFAULT, NON-EMPTY payload for one scope. */
 function payloadFor(scope, suffix) {
   const first = `ent-${suffix}-1`;
   const second = `ent-${suffix}-2`;
@@ -91,9 +72,7 @@ for (const scope of SCOPES) {
   describe(`the ${scope.name} store`, () => {
     // --- Criterion 2: the seeded predicate -------------------------------------------------
     it('reports an UNWRITTEN setting as unseeded, per sub-key, even though it reads as empty', () => {
-      // THE CASE THAT DESTROYS WORLDS. Foundry returns the REGISTERED DEFAULT for a world setting
-      // that was never written, so every unmigrated client reads `{}` and normalizes to three
-      // empty collections — identical, at this API, to a GM who deliberately emptied them.
+      // THE CASE THAT DESTROYS WORLDS.
       const seam = settingsSeam({ [scope.settingKey]: {} });
       const store = scope.create(seam);
       assert.deepEqual(store.listEntities(), []);
@@ -105,8 +84,7 @@ for (const scope of SCOPES) {
 
     it('reports a GM-EMPTIED sub-key as seeded, and its unwritten siblings as not', () => {
       // The distinction the basis turns on: "written empty" is a real, empty, PRUNABLE basis;
-      // "never written" is not. The aggregate form ORs across sub-keys, which is exactly why
-      // `_scopeBasis` asks `isSeeded('entities')` and never the aggregate.
+      // "never written" is not.
       const seam = settingsSeam({ [scope.settingKey]: { entities: [] } });
       const store = scope.create(seam);
       assert.equal(store.isSeeded('entities'), true, 'the GM emptied the roster deliberately');
@@ -174,9 +152,7 @@ for (const scope of SCOPES) {
     // --- Criterion 4: publish before await -------------------------------------------------
     it('publishes the cache BEFORE awaiting the write', async () => {
       // `tests/currency-config-store.test.js`'s working precedent: a delayed `setSetting` promise
-      // plus a SYNCHRONOUS read taken mid-flight. Publish after the await and a second edit that
-      // starts while the first is in flight reads the pre-first-edit corpus and clobbers it —
-      // which, on a label field firing one write per keystroke, is the GM's typing disappearing.
+      // plus a SYNCHRONOUS read taken mid-flight.
       let releaseWrite;
       const store = scope.create({
         getSetting: () => ({}),
@@ -274,10 +250,7 @@ describe('the three world scope settings', () => {
     assert.equal(SETTING_KEYS.TOOL_SCOPE, 'toolScope');
     // `fabricate.worldVocabulary` EXISTS since issue 1392, and this assertion INVERTS with it —
     // deliberately, because the claim was never "it does not exist" but "it is not one of these
-    // three". `## Scoped Entity Definitions` requirement 13 enumerates the three SCOPED-ENTITY
-    // layers, and the World Vocabulary is a fourth world setting of the same registration shape
-    // modelled by `## World Vocabulary`. It carries no entity roster, no world defaults and no
-    // membership records, so no `createScopedDefinitionStore` call site takes its key.
+    // three".
     assert.equal(SETTING_KEYS.WORLD_VOCABULARY, 'worldVocabulary');
     assert.equal(
       SCOPES.some((scope) => scope.settingKey === SETTING_KEYS.WORLD_VOCABULARY),
@@ -288,11 +261,7 @@ describe('the three world scope settings', () => {
 
   it('are registered at WORLD scope, which the rest of this suite cannot see', () => {
     // Every other case here injects its own settings seam, so it would pass verbatim against a
-    // typo'd `scope: 'client'` registration - and that typo is not cosmetic. A client-scoped key
-    // is PER USER: the corpus each player read would be their own, `_scopeBasis` would answer
-    // from a roster the GM never wrote, and both bridge legs would stop replicating because there
-    // would be nothing world-level to replicate. Pinned against `WORLD_SCOPED_SETTING_KEYS`,
-    // which is DERIVED from the registration itself, rather than against a restated literal.
+    // typo'd `scope: 'client'` registration - and that typo is not cosmetic.
     assert.equal(WORLD_SCOPED_SETTING_KEYS.has(SETTING_KEYS.COMPONENT_SCOPE), true);
     assert.equal(WORLD_SCOPED_SETTING_KEYS.has(SETTING_KEYS.ESSENCE_SCOPE), true);
     assert.equal(WORLD_SCOPED_SETTING_KEYS.has(SETTING_KEYS.TOOL_SCOPE), true);
@@ -314,8 +283,7 @@ describe('the world tool-breakage authority', () => {
     });
 
     // An unauthored or unrecognized authority carries NO key at all rather than minting
-    // `toolSpecific`. A minted default at world scope is indistinguishable from a GM's deliberate
-    // choice, and would become the value every absent-preserving system inherits after the flip.
+    // `toolSpecific`.
     await store.save({ entities: [], toolBreakage: { authority: 'nonsense' } });
     assert.equal('toolBreakage' in seam.values.get(SETTING_KEYS.TOOL_SCOPE), false);
     await store.save({ entities: [] });

@@ -6,7 +6,7 @@ Use this procedure when a per-worktree Foundry smoke environment may be running,
 It protects the bound data directory, preserves the extracted Foundry application cache, and distinguishes infrastructure recovery from product results.
 
 The runtime identity is derived from the worktree root by `scripts/lib/foundryRunIdentity.js`.
-The launcher and phase orchestration live in `scripts/foundry-test-run.mjs`, and the container definition lives in `docker-compose.foundry.yml`.
+The launcher lives in `scripts/foundry-test-run.mjs` and the phases it drives live in `scripts/foundry-smoke/` (one module per walk section, listed in walk order by `registry.mjs`); the container definition lives in `docker-compose.foundry.yml`.
 
 ## Stop before replacing bound data
 

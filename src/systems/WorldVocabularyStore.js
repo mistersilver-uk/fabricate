@@ -1,5 +1,6 @@
 import { cloneJson } from '../utils/scalars.js';
 
+import { SettingsBackedStore } from './SettingsBackedStore.js';
 import { normalizeWorldVocabularyEntries, WORLD_VOCABULARY_KINDS } from './worldVocabulary.js';
 
 /**
@@ -123,16 +124,17 @@ export function createWorldVocabularyStore({
 }
 
 /** @see createWorldVocabularyStore */
-class WorldVocabularyStore {
+class WorldVocabularyStore extends SettingsBackedStore {
   constructor({ getSetting, setSetting, settingKey }) {
-    this.settingKey = settingKey;
-    this.getSetting = getSetting;
-    this.setSetting = setSetting;
+    super({ getSetting, setSetting, settingKey });
     /** @type {Record<string, Array<{id: string, name: string}>>|null} */
     this._corpus = null;
-    this.loaded = false;
     this.seeded = {};
     for (const kind of WORLD_VOCABULARY_KINDS) this.seeded[kind] = false;
+  }
+
+  _setCache(corpus) {
+    this._corpus = corpus;
   }
 
   /**
@@ -145,31 +147,10 @@ class WorldVocabularyStore {
    * @returns {object} The published corpus.
    */
   load() {
-    let raw;
-    try {
-      raw = this.getSetting(this.settingKey);
-    } catch {
-      raw = null;
-    }
+    const raw = this._readSettingGuarded();
     this.seeded = carriedKinds(raw);
     this._publish(this._normalize(raw));
     return this._corpus;
-  }
-
-  /**
-   * Replace the published corpus wholesale.
-   *
-   * @param {object} corpus
-   * @returns {void}
-   * @private
-   */
-  _publish(corpus) {
-    this._corpus = corpus;
-    this.loaded = true;
-  }
-
-  _ensureLoaded() {
-    if (!this.loaded) this.load();
   }
 
   /**
@@ -258,22 +239,10 @@ class WorldVocabularyStore {
     return payload;
   }
 
-  /**
-   * PUBLISH THE CACHE BEFORE AWAITING THE WRITE — see the module note, including its recorded
-   * cost when the write rejects.
-   *
-   * @param {object} next A normalized corpus.
-   * @param {Record<string, boolean>} seeded
-   * @returns {Promise<object>}
-   * @private
-   */
   async _persist(next, seeded) {
-    this._publish(next);
+    const payload = cloneJson(this._persistedShape(next, seeded));
     this.seeded = seeded;
-    // NOT OPTIONAL-CHAINED, matching `ScopedDefinitionStore#_persist`. `await undefined?.()` is
-    // `undefined`, so a store built without a write seam would report EVERY write as a success
-    // and hand `worldScopeActions` a `true` it then reports to the GM as a landed deletion.
-    await this.setSetting(this.settingKey, cloneJson(this._persistedShape(next, seeded)));
+    await this._publishThenWrite(next, payload);
     return this._corpus;
   }
 

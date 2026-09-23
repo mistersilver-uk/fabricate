@@ -17,13 +17,12 @@ describe('createMountedComponentHarness event-loop yield', () => {
     const harness = createMountedComponentHarness({
       repoRoot,
       tmpPrefix: 'fabricate-svelte-harness-yield-',
-      compiledModules: ['src/ui/svelte/apps/manager/EmptyState.svelte'],
-      componentPath: 'src/ui/svelte/apps/manager/EmptyState.svelte'
+      compiledModules: ['src/ui/svelte/components/EmptyState.svelte'],
+      componentPath: 'src/ui/svelte/components/EmptyState.svelte'
     });
     await harness.setup();
 
-    // Queued BEFORE mount(). `flushSync()` and `tick()` are microtasks, so this only runs
-    // during mount() if mount() genuinely yields to a new event-loop turn first.
+    // Queued BEFORE mount(). `flushSync()` and `tick()` are microtasks.
     let macrotaskRan = false;
     setImmediate(() => {
       macrotaskRan = true;

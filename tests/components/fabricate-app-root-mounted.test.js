@@ -1,12 +1,4 @@
-/**
- * The player shell's mounted tier.
- *
- * It did not exist before issue 1198, and without it the two behaviours most likely to be
- * wrong — the companion fallback branch and the fault state — would have no honest proof: a
- * source regex can see that a branch is written, never that it renders. Everything here runs
- * against a REAL player-extension registry and the real pure derivations, so a drift between
- * the registry, `playerNavModel.js` and the rail fails here rather than at runtime.
- */
+/** The player shell's mounted tier. */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -28,6 +20,7 @@ import {
   INVALIDATION_STORES,
 } from '../../src/systems/invalidationDomains.js';
 import { CRAFTING_DATA_CHANGED_HOOK } from '../../src/systems/craftingDataChange.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -46,10 +39,10 @@ const harness = createMountedComponentHarness({
     'src/config/hooks.js',
     'src/config/stackQuantityPathPresets.js',
     'src/gatheringImageDefaults.js',
-    'src/systems/CraftingListingBuilder.js',
+    'src/ui/presenters/CraftingListingBuilder.js',
     'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
-    'src/systems/craftingBrowseStatus.js',
+    'src/ui/presenters/craftingBrowseStatus.js',
     'src/systems/foundryCalendar.js',
     'src/systems/inventorySnapshot.js',
     // Issue 1370 (epic 1357, PR 8a): the listing builder and the inventory snapshot enter
@@ -63,28 +56,25 @@ const harness = createMountedComponentHarness({
     'src/systems/scopedDefinitions.js',
     'src/systems/scopedDefinitionStore.js',
     'src/utils/scalars.js',
-    'src/migration/worldScopeEntityGrouping.js',
+    'src/systems/worldScopeEntityGrouping.js',
     'src/systems/invalidationDomains.js',
     'src/systems/itemStackQuantity.js',
     'src/systems/passInventorySnapshot.js',
     'src/systems/salvageCheckUsability.js',
     'src/systems/stepRecipeView.js',
-    'src/systems/summaryProjection.js',
+    'src/ui/presenters/summaryProjection.js',
     'src/systems/toolCheckBonus.js',
     'src/ui/extensionRegistry.js',
     'src/ui/playerExtensions.js',
     'src/ui/playerNavModel.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
-    // `ActorSelectTopBar`'s picker is a `<SearchablePopover>` now (issue 1475), and the
-    // primitive PORTALS its panel and measures it against the resolved application root.
-    // These three arrive through that one conversion; omitting any of them fails this
-    // suite's `before()` by name rather than hanging it, which is what the shared harness
-    // buys over the allowlist it replaced.
+    // `ActorSelectTopBar`'s picker is a `<SearchablePopover>` now (issue 1475).
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js',
     'src/ui/svelte/apps/gathering/scopedSelection.js',
@@ -102,8 +92,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
+  'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/util/formatDuration.js',
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     // Issue 1648: the shared authority-refusal wording the Journal panels and stores read.
     'src/ui/svelte/util/journalRunReasons.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
@@ -111,14 +102,14 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/gatheringFormat.js',
     'src/ui/svelte/util/ingredientOptionStatus.js',
     'src/ui/svelte/util/recipeDuration.js',
+    'src/ui/svelte/util/bookRecipeBrowse.js',
+    'src/ui/svelte/util/disclosurePhrase.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     'src/ui/svelte/util/requirementSlots.js',
     'src/ui/svelte/util/sceneImages.js',
     'src/ui/svelte/util/worldTimeLabel.js',
     'src/utils/checkModifierPicks.js',
     // The player complication projection (issue 1286). Reached TWICE from this tree:
-    // CraftingListingBuilder attaches the crafting forecast, and `inventoryStore` marks
-    // the salvage fired tense. Its closure is complicationPlan -> componentComplications.
     'src/utils/complicationPlan.js',
     'src/utils/componentCategories.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.
@@ -136,10 +127,7 @@ const harness = createMountedComponentHarness({
     'src/utils/sourceUuid.js',
   ],
   compiledModules: [
-    // The player window's own shared roster (issue 1514), spread rather than listed: this tree
-    // renders the not-yet-ready chrome, the record tile, the portrait and the kind filter's
-    // segmented track, and a manifest that named each would insert lines into a block Sonar
-    // already reads as duplicated across these suites. See `PLAYER_APP_COMPILED_MODULES`.
+    // The player window's own shared roster (issue 1514), spread rather than listed.
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/apps/PlayerExtensionHost.svelte',
     'src/ui/svelte/apps/alchemy/AlchemyDisciplineChooser.svelte',
@@ -169,13 +157,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
     // The shared complication summary row and the two leaves it renders (issue 1286).
-    // `ProgressiveStageList` draws the per-stage complication band through it, and it is
-    // already listed above — so omitting any of these three HANGS this suite (# cancelled)
-    // rather than failing it.
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
-    // Issue 1504: the shared `<Select>`'s whole compiled closure — covers `Chip` (also shared
-    // with the complication band above), the searchable picker `ActorSelectTopBar` converted
-    // onto (issue 1475) and the empty panel it renders over a filtered-to-nothing list.
+    // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
@@ -272,17 +255,11 @@ const DEFAULT_TAB = 'crafting';
 /**
  * A player provider whose tab set is its OWN — three tabs, none of them a Core id.
  *
- * `count` on the first tab is deliberate: the rail renders a badge for any entry with a
- * positive count, so a projection that spread the provider's tab would hand a companion an
- * unvalidated badge. It must be dropped.
- *
  * @param {object} [options] Fixture behaviour.
  * @returns {object} `{ provider, calls }`.
  */
 function makeProvider({ id = 'downtime', throwOnMount = false } = {}) {
-  // `cleanups` records `connected` because that is the whole guarantee: the shell must run a
-  // companion's cleanup while its target is still in the document, and a count alone cannot
-  // tell a connected teardown apart from one running against an already-detached tree.
+  // `cleanups` records `connected` because that is the whole guarantee.
   const calls = { mounts: [], cleanups: [] };
   const provider = {
     apiVersion: 1,
@@ -317,10 +294,6 @@ function makeProvider({ id = 'downtime', throwOnMount = false } = {}) {
 /**
  * The shared player services the shell reads.
  *
- * `selectedActorId` defaults to the EMPTY STRING rather than to `null`, because that is what
- * `createActorBarStore` initialises and clears its selection to — and the context contract
- * normalises it to `null`. A case that wants a real selection passes one; nothing else changes.
- *
  * @param {object} [options] Selection state the actor bar holds.
  * @param {string} [options.selectedActorId] The bar's raw selection.
  * @returns {object} The services object the shell is given.
@@ -351,11 +324,7 @@ function fakeServices({ selectedActorId = '' } = {}) {
   };
 }
 
-/**
- * Drive the shell exactly as the application host does: derive the frozen snapshot from the
- * REAL registry, and fall the active route back through the production `resolveActiveTab`
- * over the rail the shell actually rendered. Nothing here reimplements a production rule.
- */
+/** Drive the shell exactly as the application host does. */
 function makeHost(registry, initialTab = DEFAULT_TAB) {
   let activeTab = initialTab;
   let selectedActorId = '';
@@ -363,8 +332,7 @@ function makeHost(registry, initialTab = DEFAULT_TAB) {
     get activeTab() {
       return activeTab;
     },
-    // The window-wide Actor selection, changed as `ActorSelectTopBar` would change it: the next
-    // `props()` carries the new value, exactly as the application host re-reads the store.
+    // The window-wide Actor selection, changed as `ActorSelectTopBar` would change it.
     selectActor(actorId) {
       selectedActorId = actorId;
     },
@@ -376,15 +344,12 @@ function makeHost(registry, initialTab = DEFAULT_TAB) {
           activeTab = tab;
         },
         services: fakeServices({ selectedActorId }),
-        // The gate is stated OPEN in this suite throughout: its fixture provider claims the
-        // gated `downtime` id, and what these cases are about is how the shell renders a
-        // snapshot, not which surfaces reach one (issue 1257).
+        // The gate is stated OPEN in this suite throughout.
         extensionSurfaces: deriveExtensionSurfaces(registry, { experimentalFeaturesEnabled: true }),
         playerExtensions: registry,
       };
     },
-    // The offered set read off what the shell RENDERED, so the fallback is applied to the
-    // real rail rather than to a fixture mirror of it.
+    // The offered set read off what the shell RENDERED.
     applyFallback(root) {
       const navTabs = railKeys(root).map((routeKey) => ({ routeKey }));
       activeTab = resolveActiveTab(activeTab, navTabs, DEFAULT_TAB);
@@ -412,9 +377,6 @@ function focusedNavTab(root) {
 /**
  * Register one provider into a fresh real registry and mount the shell on one of its tabs.
  *
- * Hoisted because eleven cases need exactly this three-line opening, and a fresh copy of it
- * per case is the near-identical block SonarCloud's new-code duplication gate counts.
- *
  * @param {object} [options] Scenario inputs.
  * @returns {Promise<object>} `{ registry, provider, calls, host, root, unregister }`.
  */
@@ -428,12 +390,7 @@ async function mountOnCompanionTab({ id = 'downtime', tabId = 'board', emitHook 
 }
 
 /**
- * The shell's own compiled stylesheet, as injected into the mounted document, with comments
- * STRIPPED.
- *
- * Stripping is what stops an assertion being satisfied by the prose *about* a declaration
- * instead of the declaration itself — the rail's width rule is explained in a comment that
- * quotes it verbatim, so an unstripped substring match could never fail.
+ * The shell's own compiled stylesheet, as injected into the mounted document.
  *
  * @param {HTMLElement} root Mounted root.
  * @returns {string} Declaration text.
@@ -488,8 +445,7 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
       'ext:downtime:board',
       'ext:downtime:ledger',
     ]);
-    // A Core entry's route key IS its tab id, so the shipped `data-nav-count` value and every
-    // Core id in the DOM are byte-identical to what they were before the seam existed.
+    // A Core entry's route key IS its tab id.
     assert.equal(railButton(root, 'crafting').id, 'player-nav-tab-crafting');
     assert.equal(railButton(root, 'ext:downtime:board').id, 'player-nav-tab-ext:downtime:board');
   });
@@ -564,8 +520,7 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
     const active = railButton(root, 'ext:downtime:board');
     assert.equal(active.getAttribute('aria-label'), 'Open the Downtime board');
     assert.equal(active.getAttribute('aria-describedby'), 'player-nav-tooltip-ext:downtime:board');
-    // Selected by ATTRIBUTE, never by id: an id selector containing a colon is invalid CSS and
-    // throws `SyntaxError` rather than returning null.
+    // Selected by ATTRIBUTE, never by id.
     const tooltip = root.querySelector('[id="player-nav-tooltip-ext:downtime:board"]');
     assert.equal(tooltip?.getAttribute('role'), 'tooltip');
     assert.equal(tooltip?.textContent, 'Plan downtime activities');
@@ -618,10 +573,7 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
     assert.ok(Boolean(fault), 'Core renders its own error state in the panel');
     assert.equal(fault.dataset.playerExtensionFault, 'downtime');
     assert.match(fault.textContent, /downtime/, 'and it names the provider that failed');
-    // The strip is the shared `Notice` since issue 1514, and `blocking` is what keeps the role
-    // this state has always carried. Matched on the attribute's exact value rather than by
-    // substring: a non-blocking notice emits `status`, and `alert` is not a substring of it, but
-    // a later role would be — and `role="alert"` is the whole reason `Callout` was refused here.
+    // The strip is the shared `Notice` since issue 1514.
     assert.equal(fault.getAttribute('role'), 'alert', 'the strip is still announced as an alert');
     assert.equal(
       fault.getAttribute('aria-live'),
@@ -641,8 +593,7 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
       !root.querySelector('[data-companion-control]'),
       'the partial content the companion appended before throwing is gone'
     );
-    // The registration SURVIVES: the unregister handle stays the companion's, and a later
-    // snapshot may mount without it re-registering.
+    // The registration SURVIVES: the unregister handle stays the companion's.
     assert.equal(registry.getPlayerNavProvider('downtime'), provider);
   });
 
@@ -653,9 +604,7 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
     await tick();
     await tick();
 
-    // Compared through `id`, never as elements: `node:assert` serialises the actual value to
-    // build its diff and walks a mounted happy-dom element's circular tree until the heap
-    // dies, so a plain element comparison fails as an OOM with no message.
+    // Compared through `id`, never as elements.
     assert.equal(
       root.ownerDocument.activeElement?.getAttribute?.('data-player-nav-tab') ?? null,
       'ext:downtime:board',
@@ -723,11 +672,7 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
       );
     };
 
-    // FOCUS IS PINNED ALONGSIDE SELECTION, and it is the half that matters: the handler
-    // schedules `railButton(next).focus()` on `tick()`, and selection without focus leaves the
-    // user parked on a button that has just become `tabindex="-1"` — reachable by neither Tab
-    // nor a further arrow press. Two ticks because the handler's own `tick().then` is what
-    // moves focus, so the first only settles the flush that resolved it.
+    // FOCUS IS PINNED ALONGSIDE SELECTION, and it is the half that matters.
     const settle = async () => {
       await tick();
       await tick();
@@ -806,11 +751,7 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
   });
 
   it('lets the rail button yield the scrollbar gutter rather than overflowing the 84px column', async () => {
-    // ASSERTED AS A DECLARATION, not as measured overflow, and deliberately so. The View Lab's
-    // `expectNoHorizontalOverflow` compares scrollWidth against clientWidth, and headless
-    // Chromium renders OVERLAY scrollbars that consume no layout width at all — so a green
-    // capture proves no CONTENT overflow and can say nothing about a reserved gutter. happy-dom
-    // computes no cascade either. The compiled, injected stylesheet is the honest target.
+    // ASSERTED AS A DECLARATION, not as measured overflow.
     const { root } = await mountOnCompanionTab();
     const css = shellStyleSheet(root);
 
@@ -829,28 +770,7 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
   });
 });
 
-/**
- * The shell's invalidation-domain routing, mounted (issue 1078 part B1).
- *
- * ## Why this exists at all
- *
- * The two source-text guards it replaces sliced a 400-character window after the FIRST
- * occurrence of a `subscribe*(` call, and that window spanned four subscription sites — so
- * review demonstrated all five of their assertions passing against routing that was
- * simultaneously wrong in three ways. Nothing short of driving the real hook seam can see which
- * store a given change actually reaches.
- *
- * ## What makes it falsifiable
- *
- * The expectation is computed from the SHIPPED `DOMAIN_CONSUMERS`, so it is not a second
- * hand-written table that could agree with a wrong one. What it compares that against is the
- * shell's real, mounted subscription behaviour — which is exactly the assertion the derived
- * `STORE_DOMAINS` has no other gate for.
- *
- * `subscribeCraftingDataChange` reads `globalThis.Hooks` at subscribe time and previously
- * no-oped under this harness because the global was absent, which is why the routing had never
- * been runtime-tested at all. A `Hooks` fake is all it needed.
- */
+/** The shell's invalidation-domain routing, mounted (issue 1078 part B1). */
 describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
   /** The stores THIS component owns. `gathering` belongs to `GatheringView`. */
   const SHELL_STORES = [
@@ -886,18 +806,9 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
 
   /**
    * The shared services, with every store seam the shell can reach replaced by a counter.
-   *
    * `inventory` carries BOTH seams: `reloadOnDocumentChange` is the bulk-run guard the shell
    * must use, and `load` is the bypass it must never call. Counting them separately is what
    * lets one case assert routing and the absence of the bypass at the same time.
-   *
-   * WHAT THE INVENTORY COUNTER COUNTS IS THE SEAM CALL, NOT THE LISTING BUILD, and for this
-   * subject the two diverge: the real `inventoryStore.reloadOnDocumentChange()` returns without
-   * loading while `bulkRunning || bulkDestroying`, so a build-counting guard would read zero in
-   * BOTH directions if a fixture left either flag set. The question here is whether the shell
-   * ROUTED the change to the inventory store at all, so the seam call is the right thing to
-   * count — and because these are plain counters rather than a real store, no bulk run can be
-   * in flight to suppress one.
    *
    * @returns {{calls: object, services: object}}
    */
@@ -917,8 +828,7 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
       calls,
       services: {
         ...fakeServices(),
-        // `setCraftingActor` is not decoration: the Crafting tab is the DEFAULT route, so its
-        // view renders and pushes the shared actor selection into the sources store on mount.
+        // `setCraftingActor` is not decoration: the Crafting tab is the DEFAULT route.
         craftingSources: { load: bump('craftingSources'), setCraftingActor: () => {} },
         crafting: { load: bump('crafting') },
         inventory: { reloadOnDocumentChange: bump('inventory'), load: bump('inventoryBypass') },
@@ -1033,9 +943,7 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
   });
 
   it('quietly rebuilds the Journal when the run authority reports its refusal lifted', async () => {
-    // M25: the listing captures the authority's availability as it builds, so a `claim-held`
-    // captured while a command ran keeps refusing runs against a claim that has since gone.
-    // The authority announces the lift; this is the shell binding that acts on it.
+    // M25: the listing captures the authority's availability as it builds.
     const restoredHook = 'fabricate.journalRunAuthorityRestored';
     const loads = [];
     const services = fakeServices();
@@ -1081,8 +989,7 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
   it('does NOT rebuild the journal for prose, measured from a warmed non-zero baseline', async () => {
     const calls = await mountWithSpies();
 
-    // WARM. `assert.equal(journal, 0)` against a cold fixture is vacuous, so the journal is
-    // made to reload first and that baseline is asserted before the real measurement.
+    // WARM. `assert.equal(journal, 0)` against a cold fixture is vacuous.
     hooks.callAll(CRAFTING_DATA_CHANGED_HOOK, oneDomain(INVALIDATION_DOMAINS.LABELLING));
     assert.ok(calls.journal > 0, 'the baseline: a labelling change DOES rebuild the journal');
     const warmed = calls.journal;
@@ -1102,14 +1009,6 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
 
   it('reloads EVERY store when the change names no domain', async () => {
     // The fail-safe, asserted BEHAVIOURALLY rather than through the fallback counter.
-    //
-    // Not because the counter is unreachable — it is: the harness copies `foundryBridge.js`
-    // into its temp tree and the mounted component imports that copy, so this file's import of
-    // the repo path reads a DIFFERENT module instance, but the temp copy has zero imports and
-    // could be loaded from the temp tree if a case wanted it. It is simply not what this case
-    // is for: the claim here is which stores an unattributable change reaches, and the counter
-    // itself is asserted directly in `tests/util/foundry-bridge-subscriptions.test.js` and
-    // `tests/invalidation-domain-signal.test.js`.
     const calls = await mountWithSpies();
 
     hooks.callAll(CRAFTING_DATA_CHANGED_HOOK, { source: 'recipes', scopes: [] });
@@ -1119,9 +1018,7 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
   });
 
   it('carries craftingSources with the crafting store rather than as a taxonomy store', async () => {
-    // It holds the selectable component-source ACTORS, not a definition-derived read model, so
-    // it has no fact class of its own. Pinned because dropping it would silently stop a source
-    // list refreshing on exactly the changes it refreshed on before this issue.
+    // It holds the selectable component-source ACTORS, not a definition-derived read model.
     const calls = await mountWithSpies();
 
     hooks.callAll(CRAFTING_DATA_CHANGED_HOOK, oneDomain(INVALIDATION_DOMAINS.LABELLING));
@@ -1196,8 +1093,7 @@ describe('FabricateAppRoot companion disposal (mounted)', () => {
     const { calls, host, unregister } = await mountOnCompanionTab();
 
     unregister();
-    // The publication path: `_refreshExtensionSurfaces` pushes the new snapshot, the
-    // {:else if activeSurface} branch flips, and the host is destroyed outright.
+    // The publication path: `_refreshExtensionSurfaces` pushes the new snapshot.
     await harness.setProps(host.props());
 
     assert.deepEqual(calls.cleanups, [{ tabId: 'board', connected: true }]);
@@ -1286,10 +1182,7 @@ describe('FabricateAppRoot companion context stability (mounted)', () => {
   });
 
   it('mounts exactly once across the open path: the seeded snapshot and the registry replay', async () => {
-    // `_prepareSvelteProps` seeds snapshot #1, then `_onRender` -> `_registerHooks()` joins the
-    // registry — and `subscribeSurfaceIds` replays the current value SYNCHRONOUSLY before it
-    // returns the unsubscribe, producing snapshot #2 inside the same open. Both steps are the
-    // real ones here: the real registry replay and the real derivation.
+    // `_prepareSvelteProps` seeds snapshot #1.
     const { registry, calls, host } = await mountOnCompanionTab();
     const pushes = [];
     const unsubscribe = registry.subscribeSurfaceIds(() =>
@@ -1333,9 +1226,7 @@ describe('FabricateAppRoot companion context stability (mounted)', () => {
     const { calls, host } = await mountOnCompanionTab();
     assert.equal(calls.mounts[0].context.isGM, false, 'the fixture user is not a GM to begin with');
 
-    // `isGameMaster()` reads the Foundry global at derivation time and subscribes to nothing, so
-    // a republication is what recomputes it. Restored in `finally` so a failed assertion cannot
-    // leak a GM user into the cases that follow.
+    // `isGameMaster()` reads the Foundry global at derivation time and subscribes to nothing.
     globalThis.game.user = { isGM: true };
     try {
       await harness.setProps(host.props());

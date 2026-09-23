@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -12,15 +13,14 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-chance-bar-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/gatheringFormat.js'
   ],
   // `FillBar` joined the tree when issue 1096 rebuilt ChanceBar on the shared primitive
-  // `ui-integration/spec.md` §Shared product UI primitives names. Omitting it does not fail
+  // `ui-visual-style/spec.md` §Shared product UI primitives names. Omitting it does not fail
   // this suite — `createMountedComponentHarness` throws in `before()` naming the module,
   // which is the loud half of the trap; a hand-rolled harness would have HUNG instead.
-  // `Kicker` joined the tree when issue 1514 converted the caption to the shared label.
   compiledModules: [
     'src/ui/svelte/components/FillBar.svelte',
     'src/ui/svelte/components/Kicker.svelte',
@@ -48,9 +48,7 @@ describe('ChanceBar (mounted)', () => {
     assert.equal(meter.getAttribute('aria-valuemin'), '0');
     assert.equal(meter.getAttribute('aria-valuemax'), '100');
     assert.equal(meter.getAttribute('data-gathering-event-value'), null);
-    // The caption moved onto the shared `Kicker` leaf (issue 1514), on the same terms the fill
-    // moved onto `FillBar` below: retargeted at the class the primitive emits rather than
-    // deleted, because what this line proves is that the caption RENDERS.
+    // The caption moved onto the shared `Kicker` leaf (issue 1514).
     assert.ok(Boolean(root.querySelector('.fab-kicker')), 'the caption renders as a kicker');
     // The fill moved into the shared `FillBar` leaf (issue 1096). Retargeted rather than
     // deleted: the value-width binding is the thing this line has always been proving, and
@@ -96,18 +94,7 @@ describe('ChanceBar (mounted)', () => {
   });
 
   it('routes the event fill through the tier custom property, and keeps four DISTINCT values', async () => {
-    // The tier classes used to select four rules in this component's own scoped block, and
-    // rebuilding on `FillBar` put the painted element out of that block's reach. The colour
-    // therefore travels as ONE inherited custom property, and nothing in the assertions
-    // above would notice if two tiers had been folded onto one value on the way.
-    //
-    // Two halves, because neither is sufficient alone. The MOUNTED half proves the child
-    // actually reads the property (a rebuild that dropped the `color` prop would leave the
-    // four rules declaring a variable nobody consumes). The SOURCE half proves the four
-    // rules still resolve to four different colours — happy-dom applies no stylesheet at
-    // all, so a mounted read cannot see a declared value, and a `color-mix()` written
-    // inline is silently DISCARDED by its `cssText` parser, which is what makes the
-    // stylesheet the right home for these rather than a workaround for the test.
+    // The tier classes used to select four rules in this component's own scoped block.
     const root = await harness.mount({ value: 0.6, scale: 'event' });
     const fill = root.querySelector('.fab-fill-bar-fill');
     assert.match(fill.getAttribute('style') || '', /background:\s*var\(--chance-bar-fill\)/);

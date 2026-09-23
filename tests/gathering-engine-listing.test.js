@@ -760,10 +760,8 @@ test('listForActor still locks a disabled blind environment whose sole task is h
 test('listForActor surfaces a disabled environment to a GM as the same identity-only locked listing', async () => {
   const gmViewer = { id: 'gm-1', isGM: true };
   const engine = makeEngine({
-    // Same real-composition + non-zero richState setup as the player test: the
-    // GM locked teaser must NOT leak real counts either. A regression that let
-    // a non-locked path report through the GM teaser would surface non-zero
-    // counts here and fail.
+    // Same real-composition + non-zero richState setup as the player test: the GM locked teaser
+    // must NOT leak real counts either.
     environments: [environment({
       id: 'env-gm-disabled',
       name: 'Sealed Vault',
@@ -834,13 +832,9 @@ test('listForActor ignores an environment.reveal override when resolving revealP
 });
 
 test('listForActor drops an enabled composed-empty environment but pins a locked one to 0 counts', async () => {
-  // Two distinct paths, NOT the same outcome:
-  //  - ENABLED + composed-empty  -> no visible tasks -> the env is DROPPED from
-  //    the listing entirely (model.visible === false), so it never surfaces a
-  //    pinned count; we assert it resolves to [] below.
-  //  - LOCKED (enabled === false) -> the env IS surfaced as a teaser, and its
-  //    composedTaskCount / discoveredTaskCount are pinned to 0 regardless of
-  //    stored reveals; that pinning is what we assert via the locked path.
+  // Two distinct paths, NOT the same outcome: - ENABLED + composed-empty -> no visible tasks -> the
+  // env is DROPPED from the listing entirely (model.visible === false), so it never surfaces a
+  // pinned count; we assert it resolves to [] below.
   const emptyEngine = makeEngine({
     environments: [environment({
       id: 'env-empty',
@@ -870,9 +864,8 @@ test('listForActor drops an enabled composed-empty environment but pins a locked
   assert.equal(lockedEntry.composedTaskCount, 0);
   assert.equal(lockedEntry.discoveredTaskCount, 0);
 
-  // The enabled composed-empty env is DROPPED (visible:false), so the listing is
-  // empty — there is no enabled count-0 entry to pin. (Confirms the engine also
-  // does not throw while resolving an empty-pool blind environment.)
+  // The enabled composed-empty env is DROPPED (visible:false), so the listing is empty — there is
+  // no enabled count-0 entry to pin.
   const emptyListing = await emptyEngine.listForActor({ viewer, actor });
   assert.deepEqual(emptyListing.environments, []);
 });
@@ -1424,11 +1417,8 @@ test('getTaskDropBreakdown returns empty drops when richState has no previewDrop
   assert.deepEqual(result.drops, []);
 });
 
-// ---------------------------------------------------------------------------
-// System-validity gate (issue 429): a system with a `blocks: 'system'`
-// validation issue exposes nothing to non-GM viewers, while a GM still sees it.
-// A multi-step-in-alchemy system is a structural blocker that needs no recipes.
-// ---------------------------------------------------------------------------
+// System-validity gate (issue 429): a system with a `blocks: 'system'` validation issue exposes
+// nothing to non-GM viewers, while a GM still sees it.
 
 const blockedGatheringSystem = {
   id: 'system-a',

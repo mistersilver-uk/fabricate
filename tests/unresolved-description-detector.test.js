@@ -1,10 +1,7 @@
 /**
- * Issue 800 — the GM-only startup DETECTOR.
- *
- * For a world whose stored descriptions predate write-time resolution there is
- * otherwise zero signal: the GM sees raw text and has no reason to connect it to a
- * settings button. This is a detector, NOT a flattener — it must never rewrite
- * displayed text, and it self-clears once the repair has run.
+ * Issue 800 — the GM-only startup DETECTOR. For a world whose stored descriptions predate
+ * write-time resolution there is otherwise zero signal: the GM sees raw text and has no reason to
+ * connect it to a settings button.
  */
 
 import test from 'node:test';
@@ -12,6 +9,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { entrySources } from './helpers/bootstrapEntrySource.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -59,10 +58,7 @@ test('counts components and recipe-item definitions carrying raw directives, exc
 });
 
 test('does NOT count a fully LABELLED description — it already reads cleanly', () => {
-  // The notice must not claim a defect the GM can disprove by looking. A labelled
-  // directive is rendered as its label by the read-time mop-up with no repair, so a
-  // world whose only "defect" is `@UUID[…]{Acid}` — the maintainer's REPORTED shape —
-  // gets no notice at all, rather than the same false alarm at every login.
+  // The notice must not claim a defect the GM can disprove by looking.
   const labelledOnly = [
     {
       id: 'sys1',
@@ -102,13 +98,9 @@ test('stays silent for a non-GM', () => {
   assert.equal(infos.length, 0);
 });
 
-// ---------------------------------------------------------------------------
 // The other half of the loop: what the repair TELLS the GM afterwards.
-// ---------------------------------------------------------------------------
 
-/**
- * Install a world whose repair returns `descriptions`, capturing every toast by level.
- */
+/** Install a world whose repair returns `descriptions`, capturing every toast by level. */
 function installRepairWorld(descriptions) {
   const toasts = { info: [], warn: [], error: [] };
   globalThis.ui = {
@@ -140,10 +132,9 @@ function installRepairWorld(descriptions) {
 }
 
 test('the repair reports the description outcome even when NOTHING could be refreshed', async () => {
-  // The nag loop's exit. A GM sent here by the startup notice whose definitions all
-  // land in `skipped` — the uninstalled-module case — would otherwise be told nothing
-  // about descriptions at all, learn nothing, and get the same notice at next login,
-  // forever. The failure branch names the cause so they can act or stop worrying.
+  // The nag loop's exit. A GM sent here by the startup notice whose definitions all land in
+  // `skipped` — the uninstalled-module case — would otherwise be told nothing about descriptions at
+  // all, learn nothing, and get the same notice at next login, forever.
   const toasts = installRepairWorld({
     refreshed: 0,
     unchanged: 0,
@@ -207,21 +198,19 @@ test('never rewrites the descriptions it inspects', () => {
   );
 });
 
-// ---------------------------------------------------------------------------
-// Production wiring. Both seams default to PASS-THROUGHS, so deleting the wiring in
-// `src/main.js` reverts the entire feature in production while every unit test —
-// which constructs its own manager with its own fakes — stays green. The same is true
-// of the detector's call site. `src/main.js` imports a stylesheet and cannot be
-// imported under node:test, so these assert on source text, the established pattern
-// for main.js coverage in this repo (cf. tests/alchemy-double-bucketing.test.js).
-// ---------------------------------------------------------------------------
-
-const mainSource = readFileSync(resolve(__dirname, '../src/main.js'), 'utf8');
+// Production wiring. Both seams default to PASS-THROUGHS, so deleting the wiring reverts the entire
+// feature in production while every unit test — which constructs its own manager with its own fakes
+// — stays green. The entry composes the manager and `src/bootstrap/hooks.js` runs the detector, so
+// both are read here through ONE call (issue 1715).
+const mainSource = [
+  entrySources['src/bootstrap/composeServices.js'],
+  entrySources['src/bootstrap/hooks.js'],
+].join('\n');
 
 test('src/main.js wires the REAL enricher seams into CraftingSystemManager', () => {
   assert.match(
     mainSource,
-    /new CraftingSystemManager\(\s*this\.recipeManager\s*,\s*\{/,
+    /new CraftingSystemManager\(\s*fabricate\.recipeManager\s*,\s*\{/,
     'the manager must be constructed WITH seams — the bare one-argument form silently ' +
       'reverts issue 800 in production, because both seams default to pass-throughs'
   );
@@ -229,7 +218,7 @@ test('src/main.js wires the REAL enricher seams into CraftingSystemManager', () 
   assert.match(mainSource, /primeEnricherCache:\s*\(rawTexts\) => primeEnricherCache\(rawTexts\)/);
   assert.match(
     mainSource,
-    /import \{[^}]*\benrichToHtml\b[^}]*\bprimeEnricherCache\b[^}]*\} from '\.\/ui\/svelte\/util\/foundryBridge\.js'/,
+    /import \{[^}]*\benrichToHtml\b[^}]*\bprimeEnricherCache\b[^}]*\} from '\.\.?\/ui\/svelte\/util\/foundryBridge\.js'/,
     'both seams must be imported from the Foundry bridge'
   );
 });
@@ -242,6 +231,6 @@ test('src/main.js invokes the startup detector', () => {
   );
   assert.match(
     mainSource,
-    /import \{ notifyUnresolvedItemDescriptions \} from '\.\/config\/repairItemData\.js'/
+    /import \{ notifyUnresolvedItemDescriptions \} from '\.\.?\/config\/repairItemData\.js'/
   );
 });

@@ -1,28 +1,14 @@
 /**
- * The Component Rules editor's Validation tab (issue 1371, maintainer parity round 4).
+ * The Component Rules editor's Validation tab: ONE SYSTEM'S RULES — the essence contribution, the
+ * salvage results, the outcome routing and the progressive DC. Deliberately not
+ * `componentScopeValidation.js`, which validates a WORLD entry and holds none of those facts;
+ * widening it to take both would make it the union of two screens.
  *
- * The reference draws this editor with TWO tabs — `Component rules` and `Validation ⓵` — and the
- * shipped editor had no tab strip at all (gap-list row 127). D-9's "this lane does not rebuild
- * `ComponentEditView`'s tab model" was a scope statement rather than a licence, so the strip and
- * its second tab are built here.
- *
- * ── WHY THIS IS NOT `componentScopeValidation.js` ─────────────────────────────────────────
- * That module validates a WORLD entry: its source link, its name, its world defaults, and
- * whether a given system resolves a category from them. This one validates ONE SYSTEM'S RULES —
- * the essence contribution, the salvage results, the outcome routing and the progressive DC —
- * which are exactly the facts the world entry does not hold and cannot answer. Widening that
- * module to take both would make it the union of two screens, and its `systemKnown` / `member`
- * gating already shows how far a shared evaluator can honestly stretch.
- *
- * ── EVERY INPUT IS SUPPLIED, AND EVERY ONE IS THE DRAFT ───────────────────────────────────
- * This module reaches nothing. The editor holds a buffered draft, and a validation surface that
- * read the PERSISTED record would tell a GM their unsaved fix had not landed. The one input that
- * is not the draft is `resultRulesById` — whether the system has rules for each component a
- * salvage result names — because that is a fact about OTHER records the draft cannot carry.
- *
- * The evaluator is string-free and the presentation function localizes, following
- * `componentScopeValidation.js` exactly: a check set that carried its own copy could not be
- * asserted without a localization seam in every unit test.
+ * EVERY INPUT IS SUPPLIED, AND EVERY ONE IS THE DRAFT — this module reaches nothing — because a
+ * validation surface reading the PERSISTED record would tell a GM their unsaved fix had not landed.
+ * The one exception is `resultRulesById`, a fact about OTHER records the draft cannot carry. The
+ * evaluator is string-free and the presentation function localizes, so a unit test needs no
+ * localization seam.
  */
 
 /** The checks, in the order the surface renders them. */
@@ -36,11 +22,8 @@ export const COMPONENT_RULES_VALIDATION_CHECKS = [
 ];
 
 /**
- * Which group each check belongs to.
- *
- * TWO GROUPS, because the reference's validation body is kickered groups of icon rows and these
- * checks fall cleanly in two: what this system CLASSIFIES the component as, and what it does
- * when the component is broken down.
+ * Which group each check belongs to. TWO, because these checks fall cleanly in two: what this
+ * system CLASSIFIES the component as, and what it does when the component is broken down.
  */
 const CHECK_GROUP = {
   category: 'classification',
@@ -52,12 +35,9 @@ const CHECK_GROUP = {
 };
 
 /**
- * Each check's severity.
- *
- * `salvageResults` and `salvageRouting` BLOCK, because both describe salvage that is switched on
- * and cannot resolve: an enabled component with no results awards nothing, and an unrouted
- * outcome tier awards nothing on the tier a player actually rolled. Everything else warns — a
- * missing essence contribution or an inherited-but-unset category is a gap a GM may have meant.
+ * Each check's severity. `salvageResults` and `salvageRouting` BLOCK, both describing salvage that
+ * is switched on and cannot resolve; everything else warns, because a missing essence contribution
+ * or an inherited-but-unset category is a gap a GM may have meant.
  */
 const SEVERITY = {
   category: 'warning',
@@ -85,15 +65,8 @@ export const COMPONENT_RULES_VALIDATION_GROUPS = [
 ];
 
 /**
- * Whether a check applies at all in this configuration.
- *
- * A check that cannot be answered is DROPPED rather than answered `pass`: a green
- * `Outcome routing` row on a system whose salvage is simple would tell a GM something was
- * checked that was not.
- *
- * @param {string} id
- * @param {{salvageActive: boolean, routed: boolean, progressive: boolean, essencesOffered: boolean}} gates
- * @returns {boolean}
+ * Whether a check applies at all here. One that cannot be answered is DROPPED rather than answered
+ * `pass`: a green `Outcome routing` row on a simple-salvage system claims a check that never ran.
  */
 function checkApplies(id, gates) {
   if (id === 'essences') return gates.essencesOffered;
@@ -104,23 +77,9 @@ function checkApplies(id, gates) {
 }
 
 /**
- * Evaluate one system's component rules.
- *
- * @param {object} context
- * @param {unknown} [context.category] the category this system resolves for the component.
- * @param {boolean} [context.essencesOffered] whether the system defines any essence at all.
- * @param {number} [context.essenceTotal] the total quantity the draft contributes.
- * @param {boolean} [context.salvageFeatureEnabled] the SYSTEM's salvage feature switch.
- * @param {boolean} [context.salvageEnabled] the COMPONENT's own salvage switch.
- * @param {boolean} [context.routed] whether the system routes salvage by check outcome.
- * @param {boolean} [context.progressive] whether the system resolves salvage progressively.
- * @param {number} [context.resultCount] how many results the draft awards.
- * @param {string[]} [context.resultsWithoutRules] result component names this system has no
- *   rules for.
- * @param {string[]} [context.unroutedOutcomes] outcome tiers with no result group.
- * @param {unknown} [context.progressiveDc] the component's own progressive DC.
- * @returns {{checks: {id: string, severity: string, valid: boolean, count: number}[],
- *   counts: {passing: number, warnings: number, blocking: number}}}
+ * Evaluate one system's component rules. `context` carries the draft's category, essence total and
+ * salvage results, the SYSTEM's own `salvageFeatureEnabled` / `routed` / `progressive` switches,
+ * and the two cross-record lists — `resultsWithoutRules` and `unroutedOutcomes`.
  */
 export function componentRulesValidation(context = {}) {
   const resultsWithoutRules = Array.isArray(context.resultsWithoutRules)
@@ -169,13 +128,7 @@ export function componentRulesValidation(context = {}) {
   };
 }
 
-/**
- * One check's row status. An early-return chain rather than a nested ternary, which SonarCloud
- * reports as S3358 in a file it indexes.
- *
- * @param {{valid: boolean, severity: string}} check
- * @returns {'pass'|'warn'|'block'}
- */
+/** One check's row status; an early-return chain, because SonarCloud reports a nested ternary. */
 function checkStatus(check) {
   if (check.valid) return 'pass';
   return check.severity === 'blocking' ? 'block' : 'warn';
@@ -253,17 +206,10 @@ const DETAILS = {
 };
 
 /**
- * The grouped rows, in the shape `EditorValidationSurface` takes.
- *
- * The check SET, its order and every severity come from the evaluator above; this maps them onto
- * copy. It FILTERS BEFORE IT MAPS, so a check the evaluator did not return is dropped rather than
- * dereferenced half-built inside a render.
- *
- * @param {object} context see {@link componentRulesValidation}.
- * @param {(key: string, fallback: string, data?: object) => string} [phrase] the caller's
- *   interpolating localizer. Defaults to token replacement over the fallback, so a unit test
- *   needs no localization seam.
- * @returns {{checks: object[], counts: object, groups: object[]}}
+ * The grouped rows in the shape `EditorValidationSurface` takes. The check SET, its order and every
+ * severity come from the evaluator; this only maps them onto copy, and it FILTERS BEFORE IT MAPS so
+ * an absent check is dropped rather than dereferenced half-built inside a render. `phrase` defaults
+ * to token replacement over the fallback, so a unit test needs no localization seam.
  */
 export function componentRulesValidationPresentation(
   context = {},

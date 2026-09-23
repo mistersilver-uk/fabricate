@@ -1,12 +1,4 @@
-/**
- * Coverage for the character prerequisite library CRUD in adminStore (issue 544).
- *
- * The library moved to WORLD scope in issue 1308, so it is persisted through the
- * `CharacterLibrariesStore` rather than through the crafting system, none of the actions takes a
- * crafting system id, and — the part worth pinning — none of them requires a system to be
- * SELECTED. The fake store below is the real class over an in-memory setting, so the round trip
- * goes through the real `normalizeCharacterPrerequisiteList`.
- */
+/** Coverage for the character prerequisite library CRUD in adminStore (issue 544). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
@@ -14,9 +6,9 @@ import { get } from 'svelte/store';
 import { createAdminStore } from '../src/ui/svelte/stores/adminStore.js';
 import { normalizeCharacterPrerequisiteList } from '../src/systems/characterPrerequisites.js';
 import { CharacterLibrariesStore } from '../src/systems/CharacterLibrariesStore.js';
+import { createServices as createSharedServices } from './helpers/adminStoreServices.js';
 
 function createServices({ prerequisites = [], foundrySystemId = 'dnd5e' } = {}) {
-  const store = {};
   let idSeq = 0;
   const system = {
     id: 'sys1',
@@ -41,37 +33,15 @@ function createServices({ prerequisites = [], foundrySystemId = 'dnd5e' } = {}) 
     },
     randomID: () => `mgr-${++idSeq}`,
   });
-  const systemManager = {
-    getSystems: () => [system],
-    getSystem: (id) => (id === system.id ? system : null),
-    getItems: () => system.components || system.items || [],
-    createSystem: async () => system,
-    deleteSystem: async () => {},
-    deleteItem: async () => {},
-    updateSystem: async (id, updates = {}) => {
-      if (id !== system.id) return null;
-      Object.assign(system, updates);
-      return system;
-    },
-  };
-  return {
-    getSetting: (key) => store[key] ?? null,
-    setSetting: async (key, value) => {
-      store[key] = value;
-    },
-    getCraftingSystemManager: () => systemManager,
+  return createSharedServices(system, [], [], {
+    settings: {},
     getCharacterLibrariesStore: () => characterLibrariesStore,
-    getRecipeManager: () => ({ getRecipes: () => [], getRecipe: () => null }),
     getGatheringEnvironmentStore: () => ({ list: () => [], save: async () => true }),
     getFoundrySystemId: () => foundrySystemId,
-    getScriptMacros: () => [],
-    getSceneOptions: () => [],
-    notify: { info: () => {}, warn: () => {}, error: () => {} },
     confirmDialog: async () => true,
-    localize: (key) => key,
     _system: system,
     _worldSetting: worldSetting,
-  };
+  });
 }
 
 async function storeFor(overrides) {
@@ -182,13 +152,7 @@ describe('adminStore character prerequisites (system-owned)', () => {
   });
 });
 
-// The delete CONFIRMATION (issue 1308). These two lists are the only destructive edits on a page
-// framed as "settings for the selected crafting system" whose reach is the whole world, and until
-// this they were one unconfirmed click on a bare icon button.
-//
-// Every assertion below exists to kill a specific mutation. Both harnesses stub `confirmDialog`
-// to resolve true, so deleting the confirm call outright leaves the rest of the suite green —
-// only the DECLINE case notices.
+// The delete CONFIRMATION (issue 1308).
 describe('adminStore character prerequisite delete confirmation (issue 1308)', () => {
   function servicesWithConfirm(confirmed, seen = []) {
     const services = createServices({

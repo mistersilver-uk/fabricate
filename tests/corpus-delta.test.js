@@ -1,18 +1,6 @@
 /**
- * `corpusDelta()` — the per-record sibling of `corpusChanged` (issue 1078, under #1070).
- *
- * Three rules carry the whole contract, and each has a named test below:
- *
- * 1. An inserted or deleted record is attributed to ITS OWN id and to nothing else. The
- *    delta pairs by record id, so the records after an insertion are unchanged — index
- *    pairing would report the entire tail as changed and reintroduce, on the path that runs
- *    on every connected client, exactly the over-broad invalidation this work removes.
- * 2. A pure reordering is a change that cannot be attributed to any record, so it reports
- *    `reordered: true` with an EMPTY per-record delta and its consumers route broadly.
- * 3. A changed record yields the set of fields that actually differ.
- *
- * `corpusChanged`'s own contract is asserted alongside, because the point of adding a
- * sibling rather than generalising it is that the cheap boolean keeps short-circuiting.
+ * `corpusDelta()` — the per-record sibling of `corpusChanged` (issue 1078, under #1070). Three
+ * rules carry the whole contract, and each has a named test below:
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -48,9 +36,8 @@ describe('corpusDelta — an INSERTED record is attributed to itself alone', () 
   });
 
   it('does NOT pair by index — b and c shifted position and did not change', () => {
-    // The defect this rule exists to prevent, stated as its own assertion: `corpusChanged`
-    // compares position 1 against position 1, so an index-paired delta would report `b` and
-    // `c` as changed. One recipe create would then invalidate every later recipe.
+    // The defect this rule exists to prevent, stated as its own assertion: `corpusChanged` compares
+    // position 1 against position 1, so an index-paired delta would report `b` and `c` as changed.
     const before = [record('a'), record('b'), record('c')];
     const after = [record('inserted'), record('a'), record('b'), record('c')];
 
@@ -122,10 +109,7 @@ describe('corpusDelta — a pure REORDERING is broad', () => {
   });
 
   it('reports a corpus holding a record with NO id as unattributable', () => {
-    // The nullish half of the same fail-safe. The doc names "a nullish OR duplicated id", and
-    // only the duplicate half had a test — so `id == null ||` could be dropped and a record
-    // with no id would silently pair with the other side's id-less record, attributing a
-    // change to the key `undefined`.
+    // The nullish half of the same fail-safe.
     const before = [record('a'), { name: 'No id at all' }];
     const after = [record('a'), { name: 'No id, and renamed' }];
 
@@ -222,10 +206,9 @@ describe('corpusDelta — a CHANGED record yields its field set', () => {
   });
 
   it('reports a NON-OBJECT projection change with an empty field set, never as no change', () => {
-    // The `CorpusRecordDelta` typedef's stated contract, which nothing exercised: a change
-    // that is real but not attributable to any field carries an EMPTY set, and a consumer
-    // attributing work by field must read that as "everything", never as "nothing". A
-    // projection that is an array or a primitive is the case that produces it.
+    // The `CorpusRecordDelta` typedef's stated contract, which nothing exercised: a change that is
+    // real but not attributable to any field carries an EMPTY set, and a consumer attributing work
+    // by field must read that as "everything", never as "nothing".
     const before = [{ id: 'a', v: [1] }];
     const after = [{ id: 'a', v: [2] }];
 
@@ -329,11 +312,7 @@ describe('patchCorpusInPlace — the reuse licence, in one place', () => {
   });
 
   it('REFUSES a reordered delta rather than half-applying one', () => {
-    // The stated precondition, made executable. A reordering reports an empty `perRecord`, so
-    // patching one would reuse every record — which happens to be safe today only because
-    // reuse is licensed per record regardless of order. This function exists so that the
-    // reuse rule has one audit rather than two copies, and an unenforced precondition is
-    // exactly how a third caller quietly widens it.
+    // The stated precondition, made executable.
     const { retained, next, delta } = corpora(
       [record('a'), record('b')],
       [record('b'), record('a')]
@@ -350,9 +329,7 @@ describe('patchCorpusInPlace — the reuse licence, in one place', () => {
 
 describe('corpusDelta — the delta it hands back is read-only', () => {
   it('refuses every mutation of perRecord, not just of the wrapper', () => {
-    // `Object.freeze` does not reach inside a `Map`. Deleting an entry is the mutation that
-    // matters: it would license `patchCorpusInPlace` to reuse a record the delta reported
-    // changed, which is the one failure direction that corrupts a cache.
+    // `Object.freeze` does not reach inside a `Map`.
     const delta = corpusDelta([record('a')], [record('a', { name: 'Renamed' })]);
 
     assert.equal(Object.isFrozen(delta), true);

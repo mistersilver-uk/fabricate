@@ -1,79 +1,14 @@
 <!-- Svelte 5 runes mode -->
 <!--
   THE `SYSTEM RULES n / m` PANEL: which crafting systems have rules for one entity, and the way
-  into each one's (issue 1372, maintainer parity round 8).
-
-  ── WHY IT IS A COMPONENT AND NOT A SECOND COPY ────────────────────────────────────────────────
-  The reference draws this panel on BOTH essence screens — the world Essence Catalogue's inspector
-  (`tmp/proto/essence-catalogue.png`, markup `proto:3290`-`3320`) and the system Essence Rules
-  inspector (`tmp/proto/essence-rules.png`, markup `proto:1694`-`1716`) — with the same head, the
-  same count, the same `Search systems` field, the same one-line rows and the same five-row pager.
-  It shipped only on the catalogue, inlined into `EntityCatalogueShell`'s inspector snippet, so
-  the system rules rail had no answer at all to "which other systems have rules for this essence".
-
-  Adding it to the second screen by copying the snippet is what `scoped-shell-prop-contract.test.js`
-  calls the 93-of-98 shape, and it is also what the SonarCloud duplication gate counts. So the
-  panel is extracted verbatim — markup, styles and the pager's inspector-column metrics — and both
-  screens compose it.
-
-  ── EVERY RULE THIS PANEL NEEDS TRAVELS WITH IT ────────────────────────────────────────────────
-  Svelte stamps its scope hash only on elements the component itself writes, so a rule left behind
-  in `EntityCatalogueShell` addressing markup that moved here would compile to a selector matching
-  nothing, silently and with no warning. The section, head, count, search, row, name, link and the
-  three `:global()` pager overrides therefore all moved with the markup rather than being
-  re-declared on either side.
-
-  ── A MEMBER ROW IS A LINK; A NON-MEMBER ROW IS AN ADD ─────────────────────────────────────────
-  The reference's row is `[System name]  [Rules ↗]`: this panel is where a GM finds out WHICH
-  systems hold the entity and gets to each one's rules, and it is not where they edit those rules.
-  A NON-MEMBER row keeps `MembershipActions`, because there is no rules screen to link to for a
-  system that has no record: Add is the only verb it has, and it is not destructive.
-
-  `onOpenSystemRules` is `null` by default, which falls every row back to the membership cluster —
-  so a caller with nowhere to route to still gets a usable panel.
-
-  ── `systemRowAction: 'navigate'` OVERRIDES THE PARAGRAPH ABOVE, AND THE TOOL CATALOGUE TAKES IT
-  (issue 1373, maintainer ruling). The design's tool catalogue rows are `[System name] [Rules ↗]`
-  and nothing else, member or not: this panel says WHICH systems hold the Tool and how to reach
-  each one's rules, and the verb that creates a system's record belongs on that system's own Tool
-  Rules screen — where its inspector already pins `Add {tool} to {system}`. A write action here
-  put the create verb on the world catalogue, one scope away from the record it writes.
-
-  The link is still meaningful for a NON-MEMBER under this mode: the rules list it opens is the
-  system's whole Tool Rules screen, which is exactly where the adoption happens. The world
-  component and essence catalogues take it too, the essence one after the maintainer reported
-  its full-width `Add to this system` rows as malformed beside the tool catalogue's links.
-  `manage` stays the default for any caller that opts into nothing.
-
-  Props:
-   - rows: the entity's projected per-system rows, `{systemId, systemName, member, enabled}[]`.
-     This is the projection's JOIN and has one row per roster entry; the narrowed `{id, name}`
-     roster cannot answer `member` or `enabled` and is not what this takes.
-   - memberCount / rosterSize: the numerator and denominator of the head count.
-   - entityId / entityName / entityType / enableable: what `MembershipActions` needs to name and
-     perform its writes.
-   - actions: the entity type's write family — `addToSystem`, `removeFromSystem`, and `setEnabled`
-     only when `enableable`.
-   - onOpenSystemRules(entityId, systemId): the member row's `Rules ↗` deep link.
-   - systemRowAction: `manage` (the default, described above) or `navigate`. See the paragraph
-     immediately below for why the tool catalogue takes the second one.
-   - armedToken / onArm / onDisarm: the shared arm latch, threaded through so one armed Remove at
-     a time survives across the whole screen rather than per row.
-   - recessed / searchWell: the reference's two SURFACE decisions for this card, both opt-in and
-     both absent by default (issue 1371, parity round 5, reviewer finding 7). `recessed` drops the
-     card one ramp rung to `--fab-bg-0`; `searchWell` lifts its search field back up to a
-     `--fab-bg-1` box with a hairline and the rows' own 7px corner, so a recessed card reads as a
-     container holding two kinds of lifted thing.
-
-     THEY ARE PROPS BECAUSE SIX SCREENS COMPOSE THIS COMPONENT. Round 4 landed both as
-     UNCONDITIONAL declarations, which repainted the merged world Essence catalogue and the world
-     Tool catalogue — two other lanes' approved screens — as a side effect of a component parity
-     ruling. A shared primitive that has to behave differently at a second site takes a prop; the
-     default is what those screens rendered before this work, which is a card on the pane's own
-     surface with a bare input on it.
-   - resetKey: any value that identifies the SUBJECT. When it changes, the search term and the
-     page index reset — without it the panel keeps the previous entity's page three and search
-     term and shows an empty system list under a full inspector.
+  into each one's (issue 1372). A component rather than a second copy, and every rule it needs
+  travels with it — Svelte stamps its scope hash only on elements this file writes, so a rule
+  left behind would compile to a selector matching nothing, silently. A MEMBER ROW IS A LINK and
+  a NON-MEMBER ROW IS AN ADD, unless `systemRowAction: 'navigate'`, which the three world
+  catalogues take because the create verb belongs on the system's own screen. `rows` is the
+  projection's JOIN; `recessed` and `searchWell` are opt-in, because SIX screens compose this
+  and an unconditional declaration repainted two other lanes' approved screens. `resetKey`
+  identifies the SUBJECT, without which the panel keeps the previous entity's page and search.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -92,19 +27,10 @@
     actions = null,
     onOpenSystemRules = null,
     systemRowAction = 'manage',
-    // WHAT A ZERO-MEMBER ROSTER SAYS INSTEAD OF LISTING EVERY SYSTEM (issue 1371, round 2).
-    //
-    // Under `systemRowAction="navigate"` EVERY row is a live `Rules ↗`, which is right for an
-    // entity some system has — and wrong for one none does: the world component catalogue drew
-    // `SYSTEM RULES 0 / 6` over six identical live links into six screens that hold no rules for
-    // it. The reference replaces the roster in that state with a sentence.
-    //
-    // OPT-IN AND EMPTY BY DEFAULT, so the essence and tool catalogues render exactly the roster
-    // they always did: this component is shared by six screens, and a branch that fired for all
-    // of them would change two other lanes' output.
+    // WHAT A ZERO-MEMBER ROSTER SAYS INSTEAD OF SIX DEAD `Rules ↗` LINKS. Opt-in and empty by
+    // default, so the essence and tool catalogues render the roster they always did.
     rosterEmptyNote = '',
-    // The card's two surface decisions, OFF by default so the essence and tool catalogues render
-    // exactly the card they rendered before this work. See the props block above.
+    // The card's two surface decisions, OFF by default. See the props block above.
     recessed = false,
     searchWell = false,
     armedToken = '',
@@ -132,23 +58,13 @@
     return result;
   }
 
-  /**
-   * A crafting system's display name, with an ID FALLBACK.
-   *
-   * The roster narrows a system to `{id, name}` and coerces a missing name to `''`, so a row
-   * rendering `system.name` unguarded prints nothing where a system has no name and one rendering
-   * `${system.name}` prints the literal `undefined`. Neither is an answer.
-   *
-   * @param {{systemId?: string, systemName?: string}} row
-   * @returns {string}
-   */
+  /** A system's display name with an ID FALLBACK; the roster coerces a missing name to `''`. */
   function systemLabel(row) {
     const named = typeof row?.systemName === 'string' ? row.systemName.trim() : '';
     return named || String(row?.systemId ?? '');
   }
 
-  // The panel's own search, over the DISPLAY LABEL — so a roster whose names never loaded is
-  // still searchable by the ids on screen rather than by nothing at all.
+  // The panel's own search, over the DISPLAY LABEL, so an unnamed roster is still searchable.
   const visibleRows = $derived(filterRows(rows, systemQuery));
 
   function filterRows(all, query) {
@@ -164,33 +80,16 @@
     visibleRows.slice(pageIndex * SYSTEM_PAGE_SIZE, (pageIndex + 1) * SYSTEM_PAGE_SIZE)
   );
 
-  /**
-   * Reset the list to its first page.
-   *
-   * A search that shrinks the list below the current page would otherwise leave the panel on an
-   * empty page with a pager reading `Showing 11–5 of 3`.
-   *
-   * @param {unknown} value
-   */
+  /** Reset to page one: a search that shrinks the list leaves `Showing 11–5 of 3` otherwise. */
   function changeSystemQuery(value) {
     systemQuery = String(value ?? '');
     systemPageIndex = 0;
   }
 
   /**
-   * The state one `(entity, system)` cell is in, as a machine-readable attribute.
-   *
-   * ── THREE STATES FOR AN ENABLEABLE TYPE, TWO FOR THE REST ────────────────────────────────
-   * `absent` / `disabled` / `enabled`, read from `member` FIRST: a projected row omits `enabled`
-   * for a type that has none and answers `false` for a non-member, so a test of `enabled` first
-   * would paint every non-member as "disabled" — the one reading a GM cannot act on, since a
-   * disabled member is re-enabled by a toggle and a non-member is not.
-   *
-   * The attribute exists because the state has to stay MEASURABLE: without it the three states
-   * would be conveyed only by which controls `MembershipActions` happens to render.
-   *
-   * @param {{member?: boolean, enabled?: boolean}} row a projected system row.
-   * @returns {string}
+   * The state one `(entity, system)` cell is in, as a MEASURABLE attribute: `absent` /
+   * `disabled` / `enabled`, read from `member` FIRST, since a row answers `enabled: false` for
+   * a non-member too.
    */
   function membershipState(row) {
     if (row?.member !== true) return 'absent';
@@ -220,32 +119,11 @@
   </div>
 
   <!--
-    THE CARD, WHICH THIS PANEL HAD NONE OF (issue 1373, maintainer feedback round 2).
-
-    The design's `SYSTEM RULES` block is a HEAD over a bordered inset holding all three parts —
-    the search field, the roster and the pager — at `proto:2022`, byte-identically at
-    `proto:3290` for the essence catalogue that shares this component. What shipped was the head
-    and then three bare siblings loose in the inspector column, so a panel the design draws as
-    one object read as three unrelated ones, its pager floated against the pinned foot action
-    with nothing between them, and a short roster left no boundary at all.
-
-    AND ITS SURFACE IS THE RECESS WHERE A CALLER ASKS FOR ONE (issue 1371, parity rounds 4 and 5).
-    Round 3 of the sibling lane recorded "our ramp has nowhere to go" and drew the card with no
-    fill. That was an adaptation argument rather than a measurement: `--fab-bg-0` exists, it IS a
-    rung below the `--fab-bg-2` this inspector pane is painted in, and the reference recesses the
-    card to it while lifting each part inside to `--fab-bg-1`. Three surfaces, three tokens, all
-    published, and the maintainer's parity ruling voids every "our ramp is different" exemption.
-
-    ROUND 4 THEN STATED IT UNCONDITIONALLY, WHICH IS THE HALF THAT IS CORRECTED HERE. Six screens
-    compose this component; a parity finding raised against ONE of them is not a licence to
-    repaint the other five. It is `recessed` now, with `searchWell` for the lifted field that
-    makes the recess legible, and both default to the surface the essence and tool catalogues have
-    always drawn.
+    THE CARD (`proto:2022`): one bordered inset holding the search field, the roster and the
+    pager, where three bare siblings shipped. Its recess is opt-in, for the head comment's reason.
   -->
   <div class="manager-scoped-roster-card" class:is-recessed={recessed}>
-    <!-- NO ELLIPSIS ON THE PLACEHOLDER. The design's field reads `Search systems` (`proto:2025`),
-         on all six screens that draw this card; the trailing `…` was this panel's own addition
-         and was the one string in the card that differed from the reference. -->
+    <!-- NO ELLIPSIS ON THE PLACEHOLDER: the design's field reads `Search systems` (`proto:2025`). -->
     <ManagerSearchField
       class={searchWell
         ? 'manager-scoped-roster-search manager-scoped-roster-search-well'
@@ -310,9 +188,7 @@
         {/each}
       </ul>
 
-      <!-- NO per-page selector: see `Pagination`'s own `showPageSize` note. The window is five rows
-         because the reference's pager states five, and a size a GM cannot change is not a control
-         they need offered. -->
+      <!-- NO per-page selector: the window is five rows because the reference's pager states five. -->
       <Pagination
         persistent={true}
         showPageSize={false}
@@ -333,26 +209,10 @@
     line-height: 1.5;
   }
 
-  /* NO MEMBERSHIP MARKER ON A ROSTER ROW, and the absence is deliberate (issue 1371, round 4).
-     Round 2 added `box-shadow: inset 2px 0 0 0 var(--fab-accent)` here on the reasoning that
-     `data-scoped-system-state` was emitted and no sheet read it. The reference draws no such
-     marker: every row is `background:var(--bg1); border:1px solid var(--border); radius:7px` and
-     every row carries `Rules ↗` whichever state it is in. An attribute a sheet does not read is
-     a hook for a test, not a licence to invent a treatment.
+  /* NO MEMBERSHIP MARKER ON A ROSTER ROW: the reference draws every row alike. */
 
-     It also could not be caught: `box-shadow` was in no property group in
-     `scripts/visual-parity/lib/schema.js`, and the row is a landmark either way, so `compare` and
-     `inventory` were both silent. The group is added in the same change, and the row regions
-     carry it, so the next invented marker reddens a run. */
-
-  /* STATIC class names, so Svelte can prove each selector is used and `lint:svelte:warnings`
-     stays at zero.
-
-     THE PANEL'S VERTICAL BUDGET IS THE WHOLE REASON THIS IS TIGHT. A 900px window gives an
-     inspector about 660px, and the reference fits an identity block, three cards, this head, a
-     search field, FIVE system rows and a pager into it with the primary action pinned below. At
-     the manager's default `--fab-space-2` rhythm that stack is roughly 680px and the pager falls
-     below the fold — the one control that says there are more systems than the five on screen. */
+  /* STATIC class names, so `lint:svelte:warnings` stays at zero. The panel's vertical budget is
+     why this is tight: an inspector is about 660px and must hold five rows and a pager. */
   .manager-scoped-roster {
     display: flex;
     flex-direction: column;
@@ -368,14 +228,7 @@
     min-width: 0;
   }
 
-  /* The `13 / 24` at the trailing edge of the head: members over roster. `tabular-nums` so the
-     pair does not shuffle as a GM adds systems.
-
-     THE DESIGN INKS IT ONE STOP BRIGHTER THAN THE KICKER BESIDE IT (`proto:2021`): the head's
-     label is subtle and its count is the SECONDARY text colour, because the label names the
-     panel and the count is the fact. This drew both in the same subtle tone, which made the one
-     number in the head the quietest thing in it. Size follows the same line: 10px, not the
-     0.66rem this approximated it with. */
+  /* The head's `13 / 24`, `tabular-nums` and ONE STOP BRIGHTER than the kicker (`proto:2021`). */
   .manager-scoped-roster-count {
     flex: 0 0 auto;
     color: var(--fab-text-secondary);
@@ -385,16 +238,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* ── THE CARD (`proto:2022`) ────────────────────────────────────────────────────────────────
-     One bordered inset holding the search field, the roster and the pager, which is the object
-     the design draws and which this panel had no equivalent of at all: the three parts were bare
-     siblings in the inspector column, so nothing bounded them and the pager sat straight against
-     the panel's pinned foot action.
-
-     Its own rhythm is stated rather than inherited, because it is TIGHTER than the inspector's:
-     the design pads the card and separates its search field from the roster by about a step of
-     the scale, and leaves a wider step above the pager so the walk control reads as the card's
-     foot rather than as a sixth row. */
+  /* THE CARD (`proto:2022`); its rhythm is stated because it is TIGHTER than the inspector's. */
   .manager-scoped-roster-card {
     display: flex;
     flex-direction: column;
@@ -404,24 +248,13 @@
     border-radius: 9px;
   }
 
-  /* THE RECESS, OPT-IN. One rung below the `--fab-bg-2` pane this card sits in, which is what
-     makes the `--fab-bg-1` search well and the `--fab-bg-1` rows inside it read as lifted. It is
-     a SEPARATE RULE rather than a `background` on the base one because the base one is what five
-     other screens render: an unrecessed card states no fill at all and takes the pane's, which is
-     what it did before this work and what it still does. See the head comment. */
+  /* THE RECESS, OPT-IN: a SEPARATE RULE, so an unrecessed card states no fill and takes the pane's. */
   .manager-scoped-roster-card.is-recessed {
     background: var(--fab-bg-0);
   }
 
-  /* The search field is the shipped `.manager-search`; only its own row sizing is stated here,
-     because the global rule sizes it for a toolbar rather than for a 300px column.
-
-     `:global`, chained onto `.manager-search`, since the field became a `<ManagerSearchField>`
-     (issue 1039): the class travels to the primitive's `<label>`, which this component does not
-     write and therefore never carries its scope hash. Unlike the three toolbar rules in
-     `EntityListInspectorFrame`, this one was PRUNED rather than silently emitted — this file
-     writes no regular element with a spread or an expression-valued `class`, so nothing made its
-     class selectors possibly-matching and `lint:svelte:warnings` would have named it. The chain
+  /* Only the field's row sizing is stated here; the global rule sizes it for a toolbar. Chained
+     `:global`, because the class travels to `ManagerSearchField`'s own `<label>`, and the chain
      keeps the specificity at (0,2,0), which is what the scoped form compiled to. */
   :global(.manager-search.manager-scoped-roster-search) {
     flex: 0 0 auto;
@@ -430,38 +263,21 @@
     margin-bottom: var(--fab-space-2);
   }
 
-  /* AND ITS FIELD IS THE CARD'S SIZE, NOT THE TOOLBAR'S. The shipped `.manager-search input` is
-     a 34px page-level control; the design's system search inside this card is 28px, which is a
-     published rung of the control-height ladder and is what keeps five rows and a pager inside
-     the panel's budget. Chained `:global()` for the reason the rule above gives — the element
-     belongs to `ManagerSearchField` — and kept under the local class so no other search field
-     moves. */
+  /* AND ITS FIELD IS THE CARD'S SIZE, NOT THE TOOLBAR'S: 28px, a published control-height rung. */
   :global(.manager-search.manager-scoped-roster-search input) {
     height: 28px;
     min-height: 28px;
   }
 
-  /* AND IT IS A WELL WHERE A CALLER ASKS FOR ONE (issue 1371, rounds 4 and 5). The reference draws
-     the search as a lifted `--fab-bg-1` box with a hairline and a 7px radius — the same treatment
-     as the rows below it — so that a recessed card reads as a container holding two kinds of
-     lifted thing. Without a fill and a border it read as a caption floating on the card.
-
-     SELECTED ON A SECOND CLASS, not on the one above it. Round 4 wrote this against
-     `.manager-scoped-roster-search`, which is the class EVERY caller passes, so the well landed on
-     the merged world Essence catalogue and the world Tool catalogue too. The `searchWell` prop
-     appends `manager-scoped-roster-search-well` beside it, so the sizing rule above stays shared
-     and only the surface is opted into. `:global` for the reason the two rules above give — the
-     `<input>` belongs to `ManagerSearchField` and never carries this file's scope hash. */
+  /* AND IT IS A WELL WHERE A CALLER ASKS FOR ONE, SELECTED ON A SECOND CLASS rather than the one
+     every caller passes — which is how round 4's well landed on two other lanes' catalogues. */
   :global(.manager-search.manager-scoped-roster-search-well input) {
     border: 1px solid var(--fab-border);
     border-radius: 7px;
     background: var(--fab-bg-1);
   }
 
-  /* THE ROSTER HOLDS ITS HEIGHT AT FIVE ROWS (`proto:2027`), which is the half of this panel a
-     screenshot cannot argue about: without a floor the card collapses onto however many systems
-     the search left, and the pager — the one control that says there ARE more — walks up and
-     down the column as a GM types. The design states the same floor for the same reason. */
+  /* THE ROSTER HOLDS ITS HEIGHT AT FIVE ROWS (`proto:2027`), so the pager cannot walk the column. */
   .manager-scoped-roster-systems {
     display: flex;
     flex-direction: column;
@@ -473,53 +289,25 @@
     min-height: 171px;
   }
 
-  /* ONE LINE PER SYSTEM: the name leads and its membership cluster trails, where a stacked row
-     made a six-system list about 350px tall. */
+  /* ONE LINE PER SYSTEM: a stacked row made a six-system list about 350px tall. */
   .manager-scoped-roster-system {
     display: flex;
     gap: var(--fab-space-2);
     align-items: center;
     justify-content: space-between;
-    /* THE DESIGN'S ROW BOX (`proto:2029`): a step of the scale down each side and a step below
-       the card's own inline padding across. It was 2px vertical, which made a row shorter than
-       the 24px control it used to carry and left the name sitting hard against the border.
-
-       THE REFERENCE'S INLINE VALUE IS 9px AND IT SNAPS TO 8 (issue 1371, parity round 4). The
-       published spacing scale has steps at 8 and 12 and `ui-integration/spec.md`'s "Spacing
-       scale" clause makes it mandatory for padding, margin and gap — the same shape of rule as
-       the control-height ladder that snaps the reference's 32 and 36 to 34. One pixel is the
-       whole difference and the token is the rule, so this is a recorded rung rather than a
-       parity defect. */
+    /* THE DESIGN'S ROW BOX (`proto:2029`); its 9px inline value SNAPS TO 8, because the published
+       spacing scale is mandatory for padding. A recorded rung rather than a parity defect. */
     padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 7px;
-    /* AND ITS FILL (`proto:2029`), WHICH THE PANE ARGUMENT DID NOT COVER (issue 1373).
-
-       The note here read "no fill: the reference draws every card in the CONTENT AREA on the
-       pane's own surface". True of the content area, and this row is not in it - it is inside the
-       inspector aside, which is `--fab-bg-1`, so `proto:2029`'s `--bg1` recess is reachable as
-       `--fab-bg-0`. Transparent painted the row the aside's own colour and left the hairline
-       doing all the work in a column the design builds from two surfaces.
-
-       THE CARD AROUND IT STAYS UNFILLED, and that is stated rather than left as an oversight:
-       `proto:2021` draws the card at `--bg0`, a rung BELOW the row, and this theme's ramp has
-       no counterpart for it - `--fab-bg-0` is already the design's `--bg1`. So the row takes
-       the design's own absolute value and the card keeps the aside's, which is the closest this
-       ramp reaches. */
+    /* AND ITS FILL: this row is inside the inspector ASIDE, so `proto:2029`'s `--bg1` recess is
+       reachable as `--fab-bg-0`. The card around it stays unfilled — `proto:2021` draws it a
+       rung below the row, which this ramp cannot reach. */
     background: var(--fab-bg-0);
     min-width: 0;
   }
 
-  /* THE `Rules ↗` LINK IS A BARE ACCENT LINK, NOT A BORDERED PILL (`proto:2031`).
-
-     The note here used to say the reference drew it as a small outlined link. It does not: the
-     design's row is a name and an accent-inked `Rules ↗` with no box, no fill and no height of
-     its own, and the pill this drew instead put a second bordered control inside an already
-     bordered row inside a card — three edges deep in a 300px column — and gave a navigation
-     affordance the same weight as the catalogue row's own `Edit tool` button.
-
-     The BOX GOES and the ink changes; the reset stays, because Foundry's host rule still centres
-     a `<button>`'s content and pins it a fixed height whatever it is drawn as. */
+  /* A BARE ACCENT LINK, NOT A BORDERED PILL (`proto:2031`); the `<button>` reset stays. */
   .manager-scoped-roster-system-link {
     display: inline-flex;
     flex: 0 0 auto;
@@ -540,8 +328,7 @@
     cursor: pointer;
   }
 
-  /* The trailing mark is the design's 8px glyph rather than the link's own size, so the arrow
-     reads as a mark on the word instead of a second word. */
+  /* The trailing mark is the design's 8px glyph, so the arrow reads as a mark and not a word. */
   .manager-scoped-roster-system-link i {
     font-size: 8px;
   }
@@ -556,21 +343,13 @@
     outline-offset: 2px;
   }
 
-  /* THE ROW IS ~36px, AND THE 34px CONTROL INSIDE IT IS WHY IT TAKES A RULE.
-     `.manager-button` pins `min-height: 34px` for a page-level control; five of those plus the
-     row's own padding is 290px of a panel that also has to hold cards, a search field and a
-     pager, so only four rows of five fitted above the fold and the pager was never on screen.
-
-     Scoped to this row, so no other `ArmedDangerButton` in the manager is retuned. */
+  /* THE 34px CONTROL IS WHY THE ~36px ROW TAKES A RULE. Scoped, so no other danger button moves. */
   .manager-scoped-roster-system :global(.manager-button.is-danger) {
     min-height: 26px;
     padding: 0 var(--fab-space-2);
   }
 
-  /* THE SYSTEM NAME IS A SERIF (`proto:2030`), which is the type half of this finding: every
-     other place this app prints an entity's NAME — the catalogue row, the inspector heading, the
-     empty state's title — is set in the serif face, and this one row printed a crafting system's
-     name in the sans and so read as a label rather than as a name. */
+  /* THE SYSTEM NAME IS A SERIF (`proto:2030`), as every other printed entity NAME in this app. */
   .manager-scoped-roster-system-name {
     flex: 1 1 0;
     color: var(--fab-text);
@@ -582,56 +361,20 @@
     white-space: nowrap;
   }
 
-  /* THE CLUSTER KEEPS ITS WIDTH AND THE NAME GIVES WAY. `.manager-scoped-membership-actions` is
-     `flex-wrap: wrap` in the host sheet, sized for a full-width editor row; dropped into a 258px
-     inspector row it wrapped its own two controls onto separate lines and made every system row
-     three lines tall. `flex: 0 0 auto` + `nowrap` fixes the cluster at its content width and the
-     name — already `overflow: hidden` with an ellipsis — takes the remainder.
-
-     `:global()` because the element belongs to `MembershipActions`, scoped under a local class so
-     it reaches no other caller of that component. */
+  /* THE CLUSTER KEEPS ITS WIDTH AND THE NAME GIVES WAY: the host sheet's `flex-wrap: wrap` made
+     every 258px system row three lines tall. `:global()` under a local class, because the
+     element belongs to `MembershipActions`. */
   .manager-scoped-roster-system > :global(.manager-scoped-membership-actions) {
     flex: 0 0 auto;
     flex-wrap: nowrap;
   }
 
-  /* `Pagination` renders its own `<section>`, so the sizing has to be stated from this side of
-     the boundary.
-
-     THE THREE RULES BELOW ARE WHY THE ARROWS ARE ON SCREEN. The shipped bar is built for the foot
-     of a full-width list: `gap: --fab-space-3`, `padding: --fab-space-2 --fab-space-3`, a 96px
-     minimum on the page label and `flex-wrap: wrap`. In a 258px inspector column that wraps the
-     nav onto a second line below the summary, and the second line fell under the panel's own
-     scroll edge — so the frame published `Showing 1-5 of 6` with no way to reach row six, which
-     is a pager that states there is more and then hides the only control that gets to it.
-
-     `nowrap` plus the tighter metrics put the summary and the nav on one line at this width.
-
-     ── THE ANCESTOR MOVED WITH THE MARKUP, AND THAT IS THE WHOLE REASON IT IS RESTATED ─────────
-     The pager is a child of the CARD now, not of the section, so the direct-child combinator
-     that used to reach it reaches nothing. Svelte emits a pruned-selector warning for a scoped
-     compound it can prove is unused, but not for one whose only failing part is `:global()`, so
-     this would have compiled clean and simply put the shipped full-width bar back inside a 300px
-     column — the exact defect the three rules here exist to prevent.
-
-     The trailing step above it is the design's (`proto:2037`), and it is wider than the row gap
-     so the walk control reads as the card's foot rather than as a sixth system.
-
-     ── THE PAGER IS A BORDERED ROW, NOT A BARE STRIP UNDER A HAIRLINE (issue 1373, maintainer
-     feedback round 3) ─────────────────────────────────────────────────────────────────────────
-     `proto:2037` draws it as `padding:6px 8px; border:1px solid var(--border); border-radius:8px`
-     — the same construction, the same border colour and the same horizontal inset as a roster
-     row three lines above it (`proto:2029`), separated from the last row by `margin-top:11px`.
-     The design has NO separator rule anywhere inside this card.
-
-     What shipped was the shared bar's `border-top: 1px solid` running the full width of the card
-     with the pager loose beneath it — the one part of the card not brought across, and the only
-     hairline on a screen whose every other boundary is a card edge. The `border` SHORTHAND is
-     what removes it: a `border-top: 0` beside a `border` declaration is two rules stating one
-     edge, and the next reader has to work out which wins.
-
-     `margin-top` rather than the old `padding-top`, because the step is now OUTSIDE a box that
-     has an edge of its own; padding would have put the 12px inside the border. */
+  /* `Pagination` renders its own `<section>`, so the sizing is stated from this side: the shipped
+     bar is built for a full-width list and in a 258px column it wrapped the nav below the scroll
+     edge. THE ANCESTOR MOVED WITH THE MARKUP, which is why it is restated — Svelte prunes a
+     scoped compound it can prove unused, but not one whose only failing part is `:global()`, so
+     this would have compiled clean. The pager is a BORDERED ROW (`proto:2037`), and the `border`
+     SHORTHAND is what removes the shipped `border-top`. */
   .manager-scoped-roster-card > :global(.manager-pagination) {
     flex: 0 0 auto;
     flex-wrap: nowrap;
@@ -640,10 +383,7 @@
     padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 8px;
-    /* AND ITS FILL (`proto:2037`), on the row rule's own corrected argument: the pager is a part
-       of the card in the ASIDE, not in the pane, so `--bg1` maps to `--fab-bg-0` and the recess
-       is reachable. The old note reasoned from "this route's pane is on the bottom rung already",
-       which is true and beside the point for an element the pane does not hold. */
+    /* AND ITS FILL (`proto:2037`): the pager is part of the card in the ASIDE, not in the pane. */
     background: var(--fab-bg-0);
     font-size: 0.62rem;
   }

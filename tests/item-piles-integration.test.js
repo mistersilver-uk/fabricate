@@ -1,31 +1,17 @@
 /**
- * Unit tests for ItemPilesIntegration (T-086)
- *
- * Tests use node:test + node:assert/strict following the pattern in
- * tool-model.test.js.  The Item Piles API (game.itempiles.API) is fully
- * mocked — no real companion module is required.
- *
- * Test matrix:
- *  - Module-absent path
- *  - Module-present-but-toggle-off path
- *  - Toggle-on happy paths for all operations
- *  - Version mismatch handling
- *  - CraftingEngine integration (currency check + deduct during craft)
+ * Unit tests for ItemPilesIntegration (T-086). Tests use node:test + node:assert/strict following
+ * the pattern in tool-model.test.js.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
 // Minimal Foundry stubs (loaded before any src/ import)
-// ---------------------------------------------------------------------------
 globalThis.foundry = { utils: { randomID: () => `id-${Math.random().toString(36).slice(2)}`, getProperty: () => undefined } };
 globalThis.game = { modules: new Map(), itempiles: undefined };
 
 const { ItemPilesIntegration, ITEM_PILES_MINIMUM_VERSION } = await import('../src/integrations/ItemPilesIntegration.js');
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function makeModule(active, version) {
   return { active, version };
@@ -39,9 +25,7 @@ function makeSystem(itemPilesEnabled = false) {
   return { features: { itemPiles: itemPilesEnabled } };
 }
 
-// ---------------------------------------------------------------------------
 // detect() — module absent
-// ---------------------------------------------------------------------------
 
 test('detect - available is false when module map is empty', () => {
   globalThis.game = { modules: new Map() };
@@ -58,9 +42,7 @@ test('detect - available is false when module is not active', () => {
   assert.equal(integration.available, false);
 });
 
-// ---------------------------------------------------------------------------
 // detect() — version checks
-// ---------------------------------------------------------------------------
 
 test('detect - available is false when version is below minimum', () => {
   globalThis.game = { modules: new Map([['item-piles', makeModule(true, '2.9.0')]]) };
@@ -110,9 +92,7 @@ test('ITEM_PILES_MINIMUM_VERSION is exported and equals 3.1.0', () => {
   assert.equal(ITEM_PILES_MINIMUM_VERSION, '3.1.0');
 });
 
-// ---------------------------------------------------------------------------
 // isEnabled()
-// ---------------------------------------------------------------------------
 
 test('isEnabled - false when integration is not available', () => {
   globalThis.game = { modules: new Map() };
@@ -149,9 +129,7 @@ test('isEnabled - true when available and toggle is on', () => {
   assert.equal(integration.isEnabled(makeSystem(true)), true);
 });
 
-// ---------------------------------------------------------------------------
 // canAfford()
-// ---------------------------------------------------------------------------
 
 test('canAfford - returns true when actor has sufficient currency', async () => {
   globalThis.game = {
@@ -247,9 +225,7 @@ test('canAfford - throws when integration is not available', async () => {
   );
 });
 
-// ---------------------------------------------------------------------------
 // deductCurrency()
-// ---------------------------------------------------------------------------
 
 test('deductCurrency - calls removeCurrencies with mapped abbreviation object', async () => {
   const calls = [];
@@ -312,9 +288,7 @@ test('deductCurrency - throws when integration is not available', async () => {
   );
 });
 
-// ---------------------------------------------------------------------------
 // getMerchantItems()
-// ---------------------------------------------------------------------------
 
 test('getMerchantItems - returns array from API', async () => {
   const fakeItems = [{ name: 'Sword' }, { name: 'Shield' }];
@@ -368,9 +342,7 @@ test('getMerchantItems - throws when integration is not available', async () => 
   );
 });
 
-// ---------------------------------------------------------------------------
 // getContainerContents()
-// ---------------------------------------------------------------------------
 
 test('getContainerContents - returns array from API', async () => {
   const fakeContents = [{ name: 'Potion' }];
@@ -424,9 +396,7 @@ test('getContainerContents - throws when integration is not available', async ()
   );
 });
 
-// ---------------------------------------------------------------------------
 // CraftingEngine integration: canAfford is checked during craft
-// ---------------------------------------------------------------------------
 
 // Re-use a lightweight stub CraftingEngine for integration-style tests.
 // We directly call the private helper that the engine would call.
@@ -448,10 +418,8 @@ test('CraftingEngine integration - canAfford consulted when currencyCost present
     }
   };
 
-  // Simulate the logic that CraftingEngine performs:
-  // 1. Check currencyCost on recipe
-  // 2. If present and integration enabled, call canAfford
-  // 3. After success, call deductCurrency
+  // Simulate the logic that CraftingEngine performs: 1. Check currencyCost on recipe 2. If present
+  // and integration enabled, call canAfford 3. After success, call deductCurrency
 
   const actor = makeActor();
   const currencyCost = { currencies: [{ abbreviation: 'gp', amount: 10 }] };
@@ -545,9 +513,7 @@ test('CraftingEngine integration - no currency check when recipe has no currency
   assert.equal(canAffordCalled, false);
 });
 
-// ---------------------------------------------------------------------------
 // Version mismatch handling
-// ---------------------------------------------------------------------------
 
 test('version mismatch - detectedVersion is set even when below minimum', () => {
   globalThis.game = { modules: new Map([['item-piles', makeModule(true, '2.0.0')]]) };
@@ -570,9 +536,7 @@ test('version mismatch - re-detection after upgrade makes module available', () 
   assert.equal(integration.available, true);
 });
 
-// ---------------------------------------------------------------------------
 // Ordering: deductCurrency must NOT be called when ingredient consumption throws
-// ---------------------------------------------------------------------------
 
 test('CraftingEngine ordering - deductCurrency not called when ingredient consumption throws', async () => {
   let deductCalled = false;
@@ -590,10 +554,8 @@ test('CraftingEngine ordering - deductCurrency not called when ingredient consum
   const currencyCost = { currencies: [{ abbreviation: 'gp', amount: 10 }] };
   const system = makeSystem(true);
 
-  // Simulate the ordering that CraftingEngine now enforces:
-  // 1. canAfford checked upfront (returns true)
-  // 2. _consumeIngredients called and throws
-  // 3. _deductItemPilesCurrencyCost is NOT reached
+  // Simulate the ordering that CraftingEngine now enforces: 1. canAfford checked upfront (returns
+  // true) 2. _consumeIngredients called and throws 3. _deductItemPilesCurrencyCost is NOT reached
 
   async function simulateConsumeIngredients() {
     throw new Error('Inventory locked');

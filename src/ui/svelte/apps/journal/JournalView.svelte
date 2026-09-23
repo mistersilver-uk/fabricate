@@ -4,8 +4,8 @@
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import Notice from '../../components/Notice.svelte';
   import Select from '../../components/Select.svelte';
-  import SegmentedControl from '../manager/SegmentedControl.svelte';
-  import EmptyState from '../manager/EmptyState.svelte';
+  import SegmentedControl from '../../components/SegmentedControl.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import PlayerViewState from '../PlayerViewState.svelte';
   import ActiveRunsList from './ActiveRunsList.svelte';
   import HistoryList from './HistoryList.svelte';

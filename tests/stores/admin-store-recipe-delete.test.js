@@ -1,14 +1,7 @@
 /**
- * The Recipe Studio's set delete, store side (issue 1132).
- *
- * `describeRecipeDelete` is what the bulk panel renders BEFORE the GM arms the control, and
- * `deleteRecipes` is what the second click performs. The contract between them is
- * STRUCTURAL rather than asserted: both this describer and
- * `CraftingSystemManager.deleteRecipes` count through `utils/recipeDeleteImpact.js`, so the
- * stated numbers cannot be a parallel model of the write. What is asserted here is the
- * STORE's half — the resolution, the caching, the render-path tolerance and the failure
- * mode — plus the divergence MATRIX the delta requires, because "the statement equals the
- * write" is one claim per axis, not one fixture.
+ * The Recipe Studio's set delete, store side (issue 1132). `describeRecipeDelete` is what the bulk
+ * panel renders BEFORE the GM arms the control, and `deleteRecipes` is what the second click
+ * performs.
  */
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -137,9 +130,8 @@ describe('1132 adminStore.describeRecipeDelete', () => {
   });
 
   it('returns the zero impact, not a throw, for a stale or absent system on the render path', async () => {
-    // The describer runs inside a `$derived` on every selection change, so a throw here is a
-    // broken panel rather than a caught error. A system id that resolves to nothing is
-    // reachable: the browser publishes asynchronously and a system can be deleted under it.
+    // The describer runs inside a `$derived` on every selection change, so a throw here is a broken
+    // panel rather than a caught error.
     const services = createServices(modernSystem(), threeRecipes());
     const systemManager = services.getCraftingSystemManager();
     services.getCraftingSystemManager = () => ({ ...systemManager, getSystem: () => null });
@@ -186,17 +178,12 @@ describe('1132 adminStore.describeRecipeDelete', () => {
 });
 
 describe('1132 adminStore.describeRecipeDelete — the divergence matrix', () => {
-  // ACCEPTANCE 7 is a MATRIX over the axes on which the STATED and the PERFORMED numbers
-  // can legitimately differ, not a single fixture. Each number is asserted against its own
-  // definition, because conflating them would produce a test written against two things that
-  // differ by design, which then gets weakened until it proves nothing.
+  // ACCEPTANCE 7 is a MATRIX over the axes on which the STATED and the PERFORMED numbers can
+  // legitimately differ, not a single fixture.
 
   it('AXIS 1 — membership basis: the stated recipe-item count is basis-aware', async () => {
-    // On a LEGACY-basis system membership lives on the recipe's own `recipeItemId` scalar
-    // and every `recipeIds` array is empty by construction. The write rewrites nothing —
-    // `recipeItemsRewritten` is 0 — but the sentence "1 book or scroll" is still
-    // TRUE, because the book really does stop containing the recipe. Revision 2 of this
-    // delta would have stated the number and pruned nothing while claiming they matched.
+    // On a LEGACY-basis system membership lives on the recipe's own `recipeItemId` scalar and every
+    // `recipeIds` array is empty by construction.
     const legacy = makeSystem({
       recipeItemDefinitions: [
         { id: 'primer', name: 'Primer', originItemUuid: 'Item.aaa', recipeIds: [], caps: {} },
@@ -216,10 +203,9 @@ describe('1132 adminStore.describeRecipeDelete — the divergence matrix', () =>
   });
 
   it('AXIS 2 — a stale selected id inflates neither the statement nor the write', async () => {
-    // `RecipesBrowserView` prunes phantom ids only when the projection republishes, which is
-    // a different moment from the click, and `RecipeManager.deleteRecipe` THROWS for an id
-    // that no longer resolves. So the card states, and the button deletes, the resolvable
-    // ids — and `deletableIds` is what the confirm handler is handed.
+    // `RecipesBrowserView` prunes phantom ids only when the projection republishes, which is a
+    // different moment from the click, and `RecipeManager.deleteRecipe` THROWS for an id that no
+    // longer resolves.
     const store = createAdminStore(createServices(modernSystem(), threeRecipes()));
     await store.refresh();
 
@@ -299,11 +285,9 @@ describe('1132 adminStore.deleteRecipes', () => {
     assert.equal(result.deleted, 2);
   });
 
-  // A DELETE THAT REACHED NOTHING REPORTS, and it is reachable with no failure at all: a
-  // concurrent client deleting the same recipes between the describe and the click empties
-  // the resolvable set. The store used to return the zero result in silence and the caller
-  // then returned `false`, so a GM who clicked delete and saw nothing happen was told
-  // nothing; only the `catch` surfaced anything at all (issue 1132, review round).
+  // A DELETE THAT REACHED NOTHING REPORTS, and it is reachable with no failure at all: a concurrent
+  // client deleting the same recipes between the describe and the click empties the resolvable set
+  // (issue 1132).
   it('writes nothing, and SAYS so, when no selected id resolves', async () => {
     const calls = [];
     const warnings = [];
@@ -388,9 +372,8 @@ describe('1132 adminStore.deleteRecipes', () => {
 
   it('surfaces a refused write to the GM and returns the ZERO result, not a throw', async () => {
     // Reachable, not theoretical: `_assertGM` is `game.user.isGM` while `SETTINGS_MODIFY` is
-    // revocable from an assistant GM, so in a world that has revoked it the client-side gate
-    // passes and the server refuses. The caller must be able to tell that apart from success
-    // by a NUMBER — the zero result is an object and therefore truthy.
+    // revocable from an assistant GM, so in a world that has revoked it the client-side gate passes
+    // and the server refuses.
     const errors = [];
     const calls = [];
     const services = withDeleteRecorder(
@@ -412,14 +395,8 @@ describe('1132 adminStore.deleteRecipes', () => {
 });
 
 describe('1132 adminStore.deleteRecipe — the studio SINGULAR', () => {
-  // A recipe lives in its OWN world setting and carries its own `craftingSystemId`, while
-  // the prune runs over `getSystem(systemId).recipeItemDefinitions`. The selection was being
-  // preferred over the recipe, so for a recipe whose system is not the selected one the
-  // recipe deleted, the prune ran over the WRONG system's definitions, found no containing
-  // definition, and the recipe's real book kept the dangling id — precisely the invariant
-  // this change exists to restore. The describer had the same skew, so the dialog stated
-  // zero impact while the delete proceeded. `game.fabricate.deleteRecipe` has always read
-  // the id off the recipe; the fallback order was simply inverted here.
+  // A recipe lives in its OWN world setting and carries its own `craftingSystemId`, while the prune
+  // runs over `getSystem(systemId).recipeItemDefinitions`.
   function twoSystemServices(calls, dialogs) {
     const other = makeSystem({
       id: 'sys2',
@@ -503,16 +480,10 @@ describe('1132 adminStore.deleteRecipe — the studio SINGULAR', () => {
   });
 
   it('passes the confirm shape DialogV2 actually reads, on both buttons', async () => {
-    // `services.confirmDialog` calls `DialogV2.confirm` WITHOUT `normalizeDialogOptions`, so
-    // a top-level `title` is read by nothing; and `DialogV2.confirm` merges `yes` and `no`
-    // over defaults carrying their own labels and callbacks, so a bare function contributes
-    // no own enumerable keys. `no: () => false` was harmless — the default `no.callback`
-    // already returns false — but it is the identical shape, and one of the pair left in the
-    // broken form is how the pattern comes back.
-    //
-    // VERSION NOTE for anyone extending this: the DEFAULT labels are the literals "Yes"/"No"
-    // on V13.351 and the i18n keys "COMMON.Yes"/"COMMON.No" on V14.365. Asserting a supplied
-    // label is version-independent; asserting a default one is not.
+    // `services.confirmDialog` calls `DialogV2.confirm` WITHOUT `normalizeDialogOptions`, so a
+    // top-level `title` is read by nothing; and `DialogV2.confirm` merges `yes` and `no` over
+    // defaults carrying their own labels and callbacks, so a bare function contributes no own
+    // enumerable keys.
     const dialogs = [];
     const store = createAdminStore(twoSystemServices([], dialogs));
     await store.refresh();
@@ -529,11 +500,10 @@ describe('1132 adminStore.deleteRecipe — the studio SINGULAR', () => {
 });
 
 describe('1132 adminStore learner-index freshness', () => {
-  // `updateActor` routes a `flags` diff to `scheduleKnowledgeRefresh`, which is a TOTAL
-  // no-op unless the Knowledge surface is open — so with the Recipe Studio open, a player
-  // learning from a scroll left the card understating "Will be forgotten by N characters"
-  // until an unrelated `refresh()`. Rebuilding at the hook would be a world walk per foreign
-  // module's flag write, so the hook MARKS and the next read that needs the index rebuilds.
+  // `updateActor` routes a `flags` diff to `scheduleKnowledgeRefresh`, which is a TOTAL no-op
+  // unless the Knowledge surface is open — so with the Recipe Studio open, a player learning from a
+  // scroll left the card understating "Will be forgotten by N characters" until an unrelated
+  // `refresh()`.
   it('rebuilds the index on the next read after an actor write marks it stale', async () => {
     let actorReads = 0;
     const services = createServices(modernSystem(), threeRecipes(), [], {

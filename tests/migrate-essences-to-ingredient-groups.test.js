@@ -1,13 +1,7 @@
 /**
- * Tests for the 1.17.0 migration (issue 649): supersede the per-set
- * `IngredientSet.essences` map with first-class single-option essence GROUPS, and
- * reconcile the alchemy signature collisions folding essences into signature-bearing
- * groups can introduce.
- *
- * Covers: idempotency; map→group round-trip; AND-semantics preserved; step-level set
- * migration; essence-only set; non-positive-entry drop; the payload read from
- * `data.recipes` (nothing under `data.systems`); and the post-migration collision
- * reconciliation (both colliding recipes disabled, gate cleared).
+ * Tests for the 1.17.0 migration (issue 649): supersede the per-set `IngredientSet.essences` map
+ * with first-class single-option essence GROUPS, and reconcile the alchemy signature collisions
+ * folding essences into signature-bearing groups can introduce.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -130,13 +124,8 @@ test('reads and returns the recipes payload — data.systems carries no ingredie
 // --- Post-migration alchemy-collision reconciliation (§3a) ------------------
 
 test('disables BOTH colliding recipes after folding essences into signature-bearing groups', () => {
-  // Inseparable case (issue 774): A requires {C}; B requires fire essence only, where
-  // C is the SOLE fire carrier. Post-migration B folds to a fire-essence group that
-  // expands to exactly {C}, so A and B reduce to the IDENTICAL signature [{C}] — a
-  // symmetric, inseparable collision no ingredient can resolve. One pass over the
-  // all-enabled migrated set disables both participants so the system is unblocked.
-  // (A one-directional subset/superset created by folding is NOT a collision now:
-  // the runtime's most-specific pick disambiguates it, so it stays enabled.)
+  // Inseparable case (issue 774): A requires {C}; B requires fire essence only, where C is the SOLE
+  // fire carrier.
   const components = [
     { id: 'C', name: 'Cinder', tags: [], essences: { fire: 1 } },
     { id: 'X', name: 'Xenon', tags: [], essences: {} },

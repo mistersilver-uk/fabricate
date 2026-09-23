@@ -8,6 +8,8 @@ import {
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -23,20 +25,23 @@ const harness = createMountedComponentHarness({
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/gatheringImageDefaults.js',
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
+    'src/ui/svelte/util/disclosurePhrase.js',
     'src/ui/svelte/util/gatheringFormat.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
+  'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/util/dropUtils.js',
     // The browse view-state the environments browser and its two gathering children
     // read (issue 1438).
-    'src/utils/managerBrowserViewState.js',
+    'src/ui/model/managerBrowserViewState.js',
     // The shared colour-token constant + its localized labels (issue 1036). Both colour
     // components import it, and both are compiled below.
     'src/ui/svelte/util/managerColorTokens.js',
@@ -45,15 +50,16 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/actions/dragDrop.js',
-    // `ActionMenu`'s own import-free leaves (issue 1515), reached only through the row menus the
-    // three browsers below now render. `portal.js` and `anchoredPopover.js` are already above.
+    // `ActionMenu`'s own import-free leaves (issue 1515).
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/actionMenuLayout.js',
   ],
+  // The browse-list wiring is a runes composable (issue 1716), reached by this view and by the
+  // two gathering browsers it compiles below, so it is compiled rather than copied. An omission
+  // cancels this suite rather than failing it.
+  runeModules: ['src/ui/svelte/apps/manager/browserListState.svelte.js'],
   compiledModules: [
-    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
-    // ONE labelled push-button (issue 1118), rendered from EnvironmentsBrowserView and from
-    // the two gathering browsers it embeds.
+    // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     // THE shared overflow action menu (issue 1477). All three browsers in this tree render one
@@ -75,8 +81,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/apps/manager/PartyNameField.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
-    // The three card components the parties rebuild added (issue 1182), each imported
-    // by PartyExpandedBody, so each must be compiled before it.
+    // The three card components the parties rebuild added (issue 1182).
     'src/ui/svelte/apps/manager/PartyMemberRow.svelte',
     'src/ui/svelte/apps/manager/PartyAddMemberPanel.svelte',
     'src/ui/svelte/apps/manager/PartyTravelActorPanel.svelte',
@@ -137,12 +142,6 @@ async function mountSettingsTab() {
 // trigger's own DOM subtree, which would silently defeat the regression this suite
 // exists to catch, since the real bug only exists once the popover is portaled away
 // from the trigger.
-//
-// THE `.manager-main` RECT IS THE SECOND STUB, and it is what makes the panel take a
-// position at all rather than merely a parent. `bounds` here is the SELECTOR STRING
-// `MANAGER_MAIN_SELECTOR`, which the action resolves with `anchor.closest('.manager-main')`
-// (`anchoredPopover.js:185-190`) — not with `ancestorScrollerBounds`, whose skip-the-zero-
-// sized-candidate walk belongs to the callers that pass a resolver (`overlayBounds.js:65-72`).
 // happy-dom gives every element a zero rect and the string branch KEEPS it: minLeft becomes 16
 // and maxRight −16, a zero-width band that `computeIconPickerPopoverLayout` answers `null` for
 // (`iconPickerPopover.js:77-78`), and the action then CLEARS the style, so the panel renders
@@ -172,10 +171,7 @@ function stageManagerShell(target, triggerLeft = 140) {
   return trigger;
 }
 
-// Opening the popover also runs the effect that applies `anchoredPopover`, which portals
-// the panel and registers `window` resize / capture-`scroll` listeners (unrelated to the
-// dismissal bug this suite covers). That effect pass is scheduled a tick after the state
-// change, so a single synchronous `flushSync()` is not enough to settle it.
+// Opening the popover also runs the effect that applies `anchoredPopover`.
 async function openBiomePopover(trigger) {
   trigger.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
   flushSync();
@@ -183,28 +179,26 @@ async function openBiomePopover(trigger) {
   flushSync();
 }
 
-describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', () => {
-  before(async () => {
-    await harness.setup();
-    // happy-dom's Window is flattened onto `globalThis` by setupDOM() (see
-    // tests/helpers/svelte-dom.js), and `globalThis` itself has no
-    // `addEventListener`. The popover-positioning effect (unrelated to the
-    // dismissal mechanism under test here) registers `window` resize/scroll
-    // listeners whenever the popover opens; stub them so that pre-existing,
-    // out-of-scope effect does not crash this suite.
-    window.addEventListener ??= () => {};
-    window.removeEventListener ??= () => {};
-    // `defineProperty` and not `window.innerWidth = 1280`: happy-dom declares both as
-    // accessors with no setter, so a plain assignment is silently dropped in sloppy mode
-    // and they stay `undefined`. The positioning pass falls back to the window box when
-    // the host reports no size, so without a real viewport the layout has no answer and
-    // the panel is left unpositioned — see `stageManagerShell` for the other half.
-    Object.defineProperty(window, 'innerWidth', { value: 1280, configurable: true });
-    Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
-  });
-  after(harness.teardown);
-  afterEach(harness.remount);
+// File-level, because this harness now serves the shared crafting-system switch run below as
+// well as the popover describe (issue 1716); a `before` inside one describe never reaches another.
+before(async () => {
+  await harness.setup();
+  // happy-dom's Window is flattened onto `globalThis` by setupDOM() (see
+  // tests/helpers/svelte-dom.js), and `globalThis` itself has no
+  // `addEventListener`. The popover-positioning effect (unrelated to the
+  // dismissal mechanism under test here) registers `window` resize/scroll
+  // listeners whenever the popover opens; stub them so that pre-existing,
+  // out-of-scope effect does not crash this suite.
+  window.addEventListener ??= () => {};
+  window.removeEventListener ??= () => {};
+  // `defineProperty` and not `window.innerWidth = 1280`.
+  Object.defineProperty(window, 'innerWidth', { value: 1280, configurable: true });
+  Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
+});
+after(harness.teardown);
+afterEach(harness.remount);
 
+describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', () => {
   it("right-clicking the open popover's own trigger closes it instead of reopening it", async () => {
     const target = await mountSettingsTab();
     const trigger = stageManagerShell(target);
@@ -212,10 +206,7 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
     await openBiomePopover(trigger);
     const opened = colorPopover(target);
     assert.ok(opened, 'first right-click opens the popover');
-    // `assert.ok(a === b)` and not `assert.equal(a, b)`: on failure node:assert serialises both
-    // operands to build its diff, and a happy-dom element's own enumerable state reaches its
-    // parents, its children and its owner document — so the failure allocates until the heap
-    // dies and the suite reports `# cancelled` with no message. The boolean fails in words.
+    // `assert.ok(a === b)` and not `assert.equal(a, b)`.
     assert.ok(
       opened.parentElement === target,
       'the popover is portaled out of the trigger row into the manager shell'
@@ -264,34 +255,12 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
     assert.ok(!colorPopover(target), 'Escape still dismisses the popover');
   });
 
-  // THE POSITIONING HALF (issue 1500). Every case above is about DISMISSAL, and each of them is
-  // satisfied by a popover that opens, portals and is then laid out nowhere at all: the conversion
-  // deleted a hand-written measure/clamp/place block from this view and handed the job to
-  // `anchoredPopover` + `bounds: MANAGER_MAIN_SELECTOR`, and a conversion that portals correctly
-  // while measuring against the wrong box is exactly the regression a dismissal assertion cannot
-  // see.
-  //
-  // The string is not a golden value copied out of a run. It is the arithmetic of the deleted
-  // block over the two stubs, and every term is checkable by hand against
-  // `computeIconPickerPopoverLayout`:
-  //
+  // THE POSITIONING HALF (issue 1500). Every case above is about DISMISSAL.
   //   bounds  `.manager-main` at left 60 / right 1220, inset 16 → minLeft 76, maxRight 1204
   //   width   `minWidth: maxWidth: 220` from the view's own `layoutOptions` → 220
   //   left    horizontalAlign 'left' → the trigger's own 140, inside [76, 1204 − 220]
   //   height  preferred 380, and the space below the trigger (800 − 130 − 6 − 16 = 648) exceeds it
   //   top     the trigger's bottom 130 plus the 6px gap → 136, so the placement is 'bottom'
-  //
-  // A width option dropped, a flip to `top`, or a layout that stopped being applied at all
-  // therefore reds here with the offending term visible in the diff, rather than passing as "the
-  // popover opened". The CLAMP is not one of the terms this case can see — at a trigger 140px
-  // from the left of a 1160px column, the column's boundary and the window's agree on the answer
-  // — which is what the case below it exists for.
-  //
-  // The resolved width is now written as BOTH BOUNDS as well (issue 1520 review round 2), and this
-  // panel's box does not move: it asks for 220/220 against a rule that states `width: 220px` and
-  // no bounds at all, so the three declarations agree with each other and with the sheet. This
-  // suite and its sibling in `tests/actions/` are the two that pin the string, which is how the
-  // change's reach was measured rather than argued.
   it('positions the portaled panel where the deleted block would have', async () => {
     const target = await mountSettingsTab();
     const trigger = stageManagerShell(target);
@@ -311,16 +280,6 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
   // both sides, where `bounds: MANAGER_MAIN_SELECTOR` and the action's default window margin
   // return the same number — so deleting the `bounds` option entirely leaves it green, and the
   // boundary the conversion had to carry over from the deleted block would be unguarded.
-  //
-  // A trigger 1020px in has 260px of window to its right and only 200px of COLUMN, so the two
-  // boundaries now disagree and the panel is placed by whichever one the action was given:
-  //
-  //   with `bounds`      maxRight 1204 → maxLeft 1204 − 220 = 984, and 1020 clamps back to 984
-  //   without it         maxRight 1264 → maxLeft 1044, and 1020 is left where it asked to be
-  //
-  // 984 is therefore a value only the column can produce. The manager column is the box the biome
-  // panel must not overhang — it scrolls, and a panel laid out past its right edge is the defect
-  // `MANAGER_MAIN_SELECTOR` names.
   it('clamps the panel to the manager column and not to the window', async () => {
     const target = await mountSettingsTab();
     const trigger = stageManagerShell(target, 1020);
@@ -349,4 +308,115 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
 
     assert.ok(colorPopover(target), 'a mousedown inside the popover leaves it open');
   });
+});
+
+// `EnvironmentsBrowserView` renders the two gathering browsers itself and threads their lifted
+// state through, so all three instantiations below mount the same component.
+const SWITCH_SYSTEM = 'sys-first';
+
+/** One gathering vocabulary the biome add-form can render against. */
+const biomeVocabulary = {
+  values: [
+    { id: 'forest', label: 'Moon Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' },
+  ],
+};
+
+const gatheringRows = (key, rowCount, namePrefix) => ({
+  systems: {
+    [SWITCH_SYSTEM]: {
+      vocabularies: { biomes: biomeVocabulary },
+      [key]: Array.from({ length: rowCount }, (_, index) => ({
+        id: `${key}-${index + 1}`,
+        name: `${namePrefix} ${index + 1}`,
+        enabled: true,
+        biomes: ['forest'],
+      })),
+    },
+  },
+});
+
+describeBrowserListState({
+  label: 'EnvironmentsBrowserView',
+  harness,
+  props: ({ rowCount, selectedSystemId, browserState }) => ({
+    activeGatheringTab: 'environments',
+    selectedSystemId,
+    selectedSystemName: 'Alchemy',
+    gatheringConfig: gatheringRows('environments', 0, 'Glade'),
+    environments: Array.from({ length: rowCount }, (_, index) => ({
+      id: `env-${index + 1}`,
+      name: `Glade ${index + 1}`,
+      enabled: true,
+      selectionMode: 'weighted',
+      risk: 'safe',
+      biomes: ['forest'],
+    })),
+    browserState,
+  }),
+  // Every filter axis names a vocabulary the new system does not share.
+  resetAxes: {
+    searchTerm: ['moon', ''],
+    statusFilter: ['active', 'all'],
+    selectionFilter: ['weighted', 'all'],
+    riskFilter: ['deadly', 'all'],
+    biomeFilter: ['forest', 'all'],
+  },
+  // The page is the one this view deliberately keeps: its resets only ever widen the corpus, so
+  // the clamp never fires and a GM reading page two stays on page two.
+  preservedAxes: { pageIndex: 1, pageSize: 1 },
+  clampsPage: true,
+  localDraft: {
+    props: ({ selectedSystemId, browserState }) => ({
+      activeGatheringTab: 'settings',
+      selectedSystemId,
+      selectedSystemName: 'Alchemy',
+      gatheringConfig: gatheringRows('environments', 0, 'Glade'),
+      browserState,
+    }),
+    selector: '[data-gathering-vocabulary-panel="biomes"] form input[aria-label="Add biome"]',
+    typed: 'Mushroom forest',
+    why: 'a half-typed biome name belongs to the system it was being added to, so the switch clears it',
+  },
+});
+
+describeBrowserListState({
+  label: 'GatheringTasksBrowserView',
+  harness,
+  props: ({ rowCount, selectedSystemId, browserState }) => ({
+    activeGatheringTab: 'tasks',
+    selectedSystemId,
+    selectedSystemName: 'Alchemy',
+    gatheringConfig: gatheringRows('tasks', rowCount, 'Forage'),
+    gatheringTasksBrowserState: browserState,
+  }),
+  resetAxes: {
+    searchTerm: ['forage', ''],
+    statusFilter: ['active', 'all'],
+    biomeFilter: ['forest', 'all'],
+    availabilityFilter: ['limited', 'all'],
+    pageIndex: [1, 0],
+  },
+  preservedAxes: { pageSize: 1 },
+  clampsPage: true,
+});
+
+describeBrowserListState({
+  label: 'GatheringEventsBrowserView',
+  harness,
+  props: ({ rowCount, selectedSystemId, browserState }) => ({
+    activeGatheringTab: 'encounters',
+    selectedSystemId,
+    selectedSystemName: 'Alchemy',
+    gatheringConfig: gatheringRows('events', rowCount, 'Ambush'),
+    gatheringEventsBrowserState: browserState,
+  }),
+  resetAxes: {
+    searchTerm: ['ambush', ''],
+    statusFilter: ['active', 'all'],
+    biomeFilter: ['forest', 'all'],
+    dangerFilter: ['deadly', 'all'],
+    pageIndex: [1, 0],
+  },
+  preservedAxes: { pageSize: 1 },
+  clampsPage: true,
 });

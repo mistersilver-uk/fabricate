@@ -1,22 +1,7 @@
 /**
- * Revisioned inventory / knowledge snapshot reads (issue 1077, under #1070).
- *
- * Three properties are load-bearing here and each gets its own section:
- *
- * 1. **The recipe-item prefilter cannot change an answer.** It is a SUPERSET filter, so the
- *    only way it can be wrong is by dropping an item some recipe's own matcher would have
- *    accepted. The legacy `linkedRecipeItemUuid` leg is the sharp case — its definition is
- *    synthesised per recipe and is NOT in `system.recipeItemDefinitions` — so it is pinned
- *    directly rather than left to a corpus test to notice.
- * 2. **The counters are not vacuous.** #1076's first bounds draft passed against broken code
- *    because its counter could only see what its own index inspected. So every bound below
- *    is asserted through an INDEPENDENT, fixture-side probe — an `actor.items` getter that
- *    counts reads and items — which observes the inventory walk itself and would still move
- *    if a linear rescan were reintroduced beside the snapshot.
- * 3. **The memo respects staleness.** The retained member-book lookup is keyed on the
- *    definition array's identity, length AND `definitionIndex`'s revision counter. The third
- *    clause is the one an in-place `recipeIds` rewrite needs and the one a first draft
- *    forgets, so it is exercised in both directions.
+ * Revisioned inventory / knowledge snapshot reads (issue 1077, under #1070). 1. **The recipe-item
+ * prefilter cannot change an answer.** It is a SUPERSET filter, so the only way it can be wrong is
+ * by dropping an item some recipe's own matcher would have accepted.
  */
 
 import { describe, it } from 'node:test';
@@ -40,9 +25,7 @@ const { buildInventorySnapshot, projectRecipeAvailability } = await import(
 const { advanceDefinitionRevision } = await import('../src/utils/definitionIndex.js');
 const { itemMatchesRecipeItemSource } = await import('../src/utils/sourceUuid.js');
 
-// ---------------------------------------------------------------------------
 // Fixture
-// ---------------------------------------------------------------------------
 
 const SYSTEM_ID = 'sys-1';
 
@@ -71,11 +54,7 @@ function makeActor(id, items) {
   return { id, name: id, items };
 }
 
-/**
- * Wrap actors so every `items` read is counted. This is the INDEPENDENT probe: it sits on
- * the fixture, not in `src/`, and it observes the inventory walk rather than the index, so
- * it can see a linear rescan that a `definitionIndex` counter cannot.
- */
+/** Wrap actors so every `items` read is counted. */
 function countingActors(actors) {
   const counts = { reads: 0, itemsWalked: 0 };
   const wrapped = actors.map((actor) => {
@@ -129,9 +108,8 @@ function makeWorld({ recipeCount = 4, filler = 12, legacyRecipe = false } = {}) 
   }
 
   if (legacyRecipe) {
-    // An UN-MIGRATED recipe: it names its book only through the old single reverse ref, and
-    // that book is NOT one of `system.recipeItemDefinitions`. Its match definition is
-    // synthesised per recipe, which is exactly what the snapshot's superset must include.
+    // An UN-MIGRATED recipe: it names its book only through the old single reverse ref, and that
+    // book is NOT one of `system.recipeItemDefinitions`.
     system.membershipResolvesByRecipeIds = false;
     recipes.push({
       id: 'recipe-legacy',
@@ -171,9 +149,7 @@ function makeService(world) {
 
 const VIEWER = { id: 'player-1', isGM: false };
 
-// ---------------------------------------------------------------------------
 // 1. The prefilter is a superset — it cannot change an answer
-// ---------------------------------------------------------------------------
 
 describe('the recipe-item prefilter preserves visibility answers', () => {
   it('returns the same visible recipes as an un-snapshotted pass', () => {
@@ -252,9 +228,7 @@ describe('the recipe-item prefilter preserves visibility answers', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // 2. The bound, proved with an independent probe
-// ---------------------------------------------------------------------------
 
 describe('inventory is walked once per pass, not once per recipe', () => {
   it('reads each actor once regardless of recipe count', () => {
@@ -288,9 +262,7 @@ describe('inventory is walked once per pass, not once per recipe', () => {
   });
 
   it('a recipe belonging to no book reads no inventory, and still reports no candidates', () => {
-    // The common configuration: a system that does not gate on books at all. Every such
-    // recipe has an empty match-definition set, so the walk can only return `[]` — but it
-    // used to perform a full inventory scan per recipe to discover that.
+    // The common configuration: a system that does not gate on books at all.
     const world = makeWorld({ recipeCount: 3, filler: 20 });
     world.system.recipeItemDefinitions = [];
     world.definition.recipeIds = [];
@@ -324,9 +296,7 @@ describe('inventory is walked once per pass, not once per recipe', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // 3. Exhaustion derives from the already-collected candidate set
-// ---------------------------------------------------------------------------
 
 describe('knowledge exhaustion reuses the evaluated candidate set', () => {
   function exhaustibleWorld() {
@@ -410,9 +380,7 @@ describe('knowledge exhaustion reuses the evaluated candidate set', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // 4. The retained member-book memo and its staleness rule
-// ---------------------------------------------------------------------------
 
 describe('the retained member-book lookup honours the revision clause', () => {
   it('sees an in-place recipeIds rewrite once the revision is advanced', () => {
@@ -445,15 +413,11 @@ describe('the retained member-book lookup honours the revision clause', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // 5. The optimistic availability projection
-// ---------------------------------------------------------------------------
 
 describe('the availability projection is indexed and optimistic', () => {
-  // `comp-wood` carries its tags on the COMPONENT definition, which is where Fabricate
-  // authors them — nothing in production stamps `flags.fabricate.tags` onto an owned item
-  // (issue 857). A fixture that tagged only the item would pin a tally that is empty in
-  // every real world.
+  // `comp-wood` carries its tags on the COMPONENT definition, which is where Fabricate authors them
+  // — nothing in production stamps `flags.fabricate.tags` onto an owned item (issue 857).
   const components = [
     { id: 'comp-iron', name: 'Iron', essences: { earth: 2 } },
     { id: 'comp-wood', name: 'Wood', essences: {}, tags: ['plank'] },
@@ -494,10 +458,7 @@ describe('the availability projection is indexed and optimistic', () => {
   });
 
   it('is OPTIMISTIC for a contended set: it says available where exact evaluation would not', () => {
-    // Two groups both needing 2x Iron, against 3 held units. No assignment satisfies both,
-    // so exact evaluation says no; the projection compares each requirement against the
-    // same total independently and says yes. That is the documented contract, and this test
-    // exists so a future reader cannot mistake it for a bug.
+    // Two groups both needing 2x Iron, against 3 held units.
     const recipe = {
       id: 'r',
       ingredientSets: [
@@ -570,9 +531,8 @@ describe('the availability projection is indexed and optimistic', () => {
   });
 
   it('bounds a tag-matched option without claiming exactness', () => {
-    // The item carries NO tag flag: its tags come from the component it resolves to, which
-    // is the only place Fabricate ever authors them. Stamping the flag here would pin a
-    // premise production never satisfies.
+    // The item carries NO tag flag: its tags come from the component it resolves to, which is the
+    // only place Fabricate ever authors them.
     const tallies = talliesFor([makeItem({ uuid: 'i1', name: 'Wood', quantity: 2 })]);
     const withTag = (quantity, tagMatch, tags) => ({
       id: 'r',
@@ -596,8 +556,7 @@ describe('the availability projection is indexed and optimistic', () => {
   it('tallies tags from the COMPONENT definition, which is the only place they are authored', () => {
     // The defect this pins: `flags.fabricate.tags` is never written by Fabricate, so a tally
     // reading it alone is empty in every real world and every tag-matched option reports
-    // `available: false` — a false negative, which the projection's contract forbids
-    // outright. `RecipeManager._matchesTagIngredient` matches on the union; so does this.
+    // `available: false` — a false negative, which the projection's contract forbids outright.
     const tagged = talliesFor([makeItem({ uuid: 'i1', name: 'Wood', quantity: 4 })]);
     assert.equal(tagged.quantityByTag.get('plank'), 4, 'the component-authored tag is counted');
 
@@ -638,9 +597,7 @@ describe('the availability projection is indexed and optimistic', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // 6. The snapshot's own read API
-// ---------------------------------------------------------------------------
 
 describe('the snapshot resolves each held document once', () => {
   it('caches its per-system candidate set rather than re-filtering', () => {

@@ -3,7 +3,7 @@
 ## Purpose
 
 Define recipe visibility, knowledge gating, recipe-item matching, and learning behaviour.
-UI rendering requirements live in `ui-integration/spec.md`.
+UI rendering requirements live in the UI surface specs indexed by `ui-integration/spec.md`.
 
 ## Scope
 
@@ -95,7 +95,7 @@ This gate is paired with the mandatory primary-GM auto-stamp (see the data-model
 > Authoring note (issue 511, PR-B): recipe↔book membership is authored **book-side** on the Books & Scrolls item Contents tab — each recipe item definition owns a `recipeIds[]` list of the recipes it contains.
 The recipe editor no longer writes a book link.
 When a definition's `originItemUuid` no longer resolves, the editor surfaces a missing/stale state and retains the reference.
-The matching rules above are unchanged; UI rendering specifics defer to `ui-integration`.
+The matching rules above are unchanged; UI rendering specifics defer to `ui-system-studio` § Books & Scrolls Surface.
 
 ## Visibility Mode (Canonical Strategy)
 
@@ -363,7 +363,7 @@ Tests MUST cover the redacted player summary directly — that it withholds avai
 
 ### Per-Recipe Detail Hydration
 
-The player crafting read is two phases: a corpus-wide summary phase and a per-recipe detail phase (see `ui-integration/spec.md` § Browse And Detail Phases).
+The player crafting read is two phases: a corpus-wide summary phase and a per-recipe detail phase (see `ui-crafting-app/spec.md` § Browse And Detail Phases).
 Splitting the read splits the gate, so the following are normative for the detail phase.
 
 - **A recipe id is not a permission.**
@@ -723,12 +723,13 @@ In mixed-system worlds, the manual path only includes recipes from systems where
 A single knowledge-deletion primitive (`RecipeVisibilityService.forgetLearnedRecipes`) serves three grains from one code path: **erase one** learned recipe, **reset one system**, and **reset all systems** for one actor.
 It is the shared mutation behind the GM reset API and the Knowledge surface's per-recipe "Erase memory" action.
 
-- Deletion is an explicit, reload-safe `-=` flag-key removal at the **full doubly-nested** path `Actor.flags.fabricate.fabricate.learnedRecipes.-=<recipeId>` (and, when clearing discovery, `Actor.flags.fabricate.fabricate.discoveryProgress.-=<recipeId>`), batched into a single `Actor#update`.
-It must NOT prune by rebuilding a filtered map through `setFlag` as the sole write — that merge never removes keys, so the entry resurrects on reload (the `deleteRemovedActiveRunFlags` doctrine); a shallow `flags.fabricate.learnedRecipes.-=<id>` silently no-ops.
-- An id routes to a **two-step delete-then-write fallback** whenever a batched `-=<id>` key would destroy anything other than that id's own entry: the parent key is dropped first (`await actor.update({ 'flags.fabricate.fabricate.-=learnedRecipes': null })`), then the retained map is re-written (`await _setLearnedMap(actor, retainedMap)`).
-These are two sequential awaited operations, never one order-dependent update — `mergeObject`/`_migrateDeletionKey` may process the deletion after the insertion and wipe the whole map.
+- Deletion is an explicit, reload-safe forced deletion of each `<recipeId>` under the **full doubly-nested** path `Actor.flags.fabricate.fabricate.learnedRecipes` (and, when clearing discovery, under `Actor.flags.fabricate.fabricate.discoveryProgress`), batched into a single `Actor#update` whose entries are built only through the shared `forcedDeletionEntry` helper.
+The entry form is feature-detected, never version-compared: on a build without `foundry.data.operators.ForcedDeletion` (V13) each entry is `'flags.fabricate.fabricate.learnedRecipes.-=<recipeId>': null`; on a build with it (V14) each entry is `'flags.fabricate.fabricate.learnedRecipes.<recipeId>'` set to a `ForcedDeletion` instance, and no key in the payload contains `-=`.
+It must NOT prune by rebuilding a filtered map through `setFlag` as the sole write — that merge never removes keys, so the entry resurrects on reload; a deletion addressed at the shallow `flags.fabricate.learnedRecipes` path silently no-ops.
+- An id routes to a **two-step delete-then-write fallback** whenever a batched per-id forced deletion cannot remove exactly that id's own entry and nothing else: the parent key is dropped first by one `Actor#update` carrying the helper's deletion entry for `learnedRecipes` under `flags.fabricate.fabricate` (V13 `'flags.fabricate.fabricate.-=learnedRecipes': null`, V14 `'flags.fabricate.fabricate.learnedRecipes'` set to a `ForcedDeletion` instance), then the retained map is re-written (`await _setLearnedMap(actor, retainedMap)`).
+These are two sequential awaited operations, never one order-dependent update — on either build core may apply the parent deletion after the insertion and wipe the whole map.
 The same two-step applies to `discoveryProgress` when clearing discovery.
-Two conditions each force it, and the second is NOT the dotted-id case: the id is not a safe flag-key segment, so `-=<id>` cannot address it; **or** another entry nests inside it, because ids `a` and `a.b` share one persisted node and `-=a` is a well-formed key that removes recipe `a.b` along with it.
+Three conditions each force it, and the second is NOT the dotted-id case: the id is not a safe flag-key segment, so no per-id deletion entry can address it (the helper refuses such a key); **or** another entry nests inside it, because ids `a` and `a.b` share one persisted node and a forced deletion of `a` — `-=a` on V13, the operator at `a` on V14 — is well-formed and removes recipe `a.b` along with it; **or** the id is `__proto__`, `constructor` or `prototype`, which the helper declines to address on either build because V14 core `setProperty` skips it.
 The retained map is rebuilt from the **entry view** below, never by filtering `Object.entries` of the raw store against the cleared ids — that comparison puts nested first segments on one side and recipe ids on the other, matches nothing, and writes the just-deleted entry straight back.
 A retained entry whose own id contains a dot re-splits on the step-2 rewrite exactly as the original learn write did — a known fidelity limit of dotted retained ids, not an expandObject-safe guarantee.
 - `freeLearnBudget` defaults ON for the reset/erase grains (respec/amnesia must let the actor re-learn) and is passed OFF for the recipe-deletion cleanup path.
@@ -751,7 +752,7 @@ Both supported builds do this, by different routes — V14 inside the field (`Ob
 Fabricate always writes the dotted `flags.fabricate.fabricate.<key>` path, so the V13 guard always fires and the persisted shape is the same on both.
 
 Every reader of either map — the recipe-deletion cascade, the deletion primitive's existence check, its budget lookup, its retained-map rebuild, the per-system and reset-all id enumerations, and the GM panel's learner index — MUST derive ids from a shared **entry-boundary** reader rather than from the map's top level.
-Reading the top level yields a dotted id's FIRST SEGMENT, which names no recipe; the cascade therefore classified it as stale and issued `-=imported`, destroying every sibling entry under that segment whose recipe still existed.
+Reading the top level yields a dotted id's FIRST SEGMENT, which names no recipe; the cascade therefore classified it as stale and issued a forced deletion of `imported`, destroying every sibling entry under that segment whose recipe still existed.
 The panel-facing learner index and the cascade MUST agree on the ids they see, or the GM surface reports learners the mutation does not act on.
 
 The reader recognises an entry by its own **marker fields** — `learnedAt` / `sourceItemUuid` for learned entries, `progress` / `fragments` / `discoveredAt` / `manuallySet` for discovery entries — so it is parameterised on the shape rather than hard-coding one map's fields.
@@ -878,7 +879,7 @@ If `recipeItemDefinition.originItemUuid` no longer resolves to a template:
 
 - Remove corresponding learned entries from the actors the deleting client may write.
 This is the same scope `destructive-changes-and-migrations/spec.md`'s Delete Recipe cascade states, and the same scope the GM surface counts characters over, so one cascade is never described by two capabilities as reaching two different sets.
-- The removal uses the explicit `-=` deletion primitive (`forgetLearnedRecipes`) called with `freeLearnBudget: false` — recipe deletion is content management, not an in-fiction un-learn, so it must not refund any consumed learn budget.
+- The removal uses the knowledge-deletion primitive (`forgetLearnedRecipes`) called with `freeLearnBudget: false` — recipe deletion is content management, not an in-fiction un-learn, so it must not refund any consumed learn budget.
 `cleanupLearnedRecipes` is rerouted onto that primitive, fixing the prior filtered-map `setFlag` rebuild that MERGED and therefore never actually deleted the stale keys (they resurrected on reload).
 - The stale set is derived through the entry-boundary reader (see Reading A Recipe-Id-Keyed Flag Map), so deleting one recipe removes **only** that recipe's entry.
 An actor holding entries for several recipes whose ids share a leading segment keeps every entry whose recipe still exists, and an actor with no stale entry is not written to at all.

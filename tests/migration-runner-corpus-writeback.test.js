@@ -1,26 +1,10 @@
 /**
  * The startup migration pass's corpus WRITEBACK: its order, its containment, and its
- * order-independence.
- *
- * Successor to `migration-runner-recipe-corpus.test.js` (issue 1242), which paired each of
- * these with an arrangement-aware arm. Issue 1261 removed the arrangement; what survives here
- * is every case that never depended on one, because each states a property of the pass itself:
- *
- * - the recipes leg is issued FIRST and a tear on a later leg abandons the rest, so a failed
- *   pass cannot leave `toolIds` on recipes with the tool bodies missing from systems;
- * - a writeback rejection is CONTAINED into a deferred summary rather than escaping `run()`,
- *   where it would fire no error hook and leave the module with no managers;
- * - `migrationVersion` is not advanced by a deferred pass, so the next boot re-runs it;
- * - a corpus-global reduction reaches the same decision whatever order the corpus is stored
- *   in (`data-models/spec.md` § Destructive Pass Safety).
- *
- * The tear assertions read the recorded call log rather than the store's contents: the
- * migrations transform their input in place, so the store already carries the migrated field
- * even in a run whose write threw. Anything driven through `run()` seeds a `migrationVersion`
- * BELOW the migration under test, because `run()` returns early with no reads at all when
- * nothing is pending.
+ * order-independence. Successor to `migration-runner-recipe-corpus.test.js` (issue 1242), which
+ * paired each of these with an arrangement-aware arm.
  */
 
+import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +12,8 @@ import test from 'node:test';
 
 import { SETTING_KEYS } from '../src/config/settings.js';
 import { MIGRATION_DEFERRAL_REASONS, MigrationRunner } from '../src/migration/MigrationRunner.js';
+import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
+
 
 /** A recipe the 0.6.0 catalyst-to-tool migration transforms. */
 function catalystRecipe(id, systemId = 'sys-1') {
@@ -41,10 +27,9 @@ function catalystRecipe(id, systemId = 'sys-1') {
 /**
  * A whole-array world and a runner over it, recording every `setSetting` key in order.
  *
- * @param {object} [options]
  * @param {object} [options.settings] seed values, merged over the defaults
- * @param {(key: string, value: *) => Promise<void>|void} [options.onWrite] a hook that may
- *   throw to tear one leg; the key is recorded before it runs
+ * @param {(key: string, value: *) => Promise<void>|void} [options.onWrite] a hook that may throw to
+ * tear one leg; the key is recorded before it runs
  * @param {Array<object>} [options.migrations] override the production registry
  */
 function makeWorld({ settings = {}, onWrite = null, migrations } = {}) {
@@ -68,9 +53,7 @@ function makeWorld({ settings = {}, onWrite = null, migrations } = {}) {
   return { store, written, getSetting, setSetting, runner };
 }
 
-// ---------------------------------------------------------------------------
 // 1. The write order is pinned
-// ---------------------------------------------------------------------------
 
 test('the recipes key precedes every other whole-array write', async () => {
   const world = makeWorld();
@@ -95,9 +78,7 @@ test('the recipes key precedes every other whole-array write', async () => {
   );
 });
 
-// ---------------------------------------------------------------------------
 // 2. Cross-key integrity is asserted by a TEAR, not by a clean run
-// ---------------------------------------------------------------------------
 
 for (const [label, settings] of [
   ['0.6.0 (recipes + systems)', { migrationVersion: '0.5.0' }],
@@ -125,9 +106,8 @@ for (const [label, settings] of [
 
     assert.equal(summary.deferred, true, 'the rejection did not escape run()');
     assert.equal(summary.deferredReason, MIGRATION_DEFERRAL_REASONS.WRITEBACK_FAILED);
-    // The recipes leg landed FIRST, and exactly one further leg was attempted before the
-    // pass abandoned the rest. A clean run proves nothing here: both legs land in either
-    // order, which is why an ordering defect is invisible to it.
+    // The recipes leg landed FIRST, and exactly one further leg was attempted before the pass
+    // abandoned the rest.
     assert.equal(world.written[0], SETTING_KEYS.RECIPES, 'the recipes leg was issued first');
     assert.equal(world.written.length, 2, 'the pass stopped at the first failed leg');
     assert.equal(
@@ -191,9 +171,7 @@ test('a pending pass that transforms nothing issues ZERO corpus writes', async (
   );
 });
 
-// ---------------------------------------------------------------------------
 // 3. The deferral notices
-// ---------------------------------------------------------------------------
 
 test('only the write-failure notice instructs a reload', () => {
   const strings = JSON.parse(readFileSync(new URL('../lang/en.json', import.meta.url), 'utf8'))
@@ -208,7 +186,7 @@ test('only the write-failure notice instructs a reload', () => {
 test('main.js reports a deferred pass before it reports an aborted one', () => {
   // A source scan, and deliberately so: `main.js` cannot be imported under `node --test`, and
   // a unit test that hand-injects the collaborator cannot observe the wiring at all.
-  const source = readFileSync(fileURLToPath(new URL('../src/main.js', import.meta.url)), 'utf8');
+  const source = entryModuleSource('src/bootstrap/migrations.js');
 
   assert.match(
     source,
@@ -225,9 +203,7 @@ test('main.js reports a deferred pass before it reports an aborted one', () => {
   assert.match(source, /Migration\.Deferred\.WritebackFailed/);
 });
 
-// ---------------------------------------------------------------------------
 // 4. Corpus order does not change any decision
-// ---------------------------------------------------------------------------
 
 test('a permuted corpus produces the same decisions and set-equal reference lists', async () => {
   const records = () => [
@@ -244,9 +220,8 @@ test('a permuted corpus produces the same decisions and set-equal reference list
       resultSelection: { provider: 'check' },
       linkedRecipeItemUuid: 'Item.book-1',
     },
-    // Two check voters and one ingredient voter, so the routed tie-break is decided by a
-    // COUNT and not by whichever record happens to come first. Ordering r3 (check) first and
-    // r5 (ingredientSet) first in the two runs is what makes a first-wins reduction visible.
+    // Two check voters and one ingredient voter, so the routed tie-break is decided by a COUNT and
+    // not by whichever record happens to come first.
     { id: 'r3', craftingSystemId: 'routed-1', resultSelection: { provider: 'check' } },
     { id: 'r4', craftingSystemId: 'routed-1', resultSelection: { provider: 'check' } },
     { id: 'r5', craftingSystemId: 'routed-1', resultSelection: { provider: 'ingredientSet' } },
@@ -256,9 +231,7 @@ test('a permuted corpus produces the same decisions and set-equal reference list
       id: 'alch-1',
       resolutionMode: 'alchemy',
       // 1.13.0 appends recipe ids onto this list in CORPUS ITERATION ORDER, so it is the one
-      // persisted value in the registry whose bytes change under permutation. Membership is a
-      // set semantically, which is why the assertion below is set equality — and why the
-      // ARRAY inequality is asserted too, so the set comparison cannot go vacuous.
+      // persisted value in the registry whose bytes change under permutation.
       recipeItemDefinitions: [{ id: 'def-1', sourceItemUuid: 'Item.book-1' }],
     },
     { id: 'routed-1', resolutionMode: 'routed' },
@@ -296,9 +269,8 @@ test('a permuted corpus produces the same decisions and set-equal reference list
     'and the count really does decide it, so the comparison is not vacuous'
   );
 
-  // SET equality, not array equality. 1.13.0 appends recipe ids in corpus iteration order, so
-  // a re-sorted corpus yields a permuted list. Membership is a set semantically, and this is
-  // the one accepted, gated deviation from order-independence.
+  // SET equality, not array equality. 1.13.0 appends recipe ids in corpus iteration order, so a
+  // re-sorted corpus yields a permuted list.
   const recipeIdsOf = (list) => [...byId(list, 'alch-1').recipeItemDefinitions[0].recipeIds];
   assert.deepEqual(recipeIdsOf(forward).sort(), ['r1', 'r2'], 'the list really is populated');
   assert.deepEqual(recipeIdsOf(forward).sort(), recipeIdsOf(reversed).sort());
@@ -310,11 +282,8 @@ test('a permuted corpus produces the same decisions and set-equal reference list
 });
 
 test('a permuted corpus disables the same SET of colliding alchemy recipes', async () => {
-  // The 1.17.0 reconciliation is the one cross-record migration whose order-independence is
-  // not obvious: it computes conflicts and then disables BOTH participants of each. The
-  // inseparable fixture is from `tests/migrate-essences-to-ingredient-groups.test.js` — A
-  // requires component C; B requires fire essence, of which C is the sole carrier, so after
-  // folding both reduce to the identical signature.
+  // The 1.17.0 reconciliation is the one cross-record migration whose order-independence is not
+  // obvious: it computes conflicts and then disables BOTH participants of each.
   const seedRecords = () => [
     {
       id: 'A',

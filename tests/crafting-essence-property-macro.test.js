@@ -1,24 +1,4 @@
-/**
- * Issue 1036 — essence property macros.
- *
- * `EssenceDefinition.propertyMacroUuid` names a script Macro run against the item data of
- * every result its essence contributed to, before that item is created and before the
- * result's own macro.
- *
- * The two headline traps these tests exist to catch:
- *
- *  1. **Anti-stacking.** `_createSingleResult` looks for stacking candidates only when
- *     `!hasPropertyUpdates && !transfersEffects`, and `createOrStackComponentItem`
- *     DISCARDS `itemData` wholesale when it stacks. An essence-mutated output that failed
- *     to set `hasPropertyUpdates` would merge into a plain stack and lose every mutation
- *     with no error at all. Criterion 5, with the negative control that a `null`-returning
- *     macro DOES still stack.
- *  2. **Ordering.** `resolvedEssences` is accumulated over consumed items, so its key
- *     order is integer-like ids first in ascending numeric order and then inventory scan
- *     order — neither stable nor GM-authorable. Macros run in `essenceDefinitions` LIBRARY
- *     order instead, which is why the fixture below gives one essence a DIGIT-ONLY id that
- *     hoists to the front of the object.
- */
+/** Issue 1036 — essence property macros. */
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -46,10 +26,7 @@ const LOOT_INGOT = { ...INGOT, registeredItemUuid: 'Item.ingot-source' };
 
 /**
  * A source item carrying the ORDINARY dnd5e loot shape: `system.container` is `null` and
- * `system.quantity` is an integer. `foundry.utils.setProperty` vivifies an intermediate
- * only when it is `=== undefined`, so it traverses INTO the `null` and assigns ONTO the
- * integer, and both throw in strict mode from inside core. Neither is exotic data — this
- * is what a plain dnd5e loot item serializes to.
+ * `system.quantity` is an integer.
  */
 function makeLootSourceItem() {
   return {
@@ -143,9 +120,8 @@ test('1036/5 negative control: a null-returning essence macro leaves the result 
 });
 
 test('1036/6: essence macros run in essenceDefinitions order, unaffected by consumed-item ordering', async () => {
-  // `7` is a digit-only essence id, which `_toKey` permits and which JavaScript hoists to
-  // the FRONT of `resolvedEssences` however the map was built. Library order puts it LAST,
-  // so a loop over `resolvedEssences` would produce the opposite last writer.
+  // `7` is a digit-only essence id, which `_toKey` permits and which JavaScript hoists to the FRONT
+  // of `resolvedEssences` however the map was built.
   const system = makeSystem({
     essenceDefinitions: [
       makeEssence({ id: 'fire', name: 'Fire', propertyMacroUuid: 'Macro.fire' }),
@@ -228,11 +204,10 @@ test('1036/6: a throwing essence macro fails only that essence; every later macr
     'water',
     'the macro AFTER the throwing one still ran and still applied'
   );
-  // The OTHER half of the contract, and the one that separates a macro BODY throw from
-  // every silent-skip branch around it: an unresolvable uuid, a chat macro and an
-  // unwritable return path are all GM-side authoring defects and stay silent, but a macro
-  // that genuinely blew up DOES raise `ui.notifications.error`. Without this the suite
-  // reads as "essence macros never toast", which is the opposite of the design.
+  // The OTHER half of the contract, and the one that separates a macro BODY throw from every
+  // silent-skip branch around it: an unresolvable uuid, a chat macro and an unwritable return path
+  // are all GM-side authoring defects and stay silent, but a macro that genuinely blew up DOES
+  // raise `ui.notifications.error`.
   assert.equal(
     notifications.errors.length,
     before + 1,
@@ -240,20 +215,7 @@ test('1036/6: a throwing essence macro fails only that essence; every later macr
   );
 });
 
-// ---------------------------------------------------------------------------------------
 // Applying a return can throw too — and the apply loop runs AFTER consumption.
-//
-// `foundry.utils.setProperty` vivifies an intermediate only on `=== undefined`, so a
-// `null` intermediate is traversed into and a primitive one is assigned onto; both throw
-// in strict mode from inside core. `itemData` is `sourceItem.toObject()`, where both are
-// ordinary. Unguarded, that throw escapes `_runEssencePropertyMacros` ->
-// `_createSingleResult` -> `_createResultItems`, and `craft()` wraps none of them — its
-// only `try` blocks are around consumption — so the craft ends with the ingredients gone,
-// no result item, and the recipe's own result macro never run.
-//
-// `tests/helpers/essenceFixtures.js` transcribes the real helper for exactly this reason:
-// a stub that vivified on `== null` made this whole class of defect untestable.
-// ---------------------------------------------------------------------------------------
 
 test('1036/6: a macro returning an UNWRITABLE path fails only that essence; the craft still produces its result', async () => {
   const system = makeSystem({
@@ -295,10 +257,8 @@ test('1036/6: a macro returning an UNWRITABLE path fails only that essence; the 
 });
 
 test('1036/8: a PARTIALLY applied essence macro still vetoes stacking', async () => {
-  // Object key order is insertion order, so `system.school` lands and then
-  // `system.quantity.value` throws — core cannot create a property on the integer `1`.
-  // The item data really was mutated, so `hasPropertyUpdates` must be true: stacking
-  // DISCARDS `itemData` wholesale, which would silently erase the applied path.
+  // Object key order is insertion order, so `system.school` lands and then `system.quantity.value`
+  // throws — core cannot create a property on the integer `1`.
   const system = makeSystem({
     components: [LOOT_INGOT],
     essenceDefinitions: [makeEssence({ id: 'fire', propertyMacroUuid: 'Macro.partial' })],
@@ -326,10 +286,8 @@ test('1036/8: a PARTIALLY applied essence macro still vetoes stacking', async ()
 });
 
 test('1036: a CHAT macro is skipped silently rather than compiled as JavaScript', async () => {
-  // `command` is a required string on BOTH Macro types and `type` defaults to `chat`
-  // (Foundry 14.361 `common/documents/macro.mjs`), so `typeof command === 'string'` is not
-  // a script test. Compiling `/roll 1d20` as JS is a SyntaxError, which the macro-body
-  // catch turns into one `ui.notifications.error` per essence, per result, on every craft.
+  // `command` is a required string on BOTH Macro types and `type` defaults to `chat` (Foundry
+  // 14.361 `common/documents/macro.mjs`), so `typeof command === 'string'` is not a script test.
   const system = makeSystem({
     essenceDefinitions: [makeEssence({ id: 'fire', propertyMacroUuid: 'Macro.chat' })],
   });
@@ -351,9 +309,7 @@ test('1036: a CHAT macro is skipped silently rather than compiled as JavaScript'
 });
 
 test('1036: no essence context is built when no runnable essence carries a macro', async () => {
-  // `_buildEssenceContext` re-runs `resolveItemEssences` over every consumed item. A
-  // system that enabled `propertyMacros` for a single RECIPE-level macro would otherwise
-  // pay that on every craft AND salvage result for a loop that finds nothing to run.
+  // `_buildEssenceContext` re-runs `resolveItemEssences` over every consumed item.
   const system = makeSystem({
     essenceDefinitions: [
       makeEssence({ id: 'fire', propertyMacroUuid: null }),

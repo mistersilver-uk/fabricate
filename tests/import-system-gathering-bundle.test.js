@@ -1,26 +1,10 @@
 /**
- * Regression guard for issue #699: the PUBLIC import surface
- * (`game.fabricate.importSystemFromFile` / `importFromPack` /
- * `getCompendiumImporter`) silently dropped the gathering authoring bundle because
- * `src/main.js` built the SHARED `CompendiumImporter` with no persistence seams —
- * `_persistEnvironments` and `_persistGatheringConfig` early-return without them,
- * yet `_importGatheringAuthoring` still pushed the gathering reference dispositions
- * into the report, implying the bundle was processed while both persists no-op.
- *
- * The GM UI path (SvelteCraftingSystemManagerApp) wires the seams and works, so the
- * fix wires the same seams into the shared importer. The construction-order trap
- * (the environment store is built AFTER the importer in `src/main.js`) is resolved
- * with a thin delegating object that resolves the store lazily, mirroring the
- * exportSystem lazy-read idiom.
- *
- * WHY NOT `import '../src/main.js'`: `src/main.js` imports the global stylesheet and
- * the compiled Svelte apps at module load, so it cannot be imported under plain
- * `node --test`. This suite therefore combines:
- *   1. a BEHAVIOURAL test that drives the REAL GatheringEnvironmentStore through a
- *      thin delegating seam assigned AFTER the importer is constructed (the exact
- *      construction-order trap), proving persistence still runs; and
- *   2. a SOURCE-CONTRACT guard pinned to `src/main.js`'s actual importer
- *      construction — the assertion that FAILS on the pre-fix seamless code.
+ * Regression guard for issue #699: the PUBLIC import surface (`game.fabricate.importSystemFromFile`
+ * / `importFromPack` / `getCompendiumImporter`) silently dropped the gathering authoring bundle
+ * because `src/main.js` built the SHARED `CompendiumImporter` with no persistence seams —
+ * `_persistEnvironments` and `_persistGatheringConfig` early-return without them, yet
+ * `_importGatheringAuthoring` still pushed the gathering reference dispositions into the report,
+ * implying the bundle was processed while both persists no-op.
  */
 
 import test from 'node:test';
@@ -28,6 +12,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { entrySources } from './helpers/bootstrapEntrySource.js';
+
 
 const { makeHarness, exportCurrent } = await import('./helpers/authoringExportHarness.js');
 const { prepareForImport } = await import('../src/systems/CraftingSystemExporter.js');
@@ -36,7 +22,10 @@ const { buildFullAuthoringFixture, FIXTURE_SYSTEM_ID } =
   await import('./helpers/fullAuthoringFixture.js');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainSource = readFileSync(resolve(__dirname, '../src/main.js'), 'utf8');
+const mainSource = [
+  entrySources['src/bootstrap/composeServices.js'],
+  entrySources['src/bootstrap/publicApi.js'],
+].join('\n');
 
 // A thin delegating environment store that resolves its target lazily, reproducing
 // the exact seam `src/main.js` passes when the real store does not exist yet.
@@ -108,9 +97,8 @@ test('#699 API-path import persists gatheringEnvironments + gatheringConfig thro
   assert.equal(persistedTask.resolutionMode, 'straight');
   assert.deepEqual(persistedTask.resultGroups, sourceTask.resultGroups);
 
-  // Report honesty: the gathering source-item references the report claims were
-  // handled correspond to a run that actually persisted (no processed-looking
-  // report over a no-op persist).
+  // Report honesty: the gathering source-item references the report claims were handled correspond
+  // to a run that actually persisted (no processed-looking report over a no-op persist).
   assert.ok(Array.isArray(summary.unresolvedReferences), 'summary carries a reference report');
 });
 
@@ -199,13 +187,13 @@ test('#699 keep-mode API-path round-trip preserves the gathering authoring bundl
   assert.deepEqual(second.gatheringConfig, first.gatheringConfig);
 });
 
-test('source contract: src/main.js builds the shared CompendiumImporter with the gathering seams', () => {
-  const marker = 'this.compendiumImporter = new CompendiumImporter(';
+test('source contract: src/bootstrap/composeServices.js builds the shared CompendiumImporter with the gathering seams', () => {
+  const marker = 'fabricate.compendiumImporter = new CompendiumImporter(';
   const start = mainSource.indexOf(marker);
-  assert.ok(start >= 0, 'located the shared CompendiumImporter construction in src/main.js');
+  assert.ok(start >= 0, 'located the shared CompendiumImporter construction in src/bootstrap/composeServices.js');
   const closure = mainSource.slice(
     start,
-    mainSource.indexOf('this.craftingEngine = new CraftingEngine(')
+    mainSource.indexOf('fabricate.craftingEngine = new CraftingEngine(')
   );
   assert.ok(closure.length > 0, 'isolated the importer construction closure');
 
@@ -214,16 +202,26 @@ test('source contract: src/main.js builds the shared CompendiumImporter with the
   // does NOT match and fails here.
   assert.match(
     closure,
-    /new CompendiumImporter\(\s*this\.craftingSystemManager,\s*this\.recipeManager,\s*\{/,
+    /new CompendiumImporter\(\s*fabricate\.craftingSystemManager,\s*fabricate\.recipeManager,\s*\{/,
     'the shared importer must be constructed with a seams object'
   );
 
   // Lazy resolution of the environment store (constructed AFTER the importer).
   assert.ok(
-    closure.includes('this.gatheringEnvironmentStore?.list'),
-    'environmentStore seam must resolve this.gatheringEnvironmentStore lazily'
+    closure.includes('fabricate.gatheringEnvironmentStore?.list'),
+    'environmentStore seam must resolve the field lazily'
   );
   assert.match(closure, /environmentStore:/, 'wires the environmentStore seam');
+
+  // The world realm store is constructed after the importer too, so its seam resolves lazily for
+  // the same reason. Dropping it sends the travel merge back to the raw setting write, which lands
+  // the library BEHIND the store's cache and leaves a hook-free world rejecting realm-gated
+  // environments (issue 1858).
+  assert.match(closure, /travelStore:/, 'wires the travelStore seam');
+  assert.ok(
+    closure.includes('fabricate.gatheringRealmStore?.'),
+    'travelStore seam must resolve fabricate.gatheringRealmStore lazily'
+  );
   assert.match(
     closure,
     /getSetting:\s*\(key\)\s*=>\s*getSetting\(key\)/,

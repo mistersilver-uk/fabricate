@@ -1,22 +1,4 @@
-/**
- * The two SYSTEM-scope component screens' world-scope halves, mounted (issue 1371, epic 1357).
- *
- * ## The three states a system-scope screen can be in, and why each needs its own fixture
- *
- * A component this system holds and INHERITS the world category; one it holds and OVERRIDES; and
- * one the world corpus knows and this system has no record for at all. The third is the whole
- * point of the widened membership filter, and it is unreachable from a fixture built out of the
- * system's own component cards — which is the shape every mounted assertion about this screen had
- * before this lane.
- *
- * ## And why the zero point is the criterion rather than the populated case
- *
- * The sibling Tool Rules list records the measured defect: three places asked "is there anything
- * on this screen" and all three answered with the raw prop, so for a system that has adopted
- * nothing the toolbar counted the widened cohort over a body drawing the zero state — and the ONE
- * route in the product to adopt a component into an empty system became unreachable, by the
- * segment AND by the zero state's own button.
- */
+/** The two SYSTEM-scope component screens' world-scope halves, mounted (issue 1371, epic 1357). */
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { dirname, resolve } from 'node:path';
@@ -33,6 +15,18 @@ import {
   recordingComponentActions,
 } from '../helpers/componentScopeMountModules.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
+// The category card's one control is the shared `<Select>` since issue 1510, so choosing a value is
+// an open-then-click on a panel portaled onto the mount target rather than a `change` event.
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  closeSelectPanel,
+  selectOptionLabels,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
+
+const CATEGORY_TRIGGER = '[data-component-edit-category]';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -75,18 +69,9 @@ async function openEditor(
 ) {
   const { calls, actions } = recordingComponentActions();
   const opened = [];
-  // THE DIRTY REPORTS, in order (issue 1371 r18-entry): the header's Save is disabled from this
-  // flag, so "the control lights Save" is an assertion on the last value reported here.
+  // THE DIRTY REPORTS, in order (issue 1371 r18-entry).
   const dirty = [];
-  // THE SAVE IS RECORDED THROUGH THE SAME `calls` LIST as the world-scope writes, and that is the
-  // point rather than a convenience: since revision 8 the category's two halves — the in-system
-  // VALUE through `onSave` and the membership INHERIT FLAG through `setSectionInherited` — both
-  // land on Save, and their ORDER is the thing a half-failed save turns on. Two separate spies
-  // could not state an ordering between them at all.
-  //
-  // THE THIRD ARGUMENT IS RECORDED TOO (issue 1371 r22-store4): since the Foundry integrator's
-  // round-8 finding the editor states the BASELINE it drew, and the whole point of stating it is
-  // that the receiver no longer has to assume which projection the rows came from.
+  // THE SAVE IS RECORDED THROUGH THE SAME `calls` LIST as the world-scope writes.
   const onSave = async (id, updates, options) => {
     calls.push({ verb: 'onSave', args: [id, updates], options });
     await Promise.resolve();
@@ -99,9 +84,7 @@ async function openEditor(
     actions,
     systemId,
     showTags,
-    // `{tag, checked}` RECORDS, which is what `cloneTagOptions` reads: a bare string list
-    // clones to two `{tag: undefined}` entries and the writable card's keyed `{#each}`
-    // throws `each_key_duplicate` before a single assertion runs.
+    // `{tag, checked}` RECORDS, which is what `cloneTagOptions` reads.
     tagOptions: [
       { tag: 'ore', checked: true },
       { tag: 'ingot', checked: false },
@@ -114,12 +97,29 @@ async function openEditor(
   return { target, calls, opened, dirty };
 }
 
-/** Choose one option on the category control, exactly as a GM does. */
+/** Choose one option on the category control, exactly as a GM does: open, then click the row. */
 function chooseCategory(target, value) {
-  const select = target.querySelector('[data-component-edit-category]');
-  select.value = value;
-  select.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
-  return select;
+  chooseSelectOption(target, CATEGORY_TRIGGER, value);
+  return target.querySelector(CATEGORY_TRIGGER);
+}
+
+/** The value the control currently shows, read back through its own option list. */
+function chosenCategory(target) {
+  const shown = selectTriggerText(target, CATEGORY_TRIGGER);
+  const labels = selectOptionLabels(target, CATEGORY_TRIGGER);
+  const values = selectOptionValues(target, CATEGORY_TRIGGER);
+  closeSelectPanel(target, CATEGORY_TRIGGER);
+  const index = labels.indexOf(shown);
+  assert.ok(index >= 0, `the trigger shows "${shown}", which is no option this control offers`);
+  return values[index];
+}
+
+/** A concrete category, which is any option but the inherit sentinel. */
+function concreteCategory(target) {
+  const value = selectOptionValues(target, CATEGORY_TRIGGER).find((each) => each !== '__inherit');
+  closeSelectPanel(target, CATEGORY_TRIGGER);
+  assert.ok(Boolean(value), 'the control offers a concrete category to choose');
+  return value;
 }
 
 /** Submit the editor's form, which is what the shell's header Save does by `form` id. */
@@ -156,8 +156,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     });
 
     it('and 1 other system for one two systems hold', async () => {
-      // The positive control: with the count above zero the clamp is invisible, which is why the
-      // zero fixture is the criterion rather than this one.
+      // The positive control: with the count above zero the clamp is invisible.
       const { target } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'));
       assert.match(
         target.querySelector('[data-component-identity-note]').textContent,
@@ -204,8 +203,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
   // stage until Save, and Save writes the FLAG first through `setSectionInherited`, then the values
   // through the existing in-system write — exactly the category flow (D-46).
   describe('the essence card carries the category’s inherit-or-override choice (M31)', () => {
-    // THE WORLD MAP AND THE TWO SWITCHES: `ingot` carries `flame: 2` on its world section; the
-    // forge membership OMITS the essences switch (inheriting), the alchemy one overrides it.
+    // THE WORLD MAP AND THE TWO SWITCHES: `ingot` carries `flame: 2` on its world section.
     const ESSENCE_CORPUS = Object.freeze({
       defaults: [
         { id: 'ingot', category: 'Refined', essences: { flame: 2 } },
@@ -336,13 +334,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     });
 
     it('states the BASELINE it drew, so an untouched save is not read as an authored override', async () => {
-      // The Foundry integrator's round-8 finding 1, at the surface. The receiver used to be left
-      // to assume this editor was seeded from the read union, and revision 21 falsified that by
-      // narrowing the item card's essence run — after which an untouched save differed from the
-      // rule's fallback by exactly the off-roster ids, flipped `inherit.essences` and dropped
-      // them. The baseline is a fact about the RENDER, so the editor computes it from the rows it
-      // drew and hands it over, and the rule no longer depends on a premise a projection change
-      // can falsify.
+      // The Foundry integrator's round-8 finding 1.
       const { target, calls } = await openEssences('ingot', 'sys-forge', options(2), {
         component: {
           ...componentRecord('ingot', 'Iron Ingot', 'Refined'),
@@ -372,8 +364,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     });
 
     it('from an OVERRIDING system, flipping back to inherit stages `true`, shows the WORLD map again, and Save writes it first', async () => {
-      // The alchemy record overrides with an EMPTY in-system map, so its options read zero for
-      // everything; flipping back to inherit shows the world's `flame: 2` while the draft rests.
+      // The alchemy record overrides with an EMPTY in-system map.
       const { target, calls } = await openEssences('ingot', 'sys-alchemy', options(0));
       assert.equal(
         target.querySelector('[data-scoped-inherit-state]').getAttribute('data-scoped-inherit-state'),
@@ -427,9 +418,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
 
     it('a category choice and an essence choice in ONE save write both flags, then the value', async () => {
       const { target, calls } = await openEssences('ingot', 'sys-forge', options(2));
-      const select = target.querySelector('[data-component-edit-category]');
-      const concrete = [...select.options].find((option) => option.value !== '__inherit');
-      chooseCategory(target, concrete.value);
+      chooseCategory(target, concreteCategory(target));
       await drain();
       await flip(target);
       save(target);
@@ -466,28 +455,31 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
 
   describe('the category control is ONE select whose first option is the inherit option', () => {
     // AC-14, rebuilt to the reference for issue 1371's parity round 4 (gap-list rows 133, 143).
-    // The card used to float a `<select>` into its head, DISABLE it while the section inherited,
-    // and repeat the choice as a second labelled row with a toggle and the note beside it. The
-    // reference draws the head, then one full-width select whose FIRST option is
-    // `Inherit from world · {value}`, then the note directly under it.
     it('offers the inherit option FIRST and selects it while the section inherits', async () => {
       const { target } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'));
-      const select = target.querySelector('[data-component-edit-category]');
-      assert.ok(Boolean(select), 'the editor renders its category control');
+      const trigger = target.querySelector(CATEGORY_TRIGGER);
+      assert.ok(Boolean(trigger), 'the editor renders its category control');
       assert.equal(
-        select.options[0].value,
+        assertSelectHasResolvedName(target, CATEGORY_TRIGGER),
+        'Component category',
+        'and it still announces the name the native control did'
+      );
+      assert.equal(
+        selectOptionValues(target, CATEGORY_TRIGGER)[0],
         '__inherit',
         'the inherit option is folded into the control rather than living beside it'
       );
-      assert.match(select.options[0].textContent, /Inherit from world/);
+      const [inheritLabel] = selectOptionLabels(target, CATEGORY_TRIGGER);
+      closeSelectPanel(target, CATEGORY_TRIGGER);
+      assert.match(inheritLabel, /Inherit from world/);
       assert.match(
-        select.options[0].textContent,
+        inheritLabel,
         /Refined/,
         'and it NAMES the world value, which is the whole reason it is an option and not a switch'
       );
-      assert.equal(select.value, '__inherit', 'an inheriting section selects it');
+      assert.equal(chosenCategory(target), '__inherit', 'an inheriting section selects it');
       assert.equal(
-        select.disabled,
+        trigger.disabled,
         false,
         'the control is no longer disabled: choosing a concrete category IS how you override'
       );
@@ -498,21 +490,15 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     });
 
     it('choosing a concrete category WRITES NOTHING until Save', async () => {
-      // Reviewer 9.2. The choice is TWO facts in two world settings keys — the VALUE on the
-      // in-system record, the INHERIT FLAG on the membership record — and until revision 8 only
-      // the value was buffered. So a GM who picked a category and then walked away left the
-      // system silently switched from inheriting to overriding, with no save, nothing on screen
-      // saying so, and the flag written for a value that was never persisted.
+      // Reviewer 9.2. The choice is TWO facts in two world settings keys.
       const { target, calls } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'));
-      const select = target.querySelector('[data-component-edit-category]');
-      const concrete = [...select.options].find((option) => option.value !== '__inherit');
-      chooseCategory(target, concrete.value);
+      const concrete = concreteCategory(target);
+      chooseCategory(target, concrete);
       await drain();
 
       assert.deepEqual(calls, [], 'a draft edit persists nothing, in EITHER key');
-      // …and it is a real edit rather than a choice that did not take: the control shows it and
-      // the note flips to the overriding face, so the screen previews the pending state.
-      assert.equal(select.value, concrete.value);
+      // …and it is a real edit rather than a choice that did not take.
+      assert.equal(chosenCategory(target), concrete);
       assert.ok(
         target
           .querySelector('[data-component-edit-category-note]')
@@ -522,15 +508,10 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     });
 
     it('and Save lands BOTH halves, flag first, so a half-failed save cannot hide a value', async () => {
-      // THE ORDER IS THE ASSERTION. There is no transaction across the two settings keys, so one
-      // can land alone. Flag-first leaves the system overriding with the value it was already
-      // resolving — the effective category does not move. Value-first would persist the GM's
-      // typed category into a record the read union still masks with the world default, which is
-      // the discarded-edit defect this whole change is about.
+      // THE ORDER IS THE ASSERTION. There is no transaction across the two settings keys.
       const { target, calls } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'));
-      const select = target.querySelector('[data-component-edit-category]');
-      const concrete = [...select.options].find((option) => option.value !== '__inherit');
-      chooseCategory(target, concrete.value);
+      const concrete = concreteCategory(target);
+      chooseCategory(target, concrete);
       await drain();
       save(target);
       await drain();
@@ -541,7 +522,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
         'the membership flag is cleared BEFORE the value is written'
       );
       assert.deepEqual(calls[0].args, ['ingot', 'sys-forge', 'category', false]);
-      assert.equal(calls[1].args[1].category, concrete.value, 'and the value is the chosen one');
+      assert.equal(calls[1].args[1].category, concrete, 'and the value is the chosen one');
     });
 
     it('and choosing the inherit option defers setSectionInherited(…, true) to Save too', async () => {
@@ -550,8 +531,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
       const { target, calls } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'), {
         systemId: 'sys-alchemy',
       });
-      const select = target.querySelector('[data-component-edit-category]');
-      assert.notEqual(select.value, '__inherit', 'the overriding system does not start there');
+      assert.notEqual(chosenCategory(target), '__inherit', 'the overriding system does not start there');
       chooseCategory(target, '__inherit');
       await drain();
       assert.deepEqual(calls, [], 'still a draft');
@@ -565,16 +545,12 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     });
 
     it('a REFUSED flag write stops the save rather than writing the value alone', async () => {
-      // The failure branch of the ordering above. If the first half refuses, the second must not
-      // run: a value written under a flag that did not move is a persisted, invisible edit.
+      // The failure branch of the ordering above. If the first half refuses.
       const { target, calls } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'));
-      const select = target.querySelector('[data-component-edit-category]');
-      const concrete = [...select.options].find((option) => option.value !== '__inherit');
-      chooseCategory(target, concrete.value);
+      chooseCategory(target, concreteCategory(target));
       await drain();
-      // The recording bag answers `true` for every verb, so the refusal is injected here rather
-      // than by widening that shared fake for one test.
-      const editorTarget = target.querySelector('[data-component-edit-category]');
+      // The recording bag answers `true` for every verb.
+      const editorTarget = target.querySelector(CATEGORY_TRIGGER);
       assert.ok(Boolean(editorTarget), 'the control is still there, so the setup below is real');
       calls.length = 0;
       await editor.setProps({
@@ -595,9 +571,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     });
 
     it('and an untouched switch writes NOTHING on Save, so a save is not a flag write', async () => {
-      // The negative control for the branch above. Without it, a `handleSave` that fired
-      // `setSectionInherited` unconditionally passes every ordering assertion here — and would
-      // write the flag on every save of every component in every system.
+      // The negative control for the branch above. Without it.
       const { target, calls } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'));
       save(target);
       await drain();
@@ -610,16 +584,17 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
 
     it('and WITHHOLDS the inherit option when no world category is authored', async () => {
       // THE FIXTURE IS A MEMBER WITH NO WORLD DEFAULT, and that is the whole point of it.
-      // `orphan` is a `sys-forge` member whose world record carries no `category`, which is the
-      // only fixture that isolates the branch this test names: the affordance is withheld for a
-      // non-member first, so a non-member fixture never reaches the world-value half.
       const { target } = await openEditor(componentRecord('orphan', 'Unbound Salt', 'general'));
-      const select = target.querySelector('[data-component-edit-category]');
       assert.ok(
-        ![...select.options].some((option) => option.value === '__inherit'),
+        !selectOptionValues(target, CATEGORY_TRIGGER).includes('__inherit'),
         'the option is ABSENT rather than offered against an unauthored world value'
       );
-      assert.equal(select.disabled, false, 'and this system supplies its own value');
+      closeSelectPanel(target, CATEGORY_TRIGGER);
+      assert.equal(
+        target.querySelector(CATEGORY_TRIGGER).disabled,
+        false,
+        'and this system supplies its own value'
+      );
       const note = target.querySelector('[data-component-edit-category-note]');
       assert.ok(Boolean(note), 'the third branch of the note renders in its place');
       assert.match(note.textContent, /No world category is set/);
@@ -665,10 +640,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
   });
 
   describe('the world tag card is READ-ONLY and distinct from the writable one', () => {
-    // AC-12's editor half. The scope is load-bearing in BOTH directions: the shipped in-system
-    // chips are real buttons BY DESIGN, so an unscoped no-button assertion FAILS on a correct
-    // implementation — and a `showTags: false` fixture written to dodge that deletes the very
-    // card this criterion exists to distinguish the world card from.
+    // AC-12's editor half. The scope is load-bearing in BOTH directions.
     it('renders BOTH cards at once, each under its own hook', async () => {
       const { target } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
         showTags: true,
@@ -712,9 +684,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
         0,
         'muting is authored on the world entry; this screen shows the state and routes there'
       );
-      // THE SCOPE IS THE ASSERTION. The shipped in-system chips ARE buttons, so an unscoped
-      // version of this check fails on a correct implementation — which is what proves the
-      // selector above is actually distinguishing the two cards.
+      // THE SCOPE IS THE ASSERTION. The shipped in-system chips ARE buttons.
       assert.ok(
         target.querySelectorAll('[data-component-edit-tags] button').length > 0,
         'the writable card next to it is made of real toggles, by design'
@@ -726,12 +696,6 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
       // added an `Edit world tags` exit beside the title, on the reasoning that the reference's
       // own caption (`click to mute here`) named an interaction the card does not offer and the
       // exit was the route to where it IS offered. The maintainer ruled the other way on both:
-      // the caption loses the clause and the subject-only action is dropped.
-      //
-      // ASSERTED AS THE HEAD'S WHOLE CONTROL COUNT, not as the absence of one hook. A test that
-      // only said `data-component-edit-world-tags-exit` is gone passes the moment the same
-      // action comes back under a different attribute, which is the shape of the thing being
-      // withdrawn rather than the attribute it happened to carry.
       const { target, opened } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
         showTags: true,
       });
@@ -753,10 +717,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     });
 
     it('the run is captioned `From the world`, with no instruction it cannot honour', async () => {
-      // M11. The caption is the reference's minus its second clause: `click to mute here` is an
-      // instruction this card refuses (the chips are not controls — see the sibling assertion
-      // above), and muting is authored on the world entry. An instruction a GM cannot follow is
-      // worse than a plain label.
+      // M11. The caption is the reference's minus its second clause.
       const { target } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
         showTags: true,
       });
@@ -768,15 +729,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     });
 
     it('and NO string on this card claims the tag merge the runtime discards', async () => {
-      // `### GM World Component Screens` requirement 1: no surface may assert the false half of
-      // the merge while it is unconsumed. Two strings on this screen did — the card subtitle
-      // (`World tags merge with {system}'s own.`) and the list header's own subtitle, which the
-      // shell draws from `componentListSubtitle`. The card's is asserted here; the list's is
-      // asserted in `components-browser-view-mounted`, where that header renders.
-      //
-      // THE SCAN IS OVER THE WHOLE CARD AND OVER THE VERB, not over the one sentence that was
-      // wrong: a reworded subtitle that pushed the same claim into the merge note or the group
-      // caption would pass a sentence-shaped assertion.
+      // `## GM World Component Screens` requirement 1.
       const { target } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
         showTags: true,
       });
@@ -833,13 +786,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     });
 
     it('and the OWN run draws the label alone, where the world run leads with a glyph', async () => {
-      // UX F-F (r9). `proto:1337` is `<span … >{{ t.name }}</span>` — the label and nothing else,
-      // with the selection carried by the chip's own fill. The shipped chip led with `fa-tag` and
-      // trailed a `fa-circle-check`/`far fa-circle`, which roughly doubled each chip's width:
-      // eleven tags wrapped to four rows here against the reference's one. The world run above
-      // (`proto:1333`) IS the one that carries a leading icon, so this is a difference between
-      // the two runs rather than a house style, and asserting both directions is what makes it a
-      // measurement rather than a deletion.
+      // UX F-F (r9). `proto:1337` is `<span … >{{ t.name }}</span>`.
       const { target } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
         showTags: true,
       });
@@ -862,7 +809,6 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
       );
 
       // THE POSITIVE CONTROL, and it is the half that stops this reading as "remove all icons":
-      // the world run keeps its leading glyph, because the reference draws one there.
       const worldChips = [...target.querySelectorAll('[data-component-edit-world-tag]')];
       assert.ok(worldChips.length > 0, 'the world run renders');
       for (const chip of worldChips) {
@@ -874,9 +820,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     });
 
     it('and the WORLD run is inked blue where the system run is purple, per the reference', async () => {
-      // `proto:5692` inks a world tag blue and `proto:5711` inks the system's own purple, and the
-      // two runs stand one label apart. A single tone across both would make the card's two
-      // groups distinguishable only by their labels, which is what the colour is for.
+      // `proto:5692` inks a world tag blue and `proto:5711` inks the system's own purple.
       const { target } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
         showTags: true,
       });
@@ -912,15 +856,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     });
 
     it('the rail draws its live-preview strip LAST, after both fact groups', async () => {
-      // UX F7. `proto:1516` places `{{ d.pr.pv.live }}` as the rail's FINAL child, after
-      // `Produced by`. `ScopedEntityPreview` draws its own `liveNote` region THIRD — above the
-      // fact groups — so passing the prop put the strip between the scope sentence and `Used by`,
-      // and the rail read `…what a player sees · this updates live · used by · produced by`.
-      //
-      // ASSERTED AS A POSITION, because nothing else can see it: the strip keeps the same class,
-      // the same hook and the same paint wherever it sits, so every existing assertion about it —
-      // and the parity region that measures it — passes in both arrangements. The sibling world
-      // entry rail already solves this the same way; this is that fix applied here.
+      // UX F7. `proto:1516` places `{{ d.pr.pv.live }}` as the rail's FINAL child.
       const { target } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
         showTags: true,
       });
@@ -944,9 +880,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
           `with <${String(rail.lastElementChild?.tagName || 'nothing').toLowerCase()}> ` +
           `class="${String(rail.lastElementChild?.className || '')}"`
       );
-      // NON-VACUITY, and it is what makes the position claim mean something: the two fact groups
-      // it now trails are really there, so `lastElementChild` is not the answer a rail with
-      // nothing else in it would give.
+      // NON-VACUITY, and it is what makes the position claim mean something.
       assert.ok(
         Boolean(rail.querySelector('[data-component-rail-used-by]')),
         'the `Used by` group renders'
@@ -958,10 +892,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     });
 
     it('and the write path it declines to use IS available to it', async () => {
-      // The read-only-ness is NOT structural: this view declares `actions`, and the call site
-      // binds it to the component family — the one family carrying `setMutedTags`. So after this
-      // lane the screen holds a live write path, and the assertion above is the only thing
-      // withholding it.
+      // The read-only-ness is NOT structural: this view declares `actions`.
       const { calls } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
         showTags: true,
       });
@@ -974,13 +905,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
   });
 
   describe('the `How players see it` rail IS the world entry’s rail, at the system scope (M27)', () => {
-    // Maintainer ruling M27, tested live at `1f5617d5`: "the 'How players see it' uses a different
-    // layout than the world component editor - it must use the same one!" The reference draws the
-    // two rails from ONE template (`proto:985-1020` and `proto:1467-1500` differ only in the data
-    // bound to them), and the driver's binding reading is that the rules editor renders the SAME
-    // preview-rail component the world entry renders, generalised to take a scope, so the two
-    // cannot diverge again. Every assertion below is on the ENTRY rail's own hooks, because there
-    // is no other rail left to name.
+    // Maintainer ruling M27, tested live at `1f5617d5`.
     it('renders the shared rail with the system sentence, the tile, the category and the tags', async () => {
       const { target } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
         showTags: true,
@@ -991,7 +916,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
         !target.querySelector('[data-component-rules-rail]'),
         'and no rail of its own beside it — the duplicate is gone, not hidden'
       );
-      // THE SCOPE is the one thing that reads differently: the system sentence, naming THIS
+      // THE SCOPE is the one thing that reads differently: the system sentence.
       // system (`proto:1487`), where the entry reads `Across every system that has rules for it.`
       assert.equal(rail.getAttribute('aria-label'), 'Player preview');
       assert.equal(
@@ -1010,12 +935,10 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
         rail.querySelector('.manager-component-entry-preview-name').textContent.trim(),
         'Coal'
       );
-      // `coal` is linked in the corpus (`originItemUuid`), so the tile carries NO status badge and
-      // the art note is the linked sentence — the entry rail's own reading of the record.
+      // `coal` is linked in the corpus (`originItemUuid`).
       assert.ok(!rail.querySelector('[data-scoped-entry-preview-status]'), 'no `No source item` badge');
       assert.match(rail.textContent, /come from the linked item/);
-      // THE SYSTEM'S RESOLVED FACTS: `coal` overrides the world's `Raw` here, and the checked
-      // system tag joins the applied world tag in the run.
+      // THE SYSTEM'S RESOLVED FACTS: `coal` overrides the world's `Raw` here.
       assert.equal(
         rail.querySelector('[data-scoped-entry-preview-category]').textContent.trim(),
         'Raw'
@@ -1078,16 +1001,6 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
 
 
   // ── THE ESSENCE CARD COUNTS WHAT IT DRAWS (issue 1371 r20-entry3, UX review round 6 finding 1) ──
-  //
-  // The card's subtitle read `essenceDraft.length` — the system's WHOLE roster — while the grid
-  // below drew `offeredEssences`, issue 1036's enabled-plus-carried subset. So on every component
-  // that does not carry a disabled essence the card said `Keyed to the 6 essences …` over five
-  // tiles, and was CORRECT on the ones that do: a GM who checks the number once, finds it right,
-  // and has no reason to distrust it later. The same split made the empty state unreachable — a
-  // roster whose every essence is disabled rendered an empty grid and no sentence at all.
-  //
-  // Both halves are read off ONE render here, which is what makes them a comparison rather than
-  // two independent claims that could each be satisfied by a different arrangement.
   describe('the essence card’s subtitle counts the tiles it actually draws (UX round 6 F1)', () => {
     const essenceSection = (target) => target.querySelector('[data-component-edit-section="essences"]');
     const subtitle = (target) =>
@@ -1109,8 +1022,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
         showEssences: true,
         essenceOptions: roster(0),
       });
-      // NON-VACUITY FIRST: the roster really does hold a third essence the grid withholds, so the
-      // numbers below are two different arrays rather than one array read twice.
+      // NON-VACUITY FIRST: the roster really does hold a third essence the grid withholds.
       assert.deepEqual(tiles(target), ['flame', 'earth'], 'the grid withholds the disabled essence');
       assert.match(
         subtitle(target),
@@ -1149,8 +1061,6 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
         'the card said nothing at all about a roster it can offer nothing from'
       );
       // AND IT SAYS WHICH EMPTY IT IS (issue 1371 r21-store4, the domain expert's loop-6 pass).
-      // This system DEFINES two essences, so the older sentence — the one the other empty state
-      // still uses — was false here, and pointed a GM at Create when what they need is Enable.
       assert.doesNotMatch(
         essenceSection(target).textContent,
         /No essences are defined for this system yet\./,
@@ -1159,8 +1069,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     });
 
     it('keeps the defined-NONE sentence for a system with no essences at all', async () => {
-      // The other side of the fork, and the non-vacuity arm for it: the two states are told apart
-      // by the roster the system holds, not by the tiles the grid can draw.
+      // The other side of the fork, and the non-vacuity arm for it.
       const { target } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'), {
         showEssences: true,
         essenceOptions: [],

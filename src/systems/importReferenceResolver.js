@@ -22,14 +22,14 @@
  *   - `reported`  — needs GM attention (external absent, or broken internal)
  */
 
-import { sourceReferencesOf, toolSourceReferences } from '../migration/worldScopeEntityGrouping.js';
+import { sourceReferencesOf, toolSourceReferences } from './worldScopeEntityGrouping.js';
 import {
   keyedRemapper,
   rewriteGatheringSliceReferences,
   rewriteMembershipReferences,
   rewriteRecipeReferences,
   rewriteSystemReferences,
-} from '../migration/worldScopeReferenceRewrite.js';
+} from './worldScopeReferenceRewrite.js';
 
 /** Reference kinds (also used as localization suffixes in the report). */
 export const REFERENCE_KINDS = Object.freeze({
@@ -358,7 +358,7 @@ export function rebindCopyContainerIds(prepared, { generateId = localId } = {}) 
  * collision rule being right.
  *
  * THE TRAVERSAL ITSELF IS NOT HERE. Every reference site lives in the ONE shared walk
- * `src/migration/worldScopeReferenceRewrite.js`, which this function and the `1.30.0` world-scope
+ * `src/systems/worldScopeReferenceRewrite.js`, which this function and the `1.30.0` world-scope
  * migration both drive (issue 1363). This function keeps only what is copy-mode-specific.
  *
  * The rewrite is KEY-AWARE: it only rewrites a value that (a) sits at one of the enumerated

@@ -62,6 +62,10 @@ They only adjust an individual row's chance after the task already matches.
 Multiple rows can reference the same component with different quantities and chances.
 Each row rolls on its own before the system's Gathering Rules choose which rows are awarded.
 
+In the player Gathering window, each possible drop is shown as one row with its current chance.
+Selecting a drop's row opens a breakdown of what makes up that chance, such as its base rate and any weather, time of day, biome, or character modifier contributing to it.
+Selecting the row again closes the breakdown.
+
 Every drop row must point at a real reward, either a component from the system's component library or a resolvable world item.
 Fabricate rejects rows that point at a component or item that no longer exists, and rows with no target, before saving the task.
 

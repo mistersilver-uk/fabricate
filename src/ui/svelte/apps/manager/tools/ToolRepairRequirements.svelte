@@ -1,41 +1,20 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  THE TOOL REPAIR SET, AT BOTH SCOPES.
+  THE TOOL REPAIR SET, AT BOTH SCOPES: ONE EYEBROW WITH A COUNT, AND ONE EXPLAINER. It shipped with
+  TWO heading levels and an explainer that stated the AND/OR algebra rather than what the block is
+  for — algebra already drawn, since an `Any one of` group says OR in its own pill and everything
+  else is AND by position, so the sentence restated the picture instead of answering "what is this
+  list, and how do I add an alternative". THE COUNT IS THE DESIGN'S OWN, down to its empty face.
 
-  == ONE EYEBROW WITH A COUNT, AND ONE EXPLAINER (issue 1373, maintainer round 2, E4) =========
-  `proto:2232`-`2237` heads this block with a SINGLE uppercase `Repair requirements` and a count
-  chip beside it on the same row (`display: flex; align-items: center; gap: 9px;
-  margin-bottom: 4px`), then one explainer at `400 10.5px/1.5 var(--sans); color: var(--muted);
-  margin-bottom: 10px`.
+  THE ROW ANATOMY CONVERGED RATHER THAN FORKING. An earlier round recorded the design's per-row
+  kind `<select>` as a deliberate divergence, on the ground that reshaping the shared row for one
+  caller would be a second implementation of one persisted shape; the maintainer ruled the other
+  way, and the reasoning is better — the answer to "three surfaces, one shape" is to change the ONE
+  row all three render. The one thing that IS caller-specific is the note beside a choice group's
+  `Any one of` pill: the recipe editor enumerates the kinds a crafter may pick between, and a
+  repair set says what picking one DOES, which `anyOneOfHint` carries and no other call site sets.
 
-  It shipped with TWO heading levels - an uppercase `REPAIR MATERIALS` over a serif
-  `Ingredient groups` - and an explainer that stated the AND/OR algebra rather than what the
-  block is for. The algebra is already drawn: an `Any one of` group says OR in its own pill and
-  everything else is AND by position, so the sentence spent itself restating the picture instead
-  of answering "what is this list, and how do I add an alternative".
-
-  THE COUNT IS THE DESIGN'S OWN, down to its empty face: `rows.length + ' requirement(s)'`, or
-  `none yet` when there are none (`countLabel` in the design's state object).
-
-  == THE ROW ANATOMY CONVERGED RATHER THAN FORKING (issue 1373, maintainer round 5) ===========
-  An earlier round recorded the design's per-row kind `<select>` (`proto:2248`) as a deliberate
-  divergence, on the ground that reshaping `RecipeIngredientSetCard` for one caller would be a
-  second implementation of one persisted shape. The maintainer ruled the other way, and the
-  reasoning is better: the answer to "three surfaces, one shape" is to change the ONE row all
-  three render, not to leave it disagreeing with the design everywhere. `RecipeIngredientOption`
-  carries the kind select, the chip-or-search name field and the one-line tag row now, and the
-  recipe editor gets them in the same change — see that component's own docblock.
-
-  The one thing that IS caller-specific is the note beside a choice group's `Any one of` pill.
-  The recipe editor enumerates the four kinds a crafter may pick between; a repair set says what
-  picking one DOES (`any one of these mends it`, `proto:2242`). `anyOneOfHint` carries it, and it
-  is empty at every other call site.
-
-  == AND THE BLOCK ENDS IN A SENTENCE ========================================================
-  `proto:2317` closes the repair block with one plain-language line at `400 10px/1.45` in the
-  subtle ink: `Mending consumes ...`. It is the only place the whole set is stated as a cost
-  rather than drawn as an editor, which is what a GM checking their own work reads. See
-  `toolRepairSummary.js` for how the sentence is built.
+  AND THE BLOCK ENDS IN A SENTENCE — the only place the whole set is stated as a cost rather than
+  drawn as an editor, which is what a GM checking their own work reads. See `toolRepairSummary.js`.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -81,12 +60,10 @@
           )
   );
 
-  // THE EMPHASISED TOKEN IS INTERPOLATED, NOT CONCATENATED. The design sets `or…` in
-  // `var(--text2)` inside the sentence, and splitting the sentence into a before-half and an
-  // after-half would hand a translator two fragments neither of which is a sentence. The key
-  // keeps the whole sentence with a `{or}` placeholder and this splits on it, so a translation
-  // is free to move the token anywhere in its own word order - or to drop the placeholder, in
-  // which case the whole string renders as the leading half and nothing is lost.
+  // THE EMPHASISED TOKEN IS INTERPOLATED, NOT CONCATENATED: splitting the sentence into two
+  // halves would hand a translator two fragments neither of which is a sentence. The key keeps the
+  // whole sentence with a placeholder and this splits on it, so a translation may move the token
+  // anywhere — or drop it, in which case the string renders whole and nothing is lost.
   const orToken = $derived(text('FABRICATE.Admin.Manager.Tools.Editor.RepairHintOr', 'or…'));
   const hintParts = $derived(
     text(
@@ -136,9 +113,8 @@
     <p class="manager-kicker">
       {text('FABRICATE.Admin.Manager.Tools.Editor.Repair', 'Repair requirements')}
     </p>
-    <!-- `proto:4696` states this count pill at `padding: 1px 8px; border-radius: 999px;
-         font: 600 9px var(--sans)`, which is `Chip`'s `list` density value for value. Without
-         it the pill took the base 20px/9.92px/700 scale and outweighed the eyebrow it counts. -->
+    <!-- The count pill is `Chip`'s `list` density value for value; at the base scale it
+         outweighed the eyebrow it counts. -->
     <Chip tone="neutral" density="list" data-tool-repair-count={groupCount}>{countLabel}</Chip>
   </div>
   <p class="manager-muted manager-tool-repair-hint" data-tool-repair-hint>
@@ -166,10 +142,8 @@
 </section>
 
 <style>
-  /* THE EYEBROW AND THE COUNT ON ONE ROW - `proto:2233`: `display: flex; align-items: center;
-     gap: 9px; margin-bottom: 4px`. 9 rounds to `--fab-space-2` on the 4px scale; the bottom
-     margin is the section's own `gap` and is not restated. `.manager-kicker` carries its own
-     `margin-bottom`, which has to go here or the chip sits two pixels high against it. */
+  /* THE EYEBROW AND THE COUNT ON ONE ROW; the bottom margin is the section's own `gap` and is not
+     restated. `.manager-kicker`'s own bottom margin is zeroed here, or the chip sits high. */
   .manager-tool-repair-heading {
     display: flex;
     align-items: center;
@@ -181,25 +155,21 @@
     margin: 0;
   }
 
-  /* `400 10.5px/1.5 var(--sans); color: var(--muted)` at `proto:2237`, which is 0.66rem against
-     the 16px root. `.manager-tool-repair` sets 0.78rem for the block, so the explainer states
-     its own size rather than inheriting a control-sized one. */
+  /* The block sets a control-sized type, so the explainer states its own rather than inherit it. */
   .manager-tool-repair-hint {
     margin: 0;
     font-size: 0.66rem;
     line-height: 1.5;
   }
 
-  /* The emphasised token: `--text2` in the design, which is `--fab-text-secondary` here. It is
-     one shade up from the sentence around it rather than an accent - it names a control the
-     reader is about to look for, not a warning. */
+  /* The emphasised token is one shade up from the sentence rather than an accent: it names a
+     control the reader is about to look for, not a warning. */
   .manager-tool-repair-or {
     color: var(--fab-text-secondary);
   }
 
-  /* `400 10px/1.45 var(--sans); color: var(--subtle)` at `proto:2317` - 0.62rem against the 16px
-     root, and a shade quieter than the explainer above the editor. It reads as a readback of
-     what the GM just authored rather than as a second instruction. */
+  /* A shade quieter than the explainer above the editor: it reads as a readback of what the GM
+     just authored rather than as a second instruction. */
   .manager-tool-repair-summary {
     margin: 0;
     color: var(--fab-text-subtle);

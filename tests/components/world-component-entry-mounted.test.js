@@ -1,15 +1,4 @@
-/**
- * The world Component entry editor, mounted (issue 1371, epic 1357).
- *
- * ## Every write assertion here is on the FORWARDED ARGUMENT LIST
- *
- * `updateWorldDefaultSection`, `setWorldTags`, `setMutedTags`, `addToSystem`, `removeFromSystem`
- * and `deleteEntity` all answer `false` on a refused write and report nothing at all. So an
- * assertion on a post-state cannot distinguish "the write landed" from "the write was refused and
- * the projection never moved": `updateWorldDefaultSection` refuses any section name outside
- * `COMPONENT_SECTIONS` BEFORE it writes, and `setMutedTags` refuses silently for a non-member.
- * Both are exactly the mistakes a screen makes, and neither has a rendered symptom.
- */
+/** The world Component entry editor, mounted (issue 1371, epic 1357). */
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { dirname, resolve } from 'node:path';
@@ -26,6 +15,7 @@ import {
 } from '../helpers/componentScopeMountModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -43,7 +33,7 @@ const harness = createComponentScopeHarness({
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/apps/manager/scoped/scopedEntryDraft.js',
     // The issue-1036 essence offer projection the `Essence contribution` card applies (M31).
-    'src/utils/essenceValidation.js',
+    'src/ui/model/essenceValidation.js',
   ],
   compiledExtras: [
     // THE ENTRY'S OWN THREE CHILDREN (issue 1371, parity round 4). Each is imported STATICALLY by
@@ -52,40 +42,32 @@ const harness = createComponentScopeHarness({
     'src/ui/svelte/apps/manager/scoped/WorldComponentEntrySystemsCard.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldComponentEntryPreviewRail.svelte',
     // THE `Essence contribution` CARD'S TWO LEAVES (issue 1371 r18-entry, maintainer ruling M31):
-    // the shared essence quantity card and the shared `Stepper` it renders. Both are STATIC
-    // imports of the page now, so an omission here HANGS this suite (`# cancelled`).
     'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
     'src/ui/svelte/components/Stepper.svelte',
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/components/ArmedDangerButton.svelte',
-    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
   ],
 });
 
-/**
- * THE SOURCE CARD ON ITS OWN, for the one prop the page cannot exercise.
- *
- * `onReviewDuplicates` is withheld by the entry page on purpose — there is no merge screen to
- * route to — so its rendered arm has no path through the page's tree. Rather than give the page a
- * prop no call site passes, the card is mounted directly; the factory means this costs a manifest
- * of three extras rather than a second copy of the harness arrangement.
- */
+/** THE SOURCE CARD ON ITS OWN, for the one prop the page cannot exercise. */
 const sourceCardHarness = createComponentScopeHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-component-entry-source-',
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldComponentEntrySourceCard.svelte',
   rawExtras: ['src/ui/svelte/actions/dragDrop.js', 'src/ui/svelte/util/dropUtils.js'],
   compiledExtras: [
-    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
   ],
@@ -93,16 +75,6 @@ const sourceCardHarness = createComponentScopeHarness({
 
 /**
  * `ItemDropZone` ON ITS OWN, for the DEFAULT half of `compact` (issue 1371 r11-entry, UX minor).
- *
- * `compact` is an opt-in this issue added to a primitive with eight other call sites, and the
- * positive arm — the entry's identity zone IS `is-compact` — is proved through the page below.
- * The negative arm is not reachable there: the ONE zone the entry renders — the source card's,
- * since maintainer ruling M17 removed the identity card's — opts in, so nothing on this screen
- * can show that a zone which does NOT ask keeps the linked art, the name and the uuid. Every other opt-in this PR shipped carries that pair (`ManagerButton`, `ManagerSearchField`,
- * `Medallion`, `ScopedEntityPreview`), and it is the pair that makes "byte-identical by default"
- * a measurement rather than a claim.
- *
- * The manifest is three modules because that is the primitive's whole static graph.
  */
 const dropZoneHarness = createMountedComponentHarness({
   repoRoot,
@@ -111,7 +83,7 @@ const dropZoneHarness = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
   ],
   compiledModules: [
     'src/ui/svelte/components/ItemDropZone.svelte',
@@ -119,35 +91,17 @@ const dropZoneHarness = createMountedComponentHarness({
   ],
 });
 
-// SHARED WITH THE CATALOGUE SUITE, which carried both verbatim; aliased so the call sites read
-// unchanged. See `createComponentScopeHarness` for why the arrangement moved rather than the
-// manifests being pruned.
+// SHARED WITH THE CATALOGUE SUITE, which carried both verbatim.
 const scopeFor = componentScopeFor;
 const drain = drainMicrotasks;
 
-/**
- * THE ROSTER WITH ITS RESOLUTION MODES, which the shared fixture's `{id, name}` pairs do not
- * carry. The entry's system row draws that mode as its sub-line (`proto:936`), so a roster that
- * cannot answer draws no sub-line at all — and a suite mounting the shared pairs would assert an
- * empty string on both rows and call the two rows discriminating.
- *
- * The two modes DIFFER on purpose: one row per mode is what makes "the sub-line reads the row's
- * own system" a measurement rather than a coincidence.
- */
+/** THE ROSTER WITH ITS RESOLUTION MODES. */
 const ENTRY_SYSTEMS = Object.freeze([
   Object.freeze({ id: 'sys-forge', name: 'Forge', resolutionMode: 'progressive' }),
   Object.freeze({ id: 'sys-alchemy', name: 'Alchemy', resolutionMode: 'simple' }),
 ]);
 
-/**
- * Mount the entry on one component, with a recording action bag and the draft wires captured.
- *
- * THE FOUR SHELL CALLBACKS ARE RECORDED TOO (issue 1371, revision 8). The source card's replace,
- * unlink and copy, and the missing state's way back, are not `actions` verbs: they resolve a
- * Foundry document or reach the clipboard, so the page reports them UP and the shell performs
- * them. A mount that left them at their `() => {}` defaults could not tell a wired control from a
- * control wired to nothing, which is exactly the state all three shipped in.
- */
+/** Mount the entry on one component, with a recording action bag and the draft wires captured. */
 async function open(entityId, overrides, vocabulary = null, mountExtras = {}) {
   const { calls, actions } = recordingComponentActions();
   const reports = {
@@ -182,11 +136,6 @@ async function open(entityId, overrides, vocabulary = null, mountExtras = {}) {
 /**
  * Re-project one entry with world-usage references attached.
  *
- * The shared fixture wires NO `requiredBy` / `producedBy`, because the projection takes them from
- * a `usage` map the admin store computes over every system's recipes and gathering tasks — a
- * corpus this suite does not build. Patching the projected entry is the smallest way to reach the
- * populated face without restating that whole leg.
- *
  * @param {object} scope
  * @param {string} entityId
  * @param {{requiredBy: object[], producedBy: object[]}} usage
@@ -194,12 +143,6 @@ async function open(entityId, overrides, vocabulary = null, mountExtras = {}) {
  */
 /**
  * Attach the WORLD VOCABULARY's names to a component scope, as `buildWorldScopeState` does.
- *
- * `componentScopeFor` runs `projectWorldScopeEntity` alone, which never sees the vocabulary
- * store: the names are attached one level up, by the function that assembles the whole
- * `worldScope`, and that is the seam maintainer ruling M18 moved the category picker onto. A
- * `null` vocabulary is the honest default — a world with none authored — and it is what most of
- * this suite mounts, because it is the state the ruling was raised against.
  *
  * @param {object} scope
  * @param {{categories?: string[], tags?: string[]}|null} vocabulary
@@ -216,16 +159,7 @@ function withVocabulary(scope, vocabulary) {
   };
 }
 
-/**
- * The two tags the corpus fixture's `coal` APPLIES, authored as a world vocabulary
- * (issue 1371 r15-entry).
- *
- * Until maintainer ruling M18 reached the entry's tag run it offered the corpus union of every
- * record's applied tags, so `coal`'s own pair was the run on every mount. The run offers the
- * vocabulary now and nothing else, so a test that wants `fuel` and `bulk` as chips has to AUTHOR
- * them here — the applied pair alone is what a migrated world carries, and offering it is the
- * defect. No categories, so the picker's offer in those tests is exactly what it was.
- */
+/** The two tags the corpus fixture's `coal` APPLIES. */
 const CORPUS_TAGS = Object.freeze({ tags: Object.freeze(['bulk', 'fuel']) });
 
 function withUsage(scope, entityId, usage) {
@@ -245,10 +179,7 @@ describe('world Component entry editor (issue 1371)', () => {
   });
 
   describe('the identity edit is BUFFERED and saved explicitly', () => {
-    // AC-7, ON THE UNLINKED RECORD. `proto:834-841` draws a linked component's name, art and
-    // description as READ-ONLY values under a lock pill, because the linked Item owns them; the
-    // editable pair survives only for a record with no source item, which is the one state where
-    // nothing else can name it. `orphan` is that record in the shared fixture.
+    // AC-7, ON THE UNLINKED RECORD. `proto:834-841` draws a linked component's name.
     it('does not write on change, and reports the dirty state up', async () => {
       const { target, calls, reports } = await open('orphan');
       const name = target.querySelector('[data-scoped-entry-name]');
@@ -311,11 +242,6 @@ describe('world Component entry editor (issue 1371)', () => {
     // AC-11. `worldScopeActions` refuses any name outside `COMPONENT_SECTIONS` BEFORE it writes,
     // and reports nothing — so `'categories'` or `'componentCategory'` is a control that silently
     // does nothing forever, with no rendered symptom.
-    //
-    // THE ASSERTION MOVED WITH THE CONTROL (issue 1371, revision 8). The picker was a native
-    // `<select>` and is now `SearchablePopover`, so the write is reached by OPENING the panel and
-    // clicking an option rather than by assigning `value` and dispatching `change`. Every claim
-    // below is the same claim; only the path to it changed.
 
     /**
      * Open the category picker and answer its option buttons, in render order.
@@ -360,8 +286,7 @@ describe('world Component entry editor (issue 1371)', () => {
       raw.click();
       await drain();
 
-      // STAGED, NOT WRITTEN (issue 1371 r18-entry, maintainer ruling M34): the pick is a draft the
-      // header's `Save entry` flushes, exactly as the identity fields and the essence steppers are.
+      // STAGED, NOT WRITTEN (issue 1371 r18-entry, maintainer ruling M34).
       assert.deepEqual(
         calls.filter((call) => call.verb === 'updateWorldDefaultSection'),
         [],
@@ -392,11 +317,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('never OFFERS the reserved bucket, whatever the vocabulary already holds', async () => {
-      // The picker is the enforcement point: nothing below it can refuse the token, and since
-      // issue 1372 a world `general` really does reset every inheriting system on the next read.
-      // The picker moves the refusal from the COMMIT to the OFFER — a value that is not an option
-      // cannot be chosen — so this is the assertion that carries it, driven from a vocabulary
-      // that really does hold the reserved bucket beside a real name.
+      // The picker is the enforcement point: nothing below it can refuse the token.
       const { target } = await open('ingot', undefined, {
         categories: ['Refined', ' GENERAL '],
       });
@@ -411,8 +332,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('but the BLANK option still clears it, because that is a real edit', async () => {
-      // The positive control on the refusal: the empty option is a GM removing the world category
-      // deliberately, and a guard that refused every non-offered value would break it.
+      // The positive control on the refusal.
       const { target, calls, reports } = await open('ingot');
       const options = await openCategoryPicker(target);
       options[0].click();
@@ -450,8 +370,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('and a world with two authored categories offers three', async () => {
-      // The positive control on the clause above: a picker that offered nothing at all would
-      // pass it. Two vocabulary names plus the unset option, in the vocabulary’s sorted order.
+      // The positive control on the clause above.
       const { target } = await open('resin', undefined, { categories: ['Corpses', 'Bespoke Items'] });
       const options = await openCategoryPicker(target);
       assert.deepEqual(
@@ -461,10 +380,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('and the names reach the page through the REAL projection, not only through this suite’s helper', async () => {
-      // `withVocabulary` mirrors what `buildWorldScopeState` attaches; a mirror that had drifted
-      // from the producer would keep every assertion above green while the shipped page offered
-      // nothing. So the seam is exercised end to end once: two fake stores, the real assembler,
-      // and the page mounted on the component leg it publishes.
+      // `withVocabulary` mirrors what `buildWorldScopeState` attaches.
       const componentStore = {
         corpus: () => componentCorpus(),
         isSeeded: () => true,
@@ -475,9 +391,7 @@ describe('world Component entry editor (issue 1371)', () => {
             { id: 'bespoke-items', name: 'Bespoke Items' },
             { id: 'corpses', name: 'Corpses' },
           ],
-          // `moss` rather than `fuel` (issue 1371 r15-entry): no record applies it, so the chip
-          // assertion below can only pass through the vocabulary leg and never through the
-          // corpus union the tag run used to read.
+          // `moss` rather than `fuel` (issue 1371 r15-entry): no record applies it.
           componentTags: [{ id: 'moss', name: 'moss' }],
           recipeCategories: [],
         }),
@@ -512,10 +426,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('and the trigger reads the PERSISTED value, so a refusal needs no restore step', async () => {
-      // What replaced `control.value = worldCategory`. The `<select>` held its own selection, so a
-      // refused choice had to be pushed back onto the element; the trigger is painted from the
-      // record, so there is nothing to put back — and this is the assertion that would red if a
-      // later change gave the trigger local selection state.
+      // What replaced `control.value = worldCategory`. The `<select>` held its own selection.
       const { target } = await open('ingot');
       assert.equal(
         target.querySelector('[data-scoped-entry-category-input]').textContent.trim(),
@@ -847,13 +758,7 @@ describe('world Component entry editor (issue 1371)', () => {
       assert.equal(reports.dirty.at(-1), true, 'the edit is still in front of the GM');
     });
 
-    // ── A FOUNDRY-REFUSED WRITE REJECTS, AND THE SCREEN SAYS SO (issue 1371 r19-entry2) ──────
-    // The case above is the `false` refusal. A refusal that reaches Foundry's socket layer is a
-    // REJECTION: it posts Foundry's own raw sentence and then rejects, so before this revision
-    // `save()` rejected rather than answering `false` — the route-exit guard's
-    // `(await handle.save()) !== false` rejected with it, the header's `onclick={() => onSave()}`
-    // dropped it unhandled, and the GM's only signal was Foundry's message with no idea which of
-    // the four sections it was about or which had already landed durably.
+    // ── A FOUNDRY-REFUSED WRITE REJECTS.
     it('a REJECTING write answers false too, and puts a second, different sentence in front of the GM naming the section and what had landed', async () => {
       const notified = [];
       const previousUi = globalThis.ui;
@@ -912,20 +817,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
   });
 
-  // ── AN APPLIED-BUT-UNAUTHORED WORLD TAG IS DRAWN, LIT AND CLEARABLE (issue 1371 r18-entry,
-  // maintainer ruling M33, closing D-CJ) ──────────────────────────────────────────────────────────
-  // A migrated record can apply a tag the world vocabulary never authored (`coal`'s `fuel` and
-  // `bulk`). Under M18 the run offered the vocabulary alone, so those tags were invisible on the
-  // one screen that could clear them and only the note counted them. M33: they are drawn on the
-  // run AFTER the vocabulary's chips as lit, clearable chips whose ACCESSIBLE NAME says they are
-  // not in the vocabulary; clearing one is staged under M34; once cleared it is never re-offered,
-  // because nothing the world has not authored can be added.
-  //
-  // AND THEY ARE NOT STRUCK (issue 1371 r19-entry2). Revision 18 struck them, and `struck` is the
-  // mark `ComponentEditView`'s world-tag group already draws for a world tag MUTED in this system
-  // — the opposite claim, on the same records, one screen away. `is-struck` is therefore asserted
-  // FALSE here rather than dropped from the reading: an assertion that stops looking is how a mark
-  // comes back.
+  // ── AN APPLIED-BUT-UNAUTHORED WORLD TAG IS DRAWN.
   describe('an applied-but-unauthored world tag is drawn lit and clearable, and NOT struck (M33)', () => {
     const MOSS = Object.freeze({ tags: ['moss'] });
     const run = (target) =>
@@ -1065,11 +957,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('each chip is a real button reporting whether the tag is applied', async () => {
-      // AC-28. A `<span onclick>` passes a pointer hit-test and is unreachable by keyboard, and
-      // a toggle that does not report its state is a control a screen reader cannot read back.
-      //
-      // TWO RECORDS, because the vocabulary mounted here is `coal`'s OWN applied pair: on `coal`
-      // both chips are lit, and only a record that holds neither can supply the unapplied face.
+      // AC-28. A `<span onclick>` passes a pointer hit-test and is unreachable by keyboard.
       const { target: applying } = await open('coal', undefined, CORPUS_TAGS);
       const { target: empty } = await open('ingot', undefined, CORPUS_TAGS);
       const applied = applying.querySelector('[data-scoped-entry-tag="bulk"]');
@@ -1084,8 +972,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('and its accessible name states the DIRECTION as well as the tag', async () => {
-      // A run of bare tag names says nothing out of visual context, and the two directions are
-      // the same words unless the name carries the verb.
+      // A run of bare tag names says nothing out of visual context.
       const { target: applying } = await open('coal', undefined, CORPUS_TAGS);
       const { target: empty } = await open('ingot', undefined, CORPUS_TAGS);
       assert.match(
@@ -1110,12 +997,6 @@ describe('world Component entry editor (issue 1371)', () => {
       // system that has rules` about a list nothing reads. `setMutedTags` has no caller under
       // `src/` either — the mute clause survives only because a MIGRATED world can carry
       // `mutedTags` on a membership record, and this note is the one place that data is visible.
-      //
-      // BOTH BRANCHES, and the second is the one that matters. The fixture's `coal` is muted in
-      // `sys-forge`, so it takes the mute clause and never reaches the `else` the false sentence
-      // lived in — an assertion on `coal` alone passes with that sentence restored, which makes
-      // it no guard at all. The no-mute face needs a record carrying tags and no mute, so the
-      // defaults are overridden to put one on `ingot`.
       const { target: muted } = await open('coal');
       assert.equal(
         muted.querySelector('[data-scoped-entry-tag-note]').textContent.trim(),
@@ -1169,14 +1050,9 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('and the empty sentence is reached only when the vocabulary has no tags, whatever the corpus carries', async () => {
-      // The condition the sentence states, both ways. `coal` applies `fuel` and `bulk` on its
-      // migrated default: with no vocabulary the run offers nothing and says none is authored,
-      // while the note beneath still counts the pair the RECORD carries — the count reads the
-      // record, as the category trigger does, and is the one place that data stays visible.
-      // With one tag authored the sentence goes.
+      // The condition the sentence states.
       const { target: none } = await open('coal');
-      // M33 (issue 1371 r18-entry): the applied-but-unauthored pair IS drawn — lit and clearable —
-      // but it is not OFFERED: no vocabulary chip exists, so the sentence still stands.
+      // M33 (issue 1371 r18-entry): the applied-but-unauthored pair IS drawn.
       assert.deepEqual(
         [...none.querySelectorAll('[data-scoped-entry-tag]')].map((chip) => [
           chip.getAttribute('data-scoped-entry-tag'),
@@ -1320,9 +1196,6 @@ describe('world Component entry editor (issue 1371)', () => {
 
   /**
    * THE VALIDATION TAB IS THE REFERENCE'S (issue 1371 r11-entry, UX finding F-D).
-   *
-   * Three separate claims, and each was a different kind of wrong before this revision:
-   *
    *  - the tab drew an `Entry validation` heading and an intro paragraph where `proto:957-960`
    *    puts the two-column grid as the body's FIRST child;
    *  - the hero read `World record` over "What every system inheriting this component resolves
@@ -1331,21 +1204,9 @@ describe('world Component entry editor (issue 1371)', () => {
    *    counts;
    *  - the block badge read `INCOMPLETE`, which is on no vocabulary the reference draws;
    *    `proto:4573`'s tone table gives `Blocking` / `Warning` / `Pass`.
-   *
-   * The hero copy is read off the RENDERED text rather than off a prop, because the derivation
-   * moved into `ScopedValidationTab` and a page-level assertion on what the page passes could not
-   * see a tab that dropped it.
    */
   /**
    * WHERE THIS SCREEN'S POINTER HIT-TESTS LIVE, AND WHY NOT HERE (issue 1371 r11-entry, UX F-H).
-   *
-   * The round-2 review looked for `elementFromPoint` in this file and found none. It is absent on
-   * purpose and the absence is measured below rather than asserted in prose: happy-dom computes
-   * NO layout, so every rendered node reports a 0x0 box and `document.elementFromPoint` answers
-   * `null` at any coordinate. A hit-test written here would therefore be one of two useless
-   * things — permanently red, or green over `null` — and neither can tell "the chip owns its
-   * centre" from "an overlay swallows it", which is the whole question.
-   *
    * The four `elementFromPoint` sites that DO exist under `tests/components/` are all real-browser
    * suites that stand up Chromium and a hand-built fixture page (`manager-layout`,
    * `overlay-portal-host-position`, `theme-rendered-validation`, `tool-rules-list-parity`). This
@@ -1355,14 +1216,6 @@ describe('world Component entry editor (issue 1371)', () => {
    * icon plus an `expectClick`, which is a real Playwright pointer click whose actionability pass
    * is strictly stronger than `elementFromPoint`. `scoped-shell-prop-contract.test.js` guards that
    * those three survive, because a registry entry is a hand-maintained mirror.
-   *
-   * THE DELTA'S FOURTH NAMED TARGET NO LONGER EXISTS. Issue body line 540 asks for a hit-test on
-   * "the entry's N-by-M mute chip grid"; the reference draws no per-system tag mute anywhere on
-   * this screen and revision 8 removed it, which `viewLabCases.js`'s own note records in terms.
-   * There is nothing to point at.
-   *
-   * This block is SELF-RETIRING: it reds the day happy-dom starts laying out, which is the day a
-   * mounted hit-test becomes worth writing.
    */
   describe('a pointer hit-test cannot be made in this harness, and here is the measurement', () => {
     it('reports a zero box and a null hit for a chip the tree plainly renders', async () => {
@@ -1496,9 +1349,7 @@ describe('world Component entry editor (issue 1371)', () => {
   });
 
   describe('the delete control names its consequence in BOTH faces', () => {
-    // E.3 / AC-16 and WCAG 2.5.3 Label in Name: a control whose accessible name omits its visible
-    // string is unactivatable by speech input, and `ArmedDangerButton` states that requirement
-    // and cannot enforce it because the labels are authored by the page.
+    // E.3 / AC-16 and WCAG 2.5.3 Label in Name.
     it('reads Cannot delete when armed over a component with rules', async () => {
       const { target } = await open('ingot');
       const control = target.querySelector('[data-scoped-entry-delete-card] [data-armed]');
@@ -1525,9 +1376,7 @@ describe('world Component entry editor (issue 1371)', () => {
   });
 
   describe('the per-system card filters, searches and counts what it draws', () => {
-    // E.5 / D-9. Round 1 shipped an unfiltered, unsearchable, unbounded list. On the two-system
-    // fixture that is invisible; the count and the two narrowing controls are what a twenty-system
-    // world needs, and each is asserted on the ROWS it changes rather than on its own presence.
+    // E.5 / D-9. Round 1 shipped an unfiltered, unsearchable.
     it('states how many of the total it is showing', async () => {
       const { target } = await open('ingot');
       const count = target.querySelector('[data-scoped-entry-system-count]');
@@ -1536,10 +1385,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('and the membership filter NARROWS the rows, carrying its own counts', async () => {
-      // `proto:929` draws three PRESSABLE SEGMENTS, each with a trailing count badge; round 3
-      // shipped a `<select>` whose option labels carried the counts in parentheses. The badge is
-      // asserted per segment, because a filter that states the widened and narrowed sets is what
-      // makes choosing between them legible before the click.
+      // `proto:929` draws three PRESSABLE SEGMENTS, each with a trailing count badge.
       const { target } = await open('resin');
       const segments = [...target.querySelectorAll('[data-scoped-entry-system-filter]')].map(
         (segment) => [
@@ -1648,8 +1494,6 @@ describe('world Component entry editor (issue 1371)', () => {
         /Refined/
       );
       // THE OVERRIDE BRANCH NAMES NO VALUE, and that is the assertion rather than an omission:
-      // the published system row does not carry an overriding system's category, so a summary
-      // that stated one would be stating `row.category ?? ''`.
       const overrideSummary = target.querySelector(
         '[data-scoped-entry-system-summary="sys-alchemy"]'
       ).textContent;
@@ -1668,9 +1512,7 @@ describe('world Component entry editor (issue 1371)', () => {
   });
 
   describe('the source Item block offers its uuid rather than only printing it', () => {
-    // E.9. The uuid is the one string on this screen a GM has to move somewhere else — into a
-    // macro, a bug report, or a sibling module's config — and selecting a `<span>` inside a
-    // Foundry application window is a drag the surrounding drop zones intercept.
+    // E.9. The uuid is the one string on this screen a GM has to move somewhere else.
     it('renders the uuid beside a copy control for a linked record', async () => {
       const { target } = await open('ingot');
       assert.equal(
@@ -1681,10 +1523,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('and `Add alias` is inert until a uuid is actually typed', async () => {
-      // `proto:5436-5438` gives the control two faces and switches on the FIELD, because an
-      // enabled-looking button that commits an empty alias is a control that reports success
-      // having stored nothing. The paint follows the disabled state, so the state is the
-      // assertion: a card that dropped the guard would still look right and behave wrongly.
+      // `proto:5436-5438` gives the control two faces and switches on the FIELD.
       const { target } = await open('ingot');
       const add = target.querySelector('[data-scoped-entry-alias-add]');
       assert.ok(Boolean(add), 'the alias row offers its add control');
@@ -1716,9 +1555,7 @@ describe('world Component entry editor (issue 1371)', () => {
   });
 
   describe('identity is READ-ONLY for a linked record, and says why', () => {
-    // `proto:834-841`, and the single biggest information-model divergence round 3 shipped: it
-    // drew a `Name` input and a `Description` textarea, which is a second authority for three
-    // values the linked Foundry Item already owns and refreshes.
+    // `proto:834-841`, and the single biggest information-model divergence round 3 shipped.
     it('draws the name as a VALUE under a lock pill naming the source type', async () => {
       const { target } = await open('ingot');
       const name = target.querySelector('[data-scoped-entry-name]');
@@ -1768,9 +1605,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('but a record with NO source item keeps both fields, because nothing else can name it', async () => {
-      // The positive control, and the product ruling this lane reports rather than assumes: an
-      // unlinked component has no Item to refresh from, so the editable pair is the only way its
-      // name exists at all.
+      // The positive control, and the product ruling this lane reports rather than assumes.
       const { target } = await open('orphan');
       assert.equal(target.querySelector('[data-scoped-entry-name]').tagName, 'INPUT');
       assert.equal(target.querySelector('[data-scoped-entry-description]').tagName, 'TEXTAREA');
@@ -1790,22 +1625,7 @@ describe('world Component entry editor (issue 1371)', () => {
   });
 
   describe('the three controls this module\'s STYLESHEET cannot reach are drawn by a prop', () => {
-    /*
-     * WHY THESE THREE ARE PINNED HERE AND NOT IN `styles/fabricate.css`.
-     *
-     * `module.json` publishes one stylesheet and Foundry imports an unlayered module sheet at
-     * `layer(modules)`, while a Svelte component's own `<style>` block is injected UNLAYERED. An
-     * unlayered normal declaration beats a layered one at ANY specificity, so the lock pill's
-     * type, the tag run's scale and the filter's shape and paint cannot be written in the sheet
-     * — measured in round 5, where a five-compound selector left the chip at the primitive's
-     * 9.92px and only `!important` moved it.
-     *
-     * Each is therefore an OPT-IN prop on the primitive, and a prop that stops being passed
-     * regresses silently to the shipped face: the control still renders, still behaves, and the
-     * rest of this suite still passes. That is exactly the class of defect nothing else here can
-     * see, which is why the three assertions below are on the resolved variant rather than on a
-     * measured pixel this suite has no way to read.
-     */
+    /* WHY THESE THREE ARE PINNED HERE AND NOT IN `styles/fabricate.css`. */
     it('the linked lock pill is the SECONDARY tone at the list scale', async () => {
       // `proto:834` draws it at 9px secondary ink on a `--fab-border` hairline over a 2px/8px
       // band. On the shared chip that face is a SHIPPED PAIR rather than an emphasis (issue
@@ -1813,11 +1633,6 @@ describe('world Component entry editor (issue 1371)', () => {
       // stadium at `600 9px`. Both are asserted, because either alone draws a different badge —
       // `secondary` at the default density floors at 20px and thickens to 700, and `list` on the
       // default tone loses the hairline and the ink this reference is named for.
-      //
-      // AND IT MUST PASS NO EMPHASIS. `outlined` is RECOGNISED on this chip and means the
-      // opposite thing — it supersedes the FILL and draws a flat `--fab-bg-1` plate — so a
-      // verbatim carry-forward of the retired pill's prop would have drawn the wrong face here
-      // silently rather than falling back to the shipped one.
       const { target } = await open('ingot');
       const pill = target.querySelector('[data-scoped-entry-linked-pill] .manager-chip');
       assert.ok(Boolean(pill), 'a linked record draws the pill');
@@ -1836,10 +1651,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('every world-tag chip carries the TAG-RUN scale, lit and unlit alike', async () => {
-      // `proto:5401` draws the run at 600/11px on a 5px/12px band at radius 999 — a chip that is
-      // a CONTROL, not a badge. BOTH faces, because `density` and `tone` are separate props: a
-      // wiring that passed the scale only on the lit branch would draw two chip sizes in one run,
-      // and the fixture's `coal` (both tags applied) cannot show the unlit face at all.
+      // `proto:5401` draws the run at 600/11px on a 5px/12px band at radius 999.
       const { target: applying } = await open('coal', undefined, CORPUS_TAGS);
       const { target: empty } = await open('ingot', undefined, CORPUS_TAGS);
       const lit = applying.querySelector('[data-scoped-entry-tag="bulk"]');
@@ -1858,19 +1670,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('and the APPLIED chip alone asks for the lit emphasis, which is its ink and its fill', async () => {
-      // `proto:5401`/`proto:5665` draw the applied tag as one colour said three ways — on the
-      // edge, on a wash of itself, and ON THE LABEL. `tone="tag"` states the edge and only the
-      // edge: it mixes its wash into the opaque surface behind the chip and inks the label in the
-      // default text token. The other two declarations are the shared primitive's
-      // `emphasis="lit"`, so a wiring that dropped that prop would still render a toned,
-      // correctly scaled, correctly edged chip and would still pass every other assertion here —
-      // the same silent regression to a shipped face this describe block exists to catch.
-      //
-      // The unlit chip is asserted WITHOUT it, and that is a constraint rather than symmetry:
-      // the emphasis is selected on the two chip classes that declare a colour of their own, so
-      // `is-lit` beside `is-neutral` matches nothing. A wiring that passed the emphasis
-      // unconditionally would read as correct from the lit chip alone and would be dead markup on
-      // every other chip in the run.
+      // `proto:5401`/`proto:5665` draw the applied tag as one colour said three ways.
       const { target: applying } = await open('coal', undefined, CORPUS_TAGS);
       const { target: empty } = await open('ingot', undefined, CORPUS_TAGS);
       const lit = applying.querySelector('[data-scoped-entry-tag="bulk"]');
@@ -1886,14 +1686,11 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('the systems filter is a PILL run on the SOFT accent track', async () => {
-      // `proto:5457`: three unenclosed segments at radius 999, the chosen one on the soft accent
-      // and the rest on a `--fab-bg-1` fill behind a hairline, all three at 600.
+      // `proto:5457`: three unenclosed segments at radius 999.
       const { target } = await open('resin');
       const track = target.querySelector('[data-scoped-entry-system-filters]');
       assert.ok(Boolean(track), 'the card draws the filter');
-      // WHOLE-TOKEN MATCHING, never `className.includes`: `is-accent` is a PREFIX of
-      // `is-accent-soft` and BOTH tracks ship, so a substring test would call the solid accent
-      // present here and would keep passing if the tone were changed to it.
+      // WHOLE-TOKEN MATCHING, never `className.includes`.
       assert.ok(
         track.classList.contains('is-pill'),
         `the construction is the pill run, and read "${track.className}"`
@@ -1915,9 +1712,7 @@ describe('world Component entry editor (issue 1371)', () => {
   });
 
   describe('the header band is told what the record IS and how far it reaches', () => {
-    // `proto:815`. The band drew the PAGE name and a generic subtitle; the reference draws the
-    // entity. The page reports the sub-line up because it already resolves the source type for
-    // its own lock pill, and resolving it twice is how a band and a card come to disagree.
+    // `proto:815`. The band drew the PAGE name and a generic subtitle.
     it('reports the source type and the membership reach', async () => {
       const { reports } = await open('ingot');
       assert.equal(reports.sublines.at(-1), 'Linked Foundry item · rules in 2 of 2 systems');
@@ -1930,15 +1725,9 @@ describe('world Component entry editor (issue 1371)', () => {
   });
 
   describe('the world category card exits to the vocabulary screen', () => {
-    // The reference draws one `World classification` card carrying `Edit world vocabulary`; this
-    // screen splits that card in two, and the split dropped the exit. It is restored on the
-    // category half, because the category is the value a system resolves and the vocabulary
-    // screen is where the list it is chosen from is authored.
+    // The reference draws one `World classification` card carrying `Edit world vocabulary`.
     it('hands the click BACK, so the owner runs the unsaved-changes guard', async () => {
-      // THE HANDOFF IS THE POINT. This editor buffers its identity edits, and every other route
-      // change on this screen goes through the gateway's `setView`, which confirms before it
-      // moves. A link that navigated itself would be the one exit here that discarded a draft
-      // silently — so the assertion is that the page CALLS OUT rather than that a route changed.
+      // THE HANDOFF IS THE POINT. This editor buffers its identity edits.
       const { target, reports, calls } = await open('ingot');
       const exit = target.querySelector('[data-scoped-entry-vocabulary-exit]');
       assert.ok(Boolean(exit), 'the category card offers the exit');
@@ -1950,10 +1739,7 @@ describe('world Component entry editor (issue 1371)', () => {
   });
 
   describe('the per-system membership controls are ACTUATED, not merely rendered', () => {
-    // AC-28. Round 1 asserted the cluster was PRESENT on each row and stopped there, so a page
-    // that wired Add to `removeFromSystem` — or wired every row to the FIRST row's system — shipped
-    // green. Both mistakes are one identifier, and neither has a rendered symptom: the write
-    // refuses silently for a pair that is already a member, so even the post-state agrees.
+    // AC-28. Round 1 asserted the cluster was PRESENT on each row and stopped there.
     function rowOf(target, systemId) {
       const row = target.querySelector(`[data-scoped-entry-system="${systemId}"]`);
       assert.ok(Boolean(row), `the card renders a row for ${systemId}`);
@@ -1961,9 +1747,7 @@ describe('world Component entry editor (issue 1371)', () => {
     }
 
     it('Add forwards addToSystem with the row OWN system, not the first row', async () => {
-      // `resin` is a member of neither system, so both rows offer Add and the SECOND one is the
-      // one actuated: a page that closed over the loop's first row passes on the first and fails
-      // here.
+      // `resin` is a member of neither system.
       const { target, calls } = await open('resin');
       rowOf(target, 'sys-alchemy').querySelector('[data-scoped-membership-add]').click();
       await drain();
@@ -1971,9 +1755,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('and Remove forwards removeFromSystem, ARMED FIRST, on its own row', async () => {
-      // `ingot` is a member of both. The first click ARMS and must write nothing at all — a
-      // destructive verb that fires on the first click is the defect the armed control exists to
-      // prevent, and an assertion that only checks the end state cannot see it.
+      // `ingot` is a member of both. The first click ARMS and must write nothing at all.
       const { target, calls } = await open('ingot');
       const remove = rowOf(target, 'sys-alchemy').querySelector('[data-armed]');
       assert.ok(Boolean(remove), 'the member row renders its armed Remove');
@@ -1994,14 +1776,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('and its accessible name DISCLOSES the recipe cascade the removal runs', async () => {
-      // The idle face of this control is a bare 26px exit icon with NO visible label, so its
-      // `aria-label` is the only name it has — and `removeFromSystem` for a COMPONENT is
-      // `partComponentFromSystem`, which runs the in-system delete through `deleteComponents`
-      // and disables every recipe left without a usable ingredient set or result. A sentence
-      // that names only the overrides tells a GM the safe half and not the consequential one.
-      //
-      // Read off the ROW, from the same fixture the actuation cases above use, so this cannot
-      // pass against a sentence assembled anywhere but the control the GM activates.
+      // The idle face of this control is a bare 26px exit icon with NO visible label.
       const { target } = await open('ingot');
       const remove = rowOf(target, 'sys-alchemy').querySelector('[data-armed]');
       const note = remove.getAttribute('aria-label');
@@ -2060,9 +1835,6 @@ describe('world Component entry editor (issue 1371)', () => {
     it('and the non-member row is MARKED as one, so the cohort is addressable', async () => {
       // `proto:5461` fills a row with no rules with `surface-soft` and leaves the member row
       // transparent, which needs a class on the row rather than only an ink change on its copy.
-      // `orphan` is a member of `sys-forge` and NOT of `sys-alchemy`, so one mount carries both
-      // faces and the claim is a discrimination rather than a presence check — `ingot`, which
-      // every other test here mounts, is a member of both and could not tell them apart.
       const { target } = await open('orphan');
       assert.ok(
         !rowOf(target, 'sys-forge').classList.contains('is-outsider'),
@@ -2083,9 +1855,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('and arming one row DISARMS the other, so a stray Enter cannot delete a second', async () => {
-      // The single-armed-token invariant, which this page owns rather than the cluster. Two rows
-      // armed at once is a keyboard hazard specifically: the GM arms one, tabs, and confirms
-      // whichever the browser focused.
+      // The single-armed-token invariant.
       const { target } = await open('ingot');
       rowOf(target, 'sys-forge').querySelector('[data-armed]').click();
       await drain();
@@ -2102,7 +1872,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('and the armed control is operable from the KEYBOARD, Escape included', async () => {
-      // AC-28's keyboard half. Two separate claims, and the second is the one an implementation
+      // AC-28's keyboard half. Two separate claims.
       // gets wrong: the control is a native `<button type="button">`, so Enter and Space are the
       // BROWSER'S activation rather than a handler this repo could omit — and Escape disarms
       // without leaving the control, which IS a handler and would otherwise strand a GM who armed
@@ -2132,10 +1902,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
   });
   describe('every card is HEADED, not kickered', () => {
-    // `proto:845`, `:882` and `:921` draw one head three times: a glyph in the card's own ink, an
-    // `h3` at 14px serif, and a sentence saying what the card decides. Round 3 drew a bare
-    // uppercase kicker on each — a FIELD label doing a SECTION head's job — and on the systems
-    // card the kicker read the DATA (`2 OF 6 SYSTEMS HAVE RULES`) rather than naming the card.
+    // `proto:845`, `:882` and `:921` draw one head three times: a glyph in the card's own ink.
     const HEADS = [
       ['[data-scoped-entry-source-card]', 'Source identity', 'fa-fingerprint'],
       ['[data-scoped-entry-classification-card]', 'World classification', 'fa-tags'],
@@ -2199,9 +1966,7 @@ describe('world Component entry editor (issue 1371)', () => {
   });
 
   describe('the preview rail is a COLUMN of the page, drawn on both tabs', () => {
-    // `proto:986`. Round 3 nested the rail inside the Definition tab's scrolling panel, so
-    // scrolling to the systems card left it blank (`subject-entry-definition-scroll-03.png`) and
-    // the Validation tab had no rail at all.
+    // `proto:986`. Round 3 nested the rail inside the Definition tab's scrolling panel.
     it('sits beside the tab panel rather than inside it', async () => {
       const { target } = await open('ingot');
       const rail = target.querySelector('[data-scoped-entry-preview]');
@@ -2231,8 +1996,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('draws the inventory tile, the resolved category and the effective tags', async () => {
-      // `proto:990-1000`. None of this existed in round 3, which drew a `World defaults` rule
-      // list — the same three values the cards beside it already author.
+      // `proto:990-1000`. None of this existed in round 3.
       const { target } = await open('coal');
       assert.ok(Boolean(target.querySelector('[data-scoped-entry-preview-tile]')));
       assert.equal(
@@ -2248,9 +2012,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('and both fact groups, each with its own empty sentence', async () => {
-      // `proto:1003-1017`. `entry.requiredBy` and `entry.producedBy` are both projected; the
-      // fixture wires neither, so this is the EMPTY face — and an absent group and an empty one
-      // say different things, only one of which is ever true here.
+      // `proto:1003-1017`. `entry.requiredBy` and `entry.producedBy` are both projected.
       const { target } = await open('ingot');
       const sentences = [...target.querySelectorAll('.manager-scoped-preview-fact-empty')].map(
         (node) => node.textContent.trim()
@@ -2277,8 +2039,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('and the fact rows carry their reference and its badge when the corpus has one', async () => {
-      // The positive control on the empty faces above: a rail hard-wired to its empty sentences
-      // passes every assertion in the previous test.
+      // The positive control on the empty faces above.
       const target = await harness.mount({
         scope: withUsage(scopeFor(), 'ingot', {
           requiredBy: [
@@ -2320,8 +2081,7 @@ describe('world Component entry editor (issue 1371)', () => {
   });
 
   describe('the tab strip names the CATALOGUE ENTRY and badges its validation state', () => {
-    // `proto:824`. Round 3 read `Definition`, and badged the Validation tab only on a failure —
-    // so a clear record and an unchecked one drew the same tab.
+    // `proto:824`. Round 3 read `Definition`.
     it('reads Catalogue entry, and ticks when nothing blocks or warns', async () => {
       const { target } = await open('coal');
       assert.equal(
@@ -2348,10 +2108,6 @@ describe('world Component entry editor (issue 1371)', () => {
     // `component-identity-strip-mounted.test.js` deleted the three tests that proved them. The
     // behaviours arrived HERE and nothing followed them: a no-op substituted for each of the
     // three handlers left 672 tests green.
-    //
-    // Each is asserted on the FORWARDED ARGUMENT LIST rather than on a post-state, for this
-    // screen's standing reason — none of the three writes anything the projection republishes,
-    // so there is no post-state to read.
     it('Unlink reports the cut UP, because the shell owns the document write', async () => {
       const { target, calls, reports } = await open('ingot');
       const unlink = target.querySelector('[data-scoped-entry-source-unlink]');
@@ -2374,9 +2130,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('Copy hands the source uuid to the clipboard seam and acknowledges it', async () => {
-      // THE ARGUMENT IS THE ASSERTION. The clipboard write is silent, so a control wired to
-      // `onCopySourceUuid()` with no argument — or with the entry id, one identifier away —
-      // copies an empty string or the wrong string and looks identical either way.
+      // THE ARGUMENT IS THE ASSERTION. The clipboard write is silent.
       const { target, reports } = await open('ingot');
       const copy = target.querySelector('[data-scoped-entry-source-copy]');
       assert.ok(Boolean(copy));
@@ -2392,10 +2146,7 @@ describe('world Component entry editor (issue 1371)', () => {
     });
 
     it('a drop on the replace target forwards the dropped uuid, and refuses a non-Item', async () => {
-      // `proto:856-861`. The drop is the only way to RE-POINT a linked record, and it goes
-      // through the same shipped `ItemDropZone` guard every other zone uses — so the rejected
-      // table is asserted beside the accepted one, or a zone that dropped its document-type check
-      // would pass on the accepted arm alone.
+      // `proto:856-861`. The drop is the only way to RE-POINT a linked record.
       const { target, reports } = await open('ingot');
       const zone = target.querySelector('[data-item-drop-zone="component-source"]');
       assert.ok(Boolean(zone), 'the source card offers its replace target');
@@ -2449,9 +2200,7 @@ describe('world Component entry editor (issue 1371)', () => {
       await reports.handles.filter(Boolean).at(-1).save();
       await drain();
 
-      // THE WHOLE LIST, NOT A DELTA. `updateEntity` replaces the field it is given, so a write of
-      // `[uuid]` alone would silently drop `Item.ingot-legacy` — the alias the fixture record
-      // already answers to, and the one a re-pointed link exists to keep matching.
+      // THE WHOLE LIST, NOT A DELTA. `updateEntity` replaces the field it is given.
       assert.deepEqual(calls, [
         {
           verb: 'updateEntity',
@@ -2492,15 +2241,9 @@ describe('world Component entry editor (issue 1371)', () => {
   });
 
   describe('`Add to systems…` reveals the addable cohort', () => {
-    // `proto:925` draws a modal picker over the non-member systems; this repository has no such
-    // overlay and `actions` exposes only the per-pair `addToSystem`, so the control narrows the
-    // card to the systems the component is NOT in. That is a real behaviour with a real
-    // consequence for what is on screen, and it was named by a lab `expectContained` and one
-    // presence query — clicked by neither.
+    // `proto:925` draws a modal picker over the non-member systems.
     it('narrows the card to the systems the component has no rules in', async () => {
-      // `orphan` is a member of `sys-forge` and not of `sys-alchemy`, so the widened and the
-      // narrowed sets are DIFFERENT — on a record that is a member of both, or of neither, this
-      // control could do nothing at all and still pass.
+      // `orphan` is a member of `sys-forge` and not of `sys-alchemy`.
       const { target } = await open('orphan');
       assert.equal(target.querySelectorAll('[data-scoped-entry-system]').length, 2);
 
@@ -2557,11 +2300,7 @@ describe('world Component entry editor (issue 1371)', () => {
     };
 
     it('states the duplicate, and WITHHOLDS the review action the page has no route for', async () => {
-      // The shipped arrangement, asserted as one claim rather than two: the BAND draws because
-      // the state it reports is real, and the action does not because this repository has no
-      // merge screen and the page therefore passes no handler. A card that drew the action
-      // anyway would hand a GM a button that does nothing — the failure `onUnlink` and
-      // `onOpenWorldVocabulary` are both withheld to avoid on this same screen.
+      // The shipped arrangement, asserted as one claim rather than two.
       const { target } = await open('ingot', SHARED_SOURCE);
       const band = target.querySelector('[data-scoped-entry-duplicate-source]');
       assert.ok(Boolean(band), 'the band reports the shared source item');
@@ -2579,10 +2318,7 @@ describe('world Component entry editor (issue 1371)', () => {
   });
 
   describe('the MISSING entry is a dead end with exactly one way out, and it is wired', () => {
-    // The issue-1373 pattern on a new screen: `[data-tool-empty-browse-world]` shipped inert
-    // because its state was reached by no test and no capture case. This state is reachable — a
-    // GM opens the entry on a component the world corpus no longer holds — the Back button is the
-    // screen's only affordance, and until now it was proven neither to exist nor to act.
+    // The issue-1373 pattern on a new screen.
     it('draws the missing state, and Back reports UP so the owner runs its exit guard', async () => {
       const { target, reports } = await open('no-such-component');
       const state = target.querySelector('[data-scoped-entry-state="missing"]');
@@ -2651,15 +2387,7 @@ describe('the world Component entry source card, mounted on its own (issue 1371)
   });
 });
 
-/**
- * THE DEFAULT HALF OF `compact` (issue 1371 r11-entry, UX minor).
- *
- * The positive arm lives above, through the page: the entry's identity card draws its zone
- * `is-compact`, which is M7's fourth clause. This is the arm the page cannot reach, because both
- * of the entry's zones opt in — a `compact` that had quietly become the primitive's DEFAULT would
- * pass every assertion on this screen while silently deleting the linked art, the name and the
- * uuid from the eight sites that never asked for it.
- */
+/** THE DEFAULT HALF OF `compact` (issue 1371 r11-entry, UX minor). */
 describe('ItemDropZone keeps its shipped LINKED form when nothing asks for the compact one', () => {
   const LINKED_ITEM = Object.freeze({
     name: 'Iron Ingot',

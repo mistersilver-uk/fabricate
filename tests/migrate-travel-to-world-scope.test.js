@@ -1,20 +1,7 @@
 /**
- * Migration 1.27.0 — `migrateTravelToWorldScope` (issue 1282).
- *
- * Lifts the realm library, the reveal mode and the modifier visibility off every crafting system
- * and into the `travelConfig` world setting, leaving each system with
- * `gatheringRealmSettings = { enabled }`, and collapses each party's per-system realm override
- * into one. Three properties decide whether a GM's world survives the upgrade:
- *
- *   - **Reference preservation.** Environments (`includedRealmIds` / `excludedRealmIds`), party
- *     overrides and actor discovery flags all cite realms by ID. A realm dropped by the merge
- *     orphans every reference to it, so the merge is a union keyed by id.
- *   - **Idempotence.** A second run must never re-impose stale system blocks over a library the
- *     GM has since edited — including a realm they deliberately deleted. That guard depends on
- *     the runner actually READING the stored `travelConfig`, which the runner test at the foot
- *     of this file exists to pin: suppress that read and the deleted realm comes back.
- *   - **Writeback ordering.** `travelConfig` is the destination and `craftingSystems` the
- *     source. Strip the source first and a failed destination write destroys the library.
+ * Migration 1.27.0 — `migrateTravelToWorldScope` (issue 1282). Reference preservation.**
+ * Environments (`includedRealmIds` / `excludedRealmIds`), party overrides and actor discovery flags
+ * all cite realms by ID.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -95,9 +82,7 @@ describe('buildWorldTravelConfig', () => {
   });
 
   it('falls back to a disabled system rather than silently reverting to the defaults', () => {
-    // Every system switched off still had a GM configure it. Reverting to `manual` here would
-    // start hiding realm names the moment they switched one back on — and silently, since a
-    // missing reveal mode coerces rather than throws.
+    // Every system switched off still had a GM configure it.
     const built = buildWorldTravelConfig([
       systemWithTravel('off', [], { enabled: false, revealMode: 'alwaysVisible' }),
     ]);
@@ -298,9 +283,7 @@ describe('migrateTravelToWorldScope', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Through the real MigrationRunner — the read, the writeback and their ORDER
-// ---------------------------------------------------------------------------
 
 function makeSettings(initial = {}) {
   const store = new Map(
@@ -369,10 +352,7 @@ describe('MigrationRunner 1.27.0 leg', () => {
   });
 
   it('READS the stored travelConfig, so an edited library survives a legacy re-import', async () => {
-    // This is the mutation guard for the runner's read leg. A legacy export re-imported over an
-    // already-migrated world resets the systems (imports do not re-run migrations inline) while
-    // the world library keeps the GM's edits. Drop the read and `fen` — which the GM deliberately
-    // deleted — is silently resurrected from the re-imported system block.
+    // This is the mutation guard for the runner's read leg.
     const settings = makeSettings({
       craftingSystems: [systemWithTravel('herbalism', [{ id: 'vale' }, { id: 'fen' }])],
       travelConfig: { revealMode: 'alwaysVisible', modifierVisibility: 'visible', realms: [{ id: 'vale', name: 'Vale' }] },

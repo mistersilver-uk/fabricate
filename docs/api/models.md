@@ -230,7 +230,8 @@ A tool's durable identity is stamped on its source Item as `Item.flags.fabricate
   (id, // string
     componentId, // string (managed component reference)
     itemUuid, // string (direct Foundry item reference)
-    quantity, // number (default 1)
+    quantity, // number (default 1) -- the AUTHORED, fixed amount
+    quantityFormula, // string | null -- a non-empty value means the amount is ROLLED instead
     propertyMacroUuid); // string | null
 }
 ```
@@ -241,6 +242,15 @@ A tool's durable identity is stamped on its source Item as `Item.flags.fabricate
 > Use `componentId` for all new data.
 
 Result data is validated as part of recipe validation and consumed by the crafting engine when a result group is awarded.
+
+{: .note }
+
+> A non-empty `quantityFormula` makes the amount ROLLED, and `quantity` stays the authored amount it falls back to, rather than the number awarded.
+> Setting a formula never overwrites `quantity`, so clearing the formula returns the result to the number the GM typed, with nothing to re-enter.
+> The formula is a roll expression, resolved once per result per award against the crafting character, and it can reference the character's own roll data.
+> `Result.validate({ Roll })` accepts `Roll` as an injected dependency and rejects a formula with no character reference whose maximum possible roll can never exceed zero.
+> With no `Roll` supplied, validation reports nothing about `quantityFormula`.
+> An empty, whitespace-only, or absent `quantityFormula` leaves the amount fixed at `quantity`, which is the state of every result created before this field existed.
 
 **Related methods:**
 

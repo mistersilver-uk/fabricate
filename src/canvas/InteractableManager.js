@@ -1,32 +1,7 @@
 /**
- * Canvas Interactable foundation (region-first model).
- *
- * Singleton that wires Foundry canvas hooks + the `fabricate.interactable` Region
- * Behaviour event seam to the pure interactable logic:
- *  - `dropCanvasData` intercepts a dropped Fabricate Tool / Gathering Task,
- *    suppresses the default drop, and spawns a Scene REGION carrying a nested
- *    `fabricate.interactable` behaviour PLUS a linked Tile marker (no actor, no
- *    sheet). Spawning is GM-only and transaction-like (an orphan Region/Tile is
- *    cleaned up if its partner fails to create).
- *  - the behaviour's `static events.tokenEnter`/`tokenExit` run on EVERY connected
- *    client and delegate here to {@link InteractableManager#onRegionEnter} /
- *    {@link InteractableManager#onRegionExit}. The prompt is shown only on the
- *    controlling player's client (avoiding N prompts); the mutation routes to the
- *    active GM (avoiding double-writes).
- *  - a `controlToken` re-trigger (Foundry's `tokenEnter` does NOT fire for a token
- *    already inside on scene load) and a client keybinding "Fabricate: interact
- *    here" both re-raise the prompt for an eligible region the controlled token
- *    is standing in.
- *
- * All decision logic stays in the pure modules (`interactableResolution.js`,
- * `interactableRegionActivation.js`, `interactableRegionFlags.js`,
- * `linkedInteractableVisual.js`, `regionHitTest.js`); the hook / event bodies
- * here are the thin Foundry edge.
- *
- * The branch carries ONLY the region-first implementation: the abandoned
- * tile-CLICK machinery (stage double-click listener, hover/permission wraps,
- * tile pointer enablement, per-tile node adapter, tile world-time pass) and its
- * modules were removed in Phase 1d.
+ * The Foundry edge of the region-first interactable model: one singleton wiring `dropCanvasData`,
+ * the region enter/exit seam, the `controlToken` re-trigger and the keybinding to the pure modules
+ * that hold every decision. Every Foundry global this feature reads is read here.
  */
 
 import { getSetting, SETTING_KEYS } from '../config/settings.js';
@@ -34,63 +9,124 @@ import { resolvedComponentsFor, resolvedToolsFor } from '../systems/scopedEntity
 import { getFabricateAppClass, getInteractionPromptAppClass } from '../ui/appFactory.js';
 
 import { promptDropEnvironment } from './environmentDialog.js';
-import { resolveDropEnvironment } from './environmentResolution.js';
 import { buildInteractableDragPayload } from './interactableDragPayload.js';
+import {
+  denialMessage,
+  openGrant as openGrantLocally,
+  requestActivation,
+  validateAndGrant as validateActivationAndGrant,
+} from './interactableGrant.js';
 import { resolveItemUuidToTool } from './interactableItemResolution.js';
 import {
-  classifyInteractableDrop,
-  buildRegionSpawnRequest,
-  buildActiveCanvasTool,
-  parseInteractableSourceUuid,
-} from './interactableResolution.js';
+  canControlActor,
+  dropPoint,
+  gridSizeFrom,
+  iconTextureFor,
+  screenCenterToScene,
+  shouldPromptForEnter,
+  tokenInsideRegion,
+  viewCenterFrom,
+} from './interactablePredicates.js';
+import { classifyInteractableDrop, parseInteractableSourceUuid } from './interactableResolution.js';
+import { INTERACTABLE_SOCKET } from './interactableSocket.js';
 import {
-  INTERACTABLE_SOCKET,
-  INTERACTABLE_ACTIVATION_GRANTED,
-  INTERACTABLE_ACTIVATION_DENIED,
-} from './interactableSocket.js';
+  buildRegionSpawnRequest as buildSpawnRequest,
+  spawnGatheringTask as spawnTask,
+  spawnInteractableRegion as spawnRegion,
+} from './interactableSpawner.js';
+import {
+  interactHere,
+  onRegionEnter as raiseEnterPrompt,
+  onRegionExit as dismissExitPrompt,
+  promptForTokenInsideRegion as promptInsideRegion,
+  repromptAfterClose,
+} from './regionEnterPrompt.js';
 import {
   regionEnvironmentIdsAtPoint,
   interactableBehaviorsContainingToken,
-  regionContainsTokenDocument,
-  selectRepromptTokenDoc,
 } from './regionHitTest.js';
-import { buildInteractableRegionFlags } from './regions/interactableDeletion.js';
-import {
-  shouldPromptOnEnter,
-  buildActivationRequest,
-  validateActivationRequest,
-  describeGrant,
-  activationDenialMessageKey,
-} from './regions/interactableRegionActivation.js';
-import {
-  buildInteractableBehaviorSystem,
-  readInteractableBehaviorSystem,
-  isInteractableRegionBehavior,
-  buildLinkedVisualFlags,
-} from './regions/interactableRegionFlags.js';
-import { identifyRegionBehaviorRef } from './regions/interactableRegionNodeAdapter.js';
+import { isInteractableRegionBehavior } from './regions/interactableRegionFlags.js';
 
-/** Fallback tile image when no tool/task icon can be resolved. */
-const DEFAULT_INTERACTABLE_IMG = 'icons/svg/item-bag.svg';
-
-/** Client keybinding id for the "interact here" re-trigger. */
 const INTERACT_KEYBINDING = 'fabricateInteractHere';
 
-/** Whether this client is the primary (active) GM. */
-function isActiveGM() {
-  return globalThis.game?.user === globalThis.game?.users?.activeGM;
+/**
+ * Every collaborator below is a function resolved at call time, never at construction: this
+ * singleton is built during page parse, before `game`, `canvas`, `ui.notifications` and `game.time`
+ * exist. Each re-entry thunk goes through the manager method, so a patched method still wins.
+ */
+function spawnCollaborators(manager) {
+  return {
+    scene: () => globalThis.canvas?.scene,
+    createRegion: (scene, data) => scene.createEmbeddedDocuments('Region', [data]),
+    // Resolved in-call, so an `init`- or `setup`-time `CONFIG.Tile.documentClass` override wins.
+    createTile: async (scene, data) => {
+      const TileDocument =
+        globalThis.foundry?.documents?.TileDocument ?? globalThis.CONFIG?.Tile?.documentClass;
+      if (TileDocument?.create) return (await TileDocument.create(data, { parent: scene })) ?? null;
+      const [created] = (await scene.createEmbeddedDocuments?.('Tile', [data])) ?? [];
+      return created ?? null;
+    },
+    deleteRegion: (regionDoc) => regionDoc?.delete?.(),
+    updateBehavior: (behavior, update) => behavior.update(update),
+    buildRegionSpawnRequest: (...args) => manager._buildRegionSpawnRequest(...args),
+    gridSize: () => manager._gridSize(),
+    iconTexture: (classification) => manager._resolveIconTexture(classification),
+    resolutionDeps: () => manager._resolutionDeps(),
+    listEnvironments: (systemId) => manager._systemEnvironments(systemId),
+    regionEnvironmentIdsAtPoint: (args) => manager._regionEnvironmentIdsAtPoint(args),
+    promptDropEnvironment: (args) => manager._promptDropEnvironment(args),
+    notifySpawnFailure: () => manager._notifySpawnFailure(),
+    notifyInfo: (message) => globalThis.ui?.notifications?.info?.(message),
+    localize: (key) => globalThis.game?.i18n?.localize?.(key),
+    formatMessage: (key, data) => globalThis.game?.i18n?.format?.(key, data),
+    spawnInteractableRegion: (request) => manager._spawnInteractableRegion(request),
+  };
+}
+
+function promptCollaborators(manager) {
+  return {
+    getPromptAppClass: () => manager._getPromptAppClass?.(),
+    currentUser: () => globalThis.game?.user,
+    currentUserId: () => globalThis.game?.user?.id ?? null,
+    viewedScene: () => globalThis.canvas?.scene,
+    getScene: (sceneId) => globalThis.game?.scenes?.get?.(String(sceneId)),
+    controlledTokens: () => globalThis.canvas?.tokens?.controlled ?? [],
+    requestActivation: (...args) => manager._requestActivation(...args),
+    behaviorsContainingToken: (token) =>
+      interactableBehaviorsContainingToken({
+        scene: globalThis.canvas?.scene,
+        token,
+        isInteractableBehavior: isInteractableRegionBehavior,
+      }),
+    promptForTokenInsideRegion: (token) => manager._promptForTokenInsideRegion(token),
+  };
+}
+
+function grantCollaborators(manager) {
+  return {
+    getAppClass: () => manager._getAppClass?.(),
+    resolveBehavior: (request) => manager._resolveBehavior(request),
+    emit: (payload) => globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, payload),
+    isActiveGM: () => globalThis.game?.user === globalThis.game?.users?.activeGM,
+    hasActiveGM: () => !!globalThis.game?.users?.activeGM,
+    currentUserId: () => globalThis.game?.user?.id ?? null,
+    worldTime: () => Number(globalThis.game?.time?.worldTime || 0),
+    getUser: (userId) => globalThis.game?.users?.get?.(String(userId ?? '')),
+    canControlActor: (...args) => manager._userCanControlActor(...args),
+    sourceExists: (system) => manager._sourceExists(system),
+    environmentExists: (environmentId) => manager._environmentExists(environmentId),
+    tokenInside: (...args) => manager._tokenInsideRegion(...args),
+    resolutionDeps: () => manager._resolutionDeps(),
+    notifyWarn: (message) => globalThis.ui?.notifications?.warn?.(message),
+    localize: (key) => globalThis.game?.i18n?.localize?.(key),
+    now: () => Date.now(),
+    onGrantClose: (args) => manager._repromptAfterInteractableClose(args),
+    validateAndGrant: (request) => manager.validateAndGrant(request),
+    openGrant: (payload) => manager.openGrant(payload),
+  };
 }
 
 class InteractableManager {
-  /**
-   * @param {object} [deps]
-   * @param {() => Function} [deps.getAppClass] Resolver for the Fabricate app class
-   *   (defaults to {@link getFabricateAppClass}).
-   * @param {() => Function} [deps.getPromptAppClass] Resolver for the prompt app
-   *   class (defaults to {@link getInteractionPromptAppClass}).
-   * @param {(args: {scene: object, point: object}) => string[]} [deps.regionEnvironmentIdsAtPoint]
-   * @param {(args: object) => Promise<string|null>} [deps.promptDropEnvironment]
-   */
   constructor({
     getAppClass = getFabricateAppClass,
     getPromptAppClass = getInteractionPromptAppClass,
@@ -101,81 +137,59 @@ class InteractableManager {
     this._getPromptAppClass = getPromptAppClass;
     this._regionEnvironmentIdsAtPoint = regionHitTest;
     this._promptDropEnvironment = promptEnvironment;
+    this._spawnDeps = spawnCollaborators(this);
+    this._promptDeps = promptCollaborators(this);
+    this._grantDeps = grantCollaborators(this);
     // Bind hook bodies once so they can be added/removed by identity.
     this._onDrop = this._onDrop.bind(this);
     this._onControlToken = this._onControlToken.bind(this);
   }
 
-  /**
-   * Install the region-first canvas hooks: the `dropCanvasData` interception
-   * (now spawns a Region + behaviour + linked Tile) and the `controlToken`
-   * re-trigger, plus the client keybinding. Idempotent.
-   */
+  /** Install the canvas hooks at `ready`. Idempotent. */
   register() {
     if (this._registered) return;
     const hooks = globalThis.Hooks;
     if (hooks?.on) {
       hooks.on('dropCanvasData', this._onDrop);
-      // Re-trigger: a token already INSIDE an interactable region when the scene
-      // loads never fires `tokenEnter`, so re-raise the prompt when the player
-      // controls such a token.
+      // A token already inside a region on scene load never fires `tokenEnter`; control does.
       hooks.on('controlToken', this._onControlToken);
     }
-    this._registerKeybinding();
     this._registered = true;
   }
 
-  /**
-   * Register the client keybinding "Fabricate: interact here" which re-raises the
-   * prompt for an eligible region the controlled token stands in. Defensive — a
-   * no-op when the keybindings API is unavailable.
-   */
-  _registerKeybinding() {
+  /** Register "Fabricate: interact here" from `init`, as core refuses it later. Idempotent. */
+  registerKeybinding() {
     const keybindings = globalThis.game?.keybindings;
-    if (typeof keybindings?.register !== 'function') return;
+    if (this._keybindingRegistered || typeof keybindings?.register !== 'function') return;
     try {
       keybindings.register('fabricate', INTERACT_KEYBINDING, {
         name: 'FABRICATE.Canvas.Interactable.Keybinding.Name',
         hint: 'FABRICATE.Canvas.Interactable.Keybinding.Hint',
         editable: [{ key: 'KeyE' }],
-        onDown: () => {
-          this._interactHere();
-          return true;
-        },
+        // Consume the key only when a prompt was raised: core `ascend` shares KeyE.
+        onDown: () => this._interactHere() === true,
         restricted: false,
       });
-    } catch {
-      // Defensive: a keybinding registration must never break init.
+      this._keybindingRegistered = true;
+    } catch (error) {
+      console.warn('Fabricate | Could not register the interact keybinding.', error);
     }
   }
 
-  // --- Drop → Region + Behaviour + linked Tile --------------------------------
-
-  /**
-   * `dropCanvasData` handler. Returns `false` to suppress Foundry's default drop
-   * when the payload is a Fabricate interactable (GM-only); returns `undefined`
-   * otherwise so Foundry handles the drop normally.
-   *
-   * @param {object} canvas
-   * @param {object} data
-   * @returns {boolean|undefined}
-   */
-  _onDrop(canvas, data) {
+  /** `dropCanvasData`: false suppresses Foundry's drop (GM-only); undefined lets it through. */
+  _onDrop(_canvas, data) {
     const classification = classifyInteractableDrop(data, this._resolutionDeps());
     if (!classification) return; // not ours — let Foundry handle it.
-
-    // Interactable spawning is GM-only.
     if (globalThis.game?.user?.isGM !== true) {
       globalThis.ui?.notifications?.warn?.(
         globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.GMOnlySpawn') ??
           'Only a GM can place Fabricate interactables on the canvas.'
       );
-      return false; // suppress: we recognized it but cannot spawn.
+      return false; // recognized, but spawning is GM-only.
     }
 
-    const point = this._dropPoint(canvas, data);
-    // Region-only (no marker): the browser's "Region only" action carries
-    // `fabricate.visualMode:'none'`. A normal drag/drop defaults to 'marker'.
+    const point = dropPoint(data);
+    // The browser's "Region only" action sets `visualMode:'none'`; a drag defaults to 'marker'.
     const visualMode = data?.fabricate?.visualMode === 'none' ? 'none' : 'marker';
     if (classification.interactableType !== 'gatheringTask') {
       const spawnRequest = this._buildRegionSpawnRequest({ classification, point, visualMode });
@@ -190,282 +204,105 @@ class InteractableManager {
     return false; // suppress Foundry's default item-drop handling.
   }
 
-  /**
-   * Click-to-place a11y fallback for the Interactable browser app: synthesize the
-   * same drop payload and route it through {@link _onDrop} at the scene's view
-   * center, reusing the GM gate, classification, and env-resolution precedence.
-   *
-   * @param {object} params
-   * @param {'tool'|'gatheringTask'} params.interactableType
-   * @param {string} params.systemId
-   * @param {string} params.referenceId
-   * @param {'marker'|'none'} [params.visualMode]  'none' ⇒ region-only (no marker).
-   * @returns {boolean}
-   */
-  placeInteractableAtViewCenter({
-    interactableType,
-    systemId,
-    referenceId,
-    visualMode = 'marker',
-  } = {}) {
-    const payload = buildInteractableDragPayload({
-      interactableType,
-      systemId,
-      referenceId,
-      visualMode,
-    });
+  /** Click-to-place a11y fallback: the same payload through {@link _onDrop} at the view centre. */
+  placeInteractableAtViewCenter(request = {}) {
+    const payload = buildInteractableDragPayload(request);
     if (!payload) return false;
     const center = this._viewCenter();
-    const data = { ...payload, x: center.x, y: center.y };
-    return this._onDrop(globalThis.canvas, data) === false;
+    return this._onDrop(globalThis.canvas, { ...payload, x: center.x, y: center.y }) === false;
   }
 
-  /**
-   * Build the pure region-spawn request from a classified drop, resolving the
-   * icon texture + grid size at the edge and injecting the behaviour-system
-   * builder.
-   *
-   * @param {object} params
-   * @param {object} params.classification
-   * @param {{x:number,y:number}} params.point
-   * @param {string} [params.environmentId]
-   * @param {'marker'|'none'} [params.visualMode]  'none' ⇒ region-only (no Tile).
-   * @returns {object|null}
-   */
-  _buildRegionSpawnRequest({ classification, point, environmentId, visualMode = 'marker' } = {}) {
-    return buildRegionSpawnRequest({
-      classification,
-      point,
-      environmentId: environmentId ?? undefined,
-      texture: this._resolveIconTexture(classification),
-      width: this._gridSize(),
-      height: this._gridSize(),
-      gridSize: this._gridSize(),
-      visualMode,
-      buildBehaviorSystem: (spawn) => buildInteractableBehaviorSystem(spawn),
+  _buildRegionSpawnRequest(args = {}) {
+    return buildSpawnRequest(args, this._spawnDeps);
+  }
+  async _spawnGatheringTask(args) {
+    return spawnTask(args, this._spawnDeps);
+  }
+  async _spawnInteractableRegion(spawnRequest) {
+    return spawnRegion(spawnRequest, this._spawnDeps);
+  }
+
+  onRegionEnter(event, behavior) {
+    raiseEnterPrompt(event, behavior, this._promptDeps);
+  }
+  onRegionExit(event, behavior) {
+    dismissExitPrompt(event, behavior, this._promptDeps);
+  }
+  /** `controlToken` re-trigger for a token already inside, which `tokenEnter` never fires for. */
+  _onControlToken(tokenPlaceable, controlled) {
+    if (controlled !== true) return;
+    this._promptForTokenInsideRegion(tokenPlaceable);
+  }
+  _interactHere() {
+    return interactHere(this._promptDeps);
+  }
+  _promptForTokenInsideRegion(tokenPlaceable) {
+    return promptInsideRegion(tokenPlaceable, this._promptDeps);
+  }
+  _repromptAfterInteractableClose(args = {}) {
+    repromptAfterClose(args, this._promptDeps);
+  }
+
+  _requestActivation(behavior, ctx = {}) {
+    requestActivation(behavior, ctx, this._grantDeps);
+  }
+  async validateAndGrant(request) {
+    return validateActivationAndGrant(request, this._grantDeps);
+  }
+  openGrant(payload) {
+    openGrantLocally(payload, this._grantDeps);
+  }
+  /** Local-user body for `interactableActivationDenied`: warn WHY. No-throw. */
+  notifyActivationDenied(reason) {
+    this._grantDeps.notifyWarn(denialMessage(reason, this._grantDeps));
+  }
+
+  _resolveBehavior({ sceneId, regionId, behaviorId } = {}) {
+    const scene = globalThis.game?.scenes?.get?.(String(sceneId ?? ''));
+    const region = scene?.regions?.get?.(String(regionId ?? ''));
+    return region?.behaviors?.get?.(String(behaviorId ?? '')) ?? null;
+  }
+  _shouldPromptForEnter(event, token) {
+    return shouldPromptForEnter({ event, token, currentUser: globalThis.game?.user });
+  }
+  _userCanControlActor(userId, actorId) {
+    if (!actorId) return false;
+    return canControlActor({
+      actor: globalThis.game?.actors?.get?.(String(actorId)) ?? null,
+      user: globalThis.game?.users?.get?.(String(userId ?? '')) ?? null,
     });
   }
-
-  /**
-   * Resolve a dropped gathering task's environment via the precedence chain and
-   * spawn its region. Precedence: Scene Region auto-detect → task default → GM
-   * dialog. A cancelled dialog aborts the spawn.
-   *
-   * @param {object} args
-   * @returns {Promise<object|null>}
-   */
-  async _spawnGatheringTask({ classification, point, forceDialog, visualMode = 'marker' }) {
+  _sourceExists(system) {
+    const parsed = parseInteractableSourceUuid(system?.sourceUuid);
+    if (!parsed) return false;
     const deps = this._resolutionDeps();
-    const task = deps.getTask({
-      systemId: classification.systemId,
-      taskId: classification.referenceId,
-    });
-    const environments = this._systemEnvironments(classification.systemId);
-    const environmentExists = (id) => environments.some((env) => String(env.id) === String(id));
-
-    const scene = globalThis.canvas?.scene;
-    const regionEnvironmentIds = this._regionEnvironmentIdsAtPoint({ scene, point });
-    const resolution = resolveDropEnvironment({
-      regionEnvironmentIds,
-      defaultEnvironmentId: task?.defaultEnvironmentId ?? null,
-      forceDialog,
-      environmentExists,
-    });
-
-    let environmentId = resolution.environmentId;
-    if (resolution.needsDialog) {
-      environmentId = await this._promptDropEnvironment({
-        environments,
-        defaultEnvironmentId: task?.defaultEnvironmentId ?? '',
-        localize: (key, fallback) => globalThis.game?.i18n?.localize?.(key) ?? fallback,
-      });
-      if (!environmentId) return null; // cancel ⇒ abort.
-    }
-
-    if (resolution.notify && environmentId) {
-      const env = environments.find((candidate) => String(candidate.id) === String(environmentId));
-      const name = env?.name || environmentId;
-      const message =
-        globalThis.game?.i18n?.format?.('FABRICATE.Canvas.Interactable.EnvironmentAutoResolved', {
-          environment: name,
-        }) ?? `Resource node placed in environment "${name}".`;
-      globalThis.ui?.notifications?.info?.(message);
-    }
-
-    const spawnRequest = this._buildRegionSpawnRequest({
-      classification,
-      point,
-      environmentId: environmentId ?? undefined,
-      visualMode,
-    });
-    return this._spawnInteractableRegion(spawnRequest);
+    return parsed.interactableType === 'tool'
+      ? deps.getTool({ systemId: parsed.systemId, toolId: parsed.referenceId }) != null
+      : deps.getTask({ systemId: parsed.systemId, taskId: parsed.referenceId }) != null;
   }
 
-  /**
-   * The environments of one crafting system, as `{ id, name }` rows.
-   *
-   * @param {string} systemId
-   * @returns {Array<{ id: string, name: string }>}
-   */
+  _gatheringEnvironments() {
+    const stored = globalThis.game?.fabricate?.getGatheringEnvironmentStore?.()?.list?.() ?? [];
+    return Array.isArray(stored) ? stored : [];
+  }
+  _environmentExists(environmentId) {
+    if (!environmentId) return false;
+    return this._gatheringEnvironments().some((env) => String(env?.id) === String(environmentId));
+  }
+  /** The environments of one crafting system, as `{ id, name }` rows. */
   _systemEnvironments(systemId) {
-    const environments =
-      globalThis.game?.fabricate?.getGatheringEnvironmentStore?.()?.list?.() ?? [];
-    return (Array.isArray(environments) ? environments : [])
+    return this._gatheringEnvironments()
       .filter((env) => String(env?.craftingSystemId ?? '') === String(systemId))
       .map((env) => ({ id: String(env.id), name: String(env.name ?? env.id) }));
   }
 
   /**
-   * Create the Region (with the nested `fabricate.interactable` behaviour) PLUS
-   * the linked Tile marker, transaction-like: if the Tile create fails after the
-   * Region exists, the orphan Region is deleted (and vice-versa). After both
-   * exist, the behaviour's `linkedVisual.{uuid,documentName}` is written back so
-   * the marker can be resolved (relink / recreate / missing-policy). No-throw;
-   * GM-notify on failure.
-   *
-   * @param {object} spawnRequest  Result of {@link buildRegionSpawnRequest}.
-   * @returns {Promise<object|null>} The created Region document, or null.
+   * Runs on the active GM's client for every player request, so it may execute against a scene that
+   * client is not viewing and nothing canvas-rendered may be consulted (requirement 6).
    */
-  async _spawnInteractableRegion(spawnRequest) {
-    if (!spawnRequest) return null;
-    const scene = globalThis.canvas?.scene;
-    if (!scene?.createEmbeddedDocuments) return null;
-
-    const { region, behaviorSystem, tile } = spawnRequest;
-    // The region area and the linked Tile marker must OVERLAY so a player walking
-    // onto the visible marker is inside the region. The two anchor DIFFERENTLY in
-    // Foundry V13 (empirically confirmed against live bounds): a Tile renders
-    // CENTERED on its stored `x/y` (`tile.object.bounds.x === doc.x - width/2`),
-    // while a Region rectangle SHAPE renders TOP-LEFT at its stored `x/y`. So when
-    // a marker exists, the region rectangle's top-left must be the tile's top-left
-    // — i.e. `tile.x - tile.width/2` — to cover the tile's footprint
-    // (`[tile.x - w/2 .. tile.x + w/2]`). Anchoring the region at `tile.x` would
-    // shift it half a tile down-right of the marker. For a region-only interactable
-    // (no tile) the pure builder's already-centered region shape is used directly.
-    const { x, y, width, height } = tile
-      ? {
-          x: Number(tile.x ?? 0) - Number(tile.width ?? this._gridSize()) / 2,
-          y: Number(tile.y ?? 0) - Number(tile.height ?? this._gridSize()) / 2,
-          width: Number(tile.width ?? region.shape?.width ?? this._gridSize()),
-          height: Number(tile.height ?? region.shape?.height ?? this._gridSize()),
-        }
-      : {
-          x: Number(region.shape?.x ?? 0),
-          y: Number(region.shape?.y ?? 0),
-          width: Number(region.shape?.width ?? this._gridSize()),
-          height: Number(region.shape?.height ?? this._gridSize()),
-        };
-
-    let regionDoc;
-    try {
-      const [created] = await scene.createEmbeddedDocuments('Region', [
-        {
-          name: region.name,
-          shapes: [{ type: 'rectangle', x, y, width, height }],
-          behaviors: [{ type: 'fabricate.interactable', system: behaviorSystem }],
-          // Stamp region-level ownership: Fabricate CREATED this region, so deleting
-          // the interactable may safely delete the whole region (issue 533). A
-          // PROMOTED region (a user region Fabricate is merely pointed at) never
-          // gets this flag, so its delete removes only Fabricate's behaviour.
-          flags: buildInteractableRegionFlags(),
-        },
-      ]);
-      regionDoc = created ?? null;
-    } catch {
-      regionDoc = null;
-    }
-    if (!regionDoc) {
-      this._notifySpawnFailure();
-      return null;
-    }
-
-    const behavior = this._firstInteractableBehavior(regionDoc);
-    const regionUuid = typeof regionDoc?.uuid === 'string' ? regionDoc.uuid : null;
-    const behaviorId = behavior?.id ?? behavior?._id ?? null;
-
-    // Region-only (no marker): the pure builder returns `tile: null` for
-    // `visualMode:'none'`. The behaviour already carries `linkedVisual.mode='none'`
-    // + `presentation.hidden=true`, so there is NO Tile to create, no orphan, and
-    // no linked-visual ref to write back — the Region itself is the interactable.
-    if (!tile) {
-      return regionDoc;
-    }
-
-    // Create the linked Tile carrying the reverse flags. On failure, delete the
-    // orphan Region so we never leave a region without its intended marker.
-    let tileDoc = null;
-    if (regionUuid && behaviorId) {
-      try {
-        const { fabricate } = buildLinkedVisualFlags({ regionUuid, behaviorId });
-        const tileData = {
-          texture: { src: tile?.texture?.src || DEFAULT_INTERACTABLE_IMG },
-          x: Number(tile?.x ?? 0),
-          y: Number(tile?.y ?? 0),
-          width: Number(tile?.width ?? this._gridSize()),
-          height: Number(tile?.height ?? this._gridSize()),
-          flags: { fabricate },
-        };
-        const TileDocument =
-          globalThis.foundry?.documents?.TileDocument ?? globalThis.CONFIG?.Tile?.documentClass;
-        if (TileDocument?.create) {
-          tileDoc = (await TileDocument.create(tileData, { parent: scene })) ?? null;
-        } else if (scene.createEmbeddedDocuments) {
-          const [created] = await scene.createEmbeddedDocuments('Tile', [tileData]);
-          tileDoc = created ?? null;
-        }
-      } catch {
-        tileDoc = null;
-      }
-    }
-
-    if (!tileDoc) {
-      // Roll back the orphan Region so the failed spawn leaves no trace.
-      try {
-        await regionDoc.delete?.();
-      } catch {
-        /* tolerate. */
-      }
-      this._notifySpawnFailure();
-      return null;
-    }
-
-    // Write the linked-visual ref back onto the behaviour. If THIS fails the
-    // interactable still works region-only; we just keep the orphan Tile (it
-    // points back at the region via its own flags) rather than tearing down a
-    // working interactable.
-    const tileUuid = typeof tileDoc?.uuid === 'string' ? tileDoc.uuid : null;
-    if (behavior?.update && tileUuid) {
-      try {
-        await behavior.update({
-          system: { linkedVisual: { uuid: tileUuid, documentName: 'Tile' } },
-        });
-      } catch {
-        // Defensive: a working region-only interactable is acceptable.
-      }
-    }
-
-    return regionDoc;
+  _tokenInsideRegion(behavior, actorId, _userId) {
+    return tokenInsideRegion({ behavior, actorId });
   }
-
-  /**
-   * Resolve the first `fabricate.interactable` behaviour on a freshly-created
-   * Region document.
-   *
-   * @param {object} regionDoc
-   * @returns {object|null}
-   */
-  _firstInteractableBehavior(regionDoc) {
-    const behaviors = regionDoc?.behaviors;
-    const list = Array.isArray(behaviors?.contents)
-      ? behaviors.contents
-      : typeof behaviors?.values === 'function'
-        ? [...behaviors.values()]
-        : Array.isArray(behaviors)
-          ? behaviors
-          : [];
-    return list.find((b) => isInteractableRegionBehavior(b)) ?? list[0] ?? null;
-  }
-
   _notifySpawnFailure() {
     globalThis.ui?.notifications?.warn?.(
       globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.SpawnFailed') ??
@@ -473,647 +310,40 @@ class InteractableManager {
     );
   }
 
-  // --- Activation: region enter / exit ---------------------------------------
-
-  /**
-   * `fabricate.interactable` `tokenEnter` seam (runs on every client). Shows the
-   * prompt on the MOVER's client AND on a non-GM OWNING player's client (see
-   * {@link _shouldPromptForEnter}) when the behaviour is `regionEnter`-triggered
-   * and currently eligible. A GM dragging a player's token prompts BOTH the GM and
-   * that player; a player's autonomous move does NOT spam the GM.
-   *
-   * @param {object} event   The region-behaviour event ({ user, data:{ token } }).
-   * @param {object} behavior  The triggering behaviour (the handler's `this`).
-   */
-  onRegionEnter(event, behavior) {
-    const system = readInteractableBehaviorSystem(behavior);
-    if (!system) return;
-    if (system.activation?.trigger !== 'regionEnter') return;
-
-    const token = this._eventToken(event);
-    if (!this._shouldPromptForEnter(event, token)) return;
-
-    // Gate the PROMPT on VISIBILITY, not full eligibility: a LOCKED interactable
-    // is visible, so it still shows the prompt; pressing Interact then routes the
-    // localized "This is locked." denial via `_requestActivation` →
-    // `validateActivationRequest` (LOCKED). Only a DISABLED or explicitly HIDDEN
-    // interactable is concealed and suppresses the prompt.
-    if (!shouldPromptOnEnter(system)) return;
-
-    const ref = identifyRegionBehaviorRef(behavior);
-    if (!ref) return;
-    const actorId = token?.actor?.id ?? token?.actorId ?? null;
-
-    const PromptApp = this._getPromptAppClass?.();
-    void PromptApp?.show?.({
-      behaviorRef: `${ref.sceneId}.${ref.regionId}.${ref.behaviorId}`,
-      name: system.name || '',
-      promptText: system.presentation?.promptText ?? null,
-      onInteract: () =>
-        this._requestActivation(behavior, {
-          actorId,
-          userId: globalThis.game?.user?.id ?? null,
-          activationSource: 'regionEnter',
-        }),
-    });
-  }
-
-  /**
-   * `fabricate.interactable` `tokenExit` seam: dismiss the prompt for this region
-   * UNCONDITIONALLY (no mover gate). `PromptApp.dismiss(ref)` is ref-matched and a
-   * no-op when this client is not showing that region's prompt — so whichever
-   * client(s) showed the prompt dismiss it on the token's exit, regardless of who
-   * moves it out. This fixes the stale-prompt case where the GM staged a player's
-   * token in the region and the player walks it out (the GM/player showing the
-   * prompt must drop it even though they did not move the token).
-   *
-   * @param {object} event
-   * @param {object} behavior
-   */
-  onRegionExit(_event, behavior) {
-    const ref = identifyRegionBehaviorRef(behavior);
-    if (!ref) return;
-    const PromptApp = this._getPromptAppClass?.();
-    void PromptApp?.dismiss?.(`${ref.sceneId}.${ref.regionId}.${ref.behaviorId}`);
-  }
-
-  /**
-   * `controlToken` re-trigger: when a player CONTROLS a token already standing in
-   * an eligible interactable region (Foundry's `tokenEnter` never fired for an
-   * already-inside token), raise the prompt. No-op on release (`controlled` false).
-   *
-   * @param {object} tokenPlaceable  The controlled token placeable.
-   * @param {boolean} controlled
-   */
-  _onControlToken(tokenPlaceable, controlled) {
-    if (controlled !== true) return;
-    this._promptForTokenInsideRegion(tokenPlaceable);
-  }
-
-  /**
-   * Keybinding "interact here": raise the prompt for the currently-controlled
-   * token standing in an eligible interactable region.
-   */
-  _interactHere() {
-    const controlled = globalThis.canvas?.tokens?.controlled ?? [];
-    const token = (Array.isArray(controlled) ? controlled : [])[0] ?? null;
-    if (!token) return;
-    this._promptForTokenInsideRegion(token);
-  }
-
-  /**
-   * Shared re-trigger body: hit-test the scene's interactable regions for the
-   * token's center; for the first eligible behaviour, show the prompt (mirrors
-   * {@link onRegionEnter} but driven by control rather than a region event).
-   *
-   * @param {object} tokenPlaceable
-   */
-  _promptForTokenInsideRegion(tokenPlaceable) {
-    const tokenDoc = tokenPlaceable?.document ?? tokenPlaceable;
-    if (!tokenDoc) return;
-    if (!this._ownsToken(tokenDoc)) return;
-    const scene = globalThis.canvas?.scene;
-    const matches = interactableBehaviorsContainingToken({
-      scene,
-      token: tokenPlaceable,
-      isInteractableBehavior: isInteractableRegionBehavior,
-    });
-    for (const { behavior } of matches) {
-      const system = readInteractableBehaviorSystem(behavior);
-      if (!system || system.activation?.trigger !== 'regionEnter') continue;
-      // VISIBILITY gate (mirrors onRegionEnter): a locked interactable still
-      // re-prompts; only disabled/hidden are concealed. Interact-time validation
-      // enforces the actual eligibility (locked → "This is locked.").
-      if (!shouldPromptOnEnter(system)) continue;
-      const ref = identifyRegionBehaviorRef(behavior);
-      if (!ref) continue;
-      const actorId = tokenDoc?.actor?.id ?? tokenDoc?.actorId ?? null;
-      const PromptApp = this._getPromptAppClass?.();
-      void PromptApp?.show?.({
-        behaviorRef: `${ref.sceneId}.${ref.regionId}.${ref.behaviorId}`,
-        name: system.name || '',
-        promptText: system.presentation?.promptText ?? null,
-        onInteract: () =>
-          this._requestActivation(behavior, {
-            actorId,
-            userId: globalThis.game?.user?.id ?? null,
-            activationSource: 'regionEnter',
-          }),
-      });
-      return; // one prompt at a time.
-    }
-  }
-
-  // --- Activation: request / validate-grant / open ---------------------------
-
-  /**
-   * Build the activation request for a behaviour and either validate+grant
-   * locally (active GM) or emit it over the socket for the active GM to handle.
-   * When no active GM is connected, warns and aborts (no hung session).
-   *
-   * @param {object} behavior
-   * @param {object} ctx  `{ actorId, userId, activationSource }`.
-   */
-  _requestActivation(behavior, ctx = {}) {
-    const system = readInteractableBehaviorSystem(behavior);
-    const ref = identifyRegionBehaviorRef(behavior);
-    if (!system || !ref) return;
-
-    const request = buildActivationRequest(system, {
-      regionId: ref.regionId,
-      behaviorId: ref.behaviorId,
-      sceneId: ref.sceneId,
-      actorId: ctx.actorId ?? null,
-      userId: ctx.userId ?? globalThis.game?.user?.id ?? null,
-      activationSource: ctx.activationSource ?? 'regionEnter',
-      ts: Date.now(),
-    });
-
-    if (isActiveGM()) {
-      void this.validateAndGrant(request);
-      return;
-    }
-    if (!globalThis.game?.users?.activeGM) {
-      globalThis.ui?.notifications?.warn?.(
-        globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.NoActiveGM') ??
-          'A GM must be online to gather here.'
-      );
-      return;
-    }
-    globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, request);
-  }
-
-  /**
-   * Active-GM body for the `interactableActivate` socket route (and the local-GM
-   * fast path): resolve the scene/region/behaviour, compute the validation
-   * collaborators (`canControlActor`, `sourceExists`, `environmentExists`,
-   * `tokenInside`), run {@link validateActivationRequest}; on pass, emit the grant
-   * to the requesting user (with the resolved `activeCanvasTool` for a tool).
-   * No-throw.
-   *
-   * @param {object} request  A validated `interactableActivate` payload.
-   * @returns {Promise<boolean>} Whether a grant was emitted.
-   */
-  async validateAndGrant(request) {
-    if (!request || typeof request !== 'object') return false;
-    const behavior = this._resolveBehavior(request);
-    const system = readInteractableBehaviorSystem(behavior);
-    if (!system) {
-      // The request resolved no behaviour system (deleted region, etc.). Tell the
-      // requester WHY (generic) rather than failing silently.
-      this._routeActivationDenied(request.userId, null);
-      return false;
-    }
-
-    const now = Number(globalThis.game?.time?.worldTime || 0);
-    // `isGM` here means the REQUESTING user's GM-override status, NOT the
-    // validating GM's identity. Pass the requester's real GM flag so the
-    // actor-control gate cannot be bypassed by a non-owning, non-GM player.
-    // (`_userCanControlActor` already returns true for a GM requester, so the
-    // net authority is identical — this is for correctness/clarity.)
-    const isGM = globalThis.game?.users?.get?.(String(request.userId ?? ''))?.isGM === true;
-    const canControlActor = this._userCanControlActor(request.userId, request.actorId);
-    const sourceExists = this._sourceExists(system);
-    const environmentExists =
-      system.interactableType === 'gatheringTask'
-        ? this._environmentExists(system.environmentId)
-        : true;
-    const tokenInside = this._tokenInsideRegion(behavior, request.actorId, request.userId);
-    const validation = validateActivationRequest(request, {
-      behaviorSystem: system,
-      now,
-      isGM,
-      canControlActor,
-      sourceExists,
-      environmentExists,
-      tokenInside,
-    });
-    if (!validation.ok) {
-      // Tell the requesting user WHY (localized) instead of failing silently.
-      this._routeActivationDenied(request.userId, validation.reason);
-      return false;
-    }
-
-    const grant = describeGrant(system);
-    if (!grant) return false;
-
-    // For a tool, resolve the live activeCanvasTool to thread into the grant.
-    if (system.interactableType === 'tool') {
-      const tool = this._resolutionDeps().getTool({
-        systemId: system.systemId,
-        toolId: system.toolId,
-      });
-      const activeCanvasTool = buildActiveCanvasTool({
-        systemId: system.systemId,
-        toolId: system.toolId,
-        tool,
-      });
-      if (!activeCanvasTool) {
-        // Tell the requesting user WHY. This used to be a bare `return false`, so a
-        // station whose Tool no longer resolves answered a click with NOTHING AT ALL —
-        // the failure mode that hid the issue-1119 item-sourced defect in play, because
-        // the station places and renders perfectly and only dies on activation.
-        this._routeActivationDenied(request.userId, 'SOURCE_MISSING');
-        return false;
-      }
-      grant.context = { ...grant.context, activeCanvasTool };
-    }
-
-    const payload = {
-      action: INTERACTABLE_ACTIVATION_GRANTED,
-      userId: request.userId,
-      behaviorId: request.behaviorId,
-      requestId: request.ts ? String(request.ts) : null,
-      grant: {
-        tab: grant.tab,
-        context: grant.context,
-        ref: {
-          sceneId: request.sceneId,
-          regionId: request.regionId,
-          behaviorId: request.behaviorId,
-        },
-        interactableType: system.interactableType,
-        environmentId: system.environmentId ?? null,
-        taskId: system.taskId ?? null,
-        // The interacting actor (the token the player walked in) becomes the
-        // default selected actor when the granted session opens. Already
-        // ownership-validated above (`canControlActor`).
-        actorId: request.actorId ?? null,
-      },
-    };
-    // The requesting user opens the session locally. When the GM IS the requester
-    // (GM activated their own token), open it here (a socket emit never reaches
-    // the emitter).
-    if (globalThis.game?.user?.id === request.userId) {
-      this.openGrant(payload);
-    } else {
-      globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, payload);
-    }
-    return true;
-  }
-
-  /**
-   * Local-user body for the `interactableActivationGranted` socket route: open the
-   * granted UI on THIS client.
-   *
-   *   tool          → SvelteFabricateApp.show('crafting', { activeCanvasTool }).
-   *   gatheringTask → SvelteFabricateApp.show('gathering', { environmentId, taskId }).
-   *
-   * A gathering-task interactable opens the gathering session scoped to that
-   * environment + task. When LINKED (`taskNodeLink === 'linked'`, the default) it
-   * reads / decrements the SAME environment `nodeRuntime[taskId]` as opening
-   * gathering directly. When UNLINKED with its own node pool (issue 302) the
-   * `grant.ref` is threaded through as `interactableRef` so the session resolves
-   * + decrements that scoped pool instead.
-   *
-   * @param {object} payload  A validated `interactableActivationGranted` payload.
-   */
-  openGrant(payload) {
-    const grant = payload?.grant;
-    if (!grant || typeof grant !== 'object') {
-      return;
-    }
-    const AppClass = this._getAppClass?.();
-    if (!AppClass?.show) {
-      return;
-    }
-
-    // The interacting actor becomes the default-selected actor in the opened
-    // session's top bar (when it is one of the user's selectable characters).
-    const actorId = grant.actorId ?? null;
-
-    if (grant.interactableType === 'tool') {
-      const activeCanvasTool = grant.context?.activeCanvasTool ?? null;
-      if (!activeCanvasTool) {
-        return;
-      }
-      // A Tool station belongs to crafting; open the functional Crafting tab with
-      // the active station tool injected as a virtual-present tool, so crafting
-      // prerequisite checks treat it as satisfied without the actor owning the item
-      // (see SvelteFabricateApp `_activeCanvasTool`).
-      void AppClass.show('crafting', { activeCanvasTool, actorId });
-      return;
-    }
-
-    if (grant.interactableType === 'gatheringTask') {
-      const environmentId = grant.environmentId ?? grant.context?.environmentId ?? null;
-      const taskId = grant.taskId ?? grant.context?.taskId ?? null;
-      if (!environmentId || !taskId) {
-        return;
-      }
-      // The scene-interactable ref (issue 302): only meaningful when the
-      // interactable owns its own scoped node pool, but always passed through —
-      // the engine falls back to the environment scope when the behaviour is
-      // environment-scoped or gone.
-      const interactableRef =
-        grant.ref && typeof grant.ref === 'object'
-          ? {
-              sceneId: grant.ref.sceneId ?? null,
-              regionId: grant.ref.regionId ?? null,
-              behaviorId: grant.ref.behaviorId ?? null,
-            }
-          : null;
-      // Issue 332: clicking Interact dismisses the prompt toast and opens this
-      // gathering session. When the session window closes, re-raise the prompt if
-      // the activating token is STILL inside the originating region (so the player
-      // need not leave and re-enter a large region, and an accidental close is
-      // recoverable). The re-prompt reuses `_promptForTokenInsideRegion`, which
-      // applies the authoritative in-region hit-test + ownership guard + prompt
-      // ref-matching — a token that has since left the region is not re-prompted.
-      const gatheringOptions = {
-        environmentId,
-        taskId,
-        actorId,
-        interactableRef,
-        onClose: () => this._repromptAfterInteractableClose({ ref: grant.ref, actorId }),
-      };
-      Promise.resolve(AppClass.show('gathering', gatheringOptions)).catch(() => {});
-    }
-  }
-
-  /**
-   * Re-raise the Interact prompt after a gathering-task interactable session
-   * window closes, IFF the activating token is still inside the originating
-   * region (issue 332). Resolves the activating token's placeable from the
-   * originating ref's scene + actor, then delegates to the existing
-   * {@link _promptForTokenInsideRegion} path — which re-applies the ownership
-   * guard and the authoritative in-region hit-test, and whose `PromptApp.show`
-   * is ref-matched, so a token that has since left (or no longer exists) is not
-   * re-prompted. No-throw: a close-handler error must never break the app close.
-   *
-   * @param {object} args
-   * @param {{ sceneId?: string, regionId?: string, behaviorId?: string }|null} args.ref
-   * @param {string|null} args.actorId  The activating actor id (from the grant).
-   */
-  _repromptAfterInteractableClose({ ref, actorId } = {}) {
-    try {
-      if (!ref || typeof ref !== 'object') return;
-      const sceneId = ref.sceneId ?? null;
-      if (!sceneId || !actorId) return;
-      const scene =
-        globalThis.game?.scenes?.get?.(String(sceneId)) ??
-        (String(globalThis.canvas?.scene?.id ?? '') === String(sceneId)
-          ? globalThis.canvas?.scene
-          : null);
-      // Only re-prompt for the scene the player is currently viewing; the prompt
-      // toast and its hit-test target the active canvas scene.
-      if (!scene || String(globalThis.canvas?.scene?.id ?? '') !== String(scene.id ?? sceneId)) {
-        return;
-      }
-      const tokenDoc = selectRepromptTokenDoc(this._sceneTokenDocs(scene), actorId);
-      if (!tokenDoc) return;
-      // Prefer the live placeable (carries the canvas center used by the hit-test);
-      // fall back to the document so the shared path can still resolve a center.
-      this._promptForTokenInsideRegion(tokenDoc.object ?? tokenDoc);
-    } catch {
-      // Defensive: never let a re-prompt failure break the window close.
-    }
-  }
-
-  /**
-   * The token DOCUMENTS of a scene, tolerating the V13 collection + array shapes.
-   *
-   * @param {object} scene
-   * @returns {Array<object>}
-   */
-  _sceneTokenDocs(scene) {
-    const tokens = scene?.tokens;
-    if (Array.isArray(tokens?.contents)) return tokens.contents;
-    if (typeof tokens?.values === 'function') return [...tokens.values()];
-    if (Array.isArray(tokens)) return tokens;
-    return [];
-  }
-
-  /**
-   * Route an activation DENIAL back to the requesting user the same way grants are
-   * routed: when the GM IS the requester (own/"as player" local request) notify
-   * here directly (a socket emit never reaches the emitter); otherwise emit the
-   * denied payload so the requesting player's client maps + shows the localized
-   * notice. No-throw.
-   *
-   * @param {string|null} userId  The requesting user id.
-   * @param {string|null} reason  The validation reason (mapped to a localized key).
-   */
-  _routeActivationDenied(userId, reason) {
-    if (globalThis.game?.user?.id === userId) {
-      this.notifyActivationDenied(reason);
-      return;
-    }
-    globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, {
-      action: INTERACTABLE_ACTIVATION_DENIED,
-      userId: userId ?? null,
-      reason: reason ?? null,
-    });
-  }
-
-  /**
-   * Local-user body for the `interactableActivationDenied` socket route (and the
-   * local-GM fast path): warn the user WHY their activation was rejected, using the
-   * pure reason→key mapping resolved through the localizer. No-throw.
-   *
-   * @param {string|null} reason  A validation reason string (unknown ⇒ generic key).
-   */
-  notifyActivationDenied(reason) {
-    const key = activationDenialMessageKey(reason);
-    const localize = globalThis.game?.i18n?.localize;
-    const message = typeof localize === 'function' ? localize.call(globalThis.game.i18n, key) : key;
-    globalThis.ui?.notifications?.warn?.(message);
-  }
-
-  // --- Foundry-edge helpers (activation) -------------------------------------
-
-  _resolveBehavior({ sceneId, regionId, behaviorId } = {}) {
-    const scene = globalThis.game?.scenes?.get?.(String(sceneId ?? ''));
-    const region = scene?.regions?.get?.(String(regionId ?? ''));
-    return region?.behaviors?.get?.(String(behaviorId ?? '')) ?? null;
-  }
-
-  _eventToken(event) {
-    return event?.data?.token ?? event?.token ?? null;
-  }
-
-  /**
-   * Region-enter prompt guard. The region handler runs on EVERY connected client;
-   * this decides which client(s) show the prompt. The prompt appears for:
-   *  - the user who MOVED the token (`event.user === game.user`); AND
-   *  - a NON-GM player who OWNS the token (so a GM dragging a player's token
-   *    prompts BOTH the GM-as-mover and the absent player's client).
-   *
-   * It deliberately does NOT use the GM-owns-everything ownership case: a GM
-   * "owns" every token, so promoting that path would spam the GM on every
-   * autonomous player move. The GM is prompted only when the GM is the mover.
-   *
-   * @param {object} event  The region-behaviour event ({ user, data:{ token } }).
-   * @param {object} token  The triggering token (placeable or document).
-   * @returns {boolean}
-   */
-  _shouldPromptForEnter(event, token) {
-    const me = globalThis.game?.user;
-    const isMover = !!(event?.user && me && String(event.user.id) === String(me.id));
-    // Non-GM owner: prompt the controlling player even when someone else moved the
-    // token. (Deliberately NOT the GM-owns-everything case — that would spam the
-    // GM on every player move.)
-    const isOwningPlayer = me?.isGM !== true && this._ownsToken(token);
-    return isMover || isOwningPlayer;
-  }
-
-  /**
-   * Whether THIS client's user owns/controls a token (player owns the actor or
-   * GM). Tolerates the placeable + document shapes.
-   *
-   * @param {object} token
-   * @returns {boolean}
-   */
-  _ownsToken(token) {
-    const doc = token?.document ?? token;
-    if (!doc) return false;
-    if (globalThis.game?.user?.isGM === true) return true;
-    if (typeof doc.isOwner === 'boolean') return doc.isOwner === true;
-    const actor = doc.actor ?? null;
-    if (actor && typeof actor.isOwner === 'boolean') return actor.isOwner === true;
-    if (typeof token?.controlled === 'boolean') return token.controlled === true;
-    return false;
-  }
-
-  _userCanControlActor(userId, actorId) {
-    if (!actorId) return false;
-    const actor = globalThis.game?.actors?.get?.(String(actorId));
-    if (!actor) return false;
-    const user = globalThis.game?.users?.get?.(String(userId ?? ''));
-    if (user?.isGM === true) return true;
-    if (typeof actor.testUserPermission === 'function' && user) {
-      try {
-        return actor.testUserPermission(user, 'OWNER') === true;
-      } catch {
-        /* fall through */
-      }
-    }
-    return false;
-  }
-
-  _sourceExists(system) {
-    const parsed = parseInteractableSourceUuid(system?.sourceUuid);
-    if (!parsed) return false;
-    const deps = this._resolutionDeps();
-    if (parsed.interactableType === 'tool') {
-      return deps.getTool({ systemId: parsed.systemId, toolId: parsed.referenceId }) != null;
-    }
-    return deps.getTask({ systemId: parsed.systemId, taskId: parsed.referenceId }) != null;
-  }
-
-  _environmentExists(environmentId) {
-    if (!environmentId) return false;
-    const environments =
-      globalThis.game?.fabricate?.getGatheringEnvironmentStore?.()?.list?.() ?? [];
-    return (Array.isArray(environments) ? environments : []).some(
-      (env) => String(env?.id) === String(environmentId)
-    );
-  }
-
-  /**
-   * Whether the actor's token is still inside the behaviour's region. This runs on
-   * the ACTIVE GM'S client for every player request, so it may execute against a
-   * scene that client is not viewing (and, on V14, against a scene level it is not
-   * viewing) — nothing canvas-rendered may be consulted. The whole containment
-   * decision therefore delegates to {@link regionContainsTokenDocument}, which
-   * asks Foundry's authoritative membership and containment APIs before falling
-   * back to geometry; see that function for the signal rule.
-   *
-   * Two defensive "cannot locate ⇒ do not block" answers are preserved. The first
-   * is here: no token document matches the requested actor. The second — a region
-   * exposing no `testPoint` — now lives inside the seam and is NOT a blanket
-   * grant: it makes only the geometric signal unanswerable, so Foundry's own
-   * containment predicate can still deny.
-   *
-   * Admitting when ANY of the actor's tokens is inside is pre-existing and
-   * deliberate.
-   *
-   * @param {object} behavior
-   * @param {string} actorId
-   * @param {string} userId
-   * @returns {boolean}
-   */
-  _tokenInsideRegion(behavior, actorId, _userId) {
-    const region = behavior?.parent ?? null;
-    const scene = region?.parent ?? null;
-    const tokenDocs = this._sceneTokenDocs(scene).filter(
-      (t) => String(t?.actorId ?? t?.actor?.id ?? '') === String(actorId ?? '')
-    );
-    if (tokenDocs.length === 0) return true; // can't locate — don't block.
-    return tokenDocs.some((tokenDoc) => regionContainsTokenDocument(region, tokenDoc) === true);
-  }
-
-  // --- Foundry-edge helpers (placement) --------------------------------------
-
   _viewCenter() {
-    const stageCenter = globalThis.canvas?.stage ? this._screenCenterToScene() : null;
-    if (stageCenter) return stageCenter;
-    const dims = globalThis.canvas?.scene?.dimensions ?? globalThis.canvas?.dimensions ?? null;
-    if (dims && Number.isFinite(dims.width) && Number.isFinite(dims.height)) {
-      return { x: Number(dims.width) / 2, y: Number(dims.height) / 2 };
-    }
-    return { x: 0, y: 0 };
+    return viewCenterFrom({
+      stageCenter: globalThis.canvas?.stage ? this._screenCenterToScene() : null,
+      dimensions: globalThis.canvas?.scene?.dimensions ?? globalThis.canvas?.dimensions ?? null,
+    });
   }
-
   _screenCenterToScene() {
-    const stage = globalThis.canvas?.stage;
-    const toLocal = stage?.toLocal;
-    const PointClass = globalThis.PIXI?.Point;
-    if (typeof toLocal !== 'function' || typeof PointClass !== 'function') return null;
-    const screenW = Number(globalThis.window?.innerWidth ?? 0);
-    const screenH = Number(globalThis.window?.innerHeight ?? 0);
-    try {
-      const local = toLocal.call(stage, new PointClass(screenW / 2, screenH / 2));
-      if (local && Number.isFinite(local.x) && Number.isFinite(local.y)) {
-        return { x: local.x, y: local.y };
-      }
-    } catch {
-      return null;
-    }
-    return null;
+    return screenCenterToScene({
+      stage: globalThis.canvas?.stage,
+      PointClass: globalThis.PIXI?.Point,
+      width: globalThis.window?.innerWidth ?? 0,
+      height: globalThis.window?.innerHeight ?? 0,
+    });
   }
-
   _resolveIconTexture(classification) {
-    const entry = classification?.entry ?? null;
-    if (classification?.interactableType === 'tool') {
-      const systemManager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
-      const system = systemManager?.getSystem?.(classification.systemId);
-      const componentId = entry?.componentId;
-      const component = resolvedComponentsFor(system).find(
-        (c) => String(c?.id ?? '') === String(componentId)
-      );
-      const img = component?.img;
-      if (typeof img === 'string' && img.trim()) return img.trim();
-    }
-    const taskImg = entry?.img;
-    if (typeof taskImg === 'string' && taskImg.trim()) return taskImg.trim();
-    return DEFAULT_INTERACTABLE_IMG;
+    const isTool = classification?.interactableType === 'tool';
+    const systemManager = isTool ? globalThis.game?.fabricate?.getCraftingSystemManager?.() : null;
+    const system = systemManager?.getSystem?.(classification?.systemId);
+    return iconTextureFor({ classification, components: resolvedComponentsFor(system) });
   }
-
-  /**
-   * The active scene's grid size (one square). Falls back to 100.
-   *
-   * @returns {number}
-   */
   _gridSize() {
-    const size =
-      globalThis.canvas?.scene?.grid?.size ??
-      globalThis.canvas?.grid?.size ??
-      globalThis.canvas?.dimensions?.size;
-    return Number.isFinite(Number(size)) && Number(size) > 0 ? Number(size) : 100;
+    const canvas = globalThis.canvas;
+    return gridSizeFrom(canvas?.scene?.grid?.size, canvas?.grid?.size, canvas?.dimensions?.size);
   }
 
   _resolutionDeps() {
     const systemManager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
     return {
-      getTool: ({ systemId, toolId }) => {
-        const system = systemManager?.getSystem?.(systemId);
-        return resolvedToolsFor(system).find((tool) => tool?.id === toolId) ?? null;
-      },
-      getTask: ({ systemId, taskId }) => {
-        const tasks = this._readLibraryTasks(systemId);
-        return tasks.find((task) => task?.id === taskId) ?? null;
-      },
+      getTool: ({ systemId, toolId }) =>
+        resolvedToolsFor(systemManager?.getSystem?.(systemId)).find(
+          (tool) => tool?.id === toolId
+        ) ?? null,
+      getTask: ({ systemId, taskId }) =>
+        this._readLibraryTasks(systemId).find((task) => task?.id === taskId) ?? null,
       resolveItemUuidToTool: (uuid) =>
         resolveItemUuidToTool(uuid, {
           resolveItem: (id) => globalThis.fromUuidSync?.(id) ?? null,
@@ -1121,31 +351,19 @@ class InteractableManager {
         }),
     };
   }
-
   _readLibraryTasks(systemId) {
     if (!systemId) return [];
-    const config = getSetting(SETTING_KEYS.GATHERING_CONFIG);
-    const tasks = config?.systems?.[systemId]?.tasks;
+    const tasks = getSetting(SETTING_KEYS.GATHERING_CONFIG)?.systems?.[systemId]?.tasks;
     return Array.isArray(tasks) ? tasks : [];
   }
 
-  _dropPoint(canvas, data) {
-    return {
-      x: Number(data?.x ?? 0),
-      y: Number(data?.y ?? 0),
-    };
-  }
   _registered = false;
+  _keybindingRegistered = false;
 }
 
-/** The shared InteractableManager singleton. */
-const instance = new InteractableManager();
-
-// Expose the singleton as a static so callers use `InteractableManager.instance.register()`.
-InteractableManager.instance = instance;
+/** The shared singleton, exposed as a static so callers use `InteractableManager.instance`. */
+InteractableManager.instance = new InteractableManager();
 
 export { InteractableManager };
-
 export default InteractableManager;
-
 export { parseInteractableSourceUuid } from './interactableResolution.js';

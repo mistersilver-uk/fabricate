@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { describeValidationHostContract } from '../helpers/validationAddressContracts.js';
 import { railCounts, tallyMatchingRail } from '../helpers/validationSurfaceReadings.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -13,15 +14,15 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-validation-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
-    // recipeReadiness dispatches through the match-type registry, which reads
-    // item flags — copy both so the harness module graph resolves.
+    // recipeReadiness dispatches through the match-type registry.
     'src/config/flags.js',
     'src/models/match/matchTypes.js',
     'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
     // The tab localizes a signature-collision blocker row via this pure leaf (issue 549).
-    'src/utils/recipeActivationMessages.js'
+    'src/utils/recipeActivationMessages.js',
+    'src/utils/scalars.js'
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
@@ -68,7 +69,7 @@ describe('RecipeValidationTab (mounted)', () => {
     const target = await harness.mount({
       recipe: { name: '', enabled: true, ingredientSets: [], resultGroups: [] }
     });
-    // Each blocking issue is merged into its owning check row (§E3): the row carries
+    // Each blocking issue is merged into its owning check row (§E3).
     // both the check and the issue id, and reads as a BLOCKS ENABLE (is-block) state.
     assert.ok(target.querySelector('[data-issue="noName"]'), 'noName issue listed');
     assert.ok(target.querySelector('[data-issue="noIngredientSet"]'), 'noIngredientSet issue listed');
@@ -81,13 +82,6 @@ describe('RecipeValidationTab (mounted)', () => {
   });
 
   // ── THE RAIL IS A TALLY OF THE ROWS (issue 1517, docs round) ─────────────────────────────
-  //
-  // `stepsNamed` is the one check in this tab with NO `CHECK_TO_ISSUES` entry, because nothing in
-  // `recipeReadiness.js` raises an issue for an unnamed step. The row builder does not need one —
-  // an unsatisfied check with no owning issue paints `warn` — but the rail used to count the
-  // ISSUES, so this recipe drew an amber row under "Warnings: 0" and a green "All clear" verdict
-  // above it. No fixture in this file reached the state: every other unsatisfied check here pairs
-  // with an issue, so the two readings agreed by accident.
   const unnamedStepRecipe = {
     name: 'Refine Ore',
     enabled: true,
@@ -141,8 +135,7 @@ describe('RecipeValidationTab (mounted)', () => {
     harness.remount();
   });
 
-  // The overlapping-requirement recipe: a component "Iron Ore" requirement AND a
-  // "metal" tag requirement that Iron Ore satisfies — ambiguous overlap.
+  // The overlapping-requirement recipe.
   const overlapRecipe = {
     name: 'Smelt',
     enabled: true,
@@ -156,9 +149,7 @@ describe('RecipeValidationTab (mounted)', () => {
     resultGroups: [{ id: 'r1' }]
   };
 
-  // No harness rawModules/compiledModules change is needed: recipeReadiness and
-  // the match-type registry it dispatches through are already copied above, so
-  // overlap expansion resolves with the existing module graph.
+  // No harness rawModules/compiledModules change is needed.
   it('warns about overlapping requirements when componentTagOptions are supplied', async () => {
     const target = await harness.mount({
       recipe: overlapRecipe,
@@ -274,16 +265,6 @@ describe('RecipeValidationTab (mounted)', () => {
   });
 
   // ── THE ROW ACTION'S SECOND ARGUMENT (issue 1517) ──────────────────────────────────────
-  //
-  // The surface calls `onSelectIssue(row.target, row.focusTarget)` — two positional
-  // arguments. `target` is the ROUTE and `focusTarget` is the CONTROL: the value of a
-  // `data-validation-target` attribute the offending control carries. This tab is the first
-  // producer-backed host of the pair, and the second argument has to survive TWO hops the
-  // route does not — `recipeReadiness` emitting it, and this tab threading it onto the row —
-  // so a row that quietly lost it would still deep-link and still look correct.
-  //
-  // The assertions read the ARGUMENTS the surface passed, not the markup, because the defect
-  // they exist to catch is an address that never leaves the producer.
   const rowActionArgs = (calls) => calls.map((call) => call.slice(0, 2));
 
   it('passes the offending result set’s own address alongside the route', async () => {
@@ -350,26 +331,12 @@ describe('RecipeValidationTab (mounted)', () => {
   });
 });
 
-/**
- * THE SURFACE ITSELF, MOUNTED (issue 1517).
- *
- * The tab above is one of nine hosts, and it can only ever exercise the shapes ITS producer
- * emits: `recipeReadiness` gives every deep-linkable row a route, gives SOME of them a focus
- * target too (issue 1517), and gives no row its own verb. The row contract has three parts
- * this tab cannot reach — a row that carries ONLY a focus target and no route, a row that
- * carries its own accessible name, and the in-group order over a hand-authored mix of
- * statuses — so they are driven against the primitive directly, in the file that owns the
- * pair.
- *
- * Its own harness, per the two-harness idiom (`alchemy-columns-mounted.test.js`): a harness is
- * one temp tree and one `componentPath`, so a second component under test is a second harness
- * rather than a second `mount()` argument.
- */
+/** THE SURFACE ITSELF, MOUNTED (issue 1517). */
 describe('EditorValidationSurface row action (mounted)', () => {
   const surfaceHarness = createMountedComponentHarness({
     repoRoot,
     tmpPrefix: 'fabricate-editor-validation-surface-',
-    rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+    rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
     compiledModules: [
       'src/ui/svelte/components/Chip.svelte',
       'src/ui/svelte/components/ManagerButton.svelte',
@@ -378,10 +345,7 @@ describe('EditorValidationSurface row action (mounted)', () => {
     componentPath: 'src/ui/svelte/components/EditorValidationSurface.svelte'
   });
 
-  // A WORLD'S TRANSLATION, not English. The surface's defaults are localization KEYS now, so a
-  // fake that echoed the key back could not tell "resolved through `game.i18n`" from "the key
-  // interpolated raw" — both render the dotted path. These two words can only appear on the
-  // screen if the key reached `localize()`.
+  // A WORLD'S TRANSLATION, not English. The surface's defaults are localization KEYS now.
   const TRANSLATIONS = {
     'FABRICATE.Admin.Manager.Validation.View': 'Ver',
     // The SHIPPED shape: two tokens, and the verb is one of them. A pattern hard-coding the verb
@@ -394,10 +358,7 @@ describe('EditorValidationSurface row action (mounted)', () => {
   const rowIds = (scope) =>
     [...scope.querySelectorAll('.manager-recipe-val-row')].map((row) => row.dataset.check);
 
-  // `Localization#format`'s REAL semantics — substitute each `{token}` from `data` into the
-  // world's own string — rather than the shared harness's default stub, which returns
-  // `key:{"subject":"…"}`. A stub looser than the helper it doubles passes whether or not the
-  // surface resolved anything, and the whole subject of the clause below is what came out.
+  // `Localization#format`'s REAL semantics.
   const formatFake = (key, data) =>
     Object.entries(data ?? {}).reduce(
       (phrase, [token, value]) => phrase.replaceAll(`{${token}}`, String(value)),
@@ -425,7 +386,6 @@ describe('EditorValidationSurface row action (mounted)', () => {
     // The NARROW rank: block to 0, everything else to 1. A three-rank sort would put `warnB`
     // ahead of `passA` here, and no sort at all would leave the authored order untouched — so
     // this fixture tells all three apart. The second group proves the sort is per GROUP:
-    // `blockD` rises inside its own group and does not join `blockC` at the top of the surface.
     const target = await surfaceHarness.mount({
       title: 'Validation',
       groups: [
@@ -492,8 +452,7 @@ describe('EditorValidationSurface row action (mounted)', () => {
       'and a row that names neither has nothing to view, so it draws no button at all'
     );
 
-    // The site's own hook carries the ROUTE, so a row with no route carries no hook. Stated
-    // rather than silent: a hook that quietly went missing is what this suite exists to report.
+    // The site's own hook carries the ROUTE.
     assert.equal(action('routeOnly').getAttribute('data-validation-view'), 'ingredients');
     assert.equal(action('both').getAttribute('data-validation-view'), 'results');
     assert.ok(!action('focusOnly').hasAttribute('data-validation-view'));

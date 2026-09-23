@@ -1,10 +1,7 @@
 /**
- * T-091: CraftingRunManager run-completion cache behavior
- *
- * Test cases:
- *  1. completeStepSuccess on a one-step recipe removes the run from activeRuns
- *  2. cache returns fresh state immediately after completeRun (no stale flag read)
- *  3. invalidateCache clears the per-actor cache entry
+ * T-091: CraftingRunManager run-completion cache behavior. Test cases: 1. completeStepSuccess on a
+ * one-step recipe removes the run from activeRuns 2. cache returns fresh state immediately after
+ * completeRun (no stale flag read) 3. invalidateCache clears the per-actor cache entry
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -52,9 +49,7 @@ function makeOneStepRecipe(id = 'r1') {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Test 1: completeStepSuccess on a one-step recipe removes run from activeRuns
-// ---------------------------------------------------------------------------
 
 test('T-091: completeStepSuccess on one-step recipe moves run out of activeRuns', async () => {
   const manager = new CraftingRunManager();
@@ -74,9 +69,7 @@ test('T-091: completeStepSuccess on one-step recipe moves run out of activeRuns'
   assert.equal(history[0].status, 'succeeded', 'completed run must have status succeeded');
 });
 
-// ---------------------------------------------------------------------------
 // Test 2: cache returns fresh data immediately after completeRun (no stale flag read)
-// ---------------------------------------------------------------------------
 
 test('T-091: cache returns fresh state immediately after completeRun (stale-flag prevention)', async () => {
   // Simulate a stale-flag race: after persist, getFlag would return the OLD data
@@ -118,9 +111,7 @@ test('T-091: cache returns fresh state immediately after completeRun (stale-flag
     'getActiveRuns must return empty after completeRun even when cache was stale before the call');
 });
 
-// ---------------------------------------------------------------------------
 // Test 3: invalidateCache clears cached data so next read falls back to flags
-// ---------------------------------------------------------------------------
 
 test('T-091: invalidateCache clears per-actor cache entry', async () => {
   const manager = new CraftingRunManager();

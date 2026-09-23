@@ -1,26 +1,4 @@
-/**
- * The canonical recipe and component summary projections (issue 1091, under #1070).
- *
- * Four properties are load-bearing here, and each gets its own section:
- *
- * 1. **The shape is exactly the manifest.** The whole point of #1091 is that #1075 and
- *    #1081 consume ONE shape rather than growing two overlapping ones, so the emitted key
- *    set is asserted against `RECIPE_SUMMARY_FIELDS` / `COMPONENT_SUMMARY_FIELDS` rather
- *    than spot-checked field by field. A field added to one surface and not the manifest
- *    fails here instead of forking the contract silently.
- * 2. **Shared fields share a DERIVATION.** The contract permits the two audiences to
- *    differ in FIELDS and forbids them differing in how a shared field is derived, so the
- *    two summaries of one recipe are compared field-by-field over `shared`.
- * 3. **The purity invariant is counted, not asserted by inspection.** Building N summaries
- *    invokes `evaluateCraftability()` and `resolveIngredientSelection()` zero times. The
- *    counter is proved non-vacuous in the same test — a counter that cannot go up reports
- *    a green baseline forever — and the structural half (this module holds no collaborator
- *    it could call either function on) is pinned separately against the real import list.
- * 4. **Redaction WITHHOLDS rather than blanks.** A redacted player summary must not carry
- *    availability, and must not have computed it: availability is derived from the
- *    recipe's ingredients, which is one of the three fields a teaser hides by default. The
- *    snapshot's tally accessor is counted to prove it was never consulted.
- */
+/** The canonical recipe and component summary projections (issue 1091, under #1070). */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -49,7 +27,7 @@ globalThis.game = { user: { name: 'Fixture GM' } };
 const { Recipe } = await import('../src/models/Recipe.js');
 const { buildInventorySnapshot } = await import('../src/systems/inventorySnapshot.js');
 const { CRAFTING_BROWSE_STATUS, deriveBrowseStatus } =
-  await import('../src/systems/craftingBrowseStatus.js');
+  await import('../src/ui/presenters/craftingBrowseStatus.js');
 const {
   COMPONENT_SUMMARY_FIELDS,
   RECIPE_SUMMARY_FIELDS,
@@ -58,7 +36,7 @@ const {
   projectRecipeSummary,
   projectSummaryAvailability,
   summaryFieldsFor,
-} = await import('../src/systems/summaryProjection.js');
+} = await import('../src/ui/presenters/summaryProjection.js');
 
 const SYSTEM_ID = 'system-1';
 
@@ -106,15 +84,7 @@ function makeItem(name, quantity) {
   return { uuid: `item-${name}-${quantity}`, name, system: { quantity } };
 }
 
-/**
- * A snapshot over one actor holding `quantity` Iron.
- *
- * `counters` is optional and, when supplied, counts every `resolveComponent` invocation.
- * That is the COST probe the memoisation tests need: `actor.items` reads sit below TWO
- * independent memo layers in `inventorySnapshot` (the lazy item walk and the per-system
- * tally cache) and are satisfied by either one alone, so an item-read count cannot see the
- * tally cache disappear. Resolver invocations can — they track `items x systems asked`.
- */
+/** A snapshot over one actor holding `quantity` Iron. */
 function snapshotHolding(quantity, counters = null) {
   return buildInventorySnapshot({
     craftingActor: { id: 'actor-1', items: [makeItem('Iron Ingot', quantity)] },
@@ -136,14 +106,7 @@ function ironSet(quantity) {
   };
 }
 
-/**
- * An explicit multi-step recipe: requirements on `steps[]`, top-level sets EMPTY.
- *
- * Takes a quantity PER STEP rather than one quantity, so a fixture can distinguish which
- * step was read. A single-step fixture cannot: first, last and active are the same element,
- * so it pins "not the empty top level" while leaving "the FIRST step" — which the spec
- * states normatively — unguarded.
- */
+/** An explicit multi-step recipe: requirements on `steps[]`, top-level sets EMPTY. */
 function makeSteppedRecipe(...perStepIron) {
   return makeRecipe({
     id: 'recipe-stepped',
@@ -193,10 +156,7 @@ describe('summary shape — one documented shape per entity', () => {
     assert.equal('locked' in player, false, 'authoring state must not cross to a player client');
     assert.equal('enabled' in player, false, 'nor the GM on/off toggle');
 
-    // Absent means UNLOCKED — the mirror of the absent-`enabled` rule below. Every other
-    // fixture sets `locked` explicitly, and a deserialized recipe carrying no `locked` key
-    // that read as pinned would disable its own edit affordances in the GM manager, with no
-    // control left to undo it.
+    // Absent means UNLOCKED — the mirror of the absent-`enabled` rule below.
     assert.equal(
       projectRecipeSummary({
         recipe: makeRecipe({ locked: undefined }),
@@ -250,9 +210,6 @@ describe('summary shape — one documented shape per entity', () => {
 
   it('derives categoryLabel from the SAME helper both shipped surfaces already use', () => {
     // `category` is the raw filter-match token and `categoryLabel` is its display string.
-    // The pair is served here rather than re-derived per surface because the player list row
-    // and the category filter both need both facets, and two derivations of "what is this
-    // bucket called" is exactly the divergence this contract exists to prevent.
     const custom = projectRecipeSummary({
       recipe: makeRecipe({ category: 'Smithing' }),
       localize: (key) => `localized:${key}`,
@@ -305,10 +262,9 @@ describe('summary shape — one documented shape per entity', () => {
   });
 
   it('takes systemId from the RECIPE, never from the system it was handed', () => {
-    // Pinned with the two deliberately DIFFERENT, because the default fixture has them
-    // equal — under which reading the wrong object is indistinguishable, and `system` is
-    // optional, so the mistake would surface as a null systemId for every caller that
-    // omits it.
+    // Pinned with the two deliberately DIFFERENT, because the default fixture has them equal —
+    // under which reading the wrong object is indistinguishable, and `system` is optional, so the
+    // mistake would surface as a null systemId for every caller that omits it.
     const summary = projectRecipeSummary({
       recipe: makeRecipe({ craftingSystemId: 'from-the-recipe' }),
       system: { id: 'from-the-system', name: 'Alchemical Arts' },
@@ -319,9 +275,7 @@ describe('summary shape — one documented shape per entity', () => {
   });
 
   it('resolves the recipe image through the shared sentinel chokepoint', () => {
-    // `resolveRecipeImage` maps both "" and Foundry's generic item-bag to the blueprint
-    // default. Reading `recipe.img` directly would render the BAG for a bag-valued recipe,
-    // which the repo records as an explicit product requirement never to do.
+    // `resolveRecipeImage` maps both "" and Foundry's generic item-bag to the blueprint default.
     for (const authored of ['', GENERIC_ITEM_IMAGE]) {
       assert.equal(
         projectRecipeSummary({ recipe: makeRecipe({ img: authored }), system: SYSTEM }).img,
@@ -351,10 +305,8 @@ describe('summary shape — one documented shape per entity', () => {
 
 describe('summary purity — zero exact-evaluation calls', () => {
   /**
-   * A recipe carrying counted tripwires everywhere a projection could plausibly reach for
-   * one: on the recipe, on each ingredient set, and on the owning system. Nothing here is
-   * a real API — the point is that if a future summary ever grows a collaborator, the
-   * shapes it would reach through are already instrumented.
+   * A recipe carrying counted tripwires everywhere a projection could plausibly reach for one: on
+   * the recipe, on each ingredient set, and on the owning system.
    */
   function tripwiredFixture(counters) {
     const recipe = makeRecipe();
@@ -401,12 +353,8 @@ describe('summary purity — zero exact-evaluation calls', () => {
   });
 
   it('ignores a manager-shaped collaborator handed to it under any plausible name', () => {
-    // The tripwires above sit on objects the projection is STRUCTURALLY unable to call, so
-    // on their own they only rule out the least likely regression. `evaluateCraftability`
-    // is a method on `RecipeManager`, so the realistic reintroduction is a new collaborator
-    // PARAMETER — this offers one under every name such a parameter would plausibly take,
-    // and pins that none of them is consulted. A future signature that accepted one would
-    // fail here rather than at review time.
+    // The tripwires above sit on objects the projection is STRUCTURALLY unable to call, so on their
+    // own they only rule out the least likely regression.
     const counters = createOperationCounters();
     const manager = {
       evaluateCraftability: () => ({ canCraft: false }),
@@ -455,16 +403,9 @@ describe('summary purity — zero exact-evaluation calls', () => {
   });
 
   it('holds no collaborator it could call either function on', () => {
-    // The structural half of the invariant. A summary takes VALUES, so the counter test
-    // above pins a property the module has no way to violate by accident — but only for
-    // as long as that stays true, which is what this asserts.
-    //
-    // An ALLOWLIST, not a blocklist of known-bad names. A blocklist has to be maintained
-    // against every collaborator anyone might reach for, and misses the one nobody
-    // predicted; an allowlist fails on ANY new import until a reviewer has looked at it.
-    // Same drift-detection shape the mount harness already uses for its module lists.
+    // The structural half of the invariant.
     const source = readFileSync(
-      fileURLToPath(new URL('../src/systems/summaryProjection.js', import.meta.url)),
+      fileURLToPath(new URL('../src/ui/presenters/summaryProjection.js', import.meta.url)),
       'utf8'
     );
 
@@ -474,13 +415,8 @@ describe('summary purity — zero exact-evaluation calls', () => {
     // pointing at an import statement that does not exist. (`[^:]` spares `://` in a URL.)
     const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
-    // The stripper is regex-based, so a stray `/*` inside a string literal or a line
-    // comment could open a phantom block running to the next real `*/` and swallow the code
-    // between. That would fail OPEN — the exhaustiveness count below reads the same
-    // stripped text, so both sides would shrink together and stay balanced while an import
-    // vanished. Counting statement-anchored imports on BOTH texts catches the desync; a
-    // JSDoc line reads ` * import …`, and `[ \t]*` does not match `*`, so prose still
-    // cannot trip it.
+    // The stripper is regex-based, so a stray `/*` inside a string literal or a line comment could
+    // open a phantom block running to the next real `*/` and swallow the code between.
     const anchoredImports = (text) => (text.match(/^[ \t]*import\b/gm) ?? []).length;
     assert.equal(
       anchoredImports(code),
@@ -488,14 +424,7 @@ describe('summary purity — zero exact-evaluation calls', () => {
       'comment stripping must not swallow an import statement'
     );
 
-    // Matches the multi-line form Prettier produces past the print width, and either quote
-    // style. A line-anchored single-quote regex misses both, and would report green while
-    // the module held exactly the collaborator this forbids.
-    //
-    // `export … from` is scanned too, and that is not thoroughness for its own sake: it is
-    // a real module dependency carrying NO `import` keyword at all, so a re-export would
-    // otherwise slip past both the allowlist and the exhaustiveness count while pulling the
-    // builder into the graph.
+    // Matches the multi-line form Prettier produces past the print width, and either quote style.
     const withClause = [
       ...code.matchAll(/\b(?:import|export)\b[\s\S]*?\bfrom\s*(['"])([^'"]+)\1/g),
     ].map((match) => match[2]);
@@ -508,12 +437,12 @@ describe('summary purity — zero exact-evaluation calls', () => {
     assert.deepEqual(
       specifiers,
       [
-        '../ui/svelte/util/craftingImageDefaults.js',
-        '../utils/componentCategories.js',
-        '../utils/recipeCategories.js',
+        '../../systems/inventorySnapshot.js',
+        '../../systems/stepRecipeView.js',
+        '../../utils/componentCategories.js',
+        '../../utils/recipeCategories.js',
+        '../svelte/util/craftingImageDefaults.js',
         './craftingBrowseStatus.js',
-        './inventorySnapshot.js',
-        './stepRecipeView.js',
       ],
       'summaryProjection may hold only pure projection leaves — no manager, engine, ' +
         'builder or visibility service. Adding an import or re-export here is a ' +
@@ -543,9 +472,8 @@ describe('the cheap-availability rule, defined once', () => {
   });
 
   it('carries #1077 optimism forward: available where exact evaluation would refuse', () => {
-    // Two groups each needing 2x Iron against 3 held units. No assignment satisfies both,
-    // so exact evaluation says no and this rule says yes. That is the documented contract
-    // both surfaces inherit, and it is pinned here so neither can "fix" it independently.
+    // Two groups each needing 2x Iron against 3 held units. No assignment satisfies both, so exact
+    // evaluation says no and this rule says yes.
     const contended = makeRecipe({
       ingredientSets: [
         {
@@ -582,12 +510,8 @@ describe('the cheap-availability rule, defined once', () => {
   });
 
   it('reads a MULTI-STEP recipe from its first execution step, not its empty top level', () => {
-    // An explicit multi-step recipe carries its requirements on `steps[]` and leaves the
-    // raw top-level `ingredientSets` EMPTY. Projected raw, the rule sees "no requirements"
-    // and answers `available: true` against an empty inventory — every stepped recipe
-    // reading "looks makeable" forever, and a craftable-only filter retaining all of them.
-    // That is not the documented optimism: optimism is being wrong about CONTENTION, not
-    // blind to a whole recipe class.
+    // An explicit multi-step recipe carries its requirements on `steps[]` and leaves the raw
+    // top-level `ingredientSets` EMPTY.
     const stepped = makeSteppedRecipe(4);
     assert.deepEqual(stepped.ingredientSets, [], 'the fixture is the real shape, not a prop');
 
@@ -613,12 +537,7 @@ describe('the cheap-availability rule, defined once', () => {
 
   it('tolerates both recipe shapes a caller may hold', () => {
     // A `Recipe` answers `getExecutionSteps()`; a deserialized row carries a bare `steps[]`.
-    // Reading only the latter would leave every instance caller on the silently-vacuous
-    // path above. The title deliberately does NOT claim the two arms take different code
-    // paths: for availability they cannot, because a Recipe's `getExecutionSteps()` returns
-    // `this.steps` verbatim when non-empty and otherwise synthesizes a step carrying the
-    // same top-level `ingredientSets` — so the method arm is defensive, not distinct. The
-    // instance arm still uses the REAL model class, so it exercises real normalization.
+    // Reading only the latter would leave every instance caller on the silently-vacuous path above.
     const plain = makeSteppedRecipe(4);
     for (const [label, recipe] of [
       ['plain object', plain],
@@ -634,11 +553,8 @@ describe('the cheap-availability rule, defined once', () => {
   });
 
   it("reads the FIRST step, not the last and not the actor's active one", () => {
-    // The spec states the FIRST step normatively, and the module's own docblock explains
-    // why it is not the active step. A one-step fixture cannot pin that — first, last and
-    // active coincide — so this uses two steps with deliberately different requirements:
-    // step 1 is satisfied by the held 3, step 2's 99 never is. Reading the last step, or
-    // "the active step, falling back to the first", both answer `false` here.
+    // The spec states the FIRST step normatively, and the module's own docblock explains why it is
+    // not the active step.
     const twoStep = makeSteppedRecipe(2, 99);
     for (const [label, recipe] of [
       ['plain object', twoStep],
@@ -654,11 +570,7 @@ describe('the cheap-availability rule, defined once', () => {
   });
 
   it('answers "not asked" for an absent recipe even WITH a snapshot in view', () => {
-    // The `!recipe` guard, pinned directly. Without it the empty-requirements early return
-    // fires and a phantom row comes back `available: true` — the same silent-wrong the
-    // not-asked/unavailable distinction exists to prevent, and exactly what an index miss
-    // would produce. The sibling tests both miss it: one passes no snapshot, so the first
-    // clause already short-circuits, and the other passes a real recipe.
+    // The `!recipe` guard, pinned directly.
     assert.equal(
       projectSummaryAvailability({ snapshot: snapshotHolding(9), system: SYSTEM, recipe: null }),
       null
@@ -689,15 +601,6 @@ describe('the cheap-availability rule, defined once', () => {
 
   it('resolves the inventory once for a whole page of recipes of one system', () => {
     // The rule's cost claim, and the reason both surfaces are allowed to call it per row.
-    //
-    // THREE probes, because no single one covers the claim. `itemReads` sits below both of
-    // `inventorySnapshot`'s memo layers and stays at 1 if EITHER survives, so on its own it
-    // cannot see the per-system tally cache disappear. `resolveComponent` can — it tracks
-    // `items x systems actually resolved`, so dropping the tally cache moves it from 1 to
-    // the page size. The `heldItems` wrapper catches a third shape: it intercepts only
-    // EXTERNAL calls (the tallies reach the walk through a closure, not through this
-    // property), so it is exactly the probe for a projection that grew its own per-recipe
-    // rescan beside the tallies — which would leave the other two counts untouched.
     const counters = createOperationCounters();
     const snapshot = snapshotHolding(20, counters);
     countCalls(snapshot, 'componentTallies', counters, 'componentTallies');
@@ -761,9 +664,8 @@ describe('player-facing redaction', () => {
   });
 
   it('still surfaces identity and grouping metadata for a teaser', () => {
-    // A teaser is shown to the player DELIBERATELY, so name, image, category and tags are
-    // the part they are meant to see. This mirrors the shipped listing model, which
-    // records the same decision for `category` in as many words.
+    // A teaser is shown to the player DELIBERATELY, so name, image, category and tags are the part
+    // they are meant to see.
     const recipe = makeRecipe();
     const summary = projectRecipeSummary({
       recipe,
@@ -813,10 +715,8 @@ describe('player-facing redaction', () => {
   });
 
   it("that fallback does not drift from the Recipe model's own normalized default", () => {
-    // The default list is a hand-maintained mirror — the model owns it, and nothing binds
-    // the copies. Pinned against the model's OBSERVABLE default (what a teaser with no
-    // authored hiddenFields normalizes to) rather than against its private constant, so
-    // this guards the behaviour a player actually gets.
+    // The default list is a hand-maintained mirror — the model owns it, and nothing binds the
+    // copies.
     const authoritative = new Recipe({
       id: 'drift',
       name: 'Drift Guard',
@@ -885,15 +785,8 @@ describe('browse-status precedence', () => {
     });
   }
 
-  // The one-hot table above cannot pin the ORDER of two conditions — it only ever sets one
-  // at a time, so swapping a pair of branches leaves it green. Precedence is spec-normative
-  // (`data-models/spec.md` § Browse-status precedence), so each adjacent pair is pinned
-  // directly. `exhausted` over `missingMaterials` is the one that bites: a player whose
-  // book is used up AND who is short on reagents would otherwise get the danger-toned
-  // "missing materials" badge, pointing them at the wrong remedy.
-  // `reason` holds one value at a time, so the three reason branches cannot be ordered
-  // against EACH OTHER by any input; what is pinned is each one outranking every lower
-  // non-reason condition, plus the exhaustion/materials pair that can genuinely co-occur.
+  // The one-hot table above cannot pin the ORDER of two conditions — it only ever sets one at a
+  // time, so swapping a pair of branches leaves it green.
   const precedencePairs = [
     ['teaser over everything below it', { reason: 'teaser' }, CRAFTING_BROWSE_STATUS.DISCOVERY],
     ['locked over everything below it', { reason: 'locked' }, CRAFTING_BROWSE_STATUS.LOCKED],
@@ -925,10 +818,8 @@ describe('browse-status precedence', () => {
   });
 
   it('never reports a GM row exhausted, because a GM bypasses the knowledge gate', () => {
-    // `browseStatus` is a SHARED field, so honouring a caller's `exhausted` for a GM would
-    // make a shared field's derivation depend on the audience — the one thing this contract
-    // forbids. The shipped listing builder gates it the same way (`!isGM && …`), and its
-    // suite pins "a GM never sees an exhausted status".
+    // `browseStatus` is a SHARED field, so honouring a caller's `exhausted` for a GM would make a
+    // shared field's derivation depend on the audience — the one thing this contract forbids.
     const summary = projectRecipeSummary({
       recipe: makeRecipe(),
       system: SYSTEM,

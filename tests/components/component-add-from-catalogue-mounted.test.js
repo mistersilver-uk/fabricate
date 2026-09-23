@@ -1,16 +1,5 @@
 /**
- * `Add from catalogue to {system}` — the system Component Rules list's header picker (issue 1371,
- * maintainer ruling M9), mounted.
- *
- * ## Why this file exists at all
- *
- * Revision 5 shipped the header action as `openWorldScopedEntry('world-component-catalogue', '')`.
- * `world-component-catalogue` is a VIEW LAB CASE ID and not a route token: it is in no route
- * table, the root's view chain has no branch for it, and the navigation helper assigns whatever
- * token it is handed — so the control dropped the GM on the crafting-systems library. It survived
- * four full gate runs because `data-component-add-from-catalogue` appeared in NO test file: the
- * whole of its coverage was the two lines of the component itself.
- *
+ * `Add from catalogue to {system}`.
  * So the criterion here is not "the dialog renders". It is the four claims a picker has to make
  * good on, each of which is unobservable from a rendered tree that nobody acts on: it offers the
  * records this system does NOT hold, it adopts each ticked one through the composed write, it
@@ -45,22 +34,14 @@ const dialog = createComponentScopeHarness({
   compiledExtras: ['src/ui/svelte/apps/manager/ManagerModal.svelte'],
 });
 
-/**
- * A world corpus in which `sys-forge` holds EXACTLY ONE of the four records.
- *
- * The shared fixture adopts three of them into `sys-forge`, which leaves a one-row offer — too
- * small to state anything about ordering, about a multi-selection, or about a sequential write.
- * Narrowing the membership rather than widening the corpus keeps the four records (and their
- * linked/unlinked/tagged states) exactly as every sibling suite reads them.
- */
+/** A world corpus in which `sys-forge` holds EXACTLY ONE of the four records. */
 function offerScope() {
   return projectWorldScopeEntity({
     entityType: 'component',
     corpus: componentCorpus({
       membership: [
         { entityId: 'ingot', systemId: 'sys-forge', inherit: { category: true } },
-        // `coal` IS held by the other system, which is what makes the `{n} other systems` column
-        // non-zero for a record `sys-forge` is being offered.
+        // `coal` IS held by the other system.
         { entityId: 'coal', systemId: 'sys-alchemy', inherit: { category: false } },
       ],
     }),
@@ -79,14 +60,7 @@ function rowIds() {
   );
 }
 
-/**
- * Tick one offered row through its real `<input type="checkbox">`.
- *
- * `flushSync` IS LOAD-BEARING, not tidying: the Apply is `disabled` while nothing is ticked, and
- * a disabled button swallows `.click()` — so without the flush every Apply below fires against
- * last render's markup and records nothing, which reads as a broken write path rather than as a
- * test that clicked an inert control.
- */
+/** Tick one offered row through its real `<input type="checkbox">`. */
 function tick(entityId) {
   const box = document.querySelector(`[data-component-add-from-catalogue-select="${entityId}"]`);
   assert.ok(Boolean(box), `the offer holds a row for ${entityId}`);
@@ -113,13 +87,7 @@ function pickedRowIds() {
   );
 }
 
-/**
- * An `onAdd` that REFUSES the ids it is given and accepts the rest.
- *
- * The composed `joinComponentToSystem` answers `false` for exactly this class — the duplicate
- * source uuid `_assertUniqueComponentSourcesForSystem` raises — after rolling its own write back
- * and notifying. It is the answer, not the throw, that the picker has to consume.
- */
+/** An `onAdd` that REFUSES the ids it is given and accepts the rest. */
 function refusingAdd(refusedIds) {
   const calls = [];
   return {
@@ -132,23 +100,14 @@ function refusingAdd(refusedIds) {
   };
 }
 
-/**
- * An `onAdd` fake that records the ORDER of every write and, optionally, holds each one open.
- *
- * It records a `start` before it awaits and an `end` after, so a caller that fired the writes
- * concurrently produces `start start end end` and a caller that awaits each one produces
- * `start end start end`. A fake recording only ids cannot tell those apart, and the whole reason
- * this loop is sequential is that every world-scope write reads-modifies-writes ONE setting.
- */
+/** An `onAdd` fake that records the ORDER of every write and, optionally, holds each one open. */
 function recordingAdd({ gated = false, withSystem = false } = {}) {
   const events = [];
   let release = () => {};
   const gate = new Promise((resolve_) => {
     release = resolve_;
   });
-  // `withSystem` records the SECOND argument too (issue 1371 r17): a run pins the system it
-  // started against and hands it to every write, and a label that names only the entity cannot
-  // see a write re-targeted at a system the GM never ticked rows for.
+  // `withSystem` records the SECOND argument too (issue 1371 r17).
   const label = (entityId, system) => (withSystem ? `${entityId}->${system}` : entityId);
   return {
     events,
@@ -164,9 +123,7 @@ function recordingAdd({ gated = false, withSystem = false } = {}) {
 }
 
 async function open(props = {}) {
-  // DESTROY THE PREVIOUS TREE FIRST. `mount()` does not, and this dialog PORTALS its panel — so a
-  // second mount without this leaves two panels in the document and every `document.querySelector`
-  // below silently reads the first one.
+  // DESTROY THE PREVIOUS TREE FIRST. `mount()` does not, and this dialog PORTALS its panel.
   dialog.remount();
   const closed = [];
   const recorder = props.recorder ?? recordingAdd();
@@ -216,9 +173,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
   });
 
   it('and the membership it reads is THIS system’s, not any system’s', async () => {
-    // The positive control for the filter above: the same corpus against the other system offers
-    // a DIFFERENT set. A dialog that filtered on "held by nobody" would answer the same three
-    // rows here, and a dialog that ignored membership entirely would answer four.
+    // The positive control for the filter above.
     await open({ systemId: 'sys-alchemy', systemName: 'Alchemy' });
     assert.deepEqual(rowIds(), ['ingot', 'orphan', 'resin']);
   });
@@ -232,20 +187,13 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
   });
 
   it('states each offered record’s SOURCE under its name, as the reference does', async () => {
-    // `proto:6027` maps each row's second line to `c.src`, and the captured prototype frame writes
-    // `Foundry item` / `Compendium` there. The first draft of this dialog put the record's
-    // DESCRIPTION on that line, which renders blank for most of a real corpus — a world
-    // component's description is a snapshot only a linked creation fills.
-    //
-    // IT IS THE SHIPPED `componentSourceLine`, so this picker, the catalogue inspector and the
-    // world entry's header cannot disagree about what a record's source is.
+    // `proto:6027` maps each row's second line to `c.src`.
     await open();
     const metaOf = (id) =>
       document.querySelector(`[data-component-add-from-catalogue-row="${id}"]`).textContent;
     assert.match(metaOf('coal'), /Linked Foundry item/, 'a record naming a world Item');
     assert.match(metaOf('orphan'), /No source item/, 'and one naming none, which is a real state');
-    // The Compendium branch needs a `Compendium.`-prefixed uuid, which this shared fixture has
-    // no record for; it is the helper's own branch and is covered where the helper is.
+    // The Compendium branch needs a `Compendium.`-prefixed uuid.
   });
 
   it('adopts every ticked record through the composed write, in offer order', async () => {
@@ -265,10 +213,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
   });
 
   it('and the writes are SEQUENTIAL, which is what one shared settings key requires', async () => {
-    // Every world-scope action loads the persisted payload, edits it and writes it back, so two
-    // concurrent adoptions would have two writers racing one setting and the last one home would
-    // carry only its own edit. `start start end end` is that failure; `start end start end` is
-    // the contract.
+    // Every world-scope action loads the persisted payload, edits it and writes it back.
     const { recorder } = await open();
     tick('coal');
     tick('orphan');
@@ -286,8 +231,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
     await drainMicrotasks();
     assert.deepEqual(recorder.events, ['start:coal'], 'the first write is open');
     assert.equal(applyButton().disabled, true, 'and the control is inert, so the guard is REACHED');
-    // …and the flag itself, not merely the disabled attribute: a click dispatched at the node
-    // while the run is open must add nothing to the queue.
+    // …and the flag itself, not merely the disabled attribute.
     applyButton().click();
     await drainMicrotasks();
     assert.deepEqual(recorder.events, ['start:coal'], 'a second Apply adds no second run');
@@ -320,7 +264,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
   });
 
   it('the Apply is inert with nothing ticked, and reads the reference’s `Create rules` when it is not', async () => {
-    // issue 1371 r12-list. `proto:6052` is the modal builder's `applyLabel`, and for this modal it
+    // issue 1371 r12-list. `proto:6052` is the modal builder's `applyLabel`.
     // is the bare `Create rules` (`proto:3754` draws the label alone, no glyph). The shipped
     // `+ Add {n} to {system}` restated two facts the dialog already draws — the count is the foot
     // note (`proto:6053`, `{n} selected`) and the system is the title — so the action names the ACT.
@@ -338,10 +282,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
   });
 
   it('search narrows the offer without dropping a row the GM already ticked', async () => {
-    // The search is this dialog's one licensed departure from `proto:6027-6039`, which draws
-    // none: the reference's fixture holds a dozen catalogue entries and a real world holds
-    // hundreds. A narrowing that also UNTICKED would be worse than no search — the GM narrowed
-    // the list, they did not change their mind.
+    // The search is this dialog's one licensed departure from `proto:6027-6039`.
     const { recorder } = await open();
     tick('coal');
     const search = document.querySelector('[data-component-add-from-catalogue-search]');
@@ -378,8 +319,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
       /matches that search/
     );
 
-    // The by-search state is this test's subject; the offer-empty pair moved into the three-state
-    // case below, which the r9 review split apart.
+    // The by-search state is this test's subject.
     assert.deepEqual(rowIds(), [], 'and no row survives the search that matched nothing');
   });
 
@@ -388,20 +328,10 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
     // that is false at the write: `worldScopeActions.addToSystem` stamps `inherit: {}`, and
     // `isSectionInherited` reads an ABSENT `inherit.category` as TRUE — so a newly adopted record
     // inherits the one section this whole change turns on, and the adoption seed copies the
-    // world identity besides. `ui-integration/spec.md`'s `### GM World Component Screens`
+    // world identity besides. `ui-world-scope/spec.md`'s `## GM World Component Screens`
     // requirement 1 forbids a surface asserting a reach that does not exist; a surface DENYING a
     // reach that does is the same defect run backwards, and its harm is the same shape — a GM
     // reads it and overrides the category locally instead of leaving it inheriting.
-    //
-    // It is a knowing divergence from `proto:6051`, which is verbatim the old sentence: the
-    // prototype's fixture has no inheritance model, and parity authority does not license
-    // shipping a false statement about a write.
-    //
-    // AND IT NAMES BOTH SECTIONS (issue 1371 r19-entry2). `1.32.0` made `essences` a second
-    // inheritable section, so `inherit: {}` now reads as inheriting BOTH — and the sentence that
-    // named only the category, and said the rules "start empty", fell to this requirement's own
-    // rule a second time in its denying direction. Both halves are asserted, because a sentence
-    // that names one section is the exact state this case was already written against.
     await open();
     const subtitle = panel().querySelector('.manager-modal-subtitle').textContent;
     assert.match(
@@ -420,8 +350,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
   });
 
   it('Cancel dismisses and writes NOTHING, which is the half apply cannot prove', async () => {
-    // QE F1 (r9). The dismiss path was covered only through `apply`, so `Cancel` losing its
-    // `onclick` shipped green: the control was SEEN and never ACTED on.
+    // QE F1 (r9). The dismiss path was covered only through `apply`.
     const recorder = refusingAdd([]);
     const { closed } = await open({ onAdd: recorder.onAdd });
     tick('coal');
@@ -438,10 +367,6 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
     // cleared the selection; `dismiss` cleared nothing. Tick two rows in Forge, Cancel, select
     // Alchemy, reopen: both rows were still ticked and the primary read an ENABLED
     // `Add 2 to Alchemy`, one click from writing rules into a system nobody chose them for.
-    //
-    // IT DRIVES `setProps`, NOT `remount`. Every other case here opens through `remount()`, which
-    // destroys the instance — the one thing the live root never does, and the reason a 14-test
-    // suite could not see this state at all.
     const { closed } = await open();
     tick('coal');
     tick('resin');
@@ -471,9 +396,6 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
     // because that one closes in between. This one never closes: the root can change
     // `selectedSystemId` under an open picker, and the offer and the selection must not be able
     // to disagree about which system is being added to.
-    // `resin` is on offer to BOTH systems, which is the whole point: a record the second system
-    // already holds would be pruned from the selection by the offer filter alone, and the case
-    // would pass with no re-seed at all.
     await open();
     tick('resin');
     assert.match(countText(), /1 selected/);
@@ -487,10 +409,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
   });
 
   it('and it puts the caret inside the dialog, rather than leaving it on the button behind', async () => {
-    // FOUNDRY 2 (r9), the half that makes the route-survival defect reachable at all: the picker
-    // never moved focus, so the GM's focus stayed on the header button BEHIND an
-    // `aria-modal="true"` dialog and a plain Tab walked the underlying page. The sibling mounted
-    // at the same level does move focus (`ImportFolderMappingModal.svelte`), in the same effect.
+    // FOUNDRY 2 (r9), the half that makes the route-survival defect reachable at all.
     await open();
     await drainMicrotasks();
     const focused = document.activeElement;
@@ -501,16 +420,12 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
   });
 
   it('reports a refusal and carries on, instead of abandoning the run at the first one', async () => {
-    // REVIEWER 5 (r9). `ui-integration/spec.md` `### GM World Component Screens` requirement 6
+    // REVIEWER 5 (r9). `ui-world-scope/spec.md` `## GM World Component Screens` requirement 6
     // states the rule for this exact composed write: the refusal is REPORTED rather than thrown,
     // the verb answers `false` and notifies, and a bulk apply continues through its remaining
     // pairs. `WorldComponentCataloguePage.applyBulk` does that; this dialog returned at the first
     // `false`, so a GM ticking eight rows and hitting one collision got one adoption, one
     // notification and six rows silently skipped.
-    //
-    // The dialog's own justification for stopping — "the next write would be issued against a
-    // payload the failed one may have left" — is not true of the shipped store:
-    // `joinComponentToSystem` removes the membership record it wrote before it answers `false`.
     const recorder = refusingAdd(['orphan']);
     const { closed } = await open({ onAdd: recorder.onAdd });
     tick('coal');
@@ -539,9 +454,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
   });
 
   it('and the adopted rows leave the offer while the refused one stays put', async () => {
-    // The other half of the same run, driven the way the live root drives it: the composed write
-    // republishes, the root hands down a new `entries`, and the adopted records are members now.
-    // What must survive that re-projection is the refused row's tick.
+    // The other half of the same run, driven the way the live root drives it.
     const recorder = refusingAdd(['orphan']);
     await open({ onAdd: recorder.onAdd });
     tick('coal');
@@ -568,10 +481,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
   });
 
   it('treats an unwired seam as a refusal rather than as a silent success', async () => {
-    // The root's wire is an optional chain, which answers `undefined` — not `false` — when a leg
-    // is absent. A guard written `=== false` would read that as success, close the picker and
-    // clear the selection with nothing written anywhere. `!== true` is the contract the composed
-    // verb actually publishes: it answers whether anything was WRITTEN.
+    // The root's wire is an optional chain, which answers `undefined` — not `false`.
     const calls = [];
     const { closed } = await open({
       onAdd: (entityId) => {
@@ -588,9 +498,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
   });
 
   it('says which of the THREE empty states it is in', async () => {
-    // FOUNDRY 5 (r9). `EmptyAll` used to answer for two different worlds: an exhausted offer and
-    // a catalogue with nothing in it. On a fresh world the sentence "{system} already has rules
-    // for every component in the catalogue" is false in both halves.
+    // FOUNDRY 5 (r9). `EmptyAll` used to answer for two different worlds.
     await open({ entries: [] });
     assert.match(
       document.querySelector('[data-component-add-from-catalogue-empty]').textContent,
@@ -621,19 +529,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
 
   // ── issue 1371 r17 ──────────────────────────────────────────────────────────────────────
   it('pins a run to the system it started against, and holds the re-seed until the run lands', async () => {
-    // FOUNDRY 1 (r13) and REVIEWER 3 (r13). `ManagerModal` draws no backdrop, so the rail's
-    // system `<select>` stays clickable under an open picker; its `mousedown` reaches the
-    // outside-click dismiss, which the dialog REFUSES while `applying` — and the root then
-    // changes `selectedSystemId` under a run that is still writing. The r11 re-seed effect,
-    // keyed on the system, answered that change by clearing the selection AND `applying`, so
-    // Cancel and every row came back to life mid-run, a second Apply could start a second run
-    // interleaved over the same world setting, and — because `onAdd` carried no system and the
-    // root's wire read the LIVE selection — every remaining write landed in the system the GM
-    // had just moved to, for rows they ticked against the old one.
-    //
-    // Driven exactly as the live root drives it: `setProps({ systemId })` BETWEEN a gated
-    // write's start and its release. `orphan` and `resin` are on offer to BOTH systems, so the
-    // count below is about the seed rather than about the offer filter pruning a held record.
+    // FOUNDRY 1 (r13) and REVIEWER 3 (r13). `ManagerModal` draws no backdrop.
     const recorder = recordingAdd({ gated: true, withSystem: true });
     const { closed } = await open({ recorder });
     tick('orphan');
@@ -677,8 +573,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
     );
     assert.deepEqual(closed, [true], 'and the run closes the picker exactly once');
 
-    // AND ONLY THEN does the deferred re-seed fire, for the system now chosen: the ticks the
-    // run consumed are gone, the Apply is inert and the title names the new subject.
+    // AND ONLY THEN does the deferred re-seed fire, for the system now chosen.
     assert.match(countText(), /0 selected/, 'the re-seed landed once the run fell');
     assert.deepEqual(pickedRowIds(), []);
     assert.equal(applyButton().disabled, true);

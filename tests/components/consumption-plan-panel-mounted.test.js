@@ -1,12 +1,4 @@
-/**
- * ConsumptionPlanPanel (issue 917) — "what this craft will spend, before it is
- * spent".
- *
- * The panel renders `buildConsumptionPlan`'s projection verbatim, so the claims
- * here are about presentation: one row per planned item (a dual-essence carrier
- * appears ONCE however many requirements it funds), and a "still to choose" line
- * joined by a locale-aware list formatter rather than an authored separator.
- */
+/** ConsumptionPlanPanel (issue 917). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -14,6 +6,7 @@ import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { buildConsumptionPlan } from '../../src/ui/svelte/util/requirementSlots.js';
 import { sharedEssenceCraftability } from '../helpers/crafting-fixtures.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -21,13 +14,14 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-consumption-plan-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/craftingArtResolution.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
+  'src/ui/svelte/util/foundryIconCatalogue.json',
   ],
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
@@ -37,7 +31,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Kicker.svelte',
     // The shared no-state panel (issue 1514). The panel's nothing-planned line is an
     // `EmptyState note`, so omitting it fails this suite by name.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
@@ -78,8 +72,7 @@ describe('ConsumptionPlanPanel mounted behavior', () => {
 
   it('states the empty case rather than an empty list', async () => {
     const target = await harness.mount({ plan: buildConsumptionPlan(null) });
-    // The line is an `EmptyState note` since issue 1514: the panel is released and the sentence
-    // renders as the variant's `hint`, so the locator is the primitive's own root.
+    // The line is an `EmptyState note` since issue 1514.
     assert.match(target.querySelector('.manager-empty.is-note').textContent, /ConsumptionPlan\.Empty/);
     assert.ok(!target.querySelector('[data-consumption-pending]'));
   });
@@ -99,8 +92,7 @@ describe('ConsumptionPlanPanel mounted behavior', () => {
     );
   });
 
-  // The essence block contributes at most ONE plan entry per item key: two rows for
-  // one shared unit is the shape that double-spends it at consumption time.
+  // The essence block contributes at most ONE plan entry per item key.
   it('emits a single row for a dual-essence carrier funding two requirements', async () => {
     const target = await harness.mount({ plan: buildConsumptionPlan(sharedEssenceCraftability()) });
     const rows = [...target.querySelectorAll('[data-consumption-row]')];
@@ -123,8 +115,7 @@ describe('ConsumptionPlanPanel mounted behavior', () => {
     assert.ok(!/Radiant/.test(pending), 'the met requirement is not still to choose');
   });
 
-  // A comma-and-"and" join is locale-specific, so the join is delegated. Proving the
-  // seam is called matters: an authored separator key is the failure this replaces.
+  // A comma-and-"and" join is locale-specific.
   it('joins the pending names through the injected list formatter', async () => {
     const seen = [];
     const target = await harness.mount({
@@ -139,11 +130,7 @@ describe('ConsumptionPlanPanel mounted behavior', () => {
     assert.match(target.querySelector('[data-consumption-pending]').textContent, /JOINED/);
   });
 
-  // The DEFAULT join is the load-bearing one: `formatList` is an injectable prop, so
-  // a panel that quietly joined with a bare `Intl.ListFormat` bound to the SERVER's
-  // locale rendered identically to one bound to the world's language, and every
-  // spy-injecting test above still passed. Stubbing Foundry's own list-formatter read
-  // is what distinguishes them.
+  // The DEFAULT join is the load-bearing one: `formatList` is an injectable prop.
   it('joins through the active language list formatter when no prop is injected', async () => {
     const asked = [];
     globalThis.game.i18n.getListFormatter = (options) => {
@@ -187,15 +174,7 @@ describe('ConsumptionPlanPanel mounted behavior', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Issue 1493 — a currency row states its cost in its NAME and reports nothing else.
-//
-// A render defect, so it is asserted against the mounted DOM: `planRowFor` can carry a
-// perfectly correct `isCurrency` while the markup keeps rendering both spans. Before this
-// branch a 100 gp cost rendered as "100 gp … ConsumptionPlan.Owned:{count:0} … x100" —
-// the evaluation's placeholder presented as a coin balance, and the price restated in
-// coin units beside a name that already spells it out.
-// ---------------------------------------------------------------------------
 
 function currencyPlanCraftability(overrides = {}) {
   return {

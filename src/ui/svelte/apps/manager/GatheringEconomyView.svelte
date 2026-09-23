@@ -1,21 +1,14 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  GatheringEconomyView is the GM authoring surface for a crafting system's
-  gathering limitation economy, shown in the gathering "Settings" tab as a single
-  card:
-   - two independent toggle pills (Stamina / Resource nodes); both can be on at
-     once (the anti-dogpiling combination), neither on means no limit;
-   - when stamina is enabled, the stamina regeneration config stacks above a
-     searchable, paginated, scrollable list of player characters (non-NPCs) with
-     editable stamina pools (image, name, current, max, save). The two used to
-     share a 2-column row; the pool table is a bulk-entry grid and needs the
-     card's full width now that its cells are steppers (see the row grid below);
-   - when resource nodes are enabled, a note points the GM to the per-task node
-     config. Both sub-blocks can render together.
+  The GM authoring surface for a crafting system's gathering limitation economy, shown in the
+  gathering Settings tab as a single card: two independent toggle pills (Stamina / Resource nodes),
+  both of which can be on at once and neither of which on means no limit; the stamina regeneration
+  config stacked above a searchable, paginated list of player characters with editable stamina
+  pools; and, for resource nodes, a note pointing at the per-task node config.
 
-  All persistence goes through the GM-only game.fabricate endpoints exposed on the
-  injected `services` bag (getGatheringEconomy/setGatheringEconomy,
-  getGatheringStaminaState/setGatheringStamina).
+  All persistence goes through the GM-only `game.fabricate` endpoints on the injected `services`
+  bag (`getGatheringEconomy` / `setGatheringEconomy`, `getGatheringStaminaState` /
+  `setGatheringStamina`).
 -->
 <script>
   import Field from '../../components/Field.svelte';
@@ -36,11 +29,10 @@
 
   const UNITS = ['minutes', 'hours', 'days', 'weeks'];
 
-  // THE TWO REGENERATION OPTION LISTS, in the shared `<Select>`'s shape (issue 1510). Both are
-  // the `<option>` sets they replaced: same order, same values, same rendered text. The unit
-  // labels stay `Economy.Unit.*`'s singular capitalised forms — "Minute", "Hour", "Day", "Week"
-  // — so the shipped row still reads "Every [3] Minute". `DurationUnitPlural` exists and is
-  // deliberately NOT adopted here: a copy change is not this conversion's to make.
+  // THE TWO REGENERATION OPTION LISTS, in the shared `<Select>`'s shape (issue 1510). Both are the
+  // `<option>` sets they replaced: same order, same values, same rendered text. The unit labels
+  // stay `Economy.Unit.*`'s singular capitalised forms, so the row still reads "Every [3] Minute";
+  // `DurationUnitPlural` exists and is deliberately NOT adopted here.
   const regenPolicyOptions = [
     {
       value: 'none',
@@ -112,10 +104,9 @@
     if (actorPageIndex > maxIndex) actorPageIndex = maxIndex;
   });
 
-  // Mirror of the service `normalizeGatheringEconomy()` read-compat mapping:
-  // "new flags present" means the `enabled` KEY exists (not merely truthy). Only
-  // when neither key exists do we fall back to a legacy `mode`, so a stale `mode`
-  // can never resurrect a disabled limitation.
+  // Mirror of the service `normalizeGatheringEconomy()` read-compat mapping: "new flags present"
+  // means the `enabled` KEY exists, not merely that it is truthy. Only when neither key exists do
+  // we fall back to a legacy `mode`, so a stale `mode` can never resurrect a disabled limitation.
   function normalizeEconomy(raw) {
     const base = defaultEconomy();
     if (!raw || typeof raw !== 'object') return base;
@@ -179,15 +170,15 @@
     void persistEconomy();
   }
 
-  // Max / starting stamina are expression templates (number or formula), rolled
-  // once per character at seed time.
+  // Max and starting stamina are expression templates (number or formula), rolled once per
+  // character at seed time.
   function updateStamina(patch) {
     economy.stamina = { ...economy.stamina, ...patch };
     void persistEconomy();
   }
 
-  // Bulk save: persist current + max override for every rolled character.
-  // Un-rolled characters have no pool to write — they need Roll first.
+  // Bulk save: persist current and max override for every rolled character. Un-rolled characters
+  // have no pool to write — they need Roll first.
   async function saveAll() {
     if (!services) return;
     for (const actor of staminaActors) {
@@ -218,8 +209,8 @@
     actorPageIndex = 0;
   }
 
-  // Two independent toggle pills. `enabled` reads its flag off the live economy;
-  // `toggle` flips it. Both can be active at once; neither active = no limit.
+  // Two independent toggle pills. `enabled` reads its flag off the live economy and `toggle` flips
+  // it; both can be active at once, and neither active means no limit.
   const TOGGLE_OPTIONS = [
     {
       id: 'stamina',
@@ -289,13 +280,11 @@
     {/if}
 
     {#if economy.stamina.enabled}
-      <!-- Regen config and the actor-pool table are SIBLING full-width children of the
-           card, not two columns of one row. The actor table is a bulk-entry grid whose
-           Current / Max cells are steppers: `minmax(140px, 1fr) 102px 102px 64px` plus
-           three 8px gaps needs 432px of row content, and the old 1.35fr sub-column of a
-           706px card afforded only 366px. Stacking them gives the table the card's full
-           width (~676px of row content) instead of buying it back by crushing the actor
-           name column below the point where a character is identifiable. -->
+      <!-- Regen config and the actor-pool table are SIBLING full-width children of the card, not
+           two columns of one row. The actor table is a bulk-entry grid whose Current and Max cells
+           are steppers and needs 432px of row content, where the old sub-column afforded 366px.
+           Stacking gives the table the card's full width instead of buying it back by crushing the
+           actor name column below the point where a character is identifiable. -->
       <div class="manager-economy-subsection" data-economy-regen-card>
         <h4 class="manager-economy-subtitle">
           <i class="fas fa-bolt" aria-hidden="true"></i><span
@@ -348,11 +337,9 @@
           class="manager-economy-regen-grid"
           class:is-single={economy.stamina.regen.policy !== 'overTime'}
         >
-          <!-- THE TWO WRAPPERS ARE GONE, not demoted (issue 1510). Each existed only to caption
-               its select — no per-site class, no hook, no sibling — and the shared `<Select>`'s
-               own labelled form renders exactly that column, so the captions ride `label=`. The
-               option labels are carried verbatim, including `Economy.Unit.*`'s singular
-               capitalised forms, so the row still reads "Every [3] Minute". -->
+          <!-- THE TWO WRAPPERS ARE GONE, not demoted (issue 1510). Each existed only to caption its
+               select, and the shared `<Select>`'s own labelled form renders exactly that column, so
+               the captions ride `label=`. The option labels are carried verbatim. -->
           <Select
             value={economy.stamina.regen.policy}
             options={regenPolicyOptions}
@@ -452,11 +439,10 @@
                   />
                   <span class="manager-economy-actor-name" title={actor.name}>{actor.name}</span>
                 </span>
-                <!-- Current is COSMETIC-ZERO: `saveAll` writes `Number(draftCurrent) || 0`,
-                     so absence is not a value this field can persist. No `allowUnset`, and
-                     an un-rolled row therefore reads `0` rather than blank. `bind:value` is
-                     gone because `Stepper` exposes no bindable prop; the explicit assignment
-                     below mutates the `$state` actor proxy, which is what `saveAll` reads. -->
+                <!-- Current is COSMETIC-ZERO: `saveAll` writes `Number(draftCurrent) || 0`, so
+                     absence is not a value this field can persist. No `allowUnset`, and an
+                     un-rolled row therefore reads `0` rather than blank. `Stepper` exposes no
+                     bindable prop, so the explicit assignment mutates the `$state` actor proxy. -->
                 <Stepper
                   value={actor.draftCurrent}
                   min={0}
@@ -470,9 +456,9 @@
                   inputProps={{ 'data-economy-actor-current': '' }}
                   onChange={(next) => (actor.draftCurrent = next)}
                 />
-                <!-- Max IS genuine absence: `saveAll` maps `'' | null` to a null override,
-                     meaning "no override, use the rolled max" — which is why the placeholder
-                     shows that rolled max per row. -->
+                <!-- Max IS genuine absence: `saveAll` maps `'' | null` to a null override, meaning
+                     "no override, use the rolled max" — which is why the placeholder shows that
+                     rolled max per row. -->
                 <Stepper
                   value={actor.draftMaxOverride}
                   min={0}
@@ -551,27 +537,22 @@
 
 <style>
   /* THE WIDTH THE ELEMENT-TYPED SHEET RULE NO LONGER SUPPLIES (issue 1510).
-     `.fabricate-field.manager-field select { width: 100% }` painted the two regeneration
-     controls until they became `<button>`s, and `.fabricate-select-trigger` declares no width at
-     all — a trigger's box belongs to the row it sits in. Without this rule the policy control
-     measured 121.53px and the unit control 61.09px on "Hour" against 71.53px on "Minute", inside
-     236px grid tracks; the two cells of a two-column grid rendered at different widths and the
-     unit cell re-sized as the GM changed it. Measured in Chromium against the fixture's declared
-     Arial face.
+     `.fabricate-field.manager-field select { width: 100% }` painted the two regeneration controls
+     until they became `<button>`s, and `.fabricate-select-trigger` declares no width at all.
+     Without this rule the two cells of a two-column grid rendered at different widths and the unit
+     cell re-sized as the GM changed it.
 
-     Both are the primitive's own labelled form, whose `<Field>` emits `.fabricate-select-field`,
-     so the rule names `.manager-field` and reaches both. The `:global()` is anchored at
-     `.manager-economy-regen-grid`, which THIS component writes, so it keeps a scoping hash
-     rather than reaching every trigger in the document — the shape the three interactables
-     roots already ship for this same form. */
+     Both are the primitive's own labelled form, whose `<Field>` emits `.fabricate-select-field`, so
+     the rule names `.manager-field` and reaches both. The `:global()` is anchored at
+     `.manager-economy-regen-grid`, which THIS component writes, so it keeps a scoping hash rather
+     than reaching every trigger in the document. */
   .manager-economy-regen-grid :global(.manager-field .fabricate-select-trigger) {
     width: 100%;
   }
 
-  /* Span the full settings grid (2 columns) so the economy reads as one card
-     above the Times-of-day / Weather / Regions panels. Stack the resolution-mode
-     card and the limitation card vertically with the same gap the cards use
-     internally, so the two sibling cards don't render flush against each other. */
+  /* Span the full settings grid so the economy reads as one card above the Times-of-day, Weather
+     and Regions panels, with the resolution-mode card and the limitation card stacked at the same
+     gap the cards use internally. */
   .manager-gathering-economy {
     grid-column: 1 / -1;
     display: flex;
@@ -638,11 +619,10 @@
     font-weight: 600;
   }
 
-  /* The fill is a NEUTRAL overlay, not an accent tint, and that is the shipped pixel rather
-     than an oversight: this rule asked for a soft accent with the overlay as its fallback,
-     the soft accent was never declared anywhere, and so the overlay is what every theme has
-     always painted. Issue 1399 wrote the surviving branch down. Tinting it is a visible
-     change and needs `--fab-accent-soft`, which does exist. */
+  /* The fill is a NEUTRAL overlay, not an accent tint, and that is the shipped pixel rather than an
+     oversight: this rule asked for a soft accent with the overlay as its fallback, the soft accent
+     was never declared anywhere, and the overlay is what every theme has always painted (issue
+     1399). Tinting it is a visible change and needs `--fab-accent-soft`, which does exist. */
   .manager-economy-mode-option.is-active {
     border-color: var(--fab-accent);
     background: var(--fab-overlay-light-035);
@@ -656,15 +636,12 @@
     min-width: 0;
   }
 
-  /* The Phase 4 reflow moved the actor table out of `.manager-economy-stamina-grid` so it
-     could have the card's full width, which left the regeneration card with the same full
-     width — and it does not want it. `.manager-economy-regen-grid.is-single` is the DEFAULT
-     state (Manual-only regen), so the first thing a GM sees after enabling Stamina was a
-     two-option `<select>` stretched across all 706px of the card, with "Amount per
-     interval" — a direct child of the subsection — doing the same. 480px keeps the two-up
-     grid at a comfortable ~236px per field, which is WIDER than the ~190px the old 1.35fr
-     sub-column afforded, while leaving the single-column state a sane control width. The
-     actor table below is unaffected: it is a sibling subsection, not a child of this one. */
+  /* The Phase 4 reflow moved the actor table out of `.manager-economy-stamina-grid` so it could
+     have the card's full width, which left the regeneration card with the same width — and it does
+     not want it. `.is-single` is the DEFAULT state (Manual-only regen), so the first thing a GM saw
+     after enabling Stamina was a two-option control stretched across the whole card. 480px keeps
+     the two-up grid at a comfortable width while leaving the single-column state a sane control
+     width; the actor table below is a sibling subsection and is unaffected. */
   .manager-economy-subsection[data-economy-regen-card] {
     max-width: 480px;
   }
@@ -702,10 +679,9 @@
     background: var(--fab-bg-1);
   }
 
-  /* Scrollable character list (paginated above 6). Right padding insets the rows
-     and the sticky header from the right edge so the (overlay) scrollbar never
-     sits over the row content. Both header and rows share the inset, so columns
-     stay aligned. */
+  /* Scrollable character list (paginated above 6). Right padding insets the rows and the sticky
+     header from the right edge so the overlay scrollbar never sits over the row content; both
+     share the inset, so columns stay aligned. */
   .manager-economy-actor-list {
     list-style: none;
     margin: 0;
@@ -713,9 +689,8 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    /* 380px, not 320px: a 30px bare cell became a 36px filled stepper, taking each
-       row from ~44px to ~50px, so six rows plus the sticky header no longer fit the
-       old height and the list would scroll before pagination ever kicked in. */
+    /* 380px, not 320px: a 30px bare cell became a 36px filled stepper, so six rows plus the sticky
+       header no longer fit the old height and the list would scroll before pagination kicked in. */
     max-height: 380px;
     overflow-y: auto;
   }
@@ -789,33 +764,23 @@
     min-width: 0;
   }
 
-  /* `.manager-economy-actor-cell` used to give the two bare number inputs their box.
-     It is deleted rather than left behind: Svelte does not apply a parent's scope
-     class to a child component's internals, so once the cells became `Stepper`s the
-     selector matched nothing and emitted `Unused CSS selector`, which fails the
-     zero-warning svelte-check gate. The chrome and the disabled dimming now come
-     from the primitive's own `.fab-stepper` / `.fab-stepper.is-disabled` rules. */
+  /* `.manager-economy-actor-cell` is deleted rather than left behind: Svelte does not apply a
+     parent's scope class to a child component's internals, so once the cells became `Stepper`s the
+     selector matched nothing and emitted `Unused CSS selector`, which fails the zero-warning gate.
+     The chrome and the disabled dimming come from the primitive's own rules. */
 
   /* The trailing action column (bulk Save in the header, roll/reset per row).
-     Slightly more compact than a default button, with slightly larger label.
 
-     `:global()` AND CHAINED (issue 1118). Both halves are load-bearing, and the first was
-     missed when this rule was chained: a SCOPED rule cannot reach this button at all any
-     more. Svelte scopes by appending `svelte-<hash>` to the selector and stamping that class
-     onto the elements THIS component writes; it does not stamp a child component's internals,
-     and the `class` prop handed to `<ManagerButton>` is forwarded verbatim. So
-     `….manager-economy-bulk-save.svelte-<hash>` matched nothing while the element carried
-     `manager-economy-bulk-save` — and nothing said so, because the compiler emits no
-     unused-selector warning for a class literal sitting on a component tag.
+     `:global()` AND CHAINED (issue 1118), both load-bearing. A SCOPED rule cannot reach this button
+     at all: Svelte stamps `svelte-<hash>` onto the elements THIS component writes and forwards a
+     `class` prop to a child verbatim, and the compiler emits no unused-selector warning for a class
+     literal sitting on a component tag.
      `tests/components/manager-button-scoped-class-reach.test.js` is the guard that now does.
 
-     Then chained, for the reason it always was: at (0,2,0) this rule did not beat
-     `.fabricate-button.manager-button.fab-manager-button` (0,3,0) at all — it lost `padding`
-     and `font-size` outright, and `is-primary`'s own padding at (0,4,0) too. Naming the
-     ancestor and the primitive's classes takes it to (0,5,0), which wins on specificity rather
-     than on where the sheet happens to be injected — see the header of
-     `tests/helpers/scoped-component-css.js` for why injection order is not a thing a rule may
-     depend on. */
+     Then chained, because at (0,2,0) this rule did not beat
+     `.fabricate-button.manager-button.fab-manager-button` (0,3,0) at all. Naming the ancestor and
+     the primitive's classes takes it to (0,5,0), which wins on specificity rather than on where the
+     sheet happens to be injected. */
   :global(
     .fabricate-manager .manager-button.fab-manager-button.is-primary.manager-economy-bulk-save
   ) {
@@ -828,30 +793,23 @@
   }
 
   /* `:global`, and CHAINED with `.manager-icon-button`, because the roll button is an
-     `<IconButton>` (issue 1422). This rule reached a `<button>` this component wrote until
-     that conversion; afterwards Svelte stamps its `svelte-<hash>` onto the elements this
-     component writes and forwards a `class` prop to the child verbatim, so the scoped
-     spelling emits `.manager-economy-actor-roll.svelte-<hash>` and matches NOTHING.
+     `<IconButton>` (issue 1422): the scoped spelling emits `.manager-economy-actor-roll.svelte-<hash>`
+     and matches NOTHING.
 
-     It is the SILENT half of that failure, not the loud one, and the pair below is the
-     worked example of both. `essences/EssenceIdentityTab.svelte` states the same kind of
-     rule as a DESCENDANT of an element it still writes, so the compiler prunes it and
-     raises `css_unused_selector`; this one is a bare single-compound selector whose class
-     literal is still visible on the component tag, so the compiler judges it used and
-     EMITS it with the hash attached. Zero warnings, `lint:svelte:warnings` green, and the
-     dice button silently loses its centring and its unrolled emphasis.
+     It is the SILENT half of that failure, not the loud one, and the pair below is the worked
+     example of both. A rule stated as a DESCENDANT of an element the component still writes is
+     pruned with a `css_unused_selector`; this one is a bare single-compound selector whose class
+     literal is still visible on the component tag, so the compiler judges it used and EMITS it with
+     the hash attached — zero warnings, and the dice button silently loses its centring.
 
-     The chain is what keeps the specificity identical rather than merely making the rule
-     reach: the dead scoped form was (0,2,0) and a bare `:global(.manager-economy-actor-roll)`
-     would be (0,1,0), which is a cascade change smuggled in as a repair. */
+     The chain keeps the specificity identical rather than merely making the rule reach: the dead
+     scoped form was (0,2,0) and a bare `:global()` would be (0,1,0). */
   :global(.manager-icon-button.manager-economy-actor-roll) {
     justify-self: center;
   }
 
-  /* Emphasise the dice button on characters that have not been rolled yet. The fill is a
-     NEUTRAL overlay for the reason `.manager-economy-mode-option.is-active` records above:
-     the soft accent this rule once deferred to was never declared, so the fallback is the
-     shipped pixel and issue 1399 wrote it down in place of the dead branch. */
+  /* Emphasise the dice button on characters that have not been rolled yet. The fill is a NEUTRAL
+     overlay for the reason `.manager-economy-mode-option.is-active` records above. */
   :global(.manager-icon-button.manager-economy-actor-roll.is-roll-needed) {
     color: var(--fab-accent);
     border-color: var(--fab-accent);

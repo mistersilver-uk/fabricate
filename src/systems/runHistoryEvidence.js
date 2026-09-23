@@ -1,4 +1,4 @@
-import { isSafeFlagKeySegment } from '../config/flags.js';
+import { isSafeFlagKeySegment, markForcedDeletion } from '../config/flags.js';
 
 import {
   hasStackQuantity,
@@ -16,6 +16,14 @@ export function receiptQuantity(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
+/** The roll a rolled amount awarded (issue 1645): `{formula, total}` and nothing more, because
+ *  this persists. `total` is the roll as it fell, so it may be negative where `quantity` is 0. */
+function rolledRecord(value) {
+  const formula = text(value?.formula);
+  const total = Number(value?.total);
+  return formula && Number.isFinite(total) ? { formula, total } : null;
+}
+
 export function itemReceipt(entry = {}) {
   const source = entry && typeof entry === 'object' ? entry : {};
   const receipt = Object.fromEntries(
@@ -29,7 +37,23 @@ export function itemReceipt(entry = {}) {
   for (const key of ['componentId', 'resultRowId', 'sourceItemUuid']) {
     if (Object.hasOwn(source, key)) receipt[key] = text(source[key]);
   }
+  // Omitted rather than nulled for a fixed amount: presence is the mode, as it is on the result.
+  const rolled = rolledRecord(source.rolled);
+  if (rolled) receipt.rolled = rolled;
   return receipt;
+}
+
+/** Map one `_consumeIngredients` entry to the persisted run-record shape, capturing the item's
+ * `name`/`img` at consume time (issue 738) — a consumed item is DELETED immediately. */
+export function mapConsumedIngredientRef({ item, quantity, receipt }) {
+  if (receipt) return itemReceipt(receipt);
+  return {
+    actorUuid: item.parent?.uuid || null,
+    itemUuid: item.uuid,
+    quantity,
+    name: item.name ?? null,
+    img: item.img ?? null,
+  };
 }
 
 export function historyEvidenceFields(source = {}) {
@@ -172,6 +196,13 @@ export function attachAwardReceipts(items, receipts) {
   return items;
 }
 
+/** The same carrier for a rolled amount's evidence (issue 1645): the chat poster reads it off the
+ *  awarded array rather than a call site relaying it. Holds a live `Roll` and is never persisted. */
+export function attachRolledAwards(items, awards) {
+  Object.defineProperty(items, 'rolledAwards', { value: Object.freeze(list(awards)) });
+  return items;
+}
+
 export function awardReceipts(items) {
   if (!Array.isArray(items)) return [];
   if (items.length > 0 && !Array.isArray(items.historyReceipts))
@@ -199,19 +230,10 @@ export async function writeAcknowledgedRunContainer(actor, namespace, key, curre
   if (sameHistoryValue(current, next)) return;
   const payload = structuredClone(next);
   for (const id of Object.keys(current?.active ?? {})) {
-    // A dotted or otherwise unsafe id cannot be addressed by a deletion key at all: the update
-    // re-splits it on every dot and the `-=` lands on another node. Mirrors the same guard on
-    // `GatheringStaminaService._deleteRetiredStaminaKeys`.
+    // A dotted id cannot be addressed by a deletion: the update re-splits it on every dot.
     if (!isSafeFlagKeySegment(id)) continue;
-    // `-=` is deprecated on V14: `_migrateDeletionKey` logs a compatibility warning for it
-    // (behaviour is unchanged; it becomes a throw only under
-    // `CONFIG.compatibility.mode = FAILURE`). It is KEPT DELIBERATELY. The replacement,
-    // `foundry.data.operators.ForcedDeletion`, does not exist on V13 and this module ships at
-    // `minimum: "13"`, and the only generation-neutral alternative — `Document#unsetFlag` —
-    // deletes one key per write, which would break the single acknowledged update this function
-    // exists to make. Migrate when the supported floor reaches V14; see the five sibling `-=`
-    // writers, which must move together.
-    if (!Object.hasOwn(payload.active, id)) payload.active[`-=${id}`] = null;
+    // Marked after the clone, which would destroy a V14 operator; see `markForcedDeletion`.
+    if (!Object.hasOwn(payload.active, id)) markForcedDeletion(payload.active, id);
   }
   requireDocumentAcknowledgment(actor, await actor.setFlag(namespace, key, payload));
 }

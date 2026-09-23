@@ -1,45 +1,4 @@
-/**
- * The forward-port's content gate, EXECUTED (issues #1418 and #1439).
- *
- * `tests/forward-port-workflow.test.js` asserts this script's source text, and
- * `tests/forward-port-provenance.test.js` drives the verifier it delegates to. Neither of them ever
- * runs the thing. That gap is not theoretical: the gate's original "did this merge introduce content
- * present in none of its parents" predicate was `git diff-tree --cc -r --no-commit-id --name-only`
- * being empty, which cannot express that question at all — and every assertion about it was a regex
- * over the script's own text or a hand-written filename string handed to the verifier, so the defect
- * was invisible to the entire suite and to review by reading.
- *
- * So this file runs the real script, with the real `git`, over real constructed merges, and stubs
- * only `gh` — the one collaborator that would otherwise reach the network.
- *
- * ── THE FIXTURE THAT MATTERS IS THE DIVERGENT CLEAN AUTO-MERGE ──────────────────────────────────
- * Two commits editing DIFFERENT REGIONS OF THE SAME FILE, merged with no conflict. It is the only
- * shape that tells a working predicate from a broken one:
- *
- *   * `git diff-tree --cc -r --no-commit-id --name-only` lists that file, because the merged blob
- *     differs from both parents' blobs — and lists exactly the same file for a genuine EVIL merge of
- *     the same two parents. The two are indistinguishable.
- *   * re-merging the two parents and comparing trees separates them exactly.
- *
- * It is also the ORDINARY shape of a forward-port that has anything to do — both lines touched a
- * common file, which is why the forward-port exists. Neither the shipped fixtures (a linear,
- * fast-forwardable topology) nor either review lane's harness contained it, and on the topologies
- * they did contain, the broken predicate answers correctly. The first test below pins that
- * indistinguishability as a fact rather than a claim.
- *
- * ── THE RESOLUTION CHECKS (issue #1439) ─────────────────────────────────────────────────────────
- * A conflicted forward-port may now be completed from a resolution the operator supplies, and every
- * judgment about that resolution is made by this script. Assertions 10 onwards drive those checks
- * over real constructed conflicts, and EVERY one of them ships with a paired negative fixture in
- * which the same check fails: a check demonstrated only in the passing direction establishes that it
- * ran, not that it decides anything.
- *
- * ── THE HARNESS IS SHARED ───────────────────────────────────────────────────────────────────────
- * The throwaway repository, the `gh` stub and the conflicted fixtures live in
- * `tests/helpers/forward-port-gate-harness.js`, because `tests/forward-port-complete-merge.test.js`
- * needs all three. A second copy would be a near-identical block in `tests/**`, which SonarCloud's
- * new-code duplication gate measures per-diff.
- */
+/** The forward-port's content gate, EXECUTED (issues #1418 and #1439). */
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -146,8 +105,7 @@ test('a divergent clean auto-merge passes the own-merge guard and is decided on 
   assert.match(unaccounted.output, new RegExp(OVERRIDE_HINT), 'a refusal names the remedy');
 
   // The counter-example the whole issue is built on: pull request #1414 was merged and reviewed —
-  // against `main`. Reviewing a change against a different line is not reviewing it for landing on
-  // this one, and widening the shell's ACCEPTED_BASES default is what would silently accept it.
+  // against `main`.
   harness.stub('gh', answering(associationPayload({ baseRef: 'main' })));
   const wrongLine = harness.runGate();
   assert.equal(wrongLine.status, 1, wrongLine.output);
@@ -166,8 +124,7 @@ test('the fast path is taken when the merge carries no content, and skips the AP
   buildDivergentForwardPort(harness);
 
   // `origin/main` already at the merge is the routine forward-port: nothing new reaches main, so no
-  // unreviewed content can either. The stub FAILS if it is reached, so "no API call was needed" is
-  // proved by the run passing rather than merely by the absence of a log line.
+  // unreviewed content can either.
   harness.git('update-ref', 'refs/remotes/origin/main', harness.git('rev-parse', 'HEAD'));
   harness.stub('gh', failingWith('{"message":"the fast path must not read associations"}'));
 
@@ -217,9 +174,7 @@ test('a merge whose parents CONFLICT is refused when NO resolution was supplied'
 
   harness.stub('gh', answering(associationPayload()));
 
-  // This is the seam the pre-resolved-merge recovery path attaches to (issue #1439). Rule 1 must
-  // not wave a resolution through: with no resolution SUPPLIED there is nothing to check, so the
-  // refusal is today's, verbatim, and it stays non-overridable.
+  // This is the seam the pre-resolved-merge recovery path attaches to (issue #1439).
   for (const environment of [{}, { ALLOW_CONTENT: 'true' }]) {
     const { status, output } = harness.runGate(environment);
     assert.equal(status, 1, output);
@@ -235,11 +190,7 @@ test('a run whose merge created NOTHING is not treated as a merge that invented 
   const harness = createGateHarness(t);
   const { git, write } = harness;
 
-  // The retry path re-fetches `main` and re-merges. If the freshly fetched `origin/main` already
-  // contains `origin/release`, `git merge --no-ff` reports "Already up to date." and creates NO
-  // commit — so HEAD is single-parent. Reading a single-parent HEAD's "combined diff" silently
-  // degrades to an ordinary diff, which is never empty for a commit that changed anything, and the
-  // guard would then fail the job non-overridably on a run that had nothing to do at all.
+  // The retry path re-fetches `main` and re-merges.
   write('f.txt', fileWith({}));
   git('add', '-A');
   git('commit', '-qm', 'chore: the shared base');
@@ -264,9 +215,7 @@ test('an UNVERIFIABLE read is not overridable, and is never offered the override
   buildDivergentForwardPort(harness);
 
   // The single most likely first-run failure of this whole feature is the release-bot App
-  // installation not holding `Pull requests: Read`. That is a 403, and a 403 establishes nothing:
-  // treating it like a refusal would let an operator "vouch for" content nothing has described to
-  // them, which is an absence of evidence accepted as an absence of unreviewed content.
+  // installation not holding `Pull requests: Read`.
   harness.stub('gh', failingWith('{"message":"Resource not accessible by integration"}'));
 
   for (const environment of [{}, { ALLOW_CONTENT: 'true' }]) {
@@ -324,9 +273,7 @@ test('a git with no `merge-tree --write-tree` refuses, and never falls back to t
   assert.ok(REAL_GIT, 'the real git must be resolvable, or the passthrough below would recurse');
 
   // The version assertion is the FIRST thing the gate does, so this stub only has to answer
-  // `--version`. The passthrough is there so that a gate which SKIPPED the assertion would carry on
-  // and report a normal verdict — a visible pass where a refusal was required — rather than
-  // crashing in a way that could be mistaken for the refusal itself.
+  // `--version`.
   const claimingVersion = (version) =>
     `if [ "$1" = "--version" ]; then echo "${version}"; exit 0; fi\nexec "${REAL_GIT}" "$@"`;
 
@@ -347,14 +294,7 @@ test('a git with no `merge-tree --write-tree` refuses, and never falls back to t
 
 // ── THE RESOLUTION CHECKS (issue #1439) ─────────────────────────────────────────────────────────
 
-/**
- * Rebuild the merge `scripts/forward-port-complete-merge.sh` builds, and move `main` onto it.
- *
- * The gate's own checks are what these tests are about, so the merge is constructed here rather than
- * by running the completion script — with every part overridable, which is how A3 and A4 are shown
- * to be able to fail at all. Assertion 21 runs the two scripts chained, which is what makes A3 and
- * A4 mean anything about production.
- */
+/** Rebuild the merge `scripts/forward-port-complete-merge.sh` builds, and move `main` onto it. */
 function completeFrom(harness, resolution, parents) {
   return completeMergeAs(harness, {
     tree: harness.git('rev-parse', `${resolution}^{tree}`),
@@ -415,8 +355,7 @@ test('a REDUNDANT resolution takes the content fast path and makes no API call',
   const { mainTip, releaseTip, mainVersion } = buildRedundantConflictedForwardPort(harness);
 
   // The squash-collision: `main` already carries the fix, so the completed forward-port must leave
-  // main's content exactly as it is. The stub FAILS if it is reached, so "no API call was needed" is
-  // proved by the run passing rather than by the absence of a log line.
+  // main's content exactly as it is.
   const resolution = resolveConflictInto(harness, () => write('f.txt', mainVersion));
   git('reset', '--hard', '-q', mainTip);
   completeFrom(harness, resolution, [mainTip, releaseTip]);
@@ -455,8 +394,6 @@ test('A8: a resolution whose DECLARED OUTCOME does not hold is refused, naming t
   harness.stub('gh', answering(associationPayload()));
 
   // The other direction from assertion 11's: this tree is NOT main's, and the operator said it was.
-  // It is the only check in the set that catches the v1.9.1 duplication shape, which is present in a
-  // parent (so A7 passes it) and inside the permitted paths (so A5 passes it).
   for (const environment of [{}, { ALLOW_CONTENT: 'true' }]) {
     const { status, output } = harness.runGate({
       RESOLUTION_REF: resolution,
@@ -480,8 +417,6 @@ test('A0: a resolution_effect that is not one of the two tokens refuses, empty i
   // Nothing else in the set establishes that this value is one of the two things it may be, and A8
   // is a two-arm `case` on it: a typo matching neither arm would skip A8 entirely and leave the
   // resolution unconstrained on the one check that reads the operator's declaration.
-  //
-  // The empty row is also `resolution_ref` supplied WITHOUT `resolution_effect`, which must refuse.
   for (const effect of ['', 'no-content', 'NO-CONTENT-ONTO-MAIN', 'no-content-onto-main-ish']) {
     const { status, output } = harness.runGate({
       RESOLUTION_REF: resolution,
@@ -551,9 +486,7 @@ test('A3: a HEAD whose parents are not origin/main then origin/release is refuse
   git('reset', '--hard', '-q', mainTip);
 
   // The resolution itself stays VALID — that is what makes this A3's own fixture rather than a
-  // second way of failing A2. What is wrong is the merge the run would push: its parents are the
-  // right two commits in the wrong order, so the ancestry it records is not the one that was
-  // checked, and `git merge-tree` still conflicts on them so the branch is genuinely reached.
+  // second way of failing A2.
   completeFrom(harness, resolution, [releaseTip, mainTip]);
   harness.stub('gh', answering(associationPayload()));
 
@@ -602,10 +535,7 @@ test('A5: a resolution may correct a COMPOSED path, and may not touch one copied
   const harness = createGateHarness(t);
   const { write } = harness;
 
-  // THE POSITIVE HALF, and the reason the permitted set is not the conflicted set. `shared.txt`
-  // never conflicted: git auto-merged it by composing both sides, which is precisely the v1.9.1
-  // shape in which the automatic merge silently duplicated a whole test. A resolution MUST be able
-  // to correct that, so this run must pass.
+  // THE POSITIVE HALF, and the reason the permitted set is not the conflicted set.
   const composed = conflictedAndCompleted(harness, () => {
     write('f.txt', fileWith({ 5: 'release took the same line' }));
     write('shared.txt', fileWith({ 1: 'shared, edited near the top on main' }));
@@ -618,15 +548,7 @@ test('A5: a resolution may correct a COMPOSED path, and may not touch one copied
   assert.equal(corrected.status, 0, corrected.output);
 
   // THE NEGATIVE HALF. `mainonly.txt` and `releaseonly.txt` were changed on ONE side only, so the
-  // automatic merge copied a side's blob verbatim and settled them without a human. A subset check
-  // whose permitted set is accidentally everything passes silently against a fixture in which every
-  // path was conflicted — these two paths are what make it falsifiable.
-  //
-  // Each is reverted to the SHARED BASE, which is the other side's version of it. That is the
-  // smuggling shape this check exists for — a resolution quietly discarding one line's work — and it
-  // is deliberately invisible to every other check in the set: every line of the reverted file is
-  // present in a parent, so A7 sees nothing, and the tree still differs from main's, so A8 sees
-  // nothing either. Only the permitted-path check can refuse it.
+  // automatic merge copied a side's blob verbatim and settled them without a human.
   for (const reached of ['mainonly.txt', 'releaseonly.txt']) {
     const overreaching = createGateHarness(t);
     const { resolution } = conflictedAndCompleted(overreaching, () => {
@@ -653,11 +575,7 @@ test('A5: a modify/delete conflict can be resolved by ACCEPTING the deletion', (
   const harness = createGateHarness(t);
   const { git, write, remove } = harness;
 
-  // The second half of the permitted set, and the one no composed-blob rule can reach. On a
-  // modify/delete conflict git leaves the MODIFYING side's blob in the tree unchanged and reports
-  // the path as conflicted — so the path is equal to a parent's blob, is not composed, and a
-  // permitted set built from composition alone would refuse every resolution that accepts the
-  // deletion. Measured on git 2.5x against exactly this fixture.
+  // The second half of the permitted set, and the one no composed-blob rule can reach.
   write('g.txt', fileWith({}));
   write('h.txt', fileWith({}));
   git('add', '-A');
@@ -714,9 +632,6 @@ test('A6: a conflict marker left behind is refused, and a DELETED path is not an
   assert.match(output, /f\.txt still carries/);
 
   // ...and the counter-case that keeps the check usable: a resolution may DELETE a conflicted path.
-  // There is then no resolved blob to read, and under `set -euo pipefail` a naive read of one dies
-  // mid-check with no message at all — fail-closed, but on a resolution this design intends to
-  // complete, and with an unintelligible log.
   const deleting = createGateHarness(t);
   const deleted = conflictedAndCompleted(deleting, () => {
     deleting.remove('f.txt');
@@ -846,10 +761,7 @@ test('A6 checks a NON-ASCII conflicted path rather than silently skipping it', (
   const { git, write } = harness;
 
   // `core.quotePath` defaults to true, so git NAMES this path as `"caf\303\251.txt"` — a form that
-  // matches nothing when handed back as a pathspec, because no real path contains a quote. With the
-  // default left in place the blob lookup returns empty, A6 and A7 skip the path entirely, and a
-  // resolution lands conflict markers on main inside it. The gate sets core.quotePath=false for
-  // exactly this reason; deleting that line turns this test red.
+  // matches nothing when handed back as a pathspec, because no real path contains a quote.
   const name = 'caf\u00e9.txt';
   write(name, fileWith({}));
   git('add', '-A');
@@ -896,16 +808,10 @@ test('A5 decides composed paths on BLOBS, so a mode-only change does not open a 
   const { git, write } = harness;
   // fileMode OFF, deliberately. Windows has no execute bit, so with it ON git reads a phantom mode
   // change on every checkout and the fixture's merge aborts with "local changes would be
-  // overwritten" — a non-conflict failure, not the conflict this test needs. OFF, git trusts the
-  // index, so `update-index --chmod` records 100755 and the merge conflicts only where intended.
+  // overwritten" — a non-conflict failure, not the conflict this test needs.
   git('config', 'core.fileMode', 'false');
 
-  // `git diff --name-only` compares whole tree ENTRIES — mode as well as oid. A path whose MODE
-  // changed on one line and whose CONTENT changed on the other therefore differs from both parents'
-  // entries, while git merged its content cleanly and composed nothing. Decided on entries, such a
-  // path enters the permitted set and a resolution may revert it — silently dropping what the
-  // release line was bringing back, on a path no human ever had to look at. Decided on blobs, as the
-  // rule is stated, it stays out.
+  // `git diff --name-only` compares whole tree ENTRIES — mode as well as oid.
   write('f.txt', fileWith({}));
   write('run.sh', '#!/bin/sh\necho hi\n');
   git('add', '-A');

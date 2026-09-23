@@ -1,21 +1,4 @@
-/**
- * KNOWN_ORPHANS — ratchet baseline for tests/lang-keys-no-orphans.test.js.
- *
- * These are `FABRICATE.*` string leaves in `lang/en.json` that NO static
- * reference in `src/**` covers (see the reverse-orphan scan in the test). They
- * are DEBT, not dynamic keys: dead vocabulary left behind as features were
- * re-localized under other namespaces. This list exists only so the guard is
- * green today while RATCHETING:
- *
- *   - No NEW orphan may be added — a freshly-unreferenced key fails the test
- *     until it is wired up, deleted, or (if genuinely dynamic) moved to
- *     DYNAMIC_KEY_ALLOWLIST in the test file.
- *   - Removing a key from `lang/en.json` (or wiring it up) makes its entry here
- *     STALE, which the test also fails on — so this baseline can only shrink.
- *
- * The bulk prune of this backlog is tracked as a follow-up to issue #680; do not
- * grow this array.
- */
+/** KNOWN_ORPHANS — ratchet baseline for tests/lang-keys-no-orphans.test.js (issue 680). */
 export const KNOWN_ORPHANS = [
   'FABRICATE.Admin.Actions',
   'FABRICATE.Admin.Environments.Actions',

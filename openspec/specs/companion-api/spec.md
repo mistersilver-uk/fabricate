@@ -8,7 +8,7 @@ A member that **asks** a question, a member that **places value**, and — since
 Every rule below that separates a question from an act binds harder on the second kind than on anything published before it, and hardest of all on the third: an award a GM did not want is value to find and reverse, while a take a GM did not want is a player's inventory gone.
 
 This specification governs a companion **consuming Fabricate's behaviour**.
-Outbound **UI contribution**, by which a companion contributes navigation and content into Fabricate's own windows, lives in `ui-integration/spec.md`.
+Outbound **UI contribution**, by which a companion contributes navigation and content into Fabricate's own windows, lives in `ui-extension-points/spec.md`.
 **Inbound** integrations, by which Fabricate consumes another module's data or services, live in `integrations/spec.md`.
 
 ## Scope
@@ -21,14 +21,18 @@ This spec governs:
 - How the contract may change without breaking a companion that depends on it.
 
 Behaviour stays with its domain.
-The knowledge grant's own gates are specified in `recipe-visibility/spec.md`, the learned-entry shape and the currency rules in `data-models/spec.md`, and the rendering of a granted row in `ui-integration/spec.md`.
+The knowledge grant's own gates are specified in `recipe-visibility/spec.md`, the learned-entry shape and the currency rules in `data-models/spec.md`, and the rendering of a granted row in `ui-system-studio/spec.md`.
 The award members split the same way.
 The currency credit's ladder rules, its spender write-truth rules and its consequences for a GM's `increment` macro are specified in `data-models/spec.md`; the reciprocal statement that the knowledge grant's idempotency has no counterpart on these two members is in `recipe-visibility/spec.md`; and the **gathering** award's own stacking rules, which are not these, stay in `gathering-and-harvesting/spec.md`.
 The pooled members split the same way: the pooled base-value read, the base-unit denomination of a pooled debit and the `balance` macro key are specified in `data-models/spec.md`, and what this spec governs is the contract those rules are published through.
 
 ## The Published Contract
 
-Fabricate publishes exactly one named, versioned contract for outbound behavioural consumption: `game.fabricate.api.COMPANION`, a frozen `{ schemaVersion, members, outcomes, callSites }` descriptor.
+Fabricate publishes exactly one named, versioned contract for outbound behavioural consumption: `game.fabricate.api.companion`, a frozen `{ schemaVersion, members, outcomes, callSites }` descriptor.
+This publication rename leaves schema version 1, those four fields and their order, every member row and order, the outcome and call-site vocabularies, signatures, result shapes, and readiness semantics unchanged.
+`game.fabricate.api.COMPANION` remains an enumerable deprecated accessor to that identical descriptor until an explicitly released breaking major version.
+Reading the alias emits at most one warning per client page session, including across the `init`/`ready` rebind, and names both the lowercase replacement and the migration documentation.
+Reading the lowercase publication emits no alias warning, and warning machinery never changes or throws instead of the descriptor result.
 
 `schemaVersion` is readable from **Fabricate's own `init` hook onward**, and for the whole of `setup` and `ready`, before any collaborator exists.
 It is **not** guaranteed readable from another package's `init`.
@@ -56,6 +60,13 @@ The carve-out is stated in full because a companion that guards only against a n
 The **awarding** half of that pair is now published in its own right.
 `awardComponents` is a `stable` member that consumes the carve-out internally, so a companion placing a component on a sheet has a supported route that never requires it to call the carve-out at all, and never has to defend against either of its throw conditions.
 The carve-out remains published because a companion still reads what an actor already holds through it, and because the award deliberately publishes no item handle of its own.
+
+## The Ungated Handle Accessors
+
+A `handle` accessor whose consumer resolves it LAZILY and guards the result with optional chaining MUST NOT be `_requireReady()`-gated, and MUST answer its constructor-`null` field instead, because optional chaining absorbs an ABSENT accessor but NOT a THROW.
+The accessors bound by this rule are `getCraftingEngine`, `getCurrencyConfigStore`, `getCharacterLibrariesStore`, `getComponentScopeStore`, `getEssenceScopeStore`, `getToolScopeStore`, `getVocabularyScopeStore`, `getActorInventoryCoinSpender` and `getActorPropertyCoinSpender`.
+A readiness throw from any of them would crash the path its consumer expected to degrade: the craftability read that should have yielded an empty coin ladder, `CraftingSystemManager._normalizeSystem` — where a throw is the issue-970 shape in which the manager never initializes at all — or a world screen that should have reported an unavailable corpus.
+`getGatheringRealmStore` is the deliberate counter-example and stays gated, no consumer resolving it during initialization.
 
 ## Behavioural Member Rules
 
@@ -105,7 +116,7 @@ A failed grant must not report itself in the words of a failed reset.
 
 ## The Outcome Vocabulary
 
-`COMPANION.outcomes` is **open by declaration and closed by enumeration**.
+`companion.outcomes` is **open by declaration and closed by enumeration**.
 It is complete for the current `schemaVersion`.
 A member may emit a **new** outcome without a version bump; renaming or removing one is a bump.
 
@@ -207,7 +218,7 @@ Nothing in the request or the environment distinguishes a GM's deliberate click 
 `broadcast` declares a handler that fires on every connected client and is additionally gated on the elected executor.
 `invalidCallSite` covers **both** a missing and an unrecognised declaration, because "not declared" is wrong for the second.
 
-The accepted pair is **published on the descriptor** as `COMPANION.callSites`, on the same rule that publishes `COMPANION.outcomes`: a caller reads a symbol rather than writing a bare string.
+The accepted pair is **published on the descriptor** as `companion.callSites`, on the same rule that publishes `companion.outcomes`: a caller reads a symbol rather than writing a bare string.
 The rule binds harder here than there, because `callSite` is the contract's one required, no-default, refused-on-mismatch input, so `invalidCallSite` is the entirety of a typo's feedback and a documented worked example that instructs an author to hand-write the literal is the surface that produces the typo.
 
 The refusal **is** the enforcement.
@@ -527,9 +538,26 @@ The names were chosen against near-misses, and the near-miss is recorded with ea
 They also reuse the already-declared `componentNotFound`, `unitNotFound`, `systemNotFound`, `invalidQuantity`, `creditNotConfigured`, `invalidCallSite` and `notElected`, and the shared `gmOnly`, `noActor` and `notReady`.
 Each member answers with its OWN message key table, because a failed take must not report itself in the words of a failed read — and that rule bites hardest between exactly this pair, which is designed to be called one after the other.
 
+## Companion Operation Submission Foundation
+
+Fabricate internally accepts one complete operation submission shaped as `{ operationId, plan }`, where `operationId` is the unmodified 16-character alphanumeric Foundry id persisted once for the consumer's logical occurrence.
+The version-1 plan contains one consumer-owned source identity, ordered decision declarations and ordered effect declarations whose dependencies name declared decisions.
+Source, decision, effect and kind identifiers are nonblank; decision ids and effect ids are unique in their respective lists.
+
+Plan payloads contain strict JSON values only.
+Validation rejects unsupported values, accessors, sparse arrays, cycles, class instances, unknown structural fields and unsafe object keys without invoking caller code or mutating caller data.
+Canonicalization sorts object keys recursively while preserving values and array order, so key insertion order does not change identity while reordered decisions or effects do.
+
+The first valid plan durably accepted for an operation id is authoritative.
+An equal retry observes the existing record unchanged, while a different plan for that id conflicts without overwriting it or minting a replacement id.
+The operation id is reused across users, clients, delivery attempts, reloads and restarts; transport request identity is separate.
+
+This submission and its persistence adapter remain internal in this increment.
+They publish no operation method on `game.fabricate.api.companion`, execute no effect and do not alter the compatibility contract below.
+
 ## The Compatibility Promise
 
-While `game.fabricate.api.COMPANION.schemaVersion` is unchanged, every member of the declared set keeps its name, keeps accepting the arguments documented for it, and keeps answering in the documented shape.
+While `game.fabricate.api.companion.schemaVersion` is unchanged, every member of the declared set keeps its name, keeps accepting the arguments documented for it, and keeps answering in the documented shape.
 A member may gain an optional argument or an additional result field; it may not lose one, change the meaning of one, or begin throwing where it returned a result.
 A new member may be added without a version change, because adding one cannot break a companion that does not call it.
 **Rows in the published member set are appended and never interleaved**, so a member's declared position is stable.

@@ -1,42 +1,12 @@
 /**
- * 1.14.0 — Retire the per-recipe alchemy `resultSelection.provider` in favour of the
- * SYSTEM-level `alchemy.checkMode` (`none` | `simple` | `tiered`), best-effort per
- * system (pure, deep-clone, idempotent).
- *
- * Alchemy was the only resolution mode that still routed via a per-recipe
- * `resultSelection.provider` (`ingredientSet` | `check`). This migration derives a
- * single system-level check mode from the system's alchemy recipes and strips the
- * retired per-recipe selection:
- *
- *  1. Per ALCHEMY system (`resolutionMode === 'alchemy'`, incl. the legacy
- *     `'cauldron'` alias), reduce over its recipes:
- *       - `hasCheckProvider` = any recipe with `resultSelection.provider === 'check'`;
- *       - `hasTieredShape`   = any such `check` recipe carrying MORE THAN ONE result
- *         group with a non-empty `checkOutcomeIds` (the tiered routing shape).
- *     Seed `alchemy.checkMode = hasCheckProvider ? (hasTieredShape ? 'tiered' :
- *     'simple') : 'none'`, but only when the system does not already carry a valid
- *     `checkMode` (idempotency — a former `ingredientSet`-provider recipe with a
- *     usable simple check that maps to `none` intentionally stops running that check;
- *     `checkMode` is now the sole authority).
- *  2. Strip `resultSelection` from EVERY alchemy recipe (recipe-level; alchemy
- *     recipes are single-step).
- *  3. Collapse any multi-INGREDIENT-SET alchemy recipe to its first set (alchemy now
- *     requires exactly one set) with a single `console.warn`. This is DISTINCT from a
- *     multi-STEP alchemy recipe, which stays unsupported and is handled by the
- *     mode-change delete path, not collapsed here. Stale `checkOutcomeIds` on a
- *     Tiered→Simple/None reduction are left intact (inert, preserved for round-trip).
- *
- * Idempotent: once no alchemy `resultSelection` remains and each alchemy system has a
- * `checkMode`, a re-run finds nothing to transform (no mutation, no duplicate warn,
- * stable `checkMode`).
- *
- * Pure: returns `{ recipes, systems }` and performs no I/O beyond the one warn.
- *
- * @param {object} data Runner payload.
- * @param {Array<object>} [data.recipes] Raw recipes setting.
- * @param {Array<object>} [data.systems] Raw crafting systems setting.
- * @returns {{ recipes: Array<object>, systems: Array<object> }}
+ * `1.14.0` — retire the per-recipe alchemy `resultSelection.provider` for the SYSTEM-level
+ * `alchemy.checkMode` (spec § Alchemy Check-Mode Migration owns the derivation). Pure, deep-clone,
+ * idempotent. A former `ingredientSet` recipe with a usable simple check maps to `none` and
+ * intentionally STOPS that check, `checkMode` now being the sole authority. A multi-INGREDIENT-SET
+ * recipe COLLAPSES to its first set — distinct from a multi-STEP one, which stays unsupported.
  */
+
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
 const VALID_CHECK_MODES = new Set(['none', 'simple', 'tiered']);
 
@@ -53,15 +23,15 @@ export function migrateAlchemyCheckMode(data = {}) {
 
   let collapsedMultiSetCount = 0;
 
-  for (const system of systems) {
-    if (!_isAlchemySystem(system)) continue;
+  forEachSystem(systems, (system) => {
+    if (!_isAlchemySystem(system)) return;
     const systemRecipes = recipes.filter(
-      (recipe) => _isPlainObject(recipe) && recipe.craftingSystemId === system.id
+      (recipe) => isPlainObject(recipe) && recipe.craftingSystemId === system.id
     );
 
     // Seed the system-level checkMode from the recipe provider reduction, unless a
     // valid checkMode is already present (idempotency).
-    const alchemy = _isPlainObject(system.alchemy) ? system.alchemy : {};
+    const alchemy = isPlainObject(system.alchemy) ? system.alchemy : {};
     if (!VALID_CHECK_MODES.has(alchemy.checkMode)) {
       const hasCheckProvider = systemRecipes.some(
         (recipe) => recipe.resultSelection?.provider === 'check'
@@ -86,7 +56,7 @@ export function migrateAlchemyCheckMode(data = {}) {
         collapsedMultiSetCount += 1;
       }
     }
-  }
+  });
 
   if (collapsedMultiSetCount > 0) {
     console.warn(
@@ -99,10 +69,7 @@ export function migrateAlchemyCheckMode(data = {}) {
 
 /** Whether a system is in alchemy mode (accepting the legacy `cauldron` alias). */
 function _isAlchemySystem(system) {
-  return (
-    _isPlainObject(system) &&
-    (system.resolutionMode === 'alchemy' || system.resolutionMode === 'cauldron')
-  );
+  return system.resolutionMode === 'alchemy' || system.resolutionMode === 'cauldron';
 }
 
 /** Count of a recipe's result groups carrying a non-empty `checkOutcomeIds`. */
@@ -111,10 +78,6 @@ function _tieredGroupCount(recipe) {
   return groups.filter(
     (group) => Array.isArray(group?.checkOutcomeIds) && group.checkOutcomeIds.length > 0
   ).length;
-}
-
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function _clone(value) {

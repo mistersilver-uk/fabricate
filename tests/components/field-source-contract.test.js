@@ -1,52 +1,4 @@
-/**
- * The END STATE of the `.manager-field` conversion, pinned in source (issue 1428).
- *
- * ── WHAT IT PINS AND WHY EACH CLAUSE EXISTS ─────────────────────────────────────────────
- * `manager-field` was a CSS convention: write the class, then remember which HOST element the
- * field is supposed to be. Measured on the tree this change started from, 88 sites across 24
- * components used three hosts — 56 `<label>`, 31 `<div>`, 1 `<fieldset>` — and that split is
- * an ACCESSIBILITY contract rather than a styling variant. A `<label>` field wraps its control
- * and gives it its accessible name; a `<div>` field does not, and 31 sites depend on not doing
- * it. So the primitive takes the host as a required-shaped `as` prop from a closed set, and
- * this file is what makes "required-shaped" mean something: nothing in the compiler or the
- * linter requires a prop, so without a source gate a forgotten `as` is invisible until a
- * screen reader announces the wrong thing.
- *
- * ── WHERE THE FIRST FIVE CLAUSES LIVE ───────────────────────────────────────────────────
- * `tests/helpers/primitiveAdoptionContract.js`, shared with
- * `manager-filter-bar-source-contract.test.js`, which asks the same questions about
- * `<ManagerToolbar>` and `<ManagerSearchField>` (issue 1039). That file records why the
- * questions are shared and why they are NOT the ones
- * `tests/helpers/primitiveSourceContract.js` asks; the short version is that a text scan cannot
- * tell a raw element from a component tag and cannot tell `manager-field` from
- * `manager-field-label`, which is why this gate parsed the template from its first version.
- * It supplies:
- *
- *   1. No `.svelte` under `src/` writes `manager-field` on a RAW element, except the files in
- *      {@link RAW_FIELD_ALLOWLIST}. This is the conversion itself: a primitive that coexists
- *      with unconverted duplicates has added a variant rather than removed one.
- *   2. The allowlist is SELF-CLEANING, pinned by EXACT count and refused at zero.
- *   3. The detector discriminates, driven over the synthetic fixture below — which is not
- *      decoration, because the first version of this detector returned zero for the whole
- *      corpus and two clauses went green on it.
- *   4. No `<Field>` carries a VALUELESS attribute, which a component renders as `="true"`.
- *   5. The corpus is alive: a floor on call sites and on the components spreading them.
- *
- * ── AND THE TWO CLAUSES THAT EARN THIS FILE ─────────────────────────────────────────────
- * Both are about the host, which no other primitive in this programme has:
- *
- *   6. Every `<Field>` renders with a LITERAL `as` drawn from the closed set. Literal, not
- *      merely present: `as={host}` would satisfy a presence check and put the host back into
- *      per-site data, which is the state this change exists to leave.
- *   7. The closed set in `Field.svelte` is exactly `label`, `div`, `fieldset`, and all three
- *      still have real users. Clause 6 reads the set out of the component, so without this pin
- *      the cheapest way to green a new `as="section"` is to widen the set; and the one silent
- *      way to "simplify" this primitive is to flatten the 31 `<div>` fields into `<label>`s,
- *      which changes nothing visible and changes what a screen reader says on 31 screens.
- *
- * Host floors rather than exact counts, deliberately: a new field is an ordinary edit and
- * should not have to re-pin a number here, whereas the SPLIT disappearing is not ordinary.
- */
+/** The END STATE of the `.manager-field` conversion, pinned in source (issue 1428). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -58,24 +10,35 @@ import {
 /** The primitive whose adoption this file pins. */
 const FIELD_PATH = 'src/ui/svelte/components/Field.svelte';
 
-/**
- * The components still writing a raw `class="manager-field …"`, with their EXACT site count.
- *
- * ONE entry, and it is a deliberate carve-out rather than an oversight.
- * `CraftingSystemManagerRoot.svelte` is the manager's 14,000-line root: its seven fields sit
- * in the drop-rate and condition editors, and converting them inside this change would have
- * put a sweep of 23 components and an edit to the one file every manager lane touches into the
- * same diff. The count is what keeps it honest — see clause 2 in the header.
- */
+/** The components still writing a raw `class="manager-field …"`, with their EXACT site count. */
 const RAW_FIELD_ALLOWLIST = Object.freeze([
   Object.freeze({
     path: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-    sites: 7,
+    sites: 1,
     why:
-      'The manager root, 14k lines and the file every manager lane touches. Its seven fields ' +
-      'are the drop-rate editor, the drop-count editor, two condition-modifier pickers, the ' +
-      'condition shortcut and two bare fields. Deferred as a whole so the sweep and the root ' +
-      'are separately reviewable, not because the sites differ from the 81 that converted.',
+      'The manager root, the file every manager lane touches. Its one remaining field is the ' +
+      'systems-list condition shortcut. It was seven until issue 1707 wrote the twice-authored ' +
+      'modifier panel once (four left, two landed in the row below, two de-duplicated rather ' +
+      'than converted), and three until its phase 2 moved the drop-rate and drop-count editors ' +
+      'into the row below with the branch that drew them. Deferred as a whole so the sweep and ' +
+      'the root are separately reviewable, not because the sites differ from the 81 that ' +
+      'converted.',
+  }),
+  Object.freeze({
+    path: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
+    sites: 2,
+    why:
+      'The condition-modifier picker and the expression-override field of the panel issue 1707 ' +
+      'wrote once. RELOCATED without converting either, so the deferral is unchanged in ' +
+      'substance; the file is now one screen\'s form, which a conversion lane can take on its own.',
+  }),
+  Object.freeze({
+    path: 'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte',
+    sites: 2,
+    why:
+      'The drop-rate editor and the drop-count editor, relocated by issue 1707 phase 2 without ' +
+      'converting either, so the deferral is unchanged in substance; the file is now one ' +
+      "screen's form, which a conversion lane can take on its own.",
   }),
 ]);
 
@@ -168,10 +131,16 @@ test('the host set is the closed three, and all three still have real users', ()
   // Floors, not exact counts — a new field is an ordinary edit. What is NOT ordinary is the
   // SPLIT collapsing: flattening the 31 `<div>` fields into `<label>`s renders identically and
   // changes what a screen reader announces on 31 screens.
-  // 49 / 31 / 1 as this lands: the corpus's 56 `<label>` sites less the seven still raw in the
-  // allowlisted manager root, plus all 31 `<div>` sites and the one `<fieldset>`.
+  // The `label` floor dropped 45 → 40 when the checks studio's selects moved onto the `Select`
+  // primitive: each wrapper existed to name a native `<select>`, and the primitive now carries
+  // that name itself (`ariaLabelledBy`/`ariaLabel`), so no site changed which host announces it.
+  // It dropped again 40 → 36 when the gathering task editor's four captioned selects converted:
+  // each `<Field as="label">` demoted to `as="div"` and the caption's id became the trigger's
+  // `ariaLabelledBy`, so the same caption still names the same control. And again 36 → 35 when the
+  // environment overview's danger ceiling converted, the one captioned select of that commit. And
+  // 35 → 34 when the environments browser's conditions card converted its current-value picker.
   for (const [host, floor] of [
-    ['label', 45],
+    ['label', 34],
     ['div', 28],
     ['fieldset', 1],
   ]) {

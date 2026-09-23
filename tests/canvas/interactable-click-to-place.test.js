@@ -1,14 +1,6 @@
 /**
- * Phase 7 — the click-to-place a11y fallback.
- *
- * Drag-and-drop is a keyboard/no-pointer dead-end, so the browser also offers a
- * "Place on current scene" button per row. It calls
- * `InteractableManager.placeInteractableAtViewCenter`, which must NOT be a
- * divergent spawn path: it synthesizes the same `dropCanvasData` payload the
- * drag emits and routes it through `_onDrop` at the scene view center, so tools
- * spawn directly and gathering tasks still run the env-resolution precedence.
- *
- * These tests assert via an injected spawn spy that the SAME pipeline is used.
+ * Phase 7 — the click-to-place a11y fallback. Drag-and-drop is a keyboard/no-pointer dead-end, so
+ * the browser also offers a "Place on current scene" button per row.
  */
 
 import test from 'node:test';
@@ -71,9 +63,7 @@ test('placeInteractableAtViewCenter routes a Tool through the SAME region-spawn 
     assert.equal(spawned[0].interactableType, 'tool');
     assert.equal(spawned[0].sourceUuid, 'Fabricate.sysA.tool.tool-1');
     assert.equal(spawned[0].behaviorSystem.interactableType, 'tool', 'the region-spawn carries the behaviour system');
-    // View center = scene dimensions midpoint (no PIXI stage installed). Both the
-    // region shape and the linked Tile are centered on it (the tile stores the
-    // center as x/y; the region rect stores center - half-size as its top-left).
+    // View center = scene dimensions midpoint (no PIXI stage installed).
     assert.equal(spawned[0].region.shape.type, 'rectangle');
     assert.equal(typeof spawned[0].tile.x, 'number');
   } finally {

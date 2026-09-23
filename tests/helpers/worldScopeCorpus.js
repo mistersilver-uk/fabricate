@@ -1,22 +1,10 @@
 /**
- * THE ONE SHARED FIXTURE BUILDER for the `1.30.0` world-scope entity migration (issue 1363).
- *
- * Every world-scope test file builds its corpora from here. That is not tidiness: `tests/**`
- * counts against the SonarCloud new-code duplication gate exactly as `src/` does, and three test
- * files each carrying their own near-identical corpus factory is the commonest way that gate goes
- * red.
- *
- * THE GENERATOR IS SEEDED, never `Math.random`, which SonarCloud reports as S2245 (insecure
- * randomness) and which FAILS the quality gate. A seeded generator is also what makes a property
- * failure reproducible from the seed printed in the assertion message.
- *
- * CORPORA ARE NORMALIZER OUTPUT, not hand-authored literals. Every fixture is passed through the
- * REAL `_normalizeSystem` before it is used as a BEFORE state, so the differential compares two
- * states production can actually occupy and the derived marker fixture cannot pin a shape
- * production never produces.
+ * THE ONE SHARED FIXTURE BUILDER for the `1.30.0` world-scope entity migration (issue 1363). THE
+ * GENERATOR IS SEEDED, never `Math.random`, which SonarCloud reports as S2245 (insecure randomness)
+ * and which FAILS the quality gate.
  */
 
-import { ESSENCE_EFFECT_SOURCE_FIELDS } from '../../src/migration/worldScopeEntityGrouping.js';
+import { ESSENCE_EFFECT_SOURCE_FIELDS } from '../../src/systems/worldScopeEntityGrouping.js';
 import { membershipKey } from '../../src/systems/scopedDefinitions.js';
 import { createScopedDefinitionStore } from '../../src/systems/scopedDefinitionStore.js';
 import {
@@ -40,7 +28,6 @@ import { effectiveToolBreakageAuthority } from '../../src/systems/toolBreakageAu
 /**
  * A deterministic 32-bit generator (mulberry32).
  *
- * @param {number} seed
  * @returns {() => number} a `[0, 1)` generator.
  */
 export function seededRandom(seed) {
@@ -72,12 +59,10 @@ export function installFoundryStubs() {
 }
 
 /**
- * Build ONE in-memory world scope store, exactly as `worldScopeStores.js` composes the real one
- * but without importing `src/config/settings.js` (which drags `src/ui/theme.js` in).
+ * Build ONE in-memory world scope store, exactly as `worldScopeStores.js` composes the real one but
+ * without importing `src/config/settings.js` (which drags `src/ui/theme.js` in).
  *
- * @param {'components'|'essences'|'tools'} entityType
  * @param {unknown} value The persisted payload.
- * @returns {object}
  */
 export function makeScopeStore(entityType, value) {
   const config = {
@@ -106,13 +91,7 @@ export function makeScopeStore(entityType, value) {
 /**
  * A crafting-system manager wired to the three scope stores built from a scope payload triple.
  *
- * FRESHLY CONSTRUCTED PER CALL, and that is load-bearing: `getScopedDefinitionUnion` memoizes on
- * `(corpus identity, system array identity, revision, length)` and a pure migration bumps no
- * revision, so a manager that already read the BEFORE leg would serve the PRE-migration union.
- *
  * @param {new (...args: any[]) => any} CraftingSystemManager The imported class.
- * @param {{componentScope?: unknown, essenceScope?: unknown, toolScope?: unknown}} [payloads]
- * @returns {object}
  */
 export function makeManagerWithScope(CraftingSystemManager, payloads = {}) {
   return new CraftingSystemManager(
@@ -126,17 +105,9 @@ export function makeManagerWithScope(CraftingSystemManager, payloads = {}) {
 }
 
 /**
- * The REAL normalize-and-save seam: hydrate every system through `_normalizeSystem` with the
- * given scope stores and hand back what would be persisted.
+ * The REAL normalize-and-save seam: hydrate every system through `_normalizeSystem` with the given
+ * scope stores and hand back what would be persisted.
  *
- * A HAND-ROLLED STAND-IN IS LOOSER THAN THIS and would produce false passes — it will not
- * reproduce the basis-gated essence-source prune, which is the ONE prune this seam performs.
- * `#### D10`'s basis does become newly-decidable at upgrade, but it prunes no recipe, salvage or
- * gathering reference at `1.30.0`: measured across every scenario here, ten references resolve to
- * nothing before the migration and ZERO disappear after the round trip. So the round trip's value
- * is that it is the REAL seam, not that it drops references — see the differential's guard arm.
- *
- * @param {new (...args: any[]) => any} CraftingSystemManager
  * @param {object} corpus `{ systems, recipes, gatheringConfig, componentScope, ... }`
  * @returns {object} the corpus with `systems` replaced by their normalized form.
  */
@@ -148,9 +119,7 @@ export function saveRoundTrip(CraftingSystemManager, corpus) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Corpus construction
-// ---------------------------------------------------------------------------
 
 const ITEM_IMAGES = ['icons/svg/item-bag.svg', 'icons/svg/chest.svg', 'icons/svg/anvil.svg'];
 
@@ -158,12 +127,7 @@ function pick(random, list) {
   return list[Math.floor(random() * list.length) % list.length];
 }
 
-/**
- * One raw component, before normalization.
- *
- * @param {object} options
- * @returns {object}
- */
+/** One raw component, before normalization. */
 function rawComponent({
   id,
   name,
@@ -196,12 +160,7 @@ function rawComponent({
           id: `sg-${id}`,
           results: [
             { componentId: id, quantity: 1 },
-            // A DANGLING result, when the scenario asks for one. It exercises the
-            // `flaggedForReview` REPORT, not a prune: measured across every scenario here, ten
-            // references resolve to nothing before the migration and ZERO disappear after the
-            // round trip. `_normalizeSystem` prunes no corpus reference against the component
-            // basis at all - its single consumer of that basis is the essence source-uuid
-            // retention. See the differential's own guard arm, which states the same thing.
+            // A DANGLING result, when the scenario asks for one.
             ...(danglingResultId ? [{ componentId: danglingResultId, quantity: 1 }] : []),
           ],
         },
@@ -210,12 +169,7 @@ function rawComponent({
   };
 }
 
-/**
- * One raw tool, before normalization.
- *
- * @param {object} options
- * @returns {object}
- */
+/** One raw tool, before normalization. */
 function rawTool({
   id,
   name,
@@ -265,13 +219,10 @@ function rawEssence({ id, name, sourceComponentId = null, macro = null, omitMacr
     colorToken: 'rose',
     description: `${name} essence`,
     enabled: true,
-    // `omitMacroKey` models a record that PREDATES the field. `propertyMacroUuid` is new at
-    // issue 1036, so any world not re-saved since carries essences with no such key - and that
-    // is exactly the shape an absence-preserving membership write hands the DONOR's macro to.
+    // `omitMacroKey` models a record that PREDATES the field (issue 1036).
     ...(omitMacroKey ? {} : { propertyMacroUuid: macro }),
-    // ALL THREE SPELLINGS, because the walk rewrites all three and two of them were the gaps
-    // `#### D9` closed. A fixture carrying only the canonical one leaves the other two outside
-    // the differential entirely.
+    // ALL THREE SPELLINGS, because the walk rewrites all three and two of them were the gaps `####
+    // D9` closed.
     sourceComponentId,
     ...(sourceComponentId
       ? { associatedSystemItemId: sourceComponentId, sourceItemUuid: sourceComponentId }
@@ -375,15 +326,7 @@ function rawGatheringSlice({ systemId, componentIds, toolIds }) {
 /**
  * Build ONE raw corpus from a declarative shape.
  *
- * `systems[]` entries declare which SOURCE ITEM each component and tool points at, so a shared
- * source uuid across two systems is what makes them one world entity. A `null` source is an
- * UNLINKED definition, which must NEVER merge.
- *
- * @param {object} spec
- * @param {number} [spec.seed]
- * @param {Array<object>} spec.systems
  * @param {boolean} [spec.legacyGatheringTools] Seed the pre-`0.7.0` gathering tools copy.
- * @returns {{systems: Array<object>, recipes: Array<object>, gatheringConfig: object}}
  */
 export function buildRawCorpus({ seed = 1, systems: specs, legacyGatheringTools = false }) {
   const random = seededRandom(seed);
@@ -409,9 +352,7 @@ export function buildRawCorpus({ seed = 1, systems: specs, legacyGatheringTools 
         refs: component.refs ?? [],
         random,
         essenceIds: component.essenceIds ?? essences.map((essence) => essence.id),
-        // SALVAGE `toolIds` DEFAULT TO THE SYSTEM'S OWN TOOLS. An empty list left the
-        // `systems[].components[].salvage.toolIds` site unexercised by projection (b), so
-        // deleting it from the walk was RED only in the marker fixture.
+        // SALVAGE `toolIds` DEFAULT TO THE SYSTEM'S OWN TOOLS.
         toolIds: component.toolIds ?? (spec.tools ?? []).map((tool) => tool.id),
         danglingResultId: component.danglingResultId ?? null,
       })
@@ -461,25 +402,17 @@ export function buildRawCorpus({ seed = 1, systems: specs, legacyGatheringTools 
 /**
  * The BEFORE state: a raw corpus hydrated through the REAL normalizer with UNSEEDED scope stores,
  * which is exactly what a pre-migration world holds on disk.
- *
- * @param {new (...args: any[]) => any} CraftingSystemManager
- * @param {object} raw
- * @returns {object}
  */
 export function normalizeCorpus(CraftingSystemManager, raw) {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   return { ...raw, systems: raw.systems.map((system) => manager._normalizeSystem(system)) };
 }
 
-// ---------------------------------------------------------------------------
 // The named scenarios, shared by every world-scope test file
-// ---------------------------------------------------------------------------
 
 /**
  * The adversarial corpus set the differential, the drift ZERO case and the post-condition
  * invariants all run over.
- *
- * @returns {Array<{name: string, raw: object}>}
  */
 export function scenarioSpecs() {
   const uuidA = 'Item.aaa';
@@ -530,9 +463,7 @@ export function scenarioSpecs() {
       }),
     },
     {
-      // Z2. An essence whose SOURCE is a component the migration re-keys. Without it the whole
-      // essence-source reference class sits outside the differential: deleting
-      // `rewriteEssenceReferences` from the system leg was GREEN across every other scenario.
+      // Z2. An essence whose SOURCE is a component the migration re-keys.
       name: 'an essence whose source component is re-keyed',
       raw: buildRawCorpus({
         seed: 111,
@@ -552,10 +483,6 @@ export function scenarioSpecs() {
     {
       // Z3. A member that KEEPS its id, so a narrowing of its source links is NOT excused by a
       // rename entry that exists only because the id changed.
-      // THE ABSENT-SECTION FALLBACK. The donor authors a property macro and the member's essence
-      // predates the field entirely, so an absence-preserving membership write would leave that
-      // member with an `inherit: false` switch over an ABSENT section - which resolves to the
-      // WORLD value, i.e. the donor's macro, on every craft.
       name: 'a member whose essence predates the property-macro field',
       raw: buildRawCorpus({
         seed: 333,
@@ -712,10 +639,8 @@ export function scenarioSpecs() {
 }
 
 /**
- * A corpus carrying MALFORMED records the normalizer would otherwise repair, used to prove the
- * pure transforms are total. It is deliberately NOT normalized first.
- *
- * @returns {object}
+ * A corpus carrying MALFORMED records the normalizer would otherwise repair, used to prove the pure
+ * transforms are total. It is deliberately NOT normalized first.
  */
 export function malformedCorpus() {
   return {
@@ -731,16 +656,13 @@ export function malformedCorpus() {
   };
 }
 
-// ---------------------------------------------------------------------------
 // The post-migration merge corpus (issue 1654)
-// ---------------------------------------------------------------------------
 
 /**
- * The `effectSource` block a membership record or world default carries, read off a raw essence
- * row through the shared field list rather than a second spelling of the three names.
+ * The `effectSource` block a membership record or world default carries, read off a raw essence row
+ * through the shared field list rather than a second spelling of the three names.
  *
  * @param {object} row A raw essence definition.
- * @returns {Record<string, unknown>}
  */
 function effectSourceBlockOf(row) {
   const block = {};
@@ -754,20 +676,9 @@ function effectSourceBlockOf(row) {
  * Build an already-migrated world: a `craftingSystems` corpus plus the essence and component scope
  * payloads `1.30.0` would have left behind, in the stored map shape.
  *
- * The builders above produce a pre-migration world, which has no world essences at all. This is the
- * same declarative idea one migration later: it reuses {@link rawEssence} for the in-system rows,
- * and defaults every membership record to fully overriding, as `buildMembershipRecord` leaves each.
- *
- * Per-essence declaration fields, all optional but `id`: `name`, `icon`, `colorToken` and
- * `description` give the world entity's identity and the first declaration wins; `macro`,
- * `sourceComponentId` and `effectSource` give the membership record's overrides; `inherit` flips
- * the two section switches; `enabled`, `member`, `inSystem` and `omitSections` shape what exists.
- *
- * @param {object} [spec]
  * @param {Array<object>} [spec.systems] `[{id, name, essences: [...], components: [{id, member}]}]`
  * @param {object} [spec.worldDefaults] `{[essenceId]: {macro?, effectSource?}}`
  * @param {string[]|null} [spec.entityOrder] An explicit `essenceScope.entities` order.
- * @returns {{systems: Array<object>, essenceScope: object, componentScope: object}}
  */
 export function buildEssenceMergeCorpus({
   systems: specs = [],
@@ -870,9 +781,7 @@ export function buildEssenceMergeCorpus({
   };
 }
 
-// ---------------------------------------------------------------------------
 // The two projections
-// ---------------------------------------------------------------------------
 
 const PROJECTED_FIELDS = Object.freeze({
   components: Object.freeze([
@@ -935,27 +844,8 @@ export const PERMITTED_IDENTITY_FIELDS = Object.freeze([
   'aliasItemUuids',
 ]);
 
-/**
- * Blank every REFERENCE leaf inside a projected value.
- *
- * THE TWO PROJECTIONS DIVIDE THE CORPUS BETWEEN THEM: (a) owns the fields of a `(system, entity)`
- * pair, (b) owns what every reference DENOTES. A re-keyed id stored inside a salvage result group
- * or a tool's repair recipe is a reference, so comparing its literal text in (a) would report
- * every successful re-key as a behaviour change — while saying nothing about whether it still
- * resolves, which is the only question that matters and which (b) answers by resolving it.
- *
- * @param {unknown} value
- * @returns {unknown}
- */
-/**
- * The leaf keys that hold a COMPONENT reference rather than content.
- *
- * The three essence spellings are here for the same reason `componentId` is: an essence source is
- * a reference the migration re-keys, so comparing its literal text in projection (a) would report
- * every successful re-key as a behaviour change while saying nothing about whether it still
- * resolves. `sourceItemUuid` is included because `## EssenceDefinition` requirement 3 permits it
- * to hold a legacy component id.
- */
+/** Blank every REFERENCE leaf inside a projected value. */
+/** The leaf keys that hold a COMPONENT reference rather than content. */
 const REFERENCE_LEAF_KEYS = new Set([
   'componentId',
   'systemItemId',
@@ -989,13 +879,10 @@ function project(record, entityType) {
 }
 
 /**
- * PROJECTION (a) — the entity projection: every field a production reader consumes, per
- * `(system, entity)` pair.
+ * PROJECTION (a) — the entity projection: every field a production reader consumes, per `(system,
+ * entity)` pair.
  *
- * @param {new (...args: any[]) => any} CraftingSystemManager
- * @param {object} corpus
  * @param {boolean} throughScope Whether to read through the scope resolvers (the AFTER leg).
- * @returns {Record<string, object>}
  */
 export function projectEntities(CraftingSystemManager, corpus, throughScope) {
   const projection = {};
@@ -1032,21 +919,9 @@ export function projectEntities(CraftingSystemManager, corpus, throughScope) {
 }
 
 /**
- * PROJECTION (b) — the resolved reference CLOSURE.
- *
- * IT IS AN INDEPENDENT GENERIC WALK, deliberately not the production enumeration. If it drove the
- * shared rewrite walk, deleting a site from that walk would delete it from this projection too
- * and the mutation would stay GREEN — which is exactly the vacuity this criterion exists to
- * prevent. It visits EVERY leaf named `componentId` / `systemItemId`, every `toolIds[]` entry and
- * the system-level `toolBreakage`, wherever they are.
- *
- * A reference resolving to nothing is recorded as `UNRESOLVED:<site path>` and never dropped, so
- * a prune is a VISIBLE DIFFERENCE rather than an absence.
- *
- * @param {new (...args: any[]) => any} CraftingSystemManager
- * @param {object} corpus
- * @param {boolean} throughScope
- * @returns {Record<string, unknown>}
+ * PROJECTION (b) — the resolved reference CLOSURE. A reference resolving to nothing is recorded as
+ * `UNRESOLVED:<site path>` and never dropped, so a prune is a VISIBLE DIFFERENCE rather than an
+ * absence.
  */
 export function projectReferenceClosure(CraftingSystemManager, corpus, throughScope) {
   const manager = throughScope
@@ -1090,10 +965,8 @@ export function projectReferenceClosure(CraftingSystemManager, corpus, throughSc
         continue;
       }
       // THE ESSENCE SOURCE SPELLINGS. Without these, `#### D9`'s newly-closed essence gaps are
-      // green in the differential and RED only in the walk, so criterion 3's claim that
-      // projection (b) covers every reference site was false for three of them.
-      // `sourceItemUuid` legitimately holds EITHER a component id or a document UUID, so a
-      // dotted value is skipped rather than recorded as unresolved.
+      // green in the differential and RED only in the walk, so criterion 3's claim that projection
+      // (b) covers every reference site was false for three of them.
       if (key === 'sourceComponentId' || key === 'associatedSystemItemId') {
         record(childPath, systemId, 'components', value);
         continue;
@@ -1130,26 +1003,14 @@ export function projectReferenceClosure(CraftingSystemManager, corpus, throughSc
   return closure;
 }
 
-// ---------------------------------------------------------------------------
 // The THIRD projection, and the id-canonicalising key rewriter (issue 1364)
-// ---------------------------------------------------------------------------
 
 /**
- * PROJECTION (c) — the three WORLD-SCOPE SLICES, per layer.
- *
- * The two projections above answer what a system's entities ARE and what every reference DENOTES.
- * Neither can see the world corpus itself: `projectReferenceClosure` records only the hard-coded
- * leaf names its walk enumerates and never walks `defaults` or `membership` at all. So an import
- * that landed the system perfectly while dropping every membership record would pass both of them,
- * which is precisely the failure a membership-filtered export makes reachable.
- *
- * THE KEY EMBEDS THE IDS, deliberately, so {@link canonicaliseProjection} can rewrite it: a
- * copy-mode import re-keys both the entity ids and the system id, and comparing raw keys would
- * report every successful re-key as a loss.
+ * PROJECTION (c) — the three WORLD-SCOPE SLICES, per layer. The two projections above answer what a
+ * system's entities ARE and what every reference DENOTES.
  *
  * @param {{components?: unknown, essences?: unknown, tools?: unknown}} scopeCorpus Each value is
- *   either the persisted scope payload or a store's published corpus; both sub-key shapes are read.
- * @returns {Record<string, unknown>}
+ * either the persisted scope payload or a store's published corpus; both sub-key shapes are read.
  */
 export function projectScopeSlices(scopeCorpus) {
   const corpus = scopeCorpus && typeof scopeCorpus === 'object' ? scopeCorpus : {};
@@ -1180,27 +1041,8 @@ function subKeyEntries(raw) {
 /**
  * Rewrite every id a projection embeds, through the ACTUAL map an import produced.
  *
- * DRIVEN BY THE REAL MAP, never by a re-derived one, and that is the whole discipline: a
- * canonicaliser that re-computed the mapping from the two corpora would agree with a WRONG import
- * by construction, because it would derive the same wrong answer. The map here is read off the
- * prepared pack data — the exact ids the import went on to persist.
- *
- * Three shapes carry an id and all three are rewritten:
- *
- * 1. `projectEntities`'s `` `${system.id}|${entityType}|${record.id}` `` keys, and
- *    `projectScopeSlices`'s four-segment keys;
- * 2. the `id` entry of every `PROJECTED_FIELDS` list, which is compared as literal text;
- * 3. `projectReferenceClosure`'s `systems.<systemId>` / `recipes.<recipeId>` /
- *    `gatheringConfig.<systemId>` PATH PREFIXES, which name the record the path descends from.
- *
- * Reference LEAVES are already scrubbed to `<reference>` by `project`, so they need no rewriting —
- * that is exactly the division of labour the two projections were built with.
- *
- * @param {Record<string, unknown>} projection
- * @param {object} maps
  * @param {Map<string, string>} maps.ids Old entity/recipe id to new.
  * @param {Map<string, string>} maps.systemIds Old system id to new.
- * @returns {Record<string, unknown>}
  */
 export function canonicaliseProjection(projection, { ids, systemIds }) {
   const mapId = (value) => ids.get(value) ?? systemIds.get(value) ?? value;
@@ -1221,11 +1063,6 @@ function canonicaliseKey(key, mapId) {
 /**
  * The keys whose value a projected record carries as an IDENTIFIER: its own identity, and the
  * component-reference leaves the shared walk rewrites.
- *
- * KEY-AWARE, never a blanket string replace, for the reason the copy-mode rebind itself is: a
- * salvage-group id or a `recipeIds[]` entry that happens to equal a component id must survive
- * verbatim, and a canonicaliser that rewrote it would hide exactly the defect that discipline
- * exists to catch.
  */
 const CANONICALISED_ID_KEYS = new Set([
   'id',
@@ -1239,13 +1076,9 @@ const CANONICALISED_ID_KEYS = new Set([
 ]);
 
 /**
- * Rewrite the ids a projected record carries. Every other field is compared verbatim.
- *
- * Reference leaves are rewritten rather than SCRUBBED here, which is the opposite of what
- * projection (a) does to the same key names — deliberately. Projection (a) hands the question
- * "does it still resolve" to projection (b), which resolves it; projection (c) has no resolver, so
- * scrubbing would leave a slice record whose component reference was never re-keyed indistinguishable
- * from one that was.
+ * Rewrite the ids a projected record carries. Every other field is compared verbatim. Reference
+ * leaves are rewritten rather than SCRUBBED here, which is the opposite of what projection (a) does
+ * to the same key names — deliberately.
  */
 function canonicaliseValue(value, mapId) {
   if (Array.isArray(value)) return value.map((entry) => canonicaliseValue(entry, mapId));
@@ -1262,15 +1095,9 @@ function canonicaliseValue(value, mapId) {
  * The ACTUAL copy-mode id map, read off the prepared pack data by POSITION against the envelope it
  * was prepared from.
  *
- * Position is sound here and nowhere else: `prepareForImport` rewrites ids in place and never
- * reorders, adds or drops a record, so index `i` of the pack is index `i` of the envelope. Reading
- * the map any other way — re-deriving it from source references, say — would agree with a wrong
- * import by construction.
- *
  * @param {object} envelope The payload handed to `prepareForImport`.
  * @param {object} packData Its result.
  * @param {string} destinationSystemId The id the import actually resolved.
- * @returns {{ids: Map<string, string>, systemIds: Map<string, string>}}
  */
 export function actualImportIdMap(envelope, packData, destinationSystemId) {
   const ids = new Map();

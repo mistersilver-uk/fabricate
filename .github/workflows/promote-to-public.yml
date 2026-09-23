@@ -146,23 +146,40 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      - name: Capture the publisher ref's deployment configuration
+        # early-access is published only from `release`, so a promotion dispatched from `main` can
+        # evaluate a tester identity no publish has used — a 404 head that reads as a cohort risk
+        # rather than as configuration drift (issue 1872). An unreadable publisher config falls back
+        # to an empty object, which compares as "declares no tester group" and is reported as drift.
+        run: |
+          git fetch origin "+refs/heads/release:refs/remotes/origin/release" --force \
+            || echo "::notice::could not fetch origin/release; the tester-configuration drift check has nothing to compare."
+          git show origin/release:release.s3.config.json > "$RUNNER_TEMP/release.s3.publisher.config.json" 2>/dev/null || {
+            echo "::notice::origin/release carries no readable release.s3.config.json; the tester-configuration drift check has nothing to compare."
+            echo '{}' > "$RUNNER_TEMP/release.s3.publisher.config.json"
+          }
+
       - name: Verify source_channel, assert the source advertises the version, and read the registry-lead heads
         id: checks
         env:
           VERSION: ${{ inputs.version }}
           SOURCE_CHANNEL: ${{ inputs.source_channel }}
+          PUBLISHER_CONFIG: ${{ runner.temp }}/release.s3.publisher.config.json
           S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
           RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
           # Both tester secrets: the guard enumerates every private target of beta AND early-access,
           # and each channel derives its tester manifest key from its OWN secret.
           S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
-          S3_EARLY_ACCESS_PATH_SECRET: ${{ secrets.S3_EARLY_ACCESS_PATH_SECRET }}
+          S3_GUILD_ARTISAN_PATH_SECRET: ${{ secrets.S3_GUILD_ARTISAN_PATH_SECRET }}
         run: |
           node --input-type=module <<'NODE'
           import { readFile, appendFile } from 'node:fs/promises';
           import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
           import { deriveS3Layout, resolveChannelConfig } from './scripts/release-s3.js';
-          import { evaluateRegistryLeadTarget } from './scripts/lib/promoteGuards.js';
+          import {
+            evaluateRegistryLeadTarget,
+            evaluateTesterConfigDrift,
+          } from './scripts/lib/promoteGuards.js';
 
           const version = process.env.VERSION;
           const sourceChannel = process.env.SOURCE_CHANNEL;
@@ -173,6 +190,24 @@ jobs:
           const bucket = process.env.S3_RELEASE_BUCKET || config.bucket;
           const baseUrl = process.env.RELEASE_BASE_URL || config.baseUrl;
           const s3 = new S3Client({ region: process.env.AWS_REGION });
+
+          // Tester identity is deployment configuration read from this ref, while early-access is
+          // published from `release`. Diagnosed, never an independent refusal: drift is why an
+          // early-access head can be absent, so the remedy belongs on that refusal.
+          let publisherConfig = {};
+          try {
+            publisherConfig = JSON.parse(await readFile(process.env.PUBLISHER_CONFIG, 'utf8'));
+          } catch (error) {
+            console.log(
+              `::notice::the publisher ref's release.s3.config.json is unreadable (${error.message}); the drift check compares against an empty declaration, which reports drift.`
+            );
+          }
+          const drift = evaluateTesterConfigDrift({
+            channel: 'early-access',
+            dispatchConfig: config,
+            publisherConfig,
+          });
+          if (drift.drifted) console.warn(`::warning::${drift.summary}`);
 
           const fail = (msg) => {
             console.error(`::error::${msg}`);
@@ -255,7 +290,11 @@ jobs:
                 head,
                 version,
               });
-              if (verdict.decision === 'refuse') fail(verdict.reason);
+              const driftsHere =
+                verdict.kind === 'absent' && channel === 'early-access' && drift.drifted;
+              if (verdict.decision === 'refuse') {
+                fail(verdict.reason + (driftsHere ? ` ${drift.remedy}` : ''));
+              }
               console.log(`registry-lead: ${verdict.reason}`);
             }
           }
@@ -347,7 +386,7 @@ jobs:
           if [ "$PREV_PUBLIC" = "$VERSION" ]; then
             echo "Would SKIP the public write: the public head already advertises v$VERSION (re-run)."
           else
-            echo "Would RE-STAGE v$VERSION from the built dist and publish it to the 'public' channel (node scripts/release-s3.js --version $VERSION --channel public)."
+            echo "Would RE-STAGE v$VERSION from the built dist and publish it to the 'public' channel (node scripts/release-s3.js --version $VERSION --channel public), under the deployment configuration this workflow ref carries."
           fi
           echo "Nothing is written to the beta or early-access channels."
 
@@ -386,8 +425,17 @@ jobs:
         run: |
           # Build from the tested commit, then re-stage per target (release-s3.js), NEVER an S3 copy.
           # 'public' has no tester group, so this is exactly one target: the public sources feed.
+          #
+          # Bytes from the tag, deployment configuration from the workflow ref (issue 1872). The
+          # checkout below moves the tree to v$VERSION, so the capture has to precede it.
+          git show "$GITHUB_SHA":release.s3.config.json > "$RUNNER_TEMP/release.s3.config.json"
           git checkout "v$VERSION"
-          node scripts/release-s3.js --version "$VERSION" --channel public
+          grep -q -- "'--config'" scripts/release-s3.js || {
+            echo "::error::scripts/release-s3.js at v$VERSION predates --config, so the deployment configuration captured from the workflow ref would be ignored. Promote a version whose tag carries --config support."
+            exit 1
+          }
+          node scripts/release-s3.js --version "$VERSION" --channel public \
+            --config "$RUNNER_TEMP/release.s3.config.json"
 
   # ── JOB 4: READBACK → PREFLIGHT → UN-DRAFT → REGISTER ───────────────────────────────────────────
   # The `if:` is VERBATIM from the issue: no `inputs.dry_run` disjunct, so a *skipped* job 2/3 (which
@@ -621,17 +669,16 @@ jobs:
           VERIFIED=$(jq -r '.compatibility.verified // ""' "$MODJSON")
           MAX=$(jq -r '.compatibility.maximum // ""' "$MODJSON")
 
-          # The published manifest carries the BARE version, as every working release has: v1.2.1's
-          # module.json says `1.2.1` while its Foundry listing reads `v1.2.1`. So the artefact and the
-          # requested version are the same string and this is a literal identity check again.
+          # The published manifest carries the BARE version, so the artefact and the requested version
+          # are the same string and this is a literal identity check.
           #
-          # The `v` is PRESENTATION, and it belongs in exactly one place — the registry payload's
-          # `version` field below, which is what the package listing renders. Issue 1407 put it in
-          # module.json instead, and issue 1457 then made this payload read the artefact rather than
-          # construct the display string, which coupled the two: `release-s3.js` compares the built
-          # manifest against the requested version, so every publish after that refused with
-          # `version mismatch: requested 1.9.3 built v1.9.3`. Do not re-derive this field from the
-          # artefact.
+          # The `v` belongs to the tag and the URLs built from it, never to a version identifier.
+          # The registry payload's `version` below is bare too: Foundry compares a version part
+          # numerically only when both parts are numeric, so a prefixed identifier string-compares
+          # against a bare one and can rank an older release above a newer one (issue 1945).
+          # Issue 1407 put the prefix in module.json, and `release-s3.js` then refused every publish
+          # with `version mismatch: requested 1.9.3 built v1.9.3`. Do not re-derive the payload's
+          # version from the artefact.
           if [ "$BUILT_VERSION" != "$VERSION" ]; then
             echo "::error::artefact version '$BUILT_VERSION' does not match the version being promoted '$VERSION'."
             exit 1
@@ -660,12 +707,17 @@ jobs:
 
           jq -n \
             --arg id "$ID" \
-            --arg version "v${VERSION}" \
+            --arg version "${VERSION}" \
             --arg manifest "$MANIFEST" \
             --arg notes "$NOTES" \
             --argjson compatibility "$COMPAT" \
             '{id: $id, "dry-run": false, release: {version: $version, manifest: $manifest, notes: $notes, compatibility: $compatibility}}' \
             > /tmp/promote/payload.json
+
+          if ! jq -e --arg v "$VERSION" '.release.version == $v' /tmp/promote/payload.json > /dev/null; then
+            echo "::error::registry payload release.version is not the bare promoted version '$VERSION'. Refusing to un-draft."
+            exit 1
+          fi
 
           echo "Registry payload (validated):"
           cat /tmp/promote/payload.json

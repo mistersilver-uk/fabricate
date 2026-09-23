@@ -1,31 +1,8 @@
-/**
- * Tests for the ingredient-`match` type registry (`src/models/match/matchTypes.js`).
- *
- * The registry centralizes per-type `match` logic (normalize / isComplete /
- * validate / signature / expandToComponentIds / matchesItem / getComponentId /
- * describe) behind `getMatchHandler`. This is a pure refactor of logic lifted
- * verbatim from Ingredient, recipeReadiness, SignatureValidator, and
- * RecipeManager, so these tests pin the registry contract AND the four
- * plan-review behaviors that must not regress:
- *
- *   1. Stacked validate — an incomplete tags/currency match yields BOTH the
- *      shared "must include a match rule" error (from Ingredient) AND the
- *      per-type tag/currency message (from the handler); under
- *      `requireComplete:false` neither completeness error fires.
- *   2. `_matchesIngredient` fall-through — only tags/currency are terminal; a
- *      `{type:'component'}` match with `alternatives` still recurses, currency
- *      is terminal-false, tags with `enableTags:false` is false.
- *   3. `systemItem` alias — `getMatchHandler({type:'systemItem'})` resolves the
- *      component handler; its id helpers return the id.
- *   4. Safe fallback — `getMatchHandler(null)` and `{type:'bogus'}` resolve a
- *      no-op handler (isComplete false, empty set, false, null).
- */
+/** Tests for the ingredient-`match` type registry (`src/models/match/matchTypes.js`). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
 // Foundry global stubs (mirrors tests/ingredient-currency-match.test.js)
-// ---------------------------------------------------------------------------
 let _idCounter = 0;
 globalThis.foundry = {
   utils: {
@@ -57,9 +34,7 @@ function fakeItem({ tags = [], uuid = 'Item.x', name = 'Thing' } = {}) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // getMatchHandler resolution
-// ---------------------------------------------------------------------------
 test('getMatchHandler resolves each known type', () => {
   assert.equal(getMatchHandler({ type: 'component' }).type, 'component');
   assert.equal(getMatchHandler({ type: 'tags' }).type, 'tags');
@@ -93,9 +68,7 @@ test('getMatchHandler returns a safe fallback for null and unknown types', () =>
   }
 });
 
-// ---------------------------------------------------------------------------
 // component handler
-// ---------------------------------------------------------------------------
 test('component handler: normalize/isComplete/signature/expand/getComponentId/describe', () => {
   const h = HANDLERS.component;
   assert.deepEqual(normalizeMatch({ match: { type: 'component', componentId: 'cmp-iron' } }), {
@@ -116,9 +89,7 @@ test('component handler: normalize/isComplete/signature/expand/getComponentId/de
   assert.deepEqual(h.validate({ type: 'component', componentId: null }, { requireComplete: true }), []);
 });
 
-// ---------------------------------------------------------------------------
 // tags handler
-// ---------------------------------------------------------------------------
 test('tags handler: normalize trims/filters and defaults tagMatch', () => {
   assert.deepEqual(
     normalizeMatch({ match: { type: 'tags', tags: [' metal ', '', 'sharp'], tagMatch: 'all' } }),
@@ -172,9 +143,7 @@ test('tags handler: getComponentId is null; describe joins tags', () => {
   assert.equal(h.describe({ type: 'tags', tags: ['metal', 'sharp'], tagMatch: 'any' }, { quantity: 1 }), '1x metal | sharp');
 });
 
-// ---------------------------------------------------------------------------
 // currency handler
-// ---------------------------------------------------------------------------
 test('currency handler: normalize trims unit and clamps amount', () => {
   assert.deepEqual(normalizeMatch({ match: { type: 'currency', unit: '  gp  ', amount: 100 } }), {
     type: 'currency',
@@ -200,9 +169,7 @@ test('currency handler: isComplete/signature/expand/matchesItem/getComponentId',
   assert.equal(h.getComponentId({ type: 'currency', unit: 'gp', amount: 100 }), null);
 });
 
-// ---------------------------------------------------------------------------
 // normalizeMatch legacy folding
-// ---------------------------------------------------------------------------
 test('normalizeMatch folds legacy systemItem/componentId/systemItemId into component', () => {
   assert.deepEqual(normalizeMatch({ match: { type: 'systemItem', systemItemId: 'cmp-iron' } }), {
     type: 'component',
@@ -225,9 +192,7 @@ test('normalizeMatch folds legacy systemItem/componentId/systemItemId into compo
   assert.equal(normalizeMatch({}), null);
 });
 
-// ---------------------------------------------------------------------------
 // Plan-review case 1: stacked validate via Ingredient
-// ---------------------------------------------------------------------------
 test('plan-review 1: an incomplete tags match stacks both the shared and tag errors', () => {
   const ingredient = new Ingredient({ quantity: 1, match: { type: 'tags', tags: [] } });
   const { valid, errors } = ingredient.validate({ requireComplete: true });
@@ -253,9 +218,7 @@ test('plan-review 1: requireComplete:false waives both completeness errors', () 
   }
 });
 
-// ---------------------------------------------------------------------------
 // Plan-review case 2: terminal-vs-fall-through dispatch
-// ---------------------------------------------------------------------------
 test('plan-review 2: component is not terminal — only tags/currency dispatch through the handler', () => {
   assert.equal(getMatchHandler({ type: 'component', componentId: 'x' }).type, 'component');
   // tags and currency are the terminal types RecipeManager dispatches to.
@@ -268,9 +231,8 @@ test('plan-review 2: _matchesIngredient — a {type:component} ingredient with a
   const features = { enableTags: true };
   const item = fakeItem({ uuid: 'Item.match', tags: [] });
 
-  // A component-typed match is NOT terminal: the dispatch falls through to the
-  // bare-field legacy paths, including the alternatives recursion. The
-  // alternative matches by itemUuid, so the whole ingredient matches.
+  // A component-typed match is NOT terminal: the dispatch falls through to the bare-field legacy
+  // paths, including the alternatives recursion.
   const ingredient = {
     match: { type: 'component', componentId: 'cmp-iron' },
     alternatives: [{ itemUuid: 'Item.match' }],
@@ -315,9 +277,7 @@ test('plan-review 2: currency terminal matchesItem is always false; tags with en
   );
 });
 
-// ---------------------------------------------------------------------------
 // isTerminalInventoryMatch — handler-declared terminality (Seam 1)
-// ---------------------------------------------------------------------------
 test('isTerminalInventoryMatch: tags and currency are terminal', () => {
   assert.equal(HANDLERS.tags.isTerminalInventoryMatch, true);
   assert.equal(HANDLERS.currency.isTerminalInventoryMatch, true);
@@ -331,9 +291,7 @@ test('isTerminalInventoryMatch: component and the null/unknown fallback are non-
   assert.equal(getMatchHandler({ type: 'bogus' }).isTerminalInventoryMatch, false);
 });
 
-// ---------------------------------------------------------------------------
 // getIngredientComponentId — shared ref → component-id resolver (Seam 2)
-// ---------------------------------------------------------------------------
 test('getIngredientComponentId: resolves a structured component match via the handler', () => {
   assert.equal(
     getIngredientComponentId({ match: { type: 'component', componentId: 'cmp-iron' } }),
@@ -371,9 +329,7 @@ test('getIngredientComponentId: null, undefined, and unknown refs/matches resolv
   assert.equal(getIngredientComponentId({ match: { type: 'bogus' } }), null);
 });
 
-// ---------------------------------------------------------------------------
 // Plan-review case 4: safe fallback (also covered above; explicit assertions)
-// ---------------------------------------------------------------------------
 test('plan-review 4: null and bogus matches resolve a no-op handler', () => {
   for (const match of [null, { type: 'bogus' }]) {
     const handler = getMatchHandler(match);

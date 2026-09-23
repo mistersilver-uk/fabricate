@@ -10,13 +10,14 @@
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
+  import { disclosurePhraseKey } from '../../util/disclosurePhrase.js';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import RealmEnvironmentsEditor from './RealmEnvironmentsEditor.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
-  import { createTravelRealmsBrowserState } from '../../../../utils/managerBrowserViewState.js';
+  import { createTravelRealmsBrowserState } from '../../../model/managerBrowserViewState.js';
 
   let {
     realms = [],
@@ -89,12 +90,6 @@
     onSelectRealm(realmId === selectedRealmId ? '' : realmId);
   }
 
-  function onRowKeydown(event, realmId) {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    selectRow(realmId);
-  }
-
   function countLabel(count, oneKey, oneFallback, manyKey, manyFallback) {
     if (count === 1) return text(oneKey, oneFallback);
     return text(manyKey, manyFallback).replace('{count}', String(count));
@@ -143,80 +138,94 @@
     />
   </ManagerToolbar>
 
-  {#if filteredRealms.length === 0}
-    <EmptyState
-      compact
-      icon={realms.length === 0 ? 'fas fa-earth-americas' : 'fas fa-magnifying-glass'}
-      title={realms.length === 0
-        ? text('FABRICATE.Admin.Manager.Travel.Realms.Empty', 'No realms yet.')
-        : text('FABRICATE.Admin.Manager.Travel.Realms.NoMatches', 'No realms match your search.')}
-      dataAttr="data-travel-realms-empty"
-    />
-  {:else}
-    <div class="manager-travel-realms-list" role="list">
-      {#each pagedRealms as realm (realm.id)}
-        {@const isExpanded = realm.id === selectedRealmId}
-        <div
-          class={`manager-travel-realms-row ${isExpanded ? 'is-expanded is-selected' : ''}`}
-          role="listitem"
-          data-manager-travel-realm-id={realm.id}
-        >
+  <div class="manager-table-scroll">
+    {#if filteredRealms.length === 0}
+      <EmptyState
+        compact
+        icon={realms.length === 0 ? 'fas fa-earth-americas' : 'fas fa-magnifying-glass'}
+        title={realms.length === 0
+          ? text('FABRICATE.Admin.Manager.Travel.Realms.Empty', 'No realms yet.')
+          : text('FABRICATE.Admin.Manager.Travel.Realms.NoMatches', 'No realms match your search.')}
+        dataAttr="data-travel-realms-empty"
+      />
+    {:else}
+      <div class="manager-travel-realms-list" role="list">
+        {#each pagedRealms as realm (realm.id)}
+          {@const isExpanded = realm.id === selectedRealmId}
+          {@const bodyId = `fab-realm-editor-${realm.id}`}
           <div
-            class="manager-travel-realms-header"
-            role="button"
-            tabindex="0"
-            aria-expanded={isExpanded}
-            onclick={() => selectRow(realm.id)}
-            onkeydown={(event) => onRowKeydown(event, realm.id)}
+            class={`manager-travel-realms-row ${isExpanded ? 'is-expanded is-selected' : ''}`}
+            role="listitem"
+            data-manager-travel-realm-id={realm.id}
           >
-            <div class="manager-travel-realms-left">
-              <span class="manager-travel-realms-icon" aria-hidden="true"
-                ><i class={REALM_ICON}></i></span
-              >
-              <span class="manager-travel-realms-name">{realm.name}</span>
-              {#if !realm.enabled}
-                <Chip tone="disabled"
-                  >{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</Chip
+            <!-- The whole header is the disclosure and therefore the button, not a focusable
+                 `div role="button"` Foundry's `KeyboardManager#hasFocus` cannot see (issue 1512).
+                 The name is the row's own copy — its name and its state chip — plus the hidden
+                 phrase; `aria-controls` is emitted only while the editor it names is mounted. -->
+            <button
+              type="button"
+              data-keyboard-focus="true"
+              class="manager-travel-realms-header"
+              aria-expanded={isExpanded}
+              aria-controls={isExpanded ? bodyId : undefined}
+              onclick={() => selectRow(realm.id)}
+            >
+              <div class="manager-travel-realms-left">
+                <span class="manager-travel-realms-icon" aria-hidden="true"
+                  ><i class={REALM_ICON}></i></span
                 >
-              {/if}
-              <Chip tone="neutral" icon="fas fa-seedling" class="manager-travel-realms-count-chip">
-                <span>{environmentCountLabel(realm)}</span>
-              </Chip>
-              <Chip
-                tone="neutral"
-                icon="fas fa-people-group"
-                class="manager-travel-realms-count-chip"
+                <span class="manager-travel-realms-name">{realm.name}</span>
+                {#if !realm.enabled}
+                  <Chip tone="disabled"
+                    >{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</Chip
+                  >
+                {/if}
+                <Chip
+                  tone="neutral"
+                  icon="fas fa-seedling"
+                  class="manager-travel-realms-count-chip"
+                >
+                  <span>{environmentCountLabel(realm)}</span>
+                </Chip>
+                <Chip
+                  tone="neutral"
+                  icon="fas fa-people-group"
+                  class="manager-travel-realms-count-chip"
+                >
+                  <span>{partyCountLabel(realm)}</span>
+                </Chip>
+              </div>
+              <span class="manager-travel-realms-chevron" aria-hidden="true">
+                <i class={isExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}></i>
+              </span>
+              <span class="visually-hidden"
+                >{localize(disclosurePhraseKey(isExpanded), { name: realm.name })}</span
               >
-                <span>{partyCountLabel(realm)}</span>
-              </Chip>
-            </div>
-            <span class="manager-travel-realms-chevron" aria-hidden="true">
-              <i class={isExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}></i>
-            </span>
+            </button>
+
+            {#if isExpanded}
+              <div class="manager-travel-realms-editor" id={bodyId} data-manager-realm-editor>
+                <RealmEnvironmentsEditor
+                  {realm}
+                  {environments}
+                  {saving}
+                  onAdd={onAddEnvironment}
+                  onRemove={onRemoveEnvironment}
+                  bind:browserState={realmEnvironmentsBrowserState}
+                />
+              </div>
+            {/if}
           </div>
+        {/each}
+      </div>
+    {/if}
+  </div>
 
-          {#if isExpanded}
-            <div class="manager-travel-realms-editor" data-manager-realm-editor>
-              <RealmEnvironmentsEditor
-                {realm}
-                {environments}
-                {saving}
-                onAdd={onAddEnvironment}
-                onRemove={onRemoveEnvironment}
-                bind:browserState={realmEnvironmentsBrowserState}
-              />
-            </div>
-          {/if}
-        </div>
-      {/each}
-    </div>
-
-    <Pagination
-      totalCount={filteredRealms.length}
-      pageSize={PAGE_SIZE}
-      {pageIndex}
-      pageSizeOptions={[PAGE_SIZE]}
-      onPageChange={(next) => (ui.pageIndex = next)}
-    />
-  {/if}
+  <Pagination
+    totalCount={filteredRealms.length}
+    pageSize={PAGE_SIZE}
+    {pageIndex}
+    pageSizeOptions={[PAGE_SIZE]}
+    onPageChange={(next) => (ui.pageIndex = next)}
+  />
 </div>

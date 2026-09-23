@@ -1,23 +1,4 @@
-/**
- * `Stepper`'s unset-value state (`allowUnset`) and its `fill` variant — issue 1050, Phase 0.
- *
- * ── WHY THE `0` CASE IS THE POINT ──────────────────────────────────────────────────
- * `Number(null)`, `Number('')` and the `: 0` fallback for `undefined` all produce the SAME
- * `0`, so `numericValue` reads `0` for every one of the three unset representations. The
- * commit path's dedupe guard (`next !== numericValue`) therefore swallows a deliberate `0`
- * typed into an unset field: nothing commits, `onBlur` then also sees `next === numericValue`
- * and stays silent, and the model keeps `null` while the input displays `0`. That is a real
- * data-loss path on the unbounded modifier bounds, where `0` is a legitimate persisted value.
- * The same guard makes `−` a live-but-inert button on an unset field with `min = 0`.
- * Both are pinned below; deleting the `isUnset ||` half of the guard fails them.
- *
- * ── WHY THE `fill` CASES ARE SOURCE ASSERTIONS ─────────────────────────────────────
- * happy-dom computes no cascade and no layout, so a mounted assertion could not tell
- * `height: 100%` from `height: 24px` either way. What actually decides the rendered result
- * is selector SPECIFICITY, which is a property of the stylesheet text — so it is asserted as
- * arithmetic over the real selectors rather than mimed through a DOM that cannot resolve it.
- * The rendered proof is the View Lab capture.
- */
+/** `Stepper`'s unset-value state (`allowUnset`) and its `fill` variant — issue 1050, Phase 0. */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -89,12 +70,7 @@ describe('Stepper unset-value state (issue 1050)', () => {
     assert.deepEqual(calls, [], 'and reports no change');
   });
 
-  // ── The adjuncts of an UNSET field, as a table ────────────────────────────────────
-  //
-  // Four cases with one shape: mount an unset field under some bounds, check which adjuncts are
-  // live, click a sequence, read the commits. Written out they were the same five lines four
-  // times over, so the shape is written once below and the cases carry only what differs — plus
-  // the reason each case exists, which is the part that is NOT interchangeable.
+  // ── The adjuncts of an UNSET field.
   const UNSET_ADJUNCT_CASES = [
     {
       title: 'steps an unset field from its lower bound, with both adjuncts live',
@@ -107,11 +83,6 @@ describe('Stepper unset-value state (issue 1050)', () => {
     {
       title: 'steps an unset field with no lower bound from 0, in both directions',
       // The `min = null` half of the baseline rule, which the `min = 5` case above cannot state:
-      // with no bound, `min ?? 0` and `numericValue` agree, so only the pairing of the two cases
-      // pins the branch. The mutation this catches is DELETION of the `isUnset ? (min ?? 0) : …`
-      // baseline — not a `??` -> `||` typo, which is indistinguishable for every value `min` takes
-      // (the fallback IS 0), so a test written for that rationale would pass under either operator
-      // and be recorded as covering something it does not.
       props: {},
       live: [],
       clicks: ['increment', 'decrement'],
@@ -129,12 +100,6 @@ describe('Stepper unset-value state (issue 1050)', () => {
     {
       title: 'keeps + effective on an unset field whose max is 0',
       // The MIRROR of the case above, and it is load-bearing rather than symmetrical tidiness.
-      // "steps an unset field from its lower bound" claims BOTH adjuncts stay live while unset,
-      // but it sets `max: 20`, where the coerced `numericValue` of `0` is nowhere near the upper
-      // bound — `0 >= 20` is false with or without the `!isUnset &&` guard on `atMax`, so
-      // deleting that half of the guard survived the entire suite while deleting the `atMin` half
-      // was caught. `max: 0` is the shape that makes the upper guard decide the outcome, exactly
-      // as `min: 0` does for the lower one.
       props: { max: 0 },
       live: ['increment'],
       clicks: ['increment'],
@@ -211,7 +176,6 @@ const CLASS_ONLY = /^(?:\s*(?:\.[A-Za-z][\w-]*|:not\(\.[A-Za-z][\w-]*\)))+$/;
 
 /**
  * The class column of a class-only selector's specificity.
- *
  * `:not()` contributes its ARGUMENT's specificity rather than zero, which is the whole
  * arithmetic this collision turns on: read as if `:not()` were free,
  * `.fab-stepper.is-fill.is-comfortable .fab-stepper-input` looks like (0,4,0) against a
@@ -239,8 +203,7 @@ describe('Stepper fill variant (issue 1050)', () => {
     // cannot see which area it was dropped into. Without it the height above is a
     // CONTENT height and the control stands 42px outside the manager.
     assert.match(body, /box-sizing: border-box;/);
-    // A custom property, not a constant: three candidate layout contexts resolve to
-    // 30/34/28px, so the 36px is a default rather than the answer.
+    // A custom property, not a constant.
     assert.match(body, /height: var\(--fab-stepper-fill-height, 36px\);/);
   });
 
@@ -295,8 +258,7 @@ describe('Stepper fill variant (issue 1050)', () => {
 });
 
 describe('Stepper inputProps contract (issue 1050)', () => {
-  // Everything above `<script>`: the component's own doc header, which is where a caller
-  // reading the props list will actually be standing.
+  // Everything above `<script>`: the component's own doc header.
   const header = stepperSource.slice(0, stepperSource.indexOf('<script>'));
 
   it('records that inputProps carries attributes only, never handlers', () => {
@@ -311,8 +273,7 @@ describe('Stepper inputProps contract (issue 1050)', () => {
   });
 
   it('records that disabled is the top-level prop, never an inputProps key', () => {
-    // The adjuncts read the top-level prop, so `inputProps={{ disabled }}` would leave
-    // −/+ live while every `input.disabled` assertion still passed.
+    // The adjuncts read the top-level prop.
     assert.match(header, /`disabled` is the TOP-LEVEL prop, never an `inputProps` key/);
   });
 });

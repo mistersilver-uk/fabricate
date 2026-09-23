@@ -1,19 +1,4 @@
-/**
- * The world Tools Catalogue, mounted (issue 1373, epic 1357).
- *
- * ## What this is FOR, and why an essence-shaped shell would have shipped past it
- *
- * `src/migration/worldScopeEntityGrouping.js` lifts SIX identity fields for a component and a
- * tool - name, img, description, and the three source-Item links - and only FOUR for an
- * essence, with no link among them. A catalogue built against the essence shape renders a row
- * that looks entirely correct and silently drops the affordance a tool needs most: which
- * game-world Item this record is, and the flag for a record that names none.
- *
- * So both states are asserted from the REAL projection rather than a hand-built `scope`. That
- * matters: `hasSourceLink` is answered inside `buildEntry`, beside the ONE list of source-link
- * field names, and a fixture that stamped the flag itself would go on passing after a rename
- * while every real row started reporting itself unlinked.
- */
+/** The world Tools Catalogue, mounted (issue 1373, epic 1357). */
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { dirname, resolve } from 'node:path';
@@ -44,59 +29,43 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...TOOL_TREE_RAW_MODULES,
     ...WORLD_TOOL_SCOPE_RAW_MODULES,
-    // THE DROP ZONE'S TWO LEAVES (issue 1373). The catalogue now renders `ItemDropZone`, whose
-    // `use:dragDrop` action and `resolveDropUuid` helper are ordinary modules: a compiled child
-    // missing from this list does not fail loudly, it HANGS, and `node --test` reports the
-    // whole suite as `# cancelled` with no message.
+    // THE DROP ZONE'S TWO LEAVES (issue 1373). The catalogue now renders `ItemDropZone`.
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
     // The list model this page's rows, pager and bulk bar are derived from.
-    'src/utils/browserPagination.js',
+    'src/ui/model/browserPagination.js',
     'src/utils/bulkSelectionModel.js',
-    'src/utils/scopedEntityListModel.js',
+    'src/ui/model/scopedEntityListModel.js',
   ],
   compiledModules: [
     ...TOOL_TREE_COMPILED_MODULES,
     'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     // THE BULK PANEL AND THE SHARED CHROME IT COMPOSES (issue 1373, maintainer feedback round 2).
-    // The page IMPORTS the panel, so all three are in this tree's static graph whether or not a
-    // given case ticks a row — and a compiled child missing from this list does not fail, it
-    // HANGS, which is exactly how this suite reported itself the first time they were left out.
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/scoped/ToolCatalogueBulkPanel.svelte',
-    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldToolCataloguePage.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
-    // THE `SYSTEM RULES n / m` PANEL, extracted out of the shell's inspector snippet (issue
-    // 1372). The shell composes it, so it is in this tree's static graph.
+    // THE `SYSTEM RULES n / m` PANEL.
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
-    // The design-system primitives the frame and the roster render (issues 1422 and 1040): the
-    // row's icon action, and the membership cluster's on/off switch. A rendered `.svelte` the
-    // harness omits HANGS this suite rather than failing it.
+    // The design-system primitives the frame and the roster render (issues 1422 and 1040).
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
-    // THE CARD SHELL the world break-mode card is now written as (issue 1427), and THE BROWSE
-    // BAR AND ITS FIELD the list frame is now written as (issue 1039). All three arrived by
-    // conversion rather than by new markup, which is exactly the case this list exists for: the
-    // tree renders the same pixels and the suite would have HUNG as `# cancelled` rather than
-    // failing had they been omitted.
+    // THE CARD SHELL the world break-mode card is now written as (issue 1427).
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/components/ManagerToolbar.svelte',
-    // THE MEMBERSHIP FILTER IS A SEGMENTED TRACK NOW (issue 1373), not a `<select>`: one filter
-    // asking the same question as the system Tool Rules screen's, drawn the same way.
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    // THE MEMBERSHIP FILTER IS A SEGMENTED TRACK NOW (issue 1373), not a `<select>`.
+    'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
-    // `Chip`/`ManagerButton` also arrive via `TOOL_TREE_COMPILED_MODULES` above; a module named
-    // twice compiles the same file twice, harmlessly.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/SelectionCheckbox.svelte',
   ],
@@ -186,8 +155,7 @@ describe('world Tools Catalogue (issue 1373)', () => {
   });
 
   it('offers a LABELLED row action, and NO membership filter at all', async () => {
-    // The labelled action is the design's, and it was also the idiom our own system Tool Rules
-    // screen already used — so the two list screens disagreed with each other as well as with it.
+    // The labelled action is the design's.
     const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
 
     const action = target.querySelector(
@@ -206,14 +174,7 @@ describe('world Tools Catalogue (issue 1373)', () => {
       'the extra segmented filter is gone rather than merely narrowed'
     );
     assert.ok(!target.querySelector('select[data-scoped-list-membership]'));
-    // AND THE BULK SELECTION SURVIVES IT, which is the distinction that makes this safe: the
-    // per-row checkboxes are a different control from the filter.
-    //
-    // THE ENTRY POINT IS THE ROW BOX, and at rest it is the ONLY one (issue 1373, round 4). The
-    // `All` box used to stand in this filter row; it is inside the selection band now, which
-    // renders only under an active selection, because `proto:1970` draws no selection affordance
-    // in this row in any state. Both halves are asserted, since "the row box is there" alone
-    // would also pass on a screen that kept `All` beside it.
+    // AND THE BULK SELECTION SURVIVES IT, which is the distinction that makes this safe.
     assert.ok(Boolean(target.querySelector('[data-scoped-list-select="hammer"]')), 'row box');
     assert.ok(
       !target.querySelector('[data-scoped-list-select-all-page]'),
@@ -242,8 +203,7 @@ describe('world Tools Catalogue (issue 1373)', () => {
       !zone.closest('[data-world-tool-break-mode]'),
       'the world breakage card no longer shares its row'
     );
-    // IT IS NOT A ROW. Every row affordance below it — selection, inspection, the entry action —
-    // would be a lie on a drop target, so it sits outside the `<ul>`.
+    // IT IS NOT A ROW. Every row affordance below it — selection, inspection.
     assert.ok(!zone.closest('li'), 'the zone is not a list item');
   });
 
@@ -257,10 +217,7 @@ describe('world Tools Catalogue (issue 1373)', () => {
       actions: {},
       worldItems: [{ uuid: entry.entity.originItemUuid, name: 'Smith’s Hammer' }],
     });
-    // THE ENTRY EDITOR DRAWS THAT LABEL AS OPTIONAL (issue 1373's parity round), so a blank is a
-    // real authored state and the row has to answer it the same way the editor does. Without the
-    // frame's `nameEntry` rung the row prints the record id under a screen that promised the
-    // Item's name would stand in.
+    // THE ENTRY EDITOR DRAWS THAT LABEL AS OPTIONAL (issue 1373's parity round).
     assert.match(
       target.querySelector('[data-scoped-list-row="hammer"]').textContent,
       /Smith’s Hammer/
@@ -305,11 +262,7 @@ describe('world Tools Catalogue (issue 1373)', () => {
   });
 
   it('states NO override count when the roster cannot answer one', async () => {
-    // THE ROSTER THIS PAGE RECEIVES IS `$viewState.systems`, a hand-built allowlist in
-    // `adminStore.js` that carries no `toolBreakage`. Answering `0` off an absent field reads
-    // as "nothing overrides it" and is a WRONG number rather than a missing one, so the line
-    // is withheld. This assertion is the gate on that decision: it reds the day the roster
-    // starts carrying the field and the line is not turned back on.
+    // THE ROSTER THIS PAGE RECEIVES IS `$viewState.systems`.
     const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
     assert.ok(
       !target.querySelector('[data-world-tool-break-overrides]'),
@@ -333,11 +286,6 @@ describe('world Tools Catalogue (issue 1373)', () => {
   });
 
   // ── THE CREATION SURFACE MOVED HERE (issue 1373) ───────────────────────────────────────
-  //
-  // The design opens this list with `Drag an Item here to make it a Tool`, and puts NO such
-  // zone on the system Tool Rules list. Ours had it exactly inverted. These cases are the
-  // BEHAVIOURAL half of the move - the system route's own tests now assert the zone's absence
-  // there, and asserting only that would leave the control untested at the moment it moved.
   describe('the create-from-drop zone', () => {
     it('raises a world-sidebar Item payload to the page owner, RAW', async () => {
       const dropped = [];
@@ -359,9 +307,7 @@ describe('world Tools Catalogue (issue 1373)', () => {
     });
 
     it('raises a COMPENDIUM payload, which carries no `uuid` at all', async () => {
-      // The common case for module-shipped content, and the one a `data.uuid` guard silently
-      // refuses. `ItemDropZone` resolves `{pack, id}` before it decides, so the zone is not
-      // stricter than the consumer it feeds.
+      // The common case for module-shipped content.
       const dropped = [];
       const target = await harness.mount({
         scope: scopeFor(),
@@ -432,8 +378,7 @@ describe('world Tools Catalogue (issue 1373)', () => {
           toggle.getAttribute('aria-label'),
           `${enabled ? 'Disable' : 'Enable'} Smith Hammer for every crafting system`
         );
-        // The catalogue opens with its first row inspected, so "without selecting" is asserted as
-        // the switch leaving the inspected row exactly where it was.
+        // The catalogue opens with its first row inspected.
         const inspectedIds = () =>
           [...target.querySelectorAll('[data-scoped-list-row][aria-current="true"]')].map(
             (row) => row.dataset.scopedListRow
@@ -451,20 +396,12 @@ describe('world Tools Catalogue (issue 1373)', () => {
   });
 
   // ── THE MAINTAINER'S FEEDBACK ROUND (issue 1373) ──────────────────────────────────────────
-  //
-  // Four of the six findings on this screen were states no case and no test could reach, which
-  // is exactly why two automated parity passes reported it complete. Each block below reaches
-  // one of them.
 
   describe('the scope band sits in the LIST column, not across the whole route', () => {
     // FINDING 2b AND FINDING 6, WHICH ARE ONE STRUCTURE. The page drew the world breakage card as
     // a SIBLING of the shell in its own grid row, which spans the content area edge to edge - so
     // the band stood over the inspector's track as well as the list's, and the inspector started
     // a card's height below the app header bar instead of running the whole route.
-    //
-    // Asserted as CONTAINMENT rather than by measuring: the card being inside
-    // `.manager-scoped-list-column` is what makes it the middle track's, and it is the one fact
-    // that cannot be true while the band spans the route.
     it('renders the breakage card inside the list column and not beside the inspector', async () => {
       const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
       const card = target.querySelector('[data-world-tool-break-mode]');
@@ -483,10 +420,7 @@ describe('world Tools Catalogue (issue 1373)', () => {
       );
     });
 
-    // AND IT SURVIVES AN UNREADABLE CORPUS, which is not a detail. The band was a sibling of the
-    // frame before, so it rendered whatever the corpus said; moving it into the frame put it
-    // behind the availability branch, and a control that vanishes when a setting fails to read
-    // is a behaviour change nobody asked for.
+    // AND IT SURVIVES AN UNREADABLE CORPUS.
     it('keeps the band on the unavailable branch, where it used to render too', async () => {
       const target = await harness.mount({
         scope: projectWorldScopeEntity({ entityType: 'tool', corpus: null, systems: SYSTEMS }),
@@ -532,7 +466,6 @@ describe('world Tools Catalogue (issue 1373)', () => {
     // FINDING 2a. The resting inspector read `Nothing selected` over the catalogue's own
     // SUBTITLE - the sentence the header prints a few pixels above it - so on an empty catalogue
     // the one column that could have said what the panel is for repeated the header instead.
-    // An EMPTY corpus, because a catalogue with rows now opens with its first one inspected.
     const target = await harness.mount({
       scope: projectWorldScopeEntity({
         entityType: 'tool',
@@ -554,8 +487,7 @@ describe('world Tools Catalogue (issue 1373)', () => {
 
   describe('bulk edit', () => {
     /**
-     * Tick a row's selection box through its LABEL, which is what a GM clicks: the real control
-     * is visually hidden behind the primitive's own box.
+     * Tick a row's selection box through its LABEL, which is what a GM clicks.
      *
      * @param {HTMLElement} target the mounted root.
      * @param {string} entityId
@@ -567,11 +499,7 @@ describe('world Tools Catalogue (issue 1373)', () => {
       input.click();
     }
 
-    // THE FINDING ITSELF (finding 4). Rows selected, the toolbar counting them, and the inspector
-    // still saying `Nothing selected` - because `bulk` is a lane snippet and the page passed
-    // none. Both halves are asserted against ONE mount, because the whole defect is that the two
-    // disagreed: a test that only looked at the panel would pass against a screen whose toolbar
-    // had silently stopped counting.
+    // THE FINDING ITSELF (finding 4). Rows selected, the toolbar counting them.
     it('swaps the inspector to the bulk panel, and the two counts agree', async () => {
       const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
       await harness.setProps({});
@@ -632,8 +560,7 @@ describe('world Tools Catalogue (issue 1373)', () => {
       target.querySelector('[data-world-tool-bulk-status-option="off"] input').click();
       await harness.setProps({});
       target.querySelector('[data-world-tool-bulk-apply]').click();
-      // The write is a sequence of awaited store calls, so the assertions below need the
-      // microtask queue drained before the panel and the selection can have moved.
+      // The write is a sequence of awaited store calls.
       for (let i = 0; i < 8; i += 1) await Promise.resolve();
       await harness.setProps({});
 
@@ -687,18 +614,7 @@ describe('world Tools Catalogue (issue 1373)', () => {
     assert.deepEqual(calls, ['checkDriven']);
   });
 
-  /**
-   * ── THE TOOLBAR, WHICH NOTHING HAD EVER LOOKED AT (issue 1373) ───────────────────────────
-   *
-   * `data-scoped-list-search`, `-sort`, `-direction` and `-clear-filters` had ZERO hits across
-   * the whole 306-case View Lab registry and no assertion anywhere: every frame photographs
-   * this bar at rest. So a typed search, both non-default sort keys, the descending direction,
-   * the filtered-to-nothing hero and the inert direction toggle were all shipped states that
-   * nothing in this repository had ever rendered.
-   *
-   * These drive each of them through the controls a GM uses rather than through the frame's
-   * state prop, because the defect class the coverage gap hides is a control WIRED to nothing.
-   */
+  /** ── THE TOOLBAR, WHICH NOTHING HAD EVER LOOKED AT (issue 1373) ─────────────────────────── */
   describe('the filter, sort and direction controls (issue 1373)', () => {
     /**
      * The row ids currently on the page, in the order they are drawn.
@@ -735,8 +651,7 @@ describe('world Tools Catalogue (issue 1373)', () => {
      * @returns {Promise<void>}
      */
     async function sortBy(target, value) {
-      // Issue 1504: the sort key is a shared `<Select>`, so this is two clicks on a portaled
-      // panel. The panel lands on `target`, which is the harness's own mount root.
+      // Issue 1504: the sort key is a shared `<Select>`.
       chooseSelectOption(target, '[data-scoped-list-sort]', value);
       await harness.setProps({});
     }
@@ -794,8 +709,7 @@ describe('world Tools Catalogue (issue 1373)', () => {
       await harness.setProps({});
       assert.deepEqual(rowIds(target), ['orphan', 'hammer'], 'name descending');
       assert.match(direction.textContent, /Desc/);
-      // THE GLYPH TURNS WITH IT. `proto:1971` binds this icon to a per-direction value; it drew
-      // one arrow in both positions, so the descending state asserted the ascending order.
+      // THE GLYPH TURNS WITH IT. `proto:1971` binds this icon to a per-direction value.
       assert.notEqual(
         direction.querySelector('i').className,
         ascendingGlyph,
@@ -805,8 +719,7 @@ describe('world Tools Catalogue (issue 1373)', () => {
       direction.click();
       await harness.setProps({});
       await sortBy(target, 'systems');
-      // `orphan` is in no system and `hammer` is in one, so the membership key is a genuinely
-      // different order from the name key rather than the same one under another label.
+      // `orphan` is in no system and `hammer` is in one.
       assert.deepEqual(rowIds(target), ['orphan', 'hammer'], 'fewest systems first');
       target.querySelector('[data-scoped-list-direction]').click();
       await harness.setProps({});
@@ -823,10 +736,7 @@ describe('world Tools Catalogue (issue 1373)', () => {
 
       await sortBy(target, 'break-asc');
       const direction = target.querySelector('[data-scoped-list-direction]');
-      // A lane descriptor supplies ONE `compare`, not a pair, so composing a direction onto its
-      // id would produce an id the model does not know and fall back silently to name order.
-      // `disabled` - never hidden - is what lets a GM see that reversing is what the control
-      // does and that it cannot be reversed here.
+      // A lane descriptor supplies ONE `compare`, not a pair.
       assert.equal(direction.disabled, true, 'the toggle states its own inertness');
       assert.ok(Boolean(direction.querySelector('span').textContent.trim()), 'and keeps its label');
       assert.deepEqual(

@@ -1,23 +1,6 @@
 /**
  * The lab world is not the world the lab renders: it is MIGRATED first, and the frames photograph
  * the result.
- *
- * `labWorld.js` seeds `game.settings` and then boots the real `fabricate.initialize()`, which runs
- * `MigrationRunner`. No lab fixture seeds `migrationVersion`, so `lastRunVersion` is `'0.0.0'` and
- * EVERY registered migration runs over these fixtures on EVERY lab build. A fixture value that a
- * migration rewrites is therefore not the value any frame shows, and nothing said so: the fixture
- * file states the intent, the case registry asserts against it, and the migration silently sits
- * between them.
- *
- * That is not hypothetical. `PROGRESSIVE_CHECK` authored `defaultModifierPolicy: 'playerPicks'`
- * with no `maxModifierPicks`, on the stated ground that absence is the UNLIMITED reading — which is
- * exactly the shape 1.20.0's `migrateMaxModifierPicks` exists to stamp `maxModifierPicks = 1` onto,
- * to preserve the single pick that rule used to mean. Two capture cases failed against a cap nobody
- * authored, and a third (`player-crafting-roll-prompt`) kept passing while publishing the historical
- * pick-one radio group under a case whose whole subject is the multi-pick control it replaced.
- *
- * These are cheap, pure checks over the same builder the lab boots from, and they run in `npm test`
- * — where a capture run needs harvested Foundry chrome and does not run on a fork PR at all.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -25,7 +8,7 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
-import { buildWorldScopeEntityNotice } from '../src/migration/worldScopeEntityNotice.js';
+import { buildWorldScopeEntityNotice } from '../src/systems/worldScopeEntityNotice.js';
 import {
   policyDefersSelection,
   resolveMaxModifierPicks,
@@ -37,13 +20,8 @@ import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js'
 /**
  * Run the real startup migration pass over the lab fixtures, exactly as a lab build does.
  *
- * The runner is driven through its injected setting seams rather than through a Foundry shim: the
- * pass is pure over the five settings it reads, so an in-memory Map reproduces it faithfully and
- * without booting anything. `migrationVersion` is deliberately NOT seeded, because that is the fact
- * under test — seeding it here would make every assertion below vacuous.
- *
- * @returns {Promise<{ before: object, after: object, summary: object }>} The seeded and
- *   migrated worlds, plus the runner summary carrying the transient world-scope report.
+ * @returns {Promise<{ before: object, after: object, summary: object }>} The seeded and migrated
+ * worlds, plus the runner summary carrying the transient world-scope report.
  */
 async function migrateLabWorld() {
   const content = buildLabContent();
@@ -71,15 +49,7 @@ const labSystem = (systems, id) => systems.find((system) => system.id === id);
 test('the startup migration pass does not rewrite any lab system’s crafting check', async () => {
   const { before, after } = await migrateLabWorld();
 
-  // ONE EXEMPTION, and it is the point of a migration rather than an accident (issue 1095,
-  // C13). `1.22.0` LIFTS `craftingCheck.checkModifiers` to `system.checkModifiers` and
-  // deletes the old key, and `labContent.js` deliberately goes on authoring it at the OLD
-  // location — which is what makes every lab build a live exercise of that transform, and
-  // what makes the frames show the state a GM upgrading will actually see. "Author the
-  // post-migration shape" is the right instruction for a stamp that fills an absence; it is
-  // the WRONG instruction for a relocation, because authoring the new location would leave
-  // the migration unexercised. So the key is dropped from BOTH sides of the comparison and
-  // the relocation is asserted positively below instead.
+  // ONE EXEMPTION, and it is the point of a migration rather than an accident (issue 1095, C13).
   const withoutRelocatedCatalogue = (check) => {
     if (!check || typeof check !== 'object') return check;
     const { checkModifiers, ...rest } = check;
@@ -111,15 +81,8 @@ test('the startup migration pass does not rewrite any lab system’s crafting ch
   );
 });
 
-// The positive half of the exemption above: the relocation the lab build exercises is
-// asserted to have HAPPENED, end to end. Without this the exemption would merely stop
-// looking at the one key `1.22.0` touches (issue 1095, C13).
-//
-// THE LAB EXERCISES BOTH HOPS (issue 1117). `1.22.0` lifts `craftingCheck.checkModifiers`
-// to `system.checkModifiers`; `1.23.0` then merges that with the gathering
-// `characterModifiers` library into `system.modifiers`. `labContent.js` deliberately goes
-// on authoring BOTH at their pre-migration locations, so a lab build runs the whole ladder
-// and the frames render the state a GM upgrading will actually see.
+// The positive half of the exemption above: the relocation the lab build exercises is asserted to
+// have HAPPENED, end to end (issue 1095).
 test('the startup migration pass MERGES both lab libraries into the world library', async () => {
   const { before, after } = await migrateLabWorld();
   const seeded = labSystem(before.craftingSystems, LAB_SYSTEM_IDS.HERBALISM);
@@ -135,27 +98,22 @@ test('the startup migration pass MERGES both lab libraries into the world librar
     before.gatheringConfig?.systems?.[LAB_SYSTEM_IDS.HERBALISM] ?? {};
   const seededGathering = seededGatheringConfig.characterModifiers ?? [];
 
-  // NO COLLISION IN THE LAB WORLD, deliberately: the two libraries authored the same id for
-  // two different expressions, which is precisely the duplication issue 1117 removes, and a
-  // fixture that kept it would model the defect AND fire the one-time rename notice on every
-  // lab build. The collision rule is exercised by
-  // `tests/migrate-unify-modifier-libraries.test.js`, against a world whose drop rows name the
-  // colliding id so the reference rewrite can be proven with it.
+  // NO COLLISION IN THE LAB WORLD, deliberately: the two libraries authored the same id for two
+  // different expressions, which is precisely the duplication issue 1117 removes, and a fixture
+  // that kept it would model the defect AND fire the one-time rename notice on every lab build.
   const seededIds = seeded.craftingCheck.checkModifiers.map((entry) => entry.id);
   assert.deepEqual(
     seededGathering.map((entry) => entry.id).filter((id) => seededIds.includes(id)),
     [],
     'the lab fixtures must author DISTINCT ids across the two libraries'
   );
-  // The destination moved again in issue 1308: `1.23.0` still merges the two into ONE library,
-  // but `1.28.0` then lifts that library off the crafting system into the `characterLibraries`
-  // world setting, so the lab build now exercises THREE hops and the merged order is asserted
-  // where it finally lands. The system's own copy is shed, and that is asserted too — an
-  // emitted-but-empty key would mean the allowlist rebuild had stopped shedding it.
+  // The destination moved again in issue 1308: `1.23.0` still merges the two into ONE library, but
+  // `1.28.0` then lifts that library off the crafting system into the `characterLibraries` world
+  // setting, so the lab build now exercises THREE hops and the merged order is asserted where it
+  // finally lands.
   assert.equal(migrated?.modifiers, undefined, 'the per-system copy is shed by 1.28.0');
   // Scoped to THIS system's ids, because the world library is a union across every lab system —
-  // which is the whole point of the 1.28.0 move. What is asserted is unchanged in substance: both
-  // of Herbalism's libraries arrive, check entries first, entry for entry, in that relative order.
+  // which is the whole point of the 1.28.0 move.
   const expected = [...seeded.craftingCheck.checkModifiers, ...seededGathering];
   const expectedIds = new Set(expected.map((entry) => entry.id));
   assert.deepEqual(
@@ -165,10 +123,8 @@ test('the startup migration pass MERGES both lab libraries into the world librar
   );
 
   // The reference REWRITE that accompanies a re-key is proven in
-  // `tests/migrate-unify-modifier-libraries.test.js`, against a world whose drop rows
-  // actually name the colliding id. The lab world authors no such reference today, so
-  // asserting it here would be vacuous — and a vacuous assertion beside a real one is worse
-  // than none, because it reads as coverage.
+  // `tests/migrate-unify-modifier-libraries.test.js`, against a world whose drop rows actually name
+  // the colliding id.
 
   assert.equal(
     Object.hasOwn(migrated?.craftingCheck ?? {}, 'checkModifiers'),
@@ -202,11 +158,7 @@ test('the lab’s check-modifier system still defers the selection with an unbou
       'renders under no other, so `manager-checks-crafting-modifiers` would have nothing to assert'
   );
 
-  // The cap is what decides which CONTROL the roll prompt draws. `buildCheckModifierChoice`
-  // takes `Math.min(cap, options.length)`, and `renderModifierFieldset` draws a pick-one radio
-  // group at 1 and a checkbox group legended "Pick up to N" above it — so a cap that has fallen
-  // below the eligible-set size does not fail any selector, it silently publishes the other
-  // control. Asserting the RELATION rather than a literal keeps this true if either count moves.
+  // The cap is what decides which CONTROL the roll prompt draws.
   const eligible = check?.defaultModifierIds?.length ?? 0;
   assert.ok(eligible >= 2, 'the engine suppresses a one-option choice, so the prompt needs two');
   assert.ok(
@@ -217,19 +169,9 @@ test('the lab’s check-modifier system still defers the selection with an unbou
 });
 
 /**
- * THE CAPTURE DRIVER'S WARNING TOLERANCE, held against the messages this world really emits.
- *
- * `scripts/view-lab-screenshots.mjs` treats an untolerated `Fabricate |` WARNING as fatal, which is
- * what makes a fixture-shaped defect fail a frame rather than publish one. `TOLERATED_WARNINGS` is
- * the only hole in that gate, so it is the one list where a pattern that is too broad is worse than
- * the bug it was added for: it excuses a real defect silently, on every case, forever.
- *
- * The two entries the `1.30.0` migration made necessary are pinned here, and the messages are
- * DERIVED rather than copied. A copied literal rots the moment the message is reworded: the pattern
- * stops matching, the copy goes on agreeing with itself, and the guard stays green while all 268
- * cases fail. So the notice is rebuilt from the report this lab world's own migration produces, and
- * the omission warning is emitted by the real composition site reading the re-key map that same
- * migration wrote.
+ * THE CAPTURE DRIVER'S WARNING TOLERANCE, held against the messages this world really emits. The
+ * two entries the `1.30.0` migration made necessary are pinned here, and the messages are DERIVED
+ * rather than copied.
  */
 const DRIVER_PATH = resolve(import.meta.dirname, '../scripts/view-lab-screenshots.mjs');
 
@@ -237,8 +179,7 @@ const LANG = JSON.parse(readFileSync(resolve(import.meta.dirname, '../lang/en.js
 
 /**
  * The localizer `src/main.js` hands the notice builder: `format` when the clause takes data,
- * `localize` when it does not. Token substitution is by name over the supplied data, exactly as
- * `toI18nStub` does it for the lab itself, so an absent token survives rather than blanking.
+ * `localize` when it does not.
  *
  * @param {string} key Dotted `FABRICATE.…` key.
  * @param {object} [data] Clause data, when the clause takes any.
@@ -256,11 +197,6 @@ function localizeLang(key, data) {
 
 /**
  * The regex literals the capture driver declares, read out of its own source.
- *
- * The driver cannot be IMPORTED — it dispatches a command off `process.argv` at module scope, so
- * importing it launches a capture — which is why the list is read as text. Parsed without a regex
- * of its own, because a parser that silently matched nothing would report an EMPTY tolerance list
- * and every assertion below would then pass vacuously.
  *
  * @returns {RegExp[]} every declared pattern, in source order.
  */
@@ -293,11 +229,6 @@ function toleratedWarningPatterns() {
 
 /**
  * The omission warning a lab build emits, from the REAL composition site.
- *
- * The corpora are empty on purpose: `composeStartupPassList` decides omissions from the id BASIS
- * alone, and every thunk it returns is left uninvoked, so the collaborators only have to answer.
- * The one input that decides anything is `getSetting`, which reads the migrated world — including
- * the `worldScopeRekeyMap` the `1.30.0` pass just wrote, which is what makes the basis incomplete.
  *
  * @param {object} after The migrated setting store.
  * @returns {string[]} every message the composition warned with.
@@ -333,9 +264,7 @@ test('the capture driver tolerates the two warnings a lab build really emits', a
 
   const notice = buildWorldScopeEntityNotice(summary.worldScopeEntityReport, localizeLang);
   // The severity is DERIVED — `warn` only when the pass produced a rename, a refusal or a flagged
-  // reference — so this fixture reaches the gate at all because it produces one rename. If that
-  // stops being true the notice never reaches the driver and its tolerance entry is DEAD, which is
-  // worth failing on: a dead entry is an unexplained hole that outlives its reason.
+  // reference — so this fixture reaches the gate at all because it produces one rename.
   assert.equal(
     notice.severity,
     'warn',
@@ -350,9 +279,7 @@ test('the capture driver tolerates the two warnings a lab build really emits', a
       '`TOLERATED_WARNINGS` is now dead and should be deleted rather than left standing'
   );
 
-  // ONE pattern per message, not "at least one". Zero means the entry was deleted or has drifted
-  // from the message it excuses; two means a pattern has been widened far enough to swallow a
-  // message it was never argued for.
+  // ONE pattern per message, not "at least one".
   for (const message of [notice.message, omissions[0]]) {
     const matched = patterns.filter((pattern) => pattern.test(message));
     assert.equal(
@@ -370,23 +297,16 @@ test('no tolerated pattern matches a warning the capture gate exists to catch', 
   const unlocalized = buildWorldScopeEntityNotice(summary.worldScopeEntityReport, () => undefined);
 
   const controls = [
-    // Real product warnings, prefixed exactly as the driver sees them. These are the defect class
-    // the gate was built for — a resolver degrading to a default and saying so at `warn` while the
-    // frame renders cleanly and publishes.
+    // Real product warnings, prefixed exactly as the driver sees them.
     'Fabricate | Ignoring invalid situational bonus',
     'Fabricate | Gathering hook failed: fabricate.gatheringComplete',
-    // A routed notification, which is the channel the first tolerated entry travels on. The gate
-    // exists to fail on THIS one: the import path's validation notice published a clean systems
-    // browser under the name "Import report" for a whole increment.
+    // A routed notification, which is the channel the first tolerated entry travels on.
     'Fabricate | notification: Invalid file: the payload declares no crafting system',
     // THE SAME NOTICE WITH ITS STRING TABLE MISSING, derived rather than written: `localizeWith`
-    // falls back to a literal when the key does not resolve. A lab that lost `lang/en.json` renders
-    // fallback copy everywhere and must FAIL a capture, so the tolerated pattern has to be specific
-    // to the localized wording rather than to the notice's subject.
+    // falls back to a literal when the key does not resolve.
     `Fabricate | notification: ${unlocalized.message}`,
     // A constructed near miss for the second entry, sharing its subject and its first two words and
-    // differing exactly where the pattern anchors. `runStartupMaintenance` reports a pass that THREW
-    // on `console.error`, so there is no real warn-level neighbour to use in its place.
+    // differing exactly where the pattern anchors.
     'Fabricate | Startup cleanup FAILED: salvage runs threw and the world may be inconsistent',
   ];
 
@@ -401,27 +321,13 @@ test('no tolerated pattern matches a warning the capture gate exists to catch', 
   }
 });
 
-// ---------------------------------------------------------------------------
-// The two world-scope states the essence work is judged on, MEASURED after the
-// migration rather than read off the fixture seeds (issue 1371 r20-store3)
-// ---------------------------------------------------------------------------
-//
-// This block exists because a review round concluded the opposite from the seeds alone. The lab
-// fixture writes `essenceScope: { entities: [], defaults: {} }` and authors no component world
-// `essences` map, which reads as "neither state is reachable in the lab world" — and the file
-// header above says at length why that reading is unsound: NO lab fixture seeds `migrationVersion`,
-// so every registered migration runs on every lab build, and `1.30.0` LIFTS every system essence
-// into `essenceScope.entities` while `1.32.0` ELECTS a component world essence map for almost every
-// entity. What the frames show is the migrated world, and only a measurement of it can say so.
+// The two world-scope states the essence work is judged on, MEASURED after the migration rather
+// than read off the fixture seeds (issue 1371 r20-store3). This block exists because a review round
+// concluded the opposite from the seeds alone.
 
 /**
  * The lab's THREE world-scope payloads through the same startup pass, seeded exactly as
  * `labWorld.js` seeds them.
- *
- * `migrateLabWorld` above deliberately seeds only the five keys its own subjects live in; the scope
- * keys are seeded here rather than added there so no assertion in this file changes meaning.
- *
- * @returns {Promise<{componentScope: object, essenceScope: object, craftingSystems: object[]}>}
  */
 async function migrateLabWorldScopes() {
   const content = buildLabContent();
@@ -469,8 +375,6 @@ async function migrateLabWorldScopes() {
 test('every lab essence is WORLD-KNOWN after the pass, so the bulk Colour axis is withheld', async () => {
   // The panel withholds its `Colour` axis when ANY selected essence is `worldDefined`, which the
   // store stamps from `worldScope.essence.entries` — the published corpus, not the fixture seed.
-  // `manager-essences-bulk-edit` ticks `mote` and `aether`, so the withheld axis and its Callout
-  // are already in a published frame and no further seed is needed to photograph them.
   const { essenceScope } = await migrateLabWorldScopes();
   const worldKnown = new Set(essenceScope.entities.map((entity) => entity.id));
 
@@ -487,7 +391,6 @@ test('the lab resolves an essence map for `sm-iron-ingot` that its OWN row does 
   // The r19 overlay — the rules list and its inspector drawing what the system RESOLVES rather than
   // the persisted row — is invisible in a freshly migrated world, because `1.32.0` elects each
   // world map FROM a system's own row and marks that system inheriting only when the two are equal.
-  // `labContent` seeds the divergence on the component `manager-component-edit-inheriting` opens.
   const { componentScope, craftingSystems } = await migrateLabWorldScopes();
   const smithing = labSystem(craftingSystems, LAB_SYSTEM_IDS.SMITHING);
   const persisted = smithing.components.find((row) => row.id === 'sm-iron-ingot');

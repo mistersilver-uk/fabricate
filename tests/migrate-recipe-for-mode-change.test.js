@@ -4,14 +4,13 @@ import assert from 'node:assert/strict';
 import {
   migrateRecipeForModeChange,
   classifyModeChange,
-} from '../src/migration/migrateRecipeForModeChange.js';
+} from '../src/systems/migrateRecipeForModeChange.js';
 
 const MODES = ['simple', 'routedByIngredients', 'routedByCheck', 'progressive', 'alchemy'];
 const ROUTED_MODES = ['routedByIngredients', 'routedByCheck'];
 
 // Shared fixtures (Sonar): a 1×1 recipe (single ingredient set + result group), a
-// multi-set/multi-group recipe, and a multi-step recipe. Each factory returns a
-// fresh JSON object so cases never share mutable state.
+// multi-set/multi-group recipe, and a multi-step recipe.
 function oneByOne(overrides = {}) {
   return {
     id: 'r-1x1',
@@ -145,10 +144,9 @@ test('alchemy → simple drops the provider when clearing a 1×1 recipe', () => 
   assert.equal(result.recipe.resultSelection, null);
 });
 
-// --- Into alchemy: NEVER seeds a provider (the provider is retired) ----------
-// Migrating into alchemy clears any stale resultSelection and collapses a
-// multi-ingredient-set recipe to its first set; the system-level alchemy.checkMode
-// is seeded separately (defaults to none).
+// Into alchemy: NEVER seeds a provider (the provider is retired) ---------- Migrating into alchemy
+// clears any stale resultSelection and collapses a multi-ingredient-set recipe to its first set;
+// the system-level alchemy.checkMode is seeded separately (defaults to none).
 
 for (const from of ['routedByIngredients', 'routedByCheck', 'simple', 'progressive']) {
   test(`${from} → alchemy seeds NO provider on a 1×1 recipe`, () => {

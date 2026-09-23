@@ -1,54 +1,7 @@
 /**
  * Source contract: the manager's button contract is written in ONE place (issue 1118).
- *
- * `class="manager-button"` was a CSS CONVENTION for as long as this app has had a manager, and
- * a convention is exactly as reliable as everyone's memory of it. The modifier half is the part
- * that drifted: `is-primary`, `is-ghost` and `is-danger` are remembered or they are not, nothing
- * enforces the choice, and a forgotten one is invisible to `lint`, to `format:check` and to
- * every source-contract test in this repository. It is visible only to someone looking at the
- * screen. The sweep found 19 controls painted as the wrong verb, and one — the environment
- * editor's labelled Force add — spelling a modifier the stylesheet declares NOWHERE, so it
- * shipped with no treatment at all while the amber treatment shipped with no call site.
- *
- * `ManagerButton.svelte` makes the role a required-shaped PROP with a small closed set, which
- * is a thing a reviewer can see and a test can assert. This file is what keeps it that way: it
- * is the END-STATE gate for the conversion, not a ratchet, and it asserts that the literal has
- * left `src/` entirely.
- *
- * ── THE TWO EXCEPTIONS, AND WHY EACH IS ONE ─────────────────────────────────────────────
- * `ManagerButton.svelte` carries the literal in its own docblock prose, twice, explaining the
- * convention it replaced. Without the exception this gate would red on the day it landed.
- * `ArmedDangerButton.svelte` is a CONSUMER of the same CSS contract rather than a consumer of
- * the primitive: it owns a two-state arm/confirm machine whose danger role is an invariant of
- * the machine, not a caller's choice, and routing it through the primitive would buy one shared
- * class string in exchange for a keydown/blur contract no other call site wants.
- *
- * Each exception states the EVIDENCE it earns its exemption by — `'prose'` or `'markup'` — and
- * the earning clause reads it that way. Issue 1502 is why: it re-rooted the family, so the
- * carrier now writes `class="fabricate-button manager-button is-danger"`, which the raw
- * `class="manager-button` prefix no longer matches while the primitive's prose still does.
- *
- * ── WHY IT READS THE FILES ITSELF ───────────────────────────────────────────────────────
- * Never by shelling to `grep`. GNU grep classifies a file holding a raw NUL byte as BINARY and
- * omits it from a recursive search with no `-a` — silently, with no diagnostic. Three tracked
- * files under `src/` held one, and `checks/ChecksView.svelte` was among them: 101KB of manager
- * markup that every `grep -rn 'class="manager-button' src/` in this issue's planning walked
- * straight past, which is how a 101KB view came to be missing from a census that had been
- * re-derived three times. The NUL guard below is the other half of that lesson.
- *
- * ── THE FIXTURE HALF ────────────────────────────────────────────────────────────────────
- * A suite that hand-writes its own HTML and measures it in a browser keeps passing after the
- * component stops emitting that HTML. It measures the old markup forever, reports green, and
- * nothing anywhere says so. Two such fixtures were already stale when this file was written —
- * one modelling the Tool Studio header, which has rendered through the primitive since #1096
- * and passed only because the values happened to agree. So every bare `manager-button` in a
- * fixture is either fixed or ALLOWLISTED WITH ITS REASON, and the allowlist is asserted
- * exactly: an entry that stops matching reds just as loudly as an unlisted one appearing.
- *
- * That census lives in `tests/helpers/managerButtonFixtureAllowlist.js` since issue 1502, because
- * the area-scope gate's fixture clauses need the same list to know which fixture elements must
- * NOT gain the family root. Two hand-listed copies of one census is the drift this repository
- * has already paid for once; it is stated there and imported here.
+ * `class="manager-button"` was a CSS CONVENTION for as long as this app has had a manager, and a
+ * convention is exactly as reliable as everyone's memory of it.
  */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -69,23 +22,8 @@ const KEYBOARD_FOCUS_ATTRIBUTE = 'data-keyboard-focus="true"';
 const PRIMITIVE_FILE = 'src/ui/svelte/components/ManagerButton.svelte';
 
 /**
- * The two `.svelte` files under `src/` that may still write the literal, each for its own
- * reason. Repo-relative POSIX paths, so a Windows checkout compares the same strings.
- *
- * ── `evidence` IS NOT DECORATION (issue 1502) ───────────────────────────────────────────
- * The exemption-earning clause below asserts that an exempted file STILL WRITES the thing it is
- * exempted for, so a permission nobody is using is dropped rather than inherited. The two
- * exemptions earn that in DIFFERENT WAYS, and one probe cannot read both:
- *
- * - `'prose'` — the file's only occurrences of the literal are inside its docblock, explaining
- *   the convention it replaced. `classAttributesIn` returns ZERO class attributes for such a
- *   file, so a token-aware probe would red with "no longer writes the literal, so drop the
- *   exception" against a file that has not changed. Prose evidence is the raw substring.
- * - `'markup'` — the file writes the literal on a real element, so the token form is both
- *   available and strictly better. It is REQUIRED here rather than merely preferred: issue
- *   1502 re-rooted the family, and `ArmedDangerButton` now spells its attribute
- *   `class="fabricate-button manager-button is-danger"`, which a `class="manager-button`
- *   PREFIX probe no longer matches. A prefix probe is exactly the shape this change defeats.
+ * The two `.svelte` files under `src/` that may still write the literal, each for its own reason.
+ * Repo-relative POSIX paths, so a Windows checkout compares the same strings (issue 1502).
  */
 const LITERAL_EXCEPTIONS = Object.freeze({
   [PRIMITIVE_FILE]: Object.freeze({
@@ -113,13 +51,7 @@ function filesUnder(directory) {
   });
 }
 
-/**
- * A prose line, which may legitimately quote the literal while explaining it.
- *
- * Line-based rather than a comment-stripping parse, for the reason
- * `confirm-button-shape-source-contract.test.js` gives: a violation is always on a CODE line,
- * and the docblocks that explain this defect must not read as the defect itself.
- */
+/** A prose line, which may legitimately quote the literal while explaining it. */
 function isCommentLine(line) {
   const trimmed = line.trimStart();
   return (
@@ -132,17 +64,6 @@ function isCommentLine(line) {
 
 /**
  * Every class attribute that is actually ON AN ELEMENT in this source, as its raw token string.
- *
- * Tag-aware rather than line-based, and both halves of that are load-bearing. Prose is the
- * first reason: this repository's guards quote the literal constantly — "is booked as converted
- * but still writes a literal class=..." is an assertion MESSAGE, not a fixture, and a bare
- * `class="…"` match cannot tell the two apart. The second is that fixture markup wraps: the
- * Checks rail probe puts its `class=` on its own line, several lines below the `<button` that
- * owns it, so a rule of "is there a `<` earlier on this line" would miss exactly the fixtures
- * this exists to find.
- *
- * Comment lines are blanked first, preserving offsets, so a docblock that draws the markup it
- * is describing does not read as the markup itself.
  *
  * @param {string} source a test file's text
  * @returns {Array<string>} the value of every `class` attribute inside an element tag
@@ -160,16 +81,8 @@ function classAttributesIn(source) {
 test('no .svelte under src writes the manager-button class literal', () => {
   const svelte = filesUnder(SRC).filter((path) => path.endsWith('.svelte'));
 
-  // NON-VACUITY, in the precedent's own style and for the precedent's own reason: an absence
-  // check over an empty corpus passes forever and reports itself satisfied. A wrong root, a bad
-  // extension filter or a `readdirSync` that stopped recursing all read as zero here.
-  //
-  // The floor is `<ManagerButton` call-site FILES, not the literal it replaced, because the
-  // literal is what this test asserts the absence of — a floor stated over the same string
-  // would be self-contradictory. 48 `.svelte` files under `src/` render the primitive as this
-  // lands: 42 converted by the sweep plus the seven that already used it, less one orphan
-  // component the sweep deleted rather than converting. 41 is a real floor with headroom, and
-  // it is deliberately below the measured number so that deleting a screen does not red this.
+  // NON-VACUITY, in the precedent's own style and for the precedent's own reason: an absence check
+  // over an empty corpus passes forever and reports itself satisfied.
   const callSiteFiles = svelte.filter((path) =>
     readFileSync(join(repoRoot, path), 'utf8').includes('<ManagerButton')
   );
@@ -179,12 +92,7 @@ test('no .svelte under src writes the manager-button class literal', () => {
       `files rendering <ManagerButton across ${svelte.length} components under src/`
   );
 
-  // TOKEN-AWARE, not a prefix probe (issue 1502). It reads the file's own `classAttributesIn`
-  // extractor and splits on whitespace, which strictly TIGHTENS the clause: the prefix form
-  // `includes('class="manager-button')` cannot see a site that spells the attribute
-  // `class="fabricate-button manager-button …"`, and re-rooting the family is precisely the
-  // change that makes that spelling the normal one for a hand-written carrier. The token form
-  // also stops matching the middle of a longer class name, which the prefix form never could.
+  // TOKEN-AWARE, not a prefix probe (issue 1502).
   const offenders = svelte
     .filter((path) => !(path in LITERAL_EXCEPTIONS))
     .filter((path) =>
@@ -198,18 +106,11 @@ test('no .svelte under src writes the manager-button class literal', () => {
     [],
     'a manager button is a `<ManagerButton role="…">`, never a remembered class string. The ' +
       'role vocabulary is closed and a per-site visual tweak travels as a pass-through on the ' +
-      '`class` prop — see `openspec/specs/ui-integration/spec.md`:\n  ' +
+      '`class` prop — see `openspec/specs/ui-visual-style/spec.md` `### Shared product UI primitives`:\n  ' +
       offenders.join('\n  ')
   );
 
-  // The exceptions are asserted to still EARN their exemption. An exception for a file that no
-  // longer contains the literal is a permission nobody is using, and the next file added to
-  // this object gets to lean on the precedent of an unchecked list.
-  //
-  // Each is read by the evidence it actually offers — see `LITERAL_EXCEPTIONS` above. Reading
-  // both the same way is what would break: the token form reports the primitive as having
-  // stopped (its literal is prose, and prose holds no class attribute), and the prose form
-  // reports the carrier as having stopped the moment it writes the family root first.
+  // The exceptions are asserted to still EARN their exemption.
   for (const [path, exception] of Object.entries(LITERAL_EXCEPTIONS)) {
     const source = readFileSync(join(repoRoot, path), 'utf8');
     const earns =
@@ -227,11 +128,7 @@ test('no .svelte under src writes the manager-button class literal', () => {
 });
 
 test('the primitive emits the family root and the keyboard-focus attribute', () => {
-  // NOTHING ELSE PINS EITHER EMISSION (issue 1502). `IconButton` has
-  // `tests/helpers/primitiveSourceContract.js` for exactly this, but `ManagerButton` does not use
-  // that helper, so its two new emissions would otherwise be deletable with every suite green:
-  // the class family would silently lose its root and fall back to matching nothing, and
-  // `KeyboardManager#hasFocus` would silently answer `false` again.
+  // NOTHING ELSE PINS EITHER EMISSION (issue 1502).
   const source = readFileSync(join(repoRoot, PRIMITIVE_FILE), 'utf8');
 
   const composed = /const classes = \$derived\(\s*\[([\s\S]*?)\]/.exec(source);
@@ -273,9 +170,7 @@ test('the primitive emits the family root and the keyboard-focus attribute', () 
       'Space/arrow/Tab bindings while this control holds focus.'
   );
 
-  // PLACEMENT, not merely presence. A rest spread that lands later wins, so the attribute has to
-  // sit on the same side of `{...rest}` as `class={classes}` — see the docblock sentence this
-  // asserts. Written after the spread, a caller`s `data-*` bag unsets it by accident.
+  // PLACEMENT, not merely presence.
   const markup = source.slice(source.indexOf('</script>'));
   const attributeAt = markup.indexOf(KEYBOARD_FOCUS_ATTRIBUTE);
   const spreadAt = markup.indexOf('{...rest}');
@@ -288,15 +183,7 @@ test('the primitive emits the family root and the keyboard-focus attribute', () 
 });
 
 test('no tracked file under src contains a raw NUL byte', () => {
-  // The blind spot that hid `checks/ChecksView.svelte` from three rounds of census. GNU grep
-  // treats a file holding a raw NUL as BINARY and omits it from a recursive search with no
-  // `-a`, printing nothing to say so — so a 101KB manager view was simply absent from every
-  // count. Three tracked files under `src/` held one, written as a signature separator inside a
-  // `.join()`; issue 1118 rewrote all three as the two-character escape, which is one identical
-  // U+0000 code point and therefore byte-identical output.
-  //
-  // This guards the tree rather than the tool: a NUL is invisible in an editor and in a diff,
-  // so the only way it stays gone is a test that reads the bytes.
+  // The blind spot that hid `checks/ChecksView.svelte` from three rounds of census (issue 1118).
   const offenders = filesUnder(SRC).filter((path) =>
     readFileSync(join(repoRoot, path)).includes(0)
   );
@@ -325,9 +212,7 @@ test('no test fixture models a manager button the product no longer renders', ()
     }
   }
 
-  // Non-vacuity: the scan must be reaching real fixture markup. Every converted fixture still
-  // carries `manager-button` beside the primitive class, so this counts both halves and would
-  // read zero if the attribute matcher, the walk or the extension filter stopped working.
+  // Non-vacuity: the scan must be reaching real fixture markup.
   assert.ok(
     attributesScanned > 20,
     `only ${attributesScanned} manager-button class attributes found under tests/`
@@ -357,10 +242,8 @@ test('no test fixture models a manager button the product no longer renders', ()
       `${entry.file} allowlists \`${entry.classes}\` with no stated reason`
     );
 
-    // An entry claiming the PRODUCT still renders its string says so with a path and a literal,
-    // and the claim is read rather than believed. A prose `why` cannot notice the call site it
-    // names being converted or deleted, which is the same rot this whole allowlist exists to
-    // catch one layer down — an exemption outliving the thing it exempts.
+    // An entry claiming the PRODUCT still renders its string says so with a path and a literal, and
+    // the claim is read rather than believed.
     if (!entry.stillRenderedBy) continue;
     const { file, literal } = entry.stillRenderedBy;
     assert.ok(

@@ -1,16 +1,6 @@
 /**
- * THE ITEM- AND ACTOR-FLAG REMAP (issue 1363, criterion 6a and 6b).
- *
- * IT IS PROVEN AT THREE LEVELS BECAUSE THE SMOKE ALONE CANNOT FAIL. A stale
- * `roles[systemId].componentId` names an id absent from the re-keyed candidate set, so tier 1
- * returns null and resolution falls through to tier 3 — the source-reference tier, which this
- * change does not touch. "Owned copies still resolve", "a craft, a salvage and a gather succeed"
- * and "every Manager browser lists the same entities" are therefore ALL TRUE with this pass never
- * written. Only an assertion on the FLAG VALUE ITSELF carries falsifiability.
- *
- * This file is level (a), the planner units, one arm per branch, and level (b), the composition
- * mutation: a source-contract assertion that `src/main.js` still calls the pass from its `ready`
- * body, which flips to FAIL when that edge is deleted.
+ * THE ITEM- AND ACTOR-FLAG REMAP (issue 1363, criterion 6a and 6b). IT IS PROVEN AT THREE LEVELS
+ * BECAUSE THE SMOKE ALONE CANNOT FAIL.
  */
 
 import assert from 'node:assert/strict';
@@ -37,7 +27,7 @@ import {
   unambiguousComponentRemap,
   unambiguousEssenceRemap,
   worldEssenceMergeLegs,
-} from '../src/migration/remapWorldScopeIdentityFlags.js';
+} from '../src/systems/remapWorldScopeIdentityFlags.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -114,9 +104,7 @@ function readFlag(document, key, fallback = null, options = {}) {
   return value ?? fallback;
 }
 
-// ---------------------------------------------------------------------------
 // (a) planner units, one per branch
-// ---------------------------------------------------------------------------
 
 test('the role componentId leaf is remapped, per system', () => {
   const item = makeDocument({
@@ -266,10 +254,7 @@ test('alchemy dead-end signature keys are PARSED, remapped, RE-SORTED and re-joi
 });
 
 test('the alchemyDeadEnds COMPOSITION edge is wired, not just the pure helper', async () => {
-  // MUTATE THE COMPOSITION, NOT ONLY THE PURE HELPER. `const deadEnds = null;` at the call site
-  // survives every assertion about `remapAlchemyDeadEnds` itself — and `#### D8` records that
-  // revision 3 missed this site ENTIRELY, so the call site is exactly the half that has been
-  // wrong before. The run containers already get this treatment; dead ends did not.
+  // MUTATE THE COMPOSITION, NOT ONLY THE PURE HELPER.
   const map = { 'sys-a': { components: { zeta: 'alpha' } } };
   const original = canonicalSignatureKey({ mid: 1, zeta: 2 });
   const written = [];
@@ -404,26 +389,21 @@ test('the unsafe-systemId skips reach the SUMMARY, so the GM notice can name the
   assert.deepEqual(summary.unsafeSystemIdSkips, ['sys.dotted']);
 });
 
-// ---------------------------------------------------------------------------
 // (b) the COMPOSITION mutation
-// ---------------------------------------------------------------------------
 
-/**
- * The index of a live `await <name>();` statement in `src/main.js`, or `-1`.
- *
- * Matched as a whole statement, never as a substring: `source.indexOf('await foo();')` is satisfied
- * by the call commented out, which is exactly how a bisect or a revert disables one, so an
- * `indexOf` probe stays green against the mutation it is there to catch.
- */
+/** The index of a live `await io.<name>();` statement in the ready startup sequence, or `-1`. */
 function liveCallIndex(source, name) {
-  return source.search(new RegExp(`\n +await ${name}\\(\\);`));
+  return source.search(new RegExp(`\n +await io\\.${name}\\(\\);`));
 }
 
-test('src/main.js calls the remap from its ready body, AFTER the owned-item restamp', () => {
-  // DELETING THE `ready`-BODY CALL SITE MUST FLIP THIS TO FAIL. A planner that is perfect and
-  // never invoked is indistinguishable, from every runtime observation, from one that is absent:
-  // resolution falls through to the untouched source-reference tier either way.
-  const source = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
+/** The module entry and the ready edge that runs its one-shots, in that order. */
+const ENTRY_AND_READY_EDGE = ['main.js', 'bootstrap/hooks.js'];
+
+test('the ready startup sequence calls the remap AFTER the owned-item restamp', () => {
+  // DELETING THE `ready`-BODY CALL SITE MUST FLIP THIS TO FAIL.
+  const source = ENTRY_AND_READY_EDGE.map((file) =>
+    readFileSync(resolve(HERE, '..', 'src', file), 'utf8')
+  ).join('\n');
   const restampIndex = liveCallIndex(source, 'runOwnedItemComponentIdentityRestamp');
   const remapIndex = liveCallIndex(source, 'runWorldScopeIdentityFlagRemap');
   assert.ok(restampIndex > 0, 'the premise: the shipped owned-item restamp edge is still there');
@@ -442,8 +422,6 @@ test('src/main.js calls the remap from its ready body, AFTER the owned-item rest
 
 test('the clear and the version advance are BOTH inside the same gate', () => {
   // Whenever the clear is withheld the pass must ALSO withhold its own Number-version advance.
-  // The shipped one-shot precedent writes its version UNCONDITIONALLY at the end, so a pass that
-  // copied it would short-circuit on every later boot and NEVER clear — orphaning the map.
   const source = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
   const body = source.slice(
     source.indexOf('async function runWorldScopeIdentityFlagRemap()'),
@@ -462,13 +440,9 @@ test('the clear and the version advance are BOTH inside the same gate', () => {
   );
 });
 
-// ---------------------------------------------------------------------------
-// (c) the `1.34.0` equivalent-essence merge arm (issue 1654)
-//
-// Here the merged ids are object keys, so every rewrite removes one — and `Document#update` merges
-// inner objects recursively without deleting, leaving the retired key beside the new one. In a
-// consumed `resolvedEssences` snapshot that makes a resumed run transfer essences nobody paid for.
-// ---------------------------------------------------------------------------
+// (c) the `1.34.0` equivalent-essence merge arm (issue 1654). Here the merged ids are object keys,
+// so every rewrite removes one — and `Document#update` merges inner objects recursively without
+// deleting, leaving the retired key beside the new one.
 
 // The persisted shape is a two-leg container: the per-system pairs nest under `systems` rather than
 // sitting beside `retired`, because a crafting system whose id is literally `retired` would collide
@@ -518,14 +492,6 @@ function mergeRecursiveWithoutDeletions(original, other) {
 /**
  * A document whose `update()` expands a dotted path and applies the merge semantics above,
  * honouring the `==` forced-replacement prefix on the last segment.
- *
- * Deliberately not a spy: a double recording `[key, value]` pairs cannot tell a merge write from a
- * replacement write, since both succeed, so it would report the corrupting write as a pass. This
- * one stores the result and the assertions read the stored flags back.
- *
- * `getFlag` answers a clone, so `flags` models persistence alone. Foundry's answers a live
- * reference, and a pass that rewrites the container in place would leave the in-memory document
- * looking repaired until the next reload; cloning the read removes that mask.
  */
 function makeMergeDocument(flags) {
   const document = {
@@ -867,8 +833,10 @@ test('a world with no pending merge never walks the actor corpus', async () => {
 
 // --- the composition mutation ----------------------------------------------
 
-test('src/main.js runs the essence remap from its ready body, AFTER the 1.30.0 remap', () => {
-  const source = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
+test('the ready startup sequence runs the essence remap AFTER the 1.30.0 remap', () => {
+  const source = ENTRY_AND_READY_EDGE.map((file) =>
+    readFileSync(resolve(HERE, '..', 'src', file), 'utf8')
+  ).join('\n');
   // Matched as a live statement, never as a substring — see {@link liveCallIndex}.
   const rekeyIndex = liveCallIndex(source, 'runWorldScopeIdentityFlagRemap');
   const essenceIndex = liveCallIndex(source, 'runWorldEssenceMergeFlagRemap');
@@ -912,11 +880,6 @@ test('the essence edge writes through the FORCED-REPLACEMENT path and never setF
 test('a `__proto__` key lands as an OWN property rather than reaching the prototype setter', () => {
   // A plain-object accumulator loses the key silently: `next['__proto__'] = 1` on an object literal
   // hits the inherited setter and stores nothing, so the entry vanishes with no error anywhere.
-  // `rewriteEssenceQuantityMap` accumulates into a `Map` for this reason, and so does this seam.
-  //
-  // Built through `JSON.parse` rather than a literal, because `{__proto__: 2}` is the literal's
-  // prototype-setter syntax and carries no own key at all — a flag read back off a document is
-  // parsed JSON, which is how such a key actually arrives.
   const stored = JSON.parse('{"__proto__": 2, "fire-a": 1}');
   assert.ok(Object.hasOwn(stored, '__proto__'), 'the premise: the INPUT carries the hostile key');
 

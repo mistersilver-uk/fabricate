@@ -1,49 +1,4 @@
-/**
- * The END STATE of the manager tab-strip conversion (issue 1429, epic 1357).
- *
- * `tests/components/editor-tabs-marker-family.test.js` already asks what `EditorTabs` DRAWS.
- * This file asks the different question the programme actually turns on: is there anything left
- * that draws a manager tab strip WITHOUT it. Nine strips existed when the epic started, the last
- * of them uncounted because it was `role="tablist"` inlined in a 468-line view rather than a file
- * named `*Tabs.svelte`, and a primitive with hand-rolled siblings still standing is a primitive
- * that has not converged.
- *
- * ── TWO CLAUSES, BECAUSE ONE OF THEM CANNOT SEE THE STRIP THAT MATTERS ──────────────────
- *
- * The CLASS clause is the shared factory in `tests/helpers/primitiveAdoptionContract.js`: no raw
- * element outside the allowlist may carry `manager-editor-tab-button`. It is the right shape for
- * a converted site, and on its own it is not enough — `downtime/WorldDowntimeTabs` writes a bare
- * `button` styled by its own scoped block and carries none of the contract classes at all, so a
- * class-keyed gate reports a fully converged corpus while a hand-rolled strip stands in it.
- *
- * The ROLE clause closes that. `role="tablist"` on a raw element is what a tab strip IS,
- * independently of how it is painted, so it is the only token a hand-rolled strip cannot avoid
- * while remaining a tab strip. It is scoped to `apps/manager/`, deliberately: the player-facing
- * strips in `FabricateAppRoot`, `GatheringDetailTabs`, `InteractableBrowserRoot` and
- * `InventoryComponentDetail` are a different surface with a different treatment, and `EditorTabs`
- * is `THE manager's editor tab strip` by its own docblock. Sweeping them in here would assert a
- * convergence nobody has ruled on.
- *
- * ── WHY THE CLASS TOKEN IS `manager-editor-tab-button` AND NOT `manager-editor-tabs` ────
- *
- * The prefix problem decides it, and both candidates were checked against the corpus rather than
- * guessed. `manager-editor-tab` is a prefix of FOUR real, different classes on real, different
- * elements — `-tabs`, `-tab-button`, `-tab-badge`, `-tab-count` — so a `\b`-terminated pattern
- * for it counts all of them, because `\b` matches before a hyphen. The factory's
- * `classTokenPattern` terminates with `(?![\w-])` for exactly this reason.
- *
- * `manager-editor-tabs` would still be wrong even token-terminated, because it is a CONTAINER
- * class four callers compose with a second one (`manager-editor-tabs manager-knowledge-tabs`) and
- * two callers do not use at all (`ChecksEditorTabs` and `SystemEditorTabs` pass
- * `manager-environment-tabs`). `manager-editor-tab-button` is the class the primitive writes on
- * the control itself, it is a prefix of nothing, and the one raw site in the corpus when this
- * landed was the strip this change converted — which is what makes the empty allowlist below a
- * claim rather than an omission.
- *
- * The primitive is not an allowlist entry either, and that is structural rather than a carve-out:
- * it emits the token from `class={`${buttonClass} …`}`, a JavaScript expression, so the raw-element
- * detector — which reads the `class` attribute's SOURCE TEXT — does not see it.
- */
+/** The END STATE of the manager tab-strip conversion (issue 1429, epic 1357). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { join, resolve } from 'node:path';
@@ -60,26 +15,10 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const PRIMITIVE = 'src/ui/svelte/components/EditorTabs.svelte';
 const MANAGER_DIRECTORY = 'src/ui/svelte/apps/manager/';
 
-/**
- * EMPTY, and the empty array is the claim.
- *
- * One raw `.manager-editor-tab-button` element existed when this landed —
- * `TagsCategoriesView.svelte`'s inlined strip — and this change converted it. There is no
- * deferred site and no adjudicated opt-out; the strip that is NOT converted, `WorldDowntimeTabs`,
- * writes none of these classes and is held by the role clause below instead.
- */
+/** EMPTY, and the empty array is the claim. */
 const RAW_BUTTON_ALLOWLIST = Object.freeze([]);
 
-/**
- * A synthetic source with a KNOWN raw-site count, driven through the detector before the corpus
- * clause runs. The corpus cannot supply an anchor: the whole point of a completed conversion is
- * that it contains no positive case, so a broken detector and a converged tree read identically.
- *
- * It carries the three shapes that have produced false counts in this repository: the token in
- * DOCBLOCK PROSE, the token in a scoped `<style>` rule, and a LONGER class the token is a prefix
- * of — here `manager-editor-tab-button-row`, which is not a shipped class and is present precisely
- * so the trailing lookahead is exercised.
- */
+/** A synthetic source with a KNOWN raw-site count. */
 const DETECTOR_FIXTURE = [
   '<!--',
   '  Prose mentioning manager-editor-tab-button, which is how a strip documents itself.',
@@ -105,8 +44,8 @@ definePrimitiveAdoptionContract({
   primitive: PRIMITIVE,
   contractClass: 'manager-editor-tab-button',
   allowlist: RAW_BUTTON_ALLOWLIST,
-  // 10 call sites in 10 components as this lands. 7 is a real floor with headroom: deleting an
-  // editor must not red this, and losing a third of them must.
+  // 12 call sites in 12 components, measured with `scripts/lib/componentImporters.js`. 7 is a
+  // real floor with headroom.
   callSiteFloor: 7,
   fileFloor: 7,
   detectorFixture: {
@@ -118,9 +57,7 @@ definePrimitiveAdoptionContract({
     ],
     loweredExpected: 1,
   },
-  // `activePanelOnly` and `danger` are declared `= false` props, so `<EditorTabs danger>` sets a
-  // boolean rather than smuggling a `data-*` hook through the rest spread. The factory reads the
-  // primitive's own source and refuses a name it does not declare with a `false` default.
+  // `activePanelOnly` and `danger` are declared `= false` props.
   booleanProps: Object.freeze(['activePanelOnly', 'danger']),
   rawRemedy:
     'these components hand-roll the tab button that ' +
@@ -139,26 +76,7 @@ definePrimitiveAdoptionContract({
 /**
  * Every raw element under `apps/manager/` — plus the primitive itself — carrying `role="tablist"`.
  *
- * Parsed rather than grepped, on the same rule the factory records: `role="tablist"` appears in
- * DOCBLOCK PROSE in four components in this corpus and inside a test-facing comment in more, and
- * a text scan reports every one of those as a hand-rolled strip.
- *
- * THE PRIMITIVE IS NAMED EXPLICITLY BECAUSE IT LEFT THE DIRECTORY (issue 1509). The strip moved to
- * `src/ui/svelte/components/`, so a walk bounded by `apps/manager/` alone stops seeing the one
- * tablist the corpus is guaranteed to hold — and the vacuity guard below, which exists precisely
- * to prove the walk found something, would have been the assertion that reported it. Widening the
- * domain by the primitive's own path keeps both the guard and the pinned set meaning what they
- * meant: everything in the manager, and the file that is supposed to write this.
- *
- * ONE WALK, TWO VIEWS, because the domain drifted once already. The `<div>`-host clause at the
- * foot of this file used to run its own copy of this loop, and when the primitive left
- * `apps/manager/` only ONE of the two copies was widened — so the host clause silently shrank to
- * `WorldDowntimeTabs` alone while its `hosts.length > 0` vacuity guard still reported "alive" on
- * that single survivor. Both readings are derived from this function now: a future move changes
- * the domain in one place or in neither.
- *
  * @returns {{file: string, element: string}[]} one entry per raw tablist element, with the tag
- *   name it is hosted on, in code-point order by path
  */
 function rawTablistElements() {
   const found = [];
@@ -188,26 +106,9 @@ function rawManagerTablists() {
   return rawTablistElements().map((entry) => entry.file);
 }
 
-/**
- * The manager files that may still write a raw `role="tablist"`, and why.
- *
- * PINNED BY EQUALITY rather than as a ceiling: a ceiling permits a net-zero swap, where one strip
- * converts and a new hand-rolled one appears and the count never moves.
- */
+/** The manager files that may still write a raw `role="tablist"`, and why. */
 const TABLIST_HOSTS = Object.freeze([
   // In CODE-POINT order, matching the walk's own comparator. The order INVERTED at issue 1509:
-  // while the primitive sat beside its callers, `E` sorted before `d` and it came first; now that
-  // it lives under `components/`, `apps/` sorts before `components/` and it comes last. Nothing
-  // about the membership changed — only where the two files live.
-  //
-  // CONVERSION PENDING, not a justified divergence. `scripts/lib/designSystemPrimitives.json`
-  // carries the re-adjudication: issue 1038 ruled it out led by the 177 lines of scoped `<style>`
-  // it owns, and issue 1429 re-read that under the maintainer's ruling and found the load-bearing
-  // part of it is a STYLE divergence — bordered, filled, 8px-radius pill buttons instead of the
-  // shared underline — which is the one kind of justification the ruling forbids. What survives
-  // is a padlock, a visible hover/focus tooltip and a roving-focus fallback, all of which the
-  // ruling says the primitive ABSORBS AS CAPABILITIES. Deleting this entry is the goal; widening
-  // this list is not.
   `${MANAGER_DIRECTORY}downtime/WorldDowntimeTabs.svelte`,
   // THE primitive. It is the one file that is supposed to write this.
   PRIMITIVE,
@@ -219,10 +120,7 @@ test('the manager tablist walk is alive, so the clause below is not vacuous', ()
     managerFiles.length > 50,
     `the walk reached ${managerFiles.length} files under ${MANAGER_DIRECTORY}, so it is not walking`
   );
-  // The walk must find the PRIMITIVE's own tablist. If it found nothing at all, the equality
-  // clause below would be comparing two empty arrays and would pass on a corpus of hand-rolled
-  // strips — the exact vacuity the class detector's synthetic fixture exists to rule out, stated
-  // here against the one positive case the corpus is guaranteed to keep.
+  // The walk must find the PRIMITIVE's own tablist. If it found nothing at all.
   assert.ok(
     rawManagerTablists().includes(PRIMITIVE),
     'the walk cannot see `EditorTabs` own `<div role="tablist">`, so it sees no tablist at all'
@@ -243,18 +141,6 @@ test('no manager component outside the pinned set hand-rolls a role="tablist"', 
 
 test('every manager tablist element is a div, so no implicit landmark is overridden', () => {
   // Preserved from `TagsCategoriesView`, which recorded it before issue 1429 moved its strip:
-  // `role="tablist"` on a `<nav>` overrides the implicit `navigation` landmark and the compiler
-  // reports it, while a `<div>` has no implicit role to conflict with. The reasoning outlived the
-  // file that stated it because `EditorTabs` renders the same host, and it is asserted here so
-  // the primitive cannot quietly change host and take every caller with it.
-  //
-  // THE DOMAIN IS THE WIDENED ONE (issue 1509): `apps/manager/` PLUS the primitive's own path,
-  // because the primitive is the only file in it whose host this clause really guards. When the
-  // strip moved to `src/ui/svelte/components/` this clause kept its own `apps/manager/`-only copy
-  // of the walk, so its subject left the domain and hosting the strip on `<nav>` stayed green —
-  // `WorldDowntimeTabs` alone kept the `hosts.length > 0` guard reporting "alive" while the file
-  // that takes THIRTEEN rendering call sites with it was no longer read. Deriving both readings
-  // from `rawTablistElements` is what stops a future move from doing that again.
   const hosts = rawTablistElements().map((entry) => `${entry.file} <${entry.element}>`);
   assert.ok(
     hosts.some((host) => host.startsWith(`${PRIMITIVE} `)),

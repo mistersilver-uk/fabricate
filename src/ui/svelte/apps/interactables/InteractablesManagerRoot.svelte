@@ -32,7 +32,7 @@
   import InspectorCard from '../../components/InspectorCard.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Select from '../../components/Select.svelte';
-  import SegmentedControl from '../manager/SegmentedControl.svelte';
+  import SegmentedControl from '../../components/SegmentedControl.svelte';
 
   let { services = null } = $props();
 
@@ -635,8 +635,8 @@
   }
 
   /* 6px, not 4: 4 is off the radius ladder (0, 6, 7, 9, 11, 999, 50%) and this row is under the
-     24px band the 6px rung is published for. `--fab-border` replaces `--fab-overlay-light-16`,
-     which is the same hairline every shared primitive in this window now draws. */
+     24px band the 6px rung is published for. `--fab-border` is the same hairline every shared
+     primitive in this window draws. */
   .fab-im-row {
     display: flex;
     align-items: center;

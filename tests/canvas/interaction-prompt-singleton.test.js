@@ -1,13 +1,7 @@
 /**
- * Unit coverage for the {@link InteractionPromptApp} player prompt.
- *
- * The prompt is now a PLAIN fixed-position DOM toast (no ApplicationV2 / no
- * Svelte), so it is fully `new`-free and import-safe under `node:test`. We
- * exercise:
- *   - the PURE show/dismiss singleton decisions (`interactionPromptSingleton.js`),
- *   - the toast lifecycle against a minimal fake `document` (one element appended,
- *     ref-matched dismiss tears it down, a stale dismiss does not),
- *   - a source guard pinning the robust inline-positioning contract.
+ * Unit coverage for the {@link InteractionPromptApp} player prompt. The prompt is now a PLAIN
+ * fixed-position DOM toast (no ApplicationV2 / no Svelte), so it is fully `new`-free and
+ * import-safe under `node:test`.
  */
 
 import test from 'node:test';

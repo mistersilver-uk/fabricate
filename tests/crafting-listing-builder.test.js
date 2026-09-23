@@ -4,17 +4,15 @@ import assert from 'node:assert/strict';
 import {
   CraftingListingBuilder,
   CRAFTING_BROWSE_STATUS,
-} from '../src/systems/CraftingListingBuilder.js';
+} from '../src/ui/presenters/CraftingListingBuilder.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { DEFAULT_RECIPE_IMAGE } from '../src/models/Recipe.js';
 import { authoredComplication } from './helpers/complicationFixtures.js';
 
-// A minimal CraftingEngine used ONLY to pin the player-listing DC to the number the
-// engine actually rolls against (`_resolveSimpleCheckDc`), so the parity assertions
-// bind to real engine behaviour rather than a hard-coded literal. The non-dynamic
-// tier/static resolution path touches no Foundry global (no macro, no Roll), so a
-// bare engine over a stub recipe manager is sufficient.
+// A minimal CraftingEngine used ONLY to pin the player-listing DC to the number the engine actually
+// rolls against (`_resolveSimpleCheckDc`), so the parity assertions bind to real engine behaviour
+// rather than a hard-coded literal.
 const parityEngine = new CraftingEngine({});
 const engineDc = (system, config, recipe) =>
   parityEngine._resolveSimpleCheckDc(system, config, recipe, null, null);
@@ -128,17 +126,7 @@ function makeBuilder({
   });
 }
 
-/**
- * The listing (cheap summaries) plus the DETAIL model for its first row.
- *
- * Since issue 1075 those are two phases: `buildListing` answers what may be browsed and
- * `buildRecipeDetail` answers what one recipe's inspector shows. Almost every assertion in
- * this file is about the rich model, so `recipe` is the detail phase's output; the handful
- * that are about the listing itself read `listing.summaries`.
- *
- * The detail call goes through the visibility service by ID, exactly as production does, so
- * the fixture's own access result still decides redaction.
- */
+/** The listing (cheap summaries) plus the DETAIL model for its first row (issue 1075). */
 function buildOne(opts, viewer = PLAYER) {
   const builder = makeBuilder(opts);
   const craftingActor = { id: 'actor-1', items: [] };
@@ -327,15 +315,8 @@ describe('CraftingListingBuilder — category projection (issue 514)', () => {
   });
 });
 
-// Inverted with issue 887. This block previously asserted the BORROW — that a linked
-// recipe-item definition's image outranked `recipe.img`. A recipe's icon is its OWN
-// image and nothing else (`data-models/spec.md` `## Recipe` requirement 16): book
-// membership is many-to-many, so "the containing book" tracked definition order rather
-// than anything the GM authored.
-//
-// Every case keeps `recipeItemId` and a `recipeItemDefinition` with DISTINCT artwork on
-// the fixture. Removing them would make these pass vacuously; retaining them fails the
-// moment anyone re-adds the borrow.
+// Inverted with issue 887. This block previously asserted the BORROW — that a linked recipe-item
+// definition's image outranked `recipe.img`.
 describe('CraftingListingBuilder — recipe image (own image, never a containing book)', () => {
   const BOOK_IMG = 'icons/weapons/club.webp';
 
@@ -648,9 +629,8 @@ describe('CraftingListingBuilder — check DC resolution (issue 778)', () => {
   });
 
   it('simple: a dynamic (macro) DC shows no chip (null), not the static fallback', () => {
-    // The non-null static dc is load-bearing: it makes `=== null` provably reject the
-    // old `config.dc`-shown behaviour. Deliberately NOT bound to the engine — the
-    // engine returns the static/macro value there; the builder suppresses the chip.
+    // The non-null static dc is load-bearing: it makes `=== null` provably reject the old
+    // `config.dc`-shown behaviour.
     const system = makeSystem({
       craftingCheck: {
         simple: { rollFormula: '1d20', dc: 15, dcMode: 'dynamic', macroUuid: 'Macro.abc' },
@@ -959,9 +939,7 @@ describe('CraftingListingBuilder — per-option products', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Progressive stage list (issue 651) — the F1 fix + D12a thresholds + redaction
-// ---------------------------------------------------------------------------
 
 describe('CraftingListingBuilder — progressive stages (F1)', () => {
   const PROGRESSIVE_SYSTEM = {
@@ -1082,9 +1060,8 @@ describe('CraftingListingBuilder — progressive stages (F1)', () => {
   });
 
   it('projects progressiveAwardMode so the store can RECOMPUTE thresholds after a reorder', () => {
-    // A threshold belongs to a stage's POSITION, so reordering invalidates the baked
-    // values and the store must recompute — which it cannot do without the mode.
-    // Mutation: drop `progressiveAwardMode` from the projection.
+    // A threshold belongs to a stage's POSITION, so reordering invalidates the baked values and the
+    // store must recompute — which it cannot do without the mode.
     assert.equal(buildOne(progressiveOpts()).recipe.progressiveAwardMode, 'equal');
     const system = {
       ...PROGRESSIVE_SYSTEM,
@@ -1162,10 +1139,8 @@ describe('CraftingListingBuilder — progressive stages (F1)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Progressive component complications (issue 1286) — the PLAYER forecast, which the
-// crafting read-model publishes on the same stage rows the stage list already renders.
-// ---------------------------------------------------------------------------
+// Progressive component complications (issue 1286) — the PLAYER forecast, which the crafting
+// read-model publishes on the same stage rows the stage list already renders.
 
 describe('CraftingListingBuilder — progressive complication forecast (1286)', () => {
   const systemWith = (complications) => ({
@@ -1225,10 +1200,9 @@ describe('CraftingListingBuilder — progressive complication forecast (1286)', 
   });
 
   it('forecasts against the CRAFTING activity, which the read-model it feeds is', () => {
-    // `appliesToActivity` is an equality test on one flag, so the token this builder passes
-    // decides both halves at once: with the wrong one a crafting-only complication vanishes
-    // from the recipe panel and a salvage-only one is advertised on it. A complication
-    // enabled for all three activities — every other fixture here — cannot tell them apart.
+    // `appliesToActivity` is an equality test on one flag, so the token this builder passes decides
+    // both halves at once: with the wrong one a crafting-only complication vanishes from the recipe
+    // panel and a salvage-only one is advertised on it.
     const stages = stagesFor([
       authoredComplication({ id: 'x1', name: 'Quench', activity: 'crafting' }),
       authoredComplication({ id: 'x2', name: 'Slip', activity: 'salvage' }),
@@ -1241,11 +1215,10 @@ describe('CraftingListingBuilder — progressive complication forecast (1286)', 
   });
 
   it("filters the forecast with the RECIPE check block's trigger ids, not salvage's", () => {
-    // The mirror of the salvage-side assertion in `progressive-stage-complications.test.js`,
-    // and it fails CLOSED rather than open: read from the wrong block — or from nothing —
-    // and `checkTriggerIdsOf` yields ids this complication does not name, so a complication
-    // the runtime WILL fire is silently absent from the player's forecast. Under-disclosure
-    // with no symptom, which is why it needs a test of its own rather than an eyeball.
+    // The mirror of the salvage-side assertion in `progressive-stage-complications.test.js`, and it
+    // fails CLOSED rather than open: read from the wrong block — or from nothing — and
+    // `checkTriggerIdsOf` yields ids this complication does not name, so a complication the runtime
+    // WILL fire is silently absent from the player's forecast.
     const stages = stagesFor(
       [
         authoredComplication({ id: 'x1', name: 'Quench', when: { checkTrigger: 'craft-1' } }),

@@ -1,25 +1,4 @@
-/**
- * Fixture proof for `tests/helpers/designLibrary.js`.
- *
- * WHY A FIXTURE AND NOT THE CORPUS
- * --------------------------------
- * The parser anchors on `div.spec-head > h4`. The two mistakes it has to be immune to are widening
- * the anchor to the whole `spec-head` div — `p.why` sits inside it — and widening it to the whole
- * file, where section 15's nine declined candidates are written in the same `&lt;Name&gt;` notation
- * as the entries.
- *
- * Measured against the real library, the div-scoped mistake DOES currently red the occurrence floor
- * in `tests/design-system-coverage.test.js`: 59 against 58. But it reds for one reason only — the
- * `<SelectionBar>` entry's `why` happens to cite `<TintPicker>`, which is also a heading elsewhere.
- * That is a coincidence, not a detector. Reword or drop that one sentence and both scopings agree
- * on every corpus floor, at which point nothing distinguishes a correct parser from a contaminated
- * one. This fixture is the part that survives that reword, so it is authored to make each mistake
- * produce a DIFFERENT answer by construction rather than by luck.
- *
- * Each property below therefore carries its own negative control: it shows the fixture contains the
- * thing being excluded before asserting that the parser excluded it. Without that, every assertion
- * here would pass just as happily over a fixture with nothing to exclude.
- */
+/** Fixture proof for `tests/helpers/designLibrary.js`. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -27,23 +6,7 @@ import { Window } from 'happy-dom';
 
 import { parseDesignLibrary, primitiveNamesIn } from './helpers/designLibrary.js';
 
-/**
- * A design library in miniature, carrying one instance of each hazard.
- *
- * `<Anchored>` is an entry. `<CitedInWhy>` is a citation inside the entry's own `spec-head` div.
- * `<Declined>` stands for the section 15 register, outside any `spec-head`. The `<style>` block
- * mentions `.spec-head` the way the real page's stylesheet does, so a parser matching the literal
- * string rather than the element over-counts blocks. The prose heading carries an entity so the
- * decoding is exercised where it matters — the heading census pins these by text.
- *
- * `<Alpha> <Beta>` is the multi-name shape, and it is here because the CORPUS cannot supply it: no
- * library block is `divergent` today, and a block whose names all agree proves nothing about a
- * record that is kept per name. It carries two different statuses with the weaker of them on the
- * block, so the roll-up the coverage gate applies has a document to read.
- *
- * The chips are written in the page's own class form (`st st-<status>`) rather than in a shape
- * invented here, so a rule that stopped matching them would show up against this fixture too.
- */
+/** A design library in miniature, carrying one instance of each hazard. */
 const FIXTURE = [
   '<!doctype html><html><head>',
   '<style>.spec-head{display:flex}.spec-head h4{margin:0}.spec-head .why{font-size:12px}</style>',
@@ -62,22 +25,13 @@ const FIXTURE = [
   '</body></html>',
 ].join('');
 
-/**
- * The same fixture with every status attribute stripped, and nothing else changed.
- *
- * The point of the properties below is that a MISSING status is reported as `null` rather than
- * defaulted, and a fixture that only ever carries them cannot show that. Derived from the fixture
- * by deletion so the two can never describe different documents.
- */
+/** The same fixture with every status attribute stripped, and nothing else changed. */
 const UNDECLARED_FIXTURE = FIXTURE.replaceAll(/ data-status(-[A-Za-z]+)?="[a-z]+"/g, '');
 
 const parsed = parseDesignLibrary(FIXTURE);
 
 /**
  * The names a `spec-head` DIV-scoped parser would yield from the fixture — the mistake, run.
- *
- * Computed here rather than asserted as a literal so the control cannot drift away from the
- * fixture it is meant to characterise.
  *
  * @returns {string[]} names, duplicates included
  */
@@ -159,9 +113,7 @@ test('a heading naming two primitives gives each name its own status', () => {
 });
 
 test('the per-name lookup folds case, because the DOM does', () => {
-  // The fixture writes `data-status-Anchored`. Nothing may require an author to write the
-  // attribute lowercased to be seen, because a name spelled `<ArtPathPicker>` is unreadable that
-  // way and an unreadable attribute is one that gets typed wrong.
+  // The fixture writes `data-status-Anchored`.
   assert.ok(
     FIXTURE.includes('data-status-Anchored='),
     'the fixture no longer writes the attribute in the name’s own case, so this proves nothing'
@@ -191,11 +143,7 @@ test('a block that declares no status reports null, and is not defaulted', () =>
 });
 
 test('the chip beside the h4 is not part of the heading a block reports', () => {
-  // The whole reason the chip is a SIBLING of the `h4`. Inside one it would be read as heading
-  // text, and for a NAMING heading nothing else notices: the census in
-  // `tests/design-system-coverage.test.js` pins verbatim text for the PROSE headings alone, and a
-  // chip yields no name, so every name-derived property answers exactly the same. `heading` is the
-  // field that gate compares against the names, which is what makes the placement checkable.
+  // The whole reason the chip is a SIBLING of the `h4`.
   assert.ok(
     FIXTURE.includes('<span class="st st-shipped">shipped</span>'),
     'the fixture has no chip'

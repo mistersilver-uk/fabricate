@@ -1,17 +1,4 @@
-/**
- * The Checks Studio's route-exit prompt, and the plural Save it belongs to (issue 1096).
- *
- * The four activity drafts moved ABOVE the four routes, which is what makes this prompt
- * necessary in the first place: under the old tab model a switch between activities never
- * left the surface, so an unsaved edit could not walk out of the building. It can now, and
- * one click on `Components` is all it takes.
- *
- * None of this was reachable from any existing suite. `confirmDiscardDirtyChecksDraft` could
- * be deleted from the store's returned object with `npm test` green, and `Checks.Save` could
- * revert to the singular with nothing noticing — both proven by mutation before this file
- * was written, and both are exactly the class of gap the store's allowlist projections make
- * invisible.
- */
+/** The Checks Studio's route-exit prompt, and the plural Save it belongs to (issue 1096). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -23,10 +10,8 @@ import { createServices, makeSystem } from './helpers/adminStoreServices.js';
 const repoRoot = resolve(import.meta.dirname, '..');
 
 /**
- * A store on the SHARED adminStore service fixture, with only the two dialog seams this
- * prompt can take overridden. The shared fixture rather than a bespoke one because the store
- * reads a good deal more than dialogs at construction, and because a fresh copy of that
- * factory is exactly the duplication `tests/helpers/adminStoreServices.js` exists to remove.
+ * A store on the SHARED adminStore service fixture, with only the two dialog seams this prompt can
+ * take overridden.
  */
 function makeStore({ choiceDialog, confirmDialog, localize } = {}) {
   const calls = [];
@@ -62,9 +47,7 @@ describe('confirmDiscardDirtyChecksDraft', () => {
   });
 
   it('is the THREE-WAY variant, by its return shape', async () => {
-    // The distinction is not cosmetic. The boolean `confirmDiscardDirtyToolsDraft` is the one
-    // sibling that does NOT use the shared helper, and copying its shape here would drop the
-    // "save and continue" branch entirely — the only branch that keeps the GM's work.
+    // The distinction is not cosmetic.
     for (const action of ['save', 'discard', 'cancel']) {
       const { store } = makeStore({ choiceDialog: () => action });
       assert.equal(await store.confirmDiscardDirtyChecksDraft(['Crafting']), action);
@@ -93,9 +76,8 @@ describe('confirmDiscardDirtyChecksDraft', () => {
   });
 
   it('NAMES the dirty activities in the prompt', async () => {
-    // The GM may be standing on Gathering while the unsaved edit is on Crafting, and this
-    // prompt is the last thing they see before it is discarded. A prompt that said only "the
-    // checks" would discard work on a route they never opened.
+    // The GM may be standing on Gathering while the unsaved edit is on Crafting, and this prompt is
+    // the last thing they see before it is discarded.
     const { store, calls } = makeStore({
       // Localization is stubbed to the FALLBACK path so the assertion reads the real authored
       // sentence rather than a key echoed back.

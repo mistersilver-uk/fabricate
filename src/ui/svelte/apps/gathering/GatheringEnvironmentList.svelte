@@ -9,7 +9,7 @@
 <script>
   import { untrack } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
-  import EmptyState from '../manager/EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import EnvironmentCard from './EnvironmentCard.svelte';
   import Pagination from '../../components/Pagination.svelte';
 

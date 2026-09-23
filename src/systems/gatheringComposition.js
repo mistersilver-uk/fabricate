@@ -48,14 +48,12 @@
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 
 /**
- * Applied by `conditionSettingsToCurrent` when a system has no current weather
- * or time-of-day recorded. Intentionally not exported: `DEFAULT_CONDITIONS`
- * (`GatheringRichStateService.js`) and `DEFAULT_GATHERING_CONDITIONS`
- * (`adminStore.js`) both survive for their own settings-normalisation reads, and
- * a third exported name for the same value would invite exactly the mirror this
- * module exists to remove. Assert it through the conversion instead.
+ * The weather and time a world falls back to when nothing is recorded. Applied by
+ * `conditionSettingsToCurrent`, by the admin store's gathering-settings normalisation and by the
+ * environment composition projection, which is why it is exported rather than mirrored (issue
+ * 1708). `DEFAULT_CONDITIONS` in `GatheringRichStateService.js` is the one remaining copy.
  */
-const DEFAULT_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
+export const DEFAULT_GATHERING_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 
 /**
  * The complete composition-state vocabulary a library record can be classified
@@ -187,8 +185,8 @@ export function resolveGatheringCompositionMode(environment) {
  */
 export function conditionSettingsToCurrent(settings) {
   return {
-    weather: settings?.weather?.current || DEFAULT_CONDITIONS.weather,
-    timeOfDay: settings?.timeOfDay?.current || DEFAULT_CONDITIONS.timeOfDay,
+    weather: settings?.weather?.current || DEFAULT_GATHERING_CONDITIONS.weather,
+    timeOfDay: settings?.timeOfDay?.current || DEFAULT_GATHERING_CONDITIONS.timeOfDay,
   };
 }
 

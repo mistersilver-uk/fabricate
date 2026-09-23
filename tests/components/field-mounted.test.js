@@ -1,43 +1,9 @@
-/**
- * `Field`, the manager's labelled `.manager-field` column, RENDERED (issue 1428).
- *
- * ── WHAT ONLY A RENDER CAN ANSWER ───────────────────────────────────────────────────────
- * The conversion of 81 sites was verified by comparing the parsed template of every changed
- * component against its pre-change self, with each `<Field as="x">` read back as the
- * `<x class="manager-field …">` it stands for. That proves the sites kept their hosts. It does
- * NOT prove the thing the whole `as` prop exists for: that the primitive actually emits the
- * element it was asked for, and that a `<label>` field still WRAPS its control — which is what
- * gives that control its accessible name, on 49 sites where no `id`/`for`/`aria-label` pair
- * would supply one.
- *
- * That claim is exactly the one a markup-level check can be true about and wrong about at the
- * same time, so it is asserted against a real DOM here, through real callers rather than a
- * synthesised fixture.
- *
- * ── THE TWO CALLERS, AND WHY THESE TWO ──────────────────────────────────────────────────
- * `InlineVocabularyAdd` renders BOTH contrasting hosts in one component, and its own source
- * already states the rule: the text field is a `<label>` wrapping its `<input>`, and the icon
- * field is a `<div>` because the control inside it is a BUTTON — not a labelable element — so a
- * wrapping label would name nothing. Flattening one into the other is invisible on screen and
- * changes what a screen reader says, which is the regression this suite exists to catch.
- *
- * `RadioCardGroup` is the corpus's ONE `<fieldset>` field, and it is a fieldset for three
- * reasons a `<div>` cannot reproduce: it renders a `<legend>`, it holds a radio group, and it
- * forwards `disabled`, which on a fieldset disables every descendant control. The last of those
- * is asserted here because it is BEHAVIOUR rather than markup — a `<div disabled>` parses fine,
- * renders fine, and leaves every radio in the group live.
- *
- * It is also the one file in the sweep whose template is not byte-equivalent to its pre-change
- * self: `class:is-config-cards={configCards}` cannot ride on a component, so it was folded into
- * the class expression. The class-string assertions below are the proof that the fold is
- * equivalent, for both values of the flag, against the exact string the `<fieldset>` carried
- * before — including the token ORDER, since `manager-field` used to be written first and is now
- * prepended by the primitive.
- */
+/** `Field`, the manager's labelled `.manager-field` column, RENDERED (issue 1428). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -45,12 +11,14 @@ const vocabularyHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-field-vocabulary-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/util/foundryIconVocabulary.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
@@ -61,8 +29,9 @@ const vocabularyHarness = createMountedComponentHarness({
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
   ],
@@ -72,7 +41,7 @@ const vocabularyHarness = createMountedComponentHarness({
 const radioHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-field-radio-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
@@ -93,28 +62,7 @@ const RADIO_OPTIONS = Object.freeze([
   Object.freeze({ value: 'routed', label: 'Routed', description: 'Several sets.' }),
 ]);
 
-/**
- * The exact class string the `<fieldset>` carries, in source order.
- *
- * `is-config-cards` is last because it arrived through a `class:` directive, which Svelte appends
- * after the static attribute. The primitive PREPENDS its family ROOT and then the hook class to
- * whatever the caller passes — `fabricate-field manager-field …` since issue 1508 rooted the
- * family at the class it emits — so the caller's own order survives behind them, and these two
- * constants are what say so out loud.
- *
- * `fabricate-option-cards` JOINED BOTH STRINGS AT ISSUE 1509 PHASE 3, third rather than first,
- * and the position is the whole shape of the thing: this element is `Field`'s root AND
- * `RadioCardGroup`'s, so it carries two namespace roots at once. `Field` prepends its pair, the
- * radio group's own template supplies its root at the head of what it hands over, and the
- * caller's classes follow. The `manager-*` names are untouched; issue 1507 retires those.
- *
- * THEY ARE ALSO THE FAMILY'S ROOT-EMISSION PROOF ON THE RENDERED DOM. Every other reader of
- * `fabricate-field` is SOURCE TEXT — the area-scope gate reads the `$derived` array, the
- * host-independence fixtures write the class as a literal — so a `Field` that declared the array
- * and stopped rendering `class={classes}` would pass all of them while every re-rooted rule
- * matched nothing. The two `getAttribute('class')` equalities below mount the component and
- * compare the WHOLE string, which is the one reader that catches it.
- */
+/** The exact class string the `<fieldset>` carries, in source order. */
 const RADIO_CLASS_CONFIG_CARDS =
   'fabricate-field manager-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards';
 const RADIO_CLASS_PLAIN =
@@ -134,22 +82,7 @@ afterEach(() => {
 });
 
 describe('RadioCardGroup emits the namespace root its rules are anchored on (issue 1509)', () => {
-  /*
-   * THE ONE ASSERTION IN THIS REPOSITORY THAT READS THE RADIO CARD'S RENDERED ROOT, and for this
-   * family it is load-bearing rather than ceremonial.
-   *
-   * `fabricate-option-cards` does not reach the DOM on an element `RadioCardGroup` writes. It is
-   * a string the component hands to `Field` as a `class` PROP, and `Field` is what renders it. So
-   * every source reader is satisfied by a tree in which `Field` has stopped forwarding that prop:
-   * the area-scope gate reads `RadioCardGroup`'s own markup and finds the literal, the sheet
-   * census reads the selectors, the fixture clauses read strings in `tests/`. All of them stay
-   * green while every re-rooted rule in `styles/fabricate.css` matches nothing and the card, its
-   * rows, its tiles and its radios draw unstyled in every host, the manager included.
-   *
-   * That gap is also exactly why the entry declares no `classProps`: a `classProps: ['class']`
-   * entry would match all twelve class attributes in this component's markup against a floor of
-   * one. The guard it would have bought is this assertion instead.
-   */
+  /* THE ONE ASSERTION IN THIS REPOSITORY THAT READS THE RADIO CARD'S RENDERED ROOT. */
   it('writes `fabricate-option-cards` on the fieldset `Field` renders for it', async () => {
     const root = await radioHarness.mount({
       legend: 'Resolution',
@@ -213,8 +146,7 @@ describe('Field (mounted, through its real callers)', () => {
       'a `<Field as="label">` must emit a real <label>. A <div> here renders identically and ' +
         'silently strips the accessible name from the control it contains.'
     );
-    // The association itself, not merely the tag: a <label> names a control it CONTAINS, and
-    // this field carries no visible text of its own beyond the caption span.
+    // The association itself, not merely the tag: a <label> names a control it CONTAINS.
     assert.equal(
       field.querySelector('input'),
       input,
@@ -269,8 +201,7 @@ describe('Field (mounted, through its real callers)', () => {
   });
 
   it('folds the config-cards flag into the class string without changing it', async () => {
-    // The `class:` directive this replaced emitted the token only when the flag was true, so
-    // both states are asserted: an unconditional token would pass a true-only check.
+    // The `class:` directive this replaced emitted the token only when the flag was true.
     const root = await radioHarness.mount({
       legend: 'Resolution',
       groupName: 'field-mounted-radio',
@@ -284,17 +215,7 @@ describe('Field (mounted, through its real callers)', () => {
   });
 
   it('forwards `disabled` to the fieldset as a real boolean attribute', async () => {
-    // `disabled` is the third reason this field is a fieldset, and it survives the rest spread
-    // in BOOLEAN form rather than as the string `"true"` a `data-*` key would get: Svelte's
-    // `set_attribute` knows `disabled` on a fieldset is a boolean attribute, so it writes `""`
-    // when set and removes it when clear. Both states are asserted, because "always present"
-    // and "correctly present" are the same assertion at one value.
-    //
-    // What is deliberately NOT asserted is that the browser then disables the descendants.
-    // happy-dom does not implement fieldset disabled propagation, and `RadioCardGroup` sets
-    // `disabled` on each `<input>` itself — so an assertion on `radio.disabled` would pass
-    // with a `<div>` host and prove nothing about the fieldset. The host and the attribute
-    // form are what a mounted test can honestly answer for.
+    // `disabled` is the third reason this field is a fieldset.
     const props = {
       legend: 'Resolution',
       groupName: 'field-mounted-radio',

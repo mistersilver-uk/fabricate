@@ -3,40 +3,48 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  createMountedComponentHarness,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 import { stepMigratedNumberField } from '../helpers/numericKeyboardStep.js';
+// The five converted controls are driven by open-then-click on a portaled panel (issue 1510).
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  selectOptionLabels,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-// Real en.json so the tests assert LOCALIZED copy resolves — not the component's
-// inline text() fallback (which would mask a missing or renamed key). The unified
-// trigger editor is keyed under FABRICATE.Admin.Manager.Checks.Breakage (+ a few
-// reused Crafting keys for the award/break labels).
+// Real en.json so the tests assert LOCALIZED copy resolves.
 const en = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
 function lookup(key) {
   return key.split('.').reduce((node, part) => (node == null ? undefined : node[part]), en);
 }
 
-// Use the shared mounted-component harness; do not re-inline compile/mount
-// boilerplate (it duplicates the other mount tests and trips the duplication gate).
+// Use the shared mounted-component harness.
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-check-triggers-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    // The popover closure the shared picker composes (issue 1510); it spreads the Foundry bridge.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/utils/craftingCheckExpression.js',
     'src/ui/svelte/apps/manager/checks/checksCopy.js',
     'src/ui/svelte/apps/manager/checks/checkTriggerSummary.js',
-    'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js'
+    'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js',
+    // The studio's converted option vocabularies (issue 1510).
+    'src/ui/svelte/apps/manager/checks/checksSelectOptions.js'
   ],
   compiledModules: [
-    // The shipped segmented primitive: the outcome toggle and the tier-step mode
-    // control both render it (issue 975). The harness validates the STATIC import
-    // closure of every declared module, so this entry is required whether or not a
-    // given test renders it.
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    // The shipped segmented primitive.
+    'src/ui/svelte/components/SegmentedControl.svelte',
     // The shared numeric stepper: the condition Value field and the tier-step operand are
     // both built on it (issue 1050), and the same static-closure rule applies.
     'src/ui/svelte/components/Stepper.svelte',
@@ -50,6 +58,9 @@ const harness = createMountedComponentHarness({
     // The shared status card: a trigger's break-tools effect is its own bordered card with an
     // icon, a sentence and a switch (issue 1096), which is exactly this primitive.
     'src/ui/svelte/components/ToggleCard.svelte',
+    // THE SHARED ONE-OF-N PICKER and its whole compiled graph (issue 1510); an omission HANGS this
+    // suite (# cancelled) rather than failing it.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte'
@@ -72,10 +83,7 @@ function triggerBlock(triggers) {
   return { triggers };
 }
 
-// The segmented control's real control is the visually hidden radio — the `<label>`
-// is only the styled surface. This is the idiom every other SegmentedControl consumer
-// test uses (`selectRadio` in crafting-settings-view-mounted.test.js): set `.checked`,
-// then dispatch a bubbling `change`. A bare `.click()` on the label is NOT it.
+// The segmented control's real control is the visually hidden radio.
 function chooseSegment(root, optionDataAttr, value) {
   const radio = root.querySelector(`[${optionDataAttr}="${value}"] input[type="radio"]`);
   assert.ok(radio, `a radio exists for ${optionDataAttr}="${value}"`);
@@ -84,9 +92,7 @@ function chooseSegment(root, optionDataAttr, value) {
   return radio;
 }
 
-// A trigger's controls live behind a disclosure (issue 1096), so every test that drives one
-// has to OPEN it first — which is also the cheapest possible proof that the disclosure works,
-// since a broken one takes the whole suite down with it.
+// A trigger's controls live behind a disclosure (issue 1096).
 function expandTrigger(root, id) {
   const disclosure = root.querySelector(`[data-trigger-disclosure="${id}"]`);
   assert.ok(Boolean(disclosure), `a disclosure renders for trigger ${id}`);
@@ -97,6 +103,13 @@ function expandTrigger(root, id) {
   assert.ok(Boolean(body), `clicking the head of trigger ${id} reveals its body`);
   return body;
 }
+
+// The five converted controls, each by the hook that rode onto its trigger (issue 1510).
+const CONDITION_TYPE = '[data-trigger-condition-type]';
+const DICE_GROUP = '[data-trigger-group]';
+const AGGREGATE = '[data-trigger-aggregate]';
+const OPERATOR = '[data-trigger-operator]';
+const TIER_TARGET = '[data-trigger-tier-step-target]';
 
 const rollTotalTrigger = {
   id: 't1',
@@ -135,13 +148,7 @@ async function mountRouted(tierStep, { outcomeOptions = ROUTED_TIERS, onChange, 
   return root;
 }
 
-/**
- * The simple-check mount: one `1d20` check over `triggers`, with the break pills off.
- *
- * The sibling of `mountRouted` above and there for the same reason — seven cases spelled out the
- * same four props to say "a simple check over 1d20", which is one call written seven times, and
- * SonarCloud counts duplication in `tests/**` exactly as it does in `src/`.
- */
+/** The simple-check mount: one `1d20` check over `triggers`, with the break pills off. */
 function mountSimple(triggers, overrides = {}) {
   return harness.mount({
     value: triggerBlock(triggers),
@@ -215,8 +222,7 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
       !hidden.querySelector('[data-trigger-break]'),
       'no break card when showBreakTools is false (toolSpecific)'
     );
-    // And the GM is told WHY, in the place the control would have been — the sentence that
-    // used to head the whole list on a card the prototype does not have.
+    // And the GM is told WHY, in the place the control would have been.
     const hint = hidden.querySelector('[data-trigger-break-unavailable]');
     assert.ok(Boolean(hint), 'the authority is explained where the missing card would be');
     assert.equal(hint.textContent.trim(), breakageKeys.LeadOutcomeOnly);
@@ -308,9 +314,7 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
     const card = root.querySelector('[data-trigger="o1"]');
     const radioFor = (value) =>
       card.querySelector(`[data-trigger-outcome="${value}"] input[type="radio"]`);
-    // Disabled on the RADIO, not merely a dimmed class: `select()` guards only
-    // `next !== value`, so a live-but-dimmed segment would still force an outcome and
-    // re-open the circularity this pin exists to prevent.
+    // Disabled on the RADIO, not merely a dimmed class.
     assert.ok(radioFor('success').disabled, 'the success segment is disabled for an outcomeTier condition');
     assert.ok(radioFor('failure').disabled, 'the failure segment is disabled for an outcomeTier condition');
     assert.equal(radioFor('none').disabled, false, 'No effect stays choosable');
@@ -368,16 +372,14 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
   });
 
   it('renders the tier-step control even when tool breakage is not authored here', async () => {
-    // Stepping is not a breakage concept: gating it on showBreakTools would hide it
-    // under toolSpecific authority, which has nothing to do with tiers.
+    // Stepping is not a breakage concept.
     const root = await mountRouted({ mode: 'up', steps: 2, tierId: null });
     assert.ok(root.querySelector('[data-trigger-tier-step]'), 'the row renders');
     assert.ok(!root.querySelector('[data-trigger-break]'), 'and the break card does not');
   });
 
   it('gives the outcome and tier-step controls different radio group names', async () => {
-    // A shared `name` makes the browser treat both radio sets as ONE group, so
-    // choosing a tier-step mode would silently uncheck the outcome radio.
+    // A shared `name` makes the browser treat both radio sets as ONE group.
     const root = await mountRouted({ mode: 'none', steps: 1, tierId: null });
     const card = root.querySelector('[data-trigger="r1"]');
     const outcomeName = card
@@ -390,8 +392,7 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
     assert.ok(stepName, 'the tier-step radios are named');
     assert.notEqual(outcomeName, stepName, 'the two controls are separate radio groups');
 
-    // And the real behavioural consequence: choosing a step mode leaves the outcome
-    // radio checked.
+    // And the real behavioural consequence.
     chooseSegment(card, 'data-trigger-tier-step-mode', 'up');
     assert.equal(
       card.querySelector('[data-trigger-outcome="none"] input[type="radio"]').checked,
@@ -425,40 +426,63 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
     }
 
     const target = await mountRouted({ mode: 'target', steps: 1, tierId: 'tier-b' });
-    const select = target.querySelector('[data-trigger-tier-step-target]');
-    assert.ok(select, 'target renders the tier select');
-    assert.equal(select.value, 'tier-b', 'the select reads back the persisted tier');
+    assert.ok(target.querySelector(TIER_TARGET), 'target renders the tier control');
+    assert.equal(
+      selectTriggerText(target, TIER_TARGET),
+      'Masterwork',
+      'the trigger reads back the persisted tier by name'
+    );
     assert.ok(!target.querySelector('[data-trigger-tier-step-steps]'), 'and no count input');
   });
 
-  it('never shows a tier it has not persisted: a null tierId selects the placeholder', async () => {
+  it('never shows a tier it has not persisted: a null tierId shows the placeholder', async () => {
     const root = await mountRouted({ mode: 'target', steps: 1, tierId: null });
-    const select = root.querySelector('[data-trigger-tier-step-target]');
-    assert.equal(select.value, '', 'nothing chosen reads as nothing chosen');
-    const placeholder = select.querySelector('option[value=""]');
-    assert.ok(placeholder, 'a placeholder option renders');
-    assert.equal(placeholder.disabled, true, 'the placeholder cannot be re-chosen');
-    // The real defect this guards: a <select> whose value matches no option renders
-    // its FIRST option as selected, so without the placeholder a GM would read
-    // "Ruined" off a check that persists null.
-    assert.notEqual(
-      select.options[select.selectedIndex].value,
-      'tier-a',
-      'the first real tier is not silently displayed as the selection'
+    assert.equal(
+      selectTriggerText(root, TIER_TARGET),
+      breakageKeys.TierStepChoose,
+      'nothing chosen reads as nothing chosen'
+    );
+    assert.ok(
+      Boolean(
+        root
+          .querySelector(`${TIER_TARGET} .fabricate-select-value`)
+          .classList.contains('fabricate-select-value-placeholder')
+      ),
+      'and reads as the placeholder rather than as a chosen value'
+    );
+    // The real defect this guards: without a placeholder the trigger would state the FIRST
+    // tier, so a GM would read "Ruined" off a check that persists null.
+    assert.deepEqual(
+      selectOptionValues(root, TIER_TARGET),
+      ['tier-a', 'tier-b'],
+      'and the placeholder is the trigger’s own text, never a re-choosable row in the list'
     );
   });
 
-  it('shows a dangling target as a Missing tier option plus an invalid field', async () => {
+  it('shows a dangling target as a Missing tier row plus an invalid field', async () => {
     const root = await mountRouted({ mode: 'target', steps: 1, tierId: 'tier-gone' });
-    const select = root.querySelector('[data-trigger-tier-step-target]');
-    assert.equal(select.value, 'tier-gone', 'the dangling id stays selected, not silently remapped');
-    const dangling = select.querySelector('option[value="tier-gone"]');
-    assert.ok(dangling, 'the dangling id is appended as its own option');
-    assert.equal(dangling.disabled, true, 'and cannot be re-chosen');
-    assert.equal(dangling.textContent.trim(), breakageKeys.TierStepMissingTier);
+    assert.equal(
+      selectTriggerText(root, TIER_TARGET),
+      breakageKeys.TierStepMissingTier,
+      'the dangling id stays selected, not silently remapped'
+    );
+    const rows = selectOptionValues(root, TIER_TARGET);
+    assert.deepEqual(rows, ['tier-a', 'tier-b', 'tier-gone'], 'appended as its own row, last');
+    assert.equal(
+      root
+        .querySelector('[data-popover-option="tier-gone"]')
+        .getAttribute('aria-disabled'),
+      'true',
+      'and cannot be re-chosen'
+    );
+    assert.equal(
+      root.querySelector(TIER_TARGET).getAttribute('aria-invalid'),
+      'true',
+      'the trigger carries the invalid treatment the deleted `.is-invalid select` rule painted'
+    );
     assert.ok(
-      root.querySelector('.manager-checks-trigger-step-operand.is-invalid'),
-      'the field carries the invalid treatment'
+      !root.querySelector('.manager-checks-trigger-step-operand.is-invalid'),
+      'and the slot carries no state class the sheet no longer paints anything from'
     );
   });
 
@@ -469,9 +493,7 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
     const cue = root.querySelector('[data-trigger-step-no-tiers]');
     assert.ok(cue, 'the tier-step cue renders');
     assert.equal(cue.textContent.trim(), breakageKeys.TierStepNoTiers);
-    // Distinct from the outcomeTier CONDITION's cue: a trigger that is both
-    // outcomeTier-conditioned and target-stepping must not carry two identically
-    // hooked nodes in one card.
+    // Distinct from the outcomeTier CONDITION's cue.
     assert.ok(
       !root.querySelector('[data-trigger-no-tiers]'),
       'the condition cue is a different hook and does not render here'
@@ -514,9 +536,12 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
       { mode: 'target', steps: 1, tierId: null },
       { onChange: (next) => emitted.push(next) }
     );
-    const select = root.querySelector('[data-trigger-tier-step-target]');
-    select.value = 'tier-a';
-    select.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    assert.equal(
+      assertSelectHasResolvedName(root, TIER_TARGET),
+      breakageKeys.TierStepTier,
+      'the tier control names itself, the slot caption beside it naming the AMOUNT'
+    );
+    chooseSelectOption(root, TIER_TARGET, 'tier-a');
     assert.equal(emitted.at(-1).triggers[0].tierStep.tierId, 'tier-a', 'the chosen tier persists');
   });
 
@@ -551,12 +576,7 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
     chooseSegment(card, 'data-trigger-tier-step-mode', 'down');
     assert.equal(emitted.at(-1).triggers[0].tierStep.mode, 'down', 'the step is authored');
   });
-  // Issue 1050's keyboard non-regression entry, still owed after issue 1096 returned this field
-  // to a PLAIN `<input type="number">` (a threshold is typed, not walked to — reaching 20 from 1
-  // is nineteen clicks of a stepper). Up/Down are native user-agent behaviour, so the two things
-  // keeping them alive are that the element stays a number input and that its `input` event still
-  // reaches the commit path. `stepUp()` throws on a non-steppable input, so a drift to
-  // `type="text"` fails here rather than silently shipping a click-only control.
+  // Issue 1050's keyboard non-regression entry.
   it('still steps the condition value from the keyboard', async () => {
     const emitted = [];
     const root = await mountSimple([rollTotalTrigger], { onChange: (next) => emitted.push(next) });
@@ -576,9 +596,6 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
 });
 
 // ── THE COLLAPSED HEAD AND ITS DISCLOSURE (issue 1096) ─────────────────────────────────
-//
-// The head is the only thing a GM sees until they open a trigger, so what it says and whether
-// it opens are the whole of this screen's readability. Every case here drives the real control.
 describe('CheckTriggers (mounted): the collapsed head', () => {
   const stepUp = {
     id: 'u1',
@@ -712,14 +729,13 @@ describe('CheckTriggers (mounted): the collapsed head', () => {
   it('reads the comparison in words, not in operator symbols', async () => {
     const root = await mountPair();
     expandTrigger(root, 'u1');
-    const options = [...root.querySelectorAll('[data-trigger-operator] option')];
     assert.deepEqual(
-      options.map((option) => option.value),
+      selectOptionValues(root, OPERATOR),
       ['==', '>=', '<=', '>', '<'],
       'every persisted operator is still offered'
     );
     assert.deepEqual(
-      options.map((option) => option.textContent.trim()),
+      selectOptionLabels(root, OPERATOR),
       [
         breakageKeys.OpSelectExactly,
         breakageKeys.OpSelectAtLeast,
@@ -729,17 +745,97 @@ describe('CheckTriggers (mounted): the collapsed head', () => {
       ],
       'and each reads as a comparison a GM can say out loud'
     );
-    assert.equal(options[0].textContent.trim(), 'is exactly', 'not "=="');
+    assert.equal(selectOptionLabels(root, OPERATOR)[0], 'is exactly', 'not "=="');
   });
 
   it('CHOOSING a comparison writes it onto the condition', async () => {
     const emitted = [];
     const root = await mountPair({ onChange: (next) => emitted.push(next) });
     expandTrigger(root, 'u1');
-    const select = root.querySelector('[data-trigger="u1"] [data-trigger-operator]');
-    select.value = '>=';
-    select.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    const operator = `[data-trigger="u1"] ${OPERATOR}`;
+    assert.equal(
+      assertSelectHasResolvedName(root, operator),
+      breakageKeys.Operator,
+      'the demoted wrapper’s caption still names the control'
+    );
+    chooseSelectOption(root, operator, '>=');
     assert.equal(emitted.at(-1).triggers[0].condition.operator, '>=');
+  });
+
+  it('CHOOSING a condition type re-authors the whole condition record', async () => {
+    const emitted = [];
+    const root = await mountPair({ onChange: (next) => emitted.push(next) });
+    expandTrigger(root, 'u1');
+    const when = `[data-trigger="u1"] ${CONDITION_TYPE}`;
+    assert.equal(
+      assertSelectHasResolvedName(root, when),
+      breakageKeys.ConditionType,
+      'the demoted wrapper’s caption still names the control'
+    );
+    assert.deepEqual(
+      selectOptionValues(root, when),
+      ['rollTotal', 'diceGroup', 'outcomeTier'],
+      'a routed check offers no progressive value'
+    );
+    chooseSelectOption(root, when, 'outcomeTier');
+    assert.deepEqual(
+      emitted.at(-1).triggers[0].condition,
+      { type: 'outcomeTier', tierIds: [], outcomeKeys: [] },
+      'the type is not patched onto the old record: the default for the new type replaces it'
+    );
+    assert.equal(
+      emitted.at(-1).triggers[0].outcome,
+      'none',
+      'and an outcomeTier condition cannot force, so the outcome is pinned with it'
+    );
+  });
+
+  it('CHOOSING a dice group writes a NUMERIC groupId, not the row’s string', async () => {
+    const emitted = [];
+    const root = await harness.mount({
+      value: triggerBlock([
+        {
+          id: 'g1',
+          condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 },
+          outcome: 'none',
+          breakTools: false,
+          tierStep: { mode: 'none', steps: 1, tierId: null }
+        }
+      ]),
+      rollFormula: '1d20 + 2d6',
+      kind: 'routed',
+      outcomeOptions: ROUTED_TIERS,
+      showBreakTools: false,
+      onChange: (next) => emitted.push(next)
+    });
+    expandTrigger(root, 'g1');
+    assert.equal(assertSelectHasResolvedName(root, DICE_GROUP), breakageKeys.Group);
+    assert.deepEqual(
+      selectOptionLabels(root, DICE_GROUP),
+      ['1d20', '2d6'],
+      'the groups read as the dice a GM typed, in evaluated-term order'
+    );
+    chooseSelectOption(root, DICE_GROUP, '1');
+    assert.strictEqual(
+      emitted.at(-1).triggers[0].condition.groupId,
+      1,
+      'the engine indexes `roll.dice` by NUMBER, so a forwarded "1" would match no group'
+    );
+
+    assert.equal(assertSelectHasResolvedName(root, AGGREGATE), breakageKeys.Aggregate);
+    assert.deepEqual(selectOptionValues(root, AGGREGATE), [
+      'total',
+      'anyDie',
+      'allDice',
+      'lowestDie',
+      'highestDie'
+    ]);
+    chooseSelectOption(root, AGGREGATE, 'lowestDie');
+    assert.equal(
+      emitted.at(-1).triggers[0].condition.aggregate,
+      'lowestDie',
+      'and the measure is written onto the same condition'
+    );
   });
 
   it('TYPING a threshold writes it: the value is a plain input, not a stepper', async () => {
@@ -771,12 +867,6 @@ describe('CheckTriggers (mounted): the collapsed head', () => {
 });
 
 // ── The common-trigger presets, THROUGH THE RENDERED CONTROL (issue 1096) ──────────────
-//
-// The pure-module test proves `buildPresetTrigger` returns the right object. It says nothing
-// about whether a GM clicking the button reaches it — the handler, the button's own state and
-// the emit that carries the result are all outside that proof, and the control shipped INERT
-// with that proof green. These go through the DOM: find the rendered button, click it, and
-// assert the trigger arrives in the emitted block.
 describe('the common-trigger presets author a trigger when CLICKED', () => {
   it('renders a preset button per offered preset for a routed check', async () => {
     const root = await harness.mount({

@@ -1,29 +1,15 @@
 /**
  * The system Component Rules list's BULK EDIT panel (issue 772; rebuilt to the reference and the
  * world panel's anatomy for issue 1371 r16-list under maintainer rulings M23 and M24).
- *
- * The panel is where a destructive multi-component write becomes legible BEFORE it happens, so
- * what is tested here is the staging semantics and the anatomy the maintainer ruled on, not the
- * pixels: the three inline insets (category, tags, essence values) and what each row does when it
- * is clicked; the `n/N` count a row states; the search well and pager on each; the foot that names
- * the staged axes; the remove leg in the dock that states its consequence and refuses per record;
- * and the essence axis's whole-map semantics made visible as `—` until staged.
- *
- * The panel does NOT own the draft — the manager root does, because the panel is unmounted the
- * moment the selection empties. So these tests drive it the way the root does: hand it a draft,
- * take the NEW draft back through `onDraftChange`, and re-render with it. Every helper in
- * `componentBulkEditModel.js` is IMMUTABLE, so a panel that called a helper without reassigning
- * would compile, run, and silently do nothing; asserting on the rendered state after the round-trip
- * is what catches that. Every control's assertion below ACTS on the control: a control that merely
- * exists proves nothing (review r9, quality F1).
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { describe, it, before, after, afterEach } from 'node:test';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createComponentBulkDraft } from '../../src/utils/componentBulkEditModel.js';
+import { createComponentBulkDraft } from '../../src/ui/model/componentBulkEditModel.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -31,7 +17,7 @@ const panel = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-component-bulk-panel-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     // The remove leg's focus/announce ordering rule (issue 1157), ported from `BulkDeleteCard`.
     'src/ui/svelte/util/announceAfterFocus.js',
@@ -39,18 +25,18 @@ const panel = createMountedComponentHarness({
     // #1663: the ONE implementation behind both category shims; imports nothing.
     'src/utils/categoryNormalization.js',
     // The pure selection + staging model, and the inset pager and `n/N` counts beside it.
-    'src/utils/componentBulkEditModel.js',
+    'src/ui/model/componentBulkEditModel.js',
     // Its shared leaf (issue 1010): a STATIC import of that module.
     'src/utils/bulkSelectionModel.js',
     // The add-new essence offer projection (issue 1036).
-    'src/utils/essenceValidation.js',
+    'src/ui/model/essenceValidation.js',
+    'src/utils/scalars.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/components/Stepper.svelte',
-    // The shared inset's `stepper` rows lead with a `Medallion` tile (issue 1371 r16-cat, M25); an
-    // omission HANGS this suite as `# cancelled` rather than failing a test.
+    // The shared inset's `stepper` rows lead with a `Medallion` tile (issue 1371 r16-cat, M25).
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
@@ -81,11 +67,7 @@ function impactOf(overrides = {}) {
   };
 }
 
-/**
- * Mount the panel the way the manager root drives it: the caller owns the draft, and every
- * `onDraftChange` REPLACES it and re-renders. Returns the live draft accessor so a test can assert
- * on what was actually staged as well as on what is rendered.
- */
+/** Mount the panel the way the manager root drives it: the caller owns the draft. */
 async function mountPanel(props = {}) {
   const state = {
     draft: props.draft || createComponentBulkDraft(),
@@ -384,8 +366,7 @@ describe('ComponentBulkEditPanel tag inset (issue 1371 r16-list)', () => {
   });
 
   it('states the TRUE half of the tag story under the inset, and never the unconsumed merge', async () => {
-    // `ui-integration/spec.md` `### GM World Component Screens` requirement 1: no surface may
-    // assert that world tags merge into a system while the union does not consume that merge.
+    // `ui-world-scope/spec.md` `## GM World Component Screens` requirement 1.
     const { root } = await mountPanel();
     const note = root.querySelector('[data-component-bulk-tags-note]');
     assert.equal(
@@ -399,12 +380,7 @@ describe('ComponentBulkEditPanel tag inset (issue 1371 r16-list)', () => {
 describe('ComponentBulkEditPanel search and pager (issue 1371 r16-list; every inset since r17-b)', () => {
   const SEVEN = ['ash', 'bone', 'coal', 'dust', 'ember', 'flux', 'grit'];
 
-  /**
-   * The three insets, each as what differs between them (quality N1): the prop that gives it
-   * seven rows, the hook its rows carry, how a row is staged and where the draft records it.
-   * Each inset binds the shared `BulkStagingInset` through its OWN view (`insetView()` in the
-   * panel), and until this table only the tags inset's binding was ever pressed.
-   */
+  /** The three insets, each as what differs between them (quality N1). */
   const AXES = [
     {
       id: 'category',
@@ -497,8 +473,7 @@ describe('ComponentBulkEditPanel essence inset (issue 1371 r16-list, M24)', () =
   });
 
   it('reads `—` on every row while the axis is UNSTAGED, and every row’s number once it is', async () => {
-    // The write REPLACES the whole map when the axis is staged, so a row that read `—` beside a
-    // staged neighbour would be saying "unchanged" about a value the write strips to 0.
+    // The write REPLACES the whole map when the axis is staged.
     const { root, state } = await mountPanel();
     assert.equal(essenceInput(root, 'fire').value, '', 'unstaged: nothing is written, so no number');
     assert.equal(essenceInput(root, 'fire').getAttribute('placeholder'), '—');
@@ -608,10 +583,6 @@ describe('ComponentBulkEditPanel progressive DC (issue 772)', () => {
 });
 
 // ── The remove leg (issue 1129's set delete, moved into the dock for issue 1371 r16-list) ────
-//
-// The panel does NOT compute the impact — it is handed one, because "how many recipes will be
-// disabled" depends on the whole selection against real recipe bodies. These tests feed an impact
-// literal and pin what the GM is SHOWN and what the two clicks DO.
 describe('ComponentBulkEditPanel remove leg (issue 1371 r16-list)', () => {
   it('states the consequence BEFORE it is armed, counted, and gates each recipe sentence on its count', async () => {
     const { root } = await mountPanel({ deleteImpact: impactOf({ recipesRewritten: 2, recipesDisabled: 1 }) });

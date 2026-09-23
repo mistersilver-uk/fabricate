@@ -1,51 +1,4 @@
-/**
- * THE DERIVED MARKER FIXTURE and its completeness closures (issue 1363, criterion 9).
- *
- * "Every non-site is untouched" is checkable only against an ENUMERATED non-site list, so it
- * cannot detect a site absent from BOTH lists — which is the failure `#### D9` had just corrected
- * twice by hand. The fixture is therefore DERIVED, never hand-authored: it is a maximally
- * populated corpus produced by the REAL producers of ALL THREE payloads, with every string leaf
- * set to one marker id; running `MARKER → REWRITTEN` over it and diffing yields the set of paths
- * the walk ACTUALLY touched.
- *
- * SCOPING THE CORPUS TO `_normalizeSystem` AND `Tool.toJSON` ALONE WOULD BE VACUOUS for most of
- * the site surface: that literal carries no `recipes` key and `gatheringConfig` is a separate
- * setting, yet the recipe / step / ingredient-set / salvage `toolIds`, the gathering task and
- * event `toolIds`, the gathering drop-row `componentId`, and the legacy gathering tools copy are
- * exactly the sites `#### D9` newly adds — the newest and least exercised part of the walk. So
- * all three producers are driven:
- *
- *   - `craftingSystems` — `CraftingSystemManager#_normalizeSystem`, which routes tools through
- *     `Tool.toJSON`;
- *   - `recipes`         — `Recipe#toJSON`, the recipe corpus producer;
- *   - `gatheringConfig` — `adminStore`'s own gathering-config save path, driven through its
- *     PUBLIC actions, because that is the only thing that writes this setting.
- *
- * TWO CLOSURES, because set-equality alone is ASYMMETRIC and cannot catch the failure this
- * fixture exists to catch. A field in NEITHER list that the walk DOES rewrite makes the touched
- * set a superset and is caught; a field in neither list that the walk does NOT rewrite — the
- * MISSED-SITE case — is absent from both sides and passes. So:
- *
- *   1. a KEY-NAME closure: the distinct leaf key names present anywhere in the derived corpus
- *      must be SET-EQUAL to (the site key names UNION an explicit reasoned exclusion list), in
- *      both directions. An anchored list of seven names is itself an unguarded hand-maintained
- *      mirror and cannot see a reference field a later PR calls `catalystComponentId` or
- *      `linkedComponentId`; under the closure a NEW leaf key is on neither list and fails THIS
- *      test regardless of what it is called.
- *   2. a strictly stronger PATH closure: every leaf PATH whose key name is in the site-key-name
- *      set must ITSELF be in the enumerated site list. The key-name closure alone catches only a
- *      missed site bearing a NEW name, and two of `#### D9`'s three historical gaps bore none —
- *      `onBreak.replacementTarget.componentId` reuses `componentId` and essence `sourceItemUuid`
- *      reuses `sourceItemUuid`, so both would sit in neither list, go untouched, and pass.
- *
- * The essence leg (issue 1654) is diffed on its own: one pass with `remapComponent` + `remapTool`
- * live against `WORLD_SCOPE_REFERENCE_SITES`, one with `remapEssence` live against
- * `WORLD_SCOPE_ESSENCE_REFERENCE_SITES`, so neither list weakens into a subset comparison.
- *
- * An essence id is the first id class this walk rewrites in key position, so a third closure diffs
- * each object's own key list and reports a moved one as a key-position site spelled `…essences{}`.
- * A leaf of a re-keyed map is attributed there rather than double-counted as a vanished leaf.
- */
+/** THE DERIVED MARKER FIXTURE and its completeness closures (issue 1363, criterion 9). */
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -61,7 +14,7 @@ import {
   WORLD_SCOPE_ESSENCE_DEFENSIVE_SITES,
   WORLD_SCOPE_ESSENCE_REFERENCE_SITES,
   WORLD_SCOPE_REFERENCE_SITES,
-} from '../src/migration/worldScopeReferenceRewrite.js';
+} from '../src/systems/worldScopeReferenceRewrite.js';
 import { installFoundryStubs } from './helpers/worldScopeCorpus.js';
 
 installFoundryStubs();
@@ -71,33 +24,19 @@ const { createAdminStore } = await import('../src/ui/svelte/stores/adminStore.js
 const MARKER = 'MARKER-ID';
 const REWRITTEN = 'REWRITTEN-ID';
 
-/**
- * The corpus's authored essence id, and the two ids the essence leg maps it to.
- *
- * `markEveryStringLeaf` replaces string leaves only, so after marking the sole surviving `fire`
- * occurrences are object keys of an `essences` quantity map — which is what makes the key-position
- * leg derivable. `MARKER` and `fire` map to distinct targets so a diff tells the rewrites apart.
- */
+/** The corpus's authored essence id, and the two ids the essence leg maps it to. */
 const ESSENCE_KEY = 'fire';
 const ESSENCE_VALUE_REWRITTEN = 'REWRITTEN-ESSENCE-VALUE';
 const ESSENCE_KEY_REWRITTEN = 'REWRITTEN-ESSENCE-KEY';
 
-/**
- * One essence-typed ingredient option, with an essence-typed alternative.
- *
- * Shared by the system and recipe producers because `matchTypes.js`'s `essenceHandler` normalizes
- * all three positions to the same `{ type: 'essence', essenceId, amount }`, and `tests/**` counts
- * against the duplication gate exactly as `src/` does.
- */
+/** One essence-typed ingredient option, with an essence-typed alternative. */
 const essenceOption = () => ({
   quantity: 1,
   match: { type: 'essence', essenceId: ESSENCE_KEY, amount: 3 },
   alternatives: [{ quantity: 1, match: { type: 'essence', essenceId: ESSENCE_KEY, amount: 2 } }],
 });
 
-// ---------------------------------------------------------------------------
 // Deriving the maximally-populated corpus from the three REAL producers
-// ---------------------------------------------------------------------------
 
 function producedSystem() {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
@@ -305,13 +244,7 @@ function leafPaths(value, path = '', collected = new Map()) {
   return collected;
 }
 
-/**
- * Every plain object in a value, as `path -> its own key names`, with array indices collapsed.
- *
- * The key-position counterpart of {@link leafPaths}, and the only view here that can see an essence
- * id re-keyed in key position. Keys accumulate per collapsed path, because two array entries share
- * one path, and the question asked is whether that position's key vocabulary moved, not entry 3's.
- */
+/** Every plain object in a value, as `path -> its own key names`, with array indices collapsed. */
 function keySetPaths(value, path = '', collected = new Map()) {
   if (Array.isArray(value)) {
     for (const entry of value) keySetPaths(entry, `${path}[]`, collected);
@@ -361,12 +294,7 @@ function markedCorpusRoots(corpus) {
   ];
 }
 
-/**
- * Run the shared walk over the marked corpus with one leg's remappers live and diff it.
- *
- * One derivation for all three legs, driven by the remappers it is handed, so neither the
- * component-and-tool list nor the essence list can acquire the weaker derivation.
- */
+/** Run the shared walk over the marked corpus with one leg's remappers live and diff it. */
 function diffMarkedCorpus(remappers) {
   const before = buildMarkedCorpus();
   const after = buildMarkedCorpus();
@@ -447,18 +375,12 @@ test('the ESSENCE leg is SET-EQUAL to its own enumerated site list, in BOTH dire
 });
 
 test('the COMPONENT-AND-TOOL leg re-keys NOTHING — key-position rewriting is the essence leg alone', () => {
-  // The negative half of the key-set closure. Every id class except essences is rewritten in leaf
-  // position only, so a component or tool remapper that moved an object key would be rewriting a
-  // position no list names and no reader expects.
+  // The negative half of the key-set closure.
   assert.deepEqual([...componentAndToolLeg.keyMaps].sort(), []);
 });
 
 /**
  * The leaf key names a reference site can bear, derived from the site lists rather than restated.
- *
- * Key-position sites are excluded: a `…essences{}` entry names a container, so folding it in would
- * put `essences` here and make the path closure below demand that `systems[].features.essences` —
- * a boolean feature flag sharing the word — be an enumerated reference site.
  */
 const leafKeyName = (path) => path.replace(/\[\]$/, '').split('.').pop().replace(/\[\]$/, '');
 
@@ -480,24 +402,9 @@ const ENUMERATED_SITES = new Set([
 ]);
 
 /**
- * Every leaf key name in the derived corpus that is NOT a reference site.
- *
- * ONE REASON COVERS THE WHOLE LIST, which is why it is stated once rather than per entry: none of
- * these keys can hold a component or a tool id. They are identity and display (`name`, `img`,
- * `icon`, `description`, `colorToken`), document UUIDs (`originItemUuid`, `itemUuid`,
- * `macroUuid`, `linkedSceneUuid`), authored behaviour and configuration (`mode`, `formula`,
- * `dc`, `enabled`, `salvageResolutionMode`, …), vocabulary tokens (`biomes`, `dangerTags`,
- * `category`, `tags`), and structural containers (`match`, `outcomes`, `salvage`, `alchemy`).
- *
- * Two names no longer fit that one reason and have moved to
- * {@link ESSENCE_LEG_NON_SITE_KEY_NAMES}: both rested on essence ids never being re-keyed, which
- * `1.34.0` retired (issue 1654).
- *
- * THE LIST IS THE MIRROR AND THE CLOSURE IS ITS GUARD. It is TOTAL against the derived corpus in
- * both directions, so a NEW leaf key emitted by any of the three producers is on neither list and
- * fails, whatever it is called — which is the property an anchored regex over seven known names
- * can never have — and a key the producers stop emitting fails too, so a dead exemption cannot
- * accumulate and hide the next one.
+ * Every leaf key name in the derived corpus that is NOT a reference site. Two names no longer fit
+ * that one reason and have moved to {@link ESSENCE_LEG_NON_SITE_KEY_NAMES}: both rested on essence
+ * ids never being re-keyed, which `1.34.0` retired (issue 1654).
  */
 const NON_SITE_KEY_NAMES = new Set([
   'alchemy',
@@ -610,20 +517,7 @@ const NON_SITE_KEY_NAMES = new Set([
   'visibilityMode',
 ]);
 
-/**
- * The two leaf key names issue 1654 moved out of {@link NON_SITE_KEY_NAMES}.
- *
- * Both rested there on "essence ids are the one class this migration never re-keys", and `1.34.0`
- * re-keys one for the first time, so that rationale would now read as a guarantee this test does
- * not make. Each is still a non-site for a reason that survives the change:
- *
- * - `essences` — every leaf of this name is a boolean (`features.essences`, the system's feature
- *   switch), and `SITE_KEY_NAMES` holds leaf field names, so admitting it would demand that a
- *   feature flag be a reference site. Its container is guarded as `…essences{}` by the key closure.
- * - `fire` — an essence id in key position, re-keyed by the essence leg under
- *   `systems[].components[].essences{}` and the two ingredient-set maps. It stays a non-site key
- *   name because the closures classify the name of a field holding an id, not the id itself.
- */
+/** The two leaf key names issue 1654 moved out of {@link NON_SITE_KEY_NAMES}. */
 const ESSENCE_LEG_NON_SITE_KEY_NAMES = new Set(['essences', ESSENCE_KEY]);
 
 test('the KEY-NAME closure: every leaf key in the derived corpus is a site key or a listed non-site', () => {
@@ -674,13 +568,7 @@ test('a system-level toolBreakage is NOT a reference site and is never rewritten
 
 test('the DEFENSIVE list is COMPLETE: every unproducible leaf the walk touches is on it', () => {
   // The list is the ONE escape hatch from the set-equality above, so it is pinned in BOTH
-  // directions rather than trusted. A corpus authoring every legacy and alias shape is walked,
-  // and every leaf the walk rewrites must be either an enumerated site or a listed defensive
-  // one. An earlier form of the list named `catalysts[]` as a bare array path and omitted every
-  // `systemItemId` alias, so the invariant it stated was false.
-  // `essenceId` sits alongside the component spellings in one match rather than in a second
-  // essence-typed corpus: the walk is key-driven and never reads `match.type`, so a single
-  // over-populated match reaches every alias at once and a `type` field cannot mask a site.
+  // directions rather than trusted.
   const match = () => ({
     type: 'component',
     componentId: MARKER,
@@ -821,8 +709,7 @@ test('every DEFENSIVE site is genuinely unproducible — the list cannot hide a 
 
 test('every ESSENCE defensive site is genuinely unproducible, leaf and key position alike', () => {
   // Same guard for the key-position half, which needs its own lookup: a `…essences{}` entry is not
-  // a leaf path, so `allLeaves` can never contain it. It is checked against the container paths the
-  // producers emit rather than resting on a stale "the fixture cannot reach it" claim.
+  // a leaf path, so `allLeaves` can never contain it.
   const producedLeaves = new Set(allLeaves.keys());
   const producedContainers = new Set([...allLeaves.keys()].map((path) => `${parentPath(path)}{}`));
   const producible = WORLD_SCOPE_ESSENCE_DEFENSIVE_SITES.filter((site) =>
@@ -836,9 +723,7 @@ test('every ESSENCE defensive site is genuinely unproducible, leaf and key posit
   assert.ok(WORLD_SCOPE_ESSENCE_DEFENSIVE_SITES.length > 0, 'the exemption list is not vacuous');
 });
 
-// ---------------------------------------------------------------------------
 // The essence leg's behaviour, where the derived fixture cannot reach (issue 1654)
-// ---------------------------------------------------------------------------
 
 /** `{ essences }` carriers for the two world-scope rows the derived corpus has no producer for. */
 const scopeRows = () => ({

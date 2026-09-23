@@ -1,32 +1,6 @@
 /**
  * The pooled holdings READ's BEHAVIOUR (issue 1342, phase 4) — `readPooledHoldings`, the leaf
  * behind `game.fabricate.readPooledHoldings`.
- *
- * The contract half — what the answer's fields promise, and how `sufficient` is derived — is
- * pinned by `tests/companion-pooled-holdings-contract.test.js`. This suite is about what the
- * member DOES: resolving a cost's name against every crafting system's definitions, counting a
- * component across a party through the matcher the consume will write through, classifying a
- * tool, and pooling coin.
- *
- * Four claims carry the weight, and each is asserted against a REAL collaborator rather than a
- * convenient double:
- *
- *   - **The count comes from the published matcher.** `CraftingEngine.findComponentItems` is
- *     borrowed from its own prototype, so its case-SENSITIVE, TIERED ALL-OR-NOTHING behaviour is
- *     what the read reports. A looser double would report a number the consume cannot pay.
- *   - **A tool's state comes from the shipped classifier**, driven through the REAL
- *     `RecipeManager.toolMatchesItem`, so a `damaged` tool reads insufficient exactly as the
- *     start-attempt gate refuses one.
- *   - **`balanceNotConfigured` blocks nothing.** A `macro` world with no `balance` macro answers
- *     `null` for its currency cost while every component and tool cost in the same request is
- *     answered normally. This is the placement the contract declares as data, proved as behaviour.
- *   - **A cost's `name` means the same thing on every axis.** A currency cost resolves its coin
- *     by id, abbreviation or label, folded exactly as the component axis folds a definition
- *     name, and reports a collision as `ambiguous` rather than picking one — while an exact id
- *     still wins outright, so a label typed onto another coin cannot redirect a working caller.
- *   - **The issue-540 name-only telemetry is not fired by resolving a cost's NAME**, with a
- *     negative control proving the probe can see a warning at all — a silent probe that could
- *     never fire would pass the first assertion vacuously.
  */
 
 import assert from 'node:assert/strict';
@@ -55,14 +29,7 @@ const SMITHING = 'smithing';
 const ALCHEMY = 'alchemy';
 const IRON_SOURCE = 'Item.ironIngotSource';
 
-/**
- * One owned item.
- *
- * `getFlag` is a real function rather than a bare `flags` literal, because `isToolBroken` reads
- * the broken marker through `candidate.getFlag(...)` first and `globalThis.foundry.utils` second:
- * an inert `{ flags: { fabricate: { toolBroken: true } } }` fixture would classify a broken tool
- * as `present` and the suite would prove the opposite of what it claims.
- */
+/** One owned item. */
 class HeldItem {
   constructor(name, { uuid = null, quantity = 1, broken = false } = {}) {
     this.name = name;
@@ -86,11 +53,6 @@ function makeActor(name, { currency = {}, items = [] } = {}) {
 /**
  * Two crafting systems, because a cost's name resolves ACROSS systems and `ambiguous` is a claim
  * about more than one of them answering.
- *
- * `Iron Ingot` carries a source reference and `Ember Dust` does not, so one component exercises
- * the durable tier of `findComponentItems` and the other its deprecated name tier — and
- * `Ember Dust` exists in BOTH systems, which is the ambiguity a companion must be told about
- * before it consumes by the id this read hands back.
  */
 function makeSystems() {
   return [
@@ -111,13 +73,8 @@ function makeSystems() {
 }
 
 /**
- * The REAL tool matcher, borrowed from `RecipeManager`'s prototype and given only the two
- * private readers it calls.
- *
- * Borrowed rather than stubbed because a looser double would report a hit the shipped matcher
- * refuses, and the read would then promise a tool the start-attempt gate rejects. `recipeManager`
- * is the shape `resolveToolMatcher` falls through to, exactly as production passes
- * `{ recipeManager: this }`.
+ * The REAL tool matcher, borrowed from `RecipeManager`'s prototype and given only the two private
+ * readers it calls.
  */
 function toolMatcherFor(systems) {
   const byId = new Map(systems.map((system) => [system.id, system]));
@@ -134,9 +91,6 @@ function toolMatcherFor(systems) {
 
 /**
  * The seam bag the facade will inject, with the PUBLISHED matcher borrowed from its own prototype.
- *
- * `findComponentItems` reads no `this`, so calling it detached is the whole real method and not a
- * re-implementation of it — which is the point: the read's numbers must be the matcher's numbers.
  */
 function readSeams(systems, { spendStrategy = 'actorProperty', macros = {}, ...rest } = {}) {
   return {
@@ -198,10 +152,7 @@ describe('readPooledHoldings — components', () => {
   });
 
   it('reports the matcher’s TIERED ALL-OR-NOTHING count rather than smoothing it', async () => {
-    // Two durably-linked copies and three name-only ones. `findComponentItems` returns the
-    // durable tier's hits and NEVER falls back once that tier answered, so the honest pooled
-    // number is 2. A read that summed both tiers would promise five to a consume that can only
-    // find two — the gate that lies, in the direction that hurts.
+    // Two durably-linked copies and three name-only ones.
     const party = [
       makeActor('Idrin', {
         items: [
@@ -231,14 +182,6 @@ describe('readPooledHoldings — components', () => {
   it('reports an ID that answers in two systems as ambiguous AFTER the 1.30.0 re-key', async () => {
     // ISSUE 1370 criterion 9, and the BEHAVIOUR here is unchanged while the FILE is not: this
     // measurement is taken after `systemComponents` was repointed at the shared read seam.
-    //
-    // The id tier runs across EVERY system. Before `1.30.0` one real item authored in two systems
-    // had two DIFFERENT ids, so an id-keyed cost could only ever answer in one of them. The
-    // migration re-keys both in-system definitions to ONE world id, so the same read now answers
-    // in two - which is exactly why `companion-api`'s ambiguity obligation STANDS even though its
-    // stated reason ("a component id is not unique across crafting systems") is retracted. The two
-    // candidate systems still resolve DIFFERENT DOCUMENT SETS, because `findComponentItems` is
-    // system-scoped through the durable identity roles map.
     const party = [makeActor('Idrin', { items: [new HeldItem('Ember Dust', { quantity: 4 })] })];
 
     const beforeMigration = makeSystems();
@@ -289,9 +232,8 @@ describe('readPooledHoldings — tools', () => {
   });
 
   it('reads a broken tool as damaged, and damaged is NOT sufficient', async () => {
-    // The whole reason a tool's `sufficient` is `state === 'present'` and nothing else: the
-    // hammer is physically in the party's hands, and the shipped start-attempt gate still
-    // refuses it.
+    // The whole reason a tool's `sufficient` is `state === 'present'` and nothing else: the hammer
+    // is physically in the party's hands, and the shipped start-attempt gate still refuses it.
     const party = [makeActor('Idrin', { items: [new HeldItem("Smith's Hammer", { broken: true })] })];
 
     const [reading] = (await read(party, toolCost)).readings;
@@ -327,16 +269,6 @@ describe('readPooledHoldings — tools', () => {
   it('names a COMPONENT-LINKED tool by its component, and reports that component back', async () => {
     // Two claims no other tool case can make, because every other fixture tool carries its own
     // `name` and a `componentId` of `null`.
-    //
-    // The first is `toolDisplayName`'s fallback: a tool whose snapshot name was never
-    // backfilled is known by its LINKED COMPONENT's name, which is the expression
-    // `RecipeManager.toolMatchesItem` derives its own fallback from — so a tool this read can
-    // find is a tool that matcher can match. With `own` truthy on every other fixture the
-    // fallback was dead code as far as the suite was concerned.
-    //
-    // The second matters more to a caller: `componentId` on a tool reading is the id a
-    // companion would then hand to the CONSUME. Until this case it was only ever observed at
-    // `null`, so a reading that named the wrong component would have looked identical.
     const systems = [
       {
         id: SMITHING,
@@ -536,11 +468,7 @@ describe('readPooledHoldings — the request itself', () => {
   });
 
   it('refuses a pool that is not a SET, because summing it twice errs PERMISSIVE', async () => {
-    // The one refusal on this floor whose absence produces a WRONG NUMBER rather than a
-    // crash. Every reading sums per entry, so one document listed twice reads as a party
-    // holding twice what it holds — and the caller consumes on the strength of that answer.
-    // The facade's gate refuses the repeat before this floor ever sees it; the floor exists
-    // because the member below it deletes and a floor that trusts its caller is not one.
+    // The one refusal on this floor whose absence produces a WRONG NUMBER rather than a crash.
     const idrin = makeActor('Idrin', {
       currency: { gp: 3 },
       items: [new HeldItem('Iron Ingot', { uuid: IRON_SOURCE, quantity: 5 })],
@@ -631,8 +559,7 @@ describe('readPooledHoldings — the deprecated name tier’s telemetry', () => 
   it('emits nothing while resolving a cost’s NAME to a definition', async () => {
     // The cost names a component BY NAME and the actors hold it by SOURCE REFERENCE, so the only
     // name compare in the whole call is the definition lookup — which goes through
-    // `definitionIndex`'s own maps and never through the warn-once reporter. A companion polling
-    // holdings every stage must not register as reliance on the tier #540 exists to remove.
+    // `definitionIndex`'s own maps and never through the warn-once reporter.
     const party = [
       makeActor('Idrin', { items: [new HeldItem('Iron Ingot', { uuid: IRON_SOURCE, quantity: 2 })] }),
     ];
@@ -644,10 +571,9 @@ describe('readPooledHoldings — the deprecated name tier’s telemetry', () => 
   });
 
   it('still reports the ITEM-side fallback, which is what proves the probe can fire at all', async () => {
-    // The negative control. `Ember Dust` carries no source reference, so `findComponentItems`
-    // falls to its case-SENSITIVE name tier against the actor's items — the shipped, deprecated
-    // compare — and that one MUST keep reporting. Without this case the assertion above would
-    // pass even if the telemetry were disconnected entirely.
+    // The negative control. `Ember Dust` carries no source reference, so `findComponentItems` falls
+    // to its case-SENSITIVE name tier against the actor's items — the shipped, deprecated compare —
+    // and that one MUST keep reporting.
     const party = [makeActor('Idrin', { items: [new HeldItem('Ember Dust', { quantity: 3 })] })];
 
     const result = await read(party, [cost('component', 'Ember Dust', 1)]);
@@ -718,11 +644,7 @@ describe('readPooledHoldings — a cost names its coin the way it names its comp
   });
 
   it('reports a coin name two coins answer to as ambiguous, and still reads the first', async () => {
-    // `Crown` is one coin's LABEL and another's ABBREVIATION. The two are alternatives for the
-    // same slot in the display chain, so a caller holding a string Fabricate printed cannot know
-    // which field it came from — ranking them would settle a real collision by a coin flip that
-    // looks authoritative. The reading's own `ambiguous` field is where that goes, exactly as it
-    // does for a component name matching in two crafting systems.
+    // `Crown` is one coin's LABEL and another's ABBREVIATION.
     const colliding = [
       {
         id: 'u1',
@@ -759,9 +681,7 @@ describe('readPooledHoldings — a cost names its coin the way it names its comp
   });
 
   it('lets an exact unit id win outright, so a rename elsewhere cannot redirect it', async () => {
-    // The precedence claim as BEHAVIOUR: `gold` is one coin's id and another's label. A caller
-    // that has always asked for `gold` keeps getting the coin it asked for, and the GM who typed
-    // that label onto a second coin has not silently changed what an existing request means.
+    // The precedence claim as BEHAVIOUR: `gold` is one coin's id and another's label.
     const words = [
       {
         id: 'gold',
@@ -802,12 +722,7 @@ describe('readPooledHoldings — a cost names its coin the way it names its comp
 
 describe('readPooledHoldings — a cost may name a definition by the id the read hands back', () => {
   // THE ROUND TRIP IS THE POINT. Every reading echoes the `componentId` it resolved, and the
-  // consume takes ids ONLY. A read that published an id and then refused to accept it would be
-  // answering a different question on the way back in: a companion caching a reading and later
-  // refreshing it would have to go back to the authored name it had already replaced.
-  //
-  // The tier order is the coin axis's, and so is its reasoning — exact id outright, then the
-  // folded name tier.
+  // consume takes ids ONLY.
 
   it('resolves a component cost by its definition id', async () => {
     const party = [
@@ -832,9 +747,7 @@ describe('readPooledHoldings — a cost may name a definition by the id the read
   });
 
   it('lets an id win outright over a name that collides with it', async () => {
-    // A world where one component's ID is another component's NAME. The id tier answers and the
-    // name tier is never consulted, so a rename cannot silently redirect a caller holding an id —
-    // the same durable-handle-beats-display-text rule the coin axis states.
+    // A world where one component's ID is another component's NAME.
     const systems = [
       {
         id: SMITHING,

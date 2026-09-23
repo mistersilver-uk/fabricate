@@ -1,17 +1,6 @@
 /**
  * Measure oversized files and functions (issue 1659). Proved from inside the `npm test` glob by
- * `tests/file-size-ledger.test.js`.
- *
- * Boundaries come from a PARSE, never a brace-depth scan. A regex literal's `{1,32}` quantifier
- * contributes braces that corrupt a depth counter, and the functions that matter here nest — the
- * issue's own `adminStore.refresh()` sits inside `createAdminStore()`, which a top-level scan
- * never reaches.
- *
- * An enclosing function's count is not reduced by a nested one: subtracting would hide a long
- * function that happens to contain a longer-lived helper.
- *
- * A class static block is deliberately out of scope: it is not a function, and none in `src/`
- * approaches the threshold.
+ * `tests/file-size-ledger.test.js`. Boundaries come from a PARSE, never a brace-depth scan.
  */
 import { parse } from 'svelte/compiler';
 
@@ -54,14 +43,7 @@ function callTarget(call) {
   return undefined;
 }
 
-/**
- * Map each function node to the declaration that names it, which the AST does not record.
- *
- * A callback is owned by the call it is passed to, so a `Hooks.once('ready', …)` body is keyed by
- * that call rather than by its position among every anonymous function in the file. A purely
- * positional key renumbers when an unrelated callback is added above it, which reads in the ledger
- * as debt moving when nothing did.
- */
+/** Map each function node to the declaration that names it, which the AST does not record. */
 function functionOwners(ast) {
   const owners = new Map();
   for (const node of walkNodes(ast)) {
@@ -115,13 +97,7 @@ function enclosingFunctions(functions) {
 
 const lineOf = (text, index) => text.slice(0, index).split('\n').length;
 
-/**
- * Every function in one parsed program, as `{ symbol, lines }`, measured in physical lines.
- *
- * A repeated qualified name takes an ordinal. Two anonymous callbacks in one file would otherwise
- * share a key, and a ledger keyed by name silently keeps only the last — a dropped entry that
- * reads as a shrinking debt.
- */
+/** Every function in one parsed program, as `{ symbol, lines }`, measured in physical lines. */
 function measureProgram(ast, text, offset = 0, seen = new Map()) {
   const functions = [...walkNodes(ast)]
     .filter((node) => FUNCTION_TYPES.includes(node.type))
@@ -145,14 +121,8 @@ export function measureModuleFunctions(text) {
 }
 
 /**
- * Every function in a component: both script blocks AND the markup.
- *
- * The markup is included because an inline handler is still a function this epic would want to see
- * grow. There are 1,381 of them across the corpus and none is oversized today, so including them
- * moves no pinned number — but Phase 5 moves logic out of the root component, which is exactly
- * when a large inline handler could appear, and a script-only scan would not see it.
- *
- * A component's FILE size is measured over the whole file rather than here.
+ * Every function in a component: both script blocks AND the markup. The markup is included because
+ * an inline handler is still a function this epic would want to see grow.
  */
 export function measureComponentFunctions(text) {
   const ast = parse(text, { modern: true });
@@ -167,12 +137,7 @@ export function measureComponentFunctions(text) {
   return measured;
 }
 
-/**
- * Physical lines, comments and blanks included, matching the measure the issue's figures use.
- *
- * A file's terminating newline does not add a line of its own. Counting it made every one of the
- * 741 corpus files read one line long and turned the exclusive thresholds into inclusive ones.
- */
+/** Physical lines, comments and blanks included, matching the measure the issue's figures use. */
 export function physicalLines(text) {
   const parts = String(text).split('\n');
   return parts.length > 1 && parts.at(-1) === '' ? parts.length - 1 : parts.length;

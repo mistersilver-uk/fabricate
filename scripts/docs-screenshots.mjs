@@ -1,62 +1,5 @@
 #!/usr/bin/env node
-/**
- * Fill the documentation site's generated image slots from the View Lab.
- *
- * A documentation page declares a slot by naming a View Lab case id. This renders those cases,
- * encodes each frame, and rewrites only the ones whose source actually moved.
- *
- *   node scripts/docs-screenshots.mjs plan       what a run would do, without rendering anything
- *   node scripts/docs-screenshots.mjs generate   render, encode what changed, update the map
- *   node scripts/docs-screenshots.mjs check      render and verify the committed frames
- *
- * WHY ONLY WHAT CHANGED
- * ---------------------
- * A generator that rewrites every image on every run produces a diff nobody can review, and a
- * reviewer looking at fifty changed binaries cannot tell a real visual change from re-encoding
- * noise. So the run says out loud which frames it touched and which it left alone.
- *
- * WHY THE DECISION IS PERCEPTUAL RATHER THAN A DIGEST COMPARISON
- * --------------------------------------------------------------
- * The obvious mechanism is a content digest of the renderer's output, and it was implemented,
- * measured, and found to be wrong: this renderer is not byte-deterministic. Repeated clean renders
- * of the same case set differ in a handful of frames by a few antialiased pixels, and the
- * differing set moves between runs rather than settling. A digest comparison therefore reports
- * roughly a tenth of the set as changed on every run forever, which is exactly the churn this
- * generator exists to prevent. The comparison lives in `scripts/lib/webpFrames.js`, which carries
- * the measurements the tolerance was derived from.
- *
- * WHAT THE RECORDED DIGEST IS FOR, THEN
- * -------------------------------------
- * `sha256` in the map is the provenance of the render that produced the committed asset — which
- * frame this image came from — and it is deliberately taken over the renderer's PNG rather than
- * over the published WebP, so that a libwebp release cannot present itself as fifty visual
- * changes. It moves only when a frame is actually rewritten. It is not, and after the measurement
- * above cannot be, the mechanism that decides whether to rewrite.
- *
- * WHY THIS FAILS CLOSED, FOUR WAYS
- * --------------------------------
- * A wrong documentation screenshot is worse than a stale one, because a reader has no way to tell.
- * So absent harvested Foundry chrome aborts, an absent encoder or decoder aborts, a manifest this
- * run did not itself write aborts, and — the subtle one — a frame is consumed only when THIS run
- * produced it. The renderer accumulates into its output directory and collects per-case failures
- * rather than throwing, so a case that failed today can still have yesterday's PNG sitting on disk.
- * Publishing that would ship a frame from an older commit as current documentation, silently. Every
- * mapped case must appear in the manifest this run wrote, stamped with this run's head, and absent
- * from its failures.
- *
- * WHERE THOSE REFUSALS LIVE, AND WHY NOT HERE
- * -------------------------------------------
- * This file dispatches its command from `process.argv` at module scope, so importing it runs a
- * capture and nothing in it can be reached from a test. The refusals above are the part worth
- * testing — a refusal that silently stopped working looks exactly like one that never fires — so
- * they live in `scripts/lib/docsScreenshotRun.js`, which decides and returns, and this file
- * performs. `scripts/lib/webpFrames.js` holds the pixel comparison for the same reason.
- *
- * WHY THERE IS NO CI JOB
- * ----------------------
- * Generation needs harvested Foundry window chrome, which is proprietary and never leaves the
- * maintainer's machine or enters this repository. CI builds and deploys what is committed.
- */
+/** Fill the documentation site's generated image slots from the View Lab. */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, statSync } from 'node:fs';
@@ -87,43 +30,20 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const RENDERER = 'scripts/view-lab-screenshots.mjs';
 const RENDER_OUTPUT_DIRECTORY = 'ui-screenshot-artifact/apps';
 
-/**
- * Where this run's freshly encoded frames go before anything decides to publish them.
- *
- * Beside the renderer's own output, which is already gitignored and already the place a human
- * looks when a run surprises them. A frame lands here whether or not it turns out to differ, so
- * "what did this run actually produce" is answerable after the fact.
- */
+/** Where this run's freshly encoded frames go before anything decides to publish them. */
 const ENCODE_OUTPUT_DIRECTORY = 'ui-screenshot-artifact/docs-frames';
 
 /** Thrown for a condition a user can act on, so the CLI can print it without a stack trace. */
 class DocsScreenshotError extends Error {}
 
-/**
- * The harvested Foundry chrome, or an abort naming how to obtain it.
- *
- * Checked here as well as in the renderer so the failure is attributed to this run before it spends
- * five minutes starting a browser, and so `check` refuses for the same reason `generate` does.
- *
- * @returns {{version: string}} The resolved chrome cache.
- */
+/** The harvested Foundry chrome, or an abort naming how to obtain it. */
 function requireChrome() {
   const cache = resolveChromeCache(ROOT);
   if (!cache) throw new DocsScreenshotError(missingChromeMessage(ROOT));
   return cache;
 }
 
-/**
- * The libwebp tools, or an abort naming what is missing.
- *
- * Both are required, and `dwebp` is required even by a run that ends up encoding nothing: it is
- * what turns "these two WebPs differ" into "this view changed", so without it the only comparison
- * available is byte equality — which this renderer's own jitter fails on roughly a tenth of the
- * set. A run that quietly fell back to byte equality would rewrite those frames and report them as
- * visual changes, so this fails closed instead.
- *
- * @returns {{encoder: string, decoder: string}} Absolute paths to both tools.
- */
+/** The libwebp tools, or an abort naming what is missing. */
 function requireImageTools() {
   const encoder = resolveExecutable(ENCODER);
   const decoder = resolveExecutable(DECODER);
@@ -140,20 +60,7 @@ function manifestWrittenAt(manifestPath) {
   return statSync(manifestPath, { throwIfNoEntry: false })?.mtimeMs;
 }
 
-/**
- * Render every mapped case and return the manifest that run wrote.
- *
- * The renderer is spawned rather than imported: it dispatches its own command from `process.argv`
- * at module scope, so importing it would run a capture as a side effect of loading it.
- *
- * Spawning is also why the manifest is timed rather than trusted. The renderer's exit status cannot
- * answer "did it produce anything", because a run with per-case failures exits non-zero having
- * written a perfectly good manifest — so this reads when the file was last written, on both sides
- * of the spawn, and hands both to {@link staleManifestReason}.
- *
- * @param {string[]} caseIds Case ids to render.
- * @returns {Promise<object>} The manifest this run wrote.
- */
+/** Render every mapped case and return the manifest that run wrote. */
 async function renderCases(caseIds) {
   console.log(`rendering ${caseIds.length} case(s) — this takes a few minutes\n`);
   const manifestPath = join(ROOT, RENDER_OUTPUT_DIRECTORY, 'manifest.json');
@@ -181,12 +88,7 @@ function locateRenderedFrame(caseId) {
   return existsSync(source) ? source : null;
 }
 
-/**
- * The SHA-256 of a file, lowercase hex.
- *
- * @param {string} path Absolute file path.
- * @returns {Promise<string>} The digest.
- */
+/** The SHA-256 of a file, lowercase hex. */
 async function digestOf(path) {
   return createHash('sha256')
     .update(await readFile(path))
@@ -200,11 +102,7 @@ function report(heading, lines) {
   for (const line of lines) console.log(`  ${line}`);
 }
 
-/**
- * Say what a run would do, without starting a browser.
- *
- * @returns {Promise<number>} Exit code.
- */
+/** Say what a run would do, without starting a browser. */
 async function commandPlan() {
   const map = await readDocsScreenshotMap(ROOT);
   const expected = await expectedProvenance(ROOT);
@@ -236,15 +134,6 @@ async function commandPlan() {
 /**
  * Render every mapped case, encode what this run produced, and judge each frame against the
  * committed one.
- *
- * Shared by `generate` and `check` deliberately: the two verbs must agree about what "changed"
- * means, and a `check` that judged frames differently from the `generate` that wrote them would be
- * a gate reporting on a rule nothing implements.
- *
- * @param {{encoder: string, decoder: string}} tools Absolute libwebp tool paths.
- * @param {object[]} screenshots Map entries.
- * @returns {Promise<{verdicts: object[], refused: string[]}>} One verdict per frame this run
- *   produced, and a line per case it did not.
  */
 async function renderAndCompare(tools, screenshots) {
   const caseIds = screenshots.map((entry) => entry.case);
@@ -296,16 +185,7 @@ async function provenanceDrift(map) {
     .map(([key, value]) => `${key}: recorded ${map.provenance[key] ?? 'nothing'}, now ${value}`);
 }
 
-/**
- * Render, rewrite what moved, and leave the rest alone.
- *
- * A frame is republished by copying THIS run's encode over the committed one, rather than by
- * re-encoding the source a second time. One encode per frame per run means the bytes that were
- * compared are the bytes that get committed, so a rewrite cannot disagree with the comparison that
- * asked for it.
- *
- * @returns {Promise<number>} Exit code.
- */
+/** Render, rewrite what moved, and leave the rest alone. */
 async function commandGenerate() {
   requireChrome();
   const tools = requireImageTools();
@@ -332,11 +212,7 @@ async function commandGenerate() {
   return plan.exitCode;
 }
 
-/**
- * Re-verify the committed frames against a fresh render, writing nothing.
- *
- * @returns {Promise<number>} Exit code.
- */
+/** Re-verify the committed frames against a fresh render, writing nothing. */
 async function commandCheck() {
   requireChrome();
   const tools = requireImageTools();

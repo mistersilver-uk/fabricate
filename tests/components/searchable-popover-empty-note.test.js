@@ -1,32 +1,4 @@
-/**
- * THE PICKER'S EMPTY PANEL IS A NOTE, NOT A NO-STATE PANEL (issue 1373).
- *
- * The maintainer opened the repair row's `+ Tag` picker beside the design and photographed
- * the difference: ours drew `EmptyState`'s dashed hero — a 32px tiled magnifier over a serif
- * heading, centred inside its own bordered box — where the design draws one quiet line
- * (`proto:2262`: `padding:7px; font:500 10px var(--sans); color:var(--subtle)`), no box and
- * no glyph. That treatment belongs to the PRIMITIVE, not to the call site: every one of the
- * 22 `<SearchablePopover>` sites reaches the same branch, and five of them pass no
- * `emptyHint` at all, so their empty panel was a dashed box containing nothing but a
- * magnifier. A hero panel inside a 240px popover is not right for any of them, so the
- * DEFAULT moves rather than a variant being added for one caller.
- *
- * ── AND THE TWO EMPTINESSES READ DIFFERENTLY ────────────────────────────────────────────
- * `openspec/specs/design-system/spec.md` requires an empty state to distinguish "an
- * unfiltered emptiness from a filtered one", and this primitive did not: a GM who typed
- * `zzz` into a picker holding twelve tags was told `No tags defined`, which is false. The
- * caller's `emptyHint` now answers only for the list being empty; a search that filters
- * everything out answers with the design's own words for that state (`proto:2281`,
- * `No matches`), which the primitive localizes itself so no call site has to be edited to
- * stop lying.
- *
- * ── WHY MOUNTED RATHER THAN SOURCE-READ ─────────────────────────────────────────────────
- * Both halves are branch selection, which a source scan cannot evaluate: the glyph is passed
- * as a prop and the message is chosen by a `$derived`, so "no icon reaches `EmptyState`" and
- * "the filtered branch is the one that renders" are facts about a render. The APPEARANCE of
- * the note — that `is-note` releases the panel and the tile — is pinned where appearance
- * lives, in `empty-state-mounted.test.js` against the primitive's own scoped block.
- */
+/** THE PICKER'S EMPTY PANEL IS A NOTE, NOT A NO-STATE PANEL (issue 1373). */
 
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -146,7 +118,7 @@ describe('1373 SearchablePopover — the empty panel is a note', () => {
   });
 
   it('drops that sentence in the filtered state, where it would be false', async () => {
-    // `emptyDetail` explains why a list holds NOTHING — the travel-actor picker names the
+    // `emptyDetail` explains why a list holds NOTHING.
     // module setting to change — and that explanation is false of a list that holds plenty and
     // was searched. The player window's actor bar is what proved it: rendered under `No
     // character matches your search`, its body still read `ask your GM to add its actor type`.

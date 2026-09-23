@@ -22,20 +22,23 @@
   There is no auto-disarm timer.
 
   Props:
-   - knowledge: the top-level `viewState.knowledge` projection (or null).
+   - knowledge: the top-level `viewState.knowledge` projection (or null). Its `loading` flag sets
+     `aria-busy` on this root and draws a loading panel in both panes; its `error` flag draws a
+     danger notice in the detail pane and leaves the roster its search field alone (issue 1969).
    - selectedSystemName: kicker copy.
    - onSelectActor(actorId)
    - onExpend(actorId, itemId) / onDelete(actorId, itemId) / onErase(actorId, recipeId)
    - onResetSystem(actorId) / onResetAll(actorId)
 -->
 <script>
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
+  import Notice from '../../components/Notice.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Avatar from '../../components/Avatar.svelte';
   import KnowledgeTabs from './knowledge/KnowledgeTabs.svelte';
   import KnowledgeRoster from './knowledge/KnowledgeRoster.svelte';
-  import { createKnowledgeRosterBrowserState } from '../../../../utils/managerBrowserViewState.js';
+  import { createKnowledgeRosterBrowserState } from '../../../model/managerBrowserViewState.js';
   import KnowledgeRecipeItemsTab from './knowledge/KnowledgeRecipeItemsTab.svelte';
   import KnowledgeLearnedRecipesTab from './knowledge/KnowledgeLearnedRecipesTab.svelte';
   import {
@@ -67,14 +70,16 @@
 
   const searchTerm = $derived(String(ui.searchTerm || ''));
   let armedToken = $state('');
-  // Seeded ONCE from the store's `defaultTab` (itself resolved once on surface
-  // entry from the DEFINITION count). Never a live `$derived` over that count: a
-  // GM authoring the system's first recipe item on another surface would flip
-  // 0 → 1 and yank the open tab — silently disarming any armed row with it.
+  // Seeded ONCE per system from the store's `defaultTab`, itself resolved from the DEFINITION count
+  // once on surface entry and again on each crafting-system switch. Never a live `$derived` over
+  // that count: a GM authoring the system's first recipe item on another surface would flip 0 → 1
+  // and yank the open tab — silently disarming any armed row with it.
   let activeTab = $state(KNOWLEDGE_TAB_RECIPE_ITEMS);
-  let tabSeeded = $state(false);
+  let seededSystemId = $state('');
   let panelElement = $state(null);
 
+  const loading = $derived(knowledge?.loading === true);
+  const loadError = $derived(knowledge?.error === true);
   const characters = $derived(knowledge?.characters || []);
   const visibleCharacters = $derived(filterKnowledgeRoster(characters, searchTerm));
   const selectedCharacter = $derived(knowledge?.selectedCharacter || null);
@@ -83,9 +88,10 @@
 
   $effect(() => {
     const defaultTab = knowledge?.defaultTab;
-    if (tabSeeded || !knowledge?.active || !defaultTab) return;
+    const systemId = knowledge?.systemId || '';
+    if (!knowledge?.active || !defaultTab || !systemId || systemId === seededSystemId) return;
     activeTab = defaultTab;
-    tabSeeded = true;
+    seededSystemId = systemId;
   });
 
   // Disarm on character change. Reading the id inside the effect is what makes the
@@ -166,10 +172,16 @@
   }
 </script>
 
-<main class="manager-main manager-knowledge-main" data-knowledge-view>
+<main
+  class="manager-main manager-knowledge-main"
+  data-knowledge-view
+  aria-busy={loading ? 'true' : undefined}
+>
   <KnowledgeRoster
     characters={visibleCharacters}
     totalCount={characters.length}
+    {loading}
+    error={loadError}
     selectedActorId={knowledge?.selectedActorId || ''}
     {searchTerm}
     onSearch={handleSearch}
@@ -180,7 +192,35 @@
     class="manager-knowledge-detail"
     aria-label={text('FABRICATE.Admin.Manager.Knowledge.DetailLabel', 'Character knowledge')}
   >
-    {#if !selectedCharacter}
+    {#if loading}
+      <EmptyState
+        icon="fas fa-spinner fa-spin"
+        title={text(
+          'FABRICATE.Admin.Manager.Knowledge.LoadingTitle',
+          'Loading character knowledge...'
+        )}
+        hint={text(
+          'FABRICATE.Admin.Manager.Knowledge.LoadingHint',
+          "Fabricate is reading each player character's recipe items and learned recipes."
+        )}
+        dataAttr="data-knowledge-loading"
+      />
+    {:else if loadError}
+      <div class="manager-knowledge-error-slot">
+        <Notice
+          tone="danger"
+          title={text(
+            'FABRICATE.Admin.Manager.Knowledge.LoadError',
+            "Couldn't load character knowledge."
+          )}
+          detail={text(
+            'FABRICATE.Admin.Manager.Knowledge.LoadErrorHint',
+            'Open another section, then return to Knowledge to try again. The browser console has the error.'
+          )}
+          dataAttr="data-knowledge-error"
+        />
+      </div>
+    {:else if !selectedCharacter}
       <EmptyState
         icon="fas fa-user"
         title={text('FABRICATE.Admin.Manager.Knowledge.NoSelectionTitle', 'Select a character')}
@@ -318,3 +358,11 @@
     {/if}
   </section>
 </main>
+
+<style>
+  /* The failure notice's slot (issue 1969). `<Notice>` declares `margin: 0` and the detail pane has
+     no padding, so this rule is the caller's layout: the detail header's own gutter. */
+  .manager-knowledge-error-slot {
+    padding: var(--fab-space-3) var(--fab-space-4);
+  }
+</style>

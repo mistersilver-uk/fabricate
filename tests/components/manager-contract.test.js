@@ -1,245 +1,96 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { classMemberSource, moduleFunctionSource } from '../helpers/boundedSource.js';
+import {
+  calledName,
+  identifierNames,
+  literalStrings,
+  walkNodes,
+} from '../helpers/moduleAst.js';
+import {
+  componentAstOf,
+  componentAstsIn,
+  componentScopeOf,
+  moduleAstOf,
+  moduleAstsIn,
+} from '../helpers/parsedSource.js';
+import {
+  attributeExpression,
+  attributeNames,
+  attributeValue,
+  boundDirectives,
+  carriesSpread,
+  containsLiteral,
+  declaredConstant,
+  declaresAttribute,
+  declaresProp,
+  importsModule,
+  passesProp,
+  propDefault,
+  propNone,
+  readsGlobal,
+  referencesIdentifier,
+  rendersComponent,
+  rendersElement,
+  requiresProp,
+  spelledLiterals,
+  spellsLiteral,
+} from '../helpers/svelteStructureContract.js';
+import {
+  CONTRACT_CLAIMS,
+  attributeLiteral,
+  attributeValues,
+  callNames,
+  callsWithLiteral,
+  claimsAcross,
+  claimsForComponent,
+  claimsForFile,
+  claimsOverCode,
+  classMemberAst,
+  classRenderedExpressions,
+  comparedLiteral,
+  constantLiteral,
+  declaredConstantValue,
+  defineStructureContract,
+  labelOf,
+  memberPaths,
+  namedCodeAst,
+  propLiteral,
+  propertyAst,
+  propertyValues,
+  pushedRecord,
+  recordAst,
+  registersAHook,
+  renderedNodes,
+  returnedTextArguments,
+  staticTextCalls,
+  structureOf,
+  templateNodes,
+  templateSuffixes,
+} from '../helpers/structureContract.js';
+import { SHIPPED_LANG as lang } from '../helpers/manager/managerLocalization.js';
+import { declaredManagerClasses } from '../helpers/manager/managerStylesheet.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
-const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
-const essenceBrowserPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/EssenceBrowserView.svelte'
-);
-const essenceEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EssenceEditView.svelte');
-// The GM Essence Studio's own components (issue 1036). They sit under `essences/` — the
-// BROWSER's directory, which the screenshot evidence map globs for the essence views — and
-// every one of them joins `managerSource` below. A `!managerSource.includes(...)` assertion
-// over markup that MOVED into one of these goes vacuous rather than red, which is why the
-// join has to move in lockstep with the extraction.
-const essenceStudioDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/essences');
-const tagsCategoriesPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/TagsCategoriesView.svelte'
-);
-const systemEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/SystemEditView.svelte');
-// World > Currency (issue 1278): the relocated currency editor, whose contract used to be part
-// of SystemEditView's.
-const worldCurrencyPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
-);
-const craftingSettingsPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/CraftingSettingsView.svelte'
-);
-const resolutionModeOptionsPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/resolutionModeOptions.js'
-);
-const systemsBrowserPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/SystemsBrowserView.svelte'
-);
-const recipesBrowserPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/RecipesBrowserView.svelte'
-);
-// The library inspector, extracted out of the root (issue 643). It sits under
-// `recipes/`, NOT `recipe/` — the latter is the recipe EDITOR's screenshot-map glob.
-const recipeBrowserInspectorPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
-);
-const componentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte');
-const componentsBrowserPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte'
-);
-const componentRowPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/components/ComponentRow.svelte'
-);
-const environmentEditPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/EnvironmentEditView.svelte'
-);
-const environmentsBrowserPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'
-);
-const gatheringTaskEditPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte'
-);
-const chanceSliderPath = resolve(repoRoot, 'src/ui/svelte/components/ChanceSlider.svelte');
-const gatheringTasksBrowserPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte'
-);
-// The GM Knowledge surface (issue 785). `KnowledgeView` and the reusable
-// `ArmedDangerButton` sit at the manager root; the surface's own children live
-// under `knowledge/`, which is also where the pure projection lives.
-const knowledgePath = resolve(repoRoot, 'src/ui/svelte/apps/manager/KnowledgeView.svelte');
-const armedDangerButtonPath = resolve(
-  repoRoot,
-  'src/ui/svelte/components/ArmedDangerButton.svelte'
-);
-const knowledgeComponentDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/knowledge');
-const toolsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
-const toolEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ToolEditView.svelte');
-const toolBreakagePath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte'
-);
-// The system-scope band that replaced the retired Overview tab (issue 1373), and the
-// inherit/override card every behaviour section of both tool editors is drawn as.
-const toolSystemScopePath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte'
-);
-const toolInheritCardPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte'
-);
-const toolRequirementsPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte'
-);
-const toolValidationPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte'
-);
-// The Checks Studio's own modifier catalogue, read here for ONE reason: it is the other caller
-// of the shared modifier row, and the claim below is that there is one row and not two.
-const craftingModifierCataloguePath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte'
-);
-const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerApp.svelte.js');
-const mainPath = resolve(repoRoot, 'src/main.js');
-const langPath = resolve(repoRoot, 'lang/en.json');
 
-const rootSource = readFileSync(rootPath, 'utf8');
-// The reward and event limit counts are one shared component (issue 1050), so the marker the
-// root used to carry twice is emitted there from its `rule` prop.
-const gatheringRuleLimitStepperSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/environment/GatheringRuleLimitStepper.svelte'),
-  'utf8'
-);
-const essenceBrowserSource = readFileSync(essenceBrowserPath, 'utf8');
-// The paginated rows/columns are the shared studio-library shelf now, so the `<ul>` and its
-// `role="list"` are rendered there rather than in each browser view.
-const libraryShelfSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/library/LibraryShelf.svelte'),
-  'utf8'
-);
-const essenceEditSource = readFileSync(essenceEditPath, 'utf8');
-const essenceStudioSources = readdirSync(essenceStudioDir)
-  .filter((entry) => entry.endsWith('.svelte') || entry.endsWith('.js'))
-  .map((entry) => readFileSync(resolve(essenceStudioDir, entry), 'utf8'));
-const essenceStudioSource = essenceStudioSources.join('\n');
-const tagsCategoriesSource = readFileSync(tagsCategoriesPath, 'utf8');
-const systemEditSource = readFileSync(systemEditPath, 'utf8');
-const worldModifiersSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte'),
-  'utf8'
-);
-const worldCurrencySource = readFileSync(worldCurrencyPath, 'utf8');
-const craftingSettingsSource = readFileSync(craftingSettingsPath, 'utf8');
-const resolutionModeOptionsSource = readFileSync(resolutionModeOptionsPath, 'utf8');
-const systemsBrowserSource = readFileSync(systemsBrowserPath, 'utf8');
-const recipesBrowserSource = readFileSync(recipesBrowserPath, 'utf8');
-const recipeBrowserInspectorSource = readFileSync(recipeBrowserInspectorPath, 'utf8');
-const componentEditSource = readFileSync(componentEditPath, 'utf8');
-const componentsBrowserSource = readFileSync(componentsBrowserPath, 'utf8');
-const componentRowSource = readFileSync(componentRowPath, 'utf8');
-const environmentEditSource = readFileSync(environmentEditPath, 'utf8');
-const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
-const gatheringTaskEditSource = readFileSync(gatheringTaskEditPath, 'utf8');
-const chanceSliderSource = readFileSync(chanceSliderPath, 'utf8');
-const gatheringTasksBrowserSource = readFileSync(gatheringTasksBrowserPath, 'utf8');
-const knowledgeSource = readFileSync(knowledgePath, 'utf8');
-const armedDangerButtonSource = readFileSync(armedDangerButtonPath, 'utf8');
-const toolsBrowserSource = readFileSync(toolsBrowserPath, 'utf8');
-const toolEditSource = readFileSync(toolEditPath, 'utf8');
-const toolBreakageSource = readFileSync(toolBreakagePath, 'utf8');
-const toolSystemScopeSource = readFileSync(toolSystemScopePath, 'utf8');
-const toolInheritCardSource = readFileSync(toolInheritCardPath, 'utf8');
-const toolEditorTabsSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte'),
-  'utf8'
-);
-const toolRequirementsSource = readFileSync(toolRequirementsPath, 'utf8');
-const toolValidationSource = readFileSync(toolValidationPath, 'utf8');
-const craftingModifierCatalogueSource = readFileSync(craftingModifierCataloguePath, 'utf8');
-// The WORLD Tool entry, which took the linked-item card off the system editor (issue 1373).
-const worldToolEntrySource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte'),
-  'utf8'
-);
-const appSource = readFileSync(appPath, 'utf8');
-const hostSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte'),
-  'utf8'
-);
-const managerExtensionsSource = readFileSync(
-  resolve(repoRoot, 'src/ui/managerExtensions.js'),
-  'utf8'
-);
-const previewProviderSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js'),
-  'utf8'
-);
-const mainSource = readFileSync(mainPath, 'utf8');
-const lang = JSON.parse(readFileSync(langPath, 'utf8'));
-
-const managerSource = [
-  rootSource,
-  recipeBrowserInspectorSource,
-  essenceBrowserSource,
-  essenceEditSource,
-  essenceStudioSource,
-  tagsCategoriesSource,
-  systemEditSource,
-  craftingSettingsSource,
-  resolutionModeOptionsSource,
-  systemsBrowserSource,
-  recipesBrowserSource,
-  componentsBrowserSource,
-  componentEditSource,
-  environmentEditSource,
-  environmentsBrowserSource,
-  gatheringTaskEditSource,
-  chanceSliderSource,
-  gatheringTasksBrowserSource,
-  toolsBrowserSource,
-].join('\n');
+/** Every `.svelte` file in one directory, as the repo-relative paths a contract target takes. */
+function componentPathsIn(dir) {
+  return readdirSync(resolve(repoRoot, dir))
+    .filter((entry) => entry.endsWith('.svelte'))
+    .map((entry) => `${dir}/${entry}`);
+}
 
 function catalogValue(key) {
   return key.split('.').reduce((node, part) => node?.[part], lang);
 }
 
-function decodeStaticString(quote, body) {
-  return Function(`return ${quote}${body}${quote};`)();
-}
-
-function staticTextCalls(source) {
-  const pattern =
-    /text\(\s*(["'])(FABRICATE(?:\\.|(?!\1).)*)\1\s*,\s*(["'])((?:\\.|(?!\3).)*)\3\s*\)/gs;
-  return [...source.matchAll(pattern)].map((match) => ({
-    key: match[2],
-    fallback: decodeStaticString(match[3], match[4]),
-  }));
-}
-
 function isChangedManagerEnvironmentLocalizationKey(key) {
   return (
-    // The Knowledge surface's whole string tree is authored fresh in issue 785, so
-    // every fallback it renders is compared against en.json rather than only the
-    // keys an older change happened to touch.
+    // The Knowledge surface's whole string tree is authored fresh in issue 785.
     key.startsWith('FABRICATE.Admin.Manager.Knowledge.') ||
     key === 'FABRICATE.Admin.Manager.Nav.Knowledge' ||
     key.startsWith('FABRICATE.Admin.Manager.Environment.') ||
@@ -255,361 +106,362 @@ function isChangedManagerEnvironmentLocalizationKey(key) {
   );
 }
 
-function sourceName(filePath) {
-  return filePath.replace(`${repoRoot}\\`, '').replace(`${repoRoot}/`, '');
-}
+const APP_SHELL = 'src/ui/SvelteCraftingSystemManagerApp.svelte.js';
+const MANAGER_SERVICES = 'src/ui/managerServices.js';
+const KNOWLEDGE_SNAPSHOT = 'src/systems/knowledgeSnapshot.js';
+const KNOWLEDGE_TARGETS = 'src/ui/svelte/apps/manager/knowledge/knowledgeTargets.js';
+const MAIN = 'src/main.js';
+
+/** Every module the entry composes; each carries the chunk-split claim in its own contract row. */
+const BOOTSTRAP_MODULES = [
+  'src/bootstrap/Fabricate.js',
+  'src/bootstrap/bulkFacade.js',
+  'src/bootstrap/companionFacade.js',
+  'src/bootstrap/composeServices.js',
+  'src/bootstrap/craftingFacade.js',
+  'src/bootstrap/gatheringFacade.js',
+  'src/bootstrap/gatheringRuntime.js',
+  'src/bootstrap/hooks.js',
+  'src/bootstrap/journalFacade.js',
+  'src/bootstrap/journalOperations.js',
+  'src/bootstrap/migrations.js',
+  'src/bootstrap/publicApi.js',
+  'src/bootstrap/socketRouter.js',
+];
+const MANAGER_ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
+const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
+const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte';
+const MANAGER_NAV_RAIL = 'src/ui/svelte/apps/manager/ManagerNavRail.svelte';
+const MANAGER_PAGE_HEADER = 'src/ui/svelte/apps/manager/ManagerPageHeader.svelte';
+const MANAGER_HEADER_BREADCRUMBS = 'src/ui/svelte/apps/manager/ManagerHeaderBreadcrumbs.svelte';
+const MANAGER_HEADER_ACTIONS = 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte';
+const MANAGER_HEADER_CRAFTING_ACTIONS =
+  'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte';
+const MANAGER_HEADER_GATHERING_ACTIONS =
+  'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte';
+const NAV_RAIL_MODEL = 'src/ui/svelte/apps/manager/navRailModel.svelte.js';
+const HEADER_MODEL = 'src/ui/svelte/apps/manager/headerModel.svelte.js';
+const MANAGER_SYSTEM_NAV = 'src/ui/svelte/apps/manager/ManagerSystemNav.svelte';
+const MANAGER_WORLD_NAV = 'src/ui/svelte/apps/manager/ManagerWorldNav.svelte';
+const MANAGER_WORLD_DOWNTIME_NAV_GROUP =
+  'src/ui/svelte/apps/manager/ManagerWorldDowntimeNavGroup.svelte';
+// The rail's three entry units answer together for a claim over the entries they share; a claim
+// narrowed to one of them would drop most of its population (issue 1717).
+const MANAGER_NAV_UNITS = [MANAGER_SYSTEM_NAV, MANAGER_WORLD_NAV, MANAGER_WORLD_DOWNTIME_NAV_GROUP];
+// The page header's copy is spelled across two units since issue 1720 — the shell's markup and the
+// model it resolves from — so a key that must appear once appears once across the pair.
+const headerCopyLiterals = () => [
+  ...spelledLiterals(componentAstOf(MANAGER_ROOT)),
+  ...literalStrings(moduleAstOf(HEADER_MODEL).ast),
+];
+const DOWNTIME_PREVIEW_PROVIDER =
+  'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js';
+const COMPONENTS_BROWSER = 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte';
+const COMPONENT_ROW = 'src/ui/svelte/apps/manager/components/ComponentRow.svelte';
+const COMPONENT_EDIT = 'src/ui/svelte/apps/manager/ComponentEditView.svelte';
+const CRAFTING_SETTINGS = 'src/ui/svelte/apps/manager/CraftingSettingsView.svelte';
+const ESSENCE_BROWSER = 'src/ui/svelte/apps/manager/EssenceBrowserView.svelte';
+const ESSENCE_EDIT = 'src/ui/svelte/apps/manager/EssenceEditView.svelte';
+// The GM Essence Studio's own components, which sit under `essences/` (issue 1036).
+const ESSENCE_STUDIO = { dir: 'src/ui/svelte/apps/manager/essences' };
+const LIBRARY_SHELF = 'src/ui/svelte/apps/manager/library/LibraryShelf.svelte';
+const MODIFIER_CATALOGUE =
+  'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte';
+const RECIPES_BROWSER = 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte';
+// The library inspector, extracted out of the root (issue 643). It sits under `recipes/`, not
+// `recipe/` — the latter is the recipe editor's screenshot-map glob.
+const RECIPE_BROWSER_INSPECTOR =
+  'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte';
+const RESOLUTION_MODE_OPTIONS = 'src/ui/svelte/apps/manager/resolutionModeOptions.js';
+const ROUTE_EXIT_GUARDS = 'src/ui/svelte/apps/manager/routeExitGuards.js';
+const SYSTEMS_BROWSER = 'src/ui/svelte/apps/manager/SystemsBrowserView.svelte';
+const SYSTEM_EDIT = 'src/ui/svelte/apps/manager/SystemEditView.svelte';
+const TAGS_CATEGORIES = 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte';
+// The system screen's presentation model (issue 1915), the world screen's twin.
+const SYSTEM_VOCABULARY = 'src/ui/svelte/apps/manager/systemVocabularyStudio.js';
+const WORLD_CURRENCY = 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte';
+const WORLD_MODIFIERS = 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte';
+// The world Tool entry, which took the linked-item card off the system editor (issue 1373).
+const WORLD_TOOL_ENTRY = 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte';
+const CHANCE_SLIDER = 'src/ui/svelte/components/ChanceSlider.svelte';
+const ENVIRONMENT_EDIT = 'src/ui/svelte/apps/manager/EnvironmentEditView.svelte';
+// The reward and event limit counts are one shared component (issue 1050).
+const GATHERING_INSPECTOR_RAIL =
+  'src/ui/svelte/apps/manager/environment/GatheringInspectorRail.svelte';
+const GATHERING_RULES_INSPECTOR =
+  'src/ui/svelte/apps/manager/environment/GatheringRulesInspector.svelte';
+const GATHERING_TASK_INSPECTOR =
+  'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte';
+const GATHERING_RULE_STEPPER =
+  'src/ui/svelte/apps/manager/environment/GatheringRuleLimitStepper.svelte';
+const ENVIRONMENTS_BROWSER = 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte';
+const GATHERING_ECONOMY = 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte';
+const GATHERING_TASK_EDIT = 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
+const GATHERING_TASKS_BROWSER = 'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte';
+const MODIFIER_LIBRARY_ROW = 'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte';
+const SCOPED_VALIDATION_TAB = 'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte';
+const TOOL_EDIT = 'src/ui/svelte/apps/manager/ToolEditView.svelte';
+const TOOL_BREAKAGE = 'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte';
+const TOOL_EDITOR_TABS = 'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte';
+const TOOL_INHERIT_CARD = 'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte';
+const TOOL_REQUIREMENTS = 'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte';
+// The system-scope band that replaced the retired Overview tab (issue 1373).
+const TOOL_SYSTEM_SCOPE = 'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte';
+const TOOL_VALIDATION = 'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte';
+// The GM Knowledge surface (issue 785). `KnowledgeView` and the reusable `ArmedDangerButton` sit
+// at the manager root; the rows and the pure projection live under `knowledge/`.
+const KNOWLEDGE_VIEW = 'src/ui/svelte/apps/manager/KnowledgeView.svelte';
+const ARMED_DANGER_BUTTON = 'src/ui/svelte/components/ArmedDangerButton.svelte';
+const KNOWLEDGE_COPY_ROW = 'src/ui/svelte/apps/manager/knowledge/KnowledgeOwnedCopyRow.svelte';
+const KNOWLEDGE_LEARNED_ROW = 'src/ui/svelte/apps/manager/knowledge/KnowledgeLearnedRow.svelte';
+const KNOWLEDGE_STUDIO = 'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js';
+
+/** The manager views a claim may hold of any one of, which the joined text used to ask of all. */
+const MANAGER_VIEWS = [
+  MANAGER_ROOT,
+  COMPONENTS_BROWSER,
+  COMPONENT_EDIT,
+  ESSENCE_BROWSER,
+  ESSENCE_EDIT,
+  RECIPES_BROWSER,
+  SYSTEMS_BROWSER,
+  SYSTEM_EDIT,
+  TAGS_CATEGORIES,
+  'src/ui/svelte/apps/manager/EnvironmentEditView.svelte',
+  'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
+  'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+  'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte',
+  'src/ui/svelte/apps/manager/ToolsBrowserView.svelte',
+  'src/ui/svelte/components/ChanceSlider.svelte',
+];
 
 describe('CraftingSystemManager source contract', () => {
-  it('injects the exact page-session manager extension registry into the Svelte root', () => {
-    assert.ok(appSource.includes("import { managerExtensions } from './managerExtensions.js';"));
-    assert.ok(appSource.includes('managerExtensions,'));
-    assert.ok(
-      rootSource.includes(
-        'let { store, services = null, managerExtensions = null, playerExtensions = null } = $props()'
+  defineStructureContract(
+    'injects the exact page-session manager extension registry into the Svelte root',
+    APP_SHELL,
+    { imports: ['./managerExtensions.js'] }
+  );
+
+  defineStructureContract(
+    'hands that registry to the root beside the player one',
+    { file: APP_SHELL, member: '_prepareSvelteProps' },
+    { names: ['managerExtensions', 'playerExtensions'] }
+  );
+
+  defineStructureContract(
+    'takes both registries as props and renders the Downtime host',
+    MANAGER_ROOT,
+    {
+      declaresProp: ['store', 'services', 'managerExtensions', 'playerExtensions'],
+      renders: ['WorldDowntimeExtensionHost'],
+    }
+  );
+
+  // The rail renders the active tab set while the host is unmounted, so the shell owns the live
+  // provider and the host takes it as a prop.
+  defineStructureContract('keeps one owner of the active Downtime provider', MANAGER_ROOT, {
+    callsWith: [['subscribe', 'WORLD_DOWNTIME_SURFACE_ID']],
+  });
+
+  defineStructureContract('leaves the Downtime host subscribing to nothing', DOWNTIME_HOST, {
+    callsNo: ['subscribe'],
+    callsWith: [['onProviderFault', 'activeProvider']],
+  });
+
+  defineStructureContract(
+    'never enumerates the tab ids the registry will accept',
+    MANAGER_EXTENSIONS,
+    { namesNo: ['CORE_DOWNTIME_PREVIEW_TAB_IDS'] }
+  );
+
+  defineStructureContract(
+    "publishes Core's preview tab ids beside its copy",
+    DOWNTIME_PREVIEW_PROVIDER,
+    { exports: ['CORE_DOWNTIME_PREVIEW_TAB_IDS'] }
+  );
+
+  // Root owns the rail label id, stated once; the host derives no id of its own (issue 1213).
+  defineStructureContract(
+    'owns the rail label id and threads it into the Downtime host',
+    MANAGER_ROOT,
+    {
+      declares: ['downtimeNavLabelId'],
+      spells: ['manager-downtime-nav-label-'],
+      passesProps: [['WorldDowntimeExtensionHost', 'navLabelId']],
+    }
+  );
+
+  // Required, with no default: a default would be the hand-maintained mirror this prop avoids —
+  // a second copy of Root's literal, agreeing today and undetectable the day it stops.
+  defineStructureContract(
+    'names its region from the prop and carries no copy of the literal',
+    DOWNTIME_HOST,
+    { requiresProp: ['navLabelId'], spellsNo: ['manager-downtime-nav'] }
+  );
+
+  // What the `AC-11` to `AC-15` mounted cases cannot say is how many render sites exist: a third
+  // one added outside the provider-mode guard would satisfy every one of them (issue 1302).
+  it('renders the Downtime badge at exactly two sites', () => {
+    const sites = templateNodes(componentAstOf(MANAGER_WORLD_DOWNTIME_NAV_GROUP))
+      .filter((node) =>
+        (node.attributes ?? []).some((attribute) =>
+          String(attribute.name ?? '').startsWith('data-world-downtime-badge')
+        )
       )
-    );
-    assert.ok(rootSource.includes('<WorldDowntimeExtensionHost'));
-  });
-  it('keeps one owner of the active Downtime provider, and it is the shell', () => {
-    // The rail renders the active tab set while the host is UNMOUNTED, and a mount fault
-    // has to move the rail as well as the panel. Two subscribers to the same registry would
-    // disagree on both, so the shell subscribes and the host takes a prop.
-    assert.ok(
-      rootSource.includes('managerExtensions.subscribe(WORLD_DOWNTIME_SURFACE_ID'),
-      'the shell subscribes to the surface it renders'
-    );
-    assert.ok(
-      !hostSource.includes('.subscribe('),
-      'the Downtime host takes the live provider as a prop and subscribes to nothing'
-    );
-    assert.ok(
-      hostSource.includes('onProviderFault(activeProvider)'),
-      'a mount fault is reported UP to the shell rather than healed locally'
-    );
-    // Core's own tab id list is content, not contract: nothing on the seam may read it.
-    assert.ok(
-      !managerExtensionsSource.includes('CORE_DOWNTIME_PREVIEW_TAB_IDS'),
-      'the registry never enumerates the tab ids it will accept'
-    );
-    assert.ok(
-      previewProviderSource.includes('export const CORE_DOWNTIME_PREVIEW_TAB_IDS'),
-      "Core's preview tab ids live beside the copy and icons they index"
-    );
-  });
-  // The cross-component handoff that names the companion panel (issue 1213). Root owns the id
-  // and threads it down; the host consumes it. Every claim here was ungated at review, and the
-  // host's DEFAULT was itself the hand-maintained mirror its own comment forbids — a second
-  // copy of Root's literal, agreeing today and undetectable the day it stops. Deleting the
-  // thread-through at the call site survived the entire suite.
-  it('threads the rail label id into the Downtime host rather than mirroring the literal', () => {
-    assert.ok(
-      rootSource.includes(
-        'const downtimeNavLabelId = (tabId) => `manager-downtime-nav-label-${tabId}`;'
-      ),
-      'Root owns the rail label id, stated once'
-    );
-    assert.ok(
-      rootSource.includes('navLabelId={downtimeNavLabelId}'),
-      'and passes it to the host — without this the panel region has no name at all'
-    );
-    assert.ok(
-      hostSource.includes('aria-labelledby={navLabelId(tab.id)}'),
-      'the host names its region from the prop and derives no id of its own'
-    );
-    // REQUIRED, with no default. The host must not be able to answer the question itself.
-    assert.match(
-      hostSource,
-      /^\s{4}navLabelId,\s*$/m,
-      'navLabelId is declared with no fallback, so an unthreaded host fails loudly'
-    );
-    assert.ok(
-      !hostSource.includes('manager-downtime-nav'),
-      'and the host carries no copy of Root literal in any form'
-    );
-    // The region takes the SCREEN name, so the id points at the label span rather than at the
-    // button — whose accessible name is the tab's `accessibleName`, an instruction.
-    assert.ok(
-      rootSource.includes('<span class="manager-nav-label" id={downtimeNavLabelId(item.id)}'),
-      'the id lands on the visible label element'
-    );
-    assert.match(
-      rootSource,
-      /aria-label=\{downtimeCoreFallback\s*\?\s*undefined\s*:\s*downtimeTabText\(item, 'accessibleName'\)\}/,
-      'and the sub-item consumes accessibleName in provider mode, so the seam does not require a field it discards'
-    );
-  });
-  // AC-15 — the mode guard on both badge render sites (issue 1302).
-  //
-  // THE FALSIFIABLE FORM FOR AN UNREACHABLE CLAIM. Core's preview tabs are a frozen literal
-  // declaring no badge, so no REGISTERED badge can ever reach core-fallback and a client-mount
-  // assertion of that half passes against an implementation with the guard deleted outright.
-  // The reachable half — a RUNTIME badge stored against a faulted provider's tab, whose ids
-  // are Core's own — is driven in the mounted suite instead.
-  it('keeps both Downtime badge render sites inside the provider-mode branch', () => {
-    // The SUB-ITEM badge, opening immediately inside the mode guard. Asserted as adjacency
-    // rather than as "the file contains both strings", which any two unrelated lines satisfy.
-    assert.match(
-      rootSource,
-      /\{#if !downtimeCoreFallback\}\s*\{@const badge = downtimeSubitemBadge\(item\)\}\s*\{#if badge\}\s*<span\s+class="manager-nav-issue-badge"\s+data-world-downtime-badge=\{item\.id\}/,
-      'the sub-item badge renders inside `downtimeCoreFallback === false`, not beside it'
-    );
-    // The ROLLUP, the same way.
-    assert.match(
-      rootSource,
-      /\{#if !downtimeCoreFallback\}\s*\{#if downtimeNavRollupVisible\}\s*<span\s+class="manager-nav-issue-badge"\s+data-world-downtime-badge-total/,
-      'and so does the parent rollup'
-    );
-    // BOTH, and only those two. A third site added outside a guard would satisfy every
-    // assertion above and render a companion's count over Core's gold upsell.
+      .map((node) => node.name);
     assert.equal(
-      rootSource.split('data-world-downtime-badge').length - 1,
+      sites.length,
       2,
-      'there are exactly two badge render sites, and the two matched above are them'
-    );
-
-    // The two DERIVATIONS behind those sites are guarded as well, which is what makes the
-    // markup guards belt and braces rather than the only thing standing between a runtime
-    // badge and a preview row.
-    assert.ok(
-      rootSource.includes(
-        'return downtimeCoreFallback ? null : resolveNavTabBadge(item, downtimeNavTabBadges);'
-      ),
-      'the resolved sub-item badge is null in core-fallback, whatever the store holds'
-    );
-    assert.match(
-      rootSource,
-      /downtimeCoreFallback \? 0 : navTabBadgeTotal\(downtimeTabs, downtimeNavTabBadges\)/,
-      'and the rollup total is zero there, so the composed parent name cannot appear either'
-    );
-    assert.match(
-      rootSource,
-      /const downtimeNavRollupVisible = \$derived\(\s*!downtimeCoreFallback &&/,
-      'the rollup’s own visibility opens on the mode, before either of its other terms'
-    );
-  });
-  it('disposes a Downtime companion before ApplicationV2 closes and removes its Svelte target', () => {
-    const closeStart = appSource.indexOf('async close(options) {');
-    const closeEnd = appSource.indexOf('  static show()', closeStart);
-    const closeSource = appSource.slice(closeStart, closeEnd);
-    const dispose = closeSource.indexOf('disposeDowntimeProviderBeforeRemoval?.()');
-    const superClose = closeSource.indexOf('return super.close(options);');
-    assert.ok(dispose >= 0, 'the production manager close invokes the root disposal bridge');
-    assert.ok(superClose > dispose, 'the bridge runs before ApplicationV2 removes the Svelte target');
-    assert.match(
-      closeSource,
-      /disposeDowntimeProviderBeforeRemoval\?\.\(\);[\s\S]*?return super\.close\(options\);/,
-      'the real manager close keeps disposal and ApplicationV2 close in one ordered composition'
-    );
-  });
-  it('self-registers as the sole crafting system manager app', () => {
-    assert.ok(
-      appSource.includes('extends SvelteApplicationMixin('),
-      'manager app should be a standalone ApplicationV2 shell with no legacy base class'
-    );
-    assert.ok(
-      !appSource.includes('SvelteRecipeManagerApp'),
-      'manager app should not reference the removed legacy manager class'
-    );
-    assert.ok(
-      appSource.includes('registerCraftingSystemManagerApp(SvelteCraftingSystemManagerApp)'),
-      'manager app should self-register with the manager registry'
-    );
-    assert.ok(
-      !appSource.includes('openCurrentAdmin'),
-      'manager app should not expose a legacy admin launch service'
-    );
-    assert.ok(
-      appSource.includes('height: 940'),
-      'manager app should open tall enough for gathering task drag/drop'
-    );
-    assert.ok(
-      !mainSource.includes("import './ui/SvelteRecipeManagerApp.svelte.js';"),
-      'legacy manager side-effect import should be removed'
-    );
-    // Issue 150: the GM-only manager subtree is deferred to a lazy chunk, so
-    // main.js must NOT statically side-effect-import it and must instead pull it
-    // in through a dynamic import() behind the memoized loader.
-    assert.ok(
-      !mainSource.includes("import './ui/SvelteCraftingSystemManagerApp.svelte.js';"),
-      'manager static side-effect import should be removed so it lands in a lazy chunk'
-    );
-    assert.ok(
-      mainSource.includes("import('./ui/SvelteCraftingSystemManagerApp.svelte.js')"),
-      'manager app should be pulled in via a dynamic import for the lazy chunk'
-    );
-    assert.ok(
-      mainSource.includes('loadCraftingSystemManagerAppClass'),
-      'main.js should expose the memoized async manager loader'
+      `the sub-item badge and the parent rollup, and nothing else (found ${sites.join(', ')})`
     );
   });
 
-  // The access rosters are the manager's only Foundry user/ownership surface, and every
-  // rule below is one a naive implementation gets WRONG in a way that silently
-  // UNDER- or OVER-reports who can craft a recipe (issue 643 §4b).
-  it('derives the access rosters from the non-GM roster, never by testing a GM', () => {
-    // `Document#testUserPermission` short-circuits EVERY GM (Assistant included, since
-    // `User#isGM` is `hasRole(ASSISTANT)`) to OWNER, so GMs must be filtered FIRST.
-    assert.ok(
-      appSource.includes('game.users?.players'),
-      'uses the canonical Foundry non-GM roster'
+  // The companion is disposed before ApplicationV2 removes its Svelte target; that ordering is
+  // asserted against the real class by `tests/components/manager-extension-composition.test.js`.
+
+  // The window height is owned by `scripts/lib/foundryChromeSpec.js` and deep-equalled against the
+  // real `DEFAULT_OPTIONS` by `tests/view-lab-app-options-parity.test.js`.
+  defineStructureContract('self-registers as the sole crafting system manager app', APP_SHELL, {
+    extendsCall: ['SvelteApplicationMixin'],
+    callsWith: [['registerCraftingSystemManagerApp', 'SvelteCraftingSystemManagerApp']],
+    namesNo: [
+      'SvelteRecipeManagerApp',
+      'openCurrentAdmin',
+      'onEditSystem',
+      'LAST_MANAGED_CRAFTING_SYSTEM',
+    ],
+  });
+
+  // Deferred to its own chunk (issue 150): the static import matters by its absence.
+  defineStructureContract('defers the GM-only manager subtree to a lazy chunk', MAIN, {
+    importsNo: [
+      './ui/SvelteRecipeManagerApp.svelte.js',
+      './ui/SvelteCraftingSystemManagerApp.svelte.js',
+    ],
+    importsLazily: ['./ui/SvelteCraftingSystemManagerApp.svelte.js'],
+    names: ['loadCraftingSystemManagerAppClass'],
+  });
+
+  // The thirteen `src/bootstrap/` modules the entry composes (issue 1715). `defineStructureContract`
+  // runs its claims against ONE target, so each is its own row rather than an extension of the
+  // entry's: a static manager import in any of them would defeat the chunk split as surely as one
+  // here. The `../ui/…` spelling is the one that can occur a directory down.
+  for (const module of BOOTSTRAP_MODULES) {
+    defineStructureContract(
+      `takes no static manager import in ${module.slice('src/bootstrap/'.length)}`,
+      module,
+      {
+        importsNo: [
+          '../ui/SvelteRecipeManagerApp.svelte.js',
+          '../ui/SvelteCraftingSystemManagerApp.svelte.js',
+        ],
+      }
     );
-    assert.ok(appSource.includes('_playerUsers()'), 'both rosters go through the one GM filter');
-    assert.equal(
-      appSource.includes('actor.isOwner'),
-      false,
-      'never uses the game.user-scoped Actor#isOwner (always true on a GM client)'
-    );
-    // The fallback must agree with `Users#players` (`!u.isGM && u.hasRole('PLAYER')`).
-    // A `!isGM` filter alone admits role-NONE users, offering the GM a grantable target
-    // the engine ignores.
-    const fallback = appSource.slice(
-      appSource.indexOf('_playerUsers() {'),
-      appSource.indexOf('_userRoleLabel(role) {')
-    );
-    assert.ok(
-      fallback.includes("hasRole('PLAYER')") && fallback.includes('USER_ROLES?.PLAYER'),
-      'the fallback applies the same role floor as the canonical roster'
-    );
-    // Everything this labels comes from the GM-free roster, so a GAMEMASTER/ASSISTANT
-    // branch would be unreachable code claiming to handle a case that cannot arrive.
-    const roleLabel = appSource.slice(appSource.indexOf('_userRoleLabel(role) {'));
-    assert.equal(
-      roleLabel.slice(0, roleLabel.indexOf('_userColor')).includes('RoleGamemaster'),
-      false,
-      'a GM never reaches the role label — the roster excludes them'
+  }
+
+  it('lists every src/bootstrap module, so a new one cannot escape the chunk-split row', () => {
+    assert.deepEqual(
+      readdirSync(resolve(repoRoot, 'src/bootstrap'))
+        .filter((file) => file.endsWith('.js'))
+        .sort()
+        .map((file) => `src/bootstrap/${file}`),
+      [...BOOTSTRAP_MODULES].sort()
     );
   });
 
-  it('models "who plays this character" as a SET, with the whole-table case explicit', () => {
-    assert.ok(
-      appSource.includes("actor.testUserPermission?.(user, 'OWNER')"),
-      'OWNER holders control the actor'
-    );
-    assert.ok(appSource.includes('user.character.id === actor.id'), 'the assigned player too');
-    assert.ok(appSource.includes('controlledBy'), 'the union is exposed as a set');
-    assert.ok(
-      appSource.includes('sharedWithAllPlayers'),
-      'ownership.default >= OWNER reaches the whole table'
-    );
-    assert.ok(appSource.includes('actor.ownership?.default'), 'reads the default ownership level');
-    assert.equal(appSource.includes('playedBy'), false, 'no lossy singular playedBy field');
+  // `Document#testUserPermission` short-circuits every GM to OWNER, so GMs are filtered first. No
+  // other file states that `Users#players` is the roster this reads, so it stays asserted here.
+  defineStructureContract('derives the access rosters from the non-GM roster', MANAGER_SERVICES, {
+    reads: ['game.users.players'],
+    calls: ['playerUsers'],
+    readsNo: ['actor.isOwner'],
+    namesNo: ['playedBy'],
   });
 
-  it('resolves granted character ids over EVERY world actor, not the PC-filtered roster', () => {
-    // The runtime predicate applies no type filter, so a grant naming a non-PC actor is
-    // still honoured — resolving over the filtered roster would drop it from display.
-    assert.ok(appSource.includes('getAccessCharacterActors:'), 'exposes the unfiltered roster');
-    const unfiltered = appSource.slice(
-      appSource.indexOf('getAccessCharacterActors:'),
-      appSource.indexOf('getWorldItemOptions:')
-    );
-    assert.equal(
-      unfiltered.includes('isPlayerCharacterActor'),
-      false,
-      'the access roster applies no player-character type filter'
-    );
-  });
+  // The fallback must agree with `Users#players` (`!u.isGM && u.hasRole('PLAYER')`).
+  defineStructureContract(
+    'falls back to the same role floor the canonical roster applies',
+    { file: MANAGER_SERVICES, fn: 'playerUsers' },
+    { calls: ['hasRole'], spells: ['PLAYER'], reads: ['globalThis.CONST.USER_ROLES.PLAYER'] }
+  );
 
-  it('forwards Tool Item services from the internal service set into prepared Svelte props', () => {
-    const buildServicesStart = appSource.indexOf('  _buildServices() {');
-    const preparePropsStart = appSource.indexOf('  _prepareSvelteProps(context) {');
-    const preparePropsEnd = appSource.indexOf('\n  // Foundry', preparePropsStart);
-    const buildServicesSource = appSource.slice(buildServicesStart, preparePropsStart);
-    const preparePropsSource = appSource.slice(preparePropsStart, preparePropsEnd);
-    const preparedServicesSource = preparePropsSource.slice(
-      preparePropsSource.indexOf('      services: {')
-    );
+  defineStructureContract(
+    'labels only the roles a grantable user can hold',
+    { file: MANAGER_SERVICES, fn: 'userRoleLabel' },
+    { spells: ['USER.RolePlayer'], spellsNo: ['RoleGamemaster'] }
+  );
 
-    assert.ok(
-      buildServicesSource.includes('getWorldItemOptions: () =>') &&
-        buildServicesSource.includes(
-          'resolveToolSource: (uuid) => resolveItemSourceSnapshot(uuid)'
-        ),
-      'the internal service set should define the world Item projection and Tool source resolver'
-    );
-    assert.ok(
-      preparedServicesSource.includes('getWorldItemOptions: this._services.getWorldItemOptions,'),
-      'prepared Svelte props should forward world Item options into the root services'
-    );
-    assert.ok(
-      preparedServicesSource.includes('resolveToolSource: this._services.resolveToolSource,'),
-      'prepared Svelte props should forward Tool Item drop resolution into the root services'
-    );
-  });
+  defineStructureContract(
+    'models "who plays this character" as a SET, with the whole-table case explicit',
+    { file: MANAGER_SERVICES, fn: 'describeAccessActor' },
+    {
+      reads: ['actor.testUserPermission', 'user.character.id', 'actor.ownership.default'],
+      names: ['controlledBy', 'sharedWithAllPlayers'],
+      spells: ['OWNER'],
+    }
+  );
 
-  it('hands the world VOCABULARY store to the manager, which nothing else can see', () => {
-    // THE FIFTH WIRING EDIT OF ISSUE 1392, and the only one with no other guard. `src/main.js`
-    // constructs, loads, publishes and replicates the store, and three loops in
-    // `tests/scoped-definition-read-and-basis.test.js` pin those. This line is what carries it
-    // into the MANAGER, and its omission is silent end to end: the vocabulary leg reads `null`,
-    // `projectWorldVocabulary` publishes `{available: false, total: 0}` — a legitimate shape —
-    // the rail badge reads 0, the screen is empty, and every adminStore unit test stays green
-    // because each one injects its own services bag.
-    const services = appSource.slice(
-      appSource.indexOf('  _buildServices() {'),
-      appSource.indexOf('  _prepareSvelteProps(context) {')
-    );
-    assert.ok(services.length > 0, 'located _buildServices');
-    assert.ok(
-      services.includes('getComponentScopeStore: () =>'),
-      'the slice reaches the world-store block, so the assertion below is a measurement'
-    );
-    assert.ok(
-      services.includes(
-        'getVocabularyScopeStore: () => game?.fabricate?.getVocabularyScopeStore?.() ?? null,'
-      ),
-      'the manager must resolve the world vocabulary store through `game.fabricate`, under the ' +
-        'accessor name the adminStore read and write legs already call'
-    );
-  });
+  defineStructureContract(
+    'resolves granted character ids over every world actor',
+    { file: MANAGER_SERVICES, fn: 'rosterServices', property: 'getAccessCharacterActors' },
+    { namesNo: ['isPlayerCharacterActor'] }
+  );
 
-  it('key-filters the noisy updateActor hook so an HP tick does not reproject', () => {
-    assert.ok(appSource.includes("Hooks.on('updateActor'"), 'actor updates are hooked');
-    assert.ok(
-      appSource.includes("'ownership' in diff || 'name' in diff || 'img' in diff"),
-      'only ownership / name / img reproject the rosters'
-    );
-    assert.ok(appSource.includes("'createActor'"), 'actor creation reprojects');
-    assert.ok(appSource.includes("'deleteActor'"), 'actor deletion reprojects');
-    assert.ok(
-      appSource.includes('refreshAccessRosters'),
-      'reprojects both rosters, not just users'
-    );
-  });
+  defineStructureContract(
+    'defines the world Item projection in the service set',
+    { file: MANAGER_SERVICES, fn: 'actorProjectionServices' },
+    { names: ['getWorldItemOptions'] }
+  );
 
-  it('guards manager startup against unready Fabricate services', () => {
-    assert.ok(
-      appSource.includes('isFabricateReady'),
-      'manager app should expose readiness through services'
-    );
-    assert.ok(
-      appSource.includes('onFabricateReady'),
-      'manager app should expose a ready callback service'
-    );
-    assert.ok(
-      appSource.includes("hooks.once('fabricate.ready'"),
-      'ready callback should listen at the Foundry edge'
-    );
-    assert.ok(
-      appSource.includes('_pendingReadyOpen'),
-      'v2 app should prevent duplicate deferred opens'
-    );
-    assert.ok(
-      appSource.includes('StartupPending'),
-      'v2 app should notify when startup defers the window open'
-    );
-    assert.ok(
-      appSource.includes("hooks.once('fabricate.ready', openWhenReady)"),
-      'v2 app should defer direct opens until fabricate.ready'
-    );
-    assert.ok(
-      systemsBrowserSource.includes('systemsLoading'),
-      'systems browser should receive loading state'
-    );
-    assert.ok(
-      rootSource.includes('systemsLoading'),
-      'root should pass loading state to systems browser and inspector'
-    );
+  defineStructureContract(
+    'resolves a Tool source through the uuid seam, not the world roster',
+    { file: MANAGER_SERVICES, fn: 'actorProjectionServices', property: 'resolveToolSource' },
+    { calls: ['resolveItemSourceSnapshot'] }
+  );
+
+  defineStructureContract(
+    'forwards Tool Item services from the internal service set into prepared Svelte props',
+    { file: APP_SHELL, member: '_prepareSvelteProps', property: 'services' },
+    { reads: ['this._services.getWorldItemOptions', 'this._services.resolveToolSource'] }
+  );
+
+  // Under the accessor name the adminStore's read and write legs already call (issue 1392).
+  defineStructureContract(
+    'hands the world VOCABULARY store to the manager, which nothing else can see',
+    { file: MANAGER_SERVICES, fn: 'worldStoreServices', property: 'getVocabularyScopeStore' },
+    { reads: ['game.fabricate.getVocabularyScopeStore'] }
+  );
+
+  // `updateActor` fires on every HP tick, so only the three keys that move a roster reproject it.
+  defineStructureContract(
+    'key-filters the noisy updateActor hook so an HP tick does not reproject',
+    { file: APP_SHELL, member: '_registerUserHooks' },
+    {
+      hooks: ['updateActor', 'createActor', 'deleteActor'],
+      diffKeys: [
+        ['diff', 'ownership'],
+        ['diff', 'name'],
+        ['diff', 'img'],
+      ],
+      calls: ['refreshAccessRosters'],
+    }
+  );
+
+  // The `fabricate.ready` one-shot is asserted byte-identically, and its deferred open replayed,
+  // by `tests/components/manager-launch-readiness.test.js`.
+  defineStructureContract(
+    'guards manager startup against unready Fabricate services',
+    { file: MANAGER_SERVICES, fn: 'readinessServices' },
+    { names: ['isFabricateReady', 'onFabricateReady'] }
+  );
+
+  defineStructureContract(
+    'defers a direct open, once, until Fabricate reports ready',
+    { file: APP_SHELL, member: 'show' },
+    { names: ['_pendingReadyOpen'], spells: ['StartupPending'] }
+  );
+
+  it('states the copy the loading and startup guards read', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.LoadingSystems, 'Loading crafting systems...');
     assert.equal(
       lang.FABRICATE.Admin.Manager.StartupPending,
@@ -617,85 +469,24 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // Issue 643 established the manager titlebar; issue 1185 reassigned its gold badge.
-  // The badge USED to name the selected crafting system — which the rail's crafting-system
-  // card already does on every screen, so the strip was repeating the rail. It now carries
-  // the premium signal instead, and only when a companion module is registered.
-  it('renders a titlebar carrying the premium signal and the system resolution', () => {
-    for (const snippet of [
-      'class="manager-titlebar"',
-      'data-manager-titlebar',
-      'class="manager-titlebar-badge"',
-      'data-manager-titlebar-premium',
-      '{#if premiumInstalled}',
-      "text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')",
-      'data-manager-titlebar-status',
-      '{titlebarStatusLabel()}',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root titlebar should include ${snippet}`);
-    }
-    // The layer-group icon and "Crafting Systems" product label are gone (issue 643):
-    // the Foundry window's own title bar already names the app, so a second copy inside
-    // the window was duplicated chrome.
-    assert.equal(
-      rootSource.includes('manager-titlebar-icon'),
-      false,
-      'the duplicated titlebar app icon should be removed'
-    );
-    assert.equal(
-      rootSource.includes('manager-titlebar-product'),
-      false,
-      'the duplicated "Crafting Systems" titlebar label should be removed'
-    );
-    // Issue 1185: the Downtime route briefly led the page header with a 42px glyph tile from
-    // the prototype. No other Manager route has one, so it is gone — and with it the third
-    // header child that broke `justify-content: space-between`.
-    assert.equal(
-      rootSource.includes('manager-route-icon'),
-      false,
-      'no route may lead the page header with an identity tile of its own'
-    );
-    assert.equal(
-      rootSource.includes('data-manager-route-icon'),
-      false,
-      'and its marker attribute goes with it'
-    );
-    // Issue 1185: the system name badge is gone in BOTH states, not merely hidden behind a
-    // flag. Its marker attribute and its lang key go with it.
-    assert.equal(
-      rootSource.includes('data-manager-titlebar-system'),
-      false,
-      'the redundant crafting-system titlebar badge should be removed'
-    );
-    assert.equal(
-      rootSource.includes('Titlebar.SystemBadge'),
-      false,
-      'and its accessible-name key with it'
-    );
+  defineStructureContract('loads the systems browser behind that guard', MANAGER_ROOT, {
+    passesProps: [['SystemsBrowserView', 'systemsLoading']],
+  });
+
+  // What the titlebar renders is mounted; here are the derivation behind it and the
+  // route-conditional negative the rail case cannot reach (issue 1185).
+  defineStructureContract('drives the titlebar premium signal off the whole surface set', MANAGER_ROOT, {
+    declares: ['premiumInstalled'],
+    calls: ['subscribeSurfaceIds', 'routedOutcomeTierCount'],
+    compares: ['routedByCheck'],
+    spellsNo: ['Mythwright', 'mythwright', 'manager-route-icon'],
+  });
+
+  it('states the titlebar copy the premium mark and the outcome-tier label read', () => {
     assert.equal(
       lang.FABRICATE.Admin.Manager.Titlebar.SystemBadge,
       undefined,
       'the orphaned SystemBadge string should be deleted from lang/en.json, not left behind'
-    );
-    assert.equal(
-      /mythwright/i.test(rootSource),
-      false,
-      '"Mythwright" is a prototype theme name and must never be hard-coded into the chrome'
-    );
-    // The premium badge is driven by the REGISTRY, not by Core's Downtime route: a companion
-    // that ships some future surface is still installed and still lights the strip.
-    assert.ok(
-      rootSource.includes('const premiumInstalled = $derived(registeredSurfaceIds.length > 0)'),
-      'the titlebar premium signal should read the whole registered surface set'
-    );
-    assert.ok(
-      rootSource.includes('managerExtensions.subscribeSurfaceIds('),
-      'and should stay live through the registry surface-set subscription'
-    );
-    assert.equal(
-      /premiumInstalled[^\n]*downtime/i.test(rootSource),
-      false,
-      'the premium signal must not be keyed on the Core downtime surface id'
     );
     assert.equal(
       lang.FABRICATE.Admin.Manager.Titlebar.Premium,
@@ -707,73 +498,145 @@ describe('CraftingSystemManager source contract', () => {
       'Fabricate Premium is installed and connected',
       'and the accessible name and tooltip that explain it'
     );
-    // The status line reports the SYSTEM's resolution mode, and counts outcome tiers
-    // only where tiers exist to count (routedByCheck).
-    assert.ok(
-      rootSource.includes(
-        "selectedSystem?.resolutionMode === 'routedByCheck'\n      ? routedOutcomeTierCount(selectedSystem?.craftingCheck?.routed)"
-      ),
-      'the titlebar outcome-tier count should only be resolved for a routed-by-check system'
-    );
-    assert.ok(
-      lang.FABRICATE.Admin.Manager.Titlebar.OutcomeTiers === 'outcome tiers',
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Titlebar.OutcomeTiers,
+      'outcome tiers',
       'lang should expose the pluralized outcome-tier label the titlebar formats'
     );
   });
 
-  it('renders the rail section label and bare mono count numerals without elevating the dead Graph row', () => {
-    assert.ok(
-      rootSource.includes('class="manager-rail-title"'),
-      'the rail should carry an uppercase section label'
-    );
-    assert.ok(
-      rootSource.includes('data-manager-rail-section'),
-      'the rail section label should be addressable'
-    );
-    assert.ok(
-      lang.FABRICATE.Admin.Manager.Nav.SectionLabel === 'GM management',
+  it('localizes the rail section label', () => {
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Nav.SectionLabel,
+      'GM management',
       'the rail section label should be localized'
-    );
-    // A rail count is a BARE NUMERAL, not a badge (issue 643). Borrowing `.manager-chip`
-    // meant every nav row wore a bordered, 24px-tall, button-shaped pill that the CSS then
-    // spent five declarations undoing; `.manager-nav-count` owns its own rule instead.
-    //
-    // And every mark still on that class is a numeral (issue 1515): the planned-view row's
-    // "Soon" was the one word drawn through the record-count vehicle, which made that
-    // vehicle's own definition false, and it has a name of its own now.
-    assert.ok(
-      rootSource.includes('<span class="manager-nav-count">{selectedCounts.components}</span>'),
-      'a rail count should render as a bare numeral, not a chip'
-    );
-    assert.equal(
-      rootSource.includes('manager-nav-count manager-chip'),
-      false,
-      'no rail count should borrow the content chip'
-    );
-    assert.ok(
-      rootSource.includes(
-        "<span class=\"manager-nav-planned\">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>"
-      ),
-      'the disabled placeholder should keep its plain Soon span, not gain a chip'
-    );
-    assert.equal(
-      rootSource.includes(
-        "<span class=\"manager-nav-count\">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>"
-      ),
-      false,
-      'and it must not return to the record-count vehicle, which draws numerals'
     );
   });
 
-  it('renders the manager shell with Systems and Recipes browser structures', () => {
-    for (const snippet of [
-      'class="fabricate-manager"',
-      'data-manager-view={currentView}',
-      'class="manager-header"',
-      'class="manager-breadcrumbs"',
-      "class={`manager-body ${railCollapsedDisplay ? 'is-rail-collapsed' : ''}`}",
-      'class="manager-rail"',
-      'class="manager-inspector"',
+  // World scope, not per system (issue 1278). Every rendered half of this editor is driven by
+  // `tests/components/world-currency-tab.test.js`; what stays is the drop pipeline behind the
+  // macro zones, and two keys claimed in full because each has a longer neighbour.
+  defineStructureContract('authors the world coin ladder on one page', WORLD_CURRENCY, {
+    declaresProp: ['currencyValidationErrors'],
+    declares: ['currencyHasProviders', 'currencyMacroMode', 'currencyUnitsReadOnly'],
+    names: ['dragDrop'],
+    calls: ['resolveDropData'],
+    compares: ['Macro'],
+    spellsExactly: [
+      'FABRICATE.Admin.Manager.CurrencyUnits.MacroConversionHint',
+      'FABRICATE.Admin.Manager.CurrencyUnits.ProviderManagedTitle',
+    ],
+    namesNo: ['inventoryMode'],
+    spellsNo: ['data-world-currency-inventory-mode-select'],
+  });
+
+  // `passesProps` requires the `<WorldCurrencyTab>` call site to declare the prop, which is the
+  // "on the tag itself" claim the sliced tag used to make, for the whole set at once. The
+  // validation report is a three-link join: publish, derive, thread (issue 1493).
+  defineStructureContract('threads the world currency profile and its report', MANAGER_ROOT, {
+    passesProps: [
+      ['WorldCurrencyTab', 'currencyUnits'],
+      ['WorldCurrencyTab', 'currencySpendStrategy'],
+      ['WorldCurrencyTab', 'currencyProviderId'],
+      ['WorldCurrencyTab', 'currencyProviderOptions'],
+      ['WorldCurrencyTab', 'currencyMacros'],
+      ['WorldCurrencyTab', 'currencyValidationErrors'],
+      ['WorldCurrencyTab', 'onAddCurrencySubUnit'],
+      ['WorldCurrencyTab', 'onSetCurrencySpendStrategy'],
+      ['WorldCurrencyTab', 'onSetCurrencyProvider'],
+      ['WorldCurrencyTab', 'onSetCurrencyMacro'],
+      ['WorldCurrencyTab', 'onClearCurrencyMacro'],
+    ],
+    declares: ['worldCurrencyValidation'],
+    reads: ['$viewState.worldCurrencyValidation'],
+    names: ['getCurrencyProvidersForFoundrySystem'],
+    namesNo: ['onSetCurrencyInventoryMode'],
+  });
+
+  defineStructureContract(
+    'derives the report from the published one',
+    { file: MANAGER_ROOT, constant: 'currencyValidationErrors' },
+    { reads: ['worldCurrencyValidation.errors'] }
+  );
+
+  // Formula-only since issue 1440: one labelled expression field, no provider leg. The key is
+  // claimed in full, because `…Modifiers.ExpressionHint` next door satisfies a substring.
+  defineStructureContract('authors a character modifier as a formula alone', WORLD_MODIFIERS, {
+    renders: ['RollDataExpressionInput'],
+    passesProps: [['RollDataExpressionInput', 'onChange']],
+    calls: ['onUpdate'],
+    spellsExactly: ['FABRICATE.Admin.Manager.Modifiers.Expression'],
+    namesNo: ['ProviderExpressionInput', 'characterModifierProviderLabel'],
+    spellsNo: ['manager-character-modifier-provider'],
+  });
+
+  // One shared row, not two: the Tool Studio's bonus picker draws it too (asserted beside its
+  // own pins), so the catalogue's half of that claim is stated here. The two absent props are
+  // read against the same rendered node the row claim resolves, so neither is vacuous.
+  defineStructureContract(
+    'draws the Checks Studio modifier catalogue with the shared library row, as it shipped',
+    MODIFIER_CATALOGUE,
+    {
+      renders: ['ModifierLibraryRow'],
+      passesPropsNo: [
+        ['ModifierLibraryRow', 'controlPlacement'],
+        ['ModifierLibraryRow', 'textLayout'],
+      ],
+    }
+  );
+
+  // `manager-rail` is `ManagerNavRail`'s own identity since issue 1717; `is-rail-collapsed` is
+  // still the shell's, because it is on `.manager-body`.
+  defineStructureContract('names the rail aside', MANAGER_NAV_RAIL, {
+    attributes: [['class', 'manager-rail']],
+  });
+
+  // `manager-header` is the page header's own identity since issue 1720, and it draws the two
+  // `<header>` elements as bare siblings rather than under a wrapper of its own.
+  defineStructureContract('names both page headers', MANAGER_PAGE_HEADER, {
+    attributes: [
+      ['class', 'manager-header'],
+      ['class', 'manager-heading'],
+    ],
+    spells: ['manager-tools-context-header'],
+    renders: ['ManagerHeaderBreadcrumbs', 'ManagerHeaderActions', 'Kicker', 'Medallion'],
+  });
+
+  // `manager-breadcrumbs` is the trail's own identity since issue 1720.
+  defineStructureContract('names the breadcrumb trail', MANAGER_HEADER_BREADCRUMBS, {
+    attributes: [['class', 'manager-breadcrumbs']],
+  });
+
+  // `manager-header-actions` is the action group's own identity since issue 1720, and the two
+  // family units it dispatches into carry none of the group's chrome.
+  defineStructureContract('names the header action group', MANAGER_HEADER_ACTIONS, {
+    attributes: [['class', 'manager-header-actions']],
+    renders: [
+      'ManagerHeaderCraftingActions',
+      'ManagerHeaderGatheringActions',
+      'ScopedEntryHeaderActions',
+    ],
+  });
+
+  defineStructureContract('draws the crafting studios’ header actions', MANAGER_HEADER_CRAFTING_ACTIONS, {
+    renders: ['ManagerButton', 'ComponentEditorHeader'],
+    writes: ['data-checks-save', 'data-component-add-from-catalogue'],
+  });
+
+  defineStructureContract('draws the gathering studios’ header actions', MANAGER_HEADER_GATHERING_ACTIONS, {
+    renders: ['ManagerButton', 'Chip'],
+    writes: ['data-environment-edit-back', 'data-gathering-task-back', 'data-gathering-event-back'],
+  });
+
+  // The shell's own chrome and the eight routes it mounts. `fabricate-manager` and
+  // `data-manager-view` are not here: every route module reads them off the mounted shell
+  // (`target.querySelector('.fabricate-manager').dataset.managerView`).
+  defineStructureContract('renders the manager shell and the routes it hosts', MANAGER_ROOT, {
+    attributes: [['class', 'manager-inspector']],
+    spells: ['is-rail-collapsed', 'manager-environment-edit-main'],
+    renders: [
+      'ManagerNavRail',
+      'ManagerPageHeader',
       'ComponentsBrowserView',
       'EnvironmentsBrowserView',
       'EssenceBrowserView',
@@ -783,504 +646,84 @@ describe('CraftingSystemManager source contract', () => {
       'RecipesBrowserView',
       'SystemEditView',
       'SystemsBrowserView',
-      'manager-environment-edit-main',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should include ${snippet}`);
-    }
-    // `class="manager-empty"` is NOT in this list any more (issue 785): the manager's
-    // no-state panel is the shared `EmptyState` component, so the root imports and renders
-    // it rather than hand-rolling the dashed-panel markup.
-    // `class="manager-toolbar"` is NOT in this list any more (issue 1039), for the reason
-    // `class="manager-empty"` left it above: the manager's filter bar is the shared
-    // `ManagerToolbar` component, so these views render it rather than hand-rolling the
-    // `<section>`. The tag is what is probed instead, so the assertion still fails if a browser
-    // stops rendering a bar at all.
-    for (const snippet of [
-      'class="manager-main"',
-      '<ManagerToolbar',
-      'class="manager-filter"',
-      "import EmptyState from './EmptyState.svelte'",
-      '<EmptyState',
-    ]) {
-      assert.ok(managerSource.includes(snippet), `manager source should include ${snippet}`);
-    }
-    // `class={componentTableClass}` is GONE (issue 676): the rebuilt browser is a LIST
-    // of rows, not a `role="table"` grid, so the table scaffolding and the class that
-    // toggled its column template are dropped rather than left orphaned on a non-table
-    // structure. `.manager-component-drop-zone` still lives here; the row's own classes
-    // moved into the extracted ComponentRow and are pinned there — both are probed by
-    // managerLayoutGuards and the smoke harness.
-    for (const snippet of ['class="manager-component-drop-zone"', 'ComponentRow']) {
-      assert.ok(
-        componentsBrowserSource.includes(snippet),
-        `ComponentsBrowserView should include ${snippet}`
-      );
-    }
-    for (const snippet of ['manager-component-row', 'class="manager-component-identity"']) {
-      assert.ok(componentRowSource.includes(snippet), `ComponentRow should include ${snippet}`);
-    }
-    // The dropped table scaffolding must not creep back in either file.
-    for (const snippet of ['role="table"', 'role="row"', 'role="columnheader"', 'role="cell"']) {
-      assert.ok(
-        !componentsBrowserSource.includes(snippet) && !componentRowSource.includes(snippet),
-        `the component browser must not reintroduce ${snippet}`
-      );
-    }
-    for (const snippet of [
-      'manager-system-edit-form',
-      'data-edit-control="advanced-options"',
-      'manager-feature-tile',
-    ]) {
-      assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
-    }
-    // The modifier editor is formula-only: one labelled expression field, with no provider
-    // chip, provider-label helper, or macro UUID field. Since issue 1117 that field is
-    // `RollDataExpressionInput` — the control the retired Checks-tab editor used, adopted
-    // here because this is now the ONE surface that authors an expression — so the binding
-    // pinned is its `onChange`, not a raw `event.currentTarget.value` read.
-    //
-    // Read from `WorldModifiersTab.svelte` since issue 1311 moved the editor onto its own World
-    // page. The contract is unchanged; only the file that has to honour it moved.
-    assert.ok(
-      !worldModifiersSource.includes('ProviderExpressionInput'),
-      'modifier editor should not import the deleted provider/expression component'
-    );
-    assert.ok(
-      !worldModifiersSource.includes('characterModifierProviderLabel'),
-      'modifier editor should not render a provider label'
-    );
-    assert.ok(
-      !worldModifiersSource.includes('manager-character-modifier-provider'),
-      'modifier summary should not render a provider chip'
-    );
-    assert.ok(
-      /onUpdate\(entry\.id, \{ expression \}\)/.test(worldModifiersSource),
-      'modifier editor should bind the expression field through RollDataExpressionInput'
-    );
-    assert.ok(
-      worldModifiersSource.includes('FABRICATE.Admin.Manager.Modifiers.Expression'),
-      'modifier editor should keep the localized Expression label'
-    );
-    // --- World > Currency (issue 1278) --------------------------------------------------
-    // The ladder, spend strategy, provider and macro set are WORLD scope: a world runs one
-    // ruleset, so there is one way actors store coins and two crafting systems cannot
-    // meaningfully disagree about it. The whole editor therefore reads WorldCurrencyTab. What
-    // survives on System Settings is the participation toggle alone, asserted at the end.
-    for (const snippet of [
-      'data-world-currency-units',
-      'manager-currency-unit-card',
-      'handleAddCurrencyUnit',
-      'onSeedCurrencyPresets',
-      'manager-currency-subunit-builder',
-      // The unit card's collapsed summary row reuses the character-modifier summary class; it
-      // moved with the card rather than staying behind on System Settings.
-      'manager-character-modifier-summary',
-      // The sub-unit token is the shared `Chip` as of issue 1515, and the amount input beside it
-      // is not a chip at all - a number a GM can change keeps its own control - so the pin
-      // follows the two CONSTRUCTS rather than the retired `manager-availability-*` names.
-      'data-world-currency-subunit={contained.unitId}',
-      'manager-currency-subunit-amount',
-    ]) {
-      assert.ok(
-        worldCurrencySource.includes(snippet),
-        `WorldCurrencyTab should include ${snippet}`
-      );
-    }
-    // Asserted as patterns rather than snippets in the list above: Prettier (issue 923) prints
-    // both calls one argument per line.
-    assert.ok(
-      /onUpdateCurrencySubUnit\(\s*unit\.id,\s*contained\.unitId,\s*event\.currentTarget\.value\s*\)/.test(
-        worldCurrencySource
-      ),
-      'WorldCurrencyTab should bind the sub-unit amount input to onUpdateCurrencySubUnit'
-    );
-    assert.ok(
-      /onDeleteCurrencySubUnit\(\s*unit\.id,\s*contained\.unitId\s*\)/.test(worldCurrencySource),
-      'WorldCurrencyTab should wire the sub-unit delete action'
-    );
-    assert.ok(
-      rootSource.includes('currencyUnits={selectedCurrencyUnits}'),
-      'root should pass the world currency units to WorldCurrencyTab'
-    );
-    // Shorthand for `onAddCurrencySubUnit={onAddCurrencySubUnit}` — prettier-plugin-svelte
-    // rewrites the long form to it (issue 923). Anchored on the leading whitespace that starts
-    // an attribute, so the needle cannot also be satisfied by the tail of a longer identifier
-    // such as `{noOnAddCurrencySubUnit}`.
-    assert.ok(
-      rootSource.includes(' {onAddCurrencySubUnit}'),
-      'root should pass currency sub-unit actions to WorldCurrencyTab'
-    );
-    assert.ok(
-      rootSource.includes('{currencySpendStrategy}'),
-      'root should thread the spend strategy to WorldCurrencyTab'
-    );
-    // Three peer top-level spend strategies (actorProperty / actorInventory / macro). The strategy
-    // select renders all three options and the editor branches on each strategy.
-    assert.ok(
-      worldCurrencySource.includes("currencySpendStrategy === 'actorInventory'"),
-      'currency editor should branch on the actorInventory spend strategy'
-    );
-    for (const value of ['actorProperty', 'actorInventory', 'macro']) {
-      assert.ok(
-        worldCurrencySource.includes(`value: '${value}'`),
-        `currency editor should offer the ${value} spend strategy option`
-      );
-    }
-    // Currency spend-strategy / provider / macro controls.
-    for (const snippet of [
-      'data-world-currency-strategy-select',
-      // Issue 1510: the shared `<Select>` hands the caller its OWN typed value, so the
-      // handler takes `next` rather than reading `event.currentTarget.value` off an element.
-      'onChange={(next) => onSetCurrencySpendStrategy(next)}',
-      // The single shared strategy hint reflects the selected strategy.
-      'data-world-currency-strategy-hint',
-      'currencySpendStrategyHint()',
-      'data-world-currency-provider-select',
-      'onChange={(next) => onSetCurrencyProvider(next)}',
-      'data-world-currency-no-provider',
-      'data-world-currency-macros',
-      'data-world-currency-macro-dropzone',
-      'manager-component-source-drop-zone',
-      'use:dragDrop',
-      'resolveDropData',
-      "type !== 'Macro'",
-      'onClearCurrencyMacro(field.key)',
-      // Each empty macro drop zone exposes a field-specific accessible name so the three zones are
-      // distinguishable to assistive tech (the linked-state group already has a field-specific label).
-      'aria-label={currencyMacroDropZoneLabel(field)}',
-    ]) {
-      assert.ok(
-        worldCurrencySource.includes(snippet),
-        `WorldCurrencyTab should include ${snippet}`
-      );
-    }
-    // The nested inventory-mode select is gone — macro is now a peer top-level strategy.
-    assert.ok(
-      !worldCurrencySource.includes('data-world-currency-inventory-mode-select'),
-      'currency editor should not render the removed nested inventory-mode select'
-    );
-    assert.ok(
-      !worldCurrencySource.includes('inventoryMode'),
-      'currency editor should not reference the removed inventoryMode model'
-    );
-    // The macro branch renders only under the peer macro strategy.
-    assert.ok(
-      worldCurrencySource.includes("currencySpendStrategy === 'macro'"),
-      'currency editor should branch on the macro spend strategy'
-    );
-    // A world with no registered provider can still select actorInventory but is steered to the
-    // macro strategy via a no-provider callout, and its units are never wiped.
-    assert.ok(
-      worldCurrencySource.includes(
-        'const currencyHasProviders = $derived(currencyProviderOptions.length > 0)'
-      ),
-      'currency editor should derive whether the world has any providers'
-    );
-    // The three macro drop zones (canAfford / increment / decrement) lay out side-by-side in a
-    // single responsive row via a namespaced container class.
-    assert.ok(
-      worldCurrencySource.includes('manager-currency-macro-zones manager-currency-macro-row'),
-      'macro drop zones should be wrapped in the single-row container'
-    );
-    // Sub-units only drive the engine in actorProperty mode, so the whole sub-unit section (heading,
-    // add control, chips, no-eligible callout) is gated behind a derived macro-mode flag — it must
-    // not render in provider (read-only) or macro modes.
-    assert.ok(
-      worldCurrencySource.includes('const currencyMacroMode = $derived('),
-      'currency editor should derive a macro-mode flag'
-    );
-    assert.ok(
-      worldCurrencySource.includes('{#if currencyMacroMode}'),
-      'currency editor should gate the per-unit editor body on the macro-mode flag'
-    );
-    // The sub-unit section markup (heading, add-sub-unit control, chips) lives only inside the
-    // non-macro branch, after the `{#if currencyMacroMode}` gate.
-    assert.ok(
-      worldCurrencySource.indexOf('{#if currencyMacroMode}') <
-        worldCurrencySource.indexOf('manager-currency-subunit-section'),
-      'sub-unit section should render only in the non-macro (actorProperty) branch'
-    );
-    // Macro mode shows a conversion hint instead of any sub-unit controls.
-    assert.ok(
-      worldCurrencySource.includes('FABRICATE.Admin.Manager.CurrencyUnits.MacroConversionHint'),
-      'macro mode should include the macro-conversion hint'
-    );
-    // The actorInventory strategy (with a provider) makes the units provider-owned and read-only:
-    // the Add/Seed header actions and the editable unit controls are gated behind a non-read-only
-    // condition, and a dedicated read-only branch with a provider-managed callout renders instead.
-    assert.ok(
-      worldCurrencySource.includes(
-        'const currencyUnitsReadOnly = $derived(currencyShowProviderBranch)'
-      ),
-      'currency editor should derive a read-only flag for the active provider inventory branch'
-    );
-    assert.ok(
-      worldCurrencySource.includes('{#if !currencyUnitsReadOnly}'),
-      'currency editor should gate the Add/Seed header actions behind the non-provider (editable) condition'
-    );
-    assert.ok(
-      worldCurrencySource.includes('{#if currencyUnitsReadOnly}'),
-      'currency editor should render a dedicated read-only branch in provider mode'
-    );
-    for (const snippet of [
-      'data-world-currency-provider-managed',
-      'manager-currency-provider-managed-callout',
-      'currencyProviderManagedHint()',
-      'manager-currency-provider-managed-summary',
-      'manager-currency-readonly-fields',
-      'data-world-currency-readonly-label',
-      'data-world-currency-abbreviation',
-      'data-world-currency-denomination',
-      'FABRICATE.Admin.Manager.CurrencyUnits.ProviderManagedTitle',
-    ]) {
-      assert.ok(
-        worldCurrencySource.includes(snippet),
-        `WorldCurrencyTab should include read-only ${snippet}`
-      );
-    }
-    // Provider read-only units present label/abbreviation/denomination as static field/value pairs;
-    // they must NOT render sub-unit chips. The only `data-world-currency-subunit` occurrence lives
-    // in the editable (actorProperty) branch, after the provider-managed read-only branch.
-    assert.ok(
-      worldCurrencySource.indexOf('data-world-currency-provider-managed') <
-        worldCurrencySource.indexOf('data-world-currency-subunit'),
-      'provider-managed read-only branch should render before the editable sub-unit chips'
-    );
-    assert.equal(
-      worldCurrencySource.split('data-world-currency-subunit=').length - 1,
-      1,
-      'sub-unit chips should appear only once (in the editable actorProperty branch)'
-    );
-    // The read-only branch precedes the editable branch, so the editable controls (editable amount
-    // input, remove cross) live only after the provider-managed branch.
-    assert.ok(
-      worldCurrencySource.indexOf('data-world-currency-provider-managed') <
-        worldCurrencySource.indexOf('class="manager-currency-subunit-amount"'),
-      'provider-managed read-only branch should render before the editable unit list'
-    );
-    for (const prop of [
-      '{currencyProviderId}',
-      '{currencyMacros}',
-      '{currencyProviderOptions}',
-      // Shorthand, like the three above: prettier-plugin-svelte rewrites `attr={attr}` to
-      // Svelte's `{attr}` form (issue 923). The two are the same binding.
-      '{onSetCurrencySpendStrategy}',
-      '{onSetCurrencyProvider}',
-      '{onSetCurrencyMacro}',
-      '{onClearCurrencyMacro}',
-      // The world currency validation report (issue 1493).
-      '{currencyValidationErrors}',
-    ]) {
-      assert.ok(rootSource.includes(prop), `root should thread ${prop} to WorldCurrencyTab`);
-    }
-    // --- The world currency validation join (issue 1493) ---------------------------------
-    // `validateCurrencyProfile` shipped with ZERO callers in the manager, so a world whose
-    // currency profile could not be spent against said nothing at all on the page that authors
-    // it. What makes it visible is a THREE-link join: `adminStore` publishes
-    // `worldCurrencyValidation`, the root derives `currencyValidationErrors` off it, and the
-    // root threads that to `WorldCurrencyTab`.
-    //
-    // Every link is asserted separately because a break in any of them is SILENT. The tab
-    // defaults the prop to `[]`, so a root that stops passing it renders a permanently healthy
-    // page — and the mounted suite passes the prop in by hand, so it cannot see that at all.
-    // The bare `rootSource.includes(...)` above is a WHOLE-FILE match on a 9,000-line component,
-    // so it stays green for a `{currencyValidationErrors}` written anywhere in it — including on
-    // some other child's tag. This one pins the attribute to the WorldCurrencyTab TAG.
-    const worldCurrencyTag = /<WorldCurrencyTab\b[\s\S]*?\/>/.exec(rootSource)?.[0] ?? '';
-    assert.ok(worldCurrencyTag.length > 0, 'root should render a self-closing <WorldCurrencyTab />');
-    assert.ok(
-      worldCurrencyTag.includes('{currencyValidationErrors}'),
-      'root should thread {currencyValidationErrors} on the WorldCurrencyTab tag itself'
-    );
-    assert.ok(
-      /currencyValidationErrors\s*=\s*\[\]/.test(worldCurrencySource),
-      'WorldCurrencyTab should DECLARE currencyValidationErrors in its $props(); an undeclared prop is silently dropped'
-    );
-    assert.ok(
-      worldCurrencySource.includes('data-world-currency-validation'),
-      'WorldCurrencyTab should render the validation live region the threaded errors feed'
-    );
-    assert.ok(
-      rootSource.includes('$viewState.worldCurrencyValidation'),
-      'root should read the store-published worldCurrencyValidation report, not invent its own'
-    );
-    assert.ok(
-      /const currencyValidationErrors = \$derived\([\s\S]{0,200}?worldCurrencyValidation\.errors/.test(
-        rootSource
-      ),
-      'root should derive currencyValidationErrors FROM the published report'
-    );
-    // The removed nested inventory-mode setter must no longer be threaded.
-    assert.ok(
-      !rootSource.includes('onSetCurrencyInventoryMode'),
-      'root should not thread the removed inventory-mode setter'
-    );
-    assert.ok(
-      rootSource.includes('getCurrencyProvidersForFoundrySystem'),
-      'root should derive provider options from the currency provider registry'
-    );
-    // --- What survives on System Settings ------------------------------------------------
-    // The participation toggle and nothing else. It reads `requirements.currency.enabled` and
-    // calls `onToggleCurrency`, and renders always so the Optional features section is never
-    // empty.
-    for (const snippet of [
-      'const currencyEnabled = $derived(selectedSystem?.requirements?.currency?.enabled === true)',
-      'data-system-currency-toggle',
-      'onToggleCurrency',
+    ],
+  });
+
+  // `class="manager-empty"` is not in this set any more (issue 785).
+  defineStructureContract('gives a browse route the same main column', MANAGER_VIEWS, {
+    spells: ['manager-main', 'manager-filter'],
+    spellsExactly: ['FABRICATE.Admin.Manager.Environment.EmptyTitle'],
+    renders: ['ManagerToolbar', 'EmptyState'],
+    imports: ['../../components/EmptyState.svelte'],
+  });
+
+  // What System Settings draws is driven by `tests/components/manager-systems-mounted.js`. The
+  // relocated currency editor (issue 1278) is the absence this states: any of these markers
+  // reappearing means the two scopes can disagree about one world's coins again.
+  defineStructureContract('keeps the crafting system page to its own settings', SYSTEM_EDIT, {
+    renders: ['SystemEditorTabs', 'SystemOverviewView'],
+    declares: ['currencyEnabled'],
+    reads: ['selectedSystem.requirements.currency.enabled'],
+    names: ['onToggleCurrency'],
+    compares: ['settings', 'validation'],
+    spells: ['manager-system-workspace'],
+    spellsExactly: [
       'FABRICATE.Admin.Manager.Feature.Currency',
       'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Currency',
-    ]) {
-      assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
-    }
-    assert.ok(
-      systemEditSource.includes('data-feature-key="currency"'),
-      'currency toggle tile should always render in the Optional features section'
-    );
-    // The editor itself is GONE from the crafting system page (issue 1278). These are markers of
-    // the card that was deleted; any of them reappearing means the per-system currency surface
-    // has crept back and the two scopes can disagree again.
-    for (const removed of [
+    ],
+    attributes: [['data-edit-control', 'advanced-options']],
+    namesNo: ['currencyProviderOptions', 'onSetCurrencySpendStrategy', 'onAddCurrencyUnit'],
+    spellsNo: [
       'manager-currency-unit-card',
       'data-system-currency-units',
       'data-system-currency-strategy-select',
       'data-system-currency-macros',
-      'currencyProviderOptions',
-      'onSetCurrencySpendStrategy',
-      'onAddCurrencyUnit',
-    ]) {
-      assert.equal(
-        systemEditSource.includes(removed),
-        false,
-        `SystemEditView should no longer carry the relocated currency control ${removed}`
-      );
-    }
-    assert.ok(
-      rootSource.includes("store.toggleRequirement?.('currency', next)"),
-      'root should thread onToggleCurrency to store.toggleRequirement'
-    );
-    assert.ok(
-      rootSource.includes("store.toggleRequirement?.('time', next)"),
-      'root should thread onToggleTime to store.toggleRequirement (issue 714)'
-    );
-    for (const snippet of [
-      'class="manager-systems-table"',
-      'manager-system-row',
-      'manager-system-identity',
-      // Same-named systems are disambiguated in the rail via the shared helper (issue 346).
-      "import { buildSystemLabelMap, systemDisplayLabel } from '../../util/systemDisambiguation.js'",
-      'buildSystemLabelMap(systems)',
-      'systemDisplayLabel(system, systemLabels)',
-    ]) {
-      assert.ok(
-        systemsBrowserSource.includes(snippet),
-        `SystemsBrowserView should include ${snippet}`
-      );
-    }
-    for (const snippet of [
-      'class="manager-recipes-table"',
-      'manager-recipe-row',
-      'class="manager-recipe-identity"',
-      'manager-recipe-status',
-      // The row's restored Edit pencil and the column header above the list (issue 643).
-      'data-recipe-edit={recipe.id}',
-      'class="manager-recipe-table-head"',
-      'FABRICATE.Admin.Manager.Recipe.Column.Recipe',
-      // The lifted browser view-state seam.
-      'browserState = $bindable(null)',
-      'createRecipeBrowserState',
-    ]) {
-      assert.ok(
-        recipesBrowserSource.includes(snippet),
-        `RecipesBrowserView should include ${snippet}`
-      );
-    }
-    // The row Edit pencil reuses the Books & Scrolls icon-button + pen idiom, and the
-    // filter/sort/paging state is lifted (no local $state for those controls remains).
-    assert.ok(
-      // `<IconButton class="manager-recipe-edit">` since issue 1422: the contract class is
-      // emitted by the primitive, so asserting it at the call site would now assert the
-      // convention this change removed.
-      /<IconButton\s+class="manager-recipe-edit"/.test(recipesBrowserSource),
-      'the row Edit affordance should be a manager-icon-button, matching Books & Scrolls'
-    );
-    assert.equal(
-      /let\s+statusFilter\s*=\s*\$state/.test(recipesBrowserSource),
-      false,
-      'the browser view-state must be lifted, not held as local component $state'
-    );
-    // The row DELEGATES its authoring-state pills to the shared activation predicate
-    // (issue 1010), which the bulk panel's pre-flight count and the attention sort read
-    // too — so the pilled rows and the counted rows are one set by construction.
-    //
-    // Delegation is all this assertion may claim, because it is all the component's text
-    // contains. The predicate is owned by `tests/util/recipe-browser-model.test.js`, and
-    // the RENDERED pills by the `authoring-state pills` cases in
-    // `tests/components/recipes-browser-view-mounted.test.js`. Two earlier attempts to
-    // pin the state here instead both failed the same way: `recipe.incomplete` ended up
-    // satisfied only by a dead `data-recipe-incomplete` attribute nothing read, and
-    // `recipe.enableBlocked` only by the prose above `STATUS_LABELS` — the field is read
-    // inside `recipeBrowserModel.js` and never appears in this markup at all. A source
-    // scan cannot see rendered state that no rendered text names.
-    assert.ok(
-      /return deriveRecipeStatuses\(recipe\)/.test(recipesBrowserSource),
-      'RecipesBrowserView should derive its authoring-state pills through the shared predicate'
-    );
-    assert.equal(
-      recipesBrowserSource.includes('recipe.incomplete'),
-      false,
-      'and must not reintroduce the narrower incomplete predicate the pills were moved off'
-    );
-    assert.ok(
-      recipesBrowserSource.includes('FABRICATE.Admin.Manager.Recipe.Incomplete'),
-      'RecipesBrowserView should use the localized Incomplete label'
-    );
-    // The four row states are one component rather than four ad-hoc chips. The tones stay
-    // distinguishable: warning = blocked but already enabled, danger = blocked AND off, i.e.
-    // enabling would be REFUSED (issue 643, repointed onto the shared activation predicate by
-    // issue 1010, and onto the one shared chip by issue 1506).
-    assert.ok(
-      recipesBrowserSource.includes("import Chip from '../../components/Chip.svelte'"),
-      'the row should render its states through the shared Chip'
-    );
-    // AND THROUGH THE TONE MAP, which is the half a source pin can see and a mounted test
-    // cannot: the projection emits the retired pill's vocabulary, `Chip` DROPS a tone it does
-    // not know, and an unmapped row therefore renders an untoned chip on a green suite.
-    assert.ok(
-      recipesBrowserSource.includes('tone={statusChipTone(pill.tone)}'),
-      'and the projected tone should be mapped rather than bound straight onto the chip'
-    );
-    assert.ok(
-      /incomplete:\s*\['FABRICATE\.Admin\.Manager\.Recipe\.Incomplete'/.test(recipesBrowserSource),
-      'the Incomplete state should carry its localized label'
-    );
-    assert.ok(
-      recipesBrowserSource.includes('FABRICATE.Admin.Manager.Recipe.CantEnable'),
-      "an incomplete + disabled recipe should say enabling is refused, not merely 'incomplete'"
-    );
-    // A card row has no columns: the list is a real <ul role="list"> of <li> cards.
-    assert.ok(
-      recipesBrowserSource.includes('<ul class="manager-recipe-group-list" role="list"'),
-      'recipe rows should be a list, not a role="table"'
-    );
-    assert.equal(
-      recipesBrowserSource.includes('role="table"'),
-      false,
-      'the card row must not retain the table role'
-    );
+    ],
+    writesNo: [
+      'data-system-currency-units',
+      'data-system-currency-strategy-select',
+      'data-system-currency-macros',
+    ],
   });
 
-  it('keeps presentational Svelte free of direct Foundry globals', () => {
-    assert.ok(
-      !/\b(?:game|ui|Hooks|CONFIG)\b/.test(rootSource),
-      'root should not directly reference Foundry globals'
-    );
+  defineStructureContract('threads both requirement toggles to the one store seam', MANAGER_ROOT, {
+    callsWith: [['toggleRequirement', 'next']],
   });
+
+  // Same-named systems are disambiguated through the shared helper (issue 346). The rows, their
+  // identity buttons and the status switch are driven by the mounted systems and rail cases.
+  // `<StatusToggle`, not the class literal (issue 1040): the row's switch renders through the
+  // shared primitive, which is the only thing under `src/` that writes `manager-status-toggle`,
+  // so a search for the class would read 0 while the control is present and correct.
+  defineStructureContract('disambiguates same-named systems in the library', SYSTEMS_BROWSER, {
+    declaresProp: ['systemsLoading', 'onToggleSystemEnabled'],
+    imports: ['../../util/systemDisambiguation.js'],
+    calls: ['buildSystemLabelMap', 'systemDisplayLabel'],
+    renders: ['StatusToggle'],
+  });
+
+  // `foundry` is deliberately NOT in the set: the root reaches `globalThis.foundry.utils.parseUuid`
+  // and `.agents/docs/foundry-and-architecture.md` requires it keep doing so.
+  defineStructureContract('keeps presentational Svelte free of direct Foundry globals', MANAGER_ROOT, {
+    readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
+  });
+
+  defineStructureContract(
+    'uses manager localization keys rather than hard-coded copy',
+    [MANAGER_ROOT, MANAGER_SYSTEM_NAV, HEADER_MODEL],
+    {
+      // In full: a substring claim is satisfied by `…Titlebar.Premium` next door. The mounted
+      // cases render this copy, which `text(key, fallback)` still produces under a renamed key.
+      spellsExactly: [
+        'FABRICATE.Admin.Manager.Title',
+        'FABRICATE.Admin.Manager.Soon',
+        'FABRICATE.Admin.Manager.Titlebar.Premium',
+      ],
+      spellsNo: ['EncountersPlaceholderTitle', 'EncountersPlaceholderHint'],
+    }
+  );
 
   it('uses localized manager copy keys', () => {
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Title'),
-      'root should use manager localization keys'
-    );
     assert.ok(lang.FABRICATE.Admin.Manager, 'English localization should define manager copy');
     assert.equal(lang.FABRICATE.Admin.Manager.Title, 'Crafting systems');
     // `Nav.Components`, `Nav.Tools` and `Component.Title` are GONE (issue 1362). The three
@@ -1295,9 +738,7 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.ToolRules, 'Tool Rules');
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.Components, undefined);
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.Tools, undefined);
-    // `Nav.Essences` SURVIVES, and the difference is the point: its last consumer names the
-    // DOMAIN NOUN rather than the screen — the system inspector's essence count, which links
-    // to nothing.
+    // `Nav.Essences` SURVIVES, and the difference is the point.
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.Essences, 'Essences');
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.Environments, 'Gathering');
     assert.equal(lang.FABRICATE.Admin.Manager.Breadcrumbs, 'Breadcrumbs');
@@ -1368,14 +809,7 @@ describe('CraftingSystemManager source contract', () => {
       'Drop items to add components'
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Component.Origin, 'Origin');
-    // `SourceOriginCompendium` — and `SourceOriginWorld` / `-Missing` / `-Unknown` with it — are
-    // RETIRED (issue 1371, maintainer parity round 5). They labelled the browser row's origin
-    // column, which the C5 rebuild replaced with the reference's one-line row: the origin is now
-    // carried by the source filter and the linked/unlinked face, neither of which names a
-    // provenance in words. Nothing under `src/` reads any of the four, so `lang-keys-no-orphans`
-    // reds on the key the moment it is put back — asserting its ABSENCE is what keeps this
-    // inventory and that ratchet describing the same en.json. `SourceOriginLinked` survives only
-    // as an explicit `KNOWN_ORPHANS` debt entry, which is the baseline, not a live reference.
+    // `SourceOriginCompendium` — and `SourceOriginWorld` / `-Missing` / `-Unknown` with it.
     assert.equal(lang.FABRICATE.Admin.Manager.Component.SourceOriginCompendium, undefined);
     assert.equal(lang.FABRICATE.Admin.Manager.TagsCategories.Title, 'Tags & Categories');
     assert.equal(lang.FABRICATE.Admin.Manager.TagsCategories.Library, 'Tags & Categories');
@@ -1386,14 +820,9 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.Title, 'Essences');
     // `Essence.Library` / `Essence.LibraryHint` / `Essence.Kicker` are RETIRED with the
     // duplicate page header the browser used to render above the shell's own (issue 1036).
-    // The route title is `Essence.Title`, which the shell owns and which is asserted above.
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EditTitle, 'Edit essence');
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EditBreadcrumb, 'Edit essence');
-    // `CreateBreadcrumb` — and `Create`, `CreateSubtitle` and `CreateNoSourceSubtitle` with it —
-    // are RETIRED (issue 1372, maintainer parity round 8): the system-scope create draft they
-    // titled had one entry point, the Essence Rules header's `+ Create essence`, and an essence's
-    // identity is a world record. `CreateTitle` survives because `EssenceEditView` still titles a
-    // draft it can be handed directly.
+    // `CreateBreadcrumb` — and `Create`.
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.CreateBreadcrumb, undefined);
     // `SourceAll` / `SourceLinkedFilter` / `SourceNone` / `SourceNeedsAttention` and the status
     // segment's `Status.All` are RETIRED with the two toolbar filters issue 1372's round-8 parity
@@ -1408,38 +837,28 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersHint,
       'Browse reusable events before attaching them to environments.'
     );
-    assert.equal(rootSource.includes('EncountersPlaceholderTitle'), false);
-    assert.equal(rootSource.includes('EncountersPlaceholderHint'), false);
   });
 
   it('keeps changed manager and environment static localization fallbacks aligned with en.json', () => {
-    const environmentComponentDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/environment');
     const contractFiles = [
-      rootPath,
-      environmentEditPath,
-      environmentsBrowserPath,
-      knowledgePath,
-      armedDangerButtonPath,
-      ...readdirSync(environmentComponentDir)
-        .filter((name) => name.endsWith('.svelte'))
-        .map((name) => resolve(environmentComponentDir, name)),
-      ...readdirSync(knowledgeComponentDir)
-        .filter((name) => name.endsWith('.svelte'))
-        .map((name) => resolve(knowledgeComponentDir, name)),
+      MANAGER_ROOT,
+      ENVIRONMENT_EDIT,
+      ENVIRONMENTS_BROWSER,
+      KNOWLEDGE_VIEW,
+      ARMED_DANGER_BUTTON,
+      ...componentPathsIn('src/ui/svelte/apps/manager/environment'),
+      ...componentPathsIn('src/ui/svelte/apps/manager/knowledge'),
     ];
     const failures = [];
 
-    for (const filePath of contractFiles) {
-      const source = readFileSync(filePath, 'utf8');
-      for (const { key, fallback } of staticTextCalls(source)) {
+    for (const file of contractFiles) {
+      for (const { key, fallback } of staticTextCalls(componentAstOf(file))) {
         if (!isChangedManagerEnvironmentLocalizationKey(key)) continue;
         const value = catalogValue(key);
         if (typeof value !== 'string') {
-          failures.push(`${sourceName(filePath)}: missing ${key}`);
+          failures.push(`${file}: missing ${key}`);
         } else if (value !== fallback) {
-          failures.push(
-            `${sourceName(filePath)}: ${key} fallback "${fallback}" does not match en.json "${value}"`
-          );
+          failures.push(`${file}: ${key} fallback "${fallback}" does not match en.json "${value}"`);
         }
       }
     }
@@ -1447,118 +866,37 @@ describe('CraftingSystemManager source contract', () => {
     assert.deepEqual(failures, []);
   });
 
-  it('routes system Edit to the in-place v2 edit view and existing store callbacks', () => {
-    assert.ok(
-      !rootSource.includes('openLegacySystemSettings'),
-      'root should not keep dead legacy edit routing'
-    );
-    assert.ok(
-      !rootSource.includes('Edit details'),
-      'root should not show the former dead edit details label'
-    );
-    assert.ok(
-      !rootSource.includes('services?.onEditSystem'),
-      'root should not launch the current admin for system row Edit'
-    );
-    assert.ok(
-      managerSource.includes('FABRICATE.Admin.Manager.EditSystem'),
-      'manager should expose a localized system edit action'
-    );
-    assert.ok(
-      rootSource.includes("activeView = 'system-edit'"),
-      'system row Edit should transition to the local edit route'
-    );
-    assert.ok(
-      managerSource.includes('store.saveSystemDetails?.('),
-      'system edit should save details through the admin store'
-    );
-    assert.ok(
-      managerSource.includes('onSetResolutionMode(nextMode)') ||
-        managerSource.includes('store.setResolutionMode?.(nextMode)'),
-      'system edit should delegate resolution changes to the admin store'
-    );
-    assert.ok(
-      rootSource.includes('store.setResolutionMode?.'),
-      'root should pass the resolution-mode callback through to the system-edit view'
-    );
-    // Scope the resolution/salvage persistence-value assertions to the resolution
-    // mode options module: the alchemy check-mode selector at the top of the Checks
-    // tab's Crafting sub-tab legitimately carries a `value: 'tiered'` check-mode
-    // option that is unrelated to the retired legacy resolution/salvage `tiered` mode.
-    assert.ok(
-      resolutionModeOptionsSource.includes("value: 'routed'"),
-      'salvage resolution should offer the canonical routed persistence value'
-    );
-    assert.ok(
-      !resolutionModeOptionsSource.includes("value: 'mapped'"),
-      'resolution options should not offer the legacy mapped persistence value'
-    );
-    assert.ok(
-      !resolutionModeOptionsSource.includes("value: 'tiered'"),
-      'resolution options should not offer the legacy tiered persistence value'
-    );
-    assert.ok(
-      !rootSource.includes('store.toggleAdvancedOptions?.'),
-      'root should not retain the removed advanced visibility toggle wiring'
-    );
-    assert.ok(
-      rootSource.includes('store.toggleFeature?.'),
-      'root should delegate feature toggles to the admin store'
-    );
-    assert.ok(
-      !managerSource.includes("storeKey: 'complexRecipes'"),
-      'system edit should not reintroduce the legacy complex recipes toggle'
-    );
-    assert.ok(
-      !managerSource.includes("storeKey: 'craftingChecks'"),
-      'system edit should not reintroduce the legacy crafting checks toggle'
-    );
-    assert.ok(
-      !managerSource.includes("storeKey: 'outcomeRouting'"),
-      'system edit should not reintroduce the legacy outcome routing toggle'
-    );
-    assert.ok(
-      !appSource.includes('onEditSystem'),
-      'v2 wrapper should not provide a row edit service for this action'
-    );
-    assert.ok(
-      !appSource.includes('openCurrentAdmin'),
-      'v2 wrapper should not retain a legacy admin fallback service'
-    );
-    assert.ok(
-      !appSource.includes('LAST_MANAGED_CRAFTING_SYSTEM'),
-      'v2 row edit should not seed and launch the current admin'
-    );
+  // The v2 route replaced a launch into the legacy admin (issue 429). Saving, the row status
+  // switch and the feature toggles are driven by `tests/components/manager-systems-mounted.js`;
+  // what stays is the dead wiring's absence and the callbacks the root threads to the page.
+  defineStructureContract('routes system Edit to the in-place v2 edit view', MANAGER_ROOT, {
+    assigns: [['activeView', 'system-edit']],
+    reads: ['store.setResolutionMode', 'store.toggleFeature'],
+    namesNo: ['openLegacySystemSettings'],
+    readsNo: ['services.onEditSystem', 'store.toggleAdvancedOptions'],
+    spellsNo: ['Edit details'],
   });
 
-  it('renames the recipe resolution-mode legend and offers a salvage resolution-mode card', () => {
-    // The recipe card legend is renamed; its consumer is now the Crafting Settings
-    // page (issue 511 moved the resolution cards off System Overview).
+  // Asked of the whole manager view set, because the action and the save live on two of its
+  // pages: "in at least one of these", stated once.
+  defineStructureContract('saves system details through the admin store', MANAGER_VIEWS, {
+    spellsExactly: ['FABRICATE.Admin.Manager.EditSystem'],
+    reads: ['store.saveSystemDetails'],
+    callsWith: [['setResolutionMode', 'nextMode']],
+  });
+
+  // The three legacy toggles are gone from the feature table, which is the only place a
+  // `storeKey` is written.
+  defineStructureContract('reintroduces none of the legacy system toggles', SYSTEM_EDIT, {
+    propertyNo: [
+      ['storeKey', 'complexRecipes'],
+      ['storeKey', 'craftingChecks'],
+      ['storeKey', 'outcomeRouting'],
+    ],
+  });
+
+  it('renames the recipe resolution-mode legend and states the salvage copy', () => {
     assert.equal(lang.FABRICATE.Admin.SystemSettings.ResolutionMode, 'Recipe resolution mode');
-    // `legend=` since issue 1509 phase 3, which deleted the `ResolutionModeCard` shim and had
-    // these call sites render `RadioCardGroup` directly. The shim's `legendFallback` was its
-    // rename of the primitive's own `legend`, and no alias prop was kept: this is the SAME
-    // fallback string on the SAME control, under the name the primitive has always used.
-    assert.ok(
-      craftingSettingsSource.includes('legend="Recipe resolution mode"'),
-      'crafting settings inline fallback should match the renamed value'
-    );
-
-    // Salvage card source hooks: fieldset + option attribute names and the radio group name.
-    assert.ok(
-      craftingSettingsSource.includes('data-crafting-salvage-resolution-mode'),
-      'crafting settings should declare the salvage fieldset hook'
-    );
-    assert.ok(
-      craftingSettingsSource.includes('data-crafting-salvage-resolution-mode-option'),
-      'crafting settings should declare the salvage option hook'
-    );
-    assert.ok(
-      craftingSettingsSource.includes('manager-crafting-salvage-resolution-mode'),
-      'crafting settings should use the dedicated salvage radio group name'
-    );
-
-    // New salvage i18n keys are present and non-empty.
     for (const key of [
       'SalvageResolutionMode',
       'SalvageResolutionModeHint',
@@ -1573,85 +911,83 @@ describe('CraftingSystemManager source contract', () => {
       assert.equal(typeof value, 'string', `SystemSettings.${key} should be a string`);
       assert.ok(value.length > 0, `SystemSettings.${key} should be non-empty`);
     }
-
-    // Salvage option-set guard: the salvage options offer simple (default) +
-    // progressive + routed, but never alchemy (no ingredient-set routing).
-    const salvageOptionsMatch = resolutionModeOptionsSource.match(
-      /salvageResolutionModeOptions\s*=\s*\[([\s\S]*?)\];/
-    );
-    assert.ok(
-      salvageOptionsMatch,
-      'the shared module should define a salvageResolutionModeOptions array'
-    );
-    const salvageOptionsBlock = salvageOptionsMatch[1];
-    assert.ok(salvageOptionsBlock.includes("value: 'simple'"), 'salvage should offer simple');
-    assert.ok(
-      salvageOptionsBlock.includes("value: 'progressive'"),
-      'salvage should offer progressive'
-    );
-    assert.ok(salvageOptionsBlock.includes("value: 'routed'"), 'salvage should offer routed');
-    assert.ok(
-      !salvageOptionsBlock.includes("value: 'alchemy'"),
-      'salvage should NOT offer alchemy'
-    );
-
-    // Persistence wiring threaded from the root through the crafting settings view to the store.
-    assert.ok(
-      craftingSettingsSource.includes('onSetSalvageResolutionMode'),
-      'crafting settings should accept the salvage persistence prop'
-    );
-    assert.ok(
-      rootSource.includes('store.setSalvageResolutionMode?.'),
-      'root should pass the salvage callback through to the crafting settings view'
-    );
   });
 
-  it('authors straight, d100 and routed on each task rather than the gathering economy', () => {
-    const gatheringEconomySource = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte'),
-      'utf8'
-    );
-    assert.ok(
-      !gatheringEconomySource.includes('data-gathering-resolution-mode'),
-      'the inert economy mode has no authoring selector'
-    );
-    const taskEditorSource = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte'),
-      'utf8'
-    );
-    assert.ok(taskEditorSource.includes('<RadioCardGroup'), 'task mode reuses the shared radio cards');
-    const optionsMatch = taskEditorSource.match(
-      /resolutionModeOptions\s*=\s*\[([\s\S]*?)\];/
-    );
-    assert.ok(optionsMatch, 'the task editor defines its mode choices');
-    const optionsBlock = optionsMatch[1];
-    for (const mode of ['straight', 'd100', 'routed']) {
-      assert.ok(optionsBlock.includes(`value: '${mode}'`), `the task offers ${mode}`);
+  // The salvage card's own hooks, which reach `RadioCardGroup` as prop values since issue 1509
+  // folded the `ResolutionModeCard` shim away.
+  defineStructureContract('draws a salvage resolution card of its own', CRAFTING_SETTINGS, {
+    declaresProp: ['onSetSalvageResolutionMode'],
+    attributes: [
+      ['legend', 'Salvage resolution mode'],
+      ['cardId', 'manager-crafting-salvage-resolution-mode'],
+      ['groupName', 'manager-crafting-salvage-resolution-mode'],
+      ['dataAttr', 'data-crafting-salvage-resolution-mode'],
+      ['optionDataAttr', 'data-crafting-salvage-resolution-mode-option'],
+    ],
+  });
+
+  // The recipe card's own legend fallback, stated apart from the salvage card's.
+  defineStructureContract('keeps the recipe card legend beside it', CRAFTING_SETTINGS, {
+    attributes: [['legend', 'Recipe resolution mode']],
+  });
+
+  // Salvage has exactly one ingredient, so ingredient-set routing is meaningless and `alchemy`
+  // is not offered; the narrowing to the salvage binding is what keeps that absence honest,
+  // because the recipe list beside it does offer alchemy.
+  defineStructureContract(
+    'offers salvage every resolution except the ingredient-set ones',
+    { file: RESOLUTION_MODE_OPTIONS, constant: 'salvageResolutionModeOptions' },
+    { spellsExactly: ['simple', 'progressive', 'routed'], spellsExactlyNo: ['alchemy'] }
+  );
+
+  // The two retired persistence tokens, across the whole module: neither list may offer them.
+  defineStructureContract(
+    'retires the legacy mapped and tiered persistence values',
+    RESOLUTION_MODE_OPTIONS,
+    { spellsExactlyNo: ['mapped', 'tiered'] }
+  );
+
+  defineStructureContract('threads the salvage persistence callback', MANAGER_ROOT, {
+    reads: ['store.setSalvageResolutionMode'],
+    passesProps: [['CraftingSettingsView', 'onSetSalvageResolutionMode']],
+  });
+
+  // The task owns its resolution mode; the inert gathering economy offers no authoring selector
+  // for one. `resolutionMode={gatheringTaskResolutionMode}` is stated by the task-library contract
+  // below, which owns every prop the root threads into this editor.
+  defineStructureContract(
+    'offers no resolution mode on the inert gathering economy',
+    GATHERING_ECONOMY,
+    { writesNo: ['data-gathering-resolution-mode'], spellsNo: ['data-gathering-resolution-mode'] }
+  );
+
+  defineStructureContract(
+    'authors straight, d100 and routed on each task, all three selectable',
+    { file: GATHERING_TASK_EDIT, constant: 'resolutionModeOptions' },
+    {
+      property: [
+        ['value', 'straight'],
+        ['value', 'd100'],
+        ['value', 'routed'],
+      ],
+      // Dormant progressive is not offered, and none of the three authored modes is disabled.
+      propertyNo: [['value', 'progressive']],
+      keysNo: ['disabled'],
     }
-    assert.ok(!optionsBlock.includes("value: 'progressive'"), 'dormant progressive is not offered');
-    assert.ok(!optionsBlock.includes('disabled:'), 'all three authored modes are selectable');
-    assert.ok(taskEditorSource.includes('onUpdateTask({ resolutionMode: mode })'), 'mode edits patch the task');
-    assert.ok(rootSource.includes('resolutionMode={gatheringTaskResolutionMode}'), 'the parent supplies the task mode');
-  });
+  );
 
-  it('folds the validation overview into a full-width tabbed System Overview page (#429)', () => {
-    // The standalone overview route and the legacy "Edit summary" key are gone.
+  defineStructureContract(
+    'reuses the shared radio cards for the task mode, and patches the task, not the event',
+    { file: GATHERING_TASK_EDIT, fn: 'setTaskResolutionMode' },
+    { callsWith: [['onUpdateTask', 'mode']], keys: ['resolutionMode'] }
+  );
+
+  it('renames the standalone overview page and retires the keys it replaced', () => {
     assert.equal(
       lang.FABRICATE.Admin.Manager.SystemEdit.Summary,
       undefined,
       'the legacy Summary key is removed'
     );
-    assert.ok(
-      !rootSource.includes('SystemEdit.Summary'),
-      'no consumer references the removed Summary key'
-    );
-
-    // The System Overview page is the renamed system-edit route, and since issue 1515 its
-    // breadcrumb tail and nav label read "System Overview" while its `<h1>` reads the SELECTED
-    // SYSTEM'S NAME. That split is deliberate rather than a drift: every other editor route in
-    // the Manager titles itself after the record it edits, and this one repeated the route name
-    // a third time under a trail that already said it twice. The trail names where you are; the
-    // title names what you are looking at.
     assert.equal(
       lang.FABRICATE.Admin.Manager.SystemEdit.Nav,
       'System Overview',
@@ -1667,351 +1003,294 @@ describe('CraftingSystemManager source contract', () => {
       undefined,
       'the page-title key is retired: the heading is the record, not a localized route name'
     );
-    assert.ok(
-      !rootSource.includes('SystemEdit.PageTitle'),
-      'no consumer references the retired page-title key'
-    );
-    assert.ok(
-      rootSource.includes(
-        "selectedSystem?.name || text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')"
-      ),
-      'the page title is the selected system name, falling back to the route name when there is ' +
-        'no selection rather than rendering an empty heading'
-    );
-    assert.ok(
-      rootSource.includes(
-        "text('FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb', 'System Overview')"
-      ),
-      'the breadcrumb tail still names the route'
-    );
-    assert.ok(
-      rootSource.includes("text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')"),
-      'the renamed nav item reads System Overview'
-    );
+  });
 
-    // The standalone Overview route was folded into the system-edit page; its old
-    // nav item and routed view token are gone.
-    assert.ok(
-      !rootSource.includes('data-nav-system-overview'),
-      'the standalone Overview nav item is removed'
-    );
-    assert.ok(
-      !rootSource.includes("activeView = 'system-overview'"),
-      'no route transitions to the standalone overview view'
-    );
-    assert.ok(
-      rootSource.includes("if (view === 'system-overview') return 'system-edit'"),
-      'a stale overview token folds into the system-edit page'
-    );
-
-    // The renamed nav item uses the validation clipboard icon and carries the
-    // open-issue badge that the standalone Overview item used to own.
-    assert.ok(
-      rootSource.includes('data-nav-system-edit'),
-      'the renamed nav item exposes a stable data hook'
-    );
-    assert.ok(
-      rootSource.includes('{#if systemOverviewCount > 0}'),
-      'the renamed nav item carries the open-validation-issue badge'
-    );
-
-    // The page is a full-width tabbed shell mirroring the environment editor: the
-    // shared inspector is skipped, and SystemEditView owns the tabs + workspace.
-    // Since issue 1362 the aside chain is BUILT from `FULL_WIDTH_VIEWS` rather than
-    // restated, so the question is whether the route is a MEMBER of that set — which is
-    // stronger than the old needle, which passed on a root that mentioned the token anywhere.
-    // `tests/manager-full-width-gate.test.js` asserts the whole set against the stylesheet.
-    assert.ok(
-      /id: 'system-edit',\s*\n\s*layoutClass: 'full-width-2-track'/.test(rootSource) &&
-        rootSource.includes('class="manager-inspector"'),
-      'the shared inspector is skipped for the full-width system-edit page'
-    );
-    assert.ok(systemEditSource.includes('SystemEditorTabs'), 'SystemEditView renders the tab bar');
-    assert.ok(systemEditSource.includes("activeTab === 'settings'"), 'Settings is a tab panel');
-    assert.ok(systemEditSource.includes("activeTab === 'validation'"), 'Validation is a tab panel');
-    assert.ok(
-      systemEditSource.includes('SystemOverviewView'),
-      'the Validation tab renders the overview list'
-    );
-    assert.ok(
-      systemEditSource.includes('manager-system-workspace'),
-      'the workspace mirrors the environment workspace'
-    );
-
-    // The library inspector's detail card is a 2x2 STAT grid (issue 643, brief §3.3),
-    // not the generic fact-line list: it answers Ingredients / Results / Steps /
-    // Crafting check. Structure and Result-groups were restatements of the row the GM
-    // had just clicked, and Produces — the one thing the old inspector could not tell
-    // them — is now a first-class section.
-    assert.ok(
-      recipeBrowserInspectorSource.includes('class="manager-recipe-stat-grid"'),
-      'the library inspector renders the 2x2 stat grid'
-    );
-    for (const fact of ['ingredients', 'results', 'steps', 'check']) {
-      assert.ok(
-        recipeBrowserInspectorSource.includes(`id: '${fact}'`),
-        `the stat grid answers "${fact}"`
-      );
+  // The heading is the selected system's name, falling back to the route name only when nothing
+  // is selected, rather than rendering an empty heading (#429).
+  defineStructureContract(
+    'titles the page after the record it edits',
+    [MANAGER_ROOT, MANAGER_SYSTEM_NAV, MANAGER_HEADER_BREADCRUMBS],
+    {
+      reads: ['selectedSystem.name'],
+      spellsExactly: [
+        'FABRICATE.Admin.Manager.SystemEdit.Nav',
+        'FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb',
+      ],
+      spellsNo: ['SystemEdit.Summary', 'SystemEdit.PageTitle'],
+      writes: ['data-nav-system-edit'],
+      writesNo: ['data-nav-system-overview'],
+      names: ['systemOverviewCount'],
+      assignsNo: [['activeView', 'system-overview']],
     }
-    assert.ok(
-      recipeBrowserInspectorSource.includes('data-recipe-produces-empty'),
-      'a recipe that makes nothing on a success says so'
-    );
-    assert.ok(
-      recipeBrowserInspectorSource.includes('buildRecipeRequirementRows') &&
-        recipeBrowserInspectorSource.includes('buildRecipeProduceRows'),
-      'the Requires/Produces walk lives in the pure model, not in the component'
-    );
+  );
 
-    // The inspector is ONE column on the panel background (issue 643): section labels are
-    // uppercase micro-labels directly on the panel, not five nested `.manager-inspector-card`
-    // boxes under `<h3>` titles, and there is no invented "Recipe details" heading.
-    assert.equal(
-      recipeBrowserInspectorSource.includes('manager-inspector-card'),
-      false,
-      'the inspector sections are micro-labels on the panel, not nested cards'
-    );
-    assert.equal(
-      recipeBrowserInspectorSource.includes('Recipe.Details'),
-      false,
-      'the invented "Recipe details" heading is gone'
-    );
+  defineStructureContract(
+    'folds a stale overview token into the system-edit page',
+    { file: MANAGER_ROOT, fn: 'normalizedActiveView' },
+    { returnsFor: [['system-overview', 'system-edit']] }
+  );
 
-    // `Edit recipe` is the point of the inspector: the accent-filled primary. There used to
-    // be no Edit at all, and Delete sat as a peer of Duplicate.
-    assert.ok(
-      recipeBrowserInspectorSource.includes('data-recipe-action="edit"'),
-      'the inspector exposes the primary Edit action'
-    );
-    assert.ok(
-      recipeBrowserInspectorSource.includes('onEdit = () => {}'),
-      'the inspector takes an onEdit callback'
-    );
-    assert.ok(
-      recipeBrowserInspectorSource.includes('manager-recipe-browser-inspector-delete'),
-      'Delete is a dark danger button below Edit, not a peer of Duplicate'
-    );
+  // The page is a full-width tabbed shell mirroring the environment editor: the aside is skipped
+  // and the column released. The registry entry is the one place that decision is recorded, and
+  // `tests/manager-full-width-gate.test.js` is what holds it to the stylesheet.
+  defineStructureContract(
+    'releases the inspector column for the tabbed overview page',
+    { file: MANAGER_ROOT, constant: 'FULL_WIDTH_VIEWS', record: ['id', 'system-edit'] },
+    { property: [['layoutClass', 'full-width-2-track']] }
+  );
 
-    // The reserved alchemy-Simple failure group is SHOWN (danger-toned), not filtered out —
-    // deleting it made an alchemy recipe's failure output invisible.
+  // Deleting the six per-route page headers moved the eyebrow up rather than removing it, so the
+  // shell resolves one per route (issue 1515). What the old "no kicker" clauses were protecting —
+  // that an eyebrow must not restate the title — is stated positively here.
+  defineStructureContract('resolves the page eyebrow per route, beside the title', HEADER_MODEL, {
+    names: ['viewKicker'],
+    calls: ['viewKicker'],
+  });
+
+  defineStructureContract(
+    'gives system-edit no eyebrow, and resolves none from a route title',
+    { file: HEADER_MODEL, fn: 'viewKicker' },
+    { spellsExactlyNo: ['system-edit'], callsNo: ['viewTitle'] }
+  );
+
+  // Issue 745: the Crafting group is unconditional (v1.3 headline), so the recipes-route
+  // experimental gate is gone and the disabled Recipes placeholder with it. Essences and Tags are
+  // real routes now, which is why neither may reappear in the placeholder list either.
+  defineStructureContract(
+    'derives the placeholder rail from selection and feature gates',
+    [MANAGER_ROOT, MANAGER_SYSTEM_NAV],
+    {
+    names: ['visiblePlaceholderViews', 'selectSystemAndShowBrowser'],
+    declares: ['experimentalFeaturesEnabled'],
+    reads: ['$viewState.experimentalFeaturesEnabled'],
+    assigns: [['activeView', 'essence-edit']],
+    callsLiteral: [
+      ['setView', 'essences'],
+      ['setView', 'tags'],
+    ],
+    namesNo: ['recipesRouteEnabled', 'recipesAvailable', 'clearSelectedSystem', 'openCurrentAdmin'],
+    // Systems is reached from the scope card, never as a left-rail tab, and the rail card never
+    // clears the real store selection.
+    callsLiteralNo: [
+      ['setView', 'systems'],
+      ['selectSystem', ''],
+    ],
+    }
+  );
+
+  defineStructureContract(
+    'advertises the Graph placeholder as the only one, behind the experimental toggle',
+    { file: MANAGER_SYSTEM_NAV, constant: 'placeholderViews' },
+    {
+      property: [
+        ['id', 'graph'],
+        // The rail id as a complete literal rather than a `manager-nav-${view.id}` template.
+        ['navId', 'manager-nav-graph'],
+        ['icon', 'fas fa-project-diagram'],
+      ],
+      propertyNo: [
+        ['id', 'recipes'],
+        ['id', 'essences'],
+        ['id', 'tags'],
+      ],
+    }
+  );
+
+  defineStructureContract(
+    'and gates it on the experimental toggle rather than on a system feature',
+    { file: MANAGER_SYSTEM_NAV, fn: 'isViewAvailableForSystem' },
+    { compares: ['graph'], names: ['experimentalFeaturesEnabled'] }
+  );
+
+  // The rail card selects (issue 643): the static name span, the x clear icon and the inline count
+  // cluster are retired rather than merely hidden.
+  defineStructureContract(
+    'renders the selected system in a rail card that selects',
+    MANAGER_NAV_RAIL,
+    {
+    writes: ['data-manager-scope-select', 'data-manager-rail-section'],
+    spells: ['manager-scope-return'],
+    spellsExactly: [
+      'manager-scope-card',
+      'FABRICATE.Admin.Manager.AllCraftingSystems',
+      'FABRICATE.Admin.Manager.ReturnToSystemLibrary',
+    ],
+    spellsNo: [
+      'manager-scope-name',
+      'manager-scope-clear',
+      'manager-count-cluster',
+      'SystemEdit.EditBadge',
+      'FABRICATE.Admin.Manager.Workspace',
+      'FABRICATE.Admin.Manager.QuickActions',
+    ],
+    }
+  );
+
+  // Three claims a whole-file search cannot make: which element carries which hook, what order two
+  // rail regions render in, and that the gathering parent takes no selected-pill class.
+  it('labels the rail before the scope card', () => {
+    const nodes = templateNodes(componentAstOf(MANAGER_NAV_RAIL));
+    const label = nodes.findIndex((node) =>
+      declaresAttribute(node, 'data-manager-rail-section', { directives: false })
+    );
+    const block = nodes.findIndex((node) => attributeValue(node, 'class') === 'manager-rail-block');
+    assert.ok(label >= 0 && block >= 0, 'both rail regions still render');
+    assert.ok(label < block, 'GM management labels the rail before the crafting-system scope card');
+  });
+
+  it('keeps Import on the library header', () => {
+    const nodes = templateNodes(componentAstOf(MANAGER_HEADER_ACTIONS));
+    // The legacy system-library header rendered an admin launch button beside Import, so the
+    // `openCurrentAdmin` absence above is vacuous against a header that no longer exists.
+    const [importButton] = nodes.filter((node) =>
+      declaresAttribute(node, 'data-manager-import-system', { directives: false })
+    );
+    assert.ok(Boolean(importButton), 'the system library header still renders Import');
+    assert.equal(importButton.name, 'ManagerButton', 'through the shared button primitive');
+    assert.equal(attributeExpression(importButton, 'onclick')?.name, 'importSystem');
+
+  });
+
+  // A universal over every composition site, which is why it reads all three entry units: the
+  // sites are spread across them and narrowing it to one would drop most of its population.
+  it('never takes the selected pill class from the route a nav parent groups', () => {
+    const parentClasses = MANAGER_NAV_UNITS.flatMap((file) =>
+      [...walkNodes(componentAstOf(file).fragment)].filter(
+        (node) =>
+          node.type === 'TemplateLiteral' &&
+          literalStrings(node).some((literal) => literal.includes('manager-nav-parent'))
+      )
+    );
+    assert.ok(parentClasses.length > 0, 'the gathering parent still composes its class');
     assert.ok(
-      recipeBrowserInspectorSource.includes(
-        "data-recipe-produces={row.failure ? 'failure' : 'success'}"
-      ),
-      'every produced group is rendered, toned by role'
+      parentClasses.every((node) => !identifierNames(node).has('isGatheringRoute')),
+      'and does not take the selected pill class from the route it groups'
     );
   });
 
-  it('keeps first-slice action and navigation hierarchy focused', () => {
-    // ISSUE 1515 REVERSED THE TWO CLAUSES THAT USED TO STAND HERE. They said the top bar renders
-    // "only the page title and subtitle", and no view kicker, which was true of the SHELL and
-    // false of the product: six routes drew their own eyebrow a few pixels lower, inside a second
-    // page header of their own. Deleting those headers moved the eyebrow up rather than removing
-    // it, so the shell resolves one per route — and the clause the old assertions were really
-    // protecting, that an eyebrow must not restate the title, is now stated positively below.
+  // The gathering rail is one submenu group with its own expand/collapse control and a rollup
+  // count summarising the three sections beneath it.
+  defineStructureContract('groups the gathering sections into a rail submenu', MANAGER_SYSTEM_NAV, {
+    spells: ['manager-nav-group '],
+    // The member path the unit reads through its `navRail` prop, which is what replaced the
+    // root's own `railGroupExpanded` (issue 1717).
+    reads: ['navRail.expanded.gathering'],
+    spellsExactly: [
+      'manager-nav-submenu',
+      'manager-nav-toggle',
+      'is-expanded',
+      'FABRICATE.Admin.Manager.Nav.ExpandGathering',
+      'FABRICATE.Admin.Manager.Nav.CollapseGathering',
+    ],
+  });
+
+  // The tab the submenu reads is still the shell's; the placeholder it routes into moved to the
+  // gathering inspector rail with issue 1707, whose own contract claims the write.
+  defineStructureContract("keeps the gathering rail's active tab on the shell", MANAGER_ROOT, {
+    names: ['activeGatheringTab'],
+  });
+
+  defineStructureContract(
+    'counts each gathering section for its own rail entry',
+    { file: MANAGER_ROOT, constant: 'gatheringNavCounts' },
+    { keys: ['environments', 'tasks', 'encounters', 'total'] }
+  );
+
+  // Narrowed to `total`, because the three lengths are each read for their own section beside it:
+  // asked of the whole derivation, a rollup that had dropped one would still answer yes.
+  defineStructureContract(
+    'and summarises environments, tasks and events in the parent rollup',
+    { file: MANAGER_ROOT, constant: 'gatheringNavCounts', property: 'total' },
+    {
+      reads: [
+        'environmentList.length',
+        'gatheringTaskDefinitions.length',
+        'gatheringEventDefinitions.length',
+      ],
+    }
+  );
+
+  defineStructureContract(
+    'derives the reusable event count from the selected gathering config',
+    { file: MANAGER_ROOT, constant: 'gatheringEventDefinitions' },
+    { reads: ['selectedGatheringSystemConfig.events'] }
+  );
+
+  defineStructureContract(
+    'owns the gathering tab state for inspector coordination',
+    { file: MANAGER_ROOT, constant: 'activeGatheringTab' },
+    { spellsExactly: ['environments'] }
+  );
+
+  // The gathering page renders no section tabs of its own: the rail owns that hierarchy, and the
+  // page reports the tab it was given back to the root.
+  defineStructureContract('reports gathering tab changes to the root', ENVIRONMENTS_BROWSER, {
+    defaults: [['activeGatheringTab', 'environments']],
+    callsWith: [
+      ['onSelectGatheringTab', 'tabId'],
+      ['onEditEnvironment', 'environment'],
+      ['onDuplicateEnvironment', 'environment'],
+      ['onDeleteEnvironment', 'environment'],
+    ],
+    callsLiteral: [
+      ['selectGatheringTab', 'tasks'],
+      ['selectGatheringTab', 'encounters'],
+    ],
+    spellsExactly: [
+      'manager-environment-action-grid',
+      'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint',
+    ],
+    spellsNo: ['manager-gathering-tabs'],
+  });
+
+  // The empty-state inspectors route the GM to the missing building block and to the published
+  // docs, rather than restating the row actions beside them.
+  defineStructureContract('routes every empty setup inspector to its own next step', MANAGER_ROOT, {
+    // The URLs in full: a substring claim on the essences page is satisfied by the
+    // effect-transfer URL one card away, which leaves a moved link green.
+    spellsExactly: [
+      'FABRICATE.Admin.Manager.EmptySetup.Title',
+      'FABRICATE.Admin.Manager.Component.EmptySetup.Title',
+      'FABRICATE.Admin.Manager.Essence.EmptySetup.Title',
+      'https://mistersilver-uk.github.io/fabricate/help/quickstart',
+      'https://mistersilver-uk.github.io/fabricate/components/',
+      'https://mistersilver-uk.github.io/fabricate/essences',
+    ],
+  });
+
+  // Read off the one node: `setView('components')` is satisfied by another button entirely.
+  it('routes the empty-setup Add components action to the components route', () => {
+    const [inspector] = templateNodes(componentAstOf(MANAGER_ROOT)).filter((node) =>
+      declaresAttribute(node, 'onAddComponents', { directives: false })
+    );
+    assert.ok(Boolean(inspector), 'the empty recipes inspector still offers Add components');
     assert.ok(
-      rootSource.includes('function viewKicker'),
-      'the shell resolves the page eyebrow per route, beside viewTitle and viewSubtitle'
+      callsWithLiteral(attributeExpression(inspector, 'onAddComponents'), ['setView', 'components']),
+      'and it routes to the components library'
     );
     assert.ok(
-      rootSource.includes('{viewKicker()}'),
-      'and renders it in the page header rather than leaving the resolver unread'
-    );
-    // NO EYEBROW ON `system-edit`, deliberately: its heading is the system's name and its trail
-    // already names both the system and the route, so a third statement of the same fact would be
-    // exactly the duplication the deleted assertions were aimed at.
-    const kickerBody = rootSource.slice(
-      rootSource.indexOf('function viewKicker'),
-      rootSource.indexOf('function viewTitle')
-    );
-    assert.ok(kickerBody.length > 0, 'the viewKicker body read is broken');
-    assert.ok(
-      !kickerBody.includes("'system-edit'"),
-      'system-edit renders no eyebrow; its title is the record and its trail names the route'
-    );
-    assert.ok(
-      !kickerBody.includes('viewTitle('),
-      'and no route resolves its eyebrow from its own title'
-    );
-    assert.ok(
-      rootSource.includes('visiblePlaceholderViews'),
-      'root should derive selected-system placeholder nav from selection and feature gates'
-    );
-    // Issue 745: the Crafting group is unconditional (v1.3 headline); the experimental
-    // toggle now only gates the unimplemented Graph placeholder.
-    assert.ok(
-      rootSource.includes(
-        'const experimentalFeaturesEnabled = $derived($viewState.experimentalFeaturesEnabled === true)'
+      memberPaths(attributeExpression(inspector, 'componentCount')).includes(
+        'selectedCounts.components'
       ),
-      'root should derive the experimental gate for the Graph placeholder'
+      'beside the count that decides whether it renders'
     );
-    assert.ok(
-      !rootSource.includes('recipesRouteEnabled'),
-      'the recipes-route experimental gate should be gone'
-    );
-    assert.ok(
-      !rootSource.includes('!recipesAvailable'),
-      'route normalization should no longer gate crafting views on the experimental toggle'
-    );
-    assert.ok(
-      !rootSource.includes('{#if recipesRouteEnabled}'),
-      'the Crafting rail group should render unconditionally'
-    );
-    assert.ok(
-      rootSource.includes("if (view.id === 'graph') return experimentalFeaturesEnabled;"),
-      'the Graph placeholder should be gated on the experimental toggle'
-    );
-    assert.ok(
-      !rootSource.includes("{ id: 'recipes', icon: 'fas fa-scroll'"),
-      'the disabled Recipes placeholder should be removed now that Crafting is always available'
-    );
-    assert.ok(
-      /id: 'graph',[\s\S]{0,600}?icon: 'fas fa-project-diagram'/.test(rootSource),
-      'the Graph placeholder should remain in the planned placeholder list'
-    );
-    // And it carries its rail id as a COMPLETE LITERAL (issue 1362), not a
-    // `manager-nav-${view.id}` template: both harnesses target every rail entry by id now, and
-    // an interpolated one is invisible to the gate that checks the id is rendered at all.
-    assert.ok(
-      rootSource.includes("navId: 'manager-nav-graph'"),
-      'the Graph placeholder declares its rail id as a complete literal'
-    );
-    assert.ok(
-      rootSource.includes('selectSystemAndShowBrowser'),
-      'root should keep an explicit systems-browser route'
-    );
-    assert.ok(
-      rootSource.includes('manager-scope-card'),
-      'root should render the selected system in a rail card'
-    );
-    assert.ok(
-      rootSource.indexOf('data-manager-rail-section') <
-        rootSource.indexOf('class="manager-rail-block"'),
-      'GM management should label the rail before the crafting-system scope card'
-    );
-    // The rail card SELECTS (issue 643): before this the rail could name the selected
-    // system but offered no way at all to switch to another one.
-    assert.ok(
-      rootSource.includes('data-manager-scope-select'),
-      'the rail card should carry a real system select'
-    );
-    assert.ok(
-      !rootSource.includes('manager-scope-name'),
-      'the static rail name span is retired, not merely hidden'
-    );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.AllCraftingSystems'),
-      'the rail back link should be localized'
-    );
-    assert.ok(
-      !rootSource.includes('FABRICATE.Admin.Manager.Workspace'),
-      'the rail should not repeat "GM management" below its own section label'
-    );
-    assert.ok(
-      rootSource.includes('manager-scope-return'),
-      'root should expose a return-to-system-library rail action'
-    );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.ReturnToSystemLibrary'),
-      'return-to-library action should be localized'
-    );
-    assert.ok(
-      !rootSource.includes('SystemEdit.EditBadge'),
-      'system settings nav should not render the former Edit badge'
-    );
-    assert.ok(
-      rootSource.includes("setView('essences')"),
-      'essences should be exposed as a real selected-system route'
-    );
-    assert.ok(
-      rootSource.includes("setView('tags')"),
-      'tags and categories should be exposed as a real selected-system route'
-    );
-    assert.ok(
-      rootSource.includes("activeView = 'essence-edit'"),
-      'essence edit actions should transition to the local edit route'
-    );
-    assert.ok(
-      !rootSource.includes("{ id: 'essences'"),
-      'essences should not remain a disabled placeholder route'
-    );
-    assert.ok(
-      !rootSource.includes("{ id: 'tags'"),
-      'tags should not remain a disabled placeholder route'
-    );
-    assert.ok(
-      !rootSource.includes('clearSelectedSystem'),
-      'root should not expose a selected-system clear route'
-    );
-    assert.ok(
-      !rootSource.includes("selectSystem('', 'systems')"),
-      'selected-system rail should not clear real store selection'
-    );
-    assert.ok(
-      !rootSource.includes('manager-scope-clear'),
-      'selected-system rail should not render the old x clear icon'
-    );
-    assert.ok(
-      managerSource.includes('toggleSystemEnabled'),
-      'systems browser should expose interactive row status toggles'
-    );
-    // `<StatusToggle`, not the class literal (issue 1040). The row's switch renders through
-    // the shared primitive, which is the only thing under `src/` that writes
-    // `manager-status-toggle` now, so a search for the class would read 0 while the control
-    // is present and correct.
-    assert.ok(
-      systemsBrowserSource.includes('<StatusToggle'),
-      'systems browser should render status as a toggle control'
-    );
-    assert.ok(
-      recipesBrowserSource.includes('<StatusToggle'),
-      'recipes browser should render status as a toggle control'
-    );
-    assert.ok(
-      !recipesBrowserSource.includes(
-        'type="checkbox"\n                  checked={recipe.enabled !== false}'
-      ),
-      'recipes browser should not render recipe status as a checkbox'
-    );
-    assert.ok(
-      !rootSource.includes("setView('systems')"),
-      'systems should not be exposed as a left-rail tab'
-    );
-    assert.ok(
-      !rootSource.includes('manager-count-cluster'),
-      'system rows should not duplicate inspector counts inline'
-    );
-    assert.ok(
-      !rootSource.includes('FABRICATE.Admin.Manager.QuickActions'),
-      'inspector should not duplicate row actions'
-    );
-    // The legacy system-library header rendered an admin launch button beside Import, wired
-    // to `openCurrentAdmin`. This guarded that by the pair's LITERAL MARKUP, which made an
-    // absence check hostage to formatting rather than to the thing it guards: the literal
-    // stopped matching the day Import gained `data-manager-import-system` and prettier
-    // reflowed the tag across five lines, and it can never match again now that Import is a
-    // `<ManagerButton>` (issue 1118). An absence assertion that cannot match does not go RED
-    // when its subject returns — it goes quietly meaningless, which is the more dangerous of
-    // the two failure modes.
-    //
-    // So: anchor on the HANDLER NAME, which is what the legacy control actually called and
-    // which no reformatting or primitive conversion can spell away, and put a floor under it
-    // that proves the branch still exists. Without the floor, deleting the whole
-    // system-library header would satisfy the absence check perfectly.
-    // The floor reads the Import control's OPEN TAG, not the bare hook name: the hook is also
-    // spelled out in the comment above the control, so a `rootSource.includes(...)` floor
-    // would survive deleting the button it is meant to prove exists.
-    assert.ok(
-      /<ManagerButton[^<>]*\bdata-manager-import-system\b[^<>]*onclick=\{importSystem\}[^<>]*>/.test(
-        rootSource
-      ),
-      'the system library header should still render Import — the absence check below is ' +
-        'vacuous against a header that no longer exists'
-    );
-    assert.ok(
-      !rootSource.includes('openCurrentAdmin'),
-      'system library header should not render the legacy admin launch button'
-    );
+  });
+
+  it('keeps the environment and task action keys to their header aria labels alone', () => {
+    const spelled = headerCopyLiterals();
+    for (const key of [
+      'FABRICATE.Admin.Manager.Environment.Actions',
+      'FABRICATE.Admin.Manager.Environment.Tasks.Actions',
+    ]) {
+      assert.equal(
+        spelled.filter((literal) => literal === key).length,
+        1,
+        `${key} is the header label, not a second inspector card heading beside it`
+      );
+    }
+  });
+
+  it('states the rail, empty-setup and gathering-tab copy those routes read', () => {
     assert.equal(
       lang.FABRICATE.Admin.Manager.SystemLibraryHint,
       'Select a row to view counts and enabled features.'
@@ -2020,33 +1299,9 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.InspectorHint,
       'The inspector shows counts, resolution mode, and enabled features for the selected system.'
     );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.EmptySetup.Title'),
-      'no-systems inspector should use localized setup copy'
-    );
-    assert.ok(
-      rootSource.includes('https://mistersilver-uk.github.io/fabricate/help/quickstart'),
-      'no-systems inspector should link to the published quickstart'
-    );
-    assert.ok(
-      rootSource.includes('https://mistersilver-uk.github.io/fabricate'),
-      'no-systems inspector should link to the published docs'
-    );
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Title, 'Set up your first system');
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Quickstart, 'Quickstart');
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Docs, 'Docs');
-    assert.ok(
-      managerSource.includes('FABRICATE.Admin.Manager.Environment.EmptyTitle'),
-      'empty environments browser should use Manager localized copy'
-    );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Environment.EmptySetup.Title'),
-      'empty environments inspector should use localized setup copy'
-    );
-    assert.ok(
-      rootSource.includes('https://mistersilver-uk.github.io/fabricate/gathering/environments'),
-      'empty environments inspector should link to published gathering docs'
-    );
     assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.EmptyTitle,
       'Prepare gathering building blocks first'
@@ -2055,118 +1310,7 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Environment.EmptyHint,
       'Define gathering tasks and events before creating environments, then attach those building blocks to each location players can gather from.'
     );
-    assert.ok(
-      rootSource.includes('manager-nav-submenu'),
-      'gathering sections should render in the left rail submenu'
-    );
-    assert.ok(
-      rootSource.includes('manager-nav-toggle'),
-      'gathering rail should expose an expand/collapse control'
-    );
-    assert.ok(
-      rootSource.includes("manager-nav-group ${railGroupExpanded.gathering ? 'is-expanded' : ''}"),
-      'expanded gathering rail should style as one submenu group'
-    );
-    assert.ok(
-      /const gatheringEventDefinitions = \$derived\(\s*Array\.isArray\(selectedGatheringSystemConfig\.events\)\s*\? selectedGatheringSystemConfig\.events\s*: \[\]\s*\)/.test(
-        rootSource
-      ),
-      'root should derive reusable gathering event counts from selected gathering config'
-    );
-    assert.ok(
-      /total:\s*environmentList\.length \+ gatheringTaskDefinitions\.length \+ gatheringEventDefinitions\.length/.test(
-        rootSource
-      ),
-      'gathering parent count should summarize environments, tasks, and events'
-    );
-    // Issue 643: a rail count is a bare mono numeral, not a chip.
-    assert.ok(
-      rootSource.includes('<span class="manager-nav-count">{gatheringNavCounts.total}</span>'),
-      'gathering parent should render a summary count numeral'
-    );
-    assert.ok(
-      rootSource.includes('gatheringNavCounts[gatheringItem.id]'),
-      'gathering submenu items should render their count chips from gathered section counts'
-    );
-    assert.equal(
-      rootSource.includes("manager-nav-parent ${isGatheringRoute ? 'is-active' : ''}"),
-      false,
-      'gathering parent should not use the selected pill class'
-    );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Nav.ExpandGathering'),
-      'gathering rail expand label should be localized'
-    );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Nav.CollapseGathering'),
-      'gathering rail collapse label should be localized'
-    );
-    assert.equal(
-      environmentsBrowserSource.includes('manager-gathering-tabs'),
-      false,
-      'gathering page should not render local section tabs'
-    );
-    assert.ok(
-      rootSource.includes("let activeGatheringTab = $state('environments')"),
-      'root should own gathering tab state for inspector coordination'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes("activeGatheringTab = 'environments'"),
-      'gathering page should accept environments as the default active tab'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onSelectGatheringTab(tabId)'),
-      'gathering page should report tab changes to the root'
-    );
-    assert.ok(
-      rootSource.includes('data-gathering-inspector-placeholder'),
-      'right inspector should render placeholders for non-environment gathering tabs'
-    );
-    assert.equal(
-      rootSource.match(/FABRICATE\.Admin\.Manager\.Environment\.Actions/g)?.length ?? 0,
-      1,
-      'environment actions localization should remain only for the header aria label, not a redundant inspector card'
-    );
-    assert.ok(
-      !rootSource.includes(
-        "<h3 class=\"manager-card-title\">{text('FABRICATE.Admin.Manager.Environment.Actions', 'Environment actions')}</h3>"
-      ),
-      'selected environment inspector should not render a redundant Environment actions card'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes(
-        'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint'
-      ),
-      'gathering task browser copy should be localized'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes("selectGatheringTab('tasks')"),
-      'empty environments guidance should route to the Tasks tab'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes("selectGatheringTab('encounters')"),
-      'empty environments guidance should route events to the Events tab'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('manager-environment-action-grid'),
-      'environment rows should keep quick action wiring'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onEditEnvironment(environment.id)'),
-      'environment rows should wire edit quick actions'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onDuplicateEnvironment(environment.id)'),
-      'environment rows should wire duplicate quick actions'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onDeleteEnvironment(environment.id)'),
-      'environment rows should wire delete quick actions'
-    );
-    assert.equal(
-      lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.Label,
-      'Gathering sections'
-    );
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.Label, 'Gathering sections');
     assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.Environments,
       'Environments'
@@ -2177,10 +1321,7 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.ExpandGathering, 'Expand gathering menu');
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.CollapseGathering, 'Collapse gathering menu');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.OpenTasks, 'Review tasks');
-    assert.equal(
-      lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.OpenEvents,
-      'Review events'
-    );
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.OpenEvents, 'Review events');
     assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint,
       'Browse gathering tasks before attaching them to environments.'
@@ -2213,29 +1354,6 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Environment.EmptySetup.GatheringDocs,
       'Gathering docs'
     );
-    // The empty-recipes setup card moved into the extracted library inspector with
-    // the rest of the aside (issue 643); the root still supplies the component count
-    // and the Components deep-link.
-    assert.ok(
-      recipeBrowserInspectorSource.includes('FABRICATE.Admin.Manager.Recipe.EmptySetup.Title'),
-      'empty recipes inspector should use localized setup copy'
-    );
-    assert.ok(
-      recipeBrowserInspectorSource.includes('https://mistersilver-uk.github.io/fabricate/crafting/recipes/'),
-      'empty recipes inspector should link to published recipe docs'
-    );
-    assert.ok(
-      recipeBrowserInspectorSource.includes('componentCount > 0'),
-      'empty recipes inspector should branch on selected-system component count'
-    );
-    assert.ok(
-      rootSource.includes('componentCount={selectedCounts.components}'),
-      'the root should feed the inspector its component count'
-    );
-    assert.ok(
-      rootSource.includes("onAddComponents={() => setView('components')}"),
-      'empty recipes inspector should route zero-component setup to Components'
-    );
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.Title, 'Set up recipes');
     assert.equal(
       lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.NoComponentsHint,
@@ -2243,316 +1361,135 @@ describe('CraftingSystemManager source contract', () => {
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.AddComponents, 'Add components');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.RecipeDocs, 'Recipe docs');
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Component.EmptySetup.Title'),
-      'empty components inspector should use localized setup copy'
-    );
-    assert.ok(
-      rootSource.includes(
-        'https://mistersilver-uk.github.io/fabricate/components/'
-      ),
-      'empty components inspector should link to published component docs'
-    );
     assert.equal(lang.FABRICATE.Admin.Manager.Component.EmptySetup.Title, 'Set up components');
     assert.equal(lang.FABRICATE.Admin.Manager.Component.EmptySetup.ComponentDocs, 'Component docs');
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Essence.EmptySetup.Title'),
-      'empty essences inspector should use localized setup copy'
-    );
-    assert.ok(
-      rootSource.includes('https://mistersilver-uk.github.io/fabricate/essences'),
-      'empty essences inspector should link to published essence docs'
-    );
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EmptySetup.Title, 'Set up essences');
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EmptySetup.EssenceDocs, 'Essence docs');
   });
 
-  it('keeps manager tags and categories route focused and store-wired', () => {
-    assert.ok(
-      rootSource.includes("import TagsCategoriesView from './TagsCategoriesView.svelte';"),
-      'root should import the focused tags/categories page'
-    );
-    assert.ok(
-      rootSource.includes('store.addCategory?.(value, icon)'),
-      'category add should delegate to the admin store with its icon'
-    );
-    assert.ok(
-      rootSource.includes('store.removeCategory?.(category)'),
-      'category remove should delegate to the admin store'
-    );
-    // Per-category icon persistence (issue 689) is a dedicated store seam.
-    assert.ok(
-      rootSource.includes('store.setCategoryIcon?.(name, icon)'),
-      'category icon edits should delegate to the admin store'
-    );
-    // The COMPONENT category vocabulary (issue 676) — the sibling of the two above,
-    // and a SEPARATE store action: it must never be folded into addCategory.
-    assert.ok(
-      rootSource.includes('store.addComponentCategory?.(value, icon)'),
-      'component category add should delegate to the admin store with its icon'
-    );
-    assert.ok(
-      rootSource.includes('store.removeComponentCategory?.(category)'),
-      'component category remove should delegate to the admin store'
-    );
-    assert.ok(
-      rootSource.includes('store.setComponentCategoryIcon?.(name, icon)'),
-      'component category icon edits should delegate to the admin store'
-    );
-    assert.ok(
-      rootSource.includes('store.addTag?.(value)'),
-      'tag add should delegate to the admin store'
-    );
-    assert.ok(
-      rootSource.includes('store.removeTag?.(tag)'),
-      'tag remove should delegate to the admin store'
-    );
-    // The destructive delete is now confirmed inline in the focused route (issue 689),
-    // then cascades through the store's remove ops — not an external confirm seam.
-    assert.ok(
-      tagsCategoriesSource.includes('onRemoveCategory'),
-      'focused route should own the vocabulary remove wiring'
-    );
-    assert.ok(
-      tagsCategoriesSource.includes('GeneralReservedFeedback'),
-      'focused route should keep reserved General feedback visible'
-    );
-    assert.ok(
-      !/\b(?:game|ui|Hooks|CONFIG)\b/.test(tagsCategoriesSource),
-      'tags/categories route should not directly reference Foundry globals'
-    );
+  // Every one of the nine store delegations this block used to pin as root text is driven by
+  // `tests/components/manager-tags-mounted.js`, which clicks the real control and reads the call
+  // back off the store double; what stays is the route's own shape.
+  defineStructureContract('routes tags and categories to its own focused page', MANAGER_ROOT, {
+    imports: ['./TagsCategoriesView.svelte'],
   });
 
-  it('keeps manager essence browsing browser-only and source UI feature-gated', () => {
-    assert.ok(
-      rootSource.includes("import EssenceEditView from './EssenceEditView.svelte';"),
-      'root should import the dedicated essence edit route'
-    );
-    assert.ok(
-      rootSource.includes('showEssenceSourceUi'),
-      'root should derive the effect-transfer source UI gate'
-    );
-    assert.ok(
-      rootSource.includes("currentView === 'essence-edit'"),
-      'root should route the dedicated edit view'
-    );
-    assert.ok(
-      rootSource.includes('confirmDiscardDirtyEssenceDraft'),
-      'root should protect dirty essence edit drafts when a confirm seam is available'
-    );
-    assert.ok(
-      essenceBrowserSource.includes('onEditEssence'),
-      'browser row edit should ask the root to route to edit'
-    );
-    assert.ok(
-      essenceBrowserSource.includes('showSourceUi'),
-      'browser should receive the source UI feature gate'
-    );
-    assert.ok(
-      !essenceBrowserSource.includes('onUpdateEssence'),
-      'browser should not own essence update persistence'
-    );
-    assert.ok(
-      !essenceBrowserSource.includes('manager-essence-edit-row'),
-      'browser should not render inline edit rows'
-    );
-    assert.ok(
-      !essenceBrowserSource.includes('manager-essence-create-name'),
-      'browser should not render inline create fields'
-    );
-    assert.ok(
-      !essenceBrowserSource.includes('manager-essence-action-band'),
-      'browser should not duplicate the route-header create action'
-    );
-    // The SOURCE COLUMN is retired with the table (issue 1036). It reported one bit — is
-    // there an image — in a column of its own; the row now carries an `Effects` capability
-    // pill instead.
-    assert.ok(
-      !essenceBrowserSource.includes('manager-essence-source-cell-image'),
-      'the source column and its image cell are retired with the table head'
-    );
-    // AND SO IS THE SOURCE-STATE SELECT (issue 1372, maintainer parity round 8). The reference's
-    // bar carries ONE filter beside the search field — the membership pair — and this bar carried
-    // four. A broken link is still findable: the row's summary line NAMES the source and marks
-    // the breakage, the search box reads that name, and the `Effects` chip carries it in its own
-    // tone and title.
-    assert.ok(
-      !essenceBrowserSource.includes('data-essence-source-filter'),
-      'the source-state select is a control the reference does not draw'
-    );
-    assert.ok(
-      !essenceBrowserSource.includes('data-essence-status-filter'),
-      'and neither is the status segment'
-    );
-    assert.ok(
-      essenceBrowserSource.includes('data-essence-membership-filter'),
-      'NON-VACUITY: the one filter the reference DOES draw is still on the bar'
-    );
-    // Browser state is LIFTED to the root, which is criterion 12: search, filters, sort,
-    // presentation and page all survive the editor round-trip.
-    assert.ok(
-      essenceBrowserSource.includes('browserState = $bindable(null)'),
-      'the browser binds its view-state rather than owning it'
-    );
-    assert.ok(
-      rootSource.includes('bind:browserState={essenceBrowserState}'),
-      'and the root is what holds it across the round-trip'
-    );
-    // A card row has no columns, so the rows are a real `<ul role="list">` of `<li>` cards
-    // and the `role="columnheader"` head is gone with the table it labelled. Pinned on the
-    // RENDERED attribute (`role="list"`) rather than on the absence of `role="table"`,
-    // which both files' own comments legitimately mention in prose.
-    assert.ok(
-      libraryShelfSource.includes('role="list"'),
-      'the row list is a real list, not a table with no columns'
-    );
-    assert.ok(
-      !essenceBrowserSource.includes('role="columnheader"'),
-      'and it has no column headers left to label'
-    );
+  defineStructureContract('owns the vocabulary wiring on that page', TAGS_CATEGORIES, {
+    declaresProp: ['onRemoveCategory', 'onRemoveComponentCategory', 'onSetComponentCategoryIcon'],
+    renders: ['VocabularyShell', 'VocabularyShellPanel'],
+    readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
   });
 
-  it('uses shared manager essence picker controls on the dedicated edit route', () => {
-    assert.ok(
-      essenceStudioSource.includes(
-        "import IconPicker from '../../../components/IconPicker.svelte';"
-      ),
-      'edit route should use the shared IconPicker'
-    );
-    assert.ok(
-      essenceStudioSource.includes(
-        "import EssenceSourceSelector from '../../../components/EssenceSourceSelector.svelte';"
-      ),
-      'edit route should use the shared source selector'
-    );
-    assert.ok(
-      essenceEditSource.includes('showSourceUi'),
-      'edit route should gate source controls by effect transfer'
-    );
-    assert.ok(
-      essenceEditSource.includes('onDirtyChange(dirty)'),
-      'edit route should expose dirty state to route-exit protection'
-    );
-    assert.ok(
-      essenceEditSource.includes('onSave(draftId || null, updates)'),
-      'edit route should delegate create and update persistence to the root/store seam'
-    );
-    assert.ok(
-      essenceEditSource.includes('id="manager-essence-edit-form"'),
-      'edit route should expose a form target for route-header save actions'
-    );
-    assert.ok(
-      !essenceEditSource.includes('EditKicker'),
-      'edit route should not render a duplicate inner route header'
-    );
-    assert.ok(
-      !essenceEditSource.includes('IconClassHint'),
-      'edit route should not expose raw icon class copy'
-    );
-    // The Save button now lives in the SHARED `ComponentEditorHeader`, which submits by id
-    // through its `formId` prop. Both halves of that pairing still have to survive
-    // verbatim — drop either and Save silently stops working, with no test to catch it —
-    // so the pairing is asserted at both ends rather than at the literal attribute.
-    assert.ok(
-      rootSource.includes('formId="manager-essence-edit-form"'),
-      'root header should own the primary save action for the edit form'
-    );
-    assert.ok(
-      rootSource.includes('saveAttr="data-essence-edit-save"'),
-      'and it wears this studio own hooks rather than the component studio ones'
-    );
-    // Edit, Duplicate and Delete are the INSPECTOR's, and the inspector is now an extracted
-    // component under `essences/` rather than ~200 lines inlined in the root. The row keeps
-    // the pencil alone; the assertions therefore move to the studio source, and asserting
-    // their ABSENCE from the root proves the extraction happened rather than being copied.
-    assert.ok(
-      !rootSource.includes('data-essence-action='),
-      'the root no longer inlines any essence inspector action'
-    );
-    // `duplicate` is NOT in this set (issue 1372, maintainer parity round 8): it wrote a
-    // system-owned essence with its own name, icon and colour from the rail whose own banner says
-    // identity is the Essence Catalogue's. Asserted absent below, so a re-added action fails here
-    // rather than reappearing under a passing loop.
-    for (const action of ['edit', 'delete', 'copy-source', 'unlink-source']) {
-      assert.ok(
-        essenceStudioSource.includes(`data-essence-action="${action}"`),
-        `the extracted inspector exposes the ${action} action`
-      );
+  // The copy and the hint machines moved OUT of the view at issue 1915: it states no vocabulary
+  // string of its own any more, so the key that pinned the reserved-bucket refusal is re-pointed
+  // at the presentation model that now spells it.
+  defineStructureContract('states the system vocabulary copy in its own model', SYSTEM_VOCABULARY, {
+    spellsExactly: ['FABRICATE.Admin.Manager.TagsCategories.GeneralReservedFeedback'],
+  });
+
+  // What the browser renders — the rows, the disabled marker, the capability pills, the usage
+  // counts, the row toggle and the absent action band — is driven by
+  // `tests/components/manager-essences-mounted.js`. What stays is the seam and what was deleted.
+  defineStructureContract('keeps essence browsing browser-only', ESSENCE_BROWSER, {
+    declaresProp: ['onEditEssence', 'showSourceUi', 'browserState'],
+    spellsExactly: ['data-essence-membership-filter'],
+    namesNo: ['onUpdateEssence'],
+    spellsNo: [
+      'manager-essence-edit-row',
+      'manager-essence-create-name',
+      'manager-essence-source-cell-image',
+      'data-essence-source-filter',
+      'data-essence-status-filter',
+    ],
+    attributesNo: [['role', 'columnheader']],
+  });
+
+  // A card row has no columns, so the paginated rows are a real list on the shared shelf.
+  defineStructureContract('renders those rows on the shared studio shelf', LIBRARY_SHELF, {
+    attributes: [['role', 'list']],
+  });
+
+  defineStructureContract(
+    'routes essence editing to its own page',
+    [MANAGER_ROOT, MANAGER_HEADER_CRAFTING_ACTIONS],
+    {
+      imports: ['./EssenceEditView.svelte'],
+      declares: ['showEssenceSourceUi'],
+      names: ['essenceBrowserState'],
+      compares: ['essence-edit'],
+      passesProps: [['EssenceBrowserView', 'browserState']],
+      renders: ['EssenceBrowserInspector', 'EssenceBulkEditPanel'],
+      // The editor's form id and save hook are the header action unit's since issue 1720.
+      spellsExactly: ['manager-essence-edit-form', 'data-essence-edit-save'],
+      writesNo: ['data-essence-action'],
     }
-    assert.ok(
-      !essenceStudioSource.includes('data-essence-action="duplicate"'),
-      'and it exposes NO duplicate action'
-    );
-    assert.ok(
-      rootSource.includes('<EssenceBrowserInspector'),
-      'and the root renders it as a component'
-    );
-    assert.ok(
-      rootSource.includes('<EssenceBulkEditPanel'),
-      'with the bulk panel replacing it while a selection exists'
-    );
-    assert.ok(
-      rootSource.includes(
-        'store.updateEssence?.(selectedEssenceForInspector.id, { sourceComponentId })'
-      ),
-      'inspector source changes should use updateEssence'
-    );
-    // Criterion 23's four route-wiring items, pinned at the chokepoint rather than at a
-    // control: the same-view skip the other guards already have, the store's `cancel` half,
-    // and the `deleteEssence` boolean the root now consumes.
-    // The skip compares the ESSENCE, not only the view token. `essence-edit` is a "same
-    // token, different subject" route: `editEssence` early-returns on an unchanged id, so
-    // every call reaching the guard from inside the editor is a switch to a DIFFERENT
-    // essence, which a token-only skip waved through with the draft unsaved and no prompt.
-    assert.ok(
-      rootSource.includes(
-        "if (nextView === 'essence-edit' && nextEssenceId && nextEssenceId === selectedEssenceId)"
-      ),
-      'the essence route guard skips a same-ESSENCE exit, as the tools and system guards do'
-    );
-    assert.ok(
-      !rootSource.includes(
-        "if (activeView !== 'essence-edit' || nextView === 'essence-edit') return true;"
-      ),
-      'and the token-only form is gone, not merely shadowed'
-    );
-    assert.ok(
-      rootSource.includes("confirmRouteExit('essence-edit', essenceId)"),
-      'and `editEssence` supplies the target id, or the comparison can never be true'
-    );
-    assert.ok(
-      rootSource.includes('store.cancelEssenceDraft?.()'),
-      'and the discard branch reaches the store half of Cancel'
-    );
-    assert.ok(
-      rootSource.includes('importSingleManagedItemFromDrop'),
-      'inspector source drops should reuse the managed-item import seam'
-    );
-    // The armed BULK delete is a deliberate deviation from the `AGENTS.md` carve-out, under
-    // the maintainer's binding decision for this action. The SINGLE delete keeps the
-    // store-owned `confirmDialog`, so the two idioms do not collide on one screen.
-    // The arm is now reached through the shared `BulkDeleteCard` (issue 1132), which renders
-    // `ArmedDangerButton` itself. Retargeted rather than dropped: the assertion is about the
-    // IDIOM — this delete arms instead of opening a dialog — and the card is what carries it.
-    assert.ok(
-      essenceStudioSource.includes('<BulkDeleteCard'),
-      'the bulk delete arms rather than opening a dialog'
-    );
-    assert.ok(
-      essenceStudioSource.includes('data-essence-bulk-impact'),
-      'and states its impact before it is armed'
-    );
-    assert.ok(
-      !essenceEditSource.includes('game.'),
-      'edit route should not reference Foundry runtime globals'
-    );
+  );
+
+  // Criterion 23: the guard compares the essence and not only the view token, so re-entering the
+  // editor for the same essence skips the prompt and switching to another one does not.
+  defineStructureContract(
+    'skips a same-essence route exit rather than a same-token one',
+    { file: ROUTE_EXIT_GUARDS, record: ['view', 'essence-edit'] },
+    { property: [['skip', 'subject']] }
+  );
+
+  defineStructureContract(
+    'and names the essence that subject is, or the comparison compares nothing',
+    { file: MANAGER_ROOT, constant: 'routeExitGuards', property: 'essence-edit' },
+    { names: ['activeView', 'selectedEssenceId'], compares: ['essence-edit'] }
+  );
+
+  defineStructureContract(
+    'and supplies the target id, or that comparison can never be true',
+    { file: MANAGER_ROOT, fn: 'editEssence' },
+    { callsWith: [['confirmRouteExit', 'essenceId']], spellsExactly: ['essence-edit'] }
+  );
+
+  defineStructureContract('authors an essence on that page and nowhere else', ESSENCE_EDIT, {
+    declaresProp: ['showSourceUi', 'onDirtyChange', 'onSave'],
+    calls: ['onDirtyChange', 'onSave'],
+    attributes: [['id', 'manager-essence-edit-form']],
+    namesNo: ['EditKicker'],
+    spellsNo: ['IconClassHint'],
+    readsNoGlobal: ['game'],
   });
 
-  it('wires production essence dirty confirmation and manager app close guard', () => {
-    assert.ok(
-      /confirmDiscardEssenceDraft:\s*\(\)\s*=>\s*confirmDialog/.test(appSource),
-      'v2 app should provide a production discard confirmation service'
-    );
+  // `duplicate` is not in this set (issue 1372), and the armed bulk delete is a deliberate
+  // deviation from the `AGENTS.md` dialog carve-out.
+  defineStructureContract('extracts the inspector and its bulk panel', ESSENCE_STUDIO, {
+    imports: [
+      '../../../components/IconPicker.svelte',
+      '../../../components/EssenceSourceSelector.svelte',
+    ],
+    renders: ['BulkDeleteCard'],
+    attributes: [
+      ['data-essence-action', 'edit'],
+      ['data-essence-action', 'delete'],
+      ['data-essence-action', 'copy-source'],
+      ['data-essence-action', 'unlink-source'],
+    ],
+    attributesNo: [['data-essence-action', 'duplicate']],
+  });
+
+  defineStructureContract(
+    'wires the production essence discard confirmation through the dialog seam',
+    { file: APP_SHELL, member: '_prepareSvelteProps', property: 'confirmDiscardEssenceDraft' },
+    { calls: ['confirmDialog'] }
+  );
+
+  defineStructureContract(
+    'guards the manager window close on the essence draft, except under a forced teardown',
+    { file: APP_SHELL, member: 'close' },
+    { names: ['canCloseEssence'], reads: ['options.force'] }
+  );
+
+  defineStructureContract(
+    'accepts the route dirty guard the essence editor registers',
+    { file: APP_SHELL, member: '_prepareSvelteProps' },
+    { names: ['registerEssenceDirtyGuard'] }
+  );
+
+  it('states the essence discard copy the confirmation reads', () => {
     for (const key of [
       'DiscardDirtyTitle',
       'DiscardDirtyContent',
@@ -2565,225 +1502,124 @@ describe('CraftingSystemManager source contract', () => {
         `en.json should define Essence.${key}`
       );
     }
-    assert.ok(
-      appSource.includes('registerEssenceDirtyGuard'),
-      'v2 app should accept the route dirty guard'
-    );
-    assert.ok(appSource.includes('async close(options)'), 'v2 app should guard window close');
-    assert.ok(
-      appSource.includes('canCloseEssence === false'),
-      'v2 app close should stay open when discard is declined'
-    );
-    assert.ok(
-      appSource.includes('if (!options?.force)'),
-      'v2 app close should bypass interactive dirty guards during forced lifecycle teardown'
-    );
   });
 
-  /**
-   * THE HALF OF THE COMPATIBILITY GUARANTEE THAT IS NOT BEHAVIOURAL.
-   *
-   * `confirmNavigation` answers `undefined` when no companion holds a guard, and its own suite
-   * pins that. What cannot be observed from a mounted test, because a single microtask of
-   * added latency is invisible through Svelte's own flush, is that BOTH callers actually read
-   * `undefined` as "take the branch you took before this seam existed". Written any other way
-   * — awaiting unconditionally, or comparing against `true` — every Manager close would pay an
-   * extra `await` and every route exit would hand `afterTruthyResult` a composed promise, for a
-   * question no companion asked. So the short-circuit is asserted where it lives.
-   */
-  it('costs a companion that registers no navigation guard nothing on either exit path', () => {
-    assert.ok(
-      appSource.includes(
-        'if (canCloseCompanion !== undefined && (await canCloseCompanion) === false) return this;'
-      ),
-      'the window close skips its await entirely when there is no companion guard to ask'
-    );
-    const closeStart = appSource.indexOf('async close(options) {');
-    const forceGate = appSource.indexOf('if (!options?.force) {', closeStart);
-    const companionAsk = appSource.indexOf('_confirmDowntimeCompanionNavigation?.()', closeStart);
-    const toolAsk = appSource.indexOf('_confirmDiscardDirtyToolDraft?.()', closeStart);
-    assert.ok(forceGate > closeStart, 'the close still gates every interactive guard on force');
-    assert.ok(
-      companionAsk > forceGate,
-      'the companion guard sits INSIDE the force gate, so a forced teardown never asks it'
-    );
-    assert.ok(
-      companionAsk < toolAsk,
-      'and is asked before the Core guards that can save, so a veto writes nothing'
-    );
-    assert.ok(
-      rootSource.includes(
-        'if (companion === undefined) return finishRouteExit(nextView, nextRouteId);'
-      ),
-      'the route exit returns its original result untouched when there is nothing to ask'
-    );
-    assert.ok(
-      rootSource.includes("confirmRouteExit('world-downtime', tabId)"),
-      'a Downtime tab switch states its destination tab, so the guard can tell it from a re-entry'
-    );
+  // What the library draws is driven by `tests/components/recipes-browser-view-mounted.test.js`,
+  // which acts on real rows in the browser and the inspector alike. What stays is the wiring
+  // behind them, and the shapes those cases would still pass without.
+  defineStructureContract('draws the recipe library as a list of cards', RECIPES_BROWSER, {
+    declaresProp: ['browserState'],
+    names: ['createRecipeBrowserState'],
+    imports: ['../../components/Chip.svelte'],
+    calls: ['deriveRecipeStatuses', 'statusChipTone'],
+    renders: ['StatusToggle', 'IconButton'],
+    spells: ['manager-recipes-table', 'manager-recipe-table-head'],
+    spellsExactly: ['FABRICATE.Admin.Manager.Recipe.Column.Recipe'],
+    attributes: [['role', 'list']],
+    attributesNo: [
+      ['role', 'table'],
+      ['type', 'checkbox'],
+    ],
+    // The narrower predicate the pills were moved off, and the save that lives in the root.
+    readsNo: ['recipe.incomplete'],
+    namesNo: ['saveRecipe'],
   });
 
-  it('keeps the recipes browser browser-only and wired to existing callbacks', () => {
-    for (const snippet of [
-      'store.setRecipeSearch?.',
-      'store.toggleRecipeEnabled?.',
-      'store.createRecipe?.()',
-      'store.duplicateRecipe?.(recipeId)',
-      'store.deleteRecipe?.(recipeId)',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should wire ${snippet}`);
-    }
-    // The recipes header now offers a single primary "Create recipe" action
-    // (create-then-edit) instead of crafting-system import/export, which moved off
-    // the recipes header entirely.
-    assert.ok(
-      rootSource.includes('function createRecipe('),
-      'createRecipe handler should be defined'
-    );
-    assert.ok(
-      !rootSource.includes('onclick={importRecipes}'),
-      'recipes header should not render import'
-    );
-    assert.ok(
-      !rootSource.includes('onclick={exportRecipes}'),
-      'recipes header should not render export'
-    );
-    // The recipe-edit route is reached BOTH from the inspector's Edit action and from
-    // each row's own Edit pencil, restored to match the Books & Scrolls row edit (issue
-    // 643): the inspector wires onEdit → editRecipe, and the row wires onEditRecipe →
-    // editRecipe(id).
-    assert.ok(
-      rootSource.includes('onEdit={() => editRecipe(selectedRecipe?.id)}'),
-      'inspector Edit should be wired to editRecipe'
-    );
-    assert.ok(
-      rootSource.includes('onEditRecipe={(id) => editRecipe(id)}'),
-      'the row Edit pencil should be wired to editRecipe(id)'
-    );
-    assert.ok(
-      rootSource.includes('function editRecipe('),
-      'editRecipe navigation should be defined'
-    );
-    assert.ok(
-      rootSource.includes('function backToRecipesBrowse('),
-      'backToRecipesBrowse navigation should be defined'
-    );
-    assert.ok(rootSource.includes("'recipe-edit'"), 'recipe-edit route should be wired');
-    // saveRecipeDraft lives in the root (it commits the root-held draft), so scope
-    // the inline-save absence to the browser source instead.
-    assert.ok(
-      !recipesBrowserSource.includes('saveRecipe'),
-      'recipes browser should not introduce inline save behavior'
-    );
-    assert.ok(
-      !rootSource.includes('required station'),
-      'recipes browser should not introduce unsupported recipe fields'
-    );
+  // The aside moved into the extracted inspector (issue 643), which is one column on the panel
+  // background rather than five nested cards.
+  defineStructureContract('answers what a recipe needs and makes', RECIPE_BROWSER_INSPECTOR, {
+    declaresProp: ['onEdit', 'componentCount'],
+    calls: ['buildRecipeRequirementRows', 'buildRecipeProduceRows'],
+    spells: [
+      'manager-recipe-browser-inspector-delete',
+      'https://mistersilver-uk.github.io/fabricate/crafting/recipes/',
+    ],
+    spellsExactly: ['FABRICATE.Admin.Manager.Recipe.EmptySetup.Title'],
+    spellsNo: ['manager-inspector-card', 'Recipe.Details'],
   });
 
-  it('keeps the components browser browser-only and wired to existing component callbacks', () => {
-    for (const snippet of [
-      'store.setItemSearch?.',
-      'services?.onDropItem?.(data)',
-      'store.deleteComponent?.(itemId)',
-      'services?.onCopySourceUuid?.(uuid)',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should wire ${snippet}`);
-    }
-    assert.ok(
-      rootSource.includes('activeView = view'),
-      'components should use the selected-system route state'
-    );
-    assert.ok(
-      !rootSource.includes('usageCount ='),
-      'components browser should not invent usage counts'
-    );
-    assert.ok(
-      !rootSource.includes('stale source'),
-      'components browser should not invent source freshness labels'
-    );
+  // Both routes into the editor, and the two header actions that are not on this header.
+  defineStructureContract('routes recipe editing from the row and the inspector', MANAGER_ROOT, {
+    passesProps: [
+      ['RecipeBrowserInspector', 'onEdit'],
+      ['RecipesBrowserView', 'onEditRecipe'],
+    ],
+    names: ['editRecipe', 'backToRecipesBrowse'],
+    spellsExactly: ['recipe-edit'],
+    namesNo: ['importRecipes', 'exportRecipes'],
+    spellsNo: ['required station'],
   });
 
-  it('AC14: confirmComponentRouteExit retains NO component-edit bypass (issue 676)', () => {
-    // LOAD-BEARING ASYMMETRY. `confirmComponentRouteExit` deliberately LACKS the
-    // `|| nextView === '<kind>-edit'` bypass its recipe and environment siblings carry
-    // (`confirmRecipeRouteExit`: `if (activeView !== 'recipe-edit' || nextView === 'recipe-edit') return true;`).
-    //
-    // That omission is exactly what makes `editComponent` guard component -> component
-    // navigation — i.e. it is what makes the salvage "Edit ↗" deep link safe. An
-    // implementer told to "mirror the Recipe Studio" copies the bypass and silently
-    // discards a dirty draft on a deep-link jump, with nothing failing.
-    const guard = rootSource.slice(
-      rootSource.indexOf('function confirmComponentRouteExit'),
-      rootSource.indexOf('function confirmEnvironmentRouteExit')
-    );
-    assert.ok(guard.length > 0, 'expected to locate confirmComponentRouteExit');
-    assert.ok(
-      guard.includes("if (activeView !== 'component-edit') return true;"),
-      'the component route guard should short-circuit only on the ACTIVE view'
-    );
-    assert.ok(
-      !guard.includes("nextView === 'component-edit'"),
-      'the component route guard must NOT gain the recipe/environment nextView bypass'
-    );
-    // The sibling that DOES carry it, pinned so this test cannot pass vacuously by the
-    // bypass string simply having been renamed everywhere.
-    assert.ok(
-      rootSource.includes(
-        "if (activeView !== 'recipe-edit' || nextView === 'recipe-edit') return true;"
-      ),
-      'the recipe sibling still carries the bypass this one deliberately omits'
-    );
+  // A card row has no columns (issue 676): the browser is a real list and the row is its item, so
+  // neither file may reintroduce the table scaffolding. Read off the rendered attribute rather
+  // than the file text, which both files' own prose legitimately mentions.
+  const TABLE_ROLES = Object.freeze([
+    ['role', 'table'],
+    ['role', 'row'],
+    ['role', 'columnheader'],
+    ['role', 'cell'],
+  ]);
+
+  defineStructureContract('draws the component library as a list of rows', COMPONENTS_BROWSER, {
+    renders: ['ComponentRow'],
+    attributes: [['role', 'list']],
+    attributesNo: TABLE_ROLES,
   });
 
-  it('routes the components row Edit action through the in-manager component-edit view', () => {
-    assert.ok(
-      rootSource.includes("activeView = 'component-edit'"),
-      'editComponent should set the activeView to the in-manager component-edit route'
-    );
-    assert.ok(
-      rootSource.includes('import ComponentEditView'),
-      'root should import the ComponentEditView'
-    );
-    assert.ok(
-      rootSource.includes('store.updateComponent?.'),
-      'root should persist component-edit saves through the admin-store updateComponent action'
-    );
-    assert.ok(
-      !rootSource.includes('services?.onEditComponent?.'),
-      'manager row Edit should no longer launch the legacy component editor'
-    );
-    const componentEditScript = componentEditSource.split('</script>')[0] || componentEditSource;
-    assert.ok(
-      !/\b(?:game|ui|Hooks|CONFIG)\.[a-zA-Z]/.test(componentEditScript),
-      'ComponentEditView script should not reference Foundry globals directly'
-    );
-    assert.ok(
-      !componentEditSource.includes('foundry.applications'),
-      'ComponentEditView should not import Foundry application classes'
-    );
+  // The `<li>` needs no explicit `listitem`; the anchor that keeps the negatives honest is the
+  // row's own class, which is what the mounted browser cases query it by.
+  defineStructureContract('draws a component row as one of that list', COMPONENT_ROW, {
+    attributes: [['class', 'manager-component-row']],
+    attributesNo: TABLE_ROLES,
   });
 
-  it('uses a purpose-built manager environment editor instead of mounting the legacy tab', () => {
-    assert.ok(
-      rootSource.includes("import EnvironmentEditView from './EnvironmentEditView.svelte';"),
-      'environment edit route should import the v2 editor view'
-    );
-    assert.ok(
-      !rootSource.includes("import EnvironmentsTab from '../EnvironmentsTab.svelte';"),
-      'manager root should not import the full legacy environments tab'
-    );
-    assert.ok(
-      !rootSource.includes('forceEditorOpen'),
-      'manager edit route should not force-open the legacy environment editor'
-    );
-    // The v2 environment editor is a composition/wrapper editor: it composes
-    // reusable library tasks/events into one environment via include/exclude,
-    // ordering, and a shared automatic|manual composition mode. It does NOT
-    // author reusable source records (that lives in the standalone
-    // gathering-task-edit / gathering-event-edit routes), so it must wire the
-    // composition store actions rather than the inline task-authoring handlers.
-    for (const snippet of [
+  // The store wiring behind this route — search, drop import, delete, copy-source and the legacy
+  // editor it no longer launches — is driven by `tests/components/manager-components-mounted.js`,
+  // which clicks each control on the real route. What stays is what nothing renders.
+  defineStructureContract('invents no component facts the store does not publish', MANAGER_ROOT, {
+    namesNo: ['usageCount'],
+    spellsNo: ['stale source'],
+  });
+
+  defineStructureContract('edits a component in place rather than in the legacy app', MANAGER_ROOT, {
+    imports: ['./ComponentEditView.svelte'],
+    calls: ['updateComponent'],
+  });
+
+  // A load-bearing asymmetry: the component row deliberately waives no navigation where its
+  // recipe sibling waives a same-view one, which is why the two are asserted together: the
+  // sibling is what makes the absence a choice rather than an oversight.
+  defineStructureContract(
+    'AC14: the component route guard keeps NO component-edit bypass (issue 676)',
+    { file: ROUTE_EXIT_GUARDS, record: ['view', 'component-edit'] },
+    { property: [['skip', 'none']] }
+  );
+
+  defineStructureContract(
+    'and the recipe sibling still carries the bypass it omits',
+    { file: ROUTE_EXIT_GUARDS, record: ['view', 'recipe-edit'] },
+    { property: [['skip', 'same-view']] }
+  );
+
+  defineStructureContract(
+    'and the component row is asked about the route it is on, not the one it is leaving',
+    { file: MANAGER_ROOT, constant: 'routeExitGuards', property: 'component-edit' },
+    { names: ['activeView'], compares: ['component-edit'], namesNo: ['nextView'] }
+  );
+
+  // `foundry` is not in the global set: the editor reaches `globalThis.foundry.utils.randomID`.
+  // What it must never reach is an application class, which is the member read below.
+  defineStructureContract('keeps the component editor free of Foundry globals', COMPONENT_EDIT, {
+    readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
+    readsNo: ['globalThis.foundry.applications', 'foundry.applications'],
+  });
+
+  // The v2 environment editor is a composition editor (issue 429): it wraps records the libraries
+  // author rather than authoring tasks of its own, so every task-authoring store action stays out
+  // of it and the root threads the composition in.
+  defineStructureContract('uses a purpose-built manager environment editor', MANAGER_ROOT, {
+    imports: ['./EnvironmentEditView.svelte'],
+    reads: [
       'store.updateEnvironmentDraft',
       'store.saveEnvironmentDraft',
       'store.deleteEnvironmentDraft',
@@ -2793,140 +1629,135 @@ describe('CraftingSystemManager source contract', () => {
       'store.excludeEnvironmentRecord',
       'store.restoreEnvironmentRecord',
       'store.reorderEnvironmentRecord',
-      'composition={$viewState.environmentComposition}',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `environment edit route should wire ${snippet}`);
-    }
-    for (const snippet of [
+      '$viewState.environmentComposition',
+    ],
+    passesProps: [['EnvironmentEditView', 'composition']],
+    importsNo: ['../EnvironmentsTab.svelte'],
+    namesNo: ['forceEditorOpen'],
+  });
+
+  defineStructureContract('composes an environment rather than authoring its tasks', ENVIRONMENT_EDIT, {
+    readsNo: [
       'store.addEnvironmentTaskResultGroup',
       'store.addEnvironmentTaskCatalyst',
       'store.updateEnvironmentTaskVisibility',
       'store.updateEnvironmentTaskCheck',
-    ]) {
-      assert.ok(
-        !environmentEditSource.includes(snippet),
-        `environment composition editor should not author tasks via ${snippet}`
-      );
-    }
-    assert.ok(
-      !environmentEditSource.includes("id: 'advanced'"),
-      'environment editor should not define an advanced task tab'
-    );
-    assert.ok(
-      !environmentEditSource.includes('manager-environment-details-tabs'),
-      'environment editor should not render environment advanced tabs'
-    );
-    assert.ok(
-      !environmentEditSource.includes('manager-environment-evidence-column'),
-      'environment editor should no longer render the duplicated evidence column'
-    );
+    ],
+    propertyNo: [['id', 'advanced']],
+    spellsNo: ['manager-environment-details-tabs', 'manager-environment-evidence-column'],
   });
 
-  it('wires Manager gathering libraries, global conditions, and environment composition controls', () => {
-    // Global conditions and vocabularies are authored from the gathering
-    // workspace browser (settings tab); library task/event authoring and rules
-    // live on their own routes, so those store actions are invoked by root-owned
-    // functions rather than passed into the environment composition editor.
-    for (const snippet of [
-      'gatheringConfig={$viewState.gatheringConfig}',
-      'onUpdateGatheringConditions={store.updateGatheringConditions}',
-      'onToggleGatheringConditionEnabled={store.toggleGatheringConditionEnabled}',
-      'onAddGatheringConditionValue={store.addGatheringConditionValue}',
-      'onDeleteGatheringConditionValue={store.deleteGatheringConditionValue}',
-      'onAddGatheringVocabularyValue={store.addGatheringVocabularyValue}',
-      'onUpdateGatheringVocabularyValue={store.updateGatheringVocabularyValue}',
-      'onDeleteGatheringVocabularyValue={store.deleteGatheringVocabularyValue}',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should wire ${snippet}`);
+  // Global conditions and vocabularies are authored from the gathering workspace browser (settings
+  // tab); library task/event authoring and rules live on their own routes, so those store actions
+  // are invoked by root-owned functions rather than passed into the composition editor.
+  // The rules card moved into `environment/GatheringRulesInspector.svelte` (issue 1707 phase 2)
+  // and the rail that selects it into `environment/GatheringInspectorRail.svelte` (phase 3), so
+  // the root renders the rail.
+  defineStructureContract('wires the Manager gathering libraries and global conditions', MANAGER_ROOT, {
+    renders: ['GatheringInspectorRail'],
+    passesProps: [
+      ['EnvironmentsBrowserView', 'gatheringConfig'],
+      ['EnvironmentsBrowserView', 'onUpdateGatheringConditions'],
+      ['EnvironmentsBrowserView', 'onToggleGatheringConditionEnabled'],
+      ['EnvironmentsBrowserView', 'onAddGatheringConditionValue'],
+      ['EnvironmentsBrowserView', 'onDeleteGatheringConditionValue'],
+      ['EnvironmentsBrowserView', 'onAddGatheringVocabularyValue'],
+      ['EnvironmentsBrowserView', 'onUpdateGatheringVocabularyValue'],
+      ['EnvironmentsBrowserView', 'onDeleteGatheringVocabularyValue'],
+    ],
+    reads: [
+      '$viewState.gatheringConfig',
+      'store.updateGatheringConditions',
+      'store.toggleGatheringConditionEnabled',
+      'store.addGatheringConditionValue',
+      'store.deleteGatheringConditionValue',
+      'store.addGatheringVocabularyValue',
+      'store.updateGatheringVocabularyValue',
+      'store.deleteGatheringVocabularyValue',
+    ],
+    names: ['updateSelectedGatheringRules', 'selectedGatheringConditionShortcuts'],
+    calls: ['buildSelectedGatheringConditionShortcuts'],
+    // `data-gathering-inspector-rules` is the rules leaf's own hook now (issue 1707 phase 2) and
+    // `manager-environments-mounted.js` pins it through the DOM.
+    writes: [
+      'data-systems-gathering-conditions',
+      'data-systems-gathering-condition',
+    ],
+  });
+
+  // The rules card moved into `environment/GatheringRulesInspector.svelte` (issue 1707 phase 2):
+  // its copy, its event-specific drop label and its two limit steppers are that leaf's own.
+  defineStructureContract('draws the gathering rules inspector', GATHERING_RULES_INSPECTOR, {
+    writes: ['data-gathering-inspector-rules'],
+    spellsExactly: [
+      'manager-rule-copy',
+      'FABRICATE.Admin.Manager.Environment.Rules.EventHighestRankedDrop',
+    ],
+    // The two limits are one shared component now (issue 1050).
+    attributes: [
+      ['rule', 'rewardLimit'],
+      ['rule', 'eventLimit'],
+    ],
+  });
+
+  // The rail's own states moved with the branch chain (issue 1707 phase 3): the placeholder hook
+  // (an unreachable arm, kept byte-faithful — deletion is a follow-up) and the empty-library setup
+  // card's title key are that file's own.
+  defineStructureContract('draws the gathering inspector rail', GATHERING_INSPECTOR_RAIL, {
+    writes: ['data-gathering-inspector-placeholder'],
+    spellsExactly: [
+      'FABRICATE.Admin.Manager.Environment.EmptySetup.Title',
+      'https://mistersilver-uk.github.io/fabricate/gathering/environments',
+    ],
+  });
+
+  // The shortcut persists against the selected system rather than against the world, which is the
+  // whole point of a per-system shortcut card.
+  defineStructureContract(
+    'persists a condition shortcut against the selected system',
+    { file: MANAGER_ROOT, fn: 'updateSelectedGatheringCondition' },
+    {
+      reads: ['store.updateGatheringConditions'],
+      keys: ['systemId'],
+      names: ['selectedSystemId'],
     }
-    // NOTE: per-token environment-editor contracts were removed when the editor
-    // was placeholder'd out pending redesign. The store wirings above and the
-    // settings/browser surfaces below still need to pass.
-    assert.ok(
-      rootSource.includes('data-gathering-inspector-rules'),
-      'root should render the settings rules inspector'
+  );
+
+  defineStructureContract('marks the shared limit stepper with the field it edits', GATHERING_RULE_STEPPER, {
+    writes: ['data-gathering-rule-stepper'],
+    declaresProp: ['rule'],
+  });
+
+  // The component header states `rule` is both the value's key and the marker; two independent
+  // claims leave the marker free to carry anything, so the binding itself is read off the node.
+  it('binds that marker to the rules field rather than to any other expression', () => {
+    const [stepper] = templateNodes(componentAstOf(GATHERING_RULE_STEPPER)).filter((node) =>
+      declaresAttribute(node, 'data-gathering-rule-stepper', { directives: false })
     );
-    assert.ok(
-      environmentsBrowserSource.includes('data-gathering-condition-panel={condition.kind}'),
-      'settings tab should render condition vocabulary panels'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onToggleGatheringConditionEnabled?.'),
-      'settings condition panels should wire matching toggles'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onAddGatheringConditionValue?.'),
-      'settings condition panels should wire value additions'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onUpdateGatheringConditionValue?.'),
-      'settings condition panels should wire label and icon updates'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onDeleteGatheringConditionValue?.'),
-      'settings condition panels should wire value deletion'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('data-gathering-vocabulary-panel={vocabulary.kind}'),
-      'settings tab should render region and biome vocabulary panels'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onAddGatheringVocabularyValue?.'),
-      'settings vocabulary panels should wire value additions'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onUpdateGatheringVocabularyValue?.'),
-      'settings vocabulary panels should wire label, icon, and colour updates'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onDeleteGatheringVocabularyValue?.'),
-      'settings vocabulary panels should wire value deletion'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('ManagerColorPicker'),
-      'settings biome panels should use the manager color picker'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('IconPicker'),
-      'settings condition panels should reuse the shared icon picker'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('manager-condition-label-input'),
-      'settings condition panels should expose editable display labels'
-    );
-    assert.ok(
-      /onAddGatheringConditionValue\?\.\(\s*kind,\s*\{ label: value, icon: conditionAddIcon\(kind\) \}/.test(
-        environmentsBrowserSource
-      ),
-      'settings condition add should include the selected icon'
-    );
+    assert.ok(Boolean(stepper), 'the stepper still marks its wrapper');
+    assert.equal(attributeExpression(stepper, 'data-gathering-rule-stepper')?.name, 'rule');
+  });
+
+  // The settings tab is where a world's condition and vocabulary values are authored, through the
+  // shared pickers rather than through bespoke inputs.
+  defineStructureContract('authors global conditions and vocabularies on the settings tab', ENVIRONMENTS_BROWSER, {
+    renders: ['ManagerColorPicker', 'IconPicker'],
+    writes: ['data-gathering-condition-panel', 'data-gathering-vocabulary-panel'],
+    calls: [
+      'onToggleGatheringConditionEnabled',
+      'onAddGatheringConditionValue',
+      'onUpdateGatheringConditionValue',
+      'onDeleteGatheringConditionValue',
+      'onAddGatheringVocabularyValue',
+      'onUpdateGatheringVocabularyValue',
+      'onDeleteGatheringVocabularyValue',
+    ],
+    callsWith: [['onAddGatheringConditionValue', 'conditionAddIcon']],
+    spellsExactly: ['manager-condition-label-input'],
+  });
+
+  it('states the gathering rule and condition copy the inspector reads', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Conditions.NewIcon, 'New value icon');
-    // NOTE: vocabulary-CSV contracts on environmentEditSource removed pending editor redesign.
-    assert.ok(rootSource.includes('updateSelectedGatheringRules'), 'root should wire rule updates');
-    assert.ok(
-      rootSource.includes('manager-rule-copy'),
-      'root should render rule descriptions beside inspector icons'
-    );
-    // The two limits are one shared component now (issue 1050), so the marker they were
-    // asserted through lives there and is driven by the `rule` prop. Both halves are pinned:
-    // the root still renders one of each, and the component still emits the marker from the
-    // prop — so a root that stopped rendering a limit, or a component that stopped marking
-    // it, fails here rather than one covering for the other.
-    for (const rule of ['rewardLimit', 'eventLimit']) {
-      assert.match(
-        rootSource,
-        new RegExp(String.raw`<GatheringRuleLimitStepper\s+rule="${rule}"`),
-        `root should render the ${rule} stepper`
-      );
-    }
-    assert.ok(
-      gatheringRuleLimitStepperSource.includes('data-gathering-rule-stepper={rule}'),
-      'the shared limit stepper marks itself with the rules field it edits'
-    );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Environment.Rules.EventHighestRankedDrop'),
-      'event rule select should use event-specific drop labels'
-    );
     assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.Rules.HighestRankedDrop,
       'Highest ranked successful drop'
@@ -2948,304 +1779,223 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Environment.Rules.EventLimitedDrops,
       'Limit triggered events'
     );
-    assert.ok(
-      rootSource.includes('selectedGatheringConditionShortcuts'),
-      'root should derive selected-system condition shortcuts'
-    );
-    assert.ok(
-      rootSource.includes('buildSelectedGatheringConditionShortcuts'),
-      'root should keep shortcut visibility gated by selected-system gathering conditions'
-    );
-    assert.ok(
-      rootSource.includes('data-systems-gathering-conditions'),
-      'systems inspector should render a global condition shortcut card'
-    );
-    assert.ok(
-      rootSource.includes('data-systems-gathering-condition={condition.kind}'),
-      'systems inspector should render one shortcut per enabled condition dimension'
-    );
-    assert.ok(
-      rootSource.includes(
-        'store.updateGatheringConditions?.({ [kind]: value, systemId: selectedSystemId })'
-      ),
-      'systems inspector shortcuts should reuse current condition persistence with selected system id'
-    );
-    // NOTE: per-token environment-editor negative assertions removed pending editor redesign.
   });
 
-  // NOTE: FilePicker and scene-drop-zone contracts on environmentEditSource removed
-  // when the editor was placeholder'd out pending redesign.
-
-  it('wires Manager Gathering Tasks browser through root-owned selection and store callbacks', () => {
-    for (const snippet of [
+  // What the library, its inspector and the focused editor draw and do — rows, drop rules,
+  // component browser, sliders, paging, availability, Required Tools, toolbar delete — is driven
+  // by `tests/components/manager-gathering-mounted.js`. What stays is the wiring behind them.
+  // The drop inspector moved into `environment/GatheringTaskInspector.svelte` (issue 1707 phase
+  // 2) and the rail that selects it into `environment/GatheringInspectorRail.svelte` (phase 3), so
+  // the root renders the editor and the rail.
+  defineStructureContract('wires the gathering task library and its inspector', MANAGER_ROOT, {
+    renders: ['GatheringTaskEditView', 'GatheringInspectorRail'],
+    names: [
       'selectedGatheringTaskId',
-      'onSelectGatheringTask={selectGatheringTask}',
-      'onCreateGatheringTask={createGatheringTask}',
-      'onEditGatheringTask={editGatheringTask}',
-      'onDuplicateGatheringTask={duplicateGatheringTask}',
-      'onDeleteGatheringTask={deleteGatheringTask}',
-      'onToggleGatheringTaskEnabled={toggleGatheringTaskEnabled}',
-      'store.duplicateGatheringLibraryTask',
-      'data-gathering-task-inspector',
-      'GatheringTaskEditView',
-      '{itemCards}',
-      'data-gathering-task-drop-inspector',
+      'selectGatheringTask',
+      'createGatheringTask',
+      'editGatheringTask',
+      'duplicateGatheringTask',
+      'deleteGatheringTask',
+      'toggleGatheringTaskEnabled',
       'addGatheringDropModifier',
       'updateGatheringDropModifier',
-      'manager-drop-editor-actions',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should include ${snippet}`);
+      'gatheringDropRateTierClass',
+      'gatheringDropRateTierColor',
+      'onGatheringDropCountKeydown',
+      'deleteGatheringTaskDraft',
+      'selectedGatheringSystemTools',
+      'addToolReferenceToSelectedTask',
+      'removeToolReferenceFromSelectedTask',
+    ],
+    reads: ['store.duplicateGatheringLibraryTask'],
+    declares: ['itemCards'],
+    passesProps: [
+      ['EnvironmentsBrowserView', 'onSelectGatheringTask'],
+      ['EnvironmentsBrowserView', 'onCreateGatheringTask'],
+      ['EnvironmentsBrowserView', 'onEditGatheringTask'],
+      ['EnvironmentsBrowserView', 'onDuplicateGatheringTask'],
+      ['EnvironmentsBrowserView', 'onDeleteGatheringTask'],
+      ['EnvironmentsBrowserView', 'onToggleGatheringTaskEnabled'],
+      ['GatheringTaskEditView', 'itemCards'],
+      ['GatheringTaskEditView', 'resolutionMode'],
+    ],
+    // Issue 883: the inspector's slider is `ChanceSlider`. The track/fill structure and the
+    // input/blur/keydown trio it hand-rolled must be gone from the root, not merely unused — a
+    // surviving copy is what the next divergence gets written against.
+    spellsNo: ['manager-drop-rate-control', 'manager-drop-rate-track', 'manager-drop-rate-fill'],
+    namesNo: ['onGatheringDropRateInput', 'onGatheringDropRateBlur', 'onGatheringDropRateKeydown'],
+    // The selected drop inspector renders no component selector, and no second duplicate action.
+    readsNo: ['selectedGatheringDrop.componentId'],
+    callsWithNo: [['duplicateGatheringTask', 'selectedGatheringTask']],
+  });
+
+  // The task and drop inspector markup moved into `environment/GatheringTaskInspector.svelte`
+  // (issue 1707 phase 2): its hooks and the drop editor's classes are that leaf's own.
+  defineStructureContract('draws the gathering task inspector and its drop editor', GATHERING_TASK_INSPECTOR, {
+    writes: [
+      'data-gathering-task-inspector',
+      'data-gathering-task-drop-inspector',
+      'data-gathering-drop-inspector-rate',
+      'data-gathering-drop-inspector-count',
+    ],
+    spellsExactly: ['manager-drop-editor-actions', 'manager-drop-editor-values'],
+    spellsNo: ['manager-drop-rate-control', 'manager-drop-rate-track', 'manager-drop-rate-fill'],
+  });
+
+  defineStructureContract(
+    'hosts the task library on the gathering workspace',
+    ENVIRONMENTS_BROWSER,
+    {
+      renders: ['GatheringTasksBrowserView'],
+      passesProps: [
+        ['GatheringTasksBrowserView', 'tasks'],
+        ['GatheringTasksBrowserView', 'selectedTaskId'],
+        ['GatheringTasksBrowserView', 'managedItemOptions'],
+      ],
+      reads: ['selectedGatheringSystemConfig.tasks'],
     }
-    for (const snippet of [
-      'GatheringTasksBrowserView',
-      'tasks={selectedGatheringSystemConfig.tasks || []}',
-      'selectedTaskId',
-      'managedItemOptions',
-    ]) {
-      assert.ok(
-        environmentsBrowserSource.includes(snippet),
-        `environment browser should include ${snippet}`
-      );
-    }
-    for (const snippet of [
-      'data-gathering-tasks-browser',
-      'manager-gathering-tasks-table',
-      'biomeChips(task)',
-      'timeChips(task)',
-      'weatherChips(task)',
-      'rowChips(task)',
-      'data-gathering-task-tags',
-      'onDuplicateTask(selectedSystemId, task.id)',
-      'onDeleteTask(selectedSystemId, task.id)',
-      'onToggleTaskEnabled(selectedSystemId, task.id',
-    ]) {
-      assert.ok(
-        gatheringTasksBrowserSource.includes(snippet),
-        `task browser should include ${snippet}`
-      );
-    }
-    for (const snippet of [
+  );
+
+  defineStructureContract('draws the task library rows and their actions', GATHERING_TASKS_BROWSER, {
+    writes: ['data-gathering-tasks-browser', 'data-gathering-task-tags'],
+    spellsExactly: ['manager-gathering-tasks-table'],
+    calls: ['biomeChips', 'timeChips', 'weatherChips', 'rowChips'],
+    callsWith: [
+      ['onDuplicateTask', 'selectedSystemId'],
+      ['onDeleteTask', 'selectedSystemId'],
+      ['onToggleTaskEnabled', 'selectedSystemId'],
+    ],
+  });
+
+  // The editor is one page, not a tab strip, and the drop table is the row itself rather than a
+  // row plus a responsive duplicate of every one of its labels.
+  defineStructureContract('authors a gathering task on one page', GATHERING_TASK_EDIT, {
+    renders: ['ChanceSlider', 'RadioCardGroup'],
+    names: [
+      'pageSize',
+      'showRewardRuleNotice',
+      'dragDrop',
+      'availableConditionOptions',
+      'selectedConditionOptions',
+      'dropRateTierColor',
+    ],
+    calls: [
+      'onClearDropComponent',
+      'onDropComponentMouseDown',
+      'onComponentDragStart',
+      'dropRateTierClass',
+      'onQuantityInput',
+      'onQuantityKeydown',
+      'onPickImagePath',
+      'onAddToolReference',
+      'onRemoveToolReference',
+    ],
+    callsWith: [['onImportDrop', 'rowId']],
+    writes: [
       'data-gathering-task-editor',
-      'class:has-reward-rule-notice={showRewardRuleNotice}',
       'data-gathering-task-core-editor',
       'data-gathering-task-availability',
+      'data-gathering-task-availability-pill',
       'data-gathering-task-component-browser',
       'data-gathering-task-component-grid',
       'data-gathering-component-card',
       'data-gathering-component-name-search',
       'data-gathering-component-tag-search',
-      'manager-selected-tag-pill',
       'data-gathering-task-drops-table',
-      'data-gathering-task-availability-option',
-      'data-gathering-task-availability-pill',
       'data-gathering-task-drop-component-cell',
       'data-gathering-task-drop-chance-cell',
       'data-gathering-task-drop-count',
+      'data-gathering-task-required-tools',
+      'oncontextmenu',
+    ],
+    attributes: [['inputmode', 'numeric']],
+    spells: ['manager-drop-cell', 'manager-drop-component-cell', 'manager-drop-quantity-cell'],
+    spellsExactly: [
+      'manager-selected-tag-pill',
+      'data-gathering-task-availability-option',
       'manager-task-drop-controls',
       'manager-task-drop-footer',
       'manager-task-component-browser-card',
       'manager-task-component-grid',
       'manager-task-component-card-grip',
-      'let pageSize = $state(5)',
-      'manager-drop-cell',
-      'manager-drop-component-cell',
-      'manager-drop-quantity-cell',
+      'manager-task-media-column',
+      'manager-task-required-tools-card',
       'manager-drop-modifier-pill',
       'manager-drop-modifier-list',
       'manager-drop-modifier-overflow',
-      'ChanceSlider',
-      'inputmode="numeric"',
-      "pattern={'[1-9][0-9]{0,2}'}",
-      'onClearDropComponent',
-      'onDropComponentMouseDown',
-      'onComponentDragStart',
-      'FabricateManagedComponent',
-      'dropRateTierClass',
-      'dropRateTierColor',
-      'onQuantityInput',
-      'onQuantityKeydown',
-      'oncontextmenu',
-      'use:dragDrop',
-      'onImportDrop(rowId, data)',
-      'onPickImagePath',
-      'DropChance',
-      'ClearDropComponentHint',
-      'DropQuantityColumn',
-      'DropModifierOverflowHint',
-      'RewardRuleNotice',
-    ]) {
-      assert.ok(gatheringTaskEditSource.includes(snippet), `task editor should include ${snippet}`);
+      '[1-9][0-9]{0,2}',
+    ],
+    // The one-page editor's absences: no tab strip, no raw internal id, no duplicate back
+    // control, no native single-select availability, no row-level quick actions, no responsive
+    // label duplicates.
+    namesNo: ['selectedCondition'],
+    attributesNo: [['type', 'checkbox']],
+    spellsExactlyNo: ['FABRICATE.Admin.Manager.Environment.Tasks.TaskId'],
+    writesNo: ['data-gathering-task-drop-actions', 'data-gathering-task-drop-row-number'],
+    spellsNo: [
+      'manager-task-editor-tabs',
+      'Internal ID',
+      'BackToLibrary',
+      'Tasks.SelectDrop',
+      'EditDrop',
+      'manager-labeled-cell manager-drop-component-cell',
+      'manager-labeled-cell manager-drop-rate-cell',
+      'QuantityShortHint',
+    ],
+  });
+
+  // Asserted where it is decided rather than over the whole file: a managed-component drop
+  // resets the row's identity and enables it.
+  defineStructureContract(
+    'resets a drop row identity when a managed component lands on it',
+    { file: GATHERING_TASK_EDIT, fn: 'handleDropZoneDrop' },
+    {
+      compares: ['FabricateManagedComponent'],
+      callsWith: [['onUpdateDrop', 'rowId']],
+      reads: ['data.componentId'],
+      keys: ['componentId', 'itemUuid', 'systemItemId', 'name', 'enabled'],
     }
-    // Asserted as a pattern rather than a snippet in the list above: Prettier (issue 923) prints
-    // this object literal one property per line with a trailing comma, so no single-line
-    // substring covers the whole payload.
-    assert.ok(
-      /onUpdateDrop\(rowId, \{\s*componentId: data\.componentId,\s*itemUuid: '',\s*systemItemId: '',\s*name: '',\s*enabled: true,?\s*\}\)/.test(
-        gatheringTaskEditSource
-      ),
-      'a managed-component drop should reset the row identity and enable it'
+  );
+
+  defineStructureContract('draws one shared chance slider for both scopes', CHANCE_SLIDER, {
+    names: ['handleNumberInput', 'handleNumberBlur', 'handleNumberKeydown', 'handleRangeInput'],
+    declaresProp: ['resolveColor', 'numberLabel', 'rangeLabel'],
+    attributes: [
+      ['type', 'number'],
+      ['type', 'range'],
+    ],
+    spells: ['manager-drop-rate-value', 'manager-drop-rate-percent'],
+    spellsExactly: ['manager-drop-rate-track', 'manager-drop-rate-fill'],
+  });
+
+  it('keeps the gathering task actions key to the header aria label alone', () => {
+    const key = 'FABRICATE.Admin.Manager.Environment.Tasks.Actions';
+    const spelled = headerCopyLiterals().filter((text) => text === key);
+    assert.equal(
+      spelled.length,
+      1,
+      'the task inspector keeps no redundant action card heading beside the header label'
     );
-    for (const snippet of [
-      'manager-drop-rate-value',
-      'manager-drop-rate-percent',
-      'manager-drop-rate-track',
-      'manager-drop-rate-fill',
-      'type="number"',
-      'type="range"',
-      'handleNumberInput',
-      'handleNumberBlur',
-      'handleNumberKeydown',
-      'handleRangeInput',
-      'resolveColor',
-      'numberLabel',
-      'rangeLabel',
-    ]) {
-      assert.ok(chanceSliderSource.includes(snippet), `shared chance slider should include ${snippet}`);
-    }
-    for (const snippet of [
-      'manager-drop-editor-values',
-      'data-gathering-drop-inspector-rate',
-      'data-gathering-drop-inspector-count',
-      'gatheringDropRateTierClass',
-      'gatheringDropRateTierColor',
-      'onGatheringDropCountKeydown',
-      'ChanceSlider',
-    ]) {
-      assert.ok(
-        rootSource.includes(snippet),
-        `root should include selected drop inspector ${snippet}`
-      );
-    }
-    // Issue 883: the inspector's slider IS `ChanceSlider`. It used to hand-roll the same
-    // track/fill/range structure and its own input/blur/keydown trio beside it, so the
-    // structure and the handlers must be gone from the root, not merely unused — a
-    // surviving copy is what the next divergence gets written against.
-    for (const dead of [
-      'manager-drop-rate-control',
-      'manager-drop-rate-track',
-      'manager-drop-rate-fill',
-      'onGatheringDropRateInput',
-      'onGatheringDropRateBlur',
-      'onGatheringDropRateKeydown',
-    ]) {
-      assert.equal(
-        rootSource.includes(dead),
-        false,
-        `root should render the drop-rate slider through ChanceSlider, not ${dead}`
-      );
-    }
-    assert.ok(
-      !gatheringTaskEditSource.includes('manager-task-editor-tabs'),
-      'task editor should be a one-page editor without tab navigation'
+  });
+
+  // The destructive role, read off one element rather than off two strings that happen to sit
+  // within 200 characters of each other. The class literal the old match keyed on left the file
+  // entirely when this toolbar moved onto `ManagerButton` (issue 1118).
+  it('renders the task delete as one danger ManagerButton wired to the draft delete', () => {
+    const [remove] = templateNodes(componentAstOf(MANAGER_HEADER_GATHERING_ACTIONS)).filter(
+      (node) => declaresAttribute(node, 'data-gathering-task-delete', { directives: false })
     );
-    assert.ok(
-      gatheringTaskEditSource.includes('TaskIdentity'),
-      'task editor should render a visible task identity heading'
+    assert.ok(Boolean(remove), 'the task editor toolbar still renders its delete control');
+    assert.equal(remove.name, 'ManagerButton', 'through the shared button primitive');
+    assert.equal(attributeValue(remove, 'role'), 'danger', 'in the destructive role');
+    assert.equal(
+      attributeExpression(remove, 'onclick')?.name,
+      'deleteGatheringTaskDraft',
+      'and the element carrying the hook is the one wired to the draft delete'
     );
-    assert.ok(
-      !/Tasks\.TaskId(?!entity)/.test(gatheringTaskEditSource),
-      'task editor should not render the raw internal task id localization'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('Internal ID'),
-      'task editor should not render the raw internal task id label'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('BackToLibrary'),
-      'task editor should not render a duplicate central back-to-library control'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('type="checkbox"'),
-      'task editor status toggle should use the shared button pattern'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('<select value={selectedCondition'),
-      'task availability should not use native single-select controls'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('function selectedCondition('),
-      'task availability should not collapse arrays to a single selection'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('Tasks.SelectDrop'),
-      'drop rows should not render a row-level edit/select quick action'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('data-gathering-task-drop-actions'),
-      'drop rows should not render row-level duplicate/delete actions'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('data-gathering-task-drop-row-number'),
-      'drop rows should not add a leading row number column'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('EditDrop'),
-      'drop rows should not add an edit quick action'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('manager-labeled-cell manager-drop-component-cell'),
-      'drop component row values should not render responsive duplicate labels'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('manager-labeled-cell manager-drop-rate-cell'),
-      'drop chance row values should not render responsive duplicate labels'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('QuantityShortHint'),
-      'drop quantity row values should not render an extra helper label'
-    );
-    assert.ok(
-      !rootSource.includes('selectedGatheringDrop.componentId ||'),
-      'selected drop inspector should not render a component selector'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('manager-task-media-column'),
-      'task editor should group image and status in the media column'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('availableConditionOptions'),
-      'task editor should filter selected availability options out of menus'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('selectedConditionOptions'),
-      'task editor should render selected availability values as pills'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('StatusOff'),
-      'task editor should use shared Off status copy'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('StatusOn'),
-      'task editor should use shared On status copy'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('manager-task-required-tools-card'),
-      'task editor should render the Required Tools section'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('data-gathering-task-required-tools'),
-      'Required Tools section should expose a stable data hook'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('onAddToolReference'),
-      'task editor should call back to the root for tool-reference additions'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('onRemoveToolReference'),
-      'task editor should call back to the root for tool-reference removals'
-    );
-    assert.ok(
-      rootSource.includes('selectedGatheringSystemTools'),
-      'root should derive the per-system tools library for the task editor'
-    );
-    assert.ok(
-      rootSource.includes('addToolReferenceToSelectedTask'),
-      'root should expose an add-tool-reference handler'
-    );
-    assert.ok(
-      rootSource.includes('removeToolReferenceFromSelectedTask'),
-      'root should expose a remove-tool-reference handler'
-    );
+  });
+
+  it('states the gathering task copy the editor, its columns and its rails read', () => {
     assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.Tasks.RequiredToolsTitle,
       'Required Tools'
@@ -3280,277 +2030,270 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Tasks.TaskId, undefined);
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.NewLibraryTask, 'New Gathering Task');
     assert.equal(
-      rootSource.match(/FABRICATE\.Admin\.Manager\.Environment\.Tasks\.Actions/g)?.length ?? 0,
-      1,
-      'gathering task actions localization should remain only for the header aria label, not a redundant inspector card'
-    );
-    assert.ok(
-      !rootSource.includes(
-        "<h3 class=\"manager-card-title\">{text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions')}</h3>"
-      ),
-      'gathering task inspector should not keep an action card heading'
-    );
-    assert.ok(
-      !rootSource.includes('duplicateGatheringTask(selectedSystemId, selectedGatheringTask.id)'),
-      'gathering task inspector should not duplicate row-level duplicate actions'
-    );
-    assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.Tasks.BackToLibrary,
       'Back to task library'
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Tasks.CopySuffix, 'Copy');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Tasks.Delete, 'Delete gathering task');
-    assert.ok(
-      rootSource.includes('onclick={deleteGatheringTaskDraft}'),
-      'gathering task editor toolbar should wire the delete button to deleteGatheringTaskDraft'
-    );
-    // The destructive role, read off ONE element rather than off two strings that happen to
-    // sit within 200 characters of each other. `/manager-button is-danger[\s\S]{0,200}
-    // deleteGatheringTaskDraft/` matched a class string in one control and a handler in
-    // another as readily as both in the same one, and the class literal it keyed on left the
-    // file entirely when this toolbar moved onto `ManagerButton` (issue 1118).
-    //
-    // `data-gathering-task-delete` is the hook that makes the element addressable — it was
-    // added for exactly this, since the control carried no `data-*` handle of its own. The
-    // open tag is bounded by `[^<>]`, so the match cannot run past this element's own `>`
-    // into the next control's attributes; if it ever does stop resolving, `deleteTag` is
-    // null and the first assertion fails by name instead of the check going quiet.
-    //
-    // What this pins is that the SOURCE asks for the destructive role. That `role="danger"`
-    // renders `is-danger` is the primitive's own contract and is pinned where it belongs, in
-    // `tests/components/manager-button-mounted.test.js`.
-    const deleteTag = /<ManagerButton[^<>]*\bdata-gathering-task-delete\b[^<>]*>/.exec(rootSource);
-    assert.ok(
-      deleteTag,
-      'gathering task editor should render its delete control as a ManagerButton carrying ' +
-        'data-gathering-task-delete'
-    );
-    assert.ok(
-      deleteTag[0].includes('role="danger"'),
-      'gathering task editor delete button should use the danger destructive role'
-    );
-    assert.ok(
-      deleteTag[0].includes('onclick={deleteGatheringTaskDraft}'),
-      'the element carrying data-gathering-task-delete should be the one wired to ' +
-        'deleteGatheringTaskDraft — otherwise the role above is asserted on some other control'
-    );
   });
 
-  // NOTE: status-toggle contract on environmentEditSource removed when the editor
-  // was placeholder'd out pending redesign.
-
-  it('wires the Tools library and focused editor through root-owned draft callbacks', () => {
-    assert.ok(
-      rootSource.includes("import ToolsBrowserView from './ToolsBrowserView.svelte';"),
-      'root should import ToolsBrowserView'
-    );
-    for (const snippet of [
-      "currentView === 'tools'",
-      "currentView === 'tool-edit'",
+  // What the library draws — rows, pager, per-system counts, selection, the three tabs, the
+  // absent creation surface and source drop zone, the dirty guard, the armed removal — is driven
+  // by `tests/components/manager-tools-mounted.js`. What stays is the wiring behind it.
+  defineStructureContract('wires the Tools library and focused editor', MANAGER_ROOT, {
+    imports: ['./ToolsBrowserView.svelte', './ToolEditView.svelte'],
+    compares: ['tools', 'tool-edit'],
+    names: [
       'focusedToolDraft',
       'focusedToolValidation',
       'openToolEditor',
       'selectLibraryTool',
       'backToToolsBrowser',
       'saveSelectedToolDraft',
-      // `deleteSelectedLibraryTool` IS GONE, and its replacement is named rather than merely
-      // dropped (issue 1373). The system editor's bare `Delete` named no scope on a screen whose
-      // subject is one world Tool adopted by many crafting systems; the design puts `Delete` on
-      // the world entry and gives system scope an explained removal that takes THIS system's
-      // rules and leaves the world Tool and every other system untouched.
-      'removeFocusedToolFromSystem',
-      // The per-section inherit switch, which is a world MEMBERSHIP write composed with an
-      // in-system one — so the root owns it, exactly as it owns the enable switch.
+      // The per-section inherit switch.
       'setFocusedToolSectionInherited',
-      'confirmToolsRouteExit',
-      // `store.createToolDraft?.` IS GONE FROM THIS LIST, and its absence is the change rather
-      // than an omission (issue 1373). Tool CREATION moved to the world Tools Catalogue: the
-      // root now resolves a dropped Item and writes a WORLD entity through
-      // `worldScope.tool.createEntity`, because a Tool is one world record every system
-      // adopts. The system Tool Rules route creates nothing, so a root that still referenced
-      // the system-scope draft creator would be carrying the surface this change removed.
-      // `createWorldToolFromItemDrop` below is what replaced it.
-      'store?.openToolDraft',
-      'store?.saveToolDraft',
-      // `store?.deleteToolDraft` GOES WITH THE HEADER BUTTON THAT CALLED IT. It deleted this
-      // system's in-system record alone, leaving the world membership record behind as a ghost
-      // nothing can read; `removeToolFromSystem` is the pair of writes that actually undoes an
-      // adoption, and it is what the removal callout reaches (issue 1373).
-      'store?.removeToolFromSystem',
-      'store?.setToolSectionInherited',
       'toolsNavCount',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
-    }
-    // TOOL CREATION IS A WORLD-SCOPE WRITE NOW. All four halves are pinned, because dropping
-    // any one of them leaves a drop that silently does nothing: the resolver seam that turns a
-    // drag payload into a name and an image, the world-scope create, the world-catalogue prop
-    // that raises the drop, and the navigation that lands the GM on the record just made.
-    for (const snippet of [
       'createWorldToolFromItemDrop',
-      'services?.resolveToolSource',
-      'store?.worldScope?.tool?.createEntity',
-      'onCreateFromItemDrop={createWorldToolFromItemDrop}',
-      "openWorldScopedEntry('world-tool-entry', entityId)",
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
-    }
-    // AND THE SYSTEM ROUTE NO LONGER CARRIES ONE. The two screens had the drop zone exactly
+      'adoptWorldToolIntoSystem',
+    ],
+    reads: [
+      'store.openToolDraft',
+      'store.saveToolDraft',
+      // `store.deleteToolDraft` left the world membership record behind as a ghost nothing can
+      // read; `removeToolFromSystem` is the pair of writes that undoes an adoption (issue 1373).
+      'store.removeToolFromSystem',
+      'store.setToolSectionInherited',
+      // Tool creation is a world-scope write now.
+      'services.resolveToolSource',
+      'store.worldScope.tool.createEntity',
+    ],
+    passesProps: [
+      ['WorldToolCataloguePage', 'onCreateFromItemDrop'],
+      ['ToolBrowserInspector', 'onAddToSystem'],
+      ['ToolBrowserInspector', 'onEditWorldTool'],
+      // Task 4: the editor behind `Edit rules` offers the route the rules list already advertises.
+      ['ToolEditView', 'onEditWorldTool'],
+    ],
+    // The row by name, because `routeExitGuardFor` alone is satisfied by any row at all.
+    callsLiteral: [['routeExitGuardFor', 'tool-edit']],
+    spellsExactly: ['world-tool-entry'],
+    // And the system route carries no creation drop. The two screens had the drop zone exactly
     // inverted against the design, so this is the half that proves the move rather than a copy.
-    assert.ok(
-      !rootSource.includes('onCreateToolDrop'),
-      'the system Tool Rules route passes no creation drop callback'
+    namesNo: ['onCreateToolDrop', 'deleteSelectedLibraryTool'],
+    readsNo: ['store.createToolDraft', 'store.deleteToolDraft'],
+  });
+
+  // The editor's own route-exit guard, which compares the tool and not only the view token, so
+  // opening another tool from the library prompts and re-opening the focused one does not.
+  defineStructureContract(
+    'and guards the focused tool editor on the tool rather than the view token',
+    { file: ROUTE_EXIT_GUARDS, record: ['view', 'tool-edit'] },
+    { property: [['skip', 'subject']] }
+  );
+
+  defineStructureContract(
+    'and names which tool that subject is, and the seam the prompt comes from',
+    { file: MANAGER_ROOT, constant: 'routeExitGuards', property: 'tool-edit' },
+    { names: ['focusedToolDraft'], reads: ['services.confirmDirtyToolsNavigation'] }
+  );
+
+  // Adoption is a named handler that selects what it adopted, rather than leaving the GM on a row
+  // that has silently changed cohort.
+  defineStructureContract(
+    'selects the Tool it has just adopted into the system',
+    { file: MANAGER_ROOT, fn: 'adoptWorldToolIntoSystem' },
+    { callsWith: [['selectLibraryTool', 'entityId']] }
+  );
+
+  // A rail count is a bare mono numeral in its own span, not a chip (issue 643). The Tool Studio
+  // entry is driven by `tests/components/manager-rail-mounted.js`, which presses it, reads the
+  // route and asserts the badge is absent at zero; which derivation each span renders is not.
+  it('renders each rail count as the derived number inside the shared count span', () => {
+    const rendered = classRenderedExpressions(
+      componentAstOf(MANAGER_SYSTEM_NAV),
+      'manager-nav-count'
     );
-    // AND ADOPTION IS A NAMED HANDLER, not the inline world-scope call it started as (issue
-    // 1373). The second half is what the inline version could not do: `unadoptedToolId` is what
-    // routes the inspector to `No rules here` / `Add {tool} to {system}`, and nothing else
-    // clears it - so without the selection move the GM presses the button, the Tool becomes a
-    // member row behind the panel, and the panel goes on offering to add a Tool it already has.
-    for (const snippet of [
-      'async function adoptWorldToolIntoSystem(entityId)',
-      'onAddToSystem={(entityId) => adoptWorldToolIntoSystem(entityId)}',
-      'return selectLibraryTool(entityId);',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
+    const read = rendered.flatMap((expression) => [
+      ...memberPaths(expression),
+      ...identifierNames(expression),
+    ]);
+    for (const count of ['gatheringNavCounts.total', 'toolsNavCount']) {
+      assert.ok(read.includes(count), `the rail renders ${count} as a bare count numeral`);
     }
     assert.ok(
-      /onclick=\{\(\) => setView\('tools'\)\}/.test(rootSource),
-      "root should wire a top-level Tools nav button to setView('tools')"
+      rendered.some(
+        (expression) =>
+          expression.type === 'MemberExpression' &&
+          expression.computed &&
+          expression.object?.name === 'gatheringNavCounts'
+      ),
+      'and each gathering sub-item reads its own section count out of the same derivation'
     );
+  });
+
+  defineStructureContract('renders the requirements tab from the focused editor', TOOL_EDIT, {
+    renders: ['ToolRequirementsTab'],
+    passesProps: [['ToolRequirementsTab', 'modifierOptions']],
+    writes: ['data-tool-editor-world-tool'],
+    names: ['onEditWorldTool'],
+    // No bare `Delete` in the system header, in either hook spelling: attribute, and object key.
+    writesNo: ['data-tool-editor-delete'],
+    spellsNo: ['data-tool-editor-delete'],
+  });
+
+  // The bonus takes its value from the world library (issue 1373): `proto:2353` and `proto:2886`
+  // both draw a single-select `World modifiers` list, so what went away is the ability to type an
+  // expression. The two absent eyebrows are headings the design merged into one sentence.
+  defineStructureContract('takes the bonus from the world modifier library', TOOL_REQUIREMENTS, {
+    renders: ['ModifierLibraryRow', 'SelectionCheckbox', 'ToolInheritCard'],
+    spells: ['manager-tool-prerequisite-list'],
+    spellsExactly: ['data-tool-bonus-modifier', 'data-tool-prerequisite-row'],
+    passesValues: [['SelectionCheckbox', 'wrapper', 'contents']],
+    namesNo: [
+      'ProviderExpressionInput',
+      'RollDataExpressionInput',
+      'ChecklistCardRow',
+      'legendVisible',
+    ],
+    rendersNo: ['ChecklistCardRow'],
+    spellsNo: ['WhichPrerequisites'],
+  });
+
+  it('draws both lists on that tab as the shared modifier row, one of them opted in', () => {
+    const requirements = componentAstOf(TOOL_REQUIREMENTS);
+    const rows = renderedNodes(requirements, 'ModifierLibraryRow');
+    assert.equal(rows.length, 2, 'the tab draws the shared row twice — prerequisites and bonus');
+    // And only one opts in. The bonus list one section below and the Checks Studio one screen
+    // away both pass neither, which is what makes the row's defaults load-bearing.
+    const optedIn = rows.filter(
+      (node) => propLiteral(node, 'controlPlacement') ?? propLiteral(node, 'textLayout')
+    );
+    assert.equal(optedIn.length, 1, 'only one opts in — the bonus list keeps the shipped face');
+    const [prerequisite] = optedIn;
+    assert.equal(propLiteral(prerequisite, 'controlPlacement'), 'leading', '`proto:2331`');
+    assert.equal(propLiteral(prerequisite, 'textLayout'), 'stacked', '`proto:2333`');
     assert.ok(
-      rootSource.includes('<span class="manager-nav-count">{toolsNavCount}</span>'),
-      'root should render a Tools nav count chip'
+      literalStrings(prerequisite).includes('data-tool-prerequisite-row'),
+      'and it is the prerequisite list, not the bonus list, that took them'
     );
+    // The gate pair keeps its option-card group; the bonus list must not grow a second one.
+    for (const group of renderedNodes(requirements, 'RadioCardGroup')) {
+      assert.ok(
+        !literalStrings(group).some((literal) => literal.includes('tool-bonus-modifier')),
+        'the bonus list renders rows, not option cards'
+      );
+    }
+  });
+
+  // The names are the row's own vocabulary: a caller-named variant is the failure this ruling
+  // rejects by name, so it is asserted rather than left to review.
+  defineStructureContract('declares the row two variants of its own', MODIFIER_LIBRARY_ROW, {
+    defaults: [
+      // The shipped trailing edge and the one-line text, so today's callers are unmoved.
+      ['controlPlacement', 'trailing'],
+      ['textLayout', 'inline'],
+    ],
+    spellsExactlyNo: ['prerequisite', 'bonus', 'checks', 'catalogue'],
+  });
+
+  // Both callers must pass the roster. A prop declared and not passed renders an empty library
+  // that reads as "this world has none" — and it also subscribes the whole spread bundle, because
+  // Svelte evaluates a spread only on a key miss.
+  defineStructureContract('forwards the roster from the world Tool entry too', WORLD_TOOL_ENTRY, {
+    passesProps: [['ToolRequirementsTab', 'modifierOptions']],
+    // One action on the tile (issue 1373): the Copy beside Unlink went with the raw uuid line it
+    // copied, which displaced the hint saying what dropping onto the tile does.
+    renders: ['ItemDropZone'],
+    spells: ['SourceDropHint'],
+    writesNo: ['copyLabel', 'subline'],
+    spellsNo: ['data-tool-source-replace'],
+  });
+
+  it('passes the world modifier roster to both Tool requirement scopes', () => {
+    const scopes = templateNodes(componentAstOf(MANAGER_ROOT)).filter(
+      (node) => attributeExpression(node, 'modifierOptions')?.name === 'selectedSystemModifiers'
+    );
+    assert.equal(scopes.length, 2, 'the focused system editor and the world Tool entry');
+  });
+
+  // Every behaviour section is a card rather than a bare page-background heading over loose
+  // controls: its head states the section, whether this system inherits the world Tool's answer,
+  // what that answer is, and the switch between the two.
+  defineStructureContract('draws breakage as inherit-aware cards', TOOL_BREAKAGE, {
+    renders: ['ToolInheritCard'],
+    writes: ['data-tool-remove-from-system'],
+    spells: ['StopUsingHereHint'],
+    // `Always fires` is gone: the design uses that slot for the inheritance state.
+    spellsNo: ['manager-tool-section-heading', 'AlwaysFires', 'BreakageKicker'],
+  });
+
+  it('splits the four world-default sections two and two across the tabs', () => {
+    assert.deepEqual(
+      attributeValues(componentAstOf(TOOL_BREAKAGE), 'section'),
+      ['breakage', 'onBreak'],
+      'Breakage owns exactly the two world-default sections it authors'
+    );
+    assert.deepEqual(
+      attributeValues(componentAstOf(TOOL_REQUIREMENTS), 'section'),
+      ['prerequisites', 'bonus'],
+      'and Requirements owns the other two'
+    );
+  });
+
+  // The switch is the shipped primitive, not a second hand-rolled one.
+  defineStructureContract('reuses the shared scoped inherit row', TOOL_INHERIT_CARD, {
+    imports: ['../scoped/InheritRow.svelte'],
+    passesValues: [['InheritRow', 'stateChip', false]],
+  });
+
+  // The linked-item card is not at system scope, and the per-system display-label override
+  // names itself as an override in the screen's own idiom rather than in a help sentence.
+  defineStructureContract('keeps the system band free of source linking', TOOL_SYSTEM_SCOPE, {
+    renders: ['ToolInheritCard'],
+    writes: ['data-tool-label'],
+    rendersNo: ['ItemDropZone'],
+    namesNo: ['onSourceDrop', 'onUnlinkSource', 'onCopySourceUuid'],
+  });
+
+  // There is no overview tab at system scope at all, and the declaration form is the `EditorTabs`
+  // primitive's (issue 1038).
+  defineStructureContract('defaults the system tab strip to Breakage', TOOL_EDITOR_TABS, {
+    defaults: [['activeTab', 'breakage']],
+    spellsExactlyNo: ['overview'],
+  });
+
+  it('declares exactly three system tabs, in the shipped order', () => {
+    assert.deepEqual(
+      propertyValues(declaredConstantValue(TOOL_EDITOR_TABS, 'TABS'), 'id'),
+      ['breakage', 'requirements', 'validation'],
+      'Breakage, Requirements and Validation, and no fourth appended past them'
+    );
+  });
+
+  // Validation reuses the shared scoped shell, and that shell really does render the recipe-style
+  // surface: asserting only the shell would pass on a shell that had dropped it.
+  defineStructureContract('reuses the shared scoped validation shell', TOOL_VALIDATION, {
+    renders: ['ScopedValidationTab'],
+  });
+
+  defineStructureContract(
+    'and that shell renders the recipe-style editor validation surface',
+    SCOPED_VALIDATION_TAB,
+    { renders: ['EditorValidationSurface'] }
+  );
+
+  it('states the Tools copy the rail, the editor and the world field read', () => {
     assert.ok(
       lang.FABRICATE.Admin.Manager.Tools && typeof lang.FABRICATE.Admin.Manager.Tools === 'object',
       'lang should expose a FABRICATE.Admin.Manager.Tools block'
     );
-    // `Tool Rules`, not `Tools` (issue 1373). The rail entry, the breadcrumb leaf and the
-    // page heading all read `Tool Rules` since the world catalogue took ownership of Tool
-    // identity, art and description; a heading reading `Tools` over a rail entry reading
-    // `Tool Rules` is the WCAG 2.5.3 "Label in Name" hazard that relabel had to avoid once
-    // already.
+    // `Tool Rules`, not `Tools` (issue 1373). The rail entry.
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.Title, 'Tool Rules');
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.Add, 'Add tool');
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.Save, 'Save tool');
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.NavigationDirty.SaveAll, 'Save All');
-    assert.ok(
-      rootSource.includes("import ToolEditView from './ToolEditView.svelte';"),
-      'root should import the focused Tool editor'
-    );
-    assert.ok(
-      toolEditSource.includes('<ToolRequirementsTab'),
-      'focused editor should render its requirements tab'
-    );
-    assert.ok(
-      !toolRequirementsSource.includes('ProviderExpressionInput'),
-      'Tool requirements should use shared prerequisites rather than provider selection'
-    );
-    assert.ok(
-      toolRequirementsSource.includes('manager-tool-prerequisite-list'),
-      'Tool requirements should expose the shared prerequisite picker'
-    );
-    // ── THE BONUS TAKES ITS VALUE FROM THE WORLD LIBRARY (issue 1373, maintainer round 3) ──
-    // The tab used to render a free-text `RollDataExpressionInput` labelled `Bonus expression`,
-    // which the design has no counterpart for at either scope: `proto:2353`-`2369` and
-    // `proto:2886`-`2905` both draw a single-select `World modifiers` list, and `proto:4753`
-    // sets `bonus` to the chosen entry's expression. The persisted shape is untouched; what
-    // went away is the ability to TYPE one.
-    assert.ok(
-      !toolRequirementsSource.includes('RollDataExpressionInput'),
-      'Tool requirements should not offer a raw bonus-expression field'
-    );
-    assert.ok(
-      toolRequirementsSource.includes('data-tool-bonus-modifier'),
-      'Tool requirements should select the bonus from the world modifier library'
-    );
-    // ── AND THE LIBRARY IS DRAWN AS ROWS, THROUGH THE CHECKS STUDIO'S OWN ROW ─────────────
-    // (issue 1373, maintainer round 4). The first pass drew it as a `RadioCardGroup` — a stack
-    // of option cards — and this app already draws the distinction the other way: the Checks
-    // Studio presents THIS SAME roster (`characterLibraries.modifiers[]`) as compact rows in
-    // `checks/CraftingModifierCatalogueCard.svelte`, and reserves `RadioCardGroup` for the
-    // closed four-option mode set (`How they combine`) directly beneath it. Library entries get
-    // rows; closed mode sets get cards.
-    //
-    // ASSERTED AS ONE COMPONENT WITH TWO CALLERS, not as "the tab emits the row's classes". A
-    // class-only assertion is satisfied by a second copy of the markup, which is exactly the
-    // third modifier row the maintainer's ruling forbids.
-    assert.ok(
-      toolRequirementsSource.includes('<ModifierLibraryRow'),
-      'the bonus list should render the shared modifier row, not option cards'
-    );
-    assert.ok(
-      craftingModifierCatalogueSource.includes('<ModifierLibraryRow'),
-      'the Checks Studio catalogue should render the SAME shared row, so there is one row and ' +
-        'not two'
-    );
-    assert.ok(
-      !/<RadioCardGroup[^>]*?tool-bonus-modifier/s.test(toolRequirementsSource),
-      'the bonus list should render no option-card group'
-    );
-
-    // ── AND SO IS THE PREREQUISITE LIST DIRECTLY ABOVE IT (issue 1373, maintainer round 5) ─
-    //
-    // `proto:4741` gives the design's prerequisite row
-    // `display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:10px;
-    // background: bg1|surface-active; border: 1px solid (border|accent-border)` — which is
-    // `proto:4752`'s bonus row byte for byte. The two lists ARE one row in the reference, and
-    // ours drew them as two: `ChecklistCardRow` above, `ModifierLibraryRow` below, with
-    // different metrics, a different fill and a different selected treatment.
-    //
-    // ASSERTED AS ONE COMPONENT WITH THREE CALLERS, for the reason the bonus assertion above
-    // records: a class-only assertion is satisfied by a third copy of the markup, and a third
-    // modifier row is precisely what the ruling forbids.
-    assert.equal(
-      (toolRequirementsSource.match(/<ModifierLibraryRow/g) || []).length,
-      2,
-      'BOTH lists on this tab draw the shared modifier row — the prerequisites and the bonus'
-    );
-    assert.ok(
-      toolRequirementsSource.includes("'data-tool-prerequisite-row': option.id"),
-      'each prerequisite row names the entry it stands for, so a frame can select one'
-    );
-    // The IMPORT and the ELEMENT, not the name: the tab's docblock records the ruling that
-    // retired that row, and an assertion that reds on a historical note is an assertion that
-    // gets satisfied by deleting the explanation.
-    assert.ok(
-      !/import ChecklistCardRow|<ChecklistCardRow/.test(toolRequirementsSource),
-      'the bespoke checklist row is gone from the tab, not merely unused beside the shared one'
-    );
-    assert.ok(
-      !existsSync(resolve(repoRoot, 'src/ui/svelte/apps/manager/ChecklistCardRow.svelte')),
-      'and the orphaned component is REMOVED — its only caller was this list, and a component ' +
-        'left standing with no caller is how a fourth row comes back by copy'
-    );
-    // THE TRAILING CONTROL IS A REAL CHECKBOX, through the manager's one selection primitive.
-    // A multi-select list needs a checkbox per row with a label; the bonus list's radio would
-    // make the set single-select, and a `role="checkbox"` wrapper would be the nested-control
-    // trap the row's own header records.
-    assert.ok(
-      toolRequirementsSource.includes('<SelectionCheckbox'),
-      'the prerequisite row trails the shared selection checkbox'
-    );
-    assert.ok(
-      /<SelectionCheckbox[^>]*wrapper="contents"/s.test(toolRequirementsSource),
-      'in `contents` mode, because the row host is already a <label> and labels may not nest'
-    );
-
-    // ── TWO HEADINGS THE DESIGN DOES NOT DRAW (issue 1373, maintainer round 5) ────────────
-    //
-    // `proto:2326` goes from the section header row STRAIGHT to the list at `proto:2328`: there
-    // is no eyebrow between them. And `proto:2334` is a single muted sentence — "All selected
-    // prerequisites are required (AND). When a character fails them:" — immediately followed by
-    // the two-column grid at `proto:2336`, where ours split one sentence into a statement plus a
-    // second uppercase eyebrow above the pair.
-    assert.ok(
-      !toolRequirementsSource.includes('WhichPrerequisites'),
-      'no `WHICH PREREQUISITES` eyebrow: the design heads the list with nothing'
-    );
-    assert.ok(
-      !toolRequirementsSource.includes('legendVisible'),
-      'and no `WHEN PREREQUISITES FAIL` eyebrow: the gate pair is introduced by the sentence ' +
-        'above it, so un-hiding its legend would print the heading the design merged away'
-    );
+    assert.equal(lang.FABRICATE.Admin.Manager.Tools.BackToToolRules, 'Back to Tool Rules');
+    assert.equal(lang.FABRICATE.Admin.Manager.Tools.SaveRules, 'Save rules');
     assert.equal(
       lang.FABRICATE.Admin.Manager.Tools.Editor.WhichPrerequisites,
       undefined,
@@ -3561,74 +2304,6 @@ describe('CraftingSystemManager source contract', () => {
       'All selected prerequisites are required (AND). When a character fails them:',
       '`proto:2334` states the AND rule and introduces the gate pair in ONE sentence'
     );
-    // ── THE ROW'S TWO VARIANTS ARE DECLARED, DEFAULTED AND NAMED FOR WHAT THEY MEAN ──────
-    // (issue 1373, maintainer round 6.)
-    //
-    // Round 5 recorded two DEVIATIONS from the reference on this row: `proto:2331` leads with the
-    // box where ours trailed it, and `proto:2333` stacks the name over the expression where ours
-    // set them on one line. The argument for recording rather than fixing them was that a row
-    // serving both lists would be "two rows wearing one name" — which holds against a single
-    // fixed shape and not against declared variants, the answer this epic already reached for a
-    // different primitive.
-    //
-    // So the row takes two props, both defaulted to the shipped rendering. NAMED FOR WHAT THEY
-    // MEAN: `controlPlacement` and `textLayout` describe the row, where a `variant="prerequisite"`
-    // would describe a CALLER and would have to grow a value per screen that ever adopts it.
-    const modifierRowSource = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte'),
-      'utf8'
-    );
-    assert.match(
-      modifierRowSource,
-      /controlPlacement = 'trailing'/,
-      "the control slot defaults to the shipped trailing edge, so today's callers are unmoved"
-    );
-    assert.match(
-      modifierRowSource,
-      /textLayout = 'inline'/,
-      'and the text defaults to one line, for the same reason'
-    );
-    // The names are the row's own vocabulary. A caller-named variant is the failure this ruling
-    // rejects by name, so it is asserted rather than left to review.
-    for (const callerName of ['prerequisite', 'bonus', 'checks', 'catalogue']) {
-      assert.equal(
-        new RegExp(`variant\\s*=\\s*'${callerName}'|'${callerName}'\\s*=>`, 'i').test(
-          modifierRowSource
-        ),
-        false,
-        `the row must not name a variant after its caller (${callerName})`
-      );
-    }
-    // AND THE PREREQUISITE LIST IS THE ONE THAT OPTS IN. The bonus list one section below and
-    // the Checks Studio one screen away both pass NEITHER, which is what makes the defaults
-    // load-bearing rather than decorative.
-    // READ OFF THE ELEMENTS, not off the file. The tab's own docblock names both props in prose,
-    // so a raw count of the attribute text counts the explanation as a call site.
-    const modifierRowTags = toolRequirementsSource.match(/<ModifierLibraryRow[^>]*>/g) || [];
-    assert.equal(modifierRowTags.length, 2, 'the tab draws the shared row twice');
-    const optedIn = modifierRowTags.filter((tag) => /controlPlacement|textLayout/.test(tag));
-    assert.equal(
-      optedIn.length,
-      1,
-      'and only ONE of the two opts in — the bonus list keeps the shipped face'
-    );
-    assert.match(optedIn[0], /controlPlacement="leading"/, '`proto:2331` puts the checkbox first');
-    assert.match(
-      optedIn[0],
-      /textLayout="stacked"/,
-      '`proto:2333` sets the name over the expression'
-    );
-    assert.match(
-      optedIn[0],
-      /data-tool-prerequisite-row/,
-      'and it is the PREREQUISITE list, not the bonus list, that took them'
-    );
-    assert.equal(
-      /controlPlacement|textLayout/.test(craftingModifierCatalogueSource),
-      false,
-      'the Checks Studio caller is untouched: it passes neither prop and renders as it shipped'
-    );
-
     // The gate group keeps its accessible name — the heading is hidden, not deleted.
     assert.equal(
       lang.FABRICATE.Admin.Manager.Tools.Editor.GateMode,
@@ -3636,186 +2311,26 @@ describe('CraftingSystemManager source contract', () => {
       'the gate group keeps a legend for a screen reader even though nothing paints it'
     );
     // AND THE EMPTY LIBRARY NAMES ITS ROUTE, exactly as the bonus section below states its own.
-    // At SYSTEM scope the card head is spent on the inherit row, so the section's subtitle —
-    // the only other place the route is written — does not render at all there.
     assert.equal(
       lang.FABRICATE.Admin.Manager.Tools.Editor.NoPrerequisites,
       'No character prerequisites are defined in this world yet. They are defined under World, ' +
         'Rules and resources.',
       'the two absences on this tab read the same way, route included'
     );
-    // AND BOTH CALLERS MUST PASS THE ROSTER. A prop declared and not passed renders an empty
-    // library that reads as "this world has none" — and it also subscribes the whole spread
-    // bundle, because Svelte evaluates a spread only on a key MISS.
-    for (const [name, source] of [
-      ['ToolEditView', toolEditSource],
-      ['WorldToolEntryPage', worldToolEntrySource],
-    ]) {
-      assert.ok(
-        /\{modifierOptions\}/.test(source),
-        `${name} should forward modifierOptions to the requirements tab`
-      );
-    }
-    assert.equal(
-      (rootSource.match(/modifierOptions=\{selectedSystemModifiers\}/g) || []).length,
-      2,
-      'the manager root should pass the world modifier roster to BOTH Tool requirement scopes'
-    );
-    // ── EVERY BEHAVIOUR SECTION IS A CARD, NOT A BARE HEADING (issue 1373) ────────────────
-    // This used to require a `manager-tool-section-heading` block — an unenclosed `<h3>` with a
-    // glyph and a hint, sitting on the page background above loose controls. The design encloses
-    // each section in its own bordered, filled card whose head states the section, whether this
-    // system inherits the world Tool's answer or overrides it, what the world's answer is, and
-    // the switch between the two. `ToolInheritCard` is that card and both tabs are its callers.
-    assert.ok(
-      !toolBreakageSource.includes('manager-tool-section-heading'),
-      'Breakage must not restore the bare page-background section heading'
-    );
-    for (const [label, source] of [
-      ['Breakage', toolBreakageSource],
-      ['Requirements', toolRequirementsSource],
-    ]) {
-      assert.ok(
-        source.includes('<ToolInheritCard'),
-        `${label} must draw its sections as inherit-aware cards`
-      );
-    }
-    assert.deepEqual(
-      [...toolBreakageSource.matchAll(/section="(\w+)"/g)].map((match) => match[1]),
-      ['breakage', 'onBreak'],
-      'Breakage owns exactly the two world-default sections it authors'
-    );
-    assert.deepEqual(
-      [...toolRequirementsSource.matchAll(/section="(\w+)"/g)].map((match) => match[1]),
-      ['prerequisites', 'bonus'],
-      'and Requirements owns the other two'
-    );
-    // THE SWITCH IS THE SHIPPED PRIMITIVE, not a second one. `stateChip={false}` is the essence
-    // rules editor's own use of it: the enclosing card already states the resolution in its pill.
-    assert.ok(
-      toolInheritCardSource.includes("import InheritRow from '../scoped/InheritRow.svelte';") &&
-        toolInheritCardSource.includes('stateChip={false}'),
-      'the card reuses the shared scoped inherit row rather than hand-rolling a second switch'
-    );
-    // AND `Always fires` IS GONE. The design uses that slot for the inheritance state.
-    assert.ok(
-      !toolBreakageSource.includes('AlwaysFires'),
-      'the on-break legend badge must not survive the card conversion'
-    );
-    assert.ok(
-      !toolBreakageSource.includes('BreakageKicker'),
-      'Breakage should not restore the redundant BREAKAGE kicker'
-    );
-    // ── THE LINKED-ITEM CARD IS NOT AT SYSTEM SCOPE, AND THAT IS THE ASSERTION (issue 1373) ──
-    // These four used to require the drop zone, the copy-uuid action, the unlink action and the
-    // replace hint on THIS tab. They were a capability the model forbids: identity is
-    // world-scoped, so a crafting system must not be able to re-point which world Item a Tool
-    // IS. The card moved whole to the world Tool entry, and the requirements below follow it
-    // there rather than being deleted — a removed assertion proves nothing about where the
-    // capability went.
-    assert.ok(
-      !toolSystemScopeSource.includes('<ItemDropZone'),
-      'the system-scope band must not carry a source drop zone'
-    );
-    assert.ok(
-      !toolSystemScopeSource.includes('onSourceDrop') &&
-        !toolSystemScopeSource.includes('onUnlinkSource') &&
-        !toolSystemScopeSource.includes('onCopySourceUuid'),
-      'nor any of the three source-link callbacks'
-    );
-    // THERE IS NO OVERVIEW TAB AT SYSTEM SCOPE AT ALL. The tab strip is three tabs, opening on
-    // Breakage: identity is world scope's, so a tab for it here would have nothing to put on it.
-    assert.ok(
-      !toolEditorTabsSource.includes("'overview'"),
-      'the system tab strip must not declare an Overview tab'
-    );
-    // THE DECLARATION FORM IS THE `EditorTabs` PRIMITIVE'S (issue 1038), not the tuple array
-    // this strip hand-rolled: the primitive takes `{id, icon, labelKey, label}` records. What
-    // is asserted is unchanged - three tabs, in this order, and no fourth - because the SET is
-    // this file's contract and the shape it is written in is the primitive's.
-    assert.match(
-      toolEditorTabsSource,
-      /const TABS = \[\s*\{\s*id: 'breakage'[\s\S]*?id: 'requirements'[\s\S]*?id: 'validation'/,
-      'and must declare Breakage, Requirements and Validation, in that order'
-    );
-    assert.equal(
-      (toolEditorTabsSource.match(/^\s*id: '/gm) || []).length,
-      3,
-      'and exactly three, so a fourth cannot be appended past the ordering match above'
-    );
-    assert.ok(
-      toolEditorTabsSource.includes("activeTab = 'breakage'"),
-      'and must default to Breakage rather than a tab that no longer exists'
-    );
-    // NO BARE `Delete` IN THE SYSTEM HEADER, and an explained removal callout instead. `Delete`
-    // names the WORLD record; what system scope can do is stop using the Tool here.
-    assert.ok(
-      !toolEditSource.includes('data-tool-editor-delete'),
-      'the system header must not carry a bare Delete'
-    );
-    assert.ok(
-      toolBreakageSource.includes('data-tool-remove-from-system') &&
-        toolBreakageSource.includes('StopUsingHereHint'),
-      'and the Breakage tab closes with the explained remove-from-system callout'
-    );
     assert.equal(
       lang.FABRICATE.Admin.Manager.Tools.Editor.StopUsingHereHint,
       'Removes the rules in {system} only. The world Tool and every other system are untouched.'
     );
-    // THE HEADER STATES SCOPE AND SAVES RULES.
     assert.equal(
       lang.FABRICATE.Admin.Manager.Tools.Editor.HeaderSystemScope,
       'Rules in {system} · identity comes from the world Tool'
-    );
-    assert.equal(lang.FABRICATE.Admin.Manager.Tools.BackToToolRules, 'Back to Tool Rules');
-    assert.equal(lang.FABRICATE.Admin.Manager.Tools.SaveRules, 'Save rules');
-    assert.ok(
-      worldToolEntrySource.includes('<ItemDropZone'),
-      'the world Tool entry reuses the shared drag-only Item drop zone'
-    );
-    // ONE ACTION ON THE TILE, which is what the design draws (issue 1373's parity round). The
-    // Copy that sat beside Unlink is gone with the raw uuid line it copied: an id is not a fact
-    // this screen states anywhere else, and the third line displaced the hint that says what
-    // dropping onto the tile does.
-    assert.ok(
-      !worldToolEntrySource.includes('copyLabel='),
-      'the tile offers one button, not a Copy beside the Unlink'
-    );
-    assert.ok(
-      !worldToolEntrySource.includes('subline='),
-      'and no raw uuid line under the two the design draws'
-    );
-    assert.ok(
-      worldToolEntrySource.includes('SourceDropHint'),
-      'and explains that dropping an Item replaces the linked source'
-    );
-    assert.ok(
-      !worldToolEntrySource.includes('data-tool-source-replace'),
-      'without reviving the removed source picker'
-    );
-    // THE SYSTEM LABEL FIELD SURVIVES, and names itself as an OVERRIDE of the world value.
-    // The maintainer's ruling keeps both fields; what was wrong was that neither scope's copy
-    // acknowledged the other.
-    assert.ok(
-      toolSystemScopeSource.includes('data-tool-label'),
-      'the per-system display-label override still ships'
-    );
-    // AND IT SAYS SO IN THE SCREEN'S OWN IDIOM RATHER THAN IN A HELP SENTENCE (issue 1373). The
-    // card is a `ToolInheritCard` now: blank IS the inheriting state, so the pill, the
-    // `World default: <name>` line, the globe row and the switch carry the whole claim, and the
-    // sentence beneath is a caption rather than the only place the override is stated.
-    assert.ok(
-      toolSystemScopeSource.includes('<ToolInheritCard'),
-      'the label card is the same inherit card every other overridable fact here renders through'
     );
     assert.equal(
       lang.FABRICATE.Admin.Manager.Tools.Editor.LabelFallback,
       'The name this crafting system shows for the Tool.'
     );
-    // AND THE WORLD FIELD NAMES ITSELF AS OPTIONAL (issue 1373's parity round). Its old copy
-    // described the field's REACH across crafting systems, which is a fact about the override
-    // above rather than about this control, and said nothing about the one thing the design's
-    // frame does: that a blank is allowed and what answers for it.
+    // The world field names itself as optional (issue 1373): its old copy described the override
+    // above rather than saying that a blank is allowed and what answers for it.
     assert.equal(
       lang.FABRICATE.Admin.Manager.Scoped.Entry.DisplayLabelInheritHint,
       'Leave blank to use the linked Item name.'
@@ -3824,347 +2339,260 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Scoped.Entry.DisplayLabelUnlinkedHint,
       'No Item is linked, so this record has no name to fall back on.'
     );
-    // TASK 4: the editor behind `Edit rules` offers the route the rules LIST already advertises.
+  });
+
+  it('removes the orphaned checklist row rather than leaving it standing', () => {
     assert.ok(
-      toolEditSource.includes('data-tool-editor-world-tool') &&
-        toolEditSource.includes('onEditWorldTool'),
-      'the focused Tool editor offers a route out to the world Tool'
-    );
-    assert.ok(
-      rootSource.includes(
-        "onEditWorldTool={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}"
-      ),
-      'and the root wires it to the same navigation the rules inspector takes'
-    );
-    assert.ok(
-      toolValidationSource.includes('<ScopedValidationTab'),
-      'Validation should reuse the shared scoped-entity validation shell'
-    );
-    // And that shell really does render the recipe-style surface. Asserting only the shell
-    // would pass on a shell that had dropped it, which is the whole point of the original.
-    assert.ok(
-      readFileSync(
-        resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte'),
-        'utf8'
-      ).includes('<EditorValidationSurface'),
-      'the shared scoped validation shell should reuse the recipe-style editor validation surface'
-    );
-    assert.ok(
-      appSource.includes('const clipboard = game?.clipboard;') &&
-        appSource.includes('await clipboard.copyPlainText(text);'),
-      'Manager UUID copies should use the Foundry V13 clipboard service'
-    );
-    assert.equal(
-      appSource.includes('navigator.clipboard') ||
-        appSource.includes('foundry.utils.copyPlainText'),
-      false,
-      'Manager UUID copies should not bypass the Foundry clipboard service'
+      !existsSync(resolve(repoRoot, 'src/ui/svelte/apps/manager/ChecklistCardRow.svelte')),
+      'its only caller was the prerequisite list, and a component left standing with no caller ' +
+        'is how a fourth row comes back by copy'
     );
   });
 
-  // The GM Knowledge surface (issue 785). Everything asserted here is a wiring
-  // decision whose absence is SILENT at runtime: an un-suppressed inspector holds a
-  // dead 300px strip open, an un-threaded `resolutionMode` hides the rail entry from
-  // the `global` + alchemy configuration that motivated the widened gate, and an
-  // ungated `setKnowledgeActive` puts a whole-world actors x items scan on every one
-  // of `refresh()`'s callers.
-  it('routes the Knowledge surface, releases its third column, and gates its projection', () => {
-    assert.ok(
-      rootSource.includes("import KnowledgeView from './KnowledgeView.svelte';"),
-      'root should import the Knowledge surface'
-    );
-    for (const snippet of [
-      "currentView === 'knowledge'",
-      'knowledge={knowledgeState}',
-      "const knowledgeState = $derived($viewState.knowledge || null)",
-      "store.setKnowledgeActive?.(currentView === 'knowledge')",
-      'store.selectKnowledgeActor?.(actorId)',
-      'store.expendRecipeItemUse?.(actorId, itemId)',
-      'store.deleteOwnedRecipeItem?.(actorId, itemId)',
-      'store.eraseLearnedRecipe?.(actorId, recipeId)',
-      'store.resetActorSystemKnowledge?.(actorId)',
-      'store.resetActorAllKnowledge?.(actorId)',
-      'resolutionMode: craftingResolutionMode,',
-      "const craftingResolutionMode = $derived(selectedSystem?.resolutionMode || '')",
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
-    }
-    // The CSS column release and this aside suppression are ONE decision expressed
-    // twice; doing only the first leaves an empty 300px inspector holding the strip.
-    // Issue 1362: a MEMBER of `FULL_WIDTH_VIEWS`, and specifically of its SELF-OWNED
-    // three-track class — Knowledge suppresses the aside AND keeps three tracks, repurposing
-    // the third column for its detail pane. Asserting the class is what stops a later change
-    // releasing its column to two tracks and clipping that pane at the 1024px minimum.
-    assert.ok(
-      /id: 'knowledge',\s*\n\s*layoutClass: 'self-owned-3-track'/.test(rootSource) &&
-        rootSource.includes('class="manager-inspector"'),
-      'the shared inspector is suppressed for the full-width knowledge surface'
-    );
-    // The projection is published TOP-LEVEL, never hung off selectedSystem.
-    assert.equal(
-      rootSource.includes('selectedSystem.knowledge'),
-      false,
-      'the knowledge projection must not be read off selectedSystem'
-    );
+  defineStructureContract(
+    'copies a UUID through the Foundry clipboard service',
+    { file: MANAGER_SERVICES, fn: 'dialogServices' },
+    { reads: ['game.clipboard'], calls: ['copyPlainText'] }
+  );
 
-    // The view owns the single armed token and every disarm rule.
-    for (const snippet of [
-      'data-knowledge-view',
+  // Asserted over BOTH halves of the shell, so moving the clipboard code out of the app module did
+  // not weaken the claim to the half it left behind.
+  for (const file of [APP_SHELL, MANAGER_SERVICES]) {
+    defineStructureContract(`never bypasses the Foundry clipboard service anywhere in ${file}`, file, {
+      readsNo: ['navigator.clipboard', 'foundry.utils.copyPlainText'],
+    });
+  }
+
+  // The GM Knowledge surface (issue 785). Each wiring decision here fails silently at runtime: an
+  // un-suppressed inspector holds a dead 300px strip open, an un-threaded `resolutionMode` hides
+  // the rail entry, and an ungated `setKnowledgeActive` scans every actor on every `refresh()`.
+  defineStructureContract('routes the Knowledge surface and gates its projection', MANAGER_ROOT, {
+    imports: ['./KnowledgeView.svelte'],
+    compares: ['knowledge'],
+    declares: ['knowledgeState', 'craftingResolutionMode'],
+    reads: [
+      '$viewState.knowledge',
+      'selectedSystem.resolutionMode',
+      'store.setKnowledgeActive',
+      'store.selectKnowledgeActor',
+      'store.expendRecipeItemUse',
+      'store.deleteOwnedRecipeItem',
+      'store.eraseLearnedRecipe',
+      'store.resetActorSystemKnowledge',
+      'store.resetActorAllKnowledge',
+    ],
+    callsWith: [
+      ['setKnowledgeActive', 'currentView'],
+      ['selectKnowledgeActor', 'actorId'],
+      ['expendRecipeItemUse', 'actorId'],
+      ['expendRecipeItemUse', 'itemId'],
+      ['deleteOwnedRecipeItem', 'actorId'],
+      ['deleteOwnedRecipeItem', 'itemId'],
+      ['eraseLearnedRecipe', 'actorId'],
+      ['eraseLearnedRecipe', 'recipeId'],
+      ['resetActorSystemKnowledge', 'actorId'],
+      ['resetActorAllKnowledge', 'actorId'],
+    ],
+    // Each delegation is threaded as the prop the view calls, so a store read that stopped
+    // reaching the surface is not answered by the read alone.
+    passesProps: [
+      ['KnowledgeView', 'knowledge'],
+      ['KnowledgeView', 'onSelectActor'],
+      ['KnowledgeView', 'onExpend'],
+      ['KnowledgeView', 'onDelete'],
+      ['KnowledgeView', 'onErase'],
+      ['KnowledgeView', 'onResetSystem'],
+      ['KnowledgeView', 'onResetAll'],
+    ],
+    // The projection is published TOP-LEVEL, never hung off selectedSystem.
+    readsNo: ['selectedSystem.knowledge'],
+  });
+
+  defineStructureContract(
+    'threads the resolution mode the widened rail gate reads',
+    { file: MANAGER_ROOT, constant: 'craftingNavArgs' },
+    { keys: ['resolutionMode'], names: ['craftingResolutionMode'] }
+  );
+
+  // The CSS column release and the aside suppression are one decision expressed twice; doing only
+  // the first leaves an empty 300px inspector holding the strip. The shared inspector element
+  // itself is stated by `renders the manager shell and the routes it hosts`.
+  defineStructureContract(
+    'releases the third column for the full-width Knowledge surface',
+    { file: MANAGER_ROOT, constant: 'FULL_WIDTH_VIEWS', record: ['id', 'knowledge'] },
+    { property: [['layoutClass', 'self-owned-3-track']] }
+  );
+
+  // The view owns the single armed token and every disarm rule, and seeds its default tab once per
+  // system.
+  defineStructureContract('owns the armed token and the seeded default tab', KNOWLEDGE_VIEW, {
+    renders: [
       'KnowledgeRoster',
       'KnowledgeTabs',
       'KnowledgeRecipeItemsTab',
       'KnowledgeLearnedRecipesTab',
-      'filterKnowledgeRoster',
-      'let armedToken = $state',
-      "role=\"tabpanel\"",
-    ]) {
-      assert.ok(knowledgeSource.includes(snippet), `KnowledgeView should include ${snippet}`);
-    }
-    // The default tab is seeded ONCE from the store, never derived live from the
-    // definition count: a GM authoring the system's first recipe item elsewhere
-    // would otherwise yank the open tab and silently disarm an armed row.
-    assert.ok(
-      knowledgeSource.includes('let tabSeeded = $state(false)'),
-      'the default tab should be seeded once on surface entry'
-    );
-
-    // The armed control is a REAL focusable button, and its token is keyed on the
-    // target document id — never a row index, which the asynchronous re-projection
-    // would turn into a destructive misfire.
-    assert.ok(
-      armedDangerButtonSource.includes('<button\n  bind:this={element}\n  type="button"'),
-      'the armed confirmation should be a real button element'
-    );
-    assert.equal(
-      /sc-on-click/.test(armedDangerButtonSource),
-      false,
-      'the prototype span affordance must not be copied'
-    );
-    for (const snippet of [
-      "data-armed={armed ? 'true' : 'false'}",
-      'data-arm-token={token}',
-      'aria-label={consequence}',
-      "event.key !== 'Escape'",
-      'function handleBlur()',
-      'armedIcon = \'fas fa-triangle-exclamation\'',
-    ]) {
-      assert.ok(
-        armedDangerButtonSource.includes(snippet),
-        `ArmedDangerButton should include ${snippet}`
-      );
-    }
-    const copyRowSource = readFileSync(
-      resolve(knowledgeComponentDir, 'KnowledgeOwnedCopyRow.svelte'),
-      'utf8'
-    );
-    const learnedRowSource = readFileSync(
-      resolve(knowledgeComponentDir, 'KnowledgeLearnedRow.svelte'),
-      'utf8'
-    );
-    assert.ok(
-      copyRowSource.includes('`delete:${copy?.itemId'),
-      'the delete token should be keyed on the item document id'
-    );
-    assert.ok(
-      learnedRowSource.includes('`erase:${learned?.recipeId'),
-      'the erase token should be keyed on the recipe id'
-    );
-    // Only `spent` disables Expend. An `!inert` term would apply a gate the engine
-    // does not: `_filterNonExhausted` reads `timesUsed` alone.
-    assert.ok(
-      copyRowSource.includes('disabled={!copy.canExpend}'),
-      'Expend should be disabled purely from the projected affordance'
-    );
-    assert.equal(
-      /!\s*copy\.inert/.test(copyRowSource),
-      false,
-      'inert must not gate the Expend affordance'
-    );
-    // `inert` is an INDEPENDENT chip, so the fused "Spent · inert" label is retired.
-    assert.ok(
-      copyRowSource.includes('data-knowledge-inert'),
-      'inert should render as its own chip'
-    );
+    ],
+    names: ['filterKnowledgeRoster', 'armedToken', 'seededSystemId'],
+    writes: ['data-knowledge-view'],
+    attributes: [['role', 'tabpanel']],
   });
 
-  // The Knowledge SEAM (issue 785). Every rule here is invisible at unit level and
-  // silent at runtime if it regresses: dropping `reprojectKnowledge` from the item
-  // handler leaves a learn/expend/delete on another client unrendered, inverting the
-  // `doc?.pack` guard re-projects the whole world for a compendium write, flattening a
-  // `[hook, id]` tuple leaks the listener across every manager reopen, and removing an
-  // `isGM` gate hands a player a GM mutation.
-  it('registers the Knowledge hook set as tuples, filters it, and GM-gates every mutation', () => {
-    // Only actor-owned, NON-compendium items can change the projection. `Document#pack`
-    // falls back to `this.parent?.pack`, so an Item embedded in a compendium Actor is
-    // readable straight off the embedded doc.
-    assert.ok(
-      appSource.includes("if (doc?.parent?.documentName !== 'Actor') return;"),
-      'the item handler drops a world/compendium-root item'
-    );
-    assert.ok(
-      appSource.includes('if (doc?.pack) return;'),
-      'the item handler drops an item embedded in a COMPENDIUM actor'
-    );
-    // `updateActor` is key-filtered because it is noisy (every HP tick fires it);
-    // learned recipes, usage counts and learn counts all live under `flags`.
-    assert.ok(
-      appSource.includes("if ('flags' in diff) {"),
-      "updateActor re-projects knowledge only on a 'flags' diff"
-    );
-    // `scheduleKnowledgeRefresh` is a TOTAL no-op unless the Knowledge surface is open, so
-    // the same diff must ALSO mark the Recipe Studio's learned-recipe index stale — that
-    // index is what the delete card's "Will be forgotten by N characters" counts through
-    // (issue 1132, review round). Marking is all it does: `updateActor` fires for every
-    // module's flag writes, so rebuilding here would be a world walk per foreign write.
-    assert.ok(
-      appSource.includes(
-        'const markLearnerIndexStale = () => this._adminStore?.markLearnedRecipeIndexStale?.();'
-      ),
-      'the actor hooks mark the learned-recipe index stale rather than rebuilding it'
-    );
-    assert.ok(
-      appSource.includes('markLearnerIndexStale();\n        reprojectKnowledge();'),
-      'and the flags branch does both'
-    );
-    // Parent CRUD is load-bearing, not belt-and-braces: an `Actor.create` carrying
-    // `items[]` fires createActor and ZERO createItem.
-    assert.ok(
-      appSource.includes(
-        "...['createActor', 'deleteActor'].map((hook) => [hook, Hooks.on(hook, reprojectOnActorCrud)])"
-      ),
-      'createActor/deleteActor route through the knowledge reprojection too'
-    );
-    assert.ok(
-      appSource.includes('const reprojectKnowledge = () =>') &&
-        appSource.includes('scheduleKnowledgeRefresh'),
-      'the knowledge reprojection coalesces through the store scheduler'
-    );
-    for (const hook of ['createItem', 'updateItem', 'deleteItem']) {
-      assert.ok(appSource.includes(`'${hook}'`), `${hook} is registered`);
-    }
+  // A real focusable button, not the prototype's span affordance.
+  defineStructureContract('arms a real button rather than a span', ARMED_DANGER_BUTTON, {
+    elements: ['button'],
+    binds: ['this'],
+    attributes: [['type', 'button']],
+    writes: ['data-armed', 'data-arm-token', 'aria-label'],
+    names: ['armed', 'token', 'consequence', 'handleBlur'],
+    reads: ['event.key'],
+    compares: ['Escape'],
+    spellsExactly: ['fas fa-triangle-exclamation'],
+    spellsNo: ['sc-on-click'],
+  });
 
-    // EVERY `_userHooks` entry is an `[hookName, id]` tuple, and the unregister side
-    // destructures exactly that shape. A bare id makes it destructure `undefined`.
-    const hooksBlock = appSource.slice(
-      appSource.indexOf('this._userHooks = ['),
-      appSource.indexOf('_unregisterUserHooks() {')
+  // The armed token is keyed on the document id, so two copies of one recipe arm separately, and
+  // `inert` renders as its own chip rather than fused into the "Spent" label.
+  defineStructureContract('keys the delete token on the item document id', KNOWLEDGE_COPY_ROW, {
+    spells: ['delete:'],
+    reads: ['copy.itemId'],
+    writes: ['data-knowledge-inert'],
+  });
+
+  defineStructureContract('keys the erase token on the recipe id', KNOWLEDGE_LEARNED_ROW, {
+    spells: ['erase:'],
+    reads: ['learned.recipeId'],
+  });
+
+  // Only `spent` disables Expend. An `!inert` term would apply a gate the engine does not:
+  // `_filterNonExhausted` reads `timesUsed` alone. Read off the one disablable control rather
+  // than off the whole file, which legitimately reads `copy.inert` for the chip beside it.
+  it('disables Expend from the projected affordance alone', () => {
+    const expend = templateNodes(componentAstOf(KNOWLEDGE_COPY_ROW)).find((node) =>
+      declaresAttribute(node, 'disabled', { directives: false })
     );
-    assert.ok(hooksBlock.length > 0, 'the hook registration block is locatable');
-    const flatHooks = hooksBlock.replaceAll(/\s+/g, ' ');
-    const registrations = flatHooks.match(/Hooks\.on\(/g) || [];
-    const tuples = flatHooks.match(/\[ ?(?:hook|'[a-zA-Z]+') ?, ?Hooks\.on\(/g) || [];
+    assert.ok(Boolean(expend), 'the copy row still renders a disablable Expend control');
+    const gate = attributeExpression(expend, 'disabled');
+    assert.ok(memberPaths(gate).includes('copy.canExpend'), 'Expend reads the affordance');
+    assert.ok(!identifierNames(gate).has('inert'), 'and inert does not gate it');
+  });
+
+  // The Knowledge seam (issue 785). Every rule here is invisible at unit level and silent at
+  // runtime if it regresses: dropping `reprojectKnowledge` from the item handler leaves a
+  // learn/expend/delete on another client unrendered, flattening a `[hook, id]` tuple leaks the
+  // listener across every manager reopen, and removing an `isGM` gate hands a player a GM
+  // mutation. What this file cannot state is which way each guard runs and which handler a hook
+  // is bound to; `tests/components/manager-extension-composition.test.js` drives the real class
+  // against a recording `Hooks` and admin store for that.
+  // `Document#pack` falls back to `this.parent?.pack`, so a compendium-actor item is readable off
+  // the embedded doc; and `scheduleKnowledgeRefresh` no-ops unless the Knowledge surface is open.
+  defineStructureContract(
+    'registers the Knowledge hook set, filtered to what can change the projection',
+    { file: APP_SHELL, member: '_registerUserHooks' },
+    {
+      hooks: ['createItem', 'updateItem', 'deleteItem', 'createActor', 'deleteActor'],
+      diffKeys: [['diff', 'flags']],
+      reads: ['doc.parent.documentName', 'doc.pack'],
+      calls: ['markLearnedRecipeIndexStale', 'scheduleKnowledgeRefresh'],
+      compares: ['Actor'],
+    }
+  );
+
+  it('registers every user hook as an [hookName, id] tuple, and unregisters by the same shape', () => {
+    const registerHooks = classMemberAst(moduleAstOf(APP_SHELL).ast, '_registerUserHooks');
+    const nodes = [...walkNodes(registerHooks)];
+    const registrations = nodes.filter(registersAHook);
+    const tuples = nodes.filter(
+      (node) =>
+        node.type === 'ArrayExpression' &&
+        node.elements.length === 2 &&
+        registersAHook(node.elements[1])
+    );
     assert.ok(registrations.length >= 4, 'the user hooks are registered here');
     assert.equal(
       tuples.length,
       registrations.length,
-      'every Hooks.on id is registered inside a [hookName, id] tuple'
+      'every Hooks.on id is registered inside a [hookName, id] tuple — a bare id makes the ' +
+        'unregister side destructure undefined and leak the listener across every manager reopen'
     );
-    assert.ok(
-      appSource.includes('for (const [hook, id] of this._userHooks)'),
-      'the unregister side destructures the tuple'
+    const unregister = classMemberAst(moduleAstOf(APP_SHELL).ast, '_unregisterUserHooks');
+    const destructured = [...walkNodes(unregister)].some(
+      (node) =>
+        node.type === 'ForOfStatement' &&
+        node.left?.declarations?.[0]?.id?.type === 'ArrayPattern' &&
+        node.left.declarations[0].id.elements.length === 2
     );
-
-    // The GM gate is `isGM`, NOT `activeGM`: this is a single-client, user-initiated
-    // mutation from a GM-only Application, and `activeGM` would lock out the assistant
-    // GMs `show()` already admits.
-    assert.ok(
-      appSource.includes('if (game.user?.isGM !== true)') &&
-        appSource.includes('KNOWLEDGE_MESSAGES.gmOnly'),
-      'the knowledge gate denies a non-GM with the GM-only message'
-    );
-    assert.equal(
-      /activeGM/.test(appSource.slice(appSource.indexOf('_knowledgeActor('))),
-      false,
-      'the Knowledge seam must never gate on activeGM'
-    );
-    // All four mutating methods reach that gate — directly, or through the shared
-    // `_knowledgeTarget` resolver which calls it first.
-    for (const method of [
-      '_expendRecipeItemUse({',
-      '_deleteOwnedRecipeItem({',
-      '_eraseLearnedRecipe({',
-      '_resetActorKnowledge({',
-    ]) {
-      const start = appSource.indexOf(`async ${method}`);
-      assert.ok(start > 0, `${method} exists`);
-      const body = appSource.slice(start, start + 700);
-      assert.match(
-        body,
-        /this\._knowledge(Actor|Target)\(/,
-        `${method} resolves through the GM-gated helper`
-      );
-      assert.ok(body.includes('if (denied) return denied;'), `${method} returns the denial`);
-    }
-    assert.ok(
-      appSource.includes('const { actor, denied } = this._knowledgeActor(actorId);'),
-      '_knowledgeTarget itself runs the GM gate before any document lookup'
-    );
-
-    // The Foundry-free mutation bodies live in the collaborator, so the seam only
-    // resolves documents and delegates.
-    assert.ok(
-      appSource.includes(
-        "} from './svelte/apps/manager/knowledge/knowledgeMutations.js';"
-      ),
-      'the seam delegates its mutations to the plain-JS collaborator'
-    );
-    for (const call of [
-      'await expendOwnedRecipeItemUse({',
-      'await deleteOwnedRecipeItemCopy({',
-      'await eraseLearnedRecipeEntry({',
-      'await resetActorKnowledgeState({',
-    ]) {
-      assert.ok(appSource.includes(call), `the seam calls ${call}`);
-    }
-
-    // The roster is player characters only — the same predicate the Access roster uses.
-    //
-    // ANTI-PIN (issue 1024). The old assertion pinned the exact
-    // `game.fabricate?.isPlayerCharacterActor?.(actor) ?? actor?.type === 'character'`
-    // reach-around this change deletes. Replacing it with a positive
-    // `includes('isPlayerCharacterActor(actor)')` would be a tautology that survives a
-    // WRONG import — so instead assert the hardcoded literal is ABSENT (provably red
-    // before this change, at both the Access and Knowledge rosters) plus the import.
-    assert.equal(
-      appSource.includes("actor?.type === 'character'"),
-      false,
-      'the manager app must not re-hardcode the dnd5e/pf2e player-character actor type'
-    );
-    assert.equal(
-      appSource.includes("actor.type === 'character'"),
-      false,
-      'nor the unchained spelling of it'
-    );
-    assert.equal(
-      appSource.includes('game.fabricate?.isPlayerCharacterActor'),
-      false,
-      'the predicate is not published on game.fabricate, so no site may reach for it there'
-    );
-    assert.ok(
-      appSource.includes(
-        "import { isPlayerCharacterActor } from '../config/playerCharacterTypes.js';"
-      ),
-      'the manager app imports the shared, GM-configurable player-character predicate'
-    );
+    assert.ok(destructured, 'the unregister side destructures the tuple');
   });
 
-  // The learned-row ALLOWLIST (issue 1289). `_collectKnowledgeLearnedEntries` builds every
-  // learned row as a hand-written object literal, so a field that literal does not name never
-  // reaches the display ladder at all — the row renders whatever an earlier rung answers, with
-  // nothing failing anywhere. Deleting the `granted`/`grantedBy` pair from it survived the
-  // whole suite: the mounted Knowledge suite feeds `projectKnowledgeSnapshot` a hand-built
-  // `rawLearned` fixture, so it proves the ladder and the render but never the collection; the
-  // Foundry step opens no Knowledge row for its throwaway actor; and the View Lab frame is a
-  // screenshot, not a gate.
-  //
-  // The expected set is DERIVED from the ladder's own source rather than restated, so a field
-  // added to the ladder later cannot be forgotten here either.
+  defineStructureContract(
+    'gates the Knowledge seam on isGM and denies a non-GM with the GM-only message',
+    { file: KNOWLEDGE_TARGETS, fn: 'knowledgeActor' },
+    { reads: ['game.user.isGM', 'KNOWLEDGE_MESSAGES.gmOnly'] }
+  );
+
+  defineStructureContract(
+    'runs that gate before any document lookup on the item target too',
+    { file: KNOWLEDGE_TARGETS, fn: 'knowledgeTarget' },
+    { calls: ['knowledgeActor'] }
+  );
+
+  // Without the third column, the gated resolver, a row says the mutation is delegated but not
+  // that anything gates it.
+  const KNOWLEDGE_MUTATIONS = Object.freeze([
+    ['expendRecipeItemUse', 'expendOwnedRecipeItemUse', 'knowledgeTarget'],
+    ['deleteOwnedRecipeItem', 'deleteOwnedRecipeItemCopy', 'knowledgeTarget'],
+    ['eraseLearnedRecipe', 'eraseLearnedRecipeEntry', 'knowledgeActor'],
+    ['resetActorKnowledge', 'resetActorKnowledgeState', 'knowledgeActor'],
+  ]);
+
+  for (const [method, mutation, gate] of KNOWLEDGE_MUTATIONS) {
+    defineStructureContract(
+      `${method} resolves through the GM-gated helper and delegates its mutation`,
+      { file: KNOWLEDGE_TARGETS, fn: method },
+      { calls: [mutation, gate], names: ['denied'] }
+    );
+  }
+
+  // An anti-pin (issue 1024): a positive `isPlayerCharacterActor` claim is a tautology that
+  // survives the wrong import, so the claim is that the hardcoded actor type is absent, plus the
+  // import.
+  defineStructureContract(
+    'reaches the player-character roster through the shared, GM-configurable predicate', APP_SHELL,
+    {
+      imports: ['../config/playerCharacterTypes.js'],
+      comparesNo: ['character'],
+      readsNo: ['game.fabricate.isPlayerCharacterActor'],
+      namesNo: ['activeGM'],
+    }
+  );
+
+  // The two rosters that anti-pin exists for moved with the services bag (issue 1674), so the
+  // claim is asserted over its new home as well as its old one.
+  defineStructureContract(
+    'reaches the player-character roster through the shared, GM-configurable predicate',
+    MANAGER_SERVICES,
+    {
+      imports: ['../config/playerCharacterTypes.js'],
+      comparesNo: ['character'],
+      readsNo: ['game.fabricate.isPlayerCharacterActor'],
+    }
+  );
+
+  // The write half moved beside the primitives it drives (issue 1674), so the same anti-pin is
+  // asserted there: `activeGM` would lock out the assistant GMs `show()` already admits.
+  defineStructureContract('drives the merged knowledge primitives, ungated by activeGM', KNOWLEDGE_TARGETS, {
+    imports: ['./knowledgeMutations.js'],
+    namesNo: ['activeGM'],
+  });
+
+  // The learned-row allowlist (issue 1289). `collectKnowledgeLearnedEntries` in `src/systems/knowledgeSnapshot.js` builds each row as
+  // a hand-written object literal, so a field it does not name never reaches the display ladder:
+  // the row falls to an earlier rung with nothing failing, and the mounted fixture cannot see it.
   it('names every learned-entry field the display ladder reads', () => {
-    const studioSource = readFileSync(resolve(knowledgeComponentDir, 'knowledgeStudio.js'), 'utf8');
-    // Walked to a FIXED POINT from the projection the collected rows are fed to: every
-    // `raw.<field>` that projection reads, and the same again for every function it hands the
-    // same `raw` to, at any depth. One level would miss `granted`/`grantedBy`, which
-    // `learnedRecipeSource` reads only through `learnedRecipeGrantSource`.
+    const studio = moduleAstOf(KNOWLEDGE_STUDIO).ast;
+    // Walked to a fixed point from the projection the collected rows are fed to. One level would
+    // miss `granted`/`grantedBy`, which `learnedRecipeSource` reads only through
+    // `learnedRecipeGrantSource`.
     const readFields = new Set();
     const walked = new Set();
     const queue = ['projectLearnedRecipeRow'];
@@ -4172,9 +2600,15 @@ describe('CraftingSystemManager source contract', () => {
       const name = queue.shift();
       if (walked.has(name)) continue;
       walked.add(name);
-      const body = moduleFunctionSource(studioSource, name, 'knowledgeStudio.js');
-      for (const [, field] of body.matchAll(/\braw\.([A-Za-z_$][\w$]*)/g)) readFields.add(field);
-      for (const [, callee] of body.matchAll(/\b([A-Za-z_$][\w$]*)\(raw\)/g)) queue.push(callee);
+      const body = namedCodeAst(studio, name);
+      for (const path of memberPaths(body)) {
+        const [head, field] = path.split('.');
+        if (head === 'raw' && field) readFields.add(field);
+      }
+      for (const node of walkNodes(body)) {
+        if (node.type !== 'CallExpression' || node.arguments.length !== 1) continue;
+        if (node.arguments[0]?.name === 'raw') queue.push(calledName(node));
+      }
     }
     // A VACUITY guard, not the subject. The walk keys on the ladder's input still being named
     // `raw` and still being read field by field; a rewrite that destructured it would leave
@@ -4184,207 +2618,122 @@ describe('CraftingSystemManager source contract', () => {
       `the learned-row ladder no longer reads \`raw.<field>\`, so this derivation proves nothing (found ${[...readFields].join(', ') || 'nothing'})`
     );
 
-    const collector = classMemberSource(
-      appSource,
-      '_collectKnowledgeLearnedEntries(actor, items, context) {',
-      'SvelteCraftingSystemManagerApp.svelte.js'
+    const collector = namedCodeAst(
+      moduleAstOf(KNOWLEDGE_SNAPSHOT).ast,
+      'collectKnowledgeLearnedEntries'
     );
-    const literalStart = collector.indexOf('learnedRecipes.push({');
-    const literalEnd = collector.indexOf('\n      });', literalStart);
+    const literal = pushedRecord(collector, 'learnedRecipes');
     assert.ok(
-      literalStart >= 0 && literalEnd > literalStart,
+      Boolean(literal),
       'the learned-row literal is locatable inside the collector, so this is not an empty slice'
     );
-    const literal = collector.slice(literalStart, literalEnd);
-    // A field is named either as `field: value` or as the `field,` shorthand.
-    const named = new Set(
-      [...literal.matchAll(/^\s+([A-Za-z_$][\w$]*)[:,]/gm)].map(([, key]) => key)
-    );
+    // A field is named either as `field: value` or as the `field` shorthand.
+    const named = new Set(literal.properties.map((property) => property.key?.name));
     for (const field of readFields) {
       assert.ok(
         named.has(field),
         `the collector's allowlist drops \`${field}\`, which the learned-row ladder reads: the row falls silently to an earlier rung`
       );
     }
-    // Named for their own sake as well as by derivation: these two are the pair the ladder
-    // reads STRICTLY (`granted === true`, `typeof grantedBy === 'string'`), so they are also
-    // the pair a `String(...)` or `|| ''` default here would quietly make plausible.
+    // Named for their own sake as well as by derivation.
     assert.ok(
       readFields.has('granted') && readFields.has('grantedBy'),
       'the grant rungs are still part of the ladder this derivation walks'
     );
   });
 
-  it('wires a collapsible left rail persisted via the manager setting seam', () => {
-    assert.ok(
-      rootSource.includes(
-        "let railCollapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);"
-      ),
-      'rail collapsed state should initialize from the persisted managerRailCollapsed client setting'
+  // `railCollapsed` is the stored preference; the body renders `railCollapsedDisplay`, so the
+  // Downtime rail lock forces the sidebar open without un-collapsing every other route. The
+  // rendered half is mounted through `assertRailLockedOpen` and `assertRailLockSurvivesPresses`.
+  defineStructureContract('wires a collapsible left rail persisted via the manager setting seam', NAV_RAIL_MODEL, {
+    spells: ['managerRailCollapsed'],
+    reads: ['services.getSetting', 'services.setSetting'],
+    names: ['toggleRail'],
+    declares: ['collapsedDisplay'],
+  });
+
+  defineStructureContract('names the rail toggle for both states', MANAGER_NAV_RAIL, {
+    spells: [
+      'FABRICATE.Admin.Manager.Nav.CollapseRail',
+      'FABRICATE.Admin.Manager.Nav.ExpandRail',
+    ],
+  });
+
+  // Counted, not merely present (issue 1213 review): a mounted case renders one of the two sites,
+  // so the branch it does not reach would lose the lock silently.
+  it('writes the rail toggle twice, and both sites carry the same state attributes', () => {
+    const sites = templateNodes(componentAstOf(MANAGER_NAV_RAIL)).filter((node) =>
+      declaresAttribute(node, 'data-manager-rail-toggle', { directives: false })
     );
-    assert.ok(
-      rootSource.includes('function toggleManagerRail()'),
-      'root should expose a rail toggle handler'
-    );
-    assert.ok(
-      rootSource.includes("services?.setSetting?.('managerRailCollapsed', railCollapsed);"),
-      'toggling the rail should persist managerRailCollapsed through the setSetting seam'
-    );
-    // The DISPLAY value, never the stored one (issue 1213). `railCollapsed` is the GM's
-    // persisted client preference and stays authoritative for what is written back; what the
-    // body renders is `railCollapsed && !railLockedOpen`, so the Downtime rail lock can force
-    // the sidebar open without permanently un-collapsing the rail on every other route.
-    assert.ok(
-      rootSource.includes(
-        "class={`manager-body ${railCollapsedDisplay ? 'is-rail-collapsed' : ''}`}"
-      ),
-      'manager-body should bind the is-rail-collapsed modifier from the displayed rail state'
-    );
-    assert.ok(
-      rootSource.includes(
-        'const railCollapsedDisplay = $derived(railCollapsed && !railLockedOpen);'
-      ),
-      'and the displayed state must be DERIVED, never written back over the stored preference'
-    );
-    assert.ok(
-      rootSource.includes('class="manager-rail-toggle manager-scope-collapse"'),
-      'the scope-card header should render the shared collapse/expand control'
-    );
-    // COUNTED, not merely present (issue 1213 review). The control is written TWICE, once per
-    // `{#if selectedSystem}` scope-card branch, and an `includes` check is satisfied by either
-    // one alone — which is how deleting the lock attributes from the no-system branch survived
-    // the whole suite. Both sites read the DISPLAYED state and both are inert under the lock.
-    // `(?<![-\w])` because `aria-disabled={railLockedOpen}` CONTAINS `disabled={railLockedOpen}`,
-    // so a plain substring count reports four sites for two and reads as a pass.
-    const occurrences = (attribute) =>
-      rootSource.match(new RegExp(`(?<![-\\w])${attribute.replace(/[{}]/g, '\\$&')}`, 'g'))
-        ?.length ?? 0;
-    const railToggleSites = occurrences('data-manager-rail-toggle');
-    assert.equal(railToggleSites, 2, 'the scope card renders the rail toggle once per branch');
-    for (const attribute of [
-      'aria-pressed={railCollapsedDisplay}',
-      'aria-label={railToggleLabel}',
-      'title={railToggleTitle}',
-      'disabled={railLockedOpen}',
-      'aria-disabled={railLockedOpen}',
-    ]) {
-      assert.equal(
-        occurrences(attribute),
-        railToggleSites,
+    assert.equal(sites.length, 2, 'the scope card renders the rail toggle once per branch');
+    for (const attribute of ['aria-pressed', 'aria-label', 'title', 'disabled', 'aria-disabled']) {
+      assert.ok(
+        sites.every((node) => declaresAttribute(node, attribute, { directives: false })),
         `every rail-toggle site must carry ${attribute}, not just the one a mounted case renders`
       );
     }
-    assert.match(
-      rootSource,
-      /function toggleManagerRail\(\)\s*\{[\s\S]{0,400}?if \(railLockedOpen\) return;/,
-      'and the handler early-returns, so a programmatic call obeys the lock too'
-    );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Nav.CollapseRail') &&
-        rootSource.includes('FABRICATE.Admin.Manager.Nav.ExpandRail'),
-      'rail toggle labels should be localized for both states'
-    );
+  });
+
+  it('localizes the rail toggle for both states', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.CollapseRail, 'Collapse navigation rail');
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.ExpandRail, 'Expand navigation rail');
-    assert.ok(
-      appSource.includes('getSetting: this._services.getSetting,') &&
-        appSource.includes('setSetting: this._services.setSetting,'),
-      'manager app should expose the setting seam to the Svelte component services'
-    );
   });
+
+  defineStructureContract(
+    'exposes the setting seam to the Svelte component services',
+    { file: APP_SHELL, member: '_prepareSvelteProps', property: 'services' },
+    { reads: ['this._services.getSetting', 'this._services.setSetting'] }
+  );
 });
 
-/**
- * The world scoped-entity shell's HAND-MAINTAINED MIRRORS (issue 1362, epic 1357).
- *
- * Every assertion here guards a mirror between two files that no compiler and no mounted test
- * can see, and each one has already been wrong once:
- *
- *  - `ScopedEntityPreview`'s class stem is a PROP, so the five class names it renders are built
- *    at runtime and Svelte cannot check them against a stylesheet. Its docblock asserted both
- *    stems were declared in `styles/fabricate.css` while the DEFAULT stem had no rules at all,
- *    and nothing failed - the only shipped caller passes the tool stem.
- *  - the seven placeholder pages are four-value mirrors of a route token, and `npm test` renders
- *    none of them: `data-scoped-page` appears only in the View Lab registry, which is a capture
- *    gate rather than a unit gate. A swapped `titleKey` between two pages ships green.
- *  - the entry routes' breadcrumb carries its catalogue's own lang key, which is a second copy
- *    of the key `viewTitle` resolves that catalogue's header with.
- */
+/** The world scoped-entity shell's HAND-MAINTAINED MIRRORS (issue 1362, epic 1357). */
 describe('world scoped-entity source contract (issue 1362)', () => {
-  const scopedDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped');
-  const previewSource = readFileSync(resolve(scopedDir, 'ScopedEntityPreview.svelte'), 'utf8');
-  const toolPreviewSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte'),
-    'utf8'
-  );
-  const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
-  const viewTitleSource = classMemberSource(
-    rootSource,
-    'function viewTitle() {',
-    'the manager root'
-  );
+  const SCOPED_DIR = 'src/ui/svelte/apps/manager/scoped';
+  const SCOPED_PREVIEW = `${SCOPED_DIR}/ScopedEntityPreview.svelte`;
+  // The Tool rail's stem is its own prop default now.
+  const TOOL_PREVIEW = 'src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte';
+  const declaredClasses = declaredManagerClasses();
 
-  // Every class the manager stylesheet declares a rule for, as a `.fabricate-manager .<class>`
-  // subject. Built FROM the sheet rather than grepped per name, so the non-vacuity control below
-  // can prove the lookup is capable of answering "no".
-  const declaredManagerClasses = new Set(
-    [...fabricateCss.matchAll(/\.fabricate-manager\s+\.([a-z0-9-]+)/g)].map((match) => match[1])
-  );
-
-  /**
-   * The SEVEN class names `ScopedEntityPreview` renders for a given stem, derived from the
-   * component's own markup rather than restated here: a list restated in this file would be a
-   * third copy of the mirror it exists to guard.
-   *
-   * @param {string} stem
-   * @returns {string[]}
-   */
+  /** The seven class names `ScopedEntityPreview` renders for a given stem. */
   function renderedPreviewClasses(stem) {
-    const suffixes = [...previewSource.matchAll(/\$\{classPrefix\}-([a-z-]+)/g)].map(
-      (match) => match[1]
-    );
+    const suffixes = templateSuffixes(componentAstOf(SCOPED_PREVIEW), 'classPrefix');
     return [stem, ...new Set(suffixes.map((suffix) => `${stem}-${suffix}`))];
   }
 
+  defineStructureContract(
+    'renders the shared rail under the placement-free default stem',
+    WORLD_TOOL_ENTRY,
+    { attributes: [['classPrefix', 'manager-scoped-preview']] }
+  );
+
   it('declares a rule for every class the preview shell renders, for BOTH stems', () => {
+    const preview = componentAstOf(SCOPED_PREVIEW);
     assert.ok(
-      previewSource.includes('<aside class={classPrefix}'),
+      templateNodes(preview).some(
+        (node) =>
+          node.name === 'aside' && attributeExpression(node, 'class')?.name === 'classPrefix'
+      ),
       'the shell renders the bare stem as a class, which the derivation below depends on'
     );
-    const defaultStem = previewSource.match(/classPrefix = '([a-z-]+)'/)?.[1];
-    // THE TOOL RAIL'S STEM IS ITS OWN PROP DEFAULT NOW, not a literal it hands down (issue 1373's
-    // parity round). `manager-tool-preview` carries the system Tool Studio's GRID PLACEMENT
-    // (`grid-column: 3; grid-row: 2 / 4`) and its filled panel surface, so handing it to the
-    // world Tool entry — whose column is a two-track grid — placed that rail in an implicit
-    // third column off the side of its own layout. The world entry passes the DEFAULT stem
-    // instead, which is why both stems still have to be declared.
-    const toolStem = toolPreviewSource.match(/classPrefix = '([a-z-]+)'/)?.[1];
+    const defaultStem = propDefault(preview, 'classPrefix');
+    const toolStem = propDefault(componentAstOf(TOOL_PREVIEW), 'classPrefix');
     assert.equal(defaultStem, 'manager-scoped-preview');
     assert.equal(toolStem, 'manager-tool-preview');
-    assert.ok(
-      worldToolEntrySource.includes('classPrefix="manager-scoped-preview"'),
-      'the world Tool entry renders the shared rail under the placement-free default stem'
-    );
 
-    // NON-VACUITY FIRST. The lookup is a set built by regex over a 20,000-line stylesheet, and a
-    // regex that stopped matching would make every assertion below pass against an empty
-    // question. So the set has to be large, and it has to be able to answer no.
+    // NON-VACUITY FIRST. The lookup is a set built by regex over a 20,000-line stylesheet.
     assert.ok(
-      declaredManagerClasses.size > 200,
+      declaredClasses.size > 200,
       'the stylesheet scan found almost nothing, so it cannot be trusted to find an omission'
     );
     assert.equal(
-      declaredManagerClasses.has('manager-scoped-preview-not-a-real-region'),
+      declaredClasses.has('manager-scoped-preview-not-a-real-region'),
       false,
       'the lookup can answer no, so the assertions below are measurements'
     );
 
     for (const stem of [defaultStem, toolStem]) {
       const classes = renderedPreviewClasses(stem);
-      // SEVEN since issue 1371's parity round: the shell gained a `-scope-note` line under the
-      // head block and a `-fact-empty` sentence for a fact group with no rows. The number is
-      // pinned rather than derived so a region ADDED without a rule is a failure here rather
-      // than a silently unstyled block on six editors.
+      // SEVEN since issue 1371's parity round.
       assert.equal(
         classes.length,
         7,
@@ -4392,7 +2741,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
       );
       for (const className of classes) {
         assert.ok(
-          declaredManagerClasses.has(className),
+          declaredClasses.has(className),
           `\`styles/fabricate.css\` declares no rule for \`.${className}\`. The shell's docblock ` +
             'says both stems are declared there and this is the only thing that checks it: a ' +
             'renamed region leaves the six editors PRs 6a-c and 7 build rendering unstyled, and ' +
@@ -4402,20 +2751,34 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     }
   });
 
-  /**
-   * The `{key, fallback}` pair `viewTitle` declares for each world scoped-entity route, keyed by
-   * route token.
-   *
-   * @returns {Map<string, {key: string, fallback: string}>}
-   */
+  /** The `{key, fallback}` pair `viewTitle` declares per world scoped-entity route. */
   function scopedTitlesFromRoot() {
     const titles = new Map();
-    const pattern =
-      /if \(currentView === '(world-[a-z-]+)'\)\s*\n\s*return text\('([^']+)', '([^']*)'\);/g;
-    for (const match of viewTitleSource.matchAll(pattern)) {
-      titles.set(match[1], { key: match[2], fallback: match[3] });
+    const viewTitle = namedCodeAst(moduleAstOf(HEADER_MODEL).ast, 'viewTitle');
+    for (const node of walkNodes(viewTitle)) {
+      if (node.type !== 'IfStatement') continue;
+      const view = comparedLiteral(node.test, 'currentView');
+      const [key, fallback] = returnedTextArguments(node.consequent);
+      if (String(view).startsWith('world-') && key !== undefined) titles.set(view, { key, fallback });
     }
     return titles;
+  }
+
+  /** The four facts `scopedEntryRoutes.js` records per entry route, in declaration order. */
+  function declaredEntryRoutes(file) {
+    const routes = [];
+    for (const node of walkNodes(moduleAstOf(file).ast)) {
+      if (node.type !== 'Property' || !/^world-[a-z-]+-entry$/.test(node.key?.value ?? '')) continue;
+      const fact = (key) => propertyValues(node.value, key)[0];
+      routes.push({
+        entryView: node.key.value,
+        entityType: fact('entityType'),
+        catalogueView: fact('catalogueView'),
+        catalogueTitleKey: fact('catalogueTitleKey'),
+        catalogueTitleFallback: fact('catalogueTitleFallback'),
+      });
+    }
+    return routes;
   }
 
   it('gives each of the seven placeholder pages a DISTINCT triple that matches its route', () => {
@@ -4427,35 +2790,15 @@ describe('world scoped-entity source contract (issue 1362)', () => {
         'cross-check below would be against the wrong set'
     );
 
-    // TWO SPELLINGS, AND BOTH ARE READ (issue 1372). A page that still DELEGATES its body states
-    // the four facts as attributes on `ScopedPlaceholderPage`; a page a screen lane has REPLACED
-    // states them as module constants beside its own `<main>`. Reading only the first form makes
-    // every replaced page answer `undefined` on all four, which collapses the distinctness sets
-    // below to fewer than seven and reds a lane that did everything right — and reading only the
-    // second would do the same to the four that have not been replaced yet. The swap detector has
-    // to survive the transition it exists to police, so it resolves either.
-    //
-    // THE CONSTANT IS READ FIRST, and the order is load-bearing rather than arbitrary (issue
-    // 1373). The attribute regex is unanchored, so on a REPLACED page it matches the first
-    // `icon="…"` anywhere in the file — which on a page whose inspector pins an action button is
-    // that BUTTON'S glyph, not the route's. Two replaced pages that happen to pin the same verb
-    // then report the same icon and the distinctness assertion reds on markup that is correct.
-    // A page that declares the constant has stated the fact deliberately; a delegating page has
-    // no constant to find and still falls through to its attribute.
-    const declared = (source, attribute, constant) =>
-      source.match(new RegExp(`const ${constant} = '([^']+)'`))?.[1] ??
-      source.match(new RegExp(`${attribute}="([^"]+)"`))?.[1];
-    // THE SEVEN PAGES, AND THE THREE `WorldComponentEntry*` CHILDREN THAT ARE NOT PAGES (issue
-    // 1371, parity round 4). The world Component entry was rebuilt to the reference as four
-    // files; each child renders a CARD or the rail, declares no route identity and carries no
-    // route hook. They are excluded BY NAME rather than by "has no PAGE_ID", because the
-    // non-vacuity assertion below exists precisely to catch a page that stopped declaring one.
+    // Two spellings, both read (issue 1372): a page that still delegates states the four facts as
+    // attributes on `ScopedPlaceholderPage`, one a screen lane has replaced as module constants.
+    // The `WorldComponentEntry*` children declare no route identity, so they are excluded by name.
     const SCOPED_ENTRY_CHILDREN = new Set([
       'WorldComponentEntryPreviewRail.svelte',
       'WorldComponentEntrySourceCard.svelte',
       'WorldComponentEntrySystemsCard.svelte',
     ]);
-    const pages = readdirSync(scopedDir)
+    const pages = readdirSync(resolve(repoRoot, SCOPED_DIR))
       .filter(
         (entry) =>
           entry.startsWith('World') &&
@@ -4463,19 +2806,20 @@ describe('world scoped-entity source contract (issue 1362)', () => {
           !SCOPED_ENTRY_CHILDREN.has(entry)
       )
       .map((entry) => {
-        const source = readFileSync(resolve(scopedDir, entry), 'utf8');
+        const page = componentAstOf(`${SCOPED_DIR}/${entry}`);
+        const declared = (attribute, constant) =>
+          constantLiteral(page, constant) ?? attributeLiteral(page, attribute);
         return {
           file: entry,
-          pageId: declared(source, 'pageId', 'PAGE_ID'),
-          icon: declared(source, 'icon', 'PAGE_ICON'),
-          titleKey: declared(source, 'titleKey', 'TITLE_KEY'),
-          titleFallback: declared(source, 'titleFallback', 'TITLE_FALLBACK'),
+          pageId: declared('pageId', 'PAGE_ID'),
+          icon: declared('icon', 'PAGE_ICON'),
+          titleKey: declared('titleKey', 'TITLE_KEY'),
+          titleFallback: declared('titleFallback', 'TITLE_FALLBACK'),
         };
       });
-    // NON-VACUITY, because the regex pair above is exactly the thing that can silently answer
-    // `undefined` for every page after a rename: a set of seven `undefined`s has size one, which
-    // the distinctness assertions below would catch, but a set of seven MISSING title fallbacks
-    // would not — nothing else reads that field.
+    // Non-vacuity: a set of seven `undefined` ids has size one, which the distinctness assertions
+    // below would catch, but seven missing title fallbacks would not — nothing else reads that
+    // field.
     for (const page of pages) {
       for (const field of ['pageId', 'icon', 'titleKey', 'titleFallback']) {
         assert.equal(
@@ -4501,10 +2845,9 @@ describe('world scoped-entity source contract (issue 1362)', () => {
         Boolean(declared),
         `${page.file} claims the route \`${page.pageId}\`, which \`viewTitle\` does not title`
       );
-      // THE SWAP DETECTOR. The page resolves the screen's name for its `<main>` accessible name
-      // and the header resolves it again for the `<h1>`, out of two different files. A swapped
-      // key renders a page titled after its sibling - which nothing in `npm test` renders, and
-      // which the View Lab would publish as a frame before anything failed.
+      // The swap detector. The page resolves the screen's name for its `<main>` accessible name
+      // and the header resolves it again for the `<h1>`, out of two different files; a swapped key
+      // renders a page titled after its sibling, which the View Lab would publish as a frame.
       assert.equal(
         page.titleKey,
         declared.key,
@@ -4521,26 +2864,22 @@ describe('world scoped-entity source contract (issue 1362)', () => {
 
   it('roots each entry route at its own catalogue, under that catalogue title key', () => {
     const titles = scopedTitlesFromRoot();
-    const entryRoutesSource = readFileSync(resolve(scopedDir, 'scopedEntryRoutes.js'), 'utf8');
-    const declared = [
-      ...entryRoutesSource.matchAll(
-        /'(world-[a-z-]+-entry)': Object\.freeze\(\{\s*entityType: '([a-z]+)',\s*catalogueView: '([a-z-]+)',\s*catalogueTitleKey: '([^']+)',\s*catalogueTitleFallback: '([^']+)',/g
-      ),
-    ];
+    const declared = declaredEntryRoutes(`${SCOPED_DIR}/scopedEntryRoutes.js`);
     assert.deepEqual(
-      declared.map((match) => match[1]),
+      declared.map((route) => route.entryView),
       ['world-component-entry', 'world-essence-entry', 'world-tool-entry'],
       'three entry routes, one per scoped entity type'
     );
-    for (const match of declared) {
-      const [, entryView, entityType, catalogueView, catalogueKey, catalogueFallback] = match;
+    for (const route of declared) {
+      const { entryView, entityType, catalogueView, catalogueTitleKey, catalogueTitleFallback } =
+        route;
       assert.ok(titles.has(entryView), `${entryView} is one of the seven titled routes`);
       const catalogue = titles.get(catalogueView);
       assert.ok(Boolean(catalogue), `${entryView} returns to \`${catalogueView}\`, a real route`);
       // The middle crumb names the catalogue with the SAME string the catalogue own header
       // uses. Two copies of one lang key is exactly the mirror this suite exists to hold.
-      assert.equal(catalogueKey, catalogue.key, `${entryView} catalogue crumb key`);
-      assert.equal(catalogueFallback, catalogue.fallback, `${entryView} catalogue crumb copy`);
+      assert.equal(catalogueTitleKey, catalogue.key, `${entryView} catalogue crumb key`);
+      assert.equal(catalogueTitleFallback, catalogue.fallback, `${entryView} catalogue crumb copy`);
       assert.ok(
         catalogueView.startsWith(`world-${entityType.slice(0, 4)}`),
         `${entryView} must return to the catalogue of its OWN entity type`
@@ -4548,40 +2887,44 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     }
   });
 
+  // The crumb is shell chrome, and `## GM World Scoped Entity Routes` requirement 7 closes the
+  // shell to PRs 6a, 6b and 6c - so an entry editor, released to full width and therefore
+  // rendering no inspector, would have had no way back at all if this were left to them.
   it('renders the entry trail as three crumbs, the middle one a button back to the catalogue', () => {
-    // The crumb is shell chrome, and `### GM World Scoped Entity Routes` requirement 7 closes
-    // the shell to PRs 6a, 6b and 6c - so an entry editor, released to full width and therefore
-    // rendering no inspector, would have had no way back at all if this were left to them.
-    assert.match(
-      rootSource,
-      /\{#if worldScopedEntryRoute\}[\s\S]{0,900}?data-breadcrumb-world-scoped-catalogue=\{worldScopedEntryRoute\.catalogueView\}[\s\S]{0,400}?onclick=\{\(\) => setView\(worldScopedEntryRoute\.catalogueView\)\}/,
-      'the entry trail draws an intermediate catalogue crumb, and it navigates'
+    const root = componentAstOf(MANAGER_ROOT);
+    const crumbs = templateNodes(componentAstOf(MANAGER_HEADER_BREADCRUMBS)).filter((node) =>
+      declaresAttribute(node, 'data-breadcrumb-world-scoped-catalogue', { directives: false })
     );
+    assert.equal(crumbs.length, 1, 'the entry trail draws one intermediate catalogue crumb');
+    const [crumb] = crumbs;
+    assert.equal(crumb.name, 'button', 'and it is a real button, not a static crumb');
+    const navigation = attributeExpression(crumb, 'onclick');
+    assert.ok(callNames(navigation).has('setView'), 'the crumb navigates');
+    assert.ok(
+      memberPaths(navigation).includes('worldScopedEntryRoute.catalogueView'),
+      'to the catalogue the entry route records, rather than to a second copy of that mapping'
+    );
+
     // AND THE SUBJECT REACHES IT WITHOUT REOPENING THIS FILE. A catalogue row in PR 6a calls
     // `onOpenEntry(entityId)`; the shell records the subject, performs the navigation through
     // the confirm-discard gate, and resolves the name out of the published world corpus.
-    //
-    // THE DATA SEAM SITS BETWEEN THE TAG AND THE ROUTE SEAM (issue 1374), so it is matched
-    // rather than skipped over: a catalogue reached through `onOpenEntry` and handed no world
-    // corpus has no rows to open an entry FROM, which is the gap this pairing now records.
-    // WHICH bundle each site takes is `manager-scoped-prop-contract.test.js`'s subject.
     for (const [catalogue, entry] of [
       ['WorldComponentCataloguePage', 'world-component-entry'],
       ['WorldEssenceCataloguePage', 'world-essence-entry'],
       ['WorldToolCataloguePage', 'world-tool-entry'],
     ]) {
-      assert.match(
-        rootSource,
-        new RegExp(
-          `<${catalogue}\\s*\\n\\s*\\{\\.\\.\\.[a-zA-Z]+ScopeProps\\}\\s*\\n\\s*onOpenEntry=\\{\\(entityId\\) => openWorldScopedEntry\\('${entry}', entityId\\)\\}`
-        ),
-        `${catalogue} is wired with both seams PR 6a builds its catalogue on`
-      );
+      const page = templateNodes(root).find((node) => node.name === catalogue);
+      assert.ok(Boolean(page), `${catalogue} is rendered by the shell`);
+      assert.ok(carriesSpread(page), `${catalogue} takes the shared scope props`);
+      const open = attributeExpression(page, 'onOpenEntry');
+      assert.ok(callNames(open).has('openWorldScopedEntry'), `${catalogue} opens an entry route`);
+      assert.ok(literalStrings(open).includes(entry), `${catalogue} opens \`${entry}\``);
     }
-    assert.match(
-      rootSource,
-      /function openWorldScopedEntry\(view, entityId\) \{[\s\S]{0,500}?confirmRouteExit\(view\)/,
-      'and it routes through the same confirm-discard gate every other navigation passes'
-    );
   });
+
+  defineStructureContract(
+    'and routes that open through the same confirm-discard gate every navigation passes',
+    { file: MANAGER_ROOT, fn: 'openWorldScopedEntry' },
+    { callsWith: [['confirmRouteExit', 'view']] }
+  );
 });

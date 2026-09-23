@@ -5,7 +5,7 @@ import { compileFunction } from 'node:vm';
 import { IngredientSet } from '../src/models/IngredientSet.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
-import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
+import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
 import { resolvedComponentsFor } from '../src/systems/scopedEntityReads.js';
 import { createJournalRunAuthority } from '../src/systems/journalRunAuthority.js';
@@ -88,9 +88,9 @@ function commandHarness({
 
 describe('journal run command protocol', () => {
   function loadCraftingOperations() {
-    const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+    const source = readFileSync(new URL('../src/bootstrap/journalOperations.js', import.meta.url), 'utf8');
     const start = source.indexOf('async function resolveJournalSourceActors(');
-    const end = source.indexOf('function createJournalCommandsForFabricate(', start);
+    const end = source.indexOf('export function createJournalCommandsForFabricate(', start);
     assert.ok(start >= 0 && end > start, 'the production operation factory must be present');
     return compileFunction(`${source.slice(start, end)}\nreturn createCraftingJournalOperations;`,
       ['resolveAlchemySubmissions', 'resolvedComponentsFor', 'createManagerMutation'])(
@@ -233,8 +233,6 @@ describe('journal run command protocol', () => {
    * `source-owner-required` was spelled, localized and vocabulary-tested, but nothing proved it
    * FIRES (issue 1648, Q-H5): deleting the gate, or making `journalSourcesOwnedBy` return `true`,
    * left every suite green while a non-GM could consume materials off an actor they do not own.
-   * Only `authorize`/`execute` are substituted here — the gate, `resolveJournalSourceActors` and
-   * `journalSourcesOwnedBy` are the production ones, compiled out of `main.js`.
    */
   it('refuses a craft drawing materials from a source actor the sender does not own', async () => {
     const originalGame = globalThis.game;
@@ -467,15 +465,9 @@ describe('journal run command protocol', () => {
   });
 
   it('never opens a roll prompt for the public craft API, and settles the check itself', async () => {
-    // Issue 1683. `promptCheck` awaits a HUMAN and has no timeout of its own -- `sendCommand`
-    // has one, the prompt does not -- so a macro or script calling `game.fabricate.craft()` hung
-    // forever the moment the craft reached a stage with a check. It became reachable when run
-    // start began committing the first stage for a recipe with no time requirement, which made
-    // `canExecuteImmediately` true and took the public path through `execute`.
-    //
-    // Driven through the REAL `executeJournalRunCommand`, because the defect lived in the seam
-    // between it and `executePublicCraft`: every other case here stubs `executeCommand`, so
-    // nothing exercised the prompt branch at all.
+    // Issue 1683. `promptCheck` awaits a HUMAN and has no timeout of its own -- `sendCommand` has
+    // one, the prompt does not -- so a macro or script calling `game.fabricate.craft()` hung
+    // forever the moment the craft reached a stage with a check.
     let promptCalls = 0;
     const executed = [];
     const { service } = commandHarness({
@@ -522,13 +514,63 @@ describe('journal run command protocol', () => {
     assert.equal(executed.length, 1, 'the stage still executed, with the check settled for it');
   });
 
+  it('opens the roll prompt for an interactive public craft, as the crafting screen asks', async () => {
+    // Issue 1780. The player app's Craft button reaches the same `executePublicCraft` as a macro,
+    // through `game.fabricate.craftRecipe({ interactive: true })`. Issue 1683 hard-coded the
+    // execute as non-interactive, and once `main.js` began forwarding the option (issue 1759)
+    // the crafting screen lost its roll dialog: the View Lab's `player-crafting-roll-prompt`
+    // frame went from a standing prompt to a bare crafting tab. The flag is the CALLER's.
+    let promptCalls = 0;
+    const executed = [];
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      promptCheck: async () => {
+        promptCalls += 1;
+        return { confirmed: true, modifierIds: ['hb-mod-medicine'] };
+      },
+      operations: {
+        crafting: {
+          getRun: () => ({ id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' }),
+          describeCheck: async () => ({ required: true, publicPrompt: {}, privateEvaluation: {} }),
+          evaluateCheck: async () => ({
+            success: true,
+            engineEvaluated: true,
+            outcome: null,
+            value: null,
+            data: {},
+          }),
+          execute: async (args) => (executed.push(args), { success: true, terminal: true }),
+        },
+      },
+    });
+
+    const settled = await executePublicCraft({
+      engine: {
+        craft: async () => ({
+          success: true,
+          runId: 'run-1',
+          runRevision: 3,
+          requiresExecution: true,
+          canExecuteImmediately: true,
+        }),
+      },
+      runManager: { getActiveRun: () => null },
+      actor: { uuid: 'Actor.a' },
+      sourceActors: [{ uuid: 'Actor.a' }],
+      recipe: { id: 'recipe' },
+      options: { interactive: true },
+      executeCommand: (command, options) => service.executeJournalRunCommand(command, options),
+    });
+
+    assert.equal(promptCalls, 1, 'the crafting screen still gets its roll dialog');
+    assert.equal(settled.success, true, JSON.stringify(settled));
+    assert.equal(executed.length, 1, 'and the stage executed with the answered check');
+  });
+
   it('finishes a ready public gather in one call, and leaves a waiting one alone', async () => {
-    // Issue 1759. Issue 1648 gave gathering a versioned lifecycle and `startGatheringAttempt`
-    // began selecting it unconditionally, which routes a READY attempt away from the engine's
-    // immediate resolution and into a started run awaiting execution. Crafting was given
-    // `executePublicCraft` for exactly this in the same work; gathering was not. So every macro
-    // calling `game.fabricate.startGatheringAttempt()` went on answering `accepted: true` and
-    // awarding nothing -- a silent behaviour change in a documented public API.
+    // Issue 1759. Issue 1648 gave gathering a versioned lifecycle and `startGatheringAttempt` began
+    // selecting it unconditionally, which routes a READY attempt away from the engine's immediate
+    // resolution and into a started run awaiting execution.
     const executed = [];
     const ready = await executePublicGather({
       requestStart: async () => ({
@@ -537,9 +579,8 @@ describe('journal run command protocol', () => {
         requiresExecution: true,
         canExecuteImmediately: true,
         runId: 'gather-1',
-        // Top-level, as the command service's NORMALISED result carries it -- it lifts the
-        // revision out and drops the run document. A fixture shaped `run: { runRevision }` passes
-        // while production sends `undefined`.
+        // Top-level, as the command service's NORMALISED result carries it -- it lifts the revision
+        // out and drops the run document.
         runRevision: 4,
         blockedReasons: [],
       }),
@@ -569,9 +610,8 @@ describe('journal run command protocol', () => {
         requiresExecution: true,
         canExecuteImmediately: false,
         runId: 'gather-2',
-        // Top-level, as the command service's NORMALISED result carries it -- it lifts the
-        // revision out and drops the run document. A fixture shaped `run: { runRevision }` passes
-        // while production sends `undefined`.
+        // Top-level, as the command service's NORMALISED result carries it -- it lifts the revision
+        // out and drops the run document.
         runRevision: 1,
       }),
       actor: { uuid: 'Actor.a' },
@@ -596,10 +636,36 @@ describe('journal run command protocol', () => {
     assert.deepEqual(blocked.blockedReasons, [{ code: 'SCENE_BLOCKED' }]);
   });
 
+  it('forwards the gathering screen\'s interactive flag to a ready public gather', async () => {
+    // Issue 1780, the gathering half: `GatheringView` starts an attempt with `interactive: true`
+    // and expects its roll dialog on a required check. `executePublicGather` hard-coded the
+    // execute as non-interactive, so a ready attempt with a check settled silently.
+    const executed = [];
+    const ready = await executePublicGather({
+      requestStart: async () => ({
+        accepted: true,
+        started: true,
+        requiresExecution: true,
+        canExecuteImmediately: true,
+        runId: 'gather-1',
+        runRevision: 4,
+        blockedReasons: [],
+      }),
+      actor: { uuid: 'Actor.a' },
+      interactive: true,
+      executeCommand: async (command, options) => {
+        executed.push({ command, options });
+        return { success: true, terminal: true, status: 'succeeded', createdResultUuids: [] };
+      },
+    });
+
+    assert.equal(executed.length, 1);
+    assert.deepEqual(executed[0].options, { interactive: true }, 'the screen\'s flag reaches it');
+    assert.equal(ready.success, true, JSON.stringify(ready));
+  });
+
   it('reports a ready gather whose execution failed as accepted but unsuccessful', async () => {
-    // The start result is kept UNDER the settled one rather than replaced. An attempt that was
-    // accepted and then failed to execute is both of those things at once, and a caller reading
-    // `accepted` must not be told the attempt never happened.
+    // The start result is kept UNDER the settled one rather than replaced.
     const settled = await executePublicGather({
       requestStart: async () => ({
         accepted: true,
@@ -607,9 +673,8 @@ describe('journal run command protocol', () => {
         requiresExecution: true,
         canExecuteImmediately: true,
         runId: 'gather-3',
-        // Top-level, as the command service's NORMALISED result carries it -- it lifts the
-        // revision out and drops the run document. A fixture shaped `run: { runRevision }` passes
-        // while production sends `undefined`.
+        // Top-level, as the command service's NORMALISED result carries it -- it lifts the revision
+        // out and drops the run document.
         runRevision: 2,
       }),
       actor: { uuid: 'Actor.a' },
@@ -628,9 +693,8 @@ describe('journal run command protocol', () => {
         requiresExecution: true,
         canExecuteImmediately: true,
         runId: 'gather-4',
-        // Top-level, as the command service's NORMALISED result carries it -- it lifts the
-        // revision out and drops the run document. A fixture shaped `run: { runRevision }` passes
-        // while production sends `undefined`.
+        // Top-level, as the command service's NORMALISED result carries it -- it lifts the revision
+        // out and drops the run document.
         runRevision: 1,
       }),
       actor: { uuid: 'Actor.a' },
@@ -1109,11 +1173,8 @@ describe('journal run command protocol', () => {
   });
 
   /**
-   * QE2-8 reported that `journalStore`'s cancel discriminator now lets the prepare-token
-   * RELEASE fall through to a refresh. It cannot: `executeJournalRunCommand` consumes the
-   * release's answer itself and returns its own `roll-cancelled` refusal, so the
-   * `{success: true, cancelled: true}` shape never leaves this module. Pinned here, because
-   * the reading that made the report plausible is one nothing failed on.
+   * QE2-8 reported that `journalStore`'s cancel discriminator now lets the prepare-token RELEASE
+   * fall through to a refresh.
    */
   it('keeps a dismissed roll a refusal, and never returns the release command answer', async () => {
     const run = { id: 'released-run', lifecycleVersion: 1, runRevision: 2, status: 'waiting' };
@@ -1724,9 +1785,9 @@ describe('journal run command protocol', () => {
 
 describe('journal run pause lifecycle at the real command boundary', () => {
   function loadCraftingOperations() {
-    const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+    const source = readFileSync(new URL('../src/bootstrap/journalOperations.js', import.meta.url), 'utf8');
     const start = source.indexOf('async function resolveJournalSourceActors(');
-    const end = source.indexOf('function createJournalCommandsForFabricate(', start);
+    const end = source.indexOf('export function createJournalCommandsForFabricate(', start);
     assert.ok(start >= 0 && end > start, 'the production operation factory must be present');
     return compileFunction(`${source.slice(start, end)}\nreturn createCraftingJournalOperations;`, [
       'resolveAlchemySubmissions',
@@ -1887,15 +1948,7 @@ describe('journal run pause lifecycle at the real command boundary', () => {
     'leaves the authority usable for a DIFFERENT run after a real cancel settles',
     withGlobals(async () => {
       // M25: the maintainer cancelled one of seven runs and every remaining run then reported
-      // `claim-held` with NO claim page on the ledger. This drives the real cancel through the
-      // real authority and asks the two questions that separate a retained claim from a stale
-      // READING of one: is the ledger's claim gone when the command settles, and is the next
-      // command on a DIFFERENT run refused?
-      //
-      // The mid-command observation reproduces `main.js`'s own wiring: creating the claim page
-      // fires `createJournalEntryPage`, whose handler refreshes availability. That refusal is
-      // TRUE while the command runs, which is what makes a reading of it taken then so
-      // dangerous once the command finishes.
+      // `claim-held` with NO claim page on the ledger.
       const { authority, commandOn, ledger, runs } = await pauseHarness({ runCount: 2 });
       const [first, second] = runs;
       const observed = [];

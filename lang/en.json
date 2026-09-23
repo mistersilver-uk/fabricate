@@ -9,6 +9,14 @@
       "Stepper": {
         "Decrease": "Decrease {label}",
         "Increase": "Increase {label}"
+      },
+      "SortableList": {
+        "Reorder": "Reorder {name} — use the up and down arrow keys",
+        "Remove": "Remove {name}"
+      },
+      "Disclosure": {
+        "Expand": "Show details for {name}",
+        "Collapse": "Hide details for {name}"
       }
     },
     "Migration": {
@@ -785,6 +793,7 @@
           "TierSuccess": "Awards on this result",
           "TierNoAward": "No award",
           "IngredientRoutingHint": "The ingredient option you choose determines what you craft.",
+          "IngredientRoutingHintMultiStep": "The ingredient option you choose determines what this step consumes. Produces shows the recipe's final product, awarded on the last step.",
           "ProgressiveHint": "This recipe is crafted over multiple steps.",
           "MultiStepHint": "This recipe is made in {count} steps — craft each in order.",
           "StepLabel": "Step {index}: {name}",
@@ -1320,6 +1329,7 @@
           "History": "Finished is your history browser: use its pages to review ended runs and their results. Dismissing an entry hides it only for you; the actor's history is retained."
         },
         "Quantity": "×{n}",
+        "RolledAmount": "Rolled {formula} = {total}",
         "Time": {
           "DayWithPhase": "Day {day}, {phase}",
           "DayWithClock": "Day {day} {time}"
@@ -1735,7 +1745,9 @@
       "BulkSalvageOutcomeError": "Something went wrong",
       "TierStepUp": "Stepped up {steps} tier(s)",
       "TierStepDown": "Stepped down {steps} tier(s)",
-      "TierStepTarget": "Stepped to a target tier"
+      "TierStepTarget": "Stepped to a target tier",
+      "RolledAmount": "Rolled {formula} = {total}",
+      "RolledAmountEmpty": "Rolled {formula} = {total}, nothing produced"
     },
     "Check": {
       "Roll": {
@@ -2023,6 +2035,7 @@
           "RespawnOverTime": "Over world time",
           "RespawnNone": "Does not regenerate",
           "RespawnEvery": "Every",
+          "RespawnIntervalUnit": "Respawn interval unit",
           "RespawnGainMode": "Each interval",
           "GainGuaranteed": "Add one node",
           "GainChance": "Chance to add one",
@@ -2387,7 +2400,6 @@
           "EmptyTitle": "No recipe items yet",
           "EmptyHint": "Drag a world or compendium item onto the drop-zone above to create your first recipe item, then link recipes to it.",
           "CapAll": "All",
-          "CapFilterLabel": "Filter recipe items by limits",
           "DropZoneLabel": "Drop a world or compendium item to create a recipe item",
           "DropZoneTitle": "Drop an item to create a recipe item",
           "DropZoneHint": "Drag a world or compendium item here to make it a book or scroll that teaches recipes.",
@@ -2565,11 +2577,6 @@
           "DeleteStepAlsoTools": "its ingredients and results are deleted too",
           "DeleteStepAlsoAll": "its ingredients, results, and tools are deleted too",
           "UnnamedStep": "this step",
-          "DragStep": "Drag to reorder",
-          "DragResult": "Drag to reorder",
-          "MoveResultUp": "Move up",
-          "MoveResultDown": "Move down",
-          "ResultMoveAnnouncement": "{name} moved to position {position} of {total}",
           "UnnamedResult": "this result",
           "Difficulty": "Difficulty",
           "DifficultyUnset": "No difficulty",
@@ -2657,6 +2664,7 @@
           "Requires": "Requires",
           "Produces": "Produces",
           "NoResults": "No results — a successful craft makes nothing.",
+          "NoResultsIntermediateStep": "This step produces nothing — it only advances the craft.",
           "UnknownComponent": "Unknown component",
           "UnknownEssence": "Unknown essence",
           "TagsAny": "Any of: {tags}",
@@ -2755,6 +2763,7 @@
           "AllowPlayerResultReorderToggle": "Allow player result re-ordering",
           "AddResultStage": "Add result stage",
           "ResultSetEmptyPanel": "Nothing produced on this outcome.",
+          "ResultSetEmptyIntermediatePanel": "Nothing produced on this step — it only advances the craft.",
           "AddResultSet": "Add result set",
           "RemoveResultSet": "Remove result set",
           "ResultSetNamePlaceholder": "Result set name",
@@ -3289,8 +3298,6 @@
             "DifficultyShort": "DC",
             "Edit": "Edit",
             "EditDcHint": "Set on this component in its editor",
-            "MoveUp": "Move up",
-            "MoveDown": "Move down",
             "DecrementResult": "Decrease quantity",
             "IncrementResult": "Increase quantity"
           },
@@ -3576,12 +3583,10 @@
           "SearchPlaceholder": "Search tags and categories...",
           "SearchLabel": "Search tags and categories",
           "Categories": "Recipe categories",
-          "CategoriesHint": "General is always available. Add custom categories for recipes that need clearer grouping — categories are flat, and each recipe picks exactly one.",
           "CategoryName": "Category name",
           "CategoryPlaceholder": "e.g. Potions",
           "AddCategory": "Add category",
           "ComponentCategories": "Component categories",
-          "ComponentCategoriesHint": "General is always available. Add custom categories to group components in the component directory. Separate from recipe categories.",
           "ComponentCategoryName": "Component category name",
           "ComponentCategoryPlaceholder": "e.g. Reagent",
           "AddComponentCategory": "Add component category",
@@ -3594,7 +3599,10 @@
           "RemoveComponentCategoryConfirm": "Remove {name}? {count} components may keep this category value until you update them.",
           "ComponentCategoryAddFailedFeedback": "Component category could not be added.",
           "ItemTags": "Component tags",
-          "ItemTagsHint": "Component tags organise components and power tag-based ingredient options in recipes. Tags are stored lowercase and can be reused across the whole system.",
+          "CategoriesSubline": "One per recipe, in this crafting system.",
+          "ComponentCategoriesSubline": "One per component, in this crafting system.",
+          "ItemTagsSubline": "Stored lowercase, reusable across this crafting system.",
+          "SortToolbar": "Sort {vocabulary}",
           "TagName": "Tag name",
           "TagPlaceholder": "e.g. herb",
           "AddTag": "Add tag",
@@ -3634,7 +3642,6 @@
           "TagAddedFeedback": "Tag added.",
           "TagNormalizedFeedback": "Tag added with cleaned-up lowercase text.",
           "TagAddFailedFeedback": "Tag could not be added.",
-          "Inspector": "Tags and categories inspector",
           "Selected": "Selected vocabulary",
           "AlwaysOn": "Always available",
           "InspectorHint": "Define the vocabulary GMs use when assigning recipe categories and component tags.",
@@ -3649,7 +3656,6 @@
           "ExampleCategorySingular": "\"{name}\" is used by 1 recipe.",
           "ExampleTag": "\"{name}\" appears on {count} components.",
           "ExampleTagSingular": "\"{name}\" appears on 1 component.",
-          "TabList": "Vocabulary tabs",
           "ShownCount": "{count} shown",
           "BuiltInFallback": "Built-in fallback — cannot be renamed or removed.",
           "SearchCategories": "Search recipe categories...",
@@ -3671,24 +3677,7 @@
           "RemoveComponentCategoryConfirmTitle": "Remove {name}?",
           "RemoveComponentCategoryConfirmHint": "\"{name}\" is used by {count} components. Deleting reassigns them to General.",
           "RemoveTagConfirmTitle": "Remove #{name}?",
-          "RemoveTagConfirmHint": "\"{name}\" is on {count} components. Deleting removes the tag from them.",
-          "AtAGlance": "Vocabulary at a glance",
-          "RecipeCategories": "Recipe categories",
-          "TotalReferences": "Total references",
-          "ReferenceSafeTitle": "Reference-safe by default",
-          "ReferenceSafeHint": "Deleting a referenced category reassigns its recipes and components to General; deleting a referenced tag strips it from the components that carry it and from any recipe ingredient that filters on it. Nothing is left dangling.",
-          "RecipeHelpTitle": "How recipe categories work",
-          "RecipeHelp1": "Categories are flat — each recipe picks one, with no parent or child folders.",
-          "RecipeHelp2": "General is the reserved fallback for recipes without a custom category.",
-          "RecipeHelp3": "Adding a category makes it selectable in the recipe editor immediately.",
-          "ComponentHelpTitle": "How component categories work",
-          "ComponentHelp1": "Every component belongs to General until you add categories to group them.",
-          "ComponentHelp2": "Component categories are independent of recipe categories.",
-          "ComponentHelp3": "Deleting a category reassigns its components back to General.",
-          "TagHelpTitle": "How component tags work",
-          "TagHelp1": "Tags appear on components and on tag-placeholder ingredients in recipes.",
-          "TagHelp2": "Tag names are normalised to lowercase so they stay consistent.",
-          "TagHelp3": "A recipe can require any component carrying a tag instead of a specific item."
+          "RemoveTagConfirmHint": "\"{name}\" is on {count} components. Deleting removes the tag from them."
         },
         "Essence": {
           "Title": "Essences",
@@ -4616,12 +4605,9 @@
             "ColRuntime": "Runtime state",
             "NoIncludedTasks": "No tasks are available in this environment yet.",
             "NoIncludedEvents": "No events are available in this environment yet.",
-            "DragReorder": "Drag to reorder",
             "OpenSourceTask": "Open source task",
             "OpenSourceEvent": "Open source event",
             "MoreActions": "More actions",
-            "MoveUp": "Move up",
-            "MoveDown": "Move down",
             "QuickExclude": "Exclude",
             "QuickRemove": "Remove",
             "Exclude": "Exclude from environment",
@@ -6144,7 +6130,6 @@
             "ResolvedBySubject": "Chosen per {record} — each {record} picks which of these apply, and the picks are summed.",
             "ResolvedPlayerPicks": "Player picks — the crafter chooses from these at roll time, and the picks are summed.",
             "TiersLeadBands": "A recipe picks one of these; its DC anchors the outcome bands on the Outcomes section.",
-            "ReorderTier": "Reorder {name} — use the up and down arrow keys",
             "ModifierNamedHeading": "Named modifiers",
             "SimpleBoundary": "Difficulty class",
             "SimpleBandsFallback": "This check has no reachable range to draw against yet. Set a roll formula and a DC.",
@@ -7140,6 +7125,10 @@
           "LearnedEmptyTitle": "Nothing learned yet",
           "LearnedFrom": "Learned from {source}",
           "LearnedRowActions": "Learned recipe actions",
+          "LoadError": "Couldn't load character knowledge.",
+          "LoadErrorHint": "Open another section, then return to Knowledge to try again. The browser console has the error.",
+          "LoadingHint": "Fabricate is reading each player character's recipe items and learned recipes.",
+          "LoadingTitle": "Loading character knowledge...",
           "MatchCompendium": "Compendium match",
           "MatchDuplicate": "Copy-source match",
           "MatchDuplicateHint": "This copy is linked to its recipe item only by duplicate-source provenance, the weakest tier. Bulk auto-learn refuses that link.",
@@ -7164,6 +7153,7 @@
           "RosterEmptyHint": "Assign a player character in this world to audit its recipe knowledge.",
           "RosterEmptyTitle": "No player characters",
           "RosterLabel": "Characters",
+          "RosterLoadingTitle": "Loading player characters...",
           "RosterMeta": "{items} item(s) · {learned} learned",
           "RosterNoMatchHint": "Clear the search to show every player character.",
           "RosterNoMatchTitle": "No characters match this search",
@@ -7547,8 +7537,6 @@
         "NewEnvironment": "New Environment",
         "NewEnvironmentName": "New Gathering Environment",
         "NewTaskName": "Configure gathering task",
-        "NewResultGroupName": "Results",
-        "TaskCopySuffix": "{name} Copy",
         "NewDraftTitle": "New Gathering Environment",
         "Unsaved": "Unsaved",
         "Invalid": "Invalid",
@@ -7573,7 +7561,6 @@
         "TaskName": "Task name",
         "TaskDescription": "Task description",
         "TaskImage": "Task image",
-        "ChooseImage": "Choose image",
         "ImagePickerUnavailable": "Image picker is not available.",
         "TaskEnabled": "Task enabled",
         "TaskResolutionMode": "Task resolution mode",
@@ -7695,9 +7682,6 @@
         "Yes": "Yes",
         "No": "No"
       }
-    },
-    "DropZone": {
-      "DefaultLabel": "Drop items here"
     },
     "Alchemy": {
       "Title": "Alchemy",

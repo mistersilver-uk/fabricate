@@ -1,33 +1,7 @@
 /**
- * The class-1 baseline drift guard (issue 1071) — the harness's actual regression guard.
- *
- * Mirrors `tests/view-lab-chrome-drift.test.js`: re-derive the committed values from source and
- * fail when they have moved. Here the "source" is the synthetic corpus and the code under
- * measurement, and the committed values are the machine-invariant counts in
- * `benchmarks/baselines/<profile>.json`.
- *
- * ## Why counts and not milliseconds
- *
- * A committed wall-clock number is re-measured on a different machine and read as a regression.
- * This repository has already paid for that: `scripts/lib/foundryRunBudget.js` records the
- * Foundry `rc` walk budget being re-estimated three times because hosted-runner timing did not
- * match local. Counts have no such problem — the same fixture examines the same number of
- * candidates everywhere — so counts are what is asserted and timings are never asserted at all.
- *
- * ## Why this test re-runs the benchmarks rather than only reading the files
- *
- * A drift test that compared the baseline to itself would be vacuous. Each profile's count pass
- * is executed here for real (`reps: 0` — the counted pass only, no timed repetitions), which is
- * also what keeps the fixture generators honest: a generator that silently produced the wrong
- * scale would move every count in the file.
- *
- * The pass cost a measured 4.6 seconds in total while it also carried the storage-arrangement
- * and connect-payload cases (issue 1247), which seeded or converted a 10,000-recipe corpus in
- * an UNTIMED setup; issue 1261 removed them with the arrangement they measured, and 3.3 s is
- * the figure recorded before they were added. That budget is the reason `held-inventory` pins
- * its recipe corpus at 6 rows and `rich-corpus` bounds its solver case at 12 — see the ceilings
- * recorded on each profile. Those bounds buy a guard that runs in the normal suite instead of a
- * fuller measurement that would only ever run by hand and would therefore never catch anything.
+ * The class-1 baseline drift guard (issue 1071) — the harness's actual regression guard. Mirrors
+ * `tests/view-lab-chrome-drift.test.js`: re-derive the committed values from source and fail when
+ * they have moved.
  */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
@@ -103,28 +77,20 @@ for (const profile of SWEPT_SCALE_PROFILE_NAMES) {
   });
 }
 
-// ---------------------------------------------------------------------------------------------
 // The foundry-only escape hatch (issue 1255). The three loops above dropped from
-// SCALE_PROFILE_NAMES to SWEPT_SCALE_PROFILE_NAMES, so a profile can now legally have no
-// committed baseline. That is exactly the kind of relaxation that widens silently, so the SET
-// that enjoys it is pinned by name here and every member has to justify itself.
-// ---------------------------------------------------------------------------------------------
+// SCALE_PROFILE_NAMES to SWEPT_SCALE_PROFILE_NAMES, so a profile can now legally have no committed
+// baseline.
 
 test('no profile claims the foundry-only exemption today', () => {
-  // EMPTY since issue 1265 removed `granular-corpus` with the storage-arrangement axis it was
-  // built for. Pinned as `[]` rather than deleted: the pin is the whole mechanism, and an empty
-  // expectation is what makes re-adding a member a visible edit rather than a silent widening.
+  // EMPTY since issue 1265 removed `granular-corpus` with the storage-arrangement axis it was built
+  // for.
   assert.deepEqual([...FOUNDRY_ONLY_SCALE_PROFILE_NAMES], []);
-  // With the list empty, this assertion is the ONLY load-bearing check on it. Every test below
-  // that iterates `FOUNDRY_ONLY_SCALE_PROFILE_NAMES` now iterates nothing and passes
-  // unconditionally, so read them as dormant rather than as live coverage: they start checking
-  // something again on the first commit that adds a member, which is exactly when they are wanted.
+  // With the list empty, this assertion is the ONLY load-bearing check on it.
 });
 
 test('the two profile lists partition the registry, with no overlap and nothing dropped', () => {
   // A profile that fell out of BOTH lists would be swept by nothing and pinned by nothing, and
-  // every assertion in this file would still pass. Checked as a partition rather than as two
-  // memberships for that reason.
+  // every assertion in this file would still pass.
   assert.deepEqual(
     [...SWEPT_SCALE_PROFILE_NAMES, ...FOUNDRY_ONLY_SCALE_PROFILE_NAMES].sort(),
     [...SCALE_PROFILE_NAMES].sort()

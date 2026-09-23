@@ -6,18 +6,13 @@ import { fileURLToPath } from 'node:url';
 import { compileFunction } from 'node:vm';
 
 import { FABRICATE_HOOKS, MANAGER_HOOKS, PLAYER_HOOKS } from '../src/config/hooks.js';
+import { FABRICATE_ENTRY_SOURCE } from './helpers/bootstrapEntrySource.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainPath = resolve(__dirname, '../src/main.js');
-const mainSource = readFileSync(mainPath, 'utf8');
+const mainSource = FABRICATE_ENTRY_SOURCE;
 
 /**
  * Assert one public hook namespace is on the aggregate, correctly named, and documented.
- *
- * Shared by the two namespaces rather than copied per namespace: the Jekyll API reference
- * hand-lists these names, so it is a MIRROR of `config/hooks.js` and mirrors rot silently — a
- * renamed constant would leave third parties subscribing to a string nothing publishes, with
- * nothing failing until someone read the page.
  *
  * @param {string} domain Hook domain segment (`manager`, `player`).
  * @param {Readonly<Record<string, string>>} namespace The exported constant bag.
@@ -73,11 +68,11 @@ test('every public player hook is namespaced, reachable on the API, and document
 });
 
 test('Fabricate publishes the stable manager extension API through both lifecycle binds', () => {
-  assertRegistryBind('managerExtensions', './ui/managerExtensions.js');
+  assertRegistryBind('managerExtensions', '../ui/managerExtensions.js');
 });
 
 test('Fabricate publishes the stable player extension API through both lifecycle binds', () => {
-  assertRegistryBind('playerExtensions', './ui/playerExtensions.js');
+  assertRegistryBind('playerExtensions', '../ui/playerExtensions.js');
 });
 
 test('Fabricate exposes deleteRecipe on the main Foundry API object', () => {
@@ -85,10 +80,8 @@ test('Fabricate exposes deleteRecipe on the main Foundry API object', () => {
     mainSource.includes('async deleteRecipe(recipeId)'),
     'Fabricate should expose a deleteRecipe method on the main game.fabricate API object'
   );
-  // Issue 1132: it routes through the CASCADING set primitive rather than the
-  // `RecipeManager` leaf, so the public API and the GM studio cannot disagree about what
-  // deleting a recipe reaches. Its return value changed from `undefined` to the result
-  // object at the same time.
+  // Issue 1132: it routes through the CASCADING set primitive rather than the `RecipeManager` leaf,
+  // so the public API and the GM studio cannot disagree about what deleting a recipe reaches.
   assert.ok(
     mainSource.includes(
       'return await this.craftingSystemManager.deleteRecipes(recipe.craftingSystemId, [recipeId]);'
@@ -98,12 +91,11 @@ test('Fabricate exposes deleteRecipe on the main Foundry API object', () => {
 });
 
 test('Fabricate bridges replicated crafting-data setting changes into local refresh hooks', () => {
-  // Matched as a pattern rather than a literal line, so an added or removed named import
-  // from the same module cannot fail an assertion whose subject is the wiring. What must
-  // hold is that main.js takes the handler from the bridge module.
+  // Matched as a pattern rather than a literal line, so an added or removed named import from the
+  // same module cannot fail an assertion whose subject is the wiring.
   assert.match(
     mainSource,
-    /import \{[^}]*\bhandleFabricateSettingChange\b[^}]*\} from '\.\/config\/settingChangeBridge\.js'/,
+    /import \{[^}]*\bhandleFabricateSettingChange\b[^}]*\} from '\.\.?\/config\/settingChangeBridge\.js'/,
     'main.js should import the setting-change bridge'
   );
   assert.ok(
@@ -118,14 +110,12 @@ test('Fabricate bridges replicated crafting-data setting changes into local refr
 });
 
 test('Fabricate routes gathering node depletion to the active GM', () => {
-  // A player cannot write the world setting the environment node pools live in, so
-  // the decrement MUST be relayed. These pin the wiring: the pure routing module is
-  // unit-tested elsewhere, but every one of those tests stays green if main.js never
-  // injects the seam or never registers the inbound route.
+  // A player cannot write the world setting the environment node pools live in, so the decrement
+  // MUST be relayed.
   assert.ok(
     mainSource.includes('createGatheringNodeDepletionWriter') &&
       mainSource.includes('routeGatheringNodeDepleteMessage') &&
-      mainSource.includes("from './systems/gatheringNodeSocket.js'"),
+      mainSource.includes("from '../systems/gatheringNodeSocket.js'"),
     'main.js should import the gathering node depletion writer and router'
   );
   assert.ok(
@@ -133,7 +123,9 @@ test('Fabricate routes gathering node depletion to the active GM', () => {
     'the inbound route should be rate limited per sender'
   );
   assert.ok(
-    mainSource.includes('depleteEnvironmentNode: (payload) => this.gatheringNodeDepletionWriter.deplete(payload)'),
+    /depleteEnvironmentNode: \(payload\) =>\s*fabricate\.gatheringNodeDepletionWriter\.deplete\(payload\)/.test(
+      mainSource
+    ),
     'the rich-state service should receive the GM-routed depletion seam'
   );
   assert.ok(
@@ -158,30 +150,25 @@ test('Fabricate gates matured timed gathering runs to the primary GM', () => {
 
 test('Fabricate wires RecipeManager to the live crafting-system manager', () => {
   // BOTH seams are pinned. `getCraftingSystem` resolves one system; `getCraftingSystemManager`
-  // (issue 1072) is the manager itself, which the twelve paths that used to read
-  // `game.fabricate` inline now route through — including `_validateSignatures`. Losing that
-  // second line would silently send those paths back to the `ready`-hook global, where they
-  // cannot be instrumented, cached or indexed by the performance programme.
+  // (issue 1072) is the manager itself, which the twelve paths that used to read `game.fabricate`
+  // inline now route through — including `_validateSignatures`.
   assert.match(
     mainSource,
-    /this\.recipeManager\s*=\s*new RecipeManager\(\{\s*getCraftingSystem:\s*\(systemId\)\s*=>\s*this\.craftingSystemManager\?\.getSystem\?\.\(systemId\)\s*\?\?\s*null,\s*getCraftingSystemManager:\s*\(\)\s*=>\s*this\.craftingSystemManager\s*\?\?\s*null,\s*currencyConfigStore:\s*this\.currencyConfigStore,?\s*\}\)/s,
+    /fabricate\.recipeManager\s*=\s*new RecipeManager\(\{\s*getCraftingSystem:\s*\(systemId\)\s*=>\s*fabricate\.craftingSystemManager\?\.getSystem\?\.\(systemId\)\s*\?\?\s*null,\s*getCraftingSystemManager:\s*\(\)\s*=>\s*fabricate\.craftingSystemManager\s*\?\?\s*null,\s*currencyConfigStore:\s*fabricate\.currencyConfigStore,?\s*\}\)/s,
     'RecipeManager production initialization should receive the live crafting-system resolver and manager'
   );
 });
 
 test('Fabricate wires the world currency config into both currency readers', () => {
   // Currency is world scope since issue 1278, and `getCurrencyRequirementConfig` composes the
-  // per-system `enabled` flag with the world's ladder. Both readers must therefore hold the
-  // store: RecipeManager for craftability projection, CraftingEngine for the afford gate and
-  // the spend/refund paths. Without it they fall back to the `game.fabricate` global, which is
-  // exactly the un-instrumentable path issue 1072 removed.
+  // per-system `enabled` flag with the world's ladder.
   assert.ok(
-    mainSource.includes('this.currencyConfigStore = new CurrencyConfigStore({'),
+    mainSource.includes('fabricate.currencyConfigStore = new CurrencyConfigStore({'),
     'main.js should construct the world currency config store'
   );
   assert.match(
     mainSource,
-    /new CraftingEngine\([\s\S]*?currencyConfigStore:\s*this\.currencyConfigStore/,
+    /new CraftingEngine\([\s\S]*?currencyConfigStore:\s*fabricate\.currencyConfigStore/,
     'CraftingEngine should receive the world currency config store'
   );
 });
@@ -225,7 +212,7 @@ test('the location API methods gate on isGatheringRealmsEnabled (no-op when disa
   // single shared predicate so the gate never drifts from the engine/resolver.
   assert.ok(
     mainSource.includes(
-      "import { getRealmRevealMode, isGatheringRealmsEnabled } from './systems/gatheringRealms.js';"
+      "import { getRealmRevealMode, isGatheringRealmsEnabled } from '../systems/gatheringRealms.js';"
     ),
     'main.js imports the shared gate predicate and the WORLD reveal-mode reader'
   );
@@ -239,15 +226,15 @@ test('the location API methods gate on isGatheringRealmsEnabled (no-op when disa
     'revealGatheringRealmForActor no-ops (false) when disabled'
   );
   assert.ok(
-    mainSource.includes('if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return Promise.resolve(false);'),
+    /if \(!isGatheringRealmsEnabled\(this\.craftingSystemManager\?\.getSystem\(systemId\)\)\)\s*return Promise\.resolve\(false\);/.test(
+      mainSource
+    ),
     'hideGatheringRealmForActor no-ops (false) when disabled'
   );
 });
 
 test('Fabricate registers a GM-only discipline on realm mutators', () => {
-  // The reveal mutator validates the realm against the WORLD library (issue 1282). `systemId`
-  // survives on the public method as the GATE — whether that system surfaces travel at all —
-  // and no longer as the thing the realm must belong to.
+  // The reveal mutator validates the realm against the WORLD library (issue 1282).
   assert.ok(
     mainSource.includes('validateRealmExists: this.gatheringRealmStore?.get?.()'),
     'reveal validates the realm exists in the world travel config'
@@ -270,12 +257,11 @@ test('game.fabricate.gathering exposes the canonical realm helpers', () => {
 });
 
 test('Fabricate wires the crafting listing builder with a component resolver (issue 1075)', () => {
-  // The builder's privilege gates and matching logic are unit-tested directly, but the
-  // composition that hands them a resolver is not: without this line every crafting row's
-  // owned-material tally silently reads as if the player owns nothing, and no existing
-  // test goes red.
+  // The builder's privilege gates and matching logic are unit-tested directly, but the composition
+  // that hands them a resolver is not: without this line every crafting row's owned-material tally
+  // silently reads as if the player owns nothing, and no existing test goes red.
   assert.ok(
-    mainSource.includes("import { findMatchingComponent, resolveItemEssences } from './utils/essenceResolver.js';"),
+    /import \{ findMatchingComponent \} from '\.\.?\/utils\/essenceResolver\.js';/.test(mainSource),
     'main.js should import the same component resolver InventoryListingBuilder matches with'
   );
   assert.ok(
@@ -286,9 +272,7 @@ test('Fabricate wires the crafting listing builder with a component resolver (is
 
 test('Fabricate hydrates the crafting recipe detail phase through the crafting listing builder (issue 1075)', () => {
   // `hydrateCraftingRecipe` is the detail-phase companion to the cheap `listCraftingForActor`
-  // summary rows (issue 1075). The builder's `buildRecipeDetail` re-evaluation is unit-tested
-  // directly, but nothing else pins that this method actually routes there rather than, say,
-  // re-deriving a summary row or returning a stale cached value.
+  // summary rows (issue 1075).
   assert.ok(
     mainSource.includes(
       'hydrateCraftingRecipe({ recipeId = null, actorId = null, componentSourceActorIds = null } = {}) {'
@@ -305,9 +289,7 @@ test('Fabricate exposes the versioned Journal command and per-user dismissal sea
   for (const method of [
     'executeJournalRunCommand(command, options)',
     // Two arguments, load-bearing. This pin used to read the one-argument form, and sat twelve
-    // lines above another pin whose comment claimed the options were forwarded. Both passed while
-    // the facade dropped them (issue 1759); tests/facade-delegation-arity.test.js now gates the
-    // relationship rather than either line.
+    // lines above another pin whose comment claimed the options were forwarded (issue 1759).
     'dismissJournalRun(options)',
     'getDismissedJournalRunKeys(options)',
     'getJournalRunAuthorityAvailability()',
@@ -350,8 +332,10 @@ test('Fabricate exposes the versioned Journal command and per-user dismissal sea
 
 test('the real Journal composition emitter survives socket serialization and preserves recipients', () => {
   const start = mainSource.indexOf('function createJournalCommandsForFabricate(');
-  const end = mainSource.indexOf('\n// The GM notice', start);
-  assert.ok(start >= 0 && end > start);
+  // Bounded at its own column-zero closing brace: the factory is the last declaration in
+  // `src/bootstrap/journalOperations.js`, so a following-comment bound would run into another file.
+  const end = mainSource.indexOf('\n}\n', start) + 2;
+  assert.ok(start >= 0 && end > start + 2, 'the journal command factory must be present');
   let composed;
   const received = [];
   // Foundry V13.351/V14.365 handleCustomSocket destructures this argument: a
@@ -417,7 +401,7 @@ test('player-facing starts explicitly select the current journal lifecycle', () 
     'the constructed gathering engine should receive the journal authority adapter'
   );
   assert.ok(
-    mainSource.includes('fabricate.craft(actor, recipe).then(result => {'),
+    /fabricate\s*\.craft\(actor, recipe\)\s*\.then\(\(result\) => \{/.test(mainSource),
     'the /craft chat command should delegate through the public craft facade'
   );
   assert.ok(

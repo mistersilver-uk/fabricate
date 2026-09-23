@@ -1,8 +1,4 @@
-/**
- * Phase 1 (issue 335) — pure scene-scan → display rows for the GM Manage
- * Interactables panel. Covers each marker-status variant, each state flag, the
- * source-label fallback chain, and the tolerance of the live Collection shapes.
- */
+/** Phase 1 (issue 335) — pure scene-scan → display rows for the GM Manage Interactables panel. */
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,15 +1,7 @@
 /**
- * Tests for the 1.10.0 migration
- * (src/migration/migrateMoveRoutedByIngredientsCheck.js): move a
- * `routedByIngredients` system's optional pass/fail crafting-check config from the
- * shared `craftingCheck.routed` slot to the shared `craftingCheck.simple` slot.
- *
- * Covers: the move (rollFormula/dc/thresholdMode/tiers/checkBreakage routed → simple),
- * the routed slot cleared afterwards, tier-id preservation, the unauthored-simple
- * guard (no clobber of an authored simple check), idempotency, non-routedByIngredients
- * systems untouched, raw un-normalized input handling, and purity.
- *
- * node:test + node:assert/strict. Pure function; no Foundry globals.
+ * Tests for the 1.10.0 migration (src/migration/migrateMoveRoutedByIngredientsCheck.js): move a
+ * `routedByIngredients` system's optional pass/fail crafting-check config from the shared
+ * `craftingCheck.routed` slot to the shared `craftingCheck.simple` slot.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

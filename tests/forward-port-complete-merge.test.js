@@ -1,23 +1,4 @@
-/**
- * Completing a conflicted forward-port, EXECUTED (issue #1439).
- *
- * `scripts/forward-port-complete-merge.sh` runs at both of `forward-port.yml`'s merge call sites,
- * and only when `git merge --no-ff origin/release` has already failed. It deliberately makes NO
- * verdict: it establishes only what it needs in order to build a commit at all, and every
- * accept/refuse decision about the resolution belongs to `scripts/forward-port-content-gate.sh`,
- * which runs immediately afterwards. `tests/forward-port-content-gate.test.js` drives those
- * decisions, including one fixture that chains the two scripts in a single repository.
- *
- * This file runs the real script, with the real `git`, over a real conflicted merge. It stubs
- * nothing that matters: the script reaches no network on any path a valid resolution takes, and the
- * fixture's `origin` deliberately points nowhere so that a fetch or a push would fail loudly.
- *
- * ── WHAT MUST BE FALSIFIABLE HERE ───────────────────────────────────────────────────────────────
- * Every assertion below has a paired negative: a non-conflict failure that must NOT reach the
- * resolution path, a missing resolution that must refuse, an unresolvable one that must be reported
- * as UNVERIFIABLE rather than refused, and — for the constructed commit — a parent order, a tree and
- * a subject each asserted against what the workflow would otherwise push.
- */
+/** Completing a conflicted forward-port, EXECUTED (issue #1439). */
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -96,9 +77,7 @@ test('resolution_effect supplied WITHOUT resolution_ref refuses on the reachable
   withUnreachableOrigin(harness);
   conflictTheMerge(harness, topology);
 
-  // The two inputs are required together. This is the half that is reachable: the other half —
-  // `resolution_ref` with no effect — is the content gate's A0, because a ref only ever reaches a
-  // decision through the gate.
+  // The two inputs are required together.
   const { status, output } = harness.completeMerge({
     RESOLUTION_EFFECT: 'content-onto-main',
     REASON: 'a test run',
@@ -120,10 +99,9 @@ test('a merge failure that is NOT a conflict never consults the resolution input
   git('reset', '--hard', '-q', topology.mainTip);
   withUnreachableOrigin(harness);
 
-  // No merge is in progress, so the index carries no unmerged entries — the shape every non-conflict
-  // merge failure has (an unreachable ref, a working tree the merge refused to overwrite, an
-  // unreadable repository). A perfectly VALID resolution is supplied, so this can only pass if the
-  // script refuses to consult it.
+  // No merge is in progress, so the index carries no unmerged entries — the shape every
+  // non-conflict merge failure has (an unreachable ref, a working tree the merge refused to
+  // overwrite, an unreadable repository).
   const { status, output } = harness.completeMerge({
     RESOLUTION_REF: resolution,
     RESOLUTION_EFFECT: 'content-onto-main',
@@ -168,9 +146,7 @@ test('the completed merge takes the tree VERBATIM, both parents in order, under 
   // DELETION, which driving the conflicted index path-by-path cannot.
   assert.equal(git('rev-parse', 'HEAD^{tree}'), git('rev-parse', `${resolution}^{tree}`));
 
-  // A NON-RELEASING SUBJECT, under the workflow's control rather than the human's. A resolution
-  // authored with a `feat:` subject would otherwise make the beta.yml run this push triggers mint a
-  // version off a commit that changes nothing on the prerelease line.
+  // A NON-RELEASING SUBJECT, under the workflow's control rather than the human's.
   const subject = git('log', '-1', '--format=%s', 'HEAD');
   assert.match(subject, /^chore: forward-port release into main \(a test run\)/);
   assert.ok(subject.includes(resolution), 'the pushed commit says where its tree came from');

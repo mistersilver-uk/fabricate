@@ -1,48 +1,27 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The Tool editor's VALIDATION tab.
-
-  It renders the shared `ScopedValidationTab` (issue 1362), the generalisation of the shell
-  this file and `essences/EssenceValidationTab` were both already written as. It keeps its
+  The Tool editor's VALIDATION tab, rendering the shared `ScopedValidationTab`. It keeps its
   `manager-tool-tab-stack` class, its `data-tool-validation-tab` hook and its
-  `data-tool-validation-check` row hook, so no shipped rule and no test selector stops
-  matching, and it keeps the save-failure alert below the surface as the primitive's trailing
-  snippet.
+  `data-tool-validation-check` row hook, and keeps the save-failure alert below the surface as the
+  primitive's trailing snippet. UNLIKE AN ESSENCE, A TOOL REFUSES TO SAVE while a blocking issue
+  stands, which is why its block row reads `BLOCKS ENABLE` — the one thing the two sites disagree
+  about, and the only status label either passes.
 
-  UNLIKE AN ESSENCE, A TOOL REFUSES TO SAVE while a blocking issue stands, which is why its
-  block row reads `BLOCKS ENABLE` where the essence's reads `INCOMPLETE`. That word is the one
-  thing the two sites genuinely disagree about, and it is the only status label either passes.
+  THERE IS NO `LINKED ITEM` GROUP, AND ITS ABSENCE IS THE CONTRACT. That check was on IDENTITY,
+  which is world scope's and which no control on this screen can satisfy, yet it counted toward the
+  blocking total and reddened the tab badge. It is not silently dropped: `toolEditorValidation`
+  carries the failure out as `identityErrors` and the surface states it as a ROUTED NOTICE naming
+  the world Tool, rendered only when the link is genuinely missing. ESCALATED, NOT SOLVED — the
+  domain still refuses the SAVE, because an unmatched Tool cannot be found in any inventory; what
+  changed is that the screen says where to go instead of asking a GM to clear an unreachable check.
 
-  == THERE IS NO `LINKED ITEM` GROUP, AND ITS ABSENCE IS THE CONTRACT (issue 1373) ============
-  This surface opened with a `LINKED ITEM` heading over a single row reading `A game-world Item
-  is linked` — a check on IDENTITY, which is world scope's and which no control on this screen
-  can satisfy. It counted toward the blocking total and reddened the tab badge over a defect a
-  GM could only fix somewhere else.
-
-  It is not silently dropped. `toolEditorValidation` carries the failure out as `identityErrors`
-  and the surface states it as a ROUTED NOTICE naming the world Tool — the place it is fixed —
-  rather than as a check row. The notice renders only when the link is genuinely missing, so a
-  healthy Tool's surface is exactly the four rules checks and nothing else.
-
-  == AND NO IN-PANE PAGE HEADING (issue 1373) =================================================
-  It opened with an `<h2>` reading `Validation` over a `A Tool saves only when every blocking
-  issue is cleared.` intro — the only tab of the three to carry one, and the reference draws it
-  on none of them. The tab strip immediately above already names the tab, the editor header
-  above that names the Tool, and the summary card immediately below already says `Every Tool
-  check passes. Ready to save.` in the state where it matters. Both props are simply not
-  passed; `EditorValidationSurface` renders no head block at all when neither is given, so no
-  other caller of that surface changes.
-
-  ESCALATED, NOT SOLVED: the domain still refuses the SAVE. `Tool#validate` and
-  `CraftingSystemManager#upsertTool` both reject a Tool with neither a `componentId` nor a source
-  reference, because an unmatched Tool cannot be found in any inventory. So a rules record whose
-  world half has lost its Item still cannot be saved from here; what changed is that the screen
-  now says where to go instead of asking the GM to clear a check with no control behind it.
+  AND NO IN-PANE PAGE HEADING: the tab strip above names the tab, the editor header names the Tool,
+  and the summary card below already says every check passes in the state where it matters. Both
+  props are simply not passed, and the shared surface renders no head block when neither is given.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import ManagerButton from '../../../components/ManagerButton.svelte';
-  import Callout from '../Callout.svelte';
+  import Callout from '../../../components/Callout.svelte';
   import ScopedValidationTab from '../scoped/ScopedValidationTab.svelte';
   import {
     toolEditorValidation,
@@ -57,15 +36,12 @@
     validation = { valid: false, errors: [] },
     saveError = '',
     focusValidationNonce = 0,
-    // Whether the world catalogue actually holds a record for this Tool, and the route to it.
-    // Both come from the editor, which already answers the same question for its header button:
-    // an unlifted pre-migration Tool has no world half, so the notice states the defect and
-    // offers no route to a record that would open on nothing.
+    // Whether the world catalogue holds a record for this Tool, and the route to it: an unlifted
+    // pre-migration Tool has no world half, so the notice states the defect and offers no route.
     worldRecordExists = false,
     onEditWorldTool = () => {},
-    // THE ROW ACTION (issue 1517). `(target, focusTarget)` — the tab the editor switches to,
-    // and the `data-validation-target` value of the control that is wrong. The editor owns both
-    // moves; this tab only carries the address the producer emitted.
+    // THE ROW ACTION: the tab the editor switches to and the `data-validation-target` of the
+    // offending control. The editor owns both moves; this tab carries the producer's address.
     onSelectIssue = () => {},
   } = $props();
 
@@ -149,10 +125,8 @@
           labels[check.id]
         ),
         detail: check.errors?.length ? validationErrorText(check.errors[0]) : '',
-        // The row's TWO addresses, spread so a check with no route adds no key at all
-        // (issue 1517). Threaded rather than derived here: `toolStudio.js` is the only thing
-        // that knows which control a projected failure names, and a row that dropped the
-        // address would render a View button that changes tab and focuses nothing.
+        // Spread so a check with no route adds no key at all, and threaded rather than derived:
+        // `toolStudio.js` is the only thing that knows which control a failure names.
         ...toolIssueAddress(check),
       }));
   }
@@ -181,10 +155,8 @@
         id: 'general',
         label: text('FABRICATE.Common.General', 'General'),
         icon: 'fas fa-circle-exclamation',
-        // NO ADDRESS ON A GENERAL ROW, and the omission is the decision (issue 1517). These are
-        // the domain messages the projection could not place on any check, so there is no tab
-        // that is where they are fixed and no control that is the offender. They render with no
-        // View button, exactly as they did before the row action existed.
+        // NO ADDRESS ON A GENERAL ROW, and the omission is the decision: these are the messages
+        // the projection could not place, so there is no tab and no control to point at.
         rows: editorValidation.unknownErrors.map((_, index) => ({
           id: `unknown-${index}`,
           status: 'block',
@@ -199,9 +171,8 @@
   });
 </script>
 
-<!-- Declared here rather than inline so the prop can be UNSET when the world record is
-     missing: an empty snippet is still truthy, and a `Callout` that took one would draw an
-     empty flex item and its gap after the sentence. -->
+<!-- Declared here rather than inline so the prop can be UNSET: an empty snippet is still truthy,
+     and a `Callout` taking one draws an empty flex item and its gap. -->
 {#snippet worldToolAction()}
   <ManagerButton
     data-tool-identity-route={String(tool?.id ?? '')}
@@ -213,11 +184,9 @@
   >
 {/snippet}
 
-<!-- TWO COUNT TILES, NOT THREE (issue 1517). Every Tool check is two-state — it passes or it
-     blocks — and the hard-coded `warnings: 0` that used to sit in `counts` drew a Warnings tile
-     this check set can never fill. `EditorValidationSurface` renders the tiles it is REPORTED,
-     so omitting the key is how a site says it cannot answer that question, exactly as
-     `recipe-item/RecipeItemValidationTab` already does. -->
+<!-- TWO COUNT TILES, NOT THREE: every Tool check is two-state, so a `warnings: 0` drew a tile
+     this set can never fill. The surface renders the tiles it is REPORTED, so omitting the key is
+     how a site says it cannot answer that question. -->
 <ScopedValidationTab
   stackClass="manager-scoped-tab-stack manager-tool-tab-stack"
   hookAttribute="data-tool-validation-tab"
@@ -231,10 +200,9 @@
   blockLabel={text('FABRICATE.Admin.Manager.Validation.StatusBlock', 'Blocks enable')}
 >
   {#if identityBroken}
-    <!-- The note and the ONE control that answers it are one object (issue 1505). They used to
-         be two siblings inside a ruleless wrapper `<div>`, which is a shape the shared strip can
-         now hold itself: the button rides the `actions` snippet. No title is added — the site
-         carries one sentence today and inventing a headline would put `lang/en.json` in scope. -->
+    <!-- The note and the ONE control that answers it are one object, with the button riding the
+         shared strip's `actions` snippet. No title is added: inventing a headline would put
+         `lang/en.json` in scope for a site carrying one sentence. -->
     <Callout
       tone="warning"
       icon="fas fa-link-slash"

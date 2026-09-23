@@ -1,21 +1,4 @@
-/**
- * Issue 1364 (epic 1357, PR 4) — world-scope entity import/export, schema 6.
- *
- * The acceptance suite for the three envelope slices, the 5 -> 6 payload upcast that derives them,
- * copy mode's match-or-mint rule and the SPLIT merge an import performs on the destination.
- *
- * Every test below names the mutation that reddens it, because several of them are green under
- * plausible wrong implementations and say so rather than pretending otherwise: the two the delta
- * calls out — the upcast's no-aliasing rule and the "one record per component" positive statement
- * — have no reachable reddening mutation at all, and their falsifiability is carried by the
- * neighbours named in their comments.
- *
- * THE ONE STRUCTURAL TRAP, stated once at the top because three tests depend on it: the envelope
- * carries `defaults` and `membership` as ARRAYS while the shared `1.30.0` transform reads them
- * only as MAPS, and hands an array back silently discarded rather than rejected. A map-form
- * fixture therefore passes against a map-only implementation and ships the defect, so every
- * fixture here that exercises the upcast uses the ARRAY form a real bundle actually has.
- */
+/** Issue 1364 (epic 1357, PR 4) — world-scope entity import/export, schema 6. */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -25,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 
 import { installFoundryUtilsEnv } from './helpers/foundryEnv.js';
 import { destinationWorld, emptySeededScope } from './helpers/worldScopeImportHarness.js';
+import { entrySources } from './helpers/bootstrapEntrySource.js';
+
 
 installFoundryUtilsEnv();
 
@@ -36,7 +21,7 @@ const { FABRICATE_EXPORT_SCHEMA_VERSION } = await import('../src/systems/authori
 const { reportWorldIdentityDrift } = await import('../src/systems/worldIdentityDrift.js');
 const { REFERENCE_KINDS } = await import('../src/systems/importReferenceResolver.js');
 const { buildWorldScopeGrouping } = await import(
-  '../src/migration/worldScopeEntityGrouping.js'
+  '../src/systems/worldScopeEntityGrouping.js'
 );
 const { migrateWorldScopeEntities } = await import(
   '../src/migration/migrateWorldScopeEntities.js'
@@ -49,9 +34,7 @@ const { CompendiumImporter, scopeStoreDelegate } = await import(
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE_SYSTEM_ID = 'sys-source';
 
-// ---------------------------------------------------------------------------
 // Fixtures — one builder per shape, reused rather than re-authored per test
-// ---------------------------------------------------------------------------
 
 /** A minimal in-system component carrying only MODERN source spellings. */
 function component(id, overrides = {}) {
@@ -117,17 +100,11 @@ function reported(summary, kind) {
   return summary.unresolvedReferences.filter((entry) => entry.kind === kind);
 }
 
-// ---------------------------------------------------------------------------
 // Criterion 4 — the upcast DERIVES without STRIPPING
-// ---------------------------------------------------------------------------
 
 test('4(a): the upcast derives a world entity WITHOUT rewriting the in-system record', () => {
   // The divergence arm, and the reason the discard of the shared transform's returned `systems` is
-  // LOAD-BEARING rather than defensive. `groupIdentity` folds `sourceUuid` into `aliasItemUuids`
-  // even for a SINGLETON group and the identity write-back applies it to every in-system record,
-  // so adopting the returned systems would rewrite in-system identity through the import door.
-  //
-  // REDDENS WHEN: the upcast adopts `result.systems` instead of discarding it.
+  // LOAD-BEARING rather than defensive.
   const legacy = {
     fabricateVersion: '1.0.0',
     system: {
@@ -157,10 +134,7 @@ test('4(a): the upcast derives a world entity WITHOUT rewriting the in-system re
 test('4(b): no key is removed from the three in-system arrays, and no carried value changes', () => {
   // The no-strip arm, stated ONE-DIRECTIONALLY because "deep-equal to the input" is false for a
   // schema-1 payload independently of this change: `upcastLegacyTools` already ADDS keys to a
-  // component-linked tool. Run over three schemas and therefore over both branches.
-  //
-  // REDDENS WHEN: a `stripSystemScopedEntities` half is added, which is the mistake the epic's
-  // brief invites by analogy with schemas 3, 4 and 5.
+  // component-linked tool.
   const authored = {
     components: [
       component('c1', { category: 'ore', tags: ['metal'], essences: { fire: 2 } }),
@@ -192,16 +166,11 @@ test('4(b): no key is removed from the three in-system arrays, and no carried va
   }
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 5 — a colliding pair is REFUSED rather than silently emptied
-// ---------------------------------------------------------------------------
 
 test('5(a): an ordinary bundle emits one world entity per in-system record, under its own id', () => {
   // THE POSITIVE STATEMENT, and it has NO REACHABLE REDDENING MUTATION — it does not pretend
-  // otherwise. For a one-system corpus the re-key map is empty STRUCTURALLY, so disabling the
-  // output-uniqueness arm changes nothing here, and the payload's own ids never move under any
-  // mutation because the upcast discards the returned `systems`. Its falsifiability is carried by
-  // 5(b) and by 4(a).
+  // otherwise.
   const migrated = migrateExportPayload(
     envelope({ system: { components: [component('c1'), component('c2')] } })
   );
@@ -214,14 +183,7 @@ test('5(a): an ordinary bundle emits one world entity per in-system record, unde
 
 test('5(b): a colliding pair yields an EMPTY slice AND a reported refusal', () => {
   // The ordinary component-plus-variant shape: two components in ONE system sharing a
-  // `registeredItemUuid`. They group together, the group claims one id, the emitted id set
-  // collides, and the output-uniqueness post-condition REFUSES the pair.
-  //
-  // REDDENS WHEN: `findRefusals`'s output-uniqueness arm is disabled — the pair is ACCEPTED and
-  // the slice comes back NON-EMPTY with ONE merged entity for two components and no refusal; and
-  // INDEPENDENTLY when the refusal is not carried onto the prepared payload, where the slice is
-  // still empty and only the refusal assertion fails. Both are named because either alone leaves
-  // the other assertion green.
+  // `registeredItemUuid`.
   const payload = envelope({
     system: {
       components: [
@@ -243,9 +205,7 @@ test('5(b): a colliding pair yields an EMPTY slice AND a reported refusal', () =
   );
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 6 — the derivation is BRANCH-INDEPENDENT
-// ---------------------------------------------------------------------------
 
 test('6: the derivation runs on the current-schema branch AND the legacy branch', () => {
   // REDDENS WHEN: the derivation call is removed from the early-return branch (the schema-6 arm
@@ -276,19 +236,10 @@ test('6: the derivation runs on the current-schema branch AND the legacy branch'
   );
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 7 — the per-pair lift guard, ON THE ARRAY FORM
-// ---------------------------------------------------------------------------
 
 test('7: a hand-edited membership record survives the upcast BYTE-IDENTICAL, from the array form', () => {
-  // THE ARRAY FORM IS NOT OPTIONAL IN THIS FIXTURE. `readScopePayload` accepts `defaults` and
-  // `membership` only through `isPlainObject`, which excludes arrays, so a map-form fixture passes
-  // against a map-only implementation and ships the defect two reviewers found independently.
-  //
-  // REDDENS WHEN: the upcast's array-to-map re-keying is removed, so the arrays reach
-  // `readScopePayload` and are discarded — the per-(entityId, systemId) guard never fires and the
-  // hand-edited record is REBUILT by `buildMembershipRecord`; and INDEPENDENTLY when that guard is
-  // removed.
+  // THE ARRAY FORM IS NOT OPTIONAL IN THIS FIXTURE.
   const handEdited = membershipRecord('c1', SOURCE_SYSTEM_ID, {
     inherit: { category: true },
     category: 'hand-edited',
@@ -316,15 +267,10 @@ test('7: a hand-edited membership record survives the upcast BYTE-IDENTICAL, fro
   assert.ok(byEntity.has('c2'), 'while the missing pair is derived');
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 8 — the map/array conversion round-trips
-// ---------------------------------------------------------------------------
 
 test('8(a): the membership key is derived with the shipped separator, so one pair is ONE record', () => {
   // REDDENS WHEN: the separator is written as anything but the shipped `MEMBERSHIP_KEY_SEPARATOR`.
-  // A DOUBLED separator produces TWO records for one pair rather than an error, because nothing
-  // validates a map key against its record on the way in — so the assertion is on the COUNT and
-  // never on a throw.
   const migrated = migrateExportPayload(
     envelope({
       system: { components: [component('c1')] },
@@ -344,10 +290,7 @@ test('8(a): the membership key is derived with the shipped separator, so one pai
 
 test('8(b): the key is derived FROM THE RECORD, so a disagreeing carried key cannot duplicate it', () => {
   // The map form is also accepted on read, and requirement 13 DISCARDS the carried key and
-  // re-derives it. A payload whose map key and record disagree must therefore still produce
-  // exactly one record, keyed from the record.
-  //
-  // REDDENS WHEN: the carried key is trusted rather than re-derived.
+  // re-derives it.
   const migrated = migrateExportPayload(
     envelope({
       system: { components: [component('c1')] },
@@ -365,11 +308,7 @@ test('8(b): the key is derived FROM THE RECORD, so a disagreeing carried key can
 });
 
 test('8(c): two upcasts of one payload share no object, and the input is never reached', () => {
-  // NO REACHABLE REDDENING MUTATION, and it does not pretend to have one. `migrateExportPayload`
-  // deep-clones its input unconditionally on BOTH branches, so whatever the derivation aliases, it
-  // aliases inside one call's own clone where no caller can observe it — both assertions stay
-  // green with the deep copy removed. The deep copy is a STATED DEFENSIVE RULE whose falsifiability
-  // is carried by 8(a) and 8(b), which are the direct net under the array-discard defect.
+  // NO REACHABLE REDDENING MUTATION, and it does not pretend to have one.
   const raw = envelope({
     system: { components: [component('c1')] },
     componentScope: slice({ membership: [membershipRecord('c1', SOURCE_SYSTEM_ID)] }),
@@ -382,9 +321,7 @@ test('8(c): two upcasts of one payload share no object, and the input is never r
   assert.equal(raw.componentScope.membership[0].entityId, 'c1', 'the raw input is untouched');
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 1 — the round trip, per layer
-// ---------------------------------------------------------------------------
 
 test('1: keep mode round-trips all three layers into a SEEDED but empty destination', async () => {
   // REDDENS WHEN: one layer's merge is dropped, or the `entities` merge is made to win over
@@ -424,11 +361,8 @@ test('1: keep mode round-trips all three layers into a SEEDED but empty destinat
 });
 
 test('14: the three layers merge INDEPENDENTLY, with all three destination sub-keys present', async () => {
-  // ALL THREE MUST BE NON-EMPTY IN THE DESTINATION FIXTURE: an ABSENT sub-key makes an
-  // object-level merge pass by accident, which is precisely the shape this guards against.
-  //
-  // REDDENS WHEN: the three are collapsed into one object-level destination-wins merge, or the
-  // `defaults` leg is dropped or folded into `entities`.
+  // ALL THREE MUST BE NON-EMPTY IN THE DESTINATION FIXTURE: an ABSENT sub-key makes an object-level
+  // merge pass by accident, which is precisely the shape this guards against.
   const world = await destinationWorld({
     componentScope: {
       entities: [{ id: 'dest-1', name: 'Destination One', originItemUuid: 'Item.dest1' }],
@@ -478,16 +412,7 @@ test('14: the three layers merge INDEPENDENTLY, with all three destination sub-k
 });
 
 test('14: the DEFAULTS and MEMBERSHIP destination-wins guards, with a COLLIDING incoming record', async () => {
-  // THE ARM THE TEST ABOVE CANNOT CARRY. Its incoming slice names ids the destination does not
-  // hold, so `defaults` and `membership` never collide and BOTH destination-wins guards are
-  // unexercised: removing either leaves it green. This is the hand-edit-destruction class the
-  // character-libraries merge already guards, on the side the world-scope merge owns — and the
-  // merge is nominated as the repair path for a TORN import, so a merge that overwrites on the
-  // second run repairs nothing and destroys the GM's own edits instead.
-  //
-  // REDDENS WHEN: the `defaults` destination-wins guard is dropped — the destination's category
-  // becomes the incoming one; and INDEPENDENTLY when the `membership` guard is dropped — the
-  // destination's hand-edited membership record is replaced by the derived one.
+  // THE ARM THE TEST ABOVE CANNOT CARRY.
   const world = await destinationWorld({
     componentScope: {
       entities: [{ id: 'c1', name: 'Destination c1', originItemUuid: 'Item.c1' }],
@@ -540,13 +465,8 @@ test('14: the DEFAULTS and MEMBERSHIP destination-wins guards, with a COLLIDING 
 });
 
 test('the merge REPORTS a default and a membership record naming an absent world entity', async () => {
-  // `worldEntityMissing` at BOTH emission sites — the defaults leg and the membership leg — each
-  // of which survives being disabled on its own. The payload is HAND-AUTHORED because the shipped
-  // exporter cannot produce one: `entities` is filtered to the ids membership names. The merge
-  // must still handle it, because validation accepts any well-shaped slice.
-  //
-  // REDDENS WHEN: either emission is deleted — the count drops from two to one, and the two
-  // entries are distinguished by their `referenceValue` so neither can cover for the other.
+  // `worldEntityMissing` at BOTH emission sites — the defaults leg and the membership leg — each of
+  // which survives being disabled on its own.
   const world = await seededEmptyWorld();
   const { summary } = await runImport(
     world,
@@ -570,12 +490,7 @@ test('the merge REPORTS a default and a membership record naming an absent world
 });
 
 test('the merge REPORTS a keep-mode world entity id collision on a disjoint tool', async () => {
-  // `reportWorldEntityCollision`'s output reaching the import summary. It RESOLVES, to the wrong
-  // thing: the incoming tool takes an id the destination already uses for a DIFFERENT item, so the
-  // imported system's membership record binds to an unrelated world record. Keep mode must not
-  // regenerate anything, so it is reported and not repaired.
-  //
-  // REDDENS WHEN: the reporter's output is dropped rather than pushed onto the prepared payload.
+  // `reportWorldEntityCollision`'s output reaching the import summary.
   const world = await destinationWorld({
     componentScope: emptySeededScope(),
     essenceScope: emptySeededScope(),
@@ -603,27 +518,10 @@ test('the merge REPORTS a keep-mode world entity id collision on a disjoint tool
   );
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 2 — an already-configured destination is deliberately NOT identity
-// ---------------------------------------------------------------------------
 
 test('2: the destination wins world identity, and the shipped drift detector SEES it', async () => {
   // The first exercised consumer of a detector the migration ships unused.
-  //
-  // The fixture avoids LEGACY source spellings deliberately, and the reason is a real interaction
-  // rather than fussiness: because the upcast discards the shared transform's rewritten `systems`
-  // while the derived world entity folds `sourceUuid` / `sourceItemUuid` / `fallbackItemIds` into
-  // `aliasItemUuids`, a keep-mode import of a legacy bundle would land a world entity whose
-  // `aliasItemUuids` differs from the in-system record's, and the detector would report THAT field
-  // too — silently inflating the literal expectation below.
-  //
-  // REDDENS WHEN: the merge is flipped to SOURCE-wins, so the detector returns empty against a
-  // non-empty literal expectation; or when a lifted field is added to the world entity without
-  // being added to `WORLD_IDENTITY_FIELDS`, so this literal names a field the detector never
-  // compares.
-  // Both sides carry EXPLICIT `img` and `description`, because `_normalizeSystem` mints defaults
-  // for both onto the in-system record — so leaving them unauthored would put two more fields in
-  // the literal below and say nothing about the merge direction.
   const identity = {
     originItemUuid: 'Item.c1',
     registeredItemUuid: 'Item.c1',
@@ -667,9 +565,7 @@ test('2: the destination wins world identity, and the shipped drift detector SEE
   ]);
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 3 — an UNMIGRATED destination is untouched
-// ---------------------------------------------------------------------------
 
 test('3(a): an import into an UNMIGRATED destination writes none of the three settings', async () => {
   // REDDENS WHEN: the seeding gate is removed.
@@ -696,14 +592,7 @@ test('3(a): an import into an UNMIGRATED destination writes none of the three se
 });
 
 test('3(b): a hand-authored slice cannot prune an unmigrated world’s essence quantities', async () => {
-  // THE DESTRUCTIVE ARM, aimed at the ONE genuinely pruning basis. The payload is HAND-AUTHORED
-  // because the shipped exporter cannot produce it — `entities` is filtered to the ids membership
-  // names — and the merge must still handle it, because `validateImportData` accepts any
-  // well-shaped slice.
-  //
-  // REDDENS WHEN: the seeding gate is removed. The write fires because the slice DOES add an
-  // `entities` record, `_persist` seeds all three sub-keys, the essence basis flips from UNKNOWN to
-  // the KNOWN roster `{fire}`, and `_normalizeEssenceQuantities` prunes `ghost` PERMANENTLY.
+  // THE DESTRUCTIVE ARM, aimed at the ONE genuinely pruning basis.
   const world = await unmigratedWorld();
   const payload = envelope({
     system: {
@@ -725,17 +614,11 @@ test('3(b): a hand-authored slice cannot prune an unmigrated world’s essence q
   );
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 12 — the entities merge runs BEFORE createSystem
-// ---------------------------------------------------------------------------
 
 test('12: the roster merge lands BEFORE the system is created, so no essence quantity is pruned', async () => {
   // A REAL ORDERING TEST rather than a call-order spy, and aimed at the essence basis because that
   // is the only basis that prunes.
-  //
-  // REDDENS WHEN: `_persistScopedEntityRosters` is moved down beside `_persistCurrencyConfig` — at
-  // `createSystem` time the destination is SEEDED but lacks the incoming ids and the in-system
-  // array is empty, so the basis is a KNOWN roster without them and every quantity is pruned.
   const world = await seededEmptyWorld();
   const payload = envelope({
     system: {
@@ -760,17 +643,11 @@ test('12: the roster merge lands BEFORE the system is created, so no essence qua
   );
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 13 — every written membership record names the DESTINATION system
-// ---------------------------------------------------------------------------
 
 test('13: every membership record the import writes names the DESTINATION system id', async () => {
   // Three arms: copy mode, keep mode with a matching payload id, and a keep-mode overwrite where
   // the existing system is resolved BY NAME under a different id.
-  //
-  // REDDENS WHEN: the membership merge is moved back into the pre-`createSystem` slot, or the
-  // `systemId` rewrite is dropped — every record then names a phantom system and the created copy
-  // has zero members.
   const payload = () => envelope({ system: { components: [component('c1')] } });
 
   for (const mode of ['keep', 'copy']) {
@@ -816,17 +693,12 @@ test('13: every membership record the import writes names the DESTINATION system
   );
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 15 — the tool-breakage authority is a PAIR
-// ---------------------------------------------------------------------------
 
 test('15(a): an incoming world tool-breakage authority is dropped BY THE UPCAST, and reported', async () => {
   // ASSERTED ON THE UPCAST'S OWN OUTPUT, not only on the import summary, because the export
   // assembler is not on a hand-edited payload's path at all and `readScopePayload` PRESERVES the
   // key through its extras spread.
-  //
-  // REDDENS WHEN: the drop is placed only on the export assembler (the value half); and
-  // INDEPENDENTLY when the report push is deleted (the report half).
   const payload = envelope({
     system: { components: [component('c1')], tools: [{ id: 't1', name: 'Hammer' }] },
     toolScope: { ...slice(), toolBreakage: { authority: 'checkDriven' } },
@@ -849,8 +721,7 @@ test('15(a): an incoming world tool-breakage authority is dropped BY THE UPCAST,
 
 test('15(b): the DESTINATION’s own tool-breakage authority survives the merge verbatim', async () => {
   // REDDENS WHEN: the merge base is built as `{ entities, defaults, membership }` instead of
-  // `store.get()`. `_normalize` rebuilds extras from the RAW argument alone and
-  // `normalizeWorldToolBreakage(undefined)` answers `{}`, so the destination's authority is erased.
+  // `store.get()`.
   const world = await destinationWorld({
     componentScope: emptySeededScope(),
     essenceScope: emptySeededScope(),
@@ -869,15 +740,12 @@ test('15(b): the DESTINATION’s own tool-breakage authority survives the merge 
   );
 });
 
-// ---------------------------------------------------------------------------
 // Criteria 9, 17, 18, 19 — copy mode's match-or-mint rule
-// ---------------------------------------------------------------------------
 
 /**
- * The six-spelling fixture. Each linked component carries EXACTLY ONE source spelling and no
- * modern one, because the point is that the match runs on the MIGRATION's six-spelling rule rather
- * than the narrower three-field one. `fallbackItemIds` is exercised WITHOUT `aliasItemUuids`
- * deliberately: the two are an EITHER/OR, so a record carrying both would exercise nothing.
+ * The six-spelling fixture. Each linked component carries EXACTLY ONE source spelling and no modern
+ * one, because the point is that the match runs on the MIGRATION's six-spelling rule rather than
+ * the narrower three-field one.
  */
 function sixSpellingSystem() {
   return {
@@ -904,16 +772,7 @@ const LINKED_IDS = [
 ];
 
 test('9 + 17: a second copy binds every LINKED component and mints only the unlinked ones', async () => {
-  // THE SEEDING QUALIFIER IS REQUIRED. Under the seeding gate the first import writes no world
-  // entity into an UNMIGRATED destination, so the index the second import is handed would be empty
-  // and it would mint again — which is the correct behaviour for an unmigrated world, and exactly
-  // why this fixture uses a SEEDED one.
-  //
-  // REDDENS WHEN: the match is computed with `getItemMatchUuids` instead of `sourceReferencesOf` —
-  // each of the three legacy-only components mints a duplicate; or when the match is run over
-  // `componentScope.entities` instead of `prepared.system.components`, where the world entity has
-  // already canonicalised all three legacy spellings into `aliasItemUuids` and the narrower
-  // function would find them; or when the match is made name-based; or when the index is ignored.
+  // THE SEEDING QUALIFIER IS REQUIRED.
   const world = await seededEmptyWorld();
   const origin = () => envelope({ system: sixSpellingSystem() });
 
@@ -945,10 +804,6 @@ test('9 + 17: a second copy binds every LINKED component and mints only the unli
 
   // CRITERION 17 — a MATCHED entity adds no world entity, and its incoming roster record does not
   // survive; the roster grows by exactly one per UNMATCHED component.
-  //
-  // REDDENS WHEN: the fifth rewrite target is omitted — the matched entity arrives under its
-  // pre-import id, the roster grows by eight, and the merged roster carries a duplicate world
-  // record for an item the destination already had.
   assert.equal(secondRoster.length, 10, 'the roster grew by exactly one per unlinked component');
 
   const rosterIds = new Set(secondRoster.map((entity) => entity.id));
@@ -967,10 +822,6 @@ test('18: after a copy import, no defaults or membership record holds a pre-impo
   // The reference positions are exactly what the shared walk visits for a SECTION-SHAPED record,
   // and the four option-level fields are named INDIVIDUALLY because "options[] with its recursive
   // alternatives" omits three of them and an assertion written from that phrase would miss them.
-  //
-  // REDDENS WHEN: the slice rewrite is driven over `membership` only, exactly as the shipped
-  // migration drives it — a copy import's essence world DEFAULT keeps naming the pre-import
-  // component id.
   const world = await seededEmptyWorld();
   const payload = envelope({
     system: {
@@ -1116,17 +967,9 @@ test('19: a multi-match binds to the largest intersection, reports the losers, a
 });
 
 test('19: a LOSING candidate is reported even when another record has already claimed it', () => {
-  // THE BRANCH NEITHER NEIGHBOUR REACHES. The ranked candidate list splits into `contested` — the
-  // prefix ABOVE the winner, every member of which is claimed by construction — and `beaten`, the
-  // suffix below it. The two are DISJOINT, so a `claimed` filter over `beaten` cannot prevent a
-  // double report; it can only SUPPRESS a real multi-match, which is what it did.
-  //
-  // Test 19 above exercises `beaten` with an EMPTY `claimed` and criterion 9a's `beaten` is always
-  // empty, so before this fixture the false path never ran in either direction.
-  //
-  // REDDENS WHEN: `beaten` is filtered on `claimed` — `first-bee` legitimately matched TWO
-  // destination entities and NOTHING at all is reported, contradicting the spec's "MUST REPORT the
-  // ambiguity" and "reports each losing candidate".
+  // THE BRANCH NEITHER NEIGHBOUR REACHES. Test 19 above exercises `beaten` with an EMPTY `claimed`
+  // and criterion 9a's `beaten` is always empty, so before this fixture the false path never ran in
+  // either direction.
   const worldEntityIndex = {
     components: [
       { id: 'dest-ay', name: 'Destination ay', registeredItemUuid: 'Item.ay' },
@@ -1178,17 +1021,9 @@ test('19: a LOSING candidate is reported even when another record has already cl
 });
 
 test('19: a NON-intersecting destination entity is not a candidate at all', () => {
-  // THE ZERO-INTERSECTION FLOOR, and it is now the SOLE guard rather than one of two. The
-  // pre-ladder binder scanned for `size > best` starting from `best = 0`, so a zero-intersection
-  // candidate could never win even if the filter were removed; `findIndex(!claimed.has(...))` has
-  // no such floor, and takes whatever the candidate list contains.
-  //
-  // The roster must be NON-EMPTY, and that is the whole trick: an empty roster mints whatever the
-  // floor does, so it would pass either way.
-  //
-  // REDDENS WHEN: the intersection filter is relaxed to `size >= 0` — the unrelated component
-  // collapses onto the destination entity AND its own roster record is dropped as "matched", which
-  // is the silent data loss this whole binding exists to prevent.
+  // THE ZERO-INTERSECTION FLOOR, and it is now the SOLE guard rather than one of two. The roster
+  // must be NON-EMPTY, and that is the whole trick: an empty roster mints whatever the floor does,
+  // so it would pass either way.
   const packData = prepareForImport(
     envelope({
       system: {
@@ -1215,19 +1050,11 @@ test('19: a NON-intersecting destination entity is not a candidate at all', () =
   );
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 9a — the copy-mode binding is INJECTIVE, through the ID-CLAIM LADDER
-// ---------------------------------------------------------------------------
 
 /**
  * A destination scope built by the SHIPPED `1.30.0` migration over an ordinary two-system corpus,
  * NOT by hand — which is the whole point of the fixture.
- *
- * The two systems' components are connected through one shared alias, so ruling 3's union folds
- * both their references onto ONE world entity, whose set is therefore WIDER than either
- * contributor's. Nothing is contrived: this is the plain "two worlds registered the same item by
- * different routes" shape that union exists to serve, and the corpus is accepted with ZERO
- * refusals.
  *
  * @returns {object} the persisted `componentScope` value.
  */
@@ -1302,18 +1129,7 @@ function disjointPairPayload() {
 }
 
 test('9a: two incoming components intersecting ONE destination entity keep TWO ids', async () => {
-  // THE BINDING MUST BE INJECTIVE. "Intersects a destination entity" is not an equivalence
-  // relation over the incoming records — `c1{Item.iron}` and `c2{Item.steel}` share nothing with
-  // each other and both intersect the entity whose set ruling 3's union WIDENED — so it cannot
-  // partition them, and a binding that lets both take one destination id loses the second WHOLE
-  // and SILENTLY: `_normalizeSystem` keeps only the last of a duplicate id and the read union
-  // de-duplicates by entity id, with no error anywhere and a toast still reporting 2 components.
-  //
-  // REDDENS WHEN: the `claimed` ladder is removed, so both records bind to the contested id —
-  // arms (i) to (iv) fail.
-  // AND INDEPENDENTLY WHEN: the ladder's middle rung is replaced by an immediate mint — arms (i)
-  // to (iv) stay green while (v) and (vi) fail, because mint-immediately is neither idempotent
-  // nor order-stable.
+  // THE BINDING MUST BE INJECTIVE.
   const scope = widenedDestinationScope();
   assert.equal(scope.entities.length, 1, 'the two source systems produced ONE world entity');
   const contestedId = scope.entities[0].id;
@@ -1368,9 +1184,7 @@ test('9a: two incoming components intersecting ONE destination entity keep TWO i
     're-running the same copy import adds NO further world entity'
   );
 
-  // (vi) Reversing the destination roster does not change the map. Roster order is the key order
-  // of a persisted setting that nothing in this pipeline sorts, so a rule that is order-sensitive
-  // here is a rule whose answer depends on which world wrote its setting first.
+  // (vi) Reversing the destination roster does not change the map.
   const naturalIndex = world.worldEntityIndex();
   const reversedIndex = {
     ...naturalIndex,
@@ -1394,15 +1208,12 @@ test('9a: two incoming components intersecting ONE destination entity keep TWO i
   );
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 10 — copy mode without an index FAILS rather than minting
-// ---------------------------------------------------------------------------
 
 test('10: a copy-mode call with no worldEntityIndex throws, and the throw is the GUARD’S OWN', async () => {
   // REDDENS WHEN: the explicit guard is deleted — either nothing throws, or a destructuring
   // `TypeError` throws whose message does not match, which a BARE `assert.throws` would have
-  // accepted. Giving the parameter a default value is deliberately NOT the named mutation: it does
-  // not redden a correct guard, which is why the MESSAGE MATCHER carries this criterion.
+  // accepted.
   const payload = () => envelope({ system: { components: [component('c1')] } });
 
   assert.throws(() => prepareForImport(payload(), 'copy'), /worldEntityIndex/);
@@ -1414,16 +1225,10 @@ test('10: a copy-mode call with no worldEntityIndex throws, and the throw is the
   assert.ok(prepareForImport(payload(), 'keep'), 'keep mode is unaffected');
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 11 — both import call sites, in source AND in behaviour
-// ---------------------------------------------------------------------------
 
 test('11: both prepareForImport call sites pass every parameter the exporter declares', () => {
-  // A guard on the guards, on the pattern the export-side signature pin sets. The two source
-  // contracts below name their arguments literally, so a NEW parameter added to `prepareForImport`
-  // would leave both green while both call sites silently defaulted it.
-  //
-  // REDDENS WHEN: one argument is deleted from either call site.
+  // A guard on the guards, on the pattern the export-side signature pin sets.
   const exporterSource = readFileSync(
     resolve(ROOT, 'src/systems/CraftingSystemExporter.js'),
     'utf8'
@@ -1441,11 +1246,10 @@ test('11: both prepareForImport call sites pass every parameter the exporter dec
     'prepareForImport gained or lost a parameter — pin it in BOTH call-site guards below first'
   );
 
-  const mainSource = readFileSync(resolve(ROOT, 'src/main.js'), 'utf8');
-  const publicApi = mainSource.slice(
-    mainSource.indexOf('game.fabricate.importSystemFromFile ='),
-    mainSource.indexOf('game.fabricate.cleanupInteractables =')
-  );
+  const mainSource = entrySources['src/bootstrap/publicApi.js'];
+  const importStart = mainSource.indexOf('function buildImportSystem(fabricate) {');
+  assert.notEqual(importStart, -1, 'located the public-API import builder');
+  const publicApi = mainSource.slice(importStart, mainSource.indexOf('\n}\n', importStart));
   assert.ok(publicApi.length > 0, 'located the public-API import closure');
   assert.match(
     publicApi,
@@ -1454,10 +1258,7 @@ test('11: both prepareForImport call sites pass every parameter the exporter dec
   );
   assert.match(publicApi, /buildWorldEntityIndex\(fabricate\)/, 'and build it from the stores');
 
-  const managerSource = readFileSync(
-    resolve(ROOT, 'src/ui/SvelteCraftingSystemManagerApp.svelte.js'),
-    'utf8'
-  );
+  const managerSource = readFileSync(resolve(ROOT, 'src/ui/managerServices.js'), 'utf8');
   assert.match(
     managerSource,
     /prepareForImport\(data, mode, \{ worldEntityIndex \}\)/,
@@ -1473,9 +1274,6 @@ test('11: both prepareForImport call sites pass every parameter the exporter dec
 
 test('11: the index the call sites build has CONTENTS, and the contents are what bind', async () => {
   // THE BEHAVIOURAL ARM, and it exists because the source regexes above are satisfied by `{}`.
-  //
-  // REDDENS WHEN: a call site is changed to pass an empty index — the linked component mints
-  // instead of binding, and the destination acquires a second world record for an item it holds.
   const world = await destinationWorld({
     componentScope: {
       entities: [{ id: 'dest-1', name: 'Held', registeredItemUuid: 'Item.held' }],
@@ -1520,11 +1318,6 @@ test('11: both CompendiumImporter call sites INJECT the three world-scope store 
   // THE MERGE'S ONLY PRODUCTION WIRING, and it fails CLOSED: an absent seam SKIPS the merge and
   // reports nothing, so a call site that never injected them would leave every world-scope import
   // silently doing nothing while the toast still said "Imported <system> with N components".
-  //
-  // The seam names are read out of the importer's own declaration rather than written down twice,
-  // so RENAMING one reddens this test instead of quietly unwiring both call sites.
-  //
-  // REDDENS WHEN: a seam is deleted from either call site, or renamed on one side only.
   const importerSource = readFileSync(resolve(ROOT, 'src/systems/CompendiumImporter.js'), 'utf8');
   const seamBlock = /_scopeStoreSeams = \{([\s\S]*?)\};/.exec(importerSource);
   assert.ok(seamBlock, "located the importer's world-scope seam block");
@@ -1536,11 +1329,8 @@ test('11: both CompendiumImporter call sites INJECT the three world-scope store 
   );
 
   const sites = {
-    'src/main.js': readFileSync(resolve(ROOT, 'src/main.js'), 'utf8'),
-    'src/ui/SvelteCraftingSystemManagerApp.svelte.js': readFileSync(
-      resolve(ROOT, 'src/ui/SvelteCraftingSystemManagerApp.svelte.js'),
-      'utf8'
-    ),
+    'src/bootstrap/composeServices.js': entrySources['src/bootstrap/composeServices.js'],
+    'src/ui/managerServices.js': readFileSync(resolve(ROOT, 'src/ui/managerServices.js'), 'utf8'),
   };
   for (const [path, source] of Object.entries(sites)) {
     const site = importerConstructionSite(source);
@@ -1549,35 +1339,21 @@ test('11: both CompendiumImporter call sites INJECT the three world-scope store 
     }
   }
 
-  // `src/main.js` builds this importer INSIDE the same method that constructs the three stores, so
-  // it is the one site with an ordering hazard — and the hazard is silent, because the merge fails
-  // closed. It must therefore resolve each store LAZILY through the shipped delegator, exactly as
-  // the `environmentStore` seam two lines above it already does, rather than capture a field whose
-  // assignment happens to precede it today.
-  //
-  // REDDENS WHEN: a seam reverts to `componentScopeStore: this.componentScopeStore`.
-  const mainSite = importerConstructionSite(sites['src/main.js']);
+  // The composition root builds this importer INSIDE the same phase pass that constructs the three
+  // stores, so it is the one site with an ordering hazard — and the hazard is silent, because the
+  // merge fails closed.
+  const mainSite = importerConstructionSite(sites['src/bootstrap/composeServices.js']);
   for (const seam of seamNames) {
     assert.ok(
-      mainSite.includes(`${seam}: scopeStoreDelegate(() => this.${seam})`),
-      `src/main.js must resolve ${seam} lazily, not capture the field at construction`
+      mainSite.includes(`${seam}: scopeStoreDelegate(() => fabricate.${seam})`),
+      `the composition root must resolve ${seam} lazily, not capture the field at construction`
     );
   }
 });
 
 test('11: an importer WITHOUT the scope seams merges nothing, and the seamed one merges', async () => {
   // THE BEHAVIOURAL ARM, and it exists because the source contract above is satisfied by a seam
-  // wired to something inert. It is also the proof that the seam is load-bearing at all: the
-  // lazy `game.fabricate` accessor lookup this replaces was green under BOTH a renamed accessor
-  // string and an outright `return null`, because a fail-closed merge and a merge that never ran
-  // are indistinguishable from the outside.
-  //
-  // `game.fabricate` IS GIVEN THE THREE WORKING ACCESSORS BELOW, and that is the whole arm: the
-  // unseamed importer must merge NOTHING even though a lazy lookup would find real, seeded stores
-  // right there. Without that the arm proves only that an empty environment resolves nothing.
-  //
-  // REDDENS WHEN: `_scopeStore` reacquires a `game.fabricate` fallback — the unseamed import then
-  // merges through it, and the roster is no longer empty.
+  // wired to something inert.
   const world = await seededEmptyWorld();
   const payload = () => envelope({ system: { components: [component('c1')] } });
   const prepare = () =>
@@ -1617,12 +1393,6 @@ test('11: an importer WITHOUT the scope seams merges nothing, and the seamed one
 
 test('11: the SHIPPED delegator is fail-closed on an unassigned field and resolves LATE', async () => {
   // THE SHAPE PRODUCTION ACTUALLY WIRES, now that both call sites always hand over a seam object.
-  // The reachable failure is no longer "no seam" but "seam present, field not assigned yet", which
-  // is why this arm runs the SHIPPED `scopeStoreDelegate` rather than a copy of its shape.
-  //
-  // REDDENS WHEN: the delegator's `isSeeded` stops demanding a strict `true` from a real store
-  // (first half), or when it resolves the field ONCE at construction instead of on every call
-  // (second half).
   const world = await seededEmptyWorld();
   const payload = () => envelope({ system: { components: [component('c1')] } });
   const prepare = () =>
@@ -1659,9 +1429,7 @@ test('11: the SHIPPED delegator is fail-closed on an unassigned field and resolv
   );
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 16 — the destination re-check of a carried world default
-// ---------------------------------------------------------------------------
 
 /** A tool default fixture whose sections are authored one at a time by each arm. */
 function toolDefault(sections) {
@@ -1704,13 +1472,9 @@ test('16(a): an essence default naming a component the MERGED roster lacks is de
 });
 
 test('16(a) positive: a component the DESTINATION holds is addressable, so the section LANDS', async () => {
-  // THE DISCRIMINATING ARM, and without it the negative arm above is green under the very
-  // mutation it names: a component absent from the destination AND from the incoming slice is
-  // declined either way, so that fixture cannot tell the MERGED roster from the incoming one.
-  // Here the referenced component is in the DESTINATION alone.
-  //
-  // REDDENS WHEN: the addressability check is bound to the SOURCE roster — the incoming slice's
-  // own `entities` — instead of the merged destination roster.
+  // THE DISCRIMINATING ARM, and without it the negative arm above is green under the very mutation
+  // it names: a component absent from the destination AND from the incoming slice is declined
+  // either way, so that fixture cannot tell the MERGED roster from the incoming one.
   const world = await destinationWorld({
     componentScope: {
       entities: [{ id: 'held-by-destination', name: 'Held' }],
@@ -1771,8 +1535,6 @@ test('16(b): a tool default whose onBreak replacement names an absent component 
 test('16(c): a repairRequirements group a merged member system does not hold is declined', async () => {
   // The destination holds component `c1` and a system `dest-sys` that is a member of the TOOL but
   // NOT of `c1`, so the seeded repair recipe would name an ingredient that system does not have.
-  //
-  // REDDENS WHEN: the constraint is decided against the incoming slice alone.
   const world = await destinationWorld({
     componentScope: {
       entities: [{ id: 'c1', name: 'Component c1' }],
@@ -1812,12 +1574,7 @@ test('16(c): a repairRequirements group a merged member system does not hold is 
 });
 
 test('16(d): a category default is declined when an INCOMING membership record carries none', async () => {
-  // THE VACUITY ARM, and the incoming-record wording is the whole point of it. At the moment the
-  // defaults merge runs, NOTHING of the incoming membership is persisted — so a destination-only
-  // reading of the corpus passes this, because the empty incoming set satisfies the every-member
-  // precondition VACUOUSLY.
-  //
-  // REDDENS WHEN: the re-check corpus is the persisted membership alone.
+  // THE VACUITY ARM, and the incoming-record wording is the whole point of it.
   const world = await destinationWorld({
     componentScope: {
       entities: [{ id: 'c1', name: 'Component c1' }],
@@ -1858,19 +1615,7 @@ test('16(d): a category default is declined when an INCOMING membership record c
 test('16(e): the incoming records count as ONE SYNTHETIC system, never under the payload’s id', async () => {
   // THE MIS-GROUPING ARM. The destination already holds a system whose id EQUALS the payload's, and
   // that system is a member of both the tool and the component — while the system the import
-  // actually lands in (resolved BY NAME) is a member of neither. Keying the incoming records on the
-  // payload's id would collapse them into that unrelated destination system's set and the
-  // repair-requirements constraint would PASS, seeding a dangling repair recipe into a system whose
-  // GM never authored it.
-  //
-  // REDDENS WHEN: the incoming records are keyed by the payload's system id rather than a synthetic
-  // token.
-  //
-  // The union is also deliberately CONSERVATIVE, which this arm shows in passing: the default is
-  // valid against the DESTINATION alone and is declined once the incoming member joins the union.
-  // Over-declining is lossless — every incoming membership record still overrides the section with
-  // its own system's value verbatim — while under-declining hands a member system a resolved value
-  // its GM never authored.
+  // actually lands in (resolved BY NAME) is a member of neither.
   const world = await destinationWorld({
     componentScope: {
       entities: [{ id: 'c1', name: 'Component c1' }],
@@ -1915,11 +1660,7 @@ test('16(e): the incoming records count as ONE SYNTHETIC system, never under the
 
 test('16(f): with the component scope UNSEEDED, a component-referencing section is declined', async () => {
   // THE UNDECIDABLE-ROSTER ARM. The seeding gate is per entity type, so `toolScope` can be seeded
-  // while `componentScope` is not — reachable through a torn migration. No component roster will be
-  // written, so every rule that consults one is undecidable; a section carrying NO component
-  // reference is unaffected.
-  //
-  // REDDENS WHEN: the unseeded-component-scope case falls through to acceptance.
+  // while `componentScope` is not — reachable through a torn migration.
   const world = await destinationWorld({
     essenceScope: emptySeededScope(),
     toolScope: emptySeededScope(),
@@ -1960,17 +1701,12 @@ test('16(f): with the component scope UNSEEDED, a component-referencing section 
   assert.equal(reported(summary, REFERENCE_KINDS.WORLD_DEFAULT_DECLINED).length, 1);
 });
 
-// ---------------------------------------------------------------------------
 // Validation — a malformed slice is an ERROR, never a silent drop
-// ---------------------------------------------------------------------------
 
 test('validation: a malformed slice is an ERROR, checked against the RAW payload', () => {
   // CHECKED AGAINST THE RAW PAYLOAD, not the migrated one, and that is not stylistic: the upcast
   // REPLACES a slice it cannot read with a freshly derived one, so a check on the migrated payload
-  // would never fire. A dropped slice is an import that quietly creates no memberships, which is
-  // indistinguishable from success until the consumer sweep makes the read union visible.
-  //
-  // REDDENS WHEN: the check is moved onto the migrated payload, or dropped.
+  // would never fire.
   const arrayShaped = validateImportData(
     envelope({ system: { components: [component('c1')] }, componentScope: [] })
   );
@@ -1998,11 +1734,7 @@ test('validation: a malformed slice is an ERROR, checked against the RAW payload
 
 test('export: the three slices are FILTERED BY MEMBERSHIP to the exported system', () => {
   // Currency, travel and the character libraries travel WHOLE because there is no owning system to
-  // filter them by. Here there IS one, and it is membership — shipping the unfiltered roster would
-  // import a foreign world's entire component roster into the destination.
-  //
-  // REDDENS WHEN: the membership filter is dropped, or `entities` / `defaults` are filtered by
-  // anything other than the ids the filtered membership names.
+  // filter them by.
   const payload = buildExportPayload(
     { id: SOURCE_SYSTEM_ID, name: 'Source System', components: [] },
     [],
@@ -2029,9 +1761,7 @@ test('export: the three slices are FILTERED BY MEMBERSHIP to the exported system
   assert.deepEqual(payload.componentScope.entities.map((r) => r.id), ['mine']);
   assert.deepEqual(payload.componentScope.defaults.map((r) => r.id), ['mine']);
 });
-// ---------------------------------------------------------------------------
 // The 1.34.0 equivalent-essence merge over the bundle (issue 1654)
-// ---------------------------------------------------------------------------
 
 /**
  * A bundle carrying two equivalent same-name essences inside its one system — the shape the
@@ -2094,8 +1824,7 @@ test('1654: a bundle with nothing to merge is untouched, and grows no key it did
   assert.deepEqual(migrated._worldScopeEntityReport.essenceMergeRefusals, []);
   assert.deepEqual(migrated.system.essenceDefinitions, [{ id: 'iron', name: 'Iron' }]);
   // The synthesized corpus defaults an absent gathering slice to `{}` and an absent recipe list to
-  // `[]`, so an ungated write-back would add both keys to every bundle that lacked them. The
-  // envelope builder always supplies them, so the gate is exercised on a payload that does not.
+  // `[]`, so an ungated write-back would add both keys to every bundle that lacked them.
   assert.deepEqual(migrated.gatheringConfig, { system: {}, shared: {} });
   const sparse = migrateExportPayload({
     schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION,

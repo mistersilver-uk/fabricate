@@ -49,7 +49,8 @@
 import { ingredientSetToolsAreActive } from '../../../systems/toolCheckBonus.js';
 import { normalizeRecipeCategory } from '../../../utils/recipeCategories.js';
 import { recipeItemDefinitionsContaining } from '../../../utils/recipeItemMembership.js';
-import { countRecipeTagPlaceholderUsage } from '../../../utils/vocabularyUsage.js';
+import { diceEngine } from '../../../utils/rollFormulaRollability.js';
+import { countRecipeTagPlaceholderUsage } from '../../model/vocabularyUsage.js';
 
 /**
  * Build a human-readable visibility summary for a recipe row.
@@ -174,21 +175,19 @@ function _isRecipeIncompleteByCounts(recipe) {
 }
 
 /**
- * Derive whether a recipe is an incomplete authoring shell — persistable but not craftable.
- * Source of truth: a recipe is incomplete iff it is structurally sound but fails the
- * full completeness contract, i.e. `validateStructure().valid === true` while
- * `validate().valid === false`. This exactly matches the craftability/completeness
- * notion (the engine gates craft on `Recipe.validate()`), so the chip never falsely
- * reads "complete" for a recipe whose ingredient set has no groups/essences, whose
- * result group is empty, whose resolution-mode cardinality is unmet, or — for explicit
- * multi-step recipes — whose step is missing either side. The two validators are pure.
- * Falls back to a coarse count-only check when a model instance is unavailable.
- * @param {Recipe} recipe
- * @returns {boolean}
+ * Whether a recipe is an incomplete authoring shell — persistable but not craftable. It is
+ * incomplete iff it is structurally sound but fails the full completeness contract the engine
+ * gates craft on, so the chip never reads "complete" for a recipe whose ingredient set has no
+ * groups, whose result group is empty, whose resolution-mode cardinality is unmet or whose step
+ * is missing a side. Both validators are pure; a coarse count-only check covers a plain JSON row.
  */
 function _isRecipeIncomplete(recipe) {
   if (typeof recipe?.validate === 'function' && typeof recipe?.validateStructure === 'function') {
-    return recipe.validate().valid === false && recipe.validateStructure().valid === true;
+    const injected = { Roll: diceEngine() };
+    return (
+      recipe.validate(injected).valid === false &&
+      recipe.validateStructure(injected).valid === true
+    );
   }
   return _isRecipeIncompleteByCounts(recipe);
 }
@@ -405,7 +404,7 @@ function _recipeCheckSummary(context, recipe) {
  *
  * A field belongs here when NOTHING in `recipeBrowserModel.js` reads it — no filter, no sort
  * key, no category. Moving a field into this list that the model does read reintroduces the
- * failure `summaryProjection.js` records for the systems-layer manifest: the browser renders
+ * failure `summaryProjection.js` records for the shared summary manifest: the browser renders
  * name order under a "DC" label and says nothing.
  */
 const RECIPE_DETAIL_FIELDS = Object.freeze([

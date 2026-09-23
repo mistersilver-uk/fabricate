@@ -1,82 +1,4 @@
-/**
- * The tolerance that decides whether a documentation frame changed, held to its own numbers.
- *
- * `scripts/docs-screenshots.mjs` rewrites a committed image only when the view actually moved, and
- * the View Lab renderer is not byte-deterministic, so "moved" is a perceptual judgement with a
- * measured threshold behind it. A threshold nobody exercises is a number, and a number drifts. So
- * this asserts the three things that make it a tolerance rather than a blindfold: the renderer's
- * own noise counts as unchanged, the smallest change a reader would care about counts as changed,
- * and every constant sits where the measurement put it rather than merely somewhere that passes.
- *
- * WHY THE ASSERTIONS ARE EQUALITIES RATHER THAN INEQUALITIES
- * ----------------------------------------------------------
- * They were inequalities, and mutation testing showed what that bought: `pixels` could be widened
- * from 8 to 9 or to 46, and `channelDelta` from 24 to 60, with every test still green. A `>` proves
- * a threshold is somewhere below a signal; it says nothing about where. So the measured populations
- * are pinned by equality, and the constants are asserted against those pinned numbers. Moving
- * `channelDelta` outside 21..24 changes how many of the one-character fixture's pixels count and
- * turns {@link MEASURED} red; raising `pixels` above zero exceeds what noise actually produced;
- * moving `area` outside roughly 3.8%..6.0% breaks one of the two brackets below.
- *
- * WHY THE FIXTURES ARE PPM
- * ------------------------
- * `dwebp -ppm` writes binary P6, and that is what production parses. Committing the fixtures in
- * that same format means these assertions run under `npm test` on a machine with no libwebp
- * installed — CI has none — while still exercising the real parser and the real comparison. The
- * only thing not covered without the tools present is the `dwebp` invocation itself, and the last
- * test here closes that on a machine that has them.
- *
- * WHERE THE FIXTURES CAME FROM
- * ----------------------------
- * Both pairs are crops of real decoded frames, taken after encoding, because that is the state
- * production compares in: `cwebp -near_lossless 60` on both sides, then `dwebp -ppm` on both.
- * Cropping before measuring would be wrong; cropping the decoded rasters is not, and each crop
- * below contains the whole of the difference it stands for.
- *
- * - `renderer-noise-*.ppm` is a 111x49 crop of `player-inventory-bulk-mixed`, from two clean full
- *   renders of the same forty-six cases. It is the WORST renderer noise found across four full
- *   runs — 2116 differing pixels, more than any other frame pair produced — and the crop carries
- *   all 2116 of them.
- * - `one-character-*.ppm` is a 19x23 crop of `player-crafting-routed-by-check`, rendered before
- *   and after changing one character of one recipe name in the View Lab world fixture
- *   (`Runeblade` to `Runedlade`, a substitution between two letters of equal advance width so that
- *   nothing reflows). That name is on screen three times in that frame; this is the SMALLEST of
- *   the three changed glyphs, so the assertion is made against the weakest real signal rather than
- *   the most convenient one.
- *
- * WHY THE CROPS ARE PADDED BACK OUT BEFORE THEY ARE JUDGED
- * -------------------------------------------------------
- * One of the tolerance's two rules is a FRACTION of a frame, and a crop is not a frame: 2116
- * differing pixels are 0.19% of the 1280x860 frame they came from and 38.9% of the 111x49 window
- * cut around them. Judging the crop directly would ask the area rule a question about a geometry
- * production never sees, and would report the worst renderer noise ever measured as a view change.
- *
- * Both source frames are 1280x860, and each crop was cut to contain every differing pixel, so
- * padding a crop back out to 1280x860 with identical bytes on both sides reconstructs the original
- * frame pair EXACTLY as far as any of these measurements can tell — same differing pixels, same
- * amplitudes, same pixel count. The padding cannot invent a difference, because both sides get the
- * same padding. That reconstruction is what the assertions below compare, so they ask production's
- * comparison production's question.
- *
- * WHAT THE MEASUREMENT SAID
- * -------------------------
- * Across four full renders of the forty-six mapped cases — six pairings, 276 frame comparisons —
- * nineteen frame pairs differed at all, and the largest per-channel difference any of them reached
- * was 16 levels. Not one noise pixel anywhere reached 24 levels, so the significant-pixel count of
- * the worst noise pair is zero and the pixel budget is zero with it. The worst noise pair touched
- * 2116 pixels, 0.19% of a frame. The smallest single changed character puts 47 pixels past 24
- * levels, reaching 60, on 0.008% of a frame — far too little area to be caught by area, which is
- * why both rules exist.
- *
- * WHAT IS SYNTHESIZED, AND SAID TO BE
- * -----------------------------------
- * The area rule cannot be demonstrated by either committed pair: noise is too small an area and one
- * changed character is smaller still. So the two frames that bracket it are constructed here, from
- * the noise fixture's own raster, and they are not measurements of anything. A uniform lift of ten
- * levels is under the amplitude threshold by design, so only the area rule can see it — applied to
- * the whole frame it stands for a colour-token change across a panel, and applied to a 52-row band
- * it is the smallest broad change this tolerance undertakes to see at all.
- */
+/** The tolerance that decides whether a documentation frame changed, held to its own numbers. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -109,14 +31,7 @@ const FRAME = Object.freeze({ width: 1280, height: 860 });
 /** How many pixels that is, which is the denominator of the area rule. */
 const FRAME_PIXELS = FRAME.width * FRAME.height;
 
-/**
- * What the two committed pairs measure, pinned.
- *
- * Every one of these came off a real render, and they are equalities rather than bounds so that
- * moving a threshold changes one of them. `significantPixels` is the number that does the work: it
- * is a function of `RENDER_NOISE.channelDelta`, so it cannot stay at 0 and 47 while that constant
- * moves.
- */
+/** What the two committed pairs measure, pinned. */
 const MEASURED = Object.freeze({
   noise: Object.freeze({ differingPixels: 2116, significantPixels: 0, maxChannelDelta: 16 }),
   oneCharacter: Object.freeze({ differingPixels: 91, significantPixels: 47, maxChannelDelta: 60 }),
@@ -132,11 +47,6 @@ function pair(name) {
 
 /**
  * A crop, padded back out to the geometry of the frame it was cut from.
- *
- * The crop lands at the top left and the rest is left at zero. Where it lands does not matter and
- * what the padding contains does not matter, because both sides of a pair get the same treatment:
- * the padding contributes zero differing pixels by construction, and the only thing it changes is
- * the denominator the area rule divides by — which is the whole point.
  *
  * @param {Buffer} buffer A cropped PPM raster.
  * @returns {Buffer} The same crop inside a full-frame PPM raster.
@@ -161,9 +71,6 @@ function restoredToFrame(buffer) {
 
 /**
  * The same raster with a band of rows lifted by a fixed amount on every channel.
- *
- * Synthesized, and the only thing here that is. The amount is chosen below the amplitude threshold
- * so that the resulting difference is invisible to everything except the area rule.
  *
  * @param {Buffer} buffer A full-frame PPM raster.
  * @param {number} amount Levels to add, clamped at 255.
@@ -373,9 +280,8 @@ test('a measurement of nothing is not divided by nothing', () => {
 
 test('a raster that is not what dwebp writes is refused rather than misread', () => {
   const valid = parsePortablePixmap(noise[0]);
-  // Each body is the length its own header declares, so the guard being tested is the only one
-  // that can fire. A short body would trip the length check first and leave the maxval check
-  // untested — which it did, and deleting that check left every test here green.
+  // Each body is the length its own header declares, so the guard being tested is the only one that
+  // can fire.
   const sixteenBit = `P6\n4 4\n65535\n${'x'.repeat(4 * 4 * CHANNELS)}`;
   const cases = [
     [`P5\n4 4\n255\n${'x'.repeat(4 * 4 * CHANNELS)}`, 'a greyscale PGM'],

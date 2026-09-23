@@ -8,9 +8,7 @@ import assert from 'node:assert/strict';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { buildRecipeGraph, layoutGraph } from '../../src/ui/svelte/util/recipeGraphBuilder.js';
 
-// ---------------------------------------------------------------------------
 // Helper: build DOM structures that mirror RecipeGraphTab output
-// ---------------------------------------------------------------------------
 
 function makeGraphNode({ id, name, img = 'icon.png', category = '', x = 0, y = 0 } = {}) {
   return { id, name, img, category, x, y, layer: 0, inEdges: [], outEdges: [] };
@@ -140,9 +138,7 @@ function buildGraphTabDOM({ nodes = [], edges = [], categories = [], onNodeClick
   return section;
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 describe('RecipeGraphTab — component', () => {
   before(setupDOM);

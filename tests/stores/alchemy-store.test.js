@@ -7,14 +7,11 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { CraftingEngine } from '../../src/systems/CraftingEngine.js';
 import { SignatureValidator } from '../../src/systems/SignatureValidator.js';
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
+import { expectedMemberKinds, storeMemberKinds } from '../helpers/storeMemberKinds.js';
 import { toAlchemyRecords } from '../helpers/alchemySubmissionRecords.js';
 
 let compiler;
 let createAlchemyStore;
-
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
 
 function concreteRecipe(id, name, concrete, resultName = 'Result') {
   const groups = Object.entries(concrete).map(([componentId, quantity]) => ({
@@ -121,7 +118,19 @@ async function loadedStore(setup = {}) {
   return { store, ...harness };
 }
 
-// ---------------------------------------------------------------------------
+const ALCHEMY_STORE_SHAPE = {
+  getters: [
+    'activeSystemId', 'benchChips', 'benchEmpty', 'benchEssences', 'benchKey', 'brewEnabled',
+    'brewInFlight', 'canSwitch', 'componentSearch', 'components', 'denied', 'error',
+    'hasOwnedComponents', 'knownCount', 'knownRecipes', 'lastBrew', 'listing', 'loadedOnce',
+    'loading', 'missing', 'mode', 'needsChooser', 'search', 'selectedRecipe', 'selectedRecipeId',
+    'systems', 'target', 'undiscoveredCount',
+  ],
+  methods: [
+    'add', 'brew', 'chooseSystem', 'clear', 'load', 'removeAll', 'removeOne', 'selectRecipe',
+    'setComponentSearch', 'setSearch', 'signatureKey', 'switchDiscipline',
+  ],
+};
 
 describe('alchemyStore', () => {
   before(async () => {
@@ -130,10 +139,19 @@ describe('alchemyStore', () => {
     // Issue 1648: the authority-refusal wording the brew path now falls back to. A
     // dependency the store imports but the compiler does not copy CANCELS this suite.
     compiler.copyPlain('src/ui/svelte/util/journalRunReasons.js');
+    compiler.compile('src/ui/svelte/stores/browseListing.svelte.js');
     ({ createAlchemyStore } = await compiler.load('src/ui/svelte/stores/alchemyStore.svelte.js'));
   });
 
   after(() => compiler.cleanup());
+
+  it('returns exactly the 40 public members the alchemy view reads, each still a getter', () => {
+    const store = createAlchemyStore({ services: makeServices().services });
+    const shape = expectedMemberKinds(ALCHEMY_STORE_SHAPE);
+
+    assert.deepEqual(Object.keys(store).sort(), Object.keys(shape));
+    assert.deepEqual(storeMemberKinds(store), shape);
+  });
 
   it('loads the listing scoped to the active system and sets loadedOnce', async () => {
     const { store, calls } = await loadedStore();
@@ -238,9 +256,7 @@ describe('alchemyStore', () => {
   });
 
   it('duplicate/identical learned signatures fail safe to `untried` (issue 774 — engine fizzles)', async () => {
-    // Identical signatures are now rejected at enable time and, if two ever both
-    // match, the engine fizzles (a non-unique maximum). The client mirrors that: it
-    // does NOT promise a `ready` brew by iteration order, it fails safe to `untried`.
+    // Identical signatures are rejected at enable time, and a non-unique maximum fizzles.
     const listing = baseListing({
       recipes: [
         concreteRecipe('first', 'First Brew', { emberroot: 1 }, 'A'),
@@ -274,8 +290,6 @@ describe('alchemyStore', () => {
   });
 
   // The client prediction MUST name the same recipe the engine brews (issue 774).
-  // We drive the ACTUAL engine matcher and the ACTUAL store over parallel recipe
-  // definitions and assert they agree for every bench in a subset/superset family.
   it('the store prediction agrees with the engine most-specific pick', async () => {
     const componentIds = ['c1', 'c2', 'c3'];
     // Engine side.
@@ -403,6 +417,32 @@ describe('alchemyStore', () => {
     assert.ok(calls.setSystem.includes('sys-a'));
   });
 
+  it('a quiet auto-enter interleaved with a loud load leaves loading to the loud pass', async () => {
+    const pending = [];
+    const harness = makeServices({
+      alchemySystem: '',
+      listing: () => new Promise((resolve) => pending.push(() => resolve(baseListing()))),
+    });
+    const store = createAlchemyStore({ services: harness.services });
+
+    const quietPass = store.load(true);
+    const loudPass = store.load();
+    flushSync();
+    assert.equal(store.loading, true, 'the loud pass raised loading');
+
+    pending[0]();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(pending.length, 3, 'the quiet pass auto-entered the sole discipline');
+    pending[2]();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(store.loading, true, 'the auto-enter inherited the quiet flag of its own pass');
+
+    pending[1]();
+    await Promise.all([quietPass, loudPass]);
+    flushSync();
+    assert.equal(store.loading, false, 'the loud pass clears loading in its own finally');
+  });
+
   it('brew submits the expanded bench, clears it, and banners a discovery', async () => {
     const harness = makeServices();
     // After the brew, reload reveals the newly-learned recipe.
@@ -446,9 +486,7 @@ describe('alchemyStore', () => {
     assert.equal(store.benchEmpty, true);
   });
 
-  // Issue 966: a time-gated brew START matched a signature, consumed the inputs and
-  // armed a run — but returned `success: false` with no disposition, so it fell into
-  // the trailing else and bannered as a fizzle, telling the player their brew failed.
+  // A `success: false` with no disposition is a started run, not a fizzle (issue 966).
   it('a started time-gated brew banners as brewing, not as a fizzle, and toasts nothing', async () => {
     const harness = makeServices({
       submitAlchemyAttempt: async () => ({
@@ -475,9 +513,7 @@ describe('alchemyStore', () => {
     assert.equal(store.benchEmpty, true);
   });
 
-  // Issue 1648: the versioned-run authority refuses a brew with `{success:false, reason}`
-  // and no `message`, so the store toasted NOTHING and bannered `no-match-fizzle` —
-  // telling the player their reaction failed when nothing was ever attempted.
+  // A `{success: false, reason}` with no `message` is an authority refusal, not a fizzle.
   it('banners and toasts an authority refusal instead of reporting a fizzle', async () => {
     const harness = makeServices({
       submitAlchemyAttempt: async () => ({ success: false, reason: 'ledger-missing' }),
@@ -496,9 +532,7 @@ describe('alchemyStore', () => {
     assert.deepEqual(harness.calls.notify, [expected], 'a refused brew is never silent');
   });
 
-  // Issue 1648: a failed CHECK is an outcome, not "no reaction" and not an error. The
-  // versioned stage mints `disposition: 'failed'`; the banner must say the check failed
-  // and claim nothing about what the failure policy spent.
+  // Issue 1648: a failed CHECK is an outcome, not "no reaction" and not an error.
   it('banners a resolved failed check as its own outcome rather than a fizzle', async () => {
     const harness = makeServices({
       submitAlchemyAttempt: async () => ({
@@ -621,9 +655,8 @@ describe('alchemyStore', () => {
     assert.equal(store.benchEmpty, false, 'a cancelled roll leaves the bench intact');
   });
 
-  // The aggregate essence readout is the ONLY progress signal an essence-authored
-  // recipe gets: such a recipe has no `concrete` multiset, so resolution fails safe
-  // to `untried` and never reports `ready`.
+  // The only progress signal an essence-authored recipe gets: with no `concrete` multiset
+  // its resolution fails safe to `untried`.
   describe('benchEssences (aggregate essence readout)', () => {
     const essenceListing = () =>
       baseListing({

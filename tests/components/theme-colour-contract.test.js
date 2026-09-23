@@ -13,17 +13,11 @@ const productRoots = [
 ];
 const allowedExtensions = new Set(['.js', '.svelte', '.css']);
 // The READ corpus is deliberately wider than `productRoots` above (issue 1499). Tokens are read
-// from outside `src/ui` — `src/config/playerCharacterTypesMenu.js` and
-// `src/systems/BulkSalvageChatCard.js` both do — and from `.mjs`, which `allowedExtensions` omits.
-// A narrower corpus would report a live token as unread and delete a token the product paints
-// with, so the unread gate walks `src/` in full with its own extension list. The colour-literal
-// assertions keep `productRoots`: their subject is authored product UI, not every reader.
+// from outside `src/ui` — `src/config/playerCharacterTypesMenu.js` does — and from `.mjs`, which
+// `allowedExtensions` omits.
 const readCorpusRoots = [resolve(repoRoot, 'src'), resolve(repoRoot, 'styles')];
 const readCorpusExtensions = new Set(['.js', '.mjs', '.svelte', '.css']);
-// `--fab-tag-*` is read as `var(--fab-tag-${token})`, which no static scan can see, so the unread
-// gate exempts the family. An exemption is only sound while the dynamic reads it stands for still
-// exist, so the gate asserts each site first — otherwise deleting the last dynamic reader would
-// silently leave nine tokens permanently exempt and permanently dead.
+// `--fab-tag-*` is read as `var(--fab-tag-${token})`, which no static scan can see.
 const dynamicTagReadSites = Object.freeze([
   { path: 'src/ui/svelte/components/ManagerColorPicker.svelte', marker: 'var(--fab-tag-${' },
   { path: 'src/ui/svelte/components/Medallion.svelte', marker: 'var(--fab-tag-${' },
@@ -33,6 +27,8 @@ const dynamicTagReadSites = Object.freeze([
   }
 ]);
 const dynamicallyReadTokenPattern = /^--fab-tag-/;
+// A theme foundation read only by the premium companion.
+const companionReadTokens = Object.freeze(['--fab-on-info']);
 const colourLiteralPattern = /(#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)|(?<![-\w])(?:white|black)(?![-\w]))/g;
 const themeSelectors = Object.freeze({
   fabricate: ':root,\n:root[data-fabricate-theme="fabricate"],\n.fabricate[data-fabricate-theme="fabricate"]',
@@ -53,7 +49,6 @@ const themePaletteAnchors = Object.freeze({
   // `foundry-native` carries a TENTH anchor. `#BC8963` was this palette's accent AND its
   // warning, byte-identical, so one anchor pinned two roles and the accent could be re-pointed
   // without moving an anchor at all (issue 1096 re-pointed it to `#D9B06D`). Both are listed:
-  // the tan still has to be here as `--fab-warning`, and the gold now pins the accent.
   'foundry-native': ['#0C0A14', '#111018', '#30282F', '#2E2833', '#F3F3F5', '#BC8963', '#D9B06D', '#706B70', '#617054', '#A16C60']
 });
 
@@ -118,22 +113,12 @@ function fallbackBackedTokens(source) {
   return new Set([...source.matchAll(/var\((--fab-[A-Za-z0-9-]+)\s*,/g)].map(match => match[1]));
 }
 
-/**
- * Source with `/* … *\/` runs removed, so prose cannot be mistaken for code.
- *
- * Both halves of the unread gate need this and for the same reason: the `:root` block documents a
- * DELETED alias block by quoting one of its declarations (`--fab-cs-radius-row: 8px`), which the
- * declaration scan reads as a live token and then reports as unread. The read scan is stripped for
- * the mirror image of that: a commented-out `var()` is not a reader, and counting one would keep a
- * dead token alive. `/* … *\/` is a block comment in CSS, JavaScript and a Svelte `<style>` alike.
- */
+/** Source with `/* … *\/` runs removed, so prose cannot be mistaken for code. */
 function stripCommentedSource(source) {
   return source.replaceAll(/\/\*[\s\S]*?\*\//g, '');
 }
 
-/**
- * Every `--fab-*` token the product reads through `var()`, across `styles/` and all of `src/`.
- */
+/** Every `--fab-*` token the product reads through `var()`, across `styles/` and all of `src/`. */
 function tokensReadByProduct() {
   const read = new Set();
 
@@ -151,8 +136,7 @@ function tokensReadByProduct() {
 function findColourLiteralOffenders() {
   const offenders = [];
 
-  // Not `flatMap(collectProductFiles)`: `flatMap` passes the INDEX as the second argument, which
-  // would arrive as the extension set and throw on the first file.
+  // Not `flatMap(collectProductFiles)`: `flatMap` passes the INDEX as the second argument.
   for (const filePath of productRoots.flatMap(root => collectProductFiles(root))) {
     const source = readFileSync(filePath, 'utf8');
     let match;
@@ -185,9 +169,7 @@ describe('Theme colour contract', () => {
     const allReferencedFabTokens = tokenReferences(css);
     const tokensWithFallbacks = fallbackBackedTokens(css);
 
-    // A floor, not a count: it catches a theme block gutted to a stub, or a `blockFor` selector
-    // that stopped matching and returned something small. Issue 1499 deleted 24 unread tokens from
-    // every block (123 → 99), so the old floor of 100 would have failed on a correct sheet.
+    // A floor, not a count: it catches a theme block gutted to a stub.
     assert.ok(referenceThemeTokens.length > 90, 'theme blocks should define the full Fabricate theme token surface');
 
     for (const [themeId, block] of Object.entries(themeBlocks)) {
@@ -215,6 +197,40 @@ describe('Theme colour contract', () => {
     );
   });
 
+  // The only absolute presence check here.
+  it('declares every companion-read token in every theme block', () => {
+    const css = readFileSync(cssPath, 'utf8');
+    const themeIdsInSheet = [
+      ...new Set([...css.matchAll(/\[data-fabricate-theme="([^"]+)"\]/g)].map(match => match[1]))
+    ].sort();
+
+    assert.deepEqual(
+      Object.keys(themeSelectors).sort(),
+      themeIdsInSheet,
+      `themeSelectors must name every theme block the sheet declares, or this assertion is `
+        + `absolute only over a hand-written list: an unlisted theme is skipped here AND by the `
+        + `parity assertion above, and the bare \`:root\` compound would resolve its companion `
+        + `tokens to fabricate's values rather than leaving them unresolved`
+    );
+
+    const missing = Object.entries(themeSelectors).flatMap(([themeId, selector]) => {
+      const declaredInBlock = tokenNames(stripCommentedSource(blockFor(css, selector)));
+
+      return companionReadTokens
+        .filter(token => !declaredInBlock.includes(token))
+        .map(token => `${themeId} is missing ${token}`);
+    });
+
+    assert.deepEqual(
+      missing,
+      [],
+      `every theme block must declare every companion-read token — the premium companion reads `
+        + `them, and an unresolvable var() in an inherited property computes the inherited value, `
+        + `so a missing declaration paints the theme's body ink instead of failing:\n`
+        + `${missing.join('\n')}`
+    );
+  });
+
   it('declares no root-layer token the product never reads', () => {
     const css = readFileSync(cssPath, 'utf8');
     const declared = new Set([
@@ -234,7 +250,12 @@ describe('Theme colour contract', () => {
 
     const read = tokensReadByProduct();
     const unread = [...declared]
-      .filter(token => !read.has(token) && !dynamicallyReadTokenPattern.test(token))
+      .filter(
+        token =>
+          !read.has(token)
+          && !dynamicallyReadTokenPattern.test(token)
+          && !companionReadTokens.includes(token)
+      )
       .sort();
 
     assert.deepEqual(

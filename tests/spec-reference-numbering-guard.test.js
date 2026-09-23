@@ -4,15 +4,8 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Guards against recurrence of the retired NUMBERED spec-filename scheme
-// (`00N-<domain>.md`, bare `` `00N` ``, and `# Specification NNN` H1 titles).
-// The flattened layout is `openspec/specs/<domain>/spec.md`; the numbered forms
-// are uniformly dead (issue #666) and any survivor silently misdirects readers.
-//
-// The shapes are deliberately narrow so they do NOT false-positive on the
-// `file.js:NNN` citation placeholder documented in
-// `openspec/specs/agentic-workflow/spec.md`, on version numbers (`1.16.0`),
-// issue refs (`#318`), DC values, or the 50-entry cap.
+// Guards against recurrence of the retired NUMBERED spec-filename scheme (`00N-<domain>.md`, bare
+// `` `00N` ``, and `# Specification NNN` H1 titles) (issue 666).
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const specsRoot = join(repoRoot, 'openspec', 'specs');
@@ -23,14 +16,13 @@ const SRC_FILES = [
   'src/models/Tool.js',
   'src/migration/migrateLegacyResolutionModes.js',
   'src/migration/migrateSplitRoutedResolutionModes.js',
-  'src/migration/migrateRecipeForModeChange.js',
+  'src/systems/migrateRecipeForModeChange.js',
 ].map((relPath) => join(repoRoot, relPath));
 
 // `00N-<domain>.md` (the retired filename form) — used over specs AND src.
 const MD_FILENAME_SHAPE = /\d{3}-[a-z-]+\.md/;
-// `00N-<domain>` with the `.md` OPTIONAL — used over the src set only, so the
-// three `.md`-less stragglers cannot regress. NOT applied to specs, where a
-// legitimate `\d{3}-word` string could otherwise trip it.
+// `00N-<domain>` with the `.md` OPTIONAL — used over the src set only, so the three `.md`-less
+// stragglers cannot regress.
 const SRC_NUMBERED_SHAPE = /\d{3}-[a-z-]+/;
 // Bare backtick reference such as `` `002` `` / `` `007` `` — specs only.
 const BARE_BACKTICK_SHAPE = /`00\d`/;

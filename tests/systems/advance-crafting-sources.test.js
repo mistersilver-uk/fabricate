@@ -1,10 +1,6 @@
 /**
  * Coverage for the pure ownership-guard + component-source resolver
- * (`src/systems/advanceCraftingSources.js`) extracted from
- * `Fabricate#advanceCraftingRun`. It must block an unknown crafting actor,
- * resolve `componentSourceActorUuids` through the injected `fromUuid` (filtering
- * falsy resolutions), fall back to `[actor]` when nothing resolves, and block
- * when the crafting actor OR any source actor is not owned by the viewer.
+ * (`src/systems/advanceCraftingSources.js`) extracted from `Fabricate#advanceCraftingRun`.
  */
 
 import { describe, it } from 'node:test';

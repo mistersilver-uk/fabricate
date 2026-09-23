@@ -1,42 +1,6 @@
 /**
  * Issue 1226 — the **Valid Id Basis** gate on the MUTATION-TIME door
  * (`openspec/specs/data-models/spec.md` § Valid Id Basis).
- *
- * Issue 1224 gated the startup housekeeping and deliberately left this door open, recording
- * it in the spec as unsafe. The same id sets are recomputed and the same destructive
- * collaborators are called from `RecipeManager#_cleanupFlagsAfterRecipeMutation` and
- * `CraftingSystemManager#_cleanupSystemScopedState`, so a GM deleting a recipe against a
- * partially converted corpus destroys the same durable actor state — and the trigger is far
- * more ordinary than a boot.
- *
- * **Both directions are asserted, and the open one is not decoration.** A gate that never
- * fires is a data-loss bug; a gate that always fires converts it into an orphaned-flag leak
- * nothing detects.
- *
- * **The third direction the spec adds here**: refusing the sweep must not itself leak the
- * flags the mutation orphaned. A refused sweep falls back to a SUBJECT-TARGETED prune of
- * exactly the ids the caller removed, so the closed cases assert both that the corpus-wide
- * sweep did NOT run and that the just-deleted recipe's flags went anyway.
- *
- * ## What CLOSES the gate after issue 1261, and why the fixtures changed
- *
- * Every closed-direction case used to build a PARTIAL CORPUS by moving a Definition Storage
- * setting after the corpus read, and reach the gate through the real `RecipeManager` driven
- * from SETTINGS — never by injecting a basis — because injecting the answer is how two
- * earlier acceptance sets for #1224 went green against an implementation whose gate never ran.
- *
- * Issue 1261 removed the storage arrangement, and with it the only mechanism that could
- * produce a partial corpus: each class now arrives in one whole-array read that either
- * returns the corpus or throws. So no production seam can drive `basis[kind] !== true`, and
- * a settings-driven closed case can no longer be written at all. The compromise is forced
- * rather than chosen, and it is bounded to ONE seam: the closed direction is asserted
- * directly against {@link buildStartupPassList} with an injected basis, which is the pure
- * builder both composition sites call, while every case that reaches the real managers is an
- * OPEN-direction case with no injection anywhere in it.
- *
- * The remaining production route to an omission is an UNDECLARED pass, which is not
- * hypothetical: it is what stops a future destructive prune from shipping ungated by
- * forgetting to declare its entity kinds. The targeted-fallback cases are driven through it.
  */
 
 import assert from 'node:assert/strict';
@@ -65,15 +29,10 @@ const SYSTEM_ID = 'sys-1';
 
 console.debug = () => {};
 
-// ---------------------------------------------------------------------------
 // The fixture
-// ---------------------------------------------------------------------------
 
 /**
  * A recipe-visibility stand-in that records WHICH of the two prunes it was asked for.
- *
- * Shared by both fixtures below rather than written out twice: the block is what the
- * SonarCloud new-code duplication gate counts, and it counts `tests/**` exactly like `src/`.
  *
  * @param {Array} calls shared collector
  */
@@ -94,12 +53,8 @@ function recordingVisibilityService(calls) {
 }
 
 /**
- * A REAL `RecipeManager` that has genuinely read a corpus, plus recording stand-ins for the
- * two destructive collaborators.
- *
- * Nothing is injected: the manager reads its corpus through the shipped repository and the
- * gate decides from the pass declarations, so every case built on this fixture observes the
- * production path end to end.
+ * A REAL `RecipeManager` that has genuinely read a corpus, plus recording stand-ins for the two
+ * destructive collaborators.
  */
 async function makeRecipeFixture() {
   const env = installFoundryEnv();
@@ -156,14 +111,11 @@ async function makeRecipeFixture() {
   };
 }
 
-// ---------------------------------------------------------------------------
 // The public orphan sweep
-// ---------------------------------------------------------------------------
 
 test('the OPEN direction — a whole corpus still runs both corpus-derived sweeps', async () => {
-  // The positive control, and it is the assertion that stops this whole change from being a
-  // gate that simply never lets anything run. Without it, every case below is satisfied by
-  // an implementation that prunes nothing, ever.
+  // The positive control, and it is the assertion that stops this whole change from being a gate
+  // that simply never lets anything run.
   const fixture = await makeRecipeFixture();
   try {
     await fixture.recipeManager.cleanupOrphanedRecipeFlags();
@@ -180,13 +132,9 @@ test('the OPEN direction — a whole corpus still runs both corpus-derived sweep
 });
 
 test('an omitted sweep still prunes what the caller REMOVED — the gate leaks nothing', async () => {
-  // The third direction. Gating alone would trade a data-loss defect for an orphaned-flag
-  // leak that nothing detects, because the flags a deletion orphans are the entire reason
-  // this cleanup path exists.
-  //
-  // Driven through an UNDECLARED pass, which after issue 1261 is the production route to an
-  // omission: a future destructive prune shipped without declaring its entity kinds is
-  // omitted rather than run, and its targeted fallback must still fire.
+  // The third direction. Gating alone would trade a data-loss defect for an orphaned-flag leak that
+  // nothing detects, because the flags a deletion orphans are the entire reason this cleanup path
+  // exists (issue 1261).
   const removed = ['r-also-gone', 'r-doomed'];
   const targeted = [];
   const swept = [];
@@ -254,9 +202,7 @@ test('a mutation that removed NOTHING has no fallback, so an omission removes no
   assert.deepEqual(warnings[0].targetedFallbacks, []);
 });
 
-// ---------------------------------------------------------------------------
 // The delete paths, end to end
-// ---------------------------------------------------------------------------
 
 test('deleteRecipe on a known-complete corpus prunes against the POST-deletion id set', async () => {
   const fixture = await makeRecipeFixture();
@@ -317,18 +263,9 @@ test('an import sweeps against the POST-import corpus and names no removed ids',
   }
 });
 
-// ---------------------------------------------------------------------------
 // The declaration table
-// ---------------------------------------------------------------------------
 
-/**
- * Which startup pass each mutation-time pass is the same prune as.
- *
- * The mutation-time table is a SUBSET — `phantom crafting runs` and `salvage runs` have no
- * mutation-time entrance — so the mirror cannot be a key-set equality against the startup
- * table. It is a key-set equality against THIS map instead, which is what makes a fourth
- * mutation-time label fail rather than pass unexamined.
- */
+/** Which startup pass each mutation-time pass is the same prune as. */
 const MUTATION_TO_STARTUP_LABEL = Object.freeze({
   'orphaned crafting runs': 'crafting runs',
   'orphaned learned recipes': 'learned recipes',
@@ -336,13 +273,8 @@ const MUTATION_TO_STARTUP_LABEL = Object.freeze({
 });
 
 test('the mutation-time declarations mirror the startup ones pass for pass', () => {
-  // The two doors call the SAME collaborators, so a kind declared on one and not the other
-  // is a gate that disagrees with itself about what a prune reads.
-  //
-  // Three assertions, because three things can drift. The key sets catch a mutation-time
-  // pass with no startup counterpart — the case the earlier three-pair comparison could not
-  // see, since it named its pairs and asserted nothing about what else was in the table. The
-  // startup lookup catches a renamed startup pass. The kind arrays catch a widened basis.
+  // The two doors call the SAME collaborators, so a kind declared on one and not the other is a
+  // gate that disagrees with itself about what a prune reads.
   assert.deepEqual(
     Object.keys(MUTATION_CLEANUP_ENTITY_KINDS).sort(),
     Object.keys(MUTATION_TO_STARTUP_LABEL).sort(),
@@ -362,11 +294,8 @@ test('the mutation-time declarations mirror the startup ones pass for pass', () 
 });
 
 test('an UNDECLARED mutation-time pass is omitted rather than run', async () => {
-  // The property that stops a future destructive prune from shipping ungated by forgetting
-  // to declare it. The declared pass running in the same call is what proves the omission was
-  // not a blanket refusal; the `undeclared: true` flag on the omission is what proves it was
-  // decided by the declaration table rather than by an incomplete kind. Asserting only "it
-  // did not run" leaves both.
+  // The property that stops a future destructive prune from shipping ungated by forgetting to
+  // declare it.
   const ran = [];
   const warnings = [];
   const pass = (label) => ({
@@ -389,14 +318,11 @@ test('an UNDECLARED mutation-time pass is omitted rather than run', async () => 
   ]);
 });
 
-// ---------------------------------------------------------------------------
 // The subject-targeted collaborators
-// ---------------------------------------------------------------------------
 
 test('removeRunsForRecipes drops the named runs and keeps everything it was not told about', async () => {
-  // The safety property the fallback rests on: it removes by NAME, so a run whose recipe is
-  // merely missing from a half-read corpus survives. That is the whole difference from
-  // `cleanupInvalidRuns`, and it is why this needs no basis.
+  // The safety property the fallback rests on: it removes by NAME, so a run whose recipe is merely
+  // missing from a half-read corpus survives.
   installFoundryEnv();
   const container = {
     active: {
@@ -483,16 +409,11 @@ test('forgetDeletedRecipes forgets the named ids and leaves an unread recipe lea
   );
 });
 
-// ---------------------------------------------------------------------------
 // The crafting-system doors: system-scoped state and the preference sweep
-// ---------------------------------------------------------------------------
 
 /**
- * A REAL `CraftingSystemManager` holding one system with one component, over a settings
- * store carrying a progressive-order map with a live and a stale key in BOTH scopes.
- *
- * `_cleanupCraftingPreferences` replaces that map wholesale, so the four keys are what make
- * the scope of the prune observable at all.
+ * A REAL `CraftingSystemManager` holding one system with one component, over a settings store
+ * carrying a progressive-order map with a live and a stale key in BOTH scopes.
  */
 function makeSystemFixture() {
   const env = installFoundryEnv();
@@ -542,11 +463,10 @@ function makeSystemFixture() {
 }
 
 test('the preference sweep KEEPS the live salvage key while dropping the stale one', async () => {
-  // The open direction, and it also pins a defect this gate exposed: the component ids were
-  // never passed, so `validComponentIds` took its empty-set default and EVERY
-  // `salvage:<componentId>` key was dropped on every resolution-mode change and every system
-  // deletion — a corpus-derived prune against a basis of nothing. Issue 1261 closed the
-  // default itself: the parameter is now REQUIRED, so omitting it throws rather than pruning.
+  // The open direction, and it also pins a defect this gate exposed: the component ids were never
+  // passed, so `validComponentIds` took its empty-set default and EVERY `salvage:<componentId>` key
+  // was dropped on every resolution-mode change and every system deletion — a corpus-derived prune
+  // against a basis of nothing (issue 1261).
   const fixture = makeSystemFixture();
   try {
     await fixture.manager._cleanupCraftingPreferences();
@@ -571,9 +491,8 @@ test('the preference pass is omitted when the COMPONENT basis alone is incomplet
 
   const emitted = buildStartupPassList({
     candidates,
-    // `componentIdentityRemap` is supplied TRUE so this arm isolates the `components: false`
-    // case. It is a separate kind (issue 1363) asking whether component ids are still CURRENT
-    // rather than whether the corpus is COMPLETE, and it has its own arm below.
+    // `componentIdentityRemap` is supplied TRUE so this arm isolates the `components: false` case
+    // (issue 1363).
     basis: { ...WHOLE_CORPUS_ID_BASIS, components: false, componentIdentityRemap: true },
     declarations: MUTATION_CLEANUP_ENTITY_KINDS,
     onOmit: (omission) => omissions.push(omission),
@@ -594,10 +513,8 @@ test('the preference pass is omitted when the COMPONENT basis alone is incomplet
 });
 
 test('the preference pass is omitted when component ids are COMPLETE but not CURRENT', () => {
-  // The second, independent reason to withhold the same pass (issue 1363): the `1.30.0`
-  // migration MOVES component ids, and the pass that repairs every actor-side reference to
-  // them runs later. Completeness and CURRENCY are different questions, and the shared
-  // `WHOLE_CORPUS_ID_BASIS` only ever answered the first.
+  // The second, independent reason to withhold the same pass (issue 1363): the `1.30.0` migration
+  // MOVES component ids, and the pass that repairs every actor-side reference to them runs later.
   const omissions = [];
   const emitted = buildStartupPassList({
     candidates: [
@@ -663,19 +580,14 @@ test('deleteSystem sweeps learned recipes on a known-complete corpus', async () 
   }
 });
 
-// ---------------------------------------------------------------------------
 // The source contract: no ungated route to a corpus-derived prune
-// ---------------------------------------------------------------------------
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const readSource = (relative) => readFileSync(resolve(HERE, '..', relative), 'utf8');
 
 /**
- * The two modules that ARE the gate, and are therefore allowed to call a corpus-derived
- * prune outside a `sweep:`.
- *
- * An allowlist rather than a path filter, so adding a third gate is a deliberate edit here
- * rather than something a new filename quietly acquires.
+ * The two modules that ARE the gate, and are therefore allowed to call a corpus-derived prune
+ * outside a `sweep:`.
  */
 const GATE_COMPOSITION_SITES = Object.freeze([
   'src/systems/startupPassComposition.js',
@@ -696,15 +608,9 @@ function everySourceFile(directory = resolve(HERE, '..', 'src'), collected = [])
 }
 
 test('every corpus-derived prune anywhere under src is reached through a gate', () => {
-  // A hand-maintained mirror guard, and the reason it walks the WHOLE tree: the issue that
-  // filed this under-counted its own reachable sites — it named four and there are seven —
-  // so the durable protection has to fail when an EIGHTH appears in a file nobody thought
-  // to list. An earlier version of this scanned two named managers, which would have said
-  // nothing about a new door in a third.
-  //
-  // The rule: a call to one of the three destructive corpus-derived collaborators may only
-  // appear as the `sweep:` of a pass handed to a gate. Three exemptions, all narrow:
-  // the two composition sites that ARE the gate, and the DEFINITION of each collaborator.
+  // A hand-maintained mirror guard, and the reason it walks the WHOLE tree: the issue that filed
+  // this under-counted its own reachable sites — it named four and there are seven — so the durable
+  // protection has to fail when an EIGHTH appears in a file nobody thought to list.
   const DESTRUCTIVE = /(cleanupInvalidRuns|cleanupLearnedRecipes|cleanupStalePreferences)\(/;
   const DEFINITION = /^\s*(?:export\s+)?(?:async\s+)?(?:function\s+)?(?:cleanupInvalidRuns|cleanupLearnedRecipes|cleanupStalePreferences)\(/;
   const root = resolve(HERE, '..');
@@ -713,12 +619,7 @@ test('every corpus-derived prune anywhere under src is reached through a gate', 
   for (const full of everySourceFile()) {
     const relative = toPosix(relativePath(root, full));
     if (GATE_COMPOSITION_SITES.includes(relative)) continue;
-    // Comment text is BLANKED before the scan, never filtered after it. The `sweep:`
-    // exemption is tested against the whole line, so a TRAILING comment carrying that token
-    // waives a live ungated call: `cleanupInvalidRuns(new Set(), new Set()); // sweep: n/a`
-    // was proven to pass this guard while pruning player-owned run data. A leading-marker
-    // filter cannot see it, because the line does not begin with a marker. Same shape as
-    // `tests/actor-type-literal-gate.test.js`, which is why `stripComments` is shared.
+    // Comment text is BLANKED before the scan, never filtered after it.
     const lines = stripComments(readFileSync(full, 'utf8')).split('\n');
     lines.forEach((line, index) => {
       if (!DESTRUCTIVE.test(line)) return;
@@ -735,9 +636,7 @@ test('every corpus-derived prune anywhere under src is reached through a gate', 
 });
 
 test('that scan is not vacuous — it sees the calls it exempts', () => {
-  // The scan reports nothing, which is also what a scan reading zero files reports. This
-  // pins the population: the three collaborator definitions and the four gated calls at the
-  // startup composition site are all present in the tree the walk produces.
+  // The scan reports nothing, which is also what a scan reading zero files reports.
   const DESTRUCTIVE = /(cleanupInvalidRuns|cleanupLearnedRecipes|cleanupStalePreferences)\(/;
   const matched = everySourceFile().filter((full) =>
     DESTRUCTIVE.test(stripComments(readFileSync(full, 'utf8')))
@@ -752,9 +651,8 @@ test('that scan is not vacuous — it sees the calls it exempts', () => {
       'src/systems/RecipeManager.js',
       'src/systems/RecipeVisibilityService.js',
       'src/systems/SalvageRunManager.js',
-      // `mutationCleanupComposition.js` is deliberately absent: it names these collaborators
-      // only in prose, and `stripComments` blanks prose. That it drops out here is itself
-      // evidence the blanking runs before the scan rather than after it.
+      // `mutationCleanupComposition.js` is deliberately absent: it names these collaborators only
+      // in prose, and `stripComments` blanks prose.
       'src/systems/startupPassComposition.js',
     ],
     'the walk must actually reach every file that names a corpus-derived prune'
@@ -763,9 +661,8 @@ test('that scan is not vacuous — it sees the calls it exempts', () => {
 
 test('no caller anywhere under src invokes the orphan sweep without naming its ids', () => {
   // The public wrapper is the entrance the issue's site list missed TWICE — the compendium
-  // importer's prune phase and `_deleteRecipeSet` — so this walks the whole tree rather than
-  // the two files that happen to hold today's callers. A caller that omits its ids gets a
-  // gate that protects the world and leaks its own orphans.
+  // importer's prune phase and `_deleteRecipeSet` — so this walks the whole tree rather than the
+  // two files that happen to hold today's callers.
   const BARE_CALL = /cleanupOrphanedRecipeFlags\??\.?\(\s*\)/;
   const root = resolve(HERE, '..');
   const bare = [];

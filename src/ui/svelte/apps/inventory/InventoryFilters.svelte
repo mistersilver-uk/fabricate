@@ -18,7 +18,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Select from '../../components/Select.svelte';
-  import SegmentedControl from '../manager/SegmentedControl.svelte';
+  import SegmentedControl from '../../components/SegmentedControl.svelte';
 
   let {
     search = '',

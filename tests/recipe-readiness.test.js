@@ -656,13 +656,9 @@ describe('evaluateRecipeReadiness routed check-mode warnings', () => {
 
 describe('recipeValidationRowStates', () => {
   it('gives a row that BLOCKS ENABLING the block word even when its severity is only a warning', () => {
-    // THE ORDERING THIS EXISTS FOR, and it is unreachable from `evaluateRecipeReadiness` today:
-    // all seven of its `blocks: 'enable'` issues are also `severity: 'critical'`, so severity
-    // alone would answer correctly for every one of them. That is exactly why the clause needs a
-    // synthetic issue rather than a recipe — a rule with no reachable case is a rule nothing can
-    // tell from its own absence, and the environment editor's rail is where the same pairing DID
-    // ship: `noAvailableTasks` is graded `warning` on a disabled environment and blocks enabling
-    // in both states, and reading severity alone told that GM the environment "Saves and enables".
+    // THE ORDERING THIS EXISTS FOR, and it is unreachable from `evaluateRecipeReadiness` today: all
+    // seven of its `blocks: 'enable'` issues are also `severity: 'critical'`, so severity alone
+    // would answer correctly for every one of them.
     const [row] = recipeValidationRowStates({
       checks: [{ id: 'hasName', satisfied: false }],
       issues: [{ id: 'noName', severity: 'warning', blocks: 'enable' }]

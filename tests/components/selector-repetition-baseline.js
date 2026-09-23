@@ -1,173 +1,46 @@
 /**
  * How often `styles/fabricate.css` writes one selector into more than one rule (issue 1501).
- *
- * THIS IS A DESCRIPTION OF DELIBERATE AUTHORING, NOT A DEFECT COUNT, and that is the whole reason
- * it lives here rather than in `design-system-known-debt.json`. Every row in that table is
- * something `openspec/specs/design-system/spec.md` already prohibits. Nothing in this one is: the
- * sheet's repetition is almost entirely a selector appearing in one comma-separated LIST and again
- * in a DIFFERENT list — shared-list authoring, three instances of it carrying a comment saying so —
- * and `stylelint`'s `no-duplicate-selectors` is enabled on the sheet and green, because its default
- * `disallowInList: false` is exactly what makes those two facts compatible. Issue 1501 measured the
- * population of repeated full selector LISTS, the only population a merge could act on, and found
- * it EMPTY. So this table exists to say what the shape of the sheet is, and to make a change to
- * that shape an edit somebody signed rather than a drift nobody saw.
- *
- * ── AN EXACT PIN, NOT A CEILING ─────────────────────────────────────────────────────────
- * `assertRatchet` reds on a SHRINK and on a VANISHED key just as loudly as on growth, and that is
- * the behaviour wanted here rather than a side effect tolerated. A row leaving this table means a
- * shared selector list was split or a rule deleted, which moves declarations through the cascade;
- * a row arriving means a list was widened or a rule copied. Both are edits a reviewer should see,
- * and neither is wrong on its face. The remedy for either is the same: re-derive the table and say
- * in the pull request which rule moved and why.
- *
  * ── WHAT THE KEY IS ─────────────────────────────────────────────────────────────────────
  * `<at-context chain> | <normalised selector>`, with `(top level)` for a rule under no at-rule at
  * all, and the chain joined by ` >> ` when a rule is nested. The at-context is part of the key
  * because two rules under different conditions are never the same rule: the same selector inside
  * a `@container` and at the top level is two different pieces of authoring, and merging them is
- * not a thing that can be done. Keyed on the selector ALONE the sheet holds 207 repeated selectors
- * rather than these 113, and both figures are published so a reader can tell which produced a pin.
- *
+ * not a thing that can be done. Keyed on the selector ALONE the sheet holds 216 repeated selectors
+ * rather than these 107, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,060 `(at-context, selector)` keys, of which 2,947 appear exactly
+ * Unfiltered, the sheet holds 3,078 `(at-context, selector)` keys, of which 2,971 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
  * sides — the gate tallies only repeated selectors too — so a selector falling to one appearance
  * is a VANISHED row rather than a silent pass.
- *
  * ── WHERE THE NUMBERS COME FROM ─────────────────────────────────────────────────────────
  * MEASURED after #1648's history batch replaces the dismiss override with an owning 24px
  * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,576 rules at that head, 113 repeated keys and 231 appearances
+ * printed from. The sheet holds 2,570 rules at that head, 107 repeated keys and 219 appearances
  * between them; five keys appear three times and none appears four or more.
- *
- * ISSUE 1517 PHASE 3 RE-KEYED NO ROW AND MOVED THE THREE CONTEXTUAL FIGURES, by adding ONE rule
- * of six selectors and deleting none. The rule paints `[data-validation-focused]`, the transient
- * mark a validation row's focus action stamps on the control it lands on, and it is written FLAT
- * over the module focus pair's own element list — `a`, `button`, `input`, `select`, `textarea`
- * each as `.fabricate <el>[data-validation-focused]`, plus `.fabricate [tabindex][…]` — because a
- * single `.fabricate [data-validation-focused]` selector is (0,2,0) and would lose outright to the
- * (0,2,1) and (0,3,0) `:focus` reset above it, painting nothing at all. So the six selectors are
- * the point of the rule rather than a stylistic expansion of it.
- *
- * All six are singletons in both keyings — measured — because no other rule in the sheet names
- * `[data-validation-focused]` at all, so the repeated table is untouched and `pinnedTotal` stays
- * 243 across 119 rows. The rule count rises by one and the key and singleton counts each rise by
- * six, which is the plain shape: one added rule, six added keys, none of them shared.
- *
- * ISSUE 1517 PHASE 6 RE-KEYED NO ROW AND MOVED THE THREE CONTEXTUAL FIGURES DOWNWARD, which is
- * the mirror of Phase 3 above: it deletes EIGHT rule blocks of twelve selectors and adds none.
- * The blocks are the environment editor Validation tab own family — its issue list, its check
- * list, its check rows and their two satisfied/unsatisfied glyph re-tones, its issue row and
- * that row title — plus the dead `manager-environment-layer` family that shared three of those
- * selector lists and was the reason a dead family survived a dead-rule sweep at all. The tab was
- * converted onto `EditorValidationSurface`, so every class the blocks named stopped being
- * emitted, and `styles-dead-classes.test.js` named all eight before the deletion.
- *
- * All twelve are singletons in both keyings, measured rather than assumed, because no rule
- * outside that family names any of those classes: the rule count falls by eight, the key and
- * singleton counts each fall by twelve, and `pinnedTotal` STAYS 243 across 119 rows. Re-derived
- * by running the census, not predicted from the diff.
- *
- * ISSUE 1517's REVIEW ROUND SPLIT ONE OF PHASE 3'S OWN SELECTOR LISTS, AND MOVED ONE FIGURE.
- * The six-selector mark rule is now two rules — the five TYPED selectors keeping the repaint's
- * outward `outline-offset: 2px`, and the `[tabindex]` one taking `-2px` — because a `[tabindex]`
- * destination is a card or a section spanning the full width of `.manager-editor-tab-panel`,
- * which is `overflow: auto` with no left padding, so an outward ring had its left arm clipped
- * away. Measured at pixel level in Chromium, both ways, in `validation-focus.test.js`.
- *
- * A SPLIT ADDS A RULE WITHOUT ADDING A KEY, which is the shape issue 1509 phases 1 and 3 recorded
- * six times over: both halves were already their own keys and each still appears exactly once. So
- * the rule count alone rises by one and the key and singleton counts do not move, while
- * `pinnedTotal` is untouched. Re-derived by running the census.
- *
- * RESTACKED ONTO ISSUE 1515 (PR 1634) BEFORE MERGE, and the three contextual figures were
- * RE-DERIVED at the restacked head rather than carried over: the sheet holds 2,565 rules, 3,046
- * keys and 2,934 singletons, with the repeated table exactly as issue 1515 left it — 112 rows and
- * a `pinnedTotal` of 229 — because none of the three entries above touches a repeated key. The
- * per-phase movements the three entries describe were measured on the pre-restack base and are
- * kept as the record of what each phase did; the figures the gate asserts are the ones here.
- *
- * ISSUE 1515 DELETED TWO ROWS, which is a shape none of the entries below took: every one of them
- * left the repeated table alone. `.fabricate-manager .manager-section-header` was written twice at
- * the top level — once as a list member beside `.fabricate-filter-bar.manager-toolbar` for the
- * shared padding and rule line, and once alone for its own flex row — and a third time inside the
- * 680px `@container`, which is a different at-context and was always a singleton. All three go,
- * because the class has no emitter left: the six manager views that drew a SECOND page header
- * under the shell's own now draw none, and a rule that went on painting one would be a standing
- * invitation to write it again.
- *
- * THE SECOND ROW IS THE CONSEQUENCE OF THE FIRST, and it is the reason this file asks for the
- * reason rather than the number. Removing one member from a two-member list left
- * `.fabricate-filter-bar.manager-toolbar` stated ALONE in two rules — which is the duplicate
- * `stylelint`'s `no-duplicate-selectors` rejects, where two DIFFERING lists were allowed by design
- * and are what almost every row in this table is. So the two rules are MERGED, at the earlier
- * position and in declaration order, and the toolbar's own row vanishes with the header's. One
- * THREE RULES ARRIVE with the deleted headers' consequences, and every one is a singleton in both
- * keyings: the page eyebrow's wrapper margin, the `systems`/`access` route row template — three
- * children against the shared three-track default would have handed the growing track to the
- * PAGER, which is the failure issues 643 and 676 recorded when they deleted the same header from
- * two other routes — and the validation surface's counts-rail inset, which the deleted section
- * header used to supply. Net: the sheet holds two rules MORE, the keyed population rises by two
- * with three more singletons, and the repeated table loses two whole rows. Re-derived by running
- * the gate rather than predicted.
- *
- * ISSUE 1515 PHASE 5 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, and it is
- * the first entry here whose rule and selector counts move by DIFFERENT amounts. The Tools list's
- * hand-rolled enable switch adopts `StatusToggle`, so its five-rule skin under
- * `.manager-tools-enabled-toggle` is deleted — the box, the track, the knob and the two `is-on`
- * repaints — and the sixth selector goes from a SHARED LIST: the switch's `:focus-visible` leg
- * stood beside `.manager-tools-select-target:focus-visible`, and only the switch's half leaves,
- * because the primitive's family already writes that exact ring. So SIX selectors go while FIVE
- * rules do: the rule count falls to 2,580, the key and singleton counts each fall by six to 3,056
- * and 2,939, and the repeated table is untouched with `pinnedTotal` staying 239 across 117 rows.
- *
- * ISSUE 1515 PHASE 6 MOVED THE THREE CONTEXTUAL FIGURES BY DIFFERENT AMOUNTS AGAIN, AND STILL
- * NONE OF THE REPEATED ONES. Four rules go and one arrives: the recipes blocked-enable flash was
- * a bespoke floating toast with its own glyph, message and dismiss rules, and it is a `<Notice>`
- * in the page's flow now, so what the sheet keeps is the SLOT's conditional inset and nothing
- * else. Two MORE selectors leave without taking a rule with them, and they are the interesting
- * pair: the composite-search-field focus reset and its inset ring are each written over a list
- * whose other member is the add-a-member search, and only the parties search's half leaves,
- * because `ManagerSearchField`'s own family already declares both halves around the control it
- * owns. So SIX selectors go while THREE rules do net: the rule count falls to 2,577 and the key
- * and singleton counts each fall by five to 3,051 and 2,934, with the repeated table untouched
- * and `pinnedTotal` staying 239 across 117 rows.
- *
- * ISSUE 1515 PHASE 7 IS THE FIRST ENTRY HERE THAT MOVES THE REPEATED TABLE, and it moves it
- * DOWNWARDS by three whole rows. The availability pill family's per-facet colour mappings -
- * `.manager-availability-pill.is-realm`, `.is-weather` and `.is-timeOfDay` - were each written
- * TWICE at the top level: once alone, to declare the facet's `--fab-chip-color`, and once as a
- * member of the six-selector list that mixed that property into a fill and an edge. Nothing emits
- * any of the three any more, so both halves go, which is why each is a VANISHED row rather than a
- * shrunken one. `.is-tag`, `.is-modifier` and `.is-biome` survive in the list, because all three
- * classes are still emitted elsewhere in the tree.
- *
- * The three CONTEXTUAL figures move in three different directions, and that is worth stating
- * because a reader expecting them to track the rule count will find they do not. FIVE rules are
- * deleted - the three facet one-liners plus the currency sub-unit pill's own skin and its glyph
- * colour - so the rule count falls to 2,572. But SIX selectors also ARRIVE, in four surviving
- * lists: the condition picker's trigger and the danger tag's remove control each take a name
- * outside the retiring family while the primitive that keeps the family goes on emitting the old
- * one, so each of those two rules and each of their two `:hover, :focus-visible` twins gains a
- * leg. Every arriving selector is a singleton in both keyings. Net: the key count RISES by one to
- * 3,052 and the singleton count rises by four to 2,938, while `pinnedTotal` falls to 233 across
- * 114 rows. Re-derived by running the census twice, not subtracted.
- *
- * RE-DERIVED BY RUNNING THE CENSUS RATHER THAN SUBTRACTED. Two of the six selectors leaving are
- * list members, which is the shape that CAN move the repeated table, and here it does not: each
- * names a class only its own row's rules select, so both were singletons in both keyings.
- *
- * THAT LAST FIGURE IS RE-DERIVED RATHER THAN PREDICTED, and the phase's own plan expected it to
- * move. It does not: every one of the six is a singleton in both keyings, because a per-screen
- * skin over a shared control is by construction shared with nothing — which is also exactly why
- * the four `> span` members had to be deleted rather than re-rooted. They select the primitive's
- * own track and knob at (0,2,1) and (0,2,2) against the family's (0,2,0), so leaving them would
- * have re-skinned a shared switch from one caller's block with every gate green.
- *
+ * ISSUE 1510 PHASE 2 moves both the contextual figures and one repeated row. The component
+ * studio conversion is already in main; the checks conversion adds two net rules and one net
+ * keyed selector, adds two singleton keys, removes the repeated trigger-body native-select row,
+ * and therefore moves 2,561 -> 2,563 rules, 3,039 -> 3,040 keyed selectors, 2,928 -> 2,930
+ * singletons, 111 -> 110 repeated rows, 227 -> 225 appearances, and 205 -> 204 selectors keyed
+ * alone. Re-derived from the combined sheet rather than treating either branch's figures as final.
+ * ISSUE 1512 DELETES TWO REPEATED ROWS AND ADDS NONE. The progressive recipe stage row renders
+ * through `SortableList`, so `.fabricate-manager .manager-recipe-result-row.is-reorderable` and
+ * its `.manager-recipe-option-controls` descendant have no carrier left: the shared list's row
+ * draws the box the first stated and the second is written once, against the row class the
+ * conversion emits, rather than twice. `pinnedTotal` goes 231 -> 227 across 111 rows, and the
+ * three contextual figures fall with the retired stage-row, steps-row, grip, rocker and
+ * composition-pip families: 2,567 -> 2,555 rules, 3,051 -> 3,032 keys, 2,938 -> 2,921 singletons,
+ * and 207 -> 205 selectors keyed alone. Its review round then adds four rules and one selector list
+ * of two — the Included row's `.is-selected` and `.is-unavailable` state paint, the rocker's bare
+ * icon-button override and the always-open body gate — so 2,555 -> 2,559 rules, 3,032 -> 3,037 keys
+ * and 2,921 -> 2,926 singletons; the Checks studio's remove rule keeps both its selectors, because
+ * `CraftingCheckEditor.svelte`'s unconverted outcome list still draws `.manager-checks-tier-remove`.
+ * None of the five is a repeated selector, so the 111 rows, the 227 appearances and the 205
+ * selectors keyed alone are unmoved. Re-derived by running the census twice, not subtracted.
  * ISSUE 1515 PHASE 9 MOVES THE THREE CONTEXTUAL FIGURES AND RE-KEYS ONE REPEATED ROW, and the two
  * halves are unrelated to one another. RE-KEYED: the rail's premium chip stops riding the
  * record-count vehicle, so `.fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium`
@@ -181,30 +54,6 @@
  * and singleton counts each rise by three, to 3,052 and 2,940. That is the two shapes recorded
  * below arriving together: a whole block, and selectors joining an existing group. Re-derived by
  * running the census twice, not subtracted.
- *
- * ISSUE 1515 PHASE 8 MOVES THE REPEATED TABLE DOWN AGAIN, BY TWO ROWS, AND ONE OF THEM VANISHES
- * FOR A REASON NO EARLIER ENTRY HERE HAS: a stylelint rule made the merge compulsory.
- * `.manager-availability-pill.is-tag` was written twice at the top level, once alone for the
- * facet's `--fab-chip-color` and once as a member of the three-selector list that mixed it into a
- * fill and an edge, exactly as the three facets phase 7 removed were; nothing emits it and both
- * halves go. `.is-modifier` is the other shape entirely. It is still emitted, by the one component
- * that keeps the family, but the sweep took its two SIBLINGS out of that three-selector list and
- * left the list stating the one selector its own one-liner already stated — the duplicate
- * `no-duplicate-selectors` rejects. So the two rules are MERGED at the earlier position, with
- * `--fab-chip-color` set on the same element and the two `color-mix` declarations carried
- * verbatim, and a selector that appeared twice now appears once.
- *
- * The three CONTEXTUAL figures move by three different amounts again. FOUR rules are deleted —
- * the tag one-liner, the declared-and-never-emitted `.manager-availability-picker`, and one of the
- * merged pair — and ONE arrives: the pill's leading-glyph rule is SPLIT out of the list it shared
- * with the dead menu option's, because a dead selector sitting beside a live one is invisible to
- * `deadRuleBlocks`, which calls a block dead only when EVERY selector in it is. Net: the rule
- * count falls by two to 2,570, the key count falls by three to 3,049 as `.is-tag`, `.is-biome` and
- * `-picker` leave, the singleton count falls by one to 2,937 — it loses those last two and gains
- * `.is-modifier`, now written once — and `pinnedTotal` falls to 229 across 112 rows. The
- * re-rooting itself moves NONE of them: every one of the eleven surviving selectors is renamed
- * from `.fabricate-manager` to `.fabricate-pill-select` one for one.
- *
  * ISSUE 1511 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, and it is the
  * first change to move them by deleting an APPLICATION ROOT'S element theme rather than a
  * primitive's or an area's copy of one. The player app's last native select converted, so
@@ -215,35 +64,11 @@
  * `pinnedTotal` STAYS 229 across 112 rows. The change adds no sheet rule at all — the two width
  * treatments the conversion needs live in the callers' own scoped blocks — so there is nothing on
  * the other side of the ledger to net against. Re-derived by running the census, not predicted.
- *
- * ISSUE 1520 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting eight
- * rule blocks and adding one. Deleted: the per-area Foundry-core focus-ring copies carried by the
- * interactable browser, the interactable config sheet and the interactables manager — a reset and
- * a ring apiece, five selectors each — and, from the roll-prompt dialog, its three-selector reset
- * and its two-selector `button, input` ring. Thirty-five selectors, every one a singleton in both
- * keyings, because each names a root no other rule shares a list with. Added: the one-selector
- * `.fabricate.fabricate-app-window` rule the same change split the player window's drag-resize
- * floor onto, so it could adopt `.fabricate-app` on three 420-560px windows without inflating
- * them — also a new singleton. Net: the rule count falls by seven, and the key and singleton
- * counts each fall by thirty-four. The repeated table is untouched and `pinnedTotal` stays 243
- * across 119 rows. The dialog's `select:focus-visible` ring SURVIVES the sweep, and is not a
- * repeated key either: it paints an inset `box-shadow` where the module ring paints an outset
- * `outline`, which is a variant rather than a copy.
- *
  * ISSUE 1520 PHASE 5 MOVED THE THREE CONTEXTUAL FIGURES AGAIN AND STILL NONE OF THE REPEATED
  * ONES, and this time by the largest single deletion of the change. The Manage Interactables
  * panel's whole `fab-im-*` element family — 28 rules, 29 selectors — left `styles/fabricate.css`
  * for the root's own scoped block, because those rules were the only thing keeping the window's
  * appearance rooted at an application class. Every one is a singleton in both keyings, measured:
- * each names a `.fabricate-interactables-manager` descendant no other rule shares a list with. So
- * the rule count falls by twenty-eight, the key and singleton counts each fall by twenty-nine, and
- * `pinnedTotal` STAYS 243 across 119 rows.
- *
- * That last figure is the one worth stating rather than assuming: deleting twenty-nine selector
- * lines from this gate's only corpus is exactly the shape that could have moved the repeated
- * table, and it did not, because a private per-window family is by construction not shared with
- * anything. It is re-derived by running the census, not predicted.
- *
  * ISSUE 1509 PHASE 4 IS THE FIRST OF THIS CHANGE'S PHASES TO RE-KEY A ROW, AND IT RE-KEYS EXACTLY
  * ONE. Rooting `ToggleCard` at `fabricate-toggle-card` rewrites the leading compound of ten
  * selectors and rooting `ItemDropZone` at `fabricate-link-field` rewrites fifteen more, and of
@@ -254,93 +79,55 @@
  * split or deleted: the rule count stands at 2,619, the keyed and singleton figures at 3,123 and
  * 3,004, and the phase writes no new rule at all — both families declare NO focus pair and NO font
  * floor, and both refusals are asserted rather than merely absent.
- *
- * ISSUE 1509 PHASE 3 RE-KEYED NO ROW AND MOVED ONE CONTEXTUAL FIGURE, WHICH IS A SHAPE NEITHER
- * EARLIER PHASE TOOK. Rooting `RadioCardGroup` rewrites the leading compound of 32 selectors, and
- * not one of them is a repeated key — measured — so the repeated table is untouched and
- * `pinnedTotal` stays 243 across 119 rows. What moves is the RULE COUNT alone, by six: six
- * selector LISTS were SPLIT, each of them pairing a `manager-resolution-option` radio member that
- * re-roots with a `manager-tool-bonus-row` one that must not. A split adds a rule without adding
- * a key, because both members were already their own keys and each keeps exactly one appearance
- * — so unlike phases 1 and 2 the key and singleton counts do not move at all, and 3,123 / 3,004
- * stand. Phase 1 recorded that shape once as one third of its own change; here it is the whole of
- * it, six times over, and the phase adds no rule of its own: the family's focus pair already
- * existed and is re-rooted in place rather than written.
- *
- * ISSUE 1509 PHASE 1 RE-KEYED NO ROW AND MOVED THE THREE CONTEXTUAL FIGURES, which is issue 1508
- * phase 3's shape again. Rooting `EditorTabs` rewrites the leading compound of eight selectors, and
- * NOT ONE of them is a repeated key — measured — so the repeated table is untouched and
- * `pinnedTotal` stays 243 across 119 rows. What moves is three RULES: the strip and repaint halves
- * of the strip's new focus pair, and one half of a SPLIT. The split is the active count re-tone,
- * whose two-member list paired a caller's `manager-environment-tab-button` leg with the primitive's
- * own `manager-editor-tab-button` leg; a selector list's specificity is per member and only the
- * second leg re-roots, so the rule is written as two adjacent rules with byte-identical
- * declarations. That adds a RULE without adding a KEY — both members were already their own keys —
- * which is the mirror image of the selector-leaving-a-group shape recorded above. The third new key
- * is `.fabricate-tabs button`, a fifth selector joining the existing four-member font floor group
- * rather than a rule of its own. So the rule count rises by three and the key and singleton counts
- * rise by three as well: two from the pair, one from the floor member, none from the split.
- *
- * ISSUE 1508 RE-KEYED THREE ROWS AND MOVED THE THREE CONTEXTUAL FIGURES, and it did the two
- * things separately. RE-KEYED: rooting `Field` at the class it emits rewrites the leading compound
- * of its whole family, so the three rows whose members re-root together —
- * `.fabricate-manager .manager-field input:not(…)`, `… select` and `… textarea` — become
- * `.fabricate-field.manager-field …`. Each row keeps its count of 2, because both members of each
- * pair re-rooted in the same commit, so `pinnedTotal` does not move and stays 243 across 119 rows.
- * MOVED: the same change ADDS six rules carrying fourteen selectors — the two-member font floor,
- * `Field`'s seven-leg element-typed chrome rule, and the strip and repaint halves of both new
- * families' focus pairs — every one of them a new singleton in both keyings, so the key count and
- * the singleton count each rise by fourteen and the rule count by six, while the repeated table is
- * untouched.
- *
- * ISSUE 1508 PHASE 2 RE-KEYED TWO MORE ROWS AND MOVED NOTHING ELSE, which is the shape a pure
- * re-root takes. Rooting `ManagerToolbar` and `InspectorCard` at the classes they emit rewrites
- * the leading compound of both families, so `.fabricate-manager .manager-inspector-card` becomes
- * `.fabricate-card.manager-inspector-card` and `.fabricate-manager .manager-toolbar` becomes
- * `.fabricate-filter-bar.manager-toolbar`. Each row keeps its count of 2 because both members of
- * each pair re-rooted in the same commit, and unlike phase 1 this phase ADDS no rule at all —
- * neither family owns a control, so neither declares a font floor or a focus pair — so the rule,
- * key and singleton counts are all unchanged and `pinnedTotal` stays 243 across 119 rows.
- *
- * ISSUE 1508 PHASE 3 RE-KEYED NO ROW AND MOVED THE THREE CONTEXTUAL FIGURES, which is the third
- * shape this change takes. Rooting `StatusToggle` and `ChanceSlider` rewrites the leading compound
- * of forty selectors, and NOT ONE of them is a repeated key — measured, and the reason is that
- * neither family shares a selector list with another family — so the repeated table is untouched
- * and `pinnedTotal` stays 243 across 119 rows. What moves is the four rules the phase ADDS:
- * `StatusToggle`'s (0,1,0) font floor at its own root, the strip half of its checkbox host's pair
- * (`.fabricate-toggle .manager-tool-setting-toggle-input:focus`, whose repaint is the `:has()`
- * ring that already existed), and `ChanceSlider`'s own strip and repaint. Each is a new singleton
- * in both keyings, and the slider's font floor is a fifth new SELECTOR joining the existing
- * two-member floor group rather than a rule of its own — so the rule count rises by four while the
- * key and singleton counts each rise by five.
- *
- * ISSUE 1506 MOVED THE THREE CONTEXTUAL FIGURES A THIRD TIME, by adding one rule:
- * `.fabricate-manager .manager-recipe-name-row .manager-chip` gives the row's status pills
- * `flex: 0 0 auto`, so `truncate`'s `overflow: hidden` cannot zero their automatic minimum
- * size and squeeze them for room the name should give up first. The selector is a new
- * singleton in both keyings, so the rule, key and singleton counts each rise by one and the
- * repeated table is untouched.
- *
- * ISSUE 1506 MOVED TWO OF THE THREE CONTEXTUAL FIGURES A SECOND TIME, AND NOT THE RULE COUNT, by
- * deleting one SELECTOR out of a five-selector group: `.fabricate-manager .manager-recipe-thumb`,
- * whose two raw `<img>` call sites became the shared art tile. The rule and its four other
- * selectors — all owned by other geometry sweeps — stay, so the RULE count is unchanged at 2,599
- * while the key count and the singleton count each fall by one. That is the shape a selector
- * leaving a group takes, as against a whole block leaving, and the two are recorded separately
- * because only one of them moves the rule count. The gate cannot see this one on its own:
- * `deadRuleBlocks` treats a block as dead only when EVERY selector in the group is dead, so the
- * check with teeth is `git grep -n 'manager-recipe-thumb'` returning nothing across `styles/` and
- * `src/`, which the pull request quotes.
- *
- * ISSUE 1506 ALSO MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting one
- * rule block: the Tool player preview's `[data-tool-player-preview] .fab-status-pill.is-subtle`,
- * which selected the status pill this change retires into the shared chip. It was a singleton
- * key, so the rule count falls by one and the key and singleton counts fall with it, and the
- * repeated table is untouched — the same shape as the deletion issue 1505 recorded above. The
- * rule had never rendered, for the reason its own comment recorded: the sheet is imported at
- * `layer(modules)` and the primitive's scoped block is unlayered, so it lost at every
- * specificity.
- *
+ * Issue 1510 phase 2's fourth commit moves the three contextual figures and none of the repeated
+ * ones. Converting the gathering task editor's seven selects strips the `select` token from two
+ * `.manager-gathering-task-edit-view` legs and adds two trigger-width rules — one for the four
+ * stacked fields, and one the review round added for the stamina row's two grid cells — so two
+ * rules arrive and are singletons in both keyings while the two narrowed selectors re-key in place:
+ * the rule, key and singleton counts each rise by two, to 2,573, 3,056 and 2,944, and `pinnedTotal`
+ * stays 229 across 112 rows. Re-derived by running the census twice, not subtracted.
+ * Issue 1510 phase 2's fifth commit moves the three contextual figures and none of the repeated
+ * ones. Converting the environment overview's three selects and the Tool rails' actor picker adds
+ * one rule — the context column's shared trigger width — while the actor picker's own skin rule
+ * re-keys in place onto its trigger rather than leaving: the rule, key and singleton counts each
+ * rise by one, to 2,574, 3,057 and 2,945, and `pinnedTotal` stays 229 across 112 rows. Re-derived
+ * by running the census twice, not subtracted.
+ * Issue 1510 phase 2's fifth commit also restores one rule issue 1512 deleted by mistake: the
+ * outcome tier row's own box, `.manager-checks-tier-list > .manager-checks-tier-row`, which the
+ * SortableList conversion took out with the recipe tier list while `CraftingCheckEditor.svelte`'s
+ * outcome list still drew the rows itself. A new singleton in both keyings, so the rule, key and
+ * singleton counts each rise by one over the rebased tree, to 2,567, 3,044 and 2,934, and
+ * `pinnedTotal` is unmoved. Re-derived by running the census twice, not subtracted.
+ * Issue 1510 phase 3's first commit moves the three contextual figures and none of the repeated
+ * ones, and it is the first of the change to move them by ADDING ONLY. Converting the systems,
+ * recipe-access and recipe-item browse filters narrows no rule at all — the native
+ * `.manager-filter select` skin still has carriers in three unconverted toolbars and stays — and
+ * adds two: the shared trigger floor those six converted controls take, and the `min-width: 0` the
+ * picker root needs as the bar's flex item. Both are new singletons in both keyings, so over the
+ * tree it landed on the rule, key and singleton counts each rise by two, from 2,566, 3,042 and
+ * 2,932 to 2,568, 3,044 and 2,934, and `pinnedTotal` stays 225 across 110 rows. Re-derived by
+ * running the census twice, not subtracted.
+ * Its second commit moves the rule count alone. The conditions card's shared 36px rule loses its
+ * `.manager-condition-current select` leg and keeps the add row's input, and the trigger's full
+ * width arrives as a rule of its own, so the sheet holds one more rule, 2,569, while one key leaves
+ * and one arrives: 3,044 keys and 2,934 singletons, both unmoved, and `pinnedTotal` stays 225
+ * across 110 rows. Re-derived by running the census twice, not subtracted.
+ * Its third commit deletes the `.manager-filter select` skin, whose last carriers were the
+ * gathering task and event toolbars' six filters. It was a singleton in both keyings, so the rule,
+ * key and singleton counts each fall by one, to 2,568, 3,043 and 2,933, and `pinnedTotal` stays
+ * 225 across 110 rows. Re-derived by running the census twice, not subtracted.
+ * Its fourth commit moves the repeated table. The recipe, component and essence toolbars' native
+ * select skin is deleted and their shared control-font rule narrowed to the search inputs, so each
+ * `.manager-*-toolbar select` key loses both appearances and its row: 110 -> 107 rows, 225 -> 219
+ * appearances, 203 -> 200 keyed alone. Of the singletons, the `select.is-size-38` rung and the
+ * components route's select ink leave, the ink and the 12px filter type are re-keyed onto the
+ * trigger, the 38px trigger rung gains the component toolbar's member and the filter roots' cap
+ * reaches the trigger in a rule of its own: 2,568 -> 2,567 rules, 3,043 -> 3,042 keys and
+ * 2,933 -> 2,935 singletons. Re-derived by running the census twice, not subtracted.
+ * Its fifth commit moves no figure. The vocabulary panel's sort skin is deleted, and the recipe
+ * inspector's route picker keeps its root rule and gains a trigger rule of its own, so one
+ * singleton key leaves as another arrives: 2,567 rules, 3,042 keys and 2,935 singletons, and
+ * `pinnedTotal` stays 219 across 107 rows. Re-derived by running the census twice.
  * ISSUE 1505 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting
  * three rule blocks the shared `Callout` made redundant: the Checks studio's
  * `[data-failure-salvage-note]` override and its glyph rule, whose whole content the primitive
@@ -348,32 +135,6 @@
  * three were singleton keys, so the rule count falls by three, the key count and the singleton
  * count fall with it, and the repeated table is untouched — a deletion of unique authoring
  * rather than a repetition being paid down.
- *
- * ISSUE 1504 MOVED FOUR OF THESE SIX FIGURES, through three edits that partly cancel. The
- * `.fabricate-select*` family arrived — 32 new rules writing 33 new keys, every one a
- * singleton, so it moved the contextual figures and left the repeated ones alone. Then the two
- * scoped-catalogue toolbar select rules were NARROWED onto the one route that still renders a
- * native select there, which SPLIT the type rule's two-member list: its `input` leg merges into
- * a rule that already existed, and its `select` leg merges with the geometry rule under the
- * narrowed selector. Two rows therefore VANISH and the appearance total drops by four, while the
- * key total is unchanged and the singleton count rises by two: a list being split rather than a
- * defect being counted. That narrowing removed one rule and issue 1371's own `is-size-38` rung
- * was SPLIT in the same pass — its scoped-catalogue member had to name the converted trigger
- * rather than a `select` element — which adds one back, so the rule total is where the family
- * lift left it. Issue 1371's separately merged fix (9cca54f6) added one more rule and one more
- * singleton key beneath all three of these edits.
- *
- * A COMMIT SHA IS NOT THE ANCHOR, deliberately. An earlier draft of this docblock cited the
- * coordinator head it was first measured at; a rebase then added a rule to the sheet, the three
- * contextual figures went stale, and no gate could see it because none of them is pinned. The
- * figures a reader can check are the ones this branch's own tree produces.
- *
- * Issue 1503 moved it by exactly three rows and six appearances, from the 124 keys / 253
- * appearances issue 1501's Phase A left:
- * `.fabricate-icon-picker-popover .essence-icon-picker-option`,
- * `.fabricate-source-picker-popover .essence-source-picker-grid` and
- * `.fabricate-source-picker-popover .essence-source-picker-option` each fell to ONE appearance
- * when the callers' panel, list and row blocks were deleted in favour of the shared primitive's.
  * Those 124 / 253 in turn came from the 126 keys / 257 appearances issue 1501's own base held, by
  * two rows and four appearances: `.fabricate-app select:focus-visible`, whose list membership went
  * when the app and manager focus pair collapsed onto `.fabricate`, and
@@ -382,24 +143,57 @@
  * earlier reading of this table is the base's: issue 1371's catalogue, entry and system-rules
  * screens added seven repeated keys and rebuilt two rules out of existence, all of it beneath
  * both branches and neither one's conversion.
- *
- * ── WHY THE ROWS ARE JSON AND NOT ARRAYS IN THIS MODULE ─────────────────────────────────
- * The reason `design-system-known-debt.js` records for its own table: SonarCloud's copy-paste
- * detector normalises string literals, so a long run of quoted-string lines matches any other such
- * run by SHAPE whatever the strings say. `.json` is not indexed by the JavaScript analyser at all.
- * The rows are OBJECTS rather than the `'<key> | <count>'` strings that table uses, which is the
- * one place the two files deliberately differ: a row that is already `{key, count}` needs no
- * parser, so there is no second copy of `knownDebt`'s split-from-the-right to drift from the
- * first.
+ * ISSUE 1915 MOVED THE THREE CONTEXTUAL FIGURES AND ONE OF THE KEYED-ALONE ONES, and it is the
+ * first change here to move the keyed-alone figure without touching the keyed table. Converging
+ * both Tags & Categories screens on one shell deletes three rule blocks:
+ * `.manager-tags-categories-workspace` at the top level AND its member of the 1120px
+ * `@container` collapse list, and `.manager-vocabulary-tabs`, whose tab strip is retired. The
+ * workspace class is the reason the keyed-alone figure moves: its two rules sit in two DIFFERENT
+ * at-contexts, so it is two singletons under this file's keying and one repeated selector under
+ * the other, and deleting both takes 204 -> 203 there while the keyed table is untouched.
+ * `.manager-environment-details-grid` leaves with it, a fourth singleton key: it was the
+ * workspace's only companion in that `@container` list and `styles-dead-classes` reports the
+ * block as matching nothing the moment the workspace selector goes, which is that gate finding a
+ * dead selector that had been hiding inside a live rule. The `tags` `.manager-main` rule is
+ * REWRITTEN rather than added, and the narrowed toolbar-select skin is RE-KEYED onto
+ * `.manager-vocabulary-shell-panel` — a singleton before and after in both keyings — so neither
+ * moves a figure. 2,565 -> 2,562 rules, 3,042 -> 3,038 keys, 2,932 -> 2,928 singletons, 204 ->
+ * 203 keyed alone; 110 repeated keys and 225 appearances are unmoved. Re-derived by running
+ * `node scripts/stylesheet-selector-census.mjs`, not subtracted.
+ * ITS PHASE 3 MOVES THE THREE CONTEXTUAL FIGURES AGAIN AND NOTHING ELSE. Retiring the system
+ * screen's inspector rail releases its grid column, which is a `.manager-body` pair — the 2-track
+ * rule and its `.is-rail-collapsed` twin at equal specificity — written as its own rules rather
+ * than appended to either released-route list, so that the seven world-route lists stay
+ * byte-identical. Both are ARRIVALS and both are singletons in both keyings, so the repeated
+ * table is untouched a second time: 2,562 -> 2,564 rules, 3,038 -> 3,040 keys, 2,928 -> 2,930
+ * singletons, 203 keyed alone unmoved, 110 repeated keys and 225 appearances unmoved. Re-derived
+ * by running `node scripts/stylesheet-selector-census.mjs`, not subtracted.
+ * ISSUE 1973 (2026-09-23) ADDS ONE SELECTOR AND NO RULE. `world-travel` joins the world routes'
+ * single-track `.manager-main` list, a singleton in both keyings: 3,042 -> 3,043 keys and
+ * 2,935 -> 2,936 singletons; 2,567 rules, 107 repeated keys, 219 appearances and 200 keyed alone
+ * are unmoved. Re-derived by running `node scripts/stylesheet-selector-census.mjs`.
+ * ISSUE 1972 (2026-09-23) MOVES THE THREE CONTEXTUAL FIGURES AND ONE KEYED-ALONE ONE. Knowledge
+ * keeps its full-height rail between the 1120px and 832px rungs through ONE new top-level rule,
+ * `.fabricate-manager[data-manager-view="knowledge"] .manager-rail`; the body rule and the 831px
+ * rail rule gain declarations in place. The arrival is a singleton under this file's keying, but
+ * its selector already heads the 831px block's rail rule, so keyed alone it becomes a repeated
+ * selector: 2,567 -> 2,568 rules, 3,043 -> 3,044 keys, 2,936 -> 2,937 singletons, 200 -> 201
+ * keyed alone; 107 repeated keys and 219 appearances are unmoved. Re-derived by running
+ * `node scripts/stylesheet-selector-census.mjs` and this file's ledger gate, not subtracted.
+ * ISSUE 1976 (2026-09-23) MOVES THE THREE CONTEXTUAL FIGURES AND THE KEYED-ALONE ONE. The fourteen
+ * side-rail routes join the shared top-level rail reset (Knowledge's own rail rule folds into it,
+ * and Downtime's moves there out of the 1120px block); the 1120px block gains the band body rule
+ * (Knowledge and the fourteen) and the two scroll-owner restorations; and one new unnamed 760px
+ * container block sizes the three stacked catalogues. Every arrival is a singleton under this
+ * file's keying, so the repeated table is untouched, but fifteen of them already head a top-level
+ * rule, so keyed alone they become repeated selectors: 2,568 -> 2,570 rules, 3,044 -> 3,078 keys,
+ * 2,937 -> 2,971 singletons, 201 -> 216 keyed alone; 107 repeated keys and 219 appearances are
+ * unmoved. Re-derived by running `node scripts/stylesheet-selector-census.mjs` and this file's
+ * ledger gate, not subtracted.
  */
 import { readFileSync } from 'node:fs';
 
-/**
- * The table, read once at module load.
- *
- * The file is data with no imports and no cycles, so there is nothing to defer: a parse failure
- * here is a broken checkout rather than a test outcome.
- */
+/** The table, read once at module load. */
 const TABLE = JSON.parse(
   readFileSync(new URL('selector-repetition-baseline.json', import.meta.url), 'utf8')
 );
@@ -435,9 +229,8 @@ export const SELECTOR_REPETITION_BASELINE = checkedRows(TABLE.rows);
 
 /**
  * The SUM of the counts, not the number of rows.
- *
  * `assertRatchet` asserts exactly that and throws before any comparison if the two disagree, so
  * this is the one figure a reviewer can check against the issue without reading the table. At the
- * measured commit it is 231 across 113 rows.
+ * measured commit it is 219 across 107 rows.
  */
 export const SELECTOR_REPETITION_TOTAL = TABLE.pinnedTotal;

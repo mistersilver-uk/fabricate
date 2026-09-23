@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
+import { expectedMemberKinds, storeMemberKinds } from '../helpers/storeMemberKinds.js';
 import {
   SYS_A,
   SYS_B,
@@ -42,13 +43,28 @@ function makeServices(overrides = {}) {
   return { services, calls };
 }
 
+const INVENTORY_STORE_SHAPE = {
+  getters: [
+    'bulkActive', 'bulkBlocked', 'bulkCounts', 'bulkDestroying', 'bulkEntries', 'bulkProgress',
+    'bulkReport', 'bulkRunning', 'bulkSalvageable', 'bulkSelectedKeys', 'bulkSelectedRows',
+    'bulkYieldPreview', 'error', 'filter', 'filterCounts', 'hasActor', 'learningRecipeId',
+    'listing', 'loadedOnce', 'loading', 'orderedSalvageStages', 'page', 'pageCount', 'pageItems',
+    'pageSize', 'rows', 'salvageOrderAnnouncement', 'salvageOrderIsCustom', 'salvageResult',
+    'salvagingKey', 'search', 'selectedItem', 'selectedKey', 'selectedParticipation',
+    'selectedSystemId', 'sort', 'visibleItems', 'worldTimeTick',
+  ],
+  methods: [
+    'bulkDestroy', 'bulkSalvage', 'clearBulkSelection', 'flushSalvageOrder', 'learn', 'learnAll',
+    'load', 'reloadOnDocumentChange', 'removeFromBulkSelection', 'reorderSalvageStage',
+    'resetSalvage', 'resetSalvageOrder', 'salvage', 'select', 'selectSystem', 'setFilter',
+    'setPage', 'setPageSize', 'setSearch', 'setSort', 'tickWorldTime', 'toggleBulkSelection',
+  ],
+};
+
 describe('inventoryStore', () => {
   before(async () => {
     compiler = createSvelteModuleCompiler('fabricate-inventory-store-');
-    // The store's real import graph, walked rather than restated. This suite used to name
-    // the two ordering leaves by hand; issue 1286 added a third import with a closure of
-    // its own, and a copy list that falls behind an import does not fail this suite — it
-    // HANGS it, and `node --test` reports that as `cancelled` under a `fail 0` summary.
+    // The store's real import graph, walked rather than restated (issue 1286).
     ({ createInventoryStore } = await compiler.loadWithClosure(
       'src/ui/svelte/stores/inventoryStore.svelte.js'
     ));
@@ -56,6 +72,14 @@ describe('inventoryStore', () => {
 
   after(() => {
     compiler.cleanup();
+  });
+
+  it('returns exactly the 60 public members the inventory view reads, each still a getter', () => {
+    const store = createInventoryStore({ services: makeServices().services });
+    const shape = expectedMemberKinds(INVENTORY_STORE_SHAPE);
+
+    assert.deepEqual(Object.keys(store).sort(), Object.keys(shape));
+    assert.deepEqual(storeMemberKinds(store), shape);
   });
 
   it('load fetches the listing with the current actor + source ids and sets loadedOnce', async () => {
@@ -250,6 +274,15 @@ describe('inventoryStore', () => {
       store.pageItems.map((r) => r.name),
       ['Charlie', 'Delta']
     );
+
+    store.setPage(99);
+    flushSync();
+    assert.equal(store.page, 99, 'the item pager stores the requested index unclamped');
+    assert.deepEqual(
+      store.pageItems.map((r) => r.name),
+      ['Echo'],
+      'the clamp happens on read, so an out-of-range page shows the last one'
+    );
   });
 
   it('selects by key and falls back to the first visible item', async () => {
@@ -364,12 +397,7 @@ describe('inventoryStore', () => {
     assert.equal(calls.listInventoryForActor.length, before, 'a failed learn does not reload');
   });
 
-  // --- Salvage (issue 675) ------------------------------------------------------
-  //
-  // `salvage()` has FOUR outcomes, not two. The one that is easy to miss is a
-  // `success` carrying NULL results: a time-gated run that has STARTED and awarded
-  // nothing. Treating `success` as "done" shows a success ribbon for a run that gave
-  // the player nothing.
+  // Salvage (issue 675). `salvage()` has FOUR outcomes, not two.
 
   function salvageRow(overrides = {}) {
     return row('sys:c1', 'Iron', {
@@ -558,9 +586,8 @@ describe('inventoryStore', () => {
 
     it('refuses a double-submit while a salvage is in flight', async () => {
       let resolveCall;
-      // Built up front, not inside the factory: `salvage()` awaits the order flush
-      // before it ever calls the seam, so the factory has not run yet at the point the
-      // second press is made.
+      // Built up front, not inside the factory: `salvage()` awaits the order flush before it ever
+      // calls the seam, so the factory has not run yet at the point the second press is made.
       const inFlight = new Promise((resolve) => (resolveCall = resolve));
       const { services, calls } = salvageServices({ result: () => inFlight });
       const store = createInventoryStore({ services });
@@ -583,9 +610,8 @@ describe('inventoryStore', () => {
     });
 
     // AC10 / decision 11. Salvaging the last copy DROPS the row from the listing, and
-    // `selectedItem` would fall through to `visibleItems[0]` - rendering the success
-    // ribbon against a completely different component. This is the common case (the
-    // smoke fixture seeds a single copy), not an edge.
+    // `selectedItem` would fall through to `visibleItems[0]` - rendering the success ribbon against
+    // a completely different component.
     it('AC10: holds the salvaged row selected after its last copy is consumed', async () => {
       const other = row('sys:c9', 'Aether', { systemId: 'sys', componentId: 'c9' });
       let listingRows = [salvageRow(), other];
@@ -679,12 +705,8 @@ describe('inventoryStore', () => {
     });
   });
 
-  // --- Progressive salvage reorder (issue 675) ----------------------------------
-  //
-  // The first consumer of `Component.salvage.allowPlayerResultReorder`. The store's
-  // only job is writing the STANDING PREFERENCE (`salvage:<componentId>`); the engine
-  // captures it onto the run record at start, and there is deliberately no settings
-  // fallback there.
+  // Progressive salvage reorder (issue 675). The first consumer of
+  // `Component.salvage.allowPlayerResultReorder`.
 
   function progressiveRow() {
     return row('sys:c1', 'Iron', {
@@ -855,8 +877,6 @@ describe('inventoryStore', () => {
     });
 
     // The threshold is CUMULATIVE - a property of a stage's POSITION, not of the stage.
-    // `applyPlayerResultOrder` returns elements ===-identical to its inputs, so a carried
-    // threshold would have the top row claiming a HIGHER bar than the row beneath it.
     it('RECOMPUTES thresholds for the new order rather than carrying them', async () => {
       const { store } = await loadedProgressiveStore();
       assert.deepEqual(
@@ -937,9 +957,8 @@ describe('inventoryStore', () => {
       assert.deepEqual(log[0][2], ['s2', 's1'], 'the order captured is the CURRENT one');
     });
 
-    // AC6 / decision 9. The write is optimistic, so by the time a rejection returns the
-    // row has already moved and the live region has already announced it. Proceeding
-    // would consume the component against an order the player can see was undone.
+    // AC6 / decision 9. The write is optimistic, so by the time a rejection returns the row has
+    // already moved and the live region has already announced it.
     it('AC6: a REJECTED order write reverts, announces, and ABORTS the salvage', async () => {
       const { store, log } = await loadedProgressiveStore({
         setOrder: () => Promise.reject(new Error('user setting write failed')),
@@ -1042,13 +1061,9 @@ describe('inventoryStore', () => {
     });
 
     it('the progressive order commit key is distinct per system for a SHARED component id', async () => {
-      // Two participations whose component ids COLLIDE ('shared') must still commit to
-      // DISTINCT keys — the pre-existing latent collision the collapse surfaces (component
-      // ids are not globally unique). Routed through the store's OWN `salvageOrderId` /
-      // `selectedParticipation` derivation (reorder → flush → observe the committed key),
-      // NOT pre-composed ids handed to `progressiveOrderKey` — so dropping the `systemId`
-      // term from `salvageOrderId` collapses BOTH commits onto `salvage:shared` and flips
-      // this test, which the neighbouring flush/reorder tests would not catch.
+      // Two participations whose component ids COLLIDE ('shared') must still commit to DISTINCT
+      // keys — the pre-existing latent collision the collapse surfaces (component ids are not
+      // globally unique).
       const committed = [];
       const { services } = makeServices({
         listing: {
@@ -1101,9 +1116,7 @@ describe('inventoryStore', () => {
     });
   });
 
-  // =========================================================================
   // Bulk salvage / bulk destroy (issue 859).
-  // =========================================================================
 
   /** A salvage projection with every field the bulk partition and preview read. */
   function salvageProjection(overrides = {}) {
@@ -1139,12 +1152,8 @@ describe('inventoryStore', () => {
   }
 
   /**
-   * A reorderable PROGRESSIVE row — the only kind of card that can carry a pending stage
-   * order into a bulk run. Stage ids are derived from `componentId`, so two of these
-   * never collide.
-   *
-   * ONE definition, not one per describe: three tests drive this exact shape, and the
-   * copies were a normalized self-duplication Sonar counts.
+   * A reorderable PROGRESSIVE row — the only kind of card that can carry a pending stage order into
+   * a bulk run. Stage ids are derived from `componentId`, so two of these never collide.
    */
   function progressiveBulkRow(componentId, name) {
     return bulkRow(
@@ -1174,22 +1183,15 @@ describe('inventoryStore', () => {
     );
   }
 
-  /**
-   * A store loaded with `rows`, plus a recording services object covering the four
-   * bulk seams. `reporter` is a FUNCTION carrying a `dismiss` — the shape
-   * `createProgressReporter` returns and `bulkSalvage`'s `finally` calls both halves of.
-   */
+  /** A store loaded with `rows`, plus a recording services object covering the four bulk seams. */
   function bulkServices(rows, overrides = {}) {
     const log = [];
     const listings = Array.isArray(overrides.listings) ? [...overrides.listings] : null;
     const reporter = (update) => log.push(['progress', update]);
     reporter.dismiss = () => log.push(['dismiss']);
     /**
-     * Emit the INTERMEDIATE ticks the real services report, so the store's own
-     * `onProgress` callback body runs. A fake that accepts `args` and never calls
-     * `args.onProgress` leaves that body dead: only the terminal `bulkProgress === null`
-     * is then observable, and a store that had stopped updating the panel counter or the
-     * toast fraction mid-run would look identical.
+     * Emit the INTERMEDIATE ticks the real services report, so the store's own `onProgress`
+     * callback body runs.
      */
     const emitProgress = (args) => {
       for (const tick of overrides.progressTicks ?? []) {
@@ -1230,9 +1232,8 @@ describe('inventoryStore', () => {
       salvageComponents: async (args) => {
         log.push(['salvageComponents', args]);
         emitProgress(args);
-        // A caller-held gate, so a test can observe the store MID-RUN. Without it the
-        // whole run resolves inside the first microtask turn and `bulkRunning` is never
-        // observably true.
+        // A caller-held gate, so a test can observe the store MID-RUN. Without it the whole run
+        // resolves inside the first microtask turn and `bulkRunning` is never observably true.
         if (overrides.salvageGate) await overrides.salvageGate;
         if (overrides.salvageThrows) throw new Error('the engine blew up');
         return overrides.salvageResult ?? { cancelled: false, items: [], counts: {}, posted: true };
@@ -1255,13 +1256,7 @@ describe('inventoryStore', () => {
     return { store, log, services };
   }
 
-  /**
-   * Yield until the store is observably mid-run, ASSERTING that it got there.
-   *
-   * `bulkSalvage` sets `bulkRunning` only after awaiting the order flush, so a test that
-   * looked at the store immediately after calling it would be inspecting a store that had
-   * not started — and would pass whatever the suppression did.
-   */
+  /** Yield until the store is observably mid-run, ASSERTING that it got there. */
   async function waitForBulkRunning(store) {
     for (let attempt = 0; attempt < 10 && !store.bulkRunning; attempt += 1) {
       await Promise.resolve();
@@ -1375,21 +1370,20 @@ describe('inventoryStore', () => {
     });
 
     it('the store literal MATCHES the shared BULK_MAX_ITEMS it duplicates', async () => {
-      // The store declares its own `BULK_MAX_ITEMS` rather than importing the service's:
+      // The bulk sub-store declares its own `BULK_MAX_ITEMS` rather than importing the service's:
       // importing pulls the bulk chat-card builder, `componentStacking.js` and
-      // `itemStackQuantity.js` into this harness's module graph for the sake of one
-      // integer. A hand-maintained mirror rots silently, so it is pinned against the
-      // real export — the only way a divergence can be caught at all.
+      // `itemStackQuantity.js` into this harness's module graph for the sake of one integer. The
+      // pin MOVED with the constant at issue 1695; it was re-anchored, never duplicated.
       const { readFileSync } = await import('node:fs');
       const { resolve } = await import('node:path');
       const { BULK_MAX_ITEMS } = await import('../../src/systems/BulkSalvageService.js');
       const storeSource = readFileSync(
-        resolve(import.meta.dirname, '../../src/ui/svelte/stores/inventoryStore.svelte.js'),
+        resolve(import.meta.dirname, '../../src/ui/svelte/stores/inventoryBulkActions.svelte.js'),
         'utf8'
       );
       assert.ok(
         storeSource.includes(`const BULK_MAX_ITEMS = ${BULK_MAX_ITEMS};`),
-        `the store must declare ${BULK_MAX_ITEMS}, matching BulkSalvageService`
+        `the bulk sub-store must declare ${BULK_MAX_ITEMS}, matching BulkSalvageService`
       );
     });
   });
@@ -1591,11 +1585,8 @@ describe('inventoryStore', () => {
     });
 
     it('routed: the max over SUCCESS outcomes, with a failure tier contributing 0', async () => {
-      // Divergence 2, and the rule that CHANGED DIRECTION — therefore the one most
-      // likely to be implemented wrong. `salvage()` returns at `if (!checkResult.success)`
-      // BEFORE `_resolveSalvageResultGroups`, so a failure tier awards nothing at all;
-      // and because routed salvage clamps a below-lowest total to the lowest tier, a
-      // failing lowest tier is always reachable, so the guaranteed floor is 0.
+      // Divergence 2, and the rule that CHANGED DIRECTION — therefore the one most likely to be
+      // implemented wrong.
       const preview = await previewFor(
         salvageProjection({
           mode: 'routed',
@@ -1612,9 +1603,8 @@ describe('inventoryStore', () => {
     });
 
     it('routed with ONLY success tiers: a guaranteed floor below the best case', async () => {
-      // Row shape 2 — `guaranteed > 0 && quantity > guaranteed`, which the panel renders
-      // as the guaranteed count plus an "up to {quantity}" affix. This is the ONLY shape
-      // that carries the affix, and it needs every authored tier to be a success tier.
+      // Row shape 2 — `guaranteed > 0 && quantity > guaranteed`, which the panel renders as the
+      // guaranteed count plus an "up to {quantity}" affix.
       const preview = await previewFor(
         salvageProjection({
           mode: 'routed',
@@ -1683,12 +1673,9 @@ describe('inventoryStore', () => {
     });
 
     it('keeps SAME-NAMED components apart, aggregating on id rather than display name', async () => {
-      // The defect this closes: the preview aggregated on `name`, so two genuinely
-      // different components that share a display name collapsed into ONE row and the
-      // player was shown a subset of what a best-case roll actually yields. Names are
-      // GM-authored and not unique — across systems or within one ladder — so identity
-      // is the only safe key. Reported against Mythwright's Slain Balehound Pup and
-      // Denmother (issue 859).
+      // The defect this closes: the preview aggregated on `name`, so two genuinely different
+      // components that share a display name collapsed into ONE row and the player was shown a
+      // subset of what a best-case roll actually yields (issue 859).
       const preview = await previewFor(
         salvageProjection({
           mode: 'progressive',
@@ -1880,10 +1867,7 @@ describe('inventoryStore', () => {
     });
 
     it('discharges the whole exit obligation on a THROWN run', async () => {
-      // The sharpest correctness risk in the feature. `reloadOnDocumentChange` reads
-      // `bulkRunning` at FIRE time, forever — so a throw escaping with the flag still
-      // true leaves the inventory permanently deaf to document-change reloads for the
-      // rest of the session, silently and with no error anywhere.
+      // The sharpest correctness risk in the feature.
       const rows = [bulkRow('c1', 'Iron')];
       const { store, log } = await loadedBulkStore(rows, { salvageThrows: true });
       store.toggleBulkSelection('sys:c1');
@@ -1951,14 +1935,8 @@ describe('inventoryStore', () => {
     });
 
     it('advances bulkProgress and the toast on each INTERMEDIATE tick', async () => {
-      // Observed MID-RUN, behind the gate: the terminal state is `null` for a run that
-      // reported nothing at all, so a store that never advanced would be indistinguishable
-      // at the end.
-      //
-      // The tick below deliberately reports `1 of 1` for a queue of TWO — the facade's
-      // own stated limit, since its `total` counts only the rows the owner gate let
-      // through. The denominator the player sees must stay the store's OWN snapshot
-      // length, or a refused row would visibly SHRINK the bar mid-run.
+      // Observed MID-RUN, behind the gate: the terminal state is `null` for a run that reported
+      // nothing at all, so a store that never advanced would be indistinguishable at the end.
       let release;
       const gate = new Promise((resolve) => {
         release = resolve;
@@ -1989,12 +1967,7 @@ describe('inventoryStore', () => {
     });
 
     it('never OPENS the progress toast on a run that ticked zero times', async () => {
-      // `createDefaultProgressReporter` opens its toast LAZILY, on its first call. An
-      // unconditional terminal `pct: 1` therefore opened a toast for the first time on a
-      // dismissed batch prompt — which returns before the first target is touched — and
-      // drove it straight to 100%: a completion notification for a run that called the
-      // engine zero times. `dismiss()` is documented as a no-op when the reporter never
-      // started, so the exit-path obligation is still fully discharged.
+      // `createDefaultProgressReporter` opens its toast LAZILY, on its first call.
       const { store, log } = await loadedBulkStore([bulkRow('c1', 'Iron')], {
         salvageResult: { cancelled: true, items: [] },
       });
@@ -2106,10 +2079,9 @@ describe('inventoryStore', () => {
     });
 
     it('reports each destroy tick to the toast before the terminal one', async () => {
-      // Destroy has no mid-run gate to observe `bulkProgress` behind, but the reporter log
-      // SURVIVES the run: the intermediate fractions have to be there, in order, ahead of
-      // the `finally` block's terminal 1. A callback body that never ran would leave only
-      // that terminal entry.
+      // Destroy has no mid-run gate to observe `bulkProgress` behind, but the reporter log SURVIVES
+      // the run: the intermediate fractions have to be there, in order, ahead of the `finally`
+      // block's terminal 1. A callback body that never ran would leave only that terminal entry.
       const { store, log } = await loadedBulkStore(
         [bulkRow('c1', 'Iron'), bulkRow('c2', 'Ash'), bulkRow('c3', 'Zinc')],
         { progressTicks: [1, 2, 3] }
@@ -2150,12 +2122,9 @@ describe('inventoryStore', () => {
     });
 
     it('never OPENS the progress toast on a destroy that ticked zero times', async () => {
-      // The mirror of `bulkSalvage`'s own zero-tick gate, and reachable WITHOUT a throw:
-      // a destroy every row of which the facade's owner gate REFUSES returns a full
-      // result set having called `onProgress` not once. `createDefaultProgressReporter`
-      // opens its toast lazily on its FIRST call, so an unconditional terminal `pct: 1`
-      // in the `finally` opens a toast for the first time at 100% — a completion
-      // notification for a run that deleted nothing.
+      // The mirror of `bulkSalvage`'s own zero-tick gate, and reachable WITHOUT a throw: a destroy
+      // every row of which the facade's owner gate REFUSES returns a full result set having called
+      // `onProgress` not once.
       const { store, log } = await loadedBulkStore([bulkRow('c1', 'Iron')], {
         destroyResult: {
           items: [{ outcome: 'notPermitted', unitsDeleted: 0, documentsDeleted: 0 }],
@@ -2187,12 +2156,8 @@ describe('inventoryStore', () => {
     });
 
     it('destroys the set SNAPSHOTTED before the dialog, not the one it reloaded into', async () => {
-      // The listing reloads on world-time, scene and source changes, any of which can
-      // fire while the modal stands. The set the caller counted for the confirmation copy
-      // — "3 components (47 items)" — has to be the set that is destroyed, so the
-      // snapshot is taken BEFORE the await on `confirmDialog`, never after. Re-read
-      // afterwards, this run finds an empty selection and deletes nothing at all while
-      // still reporting a confirmed destroy.
+      // The listing reloads on world-time, scene and source changes, any of which can fire while
+      // the modal stands.
       const rows = [bulkRow('c1', 'Iron'), bulkRow('c2', 'Ash')];
       let release;
       const gate = new Promise((resolve) => {
@@ -2259,11 +2224,10 @@ describe('inventoryStore', () => {
     // Two progressive cards (the shared `progressiveBulkRow` above), so a selection
     // change between the gesture and the flush is real.
     it('commits the key captured when the reorder was SCHEDULED, not the live one', async () => {
-      // The latent bug this change fixes: `reorderSalvageStage` computed the order key at
-      // SCHEDULE time but `flushSalvageOrder` re-derived it at FLUSH time, so a selection
-      // change in between committed the reordered array under a DIFFERENT participation's
-      // key — silently, with no error and no visible symptom until the wrong card opened
-      // in the wrong order.
+      // The latent bug this change fixes: `reorderSalvageStage` computed the order key at SCHEDULE
+      // time but `flushSalvageOrder` re-derived it at FLUSH time, so a selection change in between
+      // committed the reordered array under a DIFFERENT participation's key — silently, with no
+      // error and no visible symptom until the wrong card opened in the wrong order.
       const { store, log } = await loadedBulkStore([
         progressiveBulkRow('cA', 'Alpha'),
         progressiveBulkRow('cB', 'Beta'),

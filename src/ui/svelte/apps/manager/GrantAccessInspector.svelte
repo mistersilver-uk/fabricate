@@ -1,44 +1,26 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  Grant-access inspector for the selected recipe (Books & Scrolls `restricted`
-  visibility mode). Two independent rosters — Characters and Players — each with
-  its own search box and the shared pagination bar. Toggling any row grants or revokes
-  that character/player independently and persists the FULL access snapshot via
-  onSaveAccess (characters and players are separate arrays). Grant state is read
-  from `recipe.access`, so searching or paging never loses a grant.
-
-  Props:
-   - recipe: the selected recipe row ({ id, name, img, category, access, accessSummary }).
-   - characters: player-character roster [{ id, name, img, subtitle? }].
-   - players: world-user roster [{ id, name, role?, color? }].
-   - onSaveAccess(recipeId, { characterIds, playerIds }): persists the full snapshot.
+  Grant-access inspector for the selected recipe (Books & Scrolls `restricted` visibility mode). Two
+  independent rosters — Characters and Players — each with its own search box and the shared
+  pagination bar. Toggling any row grants or revokes independently and persists the FULL access
+  snapshot through `onSaveAccess(recipeId, { characterIds, playerIds })`; grant state is read from
+  `recipe.access`, so searching or paging never loses a grant.
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
   import Medallion from '../../components/Medallion.svelte';
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
   import RosterRow from './RosterRow.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
-  import { createRecipeAccessBrowserState } from '../../../../utils/managerBrowserViewState.js';
+  import { createRecipeAccessBrowserState } from '../../../model/managerBrowserViewState.js';
 
-  // Fixed roster page size (design: 6 per roster).
-  //
-  // THE SEARCH FIELD IS UNCONDITIONAL WITH RESPECT TO THE PAGE SIZE (issue 1513). It used to
-  // render only where the roster was longer than one page, which withheld it from exactly the
-  // rosters a GM reads most: a world of six characters drew no way to find one by name at all,
-  // and a field that appears when a seventh actor joins reads as a layout glitch rather than as
-  // a capability. Nothing about finding a name by typing it depends on how many names there are
-  // — but it does depend on there being some, so the markup gates the field on the UNFILTERED
-  // roster being non-empty and on nothing else.
-  //
-  // THE PAGER KEEPS ITS THRESHOLD, and that is not an inconsistency: a bar that can only say
-  // "Page 1 of 1" states nothing the list beneath it does not already show. The shared
-  // primitive computes it identically — with showPageSize={false} and this page size, its own
-  // totalCount > minPageSize gate is > 6, the same number the hand-rolled bar tested.
+  // Fixed roster page size (design: 6 per roster). THE SEARCH FIELD IS UNCONDITIONAL WITH RESPECT
+  // TO IT (issue 1513): gating on it withheld the field from exactly the rosters a GM reads most,
+  // so the markup gates only on the UNFILTERED roster being non-empty. THE PAGER KEEPS ITS
+  // THRESHOLD, because a bar that can only say "Page 1 of 1" states nothing the list does not.
   const ROSTER_PAGE_SIZE = 6;
 
   let {
@@ -46,12 +28,9 @@
     characters = [],
     players = [],
     onSaveAccess = () => {},
-    // ── THE TWO ROSTERS' VIEW-STATE IS LIFTED (issue 1438) ───────────────────────────────
-    // This inspector stays mounted while the selected recipe changes, so neither query has
-    // ever been lost to picking another row — and it still is not, because the lifted object
-    // is not keyed by recipe. What it did not survive is leaving the Access route, which
-    // unmounts the whole branch; the root owns the slot so the trip out and back keeps both
-    // terms and both pages.
+    // THE TWO ROSTERS' VIEW-STATE IS LIFTED (issue 1438). Neither query was ever lost to picking
+    // another row, and still is not, because the lifted object is not keyed by recipe; what it did
+    // not survive is leaving the Access route, which unmounts the branch.
     browserState = $bindable(null),
   } = $props();
 
@@ -96,12 +75,10 @@
     );
   }
 
-  // Each roster returns to page 1 when its own search term changes, so a filter never leaves
-  // the viewer on an out-of-range page. It is done in the SEARCH HANDLER below rather than in
-  // an effect over the term, because an effect also runs on mount: against the lifted state
-  // that would reset the restored page on every return to this route, which is the exact
-  // failure the lift exists to remove. `onSearch` is the only writer of either term, so the
-  // two are equivalent everywhere except on that first run.
+  // Each roster returns to page 1 when its own term changes, in the SEARCH HANDLER rather than an
+  // effect over the term: an effect also runs on mount, which against the lifted state would reset
+  // the restored page on every return. `onSearch` is the only writer, so the two are otherwise
+  // equivalent.
 
   function persist(characterIds, playerIds) {
     if (!recipe?.id) return;
@@ -122,12 +99,9 @@
     persist([...grantedCharacterIds], playerIds);
   }
 
-  // Player roster rows show the user's human-readable role as the subtitle and tint the
-  // leading icon with that user's Foundry colour, both sourced from the game users data.
-  // The roster is `game.users.players` — GM-free by construction — so the only roles
-  // that appear are Player and Trusted Player. A GM is never a grantable target: the
-  // runtime predicate already returns true for any GM viewer before it reads
-  // `playerIds`, so granting one would do nothing.
+  // The roster is `game.users.players`, GM-free by construction, so only Player and Trusted Player
+  // appear. A GM is never a grantable target: the runtime predicate returns true for any GM viewer
+  // before it reads `playerIds`.
   const playerRows = $derived(
     (players || []).map((player) => ({
       id: player.id,
@@ -156,18 +130,10 @@
   const charSlice = $derived(pageSlice(characterRows, charQuery, charPage));
   const playerSlice = $derived(pageSlice(playerRows, playerQuery, playerPage));
 
-  // THE TWO PAGERS' LANDMARK NAMES (issue 1513), composed from the roster's own title.
-  //
-  // `Pagination` emits a `<section aria-label>` (a REGION) containing a `<nav aria-label>`, and
-  // this screen draws two of them in one 300px column — so with the primitive's defaults a
-  // screen-reader user's landmark list held two regions called "Pagination" and two navigations
-  // called "Page navigation", which is the one surface where the two have to be told apart. The
-  // qualifier is the SAME string the roster heading shows, so the landmark and the visible
-  // heading cannot drift.
-  //
-  // Composed from a template key rather than by concatenating two localized fragments: word
-  // order is a translator's decision, and `{roster} pagination` is the only shape that lets a
-  // language put the qualifier last.
+  // THE TWO PAGERS' LANDMARK NAMES (issue 1513), composed from the roster's own title, because
+  // this screen draws two `Pagination` regions in one column and a landmark list is navigated by
+  // name. Composed from a template key rather than concatenated fragments: word order is a
+  // translator's decision.
   function rosterLandmarks(title) {
     return {
       label: text('FABRICATE.Admin.Manager.Access.RosterPagination', '{roster} pagination').replace(
@@ -181,8 +147,7 @@
     };
   }
 
-  // Two section descriptors drive a single markup block so the Characters and
-  // Players rosters share one implementation (no duplicated section markup).
+  // Two descriptors drive one markup block, so the rosters share one implementation.
   const sections = $derived([
     {
       key: 'characters',
@@ -265,13 +230,9 @@
           <i class={section.icon} aria-hidden="true"></i>
           <span>{section.title}</span>
         </div>
-        <!-- A SEARCH OVER SOMETHING (issue 1513). The field is unconditional with respect to
-             the PAGE SIZE — that threshold is what withheld it from the rosters a GM reads most
-             — but a roster holding no rows at all is a different fact: there is nothing to find
-             by typing, and a query box over it can only ever produce the same empty line the
-             screen already shows. The gate reads the UNFILTERED rows, never `slice.filtered`,
-             because a field that removed itself once a query matched nothing would trap the GM
-             with no way to clear the term they typed. -->
+        <!-- A SEARCH OVER SOMETHING (issue 1513): the gate reads the UNFILTERED rows, never
+             `slice.filtered`, because a field that removed itself once a query matched nothing
+             would trap the GM with no way to clear the term they typed. -->
         {#if section.rows.length > 0}
           <ManagerSearchField
             class="manager-access-roster-search"
@@ -283,13 +244,9 @@
           />
         {/if}
         {#if section.slice.filtered.length === 0}
-          <!-- THE SHARED NO-STATE PRIMITIVE IN ITS QUIET FORM (issue 1515). This roster sits in a
-               300px inspector column the screen has already drawn a boundary around, and
-               `openspec/specs/design-system/spec.md` rules such an emptiness a NOTE rather than a
-               panel: one quiet line at the column's own scale, with no dashed edge, no fill and no
-               icon tile. That is what the bespoke `<p>` this replaces already drew by hand — the
-               conversion changes the line's scale and its ink, not its shape, and it retires the
-               last hand-rolled no-state message on this screen. -->
+          <!-- THE SHARED NO-STATE PRIMITIVE IN ITS QUIET FORM (issue 1515): the column already has
+               a boundary drawn around it, and `openspec/specs/design-system/spec.md` rules such an
+               emptiness a NOTE rather than a panel. -->
           <EmptyState
             note
             title={text('FABRICATE.Admin.Manager.Access.NoMatches', 'No matches')}
@@ -314,20 +271,13 @@
               />
             {/each}
           </div>
-          <!-- THE SHARED PAGER (issue 1513), replacing a hand-rolled label-plus-two-arrows bar
-               that restated the primitive's own arithmetic, its own disabled rule and the same
-               three Pagination.* strings. It gains the range line — "Showing 7–8 of 8" — which
-               the hand-rolled bar never drew, and showPageSize={false} keeps a per-page selector
-               out of a 300px inspector column, which is the mode that prop exists for.
-
-               IT STAYS INSIDE [data-access-roster], and that placement is load-bearing: this
-               screen draws TWO of these bars and the primitive stamps a bare
-               data-pagination-prev/-next with no per-instance key, so the roster section is the
-               only thing that tells the two apart FOR A TEST OR A CAPTURE. The retired
-               data-access-roster-prev/-next hooks carried the key themselves; a reader of either
-               addresses it by ancestor now. For a screen-reader user the ancestor is not
-               reachable, which is what `label`/`navLabel` answer: the two bars are two REGION
-               landmarks and two navigations, and a landmark list is navigated by NAME. -->
+          <!-- THE SHARED PAGER (issue 1513); `showPageSize={false}` keeps a per-page selector out
+               of a 300px column, which is the mode that prop exists for. IT STAYS INSIDE
+               [data-access-roster], and that placement is load-bearing: the primitive stamps a
+               bare `data-pagination-prev`/`-next` with no per-instance key, so the roster section
+               is the only thing that tells the two bars apart FOR A TEST OR A CAPTURE. A
+               screen-reader user cannot reach the ancestor, which is what `label`/`navLabel`
+               answer. -->
           <Pagination
             totalCount={section.slice.filtered.length}
             pageSize={ROSTER_PAGE_SIZE}

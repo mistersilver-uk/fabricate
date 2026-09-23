@@ -1,12 +1,7 @@
 /**
- * Issue 917 — the shared essence BLOCK in `IngredientSet.resolveIngredientSelection`.
- *
- * Every `match.type === 'essence'` option in one ingredient set is funded jointly from
- * one backtrackable node placed after every component/tag group has claimed. These
- * tests pin the parts of that contract whose breakage is SILENT: the author-order
- * emission `RecipeManager` reads positionally, the block's ability to force an earlier
- * group to re-branch, the one-entry-per-item-key plan, and the per-essence-id
- * attribution partition that supplies every requirement's reported quantity.
+ * Issue 917 — the shared essence BLOCK in `IngredientSet.resolveIngredientSelection`. Every
+ * `match.type === 'essence'` option in one ingredient set is funded jointly from one backtrackable
+ * node placed after every component/tag group has claimed.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -56,12 +51,7 @@ function requirementFor(selection, groupId) {
   return selection.essencePool?.requirements.find((entry) => entry.groupId === groupId) ?? null;
 }
 
-// ---------------------------------------------------------------------------
-// The positional `selectedIngredients` contract. `RecipeManager._chosenOptionByGroup`
-// reads it by RUNNING INDEX over non-missing groups, so emitting the essence entry
-// out of author position mis-maps every later tile's image, name, need and checked
-// radio with no exception thrown anywhere.
-// ---------------------------------------------------------------------------
+// The positional `selectedIngredients` contract.
 
 test('selectedIngredients stays in author-group order when the essence group is authored FIRST', () => {
   const set = new IngredientSet({
@@ -129,11 +119,7 @@ test('a missing essence group still leaves the later groups index-aligned', () =
   assert.equal(selection.missingGroups[0].group.id, 'g-ess');
 });
 
-// ---------------------------------------------------------------------------
-// The block is a backtrackable NODE, not a post-pass. If it cannot force an earlier
-// component/tag group to re-branch then joint resolution stops being a strict
-// relaxation and worlds craftable today become uncraftable.
-// ---------------------------------------------------------------------------
+// The block is a backtrackable NODE, not a post-pass.
 
 test('a block that cannot fund forces an earlier tag group to re-branch onto its other stack', () => {
   // Both stacks carry the tag; only `ember` carries the essence. Greedy takes `ember`
@@ -155,21 +141,7 @@ test('a block that cannot fund forces an earlier tag group to re-branch onto its
 });
 
 test('a requirement needing EXACTLY the ledger ceiling is still feasible and search-rescued', () => {
-  // The boundary of issue 1083's essence prune. The pass index withholds an essence option
-  // whose need exceeds what the WHOLE untouched ledger could ever deliver for that id
-  // (`ceiling >= need`); at `ceiling === need` the option must survive, because an assignment
-  // that consumes every carrier unit satisfies it exactly.
-  //
-  // This case is here rather than in the differential corpus for a specific reason. Withholding
-  // the option makes the SEARCH fail, and `resolveIngredientSelection` then falls back to
-  // `_resolveGreedy`, which does not apply the prune at all — so a wrong verdict is invisible in
-  // every case greedy can already answer, which is most of them. It has to be a case greedy gets
-  // WRONG: the carrier is listed first, so greedy spends it on the tag group and strands the
-  // block, and only the re-branch onto `x` satisfies the set. Mutating `>=` to `>` here reports
-  // a craftable recipe as unsatisfiable.
-  //
-  // Ceiling: `y` carries fire 1 per unit and holds 2 units, so the ledger can deliver exactly 2,
-  // which is exactly what the requirement needs.
+  // The boundary of issue 1083's essence prune.
   const set = new IngredientSet({
     id: 's',
     ingredientGroups: [tagGroup('g-tag', ['metal']), essenceGroup('g-ess', 'fire', 2)],
@@ -222,10 +194,8 @@ test('the block draws only what the component/tag groups left in the ledger', ()
   );
 });
 
-// ---------------------------------------------------------------------------
-// One plan entry per item key. A second entry for the same shared unit makes the
-// engine re-read a live `system.quantity` and delete a document that is already gone.
-// ---------------------------------------------------------------------------
+// One plan entry per item key. A second entry for the same shared unit makes the engine re-read a
+// live `system.quantity` and delete a document that is already gone.
 
 test('a dual-essence carrier funding two requirements contributes ONE plan entry', () => {
   const set = new IngredientSet({
@@ -280,10 +250,8 @@ test('a component group and the block may each contribute an entry for the same 
   assert.equal(consumedByUuid(selection).ember, 3, 'the disjoint draws sum to the whole stack');
 });
 
-// ---------------------------------------------------------------------------
-// The per-essence-id attribution partition. It runs unconditionally and is the SOLE
-// source of every essence requirement's reported quantity, satisfied or short.
-// ---------------------------------------------------------------------------
+// The per-essence-id attribution partition. It runs unconditionally and is the SOLE source of every
+// essence requirement's reported quantity, satisfied or short.
 
 test('two same-essence requirements each report their own need, never the id total', () => {
   const set = new IngredientSet({
@@ -356,9 +324,7 @@ test('a satisfied requirement reports delivered exactly equal to need despite un
   assert.equal(selection.essencePool.carriers[0].allocatedUnits, 1, 'overshoot shows in units');
 });
 
-// ---------------------------------------------------------------------------
 // The `essenceAllocation` override channel.
-// ---------------------------------------------------------------------------
 
 test('a player allocation is honoured and is exactly what the plan consumes', () => {
   const set = new IngredientSet({ id: 's', ingredientGroups: [essenceGroup('g-a', 'fire', 2)] });
@@ -450,9 +416,7 @@ test('allocateEssences overrides the suggestion strategy', () => {
   assert.deepEqual(consumedByUuid(selection), { b: 2 });
 });
 
-// ---------------------------------------------------------------------------
 // Shape guarantees the read side depends on.
-// ---------------------------------------------------------------------------
 
 test('a set with no essence requirement has a null pool and an empty allocation', () => {
   const set = new IngredientSet({

@@ -1,20 +1,7 @@
 /**
- * Issue 539: crafted OUTPUT items must carry a durable per-system component identity
- * so the inventory matcher attributes them to their OWN component instead of a sibling
- * reached through Foundry's transitive `_stats.duplicateSource` chain.
- *
- * The reported world crafted a *Masterwork Round Shield* whose component source item had
- * itself been duplicated from a *Reinforced Round Shield* item, so every crafted Masterwork
- * shield inherited Reinforced's template UUID as its `_stats.duplicateSource`. With no
- * identity flag stamped, `resolveComponentForItem` fell through to the raw source-reference
- * tier and matched the crafted shield to the WRONG (Reinforced) component.
- *
- * These tests drive `CraftingEngine._createSingleResult` (the single stamp site every
- * standard, alchemy, salvage, and timed output funnels through) and assert:
- *   1. the crafted item carries `flags.fabricate.roles[systemId].componentId` = its own id;
- *   2. the canonical reader `resolveComponentForItem` attributes it to its OWN component
- *      EVEN when its `_stats.duplicateSource` points at a sibling component;
- *   3. a bare `itemUuid` output with no managed component is left unstamped (no crash).
+ * Issue 539: crafted OUTPUT items must carry a durable per-system component identity so the
+ * inventory matcher attributes them to their OWN component instead of a sibling reached through
+ * Foundry's transitive `_stats.duplicateSource` chain.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,11 +9,9 @@ import assert from 'node:assert/strict';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { resolveComponentForItem } from '../src/utils/sourceUuid.js';
 
-// ---------------------------------------------------------------------------
-// Minimal foundry.utils.{getProperty,setProperty} so the engine can write the
-// doubly-nested `flags.fabricate.fabricate.roles.<systemId>.componentId` path and a
-// reader can walk it exactly as Foundry's Document#getFlag would.
-// ---------------------------------------------------------------------------
+// Minimal foundry.utils.{getProperty,setProperty} so the engine can write the doubly-nested
+// `flags.fabricate.fabricate.roles.<systemId>.componentId` path and a reader can walk it exactly as
+// Foundry's Document#getFlag would.
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -71,10 +56,8 @@ function makeEngine() {
 }
 
 /**
- * Configure the global crafting-system manager + fromUuid so `_createSingleResult`
- * resolves `MASTERWORK` and reads its source item. The source item's `toObject()`
- * reproduces the bug: it carries a transitive `_stats.duplicateSource` pointing at the
- * SIBLING (Reinforced) source, and NO fabricate flag.
+ * Configure the global crafting-system manager + fromUuid so `_createSingleResult` resolves
+ * `MASTERWORK` and reads its source item.
  */
 function setupGame() {
   const system = { id: SYSTEM_ID, components: COMPONENTS, features: {} };
@@ -126,9 +109,8 @@ function makeCapturingActor() {
 }
 
 /**
- * Wrap created item-data in a `getFlag`-compatible reader that mirrors Foundry's
- * Document#getFlag: `getFlag('fabricate', 'fabricate.roles')` walks
- * `flags.fabricate.fabricate.roles`.
+ * Wrap created item-data in a `getFlag`-compatible reader that mirrors Foundry's Document#getFlag:
+ * `getFlag('fabricate', 'fabricate.roles')` walks `flags.fabricate.fabricate.roles`.
  */
 function asOwnedItem(itemData) {
   return {
@@ -246,10 +228,8 @@ test('539: a DOTTED craftingSystemId leaves the output unstamped (no mis-nested 
 });
 
 test('539: a componentId that resolves to NO managed component writes no null identity leaf', async () => {
-  // Result names a componentId absent from the system's component set ⇒ managedItem is
-  // null ⇒ the `!componentId` guard skips the stamp (the sibling case to the bare
-  // itemUuid). A resolvable itemUuid still builds and creates an item, so we assert the
-  // created item carries NO null/undefined componentId leaf.
+  // Result names a componentId absent from the system's component set ⇒ managedItem is null ⇒ the
+  // `!componentId` guard skips the stamp (the sibling case to the bare itemUuid).
   const system = { id: SYSTEM_ID, components: COMPONENTS, features: {} };
   globalThis.game = {
     fabricate: { getCraftingSystemManager: () => ({ getSystem: () => system }) },

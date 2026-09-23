@@ -2,13 +2,14 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-item-page-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
@@ -63,9 +64,7 @@ describe('ItemPageInspector (mounted)', () => {
     assert.equal(itemMode.querySelector('[data-item-page-mid-label]').textContent.trim(), 'Uses');
     assert.equal(itemMode.querySelector('[data-item-page-mid-value]').textContent.trim(), '4');
 
-    // The middle figure is the accented one, and it is the ONLY site in the tree that reaches
-    // `StatBox tone="info"` — no registry case drew this grid when the tone shipped, so this is
-    // its discharge. Before the conversion the ink was a hard-coded `is-accent` class here.
+    // The middle figure is the accented one.
     assert.equal(
       itemMode.querySelector('[data-item-page-stat="uses"]').getAttribute('data-stat-tone'),
       'info',

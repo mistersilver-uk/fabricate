@@ -23,10 +23,6 @@
  */
 
 import {
-  SOURCE_LINK_FIELDS,
-  WORLD_IDENTITY_FIELDS,
-} from '../../../migration/worldScopeEntityGrouping.js';
-import {
   COMPONENT_SCOPE,
   COMPONENT_SECTIONS,
   normalizeComponentEssenceMap,
@@ -40,10 +36,14 @@ import {
 } from '../../../systems/scopedDefinitions.js';
 import { TOOL_SCOPE, TOOL_SECTIONS } from '../../../systems/toolScope.js';
 import {
+  SOURCE_LINK_FIELDS,
+  WORLD_IDENTITY_FIELDS,
+} from '../../../systems/worldScopeEntityGrouping.js';
+import {
   WORLD_VOCABULARY_KINDS,
   worldDefaultsAffectedByDeletion,
 } from '../../../systems/worldVocabulary.js';
-import { buildVocabularyUsage } from '../../../utils/vocabularyUsage.js';
+import { buildVocabularyUsage } from '../../model/vocabularyUsage.js';
 
 /**
  * The three entity types, in the order the rail lists their world screens.
@@ -88,7 +88,7 @@ function identityFieldsOf(entityType) {
 /**
  * Whether this entity type's identity record carries a source item link.
  *
- * DERIVED, NEVER RESTATED. `src/migration/worldScopeEntityGrouping.js` owns both lists; this
+ * DERIVED, NEVER RESTATED. `src/systems/worldScopeEntityGrouping.js` owns both lists; this
  * intersects them. True for a component and a tool, false for an essence — which is one of the
  * THREE ways the three identity records differ (`data-models/spec.md` `### Properties`), and one
  * of the two a shell's own markup reads.
@@ -231,9 +231,9 @@ export function emptyWorldVocabularyState() {
  * `total` IS THE PUBLISHED FIELD NAME, and it is a contract rather than an implementation
  * detail: `CraftingSystemManagerRoot.svelte` reads `worldScope.vocabulary.total` for the
  * `Tags & Categories` rail leaf's count badge, and requirement 7 of
- * `### GM World Scoped Entity Routes` bars PR 7 from that file - so a producer that published
+ * `## GM World Scoped Entity Routes` bars PR 7 from that file - so a producer that published
  * `count` or `entries.length` instead would leave the badge reading 0 forever with every test
- * still green. `ui-integration/spec.md`'s `### GM World Vocabulary Route` names it, and
+ * still green. `ui-world-scope/spec.md`'s `## GM World Vocabulary Route` names it, and
  * `tests/world-scope-projection.test.js` pins it.
  *
  * The three vocabularies are summed rather than deduplicated across kinds: a category and a tag
@@ -853,7 +853,7 @@ function retiredEssenceIds(mergeMap) {
  * reads it through the same `services.getVocabularyScopeStore?.() ?? null` idiom as the other
  * three, so it degrades to `null` - and to a `total: 0` projection - until PR 7 registers the
  * store. That leg exists NOW because `adminStore.js` is a gateway file requirement 7 of
- * `### GM World Scoped Entity Routes` closes to PR 7: a producer wired later could only be
+ * `## GM World Scoped Entity Routes` closes to PR 7: a producer wired later could only be
  * wired by reopening a file that lane may not open. Its WRITE-path sibling was added by issue
  * 1374 for the same reason, so the vocabulary lane declares its action family in
  * `worldScopeActions.js` — a file it owns — and finds the store leg already there.

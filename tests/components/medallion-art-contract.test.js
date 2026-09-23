@@ -1,34 +1,4 @@
-/**
- * A MEDALLION THAT CARRIES ART SAYS WHAT THE ART IS FOR (issue 1506).
- *
- * ── THE RENAME, AND THE HOLE IT WOULD OTHERWISE LEAVE ───────────────────────────────────────
- * The tile's image prop was `src`, which is an ELEMENT's attribute name; the design system
- * publishes it as `art`, which is what a record's artwork is. Issue 1506 takes the published
- * name and keeps `src` as a deprecated alias for one release, so an out-of-tree caller is not
- * broken by a rename it never saw. An alias is also an ESCAPE HATCH: a contract asked only of
- * `art` is a contract any caller can step around by spelling the old name, so both spellings are
- * the domain of the clause below, and a second clause pins that no shipped site uses the alias
- * at all — the alias exists for callers this repository cannot see.
- *
- * ── WHY `alt` IS "EXPLICITLY PASSED" AND NOT "REQUIRED TO BE NON-EMPTY" ─────────────────────
- * `alt=""` is the CORRECT value at every shipped site: each renders the record's own name as
- * adjacent text, so alt text would be a second reading of the same word to a screen reader. What
- * is not correct is silence — a tile whose author never considered the question. So the contract
- * is that the DECISION WAS TAKEN, spelled as an `alt` attribute with whatever value the site
- * needs. Worded as "must be non-empty" it would push an author into writing redundant alt text
- * beside a visible name on every browse row, which is worse for the reader it is meant to serve.
- *
- * ── WHY A SOURCE SCAN AND NOT A RUNTIME THROW ───────────────────────────────────────────────
- * A primitive that threw on a missing `alt` would fail at the one moment nobody is watching —
- * inside a GM's Foundry session, on a screen a mounted suite does not reach — and would make the
- * tile's own render depend on a caller's discipline. The failure this guards is a call site that
- * was never written, which is a fact about `src/` and is answerable by reading it.
- *
- * The scan is `openingTagsNamed`, the shared depth-aware tag reader, rather than a `[^<>]*`
- * regular expression: practically every call site here passes an expression attribute, and a
- * `>` inside one truncates a naive match half way through the attribute list — which would not
- * fail this clause but would make it report clean over half a tag.
- */
+/** A MEDALLION THAT CARRIES ART SAYS WHAT THE ART IS FOR (issue 1506). */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
@@ -39,63 +9,11 @@ import { openingTagsNamed } from '../helpers/svelteTagScan.js';
 const ART = 'art';
 const DEPRECATED_ALIAS = 'src';
 
-/**
- * THE THIRD WAY A CALL SITE PASSES ART, and the reason this is not just an attribute scan.
- *
- * The thirty-two converted crafting tiles do not write `art=` at all: they spread the shared art
- * resolver, `<Medallion {...resolveCraftingArt(row.img)} alt="" size={30} />`, because the choice
- * between a record's own image, Foundry's item-bag sentinel, a fallback glyph and the house
- * blueprint is one decision and belongs in one place. A scan that read attributes alone would
- * report thirty-two art-bearing tiles as glyph-only and exempt every one of them from the clause
- * below — the largest hole this contract could have, and a silent one.
- *
- * The spread counts because the resolver's return ALWAYS carries an `art` key, in both branches,
- * which `crafting-art-resolution.test.js` pins directly.
- */
+/** THE THIRD WAY A CALL SITE PASSES ART, and the reason this is not just an attribute scan. */
 const ART_RESOLVER = 'resolveCraftingArt(';
 
-/**
- * EVERY MEDALLION RENDER SITE IN `src/`, PINNED, so no clause below can pass over nothing.
- *
- * A negative clause — "no art-bearing tile is silent about `alt`" — is satisfied by a tree with
- * no art-bearing tiles in it, which is exactly what a scan that stopped matching would produce.
- * So the population is counted, not just quantified over.
- *
- * Every shipped file imports the component under this one name (measured on this tree: forty-two
- * importers, two specifier depths, one local name), which is what makes a tag-name scan the
- * whole population rather than most of it.
- *
- * 65 -> 63 (issue 1506): the GM Knowledge surface's roster row and detail header LEFT this
- * population for `components/Avatar.svelte`, which is the actor portrait rather than a record's
- * tile. Both were art-bearing and both passed `alt=""`, so the second count falls by the same
- * two. Their contract did not lapse with the move — `avatar-source-contract.test.js` states the
- * same clause over the same two sites — and this file's domain is now the RECORD tile alone,
- * which is what its clauses were always about.
- *
- * 63 -> 65 (issue 1514, phase 2): the player gathering tab's drop row and required-tool card each
- * moved a raw `<img>` onto this tile. BOTH are art-bearing and both pass `alt=""`, because each
- * renders the record's name as adjacent text, so the second count moves by the same two. Both are
- * the first render sites this component has in `apps/gathering/`, and the five gathering tiles
- * that did NOT convert are the ones whose `.is-fallback` rule re-fits a default IMAGE with
- * `object-fit: contain` and a padding — a state this tile's fixed `cover` cannot draw.
- *
- * 65 -> 77 (issue 1514, phase 3): the ALCHEMY and JOURNAL tabs' twelve raw `<img>` thumbs, and
- * ALL TWELVE convert — the `.is-fallback` obstruction that deferred five of the seven gathering
- * tiles has no instance in either tab. The predicate was run over both directories: eleven
- * `object-fit: cover` rules cover the twelve sites, `StepDetails`' two thumbs share one, and not
- * one of the eleven declares an `.is-fallback` variant or a `filter`.
- *
- * Every one of the twelve is art-bearing and passes `alt=""`, so the second count moves by the
- * same twelve. Five of them ALSO pass `glyph`, `tint` and `icon`: the alchemy tiles are the first
- * sites in the tree whose replaced markup had a real `{#if img}` / `{:else}` glyph branch, so the
- * fallback's face, its size and its ink are all carried across explicitly rather than left to the
- * component's `fa-scroll` default at `0.9rem` in the accent. The seven journal tiles pass none of
- * the three, because every one of them resolves an image unconditionally.
- */
-// #1648: RunDetail -1, StepDetails -2, ChoiceOptionList +1, EssencePool +2,
-// SlotTile +1, YieldScale +1 = net +2; the artwork-bearing subset rises by one.
-// TP11 re-census: 84 sites / 66 artwork-bearing after historical composition and
-// dense ListRow adoption; EssencePool now has four sites, two artwork-bearing.
+/** EVERY MEDALLION RENDER SITE IN `src/`, PINNED, so no clause below can pass over nothing. */
+// #1648: RunDetail -1, StepDetails -2, ChoiceOptionList +1.
 const MEDALLION_SITES = 84;
 
 /** How many of them bind artwork at all. The rest are glyph-only and `alt` is moot for them. */
@@ -108,14 +26,6 @@ const TAGS = Object.entries(SOURCES).flatMap(([path, source]) =>
 
 /**
  * Does this tag name `prop`, in either binding form?
- *
- * Both forms are read because Svelte's shorthand `{tint}` is invisible to a `tint=` scan, and a
- * census of this component built on `tint=` alone undercounted its tinted sites by one for the
- * whole of issue 1506's planning.
- *
- * The lookbehind is `(?<![\w-])` rather than `\b`, because `\b` matches before a hyphen and after
- * a letter: a `\b`-anchored `alt=` pattern would read `data-alt=` as this attribute, and a
- * `src=`-anchored one would read any future `*src=` prop as the alias.
  *
  * @param {string} tag one opening tag's source text
  * @param {string} prop the prop name
@@ -171,10 +81,7 @@ describe('1506 the medallion art contract — `alt` is a decision, not a default
   });
 
   it('cannot be escaped by reaching for the deprecated alias, and the alias is unused', () => {
-    // The clause above already covers the alias; this one covers the alias itself. It exists for
-    // callers outside this repository for ONE release, so a shipped site adopting it would be a
-    // second first-class name for one prop — and the deletion that ends the deprecation would
-    // then break the tree it was introduced to protect.
+    // The clause above already covers the alias.
     assert.deepEqual(
       TAGS.filter(({ tag }) => names(tag, DEPRECATED_ALIAS)).map(({ path }) => path),
       [],
@@ -187,8 +94,6 @@ describe('1506 the medallion art contract — `alt` is a decision, not a default
     // is that it contains no positive case, so a detector that had silently stopped matching
     // would report clean and read exactly like a completed conversion. It is therefore driven
     // over sources with a KNOWN answer.
-    // Assembled from single-quoted lines rather than written as one template literal, because a
-    // Svelte expression attribute and a template placeholder are spelled the same way.
     const fixture = [
       '<Medallion art={row.img} icon="fas fa-cube" size={40} />',
       '<Medallion src={row.img} size={40} />',

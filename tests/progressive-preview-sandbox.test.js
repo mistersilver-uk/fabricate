@@ -1,24 +1,4 @@
-/**
- * The progressive check's PREVIEW SANDBOX (issue 1097).
- *
- * `progressive.preview.difficulties` is the ordered list a GM types into the Checks
- * Studio's odds histogram to see what a progressive check would award. It is scratch state
- * for one experiment, not authored configuration, and every rule below is what makes that
- * distinction real rather than a claim in a comment:
- *
- *  1. NO ENGINE PATH READS IT — proved by deleting the key from a live award and getting a
- *     byte-identical result, with a negative control showing the same harness DOES see a
- *     change when a key the engine really reads is deleted.
- *  2. READINESS NEVER VALIDATES IT — a nonsensical order raises no issue and badges no
- *     section, proved against a control whose issue set is non-empty for another reason.
- *  3. EXPORT STRIPS IT, from all three activity checks, by DELETING the key.
- *  4. EVERY ALLOWLIST REBUILD EMITS IT — the persistence normalizer here, the manager
- *     root's draft clone in `tests/components/manager-mounted.test.js`, and the store's
- *     projection and saver below. Issue 1095 shipped a defect of exactly this class: a key
- *     that persisted correctly and was never read at roll time, because a THIRD rebuild did
- *     not emit it.
- *  5. ABSENCE IS NOT EMPTINESS, and the ORDER IS THE DATUM.
- */
+/** The progressive check's PREVIEW SANDBOX (issue 1097). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
@@ -72,8 +52,6 @@ describe('the sandbox derivation', () => {
 
   it('does NOT store a token that cannot be a number, because JSON would rewrite it', () => {
     // `JSON.stringify(NaN)` is `null` and `Number(null)` is `0` — a perfectly finite cost.
-    // Storing a NaN would silently turn the GM's experiment into a different one after a
-    // reload, which is worse than not storing the token at all.
     assert.deepEqual(parsePreviewDifficulties('6, banana, 9'), [6, 9]);
     assert.deepEqual(parsePreviewDifficulties('nonsense'), []);
   });
@@ -161,11 +139,6 @@ describe('the persistence normalizer emits it', () => {
 
 /**
  * A store over ONE system, with a real `updateSystem` that normalizes through the manager.
- *
- * Built on the shared `adminStoreServices` fixture rather than a fresh factory — Sonar
- * counts `tests/**` for duplication — with only the system-manager seam replaced, because
- * that fixture's manager has no `updateSystem` and the write path is half of what is under
- * test here.
  *
  * @param {object} craftingCheck The system's crafting check block.
  * @returns {Promise<{store: object, system: object, writes: Array<object>}>} The fixture.
@@ -275,9 +248,8 @@ describe('the engine never reads it', () => {
         },
       ],
     };
-    // 8 against three costs of 4 is chosen to DISCRIMINATE the award mode: `exceed` needs
-    // a strict `>` and stops after one, `equal` pays for exactly two. A value the two modes
-    // agree on would make the negative control below vacuous.
+    // 8 against three costs of 4 is chosen to DISCRIMINATE the award mode: `exceed` needs a strict
+    // `>` and stops after one, `equal` pays for exactly two.
     return service.resolveResultGroups({ recipe, step, checkResult: { value: 8 } });
   }
 
@@ -306,9 +278,8 @@ describe('the engine never reads it', () => {
   });
 
   it('NEGATIVE CONTROL: the same harness DOES see a key the engine really reads', () => {
-    // Without this, "deleting the sandbox changed nothing" would be indistinguishable from
-    // a harness that cannot see any change at all. `awardMode` is read one line away from
-    // where `preview` would have to be read, and deleting it moves the award.
+    // Without this, "deleting the sandbox changed nothing" would be indistinguishable from a
+    // harness that cannot see any change at all.
     const withMode = award({ ...AUTHORED });
     const withoutMode = award({ rollFormula: '1d20', preview: AUTHORED.preview });
     assert.notDeepEqual(

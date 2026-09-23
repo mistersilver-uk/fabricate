@@ -1,18 +1,7 @@
-/**
- * ingredientOptionStatus — pure presentation map from an ingredient set's
- * craftability to its option-card status descriptor for the routed-by-ingredients
- * option grid. No Foundry/DOM dependencies, so it is fully unit-testable.
- *
- * Precedence (highest first):
- *   1. craftable   — the set can be crafted right now (`canCraft === true`)
- *   2. blocked     — a required tool is missing (a hard block, not just materials)
- *   3. missing     — some ingredient/essence components are short; `count` is the
- *                    number of distinct unsatisfied ingredient + essence entries
- *
- * `tone` is a semantic token (resolved to a colour by CSS — never a literal here);
- * `icon` is a Font Awesome class; `count` is only meaningful for the `missing`
- * token.
- */
+// The routed-by-ingredients option grid's status descriptor per set. Precedence, highest first:
+// `craftable`, then `blocked` (a missing TOOL is a hard block, not a shortage), then `missing`,
+// whose `count` is the number of distinct unsatisfied ingredient plus essence entries. `tone` is a
+// semantic token CSS resolves, never a colour literal.
 
 const CRAFTABLE = Object.freeze({
   token: 'craftable',
@@ -42,22 +31,14 @@ function hasMissingTool(craftability) {
   );
 }
 
-/**
- * Resolve the `{ token, tone, icon, count }` status descriptor for an option's
- * craftability. A null/absent craftability is treated as blocked (nothing is
- * known to be satisfiable).
- *
- * @param {object|null} craftability A per-set `evaluateCraftability` result.
- * @returns {{ token: string, tone: string, icon: string, count: number }}
- */
+// A null or absent craftability is blocked: nothing is known to be satisfiable.
 export function ingredientOptionStatus(craftability) {
   if (craftability?.canCraft === true) return CRAFTABLE;
   if (hasMissingTool(craftability)) return BLOCKED;
   const count =
     unsatisfiedCount(craftability?.ingredientStates) +
     unsatisfiedCount(craftability?.essenceStates);
-  // Nothing specifically short and no missing tool (incl. a null/unknown
-  // craftability) — treat as a hard block rather than surfacing "Missing 0".
+  // Nothing short and no missing tool: a hard block, rather than surfacing "Missing 0".
   if (count === 0) return BLOCKED;
   return { token: 'missing', tone: 'warning', icon: 'fa-solid fa-triangle-exclamation', count };
 }

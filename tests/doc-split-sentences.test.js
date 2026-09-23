@@ -1,28 +1,7 @@
 /**
- * NO RULE SENTENCE IS LOST WHEN THE HARNESS DOCUMENTS ARE SPLIT (issue #1661, phases 3-5).
- *
- * `AGENTS.md`, `CLAUDE.md` and `CONTRIBUTING.md` are being split into a short rulebook plus
- * reference files loaded on demand, across several PRs. The issue's acceptance for that was "a
- * diff review confirms no rule sentence was lost". A human diff review of an 1,100-line move is
- * exactly where a lost sentence hides, so this is the mechanical replacement, and it lands BEFORE
- * any text moves — a gate added after the move it was meant to guard has nothing left to guard.
- *
- * HOW IT WORKS. `tests/fixtures/doc-split/*.pre-split.md` are byte copies of the three documents
- * as they stood before any split. Every rule-bearing line of those is asserted to survive, the
- * same number of times, somewhere in the post-split set — which is enumerated by explicit path in
- * `DESTINATIONS` below, never by directory glob, so adding a file cannot silently satisfy this.
- *
- * WHY A MULTISET AND NOT A SET. If a rule appears twice in the old documents and once in the new,
- * a set comparison is satisfied while one of the two places that stated it has stopped stating it.
- * The issue's own verification allowed for "minus duplicated paragraphs", which is a loophole
- * wide enough to lose a rule through: a deliberate de-duplication must name the surviving location
- * and is checked against it, and the allowlist's length is pinned so it cannot quietly grow.
- *
- * WHILE NOTHING HAS MOVED YET this passes trivially — `DESTINATIONS` is the same three files. That
- * is the correct state for a gate armed ahead of the work, and it is also the state in which a
- * broken checker is invisible. So the falsification below is not decoration: it drives the real
- * comparator against deletion, reordering and REWORDING, the last being the edit a reviewer cannot
- * catch by eye and the one a laxer normalisation would wave through.
+ * NO RULE SENTENCE IS LOST WHEN THE HARNESS DOCUMENTS ARE SPLIT (issue #1661, phases 3-5). HOW IT
+ * WORKS. `tests/fixtures/doc-split/*.pre-split.md` are byte copies of the three documents as they
+ * stood before any split.
  */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
@@ -37,6 +16,7 @@ import {
   withoutCounts,
   withoutLinkTargets,
 } from '../scripts/lib/docSentences.js';
+import { TOTALS_DOCUMENT, totalsRegion } from '../scripts/view-lab-registry-totals.mjs';
 
 const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURES = 'tests/fixtures/doc-split';
@@ -49,14 +29,7 @@ const SOURCES = [
   { fixture: `${FIXTURES}/CONTRIBUTING.pre-split.md`, floor: 900 },
 ];
 
-/**
- * Every file a sentence is allowed to have moved INTO, by explicit path.
- *
- * NOT A GLOB, and that is the load-bearing part. A directory glob would let a stray file — a
- * scratch note, an unrelated document that happens to quote a rule — satisfy the assertion, so a
- * sentence could read as surviving in a file nothing else knows about. Phases 3-5 add their
- * destinations here, which is a visible edit in the PR that moves the text.
- */
+/** Every file a sentence is allowed to have moved INTO, by explicit path. */
 const DESTINATIONS = [
   'AGENTS.md',
   'CLAUDE.md',
@@ -70,30 +43,15 @@ const DESTINATIONS = [
 ];
 
 /**
- * Sentences deliberately dropped, each naming the location that still carries them.
- *
- * The one admissible reason is de-duplication: the same rule stated twice, now stated once. A bare
- * "this was a duplicate" is not admissible — the entry names where it survives, and the assertion
- * below checks that file actually contains it. Same shape as ALLOW_MISSING in
- * `scripts/validate-agent-bindings.mjs`, where every exception carries a reason that is checkable.
- *
- * Empty, because nothing has moved yet. It is pinned at its length so that an entry cannot be
- * appended as the cheap way to green a real loss.
+ * Sentences deliberately dropped, each naming the location that still carries them. Empty, because
+ * nothing has moved yet.
  */
 const DEDUPLICATED = [];
 
 /** Pinned exactly, not as a ceiling: a ceiling banks a free slot on every entry that is retired. */
 const DEDUPLICATED_COUNT = 0;
 
-/**
- * Sentences a move forced to change, where the only change is a link TARGET.
- *
- * When a heading moves to another file, the in-file `(#anchor)` links pointing at it have to
- * become `(path/to.md#anchor)`. That is a changed sentence and the subset assertion reports it,
- * which is correct — so the allowance is made here, and made narrowly: the test asserts that
- * stripping link targets from both makes them the same string. A retarget is admissible; a
- * reworded rule wearing a retarget's clothes is not.
- */
+/** Sentences a move forced to change, where the only change is a link TARGET. */
 const RETARGETED = [
   {
     before: 'See [Manager confirm-discard guard](#manager-confirm-discard-guard).',
@@ -105,36 +63,278 @@ const RETARGETED = [
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
 const RETARGETED_COUNT = 1;
 
-/**
- * Sentences that state a View Lab registry case count, where the only change is that NUMBER.
- *
- * `scripts/lib/viewLabCases.js` grows independently of the AGENTS.md/CLAUDE.md/CONTRIBUTING.md
- * split, and these frozen sentences state the registry size directly, so a case-count PR changes
- * them for a reason that has nothing to do with a move. RETARGETED's shape — pin the literal
- * replacement text — does not fit here: the count keeps changing (it is already 463, and TP14-F
- * raises it again to 479), so a pinned `after` string would need editing on every registry change,
- * which is the churn this allowance exists to avoid.
- *
- * So each entry is the frozen `before` sentence only, and the proof is narrower instead of the
- * replacement being narrower: `withoutCounts` (digits replaced with a placeholder) must match
- * EXACTLY ONE surviving sentence, and the frozen text itself must no longer be present. Every
- * character that is not part of a digit run must still match exactly, so a reworded rule cannot
- * hide behind a coincidental digit change.
- */
+/** Sentences that state a View Lab registry case count, where the only change is that NUMBER. */
 const RENUMBERED = [
-  'As of this writing the registry holds 379 cases: 148 `exact`, 8 `window`, 223 `beyond`.',
-  'By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other ' +
-    'file the lab depends on selects **surface coverage**: one frame of every route and tab the ' +
-    'lab renders — every manager route, every player tab, one per single-screen canvas window, ' +
-    'plus the light-theme pair — which is 48 of the 379 publishable cases.',
-  'For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`) — which is the ' +
-    'normal case, at 379 cases across five windows — the **View Lab** is the producer, and it is ' +
-    'what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every ' +
-    'case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.',
+  // Issue #1692 moved the walk into scripts/foundry-smoke/, leaving the runner at ~230 lines.
+  'The main harness is `scripts/foundry-test-run.mjs` (~3700 lines).',
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT and RETARGETED_COUNT. */
-const RENUMBERED_COUNT = 3;
+const RENUMBERED_COUNT = 1;
+
+/** The region the retired View Lab counts are generated into, read from the writer that owns it. */
+const TOTALS_REGION_LINES = totalsRegion().split('\n');
+const TOTALS_DELIMITERS = [TOTALS_REGION_LINES[0], TOTALS_REGION_LINES.at(-1)];
+
+/**
+ * Sentences a count LEFT rather than changed (issue #1937). A RENUMBERED entry keeps its number and
+ * must be re-edited whenever the registry grows; these stopped quoting one, so `removed` names the
+ * clause deleted from `before`, and `after` is `null` when the whole sentence was retired into the
+ * generated region `derivedIn` carries.
+ */
+const DECOUNTED = [
+  {
+    before:
+      'For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`) — which is the normal case, at 379 cases across five windows — the **View Lab** is the producer, and it is what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.',
+    after:
+      'For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`) — which is the normal case — the **View Lab** is the producer, and it is what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.',
+    removed: ', at 379 cases across five windows',
+    derivedIn: TOTALS_DOCUMENT,
+  },
+  {
+    before:
+      "Selection is targeted, and no single changed file selects the whole registry: a render file selects the cases whose `sourceMatches` claim it, a broad shared primitive or stylesheet selects a small representative set, and a change to one of the lab's OWN inputs (fixture world, capture driver, registry shared code) selects **surface coverage** — one frame of every route and tab the lab renders, 48 cases — rather than every state of every screen.",
+    after:
+      "Selection is targeted, and no single changed file selects the whole registry: a render file selects the cases whose `sourceMatches` claim it, a broad shared primitive or stylesheet selects a small representative set, and a change to one of the lab's OWN inputs (fixture world, capture driver, registry shared code) selects **surface coverage** — one frame of every route and tab the lab renders — rather than every state of every screen.",
+    removed: ', 48 cases',
+    derivedIn: TOTALS_DOCUMENT,
+  },
+  {
+    before:
+      'As of this writing the registry holds 379 cases: 148 `exact`, 8 `window`, 223 `beyond`.',
+    after: null,
+    removed:
+      'As of this writing the registry holds 379 cases: 148 `exact`, 8 `window`, 223 `beyond`.',
+    derivedIn: TOTALS_DOCUMENT,
+  },
+  {
+    before:
+      'By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, one per single-screen canvas window, plus the light-theme pair — which is 48 of the 379 publishable cases.',
+    after:
+      'By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, one per single-screen canvas window, plus the light-theme pair.',
+    removed: ' — which is 48 of the 379 publishable cases',
+    derivedIn: TOTALS_DOCUMENT,
+  },
+];
+
+/** Pinned for the same reason as DEDUPLICATED_COUNT. */
+const DECOUNTED_COUNT = 4;
+
+/**
+ * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue
+ * #1761).
+ */
+const RENAMED = [
+  {
+    before:
+      'The tester feed lives at an unguessable path: `testers/<group>/<segment>/<moduleId>/…`, ' +
+      'where `<segment>` comes from a per-channel repository **secret** (`S3_TESTER_PATH_SECRET` ' +
+      'for beta, a separate `S3_EARLY_ACCESS_PATH_SECRET` for early access, referred to abstractly ' +
+      'here — never paste the value) — never the committed config.',
+    after:
+      'The tester feed lives at an unguessable path: `testers/<group>/<segment>/<moduleId>/…`, ' +
+      'where `<segment>` comes from a per-channel repository **secret** (`S3_TESTER_PATH_SECRET` ' +
+      'for beta, a separate `S3_GUILD_ARTISAN_PATH_SECRET` for early access, referred to abstractly ' +
+      'here — never paste the value) — never the committed config.',
+    identifiers: [['S3_GUILD_ARTISAN_PATH_SECRET', 'S3_EARLY_ACCESS_PATH_SECRET']],
+  },
+  {
+    before:
+      "Cite code by symbol name and file path only — for example `_playerListingFields` in `src/systems/GatheringListingBuilder.js`, locatable with `grep -n` — never by line number; `npm run validate:agents` rejects `file.js:NNN`-style citations because they rot silently as code moves.",
+    after:
+      "Cite code by symbol name and file path only — for example `_playerListingFields` in `src/ui/presenters/GatheringListingBuilder.js`, locatable with `grep -n` — never by line number; `npm run validate:agents` rejects `file.js:NNN`-style citations because they rot silently as code moves.",
+    identifiers: [['src/ui/presenters/GatheringListingBuilder.js', 'src/systems/GatheringListingBuilder.js']],
+  },
+  {
+    before:
+      "**Player listing counts are a separate, engine-owned surface.** The player-facing listing is produced by `GatheringEngine.listForActor` — a thin delegator to the engine's injected `GatheringListingBuilder` collaborator, whose `_buildEnvironmentListing` in `src/systems/GatheringListingBuilder.js` does the construction — not the admin store.",
+    after:
+      "**Player listing counts are a separate, engine-owned surface.** The player-facing listing is produced by `GatheringEngine.listForActor` — a thin delegator to the engine's injected `GatheringListingBuilder` collaborator, whose `_buildEnvironmentListing` in `src/ui/presenters/GatheringListingBuilder.js` does the construction — not the admin store.",
+    identifiers: [['src/ui/presenters/GatheringListingBuilder.js', 'src/systems/GatheringListingBuilder.js']],
+  },
+  // Issue #1674 moved the world Item projection out of the manager shell into its services module.
+  {
+    before:
+      '`getWorldItemOptions` in `src/ui/SvelteCraftingSystemManagerApp.svelte.js` is `Array.from(game.items.contents)`, the world Item collection alone, and a `Compendium.` address is never in it.',
+    after:
+      '`getWorldItemOptions` in `src/ui/managerServices.js` is `Array.from(game.items.contents)`, the world Item collection alone, and a `Compendium.` address is never in it.',
+    identifiers: [['src/ui/managerServices.js', 'src/ui/SvelteCraftingSystemManagerApp.svelte.js']],
+  },
+  // Issue #1671 moved the cases into one file per surface, so these three sentences name the directory.
+  {
+    before: 'Cases live in `scripts/lib/viewLabCases.js`.',
+    after: 'Cases live in `scripts/lib/view-lab-cases/`.',
+    identifiers: [['scripts/lib/view-lab-cases/', 'scripts/lib/viewLabCases.js']],
+  },
+  {
+    before:
+      'A patch to `scripts/lib/viewLabCases.js` selects only the case literals its hunks fall inside.',
+    after:
+      'A patch to `scripts/lib/view-lab-cases/` selects only the case literals its hunks fall inside.',
+    identifiers: [['scripts/lib/view-lab-cases/', 'scripts/lib/viewLabCases.js']],
+  },
+  {
+    before:
+      "**Adding a new editor kind:** (1) add a `confirmDiscardDirty{Kind}Draft()` helper in `adminStore.js` using the shared `_confirmDiscardDirtyDraft` factory; (2) export it on the store API; (3) add a `confirm{Kind}RouteExit(nextView)` function in `CraftingSystemManagerRoot.svelte` and chain it through `confirmRouteExit`; (4) wire the editor's Back / Cancel button to a handler that runs `afterTruthyResult(confirmRouteExit(nextView), () => { activeView = ... })` — never call `store.cancel{Kind}Draft?.()` directly, that bypasses the prompt; (5) add a stub for the new helper to the `confirmDiscardDirty{Kind}Draft` stub block in the store fixture of `tests/components/manager-mounted.test.js` (locate it with `grep -n confirmDiscardDirty`).",
+    after:
+      "**Adding a new editor kind:** (1) add a `confirmDiscardDirty{Kind}Draft()` helper in `adminStore.js` using the shared `_confirmDiscardDirtyDraft` factory; (2) export it on the store API; (3) add a `confirm{Kind}RouteExit(nextView)` function in `CraftingSystemManagerRoot.svelte` and chain it through `confirmRouteExit`; (4) wire the editor's Back / Cancel button to a handler that runs `afterTruthyResult(confirmRouteExit(nextView), () => { activeView = ... })` — never call `store.cancel{Kind}Draft?.()` directly, that bypasses the prompt; (5) add a stub for the new helper to the `confirmDiscardDirty{Kind}Draft` stub block in the store fixture of `tests/helpers/manager/managerStoreFake.js` (locate it with `grep -n confirmDiscardDirty`).",
+    identifiers: [['tests/helpers/manager/managerStoreFake.js', 'tests/components/manager-mounted.test.js']],
+  },
+  // Issue #1692 moved the smoke walk out of the runner, so these four sentences name its new home.
+  {
+    before:
+      '**Workflow rule:** Whenever editing manager UI markup (env browser row, env-edit view, CompositionList, header actions, Travel tabs, etc.), grep `scripts/foundry-test-run.mjs` for the changed classes / text BEFORE declaring the change done.',
+    after:
+      '**Workflow rule:** Whenever editing manager UI markup (env browser row, env-edit view, CompositionList, header actions, Travel tabs, etc.), grep `scripts/foundry-smoke/` for the changed classes / text BEFORE declaring the change done.',
+    identifiers: [['scripts/foundry-smoke/', 'scripts/foundry-test-run.mjs']],
+  },
+  {
+    before:
+      '`exerciseManagerEnvironmentPointerTargets` in `scripts/foundry-test-run.mjs` and the env-edit checks in the same file pin many selectors by class, child index (`.nth(N)`), and visible button text.',
+    after:
+      '`exerciseManagerEnvironmentPointerTargets` in `scripts/foundry-smoke/pageOps/pageLifecycle.mjs` and the env-edit checks in the same file pin many selectors by class, child index (`.nth(N)`), and visible button text.',
+    identifiers: [['scripts/foundry-smoke/pageOps/pageLifecycle.mjs', 'scripts/foundry-test-run.mjs']],
+  },
+  {
+    before:
+      'The smoke harness Phase D0 (`screenshot-manager` step in `scripts/foundry-test-run.mjs`) pins many selectors by class, `.nth(N)` index, and visible button text.',
+    after:
+      'The smoke harness Phase D0 (`screenshot-manager` step in `scripts/foundry-smoke/scenarios/`) pins many selectors by class, `.nth(N)` index, and visible button text.',
+    identifiers: [['scripts/foundry-smoke/scenarios/', 'scripts/foundry-test-run.mjs']],
+  },
+  {
+    before:
+      'The evidence must DEMONSTRATE the change, not merely clear the gate: at least one published frame must show the changed state itself, and when that state is not reachable by the existing capture walk in `scripts/foundry-test-run.mjs` or by a registry case, the branch adds one that reaches it rather than publishing an unrelated frame.',
+    after:
+      'The evidence must DEMONSTRATE the change, not merely clear the gate: at least one published frame must show the changed state itself, and when that state is not reachable by the existing capture walk in `scripts/foundry-smoke/scenarios/` or by a registry case, the branch adds one that reaches it rather than publishing an unrelated frame.',
+    identifiers: [['scripts/foundry-smoke/scenarios/', 'scripts/foundry-test-run.mjs']],
+  },
+
+  // Issue 1715 moved the module entry's Foundry edge into `src/bootstrap/`; each of these eleven
+  // sentences cites one code anchor that moved with it. The migration-gate entry renames a symbol
+  // and its file together, which is one anchor rather than two.
+  {
+    before:
+      "`_resolveCraftingActor` / `_resolveCraftingSources` (`src/main.js`) are the whole gate, which is exactly why every player-facing facade (`craftRecipe`, `salvageComponent`, `listInventoryForActor`, the alchemy pair) takes an **`actorId`** and resolves it, and **never accepts an actor uuid**.",
+    after:
+      "`_resolveCraftingActor` / `_resolveCraftingSources` (`src/bootstrap/craftingFacade.js`) are the whole gate, which is exactly why every player-facing facade (`craftRecipe`, `salvageComponent`, `listInventoryForActor`, the alchemy pair) takes an **`actorId`** and resolves it, and **never accepts an actor uuid**.",
+    identifiers: [["src/bootstrap/craftingFacade.js", "src/main.js"]],
+  },
+  {
+    before:
+      "`applyComplicationDelivery` (`src/main.js`) is the correct pattern; the blind-run gather relay carried the defect and #1288 removed it — `isGatheringActorSelectableByUser` (`src/config/preferencesCleanup.js`) now reads the passed user only, and denies rather than throwing on a nullish user (`Document#testUserPermission` reads `user.isGM` as its first statement) or slipping through on a user-id STRING (`getUserLevel` reads `user.id`, so a string falls through to `ownership.default`).",
+    after:
+      "`applyComplicationDelivery` (`src/bootstrap/socketRouter.js`) is the correct pattern; the blind-run gather relay carried the defect and #1288 removed it — `isGatheringActorSelectableByUser` (`src/config/preferencesCleanup.js`) now reads the passed user only, and denies rather than throwing on a nullish user (`Document#testUserPermission` reads `user.isGM` as its first statement) or slipping through on a user-id STRING (`getUserLevel` reads `user.id`, so a string falls through to `ownership.default`).",
+    identifiers: [["src/bootstrap/socketRouter.js", "src/main.js"]],
+  },
+  {
+    before:
+      "**The player salvage order key is derived INDEPENDENTLY at two sites, and they must produce the identical string or the captured order silently reads empty.** The inventory store WRITES the order under `progressiveOrderKey({ scope: 'salvage', id })` (via `salvageOrderId` in `inventoryStore.svelte.js`), and `CraftingEngine.salvage` READS it back through the injected `getPlayerResultOrder` (wired to `_readPlayerResultOrder` in `src/main.js`) at capture time — two separate derivations of the same key.",
+    after:
+      "**The player salvage order key is derived INDEPENDENTLY at two sites, and they must produce the identical string or the captured order silently reads empty.** The inventory store WRITES the order under `progressiveOrderKey({ scope: 'salvage', id })` (via `salvageOrderId` in `inventoryStore.svelte.js`), and `CraftingEngine.salvage` READS it back through the injected `getPlayerResultOrder` (wired to `_readPlayerResultOrder` in `src/bootstrap/composeServices.js`) at capture time — two separate derivations of the same key.",
+    identifiers: [["src/bootstrap/composeServices.js", "src/main.js"]],
+  },
+  {
+    before:
+      "Both hooks fire synchronously, inside the still-`await`ed `game.settings.set`: `ClientSettings#set` → `#setWorld` → `Setting#update`/`create` → `ClientDatabaseBackend#_handleUpdateDocuments` (or `#_handleCreateDocuments` on the first write) calls `Hooks.callAll('updateSetting', …)` / `Hooks.callAll('createSetting', …)` before the write's promise resolves (`client/data/client-backend.mjs`, identical on 13.351 and 14.367), which is why `src/main.js` registers one handler on both hooks rather than choosing between them.",
+    after:
+      "Both hooks fire synchronously, inside the still-`await`ed `game.settings.set`: `ClientSettings#set` → `#setWorld` → `Setting#update`/`create` → `ClientDatabaseBackend#_handleUpdateDocuments` (or `#_handleCreateDocuments` on the first write) calls `Hooks.callAll('updateSetting', …)` / `Hooks.callAll('createSetting', …)` before the write's promise resolves (`client/data/client-backend.mjs`, identical on 13.351 and 14.367), which is why `src/bootstrap/hooks.js` registers one handler on both hooks rather than choosing between them.",
+    identifiers: [["src/bootstrap/hooks.js", "src/main.js"]],
+  },
+  {
+    before:
+      "`SalvageRunManager.processWorldTime` and `CraftingRunManager.processWorldTime` were the unguarded case (#656, fixed): both now take an injected `isPrimaryGM` collaborator, defaulting fail-open to `() => true` so unit fixtures still resume, with the real `activeGM` check wired at construction in `src/main.js`.",
+    after:
+      "`SalvageRunManager.processWorldTime` and `CraftingRunManager.processWorldTime` were the unguarded case (#656, fixed): both now take an injected `isPrimaryGM` collaborator, defaulting fail-open to `() => true` so unit fixtures still resume, with the real `activeGM` check wired at construction in `src/bootstrap/composeServices.js`.",
+    identifiers: [["src/bootstrap/composeServices.js", "src/main.js"]],
+  },
+  {
+    before:
+      "**Membership is an explicit allowlist, so READ it — never infer it from a module's kind or its name.** That incident does **not** generalize to \"builders are in the harness graph\": its sibling `InventoryListingBuilder` is copied by **no** harness (its only importer is `src/main.js`), so the hazard does not apply to it at all — issue 675's delta inherited the opposite belief from this note and planned around a constraint that did not bind.",
+    after:
+      "**Membership is an explicit allowlist, so READ it — never infer it from a module's kind or its name.** That incident does **not** generalize to \"builders are in the harness graph\": its sibling `InventoryListingBuilder` is copied by **no** harness (its only importer is `src/bootstrap/craftingFacade.js`), so the hazard does not apply to it at all — issue 675's delta inherited the opposite belief from this note and planned around a constraint that did not bind.",
+    identifiers: [["src/bootstrap/craftingFacade.js", "src/main.js"]],
+  },
+  {
+    before:
+      "`createJournalCommandsForFabricate` in `src/main.js` therefore emits `options ?? {}`; targeted replies supply `{ recipients: [senderId] }` rather than relying on a recipient field inside a broadcast payload.",
+    after:
+      "`createJournalCommandsForFabricate` in `src/bootstrap/journalOperations.js` therefore emits `options ?? {}`; targeted replies supply `{ recipients: [senderId] }` rather than relying on a recipient field inside a broadcast payload.",
+    identifiers: [["src/bootstrap/journalOperations.js", "src/main.js"]],
+  },
+  {
+    before:
+      "Initial crafting check descriptors are redacted in `createCraftingJournalOperations` in `src/main.js` before transport, independently of the post-commit roll-handoff entitlement check.",
+    after:
+      "Initial crafting check descriptors are redacted in `createCraftingJournalOperations` in `src/bootstrap/journalOperations.js` before transport, independently of the post-commit roll-handoff entitlement check.",
+    identifiers: [["src/bootstrap/journalOperations.js", "src/main.js"]],
+  },
+  {
+    before:
+      "The service stays Foundry-free and unit-testable: the `senseSceneRegions` collaborator (`(travelActorUuid) => Iterable<sceneRegionUuid>`) is injected (default `() => []`); the real implementation is wired in `src/main.js`.",
+    after:
+      "The service stays Foundry-free and unit-testable: the `senseSceneRegions` collaborator (`(travelActorUuid) => Iterable<sceneRegionUuid>`) is injected (default `() => []`); the real implementation is wired in `src/bootstrap/composeServices.js`.",
+    identifiers: [["src/bootstrap/composeServices.js", "src/main.js"]],
+  },
+  {
+    before:
+      "Key files: `GatheringLocationService.js`, `src/main.js` (`senseSceneRegions` injection), `src/canvas/regionHitTest.js`, `foundryBridge.js`, `adminStore.js`, `GatheringView.svelte` / `src/ui/SvelteFabricateApp.svelte.js`.",
+    after:
+      "Key files: `GatheringLocationService.js`, `src/bootstrap/composeServices.js` (`senseSceneRegions` injection), `src/canvas/regionHitTest.js`, `foundryBridge.js`, `adminStore.js`, `GatheringView.svelte` / `src/ui/SvelteFabricateApp.svelte.js`.",
+    identifiers: [["src/bootstrap/composeServices.js", "src/main.js"]],
+  },
+  {
+    before:
+      "The gate is `_runMigrations` in `src/main.js`, which early-returns unless `game.users?.activeGM?.id === game.user?.id`, so exactly one client runs the pass and no player or assistant races the setting writes.",
+    after:
+      "The gate is `runMigrations` in `src/bootstrap/migrations.js`, which early-returns unless `game.users?.activeGM?.id === game.user?.id`, so exactly one client runs the pass and no player or assistant races the setting writes.",
+    identifiers: [["`runMigrations` in `src/bootstrap/migrations.js`", "`_runMigrations` in `src/main.js`"]],
+  },
+  // Four cites written as a bare `main.js` rather than `src/main.js`, repointed with the rest.
+  {
+    before:
+      "The gate applies to actor `setFlag` / `_persist` broadcast document writes too, not only `craft()` / award side effects — `SalvageRunManager.processWorldTime` and `CraftingRunManager.processWorldTime` resume matured timed runs and persist a broadcast `setFlag`, so both carry the `isPrimaryGM` seam wired in `main.js` (issue 656).",
+    after:
+      "The gate applies to actor `setFlag` / `_persist` broadcast document writes too, not only `craft()` / award side effects — `SalvageRunManager.processWorldTime` and `CraftingRunManager.processWorldTime` resume matured timed runs and persist a broadcast `setFlag`, so both carry the `isPrimaryGM` seam wired in `src/bootstrap/composeServices.js` (issue 656).",
+    identifiers: [["`src/bootstrap/composeServices.js`", "`main.js`"]],
+  },
+  {
+    before:
+      "See `buildCompendiumImportContextOption` (`src/ui/compendiumDirectoryContext.js`) and its `main.js` wiring.",
+    after:
+      "See `buildCompendiumImportContextOption` (`src/ui/compendiumDirectoryContext.js`) and its `src/bootstrap/hooks.js` wiring.",
+    identifiers: [["`src/bootstrap/hooks.js`", "`main.js`"]],
+  },
+  {
+    before:
+      "**The player-path ownership gate lives in the `main.js` FACADE, not in `CraftingEngine`.** `CraftingEngine.craft` / `salvage` contain **no ownership check at all** — they resolve the actor uuid they are handed and mutate that actor's Items directly.",
+    after:
+      "**The player-path ownership gate lives in the `src/bootstrap/craftingFacade.js` facade, not in `CraftingEngine`.** `CraftingEngine.craft` / `salvage` contain **no ownership check at all** — they resolve the actor uuid they are handed and mutate that actor's Items directly.",
+    identifiers: [["`src/bootstrap/craftingFacade.js` facade", "`main.js` FACADE"]],
+  },
+  {
+    before:
+      "The interactable socket layer does this: `handleInteractableSocketMessage` (`src/canvas/interactableSocketBridge.js`) takes `{ senderId, isSenderGM }` from `main.js` and gates the visual write/delete edges (GM-only), the behaviour-update edge (non-GM restricted to `system.node`), and activation (requester must be the sender) — see issue 593.",
+    after:
+      "The interactable socket layer does this: `handleInteractableSocketMessage` (`src/canvas/interactableSocketBridge.js`) takes `{ senderId, isSenderGM }` from `src/bootstrap/socketRouter.js` and gates the visual write/delete edges (GM-only), the behaviour-update edge (non-GM restricted to `system.node`), and activation (requester must be the sender) — see issue 593.",
+    identifiers: [["`src/bootstrap/socketRouter.js`", "`main.js`"]],
+  },
+  {
+    before:
+      "See `forgetLearnedRecipes` (`src/systems/RecipeVisibilityService.js`) and `deleteRemovedActiveRunFlags` (`src/config/flags.js`) for the worked precedents; the party pool instead lives in a world setting, so its `decrement` re-`set`s the whole map with no `-=` key.",
+    after:
+      "See `forgetLearnedRecipes` (`src/systems/RecipeVisibilityService.js`) and `writeAcknowledgedRunContainer` (`src/systems/runHistoryEvidence.js`) for the worked precedents; the party pool instead lives in a world setting, so its `decrement` re-`set`s the whole map with no `-=` key.",
+    identifiers: [
+      [
+        '`writeAcknowledgedRunContainer` (`src/systems/runHistoryEvidence.js`)',
+        '`deleteRemovedActiveRunFlags` (`src/config/flags.js`)',
+      ],
+    ],
+  },
+];
+
+/** Pinned for the same reason as DEDUPLICATED_COUNT. */
+const RENAMED_COUNT = 27;
 
 /** Every sentence of the post-split set, as one multiset. */
 function survivingSentences() {
@@ -149,8 +349,7 @@ function survivingSentences() {
 
 test('the frozen fixtures are the documents they claim to be', () => {
   // A checker fed an empty or unreadable OLD passes trivially, which is the commonest way a
-  // migration gate is green on arrival. Each fixture is floored at a count derived from the real
-  // document, so a truncated or emptied one fails here rather than everywhere else silently.
+  // migration gate is green on arrival.
   for (const { fixture, floor } of SOURCES) {
     const absolute = path.join(REPOSITORY_ROOT, fixture);
     assert.ok(existsSync(absolute), `${fixture} is missing; it is the only record of the old text`);
@@ -170,7 +369,9 @@ test('every sentence of the pre-split documents still exists somewhere', () => {
   const allowed = new Set([
     ...DEDUPLICATED.map(({ sentence }) => sentence),
     ...RETARGETED.map(({ before }) => before),
+    ...RENAMED.map(({ before }) => before),
     ...RENUMBERED,
+    ...DECOUNTED.map(({ before }) => before),
   ]);
   const lost = missingSentences(before, after).filter(({ sentence }) => !allowed.has(sentence));
 
@@ -181,7 +382,9 @@ test('every sentence of the pre-split documents still exists somewhere', () => {
       'DESTINATIONS names. Move them, or — if one is a genuine duplicate that now lives in one ' +
       'place — add it to DEDUPLICATED with the file that still carries it, and raise ' +
       'DEDUPLICATED_COUNT in the same commit. If only a registry case count changed, add it to ' +
-      'RENUMBERED and raise RENUMBERED_COUNT instead.'
+      'RENUMBERED and raise RENUMBERED_COUNT instead; if a count clause LEFT the sentence because ' +
+      'the number is generated now, DECOUNTED and DECOUNTED_COUNT; if only a renamed identifier ' +
+      'changed, RENAMED and RENAMED_COUNT.'
   );
 });
 
@@ -222,9 +425,7 @@ test('every retarget claim really is a retarget and nothing more', () => {
       (surviving.get(after) ?? 0) > 0,
       `RETARGETED claims this replaced a sentence and it is in no destination:\n  ${after}`
     );
-    // 2. THE ONLY DIFFERENCE MAY BE THE LINK TARGET. Without this the allowlist is a hole big
-    //    enough to rewrite a rule through, which is the exact loophole this whole file exists to
-    //    close on the deduplication side.
+    // 2. THE ONLY DIFFERENCE MAY BE THE LINK TARGET.
     assert.equal(
       withoutLinkTargets(after),
       withoutLinkTargets(before),
@@ -255,9 +456,7 @@ test('every renumbering claim really is a renumbering and nothing more', () => {
       0,
       `RENUMBERED still lists this sentence, which is present after all — remove the entry:\n  ${sentence}`
     );
-    // 2. Exactly one surviving sentence may match once digits are ignored. Zero means the count
-    //    changed into a sentence that also changed some other word; more than one means the digit
-    //    normalisation is too coarse to say which surviving sentence replaced this one.
+    // 2. Exactly one surviving sentence may match once digits are ignored.
     const target = withoutCounts(sentence);
     const matches = [...surviving.keys()].filter((candidate) => withoutCounts(candidate) === target);
     assert.equal(
@@ -269,10 +468,92 @@ test('every renumbering claim really is a renumbering and nothing more', () => {
   }
 });
 
+test('every decount claim really is a decount and nothing more', () => {
+  assert.equal(
+    DECOUNTED.length,
+    DECOUNTED_COUNT,
+    'the decount allowlist changed size. Each entry excuses one sentence from the subset ' +
+      'assertion, so growing it needs its own justification in review.'
+  );
+
+  const surviving = survivingSentences();
+  for (const { before, after, removed, derivedIn } of DECOUNTED) {
+    // 1. A clause with no number in it is an ordinary deletion wearing a decount's name.
+    assert.ok(/\d/u.test(removed), `DECOUNTED names a clause that states no count:\n  ${removed}`);
+    // 2. It must not be stale: an entry whose `before` still exists excuses nothing.
+    assert.equal(
+      surviving.get(before) ?? 0,
+      0,
+      `DECOUNTED still lists this sentence, which is present after all — remove the entry:\n  ${before}`
+    );
+    // 3. The count must still be somewhere, which is the region that generates it.
+    assert.ok(
+      DESTINATIONS.includes(derivedIn),
+      `${derivedIn} is not in DESTINATIONS, so nothing checks it`
+    );
+    const derived = readFileSync(path.join(REPOSITORY_ROOT, derivedIn), 'utf8');
+    for (const delimiter of TOTALS_DELIMITERS) {
+      assert.ok(
+        derived.includes(delimiter),
+        `DECOUNTED derives this count in ${derivedIn}, which has no ${delimiter}`
+      );
+    }
+    // 4. A retired sentence is done here; otherwise ONLY the named clause may have gone.
+    if (after === null) continue;
+    assert.equal(
+      before.replace(removed, '').replaceAll(/\s+/gu, ' ').trim(),
+      after,
+      'a DECOUNTED entry changed more than the clause it names, so it is a rewrite'
+    );
+    assert.ok(
+      (surviving.get(after) ?? 0) > 0,
+      `DECOUNTED claims this replaced a sentence and it is in no destination:\n  ${after}`
+    );
+  }
+});
+
+test('every rename claim really is a rename and nothing more', () => {
+  assert.equal(
+    RENAMED.length,
+    RENAMED_COUNT,
+    'the rename allowlist changed size. Each entry excuses one sentence from the subset ' +
+      'assertion, so growing it needs its own justification in review.'
+  );
+
+  const surviving = survivingSentences();
+  for (const { before, after, identifiers } of RENAMED) {
+    // 1. The replacement must actually be somewhere, or the sentence is simply gone.
+    assert.ok(
+      (surviving.get(after) ?? 0) > 0,
+      `RENAMED claims this replaced a sentence and it is in no destination:
+  ${after}`
+    );
+    // 2. It must not be stale: an entry whose `before` still exists excuses nothing.
+    assert.equal(
+      surviving.get(before) ?? 0,
+      0,
+      `RENAMED still lists this sentence, which is present after all — remove the entry:
+  ${before}`
+    );
+    // 3. The only difference may be the one named identifier, and the substitution must really
+    //    fire: a pair matching nothing would leave the equality below comparing a sentence to
+    //    itself, and five pairs under one entry would excuse a rewrite as a rename.
+    assert.equal(identifiers.length, 1, `RENAMED entry names ${identifiers.length} pairs, not one`);
+    let restored = after;
+    for (const [renamed, original] of identifiers) {
+      assert.ok(restored.includes(renamed), `RENAMED entry does not contain ${renamed}`);
+      restored = restored.replaceAll(renamed, original);
+    }
+    assert.equal(
+      restored,
+      before,
+      'a RENAMED entry changed more than the identifiers it names, so it is a rewrite'
+    );
+  }
+});
+
 test('the comparator catches deletion, reordering and rewording', () => {
-  // A gate that has only ever been watched to report nothing is not known to work. Each case below
-  // is a way the split can actually go wrong, and the third is the one a laxer normaliser — one
-  // that folded case or stripped punctuation "to be forgiving" — would wave through.
+  // A gate that has only ever been watched to report nothing is not known to work.
   const original = ['Never import them directly.', 'Read the token through `.document`.', 'Do not conflate the two.'];
   const before = multiset(original);
 

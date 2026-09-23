@@ -65,9 +65,7 @@ describe('System overview deep-link drift guard', () => {
       [...table.matchAll(/(\w+):\s*\{\s*view:\s*'([\w-]+)'/g)].map((match) => [match[1], match[2]])
     );
 
-    // Every non-`system` kind must be deep-linkable, and its target view must be
-    // a real root view token. (`system` is the overview itself, so it has no
-    // deep link.)
+    // Every non-`system` kind must be deep-linkable.
     for (const kind of AGGREGATOR_KINDS) {
       if (kind === 'system') {
         assert.equal(mapped.has(kind), false, 'the system kind must not carry a deep link');
@@ -112,11 +110,7 @@ describe('System overview deep-link drift guard', () => {
     );
   });
 
-  // Regression guard for the UX defect: task/event issues carry the task/event
-  // RECORD id as `entityId`, but the environment editor selects by ENVIRONMENT
-  // id. The aggregator must therefore carry `environmentId`, and the root's
-  // environment/task/event deep-links must resolve through it — otherwise the
-  // "Open gathering task/event" buttons silently no-op.
+  // Regression guard for the UX defect.
   it('carries environmentId for environment-derived issues so the deep-link resolves', () => {
     // The aggregator's environment-issue tagger must include an `environmentId`.
     assert.match(

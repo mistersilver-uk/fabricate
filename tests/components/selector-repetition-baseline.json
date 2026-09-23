@@ -1,5 +1,5 @@
 {
-  "pinnedTotal": 231,
+  "pinnedTotal": 219,
   "rows": [
     {
       "key": "(top level) | .fabricate-list-row.is-truncated .fabricate-list-row-detail",
@@ -70,10 +70,6 @@
       "count": 2
     },
     {
-      "key": "(top level) | .fabricate-manager .manager-checks-trigger-body .manager-field select",
-      "count": 2
-    },
-    {
       "key": "(top level) | .fabricate-manager .manager-component-browser-inspector",
       "count": 2
     },
@@ -99,10 +95,6 @@
     },
     {
       "key": "(top level) | .fabricate-manager .manager-component-toolbar .manager-search input",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-component-toolbar select",
       "count": 2
     },
     {
@@ -151,10 +143,6 @@
     },
     {
       "key": "(top level) | .fabricate-manager .manager-essence-toolbar .manager-search input",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-essence-toolbar select",
       "count": 2
     },
     {
@@ -222,14 +210,6 @@
       "count": 2
     },
     {
-      "key": "(top level) | .fabricate-manager .manager-recipe-result-row.is-reorderable",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-option-controls",
-      "count": 2
-    },
-    {
       "key": "(top level) | .fabricate-manager .manager-recipe-row",
       "count": 2
     },
@@ -243,10 +223,6 @@
     },
     {
       "key": "(top level) | .fabricate-manager .manager-recipe-tool-row",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-recipe-toolbar select",
       "count": 2
     },
     {

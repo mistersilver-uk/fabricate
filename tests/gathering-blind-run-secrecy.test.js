@@ -1,22 +1,12 @@
 /**
- * Issue 901 — a blind gathering run's identity must not be persisted on the
- * player-readable, player-WRITABLE actor flag.
- *
- * The boundary these tests pin is INTEGRITY, not confidentiality: Foundry has no
- * server-side read authorization, so a determined player can still read world
- * state from a console. What they must not be able to do is forge it. Each of the
- * four binding decisions gets its own test:
- *
- *   1. one active blind run per blind environment
- *   2. the GM sees the resolved task, marked as a secret preview
- *   3. blind runs resolve against a START-TIME snapshot
- *   4. resource nodes are RESERVED at start
+ * Issue 901 — a blind gathering run's identity must not be persisted on the player-readable,
+ * player-WRITABLE actor flag.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { SETTING_KEYS } from '../src/config/settings.js';
-import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
+import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 
 import {
   BLIND_ENVIRONMENT_ID,
@@ -358,13 +348,8 @@ test('a waiting run written before this change resolves from its own task id and
 });
 
 /**
- * ## The receipt and linkage fields as a disclosure channel (issue 1648, acceptance 8)
- *
- * Issue 1648 adds `resultRowId` to evaluated rows and actual refs and `sourceItemUuid` to
- * receipts. Both name AUTHORED CONFIGURATION — a drop row's id, and the pack Item a task
- * awards from — so each is a new way for a blind run to name the task behind it. These
- * drive a real blind gather that genuinely awards an item, then check what a protected
- * viewer can reach in persistence, in the response, and in the journal projection.
+ * The receipt and linkage fields as a disclosure channel (issue 1648, acceptance 8). Issue 1648
+ * adds `resultRowId` to evaluated rows and actual refs and `sourceItemUuid` to receipts.
  */
 
 const SECRET_SOURCE_UUID = 'Compendium.secrets.lodes.Item.moonsilver';
@@ -482,14 +467,9 @@ test('a THROWING blind-secret source is never consulted for a protected viewer',
 });
 
 /**
- * ## D-027 — the reveal policy governs a blind task's identity in history, and only it
- *
- * Maintainer ruling, verbatim: "No, only if the reveal policy reveals the task name instead of
- * keeping it hidden. if hidden on a successful gather it should not be shown".
- *
- * The fixture actor answers `testUserPermission` as every real Foundry Actor does, so
- * `_nativeHistoryEntitled` takes its PRODUCTION branch rather than the `viewer.id === run.userId`
- * fallback the corpus fell through to. The player owns the character and is still not told.
+ * D-027 — the reveal policy governs a blind task's identity in history, and only it. Maintainer
+ * ruling, verbatim: "No, only if the reveal policy reveals the task name instead of keeping it
+ * hidden.
  */
 function ownedByPlayer() {
   return new GatheringDocumentActor('Gatherer', { ownerIds: [BLIND_PLAYER.id] });

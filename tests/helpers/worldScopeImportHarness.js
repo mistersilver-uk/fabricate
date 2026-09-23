@@ -1,27 +1,6 @@
 /**
- * A DESTINATION WORLD for the world-scope entity import/export suite (issue 1364, epic 1357).
- *
- * It stands up the whole composition a real import runs through: one settings map, the three REAL
- * world-scope entity stores reading and WRITING through it, a real `CraftingSystemManager` over
- * the same map, and a `CompendiumImporter` with those three stores injected as seams.
- *
- * ## THE SETTING SEAM MUST READ BACK, and that is not a convenience
- *
- * The migration suite's `makeScopeStore` closes over a FIXED value (`getSetting: () => value`,
- * `setSetting: async () => {}`), which is right for a pure differential and wrong here: the import
- * writes the same setting TWICE — the rosters and defaults before the system is created, the
- * membership records after — so a record-only seam would leave the second write reading pre-import
- * state and silently dropping whatever the first one added.
- *
- * ## SEEDED VERSUS UNMIGRATED IS THE DISTINCTION THE WHOLE MERGE TURNS ON
- *
- * A key left ABSENT from the seed reads back as `undefined`, which is what an unmigrated world
- * looks like: `isSeeded('entities')` answers false and the merge writes nothing at all. A key
- * seeded with `{ entities: [], defaults: {}, membership: {} }` is a MIGRATED world that happens to
- * hold nothing, and the merge writes into it. Passing `{}` would be neither — it carries no
- * sub-key, so `carriedSubKeys` reports every one of them unseeded.
- *
- * This file is a HELPER, never a `*.test.js`.
+ * A DESTINATION WORLD for the world-scope entity import/export suite (issue 1364, epic 1357). THE
+ * SETTING SEAM MUST READ BACK, and that is not a convenience
  */
 
 import { installFoundryEnv } from './foundryEnv.js';
@@ -41,11 +20,8 @@ export function emptySeededScope() {
 /**
  * Stand up a destination world.
  *
- * @param {object} [options]
  * @param {object} [options.componentScope] Seed for `fabricate.componentScope`; OMIT for an
- *   unmigrated world.
- * @param {object} [options.essenceScope]
- * @param {object} [options.toolScope]
+ * unmigrated world.
  * @param {object[]} [options.systems] Crafting systems the destination already holds.
  * @returns {Promise<object>} the world.
  */
@@ -92,8 +68,7 @@ export async function destinationWorld(options = {}) {
     toolScopeStore: stores.tools,
   });
   // `reload()` is the manager's own read of the persisted corpus, through its real repository and
-  // its real `_normalizeSystem`. A seeded destination system therefore arrives NORMALIZED, which
-  // is what `_findExistingSystem`'s id-then-name resolution runs against.
+  // its real `_normalizeSystem`.
   systemManager.reload();
   systemManager.initialized = true;
 

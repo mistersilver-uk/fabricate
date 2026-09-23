@@ -1,13 +1,4 @@
-/**
- * The rebuilt GM recipe library (issue 643) and its extracted inspector.
- *
- * The load-bearing assertions here are the DEFAULTS the smoke harness depends on
- * (groups expanded, filters at `all`, a page size that clears the fixture count —
- * the harness waits for a VISIBLE row and throws "Manager rendered no table rows"
- * on zero) and the blocked-enable flash, which must OWN the refusal message: the
- * store suppresses its Foundry notification while a flash handler is supplied, so a
- * component that surfaced the error itself would double-report it.
- */
+/** The rebuilt GM recipe library (issue 643) and its extracted inspector. */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -19,20 +10,24 @@ import {
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
-import { createRecipeBrowserState } from '../../src/utils/recipeBrowserModel.js';
+import { createRecipeBrowserState } from '../../src/ui/model/recipeBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 import { itResolvesTheRecipesOwnImage } from '../helpers/recipeOwnImageCases.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
-// Issue 1504: a converted control is a shared `<Select>`, so choosing a value is two clicks
-// on a portaled panel rather than a `change` on a native `<select>`. The panel lands on the
-// harness's own mount target, which is why every lookup is rooted there.
-import { chooseSelectOption } from '../helpers/select-control.js';
+import { describeBrowserListState } from '../helpers/browserListStateCases.js';
+// Issue 1504: a converted control is a shared `<Select>`.
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  openSelectPanel,
+  selectOptionLabels,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 // Issue 1506: the row and inspector states are chips, so the tone is the chip's own class.
 import { chipToneOf } from '../helpers/chipTone.js';
-// Issue 1515: the blocked-enable strip is a `<Notice>`, and the View Lab case that photographs
-// it names the primitive's own class and dismiss hook. Reading the case's selector here is what
-// makes that declaration a tested claim rather than one the capture discovers.
+// Issue 1515: the blocked-enable strip is a `<Notice>`.
 import { getCaseById } from '../../scripts/lib/viewLabCases.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -41,21 +36,24 @@ const RECIPE_RAW_MODULES = [
   ...STATUS_TONE_RAW_MODULES,
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
-  'src/ui/svelte/util/foundryBridge.js',
+  ...FOUNDRY_BRIDGE_RAW_MODULES,
   'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/craftingImageDefaults.js',
   'src/utils/recipeCategories.js',
   // #1663: the ONE implementation behind both category shims; imports nothing.
   'src/utils/categoryNormalization.js',
-  'src/utils/recipeBrowserModel.js',
-  // recipeBrowserModel imports the shared category totals (issue 676); omitting it here
-  // HANGS this suite (`# cancelled`) rather than failing it.
-  'src/utils/browserGroupCounts.js',
+  // The lifted browse state's default page size, which the browse-list composable reads.
+  'src/ui/model/managerBrowserViewState.js',
+  'src/ui/model/recipeBrowserModel.js',
+  // ... which since issue 1688 runs on the shared adapter-driven pipeline.
+  'src/ui/model/entityBrowserModel.js',
+  // entityBrowserModel imports the shared category totals (issue 676).
+  'src/ui/model/browserGroupCounts.js',
   // ... and, since issue 1036, the shared page-window model too. Same consequence.
-  'src/utils/browserPagination.js',
-  // The pure bulk selection + staging model (issue 1010). The browser imports it for the
-  // four selection helpers and the toolbar reads the description it returns.
-  'src/utils/recipeBulkEditModel.js',
+  'src/ui/model/browserPagination.js',
+  // The pure bulk selection + staging model (issue 1010). Since issue 1706 the browser no
+  // longer imports it for the four selection helpers — those moved to the composable below.
+  'src/ui/model/recipeBulkEditModel.js',
   // Its shared leaf: those selection helpers live here and `recipeBulkEditModel.js`
   // re-exports them, so it is a STATIC import of that module. Naming only the model HANGS
   // the suite (`# cancelled`) rather than failing it.
@@ -82,10 +80,18 @@ const browser = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipes-browser-',
   rawModules: RECIPE_RAW_MODULES,
+  // The selection wiring is a runes composable (issue 1706), so it is COMPILED rather than copied.
+  // The inspector harness below renders no selection at all, so it is named here rather than
+  // hoisted into RECIPE_RAW_MODULES.
+  // The browse-list wiring is a second runes composable (issue 1716), reached through the view.
+  runeModules: [
+    'src/ui/svelte/apps/manager/bulkSelection.svelte.js',
+    'src/ui/svelte/apps/manager/browserListState.svelte.js',
+  ],
   compiledModules: [
     ...RECIPE_PRIMITIVES,
     ...SELECT_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     // The manager's ONE selection control and its ONE multi-select toolbar row (issue
     // 1010). The inspector harness below does not render either, so they are named here
     // rather than hoisted into RECIPE_PRIMITIVES.
@@ -208,9 +214,7 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     assert.equal(root.querySelector('[role="table"]'), null);
   });
 
-  // The model groups the PAGE, not the filtered list — so a header counting only the
-  // filtered list reads "12 recipes" above the three rows page 2 renders, and a header
-  // counting only the page says a 12-strong category holds 10. It says BOTH (issue 676).
+  // The model groups the PAGE, not the filtered list.
   it('pairs what the group RENDERS with the category total across the filtered list', async () => {
     const many = Array.from({ length: 12 }, (_, index) =>
       makeRecipe({
@@ -244,8 +248,7 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     assert.equal(countText(), '2 of 12 recipes', 'the header agrees with the two rows below it');
   });
 
-  // "1 recipes" was the shipped component-browser bug; the singular that reaches the
-  // paged form is "1 of N", whose noun agrees with the total.
+  // "1 recipes" was the shipped component-browser bug.
   it('handles the singular on both the whole-group and the paged form', async () => {
     const many = Array.from({ length: 11 }, (_, index) =>
       makeRecipe({
@@ -315,8 +318,7 @@ describe('RecipesBrowserView category-major grouped pagination (issue 801)', () 
     // Shrink the page to 10 so general (12) must span two pages.
     chooseSelectOption(root, '[data-pagination-size]', '10');
 
-    // Page 1: the whole alchemy bucket, then the first slice of general — not an
-    // interleaved alphabetical slice of all three categories.
+    // Page 1: the whole alchemy bucket, then the first slice of general.
     assert.equal(root.querySelectorAll('.manager-recipe-row').length, 10, 'page 1 holds ten');
     assert.deepEqual(recipeGroupsOnPage(root), [
       ['alchemy', '6 recipes'],
@@ -342,13 +344,7 @@ describe('RecipesBrowserView category-major grouped pagination (issue 801)', () 
 // shared, parameterised run in `browserBulkSelectionCases.js`, instantiated here and in
 // `components-browser-view-mounted.test.js` alike: the two studios render the SAME
 // `BulkSelectionToolbar` over the SAME `bulkSelectionModel.js`, so a second hand-copied
-// run of the same seven bodies would be duplication rather than coverage.
-//
-// The eighth shipped Component Studio case — the focus-ring adjacency contract (issue
-// 924) — is deliberately NOT twinned: issue 1010 relocated it to
-// `tests/components/bulk-selection-toolbar-mounted.test.js`, which owns it for both
-// studios at once along with the drift assertion over the tokens inside the toolbar's
-// `:global()`.
+// run of the same eight bodies would be duplication rather than coverage.
 describeBrowserBulkSelection({
   label: 'RecipesBrowserView',
   prefix: 'recipe',
@@ -362,8 +358,7 @@ describeBrowserBulkSelection({
     Array.from({ length: count }, (_, index) =>
       makeRecipe({
         id: `f${index + 1}`,
-        // Zero-padded so name-ascending order is also numeric order, which is what makes
-        // `flatId(1)` reliably the first row of page 1.
+        // Zero-padded so name-ascending order is also numeric order.
         name: `Flask ${String(index + 1).padStart(2, '0')}`,
         category: 'general'
       })
@@ -376,8 +371,7 @@ describeBrowserBulkSelection({
     makeRecipe({ id: 's2', name: 'Steel Ingot', category: 'smithing' })
   ],
   grouped: {
-    // The header's `data-group-header` is the DISPLAY name, and a custom recipe category
-    // is its own label — only the reserved `general` is localized.
+    // The header's `data-group-header` is the DISPLAY name.
     collapseHeader: 'alchemy',
     hiddenIds: ['a1', 'a2'],
     visibleIds: ['s1', 's2']
@@ -401,6 +395,27 @@ describeBrowserBulkSelection({
       'the row still carries exactly its three cluster buttons — lock, enable and edit — ' +
       'so the smoke walk that reaches Edit through them is undisturbed by the new control'
   }
+});
+
+describeBrowserListState({
+  label: 'RecipesBrowserView',
+  harness: browser,
+  props: ({ rowCount, selectedSystemId, browserState }) => {
+    const recipes = Array.from({ length: rowCount }, (_, index) =>
+      makeRecipe({ id: `s${index + 1}`, name: `Salve ${index + 1}`, category: 'general' })
+    );
+    return {
+      recipes,
+      showRecipeCategories: true,
+      recipeCategories: [{ name: 'general', count: recipes.length }],
+      selectedSystemId,
+      browserState
+    };
+  },
+  // The category names a vocabulary the new system does not share.
+  resetAxes: { categoryFilter: ['alchemy', 'all'], pageIndex: [1, 0] },
+  // Status and lock are preferences, and the page size with them.
+  preservedAxes: { statusFilter: 'off', lockFilter: 'locked', pageSize: 5 }
 });
 
 describe('RecipesBrowserView filtering and sorting', () => {
@@ -499,8 +514,7 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
     const dcPill = withDc.querySelector('[data-recipe-check]');
     assert.equal(dcPill.dataset.recipeCheck, 'dc');
     assert.match(dcPill.textContent, /DC 18/);
-    // The DC is the archetypal numeric in this row: it takes the mono face. The
-    // word-only kinds below do not — mono marks a number, it does not decorate a pill.
+    // The DC is the archetypal numeric in this row.
     assert.ok(dcPill.classList.contains('is-mono'), 'a DC is a numeric and reads in the mono face');
     browser.remount();
 
@@ -514,11 +528,7 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
     );
   });
 
-  // The two check-LESS states are not the same fact, and the row must not tell the GM they
-  // are. `none` means the system cannot roll for this recipe at all — a state a GM should
-  // be able to SCAN a library for, which an em dash behind a ban glyph never let them do.
-  // `ingredients` is its neutral sibling: a routedByIngredients craft resolves off the
-  // ingredient set that was used, so no check is a working configuration, not a gap.
+  // The two check-LESS states are not the same fact.
   it('warns when the system cannot roll for a recipe, and stays neutral when it need not', async () => {
     const noCheck = await browser.mount({
       recipes: [makeRecipe({ checkSummary: { kind: 'none', dc: null } })]
@@ -547,18 +557,7 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
   });
 });
 
-// Issue 1010 — the row's two AUTHORING-state pills read ONE predicate: `deriveRecipeStatuses`
-// over the projected `enableBlocked`, "would activation refuse this recipe?". That is the same
-// predicate the bulk panel's pre-flight count and the set-apply write run, so the pilled rows
-// and the counted rows are one set by construction. The pre-1010 predicate was `incomplete`
-// (`validate() === false && validateStructure() === true`), which a STRUCTURALLY broken recipe
-// does not trip — so the reddest rows in the library wore no pill at all.
-//
-// These are MOUNTED rather than asserted against the component's source, and that is the whole
-// point of them: `enableBlocked` is read inside `recipeBrowserModel.js` and never appears in
-// this component's markup, so a source-text pin on the field name is satisfied by the comment
-// above `STATUS_LABELS` and by nothing else. Reverting the predicate reds every case below
-// while changing not one character of the component.
+// Issue 1010 — the row's two AUTHORING-state pills read ONE predicate.
 describe('RecipesBrowserView authoring-state pills (issue 1010)', () => {
   const pills = (root, id) =>
     [
@@ -566,8 +565,7 @@ describe('RecipesBrowserView authoring-state pills (issue 1010)', () => {
     ].map((pill) => [chipToneOf(pill), pill.textContent.trim()]);
 
   it('paints an off, blocked recipe RED and says enabling would be refused', async () => {
-    // `incomplete: false` is the load-bearing half: this is the structurally-broken row the
-    // narrower predicate reads as fine, and it is exactly what the bulk panel forecasts.
+    // `incomplete: false` is the load-bearing half.
     const root = await browser.mount({
       recipes: [makeRecipe({ id: 'r1', enabled: false, incomplete: false, enableBlocked: true })]
     });
@@ -578,17 +576,14 @@ describe('RecipesBrowserView authoring-state pills (issue 1010)', () => {
   });
 
   it('paints an ON, blocked recipe AMBER — unfinished, but nothing is being refused', async () => {
-    // The activation gate fires only on the transition INTO enabled, so an already-on blocked
-    // recipe is authoring work outstanding rather than a refusal. Two tones, one predicate.
+    // The activation gate fires only on the transition INTO enabled.
     const root = await browser.mount({
       recipes: [makeRecipe({ id: 'r1', enabled: true, incomplete: false, enableBlocked: true })]
     });
     assert.deepEqual(pills(root, 'r1'), [['warning', 'Incomplete']]);
   });
 
-  // The mirror, and the case that makes the two above non-vacuous: `incomplete` alone paints
-  // NOTHING now. Without this a predicate reading `incomplete || enableBlocked` would satisfy
-  // both cases above and still let the browser and the panel disagree.
+  // The mirror, and the case that makes the two above non-vacuous.
   it('paints no authoring pill on a row only the narrower incomplete predicate flags', async () => {
     const root = await browser.mount({
       recipes: [makeRecipe({ id: 'r1', enabled: false, incomplete: true, enableBlocked: false })]
@@ -636,8 +631,7 @@ describe('RecipesBrowserView lock and enable controls', () => {
       const row = root.querySelector(`[data-recipe-id="${id}"]`);
       assert.ok(row.querySelector('[data-recipe-lock]'), 'the lock control is present');
       assert.ok(row.querySelector('.manager-status-toggle'), 'the enable toggle is present');
-      // Duplicate / Delete stay inspector-only (issue 643): the row carries a single Edit
-      // pencil, not the old three-icon action group.
+      // Duplicate / Delete stay inspector-only (issue 643).
       assert.equal(row.querySelector('.manager-action-group'), null, 'the row carries no action group');
     }
 
@@ -648,9 +642,7 @@ describe('RecipesBrowserView lock and enable controls', () => {
     assert.deepEqual(locks, [['r1', true], ['r2', false]], 'lock toggles both ways');
   });
 
-  // The row's Edit pencil is restored (issue 643), styled like the Books & Scrolls row
-  // edit: a `.manager-icon-button` with a `fa-pen`, sitting after the enable toggle. It
-  // is the primary way to open the editor from the row.
+  // The row's Edit pencil is restored (issue 643).
   it('renders a single Edit pencil per row that reports the recipe id', async () => {
     const edits = [];
     const root = await browser.mount({
@@ -697,8 +689,7 @@ describe('RecipesBrowserView column header (issue 643)', () => {
   });
 });
 
-// Issue 884 — the row medallion is the recipe's own icon, resolved through the shared
-// helper. It used to prefer the first containing book's artwork.
+// Issue 884 — the row medallion is the recipe's own icon.
 describe('RecipesBrowserView row medallion (issue 884)', () => {
   itResolvesTheRecipesOwnImage({
     harness: browser,
@@ -715,10 +706,7 @@ describe('RecipesBrowserView row medallion (issue 884)', () => {
 // re-applies the GM's filters on remount).
 describe('RecipesBrowserView lifted browser state', () => {
   it('writes control changes back into the bound browserState object', async () => {
-    // A plain object is not a Svelte `$state` proxy, so the write lands but does not
-    // reactively refilter the view here — the root passes a real proxy, and the live
-    // refilter + round-trip is proven end-to-end in the mounted manager suite. This
-    // proves the write REACHES the shared object rather than a hidden local copy.
+    // A plain object is not a Svelte `$state` proxy.
     const shared = createRecipeBrowserState();
     const root = await browser.mount({
       recipes: [makeRecipe({ id: 'r1', name: 'On' }), makeRecipe({ id: 'r2', name: 'Off', enabled: false })],
@@ -780,8 +768,7 @@ describe('RecipesBrowserView lifted browser state', () => {
     const shared = createRecipeBrowserState();
     const recipes = alchemyHeavyLibrary();
 
-    // First mount with a REAL system id: the reset effect runs once and stamps
-    // ui.systemId = 'sys-1'.
+    // First mount with a REAL system id.
     await browser.mount({
       recipes,
       recipeCategories: [{ name: 'alchemy', count: 15 }, { name: 'smithing', count: 5 }],
@@ -791,8 +778,7 @@ describe('RecipesBrowserView lifted browser state', () => {
     });
     assert.equal(shared.systemId, 'sys-1', 'the first mount stamps the persisted system sentinel');
 
-    // The GM narrows the library AFTER arriving: a non-default category, page 2, a
-    // collapsed group, and a non-default sort to prove cross-system prefs survive a switch.
+    // The GM narrows the library AFTER arriving: a non-default category, page 2.
     shared.categoryFilter = 'alchemy';
     shared.pageSize = 10;
     shared.pageIndex = 1;
@@ -828,20 +814,14 @@ describe('RecipesBrowserView lifted browser state', () => {
       browserState: shared
     });
 
-    // The default page size keeps the 20-row library on a single page, so the page index
-    // reads 0 deterministically here: the test's `browserState` is a plain object rather
-    // than a `$state` proxy, so the non-reactive `model` cannot recompute after the reset
-    // effect writes — the page-sync effect would otherwise memoize a stale non-zero page.
-    // The page RESET on switch is faithful in the app (a real proxy) and the page PRESERVE
-    // on a same-system return is proven rigorously by the sibling round-trip test above.
+    // The default page size keeps the 20-row library on a single page.
     shared.categoryFilter = 'alchemy';
     shared.pageIndex = 1;
     shared.collapsedCategories = new Set(['alchemy']);
     shared.sortKey = 'dc';
     shared.groupByCategory = false;
 
-    // Remount with a DIFFERENT system id: a real switch, so the vocabulary-scoped fields
-    // and the page/collapse reset — but sort and group-by are cross-system preferences.
+    // Remount with a DIFFERENT system id: a real switch.
     browser.remount();
     await browser.mount({
       recipes,
@@ -885,8 +865,7 @@ describe('RecipesBrowserView lifted browser state', () => {
       browserState: shared
     });
 
-    // The pager clamps to the last valid page rather than stranding an empty one; the
-    // page-sync effect writes the clamped index back into the persisted state.
+    // The pager clamps to the last valid page rather than stranding an empty one.
     assert.equal(shared.pageIndex, 0, 'the out-of-range page clamps to the last valid page');
   });
 
@@ -924,12 +903,7 @@ describe('RecipesBrowserView lifted browser state', () => {
     assert.equal(flash.getAttribute('role'), 'alert');
     assert.match(flash.textContent, /This recipe has no result groups\./);
 
-    // THE CAPTURE CASE'S OWN SELECTOR, resolved against the rendered strip. One bad
-    // `expectSelector` fails the WHOLE View Lab capture and publishes no frames at all, and
-    // nothing checks it until that run — so the frame's proof is proved here. It is READ from the
-    // case rather than restated: a copy would keep passing after the case started naming
-    // something else. Only the area root is stripped, which is the one part of it a mounted
-    // component has no shell to supply.
+    // THE CAPTURE CASE'S OWN SELECTOR.
     const captureSelector = getCaseById(
       'manager-recipes-blocked-enable-flash'
     ).expectSelector.replace('.fabricate-manager ', '');
@@ -938,9 +912,7 @@ describe('RecipesBrowserView lifted browser state', () => {
       `the blocked-enable frame's selector matched nothing: ${captureSelector}`
     );
 
-    // `<Notice dismissable>` stamps no per-caller hook on the control it draws, so the dismiss
-    // is addressed by the primitive's own `data-notice-dismiss` (issue 1515). What the caller
-    // still owns is the `dataAttr` hook on the root, which is what `[data-recipe-flash]` reads.
+    // `<Notice dismissable>` stamps no per-caller hook on the control it draws.
     root.querySelector('[data-notice-dismiss]').click();
     flushSync();
     assert.ok(!root.querySelector('[data-recipe-flash]'), 'the flash is dismissible');
@@ -979,9 +951,7 @@ describe('RecipesBrowserView lifted browser state', () => {
   });
 });
 
-// The library inspector against brief §3.3: a 2x2 stat grid answering the four
-// questions a GM has about the recipe they just clicked, then what it REQUIRES and
-// what it PRODUCES. An inspector that cannot say what a recipe makes is not finished.
+// The library inspector against brief §3.3.
 const INSPECTOR_COMPONENTS = [
   { id: 'cmp-herb', name: 'Mountain Herb', img: 'icons/herb.webp' },
   { id: 'cmp-potion', name: 'Healing Potion', img: 'icons/potion.webp' }
@@ -1053,9 +1023,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     );
   });
 
-  // `Edit recipe` is the POINT of the inspector: the accent-filled primary and the loudest
-  // thing on the panel. There used to be NO Edit button at all, and Delete sat as a visual
-  // peer of Duplicate — so the panel's loudest action was destroying the recipe.
+  // `Edit recipe` is the POINT of the inspector.
   it('renders the selected recipe with its image and its Duplicate / Edit / Delete ladder', async () => {
     let edited = 0;
     let duplicated = 0;
@@ -1143,8 +1111,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     );
   });
 
-  // The panel is the one surface with the room for the recipe's flavour text; it used to
-  // cut it at 160 characters anyway.
+  // The panel is the one surface with the room for the recipe's flavour text.
   it('shows the flavour text whole', async () => {
     const description = 'A classic arming sword. '.repeat(12).trim();
     const root = await inspector.mount({
@@ -1155,11 +1122,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.equal(root.textContent.includes('…'), false, 'nothing is truncated');
   });
 
-  // The rows render `getRecipeCategoryLabel(...)`; the inspector rendered
-  // `selectedRecipe.category` raw, so the same recipe read "General" in the row and
-  // "general" in the inspector inches away. (The harness's i18n stub echoes the key,
-  // so the localized reserved label surfaces here as its key — which is exactly the
-  // evidence that the helper, not the raw field, produced it.)
+  // The rows render `getRecipeCategoryLabel(...)`.
   it('labels the category through the same helper the rows use', async () => {
     const general = await inspector.mount({
       selectedRecipe: makeRecipe({ id: 'r1', category: 'general' }),
@@ -1205,8 +1168,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
       essenceOptions: INSPECTOR_ESSENCES
     });
 
-    // The two options share ONE requirement, so they render as equal members inside an
-    // ANY-ONE-OF group — neither promoted above the other.
+    // The two options share ONE requirement.
     const group = root.querySelector('[data-recipe-requirement="anyOf"]');
     assert.ok(group, 'a two-option requirement renders as an any-one-of group');
     assert.ok(
@@ -1244,9 +1206,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.equal(rows.length, 1);
     assert.equal(rows[0].dataset.recipeProduces, 'success');
     assert.match(rows[0].textContent, /Healing Potion/);
-    // The pill carries the GM-AUTHORED group name — Fabricate's outcome tiers are authored,
-    // so the name is the recipe's and never an invented crit/success/fail vocabulary. Its
-    // TONE is not the recipe's: it is the role the group plays.
+    // The pill carries the GM-AUTHORED group name.
     const pill = rows[0].querySelector('.manager-recipe-flow-group');
     assert.equal(pill.textContent.trim(), 'On success');
     assert.ok(pill.classList.contains('is-success'));
@@ -1270,9 +1230,6 @@ describe('RecipeBrowserInspector (mounted)', () => {
   // of Produces (as this used to) made an alchemy recipe's failure output INVISIBLE in the one
   // surface whose job is to say what a recipe makes. It is shown, in danger, and the
   // successful-craft-makes-nothing warning still fires — because it is still true.
-  //
-  // No failure row is ever INVENTED: it exists only where the model has one. The routed modes
-  // produce nothing at all on a failure and carry no such group.
   it("shows the reserved role: 'failure' group in danger, and still says a success makes nothing", async () => {
     const root = await inspector.mount({
       selectedRecipe: makeRecipe({
@@ -1304,9 +1261,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
 
   it("says a locked, incomplete, disabled recipe can't be enabled", async () => {
     const root = await inspector.mount({
-      // `enableBlocked` is the projection field the pill now reads (issue 1010); this
-      // fixture is hand-built, so it has to state it. `incomplete` stays because the row
-      // is genuinely both — an incomplete shell IS one of the things activation refuses.
+      // `enableBlocked` is the projection field the pill now reads (issue 1010).
       selectedRecipe: makeRecipe({
         id: 'r1',
         enabled: false,
@@ -1374,11 +1329,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     });
   }
 
-  function changeSelect(select, value) {
-    select.value = value;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    flushSync();
-  }
+  const ROUTE_SET = '[data-recipe-route="ingredient-set"]';
 
   it('routed by ingredients: one ingredient-set dropdown filters both lists and drops the group pill', async () => {
     const root = await inspector.mount({
@@ -1388,12 +1339,17 @@ describe('RecipeBrowserInspector (mounted)', () => {
       componentOptions: INSPECTOR_COMPONENTS
     });
 
-    const setSelect = root.querySelector('[data-recipe-route="ingredient-set"]');
-    assert.ok(setSelect, 'the ingredient-set dropdown renders');
+    assert.ok(root.querySelector(ROUTE_SET), 'the ingredient-set dropdown renders');
     // The lower result-set dropdown was removed — the single set dropdown drives both lists.
     assert.equal(root.querySelector('[data-recipe-route="result-set"]'), null, 'no redundant result-set dropdown');
-    assert.deepEqual([...setSelect.options].map((o) => o.textContent.trim()), ['Herb route', 'Potion route']);
-    assert.equal(setSelect.value, 'set-1', 'defaults to the first set');
+    assert.equal(assertSelectHasResolvedName(root, ROUTE_SET), 'Select ingredient set');
+    assert.equal(root.querySelector(ROUTE_SET).getAttribute('data-select-size'), 'inline');
+    assert.ok(
+      openSelectPanel(root, ROUTE_SET).classList.contains('fabricate-select-popover-ticked'),
+      'the routes are cousins, so the list keeps its tick column'
+    );
+    assert.deepEqual(selectOptionLabels(root, ROUTE_SET), ['Herb route', 'Potion route']);
+    assert.equal(selectTriggerText(root, ROUTE_SET), 'Herb route', 'defaults to the first set');
 
     const requires = root.querySelector('.manager-recipe-flow-list');
     assert.match(requires.textContent, /Mountain Herb/, 'Requires shows set-1 requirement');
@@ -1413,7 +1369,8 @@ describe('RecipeBrowserInspector (mounted)', () => {
       componentOptions: INSPECTOR_COMPONENTS
     });
 
-    changeSelect(root.querySelector('[data-recipe-route="ingredient-set"]'), 'set-2');
+    chooseSelectOption(root, ROUTE_SET, 'set-2');
+    assert.equal(selectTriggerText(root, ROUTE_SET), 'Potion route');
 
     const requires = root.querySelector('.manager-recipe-flow-list');
     assert.match(requires.textContent, /Healing Potion/, 'Requires now shows set-2');
@@ -1608,6 +1565,90 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.match(produces[0].textContent, /×3/);
   });
 
+  it('multi-step: an empty INTERMEDIATE step reads as neutral progress, the terminal one as a gap', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({
+        id: 'r-empty-intermediate',
+        steps: [
+          {
+            id: 's1',
+            name: 'Fold',
+            ingredientSets: [{ id: 'set1', ingredientGroups: [{ id: 'ig1', options: [{ id: 'o1', quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }] }] }],
+            resultGroups: [{ id: 'g1', name: 'Nothing yet', results: [] }]
+          },
+          {
+            id: 's2',
+            name: 'Finish',
+            ingredientSets: [{ id: 'set2', ingredientGroups: [{ id: 'ig2', options: [{ id: 'o2', quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }],
+            resultGroups: [{ id: 'g2', name: 'Final', results: [] }]
+          }
+        ]
+      }),
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+
+    const intermediate = root.querySelector('[data-recipe-produces-empty]');
+    assert.ok(intermediate, 'the GM is told what the step is for');
+    assert.match(intermediate.textContent, /only advances the craft/);
+    assert.ok(
+      intermediate.classList.contains('manager-muted'),
+      'the neutral note reuses the muted copy class'
+    );
+    assert.ok(
+      !intermediate.classList.contains('manager-recipe-flow-empty'),
+      'an intermediate step is not a gap, so it carries no danger panel'
+    );
+    assert.ok(!intermediate.querySelector('i'), 'and no alarm icon');
+
+    root.querySelector('[data-recipe-step-next]').click();
+    flushSync();
+
+    const terminal = root.querySelector('[data-recipe-produces-empty]');
+    assert.ok(terminal, 'the terminal step still warns');
+    assert.match(terminal.textContent, /a successful craft makes nothing/);
+    assert.ok(
+      terminal.classList.contains('manager-recipe-flow-empty'),
+      'the terminal-step panel keeps its danger tone'
+    );
+    assert.ok(Boolean(terminal.querySelector('i')), 'and its alarm icon');
+  });
+
+  it('multi-step: a step with NO result group at all keeps the danger note, not the neutral one', async () => {
+    // `stepMissingResultGroup` is unchanged by issue 1907: only a step that DECLARES a group may
+    // award nothing. A shell step reading "it only advances the craft" would hide a real gap.
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({
+        id: 'r-shell-step',
+        steps: [
+          {
+            id: 's1',
+            name: 'Fold',
+            ingredientSets: [{ id: 'set1', ingredientGroups: [{ id: 'ig1', options: [{ id: 'o1', quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }] }] }],
+            resultGroups: []
+          },
+          {
+            id: 's2',
+            name: 'Finish',
+            ingredientSets: [{ id: 'set2', ingredientGroups: [{ id: 'ig2', options: [{ id: 'o2', quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }],
+            resultGroups: [{ id: 'g2', name: 'Final', results: [{ id: 'r2', componentId: 'cmp-potion', quantity: 1 }] }]
+          }
+        ]
+      }),
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+
+    const empty = root.querySelector('[data-recipe-produces-empty]');
+    assert.ok(empty, 'the missing group is still reported');
+    assert.ok(
+      empty.classList.contains('manager-recipe-flow-empty'),
+      'a step with no result group is a gap, so it keeps the danger panel'
+    );
+    assert.ok(Boolean(empty.querySelector('i')), 'and its alarm icon');
+    assert.match(empty.textContent, /a successful craft makes nothing/);
+  });
+
   it('alchemy: two outcome sections — Success and Failure — never "Result Group N"', async () => {
     const root = await inspector.mount({
       selectedRecipe: makeRecipe({
@@ -1673,8 +1714,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.match(root.querySelector('.manager-recipe-flow-list').textContent, /Healing Potion/);
   });
 
-  // Issue 884 — the hero medallion is the recipe's own icon, resolved through the
-  // shared helper. It used to prefer the first containing book's artwork.
+  // Issue 884 — the hero medallion is the recipe's own icon.
   itResolvesTheRecipesOwnImage({
     harness: inspector,
     mountProps: (imageOverrides) => ({

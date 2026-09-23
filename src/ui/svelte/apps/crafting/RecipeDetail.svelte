@@ -14,7 +14,7 @@
   import IngredientRoutedBody from './detail/IngredientRoutedBody.svelte';
   import RoutedByCheckBody from './detail/RoutedByCheckBody.svelte';
   import ProgressiveBody from './detail/ProgressiveBody.svelte';
-  import EmptyState from '../manager/EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
 
   let {
     recipe = null,

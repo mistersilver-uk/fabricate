@@ -1,15 +1,4 @@
-/**
- * THE WORLD-SCOPE IDENTITY SMOKE PLAN (issue 1363, acceptance criterion 6c).
- *
- * Nothing inside `scripts/foundry-test-run.mjs` can be executed by a unit test — it exports
- * nothing and runs `main()` on import — so the SEED PLAN and the EXPECTATIONS live in a pure
- * module and are asserted here without booting Chromium. What stays in the harness is the
- * Foundry edge alone.
- *
- * This file also PINS the two mirrors the plan carries, because `scripts/**` must not import
- * from `src/**`: the canonical alchemy signature key, and the fact that the plan drives the same
- * remap the production `ready` pass drives.
- */
+/** THE WORLD-SCOPE IDENTITY SMOKE PLAN (issue 1363, acceptance criterion 6c). */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -22,8 +11,9 @@ import {
   planWorldScopeIdentitySmoke,
   seededFlagPaths,
 } from '../scripts/lib/worldScopeIdentitySmoke.js';
-import { remapWorldScopeIdentityFlags } from '../src/migration/remapWorldScopeIdentityFlags.js';
+import { remapWorldScopeIdentityFlags } from '../src/systems/remapWorldScopeIdentityFlags.js';
 import { canonicalSignatureKey } from '../src/utils/alchemySignatureKey.js';
+import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -88,9 +78,7 @@ test('the plan covers every site `#### D8` enumerates, at both flag depths', () 
 });
 
 test('the REAL remap turns the seeded plan into exactly the expected values', async () => {
-  // The plan is only worth shipping if the production pass actually satisfies it. This drives
-  // the real `remapWorldScopeIdentityFlags` over the plan's own seed, so a plan that expected
-  // something the pass does not do fails HERE rather than in a container.
+  // The plan is only worth shipping if the production pass actually satisfies it.
   const plan = planWorldScopeIdentitySmoke(IDS);
   const stored = {
     fabricate: {
@@ -157,10 +145,8 @@ test('the REAL remap turns the seeded plan into exactly the expected values', as
 });
 
 test('the harness wires the section, and asserts the FLAG VALUE rather than a resolution outcome', () => {
-  // A source contract, because the harness cannot be imported. Deleting the section, or
-  // softening it to a resolution assertion, must flip this to FAIL — a resolution assertion is
-  // TRUE with the repair never written, which is the whole reason criterion 6 exists.
-  const harness = readFileSync(resolve(HERE, '..', 'scripts', 'foundry-test-run.mjs'), 'utf8');
+  // A source contract, because the harness cannot be imported.
+  const harness = SMOKE_SOURCE;
   assert.match(harness, /planWorldScopeIdentitySmoke/, 'the harness drives the shared plan');
   assert.match(
     harness,
@@ -172,21 +158,21 @@ test('the harness wires the section, and asserts the FLAG VALUE rather than a re
     /remapWorldScopeIdentityFlags\(\)/,
     'it invokes the REAL repair through the GM recovery entry point'
   );
-  // Every flag the plan seeds must be READ BACK and CHECKED. A section that seeded them and
-  // asserted a resolution outcome instead would be green with the repair never written, which
-  // is the entire reason acceptance criterion 6 exists. Plain substring checks, because the
-  // labels contain regex metacharacters and an escaping slip would silently weaken the guard.
+  // Every flag the plan seeds must be READ BACK and CHECKED.
   for (const label of [
-    "check('roles.componentId'",
-    "check('roles.toolId'",
-    "check('legacy componentId scalar'",
-    "check('craftingRuns requirement componentId'",
-    "check('craftingRuns step toolIds'",
-    "check('salvageRuns componentId'",
-    "check('gatheringRuns toolIds (single-scope depth)'",
-    "check('alchemyDeadEnds'",
+    'roles.componentId',
+    'roles.toolId',
+    'legacy componentId scalar',
+    'craftingRuns requirement componentId',
+    'craftingRuns step toolIds',
+    'salvageRuns componentId',
+    'gatheringRuns toolIds (single-scope depth)',
+    'alchemyDeadEnds',
   ]) {
-    assert.ok(harness.includes(label), `the section must assert ${label}`);
+    // Prettier may put the label on its own line, so match the call and its first argument
+    // rather than one spelling of the call site.
+    const called = new RegExp(`check\\(\\s*'${label.replaceAll(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`)}'`);
+    assert.match(harness, called, `the section must assert check('${label}')`);
   }
   assert.ok(
     harness.includes('expected.componentFlag'),

@@ -33,6 +33,10 @@
  * silently executing twice.
  */
 
+import {
+  buildBulkSalvageChatContent,
+  sumChatEntriesByName,
+} from '../ui/presenters/BulkSalvageChatCard.js';
 // The PLAYER forecast projection, and the trigger-id read that keeps it honest. Both are
 // import-free leaves, so the "what could go wrong" preview costs this service no closure.
 import { forecastComplications } from '../utils/complicationPlan.js';
@@ -41,7 +45,6 @@ import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { checkTriggerIdsOf } from '../utils/progressiveStageComplications.js';
 
-import { buildBulkSalvageChatContent, sumChatEntriesByName } from './BulkSalvageChatCard.js';
 import { awardReceipts } from './runHistoryEvidence.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import { resolvedComponentsFor } from './scopedEntityReads.js';
@@ -351,9 +354,9 @@ export class BulkSalvageService {
    * headline stays a warning rather than arithmetic.
    *
    * This is the same rule and the same shape the in-panel bulk block draws from the store's
-   * `attachStageComplications` output (`ui-integration/spec.md` § Bulk complication
-   * forecast). The two projections read different sources for different callers; they must
-   * not read different rules.
+   * `attachStageComplications` output (`ui-crafting-app/spec.md` § Player Salvage Surface,
+   * _Bulk complication forecast_). The two projections read different sources for different
+   * callers; they must not read different rules.
    *
    * Nothing here is an audience decision of this service's own: the entries come from the
    * player forecast projection, which is where the `gmOnly` filter lives, and this service
@@ -362,9 +365,9 @@ export class BulkSalvageService {
    * ## It has no caller in this repository, and that is stated rather than implied
    *
    * The shipped bulk "What could go wrong" block reads the queued entry the inventory store
-   * publishes, NOT this method — `ui-integration/spec.md` says so explicitly. This is the
-   * service-side projection published for a caller holding no store, and no such caller
-   * exists here yet; it is covered by tests and by that spec sentence alone. An earlier
+   * publishes, NOT this method — the same `ui-crafting-app/spec.md` bullet says so explicitly.
+   * This is the service-side projection published for a caller holding no store, and no such
+   * caller exists here yet; it is covered by tests and by that spec sentence alone. An earlier
    * revision of this docblock claimed the surface was unshipped and that this was what it
    * would read, and both halves were false.
    *
@@ -628,7 +631,7 @@ export class BulkSalvageService {
       item.message = result?.message ?? '';
       // A progressive check overwrites `value` with the AWARDING value on a forced
       // crit, so the raw `data.total` is preferred wherever a run record carries it —
-      // the same precedence `rollTotalForCard` applies inside the engine. The
+      // the same precedence `rollTotalForCard` applies in `craftCardFields`. The
       // top-level `value` is the last resort because `salvage()` threads it only on
       // the SUCCESS return; a rolled failure's total is reachable only through the run.
       item.rollValue = firstFinite(

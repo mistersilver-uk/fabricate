@@ -1,4 +1,5 @@
-import { Result } from '../models/Result.js';
+import { normalizeQuantityFormula, quantityFormulaErrors, Result } from '../models/Result.js';
+import { diceEngine } from '../utils/rollFormulaRollability.js';
 
 function normalizeResult(result, id) {
   const normalized = Result.fromJSON({ ...result, id }).toJSON();
@@ -47,4 +48,18 @@ export function normalizeGatheringResultGroups(
       ),
     };
   });
+}
+
+/** The rollability floor a gathering result's amount must clear, as task-configuration errors. The
+ *  data boundary applies the SAME floor the authoring surface does, because a row that entered by
+ *  import or seed had no editor to refuse it (issue 1645). */
+export function gatheringResultAmountErrors(resultGroups, Roll = diceEngine()) {
+  const groups = Array.isArray(resultGroups) ? resultGroups : [];
+  return groups.flatMap((group) =>
+    (Array.isArray(group?.results) ? group.results : []).flatMap((result) =>
+      quantityFormulaErrors(normalizeQuantityFormula(result?.quantityFormula), Roll).map(
+        (error) => `Gathering result ${error}`
+      )
+    )
+  );
 }

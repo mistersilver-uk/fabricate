@@ -1,24 +1,15 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The Recipe items tab of the Knowledge surface (issue 785): the owned copies the
-  selected character carries of THIS system's recipe items.
+  The Recipe items tab: the owned copies the selected character carries of THIS system's recipe
+  items. One idea per strip, so exactly two — a permanent note that the surface edits play state and
+  never definitions, and a CONDITIONAL band for the party-pool ordering hazard, raised only when the
+  character owns a `total`-scope copy that still sources a learned entry. Erase→Delete reclaims that
+  slot; Delete→Erase cannot, and the world pool is permanently short one learn.
 
-  Disclosure placement is one idea per strip, not a banner stack. This tab carries
-  exactly two: a permanent info banner explaining that the surface edits play
-  state and never definitions, and a CONDITIONAL warning band for the D8 ordering
-  hazard — raised only when the character owns a `total`-scope (party-pool) copy
-  that is the source of a still-learned entry, because the budget refund resolves
-  the pool key through a still-owned source copy. Erase→Delete reclaims the slot;
-  Delete→Erase never can, and the world pool is permanently short one learn.
-
-  Props:
-   - copies: projected owned-copy rows.
-   - hasPartyPoolHazard: whether to raise the D8 band.
-   - armedToken, onExpend, onDelete, onArm, onDisarm.
+  Props: copies, hasPartyPoolHazard, armedToken, onExpend, onDelete, onArm, onDisarm.
 -->
 <script>
-  import Callout from '../Callout.svelte';
-  import EmptyState from '../EmptyState.svelte';
+  import Callout from '../../../components/Callout.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import KnowledgeOwnedCopyRow from './KnowledgeOwnedCopyRow.svelte';
 
@@ -39,11 +30,8 @@
 </script>
 
 <div class="manager-knowledge-tab-body">
-  <!-- The permanent hint is NEUTRAL (issue 1505): the specimen reserves the info tint for a
-       note about LIVE state and this one is true of the tab itself. It stays quiet for a second
-       reason too — this tab also raises the conditional party-pool hazard below, and a loud
-       permanent hint beside a conditional one spends the colour that is supposed to make the
-       hazard stand out. -->
+  <!-- NEUTRAL, per `openspec/specs/ui-visual-style/spec.md` → "Standing statements": this tab also
+       raises a conditional hazard below, and a loud permanent hint would spend its colour. -->
   <Callout
     tone="neutral"
     text={text(

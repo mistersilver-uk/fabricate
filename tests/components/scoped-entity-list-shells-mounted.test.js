@@ -1,35 +1,10 @@
-/**
- * The two scoped-entity list shells, MOUNTED (issue 1380, epic 1357).
- *
- * ── THE EVIDENCE RULE THIS FILE IS WRITTEN AGAINST ────────────────────────────────────────────
- * Several of the mutations these assertions exist to catch ALSO red
- * `tests/components/scoped-entity-patterns-mounted.test.js`, which already asserts the
- * component-no-enabled-switch case and the InheritRow row counts verbatim. A red from that suite
- * is not evidence this one catches anything: it would report `not ok` on a tree where this file
- * does not exist. Every criterion below is therefore written so it fails FROM THIS FILE ALONE.
- *
- * ── THE THREE-MOUNT SHAPE, AND WHY IT IS ONE PROPS FACTORY ────────────────────────────────────
- * The whole reason these shells are one component rather than three is generality across the
- * three entity types, and one screen proves one type. So every differentiation test mounts the
- * SAME props three times, changing only `scope` — which is what makes the pair of answers a
- * comparison rather than two unrelated fixtures. A negative half ("an essence renders no source
- * badge") is worthless without its positive control ("…and it rendered rows at all"), because a
- * shell that rendered NOTHING would satisfy it.
- *
- * ── WHY `createRawSnippet` COMES FROM A PATH AND NOT FROM `svelte` ────────────────────────────
- * The harness drives the compiled components with the client runtime at
- * `node_modules/svelte/src/index-client.js`. A snippet built from a bare `svelte` specifier comes
- * out of a SECOND copy of that runtime and is a different type, so the component refuses to
- * render it. Precedent: `tests/components/bulk-edit-dock-pinning.test.js`.
- */
+/** The two scoped-entity list shells, MOUNTED (issue 1380, epic 1357). */
 import assert from 'node:assert/strict';
 import { after, afterEach, before, describe, it } from 'node:test';
 import { resolve } from 'node:path';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
-// Issue 1504: a converted control is a shared `<Select>`, so choosing a value is two clicks
-// on a portaled panel rather than a `change` on a native `<select>`. The panel lands on the
-// harness's own mount target, which is why every lookup is rooted there.
+// Issue 1504: a converted control is a shared `<Select>`.
 import { chooseSelectOption, openSelectPanel } from '../helpers/select-control.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -38,6 +13,7 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -46,7 +22,7 @@ const SCOPED_RAW_MODULES = [
   ...STATUS_TONE_RAW_MODULES,
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
-  'src/ui/svelte/util/foundryBridge.js',
+  ...FOUNDRY_BRIDGE_RAW_MODULES,
   'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
   'src/ui/svelte/stores/worldScopeProjection.js',
   // Issue 1392 (epic 1357, PR 7a): `worldScopeProjection.js` counts the World Vocabulary's
@@ -54,7 +30,7 @@ const SCOPED_RAW_MODULES = [
   // shipped counter. The harness validates this closure and names the miss, unlike the
   // hand-rolled trees elsewhere.
   'src/systems/worldVocabulary.js',
-  'src/utils/vocabularyUsage.js',
+  'src/ui/model/vocabularyUsage.js',
   'src/utils/componentCategories.js',
   // #1663: the ONE implementation behind both category shims; imports nothing.
   'src/utils/categoryNormalization.js',
@@ -65,19 +41,19 @@ const SCOPED_RAW_MODULES = [
   'src/systems/scopedDefinitions.js',
   'src/systems/scopedDefinitionStore.js',
   'src/utils/scalars.js',
-  'src/migration/worldScopeEntityGrouping.js',
+  'src/systems/worldScopeEntityGrouping.js',
   'src/utils/definitionIndex.js',
   'src/utils/sourceReferenceUnion.js',
-  'src/utils/browserPagination.js',
+  'src/ui/model/browserPagination.js',
   'src/utils/bulkSelectionModel.js',
-  'src/utils/scopedEntityListModel.js',
+  'src/ui/model/scopedEntityListModel.js',
   // The frame's lifted view-state (issue 1438). Omitting a declared dependency here
   // THROWS in `before()`, which reports its tests as `# cancelled`, never `# fail`.
-  'src/utils/managerBrowserViewState.js',
+  'src/ui/model/managerBrowserViewState.js',
 ];
 
 const FRAME_MODULES = [
-  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/components/Callout.svelte',
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
@@ -90,7 +66,7 @@ const FRAME_MODULES = [
   'src/ui/svelte/components/ManagerToolbar.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
   // THE MEMBERSHIP FILTER IS A SEGMENTED TRACK SINCE ISSUE 1373, not a `<select>`.
-  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
 ];
 
 const catalogueHarness = createMountedComponentHarness({
@@ -126,11 +102,6 @@ const rulesHarness = createMountedComponentHarness({
 /**
  * One identity record, shaped as its type's lifted identity fields actually are.
  *
- * A component and a tool carry `img` and the three source-link fields; an essence carries `icon`
- * — a Font Awesome CLASS, not a path — and `colorToken`, and no source link at all. That is the
- * whole three-way difference the shells read, so the fixture states it rather than giving all
- * three the same keys and hiding it.
- *
  * @param {string} entityType
  * @param {number} index
  * @param {object} [overrides]
@@ -145,11 +116,7 @@ function entityOf(entityType, index, overrides = {}) {
   if (entityType === 'essence') {
     return { ...base, icon: 'fas fa-flask', colorToken: 'sage', ...overrides };
   }
-  // EACH ENTRY IS LINKED BY A DIFFERENT ONE OF THE THREE SOURCE-LINK FIELDS, and that rotation
-  // is the fixture's real job. Stamping `originItemUuid` on every entry makes a row-level read
-  // of that ONE field indistinguishable from a read of the projection's published answer — so a
-  // consumer that restated the three names, and then went stale on a rename of the other two,
-  // would pass every assertion in this file.
+  // EACH ENTRY IS LINKED BY A DIFFERENT ONE OF THE THREE SOURCE-LINK FIELDS.
   const link = [
     { originItemUuid: `Item.${entityType}${index}` },
     { registeredItemUuid: `Item.${entityType}${index}` },
@@ -186,7 +153,7 @@ function scopeOf(entityType, { count = 3, systems = ROSTER, membership = null } 
     entities.map((entity) => ({
       entityId: entity.id,
       systemId: 'sys-a',
-      // An ABSENT `inherit` map reads as inheriting for every section, matching
+      // An ABSENT `inherit` map reads as inheriting for every section.
       // `isSectionInherited`, so every section's count is the member count.
     }));
   return projectWorldScopeEntity({
@@ -204,12 +171,7 @@ function markerSnippet(attribute) {
   }));
 }
 
-/**
- * A snippet that RECORDS the arguments it was rendered with.
- *
- * `createRawSnippet` hands each parameter as a thunk, so the recorded values are read through
- * `()` rather than taken directly.
- */
+/** A snippet that RECORDS the arguments it was rendered with. */
 function recordingSnippet(sink, attribute) {
   return createRawSnippet((first, second) => {
     sink.push([first?.(), second?.()]);
@@ -328,8 +290,6 @@ describe('the rules-list shell differentiates by entity type from ONE props fact
         'one badge per row'
       );
       // EVERY ROW READS AS LINKED, and the fixture links each one through a DIFFERENT field.
-      // A row-level read that restated only `originItemUuid` reports two rows in three as
-      // unlinked and shows the GM an amber "no source item" pill on records that have one.
       assert.deepEqual(
         [...root.querySelectorAll('[data-scoped-list-source]')].map((node) =>
           node.getAttribute('data-scoped-list-source')
@@ -359,8 +319,7 @@ describe('the catalogue shell labels the inherit counts the descriptor declares'
   const EXPECTED = {
     component: ['category', 'essences'], // issue 1371 r18 (M31): the world record's second section
     essence: ['effectSource', 'macro'],
-    // FOUR since `1.31.0` (issue 1373): `prerequisites` and `bonus` became world-default
-    // sections, so the catalogue inspector states a card for each of them too.
+    // FOUR since `1.31.0` (issue 1373).
     tool: ['breakage', 'onBreak', 'prerequisites', 'bonus'],
   };
   const LABELS = {
@@ -390,7 +349,6 @@ describe('the catalogue shell labels the inherit counts the descriptor declares'
         sections
       );
       // THE CARD TITLE IS THE LANE'S, WITH `scopedSectionLabel` AS THE FALLBACK (issue 1372).
-      //
       // The prototype's world-default cards title themselves after the VALUE the default
       // resolves to — `Effects from Ember Brand` — and put the inherit arithmetic underneath
       // (`essences.png`). So a lane that supplies `sectionTitles` decides the words, and this
@@ -403,13 +361,6 @@ describe('the catalogue shell labels the inherit counts the descriptor declares'
         sections.map((section) => LABELS[section])
       );
       // THE CARD'S SECOND LINE IS THE LANE'S NOTE, AND THE COUNT IS ITS FALLBACK.
-      //
-      // The prototype's card is exactly two lines — the value, then `7 of 13 systems inherit it`
-      // (`essences.png`) — so the shell has one slot to fill, not two. A lane that supplies
-      // `sectionNotes` owns the wording (the essence catalogue's is the inherit line WITH its
-      // override clause, which the bare count cannot say); a lane that supplies none gets the
-      // count. Both branches are asserted, because a shell that dropped the fallback would look
-      // correct on every screen that happens to pass a note.
       for (const cell of cells) {
         assert.match(cell.textContent, /Falls back to /);
       }
@@ -433,11 +384,6 @@ describe('the catalogue shell labels the inherit counts the descriptor declares'
     // This case used to assert the opposite: NO group head above a one-section entity, on the
     // reading that a header and a divider around a single number cost more than the number. That
     // held while the region was a run of `label · N inheriting` lines with no other chrome.
-    //
-    // It is now a stack of CARDS, and the prototype heads that stack `WORLD DEFAULTS` on every
-    // screen it draws (`essences.png`). An unheaded card stack is worse than a headed one at any
-    // section count: the cards are titled after their VALUES, so with no kicker there is nothing
-    // on screen that says the values are world defaults rather than this entity's own.
     for (const entityType of ['component', 'essence', 'tool']) {
       const props = catalogueProps(entityType);
       const root = await catalogueHarness.mount({
@@ -453,8 +399,7 @@ describe('the catalogue shell labels the inherit counts the descriptor declares'
   });
 
   it('heads the system list and states members over roster beside it', async () => {
-    // `SYSTEM RULES  13 / 24` (`essences.png`). The pair is the fact: a count of member systems
-    // alone cannot tell "every system has it" from "half of them do".
+    // `SYSTEM RULES 13 / 24` (`essences.png`). The pair is the fact.
     const props = catalogueProps('essence');
     const root = await catalogueHarness.mount({
       ...props,
@@ -529,8 +474,7 @@ describe("the composed selection toolbar wears the frame's own clothes", () => {
       assert.equal(toolbar.classList.contains(studio), false, `${studio} leaked in`);
     }
 
-    // The Component Studio's five defaults must be nowhere in this tree: inheriting them would
-    // retune six scoped screens silently the next time that studio moves.
+    // The Component Studio's five defaults must be nowhere in this tree.
     for (const inherited of [
       'data-component-selection-toolbar',
       'data-component-select-all-page',
@@ -541,14 +485,7 @@ describe("the composed selection toolbar wears the frame's own clothes", () => {
       assert.equal(root.querySelectorAll(`[${inherited}]`).length, 0, `${inherited} leaked in`);
     }
 
-    // THE REGISTER IS INSIDE THE BAND, ALL OF IT. A construction that moved the band but left any
-    // one control in the filter row would satisfy a bare presence query on `root`, so each hook
-    // is counted on the whole tree and inside the band and the two totals must agree.
-    //
-    // `select-all-results` renders only when the filtered set is bigger than the rendered one, so
-    // it is counted rather than required: this fixture is one page and draws none. The equality
-    // still bites — it is `0 === 0` here and `1 === 0` the moment the link is rendered outside
-    // the band.
+    // THE REGISTER IS INSIDE THE BAND.
     for (const hook of [
       'data-scoped-list-select-all-page',
       'data-scoped-list-selection-count',
@@ -571,14 +508,7 @@ describe("the composed selection toolbar wears the frame's own clothes", () => {
   });
 
   it('points at the inspector rather than restating what the panel there offers', async () => {
-    // `proto:594`. The band and the bulk panel BOTH state the count — the design does that too
-    // (`proto:629` is the panel's own accent hero) — and the difference is what each does next:
-    // the band names where the verbs are, the panel holds them. Without the sentence the band's
-    // `Select all` and `Clear` read as the bulk actions, which is the competition this avoids.
-    //
-    // A `bulk` SNIPPET IS SUPPLIED HERE and the base fixture has none, which is the other half of
-    // the contract: the sentence is true only when the bulk body lands in the inspector, so the
-    // frame says it only for `bulk && inspectorBody`. The second mount below is that negative.
+    // `proto:594`. The band and the bulk panel BOTH state the count.
     const root = await catalogueHarness.mount(
       catalogueProps('component', { bulk: markerSnippet('data-lane-bulk-body') })
     );
@@ -611,11 +541,7 @@ describe('every snippet is invoked with the documented parameters', () => {
   after(() => catalogueHarness.teardown());
   afterEach(() => catalogueHarness.remount());
 
-  // `clearSelection` joined the set at issue 1373's maintainer feedback round, and it is the one
-  // key that is a FUNCTION rather than a fact. The `bulk` snippet renders the shared
-  // `BulkEditPanelShell`, whose header carries a `Clear selection` action, and a lane holds the
-  // ticked ids only as the array it was rendered with — so without a way back to the set's owner
-  // that control could not do the one thing it names.
+  // `clearSelection` joined the set at issue 1373's maintainer feedback round.
   const CTX_KEYS = [
     'scope',
     'systems',
@@ -666,8 +592,6 @@ describe('every snippet is invoked with the documented parameters', () => {
     assert.equal(ctx.member, false);
     assert.equal(ctx.systemRow, null);
     // AND THE ONE CALLABLE KEY ACTUALLY CLEARS. Asserted as an EFFECT rather than as a typeof:
-    // a stub of the right shape satisfies `typeof ctx.clearSelection === 'function'` while the
-    // panel's Clear goes on doing nothing, which is the failure this key exists to prevent.
     assert.equal(typeof ctx.clearSelection, 'function', 'the bulk body can reach the set owner');
     ctx.clearSelection();
     await catalogueHarness.setProps({});
@@ -678,8 +602,7 @@ describe('every snippet is invoked with the documented parameters', () => {
   });
 
   it('reaches a conditionally present projection field through ctx.scope', async () => {
-    // `toolBreakage` is carried ONLY when the corpus holds one, so it is the field a lane would
-    // otherwise ask for a new shell prop to reach.
+    // `toolBreakage` is carried ONLY when the corpus holds one.
     const seen = [];
     const scope = projectWorldScopeEntity({
       entityType: 'tool',
@@ -732,7 +655,7 @@ describe('the rules list draws one inherit row per inheritable section, with its
   }
 
   it('renders a NON-EMPTY note on every row the shell supplied one for', async () => {
-    // A bare row-count criterion passes over every note empty, which is the state where a rules
+    // A bare row-count criterion passes over every note empty.
     // list says "Effect source · Inherited" and never says what is being inherited.
     const root = await rulesHarness.mount(rulesProps('tool'));
     const notes = [...rows(root)[0].querySelectorAll('[data-scoped-inherit-note]')];
@@ -856,8 +779,7 @@ describe('a list has three no-content states, each its own treatment', () => {
       'the unavailable panel is its OWN treatment, not the hero with different copy — a ' +
         'hook-value assertion alone passes over a hero wearing this hook'
     );
-    // Requirement 10: the whole authoring surface is suspended, so a screen cannot offer a
-    // destructive action against a corpus nobody could read.
+    // Requirement 10: the whole authoring surface is suspended.
     for (const suppressed of [
       '[data-scoped-list-search]',
       '[data-scoped-list-membership]',
@@ -883,11 +805,7 @@ describe('a list has three no-content states, each its own treatment', () => {
       false,
       'an empty world is an absence of content, not a query that matched nothing'
     );
-    // THE SELECTION BAND IS NOT ON THIS LIST, and its absence is the point rather than a gap
-    // (issue 1373, round 4). The register is a STATE now — `proto:591` gates the whole band on
-    // an active selection — and an empty corpus has no row to tick, so a band here would be a
-    // control acting on nothing. What "the surface stays live" means is the FILTERS, which is
-    // what an unreadable corpus suspends and a readable-but-empty one does not.
+    // THE SELECTION BAND IS NOT ON THIS LIST.
     for (const live of [
       '[data-scoped-list-search]',
       '[data-scoped-list-membership]',
@@ -997,11 +915,7 @@ describe('the shells own the list state machine', () => {
     const root = await catalogueHarness.mount(
       catalogueProps('component', { scope: scopeOf('component', { count: 60 }) })
     );
-    // THE PAGE BOX IS INSIDE THE BAND NOW, so it has to be opened before it can be used (issue
-    // 1373, round 4). One row's own box is what a GM clicks first, exactly as `proto:603` draws
-    // it; the band then appears carrying `All`, and clicking that completes the page. The
-    // intermediate count is asserted so a box that silently stopped selecting anything cannot
-    // read as this step working.
+    // THE PAGE BOX IS INSIDE THE BAND NOW.
     root.querySelector('[data-scoped-list-select="component-0"]').click();
     await catalogueHarness.setProps({});
     assert.match(
@@ -1017,8 +931,7 @@ describe('the shells own the list state machine', () => {
       root.querySelector('[data-scoped-list-selection-count]').textContent,
       /10 selected/
     );
-    // Page two: the count survives paging, so it is the whole selection rather than the page's
-    // intersection with it.
+    // Page two: the count survives paging.
     root.querySelector('[data-pagination-next]').click();
     await catalogueHarness.setProps({});
     assert.match(
@@ -1062,8 +975,7 @@ describe('the shells own the list state machine', () => {
   });
 
   it('DISARMS on any selection, filter, sort or page change', async () => {
-    // The defect this removes ships a staged removal nobody staged: arm Remove on one entity,
-    // search, come back, one click.
+    // The defect this removes ships a staged removal nobody staged.
     const props = catalogueProps('essence', { selectedId: 'essence-0' });
     const root = await catalogueHarness.mount(props);
     const armToken = () => root.querySelector('[data-arm-token][data-armed="true"]');
@@ -1108,12 +1020,6 @@ describe('the page index is clamped and the footer reads the clamped value', () 
 
   it('clamps when the CORPUS shrinks under a GM sitting on a later page', async () => {
     // THE FILTER PATH DOES NOT REACH THE CLAMP, and finding that out is what this test is for.
-    // Every filter, sort and membership change in the frame resets the page to zero itself, so
-    // driving the search box can never leave a stale index for `paginateRows` to clamp. The path
-    // that DOES reach it is a re-projection: another client deletes rows, `worldScope` republishes
-    // a shorter corpus, and the GM is still on page three. Measured — with the clamp weakened to
-    // `Math.max(0, ...)` the search-box version of this test stayed green, which is why it was
-    // replaced rather than kept beside this one.
     const root = await catalogueHarness.mount(
       catalogueProps('component', { scope: scopeOf('component', { count: 60 }) })
     );
@@ -1128,12 +1034,11 @@ describe('the page index is clamped and the footer reads the clamped value', () 
     );
 
     // ── (1) CLAMPED INTO A CORPUS THAT IS STILL MULTI-PAGE, where the FOOTER is the observation.
-    //
     // 15 rows at the ten-row default page size is two pages, so the bar renders and states the
     // clamped index directly. This half is here because the foot pager is `multiPageOnly` since
     // issue 1372: the shorter-corpus case below no longer draws one, and a clamp gate that only
     // ever measured the no-footer case would stop covering the footer-reads-the-clamped-value
-    // half of `ui-integration/spec.md`'s list-shell requirement 13 altogether.
+    // half of `ui-world-scope/spec.md`'s list-shell requirement 13 altogether.
     await catalogueHarness.setProps({ scope: scopeOf('component', { count: 15 }) });
     assert.equal(
       rows(root).length,
@@ -1149,12 +1054,6 @@ describe('the page index is clamped and the footer reads the clamped value', () 
     );
 
     // ── (2) CLAMPED INTO A ONE-PAGE CORPUS, where the ROW SLICE is the observation.
-    //
-    // The bar is gone here — one page — so the clamped value is read off the rows instead, and it
-    // is read as an IDENTIFIED slice rather than a count: `slice(10, 20)` over eight entries is
-    // empty, and any index above zero over an eight-row single page is empty too, so the whole
-    // corpus being present AND starting at its first record is what says the index came back to
-    // zero. The count alone would be satisfied by a frame that rendered eight unrelated rows.
     await catalogueHarness.setProps({ scope: scopeOf('component', { count: 8 }) });
     assert.ok(
       !root.querySelector('[data-pagination-summary]'),
@@ -1175,9 +1074,7 @@ describe('the page index is clamped and the footer reads the clamped value', () 
   });
 
   it('resets the page itself on a filter change, which is why the case above shrinks the corpus', async () => {
-    // Stated as its own assertion rather than left as a comment: it is the reason the clamp is
-    // unreachable from the search box, and if it ever stops holding the case above is measuring
-    // something else.
+    // Stated as its own assertion rather than left as a comment.
     const root = await catalogueHarness.mount(
       catalogueProps('component', { scope: scopeOf('component', { count: 60 }) })
     );
@@ -1188,12 +1085,7 @@ describe('the page index is clamped and the footer reads the clamped value', () 
     search.value = 'Ash 0';
     search.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
     await catalogueHarness.setProps({});
-    // The filtered set is `Ash 00`-`Ash 09` and it is ONE page at the ten-row default, so since
-    // issue 1372 there is no footer to read the reset index off. The rows say it instead, and
-    // they say it as an IDENTIFIED slice: a page index left at 1 slices `component-10` onward out
-    // of a ten-row set and renders nothing, and any index above zero renders nothing, so the
-    // whole filtered set being present AND starting at its first record is what says the index
-    // went back to zero.
+    // The filtered set is `Ash 00`-`Ash 09` and it is ONE page at the ten-row default.
     assert.deepEqual(
       rows(root).map((row) => row.getAttribute('data-scoped-list-row')),
       Array.from({ length: 10 }, (unused, index) => `component-${index}`),
@@ -1211,10 +1103,6 @@ describe('the page index is clamped and the footer reads the clamped value', () 
     // full-width `Showing 1–6 of 6 · Page 1 of 1 · Per page 25` band there — a control with no
     // reachable second state. `design-system/spec.md`'s browse recipe now permits exactly that
     // suppression and requires the bar back the moment a second page exists.
-    //
-    // BOTH HALVES, in one case and against one mount, because either alone is passed by a
-    // mutation the other catches: an absent bar is satisfied by a frame that renders no pager at
-    // all, and a present bar is satisfied by `persistent={true}` coming back.
     const root = await catalogueHarness.mount(catalogueProps('component'));
     assert.equal(
       rows(root).length,
@@ -1257,8 +1145,6 @@ describe('the owner can drive the inspected row at any time', () => {
 
   it('CONTROL: an owner change propagates when the GM has clicked nothing', async () => {
     // The control is what makes the two cases below measurements rather than harness artifacts:
-    // if a prop update did not propagate at all they would fail for a reason that has nothing to
-    // do with the component.
     const root = await catalogueHarness.mount(catalogueProps('component'));
     assert.equal(inspected(root), null, 'nothing is inspected on a bare mount');
     await catalogueHarness.setProps({ selectedId: 'component-1' });
@@ -1280,8 +1166,7 @@ describe('the owner can drive the inspected row at any time', () => {
   });
 
   it('the owner can CLEAR the selection back to resting', async () => {
-    // A falsy value is a real instruction, not an absent one: "show nothing" is what a page
-    // returning to a list-level view needs to be able to say.
+    // A falsy value is a real instruction, not an absent one.
     const root = await catalogueHarness.mount(
       catalogueProps('component', { selectedId: 'component-1' })
     );
@@ -1367,9 +1252,6 @@ describe('the catalogue offers no copy-from it cannot complete', () => {
 
   it('renders NO copy affordance even when another system holds the entity', async () => {
     // The fixture is deliberately the one where the shipped `MembershipActions` WOULD offer it:
-    // both systems hold the entity, so "some other system has a record" — the only precondition
-    // this shell can evaluate — is satisfied. What it still cannot evaluate is WHICH of them the
-    // GM meant as the source, and the write path needs that as its second argument.
     const scope = projectWorldScopeEntity({
       entityType: 'component',
       corpus: {
@@ -1452,20 +1334,12 @@ describe('QE PROBE: the route-exit guard case the spec names', () => {
     // adopting it — so its own state still holds the PREVIOUS value. "Putting the selection
     // back" therefore means writing the value it last pushed, which against a frame holding
     // separate internal state is a no-op: the prop never changed, so nothing re-runs.
-    //
-    // No flip-flop rescues it either. Signals settle before effects run, so setting the value
-    // away and back within one turn leaves an effect seeing only the final value, equal to what
-    // it last adopted.
-    //
-    // The other four cases all move the prop to a value the frame has not seen, which is why
-    // they passed while this failed.
     const root = await catalogueHarness.mount(
       catalogueProps('component', { selectedId: 'component-0' })
     );
     assert.equal(inspected(root), 'Ash 00');
 
-    // The GM clicks another row. The page is running its route-exit confirm, so it does NOT
-    // set `selectedId` — it has not decided yet.
+    // The GM clicks another row. The page is running its route-exit confirm.
     root.querySelector('[data-scoped-list-inspect="component-1"]').click();
     await catalogueHarness.setProps({});
     assert.equal(inspected(root), 'Ash 01', 'the click must land, or this case is vacuous');
@@ -1482,31 +1356,13 @@ describe('QE PROBE: the route-exit guard case the spec names', () => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════════════════════════════════
 // THE LANE FILTER'S FIRST GATE (issue 1504)
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-//
-// `data-scoped-list-filter` occurs exactly once in the whole repository — on the control
-// `EntityListInspectorFrame` renders per lane-filter descriptor — and until this change it
-// appeared in NO registry step, NO test and NO smoke step. So the frame's most configurable
-// control had no coverage at all, and issue 1504 converts it: a native `<select>` whose
-// `onchange` forwarded the raw event value becomes a shared `<Select>` whose `onChange` receives
-// the option's own value.
-//
-// That is a seam worth a gate rather than a diff review. Deleting the `onChange` forward leaves
-// a control that opens, marks a row and filters nothing, with every other assertion in this file
-// green — the frame keeps rendering, the trigger keeps its hook, and only the ROW SET is wrong.
 describe('EntityListInspectorFrame lane filters (issue 1504)', () => {
   before(catalogueHarness.setup);
   after(catalogueHarness.teardown);
   afterEach(catalogueHarness.remount);
 
-  /**
-   * One lane filter over a field the fixture rotates, so a value really partitions the corpus.
-   *
-   * `matches` is the descriptor's own predicate, exactly as `scopedEntityListModel.project`
-   * calls it, and `'all'` is inert by that model's own rule rather than by anything here.
-   */
+  /** One lane filter over a field the fixture rotates, so a value really partitions the corpus. */
   const HALF_FILTER = Object.freeze({
     id: 'half',
     label: 'Half',
@@ -1515,8 +1371,7 @@ describe('EntityListInspectorFrame lane filters (issue 1504)', () => {
       { value: 'first', label: 'First half' },
       { value: 'second', label: 'Second half' },
     ],
-    // Keyed on the entry's ID rather than on a display field, because the projection is what
-    // hands these predicates their entries and an id is the one thing it is guaranteed to carry.
+    // Keyed on the entry's ID rather than on a display field.
     matches: (entry, value) =>
       value === 'first' ? entry.id !== 'essence-2' : entry.id === 'essence-2',
   });
@@ -1555,8 +1410,7 @@ describe('EntityListInspectorFrame lane filters (issue 1504)', () => {
       'choosing a lane value narrowed the list, so the control`s onChange reached the model'
     );
 
-    // AND `all` IS INERT BY THE MODEL'S RULE, not by an absence of a click: the row set comes
-    // back whole rather than staying narrowed or emptying.
+    // AND `all` IS INERT BY THE MODEL'S RULE, not by an absence of a click.
     chooseSelectOption(root, '[data-scoped-list-filter="half"]', 'all');
     await catalogueHarness.setProps({});
     assert.deepEqual(rowIds(root), ['essence-0', 'essence-1', 'essence-2'], 'and released it');
@@ -1576,8 +1430,7 @@ describe('EntityListInspectorFrame lane filters (issue 1504)', () => {
         'addressable on its own, which is what a capture step and a smoke step need'
     );
 
-    // The two are independent axes rather than one control rendered twice: narrowing on the
-    // second must not disturb the first, and the intersection is what a GM gets.
+    // The two are independent axes rather than one control rendered twice.
     chooseSelectOption(root, '[data-scoped-list-filter="half"]', 'first');
     await catalogueHarness.setProps({});
     chooseSelectOption(root, '[data-scoped-list-filter="parity"]', 'even');
@@ -1586,10 +1439,7 @@ describe('EntityListInspectorFrame lane filters (issue 1504)', () => {
   });
 
   it('keeps the tick, because a lane`s values are close cousins the trigger shows one of', async () => {
-    // The judgement is the LIST's rather than the component's (`design-system/spec.md`): each
-    // lane's options are the values of ONE facet, the trigger shows only the chosen one, and a
-    // reader confirming which is live is exactly what the tick is earned for. The pager's page
-    // size drops it for the opposite reason, and both polarities ship in this change.
+    // The judgement is the LIST's rather than the component's (`design-system/spec.md`).
     const root = await catalogueHarness.mount(
       catalogueProps('essence', { scope: laneScope(), filters: [HALF_FILTER] })
     );

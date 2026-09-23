@@ -172,10 +172,12 @@ export default [
   //
   //    The scratch entries matter because the gate is a GLOB now (issue #1660). While `lint` named
   //    every file it covered, an untracked tree was unreachable by construction; `eslint .` reaches
-  //    anything on disk, and `.worktrees/` holds entire checkouts of this repository — so without
-  //    this a developer's agent worktrees are linted as if they were the project, and the gate's
-  //    result depends on what happens to be lying around. `.foundry-e2e/` is the same shape for a
-  //    different reason: it holds downloaded game systems and Foundry's own JavaScript.
+  //    anything on disk, and both `.worktrees/` and `.claude/worktrees/` hold entire checkouts of
+  //    this repository — so without these a developer's agent worktrees are linted as if they
+  //    were the project, and the gate's result depends on what happens to be lying around.
+  //    `.claude/worktrees/` is the path the agent worktree lifecycle actually uses; listing only
+  //    `.worktrees/` was issue #1748. `.foundry-e2e/` is the same shape for a different reason:
+  //    it holds downloaded game systems and Foundry's own JavaScript.
   //
   //    These mirror `.gitignore` by hand rather than being derived from it. ESLint's `ignores` are
   //    minimatch patterns and `.gitignore` lines are not — anchoring, negation and directory rules
@@ -191,6 +193,7 @@ export default [
       'docs/',
       'coverage/',
       '.worktrees/',
+      '.claude/worktrees/',
       '.foundry-e2e/',
       '.foundry-chrome/',
       '.foundry-perf/',
@@ -225,7 +228,7 @@ export default [
   {
     files: ['**/*.js', '**/*.mjs'],
     languageOptions: {
-      ecmaVersion: 2023,
+      ecmaVersion: 2025,
       sourceType: 'module',
     },
     rules: {
@@ -479,6 +482,15 @@ export default [
     rules: { 'no-restricted-globals': ['error', ...DOMAIN_RESTRICTED_GLOBALS] },
   },
 
+  // 5d. The Foundry-free view models under `src/ui/model/` and the presenters under
+  //     `src/ui/presenters/` (issues 1664 and 1665). A separate block, not a fifth
+  //     `DOMAIN_LAYER_ROOTS` entry: `tests/foundry-global-reads-ratchet.test.js` derives each
+  //     root from its first two path segments, so a three-segment root fails it.
+  {
+    files: ['src/ui/model/**/*.js', 'src/ui/presenters/**/*.js'],
+    rules: { 'no-restricted-globals': ['error', ...DOMAIN_RESTRICTED_GLOBALS] },
+  },
+
   // 6. Node tooling (build/release scripts and root config files). These are
   //    CLI entry points, so process control and console output are expected.
   //
@@ -565,11 +577,11 @@ export default [
       // `page.evaluate` bodies driving `game`, `Actor` and the rendered DOM.
       'scripts/lib/foundryPerfScenarios.js',
       'scripts/foundry-perf-run.mjs',
-      // The Foundry smoke harness. It carries 174 `page.evaluate` bodies — by far the most of any
-      // file here — and was missing from this list only because the old gate never linted it
-      // (issue #1660). Its `no-undef` reports were all `window`, `document`, `game` and `foundry`
-      // inside those bodies.
-      'scripts/foundry-test-run.mjs',
+      // The smoke walk's page primitives and its scenario modules (issue #1692), which is where
+      // those bodies now live. The rest of `scripts/foundry-smoke/` — the profile, the context, the
+      // registry, the loop and the cleanup — is deliberately excluded: it holds no in-page body.
+      'scripts/foundry-smoke/pageOps/*.mjs',
+      'scripts/foundry-smoke/scenarios/*.mjs',
       // Not a `page.evaluate` user: a GM world script, pasted into Foundry and run there, so the
       // whole file is in-page code rather than a body inside it. Same globals, same reason.
       'scripts/foundry/create-mythwright-dnd5e.js',

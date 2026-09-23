@@ -44,7 +44,7 @@ It prioritizes the earliest honestly reviewable PR while preserving mandatory sa
 - Repeat a reviewer only when the commit or artifact it reviews materially changes within its owned concern, or when one of its findings remains unresolved — and then as a disposition-only confirmation round at model tier `medium`, scoped to its own prior findings, never as a second full reading.
 - Apply mechanical findings yourself: a finding that names exact replacement text, an anchor, a count or a roster entry goes straight into the next delta revision or the fix brief, and does not cost a reviewer spawn to confirm.
 - Prune a path-signal role at the post-implementation and docs stages when its row fired on prose alone (comments, docblocks, cites, counts; no executable line, selector, assertion or requirement sentence; at or below the stage's `SMALL_MAX`), per step 5 of `AGENTS.md`'s **Auto-spawn routing**; record the pruned role in the handoff.
-- Plan issues that share an exact-count ledger as one delta and one PR chain, and run changes as parallel lanes only when their path sets are disjoint from each other's pinned ledgers, sheet regions and registry prose; otherwise sequence them on one rail.
+- Plan issues that share an exact-count ledger — the design-system tables and the View Lab registry prose, not the four ceiling ledgers issue #1656 added — as one delta and one PR chain, and run changes as parallel lanes only when their path sets are disjoint from each other's exact-count ledgers, sheet regions and registry prose; otherwise sequence them on one rail.
 - Do not invalidate an approval merely because issue or PR metadata changed or a rebase is patch-equivalent for the reviewed concern.
 - When repeat review is required, use a fresh detached lane pinned to the exact target and supply an immutable base-relative artifact.
 - Monitor each delegated lane for observable progress, such as tool output, a status report, a diff, or a commit.
@@ -148,8 +148,8 @@ Skills and agents should point to those documents instead of carrying detailed p
 - For UI-changing PRs, plan screenshot evidence before PR creation or update.
 **The default producer is the View Lab, and for a registry-covered view you usually plan NO capture work at all**: the `capture` CI job maps the PR's changed files to cases and publishes the affected frames into the PR body on every push, so evidence exists before anyone asks.
 Plan a local run only when you need frames before pushing or want to inspect a state directly: `node scripts/view-lab-screenshots.mjs apps <comma-separated-case-ids>` writes into `ui-screenshot-artifact/apps/` in seconds, and `ui-screenshot-artifact/apps/index.html` browses them by screen with a multi-tag filter.
-Targeting is per changed file: a typical UI file selects a handful of cases, the widest selects 35 (~3 min).
-A change to the lab's own fixture world, mount page, capture driver or registry selects **surface coverage** by design — one frame of every route and tab the lab renders, 48 of 485 cases — not every publishable case, because the detailed states of a screen are captured by the files that draw them, not by a shared input.
+Targeting is per changed file: a typical UI file selects a handful of cases.
+A change to the lab's own fixture world, mount page, capture driver or registry selects **surface coverage** by design — one frame of every route and tab the lab renders — not every publishable case, because the detailed states of a screen are captured by the files that draw them, not by a shared input.
 Do NOT plan the smoke as the routine producer.
 Its `screenshots` profile costs ~31s per frame against the lab's ~5s, needs Docker and a licensed container, and cannot run on a GitHub Actions runner at all — so it produces nothing per-PR and serialises the lane on one machine.
 Reserve it for a view the registry does not cover, or for a question about real Foundry runtime behaviour: `npm run test:foundry:screenshots` captures the changed-file-affected views (from `mapChangedFilesToViews`, via `npm run screenshots:ui:targets`) as full real-Foundry app windows; `full` stays the occasional outer-loop suite.
@@ -181,23 +181,10 @@ Anything past that is the shape `AGENTS.md` names under "Observed failure mode: 
 PR titles must comply with Conventional Commits.
 For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
 
-When opening or updating a PR, use these H2 sections in order.
+When opening or updating a PR, use the H2 sections of `.github/pull_request_template.md`, in its order.
+GitHub pre-fills that template for a PR opened in the browser, but `gh pr create --body-file` does not, so read it before writing the body.
 The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close.
 Use the non-closing `Refs #<issue>` only for a partial change that should leave the issue open.
-
-```md
-## Description
-
-Closes #<issue>
-
-## Benefit(s)
-
-## Changes in this PR
-
-## Testing
-
-## Screenshots (if applicable)
-```
 
 ## Expected output
 

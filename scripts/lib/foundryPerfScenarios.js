@@ -1,43 +1,6 @@
 /**
  * The Foundry perf profile's scenarios: the walk that produces one number per declared measurement
  * (issue 1073).
- *
- * ## Where this file sits in the harness, and the rule it follows
- *
- * Like `scripts/lib/foundryBrowserBoot.js`, this module imports NOTHING from Playwright and only
- * ever uses a `page` it is handed — so it keeps the letter of the "`scripts/lib` must be importable
- * under `node --test`" rule — but it is useless without a live browser and no test imports it. Its
- * behaviour is verified by running the profile. What IS unit-tested is its registry shape: every
- * scenario's `measurementId` must name a declared, implemented measurement, and every implemented
- * measurement must have a scenario. That mirror rots silently otherwise, and a rotted mirror here
- * means a measurement that reports nothing while the run still exits zero.
- *
- * It also imports NOTHING from `src/`, and a guard test in `tests/foundry-perf-profile.test.js`
- * holds it to that. The reason is a real failure this file already had: a static import of a
- * shipped `src/systems/` module (issue 1255's consent-prompt action constant) made a product-side
- * deletion a LOAD-TIME `Cannot find module` for the whole registry, which takes out every scenario
- * rather than the one that used it. Whatever a scenario needs from the product, it reads from the
- * live page through `game.fabricate` or a rendered selector, where an absence is one scenario
- * reporting `unavailable`.
- *
- * ## Three rules every scenario follows
- *
- * 1. **Observe in the page, decide in Node.** A scenario returns plain data. Nothing here throws to
- *    signal a finding, because a thrown scenario loses the rest of the walk and every measurement
- *    after it — an expensive way to learn one thing.
- * 2. **A control that is not there is `unavailable`, never zero.** The Alchemy tab only exists when
- *    an enabled alchemy system has recipes; a second selectable actor only exists when the fixture
- *    seeded one. Reporting `0 ms` for those is a fabricated measurement.
- * 3. **Class 1 and class 2 are separated at the point of production.** Every scenario returns
- *    `{invariant, timing}`, so nothing downstream has to guess which of its numbers may be asserted.
- *    Counts go in `invariant`; every millisecond goes in `timing.samplesMs`.
- *
- * ## Why the GM browser has no paging scenario
- *
- * Issue 1073 asks for "search/filter/page/actor/source switching". The GM manager does not paginate
- * today — that is issue 1081, unbuilt — so the paging measurement is taken where paging exists, in
- * the PLAYER recipe browser, and the GM half measures search only. Timing a control that does not
- * exist would have produced a number for a code path nobody runs.
  */
 
 import { PERF_BRIDGE_KEY } from './foundryPerfCapture.js';
@@ -45,15 +8,7 @@ import { PERF_BRIDGE_KEY } from './foundryPerfCapture.js';
 /** How many timed repetitions a repeatable scenario takes, after one untimed warm-up. */
 export const DEFAULT_REPS = 3;
 
-/**
- * Page-side scratch slots.
- *
- * An `ApplicationV2` instance and a hook observation cannot cross the Playwright boundary, so both
- * have to live on a page global. The names are constants here and are PASSED INTO each
- * `page.evaluate` rather than closed over: an evaluate body is serialized and re-parsed inside the
- * page, so a reference to a module constant would be an undefined identifier at run time — a
- * mistake that presents as a scenario failure naming the wrong thing entirely.
- */
+/** Page-side scratch slots. */
 export const MANAGER_HANDLE = '__fabricatePerfManagerApp';
 export const PROPAGATION_HANDLE = '__fabricatePerfPropagation';
 
@@ -66,11 +21,8 @@ export const PERF_SELECTORS = Object.freeze({
   actorBarReady: '[data-actor-bar-state="ready"]',
   actorBarTrigger: '.fabricate-app-actor-bar button[aria-haspopup]',
   // The picker is `SearchablePopover` now (issue 1475), so its rows are the primitive's
-  // `.manager-travel-option` and the panel is PORTALED out of the bar onto the player window's
-  // frame. `.actor-bar-popover` is the hook the bar hands the primitive through `popoverClass`
-  // and is what keeps this scoped to this picker rather than to any popover in the window; the
-  // frame is still `#fabricate-app`, which is what `playerRoot` locates, so the panel remains
-  // inside the `shell` this scenario searches.
+  // `.manager-travel-option` and the panel is portaled out of the bar onto the player window's
+  // frame.
   actorBarOption: '.actor-bar-popover .manager-travel-option',
   craftingBrowser: '[data-crafting-browser]',
   craftingSearch: '[data-crafting-browser] input[type="search"], [data-crafting-browser] input',
@@ -81,21 +33,7 @@ export const PERF_SELECTORS = Object.freeze({
   sourceEntry: '[data-crafting-sources] [data-source-id]',
 });
 
-/**
- * Time one asynchronous operation, repeatedly, returning a class-2 sample set.
- *
- * The first call is a warm-up and is NOT sampled: module chunks load lazily, Svelte compiles its
- * first render, and Foundry's own caches are cold — a first sample measures all of that once and
- * then never again, so including it makes the median a function of how many reps were requested.
- * The warm-up cost is still recorded, separately and by name, because for a scenario that only ever
- * happens once per session (opening an app) the cold number is the interesting one.
- *
- * @param {() => Promise<unknown>} operation
- * @param {object} [options]
- * @param {number} [options.reps]
- * @param {() => Promise<void>} [options.reset] Restores the precondition between reps.
- * @returns {Promise<{coldMs: number, samplesMs: number[]}>}
- */
+/** Time one asynchronous operation, repeatedly, returning a class-2 sample set. */
 export async function timeOperation(operation, { reps = DEFAULT_REPS, reset = null } = {}) {
   const coldStart = Date.now();
   await operation();
@@ -113,9 +51,6 @@ export async function timeOperation(operation, { reps = DEFAULT_REPS, reset = nu
 
 /**
  * Stamp the scenario name onto the page-side bridge so long tasks and heap samples are attributed.
- *
- * @param {object} page
- * @param {string|null} scenario
  */
 async function setScenario(page, scenario) {
   await page
@@ -157,18 +92,7 @@ async function closeFabricateApps(page) {
     .catch(() => {});
 }
 
-/**
- * Call one method on the live manager app's admin store.
- *
- * Every manager scenario drives the STORE rather than the rail buttons. Two reasons: the store call
- * is where the expensive work actually happens (row projection, not a click handler), and a
- * DOM-driven walk would re-measure Foundry's own click plumbing while pinning selectors that the
- * Manager V2 work moves regularly.
- *
- * @param {object} page
- * @param {string} method A method name on the admin store.
- * @param {unknown[]} [args]
- */
+/** Call one method on the live manager app's admin store. */
 async function callAdminStore(page, method, args = []) {
   return page.evaluate(
     async ({ handle, name, values }) => {
@@ -187,12 +111,7 @@ async function openPlayerApp(page, tab = 'crafting') {
   await shell.locator(PERF_SELECTORS.actorBarReady).first().waitFor({ state: 'visible' });
 }
 
-/**
- * The scenarios, in walk order.
- *
- * Each `run` receives `{page, playerPage, systemId, log}` and returns
- * `{invariant?, timing?, unavailable?}`.
- */
+/** The scenarios, in walk order. */
 export const PERF_SCENARIOS = Object.freeze([
   {
     id: 'startup-phases',
@@ -493,10 +412,8 @@ export const PERF_SCENARIOS = Object.freeze([
       const result = await page.evaluate(
         async ({ id, limit }) => {
           const exported = game.fabricate.exportSystem(id);
-          // BOUNDED ON PURPOSE. Import is quadratic today (issue 1086: one whole-corpus save per
-          // imported item), so an unbounded import of a 10,000-recipe corpus would not finish. The
-          // bound is reported beside the duration, because a duration whose N is not stated is not
-          // a measurement.
+          // Bounded on purpose. Import is quadratic today (issue 1086: one whole-corpus save per
+          // imported item), so an unbounded import of a 10,000-recipe corpus would not finish.
           const trimmed = {
             ...exported,
             system: { ...exported.system, id: `${id}-imported` },
@@ -532,9 +449,7 @@ export const PERF_SCENARIOS = Object.freeze([
       if (!playerPage) return { unavailable: 'no second client joined' };
       await setScenario(page, 'propagation-hydrated');
 
-      // Arm the receiver BEFORE the write. A listener installed afterwards would measure the
-      // interval from "we got round to listening" and report a healthy latency for a message that
-      // had already arrived — or for one that never did.
+      // Arm the receiver before the write.
       await playerPage.evaluate((slot) => {
         const observed = { armedAt: Date.now(), hits: [] };
         Reflect.set(globalThis, slot, observed);
@@ -581,8 +496,7 @@ export const PERF_SCENARIOS = Object.freeze([
         timing: {
           samplesMs: firstHit ? [firstHit.at - sentAt] : [],
           // Cross-MACHINE clocks would make this meaningless, but both contexts here are the same
-          // browser on the same host, so the subtraction is legitimate. Recorded explicitly so a
-          // future multi-host arm does not inherit the assumption silently.
+          // browser on the same host, so the subtraction is legitimate.
           clockBasis: 'single host, single browser process',
         },
         invariant: {
@@ -598,15 +512,7 @@ export const PERF_SCENARIOS = Object.freeze([
   },
 ]);
 
-/**
- * Read the GM browser's row census from the manager store's own view state.
- *
- * Read from the STORE rather than by counting DOM nodes: the manager virtualizes nothing today, but
- * a row count taken from the DOM would silently start meaning "rows currently painted" the moment it
- * did, and the change would look like a performance win.
- *
- * @param {object} page
- */
+/** Read the GM browser's row census from the manager store's own view state. */
 async function readManagerRowCensus(page) {
   return page.evaluate((handle) => {
     const store = Reflect.get(globalThis, handle)?._adminStore;

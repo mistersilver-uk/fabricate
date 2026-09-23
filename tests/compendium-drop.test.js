@@ -1,54 +1,15 @@
 /**
- * Tests for compendium drop handling in Recipe Manager (Phase 1 + Phase 2)
- *
- * Phase 1 -- Single item drop UUID resolution:
- *   1. World sidebar item ({ uuid }) returns the uuid unchanged
- *   2. Compendium item ({ pack, id }) returns "Compendium.{pack}.{id}"
- *   3. Both uuid and pack+id present: uuid wins
- *   4. Empty object {} returns null
- *   5. pack present but id missing returns null
- *   6. id present but pack missing returns null
- *   7. null returns null
- *   8. undefined returns null
- *
- * Phase 1 integration (onDropItem callback behaviour):
- *   9. Compendium pack+id drop resolves UUID and calls addItemFromUuid
- *  10. Invalid drop calls notifications.warn and does NOT call addItemFromUuid
- *
- * Phase 2 -- addItemsFromPack:
- *  11. Imports all Item documents from a mock pack
- *  12. Skips items already in the system (deduplication by registeredItemUuid)
- *  13. Returns correct { added, skipped, total } counts
- *  14. Throws for unknown systemId
- *  15. Throws for unknown packId
- *
- * Defect 1 -- Source-ID-aware overwrite:
- *  16. addItemFromUuid -- exact duplicate returns { item, action: 'skipped' }
- *  17. addItemFromUuid -- new item returns { item, action: 'added' }
- *  18. addItemFromUuid -- exact match with differing metadata overwrites name/img and returns updated
- *  18b. addItemFromUuid -- exact match with same metadata returns skipped
- *  19. addItemFromUuid -- overwrites when dropped UUID is in existing item's aliasItemUuids
- *  20. addItemFromUuid -- aliasItemUuids accumulates without duplicates
- *  20b. addItemFromUuid -- source-chain overwrite with fromUuid returning null keeps existing metadata
- *  21. addItemsFromPack -- returns { added, updated, skipped, total }
- *  22. addItemFromUuid -- rejects non-Item document type
- *
- * Defect 2 -- Entity type handling:
- *  23. resolveDropData -- Item type returns uuid and type
- *  24. resolveDropData -- Actor type returns uuid and type
- *  25. resolveDropData -- Folder type returns folderId and folderDocumentType
- *  26. resolveDropData -- null input returns nulls
- *  27. onDropItem integration -- Actor drop shows warning, does not call addItemFromUuid
- *  28. onDropItem integration -- Folder with Items imports each
- *  29. onDropItem integration -- Folder with no Items shows info notification
+ * Tests for compendium drop handling in Recipe Manager (Phase 1 + Phase 2). Phase 1 -- Single item
+ * drop UUID resolution: 1. World sidebar item ({ uuid }) returns the uuid unchanged 2. Compendium
+ * item ({ pack, id }) returns "Compendium.{pack}.{id}" 3. Both uuid and pack+id present: uuid wins
+ * 4. Empty object {} returns null 5. pack present but id missing returns null 6. id present but
+ * pack missing returns null 7. null returns null 8. undefined returns null
  */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
 // Foundry global stubs
-// ---------------------------------------------------------------------------
 
 let _idCounter = 0;
 globalThis.foundry = {
@@ -80,16 +41,12 @@ globalThis.ui = {
 };
 globalThis.fromUuid = async () => null;
 
-// ---------------------------------------------------------------------------
 // Module imports
-// ---------------------------------------------------------------------------
 
 const { resolveDropUuid, resolveDropData, folderIdFromDropData } = await import('../src/ui/svelte/util/dropUtils.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function makeRecipeManager(recipes = []) {
   return {
@@ -112,9 +69,7 @@ function buildManager(systems = []) {
   return mgr;
 }
 
-// ---------------------------------------------------------------------------
 // Phase 1: resolveDropUuid unit tests (8 cases)
-// ---------------------------------------------------------------------------
 
 test('resolveDropUuid — world sidebar item with uuid returns uuid', () => {
   assert.equal(resolveDropUuid({ uuid: 'Item.abc123' }), 'Item.abc123');
@@ -154,10 +109,8 @@ test('resolveDropUuid — undefined returns null', () => {
   assert.equal(resolveDropUuid(undefined), null);
 });
 
-// ---------------------------------------------------------------------------
-// Phase 1 integration: onDropItem callback behaviour (tests 9-10)
-// Simulate the callback logic inline — avoids importing the full Svelte app class
-// ---------------------------------------------------------------------------
+// Phase 1 integration: onDropItem callback behaviour (tests 9-10) Simulate the callback logic
+// inline — avoids importing the full Svelte app class
 
 function buildOnDropItem({ addItemFromUuid, refresh, warnFn }) {
   // Mirror the exact logic from SvelteRecipeManagerApp._prepareSvelteProps
@@ -205,9 +158,7 @@ test('onDropItem — invalid drop calls warn and does NOT call addItemFromUuid',
   assert.equal(warned, true);
 });
 
-// ---------------------------------------------------------------------------
 // Phase 2: Bulk compendium pack drop detection (test 11)
-// ---------------------------------------------------------------------------
 
 test('bulk pack drop — Foundry v13 { type: "Compendium", collection: "world.pack-name" } is detected', () => {
   // This mirrors the detection logic in SvelteRecipeManagerApp.onDropItem
@@ -223,9 +174,7 @@ test('bulk pack drop — single compendium item with uuid is NOT detected as bul
   assert.equal(isBulkPackDrop, false);
 });
 
-// ---------------------------------------------------------------------------
 // Phase 2: CraftingSystemManager.addItemsFromPack (tests 13-17)
-// ---------------------------------------------------------------------------
 
 test('addItemsFromPack — imports all Item documents from a mock pack', async () => {
   const mgr = buildManager([{ id: 'sys1', name: 'System One', items: [] }]);
@@ -365,14 +314,8 @@ test('addItemsFromPack — throws for unknown packId', async () => {
   );
 });
 
-// ---------------------------------------------------------------------------
-// Issue 1086: bulk import write amplification.
-//
-// `save()` replaces the WHOLE `craftingSystems` world setting, so a per-item save
-// makes a bulk import quadratic in corpus size. These are counter assertions, not
-// timings: the defect is algorithmic, so the invariant is the number of corpus
-// writes, and it must not grow with the number of imported items.
-// ---------------------------------------------------------------------------
+// Issue 1086: bulk import write amplification. `save()` replaces the WHOLE `craftingSystems` world
+// setting, so a per-item save makes a bulk import quadratic in corpus size.
 
 /**
  * Replace a manager's `save` with a counting stub that also records what the corpus
@@ -465,9 +408,7 @@ test('addItemsFromPack — a mid-batch failure flushes the items already importe
   const writes = countCorpusWrites(mgr, 'sys1');
   const documents = mockPackOfItems('world.batch-fails', 5);
 
-  // The fourth document resolves to an Actor, which `addItemFromUuid` rejects. The pack
-  // filter cannot see this: it screens the pack's own documents, while the manager
-  // re-resolves each uuid through `fromUuid`.
+  // The fourth document resolves to an Actor, which `addItemFromUuid` rejects.
   globalThis.fromUuid = async (uuid) => {
     if (uuid === 'Compendium.world.batch-fails.item-4') {
       return { documentName: 'Actor', name: 'Not an item' };
@@ -492,9 +433,7 @@ test('addItemsFromPack — a mid-batch failure flushes the items already importe
   assert.equal(mgr.getSystem('sys1').components.length, 3);
 });
 
-// ---------------------------------------------------------------------------
 // Defect 1: Source-ID-aware overwrite
-// ---------------------------------------------------------------------------
 
 test('addItemFromUuid — exact duplicate returns { item, action: "skipped" }', async () => {
   const mgr = buildManager([{
@@ -995,9 +934,8 @@ test('addItemFromUuid — rejects non-Item document type', async () => {
 });
 
 test('addItemFromUuid — a world item cloned from another (duplicateSource) imports as a NEW component', async () => {
-  // Regression: Foundry stamps _stats.duplicateSource on an item copied from
-  // another. A clone is a distinct item and must NOT be conflated with the
-  // original's component on import.
+  // Regression: Foundry stamps _stats.duplicateSource on an item copied from another. A clone is a
+  // distinct item and must NOT be conflated with the original's component on import.
   const mgr = buildManager([{
     id: 'sys1',
     name: 'System One',
@@ -1029,9 +967,7 @@ test('addItemFromUuid — a world item cloned from another (duplicateSource) imp
 });
 
 test('refreshComponentMetadataForUpdatedItem — editing a clone does NOT rewrite the original item\'s component', async () => {
-  // The clone (Talonvine) itself carries duplicateSource → the original
-  // (Moonsilver). Metadata propagation must match on identity only, so editing
-  // the clone touches its own component and leaves the original's untouched.
+  // The clone (Talonvine) itself carries duplicateSource → the original (Moonsilver).
   const mgr = buildManager([{
     id: 'sys1',
     name: 'System One',
@@ -1346,9 +1282,6 @@ test('refreshComponentMetadataForUpdatedItem — updates component description f
 
 test('refreshComponentMetadataForUpdatedItem — RESOLVES the edited description, not just normalizes it (issue 800)', async () => {
   // Item-sync is the second of exactly two triggers that refresh a stored description.
-  // Without resolution here, editing a source item would re-propagate raw directive
-  // text over a description the GM had already repaired — undoing the backfill one
-  // edit at a time. Placed beside the propagation assertion above deliberately.
   const mgr = buildManager([{
     id: 'sys1',
     name: 'System One',
@@ -1456,9 +1389,7 @@ test('refreshComponentMetadataForUpdatedItem — skips save when matched metadat
   assert.equal(saveCount, 0);
 });
 
-// ---------------------------------------------------------------------------
 // Defect 2: resolveDropData unit tests
-// ---------------------------------------------------------------------------
 
 test('resolveDropData — Item type returns uuid and type', () => {
   const result = resolveDropData({ type: 'Item', uuid: 'Item.abc123' });
@@ -1486,9 +1417,8 @@ test('resolveDropData — null input returns nulls', () => {
   assert.equal(result.type, null);
 });
 
-// Regression: Foundry v13 folder drags emit { type: 'Folder', uuid: 'Folder.<id>' }
-// with NO bare `id`. Previously the handler read data.id, got undefined, and the
-// folder drop silently no-opped.
+// Regression: Foundry v13 folder drags emit { type: 'Folder', uuid: 'Folder.<id>' } with NO bare
+// `id`.
 test('folderIdFromDropData — extracts id from a v13 Folder.<id> uuid', () => {
   assert.equal(folderIdFromDropData({ type: 'Folder', uuid: 'Folder.abc123' }), 'abc123');
 });
@@ -1511,9 +1441,7 @@ test('resolveDropData — v13 Folder uuid shape resolves folderId and folderUuid
   assert.equal(result.uuid, null);
 });
 
-// ---------------------------------------------------------------------------
 // Defect 2: onDropItem integration tests (inline simulation)
-// ---------------------------------------------------------------------------
 
 /**
  * Builds a simplified onDropItem handler that mirrors the logic in
@@ -1852,10 +1780,7 @@ test('onDropItem integration — unresolvable Folder drop warns instead of silen
 });
 
 test('onDropItem integration — compendium Folder drop imports items from pack index entries', async () => {
-  // Regression: dragging a folder out of a compendium pack previously no-opped. A compendium
-  // folder resolves via fromUuidSync (pack.folders is eager), but its `.contents` are pack index
-  // entries (uuid only, no documentName) and it carries a `pack` packId — so it must be walked
-  // with getSubfolders/contents, not collectFolderItems.
+  // Regression: dragging a folder out of a compendium pack previously no-opped.
   const compendiumFolder = {
     id: 'cmp-folder',
     name: 'Smithing Ingredients',
@@ -2101,9 +2026,7 @@ test('onDropItem integration — Folder with no Items shows info notification an
   assert.equal(infos[0].params.name, 'Empty Folder');
 });
 
-// ---------------------------------------------------------------------------
 // T-297: DropNoSystemSelected — warn when no system is selected
-// ---------------------------------------------------------------------------
 
 test('onDropItem integration — single item drop with no system selected shows DropNoSystemSelected warning', async () => {
   const addCalls = [];
@@ -2181,9 +2104,7 @@ test('onDropItem integration — compendium pack drop with no system selected sh
   assert.equal(warnings[0], 'DropNoSystemSelected');
 });
 
-// ---------------------------------------------------------------------------
 // Transferable component-id flag on the source WORLD item (import stamping)
-// ---------------------------------------------------------------------------
 
 test('addItemFromUuid — stamps flags.fabricate.roles[sys].componentId on a world source item', async () => {
   const mgr = buildManager([{ id: 'sys1', name: 'System One', items: [] }]);

@@ -62,18 +62,11 @@ import {
   resolveOpenSlotId,
   suggestChoiceOverrides,
 } from '../util/requirementSlots.js';
-import { applyPlayerResultOrder, progressiveOrderKey } from '../../../utils/progressiveResultOrder.js';
-import { progressiveStageThresholds } from '../../../utils/progressiveStageThresholds.js';
+import { createListingLoad, createPageWindow, firstVisible } from './browseListing.svelte.js';
+import { createPlayerResultOrder } from './playerResultOrder.svelte.js';
 
 const DEFAULT_PAGE_SIZE = 12;
-// Under `scope: 'user'` every commit is a REPLICATED document write (`#setWorld` broadcasts
-// createSetting/updateSetting to every client), so a burst of moves must not become a burst
-// of writes. The burst comes from the KEYBOARD path — a player walking a stage up several
-// places emits one move per chevron click. Drag emits only ONE move, on drop
-// (`ProgressiveStageList` fires `onReorder` from `ondrop`, never from `ondragover`), so it
-// settles immediately and the drop-path flush below commits it without waiting.
-const ORDER_COMMIT_DEBOUNCE_MS = 400;
-// Mirrors CRAFTING_BROWSE_STATUS.AVAILABLE (systems/CraftingListingBuilder.js). A
+// Mirrors CRAFTING_BROWSE_STATUS.AVAILABLE (ui/presenters/CraftingListingBuilder.js). A
 // local copy keeps the store free of the builder import so its unit-test compiler
 // need not resolve that module graph.
 const RECIPE_STATUS_AVAILABLE = 'available';
@@ -83,14 +76,20 @@ const RECIPE_STATUS_AVAILABLE = 'available';
 const GENERAL_RECIPE_CATEGORY = 'general';
 
 export function createCraftingStore({ services } = {}) {
-  let listing = $state(null);
-  let loading = $state(false);
-  let error = $state(null);
-  let loadedOnce = $state(false);
+  const listingLoad = createListingLoad({
+    fetch: () =>
+      services?.listCraftingForActor?.({
+        rememberedActorId: currentActorId(),
+        componentSourceActorIds: currentSourceIds(),
+      }),
+    onResult: () => {
+      favouriteIds = services?.getFavouriteRecipeIds?.() ?? [];
+      order.seed();
+    },
+  });
+  const listing = $derived(listingLoad.listing);
   let selectedRecipeId = $state(null);
   let search = $state('');
-  let page = $state(0);
-  let pageSize = $state(DEFAULT_PAGE_SIZE);
   let selectedIngredientSetId = $state(null);
   // Per-group option overrides for the selected set (issue 552), keyed by group id:
   // `{ [groupId]: { optionIndex, heldItemId } }`. Empty means the default
@@ -131,15 +130,6 @@ export function createCraftingStore({ services } = {}) {
   let worldTimeTick = $state(0);
   // Left-column filters (client-local browse state, alongside search/pagination).
   let favouriteIds = $state([]);
-  // The player's stored progressive stage orders, keyed `recipe:<id>` (issue 651). A
-  // plain object reassigned on write so the rune tracks the change.
-  let progressiveOrders = $state({});
-  // The last order successfully PERSISTED, per key — the revert target when a write
-  // rejects (D7a). Not $state: it is never rendered, only read on failure.
-  let persistedOrders = {};
-  // Pending debounce timer + the announcement surfaced to the stage list's live region.
-  let orderCommitTimer = null;
-  let orderAnnouncement = $state('');
   let favouritesOnly = $state(false);
   let craftableOnly = $state(false);
   let systemFilter = $state(null);
@@ -237,24 +227,18 @@ export function createCraftingStore({ services } = {}) {
     return [...rest, ...general];
   });
 
-  const pageCount = $derived.by(() => {
-    const size = pageSize > 0 ? pageSize : 1;
-    return Math.max(1, Math.ceil(visibleRecipes.length / size));
+  const pageWindow = createPageWindow({
+    items: () => visibleRecipes,
+    defaultPageSize: DEFAULT_PAGE_SIZE,
   });
 
-  const pageItems = $derived.by(() => {
-    const size = pageSize > 0 ? pageSize : visibleRecipes.length || 1;
-    const clampedPage = Math.min(Math.max(0, page), pageCount - 1);
-    const start = clampedPage * size;
-    return visibleRecipes.slice(start, start + size);
-  });
-
-  // The selected ROW. Find by id across the full listing; fall back to the first VISIBLE
-  // recipe so the selection respects the active search filter.
   const selectedSummary = $derived.by(() => {
     const recipes = Array.isArray(listing?.summaries) ? listing.summaries : [];
     if (recipes.length === 0) return null;
-    return recipes.find((recipe) => recipe?.id === selectedRecipeId) ?? visibleRecipes[0] ?? null;
+    return (
+      recipes.find((recipe) => recipe?.id === selectedRecipeId) ??
+      firstVisible({ all: recipes, visible: visibleRecipes })
+    );
   });
 
   // The hydrated rich models of this LOAD PASS, keyed by recipe id.
@@ -309,64 +293,39 @@ export function createCraftingStore({ services } = {}) {
   // durations and progressive stages reads this one.
   const selectedRecipe = $derived.by(() => hydrateDetail(selectedSummary?.id ?? null));
 
-  // The selected recipe's stages in the PLAYER'S order, with thresholds recomputed for
-  // that order (issue 651).
-  //
-  // Ordering is applied HERE and not in the builder: the order must re-derive when the
-  // player reorders, without a rebuild round-trip, and both award call sites plus this
-  // one then share ONE reconciliation rule (`applyPlayerResultOrder`) rather than three
-  // hand-rolled sorts. The GM's permission gates it — default-true, so only an explicit
-  // `false` pins the authored order.
-  //
-  // THE THRESHOLD MUST BE RECOMPUTED, NOT CARRIED. A threshold is cumulative, so it is a
-  // property of a stage's POSITION in the list the roll is spent down — not of the stage.
-  // The builder bakes thresholds in AUTHORED order, and `applyPlayerResultOrder` returns
-  // elements ===-identical to its inputs (deliberately — downstream depends on it), so a
-  // reordered stage would otherwise carry its authored-position threshold with it: for
-  // authored [A(5), B(3)] the rows would read "B >=8, A >=5" after moving B up, inverted,
-  // with the top row claiming a higher bar than the row beneath. Recomputing through the
-  // SAME helper the builder used (pinned by an oracle against the award loop) is what
-  // keeps the badge and the award in step.
-  //
-  // THE PLAYER COMPLICATION PROJECTION RIDES ALONG, AND CRAFTING IS FORECAST-ONLY (issue
-  // 1286). `CraftingListingBuilder._buildProgressiveStages` attaches each stage's
-  // player-visible forecast to the row through `attachStageComplications`, and the spread
-  // below carries it across the reorder for free — which is the whole reason the
-  // projection hangs ON the row rather than beside it, since a parallel list keyed by
-  // result id would desynchronise at exactly this point.
-  //
-  // There is deliberately NO fired-tense pass here, and one must not be added. The fired
-  // record is defined on the SALVAGE RUN record; the immediate crafting path writes none,
-  // so this surface has nothing to read and inventing a second carrier for it is out of
-  // scope. Every entry therefore reads `fired: false`, which is also the honest pre-roll
-  // state. Nor may a component re-derive the tense from a stage being short: `match` and
-  // the condition roll mean a missed stage need not have fired anything.
-  //
-  // No audience filter belongs here either. The rows arrive already redacted — the
-  // `visibility: 'visible'` filter, the activity gate and the could-never-fire exclusion
-  // all ran builder-side against the same records the engine fires from — so a second copy
-  // of that rule in the store or in a panel is only an opportunity for the two to drift.
-  const orderedProgressiveStages = $derived.by(() => {
-    const stages = Array.isArray(selectedRecipe?.progressiveStages)
-      ? selectedRecipe.progressiveStages
-      : [];
-    if (selectedRecipe?.allowPlayerResultReorder === false) return stages;
-    const key = progressiveOrderKey({ scope: 'recipe', id: selectedRecipe?.id });
-    if (!key) return stages;
-
-    const ordered = applyPlayerResultOrder(stages, progressiveOrders[key] ?? null);
-    // Identity means nothing moved, so the builder's authored thresholds already stand.
-    if (ordered === stages) return stages;
-
-    // `difficulty` is already null for an absent/invalid cost, so `?? NaN` reproduces the
-    // award loop's skip: no budget reaches the stage, and its threshold stays null (the
-    // row omits the badge rather than inventing a number for its new position).
-    const thresholds = progressiveStageThresholds({
-      results: ordered,
-      costFor: (stage) => stage?.difficulty ?? NaN,
-      awardMode: selectedRecipe?.progressiveAwardMode || 'equal',
-    });
-    return ordered.map((stage, index) => ({ ...stage, threshold: thresholds[index] }));
+  /**
+   * Player Result Order editing for the selected recipe (issue 651), through the composable both
+   * progressive player surfaces share (issue 1695).
+   *
+   * Ordering is applied here and not in the builder: the order must re-derive when the player
+   * reorders, without a rebuild round-trip, and both award call sites plus this one then share one
+   * reconciliation rule rather than three hand-rolled sorts. The GM's permission gates it,
+   * default-true, so only an explicit `false` pins the authored order.
+   *
+   * The player complication projection rides along for free (issue 1286), because
+   * `CraftingListingBuilder._buildProgressiveStages` attaches each stage's player-visible forecast
+   * to the row itself; a parallel list keyed by result id would desynchronise at exactly the point
+   * the reorder happens.
+   *
+   * No `markFiredStages` hook is passed, and one must not be added: the fired record is defined on
+   * the salvage run record, the immediate crafting path writes none, so this surface has nothing to
+   * read and every entry honestly reads `fired: false`. Nor may a component re-derive the tense
+   * from a stage being short — `match` and the condition roll mean a missed stage need not have
+   * fired anything. No audience filter belongs here either: the rows arrive already redacted
+   * builder-side, against the same records the engine fires from, so a second copy of that rule is
+   * only an opportunity for the two to drift.
+   */
+  const order = createPlayerResultOrder({
+    scope: 'recipe',
+    subject: () => ({
+      orderId: selectedRecipe?.id ?? null,
+      stages: selectedRecipe?.progressiveStages,
+      awardMode: selectedRecipe?.progressiveAwardMode,
+      allowReorder: selectedRecipe?.allowPlayerResultReorder !== false,
+    }),
+    read: () => services?.getProgressiveResultOrder?.(),
+    write: (key, ids) => services?.setProgressiveResultOrder?.(key, ids),
+    revertMessage: () => services?.progressiveOrderRevertMessage?.(),
   });
 
   const selectedSet = $derived.by(() => {
@@ -464,34 +423,9 @@ export function createCraftingStore({ services } = {}) {
     });
   });
 
-  /**
-   * Fetch the crafting listing for the current actor + component sources.
-   *
-   * @param {boolean} [quiet=false] When true, do not raise the `loading` flag
-   *   (used for background refreshes after a craft / world-time tick) so the list
-   *   does not flash a spinner.
-   */
-  async function load(quiet = false) {
-    if (!quiet) loading = true;
-    error = null;
-    try {
-      const result = await services?.listCraftingForActor?.({
-        rememberedActorId: currentActorId(),
-        componentSourceActorIds: currentSourceIds(),
-      });
-      listing = result ?? null;
-      favouriteIds = services?.getFavouriteRecipeIds?.() ?? [];
-      // Seed the player's stored stage orders, mirroring favouriteIds above. The
-      // persisted snapshot is the revert target for a rejected write (D7a).
-      const orders = services?.getProgressiveResultOrder?.() ?? {};
-      progressiveOrders = orders && typeof orders === 'object' ? { ...orders } : {};
-      persistedOrders = { ...progressiveOrders };
-      loadedOnce = true;
-    } catch (err) {
-      error = err?.message ?? String(err);
-    } finally {
-      if (!quiet) loading = false;
-    }
+  /** Fetch the crafting listing for the current actor + component sources. */
+  function load(quiet = false) {
+    return listingLoad.refresh(quiet);
   }
 
   /**
@@ -525,34 +459,33 @@ export function createCraftingStore({ services } = {}) {
     slotAnnouncement = '';
   }
 
-  /** Update the search query and jump back to the first page. */
   function setSearch(value) {
     search = typeof value === 'string' ? value : '';
-    page = 0;
+    pageWindow.resetPage();
   }
 
   /** Toggle the favourites-only filter (jumps back to the first page). */
   function setFavouritesOnly(value) {
     favouritesOnly = value === true;
-    page = 0;
+    pageWindow.resetPage();
   }
 
   /** Toggle the craftable-only filter (jumps back to the first page). */
   function setCraftableOnly(value) {
     craftableOnly = value === true;
-    page = 0;
+    pageWindow.resetPage();
   }
 
   /** Filter to a single crafting system id, or clear it with a falsy value. */
   function setSystemFilter(systemId) {
     systemFilter = systemId ? String(systemId) : null;
-    page = 0;
+    pageWindow.resetPage();
   }
 
   /** Filter to a single recipe category token, or clear it with a falsy value. */
   function setCategoryFilter(category) {
     categoryFilter = category ? String(category) : null;
-    page = 0;
+    pageWindow.resetPage();
   }
 
   /** Toggle a recipe's favourite state, persisting through the services seam. */
@@ -560,96 +493,6 @@ export function createCraftingStore({ services } = {}) {
     if (!recipeId) return;
     const next = services?.toggleFavouriteRecipe?.(recipeId);
     favouriteIds = Array.isArray(next) ? next : favouriteIds;
-  }
-
-  /**
-   * Persist the pending order for `key`, reverting and announcing on failure (D7a).
-   *
-   * Under `scope: 'user'` `set` is an async, replicated document write that CAN REJECT —
-   * unlike the client-scoped, synchronous `toggleFavouriteRecipe` above, whose
-   * fire-and-forget shape is safe precisely because it cannot fail.
-   *
-   * The write is optimistic, so by the time a rejection returns the row has ALREADY moved
-   * and the live region has ALREADY announced the new position. Leaving that standing
-   * would have the player believing an order that was never stored, while their next craft
-   * silently awards down the old one — this issue's own defect class, reintroduced at the
-   * UI edge. So a failure reverts to the last PERSISTED order and announces the revert
-   * through the SAME live region. A toast is not sufficient: a keyboard user reordering by
-   * chevron never looks at one.
-   */
-  async function commitProgressiveOrder(key) {
-    const attempted = progressiveOrders[key] ?? [];
-    try {
-      await services?.setProgressiveResultOrder?.(key, attempted);
-      persistedOrders[key] = [...attempted];
-    } catch {
-      const restored = persistedOrders[key] ?? null;
-      progressiveOrders = { ...progressiveOrders };
-      if (restored) {
-        progressiveOrders[key] = [...restored];
-      } else {
-        delete progressiveOrders[key];
-      }
-      orderAnnouncement = services?.progressiveOrderRevertMessage?.() ?? '';
-    }
-  }
-
-  /**
-   * Move a stage of the selected progressive recipe, optimistically and debounced.
-   *
-   * @param {number} index the stage's current position
-   * @param {number} target the position to move it to
-   * @param {string} [announcement] pre-formatted live-region text (the component owns the
-   *   i18n, and reads the moved stage's name BEFORE the move)
-   */
-  function reorderProgressiveStage(index, target, announcement = '') {
-    const recipeId = selectedRecipe?.id;
-    const key = progressiveOrderKey({ scope: 'recipe', id: recipeId });
-    if (!key || selectedRecipe?.allowPlayerResultReorder === false) return;
-
-    const current = orderedProgressiveStages;
-    if (target < 0 || target >= current.length || index < 0 || index >= current.length) return;
-
-    const next = [...current];
-    const [moved] = next.splice(index, 1);
-    next.splice(target, 0, moved);
-    // Store ids, not indices: they survive a GM editing the recipe (D4).
-    progressiveOrders = { ...progressiveOrders, [key]: next.map((stage) => stage.id) };
-    orderAnnouncement = announcement;
-
-    if (orderCommitTimer) clearTimeout(orderCommitTimer);
-    orderCommitTimer = setTimeout(() => {
-      orderCommitTimer = null;
-      void commitProgressiveOrder(key);
-    }, ORDER_COMMIT_DEBOUNCE_MS);
-  }
-
-  /**
-   * Flush a pending debounced order write immediately.
-   *
-   * Called on drop (a drag has already settled, so there is nothing to coalesce) and on
-   * window teardown via `SvelteFabricateApp._flushPendingOrderWrite` — without the latter,
-   * a player who reorders and immediately closes or refreshes inside the debounce window
-   * loses the order silently. A no-op when no write is pending, so a double call from both
-   * `close()` and `_onClose()` writes once.
-   */
-  function flushProgressiveOrder() {
-    if (!orderCommitTimer) return Promise.resolve();
-    clearTimeout(orderCommitTimer);
-    orderCommitTimer = null;
-    const key = progressiveOrderKey({ scope: 'recipe', id: selectedRecipe?.id });
-    return key ? commitProgressiveOrder(key) : Promise.resolve();
-  }
-
-  function setPage(next) {
-    const value = Number(next);
-    page = Number.isFinite(value) && value >= 0 ? Math.trunc(value) : 0;
-  }
-
-  function setPageSize(next) {
-    const value = Number(next);
-    pageSize = Number.isFinite(value) && value > 0 ? Math.trunc(value) : DEFAULT_PAGE_SIZE;
-    page = 0;
   }
 
   function chooseIngredientSet(setId) {
@@ -914,13 +757,13 @@ export function createCraftingStore({ services } = {}) {
       return listing;
     },
     get loading() {
-      return loading;
+      return listingLoad.loading;
     },
     get error() {
-      return error;
+      return listingLoad.error;
     },
     get loadedOnce() {
-      return loadedOnce;
+      return listingLoad.loadedOnce;
     },
     get selectedRecipeId() {
       return selectedRecipeId;
@@ -929,13 +772,13 @@ export function createCraftingStore({ services } = {}) {
       return search;
     },
     get page() {
-      return page;
+      return pageWindow.page;
     },
     get pageSize() {
-      return pageSize;
+      return pageWindow.pageSize;
     },
     get pageCount() {
-      return pageCount;
+      return pageWindow.pageCount;
     },
     get selectedIngredientSetId() {
       return selectedIngredientSetId;
@@ -980,15 +823,15 @@ export function createCraftingStore({ services } = {}) {
     },
     /** The selected progressive recipe's stages in the player's chosen order. */
     get orderedProgressiveStages() {
-      return orderedProgressiveStages;
+      return order.orderedStages;
     },
     /** The raw stored order map, keyed `recipe:<id>`. */
     get progressiveOrders() {
-      return progressiveOrders;
+      return order.orders;
     },
     /** Live-region text for the stage list (a move, or a D7a revert). */
     get orderAnnouncement() {
-      return orderAnnouncement;
+      return order.announcement;
     },
     get favouritesOnly() {
       return favouritesOnly;
@@ -1012,7 +855,7 @@ export function createCraftingStore({ services } = {}) {
       return visibleRecipes;
     },
     get pageItems() {
-      return pageItems;
+      return pageWindow.pageItems;
     },
     /**
      * The selected ROW — the cheap summary the browser list highlights, and the identity
@@ -1043,10 +886,10 @@ export function createCraftingStore({ services } = {}) {
     setSystemFilter,
     setCategoryFilter,
     toggleFavourite,
-    reorderProgressiveStage,
-    flushProgressiveOrder,
-    setPage,
-    setPageSize,
+    reorderProgressiveStage: order.reorder,
+    flushProgressiveOrder: order.flush,
+    setPage: pageWindow.setPage,
+    setPageSize: pageWindow.setPageSize,
     chooseIngredientSet,
     chooseIngredientOption,
     openSlot,

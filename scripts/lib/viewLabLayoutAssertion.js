@@ -1,29 +1,4 @@
-/**
- * Assert one View Lab layout from its declarative case expectation.
- *
- * The container query evaluates the content box, while `getBoundingClientRect()` reports the
- * border box. Subtracting both padding and borders keeps the capture contract aligned with CSS.
- *
- * THE TRACK COUNT IS AN INPUT, not a constant (issue 1362). It was literally
- * `if (tracks.length !== 1)`, which suited the five 1024px responsive cases — every one of
- * which asserts "this stacked" — and suits nothing else. A full-width route asserts the
- * OPPOSITE shape: the rail plus one released content column, exactly TWO resolved tracks, and
- * no inspector at all. Hard-coding one meant a case could only ever say "it stacked".
- *
- * `absentSelector` is the other half of that, and it has to be MEASURED rather than inferred
- * from the track count. Suppressing the aside in the component and releasing the column in the
- * stylesheet are two separate edits: do only the second and the (empty) aside wraps to an
- * implicit grid row underneath the content, where the track count is still two and the frame
- * still photographs a dead strip.
- *
- * A case that reaches its route with an aside present, or with the wrong number of resolved
- * tracks, FAILS THE CAPTURE rather than publishing a frame of the dead strip.
- *
- * @param {import('playwright').Page} page The rendered View Lab page.
- * @param {object|null} expectation The case's layout expectation.
- * @param {string} label The case id used in diagnostics.
- * @returns {Promise<void>}
- */
+/** Assert one View Lab layout from its declarative case expectation. */
 export async function assertViewLabLayout(page, expectation, label) {
   if (!expectation) return;
 
@@ -33,6 +8,7 @@ export async function assertViewLabLayout(page, expectation, label) {
     maxContentBoxInlineSize,
     expectedTracks = 1,
     absentSelector = '',
+    fillSelector = '',
   } = expectation;
   const container = await requiredLocator(page, containerSelector, 'container', label);
   if (Number.isFinite(maxContentBoxInlineSize)) {
@@ -70,12 +46,28 @@ export async function assertViewLabLayout(page, expectation, label) {
     );
   }
 
+  if (fillSelector) await assertFillsGrid(page, grid, expectation, label);
+
   if (!absentSelector) return;
   const absentCount = await page.locator(absentSelector).count();
   if (absentCount !== 0) {
     throw new Error(
       `${label}: ${absentSelector} must not be rendered on this route; found ${absentCount}. ` +
         'A released column with the aside still rendered photographs a dead strip.'
+    );
+  }
+}
+
+// The fill element must end where the grid ends: a capped rail stops short of it (issue 1972).
+async function assertFillsGrid(page, grid, { gridSelector, fillSelector }, label) {
+  const fill = await requiredLocator(page, fillSelector, 'fill', label);
+  const bottom = (element) => element.getBoundingClientRect().bottom;
+  const gridBottom = await grid.evaluate(bottom);
+  const fillBottom = await fill.evaluate(bottom);
+  if (Math.abs(fillBottom - gridBottom) > 1) {
+    throw new Error(
+      `${label}: ${fillSelector} bottom ${fillBottom}px must reach ${gridSelector} bottom ` +
+        `${gridBottom}px`
     );
   }
 }

@@ -7,11 +7,9 @@ import {
   requireNonEmptyString,
 } from '../src/ui/extensionRegistry.js';
 
-// This file exists because `tests/manager-extensions.test.js` — the refactor's regression
-// proof, which must stay untouched — never calls `bindPublicApi`, so the factory parameter
-// most likely to be swapped between the two registries has no behavioural cover anywhere
-// else. Everything here is pinned through the returned registry's OBSERVABLE behaviour, not
-// through a source regex, and deliberately in a file the rest of this change does not edit.
+// This file exists because `tests/manager-extensions.test.js` — the refactor's regression proof,
+// which must stay untouched — never calls `bindPublicApi`, so the factory parameter most likely to
+// be swapped between the two registries has no behavioural cover anywhere else.
 
 const HOOKS = Object.freeze({
   registered: 'test.extension.registered',
@@ -55,8 +53,7 @@ test('bindPublicApi injects the public object under the INJECTED property name',
   assert.deepEqual(Object.keys(api), ['testExtensions']);
 
   // Behavioural, not structural: registering THROUGH the injected property must reach this
-  // registry. A bind that put the object on the right key but the wrong registry would pass
-  // a key-name assertion and fail here.
+  // registry.
   const provider = fixtureProvider();
   api.testExtensions.registerTestProvider(provider);
   assert.equal(registry.getTestProvider('downtime'), provider);
@@ -90,10 +87,9 @@ test('two registries bind to two different property names from the same factory'
 
 test('bindPublicApi refuses a non-object target with a TypeError naming the registry', () => {
   const { registry } = registryUnder();
-  // A function is rejected too. `typeof fn === 'function'`, so the shipped `typeof !==
-  // 'object'` guard excludes callables — pinned here because the bind target is
-  // `game.fabricate.api`, a plain object literal, and widening the guard later would be a
-  // behaviour change rather than a tidy-up.
+  // A function is rejected too. `typeof fn === 'function'`, so the shipped `typeof !== 'object'`
+  // guard excludes callables — pinned here because the bind target is `game.fabricate.api`, a plain
+  // object literal, and widening the guard later would be a behaviour change rather than a tidy-up.
   for (const target of [null, undefined, '', 'api', 42, false, Symbol('api'), () => {}]) {
     assert.throws(
       () => registry.bindPublicApi(target),

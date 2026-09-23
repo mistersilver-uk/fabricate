@@ -202,10 +202,8 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
       assert.match(iconPath, ICON_PATH_SHAPE, `${iconPath} is not a well-formed Foundry icon path`);
     }
 
-    // Existence check: requires tmp/fvtt-icon-paths.md, which is generated
-    // locally from a running Foundry instance and gitignored. Skip when
-    // absent (CI, fresh clones) rather than fail — the shape check above
-    // still runs.
+    // Existence check: requires tmp/fvtt-icon-paths.md, which is generated locally from a running
+    // Foundry instance and gitignored.
     const iconManifestUrl = new URL('../tmp/fvtt-icon-paths.md', import.meta.url);
     if (!existsSync(iconManifestUrl)) {
       t.skip('tmp/fvtt-icon-paths.md not present — regenerate locally from a running Foundry to validate against the live icon set');

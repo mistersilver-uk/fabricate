@@ -9,6 +9,14 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { itResolvesTheRecipesOwnImage } from '../helpers/recipeOwnImageCases.js';
+// Issue 1510: both toolbar filters are shared `<Select>`s.
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  selectOptionLabels,
+  selectTriggerText,
+} from '../helpers/select-control.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -18,7 +26,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.
@@ -28,9 +36,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
-    // ONE chip (issue 883), the shared no-state primitive (issue 785), and the labelled
-    // push-button (issue 1118) Clear filters and Clear search both render.
+    // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
@@ -94,14 +100,63 @@ describe('AccessTabView (mounted)', () => {
     });
     assert.equal(root.querySelectorAll('[data-access-row]').length, 2);
 
-    const filter = root.querySelector('[data-access-filter]');
-    filter.value = 'none';
-    filter.dispatchEvent(new Event('change', { bubbles: true }));
+    const filter = '[data-access-filter]';
+    // THE NAME IS THE `aria-label` THE SELECT CARRIED, not the demoted caption: the wrapper was
+    // never this control's accessible name (issue 1510).
+    assert.equal(assertSelectHasResolvedName(root, filter), 'Filter recipes by access');
+    assert.deepEqual(selectOptionLabels(root, filter), ['All recipes', 'Granted', 'No access']);
+
+    chooseSelectOption(root, filter, 'none');
     flushSync();
+    assert.equal(selectTriggerText(root, filter), 'No access');
 
     const rows = root.querySelectorAll('[data-access-row]');
     assert.equal(rows.length, 1);
     assert.equal(rows[0].getAttribute('data-access-row'), 'open');
+  });
+
+  it('filters by recipe category, and the category rows keep their counted labels', async () => {
+    const root = await harness.mount({
+      recipes: [
+        makeRecipe({ id: 'alloy', name: 'Alloy Bronze', category: 'Smithing', characterCount: 1 }),
+        makeRecipe({ id: 'tincture', name: 'Tincture', category: 'Alchemy', playerCount: 1 })
+      ],
+      recipeCategories: [
+        { name: 'Smithing', count: 1 },
+        { name: 'Alchemy', count: 1 }
+      ]
+    });
+
+    const filter = '[data-access-category-filter]';
+    assert.equal(assertSelectHasResolvedName(root, filter), 'Filter recipes by category');
+    // The `name (count)` join is the `<option>` text the conversion carried over verbatim.
+    assert.deepEqual(selectOptionLabels(root, filter), [
+      'All categories',
+      'Smithing (1)',
+      'Alchemy (1)'
+    ]);
+
+    chooseSelectOption(root, filter, 'Alchemy');
+    flushSync();
+    const rows = root.querySelectorAll('[data-access-row]');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].getAttribute('data-access-row'), 'tincture');
+  });
+
+  // The demotion's accepted cost, at the one shape this view renders it in (issue 1510).
+  it('renders each filter caption as a span rather than a label around the trigger', async () => {
+    const root = await harness.mount({ recipes: [makeRecipe({ id: 'alloy' })] });
+
+    for (const hook of ['[data-access-category-filter]', '[data-access-filter]']) {
+      const trigger = root.querySelector(hook);
+      assert.ok(Boolean(trigger), `${hook} renders no converted trigger`);
+      assert.ok(
+        !trigger.closest('label'),
+        `${hook} sits inside a caller-rendered <label>, whose caption click would dismiss the ` +
+          'panel and then re-open it'
+      );
+      assert.equal(trigger.closest('.manager-filter').tagName, 'SPAN');
+    }
   });
 
   it('marks the selected row and fires onSelectRecipe on click', async () => {
@@ -124,9 +179,7 @@ describe('AccessTabView (mounted)', () => {
     assert.equal(root.querySelectorAll('[data-access-row]').length, 0);
   });
 
-  // Issue 924 — the list was a `<div role="list">` of `<button role="listitem">`, which
-  // overrode each row button's own interactive role and told assistive technology the row
-  // was not operable. It is now a real `<ul>`/`<li>` with the button inside the item.
+  // Issue 924 — the list was a `<div role="list">` of `<button role="listitem">`.
   it('renders the access list as a real ul/li with the button inside the item', async () => {
     const root = await harness.mount({
       recipes: [makeRecipe({ id: 'alloy', name: 'Alloy Bronze', characterCount: 1 })]
@@ -147,9 +200,7 @@ describe('AccessTabView (mounted)', () => {
     assert.equal(row.parentElement.parentElement, list, 'and each item sits in the ul');
   });
 
-  // `aria-pressed` described an independent toggle: a row cannot be un-pressed, and selecting
-  // another silently un-presses the first. `aria-current` means "the current item in a set of
-  // related items", is valid on any role, and is ABSENT rather than "false" when not current.
+  // `aria-pressed` described an independent toggle: a row cannot be un-pressed.
   it('marks the selected row with aria-current and omits the attribute otherwise', async () => {
     const root = await harness.mount({
       recipes: [
@@ -170,10 +221,7 @@ describe('AccessTabView (mounted)', () => {
     );
   });
 
-  // The loud failure mode on this surface, and the one nothing photographic can catch: the
-  // manager access screen matches no screenshot recipe and the smoke walk never visits it.
-  // Unreset, Foundry's `@layer elements.typography` `ul, ol` rule draws bullets and a
-  // ~21-24px indent on a GM screen.
+  // The loud failure mode on this surface, and the one nothing photographic can catch.
   it('resets the ul so Foundry draws no bullets or indent on it', () => {
     const source = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/AccessTabView.svelte'),
@@ -194,10 +242,7 @@ describe('AccessTabView (mounted)', () => {
     );
   });
 
-  // Issue 884 — the row thumbnail is the recipe's own icon, resolved through the
-  // shared helper. It used to prefer the first containing book's artwork. Issue 1506
-  // converted this row's raw `<img>` into the shared tile, so the query is the
-  // primitive's own image rather than the retired sheet class it used to carry.
+  // Issue 884 — the row thumbnail is the recipe's own icon.
   itResolvesTheRecipesOwnImage({
     harness,
     mountProps: (imageOverrides) => ({ recipes: [makeRecipe({ id: 'alloy', ...imageOverrides })] }),

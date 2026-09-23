@@ -48,8 +48,8 @@
   import { statusChipTone } from '../../../../util/statusChipTone.js';
   import Chip from '../../../../components/Chip.svelte';
   import ProgressiveStageList from '../../../crafting/detail/ProgressiveStageList.svelte';
-  import Callout from '../../../manager/Callout.svelte';
-  import EmptyState from '../../../manager/EmptyState.svelte';
+  import Callout from '../../../../components/Callout.svelte';
+  import EmptyState from '../../../../components/EmptyState.svelte';
   import Kicker from '../../../../components/Kicker.svelte';
 
   let {

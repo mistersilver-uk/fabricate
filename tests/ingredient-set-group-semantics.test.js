@@ -1,19 +1,13 @@
 /**
- * Unit tests for ingredient set/group semantics (T-023)
- *
- * Covers:
- *   AC1: OR across ingredient sets — recipe is craftable when ANY one set is fully satisfied
- *   AC2: AND across groups within a set — all groups must be satisfied
- *   AC3: OR within group options — any one option satisfying is enough
- *   AC4: Failure when no complete set is satisfiable
- *   Bonus: Combined semantics and quantity accounting
+ * Unit tests for ingredient set/group semantics (T-023). Covers: AC1: OR across ingredient sets —
+ * recipe is craftable when ANY one set is fully satisfied AC2: AND across groups within a set — all
+ * groups must be satisfied AC3: OR within group options — any one option satisfying is enough AC4:
+ * Failure when no complete set is satisfiable Bonus: Combined semantics and quantity accounting
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
 // Foundry globals required for module load
-// ---------------------------------------------------------------------------
 
 globalThis.foundry = {
   utils: {
@@ -31,17 +25,13 @@ globalThis.game = { user: { isGM: true }, fabricate: null };
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
 globalThis.ChatMessage = { create: () => {}, getSpeaker: () => ({}) };
 
-// ---------------------------------------------------------------------------
 // Imports — must come after globals are set
-// ---------------------------------------------------------------------------
 
 const { IngredientSet } = await import('../src/models/IngredientSet.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { Recipe } = await import('../src/models/Recipe.js');
 
-// ---------------------------------------------------------------------------
 // Helper builders
-// ---------------------------------------------------------------------------
 
 /**
  * Make a minimal mock item that is matched by itemUuid on an Ingredient.
@@ -56,9 +46,7 @@ function makeItem(uuid, quantity = 1) {
   };
 }
 
-/**
- * Make an ingredient data object that matches by exact UUID.
- */
+/** Make an ingredient data object that matches by exact UUID. */
 function makeIngredientData(itemUuid, quantity = 1) {
   return { itemUuid, quantity };
 }
@@ -83,9 +71,7 @@ function makeIngredientSet(groupDataArray) {
   return IngredientSet.fromJSON({ ingredientGroups: groupDataArray });
 }
 
-/**
- * Build a minimal Recipe with the given array of IngredientSet instances.
- */
+/** Build a minimal Recipe with the given array of IngredientSet instances. */
 function makeRecipe(ingredientSets) {
   return new Recipe({
     name: 'Test Recipe',
@@ -115,10 +101,8 @@ function makeRecipeManager() {
   return new RecipeManager();
 }
 
-// ---------------------------------------------------------------------------
-// AC 1 — OR across ingredient sets
-// Recipe is craftable when ANY one ingredient set is fully satisfied.
-// ---------------------------------------------------------------------------
+// AC 1 — OR across ingredient sets Recipe is craftable when ANY one ingredient set is fully
+// satisfied.
 
 test('AC1: recipe is craftable when only the first of two ingredient sets is satisfied', () => {
   const itemX = makeItem('item-x');
@@ -187,10 +171,7 @@ test('AC1: recipe is craftable when third of three ingredient sets is the only s
   assert.equal(result.canCraft, true, 'should be craftable when third set is satisfied');
 });
 
-// ---------------------------------------------------------------------------
-// AC 2 — AND across groups within a set
-// All groups in an IngredientSet must be satisfied.
-// ---------------------------------------------------------------------------
+// AC 2 — AND across groups within a set All groups in an IngredientSet must be satisfied.
 
 test('AC2: ingredient set succeeds when both groups are satisfied', () => {
   const itemA = makeItem('item-a');
@@ -271,10 +252,7 @@ test('AC2: ingredient set with three groups succeeds when all three are satisfie
   assert.equal(result.missingGroups.length, 0, 'no groups should be missing');
 });
 
-// ---------------------------------------------------------------------------
-// AC 3 — OR within group options
-// Any one option satisfying a group is enough.
-// ---------------------------------------------------------------------------
+// AC 3 — OR within group options Any one option satisfying a group is enough.
 
 test('AC3: group is satisfied when first option matches', () => {
   const itemX = makeItem('item-x');
@@ -343,9 +321,7 @@ test('AC3: group fails when available item does not match any option', () => {
   assert.equal(result.success, false, 'group should fail with unmatched available items');
 });
 
-// ---------------------------------------------------------------------------
 // AC 4 — Failure when no complete set is satisfiable
-// ---------------------------------------------------------------------------
 
 test('AC4: canCraft returns false when single set has a missing ingredient', () => {
   // item-a is NOT available
@@ -414,9 +390,7 @@ test('AC4: canCraft returns false when actor has no items array', () => {
   assert.equal(result.canCraft, false, 'should not be craftable with no actors');
 });
 
-// ---------------------------------------------------------------------------
 // Bonus — Combined semantics and quantity accounting
-// ---------------------------------------------------------------------------
 
 test('Bonus: shared item pool — two groups both need same item with enough for both', () => {
   // Group 1 needs 1x item-a, Group 2 needs 1x item-a
@@ -493,10 +467,9 @@ test('Bonus: multi-stack quantity via custom matcher — need 3, have two stacks
 });
 
 test('Bonus: complex recipe — 2 sets, 2 groups each with options, correct set resolves', () => {
-  // Set A: Group1(item-x OR item-y) AND Group2(item-z)
-  // Set B: Group1(item-w)
-  // Actor has: item-y, item-z (not item-x, not item-w)
-  // Expected: craftable via Set A (group1 satisfied by item-y, group2 by item-z)
+  // Set A: Group1(item-x OR item-y) AND Group2(item-z) Set B: Group1(item-w) Actor has: item-y,
+  // item-z (not item-x, not item-w) Expected: craftable via Set A (group1 satisfied by item-y,
+  // group2 by item-z)
 
   const itemY = makeItem('item-y');
   const itemZ = makeItem('item-z');
@@ -520,8 +493,7 @@ test('Bonus: complex recipe — 2 sets, 2 groups each with options, correct set 
 });
 
 test('Bonus: complex recipe — 2 sets both unsatisfied returns canCraft false', () => {
-  // Set A needs item-x AND item-z; Set B needs item-w
-  // Actor has only item-y — satisfies nothing
+  // Set A needs item-x AND item-z; Set B needs item-w Actor has only item-y — satisfies nothing
 
   const itemY = makeItem('item-y');
 

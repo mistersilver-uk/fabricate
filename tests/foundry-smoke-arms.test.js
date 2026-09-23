@@ -1,22 +1,6 @@
 /**
- * The V13 arm must stay ENV-ONLY, and the world fixture must stay a single source of truth
- * (issue #1088).
- *
- * Two things could be broken by an innocent-looking edit, and neither would announce itself:
- *
- *  1. **Someone points the compose file at Foundry 13 to "run the V13 arm".** That reds
- *     `tests/view-lab-chrome-version-lock.test.js`, rotates the CI `foundry-binary-*` cache key
- *     (which hashes `docker-compose.foundry.yml`), and leaves the View Lab's harvested chrome
- *     attesting a build nothing boots. The arm is reachable through `FOUNDRY_IMAGE` precisely so
- *     that never has to happen, and this file asserts the separation rather than describing it.
- *  2. **Someone commits a second world fixture for the second arm.** Two fixtures drift, and the
- *     drift presents as a two-minute launch timeout naming nothing. The non-default arm's manifest
- *     is DERIVED from the committed one at setup time, so the derivation is what needs pinning —
- *     specifically that it is the identity function for the default arm, which is the only thing
- *     that makes "derived" and "committed" the same claim.
- *
- * These assertions read tracked files only — no Docker, no Foundry, no network — so they run
- * everywhere `npm test` runs.
+ * The V13 arm must stay ENV-ONLY, and the world fixture must stay a single source of truth (issue
+ * #1088).
  */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -51,8 +35,7 @@ function composeImage() {
 
 test('the compose file keeps its image overridable through $FOUNDRY_IMAGE', () => {
   // The `${FOUNDRY_IMAGE:-…}` substitution form is the entire mechanism by which a non-default arm
-  // reaches Docker. Replacing it with a bare `image: felddy/foundryvtt:14.365` would still satisfy
-  // the version-lock test while silently making every arm but the default unbootable.
+  // reaches Docker.
   const composeText = readFileSync(COMPOSE_PATH, 'utf8');
   assert.match(
     composeText,
@@ -124,9 +107,7 @@ test('each arm pins a game system verified for the generation it boots', () => {
 });
 
 test('the derived world manifest is the identity function for the default arm', () => {
-  // This is what makes ONE committed fixture legitimate. If the derivation ever stopped agreeing
-  // with the committed file for the default arm, the runtime world and the file the version lock
-  // reads would be different worlds.
+  // This is what makes ONE committed fixture legitimate.
   const fixture = readWorldFixture(ROOT);
   const derived = deriveWorldManifest(fixture, resolveSmokeArm(DEFAULT_SMOKE_ARM, { root: ROOT }));
   assert.deepEqual(

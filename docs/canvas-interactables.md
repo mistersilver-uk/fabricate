@@ -182,6 +182,7 @@ Fabricate covers this two ways:
 
 - **Control re-trigger** means taking control of a token that is already inside a region the interactable does not conceal re-raises the prompt (a locked interactable still re-prompts, and the lock is still enforced at Interact time).
 - **Keybinding** means the client keybinding *Fabricate: interact here* (default **E**) re-raises the prompt for the controlled token's current region.
+  On Foundry 14, **E** is shared with core's own ascend action, so Fabricate only takes the key when it has a prompt to raise, and either action can be rebound in Configure Controls.
 
 Both re-trigger paths also honour the token's elevation, so an elevation-ranged region re-prompts a token standing in it.
 The two checks are not quite the same at the **bottom** edge of a range, though.

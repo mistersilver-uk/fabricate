@@ -1,12 +1,4 @@
-/**
- * EssencePoolPanel (issue 917) — the chooser an essence slot opens.
- *
- * The load-bearing claims: the meter is a RATIO meter (`aria-valuemax = need`, not
- * 100), a carrier's stepper maxes at the units left after the non-essence plan
- * rather than the raw stack, and the whole control set is keyboard-operable and
- * named. The ChanceBar non-reuse exists precisely because a percentage meter cannot
- * make the first of those claims.
- */
+/** EssencePoolPanel (issue 917) — the chooser an essence slot opens. */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -14,6 +6,7 @@ import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { essencePool } from '../helpers/crafting-fixtures.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -21,7 +14,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-essence-pool-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/craftingArtResolution.js',
@@ -30,18 +23,18 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
+  'src/ui/svelte/util/foundryIconCatalogue.json',
   ],
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte',
-    // The shared eyebrow (issue 1505). The panel's section title is a `<Kicker>`, so
-    // omitting it HANGS this suite (# cancelled), never fails it.
+    // The shared eyebrow (issue 1505). The panel's section title is a `<Kicker>`.
     'src/ui/svelte/components/Kicker.svelte',
     // The shared fill bar and no-state panel (issue 1514). The per-essence meter is a
     // `FillBar` and the no-carriers line is an `EmptyState note`, so omitting either fails
     // this suite by name.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/FillBar.svelte',
     'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
   ],
@@ -161,8 +154,6 @@ describe('EssencePoolPanel mounted behavior', () => {
   });
 
   // Zero delivered is an ERROR in the published slot-state matrix, not "a shorter bar":
-  // without a danger rule the only difference between untouched and part-funded was the
-  // fill width, which is a use-of-colour-alone failure at 6px tall.
   it('carries a distinct state class for every meter state, danger tone included', async () => {
     const target = await harness.mount({
       pool: essencePool({
@@ -204,9 +195,7 @@ describe('EssencePoolPanel mounted behavior', () => {
         'deleted `.essence-pool-bar-fill` state rules painted'
     );
 
-    // AND EVERY ONE OF THESE THREE IS UNTINTED, which is what makes the clause below a control
-    // rather than a restatement: none of the fixtures above declares a `colorToken`, so the
-    // tone is the only thing painting them and no `background` reaches the fill's inline style.
+    // AND EVERY ONE OF THESE THREE IS UNTINTED.
     assert.deepEqual(
       [...target.querySelectorAll('.fab-fill-bar-fill')].map((fill) =>
         (fill.getAttribute('style') || '').includes('background:')
@@ -215,8 +204,7 @@ describe('EssencePoolPanel mounted behavior', () => {
       'an essence with no colour of its own leaves the tone in charge'
     );
 
-    // happy-dom cannot compute a cascade, so what remains a CSS claim is asserted against the
-    // component's own scoped block: an emitted class with no rule is the defect.
+    // happy-dom cannot compute a cascade.
     const source = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte'),
       'utf8'
@@ -249,9 +237,7 @@ describe('EssencePoolPanel mounted behavior', () => {
     assert.match(shadow.getAttribute('style'), /--fab-tag-lavender/);
   });
 
-  // The stepper's ceiling is `ownedUnits` — the units left AFTER the set's
-  // non-essence plan has claimed — so the player cannot allocate into an
-  // infeasible state.
+  // The stepper's ceiling is `ownedUnits`.
   it('caps each carrier stepper at the units left after the non-essence plan', async () => {
     const target = await harness.mount({ pool: SHARED });
     const inputs = [...target.querySelectorAll('[data-essence-allocation]')];
@@ -316,10 +302,6 @@ describe('EssencePoolPanel mounted behavior', () => {
   // ONE component for one meaning: the identical chip is rendered from the carrier facts,
   // the selection recap and the consumption plan, so it is `EssenceContribution` rather
   // than three copies of the same markup + rules.
-  //
-  // And the authored tint is scoped to the GLYPH. The spec sentence this change added
-  // says label text keeps the standard body/muted colours, because a tag-palette colour
-  // behind 10px/600 text is where an authored colour can cut contrast.
   it('renders every contribution through one component whose tint reaches the glyph only', async () => {
     const target = await harness.mount({ pool: SHARED });
     const chips = [...target.querySelectorAll('.essence-contribution')];
@@ -361,22 +343,7 @@ describe('EssencePoolPanel mounted behavior', () => {
     assert.ok(controls.every((control) => control.hasAttribute('disabled')));
   });
 
-  /**
-   * THE PER-ESSENCE TINT REACHES THE BAR AS A PROP (issue 1514).
-   *
-   * The deleted `.essence-pool-meter.has-tint` triple painted the fill `var(--fab-chip-color)`
-   * in all three states, so a coloured essence's bar read as the same essence as the pip it was
-   * filled from. A caller's scoped block cannot reach a child component's element, so that rule
-   * had to become data: `meterColor` hands `FillBar` the REFERENCE rather than a value, because
-   * the essence's own colour is declared by `tintOf` on the meter this bar sits in and INHERITS
-   * down to it — which is also why no colour literal reaches this component.
-   *
-   * Asserted on the fill's own `style` ATTRIBUTE rather than on its computed style, because
-   * happy-dom drops a nested `var()` from `cssText` and the attribute is verbatim. Read as a
-   * PAIR, tinted beside untinted: a clause that only checked the tinted one would go on passing
-   * if the prop were hard-wired, and the mutation that dropped `meterColor` outright is what
-   * this test was added for.
-   */
+  /** THE PER-ESSENCE TINT REACHES THE BAR AS A PROP (issue 1514). */
   it('hands a coloured essence its own tint through the bar`s `color` prop, and an uncoloured one nothing', async () => {
     const target = await harness.mount({
       pool: essencePool({
@@ -430,28 +397,11 @@ describe('EssencePoolPanel mounted behavior', () => {
 
   it('states the empty case rather than rendering a bare header', async () => {
     const target = await harness.mount({ pool: essencePool({ carriers: [], allocation: {} }) });
-    // The line is an `EmptyState note` since issue 1514: the panel is released and the sentence
-    // renders as the variant's `hint`, so the locator is the primitive's own root.
+    // The line is an `EmptyState note` since issue 1514.
     assert.match(target.querySelector('.manager-empty.is-note').textContent, /Pool\.NoCarriers/);
   });
 
-  /**
-   * THE TRANSITION IS GONE, AND SO IS THE MEDIA QUERY THAT EXEMPTED IT (issue 1514).
-   *
-   * This used to assert that `.essence-pool-bar-fill`'s `transition: width 0.2s ease` was
-   * switched off under `prefers-reduced-motion`. The fill is `FillBar`'s element now and the
-   * primitive declares NO transition at all, so the bar moves instantly for everyone — which
-   * satisfies the reduced-motion contract outright rather than by exemption, and loses the
-   * eased fill for everyone else. That loss is real and is in this change's register: a
-   * `transition` the primitive owns, with its own reduced-motion escape, is what would close
-   * it. Reaching into `FillBar` with a `:global()` rule from the caller's scoped block would
-   * be this component re-styling one it does not own, which is the same reason the fill's
-   * three state colours became props above.
-   *
-   * Asserted as an ABSENCE on BOTH files, because "the animation is gone" is only true if
-   * neither declares one — a transition left in the primitive would animate this bar again
-   * with no media query anywhere to switch it off.
-   */
+  /** THE TRANSITION IS GONE, AND SO IS THE MEDIA QUERY THAT EXEMPTED IT (issue 1514). */
   it('animates the bar nowhere, so the reduced-motion exemption has nothing left to exempt', () => {
     // COMMENTS STRIPPED, in both syntaxes. The record of this deletion is a comment beside the
     // rule it replaced, and it NAMES the declaration it removed — so a raw scan reads the note

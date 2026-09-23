@@ -1,9 +1,4 @@
-/**
- * Unit tests for the Tool model.
- * Mirrors the FakeItem patterns established by tests/catalyst-model.test.js so
- * that flag reads/writes resolve through the same double-prefix path
- * (`fabricate:fabricate.<key>`) the production helpers rely on.
- */
+/** Unit tests for the Tool model. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -11,9 +6,7 @@ globalThis.foundry = { utils: { getProperty: () => undefined } };
 
 const { Tool } = await import('../src/models/Tool.js');
 
-// ---------------------------------------------------------------------------
 // FakeItem & FakeActor helpers (mirroring tests/catalyst-model.test.js)
-// ---------------------------------------------------------------------------
 
 function getPathValue(object, path) {
   return String(path).split('.').reduce((value, part) => {
@@ -75,9 +68,7 @@ function makeUpdatelessItem(name, flags = {}) {
   return item;
 }
 
-// ---------------------------------------------------------------------------
 // Construction defaults
-// ---------------------------------------------------------------------------
 
 test('Tool defaults to limitedUses with unlimited maxUses and destroy on break', () => {
   const tool = new Tool({ componentId: 'comp-axe' });
@@ -202,9 +193,7 @@ test('Tool accepts diceExpression configuration', () => {
   assert.equal('replacementComponentId' in tool.toJSON().onBreak, false);
 });
 
-// ---------------------------------------------------------------------------
 // Validation matrix
-// ---------------------------------------------------------------------------
 
 test('Tool.validate - requires componentId', () => {
   const result = new Tool({ componentId: '' }).validate();
@@ -336,9 +325,7 @@ test('Tool.validate requires selected prerequisites, enabled bonus expression, a
   assert.ok(invalid.errors.some((error) => error.includes('repairRequirements[0]')));
 });
 
-// ---------------------------------------------------------------------------
 // JSON round-trip
-// ---------------------------------------------------------------------------
 
 test('Tool.toJSON / fromJSON round-trip preserves shape including snapshot + source refs + label', () => {
   const original = new Tool({
@@ -399,9 +386,7 @@ test('Tool.fromJSON ignores unknown fields', () => {
   assert.equal(tool.toJSON().legacyField, undefined);
 });
 
-// ---------------------------------------------------------------------------
 // evaluateBreakage - limitedUses
-// ---------------------------------------------------------------------------
 
 test('evaluateBreakage limitedUses - breaks when timesUsed reaches maxUses', async () => {
   const tool = new Tool({
@@ -424,9 +409,7 @@ test('evaluateBreakage limitedUses - unlimited maxUses never breaks', async () =
   assert.equal((await tool.evaluateBreakage({ item })).broken, false);
 });
 
-// ---------------------------------------------------------------------------
 // evaluateBreakage - breakageChance
-// ---------------------------------------------------------------------------
 
 test('evaluateBreakage breakageChance - random() === 0 breaks at chance > 0', async () => {
   const tool = new Tool({
@@ -455,9 +438,7 @@ test('evaluateBreakage breakageChance - chance 100 always breaks', async () => {
   assert.equal(result.broken, true);
 });
 
-// ---------------------------------------------------------------------------
 // evaluateBreakage - diceExpression
-// ---------------------------------------------------------------------------
 
 test('evaluateBreakage diceExpression - breaks when result < threshold', async () => {
   const tool = new Tool({
@@ -487,9 +468,7 @@ test('evaluateBreakage diceExpression - non-numeric result does not break', asyn
   assert.equal(result.broken, false);
 });
 
-// ---------------------------------------------------------------------------
 // applyUsage
-// ---------------------------------------------------------------------------
 
 test('applyUsage limitedUses - increments timesUsed from missing flag', async () => {
   const tool = new Tool({
@@ -531,9 +510,7 @@ test('applyUsage diceExpression - no-op (no flag written)', async () => {
   assert.equal(item._flags.fabricate.fabricate, undefined);
 });
 
-// ---------------------------------------------------------------------------
 // applyBreakage
-// ---------------------------------------------------------------------------
 
 test('applyBreakage destroy - deletes the item', async () => {
   const tool = new Tool({ componentId: 'comp-axe', onBreak: { mode: 'destroy' } });
@@ -647,9 +624,7 @@ test('applyBreakage replaceWith - a failed creation preserves the original', asy
   assert.deepEqual(result, { action: 'none' });
 });
 
-// ---------------------------------------------------------------------------
 // immune breakage mode (issue 419)
-// ---------------------------------------------------------------------------
 
 test('legacy immune: reads forward to unlimited limitedUses plus check-driven immunity', () => {
   const tool = new Tool({ componentId: 'c', breakage: { mode: 'immune', maxUses: 5, breakageChance: 9 } });

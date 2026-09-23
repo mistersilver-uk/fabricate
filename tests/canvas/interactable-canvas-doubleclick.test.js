@@ -1,14 +1,4 @@
-/**
- * Phase 1c retired the CANVAS-STAGE double-click pointer listener entirely.
- *
- * In the region-first model a player activates a Fabricate interactable by token
- * PRESENCE in a `fabricate.interactable` Scene Region (Foundry-native), NOT by
- * double-clicking a tile. `InteractableManager.register()` therefore no longer
- * binds `canvasReady` or installs a `canvas.stage` `pointerdown` listener; the
- * dead pure hit-test / detector modules are deleted in Phase 1d. This suite
- * asserts the listener is gone (no stage `.on`, no `canvasReady` hook) so a
- * regression that re-introduces the layer-fighting tile-click path fails loudly.
- */
+/** Phase 1c retired the CANVAS-STAGE double-click pointer listener entirely. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';

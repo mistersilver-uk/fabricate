@@ -4,6 +4,13 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// The node card's two vocabularies are data since issue 1510 converted its selects: read from the
+// module that declares them rather than matched in the editor's markup.
+import {
+  respawnGainModeOptions,
+  respawnPolicyOptions
+} from '../../src/ui/svelte/apps/manager/gatheringTaskSelectOptions.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const editorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
@@ -40,9 +47,7 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
   });
 
   it('renders both economy cards independently (both guards present, no shared else)', () => {
-    // The two cards are gated by two independent {#if} blocks, so both render
-    // when both flags are on (the anti-dogpiling combination). The stamina guard
-    // is NOT chained to the nodes guard.
+    // The two cards are gated by two independent {#if} blocks.
     const staminaGuard = editorSource.indexOf('{#if staminaEnabled}');
     const nodesGuard = editorSource.indexOf('{#if nodesEnabled}');
     assert.ok(staminaGuard >= 0 && nodesGuard >= 0, 'both flag guards exist');
@@ -50,11 +55,9 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
   });
 
   it('shows the guidance hint in the {:else} of the nodes guard (nodes disabled)', () => {
-    // The hint now lives in the {:else} of the nodesEnabled guard, so it renders
-    // whenever resource nodes are off — independent of the stamina toggle.
+    // The hint now lives in the {:else} of the nodesEnabled guard.
     const guardIdx = editorSource.indexOf('{#if nodesEnabled}');
-    // Prettier (issue 923) prints the section's attributes one per line, so match the {:else}
-    // and the hint card's class as a pattern rather than as a fixed two-line string.
+    // Prettier (issue 923) prints the section's attributes one per line.
     const elseMatch = /\{:else\}\s*<section\s+class="manager-task-nodes-card manager-task-nodes-hint-card"/.exec(
       editorSource.slice(guardIdx)
     );
@@ -84,17 +87,29 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     ]) {
       assert.ok(editorSource.includes(attr), `node card should expose ${attr}`);
     }
-    // The three respawn policies are offered (issue 301 adds nonRegenerating).
-    for (const policy of ['"manual"', '"overTime"', '"nonRegenerating"']) {
-      assert.ok(editorSource.includes(`value=${policy}`), `respawn select should offer policy ${policy}`);
-    }
+    // The three respawn policies are offered, in order (issue 301 adds nonRegenerating).
+    const fallback = (key, text) => text;
+    assert.deepEqual(
+      respawnPolicyOptions(fallback).map((option) => option.value),
+      ['manual', 'overTime', 'nonRegenerating'],
+      'the respawn picker offers the three shipped policies'
+    );
     // The three over-time gain modes are offered.
-    for (const gainMode of ['"guaranteed"', '"chance"', '"expression"']) {
-      assert.ok(editorSource.includes(`value=${gainMode}`), `gain-mode select should offer ${gainMode}`);
-    }
-    // The removed legacy policies are gone.
-    for (const policy of ['"none"', '"elapsedTime"', '"probability"', '"manualAndElapsedTime"']) {
-      assert.ok(!editorSource.includes(`value=${policy}`), `respawn select should no longer offer policy ${policy}`);
+    assert.deepEqual(
+      respawnGainModeOptions(fallback).map((option) => option.value),
+      ['guaranteed', 'chance', 'expression'],
+      'the gain-mode picker offers the three shipped modes'
+    );
+    // The removed legacy policies are gone — from the vocabulary and from the editor.
+    for (const policy of ['none', 'elapsedTime', 'probability', 'manualAndElapsedTime']) {
+      assert.ok(
+        !respawnPolicyOptions(fallback).some((option) => option.value === policy),
+        `respawn picker should no longer offer policy ${policy}`
+      );
+      assert.ok(
+        !editorSource.includes(`value="${policy}"`),
+        `the editor should spell no ${policy} option`
+      );
     }
   });
 
@@ -123,9 +138,7 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
   });
 
   it('authors depletedBehavior with a FilePicker swap-image (swap is the only behavior; no delete, no postfix)', () => {
-    // Only the swap-image picker survives — the "delete the linked marker" toggle
-    // and its warning chip were removed, and the postfix toggle is not offered for
-    // canvas tiles (tiles have no nameplate).
+    // Only the swap-image picker survives.
     for (const attr of [
       'data-gathering-task-depleted-behavior',
       'data-gathering-task-depleted-image'
@@ -208,9 +221,11 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
   });
 
   it('authors the optional defaultEnvironmentId select wired from the parent', () => {
-    assert.ok(editorSource.includes('data-gathering-task-field="defaultEnvironmentId"'), 'a default-environment select is present');
+    // The hook rides the converted trigger now, so `gathering-task-editor-stepper-mounted` asserts
+    // its presence on the rendered DOM rather than this suite matching it in markup, and `clears the
+    // default environment back to the sentinel` there drives the empty-to-null coercion this used to
+    // pin as source text.
     assert.match(editorSource, /function setDefaultEnvironment/, 'has a default-environment setter');
-    assert.match(editorSource, /defaultEnvironmentId: id \|\| null/, 'the setter coerces empty to null');
     // The parent feeds the system environments into the editor.
     assert.match(rootSource, /selectedSystemEnvironmentOptions\s*=\s*\$derived/, 'parent derives the system environment options');
     assert.match(rootSource, /environmentOptions=\{selectedSystemEnvironmentOptions\}/, 'parent passes environmentOptions to the task editor');

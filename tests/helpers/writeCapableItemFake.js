@@ -1,13 +1,6 @@
 /**
- * A WRITE-capable Foundry world-item fake for durable-flag write-path tests (component
- * restamp, tool stamp, whetstone coexistence). Faithfully models the double-nested flag
- * storage (`flags.fabricate.fabricate.<...>`) that `getFabricateFlag`/`setFabricateFlag`
- * use. Foundry V13 `setFlag` stores its dotted key literally, while a flattened
- * `Document#update` path expands into nested data and `unsetFlag` deletes a dotted leaf.
- * The read-only `roleItem` fixture (`getFlag` only) cannot exercise these write semantics.
- *
- * Hoisted from `tests/component-identity-wiring.test.js` so the write-fake lives in ONE place
- * (SonarCloud counts `tests/**` duplication like `src/`).
+ * A WRITE-capable Foundry world-item fake for durable-flag write-path tests (component restamp,
+ * tool stamp, whetstone coexistence).
  */
 
 /**

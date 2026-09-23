@@ -165,9 +165,7 @@ function baseTask(overrides = {}) {
 
 const viewer = { id: 'user-1', isGM: false };
 
-// ---------------------------------------------------------------------------
 // Start-attempt gate
-// ---------------------------------------------------------------------------
 
 test('missing tool blocks startAttempt with TOOL_BLOCKED', async () => {
   const tool = { componentId: 'comp-axe', breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } };
@@ -351,9 +349,7 @@ test('timed completion resolves library toolIds for usedTools evidence', async (
   assert.deepEqual(breakage.calls.planTools[0], [libraryTool]);
 });
 
-// ---------------------------------------------------------------------------
 // Policy override
-// ---------------------------------------------------------------------------
 
 test('failureOnBreak policy overrides outcome to failed when a tool breaks', async () => {
   const tool = { componentId: 'comp-axe', breakage: { mode: 'breakageChance', breakageChance: 100 }, onBreak: { mode: 'destroy' } };
@@ -419,9 +415,7 @@ test('legacy task without tools is unaffected', async () => {
   assert.deepEqual(result.usedTools, []);
 });
 
-// ---------------------------------------------------------------------------
 // isToolBroken / classifyGatheringToolStates (display-state helpers)
-// ---------------------------------------------------------------------------
 
 function brokenViaGetFlag(key) {
   return { getFlag: (ns, flag) => ns === 'fabricate' && flag === key };
@@ -478,9 +472,7 @@ test('matchGatheringTools still collapses a broken matching tool into missing (a
   assert.equal(result.missing.length, 1);
 });
 
-// ---------------------------------------------------------------------------
 // classifyGatheringToolStates: replaceWith broken-variant recognition (display)
-// ---------------------------------------------------------------------------
 
 function replaceWithTool() {
   return {
@@ -570,9 +562,7 @@ test('matchGatheringTools: holding only the replaceWith broken variant stays mis
   assert.equal(result.missing.length, 1);
 });
 
-// ---------------------------------------------------------------------------
 // Virtual-present tools (Phase 4: activeCanvasTool injection)
-// ---------------------------------------------------------------------------
 
 test('matchGatheringTools: a componentId in presentTools matches virtually with no owned item', () => {
   const result = matchGatheringTools({
@@ -907,9 +897,7 @@ test('startAttempt: an unowned tool present as activeCanvasTool gathers without 
   assert.equal(buildRefs.length, 0, 'breakage runtime never touched an owned item');
 });
 
-// ---------------------------------------------------------------------------
 // checkDriven authority parity via the shared runtime (issue 419)
-// ---------------------------------------------------------------------------
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import {
@@ -948,10 +936,8 @@ test('gathering checkDriven runtime: forces breakage on non-immune tools, immune
 });
 
 test('gathering/crafting drift: the gathering apply breaks exactly what the crafting resolver decides', async () => {
-  // ONE shared persisted checkDriven system + ONE engine-evaluated roll. The
-  // crafting resolver decides the break; the gathering runtime APPLIES it to a real
-  // item. If either surface drifts (resolver decision or runtime application), the
-  // crafting decision and the applied gathering evidence diverge and this fails.
+  // ONE shared persisted checkDriven system + ONE engine-evaluated roll. The crafting resolver
+  // decides the break; the gathering runtime APPLIES it to a real item.
   const system = {
     toolBreakage: { authority: 'checkDriven' },
     resolutionMode: 'simple',
