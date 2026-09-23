@@ -7126,6 +7126,7 @@
           "LearnedFrom": "Learned from {source}",
           "LearnedRowActions": "Learned recipe actions",
           "LoadError": "Couldn't load character knowledge.",
+          "LoadErrorHint": "Open another section, then return to Knowledge to try again. The browser console has the error.",
           "LoadingHint": "Fabricate is reading each player character's recipe items and learned recipes.",
           "LoadingTitle": "Loading character knowledge...",
           "MatchCompendium": "Compendium match",

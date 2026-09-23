@@ -213,6 +213,10 @@
             'FABRICATE.Admin.Manager.Knowledge.LoadError',
             "Couldn't load character knowledge."
           )}
+          detail={text(
+            'FABRICATE.Admin.Manager.Knowledge.LoadErrorHint',
+            'Open another section, then return to Knowledge to try again. The browser console has the error.'
+          )}
           dataAttr="data-knowledge-error"
         />
       </div>
@@ -356,7 +360,7 @@
 </main>
 
 <style>
-  /* The failure notice's SLOT (issue 1969). `<Notice>` declares `margin: 0` and the detail pane has
+  /* The failure notice's slot (issue 1969). `<Notice>` declares `margin: 0` and the detail pane has
      no padding, so this rule is the caller's layout: the detail header's own gutter. */
   .manager-knowledge-error-slot {
     padding: var(--fab-space-3) var(--fab-space-4);

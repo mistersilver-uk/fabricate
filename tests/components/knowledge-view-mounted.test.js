@@ -831,6 +831,7 @@ describe('KnowledgeView mounted behaviour', () => {
     assert.equal(notice.getAttribute('aria-live'), 'polite');
     assert.equal(notice.getAttribute('data-notice-tone'), 'danger');
     assert.match(notice.textContent, /Couldn't load character knowledge\./);
+    assert.match(notice.textContent, /return to Knowledge to try again/);
     assert.ok(target.querySelector('[data-knowledge-search]'), 'the roster keeps its search');
     assert.equal(target.querySelectorAll('.manager-empty').length, 0, 'no empty-state claim');
     assert.equal(target.querySelector('[data-knowledge-view]').hasAttribute('aria-busy'), false);
