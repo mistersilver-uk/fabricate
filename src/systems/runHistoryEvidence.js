@@ -1,4 +1,4 @@
-import { isSafeFlagKeySegment } from '../config/flags.js';
+import { isSafeFlagKeySegment, markForcedDeletion } from '../config/flags.js';
 
 import {
   hasStackQuantity,
@@ -230,19 +230,10 @@ export async function writeAcknowledgedRunContainer(actor, namespace, key, curre
   if (sameHistoryValue(current, next)) return;
   const payload = structuredClone(next);
   for (const id of Object.keys(current?.active ?? {})) {
-    // A dotted or otherwise unsafe id cannot be addressed by a deletion key at all: the update
-    // re-splits it on every dot and the `-=` lands on another node. Mirrors the same guard on
-    // `GatheringStaminaService._deleteRetiredStaminaKeys`.
+    // A dotted id cannot be addressed by a deletion: the update re-splits it on every dot.
     if (!isSafeFlagKeySegment(id)) continue;
-    // `-=` is deprecated on V14: `_migrateDeletionKey` logs a compatibility warning for it
-    // (behaviour is unchanged; it becomes a throw only under
-    // `CONFIG.compatibility.mode = FAILURE`). It is KEPT DELIBERATELY. The replacement,
-    // `foundry.data.operators.ForcedDeletion`, does not exist on V13 and this module ships at
-    // `minimum: "13"`, and the only generation-neutral alternative — `Document#unsetFlag` —
-    // deletes one key per write, which would break the single acknowledged update this function
-    // exists to make. Migrate when the supported floor reaches V14; see the five sibling `-=`
-    // writers, which must move together.
-    if (!Object.hasOwn(payload.active, id)) payload.active[`-=${id}`] = null;
+    // Marked after the clone, which would destroy a V14 operator; see `markForcedDeletion`.
+    if (!Object.hasOwn(payload.active, id)) markForcedDeletion(payload.active, id);
   }
   requireDocumentAcknowledgment(actor, await actor.setFlag(namespace, key, payload));
 }

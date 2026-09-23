@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
 import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
+import { deletedKey, forEachDeletionForm, recordWrite } from './helpers/forcedDeletion.js';
 import {
   insertTerminalRuns,
   assertCappedMostRecentFirst,
@@ -602,7 +603,6 @@ class MergeActor {
     this.name = name;
     this.uuid = `Actor.${name}`;
     this._stored = null; // the persisted craftingRuns container
-    this.updateCalls = [];
     this.setFlagCalls = [];
   }
 
@@ -611,23 +611,19 @@ class MergeActor {
   }
 
   async setFlag(scope, key, value) {
-    this.setFlagCalls.push({ scope, key, value });
-    // Recursive-merge `active` (never deletes), replace `history` (array replace).
-    const priorActive = this._stored?.active ?? {};
+    recordWrite(this.setFlagCalls, value, { scope, key, value });
+    // Merge `active` (never deletes an omitted run), replace `history` (array replace).
+    const active = { ...(this._stored?.active ?? {}) };
+    for (const [id, run] of Object.entries(value?.active ?? {})) {
+      const deleted = deletedKey(id, run);
+      if (deleted !== null) delete active[deleted];
+      else active[id] = run;
+    }
     this._stored = {
-      active: { ...priorActive, ...(value?.active ?? {}) },
+      active,
       history: Array.isArray(value?.history) ? value.history : (this._stored?.history ?? []),
     };
-    for (const key of Object.keys(value?.active ?? {})) if (key.startsWith('-=')) { delete this._stored.active[key.slice(2)]; delete this._stored.active[key]; }
     return this;
-  }
-
-  async update(data) {
-    this.updateCalls.push(data);
-    for (const path of Object.keys(data)) {
-      const match = /craftingRuns\.active\.-=(.+)$/.exec(path);
-      if (match && this._stored?.active) delete this._stored.active[match[1]];
-    }
   }
 }
 
@@ -641,8 +637,9 @@ function persistWriteGolden(run) {
   ];
 }
 
-test('CraftingRunManager._persist deletes removed active runs from the stored flag (setFlag merge cannot)', async () => {
+forEachDeletionForm('CraftingRunManager._persist deletes removed active runs from the stored flag (setFlag merge cannot)', async (deletion) => {
   setupGlobals();
+  deletion.apply();
   const manager = new CraftingRunManager();
   const actor = new MergeActor();
 
@@ -654,8 +651,8 @@ test('CraftingRunManager._persist deletes removed active runs from the stored fl
   manager.invalidateCache();
   await manager.completeRun(actor, run, 'succeeded');
 
-  assert.deepEqual(actor.setFlagCalls, golden);
-  assert.deepEqual(actor.updateCalls, [], 'the deletion rides the one acknowledged setFlag');
+  assert.deepEqual(actor.setFlagCalls, deletion.expect(golden));
+  deletion.assertOperators(actor.setFlagCalls, 1);
   assert.ok(
     !actor._stored.active[run.id],
     'the completed run is actually removed from the stored active map (not just in memory)'

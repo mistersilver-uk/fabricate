@@ -6,6 +6,7 @@ import {
   GatheringRunManager,
   GatheringRunManagerError
 } from '../src/systems/GatheringRunManager.js';
+import { deletedKey, forEachDeletionForm, recordWrite } from './helpers/forcedDeletion.js';
 
 class FakeActor {
   constructor(name = 'Gatherer') {
@@ -20,7 +21,7 @@ class FakeActor {
   }
 
   async setFlag(namespace, key, value) {
-    this.setFlagCalls.push({ namespace, key, value });
+    recordWrite(this.setFlagCalls, value, { namespace, key, value });
     this.flags[namespace] = this.flags[namespace] || {};
     this.flags[namespace][key] = mergeObjects(this.flags[namespace][key], value);
     return this;
@@ -31,35 +32,6 @@ class RejectingActor extends FakeActor {
   async setFlag(namespace, key, value) {
     this.setFlagCalls.push({ namespace, key, value });
     throw new Error('setFlag failed');
-  }
-}
-
-class MergingActor extends FakeActor {
-  constructor(name = 'Gatherer') {
-    super(name);
-    this.updateCalls = [];
-  }
-
-  async update(updates) {
-    this.updateCalls.push(updates);
-    for (const [path, value] of Object.entries(updates)) {
-      const parts = path.split('.');
-      const deleteToken = parts.at(-1);
-      if (!deleteToken?.startsWith('-=') || value !== null) continue;
-
-      let target = this;
-      for (const part of parts.slice(0, -1)) {
-        target = target?.[part];
-      }
-      if (target) delete target[deleteToken.slice(2)];
-    }
-  }
-
-  async setFlag(namespace, key, value) {
-    this.setFlagCalls.push({ namespace, key, value });
-    this.flags[namespace] = this.flags[namespace] || {};
-    this.flags[namespace][key] = mergeObjects(this.flags[namespace][key], value);
-    return this;
   }
 }
 
@@ -809,21 +781,40 @@ function acknowledgedWriteGolden(run) {
   ];
 }
 
-test('GatheringRunManager commits history and active deletions in one acknowledged flag update', async () => {
-  const actor = new MergingActor();
+forEachDeletionForm('GatheringRunManager commits history and active deletions in one acknowledged flag update', async (deletion) => {
+  deletion.apply();
+  const actor = new FakeActor();
   const runs = manager();
   const run = await runs.createWaitingRun(actor, runData({ taskId: 'task-time' }), { minutes: 1 });
   const golden = acknowledgedWriteGolden(structuredClone(run));
 
   await runs.completeRun(actor, run, 'succeeded');
 
-  assert.deepEqual(actor.setFlagCalls, golden);
+  assert.deepEqual(actor.setFlagCalls, deletion.expect(golden));
+  deletion.assertOperators(actor.setFlagCalls, 1);
   assert.deepEqual(Object.keys(actor.flags.fabricate.gatheringRuns.active), []);
   assert.equal(actor.flags.fabricate.gatheringRuns.history[0].taskId, 'task-time');
   assert.deepEqual(runs.getActiveRuns(actor), []);
-  assert.ok(
-    actor.setFlagCalls.some(call => Object.hasOwn(call.value.active, `-=${run.id}`) && call.value.history.some(entry => entry.id === run.id)),
-    'the deletion and terminal recovery evidence belong to the same write'
+});
+
+forEachDeletionForm('GatheringRunManager never addresses a dotted run id with a deletion', async (deletion) => {
+  deletion.apply();
+  const actor = new FakeActor();
+  const ids = ['run-safe', 'run.dotted'];
+  const runs = manager({ randomID: () => ids.shift(), getActors: () => [actor] });
+  await runs.createRun(actor, runData({ craftingSystemId: 'system-x', taskId: 'task-a' }));
+  await runs.createRun(actor, runData({ craftingSystemId: 'system-x', taskId: 'task-b' }));
+  actor.setFlagCalls.length = 0;
+
+  await runs.removeRunsForSystem('system-x');
+
+  const write = { active: { '-=run-safe': null }, history: [] };
+  assert.deepEqual(actor.setFlagCalls, deletion.expect([{ namespace: 'fabricate', key: 'gatheringRuns', value: write }]));
+  deletion.assertOperators(actor.setFlagCalls, 1);
+  assert.deepEqual(
+    Object.keys(actor.flags.fabricate.gatheringRuns.active),
+    ['run.dotted'],
+    'the safe run is deleted and the dotted one is skipped rather than re-split onto another node'
   );
 });
 
@@ -911,16 +902,15 @@ test('GatheringRunManager cleanup by system, environment, and task removes match
 });
 
 function mergeObjects(previous, next) {
-  if (!previous || typeof previous !== 'object' || Array.isArray(previous)) {
-    return clonePlain(next);
-  }
   if (!next || typeof next !== 'object' || Array.isArray(next)) {
     return clonePlain(next);
   }
 
-  const merged = clonePlain(previous);
+  const isMap = previous && typeof previous === 'object' && !Array.isArray(previous);
+  const merged = isMap ? clonePlain(previous) : {};
   for (const [key, value] of Object.entries(next)) {
-    if (key.startsWith('-=')) delete merged[key.slice(2)];
+    const deleted = deletedKey(key, value);
+    if (deleted !== null) delete merged[deleted];
     else merged[key] = mergeObjects(merged[key], value);
   }
   return merged;
