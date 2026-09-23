@@ -103,9 +103,10 @@
  * recipe-access and recipe-item browse filters narrows no rule at all — the native
  * `.manager-filter select` skin still has carriers in three unconverted toolbars and stays — and
  * adds two: the shared trigger floor those six converted controls take, and the `min-width: 0` the
- * picker root needs as the bar's flex item. Both are new singletons in both keyings, so the rule,
- * key and singleton counts each rise by two, to 2,568, 3,044 and 2,934, and `pinnedTotal` stays
- * 225 across 110 rows. Re-derived by running the census twice, not subtracted.
+ * picker root needs as the bar's flex item. Both are new singletons in both keyings, so over the
+ * tree it landed on the rule, key and singleton counts each rise by two, from 2,566, 3,042 and
+ * 2,932 to 2,568, 3,044 and 2,934, and `pinnedTotal` stays 225 across 110 rows. Re-derived by
+ * running the census twice, not subtracted.
  * Its second commit moves the rule count alone. The conditions card's shared 36px rule loses its
  * `.manager-condition-current select` leg and keeps the add row's input, and the trigger's full
  * width arrives as a rule of its own, so the sheet holds one more rule, 2,569, while one key leaves
@@ -123,6 +124,10 @@
  * trigger, the 38px trigger rung gains the component toolbar's member and the filter roots' cap
  * reaches the trigger in a rule of its own: 2,568 -> 2,567 rules, 3,043 -> 3,042 keys and
  * 2,933 -> 2,935 singletons. Re-derived by running the census twice, not subtracted.
+ * Its fifth commit moves no figure. The vocabulary panel's sort skin is deleted, and the recipe
+ * inspector's route picker keeps its root rule and gains a trigger rule of its own, so one
+ * singleton key leaves as another arrives: 2,567 rules, 3,042 keys and 2,935 singletons, and
+ * `pinnedTotal` stays 219 across 107 rows. Re-derived by running the census twice.
  * ISSUE 1505 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting
  * three rule blocks the shared `Callout` made redundant: the Checks studio's
  * `[data-failure-salvage-note]` override and its glyph rule, whose whole content the primitive

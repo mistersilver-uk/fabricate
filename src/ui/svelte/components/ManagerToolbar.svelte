@@ -19,11 +19,11 @@
   - A `<section>` is a `region` landmark only while it has an accessible name, so every call site
     passes one; `tests/components/manager-filter-bar-source-contract.test.js` asserts it.
   - It declares no font floor and no focus pair, because it owns no control of its own; pinned by
-    `tests/components/re-rooted-controls-host-independence.test.js`, which excludes its one
-    app-rooted residue by count.
+    `tests/components/re-rooted-controls-host-independence.test.js`.
   - The row div and the filter control beside the search field are SLOTS, not markup this bar writes:
-    `BulkSelectionToolbar.svelte` renders the row class itself, and the control is three different
-    vocabularies across the shipped bars.
+    `BulkSelectionToolbar.svelte` renders the row class itself, and the control is two vocabularies
+    across the shipped bars, a shared `Select` and a segmented control, so the bar takes no API for
+    either.
   - No `variant` prop and no scoped `<style>`: every modifier is a pass-through on `class`.
 -->
 <script>
