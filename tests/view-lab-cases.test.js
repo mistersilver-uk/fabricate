@@ -2121,6 +2121,22 @@ test('system Travel Map evidence is populated and long-label focus cannot duplic
   assert.match(runnerSource, /evidence frame is byte-identical to/);
 });
 
+test('system Travel Map no-regions evidence reaches its world through the lab flag', () => {
+  const empty = getCaseById('manager-world-travel-map-empty');
+  const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+  const worldSource = readFileSync(resolve(ROOT, 'tests/view-lab/world/labWorld.js'), 'utf8');
+
+  assert.equal(empty.query?.noSceneRegions, '1');
+  assert.deepEqual(empty.smokeLabels, []);
+  // The no-regions icon; the no-scene empty state draws a different one.
+  assert.match(empty.expectSelector, /\.fa-map-location-dot/);
+  assert.match(mountSource, /noSceneRegions: params\.get\('noSceneRegions'\) === '1'/);
+  assert.match(mountSource, /noSceneRegions: params\.noSceneRegions/);
+  assert.match(worldSource, /regions: noSceneRegions\s*\n?\s*\? \[\]/);
+  // The interactable seed throws on a scene without the `deep-gate` region.
+  assert.match(worldSource, /!noSceneRegions && worldHasInteractableSources/);
+});
+
 test('every crafting case claims exactly the resolution-mode body it renders', () => {
   // The crafting cases carry a per-MODE `sourceMatches` pattern so that editing
   // `detail/ProgressiveBody.svelte` selects the four progressive frames rather than all 27. That

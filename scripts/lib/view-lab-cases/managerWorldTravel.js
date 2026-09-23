@@ -201,6 +201,30 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-world-travel-map-empty',
+    label: 'Manager — World Travel Map Region Links on a scene without regions',
+    // `beyond`: the smoke's scene always carries a region, so it never reaches this empty state.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing', noSceneRegions: '1' },
+    steps: [
+      { selector: '#manager-travel-toggle', press: 'Space' },
+      { selector: '#manager-travel-nav-map', press: 'Enter' },
+    ],
+    expectView: 'world-travel',
+    // The no-regions icon, which the no-scene empty state does not draw.
+    expectSelector: '[data-travel-panel="map"] [data-travel-map-links-empty] .fa-map-location-dot',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringMapLinksTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
+      // And the rail that renders that leaf, since phase 3 moved it out of the root too.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-world-travel-long-label-focus',
     label: 'Manager — World Travel long child label keyboard focus',
     // The smoke uses shipped localization, so the View Lab supplies the long-label stress string and guards it.

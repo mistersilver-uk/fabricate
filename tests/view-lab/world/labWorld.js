@@ -238,6 +238,8 @@ function stripAuthoredWorldComponents(content) {
  *   whatever the active scene carries, so "nothing on this scene" is a property of the world
  *   rather than of which behaviour a case opens. See `labInteractables.js` for why the two config
  *   states are seeded behaviours instead.
+ * @param {boolean} [options.noSceneRegions] Give the active scene NO regions, for the Map Region
+ *   Links no-regions empty state. It also skips the interactable seed, which needs a region.
  * @param {string|null} [options.journalCaseState] Focused persisted Journal state for View Lab.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
  */
@@ -251,6 +253,7 @@ export async function buildLabWorld({
   noTools = false,
   noAuthoredWorldComponents = false,
   noInteractables = false,
+  noSceneRegions = false,
   gatheringTaskMode = null,
   journalCaseState = null,
 } = {}) {
@@ -287,14 +290,16 @@ export async function buildLabWorld({
         background: {
           src: `${ICON_BASE}/environment/wilderness/cave-entrance-dwarven-hill.webp`,
         },
-        regions: [
-          {
-            id: 'deep-gate',
-            uuid: 'Scene.lab-map.Region.deep-gate',
-            name: 'Deep Gate Approach',
-            color: '#8b6f47',
-          },
-        ],
+        regions: noSceneRegions
+          ? []
+          : [
+              {
+                id: 'deep-gate',
+                uuid: 'Scene.lab-map.Region.deep-gate',
+                name: 'Deep Gate Approach',
+                color: '#8b6f47',
+              },
+            ],
       },
     ],
     worldTime: LAB_WORLD_TIME,
@@ -305,7 +310,9 @@ export async function buildLabWorld({
   // BEFORE the shim, because `installFoundryShim` wraps `world.scenes` in the collection
   // `game.scenes` exposes and captures `current` / `active` off it.
   const worldHasInteractableSources = !clearSystem && !noTools;
-  if (!noInteractables && worldHasInteractableSources) seedLabInteractables(world);
+  if (!noInteractables && !noSceneRegions && worldHasInteractableSources) {
+    seedLabInteractables(world);
+  }
 
   const shim = installFoundryShim(world);
   world.shim = shim;
