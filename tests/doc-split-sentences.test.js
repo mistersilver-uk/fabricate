@@ -40,6 +40,8 @@ const DESTINATIONS = [
   '.github/workflows/README.md',
   // Phase 4: the FoundryVTT notes and architecture pointers, moved whole.
   '.agents/docs/foundry-and-architecture.md',
+  // Issue #1984: the detailed final-delivery procedure moved out of always-loaded guidance.
+  '.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md',
 ];
 
 /**
@@ -119,6 +121,102 @@ const DECOUNTED = [
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
 const DECOUNTED_COUNT = 4;
+
+/**
+ * Historical policy sentences deliberately replaced, with both sides and the current destination
+ * pinned so an ordinary lost instruction cannot hide in the exception (issue #1984).
+ */
+const SUPERSEDED_POLICY = [
+  {
+    issue: '#1984',
+    before:
+      'Draft-head checks are preflight evidence only because some CI workflows may run only on the `ready_for_review` event.',
+    after:
+      'A successful full required check attempt remains authoritative for its exact remote head whether it started while the PR was draft or ready.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md',
+  },
+  {
+    issue: '#1984',
+    before:
+      'Draft checks are preflight only; on failure or a moved main/head, return the PR to draft and repeat the delivery loop.',
+    after:
+      'Keep a ready PR ready while rebasing, updating its branch, investigating a failed check, or routing a fix.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md',
+  },
+  {
+    issue: '#1984',
+    before:
+      'Delivery is only complete when the PR is ready and its exact-head checks are green; a green PR left in draft is unfinished work, not a cautious pause, because draft checks prove nothing about the workflows that run only on `ready_for_review`.',
+    after:
+      'Delivery is complete only when the PR is ready and one full required check attempt is successful for its exact remote head.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md',
+  },
+  {
+    issue: '#1984',
+    before:
+      'Choose one authoritative full exact-head attempt, normally the `ready_for_review` attempt, and require all full gates from that attempt rather than combining jobs from duplicates; metadata-only `edited` attempts never qualify.',
+    after:
+      'Choose one authoritative full attempt for the exact remote head and require every full gate from that attempt rather than combining successful jobs across duplicate attempts.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md',
+  },
+  {
+    issue: '#1984',
+    before:
+      'Treat draft checks as preflight only; a required workflow may be triggered by `ready_for_review` and must pass after the PR is undrafted.',
+    after:
+      'Follow the final-delivery procedure in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`; readiness changes do not create check evidence.',
+    survivesIn: 'AGENTS.md',
+  },
+  {
+    issue: '#1984',
+    before:
+      "The ready transition is the driver's own step, so run it without asking: a green PR still sitting in draft has not had its deciding checks run, so it is unfinished, not safely parked.",
+    after: 'Readiness changes do not change source and do not create check evidence.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md',
+  },
+  {
+    issue: '#1984',
+    before:
+      'On any failure, return the PR to draft before gathering evidence and routing fixes through the normal isolated implementation and review loops.',
+    after:
+      "If any check fails, gather evidence, reconcile the issue, and route fixes through isolated implementation and review lanes while preserving the PR's readiness state.",
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md',
+  },
+  {
+    issue: '#1984',
+    before:
+      'After fixes, repeat the rebase, validation, lease push, ready transition, and exact-head checks, repeating review only for a materially changed owned concern or unresolved finding.',
+    after: 'Repeat rebase, local validation, explicit-lease push, and exact-head CI after a fix.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md',
+  },
+  {
+    issue: '#1984',
+    before:
+      "If main advanced, the head changed, or the PR returned to draft, repeat the mandatory delivery steps and apply step 4's material-change review rule.",
+    after:
+      'If main advanced or the PR head changed, repeat the mandatory delivery steps while keeping a ready PR ready, preserving approval when the resulting rebase is patch-equivalent and repeating review only when the material-change rule requires it.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md',
+  },
+  {
+    issue: '#1984',
+    before:
+      'Before maintainer handoff, the driver finalizes PR metadata, rebases onto fetched `origin/main`, reruns authoritative gates and commitlint, preserves valid approval across a patch-equivalent rebase or obtains fresh detached exact-target review when the owned concern materially changed or a finding remains unresolved, pushes only with an explicit expected-head lease, marks the PR ready, and requires all post-undraft exact-head checks including both SonarCloud checks.',
+    after:
+      'The maintainer handoff is valid only when current-main ancestry, exact remote-head identity, ready state, and every required exact-head check are mechanically true at the same time.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md',
+  },
+  {
+    issue: '#1984',
+    before:
+      'Mark the PR ready for review, then wait for every required GitHub Actions and external check triggered for that exact head.',
+    after:
+      'If the PR is still draft and reviewable, mark it ready, then wait for every required GitHub Actions and external check associated with that exact remote head.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md',
+  },
+];
+
+/** Pinned exactly: every entry excuses one historical sentence. */
+const SUPERSEDED_POLICY_COUNT = 11;
 
 /**
  * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue
@@ -372,6 +470,7 @@ test('every sentence of the pre-split documents still exists somewhere', () => {
     ...RENAMED.map(({ before }) => before),
     ...RENUMBERED,
     ...DECOUNTED.map(({ before }) => before),
+    ...SUPERSEDED_POLICY.map(({ before }) => before),
   ]);
   const lost = missingSentences(before, after).filter(({ sentence }) => !allowed.has(sentence));
 
@@ -406,6 +505,32 @@ test('every deduplication claim names a place that really carries the sentence',
     assert.ok(
       text.includes(sentence),
       `DEDUPLICATED says this sentence survives in ${survivesIn}, and it does not:\n  ${sentence}`
+    );
+  }
+});
+
+test('every superseded policy mapping names its frozen source and current replacement', () => {
+  assert.equal(
+    SUPERSEDED_POLICY.length,
+    SUPERSEDED_POLICY_COUNT,
+    'the superseded-policy allowlist changed size; each entry excuses exactly one historical sentence'
+  );
+
+  const frozen = multiset(
+    SOURCES.flatMap(({ fixture }) =>
+      sentencesOf(readFileSync(path.join(REPOSITORY_ROOT, fixture), 'utf8'))
+    )
+  );
+  for (const { issue, before, after, survivesIn } of SUPERSEDED_POLICY) {
+    assert.equal(issue, '#1984', 'every superseded policy entry must name its approving issue');
+    assert.ok((frozen.get(before) ?? 0) > 0, `superseded sentence is absent from the frozen corpus:\n  ${before}`);
+    assert.ok(DESTINATIONS.includes(survivesIn), `${survivesIn} is not in DESTINATIONS`);
+    const current = sentencesOf(readFileSync(path.join(REPOSITORY_ROOT, survivesIn), 'utf8'));
+    assert.ok(current.includes(after), `replacement is absent from ${survivesIn}:\n  ${after}`);
+    assert.equal(
+      survivingSentences().get(before) ?? 0,
+      0,
+      `superseded sentence still exists in current guidance:\n  ${before}`
     );
   }
 });

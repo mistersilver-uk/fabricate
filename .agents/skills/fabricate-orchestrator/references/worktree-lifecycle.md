@@ -223,36 +223,44 @@ It runs the repository's unchanged gates against the pushed integrated commit.
 ## Final PR delivery
 
 The workflow driver completes this loop before handing a PR to the maintainer for review.
-Checks observed while the PR is draft are preflight evidence only because a required workflow may run only after the `ready_for_review` event.
+Before maintainer handoff, complete the final delivery loop: rebase onto fetched `origin/main`, rerun authoritative gates and commitlint, preserve valid approval across a patch-equivalent rebase or obtain fresh detached review when the owned concern materially changed or a finding remains unresolved, explicit-lease push, mark ready, require all exact-head checks including both SonarCloud checks, then re-fetch main and reverify ancestry, head identity, and ready state.
+A successful full required check attempt remains authoritative for its exact remote head whether it started while the PR was draft or ready.
+Readiness changes do not change source and do not create check evidence.
+Delivery is complete only when the PR is ready and one full required check attempt is successful for its exact remote head.
 
-The driver performs every step below on its own initiative, including step 7's ready transition.
-That transition is driver-owned authority, listed above under "update GitHub issue or PR state", so the driver does not pause to ask permission to undraft.
-A PR whose gates are green but which is still draft is incomplete delivery: its required exact-head checks have not run, so no one can yet act on it.
-Hold at draft only when the user has asked to hold, or when a precondition in this loop is unmet — and say which, rather than leaving the PR parked without a reason.
+**The driver runs this loop, including the ready transition, on its own initiative.**
+Marking a PR ready is a step the driver owns outright, not a decision to refer upward, so the driver never waits to be told to undraft.
+Mark the PR ready without asking once it is reviewable; hold it at draft only for incomplete work, an explicit maintainer hold, or an unmet delivery precondition, and name the reason.
+Ask first only when the user has said to hold, when the change is one the user asked to inspect before it goes out, or when a delivery precondition below cannot be met.
+Hold at draft only when the user asked to hold or a delivery precondition is unmet, and say which.
+The maintainer's decision point is reviewing and merging the ready PR, and asking them to authorise the transition into that state only moves work back to the person the loop exists to serve.
+Keep a ready PR ready while rebasing, updating its branch, investigating a failed check, or routing a fix.
 
-1. Finalize the PR title, body, issue linkage, screenshots, and other metadata before the final check run.
-2. Fetch `origin/main`, capture the expected remote SHA for the PR branch, and require a clean coordinator checkout with no active mutable lane.
-3. Rebase the integration branch onto current `origin/main`.
-4. Run every required authoritative local gate from the rebased coordinator plus `npx commitlint --from origin/main --to HEAD`.
-5. Compare the rebased patch and unresolved findings with the approved review target to determine whether any reviewer's owned concern materially changed.
-Preserve valid approval for a patch-equivalent rebase; when repeat review is required, create a fresh detached implementation-review worktree pinned to the exact rebased commit and supply a newly generated immutable diff artifact.
-Repeat domain and documentation reconciliation when conflict resolution or a later fix changes workflow, canonical specification, or documentation content.
-6. Push rewritten history only with `git push --force-with-lease=<branch>:<expected-sha>`.
-If the explicit lease is rejected, stop and investigate the remote change; never retry with `--force` or an unqualified force push.
-7. Mark the PR ready for review, then wait for every required GitHub Actions and external check associated with that exact remote head.
-Both SonarCloud checks, Automatic Analysis and Quality Gate, must report success.
-Pending, skipped when required, cancelled, stale-head, and failing results do not satisfy the gate.
-Select one authoritative full check-suite attempt for that exact head, normally the attempt triggered by `ready_for_review`.
-Require every full gate from that attempt to succeed, and do not assemble a green rollup from successful jobs spread across duplicate attempts.
+1. Finalize the PR title, body, issue linkage, screenshots, and other metadata before the final run.
+2. Fetch `origin/main`, capture the expected remote PR-head SHA, and require a clean coordinator checkout with no active mutable lane.
+3. Rebase the integration branch onto current `origin/main`, then rerun every required authoritative local gate and `npx commitlint --from origin/main --to HEAD`.
+4. Determine mechanically whether the rebase materially changed the implementation reviewer's owned concern or left an unresolved finding.
+Reuse the valid approval for a patch-equivalent rebase; when repeat review is required, create a fresh detached implementation-review lane pinned to the exact rebased commit and supply an immutable diff artifact.
+Repeat domain and documentation reconciliation when conflict resolution or a later fix changes workflow, canonical spec, or documentation content.
+5. Update the remote branch only with `git push --force-with-lease=<branch>:<expected-sha>`.
+A rejected lease stops the loop for investigation; never retry with `--force` or an unqualified force push.
+6. If the PR is still draft and reviewable, mark it ready, then wait for every required GitHub Actions and external check associated with that exact remote head.
+Both SonarCloud checks, Automatic Analysis and Quality Gate, must be successful.
+Pending, skipped when required, cancelled, stale-head, or failing checks are not green.
+Choose one authoritative full attempt for the exact remote head and require every full gate from that attempt rather than combining successful jobs across duplicate attempts.
+Reuse a complete full attempt for that head, including one started while draft; otherwise wait for the normal `opened`, `synchronize`, or `reopened` run.
 Metadata-only `edited` attempts are never authoritative code-gate attempts.
 Skipped or cancelled duplicate attempts do not invalidate a separately identified authoritative attempt, but they also cannot fill a missing gate in it.
-8. If any check fails, return the PR to draft before gathering evidence, reconciling the issue, and routing fixes through isolated implementation and review lanes.
-Repeat rebase, local validation, explicit-lease push, ready transition, and exact-head CI after a fix.
+Never toggle draft/ready to manufacture a run.
+7. If any check fails, gather evidence, reconcile the issue, and route fixes through isolated implementation and review lanes while preserving the PR's readiness state.
+Repeat rebase, local validation, explicit-lease push, and exact-head CI after a fix.
 Repeat detached review only when the fix or rebase materially changes the reviewer's owned concern or an unresolved finding remains.
-9. After the check rollup succeeds, fetch `origin/main` again and verify that it remains an ancestor of the unchanged remote PR head and that the PR remains ready.
-If main advanced, the PR head changed, or the PR is draft, return it to draft and repeat the mandatory delivery steps, preserving approval when the resulting rebase is patch-equivalent and repeating review only when the material-change rule requires it.
+8. After the final check rollup succeeds, fetch `origin/main` again and mechanically verify that it remains an ancestor of the unchanged remote PR head and that the PR remains ready.
+If main advanced or the PR head changed, repeat the mandatory delivery steps while keeping a ready PR ready, preserving approval when the resulting rebase is patch-equivalent and repeating review only when the material-change rule requires it.
+If the PR is draft without an explicit hold, mark it ready after the other delivery conditions are restored.
 
-The maintainer handoff is valid only when current-main ancestry, exact remote-head identity, ready state, and every required post-undraft check are mechanically true at the same time.
+The maintainer handoff is valid only when current-main ancestry, exact remote-head identity, ready state, and every required exact-head check are mechanically true at the same time.
+Only hand the PR to the maintainer after all final-delivery conditions are true on the same commit.
 
 ## Guarded cleanup
 
