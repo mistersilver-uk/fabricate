@@ -381,3 +381,19 @@ test('an unsafe dotted system id is never addressed with a deletion key', async 
 
   assert.equal(updates.length, 0, 'a dotted segment would re-split and delete the wrong node');
 });
+
+forEachDeletionForm('a retired field that is not one flag-key segment is skipped, never thrown on', async (deletion) => {
+  deletion.apply();
+  const actor = new MergingStaminaActor('Stamina');
+  await actor.setFlag('fabricate', 'gatheringState', {
+    stamina: { sys: { max: 12, current: 4, maxOverride: 6, 'has space': 1 } }
+  });
+
+  await makeService().service.setActorStamina(actor, { systemId: 'sys', current: 4, maxOverride: null });
+
+  assert.deepEqual(
+    actor.updateCalls,
+    deletion.expect([{ 'flags.fabricate.gatheringState.stamina.sys.-=maxOverride': null }])
+  );
+  deletion.assertOperators(actor.updateCalls, 1);
+});

@@ -9,6 +9,7 @@ import {
   stampItemDataRoleIdentity,
 } from '../src/config/flags.js';
 import {
+  assertNoLegacyDeletionKeys,
   FakeForcedDeletion,
   forEachDeletionForm,
   isForcedDeletion,
@@ -302,4 +303,28 @@ test('a non-function ForcedDeletion falls back to the V13 form', (t) => {
     assert.deepEqual(forcedDeletionEntry('p', 'k'), ['p.-=k', null]);
     assert.deepEqual(markForcedDeletion({}, 'k'), { '-=k': null });
   }
+});
+
+test('the anti-guard finds a legacy key at any depth, in a dotted segment and inside an array', () => {
+  const refused = (path, key) => (error) =>
+    error.message.startsWith(`${path} carries the legacy deletion key "${key}"`);
+  assert.throws(
+    () => assertNoLegacyDeletionKeys({ a: { b: { '-=gone': null } } }),
+    refused('payload.a.b', '-=gone')
+  );
+  assert.throws(
+    () => assertNoLegacyDeletionKeys({ 'flags.fabricate.-=gone.x': null }),
+    refused('payload', 'flags.fabricate.-=gone.x')
+  );
+  assert.throws(
+    () => assertNoLegacyDeletionKeys({ list: [{ ok: 1 }, { '-=gone': null }] }),
+    refused('payload.list.1', '-=gone')
+  );
+  assert.doesNotThrow(() =>
+    assertNoLegacyDeletionKeys({
+      'flags.fabricate.gone': new FakeForcedDeletion(),
+      active: { run: new FakeForcedDeletion(), kept: { id: 'run' } },
+      list: [new FakeForcedDeletion()],
+    })
+  );
 });
