@@ -1060,9 +1060,22 @@ It is computed by a separate refresh gated on a `knowledgeActive` flag, so it is
 Each store action awaits its seam call and then re-runs the knowledge refresh, never the shared `refresh()`.
 The result is published as a top-level `viewState.knowledge` and is **always a new object**; it MUST NOT hang off `selectedSystem`, which would force a `selectedSystem` reference rebuild on every knowledge publish and let a late second-phase publish clobber freshly projected rows.
 A crafting-system switch never leaves the previous system's rows published.
-While the surface is open, the switch drops the cached snapshot and publishes the cleared projection before the shared `refresh()` runs, then reads the snapshot once for the newly selected system after it, and a read that resolves after a later switch is discarded rather than published.
+While the surface is open, the switch drops the cached snapshot and publishes the cleared projection before the shared `refresh()` runs, then reads the snapshot once for the newly selected system after it.
+A read superseded by a later read, a later switch, or the GM leaving or re-entering the surface is discarded: it neither publishes nor writes the cached snapshot.
 While the surface is closed, the switch reads nothing and publishes nothing.
 A knowledge reset confirmed after a switch still resets the system that was selected when the GM asked for it.
+While the surface is open and holds no snapshot for the selected system, it publishes a loading projection: `viewState.knowledge.loading` is true from the moment the surface is entered, or a switch clears the cached snapshot, until the next read of the selected system settles.
+Only the latest read settles the loading and error state, whether it resolves or rejects, so a superseded read changes neither.
+A read that rejects while the surface holds no snapshot publishes an error projection: `viewState.knowledge.error` is true until a later read of the selected system resolves, and entering the surface or a switch replaces it with the loading projection at once.
+The rejection still propagates to the caller.
+`loading` and `error` are never both true.
+A hook-driven or post-action re-read of a surface that already holds a snapshot publishes neither state, so a populated surface does not blank while it refreshes, and a failed re-read keeps the last published rows.
+
+**Loading and error states.** While the projection is loading, the surface root carries `aria-busy="true"`.
+The roster pane renders a compact no-state panel stating that player characters are loading, in place of its empty and no-match panels, and the detail pane renders a no-state panel stating that character knowledge is loading, in place of its select-a-character prompt.
+While the projection is in error, the detail pane renders a danger-toned notice with `role="status"` and a polite live region, stating that character knowledge could not be loaded, and the roster pane renders its search field and nothing beneath it.
+In neither state does a pane say "No player characters", report that no character matches the search, or ask the GM to select a character, because each of those claims describes a finished read.
+Each pane nests the shared primitive inside its own tinted wrapper rather than adopting the player views' view-state composition, per the design system's rule for a pane inside a tinted container.
 
 ## Recipe Dependency Graph
 
