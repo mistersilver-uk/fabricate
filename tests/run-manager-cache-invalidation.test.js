@@ -163,7 +163,7 @@ test('runContainersChanged: matches the doubly-nested crafting/salvage and singl
 
 // Update-operator spellings (issue 1654). An update operator is part of the last path segment, so a
 // write using one arrives under a different key: the `1.34.0` remap force-replaces each run
-// container (`==<container>`) and `deleteRemovedActiveRunFlags` uses `-=`.
+// container (`==<container>`), and a V13 container-level deletion arrives as `-=<container>`.
 
 /** The segment-walking probe `foundry.utils.hasProperty` implements at runtime. */
 function hasSegmentPath(object, path) {
@@ -190,7 +190,7 @@ function expandedDiff(updateKey) {
 
 for (const [operator, why] of [
   ['==', 'the forced replacement the 1.34.0 essence remap writes'],
-  ['-=', 'the deletion `deleteRemovedActiveRunFlags` has always been able to write'],
+  ['-=', 'a container-level deletion any writer can still send on V13'],
 ]) {
   test(`runContainersChanged matches a \`${operator}\` diff at BOTH flag depths (${why})`, () => {
     // Both depths in one test, because the asymmetry is the trap: crafting and salvage are

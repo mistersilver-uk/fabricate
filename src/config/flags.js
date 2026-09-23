@@ -83,24 +83,42 @@ export async function setFabricateFlag(document, key, value) {
   return await document.setFlag(FABRICATE_FLAG_NAMESPACE, normalizedKey, value);
 }
 
+/** V14 `setProperty` skips these segments, so a dotted V14 deletion at one silently no-ops; both helpers refuse them. */
+const PROTOTYPE_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function forcedDeletionOperator() {
+  const operator = globalThis.foundry?.data?.operators?.ForcedDeletion;
+  return typeof operator === 'function' ? operator : null;
+}
+
+function isDeletableKey(key) {
+  if (PROTOTYPE_SEGMENTS.has(key)) return false;
+  if (!isSafeFlagKeySegment(key)) {
+    throw new TypeError(`Fabricate | a forced deletion needs a single flag-key segment: ${key}`);
+  }
+  return true;
+}
+
 /**
- * `setFabricateFlag` writes through `Document#update`, whose recursive merge NEVER removes keys
- * deleted from a nested object.
+ * The `[path, value]` entry that deletes `key` under a dotted update path: V13 spells it
+ * `<parent>.-=<key>: null`, V14 `<parent>.<key>: ForcedDeletion`, detected on every call.
+ * Returns `null` for a prototype segment and throws a `TypeError` for any other unsafe key.
  */
-export async function deleteRemovedActiveRunFlags(document, key, nextContainer) {
-  if (!document || typeof document.update !== 'function') return;
-  const stored = getFabricateFlag(document, key, null);
-  const isRunMap = (value) => value && typeof value === 'object' && !Array.isArray(value);
-  const storedActive = isRunMap(stored?.active) ? stored.active : {};
-  const nextActive = isRunMap(nextContainer?.active) ? nextContainer.active : {};
-  const path = `flags.${FABRICATE_FLAG_NAMESPACE}.${normalizeFlagKey(key)}.active`;
-  const updates = {};
-  for (const runId of Object.keys(storedActive)) {
-    if (!(runId in nextActive)) {
-      updates[`${path}.-=${runId}`] = null;
-    }
-  }
-  if (Object.keys(updates).length > 0) {
-    await document.update(updates);
-  }
+export function forcedDeletionEntry(parentPath, key) {
+  if (!isDeletableKey(key)) return null;
+  const Operator = forcedDeletionOperator();
+  return Operator ? [`${parentPath}.${key}`, new Operator()] : [`${parentPath}.-=${key}`, null];
+}
+
+/**
+ * Mark `key` deleted inside a `setFlag`/`update` value tree, in the form
+ * {@link forcedDeletionEntry} detects. Mark after any `structuredClone`, which destroys an
+ * operator. Returns `node`, or `null` (unmarked) for a prototype segment.
+ */
+export function markForcedDeletion(node, key) {
+  if (!isDeletableKey(key)) return null;
+  const Operator = forcedDeletionOperator();
+  if (Operator) node[key] = new Operator();
+  else node[`-=${key}`] = null;
+  return node;
 }

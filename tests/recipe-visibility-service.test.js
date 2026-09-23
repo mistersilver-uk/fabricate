@@ -8,6 +8,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { deletedKey, forEachDeletionForm, recordWrite } from './helpers/forcedDeletion.js';
+
 // Foundry globals
 
 function getProperty(object, path) {
@@ -100,7 +102,7 @@ class FakeDocument {
   }
 
   async setFlag(scope, key, value) {
-    this.setFlagCalls.push({ scope, key, value });
+    recordWrite(this.setFlagCalls, value, { scope, key, value });
     if (!this._flags[scope]) this._flags[scope] = {};
     setPathValue(this._flags[scope], key, expandValueTree(value));
     return value;
@@ -115,10 +117,10 @@ class FakeDocument {
     }
   }
 
-  // Minimal `Actor#update` fake honouring Foundry's `-=<key>` deletion syntax so a reload (re-read
-  // via getFlag) reflects a real key removal.
+  // Minimal `Actor#update` fake honouring both forced-deletion forms (`-=<key>` and the V14
+  // operator) so a reload (re-read via getFlag) reflects a real key removal.
   async update(changes = {}) {
-    this.updateCalls.push(changes);
+    recordWrite(this.updateCalls, changes);
     for (const [rawPath, value] of Object.entries(changes)) {
       const parts = String(rawPath).split('.');
       let root = this;
@@ -132,9 +134,9 @@ class FakeDocument {
         if (!target[part] || typeof target[part] !== 'object') target[part] = {};
         target = target[part];
       }
-      if (last.startsWith('-=')) {
-        const key = last.slice(2);
-        if (target && typeof target === 'object') delete target[key];
+      const deleted = deletedKey(last, value);
+      if (deleted !== null) {
+        if (target && typeof target === 'object') delete target[deleted];
       } else {
         target[last] = expandValueTree(value);
       }
@@ -3468,14 +3470,72 @@ function makeDecrementablePartyPool(initial = {}) {
   };
 }
 
-function seedLearnedActor(learned = {}, discovery = {}, items = []) {
+// The V13 write lists for the knowledge-deletion primitive (issue 1842 characterisation).
+const LEARNED = 'flags.fabricate.fabricate.learnedRecipes';
+const DISCOVERY = 'flags.fabricate.fabricate.discoveryProgress';
+const ERASE_ONE_GOLDEN = [{ [`${LEARNED}.-=recipe-a`]: null }];
+const ERASE_WITH_DISCOVERY_GOLDEN = [
+  { [`${LEARNED}.-=recipe-a`]: null, [`${DISCOVERY}.-=recipe-a`]: null }
+];
+const PER_SYSTEM_GOLDEN = [{ [`${LEARNED}.-=r-sys1`]: null, [`${DISCOVERY}.-=r-sys1`]: null }];
+const RESET_ALL_GOLDEN = [
+  {
+    [`${LEARNED}.-=r-sys1`]: null,
+    [`${LEARNED}.-=r-orphan`]: null,
+    [`${DISCOVERY}.-=r-sys1`]: null,
+    [`${DISCOVERY}.-=discovery-only`]: null
+  }
+];
+const TWO_STEP_GOLDEN = [{ 'flags.fabricate.fabricate.-=learnedRecipes': null }];
+
+function seedLearnedActor(learned = {}, discovery = {}, items = [], Actor = FakeActor) {
   const fabricate = {};
   if (learned) fabricate.learnedRecipes = learned;
   if (discovery) fabricate.discoveryProgress = discovery;
-  return new FakeActor({ id: 'actor-773', items, flagsArg: { fabricate } });
+  return new Actor({ id: 'actor-773', items, flagsArg: { fabricate } });
 }
 
-test('773 erase-one removes only the learned entry via an explicit -= deletion (payload-level)', async () => {
+function mergeNeverDeleting(target, source) {
+  for (const [key, value] of Object.entries(source)) {
+    if (isPlainObjectValue(value) && isPlainObjectValue(target[key])) mergeNeverDeleting(target[key], value);
+    else target[key] = value;
+  }
+}
+
+// `Actor#setFlag` and `Actor#update` as core runs them: a recursive merge of the JSON value that
+// never deletes, so only a real deletion removes a key a retained-map write omits.
+class MergeFaithfulActor extends FakeActor {
+  _mergeAt(root, path, value) {
+    const parts = String(path).split('.');
+    const last = parts.pop();
+    let node = root;
+    for (const part of parts) node = node[part] ??= {};
+    const deleted = deletedKey(last, value);
+    if (deleted !== null) return void delete node[deleted];
+    const expanded = expandValueTree(JSON.parse(JSON.stringify(value)));
+    if (isPlainObjectValue(node[last]) && isPlainObjectValue(expanded)) mergeNeverDeleting(node[last], expanded);
+    else node[last] = expanded;
+  }
+
+  async setFlag(scope, key, value) {
+    recordWrite(this.setFlagCalls, value, { scope, key, value });
+    this._mergeAt((this._flags[scope] ??= {}), key, value);
+    return value;
+  }
+
+  async update(changes = {}) {
+    recordWrite(this.updateCalls, changes);
+    for (const [path, value] of Object.entries(changes)) {
+      const [root, ...rest] = path.split('.');
+      assert.equal(root, 'flags', 'the two-step writes address the flags root');
+      this._mergeAt(this._flags, rest.join('.'), value);
+    }
+    return this;
+  }
+}
+
+forEachDeletionForm('773 erase-one removes only the learned entry via an explicit forced deletion (payload-level)', async (deletion) => {
+  deletion.apply();
   const service = buildService();
   const actor = seedLearnedActor(
     { 'recipe-a': { learnedAt: 1, sourceItemUuid: null }, 'recipe-b': { learnedAt: 2, sourceItemUuid: null } },
@@ -3486,15 +3546,12 @@ test('773 erase-one removes only the learned entry via an explicit -= deletion (
 
   assert.equal(result.success, true);
   assert.equal(result.count, 1);
-  const payload = Object.assign({}, ...actor.updateCalls);
-  assert.equal(payload['flags.fabricate.fabricate.learnedRecipes.-=recipe-a'], null);
-  // Negative pin (a): erase-one leaves discoveryProgress untouched (default clearDiscovery: false).
-  assert.ok(
-    !('flags.fabricate.fabricate.discoveryProgress.-=recipe-a' in payload),
-    'erase-one must not clear discoveryProgress by default'
-  );
-  assert.ok(
-    !actor.setFlagCalls.some((call) => call.key === 'fabricate.learnedRecipes'),
+  // Negative pin (a): the golden carries no discoveryProgress entry (default clearDiscovery: false).
+  assert.deepEqual(actor.updateCalls, deletion.expect(ERASE_ONE_GOLDEN));
+  deletion.assertOperators(actor.updateCalls, 1);
+  assert.deepEqual(
+    actor.setFlagCalls,
+    [],
     'the safe-id path must never rebuild the whole learned map through setFlag'
   );
   // Reload-safe: re-reading reflects the removal; recipe-b + discovery survive.
@@ -3505,7 +3562,8 @@ test('773 erase-one removes only the learned entry via an explicit -= deletion (
   assert.deepEqual(discovery['recipe-a'], { progress: 40 }, 'discovery entry is intact');
 });
 
-test('773 erase-one with clearDiscovery: true ALSO clears the discovery entry (opt-in, exposed)', async () => {
+forEachDeletionForm('773 erase-one with clearDiscovery: true ALSO clears the discovery entry (opt-in, exposed)', async (deletion) => {
+  deletion.apply();
   const service = buildService();
   const actor = seedLearnedActor(
     { 'recipe-a': { learnedAt: 1, sourceItemUuid: null } },
@@ -3514,13 +3572,15 @@ test('773 erase-one with clearDiscovery: true ALSO clears the discovery entry (o
 
   await service.forgetLearnedRecipes(actor, ['recipe-a'], { clearDiscovery: true });
 
-  const payload = Object.assign({}, ...actor.updateCalls);
-  assert.equal(payload['flags.fabricate.fabricate.learnedRecipes.-=recipe-a'], null);
-  assert.equal(payload['flags.fabricate.fabricate.discoveryProgress.-=recipe-a'], null);
+  assert.deepEqual(actor.updateCalls, deletion.expect(ERASE_WITH_DISCOVERY_GOLDEN));
+  assert.equal(actor.updateCalls.length, 1, 'both stores ride ONE update');
+  deletion.assertOperators(actor.updateCalls, 2);
+  assert.ok(!('recipe-a' in actor.getFlag('fabricate', 'fabricate.learnedRecipes')));
   assert.ok(!('recipe-a' in actor.getFlag('fabricate', 'fabricate.discoveryProgress')));
 });
 
-test('773 per-system reset clears only that system\'s entries and leaves an orphan in place', async () => {
+forEachDeletionForm('773 per-system reset clears only that system\'s entries and leaves an orphan in place', async (deletion) => {
+  deletion.apply();
   const recipes = [
     buildMockRecipe({ id: 'r-sys1', craftingSystemId: 'system-1' }),
     buildMockRecipe({ id: 'r-sys2', craftingSystemId: 'system-2' })
@@ -3539,9 +3599,8 @@ test('773 per-system reset clears only that system\'s entries and leaves an orph
   const result = await service.forgetSystemLearnedRecipes(actor, 'system-1');
 
   assert.equal(result.count, 1);
-  const payload = Object.assign({}, ...actor.updateCalls);
-  assert.equal(payload['flags.fabricate.fabricate.learnedRecipes.-=r-sys1'], null);
-  assert.equal(payload['flags.fabricate.fabricate.discoveryProgress.-=r-sys1'], null);
+  assert.deepEqual(actor.updateCalls, deletion.expect(PER_SYSTEM_GOLDEN));
+  deletion.assertOperators(actor.updateCalls, 2);
   const learned = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
   assert.ok(!('r-sys1' in learned), 'the targeted system entry is removed');
   assert.ok('r-sys2' in learned, 'another system is untouched');
@@ -3549,7 +3608,8 @@ test('773 per-system reset clears only that system\'s entries and leaves an orph
   assert.ok('r-orphan' in learned, 'an orphan (unresolvable recipe) is left in place per-system');
 });
 
-test('773 reset-all clears every learned key INCLUDING the orphan, plus discovery', async () => {
+forEachDeletionForm('773 reset-all clears every learned key INCLUDING the orphan, plus discovery', async (deletion) => {
+  deletion.apply();
   const recipes = [buildMockRecipe({ id: 'r-sys1', craftingSystemId: 'system-1' })];
   const service = buildService({ recipes });
   const actor = seedLearnedActor(
@@ -3563,26 +3623,28 @@ test('773 reset-all clears every learned key INCLUDING the orphan, plus discover
   const result = await service.forgetAllLearnedRecipes(actor);
 
   assert.equal(result.count, 2);
-  const payload = Object.assign({}, ...actor.updateCalls);
-  assert.equal(payload['flags.fabricate.fabricate.learnedRecipes.-=r-sys1'], null);
-  // Negative pin (b, direction 2): reset-all DOES delete the same orphan per-system left in place.
-  assert.equal(payload['flags.fabricate.fabricate.learnedRecipes.-=r-orphan'], null);
-  // A discovery-only id (never learned) is still cleared by reset-all.
-  assert.equal(payload['flags.fabricate.fabricate.discoveryProgress.-=discovery-only'], null);
+  // Negative pin (b, direction 2): the golden deletes the orphan per-system left in place, and a
+  // discovery-only id (never learned).
+  assert.deepEqual(actor.updateCalls, deletion.expect(RESET_ALL_GOLDEN));
+  assert.equal(actor.updateCalls.length, 1, 'four deletions across both stores ride ONE update');
+  deletion.assertOperators(actor.updateCalls, 4);
   const learned = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
   assert.deepEqual(learned, {}, 'every learned key is gone after reset-all');
   const discovery = actor.getFlag('fabricate', 'fabricate.discoveryProgress');
   assert.deepEqual(discovery, {}, 'every discovery entry is gone after reset-all');
 });
 
-test('773 dotted-id fallback is a two-step ORDERED delete-then-write; a co-resident safe entry survives byte-faithfully', async () => {
+forEachDeletionForm('773 dotted-id fallback is a two-step ORDERED delete-then-write; a co-resident safe entry survives byte-faithfully', async (deletion) => {
+  deletion.apply();
   const service = buildService();
   const dottedId = 'imported.recipe.id';
   const safeEntry = { learnedAt: 7, sourceItemUuid: 'Actor.x.Item.book' };
-  const actor = seedLearnedActor({
-    [dottedId]: { learnedAt: 1, sourceItemUuid: null },
-    'safe-retained': safeEntry
-  });
+  const actor = seedLearnedActor(
+    { [dottedId]: { learnedAt: 1, sourceItemUuid: null }, 'safe-retained': safeEntry },
+    {},
+    [],
+    MergeFaithfulActor
+  );
 
   // The seed is stored NESTED (issue 1143) — this is the shape the two-step actually
   // operates on in production, and the shape the old double hid.
@@ -3594,22 +3656,38 @@ test('773 dotted-id fallback is a two-step ORDERED delete-then-write; a co-resid
 
   await service.forgetLearnedRecipes(actor, [dottedId], { freeLearnBudget: false });
 
-  // Ordered payload assertion — call 1 is EXACTLY the parent delete...
-  assert.equal(actor.updateCalls.length, 1, 'exactly one update (the parent delete)');
-  assert.deepEqual(actor.updateCalls[0], { 'flags.fabricate.fabricate.-=learnedRecipes': null });
-  // ...call 2 is the retained-map write through setFlag (never folded into one update).
-  const learnedWrites = actor.setFlagCalls.filter((call) => call.key === 'fabricate.learnedRecipes');
-  assert.equal(learnedWrites.length, 1, 'the retained map is re-written once');
-  assert.ok(!(dottedId in learnedWrites[0].value), 'the dotted id is excluded from the retained map');
-  assert.deepEqual(
-    learnedWrites[0].value['safe-retained'],
-    safeEntry,
-    'the co-resident safe entry is retained byte-faithfully in the write payload'
-  );
-  // Post-reload (re-read): the retained entry survives byte-faithfully, dotted is gone.
+  // Ordered: call 1 is EXACTLY the parent drop, call 2 the separate retained-map write.
+  assert.deepEqual(actor.updateCalls, deletion.expect(TWO_STEP_GOLDEN));
+  deletion.assertOperators(actor.updateCalls, 1);
+  assert.deepEqual(actor.setFlagCalls, [
+    { scope: 'fabricate', key: 'fabricate.learnedRecipes', value: { 'safe-retained': safeEntry } }
+  ]);
+  // Post-reload against a merge that never deletes: only the parent drop removes the subtree.
   const reloaded = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
   assert.deepEqual(reloaded['safe-retained'], safeEntry, 'retained entry survives post-reload');
   assert.ok(!('imported' in reloaded), 'the dotted entry subtree is removed post-reload');
+});
+
+forEachDeletionForm('773 an id the deletion helper will not address takes the two-step fallback', async (deletion) => {
+  deletion.apply();
+  const service = buildService();
+  const keep = { learnedAt: 2, sourceItemUuid: null };
+  const actor = seedLearnedActor(
+    { constructor: { learnedAt: 1, sourceItemUuid: null }, keep },
+    {},
+    [],
+    MergeFaithfulActor
+  );
+
+  await service.forgetLearnedRecipes(actor, ['constructor'], { freeLearnBudget: false });
+
+  assert.deepEqual(actor.updateCalls, deletion.expect(TWO_STEP_GOLDEN), 'core setProperty skips it');
+  deletion.assertOperators(actor.updateCalls, 1);
+  assert.deepEqual(actor.setFlagCalls, [
+    { scope: 'fabricate', key: 'fabricate.learnedRecipes', value: { keep } }
+  ]);
+  const reloaded = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
+  assert.deepEqual(Object.keys(reloaded), ['keep']);
 });
 
 // Issue 1143 — deleting a recipe destroyed learned knowledge for recipes that still exist, because

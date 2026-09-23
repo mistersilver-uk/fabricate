@@ -1408,7 +1408,8 @@ export class CraftingSystemManager {
       if (previous.present) {
         if (!present || current !== previous.value) patch[`_stats.${key}`] = previous.value;
       } else if (present) {
-        patch[`_stats.-=${key}`] = null;
+        // A required nullable UUID field: a forced deletion fails validation, `null` clears it.
+        patch[`_stats.${key}`] = null;
       }
     }
     if (Object.keys(patch).length > 0) await source.update(patch);

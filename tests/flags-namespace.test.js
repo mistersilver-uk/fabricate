@@ -2,10 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  forcedDeletionEntry,
   getFabricateFlag,
+  markForcedDeletion,
   setFabricateFlag,
   stampItemDataRoleIdentity,
 } from '../src/config/flags.js';
+import {
+  assertNoLegacyDeletionKeys,
+  FakeForcedDeletion,
+  forEachDeletionForm,
+  isForcedDeletion,
+} from './helpers/forcedDeletion.js';
 
 function getPathValue(object, path) {
   return String(path).split('.').reduce((value, part) => {
@@ -231,4 +239,92 @@ test('stampItemDataRoleIdentity co-stamps componentId and toolId under one syste
     componentId: 'comp-1',
     toolId: 'tool-1',
   });
+});
+
+// Forced deletion (issue 1842): one helper spells the deletion for whichever build is running.
+
+forEachDeletionForm('forcedDeletionEntry spells the deletion for the running build', (deletion) => {
+  deletion.apply();
+  const [path, value] = forcedDeletionEntry('flags.fabricate.state', 'retired');
+  if (deletion.v14) {
+    assert.equal(path, 'flags.fabricate.state.retired');
+    assert.ok(isForcedDeletion(value), 'V14 carries the operator at the bare key');
+  } else {
+    assert.deepEqual([path, value], ['flags.fabricate.state.-=retired', null]);
+  }
+});
+
+forEachDeletionForm('markForcedDeletion marks a value-tree node for the running build', (deletion) => {
+  deletion.apply();
+  const node = { kept: 1 };
+  assert.equal(markForcedDeletion(node, 'gone'), node);
+  if (deletion.v14) {
+    assert.deepEqual(Object.keys(node), ['kept', 'gone']);
+    assert.ok(isForcedDeletion(node.gone));
+  } else {
+    assert.deepEqual(node, { kept: 1, '-=gone': null });
+  }
+});
+
+forEachDeletionForm('both forms refuse an unsafe key and skip a prototype segment', (deletion) => {
+  deletion.apply();
+  for (const key of ['a.b', '', '-=x', 'has space', 7, undefined]) {
+    assert.throws(() => forcedDeletionEntry('flags.x', key), TypeError, `entry for ${String(key)}`);
+    assert.throws(() => markForcedDeletion({}, key), TypeError, `mark for ${String(key)}`);
+  }
+  for (const key of ['__proto__', 'constructor', 'prototype']) {
+    const node = {};
+    assert.equal(forcedDeletionEntry('flags.x', key), null, key);
+    assert.equal(markForcedDeletion(node, key), null, key);
+    assert.deepEqual(Object.keys(node), [], `${key} leaves the node unmarked`);
+  }
+  assert.equal(isForcedDeletion(forcedDeletionEntry('flags.x', 'ok')[1]), deletion.v14);
+});
+
+test('the operator is detected at call time, never cached at module load', (t) => {
+  assert.deepEqual(forcedDeletionEntry('p', 'k'), ['p.-=k', null], 'no operator yet');
+  const priorFoundry = globalThis.foundry;
+  t.after(() => {
+    globalThis.foundry = priorFoundry;
+  });
+  globalThis.foundry = { data: { operators: { ForcedDeletion: FakeForcedDeletion } } };
+  assert.ok(isForcedDeletion(forcedDeletionEntry('p', 'k')[1]), 'installed after import');
+  globalThis.foundry = { data: { operators: {} } };
+  assert.deepEqual(forcedDeletionEntry('p', 'k'), ['p.-=k', null], 'and removed again');
+});
+
+test('a non-function ForcedDeletion falls back to the V13 form', (t) => {
+  const priorFoundry = globalThis.foundry;
+  t.after(() => {
+    globalThis.foundry = priorFoundry;
+  });
+  for (const ForcedDeletion of [{}, 'ForcedDeletion', null, 1]) {
+    globalThis.foundry = { data: { operators: { ForcedDeletion } } };
+    assert.deepEqual(forcedDeletionEntry('p', 'k'), ['p.-=k', null]);
+    assert.deepEqual(markForcedDeletion({}, 'k'), { '-=k': null });
+  }
+});
+
+test('the anti-guard finds a legacy key at any depth, in a dotted segment and inside an array', () => {
+  const refused = (path, key) => (error) =>
+    error.message.startsWith(`${path} carries the legacy deletion key "${key}"`);
+  assert.throws(
+    () => assertNoLegacyDeletionKeys({ a: { b: { '-=gone': null } } }),
+    refused('payload.a.b', '-=gone')
+  );
+  assert.throws(
+    () => assertNoLegacyDeletionKeys({ 'flags.fabricate.-=gone.x': null }),
+    refused('payload', 'flags.fabricate.-=gone.x')
+  );
+  assert.throws(
+    () => assertNoLegacyDeletionKeys({ list: [{ ok: 1 }, { '-=gone': null }] }),
+    refused('payload.list.1', '-=gone')
+  );
+  assert.doesNotThrow(() =>
+    assertNoLegacyDeletionKeys({
+      'flags.fabricate.gone': new FakeForcedDeletion(),
+      active: { run: new FakeForcedDeletion(), kept: { id: 'run' } },
+      list: [new FakeForcedDeletion()],
+    })
+  );
 });
