@@ -107,6 +107,12 @@ export const CASES = Object.freeze([
     steps: ['Crafting', { selector: '#manager-crafting-nav-knowledge' }],
     expectView: 'knowledge',
     position: { width: 880, height: 900 },
+    expectLayout: {
+      containerSelector: '.fabricate-manager',
+      gridSelector: '.manager-body',
+      expectedTracks: 3,
+      fillSelector: '.manager-rail',
+    },
     kinds: ['manager', 'knowledge', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,

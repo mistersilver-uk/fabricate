@@ -978,6 +978,8 @@ Two consequences follow and are stated rather than discovered: under `global` + 
 The entry carries **no count badge** — the count would require the tab-gated projection, which is a no-op precisely while the rail is rendered, and the sibling Access entry is count-less for the same reason.
 
 **Layout and roster.** Three panes: rail, searchable character roster, detail pane.
+At Manager container widths of 832px and wider the three panes sit side by side and each fills the content area's full height, the rail's panel included, with the roster list and the detail pane's tab panel owning vertical scrolling; the shared 1120px restack does not apply to this surface.
+Below 832px the panes stack in reading order as max-content rows, the body becomes the single vertical scroller, and the rail is a bounded, independently scrollable strip above the roster.
 The roster is **player characters only** — the same player-character predicate the Access Surface roster applies — with no show-NPCs toggle; an NPC's knowledge state stays reachable through the GM Knowledge Reset API.
 The two rosters share the predicate, not the accessor: Access projects each actor into a display record, while this surface enumerates the LIVE actor documents, because the projection reads each actor's owned items and flags.
 Each roster row carries the actor's portrait, name and an "N item(s) · M learned" meta line, with a dimmed "Nothing tracked" row for a character carrying neither.
