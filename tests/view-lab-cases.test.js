@@ -685,8 +685,13 @@ const FRAME_STACK_LAYOUT_CASE_IDS = [
   'world-component-entry-stacked',
   'manager-component-edit-stacked',
 ];
-// And the Knowledge band case, whose rail must reach the body's bottom edge (issue 1972).
-const RAIL_FILL_LAYOUT_CASE_IDS = ['manager-knowledge-narrow'];
+// And the band cases whose side rail must reach the body's bottom edge: Knowledge (issue 1972),
+// and Downtime once its own 1120px rail rule folded into the shared reset (issue 1976).
+const RAIL_FILL_LAYOUT_CASES = {
+  'manager-knowledge-narrow': { tracks: 3, width: 880 },
+  'manager-world-downtime-narrow': { tracks: 2, width: 960 },
+};
+const RAIL_FILL_LAYOUT_CASE_IDS = Object.keys(RAIL_FILL_LAYOUT_CASES);
 const LAYOUT_CASE_IDS = [
   ...RESPONSIVE_LAYOUT_CASE_IDS,
   ...FULL_WIDTH_LAYOUT_CASE_IDS,
@@ -760,7 +765,7 @@ test('exactly the declared layout cases carry complete layout expectations', () 
     RAIL_FILL_LAYOUT_CASE_IDS.includes(entry.id)
   )) {
     assert.equal(viewCase.expectLayout.fillSelector, '.manager-rail');
-    assert.equal(viewCase.expectLayout.expectedTracks, 3);
+    assert.equal(viewCase.expectLayout.expectedTracks, RAIL_FILL_LAYOUT_CASES[viewCase.id].tracks);
     assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, undefined);
     assert.equal(viewCase.expectLayout.absentSelector, undefined);
   }
@@ -783,7 +788,11 @@ test('the side-rail band cases name the scroller that owns their overflow', () =
   const parent = getCaseById('world-tool-catalogue');
   // 882 wide, so the list frame is below its own 760px stack while the body keeps two tracks.
   assert.deepEqual(stacked.position, { width: 882, height: 720 });
-  assert.deepEqual(stacked.steps, parent.steps);
+  assert.deepEqual(stacked.steps.slice(0, parent.steps.length), parent.steps);
+  assert.deepEqual(stacked.steps.at(-1), {
+    selector: '[data-scoped-list-inspect="sm-tool-hammer"]',
+    scroll: true,
+  });
   assert.equal(stacked.expectView, parent.expectView);
   assert.equal(stacked.expectSelector, parent.expectSelector);
   assert.equal(stacked.expectContained, undefined, 'the stacked inspector sits below the fold');
@@ -791,7 +800,9 @@ test('the side-rail band cases name the scroller that owns their overflow', () =
 
 function layoutCasePosition(id) {
   if (FRAME_STACK_LAYOUT_CASE_IDS.includes(id)) return { width: 980, height: 860 };
-  if (RAIL_FILL_LAYOUT_CASE_IDS.includes(id)) return { width: 880, height: 900 };
+  if (RAIL_FILL_LAYOUT_CASE_IDS.includes(id)) {
+    return { width: RAIL_FILL_LAYOUT_CASES[id].width, height: 900 };
+  }
   return { width: 1024, height: 860 };
 }
 

@@ -94,8 +94,13 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     // Below the list frame's 760px stack the list-over-inspector layout is the one scroller, so
     // the rows keep their height and the row step still resolves (issue 1976). No
-    // `expectContained`: the stacked inspector sits below the fold.
-    steps: CATALOGUE_STEPS,
+    // `expectContained`: the stacked inspector sits below the list, inside the one scroller.
+    // Selecting a row focuses the inspector, which scrolls the stacked layout past the list, so a
+    // last step scrolls the row back into view and the frame shows the rows it pins.
+    steps: [
+      ...CATALOGUE_STEPS,
+      { selector: '[data-scoped-list-inspect="sm-tool-hammer"]', scroll: true },
+    ],
     expectView: 'world-tools',
     expectSelector: '[data-scoped-page="world-tools"]',
     expectScrollable: '.manager-scoped-list-layout',
