@@ -972,14 +972,15 @@ describe('a converted manager panel is wide enough for the list it opens (issue 
     }
   });
 
-  // THE INSPECTOR'S PICKER, at both ends of the one-column band it spans. The trigger fills the
+  // The inspector's picker, at both ends of the one-column band it spans. The trigger fills the
   // inspector column, past the `inline` band's 240px ceiling at the bottom and past a 1024px cap at
-  // the top, so the panel is as wide as its trigger up to the inset the overlay host keeps.
+  // the top, and at both ends it is wider than the overlay host's inset box, so the panel is held
+  // to that box: the call site's cap must not bind before the host inset does.
   for (const [subject, overflow] of [
     ['recipe-inspector-1024', 240],
     ['recipe-inspector-1120', 1024],
   ]) {
-    it(`draws the ingredient-set panel as wide as its trigger past ${overflow}px (${subject})`, async () => {
+    it(`draws the ingredient-set panel to the overlay host's inset past ${overflow}px (${subject})`, async () => {
       const page = await openFixture(subject);
       try {
         await pressPointerOn(page, ROUTE_PICKER);
@@ -996,12 +997,17 @@ describe('a converted manager panel is wide enough for the list it opens (issue 
           `the trigger measured ${trigger}px, inside ${overflow}px, so this subject is not ` +
             'measuring the overflow the call site raises the cap for'
         );
-        const reach = Math.min(trigger, host - 2 * OVERLAY_INSET);
+        const inset = host - 2 * OVERLAY_INSET;
         assert.ok(
-          Math.abs(panel - reach) < EPSILON,
-          `the panel measured ${panel}px under a ${trigger}px trigger in a ${host}px host, so the ` +
-            'call site’s `maxWidth` is not reaching the band and the list draws narrower than its ' +
-            'control'
+          trigger > inset,
+          `the trigger measured ${trigger}px inside the host's ${inset}px inset box, so the panel ` +
+            'here would follow the trigger and this clause is not measuring the inset it names'
+        );
+        assert.ok(
+          Math.abs(panel - inset) < EPSILON,
+          `the panel measured ${panel}px against the ${inset}px the overlay host leaves in a ` +
+            `${host}px host, so the call site's \`maxWidth\` binds before the host inset and the ` +
+            'list draws narrower than the column it opens from'
         );
       } finally {
         await page.close();

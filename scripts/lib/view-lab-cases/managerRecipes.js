@@ -92,7 +92,8 @@ export const CASES = Object.freeze([
   }),
   // The inspector's ingredient-set list (issue 1510), at a 1024 window: the inspector restacks
   // under the list there, so the trigger fills a column far past the `inline` rung's 240px panel
-  // ceiling and the frame shows the panel matching the trigger under the call site's raised cap.
+  // ceiling and the frame shows the panel spanning the manager's overlay inset under the call
+  // site's raised cap.
   managerCase({
     id: 'manager-recipes-inspector-route-list',
     label: 'Manager — Recipes inspector ingredient-set list',

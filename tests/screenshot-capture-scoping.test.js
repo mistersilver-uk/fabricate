@@ -1203,10 +1203,9 @@ test('no capture producer drives a converted select with Playwright’s <select>
       }
     }
   }
-  // NON-VACUITY, both ways. `selectOption` must still appear somewhere — five capture steps and
-  // several smoke assertions drive genuinely native selects, every one of them the MANAGER'S since
-  // issue 1511 converted the player app's six, and all of them issue 1510's to retire — or this
-  // scan is reading a corpus with nothing in it to judge.
+  // NON-VACUITY, both ways. `selectOption` must still appear somewhere — the smoke's two drives of
+  // the manager's crafting-system scope select, a residue control issue 1777 owns — or this scan
+  // is reading a corpus with nothing in it to judge.
   assert.ok(
     calls > 0,
     'no capture producer calls `selectOption` at all, so this guard is judging an empty set. ' +
@@ -1241,9 +1240,8 @@ test('no capture producer drives a converted select with Playwright’s <select>
 // 1504, the player app's six joined the hook list at issue 1511, and issue 1510 is converting the
 // manager's. Its first phase took the two `[data-world-currency-strategy-select]` steps; phase 2
 // took the gathering task editor's respawn policy in commit 2d and the environment overview's two
-// membership add controls in commit 2e. One native `select:` step remains, phase 3's to retire:
-// the system Tool Rules list's sort. The surface this clause covers is still shrinking towards
-// zero.
+// membership add controls in commit 2e, and phase 3 took the last, the system Tool Rules list's
+// sort, in commit 3e. No native `select:` step remains; this clause now stops one coming back.
 test('no View Lab step drives a converted select with the registry’s native `select:` verb', () => {
   // The step's own literal shape: a `selector` string immediately followed by the `select:` key,
   // which is how every one of these steps is authored.
