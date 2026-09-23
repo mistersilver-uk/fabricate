@@ -129,6 +129,7 @@ export const CASES = Object.freeze([
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'knowledge'],
     sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminKnowledgeSection\.js$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
     ],
