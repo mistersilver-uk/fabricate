@@ -116,7 +116,22 @@ function row(probe, extraClass, name, enabled = false) {
   </article>`;
 }
 
-const LIST_SCREEN = `
+const SIX_ROWS = [
+  row('selected-still', 'is-selected', "Smith's Hammer", true),
+  row('selected-hovered', 'is-selected', "Smith's Anvil"),
+  row('resting', '', 'Bellows'),
+  row('resting-hovered', '', 'Tongs'),
+  row('unadopted-selected', 'is-selected is-unadopted', 'Aegis Crucible'),
+  row('unadopted-resting', 'is-unadopted', 'Star Loom'),
+].join('');
+
+/**
+ * The whole list screen around the rows the caller names.
+ *
+ * @param {string} [rows] the list's row markup
+ * @returns {string} the fixture markup
+ */
+const listScreen = (rows = SIX_ROWS) => `
 <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="tools">
   <div class="manager-body">
     <!-- THE RAIL IS LOAD-BEARING IN THE FIXTURE, not decoration. The manager body on this route
@@ -158,12 +173,7 @@ const LIST_SCREEN = `
         <section class="manager-tools-library-card" data-manager-tools-browser>
           <div class="manager-tools-library-scroll">
             <div class="manager-tools-library-list" role="list">
-              ${row('selected-still', 'is-selected', "Smith's Hammer", true)}
-              ${row('selected-hovered', 'is-selected', "Smith's Anvil")}
-              ${row('resting', '', 'Bellows')}
-              ${row('resting-hovered', '', 'Tongs')}
-              ${row('unadopted-selected', 'is-selected is-unadopted', 'Aegis Crucible')}
-              ${row('unadopted-resting', 'is-unadopted', 'Star Loom')}
+              ${rows}
             </div>
           </div>
         </section>
@@ -202,6 +212,8 @@ const LIST_SCREEN = `
   </div>
 </div>`;
 
+const LIST_SCREEN = listScreen();
+
 let sharedBrowser;
 
 before(async () => {
@@ -232,15 +244,16 @@ async function renderColumn(sections, footState) {
 /**
  * Render the screen once and hand back a reader over it.
  *
+ * @param {string} [markup] the screen to render
  * @returns {Promise<{page: import('playwright').Page, close: () => Promise<void>}>}
  */
-async function renderListScreen() {
+async function renderListScreen(markup = LIST_SCREEN) {
   const context = await sharedBrowser.newContext({
     viewport: { width: 1280, height: 720 },
     deviceScaleFactor: 1,
   });
   const page = await context.newPage();
-  await page.setContent(documentFor(LIST_SCREEN));
+  await page.setContent(documentFor(markup));
   return { page, close: () => context.close() };
 }
 
@@ -693,6 +706,129 @@ test('the Tool Rules toolbar renders the design’s own type and geometry', asyn
   } finally {
     await close();
   }
+});
+
+/**
+ * `.manager-tools-main-content`'s height in the `manager-tool-rules-sorted-desc-1280x720` lab
+ * frame at the issue 1510 pair 3e tip (504.09px). That frame has a pagination footer below the
+ * column and this fixture has none, so the body is bounded to the column's own height.
+ */
+const SORTED_DESC_COLUMN_HEIGHT = 504;
+const EDGE = 0.5;
+const CENTRE_TARGETS = [
+  '[data-probe="search"]',
+  '[data-tool-membership-option="in"]',
+  '[data-tool-membership-option="all"]',
+  '[data-probe="sort-select"]',
+  '[data-probe="sort-direction"]',
+];
+
+/** `count` plain rows, beside the six mixed-state rows the list screen draws by default. */
+const plainRows = (count) =>
+  Array.from({ length: count }, (unused, index) => row(`long-${index}`, '', `Tool ${index}`)).join(
+    ''
+  );
+
+/**
+ * The list screen with the given rows, in a body as tall as the lab frame's column.
+ *
+ * @param {string} rows the list's row markup
+ * @returns {Promise<{page: import('playwright').Page, close: () => Promise<void>}>}
+ */
+async function renderBoundedList(rows) {
+  const rendered = await renderListScreen(listScreen(rows));
+  await rendered.page.addStyleTag({
+    content: `.fabricate-manager .manager-body { height: ${SORTED_DESC_COLUMN_HEIGHT}px; }`,
+  });
+  return rendered;
+}
+
+/** The toolbar stack's boxes, and which controls own the pointer at their centre. */
+const READ_STACK = (targets) => {
+  const element = (selector) => document.querySelector(selector);
+  const box = (selector) => element(selector).getBoundingClientRect().toJSON();
+  const overflows = (selector) => element(selector).scrollHeight > element(selector).clientHeight;
+  const ownsCentre = (selector) => {
+    const { left, top, width, height } = box(selector);
+    const hit = document.elementFromPoint(left + width / 2, top + height / 2);
+    return Boolean(hit) && element(selector).contains(hit);
+  };
+  return {
+    rows: document.querySelectorAll('.manager-tools-row').length,
+    column: box('[data-probe="toolbar-stack"]'),
+    authority: box('[data-probe="authority-card"]'),
+    authorityOverflows: overflows('[data-probe="authority-card"]'),
+    search: box('[data-manager-tools-search]'),
+    bar: box('[data-probe="filter-bar"]'),
+    sort: box('[data-manager-tools-sort]'),
+    list: box('[data-manager-tools-browser]'),
+    listScrolls: overflows('.manager-tools-library-scroll'),
+    centres: Object.fromEntries(targets.map((selector) => [selector, ownsCentre(selector)])),
+  };
+};
+
+/**
+ * Every broken relation in the toolbar stack, so a failure names all of them at once. Only the
+ * list card may give up height: every card above it stays whole and in order.
+ *
+ * @param {ReturnType<typeof READ_STACK>} stack
+ * @returns {string[]} one line per broken relation
+ */
+function brokenStack({ column, authority, authorityOverflows, search, bar, sort, list }) {
+  const barInCard =
+    ['top', 'left'].every((edge) => bar[edge] >= search[edge] - EDGE) &&
+    ['bottom', 'right'].every((edge) => bar[edge] <= search[edge] + EDGE);
+  return [
+    [
+      barInCard,
+      `filter bar (${bar.top}–${bar.bottom}) is not inside the search card (${search.top}–${search.bottom})`,
+    ],
+    [authority.bottom <= search.top + EDGE, 'authority card overlaps the search card'],
+    [!authorityOverflows, 'authority card is cut short of its content'],
+    [bar.bottom <= sort.top + EDGE, `filter bar ends at ${bar.bottom}, below the sort row at ${sort.top}`],
+    [sort.bottom <= list.top + EDGE, 'sort row overlaps the list card'],
+    [list.bottom <= column.bottom + EDGE, `list card ends at ${list.bottom}, past ${column.bottom}`],
+  ]
+    .filter(([holds]) => !holds)
+    .map(([, broken]) => broken);
+}
+
+/**
+ * Render the rows and measure the stack, after the list's own precondition.
+ *
+ * @param {string} rows the list's row markup
+ * @param {number} count how many rows that markup draws
+ * @param {boolean} scrolls whether the list must overflow its scroller
+ * @param {string[]} [targets] controls that must own the pointer at their centre
+ * @returns {Promise<string[]>} every broken relation and every control that lost its centre
+ */
+async function measureBoundedList(rows, count, scrolls, targets = []) {
+  const { page, close } = await renderBoundedList(rows);
+  try {
+    const stack = await page.evaluate(READ_STACK, targets);
+    assert.equal(stack.rows, count, `the list draws ${count} rows`);
+    assert.ok(
+      Math.abs(stack.column.height - SORTED_DESC_COLUMN_HEIGHT) <= EDGE,
+      `the column is the lab frame's height, measured ${stack.column.height}`
+    );
+    assert.equal(stack.listScrolls, scrolls, `the ${count}-row list's scroll precondition`);
+    const lost = Object.keys(stack.centres).filter((selector) => !stack.centres[selector]);
+    return [...brokenStack(stack), ...lost.map((selector) => `${selector} lost its centre`)];
+  } finally {
+    await close();
+  }
+}
+
+test('a long Tool list scrolls inside its card and leaves the toolbar whole (issue 1977)', async () => {
+  assert.deepEqual(await measureBoundedList(plainRows(24), 24, true, CENTRE_TARGETS), []);
+});
+
+test('a six-row Tool list in the same column keeps the toolbar whole (issue 1977)', async () => {
+  assert.deepEqual(await measureBoundedList(SIX_ROWS, 6, true), []);
+});
+
+test('a three-row Tool list that fits is the control for the same stack (issue 1977)', async () => {
+  assert.deepEqual(await measureBoundedList(plainRows(3), 3, false), []);
 });
 
 test('the Tool Rules inspector sits one rung above its pane and states the design’s type', async () => {

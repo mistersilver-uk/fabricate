@@ -10,6 +10,7 @@ manager-tool-rules-filtered-empty-1280x720
 manager-tool-rules-overriding-filter-1280x720
 manager-tool-rules-sorted-desc-1280x720
 manager-tool-rules-sort-key-list
+manager-tool-rules-long-list-1280x720
 manager-tool-rules-row-hovered-1280x720
 manager-tool-rules-breakage-overridden-1280x720
 manager-tool-editor-rail-scrolled-1280x720
