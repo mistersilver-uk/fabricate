@@ -384,7 +384,7 @@ async function runReadyStartupSequence(io) {
   applyItemStackQuantityPathSetting({ notify: true });
 
   // Wire the region-first canvas Interactable foundation: drop interception, the region-enter
-  // prompt, the controlToken re-trigger and the interact keybinding. `register()` is idempotent.
+  // prompt and the controlToken re-trigger. `register()` is idempotent.
   InteractableManager.instance.register();
 }
 
@@ -499,6 +499,8 @@ export function registerModuleHooks(io) {
     console.log('Fabricate | Init Hook');
     registerFabricateConfig();
     io.bindFabricateGlobal();
+    // Core refuses a keybinding registered after `init` (issues 1835, 1881).
+    InteractableManager.instance.registerKeybinding();
   });
 
   // GM-only Compendium Directory bulk-import action, at module top-level and NOT in the `ready` body:

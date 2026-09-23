@@ -1,7 +1,8 @@
 /**
  * The observable behaviour of `InteractableManager`, pinned before issue 1704 split it into
  * `interactablePredicates`, `interactableGrant`, `regionEnterPrompt` and `interactableSpawner`.
- * Every cell here holds against the PRE-split manager too: substitute it and the suite still passes.
+ * Every cell held against the PRE-split manager; the keybinding cells state the post-1881 contract,
+ * where `registerKeybinding()` runs at `init` and `register()` binds only the canvas hooks.
  */
 
 import assert from 'node:assert/strict';
@@ -1052,7 +1053,7 @@ runtimeTest('the grid size reads scene grid, canvas grid then dimensions, and fa
   assert.equal(manager._gridSize(), 100);
 });
 
-runtimeTest('register binds the two canvas hooks once and registers the keybinding when it can', () => {
+runtimeTest('register binds the two canvas hooks once; registerKeybinding registers the key once', () => {
   const bound = [];
   const keybindings = [];
   globalThis.Hooks = { on: (hook, handler) => bound.push({ hook, handler }) };
@@ -1070,6 +1071,10 @@ runtimeTest('register binds the two canvas hooks once and registers the keybindi
   );
   assert.equal(manager._registered, true);
   assert.equal(manager._tokenInsideRegion.length, 3, 'the spec-cited three-parameter signature');
+  assert.equal(keybindings.length, 0, 'register() leaves the keybinding to init');
+
+  manager.registerKeybinding();
+  manager.registerKeybinding();
   assert.equal(keybindings.length, 1);
   assert.equal(keybindings[0].namespace, 'fabricate');
   assert.equal(keybindings[0].id, 'fabricateInteractHere');
@@ -1079,20 +1084,27 @@ runtimeTest('register binds the two canvas hooks once and registers the keybindi
   assert.equal(keybindings[0].definition.hint, 'FABRICATE.Canvas.Interactable.Keybinding.Hint');
 
   globalThis.canvas = { tokens: { controlled: [] } };
-  assert.equal(keybindings[0].definition.onDown(), true);
+  assert.equal(keybindings[0].definition.onDown(), false, 'no prompt raised, so the key falls through');
 });
 
-runtimeTest('register tolerates a missing hooks API and a throwing keybinding registration', () => {
-  globalThis.game = {
-    keybindings: {
-      register: () => {
-        throw new Error('bindings already initialized');
+runtimeTest('register tolerates a missing hooks API; registerKeybinding a throwing registration', () => {
+  const originalWarn = console.warn;
+  console.warn = () => {};
+  try {
+    globalThis.game = {
+      keybindings: {
+        register: () => {
+          throw new Error('bindings already initialized');
+        },
       },
-    },
-  };
-  delete globalThis.Hooks;
-  const manager = new InteractableManager();
+    };
+    delete globalThis.Hooks;
+    const manager = new InteractableManager();
 
-  assert.doesNotThrow(() => manager.register());
-  assert.equal(manager._registered, true);
+    assert.doesNotThrow(() => manager.register());
+    assert.equal(manager._registered, true);
+    assert.doesNotThrow(() => manager.registerKeybinding());
+  } finally {
+    console.warn = originalWarn;
+  }
 });
