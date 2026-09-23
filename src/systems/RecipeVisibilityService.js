@@ -2330,9 +2330,11 @@ export class RecipeVisibilityService {
    * `map['a.b']` is undefined against the shape actually on the document.
    *
    * An id routes to a two-step delete-then-write fallback whenever a batched per-id
-   * deletion would destroy something else — because the id is not a safe segment, OR
-   * because another entry nests inside it (`a` and `a.b` share one node, so deleting `a`
-   * removes both). The fallback drops the parent key (`learnedRecipes`) and
+   * deletion cannot remove exactly that id's entry — because the id is not a safe
+   * segment, OR because another entry nests inside it (`a` and `a.b` share one node, so
+   * deleting `a` removes both), OR because it is `__proto__`, `constructor` or
+   * `prototype`, which `forcedDeletionEntry` refuses. The fallback drops the parent key
+   * (`learnedRecipes`) and
    * re-writes the retained map, rebuilt from the entry view rather than by filtering the
    * raw top level — two SEQUENTIAL awaited operations, never a same-update mix (which
    * `mergeObject` may process delete-after-insert and wipe the whole map).
