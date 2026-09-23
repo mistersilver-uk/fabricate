@@ -60,6 +60,19 @@ function reorderedWithThresholds(stages, storedOrder, awardMode) {
   return ordered.map((stage, index) => ({ ...stage, threshold: thresholds[index] }));
 }
 
+/** Commits already issued (debounce fired, or committed early by `stage`), for `flush` to await. */
+function inFlightCommits() {
+  const settling = new Set();
+  return {
+    track(commit) {
+      settling.add(commit);
+      void commit.then(() => settling.delete(commit));
+      return commit;
+    },
+    pending: () => [...settling],
+  };
+}
+
 /**
  * The stored-order map and the debounced optimistic write over it, with no knowledge of what a
  * stage is. Module-private: `createPlayerResultOrder` is the only composer, and the gestures are
@@ -77,6 +90,7 @@ function createOrderWriter({ write, revertMessage, debounceMs }) {
   // salvage, generalized to crafting by issue 1695). A reorder under another key commits it first
   // (issue 1809), and a `seed` carries its order forward (issue 1807), so it is never lost.
   let pendingKey = null;
+  const inFlight = inFlightCommits();
   let announcement = $state('');
 
   /**
@@ -114,7 +128,7 @@ function createOrderWriter({ write, revertMessage, debounceMs }) {
   function stage(writeKey, ids, text) {
     if (commitTimer) {
       clearTimeout(commitTimer);
-      if (pendingKey !== writeKey) void commit(pendingKey);
+      if (pendingKey !== writeKey) inFlight.track(commit(pendingKey));
     }
     orders = { ...orders, [writeKey]: ids };
     announcement = text;
@@ -122,23 +136,27 @@ function createOrderWriter({ write, revertMessage, debounceMs }) {
     commitTimer = setTimeout(() => {
       commitTimer = null;
       pendingKey = null;
-      void commit(writeKey);
+      inFlight.track(commit(writeKey));
     }, debounceMs);
   }
 
   /**
-   * Commit a pending write now, or resolve `{ok: true}` when nothing is pending, so a double call
-   * from both `close()` and `_onClose()` writes once.
+   * Commit a pending write now and await every in-flight one; `ok` only when all succeed. Nothing
+   * pending resolves `{ok: true}`, so a double call from both `close()` and `_onClose()` writes once.
    *
    * @returns {Promise<{ok: boolean}>}
    */
   function flush() {
-    if (!commitTimer) return Promise.resolve({ ok: true });
-    clearTimeout(commitTimer);
-    commitTimer = null;
-    const writeKey = pendingKey;
-    pendingKey = null;
-    return commit(writeKey);
+    const settling = inFlight.pending();
+    if (commitTimer) {
+      clearTimeout(commitTimer);
+      commitTimer = null;
+      const writeKey = pendingKey;
+      pendingKey = null;
+      settling.push(inFlight.track(commit(writeKey)));
+    }
+    if (settling.length === 0) return Promise.resolve({ ok: true });
+    return Promise.all(settling).then((results) => ({ ok: results.every((result) => result.ok) }));
   }
 
   return {
