@@ -40,8 +40,10 @@ Narrow (stacked) layout:
 - At or below the manager's stacked container width, the rail, main and inspector regions each keep **their own content height** and the body scrolls.
   They must not share the body's height between them: every region carries `min-height: 0` and clips its overflow, so an `auto` grid track would size each to a fraction of the body and silently render a browser's rows at full height inside a collapsed, invisible scroll box.
 - The stacked rail is bounded and scrolls its own navigation, rather than becoming a full-height wall of nav above the content it navigates to.
-  This is the default for every Manager route below the manager's stacked container width; a route documents its own departure in its own section rather than here.
-  Two routes currently do: the World Downtime route (`ui-extension-points/spec.md` §Downtime Preview and Premium Extension) keeps a definite-height grid instead of restacking, and the Knowledge Surface (`ui-system-studio/spec.md` §Knowledge Surface) keeps its three columns and their own scrolling down to 832px before this rule takes over.
+  This is the default for every Manager route below the manager's stacked container width, and every route that departs from it is named here.
+  The World Downtime route (`ui-extension-points/spec.md` §Downtime Preview and Premium Extension) keeps a definite-height grid instead of restacking; the Knowledge Surface (`ui-system-studio/spec.md` §Knowledge Surface) and the Tool library and editor (`ui-system-studio/spec.md` §Tools Tab) keep their columns down to 832px before this rule takes over.
+  The side-rail routes never restack: the component rules editor, the recipe editor, the gathering task editor in its result-group modes, World Currency, World Prerequisites, World Modifiers, the system-scope Tags & Categories screen, and the seven world scoped-entity routes (`ui-world-scope/spec.md`) keep their rail beside their content at every width.
+  On a side-rail route, and on the World Downtime route and the Knowledge Surface wherever they keep their columns, the rail runs the content area's full height with its right divider and scrolls its own navigation, and the content column owns vertical scrolling as it does above the stacked width, so the body never scrolls as one page.
 
 Selected-system navigation:
 
