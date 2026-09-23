@@ -25,7 +25,7 @@
     second one would name the same region twice.
   - `hint` is always empty: the head's SUBLINE is the line under the title, and a hint as well would draw two.
   - The toolbar's `:global` repair stays chained onto `.manager-toolbar`: the class sits on a
-    COMPONENT tag, and a bare (0,1,0) would win ties it has no business in.
+    component tag, and a bare (0,1,0) would win ties it has no business in.
   - Pinned by `tests/components/world-vocabulary-control-row-cascade.test.js` and
     `tests/manager-browser-view-state-contract.test.js`.
 -->
@@ -131,8 +131,8 @@
     background: var(--fab-bg-1);
   }
 
-  /* THE FOUR CONTROL-ROW REPAIRS, all `:global` and the toolbar's chained onto `.manager-toolbar`:
-     the class sits on a COMPONENT tag, and a bare (0,1,0) would win ties it has no business in. */
+  /* The four control-row repairs, all `:global` and the toolbar's chained onto `.manager-toolbar`:
+     the class sits on a component tag, and a bare (0,1,0) would win ties it has no business in. */
 
   /* THE ADD FORM RUNS FLUSH, because the PANEL is the card now; its own fill sits two rungs above
      the panel's, so inside one it is a card in a card brighter than the rows below it. */

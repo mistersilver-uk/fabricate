@@ -513,9 +513,9 @@
     {#if routedPairing}
       <!-- Routed by ingredients: the chosen set is the route, so a dropdown picks which
            set's requirements to show — and drives the paired result-set dropdown below. -->
-      <!-- `maxWidth` is the manager's one-column breakpoint: below it the inspector spans the
-           window, so the trigger outgrows the `inline` band's 240px ceiling and, near the
-           breakpoint, a 1024px cap too; a cap under the trigger draws the list narrower than it. -->
+      <!-- `maxWidth` is the manager's 1120px one-column breakpoint: below it the inspector spans
+           the window, so the trigger outgrows the `inline` band's 240px ceiling, and the panel is
+           then held by the overlay host's inset rather than by this cap. -->
       <Select
         class="manager-recipe-route-select"
         size="inline"

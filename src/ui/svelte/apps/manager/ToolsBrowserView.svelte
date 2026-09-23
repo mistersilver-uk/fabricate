@@ -695,9 +695,6 @@
     min-width: 0;
   }
 
-  /* THE THREE FILLS ON THIS SCREEN ARE THE DESIGN'S OWN: the membership filter, the sort select and
-     the two bordered buttons are RAISED CONTROLS, each filled with the design's `--surface-soft`, so
-     removing them would flatten a control into the page. The SELECT is the one exception. */
   /* The per-row recipe count, a figure over its unit, right-aligned so the figures line up. */
   /* The `min-width` does the work: without it a `1` and a `12` give two different column widths. */
   .manager-tools-row-recipes {
@@ -749,7 +746,7 @@
 
   /* The picker root is the row's flex item and hugs; the trigger carries the width and ink, which
      the `inline` rung does not state. Chained onto the scoped row, because the class sits on a
-     COMPONENT tag. */
+     component tag. */
   .manager-tools-sort-row :global(.manager-tools-sort-select) {
     flex: 0 0 auto;
     width: auto;
