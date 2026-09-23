@@ -419,6 +419,12 @@ export const CASES = Object.freeze([
     expectScrollable: '.downtime-preview-scroll',
     expectCenterHit: '.downtime-preview:not([hidden]) .downtime-cta',
     expectClick: '.downtime-preview:not([hidden]) .downtime-cta',
+    expectLayout: {
+      containerSelector: '.fabricate-manager',
+      gridSelector: '.manager-body',
+      expectedTracks: 2,
+      fillSelector: '.manager-rail',
+    },
     position: { width: 960, height: 900 },
     kinds: ['manager', 'world', 'downtime', 'responsive'],
     sourceMatches: [

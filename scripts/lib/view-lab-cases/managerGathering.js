@@ -350,6 +350,8 @@ export const CASES = Object.freeze([
         mode === 'selector'
           ? '[data-gathering-task-resolution-mode]'
           : `[data-gathering-task-results="${mode}"]`,
+      // The editor's own main, not the body, scrolls below the 1120px rung (issue 1976).
+      expectScrollable: 'main.manager-gathering-task-edit-view',
       kinds: ['manager', 'environments', 'responsive'],
       sourceMatches: [
         /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte$/,

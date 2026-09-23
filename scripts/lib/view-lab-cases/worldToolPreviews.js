@@ -176,6 +176,8 @@ export const CASES = Object.freeze([
       gridSelector: '.manager-body',
       expectedTracks: 2,
       absentSelector: '.manager-inspector',
+      // The side rail runs the body's full height below the 1120px rung (issue 1976).
+      fillSelector: '.manager-rail',
     },
     position: { width: 1024, height: 860 },
     kinds: ['manager', 'world', 'scoped', 'responsive'],

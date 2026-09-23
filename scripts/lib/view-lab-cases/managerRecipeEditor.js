@@ -512,6 +512,8 @@ export const CASES = Object.freeze([
     expectView: 'recipe-edit',
     expectSelector:
       '.fabricate-manager .fabricate-sortable-list-row[data-recipe-step-id] [data-sortable-grip]',
+    // The editor's own main, not the body, scrolls below the 1120px rung (issue 1976).
+    expectScrollable: 'main.manager-recipe-edit-main',
     position: { width: 1024, height: 640 },
     kinds: ['manager', 'recipes', 'responsive'],
     sourceMatches: [

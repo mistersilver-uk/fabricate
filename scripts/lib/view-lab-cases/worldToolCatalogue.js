@@ -5,6 +5,22 @@
 import { WORLD_TOOL_SEARCH_MISS_TERM, WORLD_TOOL_SEARCH_TERM } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
+/** The resting catalogue's walk, shared by its wide frame and its stacked twin. */
+const CATALOGUE_STEPS = Object.freeze([
+  { selector: '#manager-world-nav-tool-catalogue' },
+  { selector: '[data-scoped-list-inspect="sm-tool-hammer"]' },
+]);
+
+/** The sources the resting catalogue frame and its stacked twin both claim. */
+const CATALOGUE_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+  // `MembershipActions` is no longer claimed here, and no case replaces it (issue 1373).
+  /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
+  /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
+]);
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'world-tool-catalogue-list-head',
@@ -41,10 +57,7 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     // `Tools Catalogue` is plural where its siblings are singular, and `Tools` is a live substring of it.
-    steps: [
-      { selector: '#manager-world-nav-tool-catalogue' },
-      { selector: '[data-scoped-list-inspect="sm-tool-hammer"]' },
-    ],
+    steps: CATALOGUE_STEPS,
     expectView: 'world-tools',
     expectSelector: '[data-scoped-page="world-tools"]',
     // The real catalogue, not the placeholder (issue 1373).
@@ -72,14 +85,28 @@ export const CASES = Object.freeze([
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     // The placeholder claim is gone, and dropping it is not optional bookkeeping.
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
-      // `MembershipActions` is no longer claimed here, and no case replaces it (issue 1373).
-      /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
+    sourceMatches: CATALOGUE_SOURCES,
+  }),
+  managerCase({
+    id: 'world-tool-catalogue-stacked',
+    label: 'Manager — World Tools Catalogue, list frame stacked',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Below the list frame's 760px stack the list-over-inspector layout is the one scroller, so
+    // the rows keep their height and the row step still resolves (issue 1976). No
+    // `expectContained`: the stacked inspector sits below the list, inside the one scroller.
+    // Selecting a row focuses the inspector, which scrolls the stacked layout past the list, so a
+    // last step scrolls the row back into view and the frame shows the rows it pins.
+    steps: [
+      ...CATALOGUE_STEPS,
+      { selector: '[data-scoped-list-inspect="sm-tool-hammer"]', scroll: true },
     ],
+    expectView: 'world-tools',
+    expectSelector: '[data-scoped-page="world-tools"]',
+    expectScrollable: '.manager-scoped-list-layout',
+    position: { width: 882, height: 720 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: CATALOGUE_SOURCES,
   }),
   managerCase({
     id: 'world-tool-catalogue-page-two',
