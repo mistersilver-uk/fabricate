@@ -228,7 +228,6 @@ describe('adminStore knowledge section corpus', () => {
       await harness.store.setKnowledgeActive(true);
       harness.store.selectKnowledgeActor('a2');
       await harness.store.selectSystem('sys1');
-      await harness.store.refreshKnowledge();
       assert.equal(harness.state().knowledge.systemId, 'sys1');
       assert.equal(harness.state().knowledge.selectedActorId, 'a2');
     } finally {
