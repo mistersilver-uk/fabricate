@@ -44,6 +44,12 @@ const mountTab = (props) =>
 
 const rows = () => harness.target.querySelectorAll('.manager-map-link-row');
 
+// Every state sits on the shared browse body, the inset every Manager browse pane uses.
+const assertInBrowseBody = (selector) => {
+  const inBody = harness.target.querySelector(`[data-travel-panel="map"] > .manager-table-scroll ${selector}`);
+  assert.ok(Boolean(inBody), `${selector} sits inside the panel's .manager-table-scroll`);
+};
+
 describe('GatheringMapLinksTab mounted behavior', () => {
   before(harness.setup);
   after(harness.teardown);
@@ -54,6 +60,7 @@ describe('GatheringMapLinksTab mounted behavior', () => {
     const empty = harness.target.querySelector('[data-travel-map-links-empty]');
     assert.ok(empty);
     assert.match(empty.textContent, /Activate a scene/);
+    assertInBrowseBody('[data-travel-map-links-empty]');
     harness.remount();
   });
 
@@ -63,6 +70,7 @@ describe('GatheringMapLinksTab mounted behavior', () => {
     const empty = harness.target.querySelector('[data-travel-map-links-empty]');
     assert.ok(empty);
     assert.match(empty.textContent, /no regions/i);
+    assertInBrowseBody('[data-travel-map-links-empty]');
     harness.remount();
   });
 
@@ -73,6 +81,7 @@ describe('GatheringMapLinksTab mounted behavior', () => {
     assert.match(first.querySelector('.manager-map-link-name').textContent, /Northwood/);
     assert.match(first.querySelector('.manager-map-link-swatch').getAttribute('style'), /#1a9c4f/);
     assert.equal(first.dataset.managerMapRegionUuid, 'Scene.s1.Region.a');
+    assertInBrowseBody('.manager-map-link-list .manager-map-link-row');
     // Each row carries its own link picker.
     assert.match(first.querySelector('.manager-map-link-picker-cell .manager-map-link-trigger').textContent, /Verdant/);
     assert.match(rows()[1].querySelector('.manager-map-link-picker-cell .manager-map-link-trigger').textContent, /Not linked/);

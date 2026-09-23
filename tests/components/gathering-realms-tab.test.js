@@ -53,6 +53,18 @@ function rows() {
   return target.querySelectorAll('.manager-travel-realms-row');
 }
 
+// The browse body every Manager browse pane uses: a full-bleed filter bar, then the inset scroller.
+function assertBrowseBody(contentSelector, site) {
+  const panel = target.querySelector('[data-travel-panel="realms"]');
+  const scroller = panel.querySelector(':scope > .manager-table-scroll');
+  assert.ok(Boolean(scroller), `${site}: the panel's body is the shared .manager-table-scroll`);
+  assert.ok(Boolean(scroller.querySelector(contentSelector)), `${site}: ${contentSelector} sits inside the scroller`);
+  const toolbar = panel.querySelector('.fabricate-filter-bar');
+  assert.ok(Boolean(toolbar), `${site}: the filter bar renders`);
+  assert.ok(toolbar.parentElement === panel, `${site}: the filter bar is a direct child of the panel`);
+  assert.ok(!scroller.contains(toolbar), `${site}: the filter bar is not inside the scroller`);
+}
+
 describe('GatheringRealmsTab mounted behavior', () => {
   before(async () => {
     setupDOM();
@@ -131,6 +143,37 @@ describe('GatheringRealmsTab mounted behavior', () => {
   it('paginates over a page size of 6', async () => {
     await mountTab({ realms: makeRealms(7) });
     assert.equal(rows().length, 6);
+    remount();
+  });
+
+  it('lays the populated, empty and no-match states on the shared browse body', async () => {
+    await mountTab({ realms: [makeRealm({ id: 'r1', name: 'Northreach' })] });
+    assertBrowseBody('.manager-travel-realms-list', 'populated');
+    remount();
+
+    await mountTab({ realms: [] });
+    assertBrowseBody('[data-travel-realms-empty]', 'empty');
+    remount();
+
+    await mountTab({ realms: [makeRealm({ id: 'r1', name: 'Northreach' })] });
+    const search = target.querySelector('input[type="search"]');
+    search.value = 'zzz';
+    search.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+    await tick();
+    flushSync();
+    assertBrowseBody('[data-travel-realms-empty]', 'no match');
+    remount();
+  });
+
+  it('keeps the pager outside the scroller, after it', async () => {
+    await mountTab({ realms: makeRealms(7) });
+    const pager = target.querySelector('.manager-pagination');
+    assert.ok(Boolean(pager), 'seven realms render a pager');
+    const panel = target.querySelector('[data-travel-panel="realms"]');
+    const scroller = panel.querySelector(':scope > .manager-table-scroll');
+    assert.ok(pager.parentElement === panel, 'the pager is a direct child of the panel');
+    assert.ok(Boolean(scroller) && scroller.nextElementSibling === pager, 'the pager follows the scroller');
     remount();
   });
 

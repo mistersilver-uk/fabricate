@@ -8,7 +8,7 @@
  * not a thing that can be done. Keyed on the selector ALONE the sheet holds 200 repeated selectors
  * rather than these 107, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,042 `(at-context, selector)` keys, of which 2,935 appear exactly
+ * Unfiltered, the sheet holds 3,043 `(at-context, selector)` keys, of which 2,936 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -168,6 +168,10 @@
  * table is untouched a second time: 2,562 -> 2,564 rules, 3,038 -> 3,040 keys, 2,928 -> 2,930
  * singletons, 203 keyed alone unmoved, 110 repeated keys and 225 appearances unmoved. Re-derived
  * by running `node scripts/stylesheet-selector-census.mjs`, not subtracted.
+ * ISSUE 1973 (2026-09-23) ADDS ONE SELECTOR AND NO RULE. `world-travel` joins the world routes'
+ * single-track `.manager-main` list, a singleton in both keyings: 3,042 -> 3,043 keys and
+ * 2,935 -> 2,936 singletons; 2,567 rules, 107 repeated keys, 219 appearances and 200 keyed alone
+ * are unmoved. Re-derived by running `node scripts/stylesheet-selector-census.mjs`.
  */
 import { readFileSync } from 'node:fs';
 

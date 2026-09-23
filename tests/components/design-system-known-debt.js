@@ -149,7 +149,8 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
 // #1510: the checks conversion removes one remaining 8px radius occurrence from the module sheet.
 // Issue 1512: the retired stage-row box (8px) and rocker buttons (4px) took four with them.
 // #1510: the Tool library's sort select took its 8px corner with it; the `inline` rung draws 7px.
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 270;
+// Issue 1973: the Travel Realms pane dropped its retired card chrome's 8px corner.
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 269;
 
 /** A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`. */
 export const KNOWN_AREA_SCOPED_STYLE_READS = knownDebt('areaScopedStyleReads');
