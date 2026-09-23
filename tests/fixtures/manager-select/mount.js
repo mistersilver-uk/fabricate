@@ -15,6 +15,8 @@ import ImportFolderMappingModal from '../../../src/ui/svelte/apps/manager/Import
 import RecipeIngredientOption from '../../../src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte';
 import EnvironmentOverviewTab from '../../../src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte';
 import EnvironmentsBrowserView from '../../../src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte';
+import GatheringEventsBrowserView from '../../../src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte';
+import GatheringTasksBrowserView from '../../../src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte';
 import RecipeOverviewTab from '../../../src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte';
 import Select from '../../../src/ui/svelte/components/Select.svelte';
 import ToolBehaviorPreview from '../../../src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte';
@@ -229,6 +231,34 @@ function environmentsSettings() {
   });
 }
 
+// The gathering task and event libraries (issue 1510): one system whose authored biome vocabulary
+// seeds both biome filters, and records whose biomes and danger tags every other filter can narrow.
+const GATHERING_CONFIG = {
+  systems: {
+    sys: {
+      vocabularies: {
+        biomes: {
+          values: [
+            { id: 'forest', label: 'Forest' },
+            { id: 'saltmarsh', label: 'Tidal saltmarsh' },
+          ],
+        },
+      },
+    },
+  },
+};
+const GATHERING_RECORDS = [
+  { id: 'rec-herbs', name: 'Moon Herbs', enabled: true, biomes: ['forest'], dangerTags: [] },
+  {
+    id: 'rec-reeds',
+    name: 'Salt Reeds',
+    enabled: false,
+    biomes: ['saltmarsh'],
+    weather: ['rain'],
+    dangerTags: ['deadly'],
+  },
+];
+
 /** The 340px column the tool-edit grid gives the rail, reproduced as fixture chrome. */
 function railColumn() {
   const rail = document.createElement('div');
@@ -397,6 +427,17 @@ const SUBJECTS = {
     mountPoint.classList.remove('fixture-column', 'fixture-mount');
     return environmentsSettings();
   },
+  // The gathering task and event toolbars' three filters each, driven through their panels too.
+  'gathering-tasks-browser': () =>
+    mount(GatheringTasksBrowserView, {
+      target: mountPoint,
+      props: { tasks: GATHERING_RECORDS, selectedSystemId: 'sys', gatheringConfig: GATHERING_CONFIG },
+    }),
+  'gathering-events-browser': () =>
+    mount(GatheringEventsBrowserView, {
+      target: mountPoint,
+      props: { events: GATHERING_RECORDS, selectedSystemId: 'sys', gatheringConfig: GATHERING_CONFIG },
+    }),
   // The `Preview as` roster, whose value is component state rather than a prop.
   'tool-preview': () =>
     mount(ToolBehaviorPreview, {

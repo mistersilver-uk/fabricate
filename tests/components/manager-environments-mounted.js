@@ -47,6 +47,10 @@ const {
   runRowMenuCommand,
 } = queries;
 
+/** A gathering task or event toolbar filter, addressed by the caption id that names it. */
+const gatheringFilter = (browser, axis) =>
+  `[data-gathering-${browser}-browser] .fabricate-select-trigger[aria-labelledby$="-${axis}-filter"]`;
+
 /**
  * A stand-in shell for ONE subject: it answers the panel's readers and, like the real shell,
  * persists a picked character modifier before the panel is rendered again (issue 1707).
@@ -297,6 +301,114 @@ export function registerEnvironmentsCases() {
     ]);
   });
 
+  // The gathering task and event toolbars' six filters (issue 1510). None ever carried an
+  // `aria-label`, so each trigger is named by its own caption through an instance-scoped id.
+  for (const [browser, subitem, axes, library] of [
+    [
+      'tasks',
+      'Tasks',
+      [
+        ['status', 'Status', ['all', 'active', 'disabled'], false],
+        ['biome', 'Biome', ['all', 'cavern', 'forest'], true],
+        ['availability', 'Availability', ['all', 'any', 'current', 'mismatch'], true],
+      ],
+      undefined,
+    ],
+    [
+      'events',
+      'Events',
+      [
+        ['status', 'Status', ['all', 'active', 'disabled'], false],
+        ['biome', 'Biome', ['all', 'cavern', 'forest'], true],
+        [
+          'danger',
+          'Danger',
+          ['all', 'safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'],
+          true,
+        ],
+      ],
+      [
+        { id: 'event-owl', name: 'Owl Omen', enabled: true, biomes: ['forest'], dangerTags: [] },
+        {
+          id: 'event-rockfall',
+          name: 'Rockfall',
+          enabled: false,
+          biomes: ['cavern'],
+          dangerTags: ['deadly'],
+        },
+      ],
+    ],
+  ]) {
+    it(`names and drives the gathering ${browser} toolbar's three converted filters`, async () => {
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: {
+          store: createStore([], { gatheringLibraryEvents: library }),
+          services: { openCurrentAdmin: () => {} },
+        },
+      });
+      flushSync();
+      navButton('Gathering').click();
+      await tick();
+      flushSync();
+      gatheringSubitem(subitem).click();
+      await tick();
+      flushSync();
+
+      for (const [axis, caption, values, ticked] of axes) {
+        const filter = gatheringFilter(browser, axis);
+        assert.equal(assertSelectHasResolvedName(target, filter), caption);
+        assert.ok(!target.querySelector(filter).hasAttribute('aria-label'));
+        assert.deepEqual(selectOptionValues(target, filter), values);
+        assert.equal(
+          openSelectPanel(target, filter).classList.contains('fabricate-select-popover-ticked'),
+          ticked,
+          `the ${browser} ${axis} list ${ticked ? 'keeps' : 'drops'} its tick column`
+        );
+        assert.equal(
+          target.querySelector(filter).closest('.manager-filter').tagName,
+          'SPAN',
+          'the caption is a demoted `<span>`: inside a `<label>` its own mousedown would dismiss ' +
+            'the panel and the forwarded click would re-open it'
+        );
+        closeSelectPanel(target, filter);
+      }
+      if (browser === 'tasks') {
+        assert.deepEqual(selectOptionLabels(target, gatheringFilter('tasks', 'biome')), [
+          'All biomes',
+          'Crystal Cavern',
+          'Moon Forest',
+        ]);
+        closeSelectPanel(target, gatheringFilter('tasks', 'biome'));
+      }
+
+      const rows = () =>
+        [...target.querySelectorAll(`[data-gathering-${browser}-browser] [role="listitem"]`)].map(
+          (row) => row.getAttribute(`data-gathering-${browser.slice(0, -1)}-id`)
+        );
+      const everyRow = rows();
+      for (const [axis, value] of [
+        ['status', 'disabled'],
+        ['biome', 'forest'],
+        [axes[2][0], browser === 'tasks' ? 'current' : 'deadly'],
+      ]) {
+        chooseSelectOption(target, gatheringFilter(browser, axis), value);
+        await tick();
+        flushSync();
+        assert.ok(
+          rows().length > 0 && rows().length < everyRow.length,
+          `the ${browser} ${axis} filter narrowed ${everyRow.join(', ')} to ${rows().join(', ')}`
+        );
+        chooseSelectOption(target, gatheringFilter(browser, axis), 'all');
+        await tick();
+        flushSync();
+        assert.deepEqual(rows(), everyRow, `the ${axis} filter restored every row`);
+      }
+    });
+  }
+
   it('routes to the environments browser and opens the forced v2 editor route', async () => {
     const calls = [];
     target = document.createElement('div');
@@ -512,11 +624,7 @@ export function registerEnvironmentsCases() {
     target.querySelector('[data-clear-filters="gathering-tasks"]').click();
     await tick();
     flushSync();
-    const taskSelects = target.querySelectorAll(
-      '[data-gathering-tasks-browser] .manager-filter select'
-    );
-    taskSelects[0].value = 'disabled';
-    taskSelects[0].dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, gatheringFilter('tasks', 'status'), 'disabled');
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-gathering-task-row').length, 1);
@@ -526,8 +634,7 @@ export function registerEnvironmentsCases() {
     await tick();
     flushSync();
     // Region filter is removed; the biome filter is now the second select.
-    taskSelects[1].value = 'cavern';
-    taskSelects[1].dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, gatheringFilter('tasks', 'biome'), 'cavern');
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-gathering-task-row').length, 1);
@@ -535,8 +642,7 @@ export function registerEnvironmentsCases() {
     target.querySelector('[data-clear-filters="gathering-tasks"]').click();
     await tick();
     flushSync();
-    taskSelects[2].value = 'mismatch';
-    taskSelects[2].dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, gatheringFilter('tasks', 'availability'), 'mismatch');
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-gathering-task-row').length, 2);

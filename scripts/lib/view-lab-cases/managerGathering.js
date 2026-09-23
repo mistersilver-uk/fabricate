@@ -66,6 +66,37 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
+  // The gathering toolbars' open-panel frame (issue 1510), on the tightest of their six lists:
+  // `Any time/weather` is 93px of the 108 a ticked row leaves at the `toolbar` band's 160px floor.
+  // No filter in these two bars carries an `aria-label`, so the trigger is addressed by the caption
+  // id that names it.
+  managerCase({
+    id: 'manager-gathering-tasks-availability-filter-list',
+    label: 'Manager — Gathering tasks availability filter list',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    // Stops on the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-tasks-browser] .fabricate-select-trigger[aria-labelledby$="-availability-filter"]',
+      },
+    ],
+    expectView: 'environments',
+    // Two claims a closed frame cannot make: the panel exists and it is the ticked availability list.
+    expectSelector:
+      '.fabricate-manager .fabricate-select-popover.fabricate-select-popover-ticked' +
+      ' [data-popover-option="any"] .fabricate-select-label',
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/GatheringTasksBrowserView\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
   managerCase({
     id: 'manager-gathering-task-editor-normal',
     label: 'Manager — Gathering task editor normal',
