@@ -2423,7 +2423,8 @@ describe('CraftingSystemManager source contract', () => {
     { property: [['layoutClass', 'self-owned-3-track']] }
   );
 
-  // The view owns the single armed token and every disarm rule, and seeds its default tab once.
+  // The view owns the single armed token and every disarm rule, and seeds its default tab once per
+  // system.
   defineStructureContract('owns the armed token and the seeded default tab', KNOWLEDGE_VIEW, {
     renders: [
       'KnowledgeRoster',
@@ -2431,7 +2432,7 @@ describe('CraftingSystemManager source contract', () => {
       'KnowledgeRecipeItemsTab',
       'KnowledgeLearnedRecipesTab',
     ],
-    names: ['filterKnowledgeRoster', 'armedToken', 'tabSeeded'],
+    names: ['filterKnowledgeRoster', 'armedToken', 'seededSystemId'],
     writes: ['data-knowledge-view'],
     attributes: [['role', 'tabpanel']],
   });

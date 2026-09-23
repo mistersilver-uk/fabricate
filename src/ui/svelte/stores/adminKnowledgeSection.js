@@ -22,8 +22,9 @@ export function createKnowledgeSection({
   let knowledgeSnapshot = null;
   let knowledgeSelectedActorId = '';
   let knowledgeRefreshScheduled = false;
-  // Resolved once per surface entry from the definition count, never as a live derivation: a GM
-  // authoring the first recipe item elsewhere would flip 0 -> 1 and yank the open tab mid-task.
+  // Resolved once per surface entry from the definition count, and again on a system switch, never
+  // as a live derivation: a GM authoring the first recipe item elsewhere would flip 0 -> 1 and yank
+  // the open tab mid-task.
   let knowledgeDefaultTab = defaultKnowledgeTab(0);
   let knowledgeDefaultTabResolved = false;
 
@@ -77,6 +78,13 @@ export function createKnowledgeSection({
     knowledgeSelectedActorId = '';
   }
 
+  // Keeps the world-scoped character; an open surface publishes the cleared projection at once.
+  function resetForSystemChange() {
+    knowledgeSnapshot = null;
+    knowledgeDefaultTabResolved = false;
+    if (knowledgeActive) publishKnowledge();
+  }
+
   /**
    * Re-read the Knowledge snapshot.
    *
@@ -87,7 +95,9 @@ export function createKnowledgeSection({
     if (!knowledgeActive) return false;
     if (force || !knowledgeSnapshot) {
       const systemId = get(selectedSystemId);
-      knowledgeSnapshot = (await services.getKnowledgeSnapshot?.(systemId)) || null;
+      const snapshot = (await services.getKnowledgeSnapshot?.(systemId)) || null;
+      if (get(selectedSystemId) !== systemId) return false; // a later switch owns the surface
+      knowledgeSnapshot = snapshot;
       if (!knowledgeDefaultTabResolved) {
         knowledgeDefaultTab = defaultKnowledgeTab(knowledgeSnapshot?.definitionCount || 0);
         knowledgeDefaultTabResolved = true;
@@ -202,6 +212,8 @@ export function createKnowledgeSection({
 
   /** Reset this character's learned knowledge for the selected system. */
   async function resetActorSystemKnowledge(actorId) {
+    // Read before the non-modal confirm: a switch while it is open must not retarget the reset.
+    const systemId = get(selectedSystemId);
     const confirmed = await confirmKnowledgeReset(
       'FABRICATE.Admin.Manager.Knowledge.ResetSystemTitle',
       'Reset this system?',
@@ -209,7 +221,6 @@ export function createKnowledgeSection({
       'Clear every recipe this character has learned in the selected crafting system.'
     );
     if (!confirmed) return { success: false, cancelled: true };
-    const systemId = get(selectedSystemId);
     return runKnowledgeMutation(() => services.resetActorKnowledge?.({ actorId, systemId }));
   }
 
@@ -242,7 +253,7 @@ export function createKnowledgeSection({
     eraseLearnedRecipe,
     resetActorSystemKnowledge,
     resetActorAllKnowledge,
-    clearCache,
+    resetForSystemChange,
     deactivate,
   };
 }

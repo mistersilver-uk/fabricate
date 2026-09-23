@@ -114,6 +114,27 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-knowledge-scope-switch',
+    label: 'Manager — Knowledge after a scope switch',
+    // `beyond`: the smoke never switches systems with the Knowledge surface open.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-knowledge' },
+      { selector: '[data-manager-scope-select]', select: 'lab-alchemy' },
+    ],
+    expectView: 'knowledge',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'knowledge'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
+      /^src\/ui\/svelte\/stores\/adminKnowledgeSection\.js$/,
+      /^src\/ui\/svelte\/stores\/adminStore\.js$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-components-progressive',
     label: 'Manager — Components progressive',
     smokeLabels: ['manager-components-progressive'],

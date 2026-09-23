@@ -127,22 +127,121 @@ describe('adminStore knowledge section corpus', () => {
       harness.drain();
 
       await harness.store.selectSystem('sys1');
-      const afterSelect = harness.drain();
-      assert.deepStrictEqual(
-        seamCalls(afterSelect, 'getKnowledgeSnapshot'),
-        [],
-        'selecting a system clears the cache rather than re-reading it'
-      );
-      assert.equal(
-        harness.state().knowledge.systemId,
-        'sys2',
-        'clearing the cache does not republish, so the surface holds the old projection'
-      );
-
-      await harness.store.refreshKnowledge();
       assert.deepStrictEqual(seamCalls(harness.drain(), 'getKnowledgeSnapshot'), [['sys1']]);
-      assert.equal(harness.state().knowledge.defaultTab, 'recipeItems');
       assert.equal(harness.state().knowledge.systemId, 'sys1');
+      assert.equal(harness.state().knowledge.defaultTab, 'recipeItems');
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it('a system switch never publishes the previous system and clears before it reads', async () => {
+    const harness = await createSectionHarness(
+      knowledgeWorld({ settings: { lastManagedCraftingSystem: 'sys2' } })
+    );
+    const published = [];
+    let unsubscribe = () => {};
+    try {
+      await harness.store.setKnowledgeActive(true);
+      unsubscribe = harness.store.viewState.subscribe((state) => {
+        published.push({ active: state.knowledge?.active, systemId: state.knowledge?.systemId });
+      });
+      published.length = 0;
+
+      await harness.store.selectSystem('sys1');
+      const systemIds = published.map((entry) => entry.systemId);
+      assert.ok(!systemIds.includes('sys2'), `no publish carries sys2: ${systemIds.join(',')}`);
+      const cleared = published.findIndex((entry) => entry.active && entry.systemId === '');
+      assert.ok(cleared !== -1, 'the cleared projection is published');
+      assert.ok(cleared < systemIds.indexOf('sys1'), 'and it lands before the new system');
+      assert.equal(systemIds.at(-1), 'sys1');
+    } finally {
+      unsubscribe();
+      harness.dispose();
+    }
+  });
+
+  it('a snapshot read that resolves after a later switch is discarded', async () => {
+    const harness = await createSectionHarness(
+      knowledgeWorld({ settings: { lastManagedCraftingSystem: 'sys2' } })
+    );
+    try {
+      await harness.store.setKnowledgeActive(true);
+      harness.drain();
+      const read = harness.services.getKnowledgeSnapshot;
+      let release;
+      let requested;
+      const held = new Promise((resolve) => {
+        release = resolve;
+      });
+      const sys1Requested = new Promise((resolve) => {
+        requested = resolve;
+      });
+      harness.services.getKnowledgeSnapshot = (systemId) => {
+        if (systemId !== 'sys1') return read(systemId);
+        harness.journal.record('getKnowledgeSnapshot', [systemId]);
+        requested();
+        return held;
+      };
+
+      const first = harness.store.selectSystem('sys1');
+      await Promise.race([sys1Requested, first]);
+      await harness.store.selectSystem('sys2');
+      release(snapshot({ systemId: 'sys1', definitionCount: 2 }));
+      await first;
+
+      assert.deepStrictEqual(seamCalls(harness.drain(), 'getKnowledgeSnapshot'), [
+        ['sys1'],
+        ['sys2'],
+      ]);
+      assert.equal(harness.state().knowledge.systemId, 'sys2');
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it('a system reset confirmed across a switch resets the system it was asked for', async () => {
+    const harness = await createSectionHarness(
+      knowledgeWorld({ settings: { lastManagedCraftingSystem: 'sys2' } })
+    );
+    try {
+      await harness.store.setKnowledgeActive(true);
+      harness.drain();
+      harness.services.confirmDialog = async () => {
+        await harness.store.selectSystem('sys1');
+        return true;
+      };
+      await harness.store.resetActorSystemKnowledge('a1');
+      assert.deepStrictEqual(seamCalls(harness.drain(), 'resetActorKnowledge'), [
+        [{ actorId: 'a1', systemId: 'sys2' }],
+      ]);
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it('the selected character survives a switch when the new system still has it', async () => {
+    const harness = await createSectionHarness(
+      knowledgeWorld({ settings: { lastManagedCraftingSystem: 'sys2' } })
+    );
+    try {
+      await harness.store.setKnowledgeActive(true);
+      harness.store.selectKnowledgeActor('a2');
+      await harness.store.selectSystem('sys1');
+      assert.equal(harness.state().knowledge.systemId, 'sys1');
+      assert.equal(harness.state().knowledge.selectedActorId, 'a2');
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it('a system switch with the surface closed reads nothing and publishes no knowledge', async () => {
+    const harness = await createSectionHarness(knowledgeWorld());
+    try {
+      const before = harness.state().knowledge;
+      await harness.store.selectSystem('sys2');
+      assert.deepStrictEqual(seamCalls(harness.drain(), 'getKnowledgeSnapshot'), []);
+      assert.deepStrictEqual(harness.state().knowledge, before);
     } finally {
       harness.dispose();
     }

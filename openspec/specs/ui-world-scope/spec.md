@@ -52,7 +52,8 @@ Shipped controls:
   The `increment` hint names every occasion the macro is actually invoked on — the player-cancel refund (the `refundOnPlayerCancel` policy), a companion's currency credit, and giving back a pooled cost a take could not complete — and says what its absence costs, because a hint that describes a macro as reserved or single-purpose sends a GM past the field that a pooled currency take is refused for want of.
   The `balance` zone is the fourth key (issue 1342) and the only one that ASKS rather than acts: it is what lets a `macro` world answer a pooled holdings read at all, it is OPTIONAL on the `increment` precedent, and its hint states the return contract — a number of the ladder's smallest coin, anything else reading as unknown.
   There is no nested inventory-mode `<select>` — macro is its own peer strategy.
-- Add currency unit and seed preset actions
+- Add currency unit and seed preset actions.
+  Adding a unit refuses and writes nothing for an empty or colliding unit id.
 - Under `actorProperty` and `macro`, selectable expandable currency unit editors for label, abbreviation, icon, with a per-unit detail field that adapts to the strategy — actor data path (`actorProperty`), or no path/denomination field with a "macros match by abbreviation" note (`macro`)
 - Under `actorInventory` (with a provider) the GM-editable unit editors are replaced by a separate read-only, provider-managed denomination list (a "provider-managed denominations" callout plus per-unit label/abbreviation/coin-denomination shown as static values); the selected provider owns the denomination ladder, so the units are not GM-editable.
   The add-currency-unit, seed-preset, add-sub-unit, and sub-unit controls below are hidden while the provider branch is active.
