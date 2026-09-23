@@ -8,6 +8,7 @@ manager-world-travel-map-stacked
 manager-world-travel-map-collapsed-rail
 manager-world-travel-long-label-focus
 manager-gathering-settings-normal
+manager-gathering-condition-current-list
 manager-gathering-economy-actors
 manager-gathering-economy-regen-unit-list
 manager-environment-edit-blind-weights

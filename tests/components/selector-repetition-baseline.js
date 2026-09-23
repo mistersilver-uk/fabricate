@@ -19,7 +19,7 @@
  * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,568 rules at that head, 110 repeated keys and 225 appearances
+ * printed from. The sheet holds 2,569 rules at that head, 110 repeated keys and 225 appearances
  * between them; five keys appear three times and none appears four or more.
  * ISSUE 1510 PHASE 2 moves both the contextual figures and one repeated row. The component
  * studio conversion is already in main; the checks conversion adds two net rules and one net
@@ -106,6 +106,11 @@
  * picker root needs as the bar's flex item. Both are new singletons in both keyings, so the rule,
  * key and singleton counts each rise by two, to 2,568, 3,044 and 2,934, and `pinnedTotal` stays
  * 225 across 110 rows. Re-derived by running the census twice, not subtracted.
+ * Its second commit moves the rule count alone. The conditions card's shared 36px rule loses its
+ * `.manager-condition-current select` leg and keeps the add row's input, and the trigger's full
+ * width arrives as a rule of its own, so the sheet holds one more rule, 2,569, while one key leaves
+ * and one arrives: 3,044 keys and 2,934 singletons, both unmoved, and `pinnedTotal` stays 225
+ * across 110 rows. Re-derived by running the census twice, not subtracted.
  * ISSUE 1505 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting
  * three rule blocks the shared `Callout` made redundant: the Checks studio's
  * `[data-failure-salvage-note]` override and its glyph rule, whose whole content the primitive

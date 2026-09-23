@@ -137,9 +137,10 @@ test('the host set is the closed three, and all three still have real users', ()
   // It dropped again 40 → 36 when the gathering task editor's four captioned selects converted:
   // each `<Field as="label">` demoted to `as="div"` and the caption's id became the trigger's
   // `ariaLabelledBy`, so the same caption still names the same control. And again 36 → 35 when the
-  // environment overview's danger ceiling converted, the one captioned select of that commit.
+  // environment overview's danger ceiling converted, the one captioned select of that commit. And
+  // 35 → 34 when the environments browser's conditions card converted its current-value picker.
   for (const [host, floor] of [
-    ['label', 35],
+    ['label', 34],
     ['div', 28],
     ['fieldset', 1],
   ]) {

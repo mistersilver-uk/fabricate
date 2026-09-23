@@ -2395,21 +2395,23 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
   );
 });
 
-// The twenty-eight frames a change to the shared positioning seam must publish (issue 1500; the
+// The twenty-nine frames a change to the shared positioning seam must publish (issue 1500; the
 // eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the
 // twelfth and thirteenth at issue 1504, when `Select`'s option list got two — one of them in the
 // PLAYER window, which is a second application root for the seam to clamp against — the fourteenth
 // and fifteenth at issue 1520's second review round, which is the two GM canvas windows' open
-// option panels, and the twenty-first to twenty-eighth at issue 1510, which are the recipe
+// option panels, and the twenty-first to twenty-ninth at issue 1510, which are the recipe
 // studio's kind list, the component studio's category list, the checks studio's trigger comparison
 // list, the gathering studio's respawn policy and stamina modifier lists, the environment editor's
-// danger ceiling, the Tool rails' `Preview as` roster and the recipe-item library's limits filter —
-// the eight converted manager selects whose panels have a frame at all, the third the first opened
-// from inside a card the walk has to author before it exists, the fourth the first in an editor the
-// rail reaches through a submenu, the fifth the first whose row has to be authored before its
-// trigger exists, the sixth the first in an environment editor, the seventh the first opened from
-// an inspector rail rather than from an editor body and the eighth the first opened from a BROWSE
-// toolbar, where the trigger sits in a row of siblings a mis-clamped panel would cover).
+// danger ceiling, the Tool rails' `Preview as` roster, the recipe-item library's limits filter and
+// the gathering conditions card's current weather — the nine converted manager selects whose
+// panels have a frame at all, the third the first opened from inside a card the walk has to author
+// before it exists, the fourth the first in an editor the rail reaches through a submenu, the fifth
+// the first whose row has to be authored before its trigger exists, the sixth the first in an
+// environment editor, the seventh the first opened from an inspector rail rather than from an
+// editor body, the eighth the first opened from a BROWSE toolbar, where the trigger sits in a row of
+// siblings a mis-clamped panel would cover, and the ninth the first whose panel is wider than its
+// rung's own ceiling, at the 1024px window where its trigger fills a one-column card).
 const ANCHORED_POPOVER_FRAMES = [
   'interactables-config-source-open',
   'interactables-manager-region-open',
@@ -2419,6 +2421,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-environment-danger-level-list',
   'manager-environment-edit-automatic-force-add',
   'manager-essences-source-picker',
+  'manager-gathering-condition-current-list',
   'manager-gathering-task-availability-menu',
   'manager-gathering-task-node-respawn-list',
   'manager-gathering-task-stamina-modifier-list',
