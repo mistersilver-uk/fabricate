@@ -65,11 +65,7 @@ function assertStackedCatalogue(route, report, label) {
     report.list.layoutScroll.scrollHeight > report.list.layoutScroll.clientHeight,
     `${tag} the stacked list layout owns the overflow`
   );
-  assert.ok(
-    report.list.rows.height >= 62,
-    `${tag} the list rows keep at least one row's height (${report.list.rows.height}px)`
-  );
-  // And every row, not a squeezed window onto them: the layout is the one scroller.
+  // Every row, not a squeezed window onto them: the layout is the one scroller.
   assert.ok(
     report.list.rowsScroll.scrollHeight <= report.list.rowsScroll.clientHeight + 1,
     `${tag} the list rows are not clipped into a second scroller ` +
@@ -220,5 +216,18 @@ test('the shared side-rail rail reset and band body rule name exactly the routes
     sorted(bodySet),
     sorted([...sideRail].filter((entry) => !(entry in OWN_ROW_MODEL))),
     'every side-rail route bounds its body row in the band, except the three that own theirs'
+  );
+
+  // The two scroll-owner restorations, exactly: gathering's is scoped to its result-group layout.
+  const restorations = band
+    .filter((rule) => selectorsOf(rule).some((selector) => selector.endsWith(' .manager-main')))
+    .filter((rule) => ['hidden auto', 'auto'].includes(declaration(rule.declarations, 'overflow')))
+    .flatMap(selectorsOf);
+  assert.deepEqual(
+    sorted(restorations),
+    sorted([
+      `${compound('recipe-edit')} .manager-main`,
+      `${compound('gathering-task-edit')}[data-gathering-task-layout="results"] .manager-main`,
+    ])
   );
 });

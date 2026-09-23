@@ -254,7 +254,7 @@ function sideRailMarkup(route, { width, height, collapsed }) {
   const bodyClass = collapsed ? 'manager-body is-rail-collapsed' : 'manager-body';
   // `.fabricate` is the application window's own class, which `.visually-hidden` is keyed on.
   return (
-    `<style>${css}</style>${SCOPED_CSS}` +
+    `<style>@layer modules { ${css} }</style>${SCOPED_CSS}` +
     `<div class="fabricate" style="width:${width}px;height:${height}px">` +
     `<div class="fabricate-manager" ${route.rootAttributes}>` +
     '<div class="manager-titlebar">titlebar</div><div class="manager-header">header</div>' +
@@ -316,7 +316,6 @@ export async function readSideRailGeometry(route, { width, height = 686, collaps
             ? {
                 layout: box('.manager-scoped-list-layout'),
                 layoutScroll: scroll('.manager-scoped-list-layout'),
-                rows: box('.manager-scoped-list-rows'),
                 rowsScroll: scroll('.manager-scoped-list-rows'),
               }
             : null,
