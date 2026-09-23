@@ -20,6 +20,9 @@ import {
 } from './manager-mounted-shared.js';
 import {
   assertSelectHasResolvedName,
+  chooseSelectOption,
+  closeSelectPanel,
+  openSelectPanel,
   selectOptionLabels,
   selectOptionValues,
   selectTriggerText,
@@ -177,6 +180,121 @@ export function registerEnvironmentsCases() {
       ['updateGatheringRules', 'alchemy', { rewardLimit: 2 }],
       'the revealed stepper writes the limit itself through the same one prop'
     );
+  });
+
+  // The environments toolbar's four filters (issue 1510). None carries a `data-*` hook, so each is
+  // addressed by the `aria-label` its `<select>` carried and the trigger keeps — the demoted
+  // caption was never its accessible name.
+  it('narrows the environments library through the four converted toolbar filters', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore([]), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+
+    const filter = (axis) => `.fabricate-select-trigger[aria-label="Filter environments by ${axis}"]`;
+    const rows = () =>
+      [...target.querySelectorAll('.manager-environment-row')].map((row) =>
+        row.getAttribute('data-environment-id')
+      );
+    assert.deepEqual(rows(), ['env-forest', 'env-cavern'], 'both fixture environments list');
+
+    for (const [axis, values, labels, ticked] of [
+      [
+        'status',
+        ['all', 'active', 'disabled', 'dirty', 'invalid'],
+        ['All environments', 'Active', 'Disabled', 'Unsaved', 'Invalid'],
+        true,
+      ],
+      ['selection mode', ['all', 'targeted', 'blind'], ['All modes', 'Targeted', 'Blind'], false],
+      [
+        'risk',
+        ['all', 'safe', 'hazardous', 'unsafe', 'extreme'],
+        ['All risks', 'Safe', 'Hazardous', 'Unsafe', 'Extreme'],
+        true,
+      ],
+      ['biome', ['all', 'cavern', 'forest'], ['All biomes', 'Cavern', 'Forest'], true],
+    ]) {
+      assert.equal(
+        assertSelectHasResolvedName(target, filter(axis)),
+        `Filter environments by ${axis}`
+      );
+      assert.deepEqual(selectOptionValues(target, filter(axis)), values);
+      assert.deepEqual(selectOptionLabels(target, filter(axis)), labels);
+      assert.equal(
+        openSelectPanel(target, filter(axis)).classList.contains('fabricate-select-popover-ticked'),
+        ticked,
+        `the ${axis} list ${ticked ? 'keeps' : 'drops'} its tick column`
+      );
+      assert.equal(
+        target.querySelector(filter(axis)).closest('.manager-filter').tagName,
+        'SPAN',
+        'the caption is a demoted `<span>`: inside a `<label>` its own mousedown would dismiss ' +
+          'the panel and the forwarded click would re-open it'
+      );
+      closeSelectPanel(target, filter(axis));
+    }
+
+    const narrowsTo = async (axis, value, expected) => {
+      chooseSelectOption(target, filter(axis), value);
+      await tick();
+      flushSync();
+      assert.deepEqual(rows(), expected, `the ${axis} filter narrowed to ${value}`);
+      chooseSelectOption(target, filter(axis), 'all');
+      await tick();
+      flushSync();
+    };
+    await narrowsTo('status', 'disabled', ['env-cavern']);
+    await narrowsTo('selection mode', 'targeted', ['env-forest']);
+    await narrowsTo('risk', 'safe', ['env-forest', 'env-cavern']);
+    await narrowsTo('risk', 'hazardous', []);
+    await narrowsTo('biome', 'forest', ['env-forest']);
+    assert.equal(selectTriggerText(target, filter('biome')), 'All biomes');
+  });
+
+  it('sets the current time and weather through the conditions card pickers', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Settings').click();
+    await tick();
+    flushSync();
+
+    const picker = (kind) =>
+      `[data-gathering-condition-panel="${kind}"] .manager-condition-current .fabricate-select-trigger`;
+    // The caption names the trigger through its id, and the field is a `<div>` rather than the
+    // `<label>` it was (issue 1510).
+    assert.equal(assertSelectHasResolvedName(target, picker('timeOfDay')), 'Current time');
+    assert.equal(assertSelectHasResolvedName(target, picker('weather')), 'Current weather');
+    assert.ok(!target.querySelector('label.manager-condition-current'));
+    assert.equal(selectTriggerText(target, picker('timeOfDay')), 'High Day');
+    assert.deepEqual(selectOptionLabels(target, picker('timeOfDay')), [
+      'First Light',
+      'High Day',
+      'Deep Night',
+    ]);
+    closeSelectPanel(target, picker('timeOfDay'));
+    assert.deepEqual(selectOptionValues(target, picker('weather')), ['clear', 'heavy-rain']);
+    closeSelectPanel(target, picker('weather'));
+
+    chooseSelectOption(target, picker('weather'), 'heavy-rain');
+    await tick();
+    assert.deepEqual(calls.filter((call) => call[0] === 'updateGatheringConditions'), [
+      ['updateGatheringConditions', { weather: 'heavy-rain', systemId: 'alchemy' }],
+    ]);
   });
 
   it('routes to the environments browser and opens the forced v2 editor route', async () => {

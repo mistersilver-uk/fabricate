@@ -104,7 +104,9 @@ export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 // total falls 44 -> 40 across 18 rows to 16.
 // #1510: the systems, recipe-access and recipe-item browse toolbars' six convert onto `Select`,
 // so the total falls 40 -> 34 across 16 rows to 13.
-export const KNOWN_NATIVE_SELECT_TOTAL = 34;
+// #1510: the environments browser's four toolbar filters and its conditions card's current-value
+// picker convert onto `Select`, so the total falls 34 -> 29 across 13 rows to 12.
+export const KNOWN_NATIVE_SELECT_TOTAL = 29;
 
 /** A native `<select>` written into a JavaScript template string, keyed `file`. */
 export const KNOWN_NATIVE_SELECTS_IN_JS = knownDebt('nativeSelectsInDialogBodies');

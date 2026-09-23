@@ -1130,8 +1130,7 @@ function assertEveryConvertedHookResolves() {
  * characters above the drive that uses it (issue 1510). A name keeps EVERY selector bound to it,
  * because a second walk re-declaring the name would otherwise hide the first drive behind it, and
  * each binding resolves to its initializer's LAST `.locator()` hop — `page.locator('.card')
- * .locator('select#y')` names the select, not the card, and a lazy read of the first hop let that
- * shape escape the element-typed ban.
+ * .locator('[data-x]')` names the control, not the card, so a hook written on the last hop is judged.
  */
 function locatorBindings(source) {
   const bindings = new Map();
@@ -1251,65 +1250,6 @@ test('no View Lab step drives a converted select with the registry’s native `s
       '`selectOption` — and that throws on a `<button role="combobox">`. Use ' +
       '`chooseSelectOption(selector, value)`, which clicks the trigger and then the row by its ' +
       '`[data-popover-option="…"]` handle:\n  ' + offenders.join('\n  ')
-  );
-});
-
-// THE ELEMENT- AND ARIA-TYPED DRIVES THE BAN ABOVE CANNOT SEE (issue 1510). "SELECT-TYPED" MEANS A
-// BARE `select` ELEMENT TOKEN, NEVER THE SUBSTRING.
-const NATIVE_SELECT_ELEMENT_TOKEN = /(?<![\w-])select(?![\w-])/u;
-
-// Every element- or aria-typed locator a capture producer still drives a NATIVE select through,
-// with the issue that retires it. Shrink-only: an entry leaves when its control converts.
-const NATIVE_ELEMENT_TYPED_SELECT_LOCATORS = Object.freeze([
-  // Issue 1510 Phase 3 — the environment browser's filters, which carry their names in an
-  // `aria-label` rather than in a hook. The `.manager-filter` entry left with the browse toolbars'
-  // own lane filters, which the phase's first commit converted.
-  '.fabricate-manager select[aria-label="Filter environments by status"]',
-  '.fabricate-manager select[aria-label="Filter environments by selection mode"]',
-]);
-
-test('no capture producer drives a converted select by an element-typed locator', () => {
-  const offenders = [];
-  const seen = new Set();
-  let elementTyped = 0;
-  for (const producer of CAPTURE_PRODUCERS) {
-    const bindings = locatorBindings(producer.source);
-    for (const match of producer.source.matchAll(/\.selectOption\(/gu)) {
-      // BOTH candidates are judged: the LAST `.locator(...)` hop before the call — a chain built
-      // from several hops still ends on the one that names the element being driven — and, where
-      // the call is written against a BINDING, that binding's own selector wherever it was
-      // declared. Judging only one of them let a drive escape through the other.
-      for (const locator of drivenLocators(producer.source, match.index, bindings)) {
-        if (!NATIVE_SELECT_ELEMENT_TOKEN.test(locator)) continue;
-        elementTyped += 1;
-        seen.add(locator);
-        if (NATIVE_ELEMENT_TYPED_SELECT_LOCATORS.includes(locator)) continue;
-        offenders.push(`${producer.path}: \`${locator}\``);
-      }
-    }
-  }
-  assert.ok(
-    elementTyped > 0,
-    'no capture producer drives any select by an element-typed locator, so the `select` element ' +
-      'token test above is quantifying over nothing. If the last one has converted, delete this ' +
-      'clause and its allowlist rather than leaving them green.'
-  );
-  // THE ALLOWLIST'S OWN DRIFT GUARD, and the clause that would have caught the regex above.
-  assert.deepEqual(
-    NATIVE_ELEMENT_TYPED_SELECT_LOCATORS.filter((locator) => !seen.has(locator)),
-    [],
-    'these allowlist entries match no element-typed drive in any capture producer. Either the ' +
-      'drive was rewritten and the entry must be deleted with it, or the scan has stopped ' +
-      'reaching the shape the entry names and the ban is passing on a producer it cannot read.'
-  );
-  assert.deepEqual(
-    offenders,
-    [],
-    'these capture steps drive a `<select>` by an ELEMENT-TYPED locator that is not on the ' +
-      'shrink-only native allowlist. Either the control converted and the drive must become the ' +
-      "harness's own `chooseSelectOption(page, trigger, { value })` — Playwright's " +
-      '`selectOption` throws on a `<button role="combobox">` — or a new native select was added, ' +
-      'which the design-system ratchet forbids:\n  ' + offenders.join('\n  ')
   );
 });
 

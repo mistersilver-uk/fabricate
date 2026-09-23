@@ -181,6 +181,10 @@ describe('a caption click cannot close a list it is wrapped in a <label> with (i
   });
 });
 
+/** The conditions card's time-of-day picker, which carries no hook of its own. */
+const CONDITION_PICKER =
+  '[data-gathering-condition-panel="timeOfDay"] .manager-condition-current .fabricate-select-trigger';
+
 /**
  * The converted sites this fixture can mount, and what each one's row is measured against.
  * "Alchemical reagent" measures 152.08px in this fixture, above the 140px floor by design.
@@ -326,9 +330,33 @@ const CONVERTED_SITES = Object.freeze([
       hook: '[data-books-scrolls-cap-filter]',
       values: ['all', 'limited'],
     },
+    // Issue 1510 commit 3b — the environments toolbar's four, which carry no hook of their own and
+    // are addressed by the `aria-label` each trigger keeps.
+    ...[
+      ['status', ['all', 'active']],
+      ['selection mode', ['all', 'targeted']],
+      ['risk', ['all', 'hazardous']],
+      ['biome', ['all', 'forest']],
+    ].map(([axis, values]) => ({
+      subject: 'environments-browser',
+      name: `the environments ${axis} filter`,
+      hook: `.fabricate-select-trigger[aria-label="Filter environments by ${axis}"]`,
+      values,
+    })),
   ].map((site) =>
     Object.freeze({ ...site, column: false, floor: 144, pinned: true, drive: true, rung: 'toolbar' })
   ),
+  // And the conditions card's current-value picker, whose value a prop seeds. Its counterpart is
+  // one sheet rule off the demoted field's class, as the danger ceiling's is.
+  Object.freeze({
+    subject: 'environments-settings',
+    name: 'the current time of day',
+    hook: CONDITION_PICKER,
+    values: ['day', 'dawn'],
+    column: true,
+    columnSelector: '.manager-condition-current',
+    rung: 'form',
+  }),
 ]);
 
 /**
@@ -710,6 +738,8 @@ describe('a converted manager panel is wide enough for the list it opens (issue 
     it(`draws every option label of ${site.name} whole`, async () => {
       const page = await openFixture(site.subject, site.start);
       try {
+        // The conditions card sits below the economy card, under the fixture frame's fold.
+        await page.locator(site.hook).first().scrollIntoViewIfNeeded();
         await pressPointerOn(page, site.hook);
         const panel = await readOpenPanel(page);
         assert.ok(Boolean(panel), `${site.hook} opened no panel to measure`);
@@ -724,6 +754,42 @@ describe('a converted manager panel is wide enough for the list it opens (issue 
             'the row padding and the panel chrome before it draws a label, so a panel driven by ' +
             'a narrow trigger truncates a label the trigger itself renders whole. State a ' +
             '`minWidth` at the call site.'
+        );
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  // THE `maxWidth` SITE, at both ends of the one-column band. The band resolves to
+  // `clamp(max(trigger, min), min, max)`: at a 1024px window the trigger outgrows the `form` rung's
+  // own 340px ceiling, and at the 1120px restack breakpoint it outgrows a 1024px cap as well, so a
+  // cap below the breakpoint would draw the list narrower than the control it opened from.
+  for (const [subject, overflow] of [
+    ['environments-settings-1024', 340],
+    ['environments-settings-1120', 1024],
+  ]) {
+    it(`draws the conditions card panel as wide as its trigger past ${overflow}px (${subject})`, async () => {
+      const page = await openFixture(subject);
+      try {
+        await page.locator(CONDITION_PICKER).first().scrollIntoViewIfNeeded();
+        await pressPointerOn(page, CONDITION_PICKER);
+        const [trigger, panel] = await page.evaluate((selector) => {
+          const width = (element) => Number(element.getBoundingClientRect().width.toFixed(2));
+          return [
+            width(document.querySelector(selector)),
+            width(document.querySelector('.fabricate-select-popover')),
+          ];
+        }, CONDITION_PICKER);
+        assert.ok(
+          trigger > overflow,
+          `the trigger measured ${trigger}px, inside ${overflow}px, so this subject is not ` +
+            'measuring the overflow the call site raises the cap for'
+        );
+        assert.ok(
+          Math.abs(panel - trigger) < EPSILON,
+          `the panel measured ${panel}px under a ${trigger}px trigger, so the call site's ` +
+            '`maxWidth` is not reaching the band and the list draws narrower than its control'
         );
       } finally {
         await page.close();
