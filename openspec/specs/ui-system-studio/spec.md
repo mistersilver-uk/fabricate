@@ -984,7 +984,8 @@ Each roster row carries the actor's portrait, name and an "N item(s) · M learne
 
 **Default tab.** The surface opens on Recipe items, except when the selected system has **zero recipe item definitions**, in which case it opens on Learned recipes.
 The rule keys on the definition count, never on the selected character's row counts, so the tab does not shift as the GM moves down the roster; and it is resolved **once on surface entry**, never as a live derivation over that count — a GM authoring the system's first recipe item elsewhere would otherwise flip the count and yank the open tab.
-A crafting-system switch while the surface stays open re-resolves the default tab a second time, against the newly selected system's own definition count, because the prior resolution named a tab for a system the surface no longer shows.
+Each crafting-system switch while the surface stays open re-resolves the default tab against the newly selected system's own definition count, and the open surface lands on that tab, because the prior resolution named a tab for a system the surface no longer shows.
+A re-publish for the same system — a hook-driven refresh or a row action — never re-applies the default, so a tab the GM picked stays open until the system changes.
 
 **Projected owned-copy row fields.** Identity (image, name, quantity), the Book / Scroll / Incomplete type derived from the recipe count, the contained-recipe count, `timesUsed` and `maxUses`, the derived remaining charges, `spent`, `inert`, `canExpend`, the resolved `learnScope`, and `matchTier` — the GM diagnostic tier from recipe-item matching.
 `matchTier` is a **provenance** label, not an ambiguity report: its `duplicate` value names the weakest link (the copy reached its definition only through `_stats.duplicateSource`, the tier the bulk auto-learn gate refuses) and is reachable from a single definition, so the surface MUST NOT present it as a duplicate, conflicting, or ambiguous match.
