@@ -59,27 +59,27 @@ describe('adminStore currency section corpus', () => {
     }
   });
 
-  it('addCurrencyUnit on a colliding id still saves, still refreshes and reports true', async () => {
-    const harness = await createSectionHarness();
-    try {
-      await harness.store.addCurrencyUnit(GOLD);
-      harness.drain();
-      const result = await harness.store.addCurrencyUnit({ ...GOLD, label: 'Second gold' });
-      const entries = harness.drain();
-      // `_updateCurrencyConfig` short-circuits only on a strict `false`, and the collision path
-      // returns `null`, so the write and the refresh both happen and `null ?? true` reports success.
-      // Pinned as measured; the misreported success is a separate defect, not this change's.
-      assert.equal(result, true);
-      assert.equal(refreshCount(entries), 1);
-      const [saved] = saves(entries);
-      assert.deepStrictEqual(
-        saved.units.map((unit) => unit.label),
-        ['Gold']
-      );
-    } finally {
-      harness.dispose();
-    }
-  });
+  for (const [label, partial] of [
+    ['a colliding id', { ...GOLD, label: 'Second gold' }],
+    ['a whitespace-only id', { ...GOLD, id: '   ' }],
+  ]) {
+    it(`addCurrencyUnit refuses ${label}: no save, no refresh, and false`, async () => {
+      const harness = await createSectionHarness();
+      try {
+        await harness.store.addCurrencyUnit(GOLD);
+        harness.drain();
+        const before = harness.state();
+        const result = await harness.store.addCurrencyUnit(partial);
+        const entries = harness.drain();
+        assert.equal(result, false);
+        assert.deepStrictEqual(saves(entries), [], 'a refused add saves nothing');
+        assert.equal(refreshCount(entries), 0, 'and costs no refresh');
+        assert.deepStrictEqual(harness.state().worldCurrency, before.worldCurrency);
+      } finally {
+        harness.dispose();
+      }
+    });
+  }
 
   it('a refused sub-unit add writes nothing beyond the unchanged save and reports false', async () => {
     const harness = await createSectionHarness();
