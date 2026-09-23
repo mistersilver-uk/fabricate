@@ -723,18 +723,19 @@ const CENTRE_TARGETS = [
   '[data-probe="sort-direction"]',
 ];
 
+/** `count` plain rows, beside the six mixed-state rows the list screen draws by default. */
+const plainRows = (count) =>
+  Array.from({ length: count }, (unused, index) => row(`long-${index}`, '', `Tool ${index}`)).join(
+    ''
+  );
+
 /**
- * The list screen with `count` rows, in a body as tall as the lab frame's column.
+ * The list screen with the given rows, in a body as tall as the lab frame's column.
  *
- * @param {number} count how many rows the list draws
+ * @param {string} rows the list's row markup
  * @returns {Promise<{page: import('playwright').Page, close: () => Promise<void>}>}
  */
-async function renderBoundedList(count) {
-  const rows =
-    count === 6
-      ? SIX_ROWS
-      : Array.from({ length: count }, (unused, index) => row(`long-${index}`, '', `Tool ${index}`))
-          .join('');
+async function renderBoundedList(rows) {
   const rendered = await renderListScreen(listScreen(rows));
   await rendered.page.addStyleTag({
     content: `.fabricate-manager .manager-body { height: ${SORTED_DESC_COLUMN_HEIGHT}px; }`,
@@ -778,7 +779,10 @@ function brokenStack({ column, authority, authorityOverflows, search, bar, sort,
     ['top', 'left'].every((edge) => bar[edge] >= search[edge] - EDGE) &&
     ['bottom', 'right'].every((edge) => bar[edge] <= search[edge] + EDGE);
   return [
-    [barInCard, `filter bar ends at ${bar.bottom}, outside the search card at ${search.bottom}`],
+    [
+      barInCard,
+      `filter bar (${bar.top}–${bar.bottom}) is not inside the search card (${search.top}–${search.bottom})`,
+    ],
     [authority.bottom <= search.top + EDGE, 'authority card overlaps the search card'],
     [!authorityOverflows, 'authority card is cut short of its content'],
     [bar.bottom <= sort.top + EDGE, `filter bar ends at ${bar.bottom}, below the sort row at ${sort.top}`],
@@ -790,15 +794,16 @@ function brokenStack({ column, authority, authorityOverflows, search, bar, sort,
 }
 
 /**
- * Render `count` rows and measure the stack, after the list's own precondition.
+ * Render the rows and measure the stack, after the list's own precondition.
  *
- * @param {number} count how many rows the list draws
- * @param {boolean | null} scrolls whether the list must overflow its scroller, or null for either
+ * @param {string} rows the list's row markup
+ * @param {number} count how many rows that markup draws
+ * @param {boolean} scrolls whether the list must overflow its scroller
  * @param {string[]} [targets] controls that must own the pointer at their centre
  * @returns {Promise<string[]>} every broken relation and every control that lost its centre
  */
-async function measureBoundedList(count, scrolls, targets = []) {
-  const { page, close } = await renderBoundedList(count);
+async function measureBoundedList(rows, count, scrolls, targets = []) {
+  const { page, close } = await renderBoundedList(rows);
   try {
     const stack = await page.evaluate(READ_STACK, targets);
     assert.equal(stack.rows, count, `the list draws ${count} rows`);
@@ -806,9 +811,7 @@ async function measureBoundedList(count, scrolls, targets = []) {
       Math.abs(stack.column.height - SORTED_DESC_COLUMN_HEIGHT) <= EDGE,
       `the column is the lab frame's height, measured ${stack.column.height}`
     );
-    if (scrolls !== null) {
-      assert.equal(stack.listScrolls, scrolls, `the ${count}-row list's scroll precondition`);
-    }
+    assert.equal(stack.listScrolls, scrolls, `the ${count}-row list's scroll precondition`);
     const lost = Object.keys(stack.centres).filter((selector) => !stack.centres[selector]);
     return [...brokenStack(stack), ...lost.map((selector) => `${selector} lost its centre`)];
   } finally {
@@ -817,15 +820,15 @@ async function measureBoundedList(count, scrolls, targets = []) {
 }
 
 test('a long Tool list scrolls inside its card and leaves the toolbar whole (issue 1977)', async () => {
-  assert.deepEqual(await measureBoundedList(24, true, CENTRE_TARGETS), []);
+  assert.deepEqual(await measureBoundedList(plainRows(24), 24, true, CENTRE_TARGETS), []);
 });
 
 test('a six-row Tool list in the same column keeps the toolbar whole (issue 1977)', async () => {
-  assert.deepEqual(await measureBoundedList(6, null), []);
+  assert.deepEqual(await measureBoundedList(SIX_ROWS, 6, true), []);
 });
 
 test('a three-row Tool list that fits is the control for the same stack (issue 1977)', async () => {
-  assert.deepEqual(await measureBoundedList(3, false), []);
+  assert.deepEqual(await measureBoundedList(plainRows(3), 3, false), []);
 });
 
 test('the Tool Rules inspector sits one rung above its pane and states the design’s type', async () => {
