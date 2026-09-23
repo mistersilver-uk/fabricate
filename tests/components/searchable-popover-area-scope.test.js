@@ -322,9 +322,7 @@ const PRIMITIVES = Object.freeze([
     // It declares NO font floor and NO focus pair, and that is a positive decision rather than a
     // gap: the bar renders `{@render children?.()}` and owns no control of its own, and
     // `openspec/specs/design-system/spec.md` forbids a primitive displacing an area's chrome for
-    // a control it does not own. One family rule nonetheless REACHES a caller's control — the
-    // `select.is-size-38` rung — and travels with the family unfloored, which is a recorded
-    // residue owned by issues 1510/1511.
+    // a control it does not own, and no family rule reaches one.
     name: 'ManagerToolbar',
     components: Object.freeze(['src/ui/svelte/components/ManagerToolbar.svelte']),
     roots: Object.freeze(['fabricate-filter-bar']),
@@ -335,10 +333,10 @@ const PRIMITIVES = Object.freeze([
     anchors: Object.freeze(['manager-toolbar']),
     // COMPOSES its family in `const classes = $derived([…])` rather than in markup.
     composesClasses: true,
-    // Measured at this commit: 1 written, 10 family selectors, 3 owned.
+    // Measured at this commit: 1 written, 8 family selectors, 1 owned.
     writtenFloor: 1,
-    familyFloor: 9,
-    ownedFloor: 2,
+    familyFloor: 8,
+    ownedFloor: 1,
     mirrored: Object.freeze([
       Object.freeze({ anchor: 'manager-toolbar', root: 'fabricate-filter-bar' }),
     ]),
