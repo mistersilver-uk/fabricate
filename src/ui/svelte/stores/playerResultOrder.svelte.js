@@ -74,14 +74,20 @@ function createOrderWriter({ write, revertMessage, debounceMs }) {
   // The key captured when `commitTimer` was armed. `flush` reads this rather than re-deriving it
   // from the current subject: a subject change between the gesture and the commit must not write
   // the pending order under a key naming a different recipe or participation (issue 859 for
-  // salvage, generalized to crafting by issue 1695).
+  // salvage, generalized to crafting by issue 1695). A reorder under another key commits it first
+  // (issue 1809), and a `seed` carries its order forward (issue 1807), so it is never lost.
   let pendingKey = null;
   let announcement = $state('');
 
-  /** Seed from settings; the revert target starts as that same snapshot. */
+  /**
+   * Seed from settings; the revert target starts as that same snapshot. A pending write survives:
+   * its order is laid back over the re-read map and stays armed, so `flush` still sees it.
+   */
   function seed(stored) {
+    const pendingIds = commitTimer ? orders[pendingKey] : undefined;
     orders = stored && typeof stored === 'object' ? { ...stored } : {};
     persisted = { ...orders };
+    if (commitTimer) orders[pendingKey] = pendingIds;
   }
 
   /** @returns {Promise<{ok: boolean}>} */
@@ -106,9 +112,12 @@ function createOrderWriter({ write, revertMessage, debounceMs }) {
 
   /** Apply `ids` under `writeKey` optimistically, announce `text`, and arm the debounce. */
   function stage(writeKey, ids, text) {
+    if (commitTimer) {
+      clearTimeout(commitTimer);
+      if (pendingKey !== writeKey) void commit(pendingKey);
+    }
     orders = { ...orders, [writeKey]: ids };
     announcement = text;
-    if (commitTimer) clearTimeout(commitTimer);
     pendingKey = writeKey;
     commitTimer = setTimeout(() => {
       commitTimer = null;

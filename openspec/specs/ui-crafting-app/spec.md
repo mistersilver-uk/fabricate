@@ -504,6 +504,11 @@ The salvage deltas are stated at the end of this section; everything else applie
 - Reorder writes are **debounced** and committed on settle, not per intermediate move, because each write is a replicated document write.
 - The key a debounced reorder write commits the **Player Result Order** under is captured when the reorder is **scheduled**, never re-derived when the write flushes.
   A subject change between the gesture and the commit would otherwise write the reordered stages under a key naming a **different** recipe or participation, silently — the player reorders one subject's stages and another subject's preference moves.
+- A pending debounced reorder write is never lost to the debounce itself.
+  A reorder of a **different** subject inside the window commits the pending write before arming its own debounce, rather than replacing it.
+  A listing reload inside the window (re-seeding the stored orders from settings) keeps the pending order rendered and still **pending**, so the eventual commit writes the player's order under its captured key — never skipped, never the re-read value, and never an empty order the re-read map merely lacked.
+  Otherwise a move already announced through the live region would be silently dropped or overwritten by the value it replaced.
+  The write stays pending rather than committing when the reload seeds it, so the flush-before-salvage rule below still sees it and a rejection can still abort the run.
 - If a write **fails**, the rows revert to the last persisted order and the revert is announced through the **same** `aria-live` region.
   A notification alone is insufficient: the writes are optimistic, so the row has already moved and already announced, and a keyboard user reordering by chevron may never see a toast — leaving the player believing an order that was never stored.
 - When the permission is `false` the rows keep their ordinal and difficulty but **drop the grip glyph** (the grip is the affordance signal), use a default cursor, attach **no** drag handlers, and show one muted line explaining that the GM set the order.
