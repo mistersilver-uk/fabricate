@@ -45,6 +45,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Avatar.svelte',
     'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/components/EmptyState.svelte',
+    // The detail pane's load-failure notice (issue 1969).
+    'src/ui/svelte/components/Notice.svelte',
     // The shared standing-statement strip both tab bodies render (issue 785).
     'src/ui/svelte/components/Callout.svelte',
     // The shared chip (issue 883). The tab bar's count badge and both row types render it.
@@ -799,6 +801,49 @@ describe('KnowledgeView mounted behaviour', () => {
 
     assert.ok(target.querySelector('[data-knowledge-no-selection]'));
     assert.match(target.textContent, /No player characters/);
+  });
+
+  it('draws a loading panel in both panes and marks the view busy (issue 1969)', async () => {
+    const target = await harness.mount(
+      makeProps({ knowledge: projectKnowledgeSnapshot(null, { active: true, loading: true }) })
+    );
+
+    const view = target.querySelector('[data-knowledge-view]');
+    assert.equal(view.getAttribute('aria-busy'), 'true');
+    assert.ok(target.querySelector('[data-knowledge-loading]'), 'the detail pane is loading');
+    assert.ok(target.querySelector('[data-knowledge-roster-loading]'), 'the roster is loading');
+    assert.match(target.textContent, /Loading character knowledge\.\.\./);
+    assert.match(target.textContent, /Loading player characters\.\.\./);
+    assert.doesNotMatch(target.textContent, /No player characters/);
+    assert.equal(target.querySelector('[data-knowledge-no-selection]'), null);
+    assert.equal(target.querySelector('[data-knowledge-error]'), null);
+    assert.ok(target.querySelector('[data-knowledge-search]'), 'the search field stays');
+  });
+
+  it('draws a polite danger notice and no empty claim when the read failed', async () => {
+    const target = await harness.mount(
+      makeProps({ knowledge: projectKnowledgeSnapshot(null, { active: true, error: true }) })
+    );
+
+    const notice = target.querySelector('[data-knowledge-error]');
+    assert.ok(notice, 'the detail pane carries the failure notice');
+    assert.equal(notice.getAttribute('role'), 'status');
+    assert.equal(notice.getAttribute('aria-live'), 'polite');
+    assert.equal(notice.getAttribute('data-notice-tone'), 'danger');
+    assert.match(notice.textContent, /Couldn't load character knowledge\./);
+    assert.match(notice.textContent, /return to Knowledge to try again/);
+    assert.ok(target.querySelector('[data-knowledge-search]'), 'the roster keeps its search');
+    assert.equal(target.querySelectorAll('.manager-empty').length, 0, 'no empty-state claim');
+    assert.equal(target.querySelector('[data-knowledge-view]').hasAttribute('aria-busy'), false);
+  });
+
+  it('a populated projection is neither busy, loading nor in error', async () => {
+    const target = await harness.mount(makeProps());
+
+    assert.equal(target.querySelector('[data-knowledge-view]').hasAttribute('aria-busy'), false);
+    assert.equal(target.querySelector('[data-knowledge-loading]'), null);
+    assert.equal(target.querySelector('[data-knowledge-roster-loading]'), null);
+    assert.equal(target.querySelector('[data-knowledge-error]'), null);
   });
 });
 

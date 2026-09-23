@@ -320,6 +320,38 @@ describe('knowledgeStudio snapshot projection', () => {
     assert.equal(projected.defaultTab, KNOWLEDGE_TAB_LEARNED_RECIPES);
   });
 
+  it('carries the loading and error keys on both return shapes (issue 1969)', () => {
+    const empty = projectKnowledgeSnapshot(null, { active: true });
+    assert.equal(empty.loading, false);
+    assert.equal(empty.error, false);
+    const populated = projectKnowledgeSnapshot(raw, { active: true });
+    assert.equal(populated.loading, false);
+    assert.equal(populated.error, false);
+
+    const loading = projectKnowledgeSnapshot(null, { active: true, loading: true });
+    assert.equal(loading.loading, true);
+    assert.equal(loading.error, false);
+    const failed = projectKnowledgeSnapshot(null, { active: true, error: true });
+    assert.equal(failed.loading, false);
+    assert.equal(failed.error, true);
+  });
+
+  it('lets loading mask error, and a populated or closed surface is neither', () => {
+    const both = projectKnowledgeSnapshot(null, { active: true, loading: true, error: true });
+    assert.equal(both.loading, true);
+    assert.equal(both.error, false, 'loading and error are never both true');
+
+    for (const [label, snapshot, active] of [
+      ['populated', raw, true],
+      ['closed', null, false],
+      ['closed and populated', raw, false],
+    ]) {
+      const projected = projectKnowledgeSnapshot(snapshot, { active, loading: true, error: true });
+      assert.equal(projected.loading, false, `${label}: never loading`);
+      assert.equal(projected.error, false, `${label}: never in error`);
+    }
+  });
+
   it('builds a NEW object on every call', () => {
     const first = projectKnowledgeSnapshot(raw, { active: true });
     const second = projectKnowledgeSnapshot(raw, { active: true });

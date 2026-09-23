@@ -5,6 +5,8 @@ manager-knowledge-party-pool-warning
 manager-knowledge-delete-armed
 manager-knowledge-narrow
 manager-knowledge-scope-switch
+manager-knowledge-loading
+manager-knowledge-error
 manager-components-progressive
 manager-components-bulk-edit-progressive
 manager-component-edit-difficulty

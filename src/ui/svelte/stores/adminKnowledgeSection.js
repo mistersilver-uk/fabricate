@@ -9,6 +9,70 @@ import {
   projectKnowledgeSnapshot,
 } from '../apps/manager/knowledge/knowledgeStudio.js';
 
+// Localized copy for the Knowledge surface's two heavyweight confirms. Every key is a static
+// literal at its call site: an interpolated key is invisible to `ui-lang-keys-resolve` and
+// `lang-keys-no-orphans`, so a missing message would ship silently.
+function knowledgeText(services, key, fallback, data = null) {
+  const localized = data ? services.localize?.(key, data) : services.localize?.(key);
+  if (localized) return localized;
+  if (!data) return fallback;
+  return Object.entries(data).reduce(
+    (text, [name, value]) => text.replace(`{${name}}`, String(value)),
+    fallback
+  );
+}
+
+function notifyKnowledgeResult(services, result) {
+  const message = result?.message;
+  if (!message) return;
+  const text = services.localize?.(message, result?.messageData) || message;
+  if (result?.success === true) services.notify?.info?.(text);
+  else services.notify?.error?.(text);
+}
+
+async function confirmKnowledgeReset(
+  services,
+  titleKey,
+  titleFallback,
+  contentKey,
+  contentFallback
+) {
+  const note = knowledgeText(
+    services,
+    'FABRICATE.Admin.Manager.Knowledge.ResetDiscoveryNote',
+    'Erasing a single memory leaves discovery progress intact; a reset also clears it.'
+  );
+  return services.confirmDialog?.({
+    title: knowledgeText(services, titleKey, titleFallback),
+    content: `<p>${knowledgeText(services, contentKey, contentFallback)}</p><p>${note}</p>`,
+    // A reset erases learned knowledge but deletes no definition, so it names its own
+    // verb rather than reusing the delete pair.
+    yes: {
+      label: knowledgeText(services, 'FABRICATE.Admin.Manager.Knowledge.ResetConfirm', 'Reset'),
+      callback: () => true,
+    },
+    no: { callback: () => false },
+  });
+}
+
+/**
+ * The supersession rule for snapshot reads (issue 1969). Every read begins a generation, and
+ * entering, leaving or switching advances it, so only the latest read may settle the surface.
+ */
+export function createKnowledgeReadTracker() {
+  let generation = 0;
+  return {
+    begin() {
+      generation += 1;
+      return generation;
+    },
+    advance() {
+      generation += 1;
+    },
+    isCurrent: (candidate) => candidate === generation,
+  };
+}
+
 export function createKnowledgeSection({
   services,
   viewState,
@@ -27,6 +91,10 @@ export function createKnowledgeSection({
   // the open tab mid-task.
   let knowledgeDefaultTab = defaultKnowledgeTab(0);
   let knowledgeDefaultTabResolved = false;
+  // Never both true. The projection masks both while a snapshot is held, so a re-read never blanks.
+  let knowledgeLoading = false;
+  let knowledgeError = false;
+  const reads = createKnowledgeReadTracker();
 
   function knowledgeRawCharacter(actorId) {
     const characters = Array.isArray(knowledgeSnapshot?.characters)
@@ -40,27 +108,6 @@ export function createKnowledgeSection({
     return copies.find((copy) => String(copy?.itemId) === String(itemId)) || null;
   }
 
-  // Localized copy for the Knowledge surface's two heavyweight confirms. Every key is a static
-  // literal at its call site: an interpolated key is invisible to `ui-lang-keys-resolve` and
-  // `lang-keys-no-orphans`, so a missing message would ship silently.
-  function knowledgeText(key, fallback, data = null) {
-    const localized = data ? services.localize?.(key, data) : services.localize?.(key);
-    if (localized) return localized;
-    if (!data) return fallback;
-    return Object.entries(data).reduce(
-      (text, [name, value]) => text.replace(`{${name}}`, String(value)),
-      fallback
-    );
-  }
-
-  function notifyKnowledgeResult(result) {
-    const message = result?.message;
-    if (!message) return;
-    const text = services.localize?.(message, result?.messageData) || message;
-    if (result?.success === true) services.notify?.info?.(text);
-    else services.notify?.error?.(text);
-  }
-
   function publishKnowledge() {
     viewState.update((prev) => ({
       ...prev,
@@ -68,6 +115,8 @@ export function createKnowledgeSection({
         active: knowledgeActive,
         selectedActorId: knowledgeSelectedActorId,
         defaultTab: knowledgeDefaultTab,
+        loading: knowledgeLoading,
+        error: knowledgeError,
       }),
     }));
   }
@@ -76,13 +125,47 @@ export function createKnowledgeSection({
     knowledgeSnapshot = null;
     knowledgeDefaultTabResolved = false;
     knowledgeSelectedActorId = '';
+    knowledgeLoading = false;
+    knowledgeError = false;
   }
 
-  // Keeps the world-scoped character; an open surface publishes the cleared projection at once.
+  // Keeps the world-scoped character; an open surface publishes the cleared, loading projection.
   function resetForSystemChange() {
+    reads.advance();
     knowledgeSnapshot = null;
     knowledgeDefaultTabResolved = false;
-    if (knowledgeActive) publishKnowledge();
+    if (!knowledgeActive) return;
+    knowledgeLoading = true;
+    knowledgeError = false;
+    publishKnowledge();
+  }
+
+  // Only the latest read of the still-selected system settles the surface; a superseded one
+  // writes no cache, resolves no tab and moves neither flag. A rejection always propagates.
+  async function readKnowledgeSnapshot() {
+    const generation = reads.begin();
+    const systemId = get(selectedSystemId);
+    const isCurrent = () => reads.isCurrent(generation) && get(selectedSystemId) === systemId;
+    let snapshot;
+    try {
+      snapshot = (await services.getKnowledgeSnapshot?.(systemId)) || null;
+    } catch (error) {
+      if (isCurrent()) {
+        knowledgeLoading = false;
+        knowledgeError = !knowledgeSnapshot;
+        publishKnowledge();
+      }
+      throw error;
+    }
+    if (!isCurrent()) return false;
+    knowledgeLoading = false;
+    knowledgeError = false;
+    knowledgeSnapshot = snapshot;
+    if (!knowledgeDefaultTabResolved) {
+      knowledgeDefaultTab = defaultKnowledgeTab(knowledgeSnapshot?.definitionCount || 0);
+      knowledgeDefaultTabResolved = true;
+    }
+    return true;
   }
 
   /**
@@ -93,16 +176,7 @@ export function createKnowledgeSection({
    */
   async function refreshKnowledge({ force = false } = {}) {
     if (!knowledgeActive) return false;
-    if (force || !knowledgeSnapshot) {
-      const systemId = get(selectedSystemId);
-      const snapshot = (await services.getKnowledgeSnapshot?.(systemId)) || null;
-      if (get(selectedSystemId) !== systemId) return false; // a later switch owns the surface
-      knowledgeSnapshot = snapshot;
-      if (!knowledgeDefaultTabResolved) {
-        knowledgeDefaultTab = defaultKnowledgeTab(knowledgeSnapshot?.definitionCount || 0);
-        knowledgeDefaultTabResolved = true;
-      }
-    }
+    if ((force || !knowledgeSnapshot) && !(await readKnowledgeSnapshot())) return false;
     publishKnowledge();
     return true;
   }
@@ -122,11 +196,15 @@ export function createKnowledgeSection({
   async function setKnowledgeActive(active) {
     const next = active === true;
     knowledgeActive = next;
+    reads.advance();
     if (!next) {
       clearCache();
       publishKnowledge();
       return false;
     }
+    knowledgeLoading = true;
+    knowledgeError = false;
+    publishKnowledge();
     await refreshKnowledge({ force: true });
     return true;
   }
@@ -144,7 +222,7 @@ export function createKnowledgeSection({
       success: false,
       message: 'FABRICATE.Knowledge.Manage.Failed',
     };
-    notifyKnowledgeResult(result);
+    notifyKnowledgeResult(services, result);
     await refreshKnowledge({ force: true });
     return result;
   }
@@ -169,10 +247,12 @@ export function createKnowledgeSection({
     if (quantity > 1) {
       const confirmed = await services.confirmDialog?.({
         title: knowledgeText(
+          services,
           'FABRICATE.Admin.Manager.Knowledge.DeleteStackTitle',
           'Delete the whole stack?'
         ),
         content: `<p>${knowledgeText(
+          services,
           'FABRICATE.Admin.Manager.Knowledge.DeleteStackContent',
           'This copy is a stack of {quantity}. Deleting removes every unit, because uses and learns are tracked per document.',
           { quantity }
@@ -192,29 +272,12 @@ export function createKnowledgeSection({
     return runKnowledgeMutation(() => services.eraseLearnedRecipe?.({ actorId, recipeId }));
   }
 
-  async function confirmKnowledgeReset(titleKey, titleFallback, contentKey, contentFallback) {
-    const note = knowledgeText(
-      'FABRICATE.Admin.Manager.Knowledge.ResetDiscoveryNote',
-      'Erasing a single memory leaves discovery progress intact; a reset also clears it.'
-    );
-    return services.confirmDialog?.({
-      title: knowledgeText(titleKey, titleFallback),
-      content: `<p>${knowledgeText(contentKey, contentFallback)}</p><p>${note}</p>`,
-      // A reset erases learned knowledge but deletes no definition, so it names its own
-      // verb rather than reusing the delete pair.
-      yes: {
-        label: knowledgeText('FABRICATE.Admin.Manager.Knowledge.ResetConfirm', 'Reset'),
-        callback: () => true,
-      },
-      no: { callback: () => false },
-    });
-  }
-
   /** Reset this character's learned knowledge for the selected system. */
   async function resetActorSystemKnowledge(actorId) {
     // Read before the non-modal confirm: a switch while it is open must not retarget the reset.
     const systemId = get(selectedSystemId);
     const confirmed = await confirmKnowledgeReset(
+      services,
       'FABRICATE.Admin.Manager.Knowledge.ResetSystemTitle',
       'Reset this system?',
       'FABRICATE.Admin.Manager.Knowledge.ResetSystemContent',
@@ -227,6 +290,7 @@ export function createKnowledgeSection({
   /** Reset this character's learned knowledge across every system. */
   async function resetActorAllKnowledge(actorId) {
     const confirmed = await confirmKnowledgeReset(
+      services,
       'FABRICATE.Admin.Manager.Knowledge.ResetAllTitle',
       'Reset every system?',
       'FABRICATE.Admin.Manager.Knowledge.ResetAllContent',
@@ -240,6 +304,7 @@ export function createKnowledgeSection({
   function deactivate() {
     knowledgeRefreshScheduled = false;
     knowledgeActive = false;
+    reads.advance();
     clearCache();
   }
 

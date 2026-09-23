@@ -256,13 +256,19 @@ export function filterKnowledgeRoster(characters = [], term = '') {
 /**
  * The whole snapshot published as `viewState.knowledge`, ALWAYS a new object. A `null` snapshot or an
  * inactive surface yields the empty state, which is what makes `refreshKnowledge` free when closed.
+ * `options.loading` and `options.error` reach only an open surface holding no snapshot, so a
+ * populated or closed projection is never loading and never in error, and loading masks error.
  */
 export function projectKnowledgeSnapshot(raw, options = {}) {
   const active = options.active === true;
   const defaultTab = options.defaultTab || KNOWLEDGE_TAB_RECIPE_ITEMS;
+  const loading = active && !raw && options.loading === true;
+  const error = active && !raw && !loading && options.error === true;
   if (!active || !raw) {
     return {
       active,
+      loading,
+      error,
       systemId: '',
       definitionCount: 0,
       defaultTab,
@@ -280,6 +286,8 @@ export function projectKnowledgeSnapshot(raw, options = {}) {
     characters.find((character) => character.id === requested) || characters[0] || null;
   return {
     active,
+    loading,
+    error,
     systemId: String(raw.systemId || ''),
     definitionCount: Number(raw.definitionCount) || 0,
     defaultTab,
