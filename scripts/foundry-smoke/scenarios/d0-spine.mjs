@@ -391,7 +391,7 @@ export default {
         }
         if (
           (await page
-            .locator(`${managerSystemRowSelector(craftingSetup.systemId)}[aria-selected="true"]`)
+            .locator(`${managerSystemRowSelector(craftingSetup.systemId)}[aria-current="true"]`)
             .count()) === 0
         ) {
           throw new Error('Manager did not select the smoke test system.');
@@ -573,7 +573,7 @@ export default {
         }
         if (
           (await page
-            .locator(`${managerSystemRowSelector(craftingSetup.systemId)}[aria-selected="true"]`)
+            .locator(`${managerSystemRowSelector(craftingSetup.systemId)}[aria-current="true"]`)
             .count()) === 0
         ) {
           throw new Error('Manager return to library should preserve the selected system row.');

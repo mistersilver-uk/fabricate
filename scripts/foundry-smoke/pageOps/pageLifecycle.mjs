@@ -509,7 +509,7 @@ export async function selectSmokeSystemInManager(page, systemId) {
   const row = page.locator(managerSystemRowSelector(systemId)).first();
   await row.waitFor({ state: 'visible', timeout: 10_000 });
   const alreadySelected = await row
-    .evaluate((element) => element.getAttribute('aria-selected') === 'true')
+    .evaluate((element) => element.getAttribute('aria-current') === 'true')
     .catch(() => false);
   if (alreadySelected) return;
   await row.locator('.manager-system-identity').click();
