@@ -1,5 +1,6 @@
 world-tool-catalogue-list-head
 world-tool-catalogue
+world-tool-catalogue-stacked
 world-tool-catalogue-page-two
 world-tool-catalogue-bulk
 world-tool-catalogue-empty

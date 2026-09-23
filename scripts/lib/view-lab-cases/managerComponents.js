@@ -436,6 +436,8 @@ export const CASES = Object.freeze([
     query: {},
     steps: [{ selector: '#manager-nav-component-rules' }, { selector: '[data-component-edit]' }],
     expectView: 'component-edit',
+    // The tab strip's pointer hit, moved here from the stacked twin (issue 1976).
+    expectCenterHit: '[data-component-edit-tab="rules"]',
     // The shared rail in this frame (issue 1371): the editor renders the world entry's rail at system scope.
     expectContained: [
       {
@@ -460,7 +462,8 @@ export const CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: '[data-component-edit]' },
-      { selector: '[data-component-edit-tab="rules"]', scroll: true },
+      // The bounded frame scrolls itself, so the stacked preview tile is below its fold (issue 1976).
+      { selector: '[data-scoped-entry-preview-tile]', scroll: true },
     ],
     expectView: 'component-edit',
     expectSelector: 'main.manager-component-edit-main',
@@ -468,8 +471,10 @@ export const CASES = Object.freeze([
       containerSelector: '.fabricate-manager',
       gridSelector: 'main.manager-component-edit-main',
       expectedTracks: 1,
+      // The side rail runs the body's full height beside the stacked frame (issue 1976).
+      fillSelector: '.manager-rail',
     },
-    expectCenterHit: '[data-component-edit-tab="rules"]',
+    expectCenterHit: '[data-scoped-entry-preview-tile]',
     expectContained: [
       {
         container: 'main.manager-component-edit-main',
