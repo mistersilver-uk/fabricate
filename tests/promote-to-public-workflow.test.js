@@ -55,19 +55,38 @@ test('a paginated gh api call buffered through execSync states its own maxBuffer
   }
 });
 
-// The Foundry package listing dropped the `v` after v1.2.1 (issue #1462 / #1490).
-test('the registry payload constructs the v, and never re-derives it from the artefact', () => {
+// Foundry compares a version part numerically only when BOTH parts are numeric, so a `v` in the
+// registry identifier string-compares against a bare one and can rank an older release above a
+// newer one (issue #1945). The `v` belongs to the tag and the URLs, never the payload's version.
+test('the registry payload publishes the bare version, checked before the un-draft', () => {
   const source = readFileSync(WORKFLOW, 'utf8');
+  const job = parseJobs(source)['readback-preflight-undraft-register'];
+  assert.ok(job, 'the readback-preflight-undraft-register job is missing');
+  const buildIndex = job.steps.findIndex((step) => step.name === 'Build and validate the registry payload');
+  assert.notEqual(buildIndex, -1, 'the "Build and validate the registry payload" step is missing');
+  const build = job.steps[buildIndex].run;
 
-  assert.match(
-    source,
-    /--arg version "v\$\{VERSION\}"/,
-    'the payload must BUILD the display version from the bare input, so the manifest need not carry a prefix'
+  assert.match(build, /--arg version "\$\{VERSION\}"/, 'the payload must publish the BARE dispatch input');
+  assert.ok(
+    !/--arg version "v/.test(source),
+    'a `v`-prefixed registry version string-compares against a bare one and breaks ordering'
   );
   assert.ok(
     !/--arg version "\$BUILT_VERSION"/.test(source),
     'reading the artefact couples the advertised version to the manifest, which is what broke every publish after #1407'
   );
+
+  const check = build.indexOf(`jq -e --arg v "$VERSION" '.release.version == $v' /tmp/promote/payload.json`);
+  assert.notEqual(check, -1, 'the payload must be checked to carry exactly the promoted version');
+  const write = build.search(/jq -n \\[\s\S]*?> \/tmp\/promote\/payload\.json/);
+  assert.notEqual(write, -1, 'the jq -n payload write is missing');
+  assert.ok(check > write, 'the identity check must read the payload AFTER it is written');
+  const undraftIndex = job.steps.findIndex((step) => /gh release edit "v\$VERSION"[\s\S]*--draft=false/.test(step.run));
+  assert.notEqual(undraftIndex, -1, 'the un-draft step is missing');
+  assert.ok(buildIndex < undraftIndex, 'the payload check must fail before the release is made public');
+
+  // The guard refuses any input that is not bare M.N.P, which is what makes `$VERSION` bare.
+  assert.match(source, /\^\[0-9\]\+\\\.\[0-9\]\+\\\.\[0-9\]\+\$/, 'the guard must still refuse a non-bare input');
 
   // The tag is `v` plus the bare version, so the URLs interpolate the input. `v${BUILT_VERSION}`
   // would be `vv1.9.3` the moment anything reintroduced a prefix into the manifest.

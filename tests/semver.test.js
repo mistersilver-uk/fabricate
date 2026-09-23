@@ -36,6 +36,12 @@ const FOUNDRY_CASES = [
   ['1.4.0', '1.3.9', true, 'newer minor'],
   ['1.10.0', '1.9.0', true, 'numeric compare, not lexical, on unsuffixed parts'],
 
+  // The registry identifier is bare (issue #1945): a `v` string-compares its first part.
+  ['1.9.7', 'v1.9.6', false, 'the hazard: a prefixed older version outranks a bare newer one'],
+  ['v1.9.6', '1.9.7', true, 'and the prefixed older version reads as newer'],
+  ['1.9.7', '1.9.6', true, 'bare to bare orders numerically'],
+  ['1.10.0', '1.9.6', true, 'bare to bare orders numerically across a minor rollover'],
+
   // Equal is never newer.
   ['1.4.0', '1.4.0', false, 'identical versions are not newer'],
   ['1.4.0-rc.3', '1.4.0-rc.3', false, 'identical prereleases are not newer'],

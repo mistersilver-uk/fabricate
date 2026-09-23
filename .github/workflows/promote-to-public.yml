@@ -669,17 +669,16 @@ jobs:
           VERIFIED=$(jq -r '.compatibility.verified // ""' "$MODJSON")
           MAX=$(jq -r '.compatibility.maximum // ""' "$MODJSON")
 
-          # The published manifest carries the BARE version, as every working release has: v1.2.1's
-          # module.json says `1.2.1` while its Foundry listing reads `v1.2.1`. So the artefact and the
-          # requested version are the same string and this is a literal identity check again.
+          # The published manifest carries the BARE version, so the artefact and the requested version
+          # are the same string and this is a literal identity check.
           #
-          # The `v` is PRESENTATION, and it belongs in exactly one place — the registry payload's
-          # `version` field below, which is what the package listing renders. Issue 1407 put it in
-          # module.json instead, and issue 1457 then made this payload read the artefact rather than
-          # construct the display string, which coupled the two: `release-s3.js` compares the built
-          # manifest against the requested version, so every publish after that refused with
-          # `version mismatch: requested 1.9.3 built v1.9.3`. Do not re-derive this field from the
-          # artefact.
+          # The `v` belongs to the tag and the URLs built from it, never to a version identifier.
+          # The registry payload's `version` below is bare too: Foundry compares a version part
+          # numerically only when both parts are numeric, so a prefixed identifier string-compares
+          # against a bare one and can rank an older release above a newer one (issue 1945).
+          # Issue 1407 put the prefix in module.json, and `release-s3.js` then refused every publish
+          # with `version mismatch: requested 1.9.3 built v1.9.3`. Do not re-derive the payload's
+          # version from the artefact.
           if [ "$BUILT_VERSION" != "$VERSION" ]; then
             echo "::error::artefact version '$BUILT_VERSION' does not match the version being promoted '$VERSION'."
             exit 1
@@ -708,12 +707,17 @@ jobs:
 
           jq -n \
             --arg id "$ID" \
-            --arg version "v${VERSION}" \
+            --arg version "${VERSION}" \
             --arg manifest "$MANIFEST" \
             --arg notes "$NOTES" \
             --argjson compatibility "$COMPAT" \
             '{id: $id, "dry-run": false, release: {version: $version, manifest: $manifest, notes: $notes, compatibility: $compatibility}}' \
             > /tmp/promote/payload.json
+
+          if ! jq -e --arg v "$VERSION" '.release.version == $v' /tmp/promote/payload.json > /dev/null; then
+            echo "::error::registry payload release.version is not the bare promoted version '$VERSION'. Refusing to un-draft."
+            exit 1
+          fi
 
           echo "Registry payload (validated):"
           cat /tmp/promote/payload.json
