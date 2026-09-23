@@ -319,10 +319,22 @@ const RENAMED = [
       "The interactable socket layer does this: `handleInteractableSocketMessage` (`src/canvas/interactableSocketBridge.js`) takes `{ senderId, isSenderGM }` from `src/bootstrap/socketRouter.js` and gates the visual write/delete edges (GM-only), the behaviour-update edge (non-GM restricted to `system.node`), and activation (requester must be the sender) — see issue 593.",
     identifiers: [["`src/bootstrap/socketRouter.js`", "`main.js`"]],
   },
+  {
+    before:
+      "See `forgetLearnedRecipes` (`src/systems/RecipeVisibilityService.js`) and `deleteRemovedActiveRunFlags` (`src/config/flags.js`) for the worked precedents; the party pool instead lives in a world setting, so its `decrement` re-`set`s the whole map with no `-=` key.",
+    after:
+      "See `forgetLearnedRecipes` (`src/systems/RecipeVisibilityService.js`) and `writeAcknowledgedRunContainer` (`src/systems/runHistoryEvidence.js`) for the worked precedents; the party pool instead lives in a world setting, so its `decrement` re-`set`s the whole map with no `-=` key.",
+    identifiers: [
+      [
+        '`writeAcknowledgedRunContainer` (`src/systems/runHistoryEvidence.js`)',
+        '`deleteRemovedActiveRunFlags` (`src/config/flags.js`)',
+      ],
+    ],
+  },
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 26;
+const RENAMED_COUNT = 27;
 
 /** Every sentence of the post-split set, as one multiset. */
 function survivingSentences() {
