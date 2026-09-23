@@ -585,8 +585,8 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
       if ((await craftButton.count()) > 0) {
         await craftButton.click().catch(() => {});
         // A UI craft now opens the interactive roll prompt: capture it, then
-        // click Roll so the run summary resolves and the overlay clears. After a full D0 walk the
-        // prompt has been seen to open between 2.5s and 7.5s after the click.
+        // click Roll so the run summary resolves and the overlay clears. The prompt can open several
+        // seconds after the click once a full D0 walk has loaded the world.
         await handleRollPromptIfPresent(ctx, 'player-crafting-roll-prompt', { timeout: 15_000 });
         await appShell
           .locator('[data-crafting-run-summary]')

@@ -324,7 +324,8 @@ export async function runFullProfileGatherAsserts(page, craftingSetup, gatherFix
         config.systems[arcaneSystemId] = { ...systemConfig, events };
         await game.settings.set('fabricate', 'gatheringConfig', config);
         // The public start result is normalised and carries no `checkResult`; a fired encounter is
-        // published on the documented `fabricate.gathering.eventTriggered` hook.
+        // published on the documented `fabricate.gathering.eventTriggered` hook, which the versioned
+        // execute emits synchronously and only on the elected GM — this page's sole Gamemaster.
         const firedEvents = [];
         const hookId = Hooks.on('fabricate.gathering.eventTriggered', (payload) => {
           if (payload?.environmentId === hazardEnvironmentId) firedEvents.push(payload.event);
@@ -341,7 +342,9 @@ export async function runFullProfileGatherAsserts(page, craftingSetup, gatherFix
             firedEvents.some((event) => event?.id === 'smoke-bramble-event') ||
             JSON.stringify(firedEvents).includes('Bramble Snare');
           if (!fired) {
-            throw new Error(`Bramble Snare did not fire (events=${JSON.stringify(firedEvents)})`);
+            throw new Error(
+              `Bramble Snare did not fire (events=${JSON.stringify(firedEvents)}, success=${result?.success}, reason=${result?.reason})`
+            );
           }
           record('exec-gather-hazard-event', true);
         } finally {
