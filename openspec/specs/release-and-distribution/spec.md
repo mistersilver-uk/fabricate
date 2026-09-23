@@ -287,6 +287,19 @@ It is a client-affecting artefact and not a storefront label: a set integer maxi
 - **THEN** the minimum and verified core versions are present and non-empty
 - **AND** a maximum is present only when a known-broken Foundry version exists
 
+### Requirement: Registry version identifier
+
+The version identifier published to the Foundry package registry MUST be the bare version the release automation minted, identical to the version the release artefact's in-archive manifest carries, and MUST NOT carry a `v` or any other prefix.
+Foundry compares two versions part by part and compares a part numerically only when both parts are numeric, so a prefixed identifier string-compares against a bare one and can order an older release above a newer one.
+The git tag and the release artefact's file name keep their `v` prefix; they are not the registry identifier, and the version-pinned manifest and notes URLs built from the tag are unaffected.
+
+#### Scenario: publishing a version to the registry
+
+- **WHEN** a stable version is published to the registry
+- **THEN** the version published to the registry is exactly the promoted version, with no prefix
+- **AND** the version-pinned manifest and notes URLs still resolve to the `v`-prefixed tag
+- **AND** a payload whose version differs from the promoted version fails before the release is made public
+
 ### Requirement: Version authority and promotion mechanics
 
 The release automation MUST be the sole authority for version numbers; a version MUST NOT be created, renamed, or copied by hand.
