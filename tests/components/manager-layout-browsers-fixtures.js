@@ -4,9 +4,6 @@ import { openLayoutContext } from '../helpers/layout-harness.js';
 
 import { chipCss, css, withChipHash } from './manager-layout-shared.js';
 
-const LONG_ACTOR_NAME =
-  'Brenna Ashwood-Varga of the Thousand Lantern Reaches, Keeper of the Unwritten Archive';
-
 // Mirrors the shipped two-line rhythm: name + type (+ quantity) on line 1.
 const COPY_ROW = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">4 Recipe Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span></span></span><span class="manager-knowledge-row-actions"><button class="fabricate-button manager-button fab-manager-button">Expend use</button><button class="fabricate-button manager-button is-danger">Delete</button></span></li>`;
 
@@ -16,8 +13,8 @@ const RAIL = `<aside class="manager-rail"><p class="manager-rail-title">GM manag
   (_, index) => `<button class="manager-nav-button">Nav entry ${index + 1}</button>`
 ).join('')}</nav></aside>`;
 
-function knowledgeMarkup(width, { collapsed, height, longName }) {
-  const name = longName ? LONG_ACTOR_NAME : 'Aria Thorn';
+function knowledgeMarkup(width, { collapsed, height }) {
+  const name = 'Aria Thorn';
   const bodyClass = collapsed ? 'manager-body is-rail-collapsed' : 'manager-body';
   // Enough rows that the detail content outgrows `.manager-body` at every ladder width.
   const rows = COPY_ROW.repeat(16);
@@ -28,12 +25,12 @@ function knowledgeMarkup(width, { collapsed, height, longName }) {
  * Render the Knowledge route inside a real Manager root and read its geometry.
  *
  * @param {number} width Manager window width, in px
- * @param {{ collapsed?: boolean, height?: number, longName?: boolean }} [options]
+ * @param {{ collapsed?: boolean, height?: number }} [options]
  * @returns {Promise<object>} column boxes, scroll state of the body and tab panel, rail borders
  */
 export async function readRenderedKnowledgeGeometry(
   width,
-  { collapsed = false, height = 686, longName = false } = {}
+  { collapsed = false, height = 686 } = {}
 ) {
   const context = await openLayoutContext({
     viewport: { width, height: Math.max(720, height + 34) },
@@ -41,7 +38,7 @@ export async function readRenderedKnowledgeGeometry(
   });
   const page = await context.newPage();
   try {
-    await page.setContent(withChipHash(knowledgeMarkup(width, { collapsed, height, longName })));
+    await page.setContent(withChipHash(knowledgeMarkup(width, { collapsed, height })));
     return await page.evaluate(() => {
       const box = (selector) => {
         const value = document.querySelector(selector)?.getBoundingClientRect();

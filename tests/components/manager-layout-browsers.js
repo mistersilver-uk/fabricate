@@ -1813,6 +1813,7 @@ test('Knowledge keeps a rail/roster/detail triptych with unclipped row actions f
     assert.equal(report.overflow, false, `${width}px surface does not overflow`);
   }
 });
+
 // Between the 1120 and 832 rungs the shared restack must not reach Knowledge (issue 1972).
 function assertKnowledgeFillsTheBody(report, label) {
   for (const column of ['rail', 'roster', 'detail']) {
@@ -1831,6 +1832,7 @@ function assertKnowledgeFillsTheBody(report, label) {
     `${label} the tab panel owns the overflow`
   );
   assert.equal(report.railBorder.right, '1px', `${label} the rail keeps its right divider`);
+  assert.equal(report.railBorder.bottom, '0px', `${label} the full-height rail has no bottom rule`);
 }
 
 test('Knowledge keeps full-height columns and its own scrollers down to 832px, and stacks a bounded rail below', async () => {
@@ -1847,13 +1849,15 @@ test('Knowledge keeps full-height columns and its own scrollers down to 832px, a
     await readRenderedKnowledgeGeometry(880, { collapsed: true }),
     '880px collapsed'
   );
-  // The Manager's narrow-band stress floor (manager-layout-shared.js, the Checks Studio restack).
-  const floor = await readRenderedKnowledgeGeometry(1024, { height: 640, longName: true });
+  // The Manager's narrow-band stress floor (manager-layout-shared.js, the Checks Studio restack):
+  // a 640px window is a 606px Manager, as the 720px default is 686. The actor name is nowrap with an
+  // ellipsis, so the header wraps from the narrower width, not the name.
+  const floor = await readRenderedKnowledgeGeometry(1024, { height: 606 });
   assert.ok(
     floor.headerHeight > wide.headerHeight,
-    'precondition: the detail header wraps at the floor, taller than its one-line 1212px height'
+    'precondition: the detail header wraps to a second line at the floor, taller than at 1212px'
   );
-  assertKnowledgeFillsTheBody(floor, '1024x640 long name');
+  assertKnowledgeFillsTheBody(floor, '1024x640');
 
   for (const width of [831, 700, 600]) {
     const report = await readRenderedKnowledgeGeometry(width);
