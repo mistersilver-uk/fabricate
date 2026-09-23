@@ -538,6 +538,23 @@ The names were chosen against near-misses, and the near-miss is recorded with ea
 They also reuse the already-declared `componentNotFound`, `unitNotFound`, `systemNotFound`, `invalidQuantity`, `creditNotConfigured`, `invalidCallSite` and `notElected`, and the shared `gmOnly`, `noActor` and `notReady`.
 Each member answers with its OWN message key table, because a failed take must not report itself in the words of a failed read — and that rule bites hardest between exactly this pair, which is designed to be called one after the other.
 
+## Companion Operation Submission Foundation
+
+Fabricate internally accepts one complete operation submission shaped as `{ operationId, plan }`, where `operationId` is the unmodified 16-character alphanumeric Foundry id persisted once for the consumer's logical occurrence.
+The version-1 plan contains one consumer-owned source identity, ordered decision declarations and ordered effect declarations whose dependencies name declared decisions.
+Source, decision, effect and kind identifiers are nonblank; decision ids and effect ids are unique in their respective lists.
+
+Plan payloads contain strict JSON values only.
+Validation rejects unsupported values, accessors, sparse arrays, cycles, class instances, unknown structural fields and unsafe object keys without invoking caller code or mutating caller data.
+Canonicalization sorts object keys recursively while preserving values and array order, so key insertion order does not change identity while reordered decisions or effects do.
+
+The first valid plan durably accepted for an operation id is authoritative.
+An equal retry observes the existing record unchanged, while a different plan for that id conflicts without overwriting it or minting a replacement id.
+The operation id is reused across users, clients, delivery attempts, reloads and restarts; transport request identity is separate.
+
+This submission and its persistence adapter remain internal in this increment.
+They publish no operation method on `game.fabricate.api.companion`, execute no effect and do not alter the compatibility contract below.
+
 ## The Compatibility Promise
 
 While `game.fabricate.api.companion.schemaVersion` is unchanged, every member of the declared set keeps its name, keeps accepting the arguments documented for it, and keeps answering in the documented shape.
