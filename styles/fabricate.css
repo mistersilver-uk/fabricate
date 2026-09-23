@@ -5211,7 +5211,7 @@
   margin-top: 0;
 }
 
-/* The routed-by-ingredients set picker under the Requires label (issue 643). The `inline` rung paints the box; the trigger fills the inspector column, which a button does not do by itself. */
+/* The routed-by-ingredients set picker under the Requires label (issue 643). The `inline` rung paints the box; the trigger fills the inspector column, which a button does not do by itself, and restates `--fab-bg-1`, the requirement rows' fill, because the rung's `--fab-bg-2` is this inspector panel's own and would leave the control a bare outline. */
 .fabricate-manager .manager-recipe-route-select {
   width: 100%;
   min-width: 0;
@@ -5220,6 +5220,7 @@
 
 .fabricate-manager .manager-recipe-route-select .fabricate-select-trigger {
   width: 100%;
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager .manager-recipe-browser-inspector-hero,
@@ -7379,7 +7380,7 @@
 
 /* THE TWO TEXT ACTIONS' TRAILING-EDGE GROUPING IS NOT HERE, AND IT CANNOT BE. */
 
-/* The control type scale. See reason 2 in the block header. The `<select>` leg left this rule with issue 1504 — see the narrowed block below. */
+/* The control type scale. See reason 2 in the block header. */
 .fabricate-manager .manager-scoped-list-toolbar .manager-search input {
   border-radius: 9px;
   font-size: var(--fab-recipe-control-font);
