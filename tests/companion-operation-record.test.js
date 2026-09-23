@@ -72,6 +72,67 @@ function terminalRecord(state = 'completed') {
   return record;
 }
 
+function precedenceRecord(state) {
+  const record = createCompanionOperationRecord(
+    submission({
+      effects: [
+        { effectId: 'review', kind: 'reviewable', payload: null, requiresDecisionIds: [] },
+        { effectId: 'failure', kind: 'fallible', payload: null, requiresDecisionIds: [] },
+        {
+          effectId: 'dependent',
+          kind: 'decisionBound',
+          payload: null,
+          requiresDecisionIds: ['check'],
+        },
+      ],
+    }),
+    100
+  );
+  record.state = state;
+  record.revision = 1;
+  record.updatedAt = 90;
+  return record;
+}
+
+function reviewPrecedenceRecord() {
+  const record = precedenceRecord('reviewRequired');
+  record.effectStates[0] = {
+    effectId: 'review',
+    phase: 'reviewRequired',
+    evidence: { reason: 'uncertain' },
+    waiver: null,
+  };
+  record.effectStates[1] = {
+    effectId: 'failure',
+    phase: 'knownFailure',
+    evidence: { reason: 'refused' },
+    waiver: null,
+  };
+  return record;
+}
+
+function failurePrecedenceRecord() {
+  const record = precedenceRecord('failed');
+  record.effectStates[1] = {
+    effectId: 'failure',
+    phase: 'knownFailure',
+    evidence: { reason: 'refused' },
+    waiver: null,
+  };
+  return record;
+}
+
+function applyingPrecedenceRecord() {
+  const record = precedenceRecord('pending');
+  record.effectStates[0] = {
+    effectId: 'review',
+    phase: 'applying',
+    evidence: { attempt: 1 },
+    waiver: null,
+  };
+  return record;
+}
+
 function expectInvalid(value, code = 'INVALID_COMPANION_OPERATION_RECORD') {
   assert.throws(
     () => observeCompanionOperationRecord(value),
@@ -246,6 +307,9 @@ test('observes every state at its valid invariant boundary, including clock reve
     awaiting,
     review,
     failed,
+    reviewPrecedenceRecord(),
+    failurePrecedenceRecord(),
+    applyingPrecedenceRecord(),
     terminalRecord('completed'),
     terminalRecord('completedWithOmissions'),
   ]) {
@@ -270,6 +334,12 @@ test('record validation fails closed for each state, slot, revision and archive 
   add(acceptedRecord(), (record) => {
     record.revision = 1;
   });
+  add(acceptedRecord(), (record) => {
+    record.updatedAt += 1;
+  });
+  add(activeRecord(), (record) => {
+    record.revision = 0;
+  });
   add(activeRecord(), (record) => {
     record.revision = -1;
   });
@@ -286,6 +356,15 @@ test('record validation fails closed for each state, slot, revision and archive 
       value: 0,
       evidence: null,
     };
+  });
+  add(activeRecord(), (record) => {
+    record.decisionStates[0] = {
+      decisionId: 'check',
+      state: 'pending',
+      value: null,
+      evidence: null,
+    };
+    record.effectStates[0].phase = 'applied';
   });
   add(activeRecord(), (record) => {
     record.decisionStates[0].evidence = null;
@@ -323,12 +402,32 @@ test('record validation fails closed for each state, slot, revision and archive 
   add(activeRecord('failed'), (record) => {
     record.effectStates[0].phase = 'reviewRequired';
   });
+  add(reviewPrecedenceRecord(), (record) => {
+    record.state = 'failed';
+  });
+  add(failurePrecedenceRecord(), (record) => {
+    record.state = 'awaitingDecision';
+  });
+  add(applyingPrecedenceRecord(), (record) => {
+    record.state = 'awaitingDecision';
+  });
   add(terminalRecord(), (record) => {
     record.outcome = null;
   });
   add(terminalRecord(), (record) => {
     record.effectStates[0].phase = 'pending';
     record.effectStates[0].evidence = null;
+  });
+  add(terminalRecord(), (record) => {
+    record.decisionStates[0] = {
+      decisionId: 'check',
+      state: 'pending',
+      value: null,
+      evidence: null,
+    };
+  });
+  add(terminalRecord(), (record) => {
+    record.state = 'completedWithOmissions';
   });
   add(terminalRecord('completedWithOmissions'), (record) => {
     record.effectStates[0].waiver.reason = ' ';

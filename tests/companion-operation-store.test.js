@@ -151,7 +151,7 @@ test('existing records classify duplicate or conflict without creating', async (
   assert.equal(duplicate.calls.creates.length, 0);
 });
 
-test('two absent pre-reads converge through the one fixed-id create race boundary', async () => {
+test('two absent pre-reads preserve the winning immutable plan and conflict the loser', async () => {
   const fixture = harness();
   let reads = 0;
   let releaseReads;
@@ -175,14 +175,34 @@ test('two absent pre-reads converge through the one fixed-id create race boundar
     clock: () => 200,
   });
 
-  const results = await Promise.all([first.accept(submission()), second.accept(submission())]);
+  const iron = submission('iron');
+  const copper = submission('copper');
+  const results = await Promise.all([first.accept(iron), second.accept(copper)]);
   assert.deepEqual(
     results.map((result) => result.status).sort(),
-    ['accepted', 'duplicate']
+    ['accepted', 'conflict']
   );
   assert.equal(fixture.calls.creates.length, 2);
   assert.equal(fixture.calls.creates.every((call) => call.options.keepId === true), true);
   assert.equal(fixture.stored.size, 1);
+
+  const winner = fixture.stored.get(OPERATION_ID).flags.fabricate.companionOperationRecord;
+  const winnerComponentId = winner.plan.effects[0].payload.componentId;
+  const loser = winnerComponentId === 'iron' ? copper : iron;
+  const winningRetry = winnerComponentId === 'iron' ? iron : copper;
+  const conflict = results.find((result) => result.status === 'conflict');
+  assert.equal(conflict.record.plan.effects[0].payload.componentId, winnerComponentId);
+
+  conflict.record.plan.effects[0].payload.componentId = 'mutated-conflict-output';
+  const reread = await first.read(OPERATION_ID);
+  assert.equal(reread.record.plan.effects[0].payload.componentId, winnerComponentId);
+  assert.equal((await first.accept(loser)).status, 'conflict');
+  assert.equal((await first.accept(winningRetry)).status, 'duplicate');
+  assert.equal(
+    fixture.stored.get(OPERATION_ID).flags.fabricate.companionOperationRecord.plan.effects[0]
+      .payload.componentId,
+    winnerComponentId
+  );
 });
 
 test('a rejected or acknowledgement-lost create classifies only from authoritative readback', async () => {
