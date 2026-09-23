@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { measureImporters } from '../scripts/lib/componentImporters.js';
 import { compoundsOf, ruleBlocks } from '../scripts/lib/stylesheetLiveClasses.js';
 import { collectSources } from './helpers/sourceScan.js';
+import { KNOWN_NATIVE_SELECT_ELEMENTS } from './components/design-system-known-debt.js';
 import { collectStyleCorpus, splitSelectorList } from './helpers/styleBlockScan.js';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
@@ -75,8 +76,16 @@ const TEMPLATES = new Map(
   ])
 );
 
+/**
+ * Whether a template's MARKUP writes a `<select>`. The `<script>` block is dropped first: its `//`
+ * comments name the element in prose, and a file that only mentions one would otherwise count as a
+ * host that renders one and keep a stranded leg in its scope reporting live.
+ */
 const RENDERS_SELECT = new Map(
-  [...TEMPLATES].map(([file, template]) => [file, /<select[\s>]/u.test(template)])
+  [...TEMPLATES].map(([file, template]) => [
+    file,
+    /<select[\s>]/u.test(template.replaceAll(/<script[\s\S]*?<\/script>/gu, ' ')),
+  ])
 );
 const ACCEPTS_CHILDREN = new Map(
   [...TEMPLATES].map(([file, template]) => [file, /@render\s+children|<slot\b/u.test(template)])
@@ -100,9 +109,9 @@ function emittersOf(token) {
  * Every selector item in the shipped CSS and in every Svelte scoped block that carries a bare
  * `select` element token, with the scope tokens governing it.
  */
-function selectElementLegs() {
+function selectElementLegs(corpus = collectStyleCorpus()) {
   const legs = [];
-  for (const [file, css] of Object.entries(collectStyleCorpus())) {
+  for (const [file, css] of Object.entries(corpus)) {
     for (const rule of ruleBlocks(css)) {
       for (const item of splitSelectorList(rule.selector)) {
         const compounds = compoundsOf(flattenGroups(item));
@@ -169,10 +178,14 @@ test('the element-typed leg scan is alive, so the clause below is not quantifyin
     `only ${legs.length} element-typed \`select\` legs found across both corpora, so the ` +
       'selector walk has stopped seeing them'
   );
-  assert.ok(
-    [...RENDERS_SELECT.values()].filter(Boolean).length > 5,
-    'no template renders a `<select>` at all, so every leg would report as stranded and the ' +
-      'baseline below would be measuring the scan rather than the sheet'
+  // The renderers ARE the native-select ratchet's rows, so the scan is pinned to that baseline
+  // rather than to a floor a converted file's prose could hold up.
+  assert.deepEqual(
+    [...RENDERS_SELECT].filter(([, renders]) => renders).map(([file]) => file).sort(),
+    [...new Set(KNOWN_NATIVE_SELECT_ELEMENTS.map((row) => row.key))].sort(),
+    'the templates this scan says render a `<select>` are not the native-select baseline, so a ' +
+      'leg would be judged against hosts that do not render one, or every leg would report as ' +
+      'stranded and the baseline below would be measuring the scan rather than the sheet'
   );
 });
 
@@ -213,5 +226,18 @@ test('the stranded baseline shrinks and is never added to', () => {
       'rule was deleted or a `<select>` came back — and the entry must be deleted with it, ' +
       'because a spent entry silently re-permits the next stranded leg with the same ' +
       'selector:\n  ' + spent.join('\n  ')
+  );
+});
+
+test('the leg walk still opens a Svelte `:global(...)` wrapper, though no scoped block carries a leg', () => {
+  // No scoped block has carried a `select` leg since issue 1510's last conversion, so the Svelte
+  // half of the corpus is proven readable here, on a synthetic block, rather than by the tree.
+  const legs = selectElementLegs({
+    'src/ui/svelte/Probe.svelte': ':global(.probe-panel .probe-toolbar select) { color: red; }',
+  });
+  assert.deepEqual(
+    legs.map((leg) => leg.tokens),
+    [['probe-panel', 'probe-toolbar']],
+    'a `select` leg inside `:global(...)` is invisible to the walk, so every Svelte scoped block is'
   );
 });
