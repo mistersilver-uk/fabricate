@@ -118,17 +118,17 @@ export function createCurrencySection({ services, randomID, refresh }) {
 
     const currency = normalizeWorldCurrencyConfig(store.get(), { randomID });
     const result = await mutate(currency);
-    if (result === false) return false;
+    if (result === false || result == null) return false;
 
     await store.save(currency);
     await refresh();
-    return result ?? true;
+    return result;
   }
 
   async function addCurrencyUnit(partial = {}) {
     return await updateCurrencyConfig((currency) => {
       const id = String(partial?.id || randomID()).trim();
-      if (!id || currency.units.some((unit) => unit.id === id)) return null;
+      if (!id || currency.units.some((unit) => unit.id === id)) return false;
       const unit = normalizeCurrencyUnit(
         {
           id,
@@ -143,7 +143,7 @@ export function createCurrencySection({ services, randomID, refresh }) {
         },
         randomID
       );
-      if (!unit) return null;
+      if (!unit) return false;
       currency.units = [...currency.units, unit];
       return unit;
     });
