@@ -10,6 +10,7 @@ import { createStore, downtimeProvider } from '../helpers/manager/managerStoreFa
 import { createManagerQueries } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
 import { censusDelta, censusOf, writeCensus } from '../helpers/domCensus.js';
+import { chooseSelectOption, selectTriggerText } from '../helpers/select-control.js';
 import {
   assertHook,
   assertNoHook,
@@ -772,16 +773,14 @@ export function registerRailCases() {
     await tick();
     flushSync();
 
-    const statusFilter = target.querySelector(
-      '[aria-label="Filter gathering tasks by status"], [data-gathering-tasks-browser] select'
-    );
-    assert.ok(statusFilter, 'the task toolbar offers a status filter');
+    // The status filter is a shared `<Select>` named by its caption (issue 1510).
+    const statusFilter =
+      '[data-gathering-tasks-browser] .fabricate-select-trigger[aria-labelledby$="-status-filter"]';
     // `active` rather than `disabled`: both are non-default.
-    statusFilter.value = 'active';
-    statusFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, statusFilter, 'active');
     await tick();
     flushSync();
-    assert.equal(statusFilter.value, 'active', 'the filter took the value');
+    assert.equal(selectTriggerText(target, statusFilter), 'Active', 'the filter took the value');
 
     target.querySelector('[aria-label="Edit Gather Moon Herbs"]').click();
     await tick();
@@ -795,10 +794,8 @@ export function registerRailCases() {
     flushSync();
 
     assert.equal(
-      target.querySelector(
-        '[aria-label="Filter gathering tasks by status"], [data-gathering-tasks-browser] select'
-      ).value,
-      'active',
+      selectTriggerText(target, statusFilter),
+      'Active',
       'the status filter survived the editor round-trip'
     );
   });

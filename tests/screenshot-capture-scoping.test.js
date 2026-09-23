@@ -1096,6 +1096,14 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-books-scrolls-status-filter',
   'data-books-scrolls-type-filter',
   'data-books-scrolls-cap-filter',
+  // Issue 1510 phase 3, commit 3c — the gathering task and event toolbars. None carries a hook or
+  // an `aria-label`, so each is spelled by the caption-id SUFFIX its trigger's `aria-labelledby`
+  // ends in, which is what a capture producer addresses it by. `-status-filter` is also the tail
+  // of the books-and-scrolls hook above and of two segmented controls' hooks, none a native select.
+  '-status-filter',
+  '-biome-filter',
+  '-availability-filter',
+  '-danger-filter',
 ]);
 
 /**

@@ -12,6 +12,7 @@
   import StatusToggle from '../../components/StatusToggle.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import Select from '../../components/Select.svelte';
   import {
     DEFAULT_BROWSER_PAGE_SIZE,
     createGatheringEventsBrowserState,
@@ -86,6 +87,28 @@
       });
     })()
   );
+  // The toolbar's three filter vocabularies, each label carried verbatim from the `<option>` text
+  // it replaced (issue 1510).
+  const statusSelectOptions = $derived([
+    {
+      value: 'all',
+      label: text('FABRICATE.Admin.Manager.Environment.Events.StatusAll', 'All events'),
+    },
+    { value: 'active', label: text('FABRICATE.Admin.Manager.StatusActive', 'Active') },
+    { value: 'disabled', label: text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') },
+  ]);
+  const biomeSelectOptions = $derived([
+    { value: 'all', label: text('FABRICATE.Admin.Manager.Environment.BiomeAll', 'All biomes') },
+    ...biomeOptions.map((biome) => ({ value: biome, label: optionLabel('biome', biome) || biome })),
+  ]);
+  const dangerSelectOptions = $derived([
+    {
+      value: 'all',
+      label: text('FABRICATE.Admin.Manager.Environment.Events.DangerAll', 'All danger tags'),
+    },
+    ...dangerOptions.map((tag) => ({ value: tag, label: dangerLabel(tag) })),
+  ]);
+  const instanceId = $props.id();
   const filteredEvents = $derived(
     eventList.filter((event) => {
       const dangerTags = Array.isArray(event.dangerTags) ? event.dangerTags : [];
@@ -336,49 +359,45 @@
         'Search gathering events'
       )}
     />
-    <label class="manager-filter">
-      <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
-      <select
+    <!-- Spans, not labels: a label forwards a caption click into the trigger and re-opens its
+         panel, so each caption names its trigger through an instance-scoped id (issue 1510). -->
+    <span class="manager-filter">
+      <span id={`${instanceId}-status-filter`}
+        >{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span
+      >
+      <Select
+        size="toolbar"
         value={statusFilter}
-        onchange={(event) => (ui.statusFilter = event.currentTarget.value)}
+        options={statusSelectOptions}
+        showTick={false}
+        ariaLabelledBy={`${instanceId}-status-filter`}
+        onChange={(next) => (ui.statusFilter = next)}
+      />
+    </span>
+    <span class="manager-filter">
+      <span id={`${instanceId}-biome-filter`}
+        >{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span
       >
-        <option value="all"
-          >{text('FABRICATE.Admin.Manager.Environment.Events.StatusAll', 'All events')}</option
-        >
-        <option value="active">{text('FABRICATE.Admin.Manager.StatusActive', 'Active')}</option>
-        <option value="disabled"
-          >{text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled')}</option
-        >
-      </select>
-    </label>
-    <label class="manager-filter">
-      <span>{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>
-      <select
+      <Select
+        size="toolbar"
         value={biomeFilter}
-        onchange={(event) => (ui.biomeFilter = event.currentTarget.value)}
+        options={biomeSelectOptions}
+        ariaLabelledBy={`${instanceId}-biome-filter`}
+        onChange={(next) => (ui.biomeFilter = next)}
+      />
+    </span>
+    <span class="manager-filter">
+      <span id={`${instanceId}-danger-filter`}
+        >{text('FABRICATE.Admin.Manager.Environment.Events.DangerTag.Label', 'Danger')}</span
       >
-        <option value="all"
-          >{text('FABRICATE.Admin.Manager.Environment.BiomeAll', 'All biomes')}</option
-        >
-        {#each biomeOptions as biome (biome)}
-          <option value={biome}>{optionLabel('biome', biome) || biome}</option>
-        {/each}
-      </select>
-    </label>
-    <label class="manager-filter">
-      <span>{text('FABRICATE.Admin.Manager.Environment.Events.DangerTag.Label', 'Danger')}</span>
-      <select
+      <Select
+        size="toolbar"
         value={dangerFilter}
-        onchange={(event) => (ui.dangerFilter = event.currentTarget.value)}
-      >
-        <option value="all"
-          >{text('FABRICATE.Admin.Manager.Environment.Events.DangerAll', 'All danger tags')}</option
-        >
-        {#each dangerOptions as tag (tag)}
-          <option value={tag}>{dangerLabel(tag)}</option>
-        {/each}
-      </select>
-    </label>
+        options={dangerSelectOptions}
+        ariaLabelledBy={`${instanceId}-danger-filter`}
+        onChange={(next) => (ui.dangerFilter = next)}
+      />
+    </span>
     <Chip
       >{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}')
         .replace('{shown}', filteredEvents.length)

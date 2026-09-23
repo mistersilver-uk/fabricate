@@ -103,8 +103,6 @@
     "src/ui/svelte/apps/manager/ComponentsBrowserView.svelte | 3",
     "src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte | 1",
     "src/ui/svelte/apps/manager/EssenceBrowserView.svelte | 1",
-    "src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte | 3",
-    "src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte | 3",
     "src/ui/svelte/apps/manager/ManagerNavRail.svelte | 1",
     "src/ui/svelte/apps/manager/RecipesBrowserView.svelte | 2",
     "src/ui/svelte/apps/manager/ToolsBrowserView.svelte | 1",
