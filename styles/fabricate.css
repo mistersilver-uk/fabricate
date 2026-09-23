@@ -12589,9 +12589,13 @@
   height: 36px;
 }
 
-.fabricate-manager .manager-condition-current select,
 .fabricate-manager .manager-condition-add input {
   height: 36px;
+}
+
+/* The current-value picker fills its card, as the native select did from `.fabricate-field.manager-field select`, which is element-typed and reaches no `<button>` (issue 1510). Its height is the `form` rung's 38 rather than the retired 36 the add row keeps: the two sit in separate stacked rows of the card, so they never stand side by side. */
+.fabricate-manager .manager-condition-current .fabricate-select-trigger {
+  width: 100%;
 }
 
 .fabricate-manager .manager-condition-pill-list {

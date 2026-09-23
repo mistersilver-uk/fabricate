@@ -250,6 +250,38 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
+  // The conditions card's current-value list (issue 1510), pinned at a 1024 window: the settings
+  // grid restacks to one column there, so the trigger fills the card far past the `form` rung's
+  // 340px panel ceiling and the frame shows the panel following it out to the call site's own
+  // 1024px cap. At the default 1280 the trigger sits under the ceiling and proves nothing.
+  managerCase({
+    id: 'manager-gathering-condition-current-list',
+    label: 'Manager — Gathering condition current weather list',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    // Stops on the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      {
+        selector:
+          '[data-gathering-condition-panel="weather"] .manager-condition-current .fabricate-select-trigger',
+      },
+    ],
+    expectView: 'environments',
+    // Two claims a closed frame cannot make: the panel exists and it is the ticked weather list.
+    expectSelector:
+      '.fabricate-manager .fabricate-select-popover.fabricate-select-popover-ticked' +
+      ' [data-popover-option="rain"] .fabricate-select-label',
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    position: { width: 1024, height: 720 },
+    kinds: ['manager', 'environments', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
   managerCase({
     id: 'manager-gathering-economy-actors',
     label: 'Manager — Gathering economy actor stamina pools',

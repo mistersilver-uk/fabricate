@@ -584,24 +584,20 @@ export async function exerciseManagerEnvironmentPointerTargets(page) {
   await search.fill('');
   await page.waitForTimeout(250);
 
-  await page
-    .locator('.fabricate-manager select[aria-label="Filter environments by status"]')
-    .first()
-    .selectOption('active');
+  // Both filters are shared `<Select>`s since issue 1510, addressed by the `aria-label` each
+  // trigger keeps; `selectOption` throws on a `<button role="combobox">`.
+  const environmentFilter = (axis) =>
+    page
+      .locator(
+        `.fabricate-manager .fabricate-select-trigger[aria-label="Filter environments by ${axis}"]`
+      )
+      .first();
+  await chooseSelectOption(page, environmentFilter('status'), { value: 'active' });
   await page.waitForTimeout(250);
-  await page
-    .locator('.fabricate-manager select[aria-label="Filter environments by status"]')
-    .first()
-    .selectOption('all');
-  await page
-    .locator('.fabricate-manager select[aria-label="Filter environments by selection mode"]')
-    .first()
-    .selectOption('targeted');
+  await chooseSelectOption(page, environmentFilter('status'), { value: 'all' });
+  await chooseSelectOption(page, environmentFilter('selection mode'), { value: 'targeted' });
   await page.waitForTimeout(250);
-  await page
-    .locator('.fabricate-manager select[aria-label="Filter environments by selection mode"]')
-    .first()
-    .selectOption('all');
+  await chooseSelectOption(page, environmentFilter('selection mode'), { value: 'all' });
 
   const azureRow = page
     .locator('.fabricate-manager .manager-environment-row:has-text("Azure Grove")')

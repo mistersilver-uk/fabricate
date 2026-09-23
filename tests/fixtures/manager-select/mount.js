@@ -14,6 +14,7 @@ import SystemsBrowserView from '../../../src/ui/svelte/apps/manager/SystemsBrows
 import ImportFolderMappingModal from '../../../src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte';
 import RecipeIngredientOption from '../../../src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte';
 import EnvironmentOverviewTab from '../../../src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte';
+import EnvironmentsBrowserView from '../../../src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte';
 import RecipeOverviewTab from '../../../src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte';
 import Select from '../../../src/ui/svelte/components/Select.svelte';
 import ToolBehaviorPreview from '../../../src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte';
@@ -180,6 +181,54 @@ const RECIPE_ITEMS = [
   },
 ];
 
+// The environments browser's fixture data (issue 1510): two environments whose biomes seed the
+// biome filter, and a time-of-day vocabulary whose labels differ sharply in length, so the
+// conditions card's current-value picker is measured on a short value and a long one.
+const BROWSE_ENVIRONMENTS = [
+  {
+    id: 'env-grove',
+    name: 'Sunlit Grove',
+    enabled: true,
+    selectionMode: 'targeted',
+    risk: 'safe',
+    biomes: ['forest'],
+  },
+  {
+    id: 'env-cavern',
+    name: 'Quiet Cavern',
+    enabled: false,
+    selectionMode: 'blind',
+    risk: 'hazardous',
+    biomes: ['cavern'],
+  },
+];
+const TIME_OF_DAY = [
+  { id: 'day', label: 'Day' },
+  { id: 'dawn', label: 'First light of dawn' },
+];
+
+/** The settings tab, its time-of-day card seeded on `startValue`. */
+function environmentsSettings() {
+  return mount(EnvironmentsBrowserView, {
+    target: mountPoint,
+    props: {
+      activeGatheringTab: 'settings',
+      selectedSystemId: 'sys',
+      services: economyServices('hours'),
+      gatheringConfig: {
+        systems: {
+          sys: {
+            conditions: {
+              timeOfDay: { enabled: true, current: startValue || 'day', values: TIME_OF_DAY },
+              weather: { enabled: true, current: 'clear', values: [{ id: 'clear', label: 'Clear' }] },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
 /** The 340px column the tool-edit grid gives the rail, reproduced as fixture chrome. */
 function railColumn() {
   const rail = document.createElement('div');
@@ -327,6 +376,20 @@ const SUBJECTS = {
       target: mountPoint,
       props: { recipeItems: RECIPE_ITEMS, visibilityMode: 'knowledge' },
     }),
+  // The environments toolbar's four filters, driven through their panels like the three above.
+  'environments-browser': () =>
+    mount(EnvironmentsBrowserView, {
+      target: mountPoint,
+      props: { activeGatheringTab: 'environments', environments: BROWSE_ENVIRONMENTS },
+    }),
+  'environments-settings': environmentsSettings,
+  // The same card in a 1024px manager window, where the settings grid restacks to one column and
+  // the card's trigger outgrows the `form` rung's 340px panel ceiling.
+  'environments-settings-1024': () => {
+    frame.style.width = '1024px';
+    mountPoint.classList.remove('fixture-column');
+    return environmentsSettings();
+  },
   // The `Preview as` roster, whose value is component state rather than a prop.
   'tool-preview': () =>
     mount(ToolBehaviorPreview, {

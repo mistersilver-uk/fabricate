@@ -102,7 +102,6 @@
   "nativeSelectElements": [
     "src/ui/svelte/apps/manager/ComponentsBrowserView.svelte | 3",
     "src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte | 1",
-    "src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte | 5",
     "src/ui/svelte/apps/manager/EssenceBrowserView.svelte | 1",
     "src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte | 3",
     "src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte | 3",
