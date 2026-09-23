@@ -71,6 +71,388 @@ function knowledgeWorld(overrides = {}) {
   };
 }
 
+/**
+ * Hold every snapshot read on its own deferred, so a test settles each read in the order it names.
+ * `next()` resolves with the next read once the store has asked for it.
+ */
+function holdKnowledgeReads(harness) {
+  const reads = [];
+  const waiters = [];
+  harness.services.getKnowledgeSnapshot = (systemId) => {
+    harness.journal.record('getKnowledgeSnapshot', [systemId]);
+    let settle;
+    const promise = new Promise((resolve, reject) => {
+      settle = { resolve, reject };
+    });
+    reads.push({ systemId, ...settle });
+    waiters.shift()?.();
+    return promise;
+  };
+  let taken = 0;
+  return {
+    async next() {
+      if (reads.length <= taken) await new Promise((resolve) => waiters.push(resolve));
+      return reads[taken++];
+    },
+  };
+}
+
+function knowledgeFlags(harness) {
+  const { loading, error, systemId } = harness.state().knowledge;
+  return { loading, error, systemId, rows: harness.state().knowledge.characters.length };
+}
+
+async function settleMicrotasks() {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+describe('adminStore knowledge section loading and error states (issue 1969)', () => {
+  it('entry publishes loading before the seam call, then the rows', async () => {
+    const harness = await createSectionHarness(knowledgeWorld());
+    try {
+      const read = harness.services.getKnowledgeSnapshot;
+      let seen = null;
+      harness.services.getKnowledgeSnapshot = (systemId) => {
+        seen = knowledgeFlags(harness);
+        return read(systemId);
+      };
+      await harness.store.setKnowledgeActive(true);
+      assert.deepStrictEqual(seen, { loading: true, error: false, systemId: '', rows: 0 });
+      assert.deepStrictEqual(knowledgeFlags(harness), {
+        loading: false,
+        error: false,
+        systemId: 'sys1',
+        rows: 2,
+      });
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it("a switch's cleared publish carries loading and no error", async () => {
+    const harness = await createSectionHarness(
+      knowledgeWorld({ settings: { lastManagedCraftingSystem: 'sys2' } })
+    );
+    const published = [];
+    let unsubscribe = () => {};
+    try {
+      await harness.store.setKnowledgeActive(true);
+      unsubscribe = harness.store.viewState.subscribe((state) => {
+        published.push({ ...state.knowledge });
+      });
+      published.length = 0;
+      await harness.store.selectSystem('sys1');
+      const cleared = published.find((entry) => entry.active && entry.systemId === '');
+      assert.ok(cleared, 'the cleared projection is published');
+      assert.equal(cleared.loading, true);
+      assert.equal(cleared.error, false);
+      assert.equal(published.at(-1).loading, false);
+    } finally {
+      unsubscribe();
+      harness.dispose();
+    }
+  });
+
+  it('a stale read resolving after a switch leaves the new system loading', async () => {
+    const harness = await createSectionHarness(
+      knowledgeWorld({ settings: { lastManagedCraftingSystem: 'sys2' } })
+    );
+    try {
+      await harness.store.setKnowledgeActive(true);
+      const reads = holdKnowledgeReads(harness);
+      const first = harness.store.selectSystem('sys1');
+      const sys1 = await reads.next();
+      const second = harness.store.selectSystem('sys2');
+      const sys2 = await reads.next();
+      assert.deepStrictEqual([sys1.systemId, sys2.systemId], ['sys1', 'sys2']);
+
+      sys1.resolve(snapshot({ systemId: 'sys1', definitionCount: 2 }));
+      await first;
+      // Force a publish, so an internal flag the stale read moved cannot hide behind no publish.
+      harness.store.selectKnowledgeActor('a1');
+      assert.deepStrictEqual(knowledgeFlags(harness), {
+        loading: true,
+        error: false,
+        systemId: '',
+        rows: 0,
+      });
+
+      sys2.resolve(snapshot({ systemId: 'sys2', definitionCount: 0 }));
+      await second;
+      assert.deepStrictEqual(knowledgeFlags(harness), {
+        loading: false,
+        error: false,
+        systemId: 'sys2',
+        rows: 2,
+      });
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it('a stale read rejecting after a switch leaves the new system loading and still throws', async () => {
+    const harness = await createSectionHarness(
+      knowledgeWorld({ settings: { lastManagedCraftingSystem: 'sys2' } })
+    );
+    try {
+      await harness.store.setKnowledgeActive(true);
+      const reads = holdKnowledgeReads(harness);
+      const first = harness.store.selectSystem('sys1');
+      const sys1 = await reads.next();
+      const second = harness.store.selectSystem('sys2');
+      const sys2 = await reads.next();
+
+      sys1.reject(new Error('stale read failed'));
+      await assert.rejects(first, /stale read failed/);
+      harness.store.selectKnowledgeActor('a1');
+      assert.deepStrictEqual(knowledgeFlags(harness), {
+        loading: true,
+        error: false,
+        systemId: '',
+        rows: 0,
+      });
+
+      sys2.resolve(snapshot({ systemId: 'sys2', definitionCount: 0 }));
+      await second;
+      assert.equal(knowledgeFlags(harness).loading, false);
+      assert.equal(knowledgeFlags(harness).rows, 2);
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it('a current read that rejects publishes the error and still throws', async () => {
+    const harness = await createSectionHarness(knowledgeWorld());
+    try {
+      harness.services.getKnowledgeSnapshot = async () => {
+        throw new Error('scan failed');
+      };
+      await assert.rejects(harness.store.setKnowledgeActive(true), /scan failed/);
+      assert.deepStrictEqual(knowledgeFlags(harness), {
+        loading: false,
+        error: true,
+        systemId: '',
+        rows: 0,
+      });
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it('an error clears on a hook read, and re-entry or a switch replaces it with loading', async () => {
+    const harness = await createSectionHarness(knowledgeWorld());
+    const published = [];
+    let unsubscribe = () => {};
+    try {
+      const read = harness.services.getKnowledgeSnapshot;
+      const failing = async () => {
+        throw new Error('scan failed');
+      };
+      harness.services.getKnowledgeSnapshot = failing;
+      await assert.rejects(harness.store.setKnowledgeActive(true), /scan failed/);
+
+      // A hook-driven read leaves the error showing until it settles, then publishes the rows.
+      harness.services.getKnowledgeSnapshot = read;
+      harness.store.scheduleKnowledgeRefresh();
+      assert.equal(knowledgeFlags(harness).error, true);
+      await settleMicrotasks();
+      assert.deepStrictEqual(knowledgeFlags(harness), {
+        loading: false,
+        error: false,
+        systemId: 'sys1',
+        rows: 2,
+      });
+
+      // Back into the error, then re-entry replaces it with loading before its read settles.
+      await harness.store.setKnowledgeActive(false);
+      harness.services.getKnowledgeSnapshot = failing;
+      await assert.rejects(harness.store.setKnowledgeActive(true), /scan failed/);
+      assert.equal(knowledgeFlags(harness).error, true);
+      const reads = holdKnowledgeReads(harness);
+      const entered = harness.store.setKnowledgeActive(true);
+      assert.deepStrictEqual(knowledgeFlags(harness), {
+        loading: true,
+        error: false,
+        systemId: '',
+        rows: 0,
+      });
+      (await reads.next()).reject(new Error('scan failed'));
+      await assert.rejects(entered, /scan failed/);
+      assert.equal(knowledgeFlags(harness).error, true);
+
+      // And so does a switch: its cleared publish is loading before its read is even asked for.
+      unsubscribe = harness.store.viewState.subscribe((state) => {
+        published.push({ ...state.knowledge });
+      });
+      published.length = 0;
+      const switched = harness.store.selectSystem('sys2');
+      const sys2 = await reads.next();
+      const firstLoading = published.findIndex((entry) => entry.loading === true);
+      assert.ok(firstLoading !== -1, 'the switch publishes loading');
+      assert.ok(
+        published.slice(firstLoading).every((entry) => entry.error === false),
+        'and the error is gone from that publish on'
+      );
+      assert.equal(knowledgeFlags(harness).loading, true);
+      sys2.resolve(snapshot({ systemId: 'sys2', definitionCount: 0 }));
+      await switched;
+      assert.deepStrictEqual(knowledgeFlags(harness), {
+        loading: false,
+        error: false,
+        systemId: 'sys2',
+        rows: 2,
+      });
+    } finally {
+      unsubscribe();
+      harness.dispose();
+    }
+  });
+
+  it('only the latest read settles loading, and a superseded rejection moves neither flag', async () => {
+    const harness = await createSectionHarness(knowledgeWorld());
+    try {
+      await harness.store.setKnowledgeActive(true);
+      const reads = holdKnowledgeReads(harness);
+      const switched = harness.store.selectSystem('sys2');
+      const switchRead = await reads.next();
+      harness.store.scheduleKnowledgeRefresh();
+      const hookRead = await reads.next();
+
+      switchRead.reject(new Error('superseded read failed'));
+      await assert.rejects(switched, /superseded read failed/);
+      harness.store.selectKnowledgeActor('a1');
+      assert.deepStrictEqual(knowledgeFlags(harness), {
+        loading: true,
+        error: false,
+        systemId: '',
+        rows: 0,
+      });
+
+      hookRead.resolve(snapshot({ systemId: 'sys2', definitionCount: 0 }));
+      await settleMicrotasks();
+      assert.deepStrictEqual(knowledgeFlags(harness), {
+        loading: false,
+        error: false,
+        systemId: 'sys2',
+        rows: 2,
+      });
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it('a superseded rejection sets no error even after the latest read found no snapshot', async () => {
+    const harness = await createSectionHarness(knowledgeWorld());
+    try {
+      await harness.store.setKnowledgeActive(true);
+      const reads = holdKnowledgeReads(harness);
+      const stale = harness.store.refreshKnowledge({ force: true });
+      const staleRead = await reads.next();
+      const latest = harness.store.refreshKnowledge({ force: true });
+      (await reads.next()).resolve(null);
+      await latest;
+
+      staleRead.reject(new Error('superseded read failed'));
+      await assert.rejects(stale, /superseded read failed/);
+      harness.store.selectKnowledgeActor('a1');
+      assert.deepStrictEqual(knowledgeFlags(harness), {
+        loading: false,
+        error: false,
+        systemId: '',
+        rows: 0,
+      });
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it('a read superseded by leaving writes no cache, so re-entry loads and resolves its own tab', async () => {
+    const harness = await createSectionHarness(knowledgeWorld());
+    try {
+      const reads = holdKnowledgeReads(harness);
+      const entered = harness.store.setKnowledgeActive(true);
+      const leftBehind = await reads.next();
+      await harness.store.setKnowledgeActive(false);
+      // Zero definitions would resolve the Learned tab, which the re-entry read must not inherit.
+      leftBehind.resolve(snapshot({ systemId: 'sys1', definitionCount: 0 }));
+      await entered;
+
+      const reentered = harness.store.setKnowledgeActive(true);
+      const reentryRead = await reads.next();
+      assert.deepStrictEqual(knowledgeFlags(harness), {
+        loading: true,
+        error: false,
+        systemId: '',
+        rows: 0,
+      });
+      reentryRead.resolve(snapshot({ systemId: 'sys1', definitionCount: 2 }));
+      await reentered;
+      assert.equal(knowledgeFlags(harness).loading, false);
+      assert.equal(knowledgeFlags(harness).rows, 2);
+      assert.equal(harness.state().knowledge.defaultTab, 'recipeItems');
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it('a populated re-read never publishes loading or error, and a failed one keeps the rows', async () => {
+    const harness = await createSectionHarness(knowledgeWorld());
+    const published = [];
+    let unsubscribe = () => {};
+    try {
+      await harness.store.setKnowledgeActive(true);
+      unsubscribe = harness.store.viewState.subscribe((state) => {
+        published.push({ ...state.knowledge });
+      });
+      published.length = 0;
+
+      harness.store.scheduleKnowledgeRefresh();
+      await settleMicrotasks();
+      await harness.store.eraseLearnedRecipe('a1', 'r1');
+      harness.services.getKnowledgeSnapshot = async () => {
+        throw new Error('re-read failed');
+      };
+      await assert.rejects(harness.store.eraseLearnedRecipe('a1', 'r1'), /re-read failed/);
+
+      assert.ok(published.length >= 3, `the re-reads published: ${published.length}`);
+      for (const entry of published) {
+        assert.equal(entry.loading, false, 'a populated re-read never publishes loading');
+        assert.equal(entry.error, false, 'a populated re-read never publishes an error');
+        assert.equal(entry.characters.length, 2, 'the last rows stay published');
+      }
+    } finally {
+      unsubscribe();
+      harness.dispose();
+    }
+  });
+
+  it('leaving and destroying reset both flags and stop an in-flight read settling them', async () => {
+    const harness = await createSectionHarness(knowledgeWorld());
+    try {
+      harness.services.getKnowledgeSnapshot = async () => {
+        throw new Error('scan failed');
+      };
+      await assert.rejects(harness.store.setKnowledgeActive(true), /scan failed/);
+      await harness.store.setKnowledgeActive(false);
+      assert.deepStrictEqual(
+        { loading: knowledgeFlags(harness).loading, error: knowledgeFlags(harness).error },
+        { loading: false, error: false }
+      );
+
+      const reads = holdKnowledgeReads(harness);
+      const entered = harness.store.setKnowledgeActive(true);
+      const inFlight = await reads.next();
+      const before = harness.state().knowledge;
+      harness.store.destroy();
+      inFlight.reject(new Error('scan failed'));
+      await assert.rejects(entered, /scan failed/);
+      assert.deepStrictEqual(harness.state().knowledge, before, 'a destroyed store publishes nothing');
+    } finally {
+      harness.dispose();
+    }
+  });
+});
+
 describe('adminStore knowledge section corpus', () => {
   it('reads the snapshot seam zero times while the surface is closed', async () => {
     const harness = await createSectionHarness(knowledgeWorld());
