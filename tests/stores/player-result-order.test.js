@@ -43,8 +43,8 @@ let compiler;
 let createPlayerResultOrder;
 
 /**
- * One composable plus the write log and the subject handle. `rejectWrite` makes the persisting seam
- * throw, which is the only way the revert path is reachable.
+ * One composable plus the write log and the subject handle. `rejectWrite` (true, or one key) makes
+ * the persisting seam throw, which is the only way the revert path is reachable.
  */
 function setup({ stored = {}, rejectWrite = false, debounceMs, markFiredStages, orderId = 'a' } = {}) {
   const writes = [];
@@ -55,7 +55,7 @@ function setup({ stored = {}, rejectWrite = false, debounceMs, markFiredStages, 
     read: () => stored,
     write: async (key, list) => {
       writes.push({ key, order: list });
-      if (rejectWrite) throw new Error('setting rejected');
+      if (rejectWrite === true || rejectWrite === key) throw new Error('setting rejected');
       return {};
     },
     revertMessage: () => REVERTED,
@@ -288,6 +288,129 @@ describe('createPlayerResultOrder', () => {
 
     await order.flush();
     assert.deepEqual(writes, [{ key: 'recipe:a', order: ['s3', 's1', 's2'] }]);
+  });
+
+  /** Reorder A, then B inside the same window, so A's write is committed early. */
+  function reorderAThenB(options) {
+    const handle = setup({ debounceMs: 10_000, ...options });
+    handle.order.reorder(2, 0, 'a moved');
+    flushSync();
+    handle.source.swapTo(progressive('b'));
+    flushSync();
+    handle.order.reorder(1, 0, 'b moved');
+    flushSync();
+    return handle;
+  }
+
+  // Issue 1809: a second subject's reorder must not clear the first subject's pending write.
+  it('two subjects reordered inside one window both persist', async () => {
+    const { order, writes } = reorderAThenB();
+    await Promise.resolve();
+    assert.deepEqual(
+      writes,
+      [{ key: 'recipe:a', order: ['s3', 's1', 's2'] }],
+      "A's write issued before the flush"
+    );
+
+    await order.flush();
+    assert.equal(writes.length, 2);
+    assert.equal(writes[0].key, 'recipe:a');
+    assert.equal(writes[1].key, 'recipe:b');
+    assert.deepEqual(writes[1].order, ['s2', 's1', 's3']);
+  });
+
+  it('flush awaits an early-committed write, so its rejection still fails the flush', async () => {
+    const { order, writes } = reorderAThenB({ rejectWrite: 'recipe:a' });
+    assert.deepEqual(await order.flush(), { ok: false });
+    assert.deepEqual(
+      writes.map((write) => write.key),
+      ['recipe:a', 'recipe:b']
+    );
+  });
+
+  it('a rejected early write reverts only its own key while the other stays pending', async () => {
+    const { order, writes } = reorderAThenB({
+      stored: { 'recipe:a': ['s1', 's3', 's2'] },
+      rejectWrite: 'recipe:a',
+    });
+    await new Promise((settle) => setTimeout(settle, 0));
+    flushSync();
+
+    assert.deepEqual(order.orders['recipe:a'], ['s1', 's3', 's2'], 'A reverted');
+    assert.equal(order.announcement, REVERTED);
+    assert.deepEqual(ids(order.orderedStages), ['s2', 's1', 's3'], "B's move still rendered");
+    assert.equal(writes.length, 1, 'B is still pending');
+
+    assert.deepEqual(await order.flush(), { ok: true });
+    assert.deepEqual(writes.at(-1), { key: 'recipe:b', order: ['s2', 's1', 's3'] });
+  });
+
+  it('A then B then A inside one window writes three times, the last the pending A', async () => {
+    const { order, writes, source } = reorderAThenB();
+    source.swapTo(progressive('a'));
+    flushSync();
+    order.reorder(2, 0, 'a moved again');
+    flushSync();
+
+    await order.flush();
+    assert.deepEqual(writes, [
+      { key: 'recipe:a', order: ['s3', 's1', 's2'] },
+      { key: 'recipe:b', order: ['s2', 's1', 's3'] },
+      { key: 'recipe:a', order: ['s2', 's3', 's1'] },
+    ]);
+  });
+
+  // Issue 1807: a listing reload (seed) inside the window must not replace the pending order.
+  it('a reload (seed) inside the window keeps the pending order, and flush writes IT', async () => {
+    const stored = { 'recipe:a': ['s2', 's1', 's3'] };
+    const { order, writes } = setup({ stored, debounceMs: 10_000 });
+    order.reorder(2, 0, 'moved');
+    flushSync();
+
+    stored['recipe:b'] = ['s3', 's2', 's1'];
+    order.seed();
+    flushSync();
+
+    assert.deepEqual(ids(order.orderedStages), ['s3', 's2', 's1'], 'the moved row did not snap back');
+    assert.equal(writes.length, 0, 'the write is still pending');
+    assert.deepEqual(order.orders['recipe:b'], ['s3', 's2', 's1'], 'the re-read map is honoured');
+
+    await order.flush();
+    assert.deepEqual(writes, [{ key: 'recipe:a', order: ['s3', 's2', 's1'] }]);
+  });
+
+  it('a reload inside the window never turns a never-stored pending order into []', async () => {
+    const stored = {};
+    const { order, writes } = setup({ stored, debounceMs: 10_000 });
+    order.reorder(2, 0, 'moved');
+    flushSync();
+
+    stored['recipe:b'] = ['s3', 's2', 's1'];
+    order.seed();
+    flushSync();
+    assert.deepEqual(ids(order.orderedStages), ['s3', 's1', 's2']);
+
+    await order.flush();
+    assert.deepEqual(writes, [{ key: 'recipe:a', order: ['s3', 's1', 's2'] }]);
+  });
+
+  it('a rejected write after an in-window reload reverts to the RE-READ order', async () => {
+    const stored = { 'recipe:a': ['s2', 's1', 's3'] };
+    const { order } = setup({ stored, rejectWrite: true, debounceMs: 10_000 });
+    order.reorder(2, 0, 'moved');
+    flushSync();
+
+    stored['recipe:a'] = ['s1', 's3', 's2'];
+    order.seed();
+    flushSync();
+    assert.deepEqual(ids(order.orderedStages), ['s3', 's2', 's1'], 'still rendered after seed');
+
+    const result = await order.flush();
+    flushSync();
+
+    assert.deepEqual(result, { ok: false });
+    assert.deepEqual(ids(order.orderedStages), ['s1', 's3', 's2']);
+    assert.equal(order.announcement, REVERTED);
   });
 
   // The revert path

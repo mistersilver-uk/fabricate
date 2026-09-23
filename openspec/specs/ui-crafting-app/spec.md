@@ -504,6 +504,11 @@ The salvage deltas are stated at the end of this section; everything else applie
 - Reorder writes are **debounced** and committed on settle, not per intermediate move, because each write is a replicated document write.
 - The key a debounced reorder write commits the **Player Result Order** under is captured when the reorder is **scheduled**, never re-derived when the write flushes.
   A subject change between the gesture and the commit would otherwise write the reordered stages under a key naming a **different** recipe or participation, silently — the player reorders one subject's stages and another subject's preference moves.
+- A pending debounced reorder write is never lost to the debounce itself.
+  A reorder of a **different** subject inside the window commits the pending write before arming its own debounce, rather than replacing it.
+  A listing reload inside the window (re-seeding the stored orders from settings) keeps the pending order rendered and still **pending**, so the eventual commit writes the player's order under its captured key — never skipped, never the re-read value, and never an empty order the re-read map merely lacked.
+  Otherwise a move already announced through the live region would be silently dropped or overwritten by the value it replaced.
+  The write stays pending rather than committing when the reload seeds it, so the flush-before-salvage rule below still sees it and a rejection can still abort the run.
 - If a write **fails**, the rows revert to the last persisted order and the revert is announced through the **same** `aria-live` region.
   A notification alone is insufficient: the writes are optimistic, so the row has already moved and already announced, and a keyboard user reordering by chevron may never see a toast — leaving the player believing an order that was never stored.
 - When the permission is `false` the rows keep their ordinal and difficulty but **drop the grip glyph** (the grip is the affordance signal), use a default cursor, attach **no** drag handlers, and show one muted line explaining that the GM set the order.
@@ -584,6 +589,9 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 - The permission is `Component.salvage.allowPlayerResultReorder` (default true; only an explicit `false` pins the authored order), not the recipe's.
 - The player's order is stored under the `salvage:<systemId>:<componentId>` key (see `resolution-modes` §Which user's order is read).
 - A pending debounced write MUST be **flushed before a salvage run starts**, and a **rejected** write MUST abort the run: an unflushed write is captured stale onto the run record, and a rejected one leaves the player looking at an order that was reverted.
+- The flush a salvage run awaits belongs to the whole salvage panel, not just the subject starting it.
+  It also awaits a commit already issued for a **different** subject — one committed early by a subject switch (§Progressive Stage List) or one the debounce timer itself already fired — so a rejection there still fails the flush and aborts this run.
+  Reordering a different component moments before starting this salvage can therefore abort a run whose own order write never failed.
 - Salvage renders **no exclude affordance**: reorder is the whole of the feature.
   That holds for the complication surfaces too: no player progressive surface offers a per-stage exclude toggle, an excluded-results list or a hidden-result note.
   Exclusion would contradict the reconciliation guarantee that a result is never dropped, so the vocabulary is not built rather than built and disabled.
