@@ -2456,6 +2456,7 @@ export class RecipeVisibilityService {
   // The in-place deletion entries for one plan, or nothing when that store has to be
   // rebuilt instead. Returned as a payload fragment so every store's deletions merge
   // into ONE `Actor#update`. An id the helper will not address reroutes the store.
+  // Rerouting sets needsRebuild here, so this must run before the two-step loop reads it.
   _inPlaceDeletions(plan) {
     if (plan.needsRebuild) return {};
     const parentPath = `${this._nestedFlagPath}.${plan.flagKey}`;
@@ -2484,8 +2485,8 @@ export class RecipeVisibilityService {
    * @private
    */
   async _rebuildStoreWithoutIds(actor, plan) {
-    const [parentPath, deletion] = forcedDeletionEntry(this._nestedFlagPath, plan.flagKey);
-    await actor.update({ [parentPath]: deletion });
+    const [path, deletion] = forcedDeletionEntry(this._nestedFlagPath, plan.flagKey);
+    await actor.update({ [path]: deletion });
     const cleared = new Set(plan.ids);
     const retained = buildFlagMapFromEntries([...plan.entries].filter(([id]) => !cleared.has(id)));
     await plan.write(actor, retained);

@@ -83,7 +83,7 @@ export async function setFabricateFlag(document, key, value) {
   return await document.setFlag(FABRICATE_FLAG_NAMESPACE, normalizedKey, value);
 }
 
-/** Core `setProperty` skips these segments on V14, so a deletion addressed at one never lands. */
+/** V14 `setProperty` skips these segments, so a dotted V14 deletion at one silently no-ops; both helpers refuse them. */
 const PROTOTYPE_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
 
 function forcedDeletionOperator() {
