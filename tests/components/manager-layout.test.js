@@ -9,5 +9,6 @@ import './manager-layout-recipes.js';
 import './manager-layout-gathering.js';
 import './manager-layout-downtime.js';
 import './manager-layout-browsers.js';
+import './manager-layout-side-rail.js';
 import './manager-layout-primitives.js';
 import './manager-layout-select.js';

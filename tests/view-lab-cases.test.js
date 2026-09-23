@@ -733,6 +733,8 @@ test('exactly the declared layout cases carry complete layout expectations', () 
     assert.equal(viewCase.expectLayout.expectedTracks, 1);
     assert.equal(viewCase.expectLayout.absentSelector, undefined);
     assert.equal(typeof viewCase.expectCenterHit, 'string');
+    // The side rail beside the stacked frame runs the body's full height (issue 1976).
+    assert.equal(viewCase.expectLayout.fillSelector, '.manager-rail');
   }
   for (const viewCase of declared.filter((entry) =>
     FULL_WIDTH_LAYOUT_CASE_IDS.includes(entry.id)
@@ -742,6 +744,8 @@ test('exactly the declared layout cases carry complete layout expectations', () 
     assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, undefined);
     assert.equal(viewCase.expectLayout.expectedTracks, 2);
     assert.equal(viewCase.expectLayout.absentSelector, '.manager-inspector');
+    // And the side rail runs the body's full height below the 1120px rung (issue 1976).
+    assert.equal(viewCase.expectLayout.fillSelector, '.manager-rail');
   }
   for (const viewCase of declared.filter((entry) =>
     RAIL_FILL_LAYOUT_CASE_IDS.includes(entry.id)
@@ -751,6 +755,29 @@ test('exactly the declared layout cases carry complete layout expectations', () 
     assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, undefined);
     assert.equal(viewCase.expectLayout.absentSelector, undefined);
   }
+});
+
+// The side-rail routes' own scrollers below the 1120px rung (issue 1976): the two editors whose
+// band override is put back, and the stacked catalogue whose list-over-inspector layout scrolls.
+test('the side-rail band cases name the scroller that owns their overflow', () => {
+  const scrollers = {
+    'manager-recipe-edit-step-narrow': 'main.manager-recipe-edit-main',
+    'manager-gathering-task-editor-selector-narrow': 'main.manager-gathering-task-edit-view',
+    'manager-gathering-task-editor-straight-narrow': 'main.manager-gathering-task-edit-view',
+    'manager-gathering-task-editor-routed-narrow': 'main.manager-gathering-task-edit-view',
+    'world-tool-catalogue-stacked': '.manager-scoped-list-layout',
+  };
+  for (const [id, scroller] of Object.entries(scrollers)) {
+    assert.equal(getCaseById(id).expectScrollable, scroller, id);
+  }
+  const stacked = getCaseById('world-tool-catalogue-stacked');
+  const parent = getCaseById('world-tool-catalogue');
+  // 882 wide, so the list frame is below its own 760px stack while the body keeps two tracks.
+  assert.deepEqual(stacked.position, { width: 882, height: 720 });
+  assert.deepEqual(stacked.steps, parent.steps);
+  assert.equal(stacked.expectView, parent.expectView);
+  assert.equal(stacked.expectSelector, parent.expectSelector);
+  assert.equal(stacked.expectContained, undefined, 'the stacked inspector sits below the fold');
 });
 
 function layoutCasePosition(id) {

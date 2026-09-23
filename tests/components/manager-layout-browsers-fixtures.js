@@ -8,7 +8,7 @@ import { chipCss, css, withChipHash } from './manager-layout-shared.js';
 const COPY_ROW = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">4 Recipe Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span></span></span><span class="manager-knowledge-row-actions"><button class="fabricate-button manager-button fab-manager-button">Expend use</button><button class="fabricate-button manager-button is-danger">Delete</button></span></li>`;
 
 // A nav taller than the body, so a missing cap on the stacked rail is measurable (issue 1972).
-const RAIL = `<aside class="manager-rail"><p class="manager-rail-title">GM management</p><nav class="manager-nav">${Array.from(
+export const RAIL = `<aside class="manager-rail"><p class="manager-rail-title">GM management</p><nav class="manager-nav">${Array.from(
   { length: 40 },
   (_, index) => `<button class="manager-nav-button">Nav entry ${index + 1}</button>`
 ).join('')}</nav></aside>`;

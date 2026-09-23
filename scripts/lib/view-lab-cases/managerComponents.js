@@ -468,6 +468,8 @@ export const CASES = Object.freeze([
       containerSelector: '.fabricate-manager',
       gridSelector: 'main.manager-component-edit-main',
       expectedTracks: 1,
+      // The side rail runs the body's full height beside the stacked frame (issue 1976).
+      fillSelector: '.manager-rail',
     },
     expectCenterHit: '[data-component-edit-tab="rules"]',
     expectContained: [
