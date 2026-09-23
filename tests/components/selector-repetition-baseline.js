@@ -5,10 +5,10 @@
  * all, and the chain joined by ` >> ` when a rule is nested. The at-context is part of the key
  * because two rules under different conditions are never the same rule: the same selector inside
  * a `@container` and at the top level is two different pieces of authoring, and merging them is
- * not a thing that can be done. Keyed on the selector ALONE the sheet holds 200 repeated selectors
+ * not a thing that can be done. Keyed on the selector ALONE the sheet holds 201 repeated selectors
  * rather than these 107, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,043 `(at-context, selector)` keys, of which 2,936 appear exactly
+ * Unfiltered, the sheet holds 3,044 `(at-context, selector)` keys, of which 2,937 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -19,7 +19,7 @@
  * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,567 rules at that head, 107 repeated keys and 219 appearances
+ * printed from. The sheet holds 2,568 rules at that head, 107 repeated keys and 219 appearances
  * between them; five keys appear three times and none appears four or more.
  * ISSUE 1510 PHASE 2 moves both the contextual figures and one repeated row. The component
  * studio conversion is already in main; the checks conversion adds two net rules and one net
@@ -172,6 +172,14 @@
  * single-track `.manager-main` list, a singleton in both keyings: 3,042 -> 3,043 keys and
  * 2,935 -> 2,936 singletons; 2,567 rules, 107 repeated keys, 219 appearances and 200 keyed alone
  * are unmoved. Re-derived by running `node scripts/stylesheet-selector-census.mjs`.
+ * ISSUE 1972 (2026-09-23) MOVES THE THREE CONTEXTUAL FIGURES AND ONE KEYED-ALONE ONE. Knowledge
+ * keeps its full-height rail between the 1120px and 832px rungs through ONE new top-level rule,
+ * `.fabricate-manager[data-manager-view="knowledge"] .manager-rail`; the body rule and the 831px
+ * rail rule gain declarations in place. The arrival is a singleton under this file's keying, but
+ * its selector already heads the 831px block's rail rule, so keyed alone it becomes a repeated
+ * selector: 2,567 -> 2,568 rules, 3,043 -> 3,044 keys, 2,936 -> 2,937 singletons, 200 -> 201
+ * keyed alone; 107 repeated keys and 219 appearances are unmoved. Re-derived by running
+ * `node scripts/stylesheet-selector-census.mjs` and this file's ledger gate, not subtracted.
  */
 import { readFileSync } from 'node:fs';
 

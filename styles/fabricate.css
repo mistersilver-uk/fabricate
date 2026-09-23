@@ -18370,10 +18370,19 @@
 /* The layout is FIVE pieces, not one rule, and doing only some of them fails silently: the shared `.manager-body` is `220px minmax(0, 1fr) 300px` with `overflow: hidden`, so releasing the third column here without ALSO suppressing the shared `<aside class="manager-inspector">` in `CraftingSystemManagerRoot.svelte` leaves an empty 300px strip holding the row open. */
 .fabricate-manager[data-manager-view="knowledge"] .manager-body {
   grid-template-columns: 220px 250px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
 }
 
 .fabricate-manager[data-manager-view="knowledge"] .manager-body.is-rail-collapsed {
   grid-template-columns: 56px 250px minmax(0, 1fr);
+}
+
+/* Down to 832px the rail is a full-height column, so the shared 1120px stacked-rail cap does not reach it (issue 1972). */
+.fabricate-manager[data-manager-view="knowledge"] .manager-rail {
+  max-height: none;
+  border-right: 1px solid var(--fab-border);
+  border-bottom: 0;
 }
 
 /* `.manager-knowledge-main` is `display: contents` — authored once alongside `.manager-tool-edit-main`, the other view that owns its own columns. */
@@ -18681,6 +18690,8 @@
   .fabricate-manager[data-manager-view="knowledge"] .manager-rail {
     max-height: 320px;
     overflow-y: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--fab-border);
   }
 
   .fabricate-manager .manager-knowledge-roster {
