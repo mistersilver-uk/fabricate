@@ -8,6 +8,7 @@ export async function assertViewLabLayout(page, expectation, label) {
     maxContentBoxInlineSize,
     expectedTracks = 1,
     absentSelector = '',
+    fillSelector = '',
   } = expectation;
   const container = await requiredLocator(page, containerSelector, 'container', label);
   if (Number.isFinite(maxContentBoxInlineSize)) {
@@ -45,12 +46,28 @@ export async function assertViewLabLayout(page, expectation, label) {
     );
   }
 
+  if (fillSelector) await assertFillsGrid(page, grid, expectation, label);
+
   if (!absentSelector) return;
   const absentCount = await page.locator(absentSelector).count();
   if (absentCount !== 0) {
     throw new Error(
       `${label}: ${absentSelector} must not be rendered on this route; found ${absentCount}. ` +
         'A released column with the aside still rendered photographs a dead strip.'
+    );
+  }
+}
+
+// The fill element must end where the grid ends: a capped rail stops short of it (issue 1972).
+async function assertFillsGrid(page, grid, { gridSelector, fillSelector }, label) {
+  const fill = await requiredLocator(page, fillSelector, 'fill', label);
+  const bottom = (element) => element.getBoundingClientRect().bottom;
+  const gridBottom = await grid.evaluate(bottom);
+  const fillBottom = await fill.evaluate(bottom);
+  if (Math.abs(fillBottom - gridBottom) > 1) {
+    throw new Error(
+      `${label}: ${fillSelector} bottom ${fillBottom}px must reach ${gridSelector} bottom ` +
+        `${gridBottom}px`
     );
   }
 }
