@@ -589,6 +589,9 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 - The permission is `Component.salvage.allowPlayerResultReorder` (default true; only an explicit `false` pins the authored order), not the recipe's.
 - The player's order is stored under the `salvage:<systemId>:<componentId>` key (see `resolution-modes` §Which user's order is read).
 - A pending debounced write MUST be **flushed before a salvage run starts**, and a **rejected** write MUST abort the run: an unflushed write is captured stale onto the run record, and a rejected one leaves the player looking at an order that was reverted.
+- The flush a salvage run awaits belongs to the whole salvage panel, not just the subject starting it.
+  It also awaits a commit already issued for a **different** subject — one committed early by a subject switch (§Progressive Stage List) or one the debounce timer itself already fired — so a rejection there still fails the flush and aborts this run.
+  Reordering a different component moments before starting this salvage can therefore abort a run whose own order write never failed.
 - Salvage renders **no exclude affordance**: reorder is the whole of the feature.
   That holds for the complication surfaces too: no player progressive surface offers a per-stage exclude toggle, an excluded-results list or a hidden-result note.
   Exclusion would contradict the reconciliation guarantee that a result is never dropped, so the vocabulary is not built rather than built and disabled.
