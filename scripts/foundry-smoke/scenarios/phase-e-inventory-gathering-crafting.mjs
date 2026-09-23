@@ -387,10 +387,21 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
       .click();
     // An immediate (d100) attempt opens the interactive roll prompt: capture it and click Roll.
     await handleRollPromptIfPresent(ctx, 'player-gathering-roll-prompt');
-    await appShell
-      .locator('[data-gathering-state="populated"]')
-      .first()
-      .waitFor({ state: 'visible', timeout: 10_000 });
+    // The attempt keeps a ready button disabled until its listing reload lands, and that reload
+    // re-keys the task rows; selecting a row before it settles races a detached element.
+    await page.waitForFunction(
+      () => {
+        const app = document.querySelector('#fabricate-app');
+        return (
+          Boolean(app?.querySelector('[data-gathering-state="populated"]')) &&
+          !app.querySelector(
+            '[data-gathering-attempt][data-gathering-attempt-blocked="false"]:disabled'
+          )
+        );
+      },
+      null,
+      { timeout: 15_000 }
+    );
   }
 
   // Documentation journey captures: exercise the user-visible gathering states the quickstart
