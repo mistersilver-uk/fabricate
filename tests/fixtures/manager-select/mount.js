@@ -266,7 +266,8 @@ const GATHERING_RECORDS = [
 // The recipe, component and essence libraries' toolbars (issue 1510). `Weaponsmithing (7)` is the
 // longest recipe category label measured in the product, and the component essence list opens on
 // `Carries any essence`, the tightest panel of the conversion. `LONG_CATEGORY_COMPONENT` is longer
-// than the 180px the bare filter root is capped at, which no panel can draw whole.
+// than the 180px the bare filter root is capped at, so the trigger is held to the cap and
+// ellipsises.
 const LIBRARY_RECIPES = [
   { id: 'r-blade', name: 'Tempered Blade', category: 'Weaponsmithing', enabled: true },
   { id: 'r-salve', name: 'Soothing Salve', category: 'Alchemy', enabled: true },

@@ -341,7 +341,7 @@ A `:has()` ring on a non-focusable host pairs with a strip on the descendant con
 
 A re-rooted family that owns NO control of its own declares NEITHER a floor nor a pair, and stating that is what keeps the two rules above from being read as obligations on every family.
 `ManagerToolbar` and `InspectorCard` render `section`s whose controls are all the caller's, so chrome declared for them would displace an area's chrome for a control the primitive does not own — which the sentence above already forbids for the pager's `select`.
-No family rule reaches a caller's control either: a caller that lifts its own select to the 38px rung does so in a rule keyed on its own bar, beside the scoped catalogue's lead row.
+No rule rooted at the family reaches a caller's control either: a caller that lifts its own select to the 38px rung does so in a rule keyed on its own bar, beside the scoped catalogue's lead row.
 
 The PAIR half of that sentence is a RULE rather than three case-by-case calls, and stating it that way is what stops a later change reading a refusal as an oversight.
 A family declares a focus pair ONLY for a control it renders ITSELF.

@@ -522,7 +522,6 @@ const EXTRA_PROBES = Object.freeze([
   'pill-select-any',
 ]);
 
-
 /** The two family RAILS whose rendered border box follows the host's `box-sizing`. */
 const BORDERED_TRACK_PROBES = Object.freeze(['toggle-track', 'slider-track']);
 
@@ -2254,7 +2253,7 @@ test('the issue-1508 controls depend on host chrome for box-sizing, and nothing 
  * `ManagerToolbar` and `InspectorCard` are the first re-rooted families whose root is not a
  * control and does not CONTAIN one of their own: the bar renders `{@render children?.()}` and the
  * card renders its caller's children. So they declare no font floor and no focus pair, and the
- * three clauses below are the two halves of that decision plus its one residue.
+ * two clauses below are the two halves of that decision.
  */
 
 test('the filter bar and the card declare their own box rather than inheriting it', async () => {
@@ -2369,6 +2368,22 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
         `\`${root}\` declares type. Neither of these families owns a control, so neither gets a ` +
           'font floor: every control in the bar is the CALLER\'s, and flooring one here is the ' +
           'displacement the requirement refuses.'
+      );
+
+      // AND NO FAMILY RULE REACHES A CONTROL. A height or a corner written here for a caller's
+      // control is the same displacement as a font floor; a caller lifts its own control in a
+      // rule keyed on its own bar.
+      const reaching = family.filter((rule) =>
+        rule.selectorText
+          .split(',')
+          .map((selector) => selector.split(named).slice(1).join(''))
+          .some((tail) => /(?:^|[\s>+~(])(?:select|input|button|textarea)(?![\w-])/.test(tail))
+      );
+      assert.deepEqual(
+        reaching.map((rule) => rule.selectorText),
+        [],
+        `\`${root}\` declares a rule that reaches a control the CALLER renders. This family owns ` +
+          'no control, so a rung or a skin for one belongs to the caller’s own bar rule.'
       );
     }
 

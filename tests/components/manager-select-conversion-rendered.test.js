@@ -709,6 +709,9 @@ describe('a converted manager trigger keeps the width its native select had (iss
           trigger: width(trigger),
           root: width(trigger.closest('.fabricate-select')),
           ellipsised: value.scrollWidth > value.clientWidth,
+          chevronInside:
+            trigger.querySelector(':scope > i:last-child').getBoundingClientRect().right <=
+            trigger.getBoundingClientRect().right + 0.5,
         };
         trigger.style.maxWidth = 'none';
         return { ...shipped, uncapped: width(trigger) };
@@ -725,9 +728,52 @@ describe('a converted manager trigger keeps the width its native select had (iss
           'the cap the root states and pushes every control after it along the row'
       );
       assert.ok(measured.ellipsised, 'and the value ellipsises inside the capped trigger');
+      assert.ok(measured.chevronInside, 'and the chevron stays inside the capped trigger');
     } finally {
       await page.close();
     }
+  });
+
+  it('inks the component toolbar triggers in the secondary text colour the reference draws', async () => {
+    // `proto:1054`, `proto:1056` and `proto:1066` ink all three `--text2`. A route rule keyed on
+    // `data-manager-view="components"` states it; the essence sort, on no such route, is the
+    // non-vacuity leg, so a probe that resolved to the rung's own ink could not pass.
+    const read = async (subject, hooks) => {
+      const page = await openFixture(subject);
+      try {
+        return await page.evaluate((selectors) => {
+          const probe = document.createElement('span');
+          probe.style.color = 'var(--fab-text-secondary)';
+          document.querySelector('.fabricate-manager').append(probe);
+          const secondary = globalThis.getComputedStyle(probe).color;
+          probe.remove();
+          return {
+            secondary,
+            inks: selectors.map(
+              (selector) => globalThis.getComputedStyle(document.querySelector(selector)).color
+            ),
+          };
+        }, hooks);
+      } finally {
+        await page.close();
+      }
+    };
+    const components = await read('components-browser', [
+      '[data-component-category-filter]',
+      '[data-component-essence-filter]',
+      '[data-component-sort]',
+    ]);
+    assert.deepEqual(
+      components.inks,
+      [components.secondary, components.secondary, components.secondary],
+      'the category, essence and sort triggers all compute to `--fab-text-secondary`'
+    );
+    const essences = await read('essence-browser', ['[data-essence-sort]']);
+    assert.notEqual(
+      essences.inks[0],
+      essences.secondary,
+      'and a trigger off that route does not, so the probe is not simply the rung’s own ink'
+    );
   });
 
   it('shows a converted trigger DOES resize with its value once its width rule is removed', async () => {

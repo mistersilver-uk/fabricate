@@ -68,7 +68,8 @@ export const CASES = Object.freeze([
     ],
   }),
   // The component toolbar's open-panel frame (issue 1510), on the tightest list in the phase:
-  // `Carries any essence` against the 108px a ticked row leaves at the `toolbar` band's floor.
+  // `Carries any essence` in the 116px a ticked row leaves inside the call site's 168px panel
+  // floor.
   managerCase({
     id: 'manager-components-essence-filter-list',
     label: 'Manager — Components essence filter list',

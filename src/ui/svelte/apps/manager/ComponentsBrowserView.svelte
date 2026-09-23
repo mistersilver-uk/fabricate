@@ -288,11 +288,14 @@
       label: `${categoryLabel(category.name)} (${category.count})`,
     })),
   ]);
+  // The one `toolbar` panel floor in the manager's select conversion. A ticked row spends 52px on
+  // the tick and the padding, leaving 108px of the band's 160px floor for a label: `Carries any
+  // essence` measures 100.8px at 12px in Signika, the product face, and 109.4px in the Arial the
+  // rendered suite measures with, because the repository cannot ship Signika. 168 is the next
+  // multiple of 8 that draws it whole in both, and the only slack this label has for translation.
+  const ESSENCE_FILTER_PANEL_MIN_WIDTH = 168;
   // The reference's two PREDICATES ahead of the per-essence entries. Their values are the model's
   // sentinels, not names.
-  // A ticked row spends 52px of its panel on the tick and the padding, which leaves `Carries any
-  // essence` no headroom at the `toolbar` band's 160px floor in a wider fallback face.
-  const ESSENCE_FILTER_PANEL_MIN_WIDTH = 168;
   const essenceSelectOptions = $derived([
     { value: 'all', label: text('FABRICATE.Admin.Manager.Component.EssenceAll', 'All essences') },
     {
