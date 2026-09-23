@@ -182,9 +182,9 @@ Before asking a maintainer to test, the workflow driver MUST identify and prove 
 
 ### Requirement: Ready-for-review delivery gate
 
-Before maintainer handoff, the workflow driver MUST deliver a PR whose unchanged remote head contains current `origin/main`, has passed authoritative post-rebase validation and required implementation review, is ready for review, and has every required post-undraft GitHub and external check successful.
-Draft-head checks MUST be treated only as preflight evidence because required workflows may use the `ready_for_review` trigger.
-Metadata-only CI MUST use concurrency independent from code-gate attempts, and a `ready_for_review` event MUST run the full required code gates.
+Before maintainer handoff, the workflow driver MUST deliver a ready PR whose unchanged remote head contains current `origin/main`, has passed authoritative post-rebase validation and required implementation review, and has one successful full required GitHub and external check attempt for that exact head.
+A successful full required check attempt for the exact remote head MUST remain authoritative across draft-to-ready transitions.
+CI MUST run full required gates on `opened`, `synchronize`, and `reopened` regardless of draft status, while metadata-only `edited` runs MUST use independent concurrency and MUST NOT supply missing code gates.
 
 #### Scenario: preparing the final remote head
 
@@ -207,19 +207,20 @@ Metadata-only CI MUST use concurrency independent from code-gate attempts, and a
 #### Scenario: validating the ready head
 
 - **WHEN** the explicit-lease push succeeds
-- **THEN** the driver marks the PR ready for review before the final check rollup
+- **THEN** the driver marks the PR ready when it is reviewable unless an explicit maintainer hold applies
 - **AND** it waits for every required GitHub Actions and external check on that exact remote head
 - **AND** both SonarCloud checks, Automatic Analysis and Quality Gate, report success
 - **AND** pending, skipped when required, cancelled, stale-head, or failing checks do not satisfy the gate
-- **AND** it identifies one authoritative full exact-head attempt, normally the `ready_for_review` attempt, and requires every full gate from that attempt rather than combining successful jobs across duplicates
+- **AND** it reuses a complete full attempt for that exact head regardless of the PR's draft state when the attempt started, or waits for the normal source-event run when no complete attempt exists
+- **AND** it requires every full gate from one authoritative attempt rather than combining successful jobs across duplicates
 - **AND** metadata-only `edited` attempts cannot cancel or satisfy the authoritative code-gate attempt
 - **AND** cancelled or skipped duplicate attempts neither supply missing gates nor invalidate a separately complete authoritative attempt
 
 #### Scenario: restarting failed or stale delivery
 
-- **WHEN** a required check fails, current `origin/main` advances, the remote PR head changes, or the PR is draft
-- **THEN** the driver returns the PR to draft before evidence gathering, issue reconciliation, or isolated fix work
-- **AND** it repeats rebase, authoritative validation, explicit-lease push, ready transition, and exact-head checks
+- **WHEN** a required check fails, current `origin/main` advances, or the remote PR head changes
+- **THEN** the driver keeps a ready PR ready while gathering evidence, reconciling the issue, and routing isolated fix work
+- **AND** it repeats rebase, authoritative validation, explicit-lease push, and exact-head checks without toggling readiness to manufacture a run
 - **AND** it repeats review only when the resulting target materially changes the reviewer's owned concern or an unresolved finding remains
 - **AND** after a successful rollup it fetches `origin/main` again and verifies current-main ancestry, unchanged remote-head identity, and ready state before maintainer handoff
 

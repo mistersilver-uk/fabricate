@@ -51,18 +51,18 @@ function parseWorkflow(source) {
   return { types, group, jobs: parseJobs(source) };
 }
 
-function contextFor(action) {
+function contextFor(action, draft = false) {
   return {
     github: {
       event_name: 'pull_request',
-      event: { action, pull_request: { number: 874 } },
+      event: { action, pull_request: { number: 874, draft } },
       sha: 'abc1234',
     },
   };
 }
 
-function jobsFor(workflow, action) {
-  const context = contextFor(action);
+function jobsFor(workflow, action, draft = false) {
+  const context = contextFor(action, draft);
   return Object.entries(workflow.jobs)
     .filter(([, job]) => !job.if || evaluate(job.if, context))
     .map(([name]) => name)
@@ -76,26 +76,34 @@ function renderGroup(template, action) {
   );
 }
 
-test('CI semantically isolates edited metadata runs and fully gates ready_for_review', () => {
+test('CI runs full gates for source events in either draft state and isolates metadata edits', () => {
   const workflow = parseWorkflow(readFileSync('.github/workflows/ci.yml', 'utf8'));
-
-  assert.ok(workflow.types.includes('edited'));
-  assert.ok(workflow.types.includes('ready_for_review'));
-  assert.deepEqual(jobsFor(workflow, 'edited'), ['check-screenshots', 'lint-commits']);
-  assert.deepEqual(jobsFor(workflow, 'ready_for_review'), [
+  const fullGateJobs = [
     'check-screenshots',
     'lint',
     'lint-commits',
     'lint-debt',
     'unit-tests',
     'validate-bindings',
-  ]);
+  ];
+
+  assert.deepEqual(workflow.types, ['opened', 'synchronize', 'reopened', 'edited']);
+  assert.deepEqual(jobsFor(workflow, 'edited'), ['check-screenshots', 'lint-commits']);
+  for (const action of ['opened', 'synchronize', 'reopened']) {
+    for (const draft of [true, false]) {
+      assert.deepEqual(
+        jobsFor(workflow, action, draft),
+        fullGateJobs,
+        `${action} must run every full gate when draft=${draft}`
+      );
+    }
+  }
 
   const edited = renderGroup(workflow.group, 'edited');
-  const ready = renderGroup(workflow.group, 'ready_for_review');
-  assert.notEqual(edited, ready);
+  const source = renderGroup(workflow.group, 'synchronize');
+  assert.notEqual(edited, source);
   assert.match(edited, /metadata/);
-  assert.match(ready, /code/);
+  assert.match(source, /code/);
 });
 
 test('a red unit-tests job re-prints its failing tests at the END of the job log', () => {
