@@ -219,12 +219,8 @@ export default {
       };
     }, craftingSetup.systemId);
 
-    const inspectorFlavour = () =>
-      page
-        .locator(
-          '.fabricate-manager [data-component-inspector] .manager-component-browser-inspector-flavour'
-        )
-        .first();
+    // The inspector renders no description; the selected row carries it.
+    const inspector = () => page.locator('.fabricate-manager [data-component-inspector]').first();
     const componentSearch = () =>
       page.getByRole('searchbox', { name: 'Search components' }).first();
     const selectComponent = async (componentId) => {
@@ -242,15 +238,14 @@ export default {
       // Components are paginated. Search by resolved identity before clicking
       // so a newly ingested component cannot be hidden on another page.
       await componentSearch().fill(componentName);
-      const identity = page
-        .locator(
-          `.fabricate-manager .manager-component-row[data-component-id="${componentId}"] .manager-component-identity`
-        )
+      const row = page
+        .locator(`.fabricate-manager .manager-component-row[data-component-id="${componentId}"]`)
         .first();
+      const identity = row.locator('.manager-component-identity');
       await identity.waitFor({ state: 'visible', timeout: 5000 });
       await identity.click();
-      await inspectorFlavour().waitFor({ state: 'visible', timeout: 5000 });
-      return ((await inspectorFlavour().textContent()) ?? '').trim();
+      await inspector().waitFor({ state: 'visible', timeout: 5000 });
+      return ((await row.locator('.manager-system-description').textContent()) ?? '').trim();
     };
     const assertResolved = (text, frame) => {
       if (/@[A-Za-z]+\[|&[A-Za-z]+\[/.test(text)) {
@@ -366,7 +361,7 @@ export default {
     await componentSearch().fill('Iron Ore');
     await page
       .locator(
-        '.fabricate-manager .manager-component-row:has-text("Iron Ore") button:has(i.fa-pen)'
+        '.fabricate-manager .manager-component-row:has-text("Iron Ore") [data-component-edit]'
       )
       .first()
       .click();
@@ -413,7 +408,7 @@ export default {
     // The off salvage body (issue 676, AC4).
     await page
       .locator(
-        '.fabricate-manager .manager-component-row:has-text("Iron Sword") button:has(i.fa-pen)'
+        '.fabricate-manager .manager-component-row:has-text("Iron Sword") [data-component-edit]'
       )
       .first()
       .click();
@@ -452,7 +447,7 @@ export default {
     await componentSearch().fill('Smoke Relic');
     await page
       .locator(
-        '.fabricate-manager .manager-component-row:has-text("Smoke Relic") button:has(i.fa-pen)'
+        '.fabricate-manager .manager-component-row:has-text("Smoke Relic") [data-component-edit]'
       )
       .first()
       .click();

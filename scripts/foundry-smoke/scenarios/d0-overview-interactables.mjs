@@ -146,7 +146,7 @@ export default {
         if (blockedNames[1]) {
           await page
             .locator(
-              `.fabricate-manager .manager-component-row:has-text(${JSON.stringify(blockedNames[1])}) button:has(i.fa-pen)`
+              `.fabricate-manager .manager-component-row:has-text(${JSON.stringify(blockedNames[1])}) [data-component-edit]`
             )
             .first()
             .click();
