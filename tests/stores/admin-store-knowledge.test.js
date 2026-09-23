@@ -222,10 +222,11 @@ describe('adminStore knowledge projection cost', () => {
     await harness.store.setKnowledgeActive(true);
     assert.equal(harness.calls.snapshot.length, 1, 're-entry re-reads the seam');
 
-    await harness.store.selectSystem('sys2');
     harness.calls.snapshot.length = 0;
+    await harness.store.selectSystem('sys2');
+    assert.equal(harness.calls.snapshot.length, 1, 'selectSystem re-reads once for the selected system');
     await harness.store.refreshKnowledge();
-    assert.equal(harness.calls.snapshot.length, 1, 'selectSystem cleared the cached snapshot');
+    assert.equal(harness.calls.snapshot.length, 1, 'the new system is cached after the switch');
   });
 
   it('coalesces a burst of hook-driven refreshes into one scan and ignores them while closed', async () => {
