@@ -106,7 +106,9 @@ export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 // so the total falls 40 -> 34 across 16 rows to 13.
 // #1510: the environments browser's four toolbar filters and its conditions card's current-value
 // picker convert onto `Select`, so the total falls 34 -> 29 across 13 rows to 12.
-export const KNOWN_NATIVE_SELECT_TOTAL = 29;
+// #1510: the gathering task and event browsers' six toolbar filters convert onto `Select`, so the
+// total falls 29 -> 23 across 12 rows to 10.
+export const KNOWN_NATIVE_SELECT_TOTAL = 23;
 
 /** A native `<select>` written into a JavaScript template string, keyed `file`. */
 export const KNOWN_NATIVE_SELECTS_IN_JS = knownDebt('nativeSelectsInDialogBodies');

@@ -343,6 +343,21 @@ const CONVERTED_SITES = Object.freeze([
       hook: `.fabricate-select-trigger[aria-label="Filter environments by ${axis}"]`,
       values,
     })),
+    // Issue 1510 commit 3c — the gathering task and event toolbars' three each. None carries an
+    // `aria-label` or a hook, so each is addressed by the caption id that names it.
+    ...[
+      ['tasks', 'status', ['all', 'active']],
+      ['tasks', 'biome', ['all', 'forest']],
+      ['tasks', 'availability', ['all', 'any']],
+      ['events', 'status', ['all', 'active']],
+      ['events', 'biome', ['all', 'forest']],
+      ['events', 'danger', ['all', 'deadly']],
+    ].map(([browser, axis, values]) => ({
+      subject: `gathering-${browser}-browser`,
+      name: `the gathering ${browser} ${axis} filter`,
+      hook: `[data-gathering-${browser}-browser] .fabricate-select-trigger[aria-labelledby$="-${axis}-filter"]`,
+      values,
+    })),
   ].map((site) =>
     Object.freeze({ ...site, column: false, floor: 144, pinned: true, drive: true, rung: 'toolbar' })
   ),
@@ -714,7 +729,7 @@ describe('the two hints the currency card draws read in one treatment (issue 151
 
 describe('a converted manager panel is wide enough for the list it opens (issue 1510)', () => {
   const PANEL_SITES = [
-    // `start` is inert for a `drive` site, which nothing seeds through `?value=`, so those six
+    // `start` is inert for a `drive` site, which nothing seeds through `?value=`, so those sites
     // measure the resting list; the panel still opens and every label is measured.
     ...CONVERTED_SITES.map((site) => ({ ...site, start: site.values[1] })),
     {
