@@ -79,7 +79,7 @@ export function installForcedDeletion() {
     const created = { data: { operators: { ForcedDeletion: FakeForcedDeletion } } };
     globalThis.foundry = created;
     return () => {
-      if (globalThis.foundry === created) delete globalThis.foundry;
+      if (Reflect.get(globalThis, 'foundry') === created) Reflect.deleteProperty(globalThis, 'foundry');
     };
   }
   if (!Object.hasOwn(root, 'data')) {
