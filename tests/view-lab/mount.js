@@ -127,6 +127,8 @@ function readParams() {
     // named long-label frame cannot collapse to the ordinary stacked Map frame.
     longTravelLabels: params.get('longTravelLabels') === '1',
     longDowntimeLabels: params.get('longDowntimeLabels') === '1',
+    // An active scene with no regions, for the Map Region Links no-regions empty state.
+    noSceneRegions: params.get('noSceneRegions') === '1',
     // Register a stand-in companion World-nav provider before the manager mounts, so the frames can
     // photograph the PREMIUM-INSTALLED chrome: the title bar's gold badge and the rail's muted
     // Downtime chip.
@@ -871,6 +873,7 @@ async function boot() {
         noAuthoredWorldComponents: params.noAuthoredWorldComponents,
         longTravelLabels: params.longTravelLabels,
         noInteractables: params.noInteractables,
+        noSceneRegions: params.noSceneRegions,
         gatheringTaskMode: params.gatheringTaskMode,
         journalCaseState: params.journalCaseState,
       });

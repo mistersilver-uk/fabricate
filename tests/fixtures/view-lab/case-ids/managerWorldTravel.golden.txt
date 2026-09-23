@@ -6,6 +6,7 @@ manager-world-travel-realms-stacked
 manager-world-travel-map-normal
 manager-world-travel-map-stacked
 manager-world-travel-map-collapsed-rail
+manager-world-travel-map-empty
 manager-world-travel-long-label-focus
 manager-gathering-settings-normal
 manager-gathering-condition-current-list
