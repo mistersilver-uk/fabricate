@@ -2033,6 +2033,12 @@ test('World Travel Realms puts a full-bleed filter bar over the 12px browse body
     );
     if (size.width > 1120) {
       assert.ok(near(pane.bottom, main.bottom), `${at}: the pane fills .manager-main to its foot`);
+      // The pane's `auto minmax(0, 1fr) auto` rows: without them the implicit auto tracks share
+      // the free height and the filter bar band stretches around its search.
+      assert.ok(
+        near(search.top - toolbar.top, 12),
+        `${at}: the filter bar keeps its content height (${search.top - toolbar.top})`
+      );
     }
   }
 });
