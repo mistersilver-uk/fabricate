@@ -426,7 +426,7 @@ describe('adminStore knowledge section loading and error states (issue 1969)', (
     }
   });
 
-  it('leaving and destroying reset both flags and stop an in-flight read settling them', async () => {
+  it('destroying stops an in-flight read settling the surface', async () => {
     const harness = await createSectionHarness(knowledgeWorld());
     try {
       harness.services.getKnowledgeSnapshot = async () => {
@@ -434,10 +434,6 @@ describe('adminStore knowledge section loading and error states (issue 1969)', (
       };
       await assert.rejects(harness.store.setKnowledgeActive(true), /scan failed/);
       await harness.store.setKnowledgeActive(false);
-      assert.deepStrictEqual(
-        { loading: knowledgeFlags(harness).loading, error: knowledgeFlags(harness).error },
-        { loading: false, error: false }
-      );
 
       const reads = holdKnowledgeReads(harness);
       const entered = harness.store.setKnowledgeActive(true);
@@ -447,6 +443,77 @@ describe('adminStore knowledge section loading and error states (issue 1969)', (
       inFlight.reject(new Error('scan failed'));
       await assert.rejects(entered, /scan failed/);
       assert.deepStrictEqual(harness.state().knowledge, before, 'a destroyed store publishes nothing');
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it('a read whose system changed under it without a switch writes nothing', async () => {
+    const harness = await createSectionHarness(knowledgeWorld());
+    try {
+      const reads = holdKnowledgeReads(harness);
+      const entered = harness.store.setKnowledgeActive(true);
+      const read = await reads.next();
+      // A selection moved by the shared refresh's fallback (the selected system deleted elsewhere)
+      // advances no read generation, so only the system half of the guard can discard this read.
+      harness.store.selectedSystemId.set('sys2');
+      read.resolve(snapshot({ systemId: 'sys1', definitionCount: 2 }));
+      await entered;
+      harness.store.selectKnowledgeActor('a1');
+      assert.deepStrictEqual(knowledgeFlags(harness), {
+        loading: true,
+        error: false,
+        systemId: '',
+        rows: 0,
+      });
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it('a current read that finds no snapshot after an error clears the error', async () => {
+    const harness = await createSectionHarness(knowledgeWorld());
+    try {
+      harness.services.getKnowledgeSnapshot = async () => {
+        throw new Error('scan failed');
+      };
+      await assert.rejects(harness.store.setKnowledgeActive(true), /scan failed/);
+      harness.services.getKnowledgeSnapshot = async () => null;
+      await harness.store.refreshKnowledge({ force: true });
+      assert.deepStrictEqual(knowledgeFlags(harness), {
+        loading: false,
+        error: false,
+        systemId: '',
+        rows: 0,
+      });
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it('a same-system read left over from before a switch away and back is discarded', async () => {
+    const harness = await createSectionHarness(knowledgeWorld());
+    try {
+      await harness.store.setKnowledgeActive(true);
+      const reads = holdKnowledgeReads(harness);
+      const stale = harness.store.refreshKnowledge({ force: true });
+      const staleRead = await reads.next();
+      const release = [];
+      harness.services.setSetting = () => new Promise((resolve) => release.push(resolve));
+      const away = harness.store.selectSystem('sys2');
+      await settleMicrotasks();
+      const back = harness.store.selectSystem('sys1');
+      await settleMicrotasks();
+      assert.equal(release.length, 2, 'both switches are parked before their reads begin');
+      staleRead.resolve(snapshot({ systemId: 'sys1', definitionCount: 2 }));
+      assert.equal(await stale, false, 'the pre-switch read is superseded');
+      harness.store.selectKnowledgeActor('a1');
+      assert.equal(knowledgeFlags(harness).loading, true);
+      assert.equal(knowledgeFlags(harness).rows, 0);
+      release.forEach((resolve) => resolve());
+      (await reads.next()).resolve(snapshot({ systemId: 'sys2', definitionCount: 0 }));
+      (await reads.next()).resolve(snapshot({ systemId: 'sys1', definitionCount: 2 }));
+      await Promise.all([away, back]);
     } finally {
       harness.dispose();
     }
