@@ -115,6 +115,10 @@ function readParams() {
     clearSystem: params.get('clearSystem') === '1',
     // Seed an EMPTY party list, for the World > Parties empty state.
     noParties: params.get('noParties') === '1',
+    // Hold the Knowledge snapshot read in flight, or make it reject, for the surface's loading and
+    // error frames (issue 1969).
+    knowledgeLoading: params.get('knowledgeLoading') === '1',
+    knowledgeError: params.get('knowledgeError') === '1',
     // Build a world with NO Tools at all, for the world Tools Catalogue's empty state.
     noTools: params.get('noTools') === '1',
     // Seed NO world component records of the lab's own, so the world's tag vocabulary is empty and
@@ -627,6 +631,15 @@ async function mountManagerApp(content, params) {
     _confirmDiscardDirtyToolDraft: null,
     _userHooks: null,
     render: () => {},
+    // Own properties shadow the prototype's snapshot builder, which `io.knowledgeSnapshot` calls.
+    // The rejecting promise is made per call, so nothing rejects at mount.
+    ...(params.knowledgeLoading ? { _buildKnowledgeSnapshot: () => new Promise(() => {}) } : {}),
+    ...(params.knowledgeError
+      ? {
+          _buildKnowledgeSnapshot: () =>
+            Promise.reject(new Error('view lab: knowledge read failed')),
+        }
+      : {}),
   });
   const props = app._prepareSvelteProps();
   const services = props.services;

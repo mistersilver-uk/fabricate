@@ -135,6 +135,44 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-knowledge-loading',
+    label: 'Manager — Knowledge loading',
+    // `beyond`: the smoke cannot hold the snapshot read in flight (issue 1969).
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', knowledgeLoading: '1' },
+    steps: ['Crafting', { selector: '#manager-crafting-nav-knowledge' }],
+    expectView: 'knowledge',
+    expectSelector: '.fabricate-manager [data-knowledge-view]:not(:has([data-knowledge-actor]))',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'knowledge'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/knowledge\//,
+      /^src\/ui\/svelte\/stores\/adminKnowledgeSection\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-knowledge-error',
+    label: 'Manager — Knowledge load error',
+    // `beyond`: the smoke cannot make the snapshot read reject (issue 1969).
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', knowledgeError: '1' },
+    steps: ['Crafting', { selector: '#manager-crafting-nav-knowledge' }],
+    expectView: 'knowledge',
+    expectSelector: '.fabricate-manager [data-knowledge-view]:not(:has([data-knowledge-actor]))',
+    // The store rethrows the rejected read, and the capture fails if that rejection is swallowed.
+    allowedConsoleErrors: [/view lab: knowledge read failed/],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'knowledge'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/knowledge\//,
+      /^src\/ui\/svelte\/stores\/adminKnowledgeSection\.js$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-components-progressive',
     label: 'Manager — Components progressive',
     smokeLabels: ['manager-components-progressive'],

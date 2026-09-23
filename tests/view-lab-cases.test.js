@@ -1070,7 +1070,8 @@ test('the capture runner threads the per-case console allowance into the render'
   ).map((viewCase) => viewCase.id);
   assert.deepEqual(
     declaring,
-    ['manager-recipes-blocked-enable-flash'],
+    // The Knowledge error frame's rejected read is rethrown by the store (issue 1969).
+    ['manager-recipes-blocked-enable-flash', 'manager-knowledge-error'],
     'a case gained or lost a console-error allowance; the console gate is what makes a lab frame ' +
       'evidence, so widening it is an accepted edit rather than an incidental one'
   );
@@ -1719,6 +1720,27 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
   assert.match(mountSource, /noParties: params\.get\('noParties'\) === '1'/);
   assert.match(mountSource, /noParties: params\.noParties/);
   assert.match(worldSource, /noParties\s*\n?\s*\? \[\]/);
+});
+
+test('the Knowledge loading and error frames reach their state through the snapshot seam', () => {
+  // Neither state is reachable in the smoke, so each case is `beyond` and its only route is the
+  // lab's own override of the manager's snapshot builder (issue 1969).
+  const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+  for (const [id, param] of [
+    ['manager-knowledge-loading', 'knowledgeLoading'],
+    ['manager-knowledge-error', 'knowledgeError'],
+  ]) {
+    const capture = getCaseById(id);
+    assert.equal(capture.query?.[param], '1', `${id} does not set ${param}`);
+    assert.equal(capture.reaches, 'beyond', `${id} claims the smoke reaches it`);
+    assert.deepEqual(capture.smokeLabels, [], `${id} names a smoke label`);
+    assert.match(mountSource, new RegExp(`${param}: params\\.get\\('${param}'\\) === '1'`));
+    assert.match(
+      mountSource,
+      new RegExp(`params\\.${param}\\s*\\?\\s*\\{\\s*_buildKnowledgeSnapshot:`),
+      `mount.js does not guard a _buildKnowledgeSnapshot override with params.${param}`
+    );
+  }
 });
 
 test('the World Tools Catalogue search terms match exactly the rows their frames claim', async () => {
