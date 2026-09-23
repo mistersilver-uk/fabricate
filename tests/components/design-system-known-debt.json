@@ -236,7 +236,7 @@
     "styles/fabricate.css | border-radius | 3px | 2",
     "styles/fabricate.css | border-radius | 4px | 19",
     "styles/fabricate.css | border-radius | 5px | 13",
-    "styles/fabricate.css | border-radius | 8px | 68"
+    "styles/fabricate.css | border-radius | 8px | 67"
   ],
   "areaScopedStyleReads": [
     "src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte | --fab-recipe-control-font | 4",

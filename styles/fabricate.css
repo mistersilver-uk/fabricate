@@ -1595,7 +1595,8 @@
 /* Same contract for the World Currency route, and for the same reason: the tab renders a single child straight into `.manager-main`, so without this it lands in the shared shell's auto-sized first row and a tall ladder grows the Manager instead of scrolling inside `.manager-world-currency`'s own overflow (issue 1278). */
 .fabricate-manager[data-manager-view="world-currency"] .manager-main,
 .fabricate-manager[data-manager-view="world-prerequisites"] .manager-main,
-.fabricate-manager[data-manager-view="world-modifiers"] .manager-main {
+.fabricate-manager[data-manager-view="world-modifiers"] .manager-main,
+.fabricate-manager[data-manager-view="world-travel"] .manager-main {
   grid-template-rows: minmax(0, 1fr);
 }
 
@@ -16344,19 +16345,9 @@
 
 /* Travel > Parties accordion list (styled after the gathering tools browser). */
 
-/* Travel > Regions accordion list — mirrors the Parties list mechanics. The card chrome below used to live in a second, later `.manager-travel-realms` rule shared with four classes of a retired combined Travel view. */
+/* Travel > Realms browse pane: filter bar, `.manager-table-scroll` body, pager — the Environments browse recipe. */
 .fabricate-manager .manager-travel-realms {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-height: 0;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  background: var(--fab-surface);
-  min-width: 0;
 }
 
 .fabricate-manager .manager-travel-realms-list {
@@ -16364,8 +16355,6 @@
   flex-direction: column;
   gap: var(--fab-space-2);
   min-height: 0;
-  overflow-y: auto;
-  padding-right: var(--fab-space-2xs);
 }
 
 .fabricate-manager .manager-travel-realms-row {
@@ -16384,8 +16373,6 @@
   flex-direction: column;
   gap: var(--fab-space-2);
   min-height: 0;
-  overflow-y: auto;
-  padding-right: var(--fab-space-2xs);
 }
 
 .fabricate-manager .manager-map-link-row {

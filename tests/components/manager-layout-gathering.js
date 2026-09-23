@@ -1,5 +1,5 @@
 /**
- * Gathering rail, settings, task browser, chance slider and World Parties layout, measured in a real browser (issue 1670).
+ * Gathering rail, settings, task browser, chance slider, World Parties and World Travel layout, measured in a real browser (issue 1670).
  */
 
 import test from 'node:test';
@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { withScopeHash } from '../helpers/scoped-component-css.js';
+import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 import { openLayoutContext } from '../helpers/layout-harness.js';
 
 import {
@@ -1867,5 +1867,202 @@ test('a 680px manager container stacks each party body without viewport coupling
     }
   } finally {
     await context.close();
+  }
+});
+
+// ── World › Travel Realms and Map Region Links on the browse body (issues 1973, 1974) ──────────
+const realmsTabSource = readFileSync(
+  resolve(__dirname, '../../src/ui/svelte/apps/manager/GatheringRealmsTab.svelte'),
+  'utf8'
+);
+const mapLinksTabSource = readFileSync(
+  resolve(__dirname, '../../src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte'),
+  'utf8'
+);
+const emptyStateScoped = scopedComponentCss(
+  resolve(__dirname, '../../src/ui/svelte/components/EmptyState.svelte')
+);
+
+const TRAVEL_REALM_ROWS = Array.from(
+  { length: 6 },
+  (_, index) => `<div class="manager-travel-realms-row" role="listitem">
+    <button type="button" class="manager-travel-realms-header">
+      <div class="manager-travel-realms-left">
+        <span class="manager-travel-realms-icon"><i class="fas fa-map-location-dot"></i></span>
+        <span class="manager-travel-realms-name">Realm ${index + 1}</span>
+      </div>
+      <span class="manager-travel-realms-chevron"><i class="fas fa-chevron-down"></i></span>
+    </button>
+  </div>`
+).join('');
+
+const TRAVEL_REALMS_PANE = `<div class="manager-gathering-panel manager-travel-realms" data-travel-panel="realms">
+  <section class="fabricate-filter-bar manager-toolbar manager-travel-realms-toolbar">
+    <label class="fabricate-search manager-search"><i class="fas fa-search"></i
+      ><input type="search" placeholder="Search realms..." /></label>
+  </section>
+  <div class="manager-table-scroll">
+    <div class="manager-travel-realms-list" role="list">${TRAVEL_REALM_ROWS}</div>
+  </div>
+  ${pagerBarFixture({ probe: 'realms', arrows: true })}
+</div>`;
+
+const mapLinksPane = (content) =>
+  `<div class="manager-gathering-panel manager-travel-map-links" data-travel-panel="map">
+    <div class="manager-table-scroll">${content}</div>
+  </div>`;
+
+const TRAVEL_MAP_PANES = {
+  rows: mapLinksPane(`<div class="manager-map-link-list" role="list">
+    <div class="manager-map-link-row" role="listitem">
+      <div class="manager-map-link-header" role="button" tabindex="0">
+        <span class="manager-map-link-swatch"></span>
+        <span class="manager-map-link-name">Deep Gate Approach</span>
+      </div>
+      <div class="manager-map-link-picker-cell"><button type="button">Not linked</button></div>
+    </div>
+  </div>`),
+  empty: mapLinksPane(
+    withScopeHash(
+      `<div class="manager-empty is-compact" data-travel-map-links-empty><div>
+        <i class="fas fa-map-location-dot"></i><h3>The active scene has no regions.</h3>
+      </div></div>`,
+      'manager-empty',
+      emptyStateScoped.hashClass
+    )
+  ),
+};
+
+/** Render one World › Travel pane in the Manager shell and read its edges against `.manager-main`. */
+async function measureTravelPane({ width, height }, paneMarkup, probes) {
+  const context = await openLayoutContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+  const page = await context.newPage();
+  try {
+    await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
+      <style>${css}</style><style>${emptyStateScoped.css}</style>
+      <style>
+        html, body { margin: 0; width: 100%; height: 100%; }
+        :root { --font-primary: Arial, sans-serif; }
+        .probe-titlebar { height: 28px; }
+        .probe-header { height: 76px; }
+      </style></head><body>
+      <div class="fabricate fabricate-manager" data-fabricate-theme="fabricate" data-manager-view="world-travel">
+        <div class="probe-titlebar"></div><div class="probe-header"></div>
+        <div class="manager-body">
+          <aside class="manager-rail"><nav class="manager-nav">Rail</nav></aside>
+          <main class="manager-main">${paneMarkup}</main>
+          <aside class="manager-inspector">Inspector</aside>
+        </div>
+      </div></body></html>`);
+    return await page.evaluate((selectors) => {
+      const edges = (selector) => {
+        const node = document.querySelector(selector);
+        if (!node) return null;
+        const { left, right, top, bottom } = node.getBoundingClientRect();
+        return { left, right, top, bottom };
+      };
+      const pane = document.querySelector('[data-travel-panel]');
+      const scroller = pane.querySelector(':scope > .manager-table-scroll');
+      const pager = pane.querySelector(':scope > .manager-pagination');
+      const paneStyle = getComputedStyle(pane);
+      return {
+        boxes: Object.fromEntries(selectors.map((selector) => [selector, edges(selector)])),
+        main: edges('.manager-main'),
+        pane: edges('[data-travel-panel]'),
+        paneBorders: ['Top', 'Right', 'Bottom', 'Left'].map((side) =>
+          Number.parseFloat(paneStyle[`border${side}Width`])
+        ),
+        pagerOutsideScroller: pager ? !scroller.contains(pager) : null,
+        scrollerClearsItsContent: scroller.scrollHeight <= scroller.clientHeight + 1,
+      };
+    }, probes);
+  } finally {
+    await context.close();
+  }
+}
+
+const near = (actual, expected) => Math.abs(actual - expected) <= 1;
+const TRAVEL_SIZES = [
+  { width: 1330, height: 900 },
+  { width: 1000, height: 720 },
+];
+
+test('World Travel Realms puts a full-bleed filter bar over the 12px browse body at both sides of the 1120px rung', async () => {
+  // `gathering-realms-tab.test.js` mounts the component and pins this order; the join keeps the
+  // fixture below on the rendered structure.
+  const toolbarAt = realmsTabSource.indexOf('<ManagerToolbar');
+  const scrollerAt = realmsTabSource.indexOf('class="manager-table-scroll"');
+  const listAt = realmsTabSource.indexOf('class="manager-travel-realms-list"');
+  const pagerAt = realmsTabSource.indexOf('<Pagination', scrollerAt);
+  assert.ok(toolbarAt > -1 && scrollerAt > toolbarAt, 'the scroller follows the filter bar');
+  assert.ok(listAt > scrollerAt, 'the realm list renders inside the scroller');
+  assert.ok(pagerAt > listAt, 'the pager renders after the scroller');
+
+  for (const size of TRAVEL_SIZES) {
+    const at = `${size.width}x${size.height}`;
+    const report = await measureTravelPane(size, TRAVEL_REALMS_PANE, [
+      '.manager-travel-realms-toolbar',
+      '.manager-travel-realms-toolbar .manager-search',
+      '.manager-travel-realms-row',
+      '.manager-pagination',
+    ]);
+    const { main, pane, boxes } = report;
+    const toolbar = boxes['.manager-travel-realms-toolbar'];
+    const search = boxes['.manager-travel-realms-toolbar .manager-search'];
+    const row = boxes['.manager-travel-realms-row'];
+    const pager = boxes['.manager-pagination'];
+
+    assert.ok(report.scrollerClearsItsContent, `${at}: the list must not overflow its scroller`);
+    assert.deepEqual(report.paneBorders, [0, 0, 0, 0], `${at}: the pane draws no card border`);
+    assert.ok(
+      near(toolbar.left, main.left) && near(toolbar.right, main.right),
+      `${at}: the filter bar is full-bleed (${toolbar.left}-${toolbar.right} vs ${main.left}-${main.right})`
+    );
+    assert.ok(
+      near(search.left, row.left) && near(search.right, row.right),
+      `${at}: the search shares the realm row's edges (${search.left}-${search.right} vs ${row.left}-${row.right})`
+    );
+    assert.ok(
+      near(row.left - main.left, 12) && near(main.right - row.right, 12),
+      `${at}: the realm row sits 12px in from .manager-main (${row.left - main.left}, ${main.right - row.right})`
+    );
+    assert.equal(report.pagerOutsideScroller, true, `${at}: the pager is outside the scroller`);
+    assert.ok(
+      near(pager.left, pane.left) && near(pager.right, pane.right),
+      `${at}: the pager spans the pane`
+    );
+    if (size.width > 1120) {
+      assert.ok(near(pane.bottom, main.bottom), `${at}: the pane fills .manager-main to its foot`);
+    }
+  }
+});
+
+test('World Travel Map Region Links rows and empty state sit on the 12px browse body at both sides of the 1120px rung', async () => {
+  const scrollerAt = mapLinksTabSource.indexOf('class="manager-table-scroll"');
+  const emptyAt = mapLinksTabSource.indexOf('dataAttr="data-travel-map-links-empty"');
+  const listAt = mapLinksTabSource.indexOf('class="manager-map-link-list"');
+  assert.ok(scrollerAt > -1, 'the pane renders the shared scroller');
+  assert.ok(emptyAt > scrollerAt && listAt > scrollerAt, 'every state renders inside it');
+
+  const states = [
+    ['rows', '.manager-map-link-row'],
+    ['empty', '[data-travel-map-links-empty]'],
+  ];
+  for (const size of TRAVEL_SIZES) {
+    for (const [state, selector] of states) {
+      const at = `${state} at ${size.width}x${size.height}`;
+      const report = await measureTravelPane(size, TRAVEL_MAP_PANES[state], [selector]);
+      const { main, pane } = report;
+      const box = report.boxes[selector];
+      assert.ok(
+        near(box.left - pane.left, 12) &&
+          near(pane.right - box.right, 12) &&
+          near(box.top - pane.top, 12),
+        `${at}: sits 12px in from the pane (${box.left - pane.left}, ${pane.right - box.right}, ${box.top - pane.top})`
+      );
+      if (size.width > 1120) {
+        assert.ok(near(pane.bottom, main.bottom), `${at}: the pane fills .manager-main to its foot`);
+      }
+    }
   }
 });
