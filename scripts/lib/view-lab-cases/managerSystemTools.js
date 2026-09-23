@@ -233,6 +233,12 @@ export const CASES = Object.freeze([
     ],
     expectView: 'tools',
     expectSelector: '[data-tool-sort-direction="desc"]',
+    expectContained: [
+      {
+        container: '[data-manager-tools-search]',
+        target: '[data-manager-tools-search] .manager-toolbar',
+      },
+    ],
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
     sourceMatches: [...TOOL_LIST_MATCHES],
@@ -256,6 +262,32 @@ export const CASES = Object.freeze([
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
     sourceMatches: [...TOOL_LIST_MATCHES, ...ANCHORED_POPOVER_SOURCES],
+  }),
+  // A list longer than the column (issue 1977): only the list card may give up height.
+  managerCase({
+    id: 'manager-tool-rules-long-list-1280x720',
+    label: 'Manager — Tool rules long list on one page 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-membership-option="all"]' },
+      ...chooseSelectOption('.manager-main [data-pagination-size]', '24'),
+    ],
+    expectView: 'tools',
+    expectSelector: '.manager-tools-library-list > .manager-tools-row:nth-child(9)',
+    expectScrollable: '[data-tool-library-scroll]',
+    expectContained: [
+      {
+        container: '[data-manager-tools-search]',
+        target: '[data-manager-tools-search] .manager-toolbar',
+      },
+    ],
+    expectCenterHit: '.manager-tools-sort-direction',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [...TOOL_LIST_MATCHES],
   }),
   managerCase({
     // A selected row under the pointer (issue 1373), which is how a live cascade defect survived three parity passes.
