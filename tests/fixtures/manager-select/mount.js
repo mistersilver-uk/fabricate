@@ -21,8 +21,10 @@ import GatheringEventsBrowserView from '../../../src/ui/svelte/apps/manager/Gath
 import GatheringTasksBrowserView from '../../../src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte';
 import RecipeOverviewTab from '../../../src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte';
 import RecipesBrowserView from '../../../src/ui/svelte/apps/manager/RecipesBrowserView.svelte';
+import RecipeBrowserInspector from '../../../src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte';
 import Select from '../../../src/ui/svelte/components/Select.svelte';
 import ToolBehaviorPreview from '../../../src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte';
+import ToolsBrowserView from '../../../src/ui/svelte/apps/manager/ToolsBrowserView.svelte';
 import WorldCurrencyTab from '../../../src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte';
 import { makeEssenceRow } from '../../helpers/makeEssenceRow.js';
 import { installFixtureI18n, mountCaptionShape } from '../select-fixture-shared.js';
@@ -315,6 +317,66 @@ function componentsBrowser(itemCards) {
   });
 }
 
+// The Tool library's sort (issue 1510), whose longest key, `In this system`, is what the call
+// site's panel floor is sized for.
+const LIBRARY_TOOLS = [
+  { id: 'tool-anvil', label: 'Anvil', enabled: true, breakage: { mode: 'unlimited' } },
+  { id: 'tool-tongs', label: 'Forge Tongs', enabled: true, breakage: { mode: 'unlimited' } },
+];
+
+// A recipe routed by its ingredients, so the inspector draws its ingredient-set picker.
+const ROUTED_RECIPE = {
+  id: 'r-cast',
+  name: 'Cast Jewellery',
+  description: '',
+  img: 'icons/svg/book.svg',
+  category: 'Casting',
+  enabled: true,
+  stepCount: 1,
+  ingredientCount: 1,
+  resultItemCount: 2,
+  resultGroupCount: 2,
+  checkSummary: { kind: 'ingredients', dc: null },
+  requirementsPreview: [],
+  ingredientSets: ['silver', 'gold'].map((metal) => ({
+    id: `set-${metal}`,
+    name: `${metal[0].toUpperCase()}${metal.slice(1)} route`,
+    resultGroupId: `grp-${metal}`,
+    ingredientGroups: [
+      { id: `g-${metal}`, options: [{ id: `o-${metal}`, quantity: 1, match: { type: 'component', componentId: metal } }] },
+    ],
+  })),
+  resultGroups: ['silver', 'gold'].map((metal) => ({
+    id: `grp-${metal}`,
+    name: metal,
+    results: [{ id: `x-${metal}`, componentId: metal, quantity: 1 }],
+  })),
+};
+
+/**
+ * The recipe inspector alone, in a manager window `width` wide at the one-column band, where it
+ * spans the window under the list; the aside is the product's own padded inspector column.
+ */
+function routedInspector(width) {
+  frame.style.width = `${width}px`;
+  mountPoint.classList.remove('fixture-column', 'fixture-mount');
+  const aside = document.createElement('aside');
+  aside.className = 'manager-inspector';
+  mountPoint.append(aside);
+  return mount(RecipeBrowserInspector, {
+    target: aside,
+    props: {
+      selectedRecipe: ROUTED_RECIPE,
+      resolutionMode: 'routedByIngredients',
+      recipeCount: 1,
+      componentOptions: [
+        { id: 'silver', name: 'Silver Billet', img: '' },
+        { id: 'gold', name: 'Gold Billet', img: '' },
+      ],
+    },
+  });
+}
+
 /** The 340px column the tool-edit grid gives the rail, reproduced as fixture chrome. */
 function railColumn() {
   const rail = document.createElement('div');
@@ -511,6 +573,14 @@ const SUBJECTS = {
       target: mountPoint,
       props: { essenceCards: [makeEssenceRow()], selectedSystemId: 'sys' },
     }),
+  'tools-browser': () =>
+    mount(ToolsBrowserView, {
+      target: mountPoint,
+      props: { tools: LIBRARY_TOOLS, systemId: 'sys' },
+    }),
+  // The bottom and the top of the one-column band the inspector's picker spans.
+  'recipe-inspector-1024': () => routedInspector(1024),
+  'recipe-inspector-1120': () => routedInspector(1120),
   // The `Preview as` roster, whose value is component state rather than a prop.
   'tool-preview': () =>
     mount(ToolBehaviorPreview, {

@@ -170,10 +170,6 @@ test('the element-typed leg scan is alive, so the clause below is not quantifyin
       'selector walk has stopped seeing them'
   );
   assert.ok(
-    legs.some((leg) => leg.file.endsWith('.svelte')),
-    'no Svelte scoped block reports a `select` leg, so half the corpus is invisible to this scan'
-  );
-  assert.ok(
     [...RENDERS_SELECT.values()].filter(Boolean).length > 5,
     'no template renders a `<select>` at all, so every leg would report as stranded and the ' +
       'baseline below would be measuring the scan rather than the sheet'

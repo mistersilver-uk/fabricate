@@ -8,6 +8,13 @@ import { createStore } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries } from '../helpers/manager/managerQueries.js';
 import { createToolsBrowserState } from '../../src/ui/model/managerBrowserViewState.js';
 import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  closeSelectPanel,
+  openSelectPanel,
+  selectOptionLabels,
+} from '../helpers/select-control.js';
+import {
   labCaseSelector,
   managerComponents,
   settleBetweenTests,
@@ -565,6 +572,8 @@ export function registerToolsCases() {
    */
   function mountToolsBrowser(props) {
     target = document.createElement('div');
+    // The application root the sort's panel portals into, as the manager window is in production.
+    target.className = 'fabricate-manager';
     document.body.appendChild(target);
     mounted = mount(ToolsBrowserViewComponent, {
       target,
@@ -677,6 +686,58 @@ export function registerToolsCases() {
       openedToolDraftIds(calls),
       ['tool-order-1'],
       'a re-sort must not open a second draft'
+    );
+  });
+
+  it('sorts the library by membership through the converted sort, back on the first page', async () => {
+    // Nine members and one unadopted world Tool whose name sorts FIRST: by name the widened list
+    // opens on the world row, and by membership it closes on it, on page two. So a sort that did
+    // not reset the page would still draw that row, and a reset that did not sort would draw it
+    // at the top.
+    const members = namedTools([
+      "Alchemist's Supplies",
+      'Arcane Forge',
+      'Ley-Line Nexus',
+      "Master's Anvil",
+      'Moonwell',
+      "Smith's Hammer",
+      'Volcanic Vent',
+      'Woodcarving Tools',
+      'Zephyr Kiln',
+    ]);
+    mountToolsBrowser({
+      tools: members,
+      scope: worldToolScope([
+        ['world-aaron', "Aaron's Anvil"],
+        ...members.map((tool) => [tool.id, tool.label]),
+      ]),
+    });
+    const SORT = '[data-tool-sort-key]';
+    assert.equal(assertSelectHasResolvedName(target, SORT), 'Sort by');
+    assert.equal(target.querySelector(SORT).getAttribute('data-select-size'), 'inline');
+    assert.ok(
+      !openSelectPanel(target, SORT).classList.contains('fabricate-select-popover-ticked'),
+      'two unrelated keys, so the list draws no tick column'
+    );
+    assert.deepEqual(selectOptionLabels(target, SORT), ['Name', 'In this system']);
+    closeSelectPanel(target, SORT);
+
+    target.querySelector('[data-tool-membership-option="all"] input').click();
+    await tick();
+    flushSync();
+    assert.equal(libraryRowNames()[0], "Aaron's Anvil", 'by name, the world Tool opens the list');
+    target.querySelector('[data-pagination-next]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(libraryRowNames(), ['Woodcarving Tools', 'Zephyr Kiln'], 'page two, by name');
+
+    chooseSelectOption(target, SORT, 'state');
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      libraryRowNames(),
+      members.slice(0, 8).map((tool) => tool.label),
+      'members first, from the first page again'
     );
   });
 

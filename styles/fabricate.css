@@ -5211,19 +5211,15 @@
   margin-top: 0;
 }
 
-/* The routed-by-ingredients set / result-set dropdowns under the Requires / Produces labels (issue 643). */
+/* The routed-by-ingredients set picker under the Requires label (issue 643). The `inline` rung paints the box; the trigger fills the inspector column, which a button does not do by itself. */
 .fabricate-manager .manager-recipe-route-select {
   width: 100%;
   min-width: 0;
-  height: 30px;
   margin-top: var(--fab-space-1);
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 7px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-  font-size: var(--fab-recipe-control-font);
-  cursor: pointer;
+}
+
+.fabricate-manager .manager-recipe-route-select .fabricate-select-trigger {
+  width: 100%;
 }
 
 .fabricate-manager .manager-recipe-browser-inspector-hero,
@@ -7387,21 +7383,6 @@
 .fabricate-manager .manager-scoped-list-toolbar .manager-search input {
   border-radius: 9px;
   font-size: var(--fab-recipe-control-font);
-}
-
-/* ── THE TOOLBAR'S SELECT SKIN IS NARROWED, NOT DELETED ── These declarations used to reach every scoped-catalogue toolbar select and are retargeted onto the one component that still renders a native one, `VocabularyShellPanel`'s `<select data-vocabulary-sort>`, which both Tags & Categories screens draw (issue 1915); they keep a `.fabricate-manager` compound because they read the area-scoped `--fab-recipe-control-font` and because `tests/styles-namespacing.test.js` requires every selector here to begin `.fabricate`. It is also the one filter-bar rule issue 1508 left application-rooted — the family compound stands THIRD, behind an ancestor that is not the application root, so neither re-rooting form exists for it. skin census (issue 1523): pinned by `tests/components/world-vocabulary-control-row-cascade.test.js`, which measures this select's computed height, corner, fill and type directly, and by a sheet-text clause in `manager-layout.test.js` (issues 1504, 1507, 1508, 1510). */
-.fabricate-manager
-  .manager-vocabulary-shell-panel
-  .manager-toolbar.manager-scoped-list-toolbar
-  select {
-  height: 34px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 9px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-  font-size: var(--fab-recipe-control-font);
-  cursor: pointer;
 }
 
 /* The list and its rows. The skin matches the ONE browser-row treatment above — hairline edge, 8px corner, translucent overlay fill — and the geometry matches the recipe and component rows' denser 11px/12px card, because a scoped list is the same kind of library at the same density. */

@@ -102,11 +102,8 @@
   "nativeSelectElements": [
     "src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte | 1",
     "src/ui/svelte/apps/manager/ManagerNavRail.svelte | 1",
-    "src/ui/svelte/apps/manager/ToolsBrowserView.svelte | 1",
     "src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte | 2",
-    "src/ui/svelte/apps/manager/environment/GatheringRulesInspector.svelte | 10",
-    "src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte | 1",
-    "src/ui/svelte/apps/manager/VocabularyShellPanel.svelte | 1"
+    "src/ui/svelte/apps/manager/environment/GatheringRulesInspector.svelte | 10"
   ],
   "nativeSelectsInDialogBodies": [
     "src/canvas/environmentDialog.js | 1",
@@ -198,7 +195,7 @@
     "src/ui/svelte/apps/manager/RosterRow.svelte | border-radius | 8px | 1",
     "src/ui/svelte/components/SearchablePopoverPanel.svelte | border-radius | 8px | 1",
     "src/ui/svelte/components/SegmentedControl.svelte | border-radius | 8px | 1",
-    "src/ui/svelte/apps/manager/ToolsBrowserView.svelte | border-radius | 8px | 2",
+    "src/ui/svelte/apps/manager/ToolsBrowserView.svelte | border-radius | 8px | 1",
     "src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte | border-radius | 8px | 1",
     "src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte | border-radius | 8px | 1",
     "src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte | border-radius | 10px | 1",

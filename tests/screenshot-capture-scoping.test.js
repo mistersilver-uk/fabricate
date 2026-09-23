@@ -1114,6 +1114,13 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-component-essence-filter',
   'data-component-sort',
   'data-essence-sort',
+  // Issue 1510 phase 3, commit 3e — the Tool library's sort, the vocabulary panel's sort and the
+  // recipe inspector's ingredient-set picker. `data-tool-sort-key` is not a bare `data-tool-sort`
+  // because that would prefix the sibling button's `data-tool-sort-direction`; the route hook is
+  // spelled with its value, the value naming which of the inspector's route controls it is.
+  'data-tool-sort-key',
+  'data-vocabulary-sort',
+  'data-recipe-route="ingredient-set"',
 ]);
 
 /**

@@ -7,7 +7,7 @@ import {
   TOOL_EDITOR_SHELL_MATCHES,
   TOOL_LIST_MATCHES,
 } from './caseConstants.js';
-import { managerCase } from './caseFactories.js';
+import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
   managerCase({
@@ -228,7 +228,7 @@ export const CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-tool-rules' },
       { selector: '[data-tool-membership-option="all"]' },
-      { selector: '.manager-tools-sort-select', select: 'state' },
+      ...chooseSelectOption('[data-tool-sort-key]', 'state'),
       { selector: '.manager-tools-sort-direction' },
     ],
     expectView: 'tools',
@@ -236,6 +236,26 @@ export const CASES = Object.freeze([
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
     sourceMatches: [...TOOL_LIST_MATCHES],
+  }),
+  // The sort key's open list (issue 1510): the one converted panel whose band floor cut its
+  // longest label, so the frame shows `In this system` whole at the call site's `minWidth`.
+  managerCase({
+    id: 'manager-tool-rules-sort-key-list',
+    label: 'Manager — Tool rules sort key list',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    // Stops on the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [{ selector: '#manager-nav-tool-rules' }, { selector: '[data-tool-sort-key]' }],
+    expectView: 'tools',
+    // Two claims a closed frame cannot make: the panel exists and it is the unticked sort list.
+    expectSelector:
+      '.fabricate-manager .fabricate-select-popover:not(.fabricate-select-popover-ticked)' +
+      ' [data-popover-option="state"] .fabricate-select-label',
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [...TOOL_LIST_MATCHES, ...ANCHORED_POPOVER_SOURCES],
   }),
   managerCase({
     // A selected row under the pointer (issue 1373), which is how a live cascade defect survived three parity passes.

@@ -421,6 +421,16 @@ const LIBRARY_TOOLBAR_SITES = Object.freeze(
 /** The bare filter roots' cap, which the trigger must be held to (issue 1510). */
 const FILTER_ROOT_CAP = 180;
 
+/** The Tool library's sort, and the panel floor its call site states for `In this system`. */
+const TOOL_SORT = '[data-tool-sort-key]';
+const TOOL_SORT_PANEL_FLOOR = 112;
+
+/** The recipe inspector's ingredient-set picker, which fills the inspector column. */
+const ROUTE_PICKER = '[data-recipe-route="ingredient-set"]';
+
+/** `anchoredPopover`'s inset from the overlay host, which bounds a panel under a full-width trigger. */
+const OVERLAY_INSET = 16;
+
 /**
  * Every option label a site's panel renders, with the two widths the truncation test compares.
  *
@@ -857,6 +867,8 @@ describe('a converted manager panel is wide enough for the list it opens (issue 
     // closed vocabulary, so it is the one that can outgrow the `toolbar` rung's 320px cap.
     ...RESTING_WIDTH_SITES.map((site) => ({ ...site, start: '' })),
     ...LIBRARY_TOOLBAR_SITES,
+    { subject: 'tools-browser', name: 'the Tool library sort', hook: TOOL_SORT, start: '' },
+    { subject: 'recipe-inspector-1024', name: 'the ingredient-set picker', hook: ROUTE_PICKER, start: '' },
   ];
 
   for (const site of PANEL_SITES) {
@@ -915,6 +927,81 @@ describe('a converted manager panel is wide enough for the list it opens (issue 
           Math.abs(panel - trigger) < EPSILON,
           `the panel measured ${panel}px under a ${trigger}px trigger, so the call site's ` +
             '`maxWidth` is not reaching the band and the list draws narrower than its control'
+        );
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  it('opens the Tool library sort at its call site’s panel floor, above its trigger', async () => {
+    // The `inline` band's own 96px floor leaves 64px of label room unticked, which cut
+    // `In this system` to an ellipsis; the call site's floor replaces the band's.
+    const page = await openFixture('tools-browser');
+    try {
+      await pressPointerOn(page, TOOL_SORT);
+      const measured = await page.evaluate((selector) => {
+        const trigger = document.querySelector(selector);
+        const width = (element) => Number(element.getBoundingClientRect().width.toFixed(2));
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--fab-text-secondary)';
+        document.querySelector('.fabricate-manager').append(probe);
+        const secondary = globalThis.getComputedStyle(probe).color;
+        probe.remove();
+        return {
+          trigger: width(trigger),
+          panel: width(document.querySelector('.fabricate-select-popover')),
+          rung: trigger.getAttribute('data-select-size'),
+          ink: globalThis.getComputedStyle(trigger).color,
+          secondary,
+        };
+      }, TOOL_SORT);
+      assertRung({ name: 'the Tool library sort', rung: 'inline' }, measured.rung);
+      assert.ok(
+        measured.trigger < TOOL_SORT_PANEL_FLOOR,
+        `the trigger measured ${measured.trigger}px, at or above the floor, so the panel's width ` +
+          'here is the trigger’s and the floor is not what this clause measures'
+      );
+      assert.ok(
+        Math.abs(measured.panel - TOOL_SORT_PANEL_FLOOR) < EPSILON,
+        `the panel measured ${measured.panel}px against the call site’s ${TOOL_SORT_PANEL_FLOOR}px floor`
+      );
+      assert.equal(measured.ink, measured.secondary, 'and the trigger keeps the row’s secondary ink');
+    } finally {
+      await page.close();
+    }
+  });
+
+  // THE INSPECTOR'S PICKER, at both ends of the one-column band it spans. The trigger fills the
+  // inspector column, past the `inline` band's 240px ceiling at the bottom and past a 1024px cap at
+  // the top, so the panel is as wide as its trigger up to the inset the overlay host keeps.
+  for (const [subject, overflow] of [
+    ['recipe-inspector-1024', 240],
+    ['recipe-inspector-1120', 1024],
+  ]) {
+    it(`draws the ingredient-set panel as wide as its trigger past ${overflow}px (${subject})`, async () => {
+      const page = await openFixture(subject);
+      try {
+        await pressPointerOn(page, ROUTE_PICKER);
+        const [trigger, panel, host] = await page.evaluate((selector) => {
+          const width = (element) => Number(element.getBoundingClientRect().width.toFixed(2));
+          return [
+            width(document.querySelector(selector)),
+            width(document.querySelector('.fabricate-select-popover')),
+            width(document.querySelector('.fabricate-manager')),
+          ];
+        }, ROUTE_PICKER);
+        assert.ok(
+          trigger > overflow,
+          `the trigger measured ${trigger}px, inside ${overflow}px, so this subject is not ` +
+            'measuring the overflow the call site raises the cap for'
+        );
+        const reach = Math.min(trigger, host - 2 * OVERLAY_INSET);
+        assert.ok(
+          Math.abs(panel - reach) < EPSILON,
+          `the panel measured ${panel}px under a ${trigger}px trigger in a ${host}px host, so the ` +
+            'call site’s `maxWidth` is not reaching the band and the list draws narrower than its ' +
+            'control'
         );
       } finally {
         await page.close();

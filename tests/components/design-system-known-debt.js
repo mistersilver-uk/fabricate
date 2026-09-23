@@ -110,7 +110,9 @@ export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 // total falls 29 -> 23 across 12 rows to 10.
 // #1510: the recipe, component and essence browsers' filters and sorts convert onto `Select`, so
 // the total falls 23 -> 17 across 10 rows to 7.
-export const KNOWN_NATIVE_SELECT_TOTAL = 17;
+// #1510: the Tool library's sort, the vocabulary panel's sort and the recipe inspector's
+// ingredient-set picker convert onto `Select`, so the total falls 17 -> 14 across 7 rows to 4.
+export const KNOWN_NATIVE_SELECT_TOTAL = 14;
 
 /** A native `<select>` written into a JavaScript template string, keyed `file`. */
 export const KNOWN_NATIVE_SELECTS_IN_JS = knownDebt('nativeSelectsInDialogBodies');
@@ -146,7 +148,8 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  */
 // #1510: the checks conversion removes one remaining 8px radius occurrence from the module sheet.
 // Issue 1512: the retired stage-row box (8px) and rocker buttons (4px) took four with them.
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 271;
+// #1510: the Tool library's sort select took its 8px corner with it; the `inline` rung draws 7px.
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 270;
 
 /** A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`. */
 export const KNOWN_AREA_SCOPED_STYLE_READS = knownDebt('areaScopedStyleReads');

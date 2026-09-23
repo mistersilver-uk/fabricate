@@ -90,6 +90,34 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
     ],
   }),
+  // The inspector's ingredient-set list (issue 1510), at a 1024 window: the inspector restacks
+  // under the list there, so the trigger fills a column far past the `inline` rung's 240px panel
+  // ceiling and the frame shows the panel matching the trigger under the call site's raised cap.
+  managerCase({
+    id: 'manager-recipes-inspector-route-list',
+    label: 'Manager — Recipes inspector ingredient-set list',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-jewelry' },
+    // Stops on the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [
+      'Crafting',
+      { selector: '.manager-recipe-row[data-recipe-id="jw-r-cast"] .manager-recipe-identity' },
+      { selector: '[data-recipe-route="ingredient-set"]' },
+    ],
+    expectView: 'recipes',
+    // Two claims a closed frame cannot make: the panel exists and it is the ticked route list.
+    expectSelector:
+      '.fabricate-manager .fabricate-select-popover.fabricate-select-popover-ticked' +
+      ' [data-popover-option="jw-set-gold"] .fabricate-select-label',
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    position: { width: 1024, height: 720 },
+    kinds: ['manager', 'recipes', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/recipes\/RecipeBrowserInspector\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
   managerCase({
     id: 'manager-recipes-narrow',
     label: 'Manager — Recipes narrow',

@@ -9,6 +9,7 @@
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
+  import Select from '../../components/Select.svelte';
   import { projectToolRow, toolSearchText } from './tools/toolStudio.js';
   import {
     breakModeSourcePill,
@@ -75,6 +76,13 @@
   const membershipFilter = $derived(ui.membershipFilter || 'in');
   const sortKey = $derived(ui.sortKey || 'name');
   const sortDirection = $derived(ui.sortDirection || 'asc');
+  const sortKeyOptions = $derived([
+    { value: 'name', label: text('FABRICATE.Admin.Manager.Tools.SortName', 'Name') },
+    {
+      value: 'state',
+      label: text('FABRICATE.Admin.Manager.Tools.FilterInSystemShort', 'In this system'),
+    },
+  ]);
   const pageIndex = $derived(ui.pageIndex || 0);
   const pageSize = $derived(ui.pageSize || DEFAULT_BROWSER_PAGE_SIZE);
   // NOT lifted: this is the "nothing is selected, pick the first row" guard, which names one mount's
@@ -405,20 +413,22 @@
       <span class="manager-tools-sort-label"
         >{text('FABRICATE.Admin.Manager.Tools.SortBy', 'Sort by')}</span
       >
-      <select
+      <!-- `minWidth` is the widest label, `In this system`, plus the unticked row chrome: the
+        `inline` band's 96px floor leaves 64px of label room and cut it to an ellipsis. -->
+      <Select
         class="manager-tools-sort-select"
+        size="inline"
         value={sortKey}
-        aria-label={text('FABRICATE.Admin.Manager.Tools.SortBy', 'Sort by')}
-        onchange={(event) => {
-          ui.sortKey = event.currentTarget.value;
+        options={sortKeyOptions}
+        showTick={false}
+        minWidth={112}
+        ariaLabel={text('FABRICATE.Admin.Manager.Tools.SortBy', 'Sort by')}
+        triggerData={{ 'data-tool-sort-key': '' }}
+        onChange={(next) => {
+          ui.sortKey = next;
           ui.pageIndex = 0;
         }}
-      >
-        <option value="name">{text('FABRICATE.Admin.Manager.Tools.SortName', 'Name')}</option>
-        <option value="state"
-          >{text('FABRICATE.Admin.Manager.Tools.FilterInSystemShort', 'In this system')}</option
-        >
-      </select>
+      />
       <button
         type="button"
         class="manager-tools-sort-direction"
@@ -737,25 +747,18 @@
     text-transform: uppercase;
   }
 
-  /* `flex: 0 0 auto` AND an explicit `width`, because the manager sheet gives every `select` a
-     full-row width. This block is unlayered and the sheet's is layered, so it wins on layer. */
-  /* NO BACKGROUND DECLARATION, and that is a correctness fix: a TRANSLUCENT background on a
-     `<select>` makes the browser open a LIGHT native popup, which `manager-layout.test.js` gates
-     against by name. `.fabricate-manager select` already paints `--fab-bg-1`. */
-  /* `proto:2520`: 32 is a retired control height, so this takes the nearest surviving rung, 30 —
-     the substitution every 32px control on this screen makes. 10px takes 12. */
-  .manager-tools-sort-select {
+  /* The picker root is the row's flex item and hugs; the trigger carries the width and ink, which
+     the `inline` rung does not state. Chained onto the scoped row, because the class sits on a
+     COMPONENT tag. */
+  .manager-tools-sort-row :global(.manager-tools-sort-select) {
     flex: 0 0 auto;
     width: auto;
-    height: 30px;
+  }
+
+  .manager-tools-sort-row :global(.manager-tools-sort-select .fabricate-select-trigger) {
     min-width: 92px;
     max-width: 180px;
-    padding: 0 var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
     color: var(--fab-text-secondary);
-    font-size: 11.5px;
-    font-weight: 500;
   }
 
   /* `height: auto` and `min-height` rather than a bare `height`, and `justify-content: flex-start` —

@@ -990,19 +990,13 @@ test('the shared Select paints identically in both areas, and beats the paint it
                   selectPanelFixture('manager', 'toolbar', { ticked: false }),
                 ].join('\n')
               )}
-              <!-- THE PANEL CLASS IS ON THE HOST BECAUSE THE SHIPPED SELECT MOVED WITH
-                   IT (issue 1504). Converting this toolbar's two controls left one native
-                   carrier, the vocabulary panel's sort select, so the geometry and type rules are
-                   NARROWED onto the one panel component that still renders a native select rather
-                   than deleted — and this is where a shipped scoped-list-toolbar select still
-                   takes its skin. Issue 1915 re-keyed the narrowing off the world route attribute
-                   and onto that component's class, because BOTH Tags & Categories screens draw it
-                   now. The search field and the direction toggle are unaffected by the narrowing
-                   and are measured in the same row. -->
+              <!-- The vocabulary panel's toolbar row: its sort is a converted toolbar-rung
+                   trigger beside the search field and the direction toggle, which are measured
+                   in the same row. -->
               <div class="manager-vocabulary-shell-panel">
                 <div class="fabricate-filter-bar manager-toolbar manager-scoped-list-toolbar">
                   <div class="fabricate-search manager-search"><input type="text" data-probe="shipped-search"></div>
-                  <select data-probe="shipped-select"><option>Name</option></select>
+                  <div class="fabricate-picker manager-travel-picker fabricate-select"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" data-probe="shipped-select" data-select-size="toolbar"><span class="manager-travel-picker-value fabricate-select-value">Name</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
                   <button type="button" class="manager-scoped-list-direction" data-probe="shipped-direction"
                     ><i class="fas fa-arrow-up" aria-hidden="true"></i><span>Asc</span></button>
                 </div>
@@ -1189,14 +1183,14 @@ test('the shared Select paints identically in both areas, and beats the paint it
     assert.equal(report.headings.untickedManager, report.headings.untickedPlayer, 'in both areas');
 
     // ── THE WEIGHT SPLIT ON THE SHIPPED TOOLBAR ROW.
-    assert.equal(report.shipped.select.size, '11.52px', 'the shipped sort select`s type size');
+    assert.equal(report.shipped.select.size, '11.52px', 'the converted sort trigger`s type size');
     assert.equal(report.shipped.search.size, '11.52px', 'and its search field`s');
     assert.equal(report.shipped.direction.size, '11.52px', 'and its direction toggle`s');
     assert.deepEqual(
       [report.shipped.select.weight, report.shipped.search.weight, report.shipped.direction.weight],
-      ['400', '400', '400'],
-      'none of the three declares a weight, so each computes `normal` — which is OFF the ' +
-        'published ramp, and is the figure the converted rung`s 500 stands beside'
+      ['500', '400', '400'],
+      'the sort takes the rung`s 500 while its two neighbours declare no weight and compute ' +
+        '`normal`, which is OFF the published ramp'
     );
     assert.equal(
       report.triggers['manager-toolbar'].fontWeight,
@@ -1606,44 +1600,28 @@ test('every converted pager site retains its declared trigger fill and width flo
   }
 });
 
-test('the stranded toolbar select rules are narrowed onto their last native carrier', () => {
-  // ── THE CI-ARMED HALF OF A DOES-NOT-MOVE CLAIM (issue 1504) ──────────────────────────────
-  // Converting the scoped-catalogue toolbar's lane filter and sort key strands the two sheet
-  // rules that painted a `.manager-scoped-list-toolbar select`. They are NARROWED onto the one
-  // PANEL COMPONENT that still renders one — `VocabularyShellPanel`'s sort select — rather than
-  // deleted, because that select takes its ENTIRE skin from them. The anchor is that component's
-  // class rather than a route attribute since issue 1915: the same component draws the world and
-  // the system Tags & Categories screens, so a route anchor would have painted only one of them.
+test('no scoped-list-toolbar rule reaches a native select, since none renders there', () => {
+  // Every control in the scoped-catalogue toolbars is the shared `Select` now, the vocabulary
+  // panel's sort included, so an element-typed `select` leg here would paint nothing.
   const declarations = css.replaceAll(/\/\*[\s\S]*?\*\//g, ' ');
   const preludes = declarations
     .split('}')
     .map((chunk) => (chunk.includes('{') ? chunk.slice(0, chunk.indexOf('{')) : ''))
     .filter((prelude) => prelude.includes('.manager-scoped-list-toolbar'))
     .map((prelude) => prelude.replaceAll(/\s+/g, ' ').trim());
-
-  // A `select` TYPE selector, not the token inside `.fabricate-select-trigger`. `\bselect\b`
-  // matches that class too, because a hyphen is a word boundary — and since issue 1504 the
-  // catalogue toolbar carries call-site rules on the converted trigger, which are not the
-  // stranded native-select rules this clause is about.
-  const withSelect = preludes.filter((prelude) => /(?:^|[\s>+~,(])select(?![\w-])/.test(prelude));
   assert.ok(
-    withSelect.length > 0,
-    'a rule naming a scoped-list-toolbar select must still exist, or this clause holds over ' +
-      'nothing and the narrowing could have been a deletion'
+    preludes.length > 0,
+    'no rule names the scoped-list toolbar at all, so this clause holds over nothing'
   );
-  for (const prelude of withSelect) {
-    assert.ok(
-      prelude.includes('.manager-vocabulary-shell-panel'),
-      'every surviving scoped-list-toolbar select rule names the one panel component that still ' +
-        `renders a native select, and \`${prelude}\` does not — an unnarrowed rule paints every ` +
-        'catalogue toolbar, none of which has a native select in it any more'
-    );
-    assert.ok(
-      prelude.startsWith('.fabricate-manager'),
-      'and it keeps a .fabricate-manager compound: the type half reads an area-scoped property ' +
-        `and this sheet is page-global, so \`${prelude}\` would red two other gates without it`
-    );
-  }
+
+  // A `select` TYPE selector, not the token inside `.fabricate-select-trigger`: a hyphen is a
+  // word boundary, so `\bselect\b` would match the converted trigger's own call-site rules.
+  const withSelect = preludes.filter((prelude) => /(?:^|[\s>+~,(])select(?![\w-])/.test(prelude));
+  assert.deepEqual(
+    withSelect,
+    [],
+    'these scoped-list-toolbar rules still name a native `select`, which no toolbar renders'
+  );
 });
 
 // THE OTHER TWO CONVERTED SITE CLASSES OWN THEIR POINTER TARGETS (issue 1504)
