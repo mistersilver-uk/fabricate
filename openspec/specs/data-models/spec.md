@@ -4593,6 +4593,45 @@ That is a property of the knowledge gate rather than an audience-dependent deriv
 The prohibition on exact evaluation is also enforced structurally: the projection accepts VALUES — a definition, a system, a snapshot, an access result — and never a manager or a listing builder, so there is no collaborator present to call either function on.
 Tests MUST cover the counted invariant over a run of N summaries, and MUST prove the counter non-vacuous rather than reporting a green baseline forever.
 
+## Companion Operation Record
+
+One versioned Companion Operation Record is the durable authority for an accepted companion operation.
+It contains the operation id, immutable canonical plan, operation state, revision, decision and effect slots, evidence, final outcome, audit timestamps and archive visibility.
+No separate deduplication flag exists that could disagree with this record.
+Unknown versions, unknown structural fields, malformed JSON or slots that do not correspond one-for-one and in plan order fail closed.
+
+An accepted record is the exact revision-zero initial snapshot: accepted and updated timestamps are equal, every decision and effect is pending, all value, evidence, waiver and outcome fields are null, and both archive fields are null.
+Every later state has a positive safe-integer revision, and one successful serialized mutation advances it once.
+Duplicate observation, idempotent archive repetition and failed persistence do not advance revision.
+Finite timestamps are injected audit-only wall-clock values and never arbitrate acceptance, freshness, execution election or cross-client ordering; they need not increase across clients.
+
+A pending decision has null value and evidence, while a resolved decision has non-null saved value and evidence; false, zero and the empty string are valid saved JSON values.
+A pending effect has null evidence and waiver.
+Applied, known-failure and review-required effects require non-null durable evidence; an applying effect may retain evidence but has no waiver.
+A waiver is present if and only if the effect is waived and records a nonblank user, finite timestamp and nonblank reason.
+An unresolved decision dependency permits its effect only to remain pending or be waived.
+
+Nonterminal blocker precedence is review-required, known failure, awaiting a decision, then pending.
+`reviewRequired` requires a review-required effect; `failed` requires a known-failure effect and no review-required effect; `awaitingDecision` requires an unresolved decision needed by an unsettled effect and no review-required, known-failure or applying effect; `pending` is the remaining nonterminal state.
+Every nonterminal outcome is null.
+`completed` requires every effect applied, every decision needed by an applied effect resolved, no waiver and a non-null outcome.
+`completedWithOmissions` requires every effect applied or waived, at least one audited waiver, every decision needed by an applied effect resolved and a non-null outcome.
+
+Only terminal records may be archived.
+Archive metadata is either two nulls or a finite `hiddenAt` paired with a nonblank `hiddenBy`.
+The first successful archive writes that pair and advances revision; later archive requests return the stored record unchanged.
+There is no erase or unarchive transition, and archival cannot rewrite identity, plan, decisions, effect evidence or outcome.
+
+The record is stored on one embedded `JournalEntryPage` whose id is the operation id, beneath a resolved private ledger.
+Acceptance first reads that exact parent and page authoritatively; a valid existing record answers duplicate or conflict without issuing a normal-retry create.
+Only a proven absent page in a present readable ledger permits `createEmbeddedDocuments('JournalEntryPage', ..., { keepId: true })`, preserving embedded-id uniqueness as the race boundary.
+A missing parent, unreadable response, malformed flag, rejected write without conclusive readback, empty or cancelled write result, wrong returned id or unverified acknowledgement fails closed.
+After an ambiguous create or archive write, only authoritative readback proving the stored state may report success.
+
+Every input and output boundary returns a detached snapshot, including the accepted plan captured before the first awaited write.
+Changing caller input while persistence is pending or changing a returned record cannot alter stored state or later plan comparison.
+The adapter claims neither a V13 compare-and-swap nor a transaction across documents; runtime execution serialization, claims, effects and public methods belong to later delivery increments.
+
 ## Behavioural Ownership
 
 - Resolution mode semantics and mode validation: `resolution-modes/spec.md`
