@@ -145,7 +145,7 @@ class InteractableManager {
     this._onControlToken = this._onControlToken.bind(this);
   }
 
-  /** Install the canvas hooks and the client keybinding. Idempotent. */
+  /** Install the canvas hooks at `ready`. Idempotent. */
   register() {
     if (this._registered) return;
     const hooks = globalThis.Hooks;
@@ -154,27 +154,25 @@ class InteractableManager {
       // A token already inside a region on scene load never fires `tokenEnter`; control does.
       hooks.on('controlToken', this._onControlToken);
     }
-    this._registerKeybinding();
     this._registered = true;
   }
 
-  /** Register "Fabricate: interact here". A no-op when the keybindings API is unavailable. */
-  _registerKeybinding() {
+  /** Register "Fabricate: interact here" from `init`, as core refuses it later. Idempotent. */
+  registerKeybinding() {
     const keybindings = globalThis.game?.keybindings;
-    if (typeof keybindings?.register !== 'function') return;
+    if (this._keybindingRegistered || typeof keybindings?.register !== 'function') return;
     try {
       keybindings.register('fabricate', INTERACT_KEYBINDING, {
         name: 'FABRICATE.Canvas.Interactable.Keybinding.Name',
         hint: 'FABRICATE.Canvas.Interactable.Keybinding.Hint',
         editable: [{ key: 'KeyE' }],
-        onDown: () => {
-          this._interactHere();
-          return true;
-        },
+        // Consume the key only when a prompt was raised: core `ascend` shares KeyE.
+        onDown: () => this._interactHere() === true,
         restricted: false,
       });
-    } catch {
-      // Defensive: a keybinding registration must never break init.
+      this._keybindingRegistered = true;
+    } catch (error) {
+      console.warn('Fabricate | Could not register the interact keybinding.', error);
     }
   }
 
@@ -236,10 +234,10 @@ class InteractableManager {
     this._promptForTokenInsideRegion(tokenPlaceable);
   }
   _interactHere() {
-    interactHere(this._promptDeps);
+    return interactHere(this._promptDeps);
   }
   _promptForTokenInsideRegion(tokenPlaceable) {
-    promptInsideRegion(tokenPlaceable, this._promptDeps);
+    return promptInsideRegion(tokenPlaceable, this._promptDeps);
   }
   _repromptAfterInteractableClose(args = {}) {
     repromptAfterClose(args, this._promptDeps);
@@ -360,6 +358,7 @@ class InteractableManager {
   }
 
   _registered = false;
+  _keybindingRegistered = false;
 }
 
 /** The shared singleton, exposed as a static so callers use `InteractableManager.instance`. */

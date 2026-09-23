@@ -42,19 +42,22 @@ export function onRegionExit(_event, behavior, deps) {
   void deps.getPromptAppClass()?.dismiss?.(behaviorRefOf(ref));
 }
 
-/** The keybinding re-trigger: prompt for the first controlled token's eligible region. */
+/** The keybinding re-trigger for the first controlled token: `true` only when it raised a prompt. */
 export function interactHere(deps) {
   const controlled = deps.controlledTokens();
   const token = (Array.isArray(controlled) ? controlled : [])[0] ?? null;
-  if (!token) return;
-  deps.promptForTokenInsideRegion(token);
+  if (!token) return false;
+  return deps.promptForTokenInsideRegion(token);
 }
 
-/** Shared re-trigger body: {@link onRegionEnter} driven by control rather than a region event. */
+/**
+ * Shared re-trigger body: {@link onRegionEnter} driven by control rather than a region event.
+ * Answers `true` only when it raised a prompt.
+ */
 export function promptForTokenInsideRegion(tokenPlaceable, deps) {
   const tokenDoc = tokenPlaceable?.document ?? tokenPlaceable;
-  if (!tokenDoc) return;
-  if (!ownsToken(tokenDoc, { isGM: deps.currentUser()?.isGM === true })) return;
+  if (!tokenDoc) return false;
+  if (!ownsToken(tokenDoc, { isGM: deps.currentUser()?.isGM === true })) return false;
   for (const { behavior } of deps.behaviorsContainingToken(tokenPlaceable)) {
     const system = readInteractableBehaviorSystem(behavior);
     if (!system || system.activation?.trigger !== 'regionEnter') continue;
@@ -62,8 +65,9 @@ export function promptForTokenInsideRegion(tokenPlaceable, deps) {
     const ref = identifyRegionBehaviorRef(behavior);
     if (!ref) continue;
     raisePrompt({ behavior, system, ref, actorId: actorOf(tokenDoc) }, deps);
-    return; // one prompt at a time.
+    return true; // one prompt at a time.
   }
+  return false;
 }
 
 /**
