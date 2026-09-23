@@ -8,6 +8,8 @@ import en from '../../../lang/en.json';
 
 import AccessTabView from '../../../src/ui/svelte/apps/manager/AccessTabView.svelte';
 import BooksScrollsView from '../../../src/ui/svelte/apps/manager/BooksScrollsView.svelte';
+import ComponentsBrowserView from '../../../src/ui/svelte/apps/manager/ComponentsBrowserView.svelte';
+import EssenceBrowserView from '../../../src/ui/svelte/apps/manager/EssenceBrowserView.svelte';
 import CharacterPrerequisitesCard from '../../../src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte';
 import GatheringEconomyView from '../../../src/ui/svelte/apps/manager/GatheringEconomyView.svelte';
 import SystemsBrowserView from '../../../src/ui/svelte/apps/manager/SystemsBrowserView.svelte';
@@ -18,9 +20,11 @@ import EnvironmentsBrowserView from '../../../src/ui/svelte/apps/manager/Environ
 import GatheringEventsBrowserView from '../../../src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte';
 import GatheringTasksBrowserView from '../../../src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte';
 import RecipeOverviewTab from '../../../src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte';
+import RecipesBrowserView from '../../../src/ui/svelte/apps/manager/RecipesBrowserView.svelte';
 import Select from '../../../src/ui/svelte/components/Select.svelte';
 import ToolBehaviorPreview from '../../../src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte';
 import WorldCurrencyTab from '../../../src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte';
+import { makeEssenceRow } from '../../helpers/makeEssenceRow.js';
 import { installFixtureI18n, mountCaptionShape } from '../select-fixture-shared.js';
 
 const params = new URLSearchParams(globalThis.location.search);
@@ -259,6 +263,57 @@ const GATHERING_RECORDS = [
   },
 ];
 
+// The recipe, component and essence libraries' toolbars (issue 1510). `Weaponsmithing (7)` is the
+// longest recipe category label measured in the product, and the component essence list opens on
+// `Carries any essence`, the tightest panel of the conversion. `LONG_CATEGORY_COMPONENT` is longer
+// than the 180px the bare filter root is capped at, which no panel can draw whole.
+const LIBRARY_RECIPES = [
+  { id: 'r-blade', name: 'Tempered Blade', category: 'Weaponsmithing', enabled: true },
+  { id: 'r-salve', name: 'Soothing Salve', category: 'Alchemy', enabled: true },
+];
+const LIBRARY_RECIPE_CATEGORIES = [
+  { name: 'Weaponsmithing', count: 7 },
+  { name: 'Alchemy', count: 2 },
+];
+const LIBRARY_COMPONENTS = [
+  {
+    id: 'c-ingot',
+    name: 'Iron Ingot',
+    category: 'Metal',
+    essences: [{ id: 'fire', name: 'Fire', quantity: 1 }],
+  },
+  { id: 'c-sage', name: 'Sage', category: 'Herb', essences: [] },
+].map(componentCard);
+const LONG_CATEGORY_COMPONENT = componentCard({
+  id: 'c-resin',
+  name: 'Amber Resin',
+  category: 'Rare alchemical reagents and tinctures',
+  essences: [],
+});
+
+/** A component card in the browser's row shape. */
+function componentCard(component) {
+  return {
+    description: '',
+    img: 'icons/svg/item-bag.svg',
+    salvageSummary: { resultGroupCount: 0 },
+    ...component,
+  };
+}
+
+/** The system Component Rules list, under the route attribute its micro-type rules key on. */
+function componentsBrowser(itemCards) {
+  frame.dataset.managerView = 'components';
+  return mount(ComponentsBrowserView, {
+    target: mountPoint,
+    props: {
+      itemCards,
+      categoryVocabulary: itemCards.map((component) => component.category),
+      selectedSystemId: 'sys',
+    },
+  });
+}
+
 /** The 340px column the tool-edit grid gives the rail, reproduced as fixture chrome. */
 function railColumn() {
   const rail = document.createElement('div');
@@ -437,6 +492,23 @@ const SUBJECTS = {
     mount(GatheringEventsBrowserView, {
       target: mountPoint,
       props: { events: GATHERING_RECORDS, selectedSystemId: 'sys', gatheringConfig: GATHERING_CONFIG },
+    }),
+  'recipes-browser': () =>
+    mount(RecipesBrowserView, {
+      target: mountPoint,
+      props: {
+        recipes: LIBRARY_RECIPES,
+        recipeCategories: LIBRARY_RECIPE_CATEGORIES,
+        showRecipeCategories: true,
+      },
+    }),
+  'components-browser': () => componentsBrowser(LIBRARY_COMPONENTS),
+  'components-browser-long-category': () =>
+    componentsBrowser([...LIBRARY_COMPONENTS, LONG_CATEGORY_COMPONENT]),
+  'essence-browser': () =>
+    mount(EssenceBrowserView, {
+      target: mountPoint,
+      props: { essenceCards: [makeEssenceRow()], selectedSystemId: 'sys' },
     }),
   // The `Preview as` roster, whose value is component state rather than a prop.
   'tool-preview': () =>

@@ -3,7 +3,7 @@
  */
 
 import { ANCHORED_POPOVER_SOURCES } from './caseConstants.js';
-import { managerCase } from './caseFactories.js';
+import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
   managerCase({
@@ -15,7 +15,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       'Crafting',
-      { selector: '[data-recipe-category-filter]', select: 'Weaponsmithing' },
+      ...chooseSelectOption('[data-recipe-category-filter]', 'Weaponsmithing'),
       { selector: '.manager-recipe-row .manager-recipe-identity' },
       { selector: '.manager-recipe-group [data-group-header]' },
       { selector: '.manager-recipe-browser-inspector [data-recipe-action="edit"]' },

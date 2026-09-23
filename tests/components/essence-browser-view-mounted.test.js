@@ -22,6 +22,12 @@ import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 import { createEssenceBrowserState } from '../../src/ui/model/essenceBrowserModel.js';
 import { makeEssenceRow } from '../helpers/makeEssenceRow.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  openSelectPanel,
+  selectOptionValues,
+} from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -532,5 +538,29 @@ describe('EssenceBrowserView membership axis (issue 1716)', () => {
       'a switch narrows the axis back, or it keeps naming a system the rows no longer come from'
     );
     harness.remount();
+  });
+});
+
+describe('EssenceBrowserView sort (issue 1510)', () => {
+  it('names the converted sort trigger and orders the rows by the key it chooses', async () => {
+    // Aether is used by two components and Water by none, so the usage order inverts the name order.
+    const root = await harness.mount(props([CONFIGURED_DISABLED, PLAIN_ENABLED]));
+    const SORT = '[data-essence-sort]';
+    const rows = () =>
+      [...root.querySelectorAll(':scope .manager-essence-row')].map((row) => row.dataset.essenceId);
+
+    assert.equal(assertSelectHasResolvedName(root, SORT), 'Sort essences');
+    assert.equal(root.querySelector(SORT).getAttribute('data-select-size'), 'toolbar');
+    assert.ok(
+      openSelectPanel(root, SORT).classList.contains('fabricate-select-popover-ticked'),
+      'the sort keys are cousins, so the list keeps its tick column'
+    );
+    assert.deepEqual(selectOptionValues(root, SORT), ['name', 'status', 'components', 'recipes']);
+
+    assert.deepEqual(rows(), ['aether', 'water'], 'by name');
+    chooseSelectOption(root, SORT, 'components');
+    assert.deepEqual(rows(), ['water', 'aether'], 'by component usage, none before two');
+    chooseSelectOption(root, SORT, 'name');
+    assert.deepEqual(rows(), ['aether', 'water'], 'and back by name');
   });
 });

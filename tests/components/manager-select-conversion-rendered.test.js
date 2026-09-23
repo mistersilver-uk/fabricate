@@ -403,6 +403,25 @@ const RESTING_WIDTH_SITES = Object.freeze([
 ]);
 
 /**
+ * The recipe, component and essence toolbars' six (issue 1510). Their filters are bare and their
+ * sorts hug beside a micro-label, so neither a column nor the `.manager-filter` floor sizes them,
+ * and the claim they carry here is the panel's; the category filter's cap has a clause of its own.
+ */
+const LIBRARY_TOOLBAR_SITES = Object.freeze(
+  [
+    ['recipes-browser', 'the recipe category filter', '[data-recipe-category-filter]'],
+    ['recipes-browser', 'the recipe sort', '[data-recipe-sort]'],
+    ['components-browser', 'the component category filter', '[data-component-category-filter]'],
+    ['components-browser', 'the component essence filter', '[data-component-essence-filter]'],
+    ['components-browser', 'the component sort', '[data-component-sort]'],
+    ['essence-browser', 'the essence sort', '[data-essence-sort]'],
+  ].map(([subject, name, hook]) => Object.freeze({ subject, name, hook, start: '' }))
+);
+
+/** The bare filter roots' cap, which the trigger must be held to (issue 1510). */
+const FILTER_ROOT_CAP = 180;
+
+/**
  * Every option label a site's panel renders, with the two widths the truncation test compares.
  *
  * @param {import('playwright').Page} page
@@ -426,6 +445,19 @@ function readOpenPanel(page) {
 }
 
 /**
+ * Put a control whose value no prop can seed in the state by the act that reaches it: open the
+ * panel and click the row, which is what the GM does and what `select-control.js` does.
+ *
+ * @param {import('playwright').Page} page
+ * @param {string} hook The trigger.
+ * @param {string} value The option's own value.
+ */
+async function driveRenderedOption(page, hook, value) {
+  await pressPointerOn(page, hook);
+  await pressPointerOn(page, `.fabricate-select-popover [data-popover-option="${value}"]`);
+}
+
+/**
  * Measure one site's trigger as it ships and with its width rule neutralised inline.
  *
  * @param {string} subject
@@ -437,12 +469,7 @@ function readOpenPanel(page) {
 async function measureTrigger(subject, hook, value, columnSelector = '.manager-field', drive = false) {
   const page = await openFixture(subject, drive ? '' : value);
   try {
-    // A CONTROL WHOSE VALUE NO PROP CAN SEED is put in the state by the act that reaches it: open
-    // the panel and click the row, which is what the GM does and what `select-control.js` does.
-    if (drive) {
-      await pressPointerOn(page, hook);
-      await pressPointerOn(page, `.fabricate-select-popover [data-popover-option="${value}"]`);
-    }
+    if (drive) await driveRenderedOption(page, hook, value);
     return await page.evaluate(([selector, column_]) => {
       const trigger = document.querySelector(selector);
       const shipped = trigger.getBoundingClientRect().width;
@@ -667,6 +694,42 @@ describe('a converted manager trigger keeps the width its native select had (iss
     }
   });
 
+  it('holds a bare filter trigger inside its root’s 180px cap on a value longer than the cap', async () => {
+    // THE TOP OF THE BAND. The root is the flex item and states the cap; the trigger is sized to its
+    // value, so without its own rule a GM-authored category overflows the root it sits in.
+    const page = await openFixture('components-browser-long-category');
+    const hook = '[data-component-category-filter]';
+    try {
+      await driveRenderedOption(page, hook, 'Rare alchemical reagents and tinctures');
+      const measured = await page.evaluate((selector) => {
+        const trigger = document.querySelector(selector);
+        const value = trigger.querySelector('.fabricate-select-value');
+        const width = (element) => Number(element.getBoundingClientRect().width.toFixed(2));
+        const shipped = {
+          trigger: width(trigger),
+          root: width(trigger.closest('.fabricate-select')),
+          ellipsised: value.scrollWidth > value.clientWidth,
+        };
+        trigger.style.maxWidth = 'none';
+        return { ...shipped, uncapped: width(trigger) };
+      }, hook);
+      assert.ok(
+        measured.uncapped > FILTER_ROOT_CAP,
+        `the trigger measured ${measured.uncapped}px uncapped, inside the cap, so this value does ` +
+          'not test the cap at all'
+      );
+      assert.ok(
+        Math.abs(measured.root - FILTER_ROOT_CAP) < EPSILON &&
+          Math.abs(measured.trigger - measured.root) < EPSILON,
+        `the trigger measured ${measured.trigger}px in a ${measured.root}px root, so it overflows ` +
+          'the cap the root states and pushes every control after it along the row'
+      );
+      assert.ok(measured.ellipsised, 'and the value ellipsises inside the capped trigger');
+    } finally {
+      await page.close();
+    }
+  });
+
   it('shows a converted trigger DOES resize with its value once its width rule is removed', async () => {
     // NON-VACUITY for every clause above. Without it.
     const [shortest, longest] = await Promise.all([
@@ -747,6 +810,7 @@ describe('a converted manager panel is wide enough for the list it opens (issue 
     // The same three, opened at rest. The roster's labels are world actor names rather than a
     // closed vocabulary, so it is the one that can outgrow the `toolbar` rung's 320px cap.
     ...RESTING_WIDTH_SITES.map((site) => ({ ...site, start: '' })),
+    ...LIBRARY_TOOLBAR_SITES,
   ];
 
   for (const site of PANEL_SITES) {

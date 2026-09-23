@@ -1104,6 +1104,16 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   '-biome-filter',
   '-availability-filter',
   '-danger-filter',
+  // Issue 1510 phase 3, commit 3d — the recipe, component and essence toolbars. Each is spelled
+  // bare, checked rather than assumed: the three `-sort` hooks prefix their sibling direction
+  // buttons' `-sort-direction` hooks, which name buttons rather than native selects, and no entry
+  // here prefixes a hook on a native control that survives.
+  'data-recipe-category-filter',
+  'data-recipe-sort',
+  'data-component-category-filter',
+  'data-component-essence-filter',
+  'data-component-sort',
+  'data-essence-sort',
 ]);
 
 /**

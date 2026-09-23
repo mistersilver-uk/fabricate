@@ -41,6 +41,7 @@
   import Notice from '../../components/Notice.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import Select from '../../components/Select.svelte';
 
   let {
     recipes = [],
@@ -238,6 +239,19 @@
   function categoryLabel(category) {
     return getRecipeCategoryLabel(category, localize);
   }
+
+  // The toolbar's two lists, each label carried verbatim from the `<option>` text it replaced
+  // (issue 1510).
+  const categorySelectOptions = $derived([
+    { value: 'all', label: text('FABRICATE.Admin.Manager.Recipe.CategoryAll', 'All categories') },
+    ...(recipeCategories || []).map((category) => ({
+      value: category.name,
+      label: `${categoryLabel(category.name)} (${category.count})`,
+    })),
+  ]);
+  const sortSelectOptions = $derived(
+    RECIPE_SORT_KEYS.map((key) => ({ value: key, label: sortLabel(key) }))
+  );
 
   function groupRegionId(category) {
     return `manager-recipe-group-${category || 'all'}`;
@@ -465,27 +479,24 @@
       643), separated by a rule and each titled by a micro-label that never wraps. -->
     <div class="manager-recipe-filter-row is-secondary">
       {#if showRecipeCategories}
-        <!-- Bare: the `aria-label` is the select's accessible name. -->
-        <select
+        <!-- Bare: the `aria-label` is the trigger's accessible name. Category names are distinct
+             names rather than cousins, so the list drops the tick. -->
+        <Select
+          size="toolbar"
           class="manager-recipe-category-filter"
-          data-recipe-category-filter
           value={ui.categoryFilter}
-          onchange={(event) => {
-            ui.categoryFilter = event.currentTarget.value;
-            ui.pageIndex = 0;
-          }}
-          aria-label={text(
+          options={categorySelectOptions}
+          showTick={false}
+          ariaLabel={text(
             'FABRICATE.Admin.Manager.Recipe.CategoryFilterLabel',
             'Filter recipes by category'
           )}
-        >
-          <option value="all"
-            >{text('FABRICATE.Admin.Manager.Recipe.CategoryAll', 'All categories')}</option
-          >
-          {#each recipeCategories || [] as category (category.name)}
-            <option value={category.name}>{categoryLabel(category.name)} ({category.count})</option>
-          {/each}
-        </select>
+          triggerData={{ 'data-recipe-category-filter': '' }}
+          onChange={(next) => {
+            ui.categoryFilter = next;
+            ui.pageIndex = 0;
+          }}
+        />
         <span class="manager-recipe-filter-divider" aria-hidden="true"></span>
         <div class="manager-recipe-filter-field">
           <span class="manager-recipe-filter-label" id="manager-recipe-group-label"
@@ -504,16 +515,14 @@
         <span class="manager-recipe-filter-label"
           >{text('FABRICATE.Admin.Manager.Recipe.SortBy', 'Sort by')}</span
         >
-        <select
+        <Select
+          size="toolbar"
           value={ui.sortKey}
-          data-recipe-sort
-          onchange={(event) => (ui.sortKey = event.currentTarget.value)}
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.SortLabel', 'Sort recipes')}
-        >
-          {#each RECIPE_SORT_KEYS as key (key)}
-            <option value={key}>{sortLabel(key)}</option>
-          {/each}
-        </select>
+          options={sortSelectOptions}
+          ariaLabel={text('FABRICATE.Admin.Manager.Recipe.SortLabel', 'Sort recipes')}
+          triggerData={{ 'data-recipe-sort': '' }}
+          onChange={(next) => (ui.sortKey = next)}
+        />
         <ManagerButton
           class="manager-recipe-sort-direction"
           data-recipe-sort-direction={ui.sortDirection}

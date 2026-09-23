@@ -108,7 +108,9 @@ export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 // picker convert onto `Select`, so the total falls 34 -> 29 across 13 rows to 12.
 // #1510: the gathering task and event browsers' six toolbar filters convert onto `Select`, so the
 // total falls 29 -> 23 across 12 rows to 10.
-export const KNOWN_NATIVE_SELECT_TOTAL = 23;
+// #1510: the recipe, component and essence browsers' filters and sorts convert onto `Select`, so
+// the total falls 23 -> 17 across 10 rows to 7.
+export const KNOWN_NATIVE_SELECT_TOTAL = 17;
 
 /** A native `<select>` written into a JavaScript template string, keyed `file`. */
 export const KNOWN_NATIVE_SELECTS_IN_JS = knownDebt('nativeSelectsInDialogBodies');

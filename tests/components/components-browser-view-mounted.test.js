@@ -16,7 +16,14 @@ import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCas
 import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 import { projectWorldScopeEntity as projectComponentScope } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 // Issue 1504: the page-size control is a shared `<Select>`.
-import { chooseSelectOption } from '../helpers/select-control.js';
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  closeSelectPanel,
+  openSelectPanel,
+  selectOptionLabels,
+  selectOptionValues,
+} from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -135,10 +142,7 @@ describe('ComponentsBrowserView group headers (issue 676)', () => {
     const root = await browser.mount({ itemCards: rows, categoryVocabulary: ['Metal'] });
     assert.deepEqual(countTexts(root), ['2', '2'], 'Metal then general');
 
-    const categoryFilter = root.querySelector('[data-component-category-filter]');
-    categoryFilter.value = 'Metal';
-    categoryFilter.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-component-category-filter]', 'Metal');
 
     assert.deepEqual(
       countTexts(root),
@@ -1040,13 +1044,12 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
 describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)', () => {
   /**
    * The reference draws this bar's search field and both filter selects at 38px
-   * (`proto:1053-1055`) and all three shipped at 34. 38 is a published rung
-   * (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44, with 32 / 36 / 40 retired), so nothing
-   * licensed the drop; ruling M12b made the rung reachable on the shared primitives and this bar
-   * is one of the two consumers.
+   * (`proto:1053-1055`). 38 is a published rung (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 /
+   * 44, with 32 / 36 / 40 retired); the field publishes it as a size prop, and the two filter
+   * triggers take it from this bar's own member of the folded `is-size-38` trigger rule.
    */
   const FIELD_SELECTOR = '.manager-search.is-size-38 input';
-  const SELECT_SELECTOR = '.manager-toolbar select.is-size-38';
+  const SELECT_SELECTOR = '.manager-component-toolbar .is-size-38 .fabricate-select-trigger';
 
   function metalWithFire() {
     return [
@@ -1076,7 +1079,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
     );
   });
 
-  it('opts BOTH filter selects into it, from inside the host that rule names', async () => {
+  it('opts BOTH filter triggers into it, from inside the host that rule names', async () => {
     const root = await browser.mount({
       itemCards: metalWithFire(),
       categoryVocabulary: ['Metal', 'Herb'],
@@ -1090,6 +1093,10 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
       ),
       ['category', 'essence'],
       'the category and essence filters both reach the rung, in bar order'
+    );
+    assert.ok(
+      !root.querySelector('[data-component-sort]').closest('.is-size-38'),
+      'and the sort trigger on the second row stays at the `toolbar` rung’s own 34'
     );
     for (const select of rung) {
       assert.ok(
@@ -1185,11 +1192,9 @@ describe('ComponentsBrowserView toolbar — the reference’s essence predicates
     );
   }
 
-  function choose(select, value) {
-    select.value = value;
-    select.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
-  }
+  const CATEGORY = '[data-component-category-filter]';
+  const ESSENCE = '[data-component-essence-filter]';
+  const SORT = '[data-component-sort]';
 
   async function mountToolbar() {
     return browser.mount({
@@ -1201,10 +1206,15 @@ describe('ComponentsBrowserView toolbar — the reference’s essence predicates
 
   it('offers `Carries any essence` and `No essences` after `All essences`, and each one FILTERS', async () => {
     const root = await mountToolbar();
-    const filter = root.querySelector('[data-component-essence-filter]');
-    assert.ok(Boolean(filter), 'the essence filter renders, because a row carries an essence');
+    assert.ok(
+      Boolean(root.querySelector(ESSENCE)),
+      'the essence filter renders, because a row carries an essence'
+    );
+    const values = selectOptionValues(root, ESSENCE);
+    const labels = selectOptionLabels(root, ESSENCE);
+    closeSelectPanel(root, ESSENCE);
     assert.deepEqual(
-      [...filter.options].map((option) => [option.value, option.textContent.trim()]),
+      values.map((value, index) => [value, labels[index]]),
       [
         ['all', 'All essences'],
         ['__any', 'Carries any essence'],
@@ -1216,21 +1226,58 @@ describe('ComponentsBrowserView toolbar — the reference’s essence predicates
     );
     assert.deepEqual(rowIds(root), ['ash', 'brimstone', 'cinder', 'dust'], 'unfiltered, by name');
 
-    choose(filter, '__any');
+    chooseSelectOption(root, ESSENCE, '__any');
     assert.deepEqual(rowIds(root), ['brimstone', 'cinder'], 'any essence at all keeps the row');
 
-    choose(filter, '__none');
+    chooseSelectOption(root, ESSENCE, '__none');
     assert.deepEqual(rowIds(root), ['ash', 'dust'], 'no essence keeps only the bare rows');
 
-    choose(filter, 'Fire');
-    assert.deepEqual(rowIds(root), ['brimstone', 'cinder'], 'and a named essence still works');
+    chooseSelectOption(root, ESSENCE, 'Air');
+    assert.deepEqual(rowIds(root), ['cinder'], 'and a named essence keeps only its carriers');
+
+    chooseSelectOption(root, ESSENCE, 'all');
+    assert.deepEqual(rowIds(root), ['ash', 'brimstone', 'cinder', 'dust'], 'and `all` restores');
+  });
+
+  it('names each converted toolbar trigger by the `aria-label` its select carried (issue 1510)', async () => {
+    const root = await browser.mount({
+      itemCards: [
+        ...toolbarRows(),
+        makeComponent({ id: 'ingot', name: 'Ingot', category: 'Metal' }),
+        makeComponent({ id: 'sage', name: 'Sage', category: 'Herb' }),
+      ],
+      categoryVocabulary: ['Metal', 'Herb'],
+      selectedSystemId: 'sys-1',
+    });
+    // Category names are distinct names and drop the tick; the essence and sort lists keep it.
+    for (const [hook, name, ticked] of [
+      [CATEGORY, 'Filter components by category', false],
+      [ESSENCE, 'Filter components by essence', true],
+      [SORT, 'Sort components', true],
+    ]) {
+      assert.equal(assertSelectHasResolvedName(root, hook), name);
+      assert.equal(root.querySelector(hook).getAttribute('data-select-size'), 'toolbar');
+      assert.equal(
+        openSelectPanel(root, hook).classList.contains('fabricate-select-popover-ticked'),
+        ticked,
+        `${hook} ${ticked ? 'keeps' : 'drops'} its tick column`
+      );
+      closeSelectPanel(root, hook);
+    }
+
+    chooseSelectOption(root, CATEGORY, 'Metal');
+    assert.deepEqual(rowIds(root), ['ingot'], 'the category filter keeps only its own rows');
+    chooseSelectOption(root, CATEGORY, 'Herb');
+    assert.deepEqual(rowIds(root), ['sage'], 'and a second category keeps only its own');
   });
 
   it('offers `Tags` as the fourth sort key, and it orders by tag count then name', async () => {
     const root = await mountToolbar();
-    const sort = root.querySelector('[data-component-sort]');
+    const values = selectOptionValues(root, SORT);
+    const labels = selectOptionLabels(root, SORT);
+    closeSelectPanel(root, SORT);
     assert.deepEqual(
-      [...sort.options].map((option) => [option.value, option.textContent.trim()]),
+      values.map((value, index) => [value, labels[index]]),
       [
         ['name', 'Name'],
         ['category', 'Category'],
@@ -1241,7 +1288,7 @@ describe('ComponentsBrowserView toolbar — the reference’s essence predicates
       'the reference’s four keys in its order, with the subject-only Salvage kept last'
     );
 
-    choose(sort, 'tags');
+    chooseSelectOption(root, SORT, 'tags');
     assert.deepEqual(
       rowIds(root),
       ['brimstone', 'dust', 'cinder', 'ash'],
@@ -1366,12 +1413,9 @@ describe('ComponentsBrowserView auto-selects the first SHOWN row (issue 1371 r13
     assert.deepEqual(selected, [], 'a re-sort moves the list, not the selection');
 
     // A filter that hides the selected row: it is still a component this system holds.
-    const filter = root.querySelector('[data-component-category-filter]');
-    const refined = [...filter.options].find((option) => /Refined/.test(option.textContent));
-    assert.ok(Boolean(refined), 'the filter offers the Refined category');
-    filter.value = refined.value;
-    filter.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    const filter = '[data-component-category-filter]';
+    assert.ok(selectOptionValues(root, filter).includes('Refined'), 'it offers Refined');
+    chooseSelectOption(root, filter, 'Refined');
     assert.deepEqual(rowIds(root), ['alloy'], 'the filter really hid the selected row');
     assert.deepEqual(selected, [], 'and the selection is not moved onto the row that remains');
 

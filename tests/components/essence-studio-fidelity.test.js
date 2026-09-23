@@ -96,11 +96,18 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       globalCss.includes('.fabricate-manager .manager-essence-filter-row {'),
       'the row class the shared toolbar wears is authored in the global sheet'
     );
-    assert.equal(
-      (globalCss.match(/\.fabricate-manager \.manager-essence-toolbar select \{/g) || []).length,
-      2,
-      'and so is the select treatment (the shared control font, and the Fabricate select chrome)'
-    );
+    // The sort is the shared `Select`, whose `toolbar` rung paints the trigger, so no rule
+    // anywhere dresses an element-typed select in this bar.
+    for (const [where, css] of [
+      ['the global sheet', globalCss],
+      ['the scoped block', styles],
+    ]) {
+      assert.doesNotMatch(
+        css,
+        /\.manager-essence-toolbar select\b/,
+        `${where} paints no native select in the essence toolbar`
+      );
+    }
   });
 
   it('keeps the grid presentation a level shelf rather than a ragged one', () => {

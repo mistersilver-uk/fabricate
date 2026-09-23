@@ -34,6 +34,7 @@
   import { essenceShortValueName, essenceSystemState } from './scoped/essenceScoped.js';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import Select from '../../components/Select.svelte';
 
   let {
     // The world-scope seam (issue 1374): three of the four keys `essenceScopeProps` supplies, so
@@ -322,6 +323,10 @@
     return text(labelKey, fallback);
   }
 
+  const sortSelectOptions = $derived(
+    ESSENCE_SORT_KEYS.map((key) => ({ value: key, label: sortLabel(key) }))
+  );
+
   function chipLabel(chip) {
     const [labelKey, fallback] = CHIP_LABELS[chip.id];
     return format(labelKey, fallback, { value: chip.value });
@@ -401,16 +406,14 @@
         <span class="manager-essence-filter-label"
           >{text('FABRICATE.Admin.Manager.Essence.SortBy', 'Sort by')}</span
         >
-        <select
+        <Select
+          size="toolbar"
           value={ui.sortKey}
-          data-essence-sort
-          onchange={(event) => (ui.sortKey = event.currentTarget.value)}
-          aria-label={text('FABRICATE.Admin.Manager.Essence.SortLabel', 'Sort essences')}
-        >
-          {#each ESSENCE_SORT_KEYS as key (key)}
-            <option value={key}>{sortLabel(key)}</option>
-          {/each}
-        </select>
+          options={sortSelectOptions}
+          ariaLabel={text('FABRICATE.Admin.Manager.Essence.SortLabel', 'Sort essences')}
+          triggerData={{ 'data-essence-sort': '' }}
+          onChange={(next) => (ui.sortKey = next)}
+        />
         <ManagerButton
           data-essence-sort-direction={ui.sortDirection}
           aria-label={text(
