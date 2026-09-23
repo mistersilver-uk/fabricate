@@ -143,7 +143,9 @@ export const CASES = Object.freeze([
     query: { system: 'lab-herbalism', knowledgeLoading: '1' },
     steps: ['Crafting', { selector: '#manager-crafting-nav-knowledge' }],
     expectView: 'knowledge',
-    expectSelector: '.fabricate-manager [data-knowledge-view]:not(:has([data-knowledge-actor]))',
+    expectSelector:
+      '.fabricate-manager [data-knowledge-view][aria-busy="true"]' +
+      ':has([data-knowledge-loading]):has([data-knowledge-roster-loading])',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'knowledge'],
     sourceMatches: [
@@ -161,7 +163,9 @@ export const CASES = Object.freeze([
     query: { system: 'lab-herbalism', knowledgeError: '1' },
     steps: ['Crafting', { selector: '#manager-crafting-nav-knowledge' }],
     expectView: 'knowledge',
-    expectSelector: '.fabricate-manager [data-knowledge-view]:not(:has([data-knowledge-actor]))',
+    expectSelector:
+      '.fabricate-manager [data-knowledge-view]:not([aria-busy])' +
+      ':has([data-knowledge-error][role="status"]):not(:has(.manager-empty))',
     // The store rethrows the rejected read, and the capture fails if that rejection is swallowed.
     allowedConsoleErrors: [/view lab: knowledge read failed/],
     position: { width: 1280, height: 900 },

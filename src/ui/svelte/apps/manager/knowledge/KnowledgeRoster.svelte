@@ -5,7 +5,9 @@
   name and an "N item(s) · M learned" meta line, or a dimmed "Nothing tracked".
 
   Props: characters (already filtered), totalCount (unfiltered, drives empty-vs-no-match),
-  selectedActorId, searchTerm, onSearch(term), onSelect(actorId).
+  selectedActorId, searchTerm, onSearch(term), onSelect(actorId), loading (the snapshot read is in
+  flight: a compact loading panel replaces every other claim), error (the read failed: the search
+  field renders alone, because an empty or no-match panel would describe a finished read).
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -20,6 +22,8 @@
     searchTerm = '',
     onSearch = () => {},
     onSelect = () => {},
+    loading = false,
+    error = false,
   } = $props();
 
   function text(key, fallback) {
@@ -55,7 +59,19 @@
   />
 
   <div class="manager-knowledge-roster-scroll">
-    {#if totalCount === 0}
+    {#if loading}
+      <EmptyState
+        compact
+        icon="fas fa-spinner fa-spin"
+        title={text(
+          'FABRICATE.Admin.Manager.Knowledge.RosterLoadingTitle',
+          'Loading player characters...'
+        )}
+        dataAttr="data-knowledge-roster-loading"
+      />
+    {:else if error}
+      <!-- The detail pane carries the failure notice; the roster makes no claim at all. -->
+    {:else if totalCount === 0}
       <EmptyState
         compact
         icon="fas fa-user-slash"
