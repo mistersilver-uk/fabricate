@@ -339,7 +339,9 @@ One generalisation to resist while doing so: the decisive axis is what a value R
 The CSS counter-example makes the same point one layer over — the `font` / `--button-size` argument does not transfer to fields, because `2em` resolves against the using element's own font size while `2rem` is root-relative and would not move even if it were declared on the element, so the UNIT is what decides and the declaration site is not.
 - **A keybinding registered at `ready` is silently dead.**
 `ClientKeybindings#register` throws once `Game#initializeKeyboard` has run, and that happens between `setup` and `ready` on both V13 and V14, so a keybinding must register at `init` or `setup`, never at `ready`.
-A `try`/`catch` around the call, as `InteractableManager._registerKeybinding` has, turns that throw into a Configure Controls entry that is silently absent rather than a startup failure — the module still loads clean, and nothing but a missing row in the keybindings menu tells you the registration never landed (issue #1835).
+`InteractableManager.registerKeybinding` (`src/canvas/InteractableManager.js`) is therefore called from the `init` hook in `src/bootstrap/hooks.js`, and a registration that still throws is logged with `console.warn` rather than swallowed (issues #1835, #1881).
+- **A client keybinding's `onDown` returns truthy only when it actually acted.**
+The dispatch loop stops at the first truthy `onDown` in `(precedence, order)` sequence, so an unconditional `true` silently eats a later action on the same key, including a core default such as `ascend` on `KeyE`.
 - Update compatibility metadata if new Foundry API requirements are introduced.
 
 ## Architecture Pointers
@@ -465,7 +467,6 @@ There is **no** gathering-side catalyst concept; env-scope "Catalysts" strings a
 There are no synthetic actors or tokens.
 Players activate by **walking a controlled token into the region** (Tile double-click is retired): a non-blocking on-canvas prompt appears on the controlling player's client, and clicking *Interact* routes an activation request to the active GM, who validates/grants it, opening the gathering app scoped to (and auto-selecting) that `(environmentId, taskId)`.
 A `controlToken` re-trigger + the *Fabricate: interact here* keybinding cover tokens already inside on scene load.
-Only the `controlToken` half is true today: the keybinding registers at `ready`, where `ClientKeybindings#register` already throws, so registration silently fails and the keybinding never fires (issue #1835).
 The behaviour has **no `node` field** and snapshots nothing at placement: it carries only `(environmentId, taskId)`; activation reads and decrements `environment.nodeRuntime[taskId]` — the **single source of truth** — exactly as a manual gather would.
 Two interactables on the same `(environment, task)` draw down the **same** shared node.
 The marker *reflects* state (no per-marker pool): a Tile marker swaps to the depleted image when `environment.nodeRuntime[taskId].current <= 0` and the task configures `nodes.depletedBehavior.swapImage`, and flips back on recharge (`interactableMarkerDepletion.js`, active-GM reconcile); marker `hidden` reflects `resolveMarkerHidden` (true when the interactable is DISABLED or HIDDEN — LOCKED stays visible: Lock ≠ Disable, the prompt fires and Interact is denied). `defaultEnvironmentId` is an optional `string | null` task **placement hint** — it does NOT participate in composition.
