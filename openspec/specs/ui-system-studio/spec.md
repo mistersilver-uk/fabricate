@@ -984,6 +984,7 @@ Each roster row carries the actor's portrait, name and an "N item(s) · M learne
 
 **Default tab.** The surface opens on Recipe items, except when the selected system has **zero recipe item definitions**, in which case it opens on Learned recipes.
 The rule keys on the definition count, never on the selected character's row counts, so the tab does not shift as the GM moves down the roster; and it is resolved **once on surface entry**, never as a live derivation over that count — a GM authoring the system's first recipe item elsewhere would otherwise flip the count and yank the open tab.
+A crafting-system switch while the surface stays open re-resolves the default tab a second time, against the newly selected system's own definition count, because the prior resolution named a tab for a system the surface no longer shows.
 
 **Projected owned-copy row fields.** Identity (image, name, quantity), the Book / Scroll / Incomplete type derived from the recipe count, the contained-recipe count, `timesUsed` and `maxUses`, the derived remaining charges, `spent`, `inert`, `canExpend`, the resolved `learnScope`, and `matchTier` — the GM diagnostic tier from recipe-item matching.
 `matchTier` is a **provenance** label, not an ambiguity report: its `duplicate` value names the weakest link (the copy reached its definition only through `_stats.duplicateSource`, the tier the bulk auto-learn gate refuses) and is reachable from a single definition, so the surface MUST NOT present it as a duplicate, conflicting, or ambiguous match.
@@ -1057,6 +1058,10 @@ The Learned recipes tab's band states the general rule without promising slot re
 It is computed by a separate refresh gated on a `knowledgeActive` flag, so it is a total no-op while the surface is closed, and while the surface is open the externally-driven actor/item hooks coalesce into one refresh through the existing microtask scheduler.
 Each store action awaits its seam call and then re-runs the knowledge refresh, never the shared `refresh()`.
 The result is published as a top-level `viewState.knowledge` and is **always a new object**; it MUST NOT hang off `selectedSystem`, which would force a `selectedSystem` reference rebuild on every knowledge publish and let a late second-phase publish clobber freshly projected rows.
+A crafting-system switch never leaves the previous system's rows published.
+While the surface is open, the switch drops the cached snapshot and publishes the cleared projection before the shared `refresh()` runs, then reads the snapshot once for the newly selected system after it, and a read that resolves after a later switch is discarded rather than published.
+While the surface is closed, the switch reads nothing and publishes nothing.
+A knowledge reset confirmed after a switch still resets the system that was selected when the GM asked for it.
 
 ## Recipe Dependency Graph
 
