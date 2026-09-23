@@ -796,13 +796,28 @@ test('GatheringRunManager completes terminal runs newest-first and caps history 
   assert.ok(history.every(run => Number.isFinite(run.completedAtWorldTime)));
 });
 
+// The V13 write list for one create-then-complete (issue 1842 characterisation).
+function acknowledgedWriteGolden(run) {
+  const terminal = { ...run, status: 'succeeded', completedAtWorldTime: 1000 };
+  return [
+    { namespace: 'fabricate', key: 'gatheringRuns', value: { active: { [run.id]: run }, history: [] } },
+    {
+      namespace: 'fabricate',
+      key: 'gatheringRuns',
+      value: { active: { [`-=${run.id}`]: null }, history: [terminal] }
+    }
+  ];
+}
+
 test('GatheringRunManager commits history and active deletions in one acknowledged flag update', async () => {
   const actor = new MergingActor();
   const runs = manager();
   const run = await runs.createWaitingRun(actor, runData({ taskId: 'task-time' }), { minutes: 1 });
+  const golden = acknowledgedWriteGolden(structuredClone(run));
 
   await runs.completeRun(actor, run, 'succeeded');
 
+  assert.deepEqual(actor.setFlagCalls, golden);
   assert.deepEqual(Object.keys(actor.flags.fabricate.gatheringRuns.active), []);
   assert.equal(actor.flags.fabricate.gatheringRuns.history[0].taskId, 'task-time');
   assert.deepEqual(runs.getActiveRuns(actor), []);

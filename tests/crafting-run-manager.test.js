@@ -603,13 +603,15 @@ class MergeActor {
     this.uuid = `Actor.${name}`;
     this._stored = null; // the persisted craftingRuns container
     this.updateCalls = [];
+    this.setFlagCalls = [];
   }
 
   getFlag(_scope, key) {
     return String(key).endsWith('craftingRuns') ? this._stored : undefined;
   }
 
-  async setFlag(_scope, _key, value) {
+  async setFlag(scope, key, value) {
+    this.setFlagCalls.push({ scope, key, value });
     // Recursive-merge `active` (never deletes), replace `history` (array replace).
     const priorActive = this._stored?.active ?? {};
     this._stored = {
@@ -629,6 +631,16 @@ class MergeActor {
   }
 }
 
+// The V13 write list for one create-then-complete (issue 1842 characterisation).
+function persistWriteGolden(run) {
+  const terminal = { ...run, status: 'succeeded', finishedAt: 1000, currentStepIndex: null };
+  const write = (value) => ({ scope: 'fabricate', key: 'fabricate.craftingRuns', value });
+  return [
+    write({ active: { [run.id]: run }, history: [] }),
+    write({ active: { [`-=${run.id}`]: null }, history: [terminal] }),
+  ];
+}
+
 test('CraftingRunManager._persist deletes removed active runs from the stored flag (setFlag merge cannot)', async () => {
   setupGlobals();
   const manager = new CraftingRunManager();
@@ -636,11 +648,14 @@ test('CraftingRunManager._persist deletes removed active runs from the stored fl
 
   const run = await manager.createRun(actor, singleStepRecipe('m'), [actor], 'user-1');
   assert.ok(actor._stored.active[run.id], 'the new run persisted into the stored active map');
+  const golden = persistWriteGolden(JSON.parse(JSON.stringify(run)));
 
   // Simulate a reload: drop the in-memory cache so completion re-reads the flag.
   manager.invalidateCache();
   await manager.completeRun(actor, run, 'succeeded');
 
+  assert.deepEqual(actor.setFlagCalls, golden);
+  assert.deepEqual(actor.updateCalls, [], 'the deletion rides the one acknowledged setFlag');
   assert.ok(
     !actor._stored.active[run.id],
     'the completed run is actually removed from the stored active map (not just in memory)'

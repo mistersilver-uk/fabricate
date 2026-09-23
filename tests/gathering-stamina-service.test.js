@@ -220,11 +220,14 @@ test('regenerateActorStamina no-ops when regen is off or the pool is unmateriali
 // written payload.
 
 class MergingStaminaActor extends FakeActor {
+  updateCalls = [];
+
   /**
    * Foundry's flattened-path `Document#update`, reduced to what the service uses: a dotted path
    * below the `flags` root, with an optional `-=` deletion operator on the LAST segment.
    */
   async update(patch) {
+    this.updateCalls.push(patch);
     for (const [path, value] of Object.entries(patch)) {
       const segments = path.split('.');
       assert.equal(segments.shift(), 'flags', 'stamina deletions address the flags root');
@@ -324,6 +327,28 @@ test('rewriting a legacy provider:external pool deletes the retired provider key
     'the retired legacy key must be deleted, or the read-time compat clause re-asserts maxReadOnly'
   );
   assert.equal(makeService().service.getActorStamina(actor, 'sys').maxReadOnly, false);
+});
+
+// The V13 update list for one rewrite retiring two fields at once (issue 1842 characterisation).
+const RETIRE_TWO_GOLDEN = [
+  {
+    'flags.fabricate.gatheringState.stamina.sys.-=provider': null,
+    'flags.fabricate.gatheringState.stamina.sys.-=maxOverride': null
+  }
+];
+
+test('retiring maxOverride and a legacy provider together deletes both in ONE update', async () => {
+  const actor = new MergingStaminaActor('Stamina');
+  await actor.setFlag('fabricate', 'gatheringState', {
+    stamina: { sys: { max: 12, current: 4, provider: 'external', maxOverride: 6, regenerationMode: 'manual' } }
+  });
+
+  await makeService().service.setActorStamina(actor, { systemId: 'sys', current: 4, max: 12, maxOverride: null, maxReadOnly: false });
+
+  assert.deepEqual(actor.updateCalls, RETIRE_TWO_GOLDEN);
+  const stored = persistedEntry(actor);
+  assert.ok(!Object.hasOwn(stored, 'provider') && !Object.hasOwn(stored, 'maxOverride'), 'both retired keys are gone');
+  assert.equal(stored.max, 12, 'the retained fields survive');
 });
 
 test('an unsafe dotted system id is never addressed with a deletion key', async () => {

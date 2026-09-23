@@ -3468,6 +3468,24 @@ function makeDecrementablePartyPool(initial = {}) {
   };
 }
 
+// The V13 write lists for the knowledge-deletion primitive (issue 1842 characterisation).
+const LEARNED = 'flags.fabricate.fabricate.learnedRecipes';
+const DISCOVERY = 'flags.fabricate.fabricate.discoveryProgress';
+const ERASE_ONE_GOLDEN = [{ [`${LEARNED}.-=recipe-a`]: null }];
+const ERASE_WITH_DISCOVERY_GOLDEN = [
+  { [`${LEARNED}.-=recipe-a`]: null, [`${DISCOVERY}.-=recipe-a`]: null }
+];
+const PER_SYSTEM_GOLDEN = [{ [`${LEARNED}.-=r-sys1`]: null, [`${DISCOVERY}.-=r-sys1`]: null }];
+const RESET_ALL_GOLDEN = [
+  {
+    [`${LEARNED}.-=r-sys1`]: null,
+    [`${LEARNED}.-=r-orphan`]: null,
+    [`${DISCOVERY}.-=r-sys1`]: null,
+    [`${DISCOVERY}.-=discovery-only`]: null
+  }
+];
+const TWO_STEP_GOLDEN = [{ 'flags.fabricate.fabricate.-=learnedRecipes': null }];
+
 function seedLearnedActor(learned = {}, discovery = {}, items = []) {
   const fabricate = {};
   if (learned) fabricate.learnedRecipes = learned;
@@ -3486,6 +3504,8 @@ test('773 erase-one removes only the learned entry via an explicit -= deletion (
 
   assert.equal(result.success, true);
   assert.equal(result.count, 1);
+  assert.deepEqual(actor.updateCalls, ERASE_ONE_GOLDEN);
+  assert.deepEqual(actor.setFlagCalls, []);
   const payload = Object.assign({}, ...actor.updateCalls);
   assert.equal(payload['flags.fabricate.fabricate.learnedRecipes.-=recipe-a'], null);
   // Negative pin (a): erase-one leaves discoveryProgress untouched (default clearDiscovery: false).
@@ -3514,6 +3534,8 @@ test('773 erase-one with clearDiscovery: true ALSO clears the discovery entry (o
 
   await service.forgetLearnedRecipes(actor, ['recipe-a'], { clearDiscovery: true });
 
+  assert.deepEqual(actor.updateCalls, ERASE_WITH_DISCOVERY_GOLDEN);
+  assert.equal(actor.updateCalls.length, 1, 'both stores ride ONE update');
   const payload = Object.assign({}, ...actor.updateCalls);
   assert.equal(payload['flags.fabricate.fabricate.learnedRecipes.-=recipe-a'], null);
   assert.equal(payload['flags.fabricate.fabricate.discoveryProgress.-=recipe-a'], null);
@@ -3539,6 +3561,7 @@ test('773 per-system reset clears only that system\'s entries and leaves an orph
   const result = await service.forgetSystemLearnedRecipes(actor, 'system-1');
 
   assert.equal(result.count, 1);
+  assert.deepEqual(actor.updateCalls, PER_SYSTEM_GOLDEN);
   const payload = Object.assign({}, ...actor.updateCalls);
   assert.equal(payload['flags.fabricate.fabricate.learnedRecipes.-=r-sys1'], null);
   assert.equal(payload['flags.fabricate.fabricate.discoveryProgress.-=r-sys1'], null);
@@ -3563,6 +3586,7 @@ test('773 reset-all clears every learned key INCLUDING the orphan, plus discover
   const result = await service.forgetAllLearnedRecipes(actor);
 
   assert.equal(result.count, 2);
+  assert.deepEqual(actor.updateCalls, RESET_ALL_GOLDEN);
   const payload = Object.assign({}, ...actor.updateCalls);
   assert.equal(payload['flags.fabricate.fabricate.learnedRecipes.-=r-sys1'], null);
   // Negative pin (b, direction 2): reset-all DOES delete the same orphan per-system left in place.
@@ -3596,7 +3620,10 @@ test('773 dotted-id fallback is a two-step ORDERED delete-then-write; a co-resid
 
   // Ordered payload assertion — call 1 is EXACTLY the parent delete...
   assert.equal(actor.updateCalls.length, 1, 'exactly one update (the parent delete)');
-  assert.deepEqual(actor.updateCalls[0], { 'flags.fabricate.fabricate.-=learnedRecipes': null });
+  assert.deepEqual(actor.updateCalls, TWO_STEP_GOLDEN);
+  assert.deepEqual(actor.setFlagCalls, [
+    { scope: 'fabricate', key: 'fabricate.learnedRecipes', value: { 'safe-retained': safeEntry } }
+  ]);
   // ...call 2 is the retained-map write through setFlag (never folded into one update).
   const learnedWrites = actor.setFlagCalls.filter((call) => call.key === 'fabricate.learnedRecipes');
   assert.equal(learnedWrites.length, 1, 'the retained map is re-written once');

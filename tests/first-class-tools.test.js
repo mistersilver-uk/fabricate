@@ -245,6 +245,40 @@ test('upsertTool restores the exact prior durable flag and Tool array when stamp
   assert.equal(saveCalls, 2, 'the staged write is followed by one compensating settings write');
 });
 
+// A real Document initialises `_stats` with both keys, so provenance absent before the write is
+// reachable only on a fake; the failing write re-adds the key as core's schema would.
+test('upsertTool rollback of provenance absent before the write (unreachable on an initialised Document)', async () => {
+  const mgr = buildManager();
+  installManager(mgr);
+  await mgr.createSystem({ id: 'sysA', name: 'A' });
+  const source = sourceItem({
+    uuid: 'Item.absent-provenance',
+    name: 'Hammer',
+    duplicateSource: 'Item.clone-origin',
+  });
+  delete source._stats.compendiumSource;
+  _registry.set(source.uuid, source);
+  const update = source.update.bind(source);
+  let rejectSanitization = true;
+  source.update = async (patch) => {
+    await update(patch);
+    if (rejectSanitization) {
+      rejectSanitization = false;
+      source._stats.compendiumSource ??= null;
+      throw new Error('provenance sanitization failed after write');
+    }
+    return source;
+  };
+
+  await assert.rejects(() => mgr.addToolFromUuid('sysA', source.uuid), /sanitization failed/);
+
+  assert.deepEqual(source.updates, [
+    { '_stats.duplicateSource': null },
+    { '_stats.duplicateSource': 'Item.clone-origin', '_stats.-=compendiumSource': null },
+  ]);
+  assert.equal(source._stats.duplicateSource, 'Item.clone-origin');
+});
+
 test('upsertTool relink restores both source flags and the Tool array when clearing fails', async () => {
   const mgr = buildManager();
   installManager(mgr);
