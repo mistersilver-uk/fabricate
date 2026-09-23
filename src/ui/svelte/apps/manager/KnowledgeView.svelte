@@ -67,10 +67,10 @@
 
   const searchTerm = $derived(String(ui.searchTerm || ''));
   let armedToken = $state('');
-  // Seeded ONCE per system from the store's `defaultTab` (itself resolved once on surface
-  // entry from the DEFINITION count). Never a live `$derived` over that count: a
-  // GM authoring the system's first recipe item on another surface would flip
-  // 0 → 1 and yank the open tab — silently disarming any armed row with it.
+  // Seeded ONCE per system from the store's `defaultTab`, itself resolved from the DEFINITION count
+  // once on surface entry and again on each crafting-system switch. Never a live `$derived` over
+  // that count: a GM authoring the system's first recipe item on another surface would flip 0 → 1
+  // and yank the open tab — silently disarming any armed row with it.
   let activeTab = $state(KNOWLEDGE_TAB_RECIPE_ITEMS);
   let seededSystemId = $state('');
   let panelElement = $state(null);
