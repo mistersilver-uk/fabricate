@@ -1,32 +1,12 @@
 /**
- * Canonical normalizers for gathering resource-node config/state.
- *
- * A "node" object is both config and runtime state:
- *   { enabled, max, current, depletionTiming, respawn: { policy, intervalUnit,
- *     intervalAmount, gainMode, chance, amountExpression, lastEvaluatedWorldTime,
- *     nextEvaluationWorldTime, lastRoll }, showCountsToPlayers? }
- *
- * Respawn interval is stored as `intervalUnit` (minutes|hours|days|weeks) +
- * `intervalAmount` so day/week lengths resolve against the active Foundry world
- * calendar at runtime. Nodes persisted before this schema carry a raw
- * `intervalSeconds` instead; that legacy field is preserved by `normalizeRespawn`
- * and honored by the runtime until the node-interval migration rewrites it.
- *
- * Respawn `policy` is one of `manual` (no automatic respawn — the GM tops up
- * counts via the restock API), `overTime` (one evaluation per elapsed interval),
- * or `nonRegenerating` (a permanently depletable pool — never regrows over world
- * time and cannot be restocked; once `current` hits 0 it is exhausted for good).
- * A `nonRegenerating` node normalizes to a bare `{ policy: 'nonRegenerating' }`:
- * the interval/gain/chance/expression and respawn-timing fields are dropped, since
- * a pool that never regrows needs none of them.
- * For `overTime`, `gainMode` selects the per-interval node gain: `guaranteed`
- * (+1), `chance` (a 0-1 probability of +1), or `expression` (roll
- * `amountExpression`, e.g. `1d4`, and add the rolled total).
- *
- * Library tasks carry node CONFIG; each environment keeps its own runtime STATE
- * (the `current` count + respawn timers) under `environment.nodeRuntime[taskId]`,
- * so the same task depletes independently per environment. Shared here so the
- * environment store, the rich-state runtime, and the admin UI store all agree.
+ * The canonical gathering resource-node normalizers. A node is config and state:
+ * `{ enabled, max, current, depletionTiming, respawn, depletedBehavior?, showCountsToPlayers? }`.
+ * Library tasks carry the config; each environment keeps its own state in
+ * `environment.nodeRuntime[taskId]`, so a task depletes independently per environment. Respawn
+ * `policy` is `manual` (GM restock only), `overTime` (per elapsed interval, by `gainMode`
+ * `guaranteed`, `chance` or `expression`) or `nonRegenerating` (never regrows or restocks).
+ * The interval is `intervalUnit` plus `intervalAmount`, resolved against the world calendar; a
+ * legacy `intervalSeconds` is kept until the node-interval migration rewrites it.
  */
 
 import { cloneJson, numberOrNull } from '../utils/scalars.js';
@@ -36,11 +16,8 @@ export const VALID_RESPAWN_POLICIES = new Set(['manual', 'overTime', 'nonRegener
 export const VALID_RESPAWN_GAIN_MODES = new Set(['guaranteed', 'chance', 'expression']);
 export const VALID_RESPAWN_UNITS = new Set(['minutes', 'hours', 'days', 'weeks']);
 
-// Pre-0.4.0 respawn policies mapped onto the manual|overTime + gainMode schema.
-// The 0.4.0 migration rewrites these in persisted data, but normalization applies
-// the same mapping at read time so a world whose node data was never migrated
-// (e.g. a stale migrationVersion) still respawns instead of silently coercing to
-// `manual` and never firing. Mirrors POLICY_MAP in migrateNodeRespawnModes.js.
+// Pre-0.4.0 policies, mapped at read time too, as `POLICY_MAP` in `migrateNodeRespawnModes.js`
+// does, so an unmigrated world still respawns rather than coercing to `manual`.
 const LEGACY_RESPAWN_POLICY_MAP = Object.freeze({
   none: { policy: 'manual' },
   elapsedTime: { policy: 'overTime', gainMode: 'guaranteed' },
@@ -48,36 +25,14 @@ const LEGACY_RESPAWN_POLICY_MAP = Object.freeze({
   manualAndElapsedTime: { policy: 'overTime', gainMode: 'chance' },
 });
 
-/**
- * Normalize a node respawn block. Unknown policies fall back to `manual`;
- * unknown gain modes fall back to `guaranteed`. Legacy auto-respawn policies
- * (`elapsedTime`/`probability`/`manualAndElapsedTime`) are mapped to the current
- * `overTime` schema here at read time (mirroring the 0.4.0 migration), so a world
- * whose node data was never migrated still respawns instead of silently degrading
- * to `manual`; `none` and unknown values fall back to `manual`.
- *
- * The respawn interval is stored as `intervalUnit` + `intervalAmount` so day/week
- * lengths resolve against the active world calendar at runtime. A node that still
- * carries only a legacy raw `intervalSeconds` (pre-unit/amount schema) keeps that
- * field — the runtime honors it as a fallback — until the node-interval migration
- * rewrites it to unit+amount.
- *
- * @param {object|null} data
- * @returns {object}
- */
+/** A respawn block; an unknown policy is `manual` and an unknown gain mode `guaranteed`. */
 export function normalizeRespawn(data = null) {
   if (!data || typeof data !== 'object') return { policy: 'manual' };
-  // Resilient to legacy (pre-0.4.0) policies even when the migration never ran:
-  // map them to the current schema rather than silently coercing to `manual`
-  // (which would disable respawn). An unknown policy still falls back to manual.
   const legacy = LEGACY_RESPAWN_POLICY_MAP[data.policy];
   const policy = VALID_RESPAWN_POLICIES.has(data.policy)
     ? data.policy
     : (legacy?.policy ?? 'manual');
-  // A `nonRegenerating` pool never regrows and cannot be restocked, so it needs
-  // none of the respawn-timing/gain fields: every respawn pass already no-ops on
-  // it. Persist a minimal block so irrelevant interval/gain/timing data is never
-  // written or carried. Idempotent: re-normalizing a minimal block yields itself.
+  // A pool that never regrows carries none of the timing or gain fields.
   if (policy === 'nonRegenerating') return { policy: 'nonRegenerating' };
   const gainMode = VALID_RESPAWN_GAIN_MODES.has(data.gainMode)
     ? data.gainMode
@@ -94,8 +49,7 @@ export function normalizeRespawn(data = null) {
     nextEvaluationWorldTime: numberOrNull(data.nextEvaluationWorldTime),
     lastRoll: data.lastRoll && typeof data.lastRoll === 'object' ? cloneJson(data.lastRoll) : null,
   };
-  // Prefer the unit+amount schema; fall back to a legacy raw `intervalSeconds`
-  // only when neither unit field is present (so un-migrated nodes keep working).
+  // The legacy `intervalSeconds` only when neither unit field is present.
   if (data.intervalUnit !== undefined || data.intervalAmount !== undefined) {
     const intervalUnit = VALID_RESPAWN_UNITS.has(data.intervalUnit) ? data.intervalUnit : 'hours';
     const intervalAmount = numberOrNull(data.intervalAmount);
@@ -111,23 +65,9 @@ function trimmedOrNull(value) {
 }
 
 /**
- * Normalize the `depletedBehavior` block on a node config.
- *
- * `depletedBehavior` describes what happens to a placed gathering-task
- * interactable's LINKED VISUAL marker when its environment node depletes
- * (`environment.nodeRuntime[taskId].current <= 0`); it is orthogonal to
- * `depletionTiming` (`onStart`/`onSuccess`, which describes WHEN a node
- * decrements). Two combinable axes:
- *   - `swapImage`   : a marker-texture path applied to the Tile while depleted
- *                     (flipped back to the available image when it respawns).
- *   - `postfixName` : when true, append a "(depleted)" label (Drawing; a Tile has
- *                     no nameplate so it is ignored there).
- *
- * Returns `null` when no behavior is configured (the default — no visual change on
- * depletion).
- *
- * @param {object|null} data
- * @returns {{ swapImage?: string, postfixName?: boolean }|null}
+ * What a placed interactable's linked marker does while its node is depleted, or `null` for
+ * nothing: `swapImage` retextures a Tile until respawn, and `postfixName` labels a Drawing
+ * "(depleted)". Unrelated to `depletionTiming`, which is when a node decrements.
  */
 export function normalizeDepletedBehavior(data = null) {
   if (!data || typeof data !== 'object') return null;
@@ -139,14 +79,7 @@ export function normalizeDepletedBehavior(data = null) {
   return Object.keys(behavior).length > 0 ? behavior : null;
 }
 
-/**
- * Normalize a node config/state object, or `null` when there is no node config.
- * Preserves a stored `current` verbatim (callers seed `current = max` when first
- * materializing a pool; this never resets an in-progress count).
- *
- * @param {object|null} data
- * @returns {object|null}
- */
+/** A node, or `null` when there is none; a stored `current` is kept, never reset. */
 export function normalizeNodeConfig(data = null) {
   if (!data || typeof data !== 'object') return null;
   const max = numberOrNull(data.max ?? data.maxCount);
@@ -167,33 +100,10 @@ export function normalizeNodeConfig(data = null) {
 }
 
 /**
- * Consume ONE unit from a resource-node pool, returning the next node object
- * (config + runtime state) without mutating the input. `current` is clamped into
- * `[0, max]` so a pool whose stored count drifted above its cap cannot persist an
- * out-of-range value. A missing or non-finite `max` means "no cap" — NOT a cap of
- * zero, which would silently empty the pool in one call.
- *
- * The upper clamp is inert on the environment path (`_mergeNodeConfigState` has
- * already clamped `current` to the library `max`) but is NOT inert on the
- * interactable-scoped path, whose node is read verbatim with no library merge: a
- * scoped pool whose stored `current` exceeded its own `max` used to decrement by one
- * and now settles to `max`. That is the intended invariant, called out here because
- * it is a behaviour change on a path this extraction otherwise leaves alone.
- *
- * The respawn anchor is seeded here when an `overTime` pool is depleted for the
- * first time: a freshly-seeded pool carries `lastEvaluatedWorldTime: null`, and
- * without an anchor the FIRST world-time advance past the interval is spent
- * re-anchoring instead of producing a gain (mirrors stamina pool anchor seeding).
- *
- * Extracted from the rich-state commit path so the acting client and the active GM
- * — which recomputes the decrement from its own authoritative stored state when a
- * player routes the write (see `gatheringNodeSocket.js`) — share one implementation
- * and can never drift.
- *
- * @param {object|null} node The current node object.
- * @param {object} [options]
- * @param {number} [options.worldTime=0] Current world time, used to seed the anchor.
- * @returns {object|null} The next node object, or null when there is no node.
+ * Consume one unit without mutating the input, clamping `current` into `[0, max]`; a missing
+ * `max` means no cap, never zero. An `overTime` pool's first depletion seeds its anchor at
+ * `worldTime`, or the first advance would only re-anchor. The acting client and the GM applier
+ * (`gatheringNodeSocket.js`) share it.
  */
 export function depleteNodeOnce(node, { worldTime = 0 } = {}) {
   if (!node || typeof node !== 'object') return null;
@@ -210,13 +120,7 @@ export function depleteNodeOnce(node, { worldTime = 0 } = {}) {
   return next;
 }
 
-/**
- * Normalize a per-environment node runtime map (taskId → node object). Drops
- * entries that don't resolve to a node config.
- *
- * @param {object|null} data
- * @returns {Record<string, object>}
- */
+/** A per-environment `taskId` to node map, dropping entries that are not nodes. */
 export function normalizeNodeRuntime(data = null) {
   if (!data || typeof data !== 'object') return {};
   const out = {};

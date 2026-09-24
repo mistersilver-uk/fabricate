@@ -1,13 +1,6 @@
 /**
- * Shared file-private internals for the gathering rich-state cluster.
- *
- * These helpers were file-private to `GatheringRichStateService`. Extracting
- * the stamina and node subsystems into dedicated collaborators
- * (`GatheringStaminaService`, `GatheringNodeService`) requires the same pure
- * coercers, the actor-flag persistence pair, and the calendar-aware duration
- * helper in all three modules. They live here so the logic is defined ONCE
- * (no Sonar duplication, no drift) and imported by the parent and both
- * collaborators alike.
+ * Internals shared by `GatheringRichStateService`, `GatheringStaminaService` and
+ * `GatheringNodeService`, defined once so the three cannot drift.
  */
 
 import { cloneJson } from '../utils/scalars.js';
@@ -34,13 +27,7 @@ export function nonNegativeInteger(value, fallback = 0) {
   return Number.isInteger(number) && number >= 0 ? number : Number(fallback || 0);
 }
 
-/**
- * Read the actor-scoped gathering state flag, returning a deep clone (so callers
- * mutate a copy) or `{}` on any missing/inaccessible state. Never throws.
- *
- * @param {object} actor Foundry actor.
- * @returns {object} Cloned state, or `{}`.
- */
+/** A deep clone of the actor's gathering state, or `{}`; never throws. */
 export function readState(actor) {
   try {
     const state = actor?.getFlag?.(FLAG_NAMESPACE, STATE_FLAG_KEY);
@@ -50,27 +37,11 @@ export function readState(actor) {
   }
 }
 
-/**
- * Persist the actor-scoped gathering state flag (deep-cloned).
- *
- * @param {object} actor Foundry actor.
- * @param {object} state State to persist.
- * @returns {Promise<*>}
- */
 export async function writeState(actor, state) {
   return actor?.setFlag?.(FLAG_NAMESPACE, STATE_FLAG_KEY, cloneJson(state));
 }
 
-/**
- * Convert a count of whole world-time units into seconds via the injected
- * `secondsPerUnit` seam, so day/week interval lengths follow the active calendar
- * (`days`/`weeks` track the active world calendar; `minutes`/`hours` are fixed).
- *
- * @param {Function} secondsPerUnit Seam resolving one unit to seconds.
- * @param {number} count Number of whole units.
- * @param {string} unit One of minutes|hours|days|weeks.
- * @returns {number} Non-negative seconds.
- */
+/** Whole units to seconds through the calendar-aware `secondsPerUnit` seam; never negative. */
 export function durationToSeconds(secondsPerUnit, count, unit) {
   const seconds = Number(secondsPerUnit(unit));
   const safe = seconds > 0 ? seconds : SECONDS_PER_UNIT.hours;

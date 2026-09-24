@@ -11,46 +11,17 @@ import {
 import { resolveAccrualAnchor, respawnNodeOnce } from './nodeRespawnMath.js';
 
 /**
- * Owns the finite resource-node subsystem extracted from
- * {@link GatheringRichStateService}: current-state resolution, scoped-source
- * resolution (environment vs interactable), restock, per-environment and
- * interactable-scoped respawn, and the library-config merge. Behaviour, persisted
- * shapes, and node maths are identical to the prior in-place implementation; the
- * parent delegates its public node methods here and routes its retained d100
- * touchpoints through `_resolveNodeSource`.
- *
- * All coupling is injected so this collaborator never reaches for globals: the
- * normalized gathering config is read through `getConfig` (the parent's single
- * `_config` read path), node maths reuse the pure `nodeRespawnMath` /
- * `gatheringNodeConfig` modules, interval lengths come from the calendar-aware
- * `secondsPerUnit`, hooks fire through `callHook`, and the interactable-scoped
- * seams (`resolveRegionBehavior`/`writeInteractableBehavior`) match the parent's.
+ * The finite resource-node subsystem of {@link GatheringRichStateService}, which delegates its
+ * node methods here: state resolution, the environment or interactable node source, restock,
+ * respawn and the library-config merge. Every collaborator is injected, with no globals; the
+ * arithmetic is the pure `nodeRespawnMath` and `gatheringNodeConfig`.
  */
 export class GatheringNodeService {
   /**
-   * @param {object} options
-   * @param {object} [options.environmentStore] Gathering environment store.
-   * @param {Function} options.getConfig Normalized gathering config reader
-   *   (the parent's `_config`).
-   * @param {Function} [options.secondsPerUnit] Seam resolving one interval unit
-   *   to seconds (calendar-aware day/week lengths).
-   * @param {Function} options.rollD100 D100 roller (1..100).
-   * @param {Function} [options.evaluateExpression] Async expression evaluator.
-   * @param {Function} [options.callHook] Hook dispatcher.
-   * @param {Function} [options.nowWorldTime] Current world-time getter.
-   * @param {Function|null} [options.resolveRegionBehavior] Interactable behaviour
-   *   resolver by ref (issue 302).
-   * @param {Function|null} [options.writeInteractableBehavior] Interactable
-   *   scoped-node writer (issue 302).
-   * @param {Function|null} [options.depleteEnvironmentNode] GM-routed environment
-   *   node depletion seam. Called as `({ environmentId, taskId })` when a gathering
-   *   attempt consumes a unit from the ENVIRONMENT pool. Present in the live module
-   *   (main.js injects the socket writer) because the pool is persisted in a WORLD
-   *   setting only a GM may update; absent by default, in which case the write is
-   *   applied directly (GM-only worlds and unit tests).
-   * @param {Function|null} [options.nodesEnabled] `(systemId) => boolean` economy
-   *   gate, so the active-GM applier re-checks the toggle instead of trusting the
-   *   requesting client.
+   * `secondsPerUnit` is calendar-aware. `depleteEnvironmentNode({ environmentId, taskId })` routes
+   * an attempt's environment-pool decrement to the GM, since that pool is a world setting a player
+   * cannot write; without it the write is direct. `nodesEnabled(systemId)` lets the active-GM
+   * applier re-check the economy toggle rather than trust the requester.
    */
   constructor({
     environmentStore = null,
@@ -86,11 +57,8 @@ export class GatheringNodeService {
     if (!environment) return null;
     const existing = this._currentNodeState(environment, taskId);
     if (!existing) return null;
-    // Resolve the EFFECTIVE policy from the library config ("config is
-    // authoritative", mirroring _mergeNodeConfigState) so a `nonRegenerating`
-    // pool can never be restocked even if a stale per-environment snapshot
-    // claims otherwise. A permanently depletable node is a no-op: return it
-    // unchanged without writing state or firing the nodeRestocked hook.
+    // The library config is authoritative, so a `nonRegenerating` pool is never restocked,
+    // whatever a stale snapshot says: no write and no `nodeRestocked` hook.
     const effective = this._mergeNodeConfigState(
       this._libraryNodeConfigs(environment.craftingSystemId).get(String(taskId)) || null,
       existing
@@ -112,11 +80,7 @@ export class GatheringNodeService {
     return updated;
   }
 
-  /**
-   * The current node object for a task in an environment: the per-environment
-   * runtime pool if present, else a fresh full pool seeded from the library
-   * task's node config. Null when the task has no node config.
-   */
+  /** The environment's runtime pool, else a full pool from the library config, else `null`. */
   _currentNodeState(environment, taskId) {
     const runtime = environment?.nodeRuntime?.[taskId];
     if (runtime) return runtime;
@@ -129,42 +93,17 @@ export class GatheringNodeService {
   }
 
   /**
-   * Resolve the node source for an attempt: either the ENVIRONMENT pool (default,
-   * unchanged) or an interactable's OWN scoped pool (issue 302), selected by the
-   * `interactableRef`. Returns a `{ kind, read(), write(node), deplete(node) }` handle
-   * so the gate / depletion / listing touchpoints stay scope-agnostic.
-   *
-   * - No `interactableRef` → `kind: 'environment'`. `read()` returns the task's
-   *   composed node (`task.nodes`); `write(node)` persists into the per-environment
-   *   `nodeRuntime[taskId]` via {@link _writeNodeState}. This is the UNCHANGED path
-   *   and never resolves a behaviour.
-   * - With an `interactableRef` whose behaviour resolves to `taskNodeLink:'unlinked'`
-   *   with a real `node` → `kind: 'interactable'`. `read()` returns that scoped node
-   *   verbatim (self-authoritative — NO library merge); `write(node)` patches the
-   *   behaviour `system.node` via the injected `writeInteractableBehavior` seam.
-   * - Any other ref (behaviour gone, environment scope, malformed node) falls back
-   *   to the environment branch — safe and never throws.
-   *
-   * `deplete(node)` is the ATTEMPT-COMMIT write and is distinct from `write(node)`
-   * because the environment pool lives in a world setting a player may not update.
-   * When the GM-routing seam is injected it takes over, and the caller's already
-   * decremented `node` is deliberately NOT sent: the active GM recomputes the single
-   * unit from its own stored state (see {@link applyEnvironmentNodeDepletion}). The
-   * interactable branch keeps writing the node through its own GM-routed behaviour
-   * writer, which is where issue 302 solved the same problem.
-   *
-   * @param {object} params
-   * @param {object} params.environment
-   * @param {object} params.task
-   * @param {{sceneId:string,regionId:string,behaviorId:string}|null} [params.interactableRef]
-   * @returns {{ kind: 'environment'|'interactable', read: () => (object|null), write: (node: object) => (void|Promise<void>), deplete: (node: object) => (void|Promise<void>) }}
+   * The attempt's node source as a `{ kind, routed, read, write, deplete }` handle. An
+   * `interactableRef` whose behaviour is `taskNodeLink: 'unlinked'` with a node selects that
+   * self-authoritative pool, with no library merge (issue 302); anything else, including a
+   * throwing resolver, is the environment pool. `deplete` is the attempt-commit write: routed, it
+   * sends no node, and the GM recomputes the unit in {@link applyEnvironmentNodeDepletion}.
    */
   _resolveNodeSource({ environment, task, interactableRef = null } = {}) {
     const environmentSource = {
       kind: 'environment',
-      // Whether `deplete` hands the write to another client. When true this client
-      // never learns the count the GM actually wrote, so callers must not publish
-      // their locally computed `current` as fact (see `commitAcceptedAttempt`).
+      // When routed this client never learns the count the GM wrote, so callers must not
+      // publish their local `current` as fact (`commitAcceptedAttempt`).
       routed: !!this.depleteEnvironmentNode,
       read: () => task?.nodes ?? null,
       write: (node) =>
@@ -193,31 +132,19 @@ export class GatheringNodeService {
     const write = (node) => this.writeInteractableBehavior?.(interactableRef, { node });
     return {
       kind: 'interactable',
-      // The behaviour writer already relays to the active GM (issue 302), but it sends
-      // the caller's node object rather than recomputing, so this client's `current` IS
-      // what gets written. Left as `false` deliberately: flipping it would change the
-      // pre-existing interactable reporting, which is outside this change.
+      // The behaviour writer relays to the GM but sends this client's node, so its `current`
+      // is what gets written.
       routed: false,
-      // Self-authoritative scoped pool — no library merge (it owns its own config).
       read: () => view.node,
       write,
-      // Already GM-routed by the behaviour writer (issue 302) — no extra hop.
       deplete: write,
     };
   }
 
   /**
-   * ACTIVE-GM edge for a routed environment node depletion: consume one unit of the
-   * addressed pool and persist it. Recomputes the decrement from the GM's OWN stored
-   * state rather than trusting any node object off the wire, so concurrent gatherers
-   * are additive and a forged request can only ever take one unit off the pool it
-   * addresses.
-   *
-   * No-ops (returning null) when the environment is gone, the task has no node
-   * config, or the crafting system's node economy is disabled.
-   *
-   * @param {{ environmentId: string, taskId: string }} args
-   * @returns {Promise<object|null>} The updated environment, or null on no-op.
+   * The active-GM edge of a routed depletion: take one unit from the GM's own stored state, never
+   * a node off the wire, so concurrent gatherers add up and a forged request costs one unit.
+   * `null` when the environment, the node config or the node economy is absent.
    */
   async applyEnvironmentNodeDepletion({ environmentId, taskId } = {}) {
     const environment = this.environmentStore?.get?.(environmentId);
@@ -225,9 +152,7 @@ export class GatheringNodeService {
     if (this.nodesEnabled && this.nodesEnabled(environment.craftingSystemId) !== true) return null;
     const existing = this._currentNodeState(environment, taskId);
     if (!existing) return null;
-    // Library config is authoritative (mirrors restockNode): merge it over the
-    // stored runtime so a stale per-environment snapshot cannot resurrect an old
-    // `max` or respawn policy through the decrement.
+    // Library config is authoritative, so a stale snapshot cannot resurrect an old policy or cap.
     const effective = this._mergeNodeConfigState(
       this._libraryNodeConfigs(environment.craftingSystemId).get(String(taskId)) || null,
       existing
@@ -237,11 +162,7 @@ export class GatheringNodeService {
     return this._writeNodeState({ environmentId, taskId, node });
   }
 
-  /**
-   * Persist a node object for a task into the per-environment `nodeRuntime` map
-   * (reading the raw stored environment so a composed/runtime environment is
-   * never written).
-   */
+  /** Persist into the stored environment's `nodeRuntime`, never a composed environment. */
   async _writeNodeState({ environmentId, taskId, node }) {
     const stored = this.environmentStore?.get?.(environmentId);
     if (!stored) return null;
@@ -251,34 +172,18 @@ export class GatheringNodeService {
   }
 
   /**
-   * Respawn finite resource nodes for one environment as world time passes
-   * (systems with `nodes.enabled` only — the caller gates on that). For each task
-   * with an `overTime` respawn policy, adds nodes per elapsed interval per the
-   * gain mode: `guaranteed` (+1), `chance` (a persisted d100 roll per interval),
-   * or `expression` (roll `amountExpression` per interval and add the rolled
-   * total), clamped to the task max. Advances each task's
-   * `respawn.lastEvaluatedWorldTime` with the consumed intervals (persisting
-   * `lastRoll`) so a same-tick refresh never rerolls. Writes the environment once
-   * when any task changed.
-   *
-   * @param {object} payload
-   * @returns {Promise<object|null>} The updated environment, or null on no-op.
+   * Respawn one environment's `overTime` pools as world time passes; the caller gates on
+   * `nodes.enabled`. One write when anything changed, else `null`.
    */
   async respawnNodes({ environment, worldTime } = {}) {
     if (!environment) return null;
     const now = Number(worldTime);
     if (!Number.isFinite(now)) return null;
 
-    // Per-environment `nodeRuntime` holds only runtime STATE (the `current` count
-    // and respawn timers); the respawn CONFIG is always sourced fresh from the
-    // current library task. Otherwise a `nodeRuntime` entry seeded under an older
-    // config (e.g. `manual` before the GM switched the task to `overTime`) would
-    // freeze that stale config and never respawn — and an emptied pool never
-    // re-depletes to pick up the new config. A sequential loop (not `.map`) so the
-    // `expression` gain mode can await.
+    // `nodeRuntime` holds only state; the config is always the current library task's, or a
+    // pool seeded under an older policy would never respawn. Sequential, as expressions await.
     let runtimeChanged = false;
     const nodeRuntime = { ...environment.nodeRuntime };
-    // Resolve the library node configs once for this environment (not per node).
     const libNodes = this._libraryNodeConfigs(environment.craftingSystemId);
     for (const [taskId, node] of Object.entries(nodeRuntime)) {
       const effective = this._mergeNodeConfigState(libNodes.get(String(taskId)) || null, node);
@@ -299,15 +204,7 @@ export class GatheringNodeService {
     return this.environmentStore.update(environment.id, { nodeRuntime });
   }
 
-  /**
-   * Index a system's library node configs by task id (`taskId → normalized
-   * task.nodes`). Read once from the canonical config so respawn always reflects
-   * the GM's current authoring rather than a per-environment snapshot, without
-   * re-normalizing the whole config per node.
-   *
-   * @param {string} systemId
-   * @returns {Map<string, object>}
-   */
+  /** A system's library node configs by task id. */
   _libraryNodeConfigs(systemId) {
     const tasks = this.getConfig().systems?.[String(systemId || '')]?.tasks;
     const map = new Map();
@@ -320,31 +217,17 @@ export class GatheringNodeService {
   }
 
   /**
-   * Merge a per-environment runtime node (`stored`) onto the current library node
-   * CONFIG so respawn/listing always use the authoritative policy, gain mode,
-   * interval, depletion timing, AND capacity (`max`) from the library task, while
-   * preserving only the per-environment STATE: the `current` count (clamped to the
-   * library `max`) and the respawn anchor/roll. `max` is config, not state — a
-   * persisted snapshot (seeded on first depletion) must never shadow a later
-   * library edit, or raising a task's node count would have no effect in
-   * environments that had already gathered it. Falls back to `stored` when the
-   * library task has no node config (e.g. the task was deleted).
-   *
-   * @param {object|null} libNode Authoritative library node config.
-   * @param {object} stored The persisted per-environment node entry.
-   * @returns {object}
+   * The library node config, `max` included, with only the stored state kept: `current`,
+   * clamped to the library cap, and the respawn anchor and roll. `stored` alone when the library
+   * task has no node config.
    */
   _mergeNodeConfigState(libNode, stored) {
     if (!libNode) return stored;
     const storedRespawn = stored?.respawn || {};
-    // Capacity is library config and authoritative — `...cloneJson(libNode)`
-    // already supplies `max`, so we never read a stale `stored.max`.
     const max = Number(libNode.max);
     const storedCurrent = Number(stored?.current);
     const merged = {
       ...cloneJson(libNode),
-      // STATE stays per-environment: the live count, clamped to the library cap so
-      // a lowered cap can't leave `current` above `max`.
       current: Number.isFinite(storedCurrent)
         ? Number.isFinite(max)
           ? Math.min(storedCurrent, max)
@@ -364,43 +247,15 @@ export class GatheringNodeService {
     return merged;
   }
 
-  /**
-   * Respawn one resource-node pool as world time passes (`overTime` policy
-   * only). Per elapsed interval, adds nodes per `respawn.gainMode`: `guaranteed`
-   * (+1), `chance` (a persisted d100 roll), or `expression` (roll
-   * `respawn.amountExpression` and add the rolled total). Clamped to max,
-   * advancing the `respawn.lastEvaluatedWorldTime` anchor so a same-tick refresh
-   * never rerolls.
-   *
-   * @param {object} nodes The node object (config + state).
-   * @param {{now:number, environment?:object, environmentId:string, taskId:string}} ctx
-   * @returns {Promise<{changed: boolean, node: object}>}
-   */
+  /** Respawn one `overTime` pool through `respawnNodeOnce`, the single implementation. */
   async _respawnNode(nodes, { now, environment = null, environmentId, taskId }) {
     const respawn = nodes?.respawn;
     if (!nodes || !respawn || respawn.policy !== 'overTime') {
       return { changed: false, node: nodes };
     }
-    // The respawn ARITHMETIC (interval resolution, gain per mode, anchor advance,
-    // absent-anchor seed, backward-time freeze, room===0 short-circuit, max-clamp
-    // early break) is the single pure implementation in `nodeRespawnMath`. This env
-    // path injects the SAME calendar/random seams the per-token adapter uses —
-    // `secondsPerUnit` (legacy `intervalSeconds` falls through inside the math),
-    // the `rollD100() <= chance*100` chance seam, and a SYNCHRONOUS expression
-    // roll backed by pre-rolled async amounts (so Roll/`evaluateExpression`
-    // evaluation still happens, while the math stays pure). Keeping one
-    // implementation removes the prior `_respawnNode`/`respawnNodeOnce` drift.
-
-    // Pre-roll expression amounts asynchronously (the math is sync). The needed
-    // count is bounded by the elapsed whole intervals capped by the restock room.
-    // The anchor MUST be resolved through the math's own shared predicate
-    // (`resolveAccrualAnchor`, issues 403/896) rather than a local finiteness
-    // test: `Number(null) === 0` is finite, so the lax form read the `null` anchor
-    // of an unevaluated pool as world time 0 and pre-rolled a whole restock of
-    // real, awaited, `Roll`-backed evaluations that the math's seed branch then
-    // consumed NONE of. With the predicates shared, the bound again mirrors the
-    // math's stochastic-loop bound; the math may still consume fewer (the
-    // max-clamp early break) — those surplus pre-rolls are simply unused.
+    // The math is synchronous, so expression amounts are pre-rolled here, bounded by elapsed
+    // intervals capped by the room. The anchor must come from `resolveAccrualAnchor`, since a
+    // `null` anchor reads as 0 to a finiteness test (issues 403, 896); surplus rolls go unused.
     let expressionRolls = null;
     let expressionCursor = 0;
     if ((respawn.gainMode || 'guaranteed') === 'expression') {
@@ -428,8 +283,7 @@ export class GatheringNodeService {
     const { changed, node } = respawnNodeOnce(nodes, {
       now,
       secondsPerUnit: (unit) => this._respawnIntervalSecondsSeam(respawn, unit),
-      // Raw 1..100 roll seam (the math hits on `roll <= chance*100` and persists
-      // the raw roll in `lastRoll.rolls`, identical to the prior env path).
+      // A raw 1..100 roll; the math hits on `roll <= chance*100` and persists it in `lastRoll`.
       rollChance: () => Number(this.rollD100()),
       rollExpression: () =>
         expressionRolls ? Number(expressionRolls[expressionCursor++] || 0) : 0,
@@ -438,8 +292,7 @@ export class GatheringNodeService {
     if (changed) {
       const nextCurrent = Number(node?.current ?? before);
       const max = Number(node?.max ?? nodes.max ?? 0);
-      // Only emit the respawn hook when the count actually moved (a seed or a
-      // room===0 anchor advance changes the node but gains nothing).
+      // A seed or an anchor advance with no room changes the node but gains nothing.
       if (nextCurrent !== before) {
         this.callHook('fabricate.gathering.nodeRespawned', {
           environmentId,
@@ -454,19 +307,8 @@ export class GatheringNodeService {
   }
 
   /**
-   * Respawn one interactable-SCOPED node pool as world time passes (issue 302).
-   * The scoped node is self-authoritative — it carries its OWN config + state, so
-   * (unlike the per-environment path) there is no library merge. Applies the same
-   * pure respawn arithmetic ({@link respawnNodeOnce}) with the identical
-   * calendar/random seams the environment path injects: `overTime` pools regrow
-   * per the gain mode; `manual` / `nonRegenerating` pools never gain (the math
-   * short-circuits on policy). Returns `{ changed, node }`; the caller persists the
-   * changed node back onto the behaviour.
-   *
-   * @param {object} params
-   * @param {object} params.node The scoped node object (config + state).
-   * @param {number} params.worldTime Current world time (seconds).
-   * @returns {Promise<{ changed: boolean, node: object }>}
+   * Respawn one self-authoritative interactable pool (issue 302), with no library merge and the
+   * environment path's seams. Answers `{ changed, node }`; the caller persists the node.
    */
   async respawnInteractableNode({ node, worldTime } = {}) {
     const respawn = node?.respawn;
@@ -476,11 +318,7 @@ export class GatheringNodeService {
     const now = Number(worldTime);
     if (!Number.isFinite(now)) return { changed: false, node };
 
-    // Pre-roll expression amounts asynchronously (the math is sync), mirroring the
-    // env path's bound: elapsed whole intervals capped by the restock room, with
-    // the anchor resolved through the math's shared absent-anchor predicate
-    // (issues 403/896) so a never-evaluated pool pre-rolls nothing on its seeding
-    // tick. See `_respawnNode` for why the lax finiteness test was wrong.
+    // Pre-rolled exactly as in `_respawnNode`.
     let expressionRolls = null;
     let expressionCursor = 0;
     if ((respawn.gainMode || 'guaranteed') === 'expression') {
@@ -513,30 +351,14 @@ export class GatheringNodeService {
     });
   }
 
-  /**
-   * `secondsPerUnit` seam for `respawnNodeOnce` on the env path: resolve the
-   * interval unit through the calendar-aware `durationToSeconds(1, unit)`, so
-   * day/week lengths follow the active world calendar exactly like the per-token
-   * adapter. The math's own legacy `intervalSeconds` fallback handles
-   * pre-unit-schema nodes (it only calls this seam when `respawn.intervalUnit`
-   * is set).
-   *
-   * @param {object} respawn The node's respawn block.
-   * @param {string} unit The interval unit passed by the math.
-   * @returns {number} Seconds for one unit.
-   */
+  /** One calendar-aware unit; the math falls back to legacy `intervalSeconds` itself. */
   _respawnIntervalSecondsSeam(respawn, unit) {
     return durationToSeconds(this.secondsPerUnit, 1, unit);
   }
 
   /**
-   * Roll the per-interval node gain for an `expression` respawn. Respawn is
-   * environment-level with no actor, so the expression must be plain dice
-   * (e.g. `1d4`); any `@actor.*` reference resolves against an empty roll-data
-   * context and coerces to 0 (never throws). Floored at 0 and rounded.
-   *
-   * @param {object} payload
-   * @returns {Promise<number>} Non-negative integer node gain for one interval.
+   * One interval's gain for an `expression` respawn, a non-negative integer. There is no actor,
+   * so `@actor.*` resolves to 0; never throws.
    */
   async _respawnExpressionAmount({ expression, environment = null } = {}) {
     if (expression === null || expression === undefined || String(expression).trim() === '')
@@ -556,9 +378,7 @@ export class GatheringNodeService {
           : // No Roll available (e.g. headless): a plain number still resolves.
             Number(expression);
     } catch {
-      // A malformed dice string (e.g. `1d`, `(`) or an `@actor.*` reference with
-      // no actor must not abort respawn for the rest of the environment — treat
-      // this interval as no gain.
+      // A malformed formula gains nothing rather than abort the environment's respawn.
       return 0;
     }
     const numeric = Number(value);
