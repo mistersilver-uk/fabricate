@@ -73,10 +73,10 @@ const SCAN_TOTALS = Object.freeze({
   // so `collisionSites` 43 -> 42); `matches` and `lines` are conserved, because nothing was added.
   // #1923 moved five normalizer reads into `normalize/system.js` (`files` 21 -> 22); the rest hold.
   // It then moved eight item-source lines into `manager/itemSources.js` (+1 file);
-  // pairs/collisions re-derived.
+  // pairs/collisions re-derived. Ten tool-source lines moved to `manager/toolSources.js` (+1 file).
   matches: 168,
   lines: 153,
-  files: 23,
+  files: 24,
   pairs: 133,
   collisionGroups: 15,
   collisionSites: 35,
@@ -148,12 +148,13 @@ const LEDGER = Object.freeze([
   ['src/systems/normalize/system.js', "const normalizedTools = Array.isArray(system.tools)", 1, 'writer'],
   ['src/systems/normalize/system.js', "? system.tools.map((t) => normalizeTool(t, { validPrerequisiteIds: validToolPrerequisiteIds }))", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "const managedItems = system.components || [];", 1, 'authoring-accessor'],
-  ['src/systems/CraftingSystemManager.js', "system.tools = previousTools;", 3, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const tools = Array.isArray(system.tools) ? system.tools : [];", 2, 'writer'],
-  ['src/systems/CraftingSystemManager.js', ": [...tools, staged];", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const previousTools = system.tools;", 2, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "system.tools = nextTools;", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "system.tools = tools.filter((entry) => String(entry?.id) !== String(toolId));", 1, 'writer'],
+  // #1923: the tool-source transaction's writer reads, moved to `manager/toolSources.js`.
+  ['src/systems/manager/toolSources.js', "system.tools = previousTools;", 3, 'writer'],
+  ['src/systems/manager/toolSources.js', "const tools = Array.isArray(system.tools) ? system.tools : [];", 2, 'writer'],
+  ['src/systems/manager/toolSources.js', ": [...tools, staged];", 1, 'writer'],
+  ['src/systems/manager/toolSources.js', "const previousTools = system.tools;", 2, 'writer'],
+  ['src/systems/manager/toolSources.js', "system.tools = nextTools;", 1, 'writer'],
+  ['src/systems/manager/toolSources.js', "system.tools = tools.filter((entry) => String(entry?.id) !== String(toolId));", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "? updates.essenceDefinitions", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', ": current.essenceDefinitions,", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "const components = Array.isArray(system.components) ? system.components : [];", 2, 'pre-persist+writer'],

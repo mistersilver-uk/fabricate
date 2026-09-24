@@ -18,7 +18,10 @@ const recipeManagerSource = read('src/systems/RecipeManager.js');
 /** The `manager/` cluster modules (issue 1923), read once by path; `SAVING_MODULES` persist through
  * `io.saveSystems(`, the manager's `save()`, and each must contribute at least one site. */
 const MANAGER_MODULE_DIR = 'src/systems/manager';
-const SAVING_MODULES = Object.freeze([`${MANAGER_MODULE_DIR}/itemSources.js`]);
+const SAVING_MODULES = Object.freeze([
+  `${MANAGER_MODULE_DIR}/itemSources.js`,
+  `${MANAGER_MODULE_DIR}/toolSources.js`,
+]);
 const managerModules = new Map(
   readdirSync(resolve(repoRoot, MANAGER_MODULE_DIR))
     .filter((name) => name.endsWith('.js'))
