@@ -335,9 +335,9 @@ The consequence for any caller reporting an amount: derive it from what the writ
 `Document#delete` also resolves `undefined` when a pre-delete veto drops the document on both V13.351 and V14.365; a successful deletion resolves the deleted document.
 Versioned consumption in `_consumeItemQuantity` in `src/systems/CraftingEngine.js` requires a document return before recording spending or allowing subsequent awards.
 A partially applied ingredient batch remains uncertain in the execution journal and requires reconciliation without replay or automatic rollback.
-- **An embedded Item re-created with `{keepId: true, keepEmbeddedIds: true}` from its pre-delete `toObject()` is exact except for `_stats`.**
-The V14.365 server backend assigns a new id only when `!(operation.keepId && data._id)`, so the `_id` and UUID survive, and `_generateEmbeddedDocumentIds(keepEmbeddedIds)` skips embedded documents that already carry an `_id`, so active effects keep theirs.
-`createdTime`, `modifiedTime` and `lastModifiedBy` are refreshed: `DocumentStatsField.managedFields` and `_sanitizeType` strip them from creation data, and `ServerDocumentMixin#_tagStats` stamps every creation (source-proven on V14.365, inferred on V13.350).
+- **An embedded Item re-created with `{keepId: true, keepEmbeddedIds: true}` from its pre-delete `toObject()` is exact except for `_stats` and, on an unlinked token, delta promotion.**
+On V13.351 and V14.365 the server backend assigns a new id only when `!(operation.keepId && data._id)`, so the `_id` and UUID survive, and `_generateEmbeddedDocumentIds(keepEmbeddedIds)` skips embedded documents that already carry an `_id`, so active effects keep theirs.
+`createdTime`, `modifiedTime` and `lastModifiedBy` are refreshed on both builds: creation data is stripped of `DocumentStatsField.managedFields` (V14.365 `_sanitizeType`, V13.351 `ServerDocumentMixin._deleteStats`) and every creation is re-stamped (V14.365 `ServerDocumentMixin#_tagStats`, V13.351 `tagModelStats` from `ServerDocumentMixin#_preCreate`).
 On an unlinked token the restore promotes an inherited item to a delta-managed record, so it stops tracking later base-actor edits; only core's `EmbeddedCollectionDelta#restoreDocuments` re-links one.
 The server rejects a `keepId` create onto an id the collection still holds, so a restore covers only the ids the delete answered.
 A restore fires `createItem` per document (`noHook` gates only the pre-hook) and yields a new JS object, so a held `Item` reference goes stale.

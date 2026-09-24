@@ -869,8 +869,6 @@ export async function creditWorldCurrency(actor, { unitId, amount, callSite } = 
 // The pooled currency balance and debit (issue 1342), world-scoped like the two above. They live
 // here so their private dependencies stay private; the companion leaves compose them.
 
-// The pooled outcome tokens are read from `COMPANION_OUTCOMES`: one vocabulary (issue 1342).
-
 /**
  * Resolve a coin from a human-written string against the world ladder (issue 1342), so the pooled
  * read names coins as it names components, through the same world settings its balance read uses.

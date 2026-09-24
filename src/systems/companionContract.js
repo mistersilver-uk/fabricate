@@ -523,7 +523,8 @@ const ROLLED_OUTCOMES = Object.freeze([
  * Build `rollActorCheck`'s answer (issue 1293). Every field is derived from the outcome and the
  * member's internal roll record, never a caller bag: `buildResult` writes `success` before it
  * spreads `extra`. `passed` is `null` when ungraded; `total` is the raw total or `null` for a
- * refusal (a rolled `0` stays `0`); `diceGroups` is `[]` on a refusal.
+ * refusal (a rolled `0` stays `0`); `diceGroups` is `[]` and `resolvedFormula` (the `@`-resolved
+ * formula) is `null` on a refusal.
  */
 export function checkRollResult(outcome, messageData = null, roll = null) {
   const rolled = ROLLED_OUTCOMES.includes(outcome);
@@ -554,6 +555,8 @@ const ASSESSED_BULK_OUTCOMES = Object.freeze([
  * Build `resolveBulkCheckDecision`'s answer (issue 1293), derived as `checkRollResult` is.
  * `decision` is set only for `decided` and has no `confirmed` key, which the evaluator reads as
  * a cancellation. `covered` holds indices into the caller's `formulas`, since formulas repeat.
+ * `allowAdvantage` is `null` for a refusal and `false` for `nothingToDecide`, where no usable
+ * formula could honour Advantage.
  */
 export function bulkCheckDecisionResult(outcome, messageData = null, decision = null) {
   const assessed = ASSESSED_BULK_OUTCOMES.includes(outcome);
@@ -820,7 +823,7 @@ export function gateCompanionCallSite(request, seams) {
 /**
  * Resolve one address, logging a throw and answering `null` so a `stable` member never throws.
  * `fromUuidSync` raises on a pack-sourced embedded address: `strict` defaults to `true` on
- * V13.350 and V14.365.
+ * V13.351 and V14.365.
  */
 function resolveOnePooledActor(uuid, seams) {
   try {

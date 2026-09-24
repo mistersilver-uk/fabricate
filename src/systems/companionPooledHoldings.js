@@ -6,8 +6,9 @@
  * with no `balance` macro answers `null` for currency and blocks nothing else.
  * Components are counted through the published `findComponentItems` and `readStackQuantity`,
  * the matcher and reader the consume drains through; that matcher is case-sensitive and tiered
- * all-or-nothing. Names resolve through `definitionIndex`'s silent `findByName`, so a polling
- * companion never feeds the issue 540 name-only telemetry.
+ * all-or-nothing. Cost names resolve through `definitionIndex`'s silent `findByName`, so they never
+ * feed the issue 540 telemetry; `findComponentItems`' item-name fallback still reports, deduped
+ * per session.
  * The facade owns GM, readiness, UUID resolution and the `noActor`/`invalidActorUuids` split;
  * this keeps a fail-closed floor. A Foundry-free leaf: everything arrives as a seam.
  */
@@ -186,9 +187,10 @@ function readToolCost({ name }, { systems, actors, craftingSystemManager, classi
 /**
  * A currency cost: the name resolves through `resolveWorldCurrencyUnitByName` (id first, additive,
  * `ambiguous` reads the first coin in ladder order) and the balance through
- * `readPooledCurrencyBalance`. `unitNotFound` or `balanceNotConfigured` (`available: null`,
- * blocking nothing). The base-unit balance is converted to the caller's unit and floored: copper
- * against a gold `requested` would err permissive.
+ * `readPooledCurrencyBalance`. A missing unit is `unitNotFound`; an empty or invalid ladder or an
+ * unreadable actor is `balanceNotConfigured` (`available: null`, blocking nothing). The base-unit
+ * balance is converted to the caller's unit and floored: copper against a gold `requested` would
+ * err permissive.
  */
 async function readCurrencyCost(
   { name },

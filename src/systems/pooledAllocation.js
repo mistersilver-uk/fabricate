@@ -11,12 +11,6 @@
 
 import { readStackQuantity } from './itemStackQuantity.js';
 
-/**
- * A plan is `{ requested, allocated, shortfall, satisfied, takes, groups }`; a take is `{ item,
- * parent, available, quantity, remainingQuantity, exhausted }` (`exhausted` means a delete, not a
- * decrement), and a group is `{ parent, takes, deletions, reductions }`.
- */
-
 /** The pooled order: every actor's items, concatenated in the caller's actor order. */
 export function pooledItemOrder(actors) {
   return (Array.isArray(actors) ? actors : []).flatMap((actor) => [...(actor?.items ?? [])]);
@@ -26,6 +20,9 @@ export function pooledItemOrder(actors) {
  * The first-fit drain plan; nothing here writes or awaits. `quantity` is used verbatim, as the
  * engine loop did. One document pays at most once, by identity (ids may repeat across actors), or
  * a repeat would read the same unwritten `available` twice and report `satisfied` falsely.
+ * A plan is `{ requested, allocated, shortfall, satisfied, takes, groups }`; a take is `{ item,
+ * parent, available, quantity, remainingQuantity, exhausted }` (`exhausted` means a delete, not a
+ * decrement), and a group is `{ parent, takes, deletions, reductions }`.
  */
 export function planFirstFitDrain(items, quantity) {
   const takes = [];
