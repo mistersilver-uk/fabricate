@@ -5,7 +5,6 @@ tests/bulk-salvage-service.test.js	1
 tests/canonical-definition-corpus.test.js	1
 tests/canvas/interactable-browser-app-show.test.js	6
 tests/canvas/interaction-prompt-singleton.test.js	9
-tests/character-libraries-world-scope-import-export.test.js	3
 tests/check-modifier-activity-seams.test.js	5
 tests/check-preview.test.js	3
 tests/checks-nav.test.js	3
@@ -16,7 +15,6 @@ tests/companion-component-award.test.js	5
 tests/companion-currency-credit.test.js	7
 tests/component-category-normalization.test.js	6
 tests/component-complications-plan.test.js	4
-tests/component-world-scope-screens.test.js	24
 tests/components/access-tab-view-mounted.test.js	3
 tests/components/alchemy-known-recipe-layout.test.js	3
 tests/components/avatar-mounted.test.js	3
@@ -118,8 +116,6 @@ tests/crafting-definition-repository.test.js	1
 tests/crafting-modifier-config.test.js	3
 tests/crafting-nav.test.js	7
 tests/currency-balance-macro.test.js	4
-tests/essence-bulk-delete-copy.test.js	2
-tests/essence-world-scope-screens.test.js	36
 tests/file-size-ledger.test.js	1
 tests/foundry-manager-rail-hooks.test.js	1
 tests/gathering-harvesting-boundary.test.js	3
@@ -159,8 +155,6 @@ tests/recipe-set-delete-cascade.test.js	5
 tests/recipe-visibility-service.test.js	5
 tests/run-manager-cache-invalidation.test.js	2
 tests/scalar-helper-duplicates.test.js	1
-tests/scoped-definitions.test.js	2
-tests/scoped-entity-list-model.test.js	8
 tests/screenshot-capture-scoping.test.js	9
 tests/select-element-typed-legs.test.js	1
 tests/sortable-list-source-contract.test.js	16
@@ -177,8 +171,4 @@ tests/systems/pooledAllocation.test.js	3
 tests/token-generation-gate.test.js	4
 tests/view-lab-cases.test.js	14
 tests/world-scope-identity-drift.test.js	3
-tests/world-scope-identity-flag-remap.test.js	8
 tests/world-scope-reader-ledger.test.js	1
-tests/world-scope-tool-breakage-authority.test.js	3
-tests/world-vocabulary-gateway-bounds.test.js	2
-tests/world-vocabulary-lang-contract.test.js	2
