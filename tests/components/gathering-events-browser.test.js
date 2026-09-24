@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { defineStructureContract } from '../helpers/structureContract.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const browserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte');
@@ -25,6 +27,14 @@ const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 const css = readFileSync(cssPath, 'utf8');
 
 describe('GatheringEventsBrowserView source contract', () => {
+  // The filter's own body; its forward to the leaf is asserted by DOM in
+  // `manager-gathering-mounted.js`, and its result by `tests/gathering-display.test.js`.
+  defineStructureContract(
+    'derives event usage from enabledEventIds',
+    'src/ui/svelte/apps/manager/gatheringDisplay.js',
+    { spellsExactly: ['enabledEventIds'] }
+  );
+
   it('renders an event library tabpanel with the expected toolbar filters', () => {
     assert.ok(browserSource.includes("class=\"manager-gathering-panel manager-gathering-panel-events\""), 'browser should use the event panel class');
     assert.ok(browserSource.includes('data-gathering-events-browser'), 'browser should expose a data attribute hook for tests');
@@ -176,9 +186,6 @@ describe('GatheringEventsBrowserView source contract', () => {
     assert.ok(eventInspectorSource.includes('manager-event-environment-usage-grid'), 'event usage tiles should sit in a grid container');
     assert.ok(eventInspectorSource.includes('manager-event-environment-usage-card'), 'event usage should render tiled cards');
     assert.ok(eventInspectorSource.includes('manager-event-environment-usage-thumb'), 'event usage tile should include a thumbnail image');
-    // `enabledEventIds` is the filter's own body, not proof it reaches the leaf: that forward is
-    // asserted by DOM in `manager-gathering-mounted.js` (issue 1707 phase 2 review).
-    assert.ok(rootSource.includes('enabledEventIds'), 'usage should be derived from enabledEventIds');
     const events = lang.FABRICATE.Admin.Manager.Environment.Events;
     assert.equal(events.UsedInEnvironmentsCard, 'Used in environments');
     assert.equal(events.NotUsedInEnvironments, 'Not used in any environments yet.');

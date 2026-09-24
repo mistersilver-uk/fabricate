@@ -38,6 +38,7 @@ const {
   craftingSubitem,
   gatheringSubitem,
   navButton,
+  runRowMenuCommand,
   worldNavItem,
   worldTravelItem,
 } = queries;
@@ -198,6 +199,429 @@ export function registerGatheringCases() {
       Boolean(target.querySelector('[data-event-environment-usage-empty]')),
       'Clear Skies is unreferenced, so the same card renders the empty state'
     );
+  });
+
+  // A system switch reopens the gathering workspace on its first tab, so the next system's
+  // library is not entered on the tab and task the GM picked in the last one.
+  it('reopens the gathering workspace on its environments tab when the selected system switches', async () => {
+    mountManager([], {
+      smithingFeatures: { gathering: true, itemTags: true, recipeCategories: true, salvage: true },
+    });
+    const settle = async () => {
+      for (let index = 0; index < 8; index += 1) await Promise.resolve();
+      await tick();
+      flushSync();
+    };
+    const switchSystem = async (systemId) => {
+      const scope = target.querySelector('[data-manager-scope-select]');
+      scope.value = systemId;
+      scope.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+      await settle();
+      await settle();
+    };
+    const tasksBrowser = () => target.querySelector('[data-gathering-tasks-browser]');
+    const selectedTaskId = () =>
+      target.querySelector('.manager-gathering-task-row.is-selected')?.dataset.gatheringTaskId;
+
+    navButton('Gathering').click();
+    await settle();
+    gatheringSubitem('Tasks').click();
+    await settle();
+    target
+      .querySelector('[data-gathering-task-id="task-cavern"] .manager-gathering-task-identity')
+      .click();
+    await settle();
+    assert.equal(selectedTaskId(), 'task-cavern', 'pre-condition: the GM picked the second task');
+
+    await switchSystem('smithing');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
+    assert.ok(!tasksBrowser(), 'the switch returns the workspace to its environments tab');
+
+    await switchSystem('alchemy');
+    gatheringSubitem('Tasks').click();
+    await settle();
+    assert.equal(selectedTaskId(), 'task-herbs', 'and the returning library selects its first task');
+  });
+
+  // The shell's writes to the gathering route model's selections, drafts and flags, one record
+  // kind per row: each case reads what the library or the editor draws after the write.
+  const LIBRARY_KINDS = Object.freeze([
+    Object.freeze({
+      kind: 'task',
+      title: 'Task',
+      section: 'Tasks',
+      first: 'task-herbs',
+      second: 'task-cavern',
+      duplicateLabel: 'Duplicate gathering task',
+      deleteLabel: 'Delete gathering task',
+      storeOptions: {},
+    }),
+    Object.freeze({
+      kind: 'event',
+      title: 'Event',
+      section: 'Events',
+      first: 'event-owl',
+      second: 'event-rockfall',
+      duplicateLabel: 'Duplicate event',
+      deleteLabel: 'Delete event',
+      storeOptions: {
+        gatheringLibraryEvents: [
+          { id: 'event-owl', name: 'Owl Omen', enabled: true, dropRate: 10 },
+          { id: 'event-rockfall', name: 'Rockfall', enabled: true, dropRate: 20 },
+        ],
+      },
+    }),
+  ]);
+
+  /**
+   * Mount on one library section. The kind's create, duplicate and delete writes answer through
+   * `deliver`, and the first two add their record to the library as the real store does.
+   */
+  async function openLibrary(entry, { deliver = (value) => value, storeOptions, configure } = {}) {
+    const calls = [];
+    const store = createStore(calls, { ...entry.storeOptions, ...storeOptions });
+    const collection = `${entry.kind}s`;
+    const addToLibrary = (record) => {
+      store.viewState.update((state) => {
+        const system = state.gatheringConfig.systems.alchemy;
+        const systems = {
+          ...state.gatheringConfig.systems,
+          alchemy: { ...system, [collection]: [...(system[collection] || []), record] },
+        };
+        return { ...state, gatheringConfig: { ...state.gatheringConfig, systems } };
+      });
+      return deliver(record);
+    };
+    store[`addGatheringLibrary${entry.title}`] = () =>
+      addToLibrary({ id: `${entry.kind}-new`, name: 'New', enabled: true, dropRate: 10 });
+    store[`duplicateGatheringLibrary${entry.title}`] = (_systemId, id) =>
+      addToLibrary({ id: `${id}-copy`, name: 'Copy', enabled: true, dropRate: 10 });
+    store[`deleteGatheringLibrary${entry.title}`] = () => deliver(true);
+    configure?.(store);
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store, services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    navButton('Gathering').click();
+    await settleRouteExit();
+    gatheringSubitem(entry.section).click();
+    await settleRouteExit();
+    return { calls, store };
+  }
+
+  const selectedRecord = (kind) =>
+    target
+      .querySelector(`.manager-gathering-${kind}-row.is-selected`)
+      ?.getAttribute(`data-gathering-${kind}-id`);
+
+  const headerButton = (label) =>
+    Array.from(target.querySelectorAll('.manager-header-actions .manager-button')).find((button) =>
+      button.textContent.includes(label)
+    );
+
+  const headerReadsUnsaved = () =>
+    target.querySelector('.manager-header-actions').textContent.includes('Unsaved');
+
+  async function pickRecord(kind, id) {
+    target
+      .querySelector(`[data-gathering-${kind}-id="${id}"] .manager-gathering-${kind}-identity`)
+      .click();
+    await settleRouteExit();
+  }
+
+  async function openEditor(kind, id) {
+    target
+      .querySelector(`[data-gathering-${kind}-id="${id}"] .manager-icon-button[aria-label^="Edit"]`)
+      .click();
+    await settleRouteExit();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, `gathering-${kind}-edit`);
+  }
+
+  async function rename(kind, name) {
+    setInputValue(target.querySelector(`[data-gathering-${kind}-field="name"]`), name);
+    await settleRouteExit();
+  }
+
+  for (const entry of LIBRARY_KINDS) {
+    const { kind, title, first, second } = entry;
+    const row = (id) => `[data-gathering-${kind}-id="${id}"]`;
+
+    for (const [delivery, deliver] of [
+      ['at once', (value) => value],
+      ['once the store resolves', (value) => Promise.resolve(value)],
+    ]) {
+      it(`selects the ${kind} it creates or duplicates, answered ${delivery}`, async () => {
+        await openLibrary(entry, { deliver });
+        assert.equal(
+          target.querySelector('aside.manager-inspector').getAttribute('aria-label'),
+          kind === 'task' ? 'Selected gathering task inspector' : 'Selected environment inspector',
+          'the aside names what the section selects'
+        );
+        headerButton('Create gathering').click();
+        await settleRouteExit();
+        assert.equal(selectedRecord(kind), `${kind}-new`, 'the created record');
+
+        await pickRecord(kind, second);
+        await runRowMenuCommand(row(second), entry.duplicateLabel);
+        await settleRouteExit();
+        assert.equal(selectedRecord(kind), `${second}-copy`, 'the duplicate');
+      });
+
+      it(`lets go of a deleted ${kind}, answered ${delivery}`, async () => {
+        await openLibrary(entry, { deliver });
+        await pickRecord(kind, second);
+        await runRowMenuCommand(row(second), entry.deleteLabel);
+        await settleRouteExit();
+        assert.equal(selectedRecord(kind), first, 'the library falls back to its first record');
+      });
+    }
+
+    it(`saves the ${kind} it opened, holding Save until the write lands`, async () => {
+      let land;
+      const writes = [];
+      const { calls } = await openLibrary(entry, {
+        configure: (store) => {
+          store[`updateGatheringLibrary${title}`] = (systemId, id, draft) => {
+            writes.push([systemId, id, draft.name]);
+            return new Promise((resolve) => {
+              land = resolve;
+            });
+          };
+        },
+      });
+      await openEditor(kind, second);
+      await rename(kind, 'Renamed');
+      assert.ok(headerReadsUnsaved(), 'pre-condition: the rename reads unsaved');
+
+      headerSaveButton(target).click();
+      await settleRouteExit();
+      const named = [['alchemy', second, 'Renamed']];
+      assert.deepEqual(writes, named, 'the write names the record the editor opened, and its draft');
+      assert.deepEqual(
+        calls
+          .filter((call) => call[0] === `confirmGatheringLibrary${title}CompositionLoss`)
+          .map(([, systemId, id, draft]) => [systemId, id, draft.name]),
+        named,
+        'and so does the composition-loss check before it'
+      );
+      assert.ok(headerSaveButton(target).disabled, 'Save holds while the write is in flight');
+      land(true);
+      await settleRouteExit();
+      assert.ok(!headerReadsUnsaved(), 'and the landed write is the new baseline');
+    });
+
+    it(`deletes the ${kind} it opened from the editor and lets go of it`, async () => {
+      const originalConfirm = globalThis.confirm;
+      globalThis.confirm = () => true;
+      try {
+        await openLibrary(entry);
+        await pickRecord(kind, second);
+        await openEditor(kind, second);
+        headerButton(entry.deleteLabel).click();
+        await settleRouteExit();
+      } finally {
+        globalThis.confirm = originalConfirm;
+      }
+      assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
+      assert.equal(selectedRecord(kind), first, 'the library falls back to its first record');
+    });
+
+    // The environment editor holds the tab on Environments, so opening a composed record from it
+    // is the one entry to the record editor that moves the tab.
+    it(`opens a composed ${kind} from the environment editor on its own library tab`, async () => {
+      const { store } = await openLibrary(entry);
+      gatheringSubitem('Environments').click();
+      await settleRouteExit();
+      target
+        .querySelector('[data-environment-id="env-forest"] .manager-icon-button[aria-label^="Edit"]')
+        .click();
+      await settleRouteExit();
+      store.viewState.update((state) => ({
+        ...state,
+        environmentComposition: {
+          compositionMode: 'automatic',
+          [`${kind}s`]: [{ id: second, name: 'Composed', compositionState: 'includedByMatch' }],
+        },
+      }));
+      target.querySelector(`#environment-tab-${kind}s`).click();
+      await settleRouteExit();
+      await runRowMenuCommand(
+        `[data-environment-tab="${kind}s"] [data-record-id="${second}"]`,
+        `Open source ${kind}`
+      );
+      await settleRouteExit();
+      assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, `gathering-${kind}-edit`);
+      assert.equal(
+        gatheringSubitem(entry.section).getAttribute('aria-current'),
+        'page',
+        'the rail marks the record kind’s own tab'
+      );
+    });
+
+    it(`states why an invalid ${kind} draft refused to save on the way out`, async () => {
+      await openLibrary(entry, {
+        storeOptions: {
+          [`confirmDiscardGathering${title}Result`]: 'save',
+          gatheringTaskValidation: () => ({ valid: false, errors: ['Name clash'] }),
+        },
+      });
+      await openEditor(kind, second);
+      await rename(kind, '');
+      worldNavItem('parties').click();
+      await settleRouteExit();
+      assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, `gathering-${kind}-edit`);
+      assert.equal(
+        target.querySelector(`[data-gathering-${kind}-save-error]`)?.textContent.trim(),
+        kind === 'task' ? 'Name clash' : 'Name is required.',
+        'the first validation error is the save error'
+      );
+    });
+  }
+
+  // Each drop verb selects the row it lands on, so the inspector beside the table edits it next.
+  it('selects the drop row each drop verb lands on', async () => {
+    const row = (id) => ({ id, componentId: 'c3', quantity: 1, dropRate: 40, enabled: true });
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { taskDropRows: [row('drop-a'), row('drop-b'), row('drop-c')] }),
+        services: {
+          openCurrentAdmin: () => {},
+          importSingleManagedItemFromDrop: async () => ({ id: 'c1', name: 'Iron Ore' }),
+        },
+      },
+    });
+    flushSync();
+    navButton('Gathering').click();
+    await settleRouteExit();
+    gatheringSubitem('Tasks').click();
+    await settleRouteExit();
+    await openEditor('task', 'task-herbs');
+    const rows = () =>
+      Array.from(target.querySelectorAll('.manager-gathering-task-drop-row')).map((node) =>
+        node.getAttribute('data-gathering-task-drop-id')
+      );
+    const selected = () =>
+      target
+        .querySelector('.manager-gathering-task-drop-row.is-selected')
+        ?.getAttribute('data-gathering-task-drop-id');
+    const press = async (node) => {
+      node.click();
+      await settleRouteExit();
+    };
+    const inspectorAction = (label) =>
+      target.querySelector(`.manager-inspector .manager-drop-editor-actions [aria-label="${label}"]`);
+
+    await press(target.querySelector('[data-gathering-add-drop="toolbar"]'));
+    assert.equal(selected(), rows().at(-1), 'an added drop is selected');
+
+    await press(target.querySelector('[data-gathering-task-drop-id="drop-b"]'));
+    await press(inspectorAction('Duplicate'));
+    const copy = rows()[2];
+    assert.ok(!['drop-b', 'drop-c'].includes(copy), 'the copy lands after its source');
+    assert.equal(selected(), copy, 'a duplicate is selected');
+
+    await press(inspectorAction('Delete'));
+    assert.equal(selected(), 'drop-c', 'a deleted drop hands the selection to its neighbour');
+
+    await press(target.querySelector('[data-gathering-task-drop-id="drop-a"]'));
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    const payload = JSON.stringify({ type: 'Item', uuid: 'Item.imported' });
+    Object.defineProperty(drop, 'dataTransfer', {
+      value: { getData: (type) => (type === 'text/plain' ? payload : '') },
+    });
+    target.querySelector('[data-gathering-task-drop-id="drop-c"]').dispatchEvent(drop);
+    await settleRouteExit();
+    assert.equal(selected(), 'drop-c', 'an imported item selects the row it landed on');
+  });
+
+  /** Mount on the Tasks section of a system whose library the options shape. */
+  async function openTasks(storeOptions = {}) {
+    const store = createStore([], storeOptions);
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store, services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    navButton('Gathering').click();
+    await settleRouteExit();
+    gatheringSubitem('Tasks').click();
+    await settleRouteExit();
+    return store;
+  }
+
+  // The inspector and the editor draw with the presenters and flags the shell hands them.
+  it('names the selected task and its drop through the shell’s presenters', async () => {
+    const store = await openTasks();
+    const inspector = () => target.querySelector('.manager-inspector');
+    assert.equal(
+      inspector().querySelector('[data-gathering-task-inspector] .manager-inspector-name').textContent.trim(),
+      'Gather Moon Herbs'
+    );
+    assert.ok(inspector().textContent.includes('High Day, Clear Sky'), 'the availability chip');
+
+    await openEditor('task', 'task-herbs');
+    const stack = inspector().querySelector('.manager-drop-inspector-stack');
+    assert.equal(
+      stack.querySelector('img.manager-recipe-preview').getAttribute('src'),
+      'icons/consumables/plants/nightshade.jpg',
+      'the selected drop pictures its managed item'
+    );
+    const biome = stack.querySelector('[data-gathering-drop-condition-modifiers="biome"]');
+    assert.equal(biome.querySelector('.manager-card-title').textContent.trim(), 'Biome modifiers');
+    assert.equal(
+      biome.querySelector('.manager-card-title + .manager-muted').textContent.trim(),
+      "Adjust this drop's chance based on the gathering environment's biomes."
+    );
+    assert.equal(
+      biome.querySelector('.manager-character-modifier-icon i').getAttribute('class'),
+      'fas fa-tree',
+      'a biome modifier takes its vocabulary icon'
+    );
+
+    // The model reads the selected system live, so a republished component name reaches the drop.
+    store.viewState.update((state) => {
+      const managedItemOptions = state.selectedSystem.managedItemOptions.map((option) =>
+        option.id === 'c3' ? { ...option, name: 'Renamed Nightshade' } : option
+      );
+      return { ...state, selectedSystem: { ...state.selectedSystem, managedItemOptions } };
+    });
+    await settleRouteExit();
+    assert.equal(
+      inspector().querySelector('.manager-drop-inspector-stack .manager-inspector-name').textContent.trim(),
+      'Renamed Nightshade'
+    );
+  });
+
+  it('keeps the drop inspector to a task that rolls d100', async () => {
+    await openTasks({ taskResolutionMode: 'progressive' });
+    await openEditor('task', 'task-herbs');
+    assert.ok(Boolean(target.querySelector('.manager-inspector')), 'a progressive task keeps the aside');
+    assert.ok(
+      !target.querySelector('.manager-inspector [data-gathering-task-drop-inspector]'),
+      'but it draws no drop inspector'
+    );
+  });
+
+  it('shows the economy cards the system economy turns on', async () => {
+    const store = await openTasks();
+    store.viewState.update((state) => {
+      const alchemy = state.gatheringConfig.systems.alchemy;
+      const economy = { ...alchemy.economy, stamina: { enabled: true }, nodes: { enabled: true } };
+      const systems = { ...state.gatheringConfig.systems, alchemy: { ...alchemy, economy } };
+      return { ...state, gatheringConfig: { ...state.gatheringConfig, systems } };
+    });
+    await settleRouteExit();
+    await openEditor('task', 'task-herbs');
+    assert.ok(Boolean(target.querySelector('[data-gathering-task-stamina]')), 'stamina');
+    assert.ok(Boolean(target.querySelector('[data-gathering-task-nodes]')), 'resource nodes');
   });
 
   it('deletes the editing gathering task from the editor toolbar and returns to the task browser', async () => {

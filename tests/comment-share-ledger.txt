@@ -36,7 +36,7 @@ src/ui/svelte/apps/inventory/detail	25
 src/ui/svelte/apps/inventory/detail/salvage	29
 src/ui/svelte/apps/journal	13
 src/ui/svelte/apps/manager	13
-src/ui/svelte/apps/manager/checks	20
+src/ui/svelte/apps/manager/checks	19
 src/ui/svelte/apps/manager/component	20
 src/ui/svelte/apps/manager/components	20
 src/ui/svelte/apps/manager/crafting	28

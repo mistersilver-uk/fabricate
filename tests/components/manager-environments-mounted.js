@@ -123,6 +123,193 @@ export function registerEnvironmentsCases() {
     await settleBetweenTests();
   });
 
+  /** Mount on the Gathering route, with a switch for the selected system's gathering feature. */
+  async function mountGatheringToggle(storeOptions = {}) {
+    const store = createStore([], storeOptions);
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store, services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    const settle = async () => {
+      await tick();
+      flushSync();
+    };
+    const setGathering = async (enabled) => {
+      store.viewState.update((state) => ({
+        ...state,
+        selectedSystem: {
+          ...state.selectedSystem,
+          features: { ...state.selectedSystem.features, gathering: enabled },
+        },
+      }));
+      await settle();
+    };
+    const openSection = async (label) => {
+      gatheringSubitem(label).click();
+      await settle();
+    };
+    navButton('Gathering').click();
+    await settle();
+    return { setGathering, openSection, settle };
+  }
+
+  // Off every gathering route the tab returns to Environments, so a workspace switched back on
+  // opens on its first tab rather than the one the GM left.
+  it('reopens a re-enabled gathering workspace on its environments tab', async () => {
+    const { setGathering, openSection } = await mountGatheringToggle();
+    const view = () => target.querySelector('.fabricate-manager').dataset.managerView;
+    const tasksBrowser = () => target.querySelector('[data-gathering-tasks-browser]');
+
+    await openSection('Tasks');
+    assert.ok(Boolean(tasksBrowser()), 'pre-condition: the GM is on the Tasks tab');
+
+    await setGathering(false);
+    assert.equal(view(), 'systems', 'with gathering off the route falls back to the library');
+    await setGathering(true);
+    assert.equal(view(), 'environments', 'switched back on, the same route returns');
+    assert.ok(!tasksBrowser(), 'on its environments tab');
+  });
+
+  // A workspace switched off clears both library selections, so each library it reopens selects
+  // its first entry rather than the one the GM left.
+  it('reselects the first task and event once a re-enabled workspace reopens', async () => {
+    const { setGathering, openSection, settle } = await mountGatheringToggle({
+      gatheringLibraryEvents: [
+        { id: 'event-owl', name: 'Owl Omen', enabled: true, dropRate: 10 },
+        { id: 'event-rockfall', name: 'Rockfall', enabled: true, dropRate: 20 },
+      ],
+    });
+    const selected = (kind) =>
+      target.querySelector(`.manager-gathering-${kind}-row.is-selected`)?.getAttribute(
+        `data-gathering-${kind}-id`
+      );
+    const pick = async (kind, id) => {
+      target
+        .querySelector(`[data-gathering-${kind}-id="${id}"] .manager-gathering-${kind}-identity`)
+        .click();
+      await settle();
+    };
+
+    await openSection('Tasks');
+    await pick('task', 'task-cavern');
+    await openSection('Events');
+    await pick('event', 'event-rockfall');
+    assert.equal(selected('event'), 'event-rockfall', 'pre-condition: the GM picked a second event');
+
+    await setGathering(false);
+    await setGathering(true);
+    await openSection('Tasks');
+    assert.equal(selected('task'), 'task-herbs');
+    await openSection('Events');
+    assert.equal(selected('event'), 'event-owl');
+  });
+
+  // The browse row and the inspector both draw the environment draft the shell hands them.
+  it('marks a dirty, invalid environment draft in its row and in the inspector', async () => {
+    const store = createStore([]);
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store, services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    store.viewState.update((state) => ({
+      ...state,
+      selectedEnvironmentId: 'env-forest',
+      environmentDraft: {
+        ...state.environments.find((environment) => environment.id === 'env-forest'),
+        name: 'Renamed Woods',
+        selectionMode: 'blind',
+        description: 'a'.repeat(200),
+      },
+      environmentDraftDirty: true,
+      environmentValidationState: { errors: ['one', 'two'] },
+    }));
+    await tick();
+    flushSync();
+
+    const row = target.querySelector('[data-environment-id="env-forest"]');
+    assert.ok(row.textContent.includes('Renamed Woods'), 'the row shows the dirty draft');
+    assert.ok(row.textContent.includes('Unsaved') && row.textContent.includes('Invalid'));
+    const inspector = target.querySelector('.manager-inspector');
+    assert.equal(inspector.querySelector('.manager-inspector-name').textContent.trim(), 'Renamed Woods');
+    assert.ok(inspector.textContent.includes('Blind'), 'the selection mode chip');
+    assert.ok(inspector.textContent.includes('Unsaved'), 'the draft-state card');
+    assert.ok(inspector.textContent.includes('2 validation issues'));
+    assert.ok(
+      inspector.textContent.includes(`${'a'.repeat(160)}…`) &&
+        !inspector.textContent.includes('a'.repeat(161)),
+      'the inspector cuts a long description at 160 characters'
+    );
+  });
+
+  it('offers the realm field in the environment editor only with Travel & Realms on', async () => {
+    for (const enabled of [true, false]) {
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: {
+          store: createStore([], { gatheringRealmsEnabled: enabled }),
+          services: { openCurrentAdmin: () => {} },
+        },
+      });
+      flushSync();
+      navButton('Gathering').click();
+      await tick();
+      flushSync();
+      target
+        .querySelector('[data-environment-id="env-forest"] .manager-icon-button[aria-label^="Edit"]')
+        .click();
+      await tick();
+      flushSync();
+      assert.equal(
+        Boolean(target.querySelector('[data-environment-field="includedRealmIds"]')),
+        enabled,
+        `the realm field follows Travel & Realms (${enabled})`
+      );
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+    }
+  });
+
+  // A party's realm override needs the selected system's gathering and its Travel & Realms.
+  it('gates the party realm override on the selected system’s Travel & Realms', async () => {
+    for (const enabled of [true, false]) {
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: {
+          store: createStore([], { gatheringRealmsEnabled: enabled }),
+          services: { openCurrentAdmin: () => {} },
+        },
+      });
+      flushSync();
+      target.querySelector('#manager-world-nav-parties').click();
+      await tick();
+      flushSync();
+      const lock = target.querySelector('[data-party-realm-override-unavailable]');
+      assert.equal(Boolean(target.querySelector('.manager-travel-parties-override-trigger')), enabled);
+      assert.equal(
+        Boolean(lock?.textContent.includes('Enable Travel & Realms in this system')),
+        !enabled,
+        'and a system without it says why'
+      );
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+    }
+  });
+
   // The rules leaf's own controls (issue 1707 phase 2). Every one of the ten selects and both
   // steppers write through one `onUpdate` prop; before this case nothing anywhere changed one, so
   // dropping the prop rendered the whole column inert and shipped green.
