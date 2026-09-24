@@ -469,11 +469,15 @@ function createReseed(drafts, { selectedSystem, selectedSystemId }) {
   };
 }
 
-function createCheckActivities(drafts, craftingCheckMode, { store, selectedSystemId, ...modes }) {
+function createCheckActivities(
+  drafts,
+  craftingCheckMode,
+  { store, selectedSystemId, salvageResolutionMode, gatheringResolutionMode }
+) {
   const slotNames = {
     crafting: craftingCheckMode,
-    salvage: modes.salvageResolutionMode,
-    gathering: modes.gatheringResolutionMode,
+    salvage: salvageResolutionMode,
+    gathering: gatheringResolutionMode,
   };
   return Object.fromEntries(
     ACTIVITIES.map((activity) => [
