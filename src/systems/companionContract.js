@@ -1,88 +1,35 @@
 /**
- * The vocabulary of `game.fabricate.api.companion` — Fabricate's named, versioned contract
- * for outbound BEHAVIOURAL consumption by a companion module (issue 1289).
- *
- * This module is deliberately a Foundry-free leaf: it reads no global, touches no document
- * and performs no I/O. It declares WHAT the contract is — its version, its member table,
- * its outcome tokens, the localization key each outcome answers with, and the two value
- * normalizers a member needs before it writes anything. The members themselves live where
- * their behaviour lives (`companionKnowledgeGrant.js`, `companionCheckRoll.js`,
- * `companionComponentAward.js`, `companionPooledHoldings.js`,
- * `companionPooledConsumption.js`, `currencyAffordance.js`) and the descriptor is assigned
- * onto the facade by `buildApiClasses` in `src/bootstrap/publicApi.js`.
- *
- * It sits under `src/systems/` rather than beside `src/ui/managerExtensions.js` because the
- * navigation seam is UI — route chrome pinned against a Svelte component — while this one is
- * behavioural, and because `src/systems/**` is ESLint- and Prettier-gated where `src/ui/**`
- * and `src/main.js` are not.
- *
- * ## The compatibility promise
- *
- * While {@link COMPANION_CONTRACT_SCHEMA_VERSION} is unchanged, every member of
- * {@link COMPANION_MEMBERS} keeps its name, keeps accepting the arguments documented for it,
- * and keeps answering in the documented shape. A member may gain an optional argument or an
- * additional result field; it may not lose one, change the meaning of one, or begin throwing
- * where it returned a result. A NEW member may be added without a version change, because
- * adding one cannot break a companion that does not call it. Removing a member, renaming one,
- * or narrowing what one accepts is a `schemaVersion` bump, announced in the release notes,
- * with the previous member retained as a deprecated delegate for at least one minor release.
- * NOTHING OUTSIDE THE DECLARED SET IS CONTRACT, however reachable it is.
- *
- * ## Two invariants, scoped to the `stable` tier
- *
- * A `stable` member NEVER THROWS: it refuses in the same result shape it succeeds in. A
- * member is called inside a GM's automation tick, after other side effects have committed,
- * where a throw aborts work mid-flight and surfaces as an unhandled rejection nothing
- * attributes to a caller. And `message` is ALWAYS a localization key — never free text — so
- * a caller can localize it; where a lower layer produces free text, the contract carries that
- * text in `messageData.detail` instead.
- *
- * A `handle` member promises only the accessor's name and that it answers the object
- * Fabricate itself uses (or `null` before readiness), and nothing about that object's method
- * surface beyond a declared carve-out.
+ * The vocabulary of `game.fabricate.api.companion`, Fabricate's versioned contract for
+ * behavioural consumption by a companion module (issue 1289). The compatibility promise is owned
+ * by `openspec/specs/companion-api/spec.md` and `docs/api/index.md` ("Companion Contract").
+ * A Foundry-free leaf: version, member table, outcome tokens, message keys and the normalizers a
+ * member needs. Members live with their behaviour; `buildApiClasses` in
+ * `src/bootstrap/publicApi.js` assigns the descriptor.
+ * While the schema version is unchanged a member keeps its name, arguments and answer shape; it
+ * may gain an optional argument or result field, and a new member needs no bump. Removing,
+ * renaming or narrowing one is a `schemaVersion` bump. Nothing outside the declared set is
+ * contract. A `stable` member never throws and its `message` is always a localization key (free
+ * text rides in `messageData.detail`); a `handle` member promises only the accessor's name and
+ * its `null`-before-readiness answer.
  */
 
 /**
- * The contract version. A companion reads this BEFORE calling any member and refuses a
- * version it does not understand.
- *
- * Readable from Fabricate's own `init` hook onward, and for the whole of `setup` and `ready`
- * — the descriptor is frozen data and needs no collaborator. It is NOT guaranteed readable
- * from ANOTHER package's `init`: Foundry dispatches `init` listeners in module-script
- * execution order, ordered by the `library` manifest flag and then world module-collection
- * order, and `relationships.requires` does not influence that order. A companion therefore
- * reads the version in `setup` or `ready`, and treats an absent `game.fabricate` as
- * "Fabricate has not loaded yet" — never as "this Fabricate has no contract", and never as a
- * trigger for a degraded path.
- *
- * @type {1}
+ * The contract version; a companion refuses one it does not understand. Readable from
+ * Fabricate's own `init` onward but not from another package's `init` (script execution order,
+ * see `.agents/docs/foundry-and-architecture.md`), so a companion reads it in `setup` or `ready`
+ * and treats an absent `game.fabricate` as not yet loaded.
  */
 export const COMPANION_CONTRACT_SCHEMA_VERSION = 1;
 
-/**
- * The two promise tiers a member is declared at. The record field is `promise`, not `tier`:
- * a bare "tier" belongs to the crafting domain's Outcome Tier vocabulary.
- *
- * `handle` is named for what it promises — a HANDLE on the object Fabricate itself uses —
- * rather than for the provenance of the accessor. `CraftingEngine` has hundreds of methods
- * and no reviewer can promise them all, so the honest promise is the accessor's name plus
- * its `null`-before-readiness answer.
- */
+/** Member promise tiers; the field is `promise`, since bare "tier" is the Outcome Tier term. */
 export const COMPANION_PROMISES = Object.freeze({
   stable: 'stable',
   handle: 'handle',
 });
 
 /**
- * WHERE a member is read from. A flat list of member names cannot resolve this set
- * uniformly, because two of the fourteen members are not facade functions: `schemaVersion` is a
- * number on the descriptor, and `findComponentItems` is a method on the object a `handle`
- * accessor RETURNS. Every row therefore declares its host and the path read off it, which is
- * what makes the member-resolution test mechanical rather than assumed.
- *
- * - `contract` — the frozen `game.fabricate.api.companion` descriptor itself.
- * - `facade` — the `game.fabricate` facade object.
- * - `craftingEngine` — the object `game.fabricate.getCraftingEngine()` answers.
+ * Where a member is read from: the `contract` descriptor, the `game.fabricate` `facade`, or the
+ * object `getCraftingEngine()` answers (`craftingEngine`).
  */
 export const COMPANION_MEMBER_HOSTS = Object.freeze({
   contract: 'contract',
@@ -90,29 +37,14 @@ export const COMPANION_MEMBER_HOSTS = Object.freeze({
   craftingEngine: 'craftingEngine',
 });
 
-/**
- * WHAT a member is, so a resolution assertion knows what to expect of the resolved value.
- *
- * `accessor` is a narrower `method`: it names exactly the four `handle` getters that answer
- * `null` before `initialize()` has run, which is a promise the contract makes and a test can
- * check as a set.
- */
+/** `accessor` narrows `method` to the four `handle` getters that answer `null` before init. */
 export const COMPANION_MEMBER_KINDS = Object.freeze({
   value: 'value',
   method: 'method',
   accessor: 'accessor',
 });
 
-/**
- * One member row.
- *
- * The single factory exists so the table below is fourteen TUPLES rather than fourteen repeated
- * frozen object literals: repeated near-identical literals are how a duplication block gets
- * reported, and a row that silently omits a field is invisible in that shape.
- *
- * @param {[string, string, string, string, string]} tuple `[name, host, path, promise, kind]`
- * @returns {Readonly<{name: string, host: string, path: string, promise: string, kind: string}>}
- */
+/** One frozen member row; the table below is fourteen TUPLES through this one factory. */
 function companionMember([name, host, path, promise, kind]) {
   return Object.freeze({ name, host, path, promise, kind });
 }
@@ -126,37 +58,13 @@ const { stable: STABLE, handle: HANDLE } = COMPANION_PROMISES;
 const { value: VALUE, method: METHOD, accessor: ACCESSOR } = COMPANION_MEMBER_KINDS;
 
 /**
- * The declared member set — the whole of the contract's surface, at exactly one promise tier
- * each.
- *
- * The members that WRITE are `grantRecipeKnowledge`, `awardComponents`, `creditCurrency` and
- * `consumePooledHoldings`; the rest read state, roll a check, settle one roll decision, or
- * hand back a collaborator —
- * which is why the contract is named for the companion rather than for any one of them. The
- * word AWARD is deliberately not used loosely here any more: **Component Award** is a bound
- * domain term naming what `awardComponents` does, so the knowledge grant is called a grant
- * and the coin credit is called a credit (issue 1301).
- *
- * `getCraftingEngine().findComponentItems` is named with its full deviations, because a
- * companion that guards only against a null actor still crashes: it takes DOCUMENTS, NOT
- * IDS; its third argument is a crafting-system OBJECT, not an id; and it THROWS on a null
- * actor AND on a null component, with only the system argument tolerant. It is still
- * declared, because a companion legitimately holds its answer — but it is NO LONGER the only
- * route to a stacking placement: `awardComponents` consumes this very method internally and
- * is the supported way to place a component on a sheet, so a companion that wants to place
- * one should call that instead of composing the write itself. Excluding this row would not
- * stop the call — only the deviation being written down.
- *
- * `consumePooledHoldings` is the first member that REMOVES value rather than placing it, and
- * its sibling `readPooledHoldings` is the first that answers over a SET of actors rather than
- * one. Both address their actors by UUID and not by id, because `game.actors.get()` cannot
- * distinguish an unlinked token actor from its world prototype — a tolerable ambiguity for a
- * member that GIVES, and a corrupting one for a member that DELETES (issue 1342).
- *
- * NEW ROWS ARE APPENDED, never interleaved (issue 1293). `getCraftingEngine().findComponentItems`
- * is named as "the eighth member" at four sites — twice in `tests/companion-facade.test.js`,
- * once in `tests/companion-contract.test.js`, and once HERE — and inserting a row above it would
- * falsify all four without any assertion noticing.
+ * The declared member set, one promise tier each; "award" is reserved for the Component Award.
+ * `getCraftingEngine().findComponentItems` takes documents, not ids, a system object as its
+ * third argument, and throws on a null actor or component; `awardComponents` is the supported
+ * placement route. The pooled pair address actors by UUID: `game.actors.get()` cannot tell an
+ * unlinked token actor from its prototype (issue 1342).
+ * New rows are appended, never interleaved (issue 1293): four sites, this one included, name
+ * `getCraftingEngine().findComponentItems` "the eighth member".
  */
 export const COMPANION_MEMBERS = Object.freeze(
   [
@@ -178,27 +86,14 @@ export const COMPANION_MEMBERS = Object.freeze(
 );
 
 /**
- * The outcome vocabulary, OPEN BY DECLARATION and CLOSED BY ENUMERATION.
- *
- * This set is complete for {@link COMPANION_CONTRACT_SCHEMA_VERSION}. A member may emit a
- * NEW outcome without a version bump; renaming or removing one is a bump. Callers MUST
- * branch on `success` first and treat an unrecognised `outcome` as a generic refusal — an
- * exhaustive `switch` is a caller bug, not a contract breach. Freezing the vocabulary shut
- * would make every new refusal path a major version, which is the wrong trade for a surface
- * whose whole purpose is to make refusals legible.
- *
- * Each token maps to itself so a caller reads
- * `result.outcome === COMPANION_OUTCOMES.alreadyKnown` rather than a bare string literal.
- * The authorization/readiness tokens are SHARED, but NOT uniformly: `gmOnly` and `notReady`
- * are answered by all EIGHT `stable` members that are METHODS — `schemaVersion` is a `stable`
- * VALUE and answers no outcome at all — while `noActor` is answered by the SEVEN of those that
- * target an actor: `resolveBulkCheckDecision` reads no actor and takes no `actorId`, so it can
- * never answer it. Each member answers with its OWN message key, because a failed grant
- * must not report itself in the words of a failed currency check.
+ * The outcome vocabulary, open by declaration and closed by enumeration: a member may emit a new
+ * outcome without a bump, renaming or removing one is a bump, and callers branch on `success`
+ * first and treat an unknown `outcome` as a generic refusal. Each token maps to itself.
+ * `gmOnly` and `notReady` are answered by all eight `stable` members that are methods, and
+ * `noActor` by the seven of those that target an actor (not `resolveBulkCheckDecision`).
  */
 export const COMPANION_OUTCOMES = Object.freeze({
-  // Shared by every `stable` member, in the gate order GM -> actor -> readiness. `noActor` is
-  // shared by the three ACTOR-TARGETED members only.
+  // Shared, in the gate order GM -> actor -> readiness.
   gmOnly: 'gmOnly',
   noActor: 'noActor',
   notReady: 'notReady',
@@ -222,10 +117,7 @@ export const COMPANION_OUTCOMES = Object.freeze({
   ladderInvalid: 'ladderInvalid',
   checkUnavailable: 'checkUnavailable',
 
-  // rollActorCheck (issue 1293). `checkPassed`/`checkFailed` carry the `check` prefix
-  // deliberately: a bare `failed` answering `success: true` is a trap, because `success: false`
-  // already means "failed" generically across the whole contract. The prefix says THE CHECK
-  // failed, not THE CALL.
+  // rollActorCheck (issue 1293). The `check` prefix says the check failed, not the call.
   checkPassed: 'checkPassed',
   checkFailed: 'checkFailed',
   rolled: 'rolled',
@@ -234,11 +126,7 @@ export const COMPANION_OUTCOMES = Object.freeze({
   noFormula: 'noFormula',
   invalidRollDecision: 'invalidRollDecision',
 
-  // Shared by rollActorCheck and resolveBulkCheckDecision: the call-site rule, which asks a
-  // different question from the authorization preamble and is therefore its own rule.
-  // `cancelled` is the shipped word for a dismissed roll prompt (`checkRoll.js` returns
-  // `cancelled: true`, both runners propagate it, and the canonical specs already use it);
-  // a second word for the shipped concept is how a caller ends up branching on both.
+  // Shared by the call-site members. `cancelled` is the shipped word for a dismissed roll prompt.
   cancelled: 'cancelled',
   invalidCallSite: 'invalidCallSite',
   notElected: 'notElected',
@@ -247,12 +135,8 @@ export const COMPANION_OUTCOMES = Object.freeze({
   decided: 'decided',
   nothingToDecide: 'nothingToDecide',
 
-  // awardComponents (issue 1301). `awarded` and `awardFailed` are answered at BOTH levels —
-  // by the call and by an individual placement — deliberately: minting a second word (`placed`)
-  // for the concept `awarded` already names is how a caller ends up branching on both, which is
-  // the reasoning recorded above for keeping the shipped word `cancelled`. The three tokens
-  // below them are ENTRY-LEVEL ONLY and can never be a call-level `outcome`; the list that says
-  // so as DATA is {@link COMPONENT_AWARD_ENTRY_OUTCOMES}.
+  // awardComponents (issue 1301). `awarded` and `awardFailed` answer at both levels; the rest are
+  // entry-level only (`COMPONENT_AWARD_ENTRY_OUTCOMES`).
   awarded: 'awarded',
   partiallyAwarded: 'partiallyAwarded',
   awardFailed: 'awardFailed',
@@ -261,36 +145,17 @@ export const COMPANION_OUTCOMES = Object.freeze({
   multiUnitUnsupported: 'multiUnitUnsupported',
   invalidAwards: 'invalidAwards',
 
-  // creditCurrency (issue 1301). FOUR outcomes carrying THREE values of `credited`: the amount
-  // for `credited`, a provable `0` for `creditNotConfigured`, and `null` for both `creditFailed`
-  // and `creditUnavailable` — which is the whole rule stated once, `0` MEANS FABRICATE CAN PROVE
-  // IT AND `null` MEANS IT CANNOT, with `outcome` carrying the distinction between the two
-  // unprovable answers. Nobody should mint a fourth value.
+  // creditCurrency (issue 1301). `credited` is the amount, a provable `0` (`creditNotConfigured`)
+  // or `null` (`creditFailed`, `creditUnavailable`): `0` means provable, `null` means not.
   credited: 'credited',
   creditFailed: 'creditFailed',
   creditUnavailable: 'creditUnavailable',
   creditNotConfigured: 'creditNotConfigured',
 
-  // readPooledHoldings (issue 1342). `read` and `readFailed` are answered at BOTH levels — by
-  // the call and by an individual cost reading — on the rule the award block above states:
-  // minting a second word for a concept an existing token already names is how a caller ends up
-  // branching on both. Everything below them is ENTRY-LEVEL ONLY and can never be a call-level
-  // `outcome`; the list that says so as DATA is {@link POOLED_HOLDINGS_READ_ENTRY_OUTCOMES}.
-  //
-  // Both members address actors by UUID and BOTH fail closed on a set that does not fully
-  // resolve, which is what keeps a consume drawing from the same set a read reported. The two
-  // refusals split on WHAT resolved: the shared preamble answers `noActor` when NOT ONE of the
-  // supplied UUIDs addresses an actor — the same word every other actor-targeted member answers
-  // — and `invalidActorUuids` covers the request itself, meaning an absent, empty or
-  // over-bound list, a non-string entry, or a list where SOME resolved and some did not.
-  // Reading a pool over fewer actors than the caller believes is the harm both refuse.
-  //
-  // The names were chosen against near-misses. `invalidActorUuids` is not `invalidPool`,
-  // because POOL already names a resource reservoir in this domain. `balanceNotConfigured` is
-  // not `poolingUnsupported`, because nothing about pooling is unsupported — a `macro` world
-  // with no `balance` macro cannot answer for ONE actor either. `invalidCostType` names a
-  // string that names no axis at all, and `costTypeUnsupported` a DECLARED axis this member
-  // does not serve; the difference is "you mistyped" against "not yet".
+  // readPooledHoldings (issue 1342). `read` and `readFailed` answer at both levels; the rest are
+  // reading-level only. Both pooled members fail closed on a set that does not fully resolve:
+  // `noActor` when none resolves, `invalidActorUuids` for a bad or partly resolved list.
+  // `costTypeUnsupported` is a declared axis not served; `invalidCostType` names no axis.
   read: 'read',
   readFailed: 'readFailed',
   balanceNotConfigured: 'balanceNotConfigured',
@@ -300,17 +165,9 @@ export const COMPANION_OUTCOMES = Object.freeze({
   invalidCosts: 'invalidCosts',
   invalidActorUuids: 'invalidActorUuids',
 
-  // consumePooledHoldings (issue 1342). `consumed`, `consumeFailed` and `insufficient` are
-  // answered at BOTH levels; `notAttempted` is entry-level only, and it is what every OTHER
-  // cost reports when one cost's shortfall refuses the whole call before anything is written.
-  //
-  // `insufficient` stays distinct from `notAffordable` because that one is in the successful
-  // set: a QUESTION answered no is a success, a REFUSED ACT is not. Two tokens are deliberately
-  // NOT minted. `costNotFound` would be a third spelling of the shipped `componentNotFound`
-  // and `unitNotFound`, so a cost naming nothing answers one of those — or `toolNotFound` for
-  // a tool. `partiallyConsumed` would name a state this design cannot reach: the take is
-  // all-or-nothing by construction, so no call could answer it, and the dead-vocabulary sweep
-  // would then demand a key table entry for a refusal no member can emit.
+  // consumePooledHoldings (issue 1342). `consumed`, `consumeFailed` and `insufficient` answer at
+  // both levels; `notAttempted` is row-only. `insufficient` is a refused act, unlike the successful
+  // `notAffordable`. The take is all-or-nothing, so there is no `partiallyConsumed`.
   consumed: 'consumed',
   consumeFailed: 'consumeFailed',
   insufficient: 'insufficient',
@@ -318,23 +175,10 @@ export const COMPANION_OUTCOMES = Object.freeze({
 });
 
 /**
- * WHERE a caller is calling from, which is a different question from WHO is calling.
- *
- * Required, with NO default: nothing in the request or the environment distinguishes a GM's
- * deliberate click from a synced `updateWorldTime` tick that fires on every connected client,
- * so a default would be a coin flip rather than a bad inference.
- *
- * - `gmAction` — a single-client, user-initiated GM action. Gated on `isGM` alone: there is
- *   no duplicate-execution risk, and requiring election would lock out the assistant GMs the
- *   surface already admits.
- * - `broadcast` — a handler that fires on EVERY connected client. Additionally gated on the
- *   elected executor, refusing `notElected` otherwise. The harm election prevents is not the
- *   duplicated dialog: N clients each roll N DIFFERENT totals and hand them to N companion
- *   instances, which then apply N sets of consequences Fabricate cannot see or reconcile.
- *
- * The declaration is the ONLY signal Fabricate has, and nothing in the environment can check
- * it — which is why an unrecognised or missing one is a first-class `invalidCallSite` REFUSAL
- * rather than a thrown `TypeError` a member that may never throw could not raise anyway.
+ * Where a caller calls from; required with no default, since nothing distinguishes a GM click
+ * from a synced tick firing on every client. `gmAction` is gated on `isGM` alone; `broadcast`
+ * also requires the elected executor (`notElected`), or N clients apply N different results.
+ * A missing or unknown value is an `invalidCallSite` refusal, never a throw.
  */
 export const COMPANION_CALL_SITES = Object.freeze({
   gmAction: 'gmAction',
@@ -342,67 +186,33 @@ export const COMPANION_CALL_SITES = Object.freeze({
 });
 
 /**
- * The outcomes that answer `success: true`.
- *
- * `alreadyKnown` is one of them deliberately. The caller is an automation tick that may
- * legitimately re-run, and `success: false` would make a correct re-run read as a failure;
- * the caller distinguishes GRANTED NOW from ALREADY KNEW by the OUTCOME, never by the
- * boolean. `notAffordable` is one of them for the same reason at the other member: the
- * question WAS answered, and the answer was no. `success: false` is reserved for "the
- * question could not be answered at all", which is what separates telling a player they are
- * short from telling a GM their currency ladder is broken.
+ * Outcomes that answer `success: true`: the question was answered or the act happened, so
+ * `alreadyKnown` and `notAffordable` are successes. `buildResult` also requires a message key,
+ * so an outcome omitted here silently answers `false`.
  */
 const SUCCESSFUL_OUTCOMES = Object.freeze([
   COMPANION_OUTCOMES.granted,
   COMPANION_OUTCOMES.alreadyKnown,
   COMPANION_OUTCOMES.affordable,
   COMPANION_OUTCOMES.notAffordable,
-  // A check that ROLLED answered the question, whichever way it landed — so all three rolled
-  // outcomes are successes and the caller reads `outcome` to learn what happened. FIVE tokens
-  // in this block, not three: `buildResult` computes `success` as membership of this list AND the
-  // presence of a message key, so omitting the two bulk outcomes would make both of
-  // `resolveBulkCheckDecision`'s answers silently report `success: false`.
+  // Every rolled outcome, plus both bulk-decision answers.
   COMPANION_OUTCOMES.checkPassed,
   COMPANION_OUTCOMES.checkFailed,
   COMPANION_OUTCOMES.rolled,
   COMPANION_OUTCOMES.decided,
-  // "There is nothing to prompt about" is a CORRECT answer, not a failure: asking a GM for a
-  // situational bonus for a batch in which nothing rolls is a dialog with no consequence.
   COMPANION_OUTCOMES.nothingToDecide,
-  // An award that placed SOME of what was asked is a success carrying a partial total, on the
-  // rule this list already states twice: the ACT happened. `awardFailed` is deliberately absent
-  // — an act that did not happen at all answers `false`, which is what separates it from
-  // `notAffordable`, a QUESTION answered no. Omitting any of these three from this list would
-  // make the member silently answer `success: false` for a write that landed, because
-  // `buildResult` computes `success` as membership here AND the presence of a message key
-  // (issue 1301).
+  // A partial award is an act that happened; `awardFailed` is absent.
   COMPANION_OUTCOMES.awarded,
   COMPANION_OUTCOMES.partiallyAwarded,
   COMPANION_OUTCOMES.credited,
-  // The pooled READ answered the question it was asked, and a `consumed` take is an ACT THAT
-  // HAPPENED — the two rules this list already states. `insufficient` is deliberately ABSENT:
-  // a pool short of a cost is a refused act rather than a question answered no, which is the
-  // line separating it from `notAffordable` above; `consumeFailed` is absent for the reason
-  // `awardFailed` is. Omitting `read` would make every successful reading answer
-  // `success: false`, because `buildResult` computes `success` as membership here AND the
-  // presence of a message key (issue 1342).
+  // `insufficient` and `consumeFailed` are absent: refused or failed acts (issue 1342).
   COMPANION_OUTCOMES.read,
   COMPANION_OUTCOMES.consumed,
 ]);
 
 /**
- * `grantRecipeKnowledge`'s outcome -> localization key table.
- *
- * The grant's keys are a `Grant` namespace beside the shipped `Reset` and `Manage` ones in
- * the Knowledge vocabulary. (Written without its dotted prefix on purpose: a partial key
- * literal in a comment is captured by the localization guards as a namespace BASE, and a
- * base declared by a comment is a reference nothing renders.)
- * `KnowledgeNotObservable` mints a NEW key rather than reusing `LearningDisabled`, because
- * the predicate it reports is no longer learn-mode: the GM is being told that granting would
- * change nothing a player can SEE, and its `messageData` carries the AUTHORED
- * `visibilityMode` and `resolutionMode` — read directly off the system, never the predicate's
- * internally resolved enum — so a GM reading a macro's output can see why in the words their
- * own system editor uses.
+ * `grantRecipeKnowledge`'s outcome -> key table. Comments name key namespaces without the dotted
+ * prefix: the localization guards capture a partial key literal as a namespace base.
  */
 export const KNOWLEDGE_GRANT_MESSAGE_KEYS = Object.freeze({
   [COMPANION_OUTCOMES.granted]: 'FABRICATE.Knowledge.Grant.Success',
@@ -418,13 +228,7 @@ export const KNOWLEDGE_GRANT_MESSAGE_KEYS = Object.freeze({
   [COMPANION_OUTCOMES.grantFailed]: 'FABRICATE.Knowledge.Grant.Failed',
 });
 
-/**
- * `checkAffordability`'s outcome -> localization key table.
- *
- * `LadderInvalid` and `CheckUnavailable` are the two strings that interpolate
- * `messageData.detail`, which is where the currency layer's FREE TEXT is carried so that
- * `message` stays a localization key. A caller of either MUST supply `detail`.
- */
+/** `checkAffordability`'s table; `LadderInvalid` and `CheckUnavailable` need `detail`. */
 export const AFFORDABILITY_MESSAGE_KEYS = Object.freeze({
   [COMPANION_OUTCOMES.affordable]: 'FABRICATE.Currency.Affordability.Affordable',
   [COMPANION_OUTCOMES.notAffordable]: 'FABRICATE.Currency.Affordability.NotAffordable',
@@ -439,24 +243,9 @@ export const AFFORDABILITY_MESSAGE_KEYS = Object.freeze({
 });
 
 /**
- * `rollActorCheck`'s outcome -> localization key table (issue 1293).
- *
- * The namespace is `Check.Roll.*` and NOT a `Companion` one. (Both written without their
- * dotted `FABRICATE.` prefix on purpose, following the shipped note on the grant's table: a
- * partial key literal in a comment is captured by the localization guards as a namespace BASE,
- * and a base declared only by a comment is a reference nothing renders.) Every top-level
- * namespace in `lang/en.json` names WHAT IT IS ABOUT — `Knowledge`, `Currency`, `Chat`,
- * `Gathering`, `Tool`, `System`, `Alchemy` — never WHO IS ASKING, and `grantRecipeKnowledge`
- * uses the `Knowledge.Grant.*` namespace for exactly that reason.
- *
- * `RollFailed` is the one string that interpolates `messageData.detail`, which is where the
- * runner's FREE TEXT is carried so that `message` stays a localization key. It is also this
- * member's generic refusal, so a caller degrading to it MUST supply `detail`.
- *
- * The three refusals the FACADE answers with — `gmOnly`, `noActor`, `notReady` — interpolate
- * NOTHING, and that is load-bearing rather than incidental: the delegator emits them before
- * it has resolved a label, so a placeholder here would put literal braces in front of a GM.
- * `InvalidCallSite` and `NotElected` are placeholder-free for the same reason.
+ * `rollActorCheck`'s table (issue 1293); namespaces name what they are about, never who asks.
+ * `RollFailed` is the generic refusal and needs `detail`. The facade refusals, `InvalidCallSite`
+ * and `NotElected` interpolate nothing: they are answered before a label exists.
  */
 export const CHECK_ROLL_MESSAGE_KEYS = Object.freeze({
   [COMPANION_OUTCOMES.checkPassed]: 'FABRICATE.Check.Roll.Passed',
@@ -475,32 +264,15 @@ export const CHECK_ROLL_MESSAGE_KEYS = Object.freeze({
 });
 
 /**
- * The DEFAULT display label a Standalone Check Roll rolls under when the caller supplies none.
- *
- * `buildInteractiveRollOptions` composes its chat flavor as `` `${activity} check${dcLabel}` ``
- * with no guard, so an omitted label would post "undefined check (DC 15)" to a GM's chat log.
- * The default must therefore be an ACTIVITY NOUN that composes with the literal word ` check`
- * the template appends — which is why it is not `Check`, a value that renders the grammatical
- * nonsense "Check check (DC 15)". **A translation of this key must not itself end in the word
- * "check".**
- *
- * The key and its English fallback travel together because the member that reads them is a
- * Foundry-free leaf: it resolves the pair through its injected `localize` seam rather than
- * touching `game.i18n` itself.
+ * The label a Standalone Check Roll uses when none is supplied. The chat flavor appends ` check`
+ * unguarded, so it is an activity noun; a translation must not itself end in "check".
  */
 export const CHECK_ROLL_DEFAULT_LABEL = Object.freeze({
   key: 'FABRICATE.Check.Roll.DefaultLabel',
   fallback: 'Fabricate',
 });
 
-/**
- * `resolveBulkCheckDecision`'s outcome -> localization key table (issue 1293).
- *
- * SEVEN entries, and the absence of `noActor` is the point: this member takes no `actorId`,
- * reads no actor and writes nothing, so it is GM-gated INLINE rather than through the shared
- * actor-targeted preamble and can never answer an actor refusal. A key here would be dead
- * vocabulary that a caller would nonetheless write a branch for.
- */
+/** `resolveBulkCheckDecision`'s table (issue 1293); no `noActor`, as it reads no actor. */
 export const BULK_CHECK_DECISION_MESSAGE_KEYS = Object.freeze({
   [COMPANION_OUTCOMES.decided]: 'FABRICATE.Check.BulkDecision.Decided',
   [COMPANION_OUTCOMES.nothingToDecide]: 'FABRICATE.Check.BulkDecision.NothingToDecide',
@@ -512,31 +284,14 @@ export const BULK_CHECK_DECISION_MESSAGE_KEYS = Object.freeze({
 });
 
 /**
- * The generic refusal `resolveBulkCheckDecision` degrades an UNDECLARED outcome to.
- *
- * Spelled outside the table on purpose. Every other member's generic refusal is one of its own
- * declared outcomes (`grantFailed`, `checkUnavailable`, `rollFailed`), but none of this
- * member's seven means "the decision could not be obtained": it rolls nothing, so `rollFailed`
- * would be a lie about a member that never rolls, and `cancelled` would report a malfunction
- * as "the GM declined" — the exact collapse the discriminator ladder exists to prevent.
- * Minting a thirteenth outcome to name a path no member can reach would enlarge a published
- * vocabulary for a case that is a programming error, so the STRING is provided without an
- * outcome to key it.
+ * The bulk decision's generic refusal, a string with no outcome: `rollFailed` would misdescribe a
+ * member that never rolls and `cancelled` would report a malfunction as a decline.
  */
 const BULK_CHECK_DECISION_FALLBACK_KEY = 'FABRICATE.Check.BulkDecision.Failed';
 
 /**
- * The outcomes an award ENTRY can answer with and a CALL never can (issue 1301).
- *
- * Declared as DATA rather than as prose because the split is asserted, not remembered. The
- * shipped dead-vocabulary sweep requires every declared outcome to appear as a key in SOME
- * member's key table, so these three have to sit in {@link COMPONENT_AWARD_MESSAGE_KEYS} even
- * though no call ever answers with one; the member's declared CALL-level set is therefore that
- * table's keys MINUS this list, computed rather than restated.
- *
- * The list is the ENTRY-ONLY tokens, not everything an entry can answer: `awarded` and
- * `awardFailed` are answered at both levels (see {@link COMPANION_OUTCOMES}), so an entry's
- * full vocabulary is this list PLUS those two.
+ * Entry-only award outcomes, as data (issue 1301): the dead-vocabulary sweep needs them in the
+ * key table, so the call-level set is that table's keys minus this list.
  */
 export const COMPONENT_AWARD_ENTRY_OUTCOMES = Object.freeze([
   COMPANION_OUTCOMES.componentNotFound,
@@ -545,29 +300,9 @@ export const COMPONENT_AWARD_ENTRY_OUTCOMES = Object.freeze([
 ]);
 
 /**
- * `awardComponents`' outcome -> localization key table (issue 1301).
- *
- * The namespace is `Component.Award.*` — a NEW top-level `Component` namespace, minted at
- * `lang/en.json`'s domain-noun tier beside `Knowledge`, `Currency`, `Check`, `Gathering`,
- * `Alchemy`, `Tool` and `System`, where a single-child namespace is entirely normal. (Written
- * without its dotted `FABRICATE.` prefix on purpose, following the shipped note on the grant's
- * table: a partial key literal in a comment is captured by the localization guards as a
- * namespace BASE, and a base declared only by a comment is a reference nothing renders.)
- * **Component** is the most central noun in `DOMAIN.md` and was the one member of that tier
- * with no namespace at all; a `Companion.*` namespace was rejected because it names the ASKER.
- *
- * The table is the UNION of the call-level and entry-level vocabularies, because every
- * placement carries its own `message` and because the dead-vocabulary sweep demands it.
- *
- * `InvalidAwards` is the one string that interpolates anything, and it interpolates the BOUND
- * rather than restating it, exactly as `GrantedByTooLong` does — so the string and
- * {@link AWARD_ENTRIES_MAX} cannot drift apart. `Awarded` and `Failed` are the two strings
- * answered at BOTH levels, so both are phrased to read as a statement about ONE placement —
- * which is what a caller records per entry — while staying true of a whole call. Every ENTRY-level key interpolates NOTHING,
- * and that is load-bearing rather than incidental: a placement carries no `messageData` at
- * all, so a placeholder there would put literal braces in front of a GM. The three refusals
- * the FACADE answers with — `gmOnly`, `noActor`, `notReady` — plus `InvalidCallSite` and
- * `NotElected` are placeholder-free for the shipped reason recorded on the check-roll table.
+ * `awardComponents`' table (issue 1301): the union of call- and entry-level vocabularies.
+ * `InvalidAwards` interpolates `max`; entry-level keys interpolate nothing, since a placement
+ * carries no `messageData`.
  */
 export const COMPONENT_AWARD_MESSAGE_KEYS = Object.freeze({
   [COMPANION_OUTCOMES.awarded]: 'FABRICATE.Component.Award.Awarded',
@@ -586,17 +321,8 @@ export const COMPONENT_AWARD_MESSAGE_KEYS = Object.freeze({
 });
 
 /**
- * `creditCurrency`'s outcome -> localization key table (issue 1301).
- *
- * A `Currency.Credit.*` sibling of the shipped `Currency.Affordability.*`, and NOT a reuse of
- * it: a failed credit must not report itself in the words of a failed check, which is the rule
- * every member's own table exists to keep.
- *
- * `LadderInvalid`, `CreditFailed`, `CreditUnavailable` and `CreditNotConfigured` are the four
- * strings that interpolate `messageData.detail`, which is where the currency layer's FREE TEXT
- * rides so that `message` stays a localization key; a caller of any of them MUST supply
- * `detail`. `Credited` interpolates the actor, the amount and the unit, on the shipped
- * `Affordability.Affordable` shape.
+ * `creditCurrency`'s table (issue 1301), apart from `Currency.Affordability` so a failed credit
+ * never speaks as a failed check. `LadderInvalid` and the three `Credit*` refusals need `detail`.
  */
 export const CURRENCY_CREDIT_MESSAGE_KEYS = Object.freeze({
   [COMPANION_OUTCOMES.credited]: 'FABRICATE.Currency.Credit.Credited',
@@ -615,18 +341,8 @@ export const CURRENCY_CREDIT_MESSAGE_KEYS = Object.freeze({
 });
 
 /**
- * The cost AXES a pooled request may name, published as symbols for the reason `callSites` is
- * (issue 1342).
- *
- * `type` is a required, no-default, refused-on-mismatch input a caller types by hand, and
- * `invalidCostType` is the whole of a typo's punishment — the argument the descriptor already
- * makes for `callSite`. Reading `POOLED_COST_TYPES.component` is what stops a caller shipping
- * `'components'`.
- *
- * WHICH axes a given member SERVES is that member's own behaviour and is not declared here:
- * the read serves all three, the consume serves components and currency, and a tool cost on
- * the consume answers `costTypeUnsupported` because tool WEAR is out of scope rather than
- * because `tool` is not an axis.
+ * The cost axes a pooled request may name, as symbols (issue 1342). Which a member serves is its
+ * own behaviour: the consume refuses a tool as `costTypeUnsupported`, as wear is out of scope.
  */
 export const POOLED_COST_TYPES = Object.freeze({
   component: 'component',
@@ -635,30 +351,14 @@ export const POOLED_COST_TYPES = Object.freeze({
 });
 
 /**
- * The axes this domain names that NO pooled member serves, declared as DATA so the two
- * refusals stay decidable.
- *
- * A caller asking for an essence or a tag cost has not mistyped anything: it has named a real
- * axis of a Fabricate requirement that these members do not read yet. That is
- * `costTypeUnsupported` — "not yet" — where a string naming no axis at all is
- * `invalidCostType` — "you mistyped". Collapsing the two would send an author looking for a
- * spelling mistake that is not there. They are deliberately NOT in {@link POOLED_COST_TYPES}:
- * that map is the set a caller may pass, and publishing a symbol for an axis every call
- * refuses would advertise a capability that does not exist.
+ * Real axes no pooled member serves (`costTypeUnsupported`, "not yet"), kept apart from a string
+ * naming no axis (`invalidCostType`) and out of `POOLED_COST_TYPES`, which a caller may pass.
  */
 export const POOLED_UNSERVED_COST_TYPES = Object.freeze(['essence', 'tag']);
 
 /**
- * The three states a required tool can be read in.
- *
- * This is the SHIPPED Required Tool Display State vocabulary — the same three words
- * `gatheringToolRuntime.js` and `GatheringEngine` already answer with — restated here as the
- * published form rather than as a fourth spelling of it.
- *
- * That vocabulary is DISPLAY-ONLY in its own home, and it never relaxes the start-attempt tool
- * gate. So a tool reading's `sufficient` is `state === 'present'` and NOTHING ELSE: a gate
- * built on the state token alone would admit a `damaged` tool, which is exactly what the
- * shipped gate refuses.
+ * The shipped Required Tool Display State vocabulary. It is display-only, so a reading's
+ * `sufficient` is `state === 'present'` alone: the start-attempt gate refuses a damaged tool.
  */
 export const POOLED_TOOL_STATES = Object.freeze({
   present: 'present',
@@ -670,20 +370,8 @@ export const POOLED_TOOL_STATES = Object.freeze({
 const POOLED_TOOL_STATE_TOKENS = Object.freeze(Object.values(POOLED_TOOL_STATES));
 
 /**
- * The outcomes a pooled READING can answer with and a CALL never can (issue 1342).
- *
- * Declared as DATA on {@link COMPONENT_AWARD_ENTRY_OUTCOMES}' precedent, so the member's
- * declared CALL-level set is its key table MINUS this list — computed rather than restated in
- * two places that can disagree.
- *
- * `balanceNotConfigured` belongs here and not at call level, and that placement IS its
- * behaviour: a `macro` world with no `balance` macro cannot answer a CURRENCY cost, and must
- * still answer every component and tool cost in the same request. It reports `available: null`
- * for its own reading and BLOCKS NOTHING.
- *
- * The list is the reading-ONLY tokens, not everything a reading can answer: `read` and
- * `readFailed` are answered at both levels, so a reading's full vocabulary is this list PLUS
- * those two.
+ * Reading-only outcomes, as data (issue 1342). `balanceNotConfigured` is reading-level on
+ * purpose: it answers `available: null` for a currency cost and blocks nothing else.
  */
 export const POOLED_HOLDINGS_READ_ENTRY_OUTCOMES = Object.freeze([
   COMPANION_OUTCOMES.componentNotFound,
@@ -696,29 +384,8 @@ export const POOLED_HOLDINGS_READ_ENTRY_OUTCOMES = Object.freeze([
 ]);
 
 /**
- * `readPooledHoldings`' outcome -> localization key table (issue 1342).
- *
- * The namespace is `Holdings.Read.*` — a NEW top-level `Holdings` namespace at
- * `lang/en.json`'s domain-noun tier beside `Knowledge`, `Currency`, `Component`, `Check`,
- * `Gathering`, `Alchemy`, `Tool` and `System`. (Written without its dotted prefix on purpose,
- * following the shipped note on the grant's table: a partial key literal in a comment is
- * captured by the localization guards as a namespace BASE, and a base declared only by a
- * comment is a reference nothing renders.) POOLED HOLDINGS is the bound term for one answer
- * over a combined supply, against BULK's many subjects settled serially.
- *
- * The table is the UNION of the call-level and reading-level vocabularies, because every
- * reading carries its own `message` and because the dead-vocabulary sweep demands it.
- *
- * `InvalidCosts` and `InvalidActorUuids` are the only two strings that interpolate anything,
- * and each interpolates its own BOUND as `max` rather than restating the number, exactly as
- * `InvalidAwards` does — so neither string can drift from {@link POOLED_COSTS_MAX} or
- * {@link POOLED_ACTORS_MAX}. Every READING-level key interpolates NOTHING, which is
- * load-bearing rather than incidental: a reading carries no `messageData` at all, so a
- * placeholder there would put literal braces in front of a GM. `Read` and `Failed` are the two
- * answered at BOTH levels, so both are phrased to read as a statement about ONE cost while
- * staying true of a whole call. The three refusals the FACADE answers with — `gmOnly`,
- * `noActor`, `notReady` — are placeholder-free for the shipped reason recorded on the
- * check-roll table.
+ * `readPooledHoldings`' table (issue 1342). `InvalidCosts` and `InvalidActorUuids` interpolate
+ * their bound as `max`; reading-level keys interpolate nothing.
  */
 export const POOLED_HOLDINGS_READ_MESSAGE_KEYS = Object.freeze({
   [COMPANION_OUTCOMES.read]: 'FABRICATE.Holdings.Read.Read',
@@ -738,20 +405,8 @@ export const POOLED_HOLDINGS_READ_MESSAGE_KEYS = Object.freeze({
 });
 
 /**
- * The outcomes a pooled LEDGER ROW can answer with and a CALL never can (issue 1342).
- *
- * `notAttempted` is why this list exists at all: when one cost's shortfall refuses the whole
- * call, every OTHER row reports `notAttempted` with `attempted: false` while the call answers
- * `insufficient`. A call could never answer `notAttempted` — "nothing was attempted" is not a
- * reason, it is the consequence of one.
- *
- * `systemNotFound` is a ROW answer here where `awardComponents` answers it at call level, and
- * that follows from the request shape rather than from a difference of opinion: the award
- * declares one `systemId` per call, while a downtime stage's requirements are mixed-system by
- * construction, so each cost carries its own.
- *
- * The list is the row-ONLY tokens: `consumed`, `consumeFailed` and `insufficient` are answered
- * at both levels, so a row's full vocabulary is this list PLUS those three.
+ * Row-only consume outcomes (issue 1342). `notAttempted` marks every other row when one shortfall
+ * refuses the call; `systemNotFound` is per row because each cost carries its own `systemId`.
  */
 export const POOLED_HOLDINGS_CONSUME_ENTRY_OUTCOMES = Object.freeze([
   COMPANION_OUTCOMES.notAttempted,
@@ -764,20 +419,8 @@ export const POOLED_HOLDINGS_CONSUME_ENTRY_OUTCOMES = Object.freeze([
 ]);
 
 /**
- * `consumePooledHoldings`' outcome -> localization key table (issue 1342).
- *
- * A `Holdings.Consume.*` sibling of `Holdings.Read.*` and NOT a reuse of it: a failed consume
- * must not report itself in the words of a failed read, which is the rule every member's own
- * table exists to keep — and it bites hardest between these two, because the pair is designed
- * to be called one after the other and a GM reading the second answer would have no way to
- * tell which call produced it.
- *
- * `CreditNotConfigured` is placeholder-free HERE where the shipped `Currency.Credit` sibling
- * interpolates `detail`, and that is the refusal's whole point: it is answered UP FRONT,
- * before any mechanism has run and before any free text exists, because a `macro` world with
- * no `increment` macro has published no way to give the coin back. `InvalidCosts` and
- * `InvalidActorUuids` interpolate their own bounds as `max`; everything else interpolates
- * nothing.
+ * `consumePooledHoldings`' table (issue 1342). `CreditNotConfigured` interpolates nothing: it is
+ * answered up front, when a `macro` world has no `increment` macro to give the coin back.
  */
 export const POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS = Object.freeze({
   [COMPANION_OUTCOMES.consumed]: 'FABRICATE.Holdings.Consume.Consumed',
@@ -801,89 +444,32 @@ export const POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS = Object.freeze({
 });
 
 /**
- * The two localization keys the GM Knowledge surface's GRANTED source rungs render.
- *
- * Declared beside the contract, and not only in the renderer, for the reason the navigation
- * seam declares its tone classes beside its tone list: the grant is what WRITES `granted`
- * and `grantedBy`, and a rung added without its string — or a string added without its rung
- * — should be a syntactically visible omission rather than a key that renders as a raw
- * dotted path.
- *
- * The wording holds the ladder's existing parallel rather than reading well alone. The
- * source line renders exactly one rung into one position, so a GM scanning a list reads
- * these beside the shipped "Learned by crafting" and "Learned from {source}":
- * `unlabelled` is the exact structural sibling of the former, and `labelled` extends it the
- * way the shipped book rung extends its own.
- *
- * The labelled rung interpolates `{grantedBy}`, NOT `{source}`, and the placeholder name is
- * the same argument that named the persisted field: `source*` on a learned entry already
- * means THE BOOK, and the labelled granted rung renders directly beside the book rung's
- * "Learned from {source}". Two adjacent keys interpolating the same `{source}` would tell a
- * translator that both name a book — reintroducing at the translator-facing surface exactly
- * the false provenance the field name evicted from the persisted shape. A placeholder can
- * only be renamed before it ships, because renaming one invalidates every translation of its
- * key.
- *
- * Neither rung asserts WHO granted the recipe. Not because the writer is unknown — the
- * facade member is GM-gated, so every entry FABRICATE writes was GM-authorised — but because
- * the flag is public: a third-party module can write `granted: true` directly without
- * passing that gate, and a surface may not assert an authorisation for a value it merely
- * reads.
+ * The GM Knowledge surface's two granted source rungs, declared beside the grant that writes
+ * `granted` and `grantedBy`. The labelled rung interpolates `{grantedBy}`, never `{source}`,
+ * which already means the book. Neither asserts who granted: the flag is public, so a third-party
+ * module can write `granted: true` without the GM gate.
  */
 export const GRANTED_SOURCE_MESSAGE_KEYS = Object.freeze({
   labelled: 'FABRICATE.Admin.Manager.Knowledge.LearnedByGrant',
   unlabelled: 'FABRICATE.Admin.Manager.Knowledge.LearnedByGrantUnlabelled',
 });
 
-/**
- * The longest `grantedBy` label the contract accepts, measured AFTER trimming.
- *
- * Bounded because the value is persisted onto a player-owned actor by a caller Fabricate
- * does not control, and rendered into a GM's list. The refusal string interpolates the limit
- * as `max`, so a caller answering `grantedByTooLong` supplies `{ max: GRANTED_BY_MAX_LENGTH }`
- * as its `messageData` rather than restating the number.
- */
+/** The longest trimmed `grantedBy`; persisted on a player actor, and interpolated as `max`. */
 export const GRANTED_BY_MAX_LENGTH = 64;
 
 /**
- * The longest `awards` list `awardComponents` accepts, counted in ENTRIES (issue 1301).
- *
- * Bounded because each entry is a Foundry document write, so an unbounded list is an unbounded
- * write batch driven by a caller Fabricate does not control. It starts bounded on
- * {@link GRANTED_BY_MAX_LENGTH}'s reasoning: WIDENING what a published member accepts is free
- * under the compatibility promise, and narrowing it is a `schemaVersion` bump — so the cheap
- * direction is the one that stays available.
- *
- * The refusal string interpolates this bound as `max` rather than restating the number, so a
- * caller answering `invalidAwards` supplies `{ max: AWARD_ENTRIES_MAX }` as its `messageData`.
+ * The longest `awards` list (issue 1301): each entry is a document write. Widening is free under
+ * the promise and narrowing is a bump, so it starts bounded; interpolated as `max`.
  */
 export const AWARD_ENTRIES_MAX = 64;
 
 /**
- * The longest `actorUuids` list either pooled member accepts, counted in ACTORS (issue 1342).
- *
- * Bounded on {@link AWARD_ENTRIES_MAX}' reasoning — widening what a published member accepts is
- * free under the compatibility promise and narrowing it is a `schemaVersion` bump, so the cheap
- * direction is the one that stays available — but bounded LOWER than it, because the work these
- * members do is the PRODUCT of the two bounds rather than either one: every cost is scanned
- * across every actor, and the consume then issues one batched write per actor that paid.
- *
- * The refusal string interpolates this bound as `max` rather than restating the number, so a
- * caller answering `invalidActorUuids` supplies `{ max: POOLED_ACTORS_MAX }` as its
- * `messageData`.
+ * The longest pooled `actorUuids` list (issue 1342), lower than `AWARD_ENTRIES_MAX` because the
+ * work is the product of this and `POOLED_COSTS_MAX`; interpolated as `max`.
  */
 export const POOLED_ACTORS_MAX = 32;
 
-/**
- * The longest `costs` list either pooled member accepts, counted in ENTRIES (issue 1342).
- *
- * The other half of the product described on {@link POOLED_ACTORS_MAX}, and bounded for the
- * same reason at the same number. A downtime stage names a handful of requirements; a list of
- * this length is already far past anything an activity describes.
- *
- * The refusal string interpolates this bound as `max`, so a caller answering `invalidCosts`
- * supplies `{ max: POOLED_COSTS_MAX }` as its `messageData`.
- */
+/** The longest pooled `costs` list, the other half of that product; interpolated as `max`. */
 export const POOLED_COSTS_MAX = 32;
 
 function buildResult(outcome, messageKeys, fallbackKey, messageData, extra) {
@@ -898,18 +484,7 @@ function buildResult(outcome, messageKeys, fallbackKey, messageData, extra) {
   return Object.freeze(result);
 }
 
-/**
- * Build `grantRecipeKnowledge`'s answer.
- *
- * An outcome this member does not declare is answered as a GENERIC REFUSAL carrying the
- * member's own failure string — the same rule the contract asks callers to apply to an
- * unrecognised outcome — rather than by throwing, because a `stable` member may not throw
- * and a `message` of `undefined` is not localizable.
- *
- * @param {string} outcome one of {@link COMPANION_OUTCOMES}
- * @param {object|null} [messageData] interpolation data for the localized message
- * @returns {Readonly<{success: boolean, outcome: string, message: string, messageData?: object}>}
- */
+/** Build the grant's answer; an undeclared outcome is a generic refusal, never a throw. */
 export function knowledgeGrantResult(outcome, messageData = null) {
   return buildResult(
     outcome,
@@ -921,19 +496,8 @@ export function knowledgeGrantResult(outcome, messageData = null) {
 }
 
 /**
- * Build `checkAffordability`'s answer.
- *
- * `affordable` is DERIVED from the outcome, never passed in: `true` for `affordable`,
- * `false` for `notAffordable`, and `null` for every refusal. That is what keeps "the actor
- * is short" and "the question could not be answered" from collapsing into the same
- * `affordable: false` — an unknown unit or a zero amount would otherwise read as a
- * confident no.
- *
- * @param {string} outcome one of {@link COMPANION_OUTCOMES}
- * @param {object|null} [messageData] interpolation data; carries `detail` for the two
- *   outcomes whose underlying failure is free text
- * @returns {Readonly<{success: boolean, affordable: boolean|null, outcome: string,
- *   message: string, messageData?: object}>}
+ * Build `checkAffordability`'s answer. `affordable` is derived: `true`, `false` for
+ * `notAffordable`, and `null` for every refusal, so "short" never reads as "unanswerable".
  */
 export function affordabilityResult(outcome, messageData = null) {
   let affordable = null;
@@ -948,11 +512,7 @@ export function affordabilityResult(outcome, messageData = null) {
   );
 }
 
-/**
- * The three outcomes that mean A DIE WAS ROLLED, and so the three that carry roll data.
- *
- * Every other outcome is a REFUSAL, and a refusal answers `total: null` / `diceGroups: []`.
- */
+/** The outcomes that rolled a die and carry roll data; a refusal answers `total: null`. */
 const ROLLED_OUTCOMES = Object.freeze([
   COMPANION_OUTCOMES.checkPassed,
   COMPANION_OUTCOMES.checkFailed,
@@ -960,38 +520,10 @@ const ROLLED_OUTCOMES = Object.freeze([
 ]);
 
 /**
- * Build `rollActorCheck`'s answer (issue 1293).
- *
- * Every answer field beyond `outcome`/`message` is DERIVED — from the outcome and from an
- * INTERNAL roll record the member builds — and none of them is overridable by a caller bag.
- * That is the shipped pattern rather than a new one: {@link affordabilityResult} derives
- * `affordable` from the outcome for the same reason. It matters more here than there, because
- * `buildResult` writes `success` BEFORE it spreads `extra`, so a caller-supplied bag reaching
- * the spread could override the computed `success` and not merely a derived scalar.
- *
- * - `passed` — `true` for `checkPassed`, `false` for `checkFailed`, and `null` for everything
- *   else INCLUDING the ungraded `rolled`: an ungraded roll is not graded, so it has no pass.
- * - `total` — the RAW roll total for the three rolled outcomes, `null` for every refusal
- *   (`engineUnavailable` and `noFormula` explicitly included). A legitimate rolled `0` answers
- *   `0` and never `null`, which is why the coalesce below is nullish rather than truthy: `null`
- *   is reserved for "no answer", and a caller must be able to tell a real zero from a refusal.
- *   It is ALWAYS the raw total and this member never forces an outcome — it passes `triggers:
- *   []` explicitly — so the runner's forced-award divergence is unreachable and a later change
- *   admitting triggers cannot silently redefine this field.
- * - `diceGroups` — the rolled groups, or `[]` on every refusal. A LIST, so its absence is
- *   empty; `null` would force every caller to guard a `.length` read. The scalars are `null`
- *   for the opposite reason: their absence is meaningful, and `0`/`false` would be a confident
- *   wrong answer.
- * - `resolvedFormula` — the `@`-resolved formula string, or `null`.
- *
- * @param {string} outcome one of {@link COMPANION_OUTCOMES}
- * @param {object|null} [messageData] interpolation data; carries `detail` for `rollFailed`,
- *   whose underlying failure is the runner's free text
- * @param {{total: number, diceGroups: Array<object>, resolvedFormula: string|null}|null} [roll]
- *   the member's INTERNAL record of what was rolled; ignored for every non-rolled outcome
- * @returns {Readonly<{success: boolean, passed: boolean|null, total: number|null,
- *   diceGroups: Array<object>, resolvedFormula: string|null, outcome: string, message: string,
- *   messageData?: object}>}
+ * Build `rollActorCheck`'s answer (issue 1293). Every field is derived from the outcome and the
+ * member's internal roll record, never a caller bag: `buildResult` writes `success` before it
+ * spreads `extra`. `passed` is `null` when ungraded; `total` is the raw total or `null` for a
+ * refusal (a rolled `0` stays `0`); `diceGroups` is `[]` on a refusal.
  */
 export function checkRollResult(outcome, messageData = null, roll = null) {
   const rolled = ROLLED_OUTCOMES.includes(outcome);
@@ -1012,36 +544,16 @@ export function checkRollResult(outcome, messageData = null, roll = null) {
   );
 }
 
-/**
- * The two outcomes for which a batch WAS assessed, and so the two that carry coverage.
- */
+/** The outcomes for which a batch was assessed, and so the two that carry coverage. */
 const ASSESSED_BULK_OUTCOMES = Object.freeze([
   COMPANION_OUTCOMES.decided,
   COMPANION_OUTCOMES.nothingToDecide,
 ]);
 
 /**
- * Build `resolveBulkCheckDecision`'s answer (issue 1293).
- *
- * Derived from the outcome and an INTERNAL decision record, on the same rule as
- * {@link checkRollResult}.
- *
- * - `decision` — the `{ bonus, rollMode, advantage }` the GM settled, and ONLY for `decided`.
- *   It carries no `confirmed` key: that flag is what `evaluateCheckRoll` reads as a
- *   cancellation, so carrying it through would turn every roll the caller then makes into one.
- * - `allowAdvantage` — whether Advantage was offered, for the two assessed outcomes; `null`
- *   for every refusal. `false` for `nothingToDecide` is a TRUE statement rather than a vacuous
- *   one: with no usable formula, no roll could have honoured Advantage.
- * - `covered` — the INDICES into the caller's own `formulas` array that the decision covers,
- *   and `[]` otherwise. Indices rather than formulas, because two subjects may share a formula
- *   and the caller must be able to map the answer back onto its own subjects.
- *
- * @param {string} outcome one of {@link COMPANION_OUTCOMES}
- * @param {object|null} [messageData] interpolation data for the localized message
- * @param {{choice: object|null, allowAdvantage: boolean, covered: number[]}|null} [decision]
- *   the member's INTERNAL decision record
- * @returns {Readonly<{success: boolean, decision: object|null, allowAdvantage: boolean|null,
- *   covered: number[], outcome: string, message: string, messageData?: object}>}
+ * Build `resolveBulkCheckDecision`'s answer (issue 1293), derived as `checkRollResult` is.
+ * `decision` is set only for `decided` and has no `confirmed` key, which the evaluator reads as
+ * a cancellation. `covered` holds indices into the caller's `formulas`, since formulas repeat.
  */
 export function bulkCheckDecisionResult(outcome, messageData = null, decision = null) {
   const assessed = ASSESSED_BULK_OUTCOMES.includes(outcome);
@@ -1061,30 +573,12 @@ export function bulkCheckDecisionResult(outcome, messageData = null, decision = 
   );
 }
 
-/**
- * Build one frozen placement record for {@link componentAwardResult}.
- *
- * `index` is the record's POSITION in the answer, taken from the map rather than from the
- * caller's entry, so it cannot disagree with where the record actually sits. `message` is
- * attached here rather than by the member: every entry carries a key from this member's own
- * table, so a caller records each placement without composing free text out of `outcome`,
- * which would invert the contract's "`message` is always a localization key" rule one level
- * down.
- *
- * @param {{componentId: *, requested: *, placed: number, stacked: boolean|null,
- *   outcome: string}} entry the member's INTERNAL record of one attempted placement
- * @param {number} index the entry's position in the caller's own `awards` list
- * @returns {Readonly<{index: number, componentId: *, requested: *, placed: number,
- *   stacked: boolean|null, outcome: string, message: string}>}
- */
+/** One frozen placement; `message` is this member's key, so no caller composes free text. */
 function componentAwardPlacement(entry, index) {
   const outcome = entry?.outcome;
   return Object.freeze({
     index,
-    // `componentId` and `requested` ECHO the caller's own entry, so a caller maps the answer
-    // back onto its request without having kept its own array. An absent value is `null` and
-    // never `undefined`: `undefined` is the one value a published field cannot carry, because
-    // it does not survive being written to a log or a flag.
+    // Echoes the caller's entry; absent is `null`, since `undefined` does not survive a log.
     componentId: entry?.componentId ?? null,
     requested: entry?.requested ?? null,
     placed: Number.isFinite(entry?.placed) ? entry.placed : 0,
@@ -1097,44 +591,14 @@ function componentAwardPlacement(entry, index) {
 }
 
 /**
- * Build `awardComponents`' answer (issue 1301).
- *
- * Derived from the outcome and an INTERNAL placement record, on the same rule as
- * {@link checkRollResult}: nothing here is overridable by a caller bag, which matters most on
- * a member that WRITES, and doubly so because `buildResult` writes `success` BEFORE it spreads
- * `extra`.
- *
- * - `placements` — one record per attempted entry, in the caller's own order. A LIST, so its
- *   absence is `[]`; `null` would force every caller to guard a `.length` read. `[]` means
- *   NOTHING WAS ATTEMPTED and a fully populated list beside `awardFailed` means everything was
- *   attempted and nothing landed — the same distinction `groupOutcomeRecord`'s `attempted`
- *   field draws in `currencyAffordance.js`.
- * - `awarded` — SUMMED from `placements[].placed` here, and never passed in. A caller-supplied
- *   total could disagree with the placements it accompanies and a reader would have no way to
- *   know which was right.
- *
- *   It is `null` for every pre-attempt refusal and `0` for `awardFailed`. **Read that beside
- *   `credited`, which is `0` for the same refusal class, and the two are not inconsistent:**
- *   `awarded` is a SUM OVER `placements[]`, so an empty attempt record makes the sum vacuous
- *   rather than zero, while `credited` has no companion structure to be vacuous over and falls
- *   to the pure provability rule (`0` when Fabricate can prove nothing moved).
- *
- * The whole answer is DEEP-frozen — the result, the array and every entry — because
- * `assertContractResult` checks `Object.isFrozen(result)` only, so a one-level freeze here
- * would publish a mutable log record with nothing failing.
- *
- * @param {string} outcome one of {@link COMPANION_OUTCOMES}
- * @param {object|null} [messageData] interpolation data; carries `max` for `invalidAwards`
- * @param {{placements: Array<object>}|null} [record] the member's INTERNAL placement record
- * @returns {Readonly<{success: boolean, awarded: number|null, placements: Array<object>,
- *   outcome: string, message: string, messageData?: object}>}
+ * Build `awardComponents`' answer (issue 1301), derived as `checkRollResult` is. `placements: []`
+ * means nothing was attempted. `awarded` is summed from `placements`: `null` before an attempt
+ * and `0` for `awardFailed`. Deep-frozen, as `assertContractResult` checks only the top level.
  */
 export function componentAwardResult(outcome, messageData = null, record = null) {
   const placements = Object.freeze(
     (Array.isArray(record?.placements) ? record.placements : []).map((entry, index) =>
-      // Called through an explicit arrow rather than passed by reference: `.map` supplies a
-      // THIRD argument, so a bare reference aligns this signature with `.map`'s only by
-      // accident, and a later parameter here would silently receive the whole array.
+      // An explicit arrow: `.map` passes a third argument a later parameter would receive.
       componentAwardPlacement(entry, index)
     )
   );
@@ -1154,13 +618,8 @@ export function componentAwardResult(outcome, messageData = null, record = null)
 }
 
 /**
- * The outcomes for which Fabricate can PROVE nothing was credited: `creditNotConfigured`, and
- * every refusal taken before any mechanism ran.
- *
- * It is the same set as the member's published ZERO-MUTATION retry set, and that is a property
- * rather than a coincidence: an answer Fabricate may promise mutated nothing is exactly an
- * answer whose `credited` it can state as `0`. The three absent tokens are the three under
- * which a mechanism ran — `credited`, `creditFailed` and `creditUnavailable`.
+ * Outcomes where Fabricate can prove nothing was credited, the member's zero-mutation retry set;
+ * `credited`, `creditFailed` and `creditUnavailable` ran a mechanism.
  */
 const PROVABLY_ZERO_CREDIT_OUTCOMES = Object.freeze([
   COMPANION_OUTCOMES.creditNotConfigured,
@@ -1176,31 +635,9 @@ const PROVABLY_ZERO_CREDIT_OUTCOMES = Object.freeze([
 ]);
 
 /**
- * Build `creditCurrency`'s answer (issue 1301).
- *
- * `credited` is DERIVED from the outcome and an INTERNAL credit record, never passed through
- * from the request — the {@link affordabilityResult} rule, on a member that moves money.
- * FOUR outcomes carry THREE values, and nobody should mint a fourth:
- *
- * - the AMOUNT for `credited`, which the member states only after it has OBSERVED the credit;
- * - `0` for every outcome in {@link PROVABLY_ZERO_CREDIT_OUTCOMES} — `creditNotConfigured` and
- *   every refusal taken before any mechanism ran;
- * - `null` for `creditFailed` and `creditUnavailable` alike, because in both a mechanism ran
- *   and Fabricate cannot prove what it did. Reporting `0` for `creditFailed` would state a
- *   third party's word as Fabricate's own proof, which is the collapse the shipped rule at
- *   {@link affordabilityResult} exists to prevent one member over.
- *
- * So `0` MEANS FABRICATE CAN PROVE IT and `null` MEANS IT CANNOT, with `outcome` carrying the
- * `creditFailed`/`creditUnavailable` distinction — one rule stated twice rather than two fields
- * that can disagree. An outcome this member does not declare falls to `null` for the same
- * reason: an unrecognised answer proves nothing.
- *
- * @param {string} outcome one of {@link COMPANION_OUTCOMES}
- * @param {object|null} [messageData] interpolation data; carries `detail` for the four outcomes
- *   whose underlying failure is free text
- * @param {{amount: number}|null} [credit] the member's INTERNAL record of what it observed
- * @returns {Readonly<{success: boolean, credited: number|null, outcome: string, message: string,
- *   messageData?: object}>}
+ * Build `creditCurrency`'s answer (issue 1301). `credited` is the observed amount for `credited`,
+ * `0` for a provably-zero outcome, and `null` for `creditFailed`, `creditUnavailable` or an
+ * undeclared outcome: `0` means Fabricate can prove it, `null` means it cannot.
  */
 export function currencyCreditResult(outcome, messageData = null, credit = null) {
   let credited = null;
@@ -1215,18 +652,7 @@ export function currencyCreditResult(outcome, messageData = null, credit = null)
   );
 }
 
-/**
- * The identity fields BOTH pooled per-entry builders echo back from the caller's own cost.
- *
- * Shared rather than written twice, because the two builders make the SAME promise about these
- * five fields — a caller maps an answer back onto its request without having kept its own array
- * — and two copies of that promise are two places for it to drift. An absent value is `null`
- * and never `undefined`: `undefined` is the one value a published field cannot carry, because
- * it does not survive being written to a log or a flag.
- *
- * @param {object|null} entry the member's INTERNAL record of one cost
- * @returns {{type: string|null, systemId: *, componentId: *, unitId: *, requested: number|null}}
- */
+/** The cost identity both pooled builders echo; absent is `null`, never `undefined`. */
 function pooledCostEcho(entry) {
   return {
     type: typeof entry?.type === 'string' ? entry.type : null,
@@ -1237,33 +663,14 @@ function pooledCostEcho(entry) {
   };
 }
 
-/**
- * Freeze a member's internal per-entry list into the published one.
- *
- * The builder is called through an explicit arrow rather than passed by reference, for the
- * reason recorded on {@link componentAwardResult}: `.map` supplies a THIRD argument, so a bare
- * reference aligns a builder's signature with `.map`'s only by accident.
- *
- * @param {*} list the member's INTERNAL list, or anything at all
- * @param {(entry: object, index: number) => object} build the per-entry builder
- * @returns {ReadonlyArray<object>}
- */
+/** Freeze an internal per-entry list, through an explicit arrow for `.map`'s third argument. */
 function frozenPooledEntries(list, build) {
   return Object.freeze(
     (Array.isArray(list) ? list : []).map((entry, index) => build(entry, index))
   );
 }
 
-/**
- * The RESOLVED actor set, echoed back frozen.
- *
- * Echoed at all because both members fail closed on an unresolvable UUID: a caller must be able
- * to see the exact set the answer was computed over, so that a consume it issues afterwards is
- * known to have drawn from the set the read reported rather than a quietly smaller one.
- *
- * @param {*} list the member's INTERNAL record of what resolved
- * @returns {ReadonlyArray<string>}
- */
+/** The resolved actor set, echoed so a caller sees exactly which set the answer covers. */
 function frozenActorUuids(list) {
   return Object.freeze(
     (Array.isArray(list) ? list : []).filter((uuid) => typeof uuid === 'string' && uuid !== '')
@@ -1271,32 +678,9 @@ function frozenActorUuids(list) {
 }
 
 /**
- * Build one frozen cost reading for {@link pooledHoldingsReadResult} (issue 1342).
- *
- * `index` is the record's POSITION in the answer, taken from the map rather than from the
- * caller's entry, so it cannot disagree with where the record actually sits — the
- * {@link componentAwardPlacement} rule. `message` is attached here rather than by the member,
- * so a caller records each reading without composing free text out of `outcome`.
- *
- * - `available` — the POOLED count across the resolved actors, or `null`. `0` MEANS FABRICATE
- *   CAN PROVE IT and `null` MEANS IT CANNOT: a currency reading in a `macro` world with no
- *   `balance` macro answers `null`, while a component nobody is carrying answers `0`. That is
- *   the shipped rule stated at {@link currencyCreditResult}, reused rather than re-derived, and
- *   nobody should mint a fourth value.
- * - `sufficient` — DERIVED from `available` against `requested`, and never passed in, on
- *   {@link affordabilityResult}'s rule. `null` wherever `available` is `null`, so "the pool is
- *   short" and "the pool could not be read" never collapse into the same confident `false`.
- * - A TOOL is the one exception, and it is the delta's own: `sufficient` is
- *   `state === 'present'` and NOTHING ELSE. `damaged` and `missing` both answer `false` even
- *   though a damaged tool is physically there, because the shipped tool gate refuses a damaged
- *   tool and a gate built on the state token alone would admit one.
- * - `ambiguous` — `true` when the cost's NAME matched a component in more than one crafting
- *   system. A strict boolean rather than a nullable one: `false` is a true statement about
- *   every reading that resolved, and about every refusal too.
- *
- * @param {object} entry the member's INTERNAL record of one reading
- * @param {number} index the entry's position in the caller's own `costs` list
- * @returns {Readonly<object>}
+ * One frozen cost reading (issue 1342). `available` is the pooled count, or `null` when it cannot
+ * be proven (a `macro` world with no `balance` macro). `sufficient` is derived from it, except a
+ * tool's: `state === 'present'` only. `ambiguous` flags a name matching in several systems.
  */
 function pooledHoldingsReading(entry, index) {
   const outcome = entry?.outcome;
@@ -1322,31 +706,9 @@ function pooledHoldingsReading(entry, index) {
 }
 
 /**
- * Build `readPooledHoldings`' answer (issue 1342).
- *
- * Derived from the outcome and an INTERNAL reading record, on the same rule as
- * {@link checkRollResult}: nothing here is overridable by a caller bag, which matters even on a
- * member that writes nothing, because `buildResult` writes `success` BEFORE it spreads `extra`.
- *
- * - `actorUuids` — the RESOLVED set, echoed. `[]` on every refusal.
- * - `readings` — one record per cost, in the caller's own order. A LIST, so its absence is `[]`;
- *   `null` would force every caller to guard a `.length` read.
- *
- * The whole answer is DEEP-frozen — the result, both arrays and every reading — because
- * `assertContractResult` checks `Object.isFrozen(result)` only, so a one-level freeze here would
- * publish a mutable record with nothing failing.
- *
- * **This answer is exact at read time and is NOT a reservation.** Nothing stops an item moving
- * between this call and a consume, so a caller that must not overdraw calls the consume and
- * reads ITS refusal rather than trusting a `sufficient` it read a moment ago.
- *
- * @param {string} outcome one of {@link COMPANION_OUTCOMES}
- * @param {object|null} [messageData] interpolation data; carries `max` for `invalidCosts` and
- *   for `invalidActorUuids`
- * @param {{actorUuids: string[], readings: Array<object>}|null} [record] the member's INTERNAL
- *   reading record
- * @returns {Readonly<{success: boolean, actorUuids: ReadonlyArray<string>,
- *   readings: ReadonlyArray<object>, outcome: string, message: string, messageData?: object}>}
+ * Build `readPooledHoldings`' answer (issue 1342), derived and deep-frozen as
+ * `componentAwardResult` is. Exact at read time but not a reservation: a caller that must not
+ * overdraw calls the consume and reads its refusal.
  */
 export function pooledHoldingsReadResult(outcome, messageData = null, record = null) {
   return buildResult(
@@ -1362,13 +724,8 @@ export function pooledHoldingsReadResult(outcome, messageData = null, record = n
 }
 
 /**
- * The two row outcomes under which a WRITE WAS ISSUED for that cost, and so the two that answer
- * `attempted: true`.
- *
- * Every other row answers `false`, INCLUDING the row whose own shortfall refused the call: a
- * pool short of a cost is refused before anything is written, so nothing was attempted there
- * either. Deriving `attempted` from this list rather than carrying it on the record is what
- * stops the flag disagreeing with the outcome beside it.
+ * The row outcomes under which a write was issued (`attempted: true`); a shortfall row is refused
+ * before any write.
  */
 const ATTEMPTED_CONSUME_OUTCOMES = Object.freeze([
   COMPANION_OUTCOMES.consumed,
@@ -1376,37 +733,10 @@ const ATTEMPTED_CONSUME_OUTCOMES = Object.freeze([
 ]);
 
 /**
- * Build one frozen take line — WHICH document on WHICH actor paid, and how much.
- *
- * `documentUuid` is `null` rather than absent for a currency take a game system settles as a
- * numeric property rather than as an item, which is the majority case: there is no document to
- * name, and `null` says so where `undefined` would not survive a log.
- *
- * ## `quantity` IS NOT IN THE UNIT THE CALLER ASKED IN, AND `unitId` IS WHY IT CAN BE READ ANYWAY
- *
- * A currency take is settled in the world's TERMINAL BASE UNIT for the over-charging reason
- * `consumePooledCurrency` states in full, while the ROW beside it echoes `requested` in the
- * caller's own denomination. So `quantity` and `requested` are two scales, and a companion that
- * printed one beside the other printed nonsense — this is exactly the defect these two fields
- * close (issue 1342).
- *
- * - `unitId` names the unit `quantity` is counted in; `null` on a COMPONENT take, which is a count
- *   of things and has no unit at all.
- * - `share` is that same amount decomposed down this world's ladder into whole coins — 15003 base
- *   units on a `gp -> sp -> cp` world reads `150 gp, 3 cp`. `[]` on a component take, and `[]` for
- *   an amount that decomposes to nothing.
- *
- * **BOTH ARMS ANSWER BOTH FIELDS**, which is the shape rule rather than an accident of the
- * currency arm being written second: a reader draws a take without first asking what kind of cost
- * produced it, and a component line that simply omitted them would make `take.unitId` mean
- * *component* on one row and *unreadable* on the next.
- *
- * `share` is DEEP-frozen, on the same rule the ledger's own `takes` is: a published array a caller
- * can push into is a published array a caller will eventually be found pushing into.
- *
- * @param {object} take the member's INTERNAL record of one document's contribution
- * @returns {Readonly<{actorUuid: string|null, documentUuid: string|null, quantity: number,
- *   unitId: string|null, share: ReadonlyArray<object>}>}
+ * One frozen take line: which document on which actor paid, and how much. `documentUuid` is
+ * `null` for a currency settled as an actor property. A currency `quantity` is in the world's
+ * terminal base unit, not the caller's denomination, so `unitId` names its unit and `share`
+ * decomposes it into whole coins; a component take answers `null` and `[]` (issue 1342).
  */
 function pooledConsumptionTake(take) {
   return Object.freeze({
@@ -1420,16 +750,7 @@ function pooledConsumptionTake(take) {
   });
 }
 
-/**
- * Build one frozen denomination line of a currency take's {@link pooledConsumptionTake} `share`.
- *
- * Normalised the way every other published leaf is, because this one crosses out of the currency
- * ladder's own arithmetic into a companion's chat card: a `unitLabel` is a string a GM authored on
- * a world currency unit, and an `amount` that is not a finite number is not a coin count.
- *
- * @param {object} entry
- * @returns {Readonly<{unitId: string|null, unitLabel: string, amount: number}>}
- */
+/** One frozen denomination line of a take's `share`, normalised for a companion's chat card. */
 function pooledConsumptionShare(entry) {
   return Object.freeze({
     unitId: typeof entry?.unitId === 'string' ? entry.unitId : null,
@@ -1438,21 +759,7 @@ function pooledConsumptionShare(entry) {
   });
 }
 
-/**
- * Build one frozen ledger row for {@link pooledHoldingsConsumeResult} (issue 1342).
- *
- * - `takes` — the per-document lines that paid this cost, DEEP-frozen. `[]` when nothing was
- *   taken, which is every refused row and every restored one.
- * - `consumed` — SUMMED from `takes`, never passed in. A carried total could disagree with the
- *   lines beside it and a reader would have no way to know which was right; summed, the ledger
- *   IS the total.
- * - `attempted` — DERIVED from the row's own outcome, so the flag and the token cannot
- *   contradict each other.
- *
- * @param {object} entry the member's INTERNAL record of one cost's settlement
- * @param {number} index the entry's position in the caller's own `costs` list
- * @returns {Readonly<object>}
- */
+/** One frozen ledger row: `consumed` is summed from `takes` and `attempted` is derived. */
 function pooledConsumptionRow(entry, index) {
   const outcome = entry?.outcome;
   const takes = Object.freeze(
@@ -1472,33 +779,10 @@ function pooledConsumptionRow(entry, index) {
 }
 
 /**
- * Build `consumePooledHoldings`' answer (issue 1342).
- *
- * Derived from the outcome and an INTERNAL ledger, on the same rule as
- * {@link componentAwardResult} — and the rule matters most here, on the one member that TAKES
- * value away rather than placing it.
- *
- * - `actorUuids` — the RESOLVED set the take drew from, echoed.
- * - `ledger` — one row per cost, in the caller's own order, naming which documents on which
- *   actors paid. `[]` means NOTHING WAS ATTEMPTED; a fully populated ledger beside
- *   `consumeFailed` means everything was attempted and the take was rolled back.
- * - `consumed` — SUMMED from the ledger's own rows, which are themselves summed from their
- *   takes, so one derivation rule reaches the published total and no two figures can disagree.
- *   It is `null` for every pre-attempt refusal, on {@link componentAwardResult}'s stated
- *   reasoning: the total is a SUM OVER the ledger, so an empty ledger makes it vacuous rather
- *   than provably zero.
- *
- * **This member is NOT idempotent.** Calling it twice takes twice, and there is no natural key
- * to absorb a repeat — which is why it declares a `callSite` and refuses `notElected` on every
- * client but the elected executor's. Not double-consuming is the caller's own obligation.
- *
- * @param {string} outcome one of {@link COMPANION_OUTCOMES}
- * @param {object|null} [messageData] interpolation data; carries `max` for `invalidCosts` and
- *   for `invalidActorUuids`
- * @param {{actorUuids: string[], ledger: Array<object>}|null} [record] the member's INTERNAL
- *   ledger
- * @returns {Readonly<{success: boolean, actorUuids: ReadonlyArray<string>, consumed: number|null,
- *   ledger: ReadonlyArray<object>, outcome: string, message: string, messageData?: object}>}
+ * Build `consumePooledHoldings`' answer (issue 1342), derived as `componentAwardResult` is.
+ * `ledger: []` means nothing was attempted; beside `consumeFailed` a full ledger means the take
+ * rolled back. `consumed` is summed from the rows, `null` before an attempt. Not idempotent: the
+ * caller owns not double-consuming.
  */
 export function pooledHoldingsConsumeResult(outcome, messageData = null, record = null) {
   const ledger = frozenPooledEntries(record?.ledger, pooledConsumptionRow);
@@ -1516,38 +800,17 @@ export function pooledHoldingsConsumeResult(outcome, messageData = null, record 
 }
 
 /**
- * The CALL-SITE rule, shared by every member that declares one and existing exactly ONCE.
- *
- * A second shared rule beside the authorization preamble, deliberately separate because it
- * answers a different question: the preamble asks WHO is calling, this asks WHERE FROM. It
- * runs AFTER the readiness refusal, because it is request validation and that is where every
- * other member's request validation sits (`invalidGrantedBy`, `invalidAmount`,
- * `invalidQuantity`).
- *
- * It lives HERE, in the Foundry-free leaf that already owns {@link COMPANION_CALL_SITES},
- * rather than in any one member's module: five members now gate on it, and the canonical
- * requirement is that the rule exists once. It is pure — the election arrives as a seam — so
- * this module stays a leaf, and a member that lifted its own copy would be free to drift on
- * exactly the question a write may not be wrong about (issue 1301, D13).
- *
- * `invalidCallSite` covers BOTH a missing and an unrecognised declaration: "not declared" is
- * wrong for the second, and a caller cannot fix what it is not told.
- *
- * @param {object|null} request the member's own request
- * @param {{isElectedExecutor: () => boolean}} seams
- * @returns {string|null} the refusal outcome, or `null` when the call site is admitted
+ * The call-site rule, existing once for every member that declares one (issue 1301, D13): pure,
+ * with election as a seam, run after the readiness refusal. `invalidCallSite` covers a missing
+ * and an unrecognised value alike.
  */
 export function gateCompanionCallSite(request, seams) {
   const callSite = request?.callSite;
   if (callSite !== COMPANION_CALL_SITES.gmAction && callSite !== COMPANION_CALL_SITES.broadcast) {
     return COMPANION_OUTCOMES.invalidCallSite;
   }
-  // A broadcast handler fires on EVERY connected client. Without this, N clients each roll N
-  // DIFFERENT totals and return them to N companion instances, which then apply N sets of
-  // consequences Fabricate can neither see nor reconcile — and on a member that WRITES it is N
-  // writes of N units each, applied to a player's sheet, with no natural key to absorb the
-  // repeats. The election admits assistant GMs and prefers a full GM only when one is
-  // connected, so a sole connected assistant IS elected.
+  // Without election, N clients apply N different results. The election admits assistant GMs and
+  // prefers a full GM only when one is connected.
   if (callSite === COMPANION_CALL_SITES.broadcast && seams.isElectedExecutor() !== true) {
     return COMPANION_OUTCOMES.notElected;
   }
@@ -1555,23 +818,9 @@ export function gateCompanionCallSite(request, seams) {
 }
 
 /**
- * Resolve ONE address, treating a resolver that THROWS as an address that answered nothing.
- *
- * A `stable` member may not throw, and the resolver is a Foundry global a caller's own world
- * hands in: an address it cannot parse must become one unresolvable actor — which the rule below
- * then refuses on — rather than an exception escaping a member that publishes "never throws".
- * It is logged rather than swallowed, because a resolver that throws on a WELL-FORMED address is
- * a defect and a silent `null` would report it as an empty party.
- *
- * The throw is REAL and not defensive: `fromUuidSync` raises on a pack-sourced EMBEDDED address
- * (`Compendium.<pack>.Actor.<id>.Item.<id>`), because its `strict` parameter defaults to `true`
- * on both v13.350 and v14.365 and such an address cannot be resolved synchronously. A companion
- * assembling addresses from its own data can hold one, and it must become a refusal here rather
- * than an exception out of a member that publishes "never throws".
- *
- * @param {string} uuid one caller address, already known to be a non-empty string
- * @param {{resolveActor: (uuid: string) => object|null}} seams
- * @returns {object|null}
+ * Resolve one address, logging a throw and answering `null` so a `stable` member never throws.
+ * `fromUuidSync` raises on a pack-sourced embedded address: `strict` defaults to `true` on
+ * V13.350 and V14.365.
  */
 function resolveOnePooledActor(uuid, seams) {
   try {
@@ -1583,55 +832,12 @@ function resolveOnePooledActor(uuid, seams) {
 }
 
 /**
- * The ACTOR-SET rule BOTH pooled members apply, existing exactly ONCE (issue 1342).
- *
- * A sibling of {@link gateCompanionCallSite}, here for that rule's stated reason: the canonical
- * requirement is that the rule exists once, it is pure — the resolver arrives as a seam — and a
- * member that lifted its own copy would be free to drift on the one question a member that
- * DELETES may not be wrong about. It also sits beside the vocabulary comment that already
- * describes this split, so the rule and its reasoning cannot come to live in two files.
- *
- * The GM half is deliberately NOT here. Reading `game.user` is the facade's, and the facade calls
- * this only once that gate has passed — which is what keeps this module a Foundry-free leaf.
- *
- * The split is on WHAT RESOLVED, and both halves fail closed:
- *
- * - `noActor` when NOT ONE of the supplied addresses answers — the same word every other
- *   actor-targeted member answers, said about a set;
- * - `invalidActorUuids` when the REQUEST itself is wrong: absent, empty, longer than
- *   {@link POOLED_ACTORS_MAX}, carrying anything that is not a non-empty string, only PARTLY
- *   resolved, or resolving to the SAME DOCUMENT TWICE.
- *
- * A partly resolved list is the request being wrong rather than the world being empty, and that
- * placement is the whole point: pooling over fewer actors than the caller believes is the harm
- * both members refuse, because a consume would then draw from a different set than the read
- * reported.
- *
- * ## A repeated document is the SAME harm, from the other direction
- *
- * A pool is a SET, and every consumer downstream sums per entry: the read flat-maps each entry's
- * items into the candidate order and sums its coin, and the consume drains that same order. So a
- * document that appears twice is counted twice — a party holding one stack of five reads as
- * holding ten, and a take of eight then plans five from the stack AND three from the same stack,
- * writes the reduction, deletes the emptied document and publishes `consumed: 8` for five units
- * that left a sheet. Nothing fails, so nothing rolls back. That is the permissive direction, on
- * the member that DELETES.
- *
- * It is not a hypothetical caller error either. `fromUuidSync` resolves a LINKED token's actor
- * address and its world actor address to the IDENTICAL document (`Token#actor` returns
- * `this.baseActor` when `isLinked`), so two well-formed, visibly different addresses legitimately
- * name one pool — and the ordering rule this API publishes ("the caller's order IS the allocation
- * policy") actively invites prepending the acting character to a party list.
- *
- * Distinctness is by object IDENTITY and never by `id`, and that distinction is load-bearing in
- * the opposite direction: an UNLINKED token's synthetic actor is a DIFFERENT document carrying
- * the SAME `id` as its base actor (`ActorDelta#applyDelta` builds it from `baseActor.toObject()`
- * with `_id` deleted), and those two are genuinely different pools. An `id`-keyed test would
- * collapse them and refuse a legitimate party.
- *
- * @param {*} actorUuids the caller's own list of addresses
- * @param {{resolveActor: (uuid: string) => object|null}} seams
- * @returns {{actors: Array<object>|null, outcome: string|null, messageData: object|null}}
+ * The actor-set rule both pooled members apply, once (issue 1342); the facade owns the GM gate.
+ * Both halves fail closed: `noActor` when no address resolves, `invalidActorUuids` when the list
+ * is absent, empty, over `POOLED_ACTORS_MAX`, non-string, partly resolved, or names one document
+ * twice. Duplicates are tested by object identity, never `id`: a linked token's actor and its
+ * world actor resolve to one document (double-counting a stack), while an unlinked token's
+ * synthetic actor shares its base actor's `id` yet is a distinct pool (`ActorDelta#applyDelta`).
  */
 export function gatePooledActorUuids(actorUuids, seams) {
   const wanted = Array.isArray(actorUuids) ? actorUuids : [];
@@ -1657,25 +863,9 @@ export function gatePooledActorUuids(actorUuids, seams) {
 }
 
 /**
- * Normalize a caller-supplied `grantedBy` label, REFUSING rather than coercing.
- *
- * The field is `grantedBy` and not `source` because `source*` on a learned entry already
- * means THE BOOK (`sourceItemUuid`, `sourceOwned`, `sourceItemName`, `sourceDefinitionName`,
- * `sourceCapped`, `sourceKind`, `sourceName`); a bare `source` beside those would read as a
- * sixth book-provenance field, which is the false provenance this contract exists to remove.
- *
- * Omitted or `null` is ACCEPTED as `null` — a caller with nothing meaningful to say must not
- * be pushed into passing its own module id to satisfy a validator, which would fill a GM's
- * audit pane with noise. A string is trimmed, and an empty result is `null`.
- *
- * Everything else is REFUSED. Truncating an over-long label is refused deliberately: a
- * truncated module id names a DIFFERENT module, which is the same class of lie as silently
- * coercing an object. A non-string is refused rather than stringified for the same reason —
- * and note that the entry-boundary reader excludes ARRAYS from its nested-record test, so an
- * array that reached the flag would survive into an entry view rather than being dropped.
- *
- * @param {*} value the caller's `grantedBy`
- * @returns {Readonly<{ok: true, value: string|null}>|Readonly<{ok: false, outcome: string}>}
+ * Normalize `grantedBy`, refusing rather than coercing; `source*` already means the book. Absent
+ * or blank is `null`; a non-string or over-long label is refused, as truncation names another
+ * module.
  */
 export function normalizeGrantedBy(value) {
   if (value === undefined || value === null) return Object.freeze({ ok: true, value: null });
@@ -1691,17 +881,8 @@ export function normalizeGrantedBy(value) {
 }
 
 /**
- * The descriptor published as `game.fabricate.api.companion`, beside the shipped
- * `api.HOOKS`.
- *
- * Frozen data assembled at module load, so `bindFabricateGlobal` assigns it and nothing
- * more, and so its version is readable before any collaborator exists.
- *
- * `callSites` is published for the same stated reason `outcomes` is: a caller should be able
- * to read a SYMBOL rather than write a bare string. It matters more here than there, because
- * `callSite` is the one REQUIRED, no-default, refused-on-mismatch input the contract has —
- * `invalidCallSite` is the whole of a typo's punishment, and nothing else tells the author
- * they mistyped a literal they were instructed to write by hand.
+ * The frozen descriptor published as `game.fabricate.api.companion`, readable before any
+ * collaborator exists; `callSites` gives the required `callSite` a symbol.
  */
 export const COMPANION_CONTRACT = Object.freeze({
   schemaVersion: COMPANION_CONTRACT_SCHEMA_VERSION,
