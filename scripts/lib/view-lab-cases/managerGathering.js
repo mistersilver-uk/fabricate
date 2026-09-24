@@ -300,8 +300,9 @@ export const CASES = Object.freeze([
         ),
         kinds: ['manager', 'environments', 'responsive'],
         sourceMatches: [
-          // One dirty-draft frame per editor stands for the route model (issue 1721).
-          ...(suffix === 'normal' && !tools ? [GATHERING_ROUTE_MODEL_PATTERN] : []),
+          // One dirty-draft frame per editor stands for the route model, and the Required Tools
+          // frame for the task's tool-reference handlers (issue 1721).
+          ...(suffix === 'normal' ? [GATHERING_ROUTE_MODEL_PATTERN] : []),
           /^src\/ui\/svelte\/apps\/manager\/Gathering(TaskEditView|EventEditView)\.svelte$/,
         ],
       });
@@ -444,6 +445,8 @@ export const CASES = Object.freeze([
       '.fabricate-manager .manager-travel-popover [data-gathering-task-availability-option="biomes"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      // The biome options are the modifier handlers' vocabulary read (issue 1721).
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(EventEditView|TaskEditView)\.svelte$/,
       ...ANCHORED_POPOVER_SOURCES,
     ],
@@ -580,6 +583,8 @@ export const CASES = Object.freeze([
     expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      // The danger levels are the modifier handlers' vocabulary read (issue 1721).
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/environment\/EnvironmentOverviewTab\.svelte$/,
       ...ANCHORED_POPOVER_SOURCES,
     ],

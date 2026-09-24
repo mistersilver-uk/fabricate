@@ -118,17 +118,17 @@
   } from './checks/checksNav.js';
   import { createChecksRouteModel } from './checks/checksRouteModel.svelte.js';
   import { createGatheringRouteModel } from './gatheringRouteModel.svelte.js';
+  import { createGatheringDraftHandlers } from './gatheringDraftHandlers.svelte.js';
+  import { createGatheringModifierHandlers } from './gatheringModifierHandlers.svelte.js';
   import {
     gatheringDropCountValue,
     gatheringDropRateTierClass,
     gatheringDropRateTierColor,
     gatheringDropRateValue,
     gatheringModifierDisplayValue,
-    gatheringModifierSignedValue,
     gatheringModifierValueClass,
     gatheringTaskDropRows,
     gatheringTaskImage,
-    gatheringVocabularyValues,
     signedToOperatorValue,
     sortedDangerTags,
     truncateDescription,
@@ -423,6 +423,29 @@
     canShowEnvironments: () => canShowEnvironments,
     isGatheringRoute: () => isGatheringRoute,
     navRail: () => navRail,
+    text,
+  });
+  // The gathering workspace's library, draft and drop writes (issue 1721).
+  const drafts = createGatheringDraftHandlers({
+    store: () => store,
+    services: () => services,
+    gathering,
+    navRail: () => navRail,
+    selectedSystemId: () => selectedSystemId,
+    canShowEnvironments: () => canShowEnvironments,
+    isPromise,
+    afterTruthyResult,
+    confirmRouteExit,
+    setActiveView: (view) => {
+      activeView = view;
+    },
+    text,
+  });
+  // The Modifier Library references and condition modifiers a drop or an event carries.
+  const modifiers = createGatheringModifierHandlers({
+    gathering,
+    drafts,
+    selectedSystemModifiers: () => selectedSystemModifiers,
     text,
   });
   const canShowEnvironments = $derived(selectedSystem?.features?.gathering === true);
@@ -820,280 +843,11 @@
     await store.clearCurrencyMacro(key);
   }
 
-  function characterModifierLibraryEntry(modifierId) {
-    if (!modifierId) return null;
-    return selectedSystemModifiers.find((entry) => entry.id === modifierId) || null;
-  }
-
-  function characterModifierLabelForRef(ref) {
-    const entry = characterModifierLibraryEntry(ref?.modifierId);
-    if (entry) return entry.label || entry.id;
-    return text(
-      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.UnknownModifier',
-      'Unknown modifier ({id})'
-    ).replace('{id}', ref?.modifierId || '');
-  }
-
-  function characterModifierIconForRef(ref) {
-    return characterModifierLibraryEntry(ref?.modifierId)?.icon || 'fa-solid fa-user';
-  }
-
-  function characterModifierIsCustomized(ref) {
-    if (!ref) return false;
-    return Boolean(ref.expressionOverride);
-  }
-
-  function rowCharacterModifiers(row) {
-    return Array.isArray(row?.characterModifiers) ? row.characterModifiers : [];
-  }
-
-  async function onAddDropCharacterModifier(rowId, modifierId = null) {
-    if (!gathering.editingGatheringTask?.id || !rowId) return;
-    const id = modifierId ?? selectedSystemModifiers[0]?.id ?? '';
-    if (!id) return;
-    const rows = gatheringTaskDropRows(gathering.editingGatheringTask);
-    const row = rows.find((entry) => entry.id === rowId);
-    if (!row) return;
-    const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
-    const newRef = {
-      id: `char-mod-${id}-${refs.length + 1}-${Math.random().toString(36).slice(2, 6)}`,
-      modifierId: id,
-      operator: '+',
-      min: null,
-      max: null,
-      expressionOverride: '',
-    };
-    updateGatheringTaskDrop(rowId, { characterModifiers: [...refs, newRef] });
-  }
-
-  let characterModifierSearchTerm = $state('');
-  const characterModifierSearchSuggestions = $derived.by(() => {
-    const term = characterModifierSearchTerm.trim().toLowerCase();
-    if (!term) return [];
-    const attached = new Set(
-      (gathering.selectedGatheringDrop?.characterModifiers || [])
-        .map((ref) => ref.modifierId)
-        .filter(Boolean)
-    );
-    return selectedSystemModifiers.filter((entry) => {
-      if (attached.has(entry.id)) return false;
-      const label = String(entry.label || '').toLowerCase();
-      const id = String(entry.id || '').toLowerCase();
-      return label.includes(term) || id.includes(term);
-    });
-  });
-  $effect(() => {
-    if (gathering.selectedGatheringDrop?.id) {
-      characterModifierSearchTerm = '';
-    }
-  });
-
-  const eventCharacterModifierSearchSuggestions = $derived.by(() => {
-    const term = characterModifierSearchTerm.trim().toLowerCase();
-    if (!term) return [];
-    const attached = new Set(
-      (gathering.editingGatheringEvent?.characterModifiers || [])
-        .map((ref) => ref.modifierId)
-        .filter(Boolean)
-    );
-    return selectedSystemModifiers.filter((entry) => {
-      if (attached.has(entry.id)) return false;
-      const label = String(entry.label || '').toLowerCase();
-      const id = String(entry.id || '').toLowerCase();
-      return label.includes(term) || id.includes(term);
-    });
-  });
-  $effect(() => {
-    if (gathering.editingGatheringEvent?.id) {
-      characterModifierSearchTerm = '';
-    }
-  });
-
-  let characterModifierSearchAnchor = $state(null);
-  let characterModifierSearchOpenUp = $state(false);
-
-  function characterModifierSearchClippingBounds(node) {
-    const documentRef = globalThis.document;
-    const windowRef = globalThis.window || globalThis;
-    const viewportTop = 0;
-    const viewportBottom =
-      Number(globalThis.innerHeight || windowRef.innerHeight) ||
-      documentRef?.documentElement?.clientHeight ||
-      0;
-    let parent = node?.parentElement;
-    while (parent && parent !== documentRef?.documentElement) {
-      const style = globalThis.getComputedStyle?.(parent);
-      const overflow = `${style?.overflow || ''} ${style?.overflowY || ''} ${style?.overflowX || ''}`;
-      if (/(auto|scroll|hidden|clip)/.test(overflow)) {
-        const rect = parent.getBoundingClientRect?.();
-        if (rect) {
-          return {
-            top: Math.max(viewportTop, rect.top),
-            bottom: Math.min(viewportBottom || rect.bottom, rect.bottom),
-          };
-        }
-      }
-      parent = parent.parentElement;
-    }
-    return { top: viewportTop, bottom: viewportBottom };
-  }
-
-  function updateCharacterModifierSearchDirection() {
-    const node = characterModifierSearchAnchor;
-    const rect = node?.getBoundingClientRect?.();
-    if (!rect) {
-      characterModifierSearchOpenUp = false;
-      return;
-    }
-    const bounds = characterModifierSearchClippingBounds(node);
-    const spaceBelow = bounds.bottom - rect.bottom;
-    const spaceAbove = rect.top - bounds.top;
-    const openUpThreshold = 160;
-    characterModifierSearchOpenUp = spaceBelow < openUpThreshold && spaceAbove > spaceBelow;
-  }
-
-  $effect(() => {
-    if (characterModifierSearchSuggestions.length === 0) {
-      characterModifierSearchOpenUp = false;
-      return;
-    }
-    updateCharacterModifierSearchDirection();
-  });
-
-  async function pickCharacterModifierForRow(rowId, modifierId) {
-    characterModifierSearchTerm = '';
-    await onAddDropCharacterModifier(rowId, modifierId);
-  }
-
-  function characterModifierOperatorClass(operator) {
-    return operator === '-' ? 'is-negative' : 'is-positive';
-  }
-
-  let gatheringTimeOfDayPickerSelection = $state('');
-  let gatheringWeatherPickerSelection = $state('');
-  let gatheringBiomePickerSelection = $state('');
-  $effect(() => {
-    const biomeAvailable = gatheringConditionAvailableOptions(
-      gathering.selectedGatheringDrop,
-      'biome'
-    );
-    if (!biomeAvailable.some((option) => option.id === gatheringBiomePickerSelection)) {
-      gatheringBiomePickerSelection = biomeAvailable[0]?.id || '';
-    }
-    const timeAvailable = gatheringConditionAvailableOptions(
-      gathering.selectedGatheringDrop,
-      'timeOfDay'
-    );
-    if (!timeAvailable.some((option) => option.id === gatheringTimeOfDayPickerSelection)) {
-      gatheringTimeOfDayPickerSelection = timeAvailable[0]?.id || '';
-    }
-    const weatherAvailable = gatheringConditionAvailableOptions(
-      gathering.selectedGatheringDrop,
-      'weather'
-    );
-    if (!weatherAvailable.some((option) => option.id === gatheringWeatherPickerSelection)) {
-      gatheringWeatherPickerSelection = weatherAvailable[0]?.id || '';
-    }
-  });
-
-  let gatheringEventTimeOfDayPickerSelection = $state('');
-  let gatheringEventWeatherPickerSelection = $state('');
-  let gatheringEventBiomePickerSelection = $state('');
-  $effect(() => {
-    const biomeAvailable = gatheringConditionAvailableOptions(
-      gathering.editingGatheringEvent,
-      'biome'
-    );
-    if (!biomeAvailable.some((option) => option.id === gatheringEventBiomePickerSelection)) {
-      gatheringEventBiomePickerSelection = biomeAvailable[0]?.id || '';
-    }
-    const timeAvailable = gatheringConditionAvailableOptions(
-      gathering.editingGatheringEvent,
-      'timeOfDay'
-    );
-    if (!timeAvailable.some((option) => option.id === gatheringEventTimeOfDayPickerSelection)) {
-      gatheringEventTimeOfDayPickerSelection = timeAvailable[0]?.id || '';
-    }
-    const weatherAvailable = gatheringConditionAvailableOptions(
-      gathering.editingGatheringEvent,
-      'weather'
-    );
-    if (!weatherAvailable.some((option) => option.id === gatheringEventWeatherPickerSelection)) {
-      gatheringEventWeatherPickerSelection = weatherAvailable[0]?.id || '';
-    }
-  });
-
-  function gatheringEventModifierPickerSelection(kind) {
-    if (kind === 'biome') return gatheringEventBiomePickerSelection;
-    return kind === 'weather'
-      ? gatheringEventWeatherPickerSelection
-      : gatheringEventTimeOfDayPickerSelection;
-  }
-
-  function setGatheringEventModifierPickerSelection(kind, value) {
-    if (kind === 'biome') gatheringEventBiomePickerSelection = value;
-    else if (kind === 'weather') gatheringEventWeatherPickerSelection = value;
-    else gatheringEventTimeOfDayPickerSelection = value;
-  }
-
-  function gatheringDropModifierPickerSelection(kind) {
-    if (kind === 'biome') return gatheringBiomePickerSelection;
-    return kind === 'weather' ? gatheringWeatherPickerSelection : gatheringTimeOfDayPickerSelection;
-  }
-
-  function setGatheringDropModifierPickerSelection(kind, value) {
-    if (kind === 'biome') gatheringBiomePickerSelection = value;
-    else if (kind === 'weather') gatheringWeatherPickerSelection = value;
-    else gatheringTimeOfDayPickerSelection = value;
-  }
-
-  function onGatheringDropModifierKeydown(rowId, kind, modifier, event) {
-    event.stopPropagation();
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-    event.preventDefault();
-    const next = signedToOperatorValue(
-      String(gatheringModifierSignedValue(modifier) + (event.key === 'ArrowUp' ? 1 : -1))
-    );
-    event.currentTarget.value = gatheringModifierDisplayValue(next);
-    updateGatheringDropModifier(rowId, kind, modifier.id, next);
-  }
-
-  function onGatheringEventModifierKeydown(kind, modifier, event) {
-    event.stopPropagation();
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-    event.preventDefault();
-    const next = signedToOperatorValue(
-      String(gatheringModifierSignedValue(modifier) + (event.key === 'ArrowUp' ? 1 : -1))
-    );
-    event.currentTarget.value = gatheringModifierDisplayValue(next);
-    updateGatheringEventConditionModifier(kind, modifier.id, next);
-  }
-
-  async function setCharacterModifierOverrideEnabled(rowId, ref, enabled, libraryEntry) {
-    const expressionOverride = enabled ? libraryEntry?.expression || '' : '';
-    await onUpdateDropCharacterModifier(rowId, ref.id, { expressionOverride });
-  }
-
-  async function onUpdateDropCharacterModifier(rowId, refId, patch) {
-    if (!gathering.editingGatheringTask?.id || !rowId || !refId) return;
-    const rows = gatheringTaskDropRows(gathering.editingGatheringTask);
-    const row = rows.find((entry) => entry.id === rowId);
-    if (!row) return;
-    const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
-    const nextRefs = refs.map((ref) => (ref.id === refId ? { ...ref, ...patch } : ref));
-    updateGatheringTaskDrop(rowId, { characterModifiers: nextRefs });
-  }
-
-  async function onDeleteDropCharacterModifier(rowId, refId) {
-    if (!gathering.editingGatheringTask?.id || !rowId || !refId) return;
-    const rows = gatheringTaskDropRows(gathering.editingGatheringTask);
-    const row = rows.find((entry) => entry.id === rowId);
-    if (!row) return;
-    const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
-    const nextRefs = refs.filter((ref) => ref.id !== refId);
-    if (nextRefs.length === refs.length) return;
-    updateGatheringTaskDrop(rowId, { characterModifiers: nextRefs });
-  }
+  $effect(() => modifiers.resetSearchOnDrop());
+  $effect(() => modifiers.resetSearchOnEvent());
+  $effect(() => modifiers.syncSearchDirection());
+  $effect(() => modifiers.reconcileDropPickers());
+  $effect(() => modifiers.reconcileEventPickers());
 
   const showRecipeCategories = $derived(!!selectedSystem);
   const selectedRecipe = $derived(
@@ -2422,11 +2176,6 @@
     return result;
   }
 
-  function updateSelectedGatheringRules(updates) {
-    if (!selectedSystemId) return;
-    store.updateGatheringRules?.(selectedSystemId, updates);
-  }
-
   function formatCount(keySingular, fallbackSingular, keyPlural, fallbackPlural, count) {
     const key = count === 1 ? keySingular : keyPlural;
     const fallback = count === 1 ? fallbackSingular : fallbackPlural;
@@ -2671,10 +2420,10 @@
   const finishGatheringTaskExit = async (action, nextView) => {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
-      const saved = await saveGatheringTaskDraft();
+      const saved = await drafts.saveGatheringTaskDraft();
       if (saved === false) return false;
     }
-    clearGatheringTaskDraft();
+    drafts.clearGatheringTaskDraft();
     if (nextView) activeView = nextView;
     return true;
   };
@@ -2682,10 +2431,10 @@
   const finishGatheringEventExit = async (action, nextView) => {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
-      const saved = await saveGatheringEventDraft();
+      const saved = await drafts.saveGatheringEventDraft();
       if (saved === false) return false;
     }
-    clearGatheringEventDraft();
+    drafts.clearGatheringEventDraft();
     if (nextView) activeView = nextView;
     return true;
   };
@@ -3096,17 +2845,17 @@
     environment: {
       view: 'environment-edit',
       targetId: (issue) => issue.environmentId,
-      open: (id) => editEnvironment(id),
+      open: (id) => drafts.editEnvironment(id),
     },
     task: {
       view: 'environment-edit',
       targetId: (issue) => issue.environmentId,
-      open: (id) => editEnvironment(id),
+      open: (id) => drafts.editEnvironment(id),
     },
     event: {
       view: 'environment-edit',
       targetId: (issue) => issue.environmentId,
-      open: (id) => editEnvironment(id),
+      open: (id) => drafts.editEnvironment(id),
     },
     salvage: {
       view: 'component-edit',
@@ -4176,467 +3925,6 @@
       .replace('{disabled}', disabled);
   }
 
-  function selectEnvironment(environmentId = gathering.selectedEnvironment?.id) {
-    if (!environmentId) return;
-    store.selectEnvironment?.(environmentId);
-  }
-
-  function editEnvironment(environmentId = gathering.selectedEnvironment?.id) {
-    if (!environmentId || !canShowEnvironments) return;
-    afterTruthyResult(store.selectEnvironment?.(environmentId), () => {
-      activeView = 'environment-edit';
-    });
-  }
-
-  function createEnvironment() {
-    if (!canShowEnvironments) return;
-    const created = store.createEnvironmentDraft?.();
-    if (isPromise(created)) {
-      created.then((value) => {
-        if (value !== false && value !== null) activeView = 'environment-edit';
-      });
-      return;
-    }
-    if (created !== false && created !== null) activeView = 'environment-edit';
-  }
-
-  function toggleEnvironmentEnabled(environmentId, enabled) {
-    if (!environmentId) return;
-    store.toggleEnvironmentEnabled?.(environmentId, enabled);
-  }
-
-  function duplicateEnvironment(environmentId = gathering.selectedEnvironment?.id) {
-    if (!environmentId) return;
-    store.duplicateEnvironmentDraft?.(environmentId);
-  }
-
-  function deleteEnvironment(environmentId = gathering.selectedEnvironment?.id) {
-    if (!environmentId) return;
-    store.deleteEnvironmentDraft?.(environmentId);
-  }
-
-  function selectGatheringTask(taskId = gathering.selectedGatheringTask?.id) {
-    gathering.selectedGatheringTaskId = taskId || '';
-  }
-
-  function createGatheringTask(systemId = selectedSystemId) {
-    if (!systemId) return;
-    const created = store.addGatheringLibraryTask?.(systemId);
-    if (isPromise(created)) {
-      created.then((task) => {
-        if (task?.id) gathering.selectedGatheringTaskId = task.id;
-      });
-      return;
-    }
-    if (created?.id) gathering.selectedGatheringTaskId = created.id;
-  }
-
-  function editGatheringTask(taskId = gathering.selectedGatheringTask?.id) {
-    if (!taskId || !canShowEnvironments) return;
-    gathering.selectedGatheringTaskId = taskId;
-    const source = gathering.gatheringTaskDefinitions.find((task) => task.id === taskId) || null;
-    const snapshot = source ? JSON.parse(JSON.stringify(source)) : null;
-    gathering.gatheringTaskDraft = snapshot;
-    gathering.gatheringTaskDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
-    gathering.gatheringTaskSaveError = '';
-    gathering.activeGatheringTab = 'tasks';
-    navRail.expandGroup('gathering');
-    activeView = 'gathering-task-edit';
-  }
-
-  function clearGatheringTaskDraft() {
-    gathering.gatheringTaskDraft = null;
-    gathering.gatheringTaskDraftBaseline = null;
-    gathering.gatheringTaskSaveError = '';
-  }
-
-  function backToGatheringTaskLibrary() {
-    afterTruthyResult(confirmRouteExit('environments'), () => {
-      gathering.activeGatheringTab = 'tasks';
-      navRail.expandGroup('gathering');
-      activeView = 'environments';
-    });
-  }
-
-  async function saveGatheringTaskDraft() {
-    if (!gathering.gatheringTaskDraft || !selectedSystemId || !gathering.selectedGatheringTaskId)
-      return false;
-    const { valid, errors } = gathering.gatheringTaskValidation;
-    if (!valid) {
-      gathering.gatheringTaskSaveError = errors[0] || '';
-      return false;
-    }
-    const proceed =
-      (await store.confirmGatheringLibraryTaskCompositionLoss?.(
-        selectedSystemId,
-        gathering.selectedGatheringTaskId,
-        gathering.gatheringTaskDraft
-      )) ?? true;
-    if (!proceed) return false; // GM cancelled the match-loss warning — keep editing, no save error
-    // Cleared here — once an attempt is actually committed to, and before the awaited store call
-    // (mirrors saveRecipeItemDraft).
-    gathering.gatheringTaskSaveError = '';
-    gathering.gatheringTaskSaving = true;
-    try {
-      const ok = await store.updateGatheringLibraryTask?.(
-        selectedSystemId,
-        gathering.selectedGatheringTaskId,
-        gathering.gatheringTaskDraft
-      );
-      if (ok) {
-        gathering.gatheringTaskDraftBaseline = JSON.parse(
-          JSON.stringify(gathering.gatheringTaskDraft)
-        );
-        gathering.gatheringTaskSaveError = '';
-        return true;
-      }
-      gathering.gatheringTaskSaveError = text(
-        'FABRICATE.Admin.Manager.Environment.Tasks.SaveFailed',
-        'Save failed. Try again.'
-      );
-      return false;
-    } catch (error) {
-      console.error('Failed to save gathering task draft', error);
-      gathering.gatheringTaskSaveError = text(
-        'FABRICATE.Admin.Manager.Environment.Tasks.SaveFailed',
-        'Save failed. Try again.'
-      );
-      return false;
-    } finally {
-      gathering.gatheringTaskSaving = false;
-    }
-  }
-
-  async function deleteGatheringTaskDraft() {
-    if (!selectedSystemId || !gathering.selectedGatheringTaskId) return;
-    const deletedTaskId = gathering.selectedGatheringTaskId;
-    const result = await store.deleteGatheringLibraryTask?.(selectedSystemId, deletedTaskId);
-    if (result === false) return;
-    if (gathering.selectedGatheringTaskId === deletedTaskId) gathering.selectedGatheringTaskId = '';
-    gathering.gatheringTaskDraft = null;
-    gathering.gatheringTaskDraftBaseline = null;
-    gathering.gatheringTaskSaveError = '';
-    gathering.activeGatheringTab = 'tasks';
-    navRail.expandGroup('gathering');
-    activeView = 'environments';
-  }
-
-  function duplicateGatheringTask(
-    systemId = selectedSystemId,
-    taskId = gathering.selectedGatheringTask?.id
-  ) {
-    if (!systemId || !taskId) return;
-    const duplicated = store.duplicateGatheringLibraryTask?.(systemId, taskId);
-    if (isPromise(duplicated)) {
-      duplicated.then((task) => {
-        if (task?.id) gathering.selectedGatheringTaskId = task.id;
-      });
-      return;
-    }
-    if (duplicated?.id) gathering.selectedGatheringTaskId = duplicated.id;
-  }
-
-  function deleteGatheringTask(
-    systemId = selectedSystemId,
-    taskId = gathering.selectedGatheringTask?.id
-  ) {
-    if (!systemId || !taskId) return;
-    const deleted = store.deleteGatheringLibraryTask?.(systemId, taskId);
-    if (isPromise(deleted)) {
-      deleted.then((value) => {
-        if (value !== false && gathering.selectedGatheringTaskId === taskId)
-          gathering.selectedGatheringTaskId = '';
-      });
-      return;
-    }
-    if (deleted !== false && gathering.selectedGatheringTaskId === taskId)
-      gathering.selectedGatheringTaskId = '';
-  }
-
-  function toggleGatheringTaskEnabled(
-    systemId = selectedSystemId,
-    taskId = gathering.selectedGatheringTask?.id,
-    enabled = true
-  ) {
-    if (!systemId || !taskId) return;
-    store.updateGatheringLibraryTask?.(systemId, taskId, { enabled });
-  }
-
-  function selectGatheringEvent(eventId = gathering.selectedGatheringEvent?.id) {
-    gathering.selectedGatheringEventId = eventId || '';
-  }
-
-  function createGatheringEvent(systemId = selectedSystemId) {
-    if (!systemId) return;
-    const created = store.addGatheringLibraryEvent?.(systemId);
-    if (isPromise(created)) {
-      created.then((event) => {
-        if (event?.id) gathering.selectedGatheringEventId = event.id;
-      });
-      return;
-    }
-    if (created?.id) gathering.selectedGatheringEventId = created.id;
-  }
-
-  function editGatheringEvent(eventId = gathering.selectedGatheringEvent?.id) {
-    if (!eventId || !canShowEnvironments) return;
-    gathering.selectedGatheringEventId = eventId;
-    const source =
-      gathering.gatheringEventDefinitions.find((event) => event.id === eventId) || null;
-    const snapshot = source ? JSON.parse(JSON.stringify(source)) : null;
-    gathering.gatheringEventDraft = snapshot;
-    gathering.gatheringEventDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
-    gathering.gatheringEventSaveError = '';
-    gathering.activeGatheringTab = 'encounters';
-    navRail.expandGroup('gathering');
-    activeView = 'gathering-event-edit';
-  }
-
-  function clearGatheringEventDraft() {
-    gathering.gatheringEventDraft = null;
-    gathering.gatheringEventDraftBaseline = null;
-    gathering.gatheringEventSaveError = '';
-    gathering.gatheringEventSaving = false;
-  }
-
-  function backToGatheringEventLibrary() {
-    afterTruthyResult(confirmRouteExit('environments'), () => {
-      gathering.activeGatheringTab = 'encounters';
-      navRail.expandGroup('gathering');
-      activeView = 'environments';
-    });
-  }
-
-  async function saveGatheringEventDraft() {
-    if (!gathering.gatheringEventDraft || !selectedSystemId || !gathering.selectedGatheringEventId)
-      return false;
-    const { valid, errors } = gathering.gatheringEventValidation;
-    if (!valid) {
-      gathering.gatheringEventSaveError = errors[0] || '';
-      return false;
-    }
-    const proceed =
-      (await store.confirmGatheringLibraryEventCompositionLoss?.(
-        selectedSystemId,
-        gathering.selectedGatheringEventId,
-        gathering.gatheringEventDraft
-      )) ?? true;
-    if (!proceed) return false; // GM cancelled the match-loss warning — keep editing, no save error
-    // Cleared at the same point, and for the same reason, as in saveGatheringTaskDraft: an
-    // unchanged error string is not a DOM mutation.
-    gathering.gatheringEventSaveError = '';
-    gathering.gatheringEventSaving = true;
-    try {
-      const ok = await store.updateGatheringLibraryEvent?.(
-        selectedSystemId,
-        gathering.selectedGatheringEventId,
-        gathering.gatheringEventDraft
-      );
-      if (ok !== false) {
-        gathering.gatheringEventDraftBaseline = JSON.parse(
-          JSON.stringify(gathering.gatheringEventDraft)
-        );
-        gathering.gatheringEventSaveError = '';
-        return true;
-      }
-      gathering.gatheringEventSaveError = text(
-        'FABRICATE.Admin.Manager.Environment.Events.SaveFailed',
-        'Save failed. Try again.'
-      );
-      return false;
-    } catch (error) {
-      // Until issue 919 this `try` had no `catch` at all, so a rejected store call escaped
-      // as an unhandled rejection and the GM saw nothing. Mirrors saveGatheringTaskDraft.
-      console.error('Failed to save gathering event draft', error);
-      gathering.gatheringEventSaveError = text(
-        'FABRICATE.Admin.Manager.Environment.Events.SaveFailed',
-        'Save failed. Try again.'
-      );
-      return false;
-    } finally {
-      gathering.gatheringEventSaving = false;
-    }
-  }
-
-  async function deleteGatheringEventDraft() {
-    if (!gathering.selectedGatheringEventId || !selectedSystemId) return;
-    const message = text(
-      'FABRICATE.Admin.Manager.Environment.Events.DeleteConfirm',
-      'Delete this event? This cannot be undone.'
-    );
-    const confirmed = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : true;
-    if (confirmed === false) return;
-    const deletedId = gathering.selectedGatheringEventId;
-    await store.deleteGatheringLibraryEvent?.(selectedSystemId, deletedId);
-    if (gathering.selectedGatheringEventId === deletedId) gathering.selectedGatheringEventId = '';
-    clearGatheringEventDraft();
-    gathering.activeGatheringTab = 'encounters';
-    navRail.expandGroup('gathering');
-    activeView = 'environments';
-  }
-
-  function duplicateGatheringEvent(
-    systemId = selectedSystemId,
-    eventId = gathering.selectedGatheringEvent?.id
-  ) {
-    if (!systemId || !eventId) return;
-    const duplicated = store.duplicateGatheringLibraryEvent?.(systemId, eventId);
-    if (isPromise(duplicated)) {
-      duplicated.then((event) => {
-        if (event?.id) gathering.selectedGatheringEventId = event.id;
-      });
-      return;
-    }
-    if (duplicated?.id) gathering.selectedGatheringEventId = duplicated.id;
-  }
-
-  function deleteGatheringEvent(
-    systemId = selectedSystemId,
-    eventId = gathering.selectedGatheringEvent?.id
-  ) {
-    if (!systemId || !eventId) return;
-    const deleted = store.deleteGatheringLibraryEvent?.(systemId, eventId);
-    if (isPromise(deleted)) {
-      deleted.then((value) => {
-        if (value !== false && gathering.selectedGatheringEventId === eventId)
-          gathering.selectedGatheringEventId = '';
-      });
-      return;
-    }
-    if (deleted !== false && gathering.selectedGatheringEventId === eventId)
-      gathering.selectedGatheringEventId = '';
-  }
-
-  function toggleGatheringEventEnabled(
-    systemId = selectedSystemId,
-    eventId = gathering.selectedGatheringEvent?.id,
-    enabled = true
-  ) {
-    if (!systemId || !eventId) return;
-    store.updateGatheringLibraryEvent?.(systemId, eventId, { enabled });
-  }
-
-  function updateSelectedGatheringEvent(updates = {}) {
-    if (gathering.gatheringEventDraft) {
-      gathering.gatheringEventDraft = { ...gathering.gatheringEventDraft, ...updates };
-      return true;
-    }
-    if (!selectedSystemId || !gathering.selectedGatheringEvent?.id) return false;
-    return store.updateGatheringLibraryEvent?.(
-      selectedSystemId,
-      gathering.selectedGatheringEvent.id,
-      updates
-    );
-  }
-
-  function updateSelectedGatheringTask(updates = {}) {
-    if (gathering.gatheringTaskDraft) {
-      gathering.gatheringTaskDraft = { ...gathering.gatheringTaskDraft, ...updates };
-      return true;
-    }
-    if (!selectedSystemId || !gathering.selectedGatheringTask?.id) return false;
-    return store.updateGatheringLibraryTask?.(
-      selectedSystemId,
-      gathering.selectedGatheringTask.id,
-      updates
-    );
-  }
-
-  function addToolReferenceToSelectedTask(toolId) {
-    if (!gathering.editingGatheringTask || !toolId) return;
-    const existing = Array.isArray(gathering.editingGatheringTask.toolIds)
-      ? gathering.editingGatheringTask.toolIds
-      : [];
-    if (existing.includes(toolId)) return;
-    updateSelectedGatheringTask({ toolIds: [...existing, toolId] });
-  }
-
-  function removeToolReferenceFromSelectedTask(toolId) {
-    if (!gathering.editingGatheringTask || !toolId) return;
-    const existing = Array.isArray(gathering.editingGatheringTask.toolIds)
-      ? gathering.editingGatheringTask.toolIds
-      : [];
-    updateSelectedGatheringTask({ toolIds: existing.filter((id) => id !== toolId) });
-  }
-
-  function gatheringDropRowId() {
-    return `drop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-  }
-
-  function addGatheringTaskDrop() {
-    if (!gathering.editingGatheringTask) return;
-    const row = {
-      id: gatheringDropRowId(),
-      name: '',
-      componentId: '',
-      itemUuid: '',
-      quantity: 1,
-      dropRate: 25,
-      conditionModifiers: { biome: [], timeOfDay: [], weather: [] },
-      enabled: false,
-    };
-    gathering.selectedGatheringDropId = row.id;
-    updateSelectedGatheringTask({
-      dropRows: [...gatheringTaskDropRows(gathering.editingGatheringTask), row],
-    });
-  }
-
-  function updateGatheringTaskDrop(rowId, updates = {}) {
-    if (!gathering.editingGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(gathering.editingGatheringTask).map((row) =>
-      row.id === rowId ? { ...row, ...updates } : row
-    );
-    const patch =
-      store.gatheringTaskAutopopulateFromComponent?.(
-        selectedSystemId,
-        gathering.editingGatheringTask,
-        rows
-      ) || {};
-    updateSelectedGatheringTask({ dropRows: rows, ...patch });
-  }
-
-  function duplicateGatheringTaskDrop(rowId = gathering.selectedGatheringDrop?.id) {
-    if (!gathering.editingGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(gathering.editingGatheringTask);
-    const index = rows.findIndex((row) => row.id === rowId);
-    if (index < 0) return;
-    const duplicate = { ...JSON.parse(JSON.stringify(rows[index])), id: gatheringDropRowId() };
-    gathering.selectedGatheringDropId = duplicate.id;
-    updateSelectedGatheringTask({
-      dropRows: [...rows.slice(0, index + 1), duplicate, ...rows.slice(index + 1)],
-    });
-  }
-
-  function deleteGatheringTaskDrop(rowId = gathering.selectedGatheringDrop?.id) {
-    if (!gathering.editingGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(gathering.editingGatheringTask);
-    const index = rows.findIndex((row) => row.id === rowId);
-    const nextRows = rows.filter((row) => row.id !== rowId);
-    gathering.selectedGatheringDropId = nextRows[Math.min(index, nextRows.length - 1)]?.id || '';
-    updateSelectedGatheringTask({ dropRows: nextRows });
-  }
-
-  function moveGatheringTaskDrop(rowId, direction) {
-    if (!gathering.editingGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(gathering.editingGatheringTask);
-    const index = rows.findIndex((row) => row.id === rowId);
-    if (index < 0) return;
-    const target = direction === 'up' ? index - 1 : index + 1;
-    if (target < 0 || target >= rows.length) return;
-    const next = [...rows];
-    [next[index], next[target]] = [next[target], next[index]];
-    updateSelectedGatheringTask({ dropRows: next });
-  }
-
-  async function importGatheringTaskDrop(rowId, data) {
-    if (!rowId) return false;
-    const item = await services?.importSingleManagedItemFromDrop?.(data);
-    if (!item?.id) return false;
-    updateGatheringTaskDrop(rowId, { componentId: item.id, itemUuid: '', name: '', enabled: true });
-    gathering.selectedGatheringDropId = rowId;
-    return true;
-  }
-
   /**
    * The world Tool that ALREADY names `uuid` as its source Item, or `null`.
    *
@@ -4864,157 +4152,6 @@
     return store.toggleToolEnabled?.(focusedToolDraft.id, enabled, selectedSystemId);
   }
 
-  function gatheringConditionOptions(kind) {
-    const setting = gathering.selectedGatheringSystemConfig.conditions?.[kind] || {};
-    return Array.isArray(setting.values) ? setting.values : [];
-  }
-
-  function gatheringVocabularyOptions(kind) {
-    return gatheringVocabularyValues(gathering.selectedGatheringSystemConfig, kind);
-  }
-
-  function gatheringConditionModifierRows(row, kind) {
-    const values = row?.conditionModifiers?.[kind];
-    return Array.isArray(values) ? values : [];
-  }
-
-  function gatheringConditionAvailableOptions(row, kind) {
-    const options =
-      kind === 'biome' ? gatheringVocabularyOptions('biomes') : gatheringConditionOptions(kind);
-    if (!row) return options;
-    const attached = new Set(
-      gatheringConditionModifierRows(row, kind).map((modifier) => modifier.conditionId)
-    );
-    return options.filter((option) => !attached.has(option.id));
-  }
-
-  function gatheringConditionModifierGroups(row) {
-    return {
-      timeOfDay: gatheringConditionModifierRows(row, 'timeOfDay'),
-      weather: gatheringConditionModifierRows(row, 'weather'),
-      biome: gatheringConditionModifierRows(row, 'biome'),
-    };
-  }
-
-  function updateGatheringDropModifier(rowId, kind, modifierId, updates = {}) {
-    if (!gathering.editingGatheringTask || !rowId || !kind || !modifierId) return;
-    const row = gatheringTaskDropRows(gathering.editingGatheringTask).find(
-      (entry) => entry.id === rowId
-    );
-    if (!row) return;
-    const conditionModifiers = gatheringConditionModifierGroups(row);
-    conditionModifiers[kind] = conditionModifiers[kind].map((modifier) =>
-      modifier.id === modifierId ? { ...modifier, ...updates } : modifier
-    );
-    updateGatheringTaskDrop(rowId, { conditionModifiers });
-  }
-
-  function addGatheringDropModifier(rowId, kind, conditionId) {
-    if (!gathering.editingGatheringTask || !rowId || !kind || !conditionId) return;
-    const row = gatheringTaskDropRows(gathering.editingGatheringTask).find(
-      (entry) => entry.id === rowId
-    );
-    if (!row) return;
-    const conditionModifiers = gatheringConditionModifierGroups(row);
-    if (conditionModifiers[kind].some((modifier) => modifier.conditionId === conditionId)) return;
-    conditionModifiers[kind] = [
-      ...conditionModifiers[kind],
-      { id: `${kind}-${gatheringDropRowId()}`, conditionId, operator: '+', value: 0 },
-    ];
-    updateGatheringTaskDrop(rowId, { conditionModifiers });
-  }
-
-  function deleteGatheringDropModifier(rowId, kind, modifierId) {
-    if (!gathering.editingGatheringTask || !rowId || !kind || !modifierId) return;
-    const row = gatheringTaskDropRows(gathering.editingGatheringTask).find(
-      (entry) => entry.id === rowId
-    );
-    if (!row) return;
-    const conditionModifiers = gatheringConditionModifierGroups(row);
-    conditionModifiers[kind] = conditionModifiers[kind].filter(
-      (modifier) => modifier.id !== modifierId
-    );
-    updateGatheringTaskDrop(rowId, { conditionModifiers });
-  }
-
-  function addGatheringEventConditionModifier(kind, conditionId) {
-    if (!gathering.editingGatheringEvent?.id || !kind || !conditionId) return;
-    const conditionModifiers = gatheringConditionModifierGroups(gathering.editingGatheringEvent);
-    if (conditionModifiers[kind].some((modifier) => modifier.conditionId === conditionId)) return;
-    conditionModifiers[kind] = [
-      ...conditionModifiers[kind],
-      { id: `${kind}-${gatheringDropRowId()}`, conditionId, operator: '+', value: 0 },
-    ];
-    updateSelectedGatheringEvent({ conditionModifiers });
-  }
-
-  function updateGatheringEventConditionModifier(kind, modifierId, updates = {}) {
-    if (!gathering.editingGatheringEvent?.id || !kind || !modifierId) return;
-    const conditionModifiers = gatheringConditionModifierGroups(gathering.editingGatheringEvent);
-    conditionModifiers[kind] = conditionModifiers[kind].map((modifier) =>
-      modifier.id === modifierId ? { ...modifier, ...updates } : modifier
-    );
-    updateSelectedGatheringEvent({ conditionModifiers });
-  }
-
-  function deleteGatheringEventConditionModifier(kind, modifierId) {
-    if (!gathering.editingGatheringEvent?.id || !kind || !modifierId) return;
-    const conditionModifiers = gatheringConditionModifierGroups(gathering.editingGatheringEvent);
-    conditionModifiers[kind] = conditionModifiers[kind].filter(
-      (modifier) => modifier.id !== modifierId
-    );
-    updateSelectedGatheringEvent({ conditionModifiers });
-  }
-
-  function pickCharacterModifierForEvent(modifierId) {
-    if (!gathering.editingGatheringEvent?.id || !modifierId) return;
-    const refs = Array.isArray(gathering.editingGatheringEvent.characterModifiers)
-      ? gathering.editingGatheringEvent.characterModifiers
-      : [];
-    if (refs.some((ref) => ref.modifierId === modifierId)) return;
-    characterModifierSearchTerm = '';
-    const newRef = {
-      id: `char-mod-${modifierId}-${refs.length + 1}-${Math.random().toString(36).slice(2, 6)}`,
-      modifierId,
-      operator: '+',
-      min: null,
-      max: null,
-      expressionOverride: '',
-    };
-    updateSelectedGatheringEvent({ characterModifiers: [...refs, newRef] });
-  }
-
-  function onUpdateEventCharacterModifier(refId, patch) {
-    if (!gathering.editingGatheringEvent?.id || !refId) return;
-    const refs = Array.isArray(gathering.editingGatheringEvent.characterModifiers)
-      ? gathering.editingGatheringEvent.characterModifiers
-      : [];
-    const next = refs.map((ref) => (ref.id === refId ? { ...ref, ...patch } : ref));
-    updateSelectedGatheringEvent({ characterModifiers: next });
-  }
-
-  function onDeleteEventCharacterModifier(refId) {
-    if (!gathering.editingGatheringEvent?.id || !refId) return;
-    const refs = Array.isArray(gathering.editingGatheringEvent.characterModifiers)
-      ? gathering.editingGatheringEvent.characterModifiers
-      : [];
-    updateSelectedGatheringEvent({ characterModifiers: refs.filter((ref) => ref.id !== refId) });
-  }
-
-  function setEventCharacterModifierOverrideEnabled(ref, enabled, libraryEntry) {
-    const expressionOverride = enabled ? libraryEntry?.expression || '' : '';
-    onUpdateEventCharacterModifier(ref.id, { expressionOverride });
-  }
-
-  function selectGatheringTab(tabId) {
-    gathering.activeGatheringTab = gathering.visibleGatheringNavItems.some(
-      (tab) => tab.id === tabId
-    )
-      ? tabId
-      : 'environments';
-    navRail.expandGroup('gathering');
-  }
-
   function openWorldParties() {
     return afterTruthyResult(confirmRouteExit('world'), () => {
       activeTravelTab = 'parties';
@@ -5143,18 +4280,6 @@
     openWorldTravelDestination('realms');
   }
 
-  function openGatheringSection(tabId = 'environments') {
-    if (!canShowEnvironments) return;
-    const nextTab = gathering.visibleGatheringNavItems.some((tab) => tab.id === tabId)
-      ? tabId
-      : 'environments';
-    afterTruthyResult(confirmRouteExit('environments'), () => {
-      gathering.activeGatheringTab = nextTab;
-      navRail.expandGroup('gathering');
-      activeView = 'environments';
-    });
-  }
-
   function enterToolEditor() {
     toolEditorActiveTab = 'breakage';
     activeView = 'tool-edit';
@@ -5221,14 +4346,6 @@
       inherit,
       selectedSystemId
     );
-  }
-
-  function activateGatheringParent() {
-    if (gathering.isActiveGatheringChildRoute) {
-      navRail.expandGroup('gathering');
-      return;
-    }
-    openGatheringSection('environments');
   }
 
   // Crafting nav group handlers (issue 511), mirroring the gathering group.
@@ -5433,50 +4550,6 @@
     services?.onCopySourceUuid?.(uuid);
   }
 
-  // The drop-rate input/blur/keydown trio that used to live here is gone with the hand-rolled
-  // slider it drove (issue 883).
-  function onGatheringDropCountInput(rowId, event) {
-    const input = event.currentTarget;
-    const normalized = String(input.value || '')
-      .replace(/\D+/g, '')
-      .replace(/^0+/, '');
-    input.value = normalized;
-    const quantity = Number(normalized);
-    if (Number.isInteger(quantity) && quantity >= 1 && quantity <= 999)
-      updateGatheringTaskDrop(rowId, { quantity });
-  }
-
-  function onGatheringDropCountBlur(row, event) {
-    const input = event.currentTarget;
-    const normalized = String(input.value || '')
-      .replace(/\D+/g, '')
-      .replace(/^0+/, '');
-    const quantity = Number(normalized);
-    if (normalized !== '' && Number.isInteger(quantity) && quantity >= 1 && quantity <= 999) {
-      input.value = String(quantity);
-      updateGatheringTaskDrop(row.id, { quantity });
-      return;
-    }
-    input.value = String(gatheringDropCountValue(row));
-  }
-
-  function onGatheringDropCountKeydown(row, event) {
-    event.stopPropagation();
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-    event.preventDefault();
-    const currentValue =
-      event.currentTarget.value === ''
-        ? gatheringDropCountValue(row)
-        : Number(event.currentTarget.value);
-    const quantity = gatheringDropCountValue({
-      quantity:
-        (Number.isFinite(currentValue) ? currentValue : gatheringDropCountValue(row)) +
-        (event.key === 'ArrowUp' ? 1 : -1),
-    });
-    event.currentTarget.value = String(quantity);
-    updateGatheringTaskDrop(row.id, { quantity });
-  }
-
   // `componentSourceState` lived here to tone the inline components inspector's source chip.
 
   // No caller left. Deleting this and its two helpers (usageEvidenceItems,
@@ -5652,8 +4725,8 @@
   const createParty = () => store.createParty?.();
   const deleteEnvironmentDraft = () => store.deleteEnvironmentDraft?.();
   const exportSelectedSystem = () => exportSystem();
-  const createGatheringTaskForSystem = () => createGatheringTask(selectedSystemId);
-  const createGatheringEventForSystem = () => createGatheringEvent(selectedSystemId);
+  const createGatheringTaskForSystem = () => drafts.createGatheringTask(selectedSystemId);
+  const createGatheringEventForSystem = () => drafts.createGatheringEvent(selectedSystemId);
 
   function openComponentAddFromCatalogue() {
     componentAddFromCatalogueOpen = true;
@@ -5776,8 +4849,8 @@
     {backToRecipesBrowse}
     {backToComponentsBrowse}
     {backToEnvironmentsBrowse}
-    {backToGatheringTaskLibrary}
-    {backToGatheringEventLibrary}
+    backToGatheringTaskLibrary={drafts.backToGatheringTaskLibrary}
+    backToGatheringEventLibrary={drafts.backToGatheringEventLibrary}
     {selectedSystemId}
     {worldEssenceEntryDirty}
     {worldEssenceEntrySaving}
@@ -5837,7 +4910,7 @@
     {canShowEnvironments}
     {createGatheringTaskForSystem}
     {createGatheringEventForSystem}
-    {createEnvironment}
+    createEnvironment={drafts.createEnvironment}
     environmentDraftDirty={$viewState.environmentDraftDirty}
     environmentDraftIsNew={$viewState.environmentDraftIsNew}
     environmentSaving={$viewState.environmentSaving}
@@ -5848,15 +4921,15 @@
     gatheringTaskValidation={gathering.gatheringTaskValidation}
     gatheringTaskSaveError={gathering.gatheringTaskSaveError}
     selectedGatheringTaskId={gathering.selectedGatheringTaskId}
-    {deleteGatheringTaskDraft}
-    {saveGatheringTaskDraft}
+    deleteGatheringTaskDraft={drafts.deleteGatheringTaskDraft}
+    saveGatheringTaskDraft={drafts.saveGatheringTaskDraft}
     gatheringEventDraftDirty={gathering.gatheringEventDraftDirty}
     gatheringEventSaving={gathering.gatheringEventSaving}
     gatheringEventValidation={gathering.gatheringEventValidation}
     gatheringEventSaveError={gathering.gatheringEventSaveError}
     selectedGatheringEventId={gathering.selectedGatheringEventId}
-    {deleteGatheringEventDraft}
-    {saveGatheringEventDraft}
+    deleteGatheringEventDraft={drafts.deleteGatheringEventDraft}
+    saveGatheringEventDraft={drafts.saveGatheringEventDraft}
   />
 
   <div class={`manager-body ${navRail.collapsedDisplay ? 'is-rail-collapsed' : ''}`}>
@@ -5886,11 +4959,11 @@
       checksNavItems={checks.checksNavItems}
       {canShowEnvironments}
       {isGatheringRoute}
-      {activateGatheringParent}
+      activateGatheringParent={drafts.activateGatheringParent}
       gatheringNavCounts={gathering.gatheringNavCounts}
       visibleGatheringNavItems={gathering.visibleGatheringNavItems}
       displayedGatheringTab={gathering.displayedGatheringTab}
-      {openGatheringSection}
+      openGatheringSection={drafts.openGatheringSection}
       {experimentalFeaturesEnabled}
       {worldScopedCounts}
       {isWorldRoute}
@@ -6148,25 +5221,25 @@
         selectedEventId={gathering.selectedGatheringEvent?.id || gathering.selectedGatheringEventId}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
         {services}
-        onSelectGatheringTab={selectGatheringTab}
-        onSelectGatheringTask={selectGatheringTask}
-        onCreateGatheringTask={createGatheringTask}
-        onEditGatheringTask={editGatheringTask}
-        onDuplicateGatheringTask={duplicateGatheringTask}
-        onDeleteGatheringTask={deleteGatheringTask}
-        onToggleGatheringTaskEnabled={toggleGatheringTaskEnabled}
-        onSelectGatheringEvent={selectGatheringEvent}
-        onCreateGatheringEvent={createGatheringEvent}
-        onEditGatheringEvent={editGatheringEvent}
-        onDuplicateGatheringEvent={duplicateGatheringEvent}
-        onDeleteGatheringEvent={deleteGatheringEvent}
-        onToggleGatheringEventEnabled={toggleGatheringEventEnabled}
-        onSelectEnvironment={(id) => selectEnvironment(id)}
-        onEditEnvironment={(id) => editEnvironment(id)}
-        onCreateEnvironment={createEnvironment}
-        onDuplicateEnvironment={(id) => duplicateEnvironment(id)}
-        onDeleteEnvironment={(id) => deleteEnvironment(id)}
-        onToggleEnvironmentEnabled={(id, enabled) => toggleEnvironmentEnabled(id, enabled)}
+        onSelectGatheringTab={drafts.selectGatheringTab}
+        onSelectGatheringTask={drafts.selectGatheringTask}
+        onCreateGatheringTask={drafts.createGatheringTask}
+        onEditGatheringTask={drafts.editGatheringTask}
+        onDuplicateGatheringTask={drafts.duplicateGatheringTask}
+        onDeleteGatheringTask={drafts.deleteGatheringTask}
+        onToggleGatheringTaskEnabled={drafts.toggleGatheringTaskEnabled}
+        onSelectGatheringEvent={drafts.selectGatheringEvent}
+        onCreateGatheringEvent={drafts.createGatheringEvent}
+        onEditGatheringEvent={drafts.editGatheringEvent}
+        onDuplicateGatheringEvent={drafts.duplicateGatheringEvent}
+        onDeleteGatheringEvent={drafts.deleteGatheringEvent}
+        onToggleGatheringEventEnabled={drafts.toggleGatheringEventEnabled}
+        onSelectEnvironment={(id) => drafts.selectEnvironment(id)}
+        onEditEnvironment={(id) => drafts.editEnvironment(id)}
+        onCreateEnvironment={drafts.createEnvironment}
+        onDuplicateEnvironment={(id) => drafts.duplicateEnvironment(id)}
+        onDeleteEnvironment={(id) => drafts.deleteEnvironment(id)}
+        onToggleEnvironmentEnabled={(id, enabled) => drafts.toggleEnvironmentEnabled(id, enabled)}
         onUpdateGatheringConditions={store.updateGatheringConditions}
         onToggleGatheringConditionEnabled={store.toggleGatheringConditionEnabled}
         onAddGatheringConditionValue={store.addGatheringConditionValue}
@@ -6217,8 +5290,8 @@
             linkedSceneImage={gathering.environmentSceneImage($viewState.environmentDraft)}
             realmRecords={worldRealms}
             realmsEnabled={gathering.gatheringRealmsEnabled}
-            biomeOptions={gatheringVocabularyOptions('biomes')}
-            dangerOptions={gatheringVocabularyOptions('danger')}
+            biomeOptions={modifiers.gatheringVocabularyOptions('biomes')}
+            dangerOptions={modifiers.gatheringVocabularyOptions('danger')}
             onPickImagePath={services?.pickImagePath}
             onUpdateEnvironment={store.updateEnvironmentDraft}
             onSetCompositionMode={store.setEnvironmentCompositionMode}
@@ -6227,8 +5300,8 @@
             onExcludeRecord={store.excludeEnvironmentRecord}
             onRestoreRecord={store.restoreEnvironmentRecord}
             onReorderRecord={store.reorderEnvironmentRecord}
-            onOpenSourceTask={(id) => editGatheringTask(id)}
-            onOpenSourceEvent={(id) => editGatheringEvent(id)}
+            onOpenSourceTask={(id) => drafts.editGatheringTask(id)}
+            onOpenSourceEvent={(id) => drafts.editGatheringEvent(id)}
           />
         </section>
       </main>
@@ -6336,9 +5409,9 @@
         resultValidationErrors={gathering.gatheringTaskValidation.resultErrors || []}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
-        weatherOptions={gatheringConditionOptions('weather')}
-        timeOfDayOptions={gatheringConditionOptions('timeOfDay')}
-        biomeOptions={gatheringVocabularyOptions('biomes')}
+        weatherOptions={modifiers.gatheringConditionOptions('weather')}
+        timeOfDayOptions={modifiers.gatheringConditionOptions('timeOfDay')}
+        biomeOptions={modifiers.gatheringVocabularyOptions('biomes')}
         selectedDropId={gathering.selectedGatheringDrop?.id || gathering.selectedGatheringDropId}
         rewardRules={gathering.selectedGatheringRules}
         characterModifierLibrary={selectedSystemModifiers}
@@ -6351,28 +5424,28 @@
         libraryTools={selectedGatheringSystemTools}
         environmentOptions={gathering.selectedSystemEnvironmentOptions}
         onPickImagePath={services?.pickImagePath}
-        onUpdateTask={updateSelectedGatheringTask}
+        onUpdateTask={drafts.updateSelectedGatheringTask}
         onSelectDrop={(rowId) => {
           gathering.selectedGatheringDropId = rowId;
         }}
-        onAddDrop={addGatheringTaskDrop}
-        onUpdateDrop={updateGatheringTaskDrop}
-        onMoveDrop={moveGatheringTaskDrop}
-        onImportDrop={importGatheringTaskDrop}
-        onAddModifier={addGatheringDropModifier}
-        onUpdateModifier={updateGatheringDropModifier}
-        onDeleteModifier={deleteGatheringDropModifier}
-        onAddToolReference={addToolReferenceToSelectedTask}
-        onRemoveToolReference={removeToolReferenceFromSelectedTask}
+        onAddDrop={drafts.addGatheringTaskDrop}
+        onUpdateDrop={drafts.updateGatheringTaskDrop}
+        onMoveDrop={drafts.moveGatheringTaskDrop}
+        onImportDrop={drafts.importGatheringTaskDrop}
+        onAddModifier={modifiers.addGatheringDropModifier}
+        onUpdateModifier={modifiers.updateGatheringDropModifier}
+        onDeleteModifier={modifiers.deleteGatheringDropModifier}
+        onAddToolReference={drafts.addToolReferenceToSelectedTask}
+        onRemoveToolReference={drafts.removeToolReferenceFromSelectedTask}
       />
     {:else if currentView === 'gathering-event-edit' && selectedSystem}
       <GatheringEventEditView
         event={gathering.editingGatheringEvent}
-        weatherOptions={gatheringConditionOptions('weather')}
-        timeOfDayOptions={gatheringConditionOptions('timeOfDay')}
-        biomeOptions={gatheringVocabularyOptions('biomes')}
+        weatherOptions={modifiers.gatheringConditionOptions('weather')}
+        timeOfDayOptions={modifiers.gatheringConditionOptions('timeOfDay')}
+        biomeOptions={modifiers.gatheringVocabularyOptions('biomes')}
         onPickImagePath={services?.pickImagePath}
-        onUpdateEvent={updateSelectedGatheringEvent}
+        onUpdateEvent={drafts.updateSelectedGatheringEvent}
       />
     {:else if currentView === 'tools' && selectedSystem}
       <ToolsBrowserView
@@ -6792,32 +5865,32 @@
             {gatheringDropRateTierClass}
             {gatheringDropRateTierColor}
             {gatheringDropRateValue}
-            {gatheringDropModifierPickerSelection}
-            {characterModifierSearchSuggestions}
+            gatheringDropModifierPickerSelection={modifiers.gatheringDropModifierPickerSelection}
+            characterModifierSearchSuggestions={modifiers.characterModifierSearchSuggestions}
             selectedGatheringEvent={gathering.selectedGatheringEvent}
             editingGatheringEvent={gathering.editingGatheringEvent}
             activeGatheringEventEnvironmentCount={gathering.activeGatheringEventEnvironmentCount}
             gatheringEventReferencingEnvironments={gathering.gatheringEventReferencingEnvironments}
-            {gatheringEventModifierPickerSelection}
-            {eventCharacterModifierSearchSuggestions}
+            gatheringEventModifierPickerSelection={modifiers.gatheringEventModifierPickerSelection}
+            eventCharacterModifierSearchSuggestions={modifiers.eventCharacterModifierSearchSuggestions}
             {sortedDangerTags}
             {selectedSystemModifiers}
-            {characterModifierSearchOpenUp}
-            {gatheringConditionAvailableOptions}
+            characterModifierSearchOpenUp={modifiers.characterModifierSearchOpenUp}
+            gatheringConditionAvailableOptions={modifiers.gatheringConditionAvailableOptions}
             gatheringConditionLabel={gathering.gatheringConditionLabel}
-            {gatheringConditionModifierRows}
+            gatheringConditionModifierRows={modifiers.gatheringConditionModifierRows}
             gatheringModifierCardHint={gathering.gatheringModifierCardHint}
             gatheringModifierCardTitle={gathering.gatheringModifierCardTitle}
             {gatheringModifierDisplayValue}
             gatheringModifierKindIcon={gathering.gatheringModifierKindIcon}
             {gatheringModifierValueClass}
             {signedToOperatorValue}
-            {rowCharacterModifiers}
-            {characterModifierIconForRef}
-            {characterModifierIsCustomized}
-            {characterModifierLabelForRef}
-            {characterModifierLibraryEntry}
-            {characterModifierOperatorClass}
+            rowCharacterModifiers={modifiers.rowCharacterModifiers}
+            characterModifierIconForRef={modifiers.characterModifierIconForRef}
+            characterModifierIsCustomized={modifiers.characterModifierIsCustomized}
+            characterModifierLabelForRef={modifiers.characterModifierLabelForRef}
+            characterModifierLibraryEntry={modifiers.characterModifierLibraryEntry}
+            characterModifierOperatorClass={modifiers.characterModifierOperatorClass}
             selectedGatheringRules={gathering.selectedGatheringRules}
             {worldTravelTab}
             {selectedTravelRealm}
@@ -6838,33 +5911,33 @@
             {truncateDescription}
             travelSaving={$viewState.travelSaving === true}
             environmentSaveError={$viewState.environmentSaveError}
-            bind:characterModifierSearchAnchor
-            bind:characterModifierSearchTerm
-            onDuplicateDrop={duplicateGatheringTaskDrop}
-            onDeleteDrop={deleteGatheringTaskDrop}
-            onUpdateDrop={updateGatheringTaskDrop}
-            onDropCountInput={onGatheringDropCountInput}
-            onDropCountBlur={onGatheringDropCountBlur}
-            onDropCountKeydown={onGatheringDropCountKeydown}
-            onSelectDropModifierPickerOption={setGatheringDropModifierPickerSelection}
-            onAddDropConditionModifier={addGatheringDropModifier}
-            onUpdateDropConditionModifier={updateGatheringDropModifier}
-            onDropConditionModifierKeydown={onGatheringDropModifierKeydown}
-            onDeleteDropConditionModifier={deleteGatheringDropModifier}
-            onPickDropCharacterModifier={pickCharacterModifierForRow}
-            {onUpdateDropCharacterModifier}
-            {onDeleteDropCharacterModifier}
-            onSetDropCharacterModifierOverride={setCharacterModifierOverrideEnabled}
-            onSelectEventModifierPickerOption={setGatheringEventModifierPickerSelection}
-            onAddEventConditionModifier={addGatheringEventConditionModifier}
-            onUpdateEventConditionModifier={updateGatheringEventConditionModifier}
-            onEventConditionModifierKeydown={onGatheringEventModifierKeydown}
-            onDeleteEventConditionModifier={deleteGatheringEventConditionModifier}
-            onPickEventCharacterModifier={pickCharacterModifierForEvent}
-            {onUpdateEventCharacterModifier}
-            {onDeleteEventCharacterModifier}
-            onSetEventCharacterModifierOverride={setEventCharacterModifierOverrideEnabled}
-            onUpdateRules={updateSelectedGatheringRules}
+            bind:characterModifierSearchAnchor={modifiers.characterModifierSearchAnchor}
+            bind:characterModifierSearchTerm={modifiers.characterModifierSearchTerm}
+            onDuplicateDrop={drafts.duplicateGatheringTaskDrop}
+            onDeleteDrop={drafts.deleteGatheringTaskDrop}
+            onUpdateDrop={drafts.updateGatheringTaskDrop}
+            onDropCountInput={drafts.onGatheringDropCountInput}
+            onDropCountBlur={drafts.onGatheringDropCountBlur}
+            onDropCountKeydown={drafts.onGatheringDropCountKeydown}
+            onSelectDropModifierPickerOption={modifiers.setGatheringDropModifierPickerSelection}
+            onAddDropConditionModifier={modifiers.addGatheringDropModifier}
+            onUpdateDropConditionModifier={modifiers.updateGatheringDropModifier}
+            onDropConditionModifierKeydown={modifiers.onGatheringDropModifierKeydown}
+            onDeleteDropConditionModifier={modifiers.deleteGatheringDropModifier}
+            onPickDropCharacterModifier={modifiers.pickCharacterModifierForRow}
+            onUpdateDropCharacterModifier={modifiers.onUpdateDropCharacterModifier}
+            onDeleteDropCharacterModifier={modifiers.onDeleteDropCharacterModifier}
+            onSetDropCharacterModifierOverride={modifiers.setCharacterModifierOverrideEnabled}
+            onSelectEventModifierPickerOption={modifiers.setGatheringEventModifierPickerSelection}
+            onAddEventConditionModifier={modifiers.addGatheringEventConditionModifier}
+            onUpdateEventConditionModifier={modifiers.updateGatheringEventConditionModifier}
+            onEventConditionModifierKeydown={modifiers.onGatheringEventModifierKeydown}
+            onDeleteEventConditionModifier={modifiers.deleteGatheringEventConditionModifier}
+            onPickEventCharacterModifier={modifiers.pickCharacterModifierForEvent}
+            onUpdateEventCharacterModifier={modifiers.onUpdateEventCharacterModifier}
+            onDeleteEventCharacterModifier={modifiers.onDeleteEventCharacterModifier}
+            onSetEventCharacterModifierOverride={modifiers.setEventCharacterModifierOverrideEnabled}
+            onUpdateRules={drafts.updateSelectedGatheringRules}
             onDeleteRealm={(realmId) => store.deleteRealm?.(realmId)}
             onRenameRealm={(realmId, name) => store.renameRealm?.(realmId, name)}
           />

@@ -16,6 +16,8 @@ const langPath = resolve(repoRoot, 'lang/en.json');
 const MANAGER_ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
 const GATHERING_ROUTE_MODEL = 'src/ui/svelte/apps/manager/gatheringRouteModel.svelte.js';
 const GATHERING_DISPLAY = 'src/ui/svelte/apps/manager/gatheringDisplay.js';
+const GATHERING_DRAFT_HANDLERS = 'src/ui/svelte/apps/manager/gatheringDraftHandlers.svelte.js';
+const GATHERING_MODIFIER_HANDLERS = 'src/ui/svelte/apps/manager/gatheringModifierHandlers.svelte.js';
 
 const chanceSliderPath = resolve(repoRoot, 'src/ui/svelte/components/ChanceSlider.svelte');
 
@@ -141,19 +143,27 @@ describe('GatheringEventEditView source contract', () => {
   // The two hook pins this block opened with are asserted in the DOM now — at the event route by
   // `manager-gathering-mounted.js`, at both subjects by `manager-environments-mounted.js` — because
   // issue 1707 computes every hook name from `subject` and no root literal spells them.
-  it('renders the event modifier inspector (time, weather, character) from the manager root', () => {
-    assert.ok(rootSource.includes('addGatheringEventConditionModifier'), 'root should expose add condition modifier handler');
-    assert.ok(rootSource.includes('updateGatheringEventConditionModifier'), 'root should expose update condition modifier handler');
-    assert.ok(rootSource.includes('deleteGatheringEventConditionModifier'), 'root should expose delete condition modifier handler');
-    assert.ok(rootSource.includes('onUpdateEventCharacterModifier'), 'root should expose update character modifier handler');
-    assert.ok(rootSource.includes('onDeleteEventCharacterModifier'), 'root should expose delete character modifier handler');
-    assert.ok(rootSource.includes('pickCharacterModifierForEvent'), 'root should expose a picker for adding character modifiers');
-    assert.equal(
-      rootSource.includes('onUpdateEventCharacterModifier(ref.id, { mode: event.currentTarget.value })'),
-      false,
-      'the per-modifier mode select must be gone (application mode is a single global system setting)'
-    );
-  });
+  // The handlers moved into the gathering modifier unit (issue 1721). Application mode is a single
+  // global system setting, so no per-modifier mode reaches the update.
+  defineStructureContract(
+    'handles the event modifier inspector (time, weather, character)',
+    GATHERING_MODIFIER_HANDLERS,
+    {
+      names: [
+        'addGatheringEventConditionModifier',
+        'updateGatheringEventConditionModifier',
+        'deleteGatheringEventConditionModifier',
+        'onUpdateEventCharacterModifier',
+        'onDeleteEventCharacterModifier',
+        'pickCharacterModifierForEvent',
+      ],
+    }
+  );
+  defineStructureContract(
+    'sends no per-modifier mode with a character modifier update',
+    [MANAGER_ROOT, GATHERING_MODIFIER_HANDLERS],
+    { callsWithNo: [['onUpdateEventCharacterModifier', 'mode']] }
+  );
 
   // The operator Positive/Negative <select> is gone; value is typed signed. The coloured box, the
   // signed-input wrapper, its `inputmode` and its `%` adornment are asserted in the DOM by
@@ -169,23 +179,21 @@ describe('GatheringEventEditView source contract', () => {
     { spellsNo: ['manager-condition-modifier-row-body'], namesNo: ['gatheringDropModifierOperatorClass'] }
   );
 
-  it('supports Arrow Up/Down stepping on condition modifier values', () => {
-    assert.ok(rootSource.includes('function onGatheringDropModifierKeydown'), 'root should expose a drop modifier keydown stepper');
-    assert.ok(rootSource.includes('function onGatheringEventModifierKeydown'), 'root should expose an event modifier keydown stepper');
-    // The `onkeydown` attribute is the shared panel's now, and since issue 1707 phase 2 the drop's
-    // arity normalisation is the task leaf's; since phase 3 the root hands both steppers to the
-    // rail under scope-distinguished names. What the root still owns is handing each scope's
-    // stepper down, and the normalised call reaching the real row is asserted by the mounted
-    // Arrow-step case in `manager-gathering-mounted.js`.
-    assert.ok(
-      /onDropConditionModifierKeydown=\{onGatheringDropModifierKeydown\}/.test(rootSource),
-      'the drop panel call site should wire the drop keydown stepper'
-    );
-    assert.ok(
-      /onEventConditionModifierKeydown=\{onGatheringEventModifierKeydown\}/.test(rootSource),
-      'the event panel call site should wire the event keydown stepper'
-    );
-    assert.ok(/onGatheringDropModifierKeydown[\s\S]*ArrowUp[\s\S]*ArrowDown/.test(rootSource), 'stepper should handle ArrowUp and ArrowDown');
+  // The `onkeydown` attribute is the shared panel's now, and since issue 1707 phase 2 the drop's
+  // arity normalisation is the task leaf's; since phase 3 the root hands both steppers to the
+  // rail under scope-distinguished names, and since issue 1721 the steppers are the modifier
+  // unit's. The normalised call reaching the real row is asserted by the mounted Arrow-step case
+  // in `manager-gathering-mounted.js`.
+  defineStructureContract('steps condition modifier values with Arrow Up/Down', GATHERING_MODIFIER_HANDLERS, {
+    names: ['onGatheringDropModifierKeydown', 'onGatheringEventModifierKeydown'],
+    spellsExactly: ['ArrowUp', 'ArrowDown'],
+  });
+  defineStructureContract('hands each scope its own keydown stepper', MANAGER_ROOT, {
+    passesProps: [
+      ['GatheringInspectorRail', 'onDropConditionModifierKeydown'],
+      ['GatheringInspectorRail', 'onEventConditionModifierKeydown'],
+    ],
+    reads: ['modifiers.onGatheringDropModifierKeydown', 'modifiers.onGatheringEventModifierKeydown'],
   });
 
   it('exposes an optional linked-scene row with drag-drop, unlink, and right-click removal', () => {
@@ -210,9 +218,13 @@ describe('GatheringEventEditView source contract', () => {
     ],
   });
 
+  // Save, delete and back are the draft handlers', and edit opens the event's own route.
+  defineStructureContract('saves, deletes and leaves the event draft', GATHERING_DRAFT_HANDLERS, {
+    names: ['saveGatheringEventDraft', 'deleteGatheringEventDraft', 'backToGatheringEventLibrary'],
+    property: [['route', 'gathering-event-edit']],
+  });
+
   it('stages event edits in a draft with Save + Dirty toolbar parity with tasks', () => {
-    assert.ok(rootSource.includes('function saveGatheringEventDraft'), 'root should expose saveGatheringEventDraft');
-    assert.ok(rootSource.includes('function deleteGatheringEventDraft'), 'root should expose deleteGatheringEventDraft');
     assert.ok(ROUTE_EXIT_GUARDS.some((guard) => guard.view === 'gathering-event-edit'), 'route-exit chain should include event confirm');
     assert.ok(gatheringActionsSource.includes('FABRICATE.Admin.Manager.Environment.Events.Save'), 'toolbar Save button uses the event Save lang key');
     assert.ok(gatheringActionsSource.includes('FABRICATE.Admin.Manager.Environment.Events.Dirty'), 'toolbar Dirty chip uses the event Dirty lang key');
@@ -227,14 +239,6 @@ describe('GatheringEventEditView source contract', () => {
     assert.ok(
       rootSource.includes('<GatheringEventEditView'),
       'manager root should mount the event editor component'
-    );
-    assert.ok(
-      rootSource.includes('function backToGatheringEventLibrary'),
-      'manager root should expose backToGatheringEventLibrary'
-    );
-    assert.ok(
-      rootSource.includes("activeView = 'gathering-event-edit'"),
-      'editGatheringEvent should set the view to gathering-event-edit'
     );
     assert.equal(
       environmentsBrowserSource.includes('GatheringEventEditView'),
