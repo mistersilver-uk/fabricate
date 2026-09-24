@@ -151,23 +151,20 @@ import { hasPendingWorldScopeRekey } from './worldScopeRekeyPending.js';
 
 const MISSING_SOURCE_FLAG = Symbol('missing-source-flag');
 
-// The invalidation-domain attributions every `save()` site names (issue 1078 part B1). Derived
-// from the FIELD map rather than by listing domains, so a local mutation and its replicated copy
-// cannot be classified differently, and hoisted because a per-call-site derivation is both
-// allocation on a write path and repeated code the duplication gate counts.
+// The invalidation-domain attributions every `save()` site names (issue 1078), derived from the
+// field map so a local mutation and its replicated copy classify alike.
 const COMPONENT_FACTS = domainsForSystemFields(['components']);
 const TOOL_FACTS = domainsForSystemFields(['tools']);
 const RECIPE_ITEM_FACTS = domainsForSystemFields(['recipeItemDefinitions']);
 // A component delete also rewrites the essence definitions that pointed at it, and an essence
 // delete strips the essence from every component: one attribution serves both directions.
 const ESSENCE_FACTS = domainsForSystemFields(['essenceDefinitions', 'components']);
-// `repairItemData` refreshes definition names, images and descriptions for BOTH libraries.
+// `repairItemData` refreshes definition names, images and descriptions for both libraries.
 const ITEM_METADATA_FACTS = domainsForSystemFields(['components', 'tools']);
 
-/** Resolve an injected store seam, whether supplied as the store itself or as a lazy getter.
- * Lazy is the production shape, because `game.fabricate` is unpopulated at construction. TOTAL:
- * a getter that throws answers `null`, an UNKNOWN basis, rather than taking the normalizer down
- * (the issue-970 failure mode). */
+/** Resolve an injected store seam, given as the store or as a lazy getter (the production shape,
+ * since `game.fabricate` is unpopulated at construction). A throwing getter answers `null`, an
+ * unknown basis, rather than breaking the normalizer (issue 970). */
 function _resolveStoreSeam(seam) {
   if (!seam) return null;
   try {
@@ -177,10 +174,9 @@ function _resolveStoreSeam(seam) {
   }
 }
 
-/** One scope store's published corpus, or `null` when there is no readable world half.
- * `_resolveStoreSeam` catches a throwing GETTER; this also catches a throwing `corpus()`, so the
- * manager spelling degrades exactly as the module spelling does. `## Scoped Entity Definitions`
- * requirement 16: an UNREADABLE world half must answer the in-system array ITSELF. */
+/** One scope store's published corpus, or `null` when no world half is readable, catching a
+ * throwing `corpus()` too. `## Scoped Entity Definitions` requirement 16: an unreadable world
+ * half answers the in-system array itself. */
 function _resolveStoreCorpus(seam) {
   try {
     return _resolveStoreSeam(seam)?.corpus?.() ?? null;
@@ -189,10 +185,10 @@ function _resolveStoreCorpus(seam) {
   }
 }
 
-/** The Valid Id Basis for ONE world-scope entity type (issue 1359): the union of the world roster
- * and the system's surviving in-system array, or `null` when neither can vouch for an id. The
- * world half counts when `isSeeded('entities')`, the legacy half only when NON-EMPTY, and it is
- * NOT MEMBERSHIP-FILTERED, because an absent membership record is a REFUSAL, never a PRUNE. */
+/** The Valid Id Basis for one world-scope entity type (issue 1359): the world roster unioned with
+ * the system's in-system array, or `null` when neither can vouch. The world half counts when
+ * `isSeeded('entities')`, the legacy half only when non-empty, and membership is not filtered:
+ * an absent membership record is a refusal, never a prune. */
 function _scopeEntityBasis(store, legacy) {
   const seeded = store?.isSeeded?.('entities') === true;
   const legacyList = Array.isArray(legacy) && legacy.length > 0 ? legacy : null;
@@ -202,27 +198,23 @@ function _scopeEntityBasis(store, legacy) {
   return ids;
 }
 
-/** The Valid Id Basis for ONE CATEGORY VOCABULARY, and the sharpest of the seven prune sites: the
- * migration empties `system.componentCategories`, so an ungated prune deletes EVERY authored
- * category icon permanently. It DELIBERATELY DOES NOT READ `fabricate.worldVocabulary`, because
- * nothing keys an icon map on a world category (`## World Vocabulary` requirement 6). */
+/** The Valid Id Basis for one category vocabulary: the migration empties
+ * `system.componentCategories`, so an ungated prune would delete every authored category icon.
+ * It never reads `fabricate.worldVocabulary` (`## World Vocabulary` requirement 6). */
 function _vocabularyBasis(vocabulary) {
   return vocabulary.length > 0 ? vocabulary : null;
 }
 
-/** The names an icon map's entries may carry, given its vocabulary basis. With a KNOWN basis this
- * is the reserved `general` bucket plus the vocabulary; with an UNKNOWN one it is the map's OWN
- * keys, so `normalizeCategoryIconMap` still lower-cases every key and sanitizes every icon value
- * while PRUNING NOTHING. */
+/** The names an icon map may carry: `general` plus the vocabulary for a known basis, or the map's
+ * own keys for an unknown one, so keys are still normalized while nothing is pruned. */
 function _iconAllowance(icons, vocabulary) {
   if (vocabulary !== null) return ['general', ...vocabulary];
   return icons && typeof icons === 'object' && !Array.isArray(icons) ? Object.keys(icons) : [];
 }
 
-/** The Valid Id Basis for ONE library: the union of the world list and the system's surviving
- * legacy copy, or `null` when neither can vouch for an id. PER LIBRARY, because the two are
- * independent, and a legacy copy counts only when NON-EMPTY, because every pre-1308 save emitted
- * an empty array that vouches for nothing while licensing a full prune. */
+/** The Valid Id Basis for one library: the world list unioned with the system's legacy copy, or
+ * `null` when neither can vouch. Per library, and a legacy copy counts only when non-empty,
+ * because pre-1308 saves emitted empty arrays that would license a full prune. */
 function _libraryBasis(store, key, readWorld, legacy) {
   const seeded = store?.isSeeded?.(key) === true;
   const legacyList = Array.isArray(legacy) && legacy.length > 0 ? legacy : null;
@@ -244,10 +236,8 @@ function _idSet(...lists) {
 }
 
 export class CraftingSystemManager {
-  /** `seams` injects the Foundry-facing collaborators (issue 800); every default is a safe
-   * pass-through, so the ~87 single-argument construction sites keep working. `enrichToHtml`
-   * defaults to a pass-through because `enrichHTML` cannot run under happy-dom, which is what
-   * keeps the headless suites honest rather than mocked. */
+  /** `seams` injects the Foundry-facing collaborators (issue 800), each defaulting to a safe
+   * pass-through; `enrichToHtml` passes through because `enrichHTML` cannot run under happy-dom. */
   constructor(recipeManager, seams = {}) {
     this.recipeManager = recipeManager;
     this.systems = new Map();
@@ -258,29 +248,24 @@ export class CraftingSystemManager {
       domainsForFields: domainsForSystemFields,
       ownersOf: (systemId) => [systemId],
     });
-    // Shares THIS map rather than mirroring it, hydrating through `_normalizeSystem`. That
-    // normalizer is a WHITELIST REBUILD, so the repository must call it rather than carry any
-    // approximation of the persisted shape.
+    // Shares this map and hydrates through `_normalizeSystem`, a whitelist rebuild, so the
+    // repository never carries its own approximation of the persisted shape.
     this._repository = seams.repository ?? this._buildDefaultRepository();
     this._enrichToHtml = seams.enrichToHtml ?? ((text) => text);
     this._primeEnricherCache = seams.primeEnricherCache ?? (async () => {});
-    // Active-GM gate for the un-versioned legacy recipe-item backfill. Defaults to a globals
-    // probe so a real player client is gated without wiring, while unit fixtures keep migrating
-    // because `activeGM` is undefined there.
+    // Active-GM gate for the legacy recipe-item backfill; defaults to a globals probe, so a
+    // player is gated without wiring while fixtures (no `activeGM`) still migrate.
     this._isActiveGM =
       seams.isActiveGM ??
       (() => globalThis.game?.users?.activeGM?.id === globalThis.game?.user?.id);
-    // Issue 1308: the WORLD character libraries, which since the move are the source of the two
-    // id sets this manager prunes references against. Optional by design — a fixture that
-    // injects none gets an UNKNOWN basis and prunes nothing, which is the safe direction. See
-    // `_characterLibraryBasis`.
+    // The world character libraries (issue 1308), the source of two pruned id sets. Optional: a
+    // fixture injecting none gets an unknown basis and prunes nothing (`_characterLibraryBasis`).
     this._characterLibrariesStore =
       seams.characterLibrariesStore ??
       (() => globalThis.game?.fabricate?.getCharacterLibrariesStore?.() ?? null);
-    // The three WORLD-SCOPE entity stores (issue 1359), optional by design: a fixture injecting
-    // none gets an UNKNOWN basis and prunes nothing. Each defaults to a LAZY getter, and the
-    // accessors are deliberately NOT `_requireReady()`-gated, because optional chaining absorbs
-    // an absent accessor but not a throw.
+    // The three world-scope entity stores (issue 1359), optional like the above. Each defaults to
+    // a lazy getter, and the accessors are not `_requireReady()`-gated, because optional
+    // chaining absorbs an absent accessor but not a throw.
     this._componentScopeStore =
       seams.componentScopeStore ??
       (() => globalThis.game?.fabricate?.getComponentScopeStore?.() ?? null);
@@ -291,17 +276,14 @@ export class CraftingSystemManager {
       seams.toolScopeStore ?? (() => globalThis.game?.fabricate?.getToolScopeStore?.() ?? null);
   }
 
-  /** Resolve the injected character-libraries store, supplied either as the store or as a lazy
-   * getter — lazy being the production shape, because `game.fabricate` is unpopulated here. */
+  /** The injected character-libraries store, given as the store or a lazy getter. */
   _resolveCharacterLibrariesStore() {
     return _resolveStoreSeam(this._characterLibrariesStore);
   }
 
-  /** Build the VALID ID BASIS for one system's reference pruning, RETURNING `null` for each set
-   * it cannot know to be complete, per `DOMAIN.md`'s Valid Id Basis rule. The basis is a UNION of
-   * the world library and the surviving legacy copy, which before the 1.28.0 migration IS the
-   * live corpus; it is NOT a `migrationVersion` check, which `DOMAIN.md` forbids. An empty world
-   * library is not enough to prune on, so the store keeps raw key presence. */
+  /** The Valid Id Basis for one system's reference pruning, `null` for each set not known to be
+   * complete (`DOMAIN.md` Valid Id Basis). It unions the world library with the legacy copy, the
+   * live corpus before the 1.28.0 migration, and is never a `migrationVersion` check. */
   _characterLibraryBasis(system) {
     const store = this._resolveCharacterLibrariesStore();
     return {
@@ -320,10 +302,9 @@ export class CraftingSystemManager {
     };
   }
 
-  /** Build the VALID ID BASIS for one system's WORLD-SCOPE reference pruning (issue 1359), plus
-   * the two vocabularies the icon maps are pruned against, RETURNING `null` for each basis it
-   * cannot know complete. NO CALL SITE MAY DEFAULT ONE TO `new Set()`, so `validEssenceIds` is
-   * `Set|null` and the `instanceof Set` test downstream is LOAD-BEARING. */
+  /** The Valid Id Basis for one system's world-scope pruning (issue 1359) plus the icon-map
+   * vocabularies, `null` for each basis not known complete. No caller may default one to
+   * `new Set()`: `validEssenceIds` is `Set|null` and the `instanceof Set` test depends on it. */
   _scopeBasis(system) {
     return {
       componentIds: _scopeEntityBasis(
@@ -342,35 +323,31 @@ export class CraftingSystemManager {
     };
   }
 
-  /** THE READ UNION for one system's components (issue 1359): the world components it is a MEMBER
-   * of, unioned with its surviving in-system array, world winning on an id collision.
-   * `_normalizeSystem` still emits `components` and `## CraftingSystem` requirement 36 keeps that
-   * array authoritative. MEMOIZED on `(world corpus, system array)`, never on a system id. */
+  /** The read union for one system's components (issue 1359): world components it is a member
+   * of, unioned with its in-system array, world winning on id collision (`## CraftingSystem`
+   * requirement 36 keeps that array authoritative). Memoized on (world corpus, system array). */
   resolveScopedComponents(system) {
     return this._resolveScopedUnion(system, this._componentScopeStore, 'components');
   }
 
-  /** THE READ UNION for one system's essence definitions. See {@link resolveScopedComponents}. */
+  /** The read union for one system's essence definitions; see {@link resolveScopedComponents}. */
   resolveScopedEssences(system) {
     return this._resolveScopedUnion(system, this._essenceScopeStore, 'essenceDefinitions');
   }
 
-  /** THE READ UNION for one system's tools. See {@link resolveScopedComponents}. */
+  /** The read union for one system's tools; see {@link resolveScopedComponents}. */
   resolveScopedTools(system) {
     return this._resolveScopedUnion(system, this._toolScopeStore, 'tools');
   }
 
-  /** The shared body of the three read unions, delegating to the ONE implementation in
-   * `scopedEntityReads.js` rather than mirroring it: delegating only the BUILD would leave the
-   * manager spelling reallocating and blanking an id-less record while the module spelling passed
-   * every arm of the unknown-half rule. */
+  /** The three read unions' shared body, delegating wholly to `scopedEntityReads.js` so both
+   * spellings follow the unknown-half rule identically. */
   _resolveScopedUnion(system, seam, field) {
     const record = typeof system === 'string' ? this.getSystem(system) : system;
     return resolveScopedEntityRead(record, _resolveStoreCorpus(seam), field);
   }
 
-  /** The repository this manager builds when the caller injects none — the ONE place the
-   * crafting-system backend is chosen (issue 1089). */
+  /** The default repository, the one place the crafting-system backend is chosen (issue 1089). */
   _buildDefaultRepository() {
     return new SettingsCraftingDefinitionRepository({
       settingKey: SETTING_KEYS.CRAFTING_SYSTEMS,
@@ -382,8 +359,7 @@ export class CraftingSystemManager {
 
   async initialize() {
     if (this.initialized) return;
-    // Hydration runs inside the repository (issue 1089), so `loadAll()` returns
-    // already-normalized systems.
+    // `loadAll()` returns already-normalized systems (issue 1089).
     for (const normalized of await this._repository.loadAll()) {
       this.systems.set(normalized.id, normalized);
     }
@@ -397,10 +373,9 @@ export class CraftingSystemManager {
     }
   }
 
-  /** Reject a crafting-system id that cannot serve as a durable-flag map key: the identity flag is
-   * `roles.<systemId>.componentId`, so a dotted id is nested by `expandObject` on write and
-   * silently missed by the reader. Fails LOUDLY at the entry point, and the id is NEVER rewritten,
-   * because recipes, tools and gathering config all reference the system by it. */
+  /** Reject a system id that cannot key a durable flag map: `roles.<systemId>.componentId` is
+   * nested by `expandObject` on a dotted id and missed by the reader. Fails loudly, and the id
+   * is never rewritten, because recipes, tools and gathering config reference it. */
   _assertValidSystemId(id) {
     if (!isSafeFlagKeySegment(id)) {
       throw new Error(
@@ -409,23 +384,20 @@ export class CraftingSystemManager {
     }
   }
 
-  /** The durable per-system component identity flag key `roles.<systemId>.componentId`, or `null`
-   * when `systemId` is not a safe dotted-path segment. A null result means a stamp/clear/repair
-   * site must NOT write; the component still resolves through the raw-reference fall-through. */
+  /** The component identity flag key `roles.<systemId>.componentId`, or `null` for an unsafe id,
+   * in which case no site writes and the component resolves through raw references. */
   _componentRoleFlagKey(systemId) {
     return isSafeFlagKeySegment(systemId) ? `roles.${systemId}.componentId` : null;
   }
 
-  /** The durable per-system TOOL identity flag key `roles.<systemId>.toolId` (issue 561), or
-   * `null` for an unsafe id. An additive SIBLING of the component leaf, so a whetstone that is
-   * both carries both and clearing one never touches the other. */
+  /** The tool identity flag key `roles.<systemId>.toolId` (issue 561), or `null` for an unsafe id;
+   * a sibling of the component leaf, so clearing one never touches the other. */
   _toolRoleFlagKey(systemId) {
     return isSafeFlagKeySegment(systemId) ? `roles.${systemId}.toolId` : null;
   }
 
-  /** The durable per-system RECIPE-ITEM identity flag key
-   * `roles.<systemId>.recipeItemDefinitionId` (issue 567), or `null` for an unsafe id — the third
-   * additive SIBLING, so clearing one system's leaf never touches another's. */
+  /** The recipe-item identity flag key `roles.<systemId>.recipeItemDefinitionId` (issue 567), or
+   * `null` for an unsafe id; the third sibling leaf. */
   _recipeItemRoleFlagKey(systemId) {
     return isSafeFlagKeySegment(systemId) ? `roles.${systemId}.recipeItemDefinitionId` : null;
   }
@@ -439,10 +411,9 @@ export class CraftingSystemManager {
     const recipeItemDefinitions = this._normalizeRecipeItemDefinitions(
       system.recipeItemDefinitions ?? system.recipeItems
     );
-    // Normalize the shared prerequisite library before Tools so every payload path applies the
-    // same ID invariant. Both libraries are WORLD scope (issue 1308), so the basis comes from
-    // `_characterLibraryBasis` and either half may be `null`; deriving it from
-    // `system.characterPrerequisites` alone would strip every tool prerequisite on an unmigrated world.
+    // Prerequisites normalize before Tools. Both libraries are world scope (issue 1308), so the
+    // basis comes from `_characterLibraryBasis` and either half may be `null`; reading
+    // `system.characterPrerequisites` alone would strip tool prerequisites on an unmigrated world.
     const { prerequisiteIds: validToolPrerequisiteIds, modifierIds: validCatalogueIds } =
       this._characterLibraryBasis(system);
     const _legacyModifiers = normalizeModifierLibrary(system.modifiers);
@@ -450,22 +421,17 @@ export class CraftingSystemManager {
       system.characterPrerequisites,
       () => foundry.utils.randomID()
     );
-    // Issue 1359: the WORLD-SCOPE Valid Id Basis, derived from the RAW system so the legacy half
-    // is judged on what was actually stored. `essenceIds` is `Set|null` from here on and MUST NOT
-    // be defaulted to an empty Set. The essence half is derived from the ALREADY-NORMALIZED
-    // definitions, because that is precisely the set this pass used to prune against.
+    // The world-scope Valid Id Basis (issue 1359), judged on the raw stored system; its essence
+    // half uses the already-normalized definitions. `essenceIds` is `Set|null`, never defaulted.
     const scopeBasis = this._scopeBasis({ ...system, essenceDefinitions });
     const essenceIds = scopeBasis.essenceIds;
-    // Salvage-normalization context (issue 764), HOISTED above the component map so the
-    // Simple-mode group-count clamp in `_normalizeSalvage` sees the owning system's mode
-    // and Simple check formula flag. Both derivations are component-independent, so
-    // hoisting is safe; the return literal below reuses `salvageResolutionMode`.
+    // Salvage-normalization context (issue 764), hoisted so `_normalizeSalvage`'s Simple-mode
+    // group clamp sees the system's mode and formula flag; both are component-independent.
     const { salvageResolutionMode, salvageSimpleCheckHasFormula } =
       this._salvageNormalizationContext(system);
-    // The ONE system-level modifier library (issue 1117), HOISTED above the three activity checks
-    // because each of their selections is validated against it. It has moved twice and is NOT read
-    // from either old location here: the migrations and the export-payload upcast are the paths a
-    // legacy payload arrives through, and a silent read-alias would make the relocation unobservable.
+    // The one system-level modifier library (issue 1117), hoisted because the three checks
+    // validate against it. No read alias for its old locations: migrations and the export upcast
+    // carry legacy payloads.
 
     const rawManagedItems = Array.isArray(system.components)
       ? system.components
@@ -484,10 +450,8 @@ export class CraftingSystemManager {
     const itemIds = new Set(items.map((i) => i.id));
     const itemById = new Map(items.map((i) => [i.id, i]));
 
-    // First-class Tools (issue 561): a component-linked tool derives its source refs and snapshot
-    // from its linked component here, so it matches owned items by SOURCE and not just by name.
-    // Item-sourced and already-derived tools are left untouched, and it runs after component
-    // normalization so `items` is the resolved set.
+    // First-class Tools (issue 561): a component-linked tool derives source refs and snapshot from
+    // its component, after component normalization, so it matches owned items by source.
     const normalizedTools = Array.isArray(system.tools)
       ? system.tools.map((t) =>
           this._normalizeTool(t, { validPrerequisiteIds: validToolPrerequisiteIds })
@@ -505,10 +469,9 @@ export class CraftingSystemManager {
         def.associatedSystemItemId ||
         (itemIds.has(def.sourceItemUuid) ? def.sourceItemUuid : null);
       const sourceComponent = sourceComponentId ? itemById.get(sourceComponentId) || null : null;
-      // A source component not in `items` used to answer `null` unconditionally, which is only
-      // sound when the component basis is KNOWN: otherwise the id may name a component this
-      // client cannot see, and nulling the authored uuid is a silent, persisted deletion. An
-      // unknown basis is a licence to keep, never a licence to emit junk.
+      // A source component absent from `items` nulls the uuid only under a known basis;
+      // otherwise the id may name a component this client cannot see, and nulling would be a
+      // persisted deletion.
       const sourceItemUuid = sourceComponentId
         ? sourceComponent?.originItemUuid ||
           sourceComponent?.registeredItemUuid ||
@@ -533,10 +496,8 @@ export class CraftingSystemManager {
       enabled: system.enabled !== false,
       resolutionMode: (function _normalizeResolutionMode(raw) {
         if (raw === 'cauldron') return 'alchemy'; // T-189: legacy alias
-        // Legacy mode TOKEN aliases for un-migrated or imported data — token renames only, since
-        // the legacy routing algorithms are gone. `mapped` → `routedByIngredients`, `tiered` →
-        // `routedByCheck`, and a bare `routed` predates the split and cannot pick a basis on read,
-        // so it falls back to `routedByIngredients`, matching the 1.9.0 migration's tie-break.
+        // Legacy mode token aliases: `mapped` and bare `routed` → `routedByIngredients` (the 1.9.0
+        // migration's tie-break), `tiered` → `routedByCheck`.
         if (raw === 'mapped' || raw === 'routed') return 'routedByIngredients';
         if (raw === 'tiered') return 'routedByCheck';
         return [
@@ -549,38 +510,31 @@ export class CraftingSystemManager {
           ? raw
           : 'simple';
       })(system.resolutionMode),
-      // New spec-first shape
       features,
       itemTags: this._normalizeStringList(system.itemTags ?? system.tags),
-      // Flat system-level visibility strategy (issue 511, PR-B): the single enum
-      // that gates the whole Crafting authoring surface. `recipeVisibility` is
-      // kept alongside it for its residual `knowledge.learn.dragDropEnabled`.
+      // The flat system visibility enum (issue 511), gating the whole Crafting authoring surface;
+      // `recipeVisibility` stays for its residual `knowledge.learn.dragDropEnabled`.
       visibilityMode: this._normalizeVisibilityMode(system.visibilityMode),
       recipeVisibility: this._normalizeRecipeVisibility(system.recipeVisibility),
       requirements: this._normalizeRequirements(system.requirements),
       essenceDefinitions: resolvedEssenceDefinitions,
       recipeItemDefinitions,
-      // Which basis resolves recipe-book membership for THIS system (issue 1011). Monotonic, and
-      // backfilled as a monotone OR over the PERSISTED value, because a bare `some(...)` would
-      // flip the basis back the moment `reload()` saw the last array emptied.
+      // Which basis resolves book membership for this system (issue 1011): monotonic, backfilled
+      // as an OR over the persisted value, so emptying the last array never flips it back.
       membershipResolvesByRecipeIds:
         system.membershipResolvesByRecipeIds === true ||
         recipeItemDefinitions.some(
           (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
         ),
-      // A SURVIVING LEGACY COPY IS CARRIED THROUGH; THE MIGRATION IS THE ONLY THING THAT REMOVES
-      // IT (issue 1308). Migrations run on the ACTIVE GM alone, so every player hydrates through
-      // this normalizer while the world setting is unwritten, and `upsertTool` derives its own
-      // Valid Id Basis from the NORMALIZED record.
+      // A surviving legacy copy is carried through; only the migration removes it (issue 1308).
+      // Migrations run on the active GM alone, so players hydrate through here until it runs.
       ...(_legacyModifiers.length > 0 && { modifiers: _legacyModifiers }),
       craftingCheck: this._normalizeCraftingCheck(system.craftingCheck, validCatalogueIds),
-      // Canonical salvage mode, derived above with the salvage-normalization context
-      // (issue 764) so the component map and this field agree on one value.
+      // Derived above with the salvage context (issue 764), so both agree.
       salvageResolutionMode,
-      // Tool-breakage authority (issue 419), ABSENCE-PRESERVING SINCE 1.30.0 (issue 1363):
-      // substituting `toolSpecific` for anything missing made the WORLD half of
-      // `resolveToolBreakageAuthority` unreachable. Every value already on disk is treated as
-      // AUTHORED (`## Scoped Entity Definitions` `### Tool scope` requirement 5).
+      // Tool-breakage authority (issue 419), absence-preserving since 1.30.0 (issue 1363) so the
+      // world half of `resolveToolBreakageAuthority` is reachable; every stored value is authored
+      // (`## Scoped Entity Definitions` `### Tool scope` requirement 5).
       ...(function _normalizeToolBreakageAuthority(raw) {
         return ['toolSpecific', 'checkDriven'].includes(raw?.authority)
           ? { toolBreakage: { authority: raw.authority } }
@@ -600,16 +554,12 @@ export class CraftingSystemManager {
       ),
       teaserConfig: this._normalizeTeaserConfig(system.teaserConfig),
 
-      // Canonical, system-owned COMPONENT category vocabulary (issue 676), a sibling of the recipe
-      // `categories` vocabulary and deliberately NOT an alias: canonical spec forbids merging,
-      // aliasing or cross-populating the two. The reserved `general` bucket is implied, never
-      // persisted. This is the SAME normalized list the vocabulary basis was derived from.
+      // The system-owned component category vocabulary (issue 676), never merged with or aliased to
+      // recipe `categories`; `general` is implied, never persisted.
       componentCategories: scopeBasis.componentCategories ?? [],
 
-      // Per-category icons (issue 689). Each map is pruned against its OWN vocabulary, which
-      // `## CraftingSystem` requirement 6b forbids merging, and GATED ON THE VOCABULARY BASIS
-      // (issue 1359), because this rebuild is a whitelist and an ungated prune would delete every
-      // authored icon PERMANENTLY.
+      // Per-category icons (issue 689), each map pruned against its own vocabulary
+      // (`## CraftingSystem` requirement 6b) and gated on the vocabulary basis (issue 1359).
       categoryIcons: normalizeCategoryIconMap(
         system.categoryIcons,
         _iconAllowance(system.categoryIcons, scopeBasis.recipeCategories)
@@ -628,20 +578,15 @@ export class CraftingSystemManager {
       enableCategories: true,
       enableMultiStepRecipes: features.multiStepRecipes === true,
       components: items,
-      // Canonical, system-owned library Tools. Populated here so every consumer
-      // (`getSystem(id).tools`) — the recipe tool gate, salvage, the canvas
-      // interactable browser, item-drop resolution, and gathering composition —
-      // reads a single source of truth. Mirrors how `components` is normalized.
+      // The canonical library Tools every consumer reads through `getSystem(id).tools`.
       tools: normalizedTools,
-      // Carried through on the same rule as the modifier library above, and removed by the same
-      // migration.
+      // Carried through and removed like the modifier library above.
       ...(_legacyCharacterPrerequisites.length > 0 && {
         characterPrerequisites: _legacyCharacterPrerequisites,
       }),
-      // PARTICIPATION ONLY (issue 1282): the realm library is world scope, so it lives in the
-      // `travelConfig` setting and this rebuild stops emitting `gatheringRealms`. The omission is
-      // destructive by design, because the allowlist rebuild is what removes the stale per-system
-      // copy — which is why the 1.27.0 migration must run before any system save.
+      // Participation only (issue 1282): realms are world scope in `travelConfig`, and omitting
+      // `gatheringRealms` here removes the stale per-system copy, so the 1.27.0 migration must run
+      // before any system save.
       gatheringRealmSettings: normalizeGatheringRealmSettings(
         system.gatheringRealmSettings ?? system.gatheringRegionSettings
       ),
@@ -700,10 +645,9 @@ export class CraftingSystemManager {
     return normalizeAlchemyConfig(config, resolutionMode);
   }
 
-  /** The FAILURE-RESULT POLICY (issue 1098) — may a failed check produce a result at all. ONE
-   * derivation, THREE callers, each a WHITELIST REBUILD, so a key emitted by two and not the third
-   * is dropped from that one activity on the next save. A new system defaults to `perRecord`; an
-   * UPGRADED world never sees that default, because the `1.25.0` seed migration writes `never`. */
+  /** The failure-result policy (issue 1098): may a failed check produce a result at all. One
+   * derivation for three whitelist rebuilds, so no activity drops the key on save. New systems
+   * default to `perRecord`; upgraded worlds get `never` from the `1.25.0` seed migration. */
   _normalizeFailureResultPolicy(value) {
     return normalizeFailureResultPolicy(value);
   }
@@ -808,10 +752,8 @@ export class CraftingSystemManager {
     return this._plainTextDescription(description);
   }
 
-  // Thin delegators to the shared Foundry-free NORMALIZER (src/utils/
-  // plainTextDescription.js). These normalize already-resolved text for display;
-  // they never RESOLVE — resolution is the async `_enrichToHtml` seam, applied at
-  // the ingestion boundaries only (issue 800).
+  // Thin delegators to the Foundry-free normalizer (`src/utils/plainTextDescription.js`); they
+  // never resolve, which is the async `_enrichToHtml` seam at ingestion (issue 800).
   _plainTextDescription(value) {
     return plainTextDescription(value);
   }
@@ -820,9 +762,8 @@ export class CraftingSystemManager {
     return descriptionTextCandidate(value, seen);
   }
 
-  /** The snapshot cluster's collaborators (issue 1699), rebuilt on every call: several suites
-   * patch `_enrichToHtml`, `_buildComponentSourceSnapshot` or `_resolveImportedComponentSourceData`
-   * on an already-constructed instance, and a bag captured once would never see them. */
+  /** The snapshot cluster's collaborators (issue 1699), rebuilt per call because suites patch
+   * these methods on constructed instances. */
   _sourceSnapshotCollaborators() {
     return {
       enrichToHtml: (raw, options) => this._enrichToHtml(raw, options),
@@ -914,16 +855,12 @@ export class CraftingSystemManager {
     return normalizeCurrencyRequirement(currency);
   }
 
-  /** Persist a crafting-system mutation through the definition repository (issue 1089).
-   * Argument-less `save()` stays the whole-corpus write, which two unbounded callers still need;
-   * every other site names what it touched, scoping the revision advance to it (issue 1078). A
-   * named save also says WHICH CLASSES OF FACT it moved, and omitting `domains` means "every
-   * domain". For a `batch`, `domains` may be PER RECORD, keyed by record id. */
+  /** Persist a crafting-system mutation through the repository (issue 1089). Argument-less
+   * `save()` is the whole-corpus write; other sites name what they touched, scoping the revision
+   * advance (issue 1078). Omitted `domains` means every domain; a `batch` may key them per record. */
   async save(change = null) {
-    // The revision-token advance point for the systems entity scope (issue 1076). `save()` is this
-    // manager's single persistence chokepoint, so announcing the change once here beats auditing
-    // every mutating method for a missing advance. A whole-corpus save advances every system,
-    // because it is exactly the case where the manager was not told what moved.
+    // The systems-scope revision advance (issue 1076), announced once at this chokepoint; a
+    // whole-corpus save advances every system.
     const touched = this._savedSystemIds(change);
     this._advanceSystemRevision(...touched);
     for (const systemId of touched) {
@@ -948,21 +885,17 @@ export class CraftingSystemManager {
     this._bookkeeping.attributeChange(domains, ...systemIds);
   }
 
-  /** `updateSystem` is the one attribution site that cannot be a constant: it takes an arbitrary
-   * patch, so it derives its domains from the fields that actually moved. */
+  /** `updateSystem` takes an arbitrary patch, so it derives domains from the moved fields. */
   _domainsForSystemEdit(previous, next) {
     return this._bookkeeping.domainsForEdit(previous, next);
   }
 
-  /** Re-read the persisted crafting-systems setting into the in-memory map — the un-guarded,
-   * non-persisting refresh path for a replicated change on ANOTHER client. {@link corpusDelta}
-   * (issues 1076, 1078) advances only the systems that changed and PRESERVES CONTAINER IDENTITY,
-   * so an unchanged system keeps the array references the retained indexes are keyed on. A
-   * reordering replaces the map, preserves no identity and advances every system. */
+  /** Re-read the persisted setting into the map: the non-persisting refresh for a change
+   * replicated from another client. {@link corpusDelta} (issues 1076, 1078) advances only changed
+   * systems and preserves container identity for the retained indexes; a reordering replaces the
+   * map and advances every system. */
   reload() {
-    // Optional repository capability: `null` means the backend has no synchronous
-    // replicated snapshot to read (see `CraftingDefinitionRepository`), so reloading
-    // is a no-op rather than a wrong answer.
+    // `null` means the backend has no synchronous replicated snapshot, so reload is a no-op.
     const saved = this._repository.readReplicatedSnapshot();
     this._bookkeeping.holdReloadDelta(null);
     if (!saved) return false;
@@ -978,7 +911,7 @@ export class CraftingSystemManager {
     if (delta.reordered) {
       this.systems = next;
       this._advanceSystemRevision(...next.keys());
-      // Attributable to no record, so to no fact class either (issue 1078 part B1).
+      // Attributable to no record, so to no fact class (issue 1078).
       this._advanceFactScopes([], ...next.keys());
       return true;
     }
@@ -993,8 +926,7 @@ export class CraftingSystemManager {
     return this._bookkeeping.consumeReloadDelta();
   }
 
-  /** A crafting system is the record, so its id is the scope owner directly. Consumed by
-   * `settingChangeBridge.js` on every client. */
+  /** A system is its own scope owner; consumed by `settingChangeBridge.js` on every client. */
   consumeReplicatedChangeScopes() {
     return this._bookkeeping.consumeReplicatedChangeScopes();
   }
@@ -1017,12 +949,9 @@ export class CraftingSystemManager {
   }
 
   /**
-   * The ENABLED-and-disabled recipe set belonging to a system — half of the
-   * `{getSystem, getRecipesForSystem, getComponentsForSystem}` contract {@link SignatureValidator}
-   * documented but which no runtime object implemented, so seven call sites hand-rolled an ad-hoc
-   * adapter closure (issue 1072). Several of those deliberately stay and now differ from a named
-   * baseline instead of from each other. Filtering on `enabled` is the validator's own job, so
-   * this accessor stays unfiltered.
+   * A system's recipes, enabled and disabled: half of the `{getSystem, getRecipesForSystem,
+   * getComponentsForSystem}` contract {@link SignatureValidator} expects (issue 1072). Unfiltered,
+   * since filtering on `enabled` is the validator's job.
    */
   getRecipesForSystem(systemId) {
     if (!systemId) return [];
@@ -1030,38 +959,29 @@ export class CraftingSystemManager {
   }
 
   /**
-   * The managed component library of a system — the other half of the
-   * {@link SignatureValidator} contract (issue 1072). Returns the LIVE array rather than a copy,
-   * matching every adapter closure it replaces; copying would be a silent behaviour change on the
-   * signature path and a per-call O(components) allocation on the exact scan this bounds, so
-   * callers must not mutate it. ANSWERS THROUGH THE READ UNION since issue 1370, and the live-array
-   * contract survives: an absent, unloaded, empty or unreadable world half returns
-   * `system.components` ITSELF, and a present one a memoized union with stable identity.
+   * A system's managed components, the other half of the {@link SignatureValidator} contract
+   * (issue 1072). Returns the live array, so callers must not mutate it. Answers through the read
+   * union (issue 1370): an absent, unloaded, empty or unreadable world half returns
+   * `system.components` itself, a present one a memoized union with stable identity.
    */
   getComponentsForSystem(systemId) {
     return this.resolveScopedComponents(this.getSystem(systemId));
   }
 
-  /** The essence definitions of a system. KEEPS ITS DEFENSIVE COPY (issue 1370): the read union's
-   * unknown-half passthrough answers the in-system array itself, which this spread discards
-   * deliberately, because the copy is a shipped contract of this accessor and removing it would
-   * silently change every caller that sorts or splices the answer. */
+  /** A system's essence definitions, as a defensive copy (issue 1370): the copy is a shipped
+   * contract, so callers may sort or splice the answer. */
   getEssenceDefinitions(systemId) {
     return [...this.resolveScopedEssences(this.getSystem(systemId))];
   }
 
-  /** The first-class tool library of a system, the tool-side twin of
-   * {@link getComponentsForSystem} (issue 1370). NEW with the consumer sweep — every tool reader
-   * previously indexed `system.tools` directly — and like the component accessor it returns the
-   * LIVE array when there is no world half. */
+  /** A system's tool library, the twin of {@link getComponentsForSystem} (issue 1370), returning
+   * the live array when there is no world half. */
   getToolsForSystem(systemId) {
     return this.resolveScopedTools(this.getSystem(systemId));
   }
 
-  /** One essence definition by id, read off the retained `byId` facet of
-   * {@link module:definitionIndex} rather than by scanning (issue 1076). The facet is built
-   * first-insert-wins in array order, so a duplicate id resolves to the same definition the
-   * previous `.find()` returned. */
+  /** One essence definition by id from the retained `byId` facet of {@link module:definitionIndex}
+   * (issue 1076); first insert wins, so a duplicate id resolves to the first definition. */
   getEssenceDefinition(systemId, essenceId) {
     const system = this.getSystem(systemId);
     if (!system || !essenceId) return null;
@@ -1074,14 +994,7 @@ export class CraftingSystemManager {
     return Array.isArray(system.recipeItemDefinitions) ? [...system.recipeItemDefinitions] : [];
   }
 
-  /**
-   * One recipe-item (book/scroll) definition by id — indexed exactly as
-   * {@link CraftingSystemManager#getEssenceDefinition} is (issue 1076).
-   *
-   * @param {string} systemId
-   * @param {string} recipeItemId
-   * @returns {object|null}
-   */
+  /** One recipe-item definition by id, indexed like {@link CraftingSystemManager#getEssenceDefinition}. */
   getRecipeItemDefinition(systemId, recipeItemId) {
     const system = this.getSystem(systemId);
     if (!system || !recipeItemId) return null;
@@ -1100,10 +1013,9 @@ export class CraftingSystemManager {
     );
   }
 
-  /** The authoring and browse accessor for a system's managed items, DELIBERATELY NOT REPOINTED at
-   * issue 1370: this is the surface the GM authors against, so it answers the PERSISTED record
-   * rather than a merged read row, which would offer a row for editing that no writer can save
-   * back. {@link getComponentsForSystem} is the repointed read accessor. */
+  /** The authoring and browse accessor for a system's managed items, deliberately on the
+   * persisted record (issue 1370): a merged read row would offer edits no writer can save.
+   * {@link getComponentsForSystem} is the read accessor. */
   getItems(systemId, search = '') {
     const system = this.getSystem(systemId);
     if (!system) return [];
@@ -1136,13 +1048,11 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Reconcile a recipe's legacy `recipeItemId` scalar against the many-to-many book membership
-   * that superseded it. Runs un-gated on every `initialize()`, so both halves are idempotent and
-   * converge on the first pass, sharing ONE walk and one save per setting — a second write here
-   * is the issue-970 failure mode below. It mints a definition and stamps the scalar for a recipe
-   * retaining a standalone `linkedRecipeItemUuid`, and clears a leaked scalar (issue 978) for a
-   * recipe that IS a book member, where four legacy resolvers read it ahead of an authored
-   * `recipe.img` (issue 887). The two cohorts never overlap.
+   * Reconcile recipes' legacy `recipeItemId` scalar with book membership. Runs ungated on every
+   * `initialize()`, so both halves are idempotent and share one walk and one save per setting.
+   * It mints a definition and stamps the scalar for a recipe keeping a standalone
+   * `linkedRecipeItemUuid`, and clears a leaked scalar (issue 978) on a book member, since
+   * legacy resolvers read it ahead of `recipe.img` (issue 887). The cohorts never overlap.
    */
   async _migrateLegacyRecipeItems() {
     if (!this.recipeManager?.getRecipes || !this.recipeManager?.save) return false;
@@ -1164,9 +1074,8 @@ export class CraftingSystemManager {
       const recipes = this.recipeManager.getRecipes({ craftingSystemId: system.id });
 
       for (const recipe of recipes) {
-        // Half 2 (issue 978), before the mint-and-stamp read below so a cleared recipe
-        // falls straight through: it has no `linkedRecipeItemUuid`, so it is not a
-        // re-stamp candidate and the repair converges on this pass.
+        // Half 2 (issue 978) first, so a cleared recipe (no `linkedRecipeItemUuid`) is no
+        // re-stamp candidate and the repair converges in one pass.
         if (
           recipe?.recipeItemId &&
           !String(recipe?.linkedRecipeItemUuid || '').trim() &&
@@ -1221,11 +1130,9 @@ export class CraftingSystemManager {
       }
     }
 
-    // `save()` / `recipeManager.save()` write WORLD settings only a GM may update, and this pass
-    // runs from `initialize()` — BEFORE `runStartupMaintenance`'s error isolation — so on a player
-    // client the rejection escapes, `this.initialized` never flips, and every facade method throws
-    // for the rest of the session (the issue-970 failure mode). The in-memory pass above stays
-    // ungated so a player's loaded systems/recipes remain self-consistent for this session.
+    // The saves write GM-only world settings, and this runs from `initialize()` before
+    // `runStartupMaintenance`'s isolation: on a player the rejection would leave `initialized`
+    // false and break the facade for the session (issue 970). The in-memory pass stays ungated.
     if (!this._isActiveGM()) return false;
     if (systemsChanged) await this.save({ domains: RECIPE_ITEM_FACTS });
     if (recipesChanged) await this.recipeManager.save();
@@ -1259,10 +1166,8 @@ export class CraftingSystemManager {
       throw new Error(`Cannot add non-Item document (${source.documentName}) as a recipe item`);
     }
 
-    // The durable per-system recipe-item identity leaf `roles.<system.id>.recipeItemDefinitionId`
-    // (issue 567). A dotted/unsafe id yields null, so every stamp/clear below is skipped and the
-    // recipe item resolves through the legacy-scalar + raw-reference fall-through, exactly like a
-    // component under an unsafe id.
+    // The recipe-item identity leaf (issue 567); an unsafe id yields null, so no stamp or clear
+    // runs and the item resolves through the legacy scalar and raw references.
     const roleFlagKey = this._recipeItemRoleFlagKey(system.id);
 
     const snapshot = await this._buildRecipeItemSourceSnapshot(itemUuid, source);
@@ -1274,10 +1179,8 @@ export class CraftingSystemManager {
         existing.description === snapshot.description &&
         existing.originItemUuid === snapshot.originItemUuid;
 
-      // Stamp the durable identity leaf (and strip a clone's stale `_stats`) on BOTH
-      // the skipped and updated branches. This makes `skipped` a user-accessible
-      // recovery path: re-registering an unchanged definition whose source predates
-      // the flag still stamps and strips it (issue 555).
+      // Stamp the identity leaf (and strip a clone's stale `_stats`) on both branches, so
+      // re-registering an unchanged definition recovers a source predating the flag (issue 555).
       const previousSourceUuid = existing.originItemUuid;
       if (roleFlagKey) await this._stampSourceIdentity(source, roleFlagKey, existing.id);
 
@@ -1289,15 +1192,12 @@ export class CraftingSystemManager {
       existing.img = snapshot.img;
       existing.description = snapshot.description;
       existing.originItemUuid = snapshot.originItemUuid;
-      // An element's indexed fields (`name`, source refs) changed at constant array
-      // length, which neither the array-identity nor the length clause of the
-      // `definitionIndex` invalidation rule can see. Advance explicitly.
+      // Indexed fields changed at constant length, invisible to the `definitionIndex` rule.
       advanceDefinitionRevision(system.recipeItemDefinitions);
 
       await this.save({ put: system, domains: RECIPE_ITEM_FACTS });
-      // A source-uuid change is a re-point: clear ONLY the durable per-system leaf off the old
-      // source document so it no longer claims this definition — never the whole `roles` flag
-      // nor the whole `roles[systemId]` object (that would destroy sibling componentId/toolId).
+      // A re-point clears only this system's leaf off the old source, never the whole `roles`
+      // flag or `roles[systemId]`, which would destroy sibling componentId/toolId.
       if (roleFlagKey && previousSourceUuid && previousSourceUuid !== snapshot.originItemUuid) {
         await this._clearSourceFlag(previousSourceUuid, roleFlagKey, existing.id);
       }
@@ -1321,11 +1221,10 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Register a first-class Tool DIRECTLY from an Item uuid (issue 561), with NO component import
-   * required: resolve the source Item, build the tool source snapshot, push a `componentId: null`
-   * first-class tool onto `system.tools`, and stamp the durable `roles[systemId].toolId` exactly
-   * as the sibling `*FromUuid` methods stamp their kinds. GM-gated, dotted-id-safe (a null flag
-   * key skips the write), and save-persisted.
+   * Register a first-class Tool directly from an Item uuid (issue 561), with no component import:
+   * resolve the Item, build its source snapshot, push a `componentId: null` tool and stamp
+   * `roles[systemId].toolId` like the sibling `*FromUuid` methods. GM-gated, skips the flag write
+   * for an unsafe id, and saves.
    */
   async addToolFromUuid(systemId, itemUuid) {
     return this.upsertTool(systemId, {}, { itemUuid });
@@ -1473,9 +1372,8 @@ export class CraftingSystemManager {
     }
   }
 
-  /** Persist one normalized Tool, optionally registering or relinking its Item source.
-   * Source resolution and snapshot construction finish before the system is mutated;
-   * a failed settings write restores the prior Tool array and performs no flag writes. */
+  /** Persist one normalized Tool, optionally registering or relinking its Item source. Sources
+   * resolve before the system is mutated; a failed write restores the Tool array with no flag writes. */
   async upsertTool(systemId, data = {}, { itemUuid } = {}) {
     this._assertGM('add tool from uuid');
     const system = this.getSystem(systemId);
@@ -1486,13 +1384,9 @@ export class CraftingSystemManager {
     const snapshot = source ? await this._buildToolSourceSnapshot(itemUuid.trim(), source) : null;
     const tools = Array.isArray(system.tools) ? system.tools : [];
     const existing = this._findToolForUpsert(tools, data, snapshot, source, flagKey);
-    // Issue 1308: the SAME Valid Id Basis `_normalizeSystem` uses, and derived through the same
-    // helper rather than rebuilt here. This site is easy to miss and expensive to get wrong: it
-    // does not go through `_normalizeSystem`, so before the fix it read the world-scoped library
-    // off `system.characterPrerequisites`, found nothing, and handed `_normalizeToolPrerequisites`
-    // a real-but-empty Set — which its own unknown-basis sentinel cannot refuse. Every Tool save
-    // would then strip that tool's prerequisite ids and flip its gate off, in a fully migrated,
-    // otherwise healthy world.
+    // The Valid Id Basis `_normalizeSystem` uses (issue 1308), via the same helper: this site
+    // bypasses `_normalizeSystem`, and a real-but-empty Set here would strip every tool's
+    // prerequisites in a healthy migrated world.
     const { prerequisiteIds: validPrerequisiteIds } = this._characterLibraryBasis(system);
     const staged = this._normalizeTool(
       {
@@ -1532,10 +1426,8 @@ export class CraftingSystemManager {
     return { item: staged, action: existing ? 'updated' : 'added' };
   }
 
-  /** Remove a Tool from `system.tools` and clear ONLY its durable `roles[systemId].toolId` leaf
-   * from the source Item (issue 561, D7). The per-role leaf clear preserves any sibling
-   * `roles[systemId].componentId` — the whetstone-coexistence guarantee — so it MUST NOT clear
-   * the whole `roles[systemId]` object. GM-gated, save-persisted. */
+  /** Remove a Tool and clear only its `roles[systemId].toolId` leaf from the source Item
+   * (issue 561), preserving a sibling `componentId` leaf. GM-gated, saved. */
   async deleteTool(systemId, toolId) {
     this._assertGM('delete tool');
     const system = this.getSystem(systemId);
@@ -1613,12 +1505,9 @@ export class CraftingSystemManager {
     };
   }
 
-  // Update a recipe item definition's per-item caps and enable state (issue 511).
-  // A definition's identity (name/img/originItemUuid) is managed by the recipe-item
-  // linking flow and is not editable here. The patch's `item`/`learn` partials merge
-  // over the current caps, then the whole block is re-normalized (uncapped defaults,
-  // finite/positive clamps, legacy/new field sync) via `_normalizeRecipeItemCaps`.
-  // An `enabled` patch toggles the definition's enable flag.
+  // Update a recipe item definition's caps and enable state (issue 511); identity is owned by
+  // the linking flow. `item`/`learn` partials merge over the current caps and the block is
+  // re-normalized by `_normalizeRecipeItemCaps`.
   async updateRecipeItemDefinition(systemId, recipeItemId, patch = {}) {
     this._assertGM('update recipe item');
     const system = this.getSystem(systemId);
@@ -1631,25 +1520,17 @@ export class CraftingSystemManager {
       definition.enabled = patch.enabled !== false;
     }
 
-    // Book membership (issue 511 many-to-many): replace the contained-recipe id set.
-    //
-    // This is the SINGLE choke point for the membership-basis marker (issue 1011): the
-    // Contents tab (`CraftingSystemManagerRoot` → `adminStore.saveRecipeItem`),
-    // `adminStore.setRecipeBookMembership` and the recipe browser's bulk book axis all
-    // land here, and none of them re-runs `_normalizeSystem` — so setting the marker at
-    // a store instead would leave the writing client reading `false` against a
-    // non-empty array while every peer, catching up through `reload()`, read `true`.
+    // Book membership (issue 511): replace the contained-recipe id set. This is the single choke
+    // point for the membership-basis marker (issue 1011); the Contents tab, `adminStore` and the
+    // bulk book axis land here without re-running `_normalizeSystem`, so a marker set elsewhere
+    // would leave the writer and its peers disagreeing.
     if (Object.prototype.hasOwnProperty.call(patch, 'recipeIds')) {
-      // Seed BEFORE the marker flips and before this definition's array is replaced, so
-      // the legacy resolution is still the live basis while it is being read across.
-      // Without it the marker would close the revert direction but make the ORPHANING
-      // direction permanent: every OTHER definition's scalar-only members would be
-      // stranded by this one write, recoverable only by re-authoring each book by hand.
+      // Seed before the marker flips and the array is replaced, while the legacy resolution is
+      // still live; otherwise every other book's scalar-only members are orphaned permanently.
       this._seedMembershipFromLegacyScalars(system);
       definition.recipeIds = this._normalizeMembershipRecipeIds(patch.recipeIds);
       system.membershipResolvesByRecipeIds = true;
-      // `recipeIds` backs the reverse membership index, and it was rewritten in place on
-      // an element of an array whose identity and length are unchanged (issue 1076).
+      // `recipeIds` backs the reverse index and was rewritten in place (issue 1076).
       advanceDefinitionRevision(system.recipeItemDefinitions);
     }
 
@@ -1669,12 +1550,9 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Coerce a book-membership id list to the canonical persisted shape: trimmed, non-empty, deduped
-   * strings. Every writer of `recipeItemDefinitions[].recipeIds` produces the same shape, because
-   * the six membership readers all match by exact string equality, so a whitespace-padded id
-   * written by a second path would simply stop matching. Deliberately NOT named `…IdList`: the
-   * imported `normalizeSelectionIds` coerces a SELECTION of recipe ids, and near-homographs on one
-   * class are invisible at a call site.
+   * Coerce a membership id list to the persisted shape: trimmed, non-empty, deduped strings, as
+   * every `recipeIds` writer produces, since membership readers match by exact equality. Not
+   * named `…IdList`, to stay distinct from the imported `normalizeSelectionIds`.
    */
   _normalizeMembershipRecipeIds(recipeIds) {
     return [
@@ -1687,14 +1565,11 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Carry a system's legacy scalar membership onto the canonical
-   * `recipeItemDefinitions[].recipeIds` arrays, in memory (issue 1011). Run by the write that
-   * FIRST sets `membershipResolvesByRecipeIds`, before the requested change is applied, and a
-   * no-op once the marker is set. This is `migrateInvertRecipeItemLink`'s PUSH half re-run at
-   * first-write time, WITHOUT its delete half, because `_migrateLegacyRecipeItems` re-stamps the
-   * scalar on every client so no clear is durable. It resolves through the shared
-   * `resolveLegacyMembershipDefinition` (issue 1155) — the same function every legacy READER
-   * uses, because a seed resolving differently would CHANGE membership as the basis switches.
+   * Carry a system's legacy scalar membership onto `recipeItemDefinitions[].recipeIds` in memory
+   * (issue 1011), run by the write that first sets `membershipResolvesByRecipeIds`; a no-op after.
+   * It is `migrateInvertRecipeItemLink`'s push half without its delete half, resolving through
+   * `resolveLegacyMembershipDefinition` (issue 1155) like every legacy reader, so membership does
+   * not change as the basis switches.
    */
   _seedMembershipFromLegacyScalars(system) {
     if (!system || system.membershipResolvesByRecipeIds === true) return false;
@@ -1704,9 +1579,7 @@ export class CraftingSystemManager {
     if (definitions.length === 0) return false;
 
     const { byId, bySource } = this._indexRecipeItemDefinitionsForLegacySeed(definitions);
-    // The seed's own indexes, handed to the shared rule as DATA ACCESS. The rule stays one
-    // implementation; only the way a definition is found differs, because this path
-    // resolves every recipe in the system in one pass rather than one recipe per read.
+    // The seed's own indexes as data access; the rule stays one implementation.
     const legacyLookups = {
       byDefinitionId: (_definitions, definitionId) => byId.get(definitionId) ?? null,
       byOriginItemUuid: (_definitions, originItemUuid) => bySource.get(originItemUuid) ?? null,
@@ -1724,16 +1597,13 @@ export class CraftingSystemManager {
       definition.recipeIds.push(recipeId);
       seeded = true;
     }
-    // Membership was seeded into elements in place, so the reverse membership index must
-    // be rebuilt on the next read (issue 1076).
+    // Seeded in place, so the reverse index rebuilds on the next read (issue 1076).
     if (seeded) advanceDefinitionRevision(definitions);
     return seeded;
   }
 
-  /** Index a system's recipe item definitions for
-   * {@link CraftingSystemManager#_seedMembershipFromLegacyScalars}: by the definition's own id
-   * (for a recipe's `recipeItemId`) and by `originItemUuid` (for a `linkedRecipeItemUuid`). Also
-   * ensures every definition carries a `recipeIds` array before the caller seeds into it. */
+  /** Index definitions by id and by `originItemUuid` for
+   * {@link CraftingSystemManager#_seedMembershipFromLegacyScalars}, ensuring each has `recipeIds`. */
   _indexRecipeItemDefinitionsForLegacySeed(definitions) {
     const byId = new Map();
     const bySource = new Map();
@@ -1748,12 +1618,9 @@ export class CraftingSystemManager {
     return { byId, bySource };
   }
 
-  // Merge a caps patch over the stored caps sub-block while keeping the legacy/new
-  // mirror pairs consistent (issue 511, PR-B). When a patch sets ONE member of a
-  // mirror pair (e.g. legacy `limitRecipes` from the old UI, or new `limitLearning`
-  // from the redesigned UI), the stored sibling would otherwise win in the
-  // normalizer and revert the change, so drop the un-patched sibling here and let
-  // `_normalizeRecipeItemCaps` re-derive it from the patched value.
+  // Merge a caps patch keeping legacy/new mirror pairs consistent (issue 511): a patch setting one
+  // member drops the stale sibling, which would otherwise win in the normalizer, so
+  // `_normalizeRecipeItemCaps` re-derives it.
   _mergeCapsSection(base = {}, patch = {}, mirrorPairs = []) {
     const merged = { ...base, ...patch };
     for (const pair of mirrorPairs) {
@@ -1815,46 +1682,32 @@ export class CraftingSystemManager {
     const toMode = merged.resolutionMode || 'simple';
     const resolutionModeChanged = fromMode !== toMode;
 
-    // #99 / spec 007 §"Alchemy Uniqueness Revalidation": an edit to an ALREADY-alchemy system that
-    // introduces an ingredient signature collision must BLOCK the save globally, including saves
-    // from unrelated recipe edits. The PROPOSED merged system is validated BEFORE persisting, so a
-    // rejected update never leaves the colliding state anywhere. A resolution-mode CHANGE into
-    // alchemy is excluded: that follows migration policy below, which migrates recipes and
-    // DISABLES any that collide rather than hard-blocking the mode switch.
+    // Spec 007 "Alchemy Uniqueness Revalidation": an edit to an already-alchemy system that
+    // introduces a signature collision blocks the save, validated on the proposed system before
+    // persisting. A mode change into alchemy instead disables colliding recipes below.
     if (toMode === 'alchemy' && !resolutionModeChanged) {
       this._assertNoAlchemySignatureCollisions(merged);
     }
 
-    // Move the crafting-check config between the shared `simple` and tier-routing
-    // `routed` slots when the mode crosses the `routedByIngredients` boundary, BEFORE
-    // the first persist — `routedByIngredients` reads `craftingCheck.simple`, the other
-    // routed mode (`routedByCheck`) reads `craftingCheck.routed`. Mutates `merged` in
-    // place, guarded to fill only an unauthored destination.
+    // Move the check config between the `simple` and `routed` slots when the mode crosses the
+    // `routedByIngredients` boundary, before the first persist; fills only an unauthored slot.
     if (resolutionModeChanged) {
       this._reconcileCraftingCheckSlotsForModeChange(merged, fromMode, toMode);
     }
 
-    // Persist the merged system FIRST so recipe migration/validation reads the NEW
-    // mode through the in-memory `systems` map (e.g. `RecipeManager` activation and
-    // routed-provider validation consult the current system).
+    // Persist first so recipe migration and validation read the new mode.
     this.systems.set(systemId, merged);
     await this.save({ put: merged, domains: this._domainsForSystemEdit(current, merged) });
 
-    // Migration-first mode change: migrate recipes to fit the new mode wherever
-    // possible and delete ONLY those a per-recipe structural constraint of the new
-    // mode rules out. System-level gaps (no progressive/routed check, alchemy
-    // signature collisions, ...) never delete here — the system-validation
-    // aggregator surfaces them and they gate visibility, not deletion.
+    // Migration-first mode change: delete only recipes a per-recipe structural constraint of the
+    // new mode rules out; system-level gaps gate visibility through validation instead.
     if (resolutionModeChanged) {
       await this._migrateRecipesForModeChange(systemId, fromMode, toMode, merged);
     }
 
-    // Path 1: Mode change -- disable invalid salvage configs. This mutates `merged`
-    // in place AFTER the early save above, so persist again when anything changed.
-    // Simple-mode components are NOT disabled here on group count anymore (issue 764):
-    // the `_normalizeSalvage` clamp above already made them valid, so this pass keeps
-    // only its non-count reasons (routed routing gaps, missing progressive check). The
-    // group-drop disclosure it used to provide is the warn below.
+    // Mode change: disable invalid salvage configs (routing gaps, missing progressive check) and
+    // persist again if anything changed. Simple-mode group counts are clamped, not disabled
+    // (issue 764).
     const oldMode = current.salvageResolutionMode || 'simple';
     const disabledComponents = this._disableInvalidSalvageConfigs(merged, oldMode);
     if (disabledComponents.length > 0) {
@@ -1865,11 +1718,8 @@ export class CraftingSystemManager {
       );
     }
 
-    // Issue 764: disclose the Simple-mode success-first clamp when it DROPPED surplus
-    // result groups. The clamp runs silently inside `_normalizeSystem`, so — as the
-    // maintainer required — a switch into (or a save in) Simple mode that discards a
-    // component's extra groups must still cue the GM by name, the same disclosure the
-    // disable-pass used to provide before the clamp made those configs valid.
+    // Disclose by name the components whose surplus Simple-mode groups the clamp dropped
+    // (issue 764), since the clamp itself is silent.
     const droppedSalvageComponents = this._detectDroppedSimpleSalvageGroups(mergedInput, merged);
     if (droppedSalvageComponents.length > 0) {
       const names = droppedSalvageComponents.join(', ');
@@ -1878,18 +1728,15 @@ export class CraftingSystemManager {
       );
     }
 
-    // Path 2: Feature disable -- clean up salvage run history
+    // Salvage feature disabled: clean up salvage run history.
     const oldSalvageEnabled = current.features?.salvage === true;
     const newSalvageEnabled = merged.features?.salvage === true;
     if (oldSalvageEnabled && !newSalvageEnabled) {
       await this._cleanupSalvageRunsForSystem(systemId);
     }
 
-    // Re-run alchemy signature reconciliation only when the mode just CHANGED to
-    // alchemy: migration policy disables colliding recipes to gate visibility (it
-    // must not delete or hard-block on the switch). A no-mode-change component/recipe
-    // edit that would introduce a collision is BLOCKED above before persisting, so it
-    // never reaches this disable path. The helper self-guards non-alchemy systems.
+    // Only a mode change into alchemy disables colliding recipes; a collision from any other edit
+    // was blocked above. The helper self-guards non-alchemy systems.
     if (toMode === 'alchemy' && resolutionModeChanged) {
       await this._reconcileAlchemySignaturesAfterDeletion(merged);
     }
@@ -1901,12 +1748,9 @@ export class CraftingSystemManager {
     return merged;
   }
 
-  /** Move the crafting-check config between the shared pass/fail `simple` slot and the
-   * tier-routing `routed` slot when a resolution mode crosses the `routedByIngredients` boundary,
-   * mirroring the one-time 1.10.0 migration for a live GM mode switch. Both directions fill only
-   * an UNAUTHORED destination, so an authored formula is never clobbered. The routed slot carries
-   * `dcMode`/`macroUuid` now (issue 1096), so a dynamic simple check crossing into `routedByCheck`
-   * keeps its macro instead of reverting to a static DC. */
+  /** Move the check config between the `simple` and `routed` slots when a mode crosses the
+   * `routedByIngredients` boundary, like the 1.10.0 migration; only an unauthored destination is
+   * filled. `dcMode`/`macroUuid` travel too (issue 1096). */
   _reconcileCraftingCheckSlotsForModeChange(merged, fromMode, toMode) {
     const check = merged?.craftingCheck;
     if (!check || typeof check !== 'object') return;
@@ -1918,11 +1762,8 @@ export class CraftingSystemManager {
     }
   }
 
-  /** Copy the shared pass/fail crafting-check fields from a source slot to a destination slot, but
-   * ONLY when the destination has no authored `rollFormula` and the source does, so an authored
-   * destination is never clobbered. `dcMode`/`macroUuid` travel with the rest now that BOTH slots
-   * carry them (issue 1096): leaving them behind was the one way this move could silently change
-   * what a check rolls against. */
+  /** Copy the pass/fail check fields to a destination only when it has no `rollFormula` and the
+   * source does, including `dcMode`/`macroUuid` (issue 1096). */
   _copyPassFailCheckFields(source, destination) {
     if (!source || typeof source !== 'object' || !destination || typeof destination !== 'object') {
       return;
@@ -1951,12 +1792,9 @@ export class CraftingSystemManager {
     }
   }
 
-  /** Migrate every recipe in a system to fit a changed resolution mode: migratable recipes are
-   * updated in place, un-migratable ones deleted, one aggregated notification per outcome. The
-   * deletions are COLLECTED and the set form called ONCE (issue 1132), because routing the loop
-   * through a cascading singular would give each recipe its own `craftingSystems` write and
-   * O(actors) flag pass, publishing a half-migrated system N times. It passes the LIVE `merged`
-   * system, because `updateSystem` saves again after this returns. */
+  /** Migrate a system's recipes to a changed mode: migratable ones in place, the rest deleted, one
+   * notification per outcome. Deletions are collected and deleted as one set (issue 1132), and
+   * the live `merged` system is passed because `updateSystem` saves again after. */
   async _migrateRecipesForModeChange(systemId, fromMode, toMode, system) {
     const affectedRecipes = this.recipeManager.getRecipes({ craftingSystemId: systemId });
     let migratedCount = 0;
@@ -2008,12 +1846,10 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Block an alchemy-system update that would introduce, or leave unresolved, an ingredient
-   * signature collision. Validates the PROPOSED merged system — its components against the
-   * system's CURRENT recipes — via the pure {@link SignatureValidator}, and throws naming the
-   * conflicting recipes/sets. Called BEFORE the merged system is persisted, so a rejected update
-   * never commits the colliding state, and it mirrors the per-recipe block in {@link RecipeManager}
-   * (spec 007 §"Alchemy Uniqueness Revalidation"). No-op for non-alchemy systems.
+   * Block an alchemy-system update that would introduce or leave a signature collision,
+   * validating the proposed components against current recipes via {@link SignatureValidator}
+   * before persisting and throwing with the conflicting recipes (spec 007 "Alchemy Uniqueness
+   * Revalidation"). No-op for non-alchemy systems.
    */
   _assertNoAlchemySignatureCollisions(system) {
     if (system?.resolutionMode !== 'alchemy') return;
@@ -2022,14 +1858,9 @@ export class CraftingSystemManager {
     const recipeJson = recipes.map((recipe) =>
       typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe
     );
-    // DELIBERATELY NOT REPOINTED at issue 1370, and the consequence is stated rather than left to
-    // be discovered. This runs PRE-PERSIST, against the PROPOSED merged record: validating a
-    // not-yet-saved system against a union that does not yet contain it would validate the wrong
-    // subject. The engine-side twin in `CraftingEngine` IS repointed, so after the sweep the same
-    // alchemy uniqueness invariant is evaluated against the union at craft time and against the
-    // raw proposed array at authoring time. The read union's ROW SET is the in-system array's row
-    // set while `## CraftingSystem` requirement 36 holds, which is what keeps the two answers in
-    // agreement; a union that could resurrect a deleted row would make the divergence reachable.
+    // Not repointed at the read union (issue 1370): this validates the proposed, unsaved record.
+    // `CraftingEngine` checks the union at craft time; both agree while `## CraftingSystem`
+    // requirement 36 keeps the union's row set equal to the in-system array's.
     const components = Array.isArray(system.components) ? system.components : [];
     const validator = new SignatureValidator({
       getSystem: (id) => (id === systemId ? system : null),
@@ -2047,11 +1878,9 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Delete a crafting system and the recipes that belong to it. GM only. An individual recipe
-   * deletion that fails does not abort the teardown: the failure is logged with its recipe id, the
-   * remaining recipes are still deleted, and the system is still removed and saved, so no
-   * half-deleted system is stranded in persisted settings. Emits one aggregated notification, or a
-   * warn summary naming how many recipes could not be auto-deleted.
+   * Delete a crafting system and its recipes (GM only). A failed recipe delete is logged and the
+   * rest continue, and the system is still removed and saved, so no half-deleted system persists.
+   * Emits one aggregated notification, or a warning with the undeleted count.
    */
   async deleteSystem(systemId) {
     this._assertGM('delete crafting system');
@@ -2060,17 +1889,10 @@ export class CraftingSystemManager {
       throw new Error(`Crafting system not found: ${systemId}`);
     }
 
-    // Delete recipes that belong to this crafting system. A single failed
-    // recipe deletion (e.g. a Foundry settings write error or timeout) must not
-    // abort the teardown: collect the failures, keep deleting the rest, and
-    // still remove the system itself below so we never leave a half-deleted
-    // system stranded in persisted settings.
     const affected = this.recipeManager.getRecipes({ craftingSystemId: systemId });
     const failedRecipeIds = [];
-    // The ids this deletion actually removed, which is what the mutation-time Valid Id
-    // Basis gate falls back to pruning when the corpus cannot be attested complete
-    // (issue 1226). A recipe whose own delete FAILED is not in here: its flags are not
-    // orphaned, because the recipe is still there.
+    // Ids actually removed, which the mutation-time Valid Id Basis gate prunes when the corpus
+    // cannot be attested complete (issue 1226); a failed delete's recipe still exists.
     const deletedRecipeIds = [];
     for (const recipe of affected) {
       try {
@@ -2117,12 +1939,10 @@ export class CraftingSystemManager {
     }
   }
 
-  /** Cascade cleanup across every persistent store keyed by `systemId`, each lookup lazy and
-   * silently skipped when the service is unavailable. Learned-recipe flags are bulk-cleaned in a
-   * SINGLE pass after the recipes and the system have been removed, so the derived valid-id set
-   * excludes them. WHICH PRUNES NEED A VALID ID BASIS (issue 1226): everything above the
-   * learned-recipe block is SUBJECT-TARGETED and names the deleted system, so only the
-   * learned-recipe and preference sweeps are corpus-derived, and only those two are gated. */
+  /** Cascade cleanup across every store keyed by `systemId`, skipping unavailable services.
+   * Learned-recipe flags are cleaned once after recipes and the system are gone. Only the
+   * learned-recipe and preference sweeps are corpus-derived and gated on a Valid Id Basis (issue
+   * 1226); the rest name the deleted system. */
   async _cleanupSystemScopedState(systemId, { removedRecipeIds = [] } = {}) {
     const environmentStore = this._getGatheringEnvironmentStore();
     if (environmentStore?.cleanupByCraftingSystem) {
@@ -2202,10 +2022,8 @@ export class CraftingSystemManager {
     }
   }
 
-  /** Announce a crafting-system change: the PUBLISHED legacy hook with its unchanged payload, then
-   * the unpublished scoped signal carrying everything attributed since the last announcement.
-   * Draining HERE rather than in `save()` is what keeps the paths that deliberately save without
-   * announcing silent. */
+  /** Announce a crafting-system change: the published legacy hook, then the scoped signal with
+   * everything attributed since; draining here keeps save-without-announce paths silent. */
   _notifySystemsChanged() {
     globalThis.Hooks?.callAll?.('fabricate.craftingSystemsChanged', this.getSystems());
     emitCraftingDataChanged(
@@ -2217,11 +2035,8 @@ export class CraftingSystemManager {
     this._assertGM('create component');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-    // Issue 1359: the SAME Valid Id Basis `_normalizeSystem` uses, derived through the same
-    // helper rather than rebuilt here. This site BYPASSES `_normalizeSystem`, so before this it
-    // read the in-system array directly and handed `_normalizeComponent` a real-but-empty Set on
-    // any client whose world corpus had not replicated — which `_normalizeEssenceQuantities`
-    // cannot refuse. `Set|null`, and NEVER defaulted to an empty Set.
+    // The Valid Id Basis `_normalizeSystem` uses (issue 1359); this site bypasses it, and a
+    // real-but-empty Set on an unreplicated client cannot be refused downstream. `Set|null`.
     const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const item = this._normalizeComponent(data, {
       validEssenceIds,
@@ -2237,8 +2052,6 @@ export class CraftingSystemManager {
   /**
    * Resolve the live and canonical source references for an imported item UUID.
    *
-   * @param {string} itemUuid
-   * @param {Item|object|null} source
    * @returns {{ currentUuid: string|null, canonicalUuid: string|null, references: string[] }}
    */
   _resolveImportedSourceData(itemUuid, source = null) {
@@ -2246,13 +2059,10 @@ export class CraftingSystemManager {
     if (typeof itemUuid === 'string' && itemUuid.trim()) {
       references.push(itemUuid.trim());
     }
-    // A WORLD SOURCE ITEM being registered that carries `_stats.duplicateSource` is a
-    // sidebar-Duplicate/clone, and its inherited `_stats.compendiumSource` still points at the
-    // ORIGINAL's pack, so keying identity on it would de-dup the clone onto the original and
-    // silently OVERWRITE the original's definition (issue 555). A clone therefore keys purely on
-    // its own uuid. This is a REGISTRATION rule ONLY: Foundry stamps `duplicateSource` on every
-    // non-compendium drag-drop, so an actor-owned copy's `compendiumSource` is legitimate
-    // provenance and `matchRecipeItemDefinition` deliberately carries no clone-gate.
+    // A world source with `_stats.duplicateSource` is a clone whose inherited `compendiumSource`
+    // names the original's pack, so it keys on its own uuid or it would overwrite the original's
+    // definition (issue 555). Registration only: Foundry stamps `duplicateSource` on every
+    // non-compendium drag-drop, so `matchRecipeItemDefinition` has no clone gate.
     const isClone = !!getDuplicateSourceUuid(source);
     const identityRefs = isClone
       ? [source?.uuid].filter((ref) => typeof ref === 'string' && ref.trim())
@@ -2266,8 +2076,8 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Resolve component import source references, falling back when Foundry's recorded canonical
-   * source no longer resolves.
+   * Component import source references, falling back when the recorded canonical source no
+   * longer resolves.
    * @returns {Promise<{currentUuid: string|null, canonicalUuid: string|null, references: string[],
    *   aliasItemUuids: string[],
    *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>}>}
@@ -2276,9 +2086,7 @@ export class CraftingSystemManager {
     const sourceData = this._resolveImportedSourceData(itemUuid, source);
     const sourceFallbacks = [];
     const aliasItemUuids = [];
-    // A clone was already stripped of its inherited compendium source by
-    // `_resolveImportedSourceData`; never resurrect it through the broken-source
-    // fallback below (which reads the raw `getCompendiumSourceUuid`).
+    // A clone's inherited compendium source was already stripped; never resurrect it here.
     if (sourceData.isClone) {
       return { ...sourceData, aliasItemUuids, sourceFallbacks };
     }
@@ -2317,14 +2125,7 @@ export class CraftingSystemManager {
     };
   }
 
-  /**
-   * Find an existing component in the system that already claims any of the given source references.
-   *
-   * @param {object} system - Normalized system object
-   * @param {string[]} references - Candidate source references
-   * @param {string|null} [excludeItemId=null] - Optional component to ignore
-   * @returns {object|null}
-   */
+  /** An existing component claiming any of the given source references, ignoring `excludeItemId`. */
   _findComponentBySourceReferences(system, references, excludeItemId = null) {
     const claimedRefs = new Set((references || []).filter(Boolean));
     if (claimedRefs.size === 0) return null;
@@ -2336,10 +2137,8 @@ export class CraftingSystemManager {
     );
   }
 
-  // The recipes a book/scroll contains. Canonical source is the definition's
-  // `recipeIds[]` (issue 511 many-to-many). Falls back to the legacy reverse ref
-  // (`recipe.recipeItemId`, or `linkedRecipeItemUuid → originItemUuid`) only while the
-  // system's `membershipResolvesByRecipeIds` marker is unset.
+  // The recipes a book contains: its `recipeIds[]` (issue 511), falling back to the legacy
+  // reverse ref only while `membershipResolvesByRecipeIds` is unset.
   _getRecipeObjectsReferencingRecipeItemDefinition(systemId, definition) {
     if (!definition || !this.recipeManager?.getRecipes) return [];
     const recipes = this.recipeManager.getRecipes({ craftingSystemId: systemId });
@@ -2350,12 +2149,8 @@ export class CraftingSystemManager {
       return recipes.filter((recipe) => idSet.has(String(recipe?.id)));
     }
 
-    // This definition carries no membership. Only reach for the legacy reverse ref while
-    // the system has not resolved by `recipeIds`; once the marker is set an empty
-    // `recipeIds` means an empty book, and a recipe's stale `recipeItemId`/
-    // `linkedRecipeItemUuid` must not resurrect a phantom membership. The marker is
-    // read, never re-derived from the arrays (issue 1011): that inference flipped in
-    // BOTH directions, so emptying the last array reverted the whole system.
+    // Once the marker is set an empty `recipeIds` is an empty book, and stale reverse refs must
+    // not resurrect membership. The marker is read, never inferred from the arrays (issue 1011).
     if (this.getSystem(systemId)?.membershipResolvesByRecipeIds === true) return [];
 
     const definitionId = String(definition.id || '').trim();
@@ -2370,11 +2165,9 @@ export class CraftingSystemManager {
     });
   }
 
-  // Forward membership query (issue 511 many-to-many): the definitions of `systemId` that contain
-  // `recipeId`. The rule — canonical `recipeIds[]`, then the legacy reverse ref while the system's
-  // `membershipResolvesByRecipeIds` marker is unset — lives in `utils/recipeItemMembership.js`,
-  // which every other membership reader asks (issue 1155). `{ id: recipeId }` stands in for a
-  // recipe the manager cannot resolve, so a stale id still answers from the definitions listing it.
+  // The definitions of `systemId` containing `recipeId` (issue 511), by the shared rule in
+  // `utils/recipeItemMembership.js` (issue 1155). `{ id: recipeId }` stands in for an unresolvable
+  // recipe, so a stale id still answers from the definitions listing it.
   getRecipeItemDefinitionsContaining(systemId, recipeId) {
     const system = this.getSystem(systemId);
     if (!system || !recipeId) return [];
@@ -2422,11 +2215,9 @@ export class CraftingSystemManager {
     return leftRefs.length === rightRefs.length && leftRefs.every((ref) => rightRefs.includes(ref));
   }
 
-  /** The stamping and repair cluster's collaborators (issue 1699), rebuilt on every call: the
-   * suites assign `save`, `_notifySystemsChanged`, `globalThis.game` and `globalThis.fromUuid`
-   * after construction and patch the flag-key derivations on the instance, so a bag captured once
-   * would never see them. The world collections arrive as thunks, which is what keeps the service
-   * free of Foundry globals. */
+  /** The stamping and repair cluster's collaborators (issue 1699), rebuilt per call because suites
+   * patch them after construction; world collections arrive as thunks, keeping the service free of
+   * Foundry globals. */
   _sourceIdentityCollaborators() {
     return {
       getSystems: () => this.getSystems(),
@@ -2478,8 +2269,8 @@ export class CraftingSystemManager {
     );
   }
 
-  /** GM maintenance ("Repair Item Data"): the GM gate stays here, ahead of the bag, so the
-   * permission failure is still the manager's. */
+  /** GM maintenance ("Repair Item Data"); the GM gate stays here so the permission failure is the
+   * manager's. */
   async repairItemData({ includeCompendiums = true } = {}) {
     this._assertGM('repair item data');
     return repairItemData(this._sourceIdentityCollaborators(), { includeCompendiums });
@@ -2488,17 +2279,14 @@ export class CraftingSystemManager {
   /**
    * Import (or refresh) a single component from a source Item UUID.
    *
-   * @param {{persist?: boolean}} [options] - Set `persist=false` for a batch caller (e.g.
-   *   {@link addItemsFromPack}) that mutates the in-memory system per item and then issues a
-   *   SINGLE `save()`, collapsing N whole-corpus `craftingSystems` writes into one. Nothing else
-   *   is gated by it, so the classification, the role-flag stamp and the return are identical.
+   * @param {{persist?: boolean}} [options] `persist: false` lets a batch caller such as
+   *   {@link addItemsFromPack} issue one `save()` for many items; nothing else changes.
    */
   async addItemFromUuid(systemId, itemUuid, options = {}) {
     this._assertGM('add component from uuid');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
 
-    // Resolve the source document (needed for type guard and metadata refresh in all paths)
     let source;
     try {
       source = await fromUuid(itemUuid);
@@ -2506,7 +2294,6 @@ export class CraftingSystemManager {
       source = null;
     }
 
-    // Document type guard: reject non-Item documents
     if (source && source.documentName && source.documentName !== 'Item') {
       throw new Error(
         `Cannot add non-Item document (${source.documentName}) as a crafting component`
@@ -2537,9 +2324,8 @@ export class CraftingSystemManager {
         nextFallbacks.length === (existing.aliasItemUuids || []).length &&
         nextFallbacks.every((ref) => (existing.aliasItemUuids || []).includes(ref));
 
-      // Stamp the source (both skipped + updated) so a source that predates this
-      // flag — or was re-imported — always carries the per-system durable component id.
-      // Skipped for a dotted (unsafe) system id, which cannot serve as a map key.
+      // Stamp the source on both branches so one predating the flag, or re-imported, carries the
+      // component id; skipped for an unsafe system id.
       const existingRoleKey = this._componentRoleFlagKey(system.id);
       if (existingRoleKey) await this._stampSourceIdentity(source, existingRoleKey, existing.id);
 
@@ -2553,17 +2339,15 @@ export class CraftingSystemManager {
       existing.registeredItemUuid = nextSnapshot.registeredItemUuid;
       existing.originItemUuid = nextSnapshot.originItemUuid;
       existing.aliasItemUuids = nextFallbacks;
-      // Indexed fields (`name`, the source-reference union) rewritten in place on an
-      // element (issue 1076).
+      // Indexed fields rewritten in place (issue 1076).
       advanceDefinitionRevision(system.components);
 
       if (options.persist !== false) await this.save({ put: system, domains: COMPONENT_FACTS });
       return { item: existing, action: 'updated', sourceFallbacks: nextSnapshot.sourceFallbacks };
     }
 
-    // No match: create new component
-    // One of the five mutation-time sites that BYPASS `_normalizeSystem` (issue 1359). Same
-    // basis, same helper; `Set|null`, never defaulted to an empty Set. See `_scopeBasis`.
+    // No match: create a new component. A `_normalizeSystem` bypass site (issue 1359): same basis,
+    // same helper, `Set|null`; see `_scopeBasis`.
     const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const item = this._normalizeComponent(
       {
@@ -2615,8 +2399,7 @@ export class CraftingSystemManager {
       );
     }
 
-    // One of the five mutation-time sites that BYPASS `_normalizeSystem` (issue 1359). Same
-    // basis, same helper; `Set|null`, never defaulted to an empty Set. See `_scopeBasis`.
+    // A `_normalizeSystem` bypass site (issue 1359): same basis, `Set|null`; see `_scopeBasis`.
     const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const updatedItem = this._normalizeComponent(
       {
@@ -2635,8 +2418,7 @@ export class CraftingSystemManager {
 
     system.components[idx] = updatedItem;
     advanceDefinitionRevision(system.components);
-    // Re-point the transferable flag: clear the old source (if it still points here)
-    // and stamp the new source, so copies match the current source, not the old one.
+    // Re-point the flag: clear the old source if it points here and stamp the new one.
     const replaceRoleKey = this._componentRoleFlagKey(system.id);
     if (replaceRoleKey) {
       if (previousSourceUuid && previousSourceUuid !== itemUuid) {
@@ -2663,23 +2445,14 @@ export class CraftingSystemManager {
     const documents = await pack.getDocuments();
     const items = documents.filter((d) => d.documentName === 'Item');
 
-    // DECISION (issue 800): no `_primeEnricherCache` call here, deliberately.
-    // This loops `addItemFromUuid`, so each item pays core's own per-`enrichHTML`
-    // priming — but the `getDocuments()` above has already loaded THIS pack into the
-    // document cache, and an intra-pack reference is the common case, so those primes
-    // are cache hits. The batched prime exists for the repair, which sweeps every
-    // definition in the world across arbitrarily many packs; here the same call would
-    // add a full extra pass over N descriptions to save round-trips that mostly are not
-    // happening. Revisit if a cross-pack-heavy import ever measures slow.
+    // No `_primeEnricherCache` here (issue 800): `getDocuments()` already cached this pack, and
+    // intra-pack references are the common case, so per-item priming mostly hits the cache.
     let added = 0;
     let updated = 0;
     let skipped = 0;
     const sourceFallbacks = [];
-    // Each item mutates the in-memory system only (persist:false); the whole batch is flushed with
-    // ONE `save()` below, collapsing N whole-corpus `craftingSystems` writes — each replicated to
-    // every connected client and re-normalized there — into a single write (issue 1086).
-    // `dirty` tracks whether anything actually changed the corpus, so an all-skipped re-drop
-    // writes nothing at all.
+    // Items mutate memory only (`persist: false`) and the batch is flushed by one `save()` below
+    // (issue 1086); `dirty` keeps an all-skipped re-drop from writing.
     let dirty = false;
     try {
       for (const item of items) {
@@ -2695,11 +2468,8 @@ export class CraftingSystemManager {
         if (Array.isArray(result.sourceFallbacks)) sourceFallbacks.push(...result.sourceFallbacks);
       }
     } finally {
-      // `finally`, not a trailing statement: an item that throws mid-batch must still persist the
-      // items already imported, which per-item saves gave for free. The error still propagates.
-      // Named rather than bare (issue 1078): every item went into THIS system and
-      // `addItemFromUuid` mutates that record in place, so the flush knows exactly which one
-      // moved, where a bare `save()` advanced every system's token for an import into one.
+      // In `finally`, so items imported before a throw still persist; named, because every item
+      // went into this one system (issue 1078).
       if (dirty) await this.save({ put: system, domains: COMPONENT_FACTS });
     }
 
@@ -2743,26 +2513,19 @@ export class CraftingSystemManager {
     const refreshDescription = this._hasUpdatedItemDescription(changes);
     if (!refreshName && !refreshImg && !refreshDescription) return { updated: 0 };
 
-    // Identity references only: a clone carries duplicateSource → its original,
-    // so matching on the duplicate source would propagate this edit onto the
-    // original item's component as well.
+    // Identity references only: a clone's duplicateSource names its original, which must not
+    // receive this edit.
     const itemRefs = new Set(getItemIdentityReferences(item));
     if (itemRefs.size === 0) return { updated: 0 };
 
     const nextName = refreshName ? item?.name || changes.name || 'Unnamed Item' : null;
     const nextImg = refreshImg ? item?.img || changes.img || 'icons/svg/item-bag.svg' : null;
-    // Item-sync RESOLVES too (issue 800). Without the await here an edited source
-    // item would re-propagate raw directive text over a description the GM had
-    // already repaired, silently undoing the backfill one edit at a time.
+    // Item sync resolves too (issue 800), or an edited source would re-propagate raw directive
+    // text over a repaired description.
     const nextDescription = refreshDescription ? await this._extractSourceDescription(item) : null;
     let updated = 0;
-    // The systems this walk actually rewrote a component in (issue 1078). It walks EVERY
-    // system by necessity — an item's identity references can name a component in any of
-    // them — but almost never touches more than one, and a bare `save()` here took the
-    // whole-corpus branch and advanced every system's token. On the `updateItem` hook
-    // `main.js` binds this to, that made every GM rename, image or description edit
-    // invalidate every token-keyed retained guard for every system, on every client.
-    /** @type {Set<object>} */
+    // The systems this walk rewrote (issue 1078). It walks every system, but a bare `save()` would
+    // advance every system's token on each GM item edit via the `updateItem` hook.
     const touched = new Set();
 
     for (const system of this.systems.values()) {
@@ -2787,8 +2550,7 @@ export class CraftingSystemManager {
         if (changed) {
           updated++;
           touched.add(system);
-          // A component's `name` is an indexed field of the name fallback, rewritten in
-          // place on an element of an otherwise unchanged array (issue 1076).
+          // `name` is indexed by the name fallback and rewritten in place (issue 1076).
           advanceDefinitionRevision(components);
         }
       }
@@ -2808,8 +2570,7 @@ export class CraftingSystemManager {
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
     const idx = system.components.findIndex((i) => i.id === itemId);
     if (idx === -1) throw new Error(`Component not found: ${itemId}`);
-    // One of the five mutation-time sites that BYPASS `_normalizeSystem` (issue 1359). Same
-    // basis, same helper; `Set|null`, never defaulted to an empty Set. See `_scopeBasis`.
+    // A `_normalizeSystem` bypass site (issue 1359): same basis, `Set|null`; see `_scopeBasis`.
     const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const updatedItem = this._normalizeComponent(
       { ...system.components[idx], ...updates, id: itemId },
@@ -2824,14 +2585,7 @@ export class CraftingSystemManager {
     return system.components[idx];
   }
 
-  /**
-   * Lowercase, trim and drop the empties from a caller-supplied tag list, matching the
-   * lowercase `itemTags` vocabulary. Order is preserved; de-duplication is the caller's
-   * job (the union path needs the incoming order, the removal path only needs the set).
-   *
-   * @param {unknown} tags
-   * @returns {string[]}
-   */
+  /** Lowercase, trim and drop empty tags, preserving order; de-duplication is the caller's job. */
   _normalizeBulkTagList(tags) {
     if (!Array.isArray(tags)) return [];
     return tags
@@ -2844,22 +2598,17 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Apply a bulk edit — any of category, tag additions, tag removals, essences and progressive DC
-   * — to a SET of components in one `save()`; the shared set-apply primitive behind folder-aware
-   * import categorization (issue 771) and multi-select bulk edit (issue 772).
+   * Apply a bulk edit (category, tag additions and removals, essences, progressive DC) to a set of
+   * components in one `save()`, for folder-aware import (issue 771) and bulk edit (issue 772).
    *
-   * The axes match `Component`'s own semantics (data-models spec): `category` is SINGLE-valued
-   * and OVERWRITES; `addTags` is ADDITIVE, unioned case-insensitively and stored lowercase;
-   * `removeTags` is a set DIFFERENCE applied AFTER `addTags`; `essences` REPLACES the whole map
-   * when the key is PRESENT; and `difficulty` is the progressive DC, cleared by `0`/`null`/`''`.
-   * The guard tests PRESENCE, never truthiness, for `essences` and `difficulty`, because
-   * `{essences: {}}` and `{difficulty: 0}` are real "clear this" edits. Every changed component
-   * is re-normalized under the owning system's essence AND salvage context, so a Simple-mode
-   * context runs the retain-one clamp (issue 764).
+   * Axes follow `Component` semantics: `category` overwrites; `addTags` unions case-insensitively,
+   * stored lowercase; `removeTags` applies after `addTags`; `essences` replaces the map when
+   * present; `difficulty` is cleared by `0`/`null`/`''`. `essences` and `difficulty` test
+   * presence, not truthiness. Changed components re-normalize under the system's essence and
+   * salvage context, so Simple mode runs the retain-one clamp (issue 764).
    *
-   * @returns {Promise<{updated: number, componentIds: string[]}>} the resolved cohort the edit
-   *   was APPLIED TO, not a diff, matching
-   *   {@link CraftingSystemManager#applyBulkEditToEssences}'s contract exactly.
+   * @returns {Promise<{updated: number, componentIds: string[]}>} the cohort the edit was applied
+   *   to, not a diff, as in {@link CraftingSystemManager#applyBulkEditToEssences}.
    */
   async applyBulkEditToComponents(systemId, componentIds, edit = {}, options = {}) {
     this._assertGM('apply a bulk edit to components');
@@ -2880,8 +2629,7 @@ export class CraftingSystemManager {
       hasCategory || addTags.length > 0 || removeTags.size > 0 || hasEssences || hasDifficulty;
     if (!staged) return { updated: 0, componentIds: [] };
 
-    // One of the five mutation-time sites that BYPASS `_normalizeSystem` (issue 1359). Same
-    // basis, same helper; `Set|null`, never defaulted to an empty Set. See `_scopeBasis`.
+    // A `_normalizeSystem` bypass site (issue 1359): same basis, `Set|null`; see `_scopeBasis`.
     const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const salvageContext = this._salvageNormalizationContext(system);
     const changedIds = [];
@@ -2926,30 +2674,18 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Apply a bulk edit — any of category, status, lock, check tier and recipe-book membership — to
-   * a SET of recipes in one `recipes` write and one `craftingSystems` write (issue 1010). The
-   * recipe twin of {@link CraftingSystemManager#applyBulkEditToComponents}, living HERE because
-   * the book axis writes `system.recipeItemDefinitions[].recipeIds` and `RecipeManager` has no
-   * `save()` for that setting; every recipe-field write still goes through
-   * `recipeManager.updateRecipe`.
+   * Apply a bulk edit (category, status, lock, check tier, book membership) to a set of recipes in
+   * one `recipes` write and one `craftingSystems` write (issue 1010). Lives here because the book
+   * axis writes `recipeItemDefinitions[].recipeIds`; recipe fields go through `updateRecipe`.
    *
-   * The `edit` contract is `toBulkRecipeEdit`'s six keys, present IF AND ONLY IF staged. Three
-   * are FALSY BUT REAL — `enabled: false`, `locked: false`, `checkTierId: null` — so the guard
-   * tests `Object.hasOwn` and never truthiness, which would drop Disable, Unlock and Default DC.
+   * `edit` carries `toBulkRecipeEdit`'s six keys only when staged; `enabled: false`,
+   * `locked: false` and `checkTierId: null` are real, so presence is tested with `Object.hasOwn`.
    *
-   * WRITE ORDER: BOOKS FIRST, THEN RECIPES. The axes are independent, so at most ONE in-memory
-   * map is dirty across any await; books first because the membership-basis marker write is what
-   * makes every subsequent membership read well-defined. The two `save()` calls are one per world
-   * SETTING, each skipped when its own half changed nothing — not a redundant pair to collapse.
-   *
-   * THE ACTIVATION GATE RUNS INSIDE `updateRecipe`, PER RECIPE, IN BATCH ORDER, which is the
-   * correct evaluation rather than a cost: {@link RecipeManager#_validateSignatures} substitutes
-   * the candidate into the LIVE recipe list, so enabling sequentially lets the second alchemy
-   * candidate see the first already enabled. {@link RecipeManager#canActivateRecipe} is the
-   * pre-batch evaluation, a LOWER BOUND; this loop's `blockedEnables` is the authority.
-   *
-   * It maintains the membership-basis marker itself, because mutating definitions directly
-   * BYPASSES the `updateRecipeItemDefinition` choke point.
+   * Books are written first, because the membership-basis marker makes later membership reads
+   * well-defined; each setting's save is skipped when its half changed nothing. The activation
+   * gate runs per recipe in batch order inside `updateRecipe`, so a second alchemy candidate sees
+   * the first enabled; {@link RecipeManager#canActivateRecipe} is only a lower bound. It maintains
+   * the marker itself, since it bypasses `updateRecipeItemDefinition`.
    */
   async applyBulkEditToRecipes(systemId, recipeIds, edit = {}) {
     this._assertGM('apply a bulk edit to recipes');
@@ -2969,7 +2705,7 @@ export class CraftingSystemManager {
       bookRemovals: 0,
     };
 
-    // Resolves — and REJECTS — the staged check tier before anything is mutated.
+    // Resolves, and rejects, the staged check tier before anything is mutated.
     const axes = this._resolveBulkRecipeAxes(system, edit);
     if (!axes.staged) return result;
 
@@ -2980,7 +2716,6 @@ export class CraftingSystemManager {
       (recipe) => targetIds.has(String(recipe?.id ?? ''))
     );
 
-    // ---- Books first -------------------------------------------------------
     const books = this._applyBulkRecipeBookMembership(system, cohort, axes);
     result.bookIds = books.bookIds;
     result.booksUpdated = books.bookIds.length;
@@ -2991,7 +2726,6 @@ export class CraftingSystemManager {
       await this.save({ put: system, domains: RECIPE_ITEM_FACTS });
     }
 
-    // ---- Then recipes ------------------------------------------------------
     const outcome = await this._applyBulkRecipePatches(cohort, axes);
     result.recipeIds = outcome.recipeIds;
     result.updated = outcome.recipeIds.length;
@@ -3002,10 +2736,8 @@ export class CraftingSystemManager {
 
     if (result.updated > 0) await this.recipeManager.save();
 
-    // At most one of EACH change hook, matching the at-most-one-save-of-each guarantee,
-    // and both are needed. On the writing client `reload()` returns `false`, so the
-    // `updateSetting` socket bridge deliberately re-emits nothing locally — a book change
-    // announced only as `recipesChanged` would be invisible to the GM's own other windows.
+    // At most one of each change hook. On the writing client `reload()` returns `false` and the
+    // socket bridge re-emits nothing, so a book change needs its own signal for the GM's windows.
     if (books.changed) this._notifySystemsChanged();
     if (result.updated > 0) {
       this.recipeManager.notifyRecipesChanged?.({
@@ -3018,11 +2750,9 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Read the six-key bulk recipe `edit` into a resolved axis descriptor, testing PRESENCE and
-   * never truthiness, and resolving the staged check tier against THIS system's authored tiers.
-   * The tier resolution throws here — before the caller has mutated anything — because a bulk
-   * write's blast radius justifies being stricter than the single-recipe editor write, which
-   * tolerates a dangling `checkTierId` and falls back to the default DC at resolution time.
+   * Read the six-key `edit` into an axis descriptor by presence, resolving the check tier against
+   * this system's tiers. The tier throws here, before any mutation: a bulk write is stricter than
+   * the single-recipe editor, which tolerates a dangling `checkTierId`.
    */
   _resolveBulkRecipeAxes(system, edit) {
     const bulkEdit = edit && typeof edit === 'object' ? edit : {};
@@ -3035,8 +2765,7 @@ export class CraftingSystemManager {
       locked: bulkEdit.locked === true,
       hasCheckTier: Object.hasOwn(bulkEdit, 'checkTierId'),
       checkTierId: null,
-      // The book axis's two disjoint id lists. `normalizeSelectionIds` is the same coercion
-      // the selection itself goes through — a staged book set IS a selection of books.
+      // A staged book set is a selection, so it takes `normalizeSelectionIds`.
       addBookIds: new Set(normalizeSelectionIds(bulkEdit.addBookIds)),
       removeBookIds: new Set(normalizeSelectionIds(bulkEdit.removeBookIds)),
     };
@@ -3053,17 +2782,11 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Resolve a staged bulk check-tier id against the tiers THIS system's crafting check actually
-   * authors, or throw. `null`/empty is the real instruction "Default DC"; anything else must name
-   * a tier the panel could have offered, which is exactly `resolveRecipeCheckTierOptions` over
-   * the system's active crafting-check SLOT — the same helper the recipe editor's dropdown and
-   * the bulk panel's gate read, so the three cannot disagree.
-   *
-   * THE SLOT IS THE RESOLVER'S OWN ANSWER (issue 1096), not a manager-side twin. A hand-rolled
-   * copy of the mode map stood here, documented as "kept structurally identical" to the root's,
-   * which nothing pinned; the moment the root moved onto `resolveActiveCraftingCheckFormula` the
-   * two disagreed for alchemy and the panel listed a tier this method threw on. A `null` slot
-   * yields no options, so a system that rolls no crafting check accepts Default DC and nothing else.
+   * Resolve a staged check-tier id against the tiers this system's crafting check authors, or
+   * throw. `null`/empty means Default DC; anything else must be an option from
+   * `resolveRecipeCheckTierOptions` over the active check slot, which the editor dropdown and the
+   * bulk panel also read. The slot comes from the resolver itself (issue 1096); a `null` slot
+   * accepts only Default DC.
    */
   _resolveBulkCheckTierId(system, rawTierId) {
     const tierId = typeof rawTierId === 'string' ? rawTierId.trim() : '';
@@ -3081,17 +2804,10 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Apply the book axis by iterating the DEFINITIONS rather than the recipes. `addBookIds` and
-   * `removeBookIds` are disjoint, so every touched definition takes exactly ONE operation and is
-   * written exactly once, and a definition named by neither is left byte-identical. A definition
-   * named by both would be a contract violation the panel's staging makes unreachable; the REMOVE
-   * wins, mirroring the component primitive's removals-after-the-union rule.
-   *
-   * The EDGE counts are measured here, against the SEEDED arrays: the seed runs first and
-   * rewrites `recipeIds` from the legacy scalars, so `current` is the book's true membership on
-   * either basis by the time the delta is taken. The seed's own writes are deliberately NOT
-   * counted, because they carry an existing membership across a basis switch rather than adding
-   * one. `changed` is true when ANY definition was mutated, including one only the seed touched.
+   * Apply the book axis per definition: `addBookIds` and `removeBookIds` are disjoint, so each
+   * touched definition takes one operation and is written once (a definition named by both loses
+   * to remove). Edge counts are taken against the seeded arrays and exclude the seed's own
+   * writes; `changed` is true when any definition was mutated, seed included.
    */
   _applyBulkRecipeBookMembership(system, cohort, axes) {
     const bookIds = [];
@@ -3103,10 +2819,8 @@ export class CraftingSystemManager {
       return { changed: false, bookIds, additions, removals };
     }
 
-    // Seed BEFORE any array is replaced, while the legacy resolution is still the live
-    // basis. Without it the marker set below would close the revert direction but make the
-    // ORPHANING direction permanent: every OTHER definition's scalar-only members would be
-    // stranded by this one write.
+    // Seed before any array is replaced, while the legacy resolution is live, or the marker set
+    // below would orphan every other book's scalar-only members.
     const seeded = this._seedMembershipFromLegacyScalars(system);
     const selected = new Set(selectedIds);
 
@@ -3126,8 +2840,7 @@ export class CraftingSystemManager {
 
       definition.recipeIds = next;
       bookIds.push(definitionId);
-      // One operation per definition, so exactly one of these can be non-zero per book and
-      // the delta IS the edge count: a union only grows, a difference only shrinks.
+      // One operation per definition, so the delta is the edge count.
       if (remove) removals += current.length - next.length;
       else additions += next.length - current.length;
     }
@@ -3138,14 +2851,10 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Run the per-recipe half of the batch.
-   *
-   * LOOP ATOMICITY HERE IS MICROTASK-ONLY, which differs from the mirrored precedent:
-   * `applyBulkEditToComponents`'s loop is LITERALLY synchronous, while this one awaits once per
-   * iteration and merely BEHAVES atomically, because `updateRecipe` with `persist: false`
-   * performs no real I/O. The moment anything awaiting real I/O enters this loop, `reload()` can
-   * replace the recipes map between iterations and silently discard every staged edit; there is
-   * no compare-and-set anywhere in the settings path to catch it.
+   * The per-recipe half of the batch. Its atomicity is microtask-only: `updateRecipe` with
+   * `persist: false` does no real I/O, but anything awaiting real I/O here would let `reload()`
+   * replace the recipes map between iterations and discard staged edits, with no compare-and-set
+   * to catch it.
    */
   async _applyBulkRecipePatches(cohort, axes) {
     const recipeIds = [];
@@ -3167,11 +2876,9 @@ export class CraftingSystemManager {
   }
 
   /**
-   * The MINIMAL patch for one recipe: only the staged fields whose value actually differs, so a
-   * recipe every staged axis already agrees with issues no `updateRecipe` call at all. The
-   * category is normalized first because `Recipe` normalizes it on construction, so a raw
-   * comparison would report `'General'` as differing from the stored `'general'` and re-write
-   * every recipe in the selection.
+   * The minimal patch for one recipe: only staged fields that differ, so an agreeing recipe gets
+   * no `updateRecipe` call. The category is normalized first, as `Recipe` does, or `'General'`
+   * would differ from a stored `'general'`.
    */
   _buildBulkRecipePatch(recipe, axes) {
     const updates = {};
@@ -3192,21 +2899,14 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Write one recipe's minimal patch, resolving BOTH error branches, which are different failures
-   * and are reported separately.
-   *
-   * `RecipeActivationError` is a refused ENABLE: the id is recorded, `enabled` is dropped and the
-   * patch retried so the ungated axes still land on a recipe that stays off. That is clean
-   * because `updateRecipe` throws at its activation gate strictly BEFORE `this.recipes.set`, and
-   * the retry cannot itself throw. `RecipePersistenceError` is a recipe that cannot be saved AT
-   * ALL — `validateStructure()` still runs under `allowIncomplete` — and is precisely the class
-   * this change makes newly selectable, so an uncaught throw would abort the batch AFTER the
-   * books save had committed. It is logged and the batch continues.
+   * Write one recipe's minimal patch. A `RecipeActivationError` (refused enable) records the id and
+   * retries without `enabled`, which is clean because `updateRecipe` throws before
+   * `this.recipes.set`. A `RecipePersistenceError` (unsaveable even under `allowIncomplete`) is
+   * logged and the batch continues, since the books save has already committed.
    */
   async _writeBulkRecipePatch(recipeId, updates) {
-    // `persist: false` is the compendium-importer batch idiom: mutate the in-memory map per
-    // recipe, then issue ONE trailing `save()`. `allowIncomplete` keeps an authoring shell
-    // editable, matching the single-recipe browser writes.
+    // `persist: false` mutates memory per recipe for one trailing `save()`; `allowIncomplete` keeps
+    // an authoring shell editable.
     const options = { persist: false, notify: false, emitChange: false, allowIncomplete: true };
     try {
       await this.recipeManager.updateRecipe(recipeId, updates, options);
@@ -3230,24 +2930,17 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Delete a SET of recipes and everything that deletion reaches, in at most ONE `recipes` write,
-   * at most ONE `craftingSystems` write and ONE actor-flag CLEAN-UP (issue 1132).
+   * Delete a set of recipes and everything the deletion reaches in at most one `recipes` write, one
+   * `craftingSystems` write and one actor-flag clean-up (issue 1132). It lives here because only
+   * this manager owns `craftingSystems`; every GM-initiated delete routes through the shared body,
+   * as component deletes route through `_deleteComponentSet`.
    *
-   * It lives here and not on `RecipeManager` because write ownership of the `craftingSystems`
-   * setting, and `save()` on it, exist only here. Every GM-initiated delete routes through the
-   * shared body, exactly as {@link CraftingSystemManager#deleteItem} and
-   * {@link CraftingSystemManager#deleteComponents} route through `_deleteComponentSet`, so the
-   * entry points cannot disagree about what deleting a recipe reaches; the two exempt paths are
-   * recorded on {@link RecipeManager#deleteRecipe}.
-   *
-   * @param {string} systemId An unresolvable id deletes the recipes and prunes nothing rather
-   *   than throwing: a recipe lives in its own world setting, so one whose `craftingSystemId`
-   *   dangles is a real, deletable orphan.
+   * @param {string} systemId An unresolvable id deletes the recipes and prunes nothing, since a
+   *   recipe with a dangling `craftingSystemId` is a real orphan.
    * @returns {Promise<{deleted: number, recipeIds: string[], recipeItemsAffected: number,
-   *   recipeItemsRewritten: number, learnersAffected: number}>} BOTH recipe-item numbers, because
-   *   they answer different questions: `recipeItemsAffected` is the basis-aware count the card
-   *   states, `recipeItemsRewritten` counts the definitions the write actually rewrote, which is
-   *   zero on a legacy-basis system. See `utils/recipeDeleteImpact.js`.
+   *   recipeItemsRewritten: number, learnersAffected: number}>} `recipeItemsAffected` is the
+   *   basis-aware count the card states, `recipeItemsRewritten` the definitions actually rewritten
+   *   (zero on a legacy-basis system); see `utils/recipeDeleteImpact.js`.
    */
   async deleteRecipes(systemId, recipeIds, options = {}) {
     this._assertGM('delete recipes');
@@ -3257,37 +2950,20 @@ export class CraftingSystemManager {
   /**
    * The shared body of every cascading recipe delete.
    *
-   * WRITE ORDER: `recipes` setting → `craftingSystems` setting → actor flags. Recipes before
-   * books, because a failed book write after the recipe write leaves dangling book ids — today's
-   * steady state, invisible at render and repaired by the next successful delete — whereas books
-   * first would lose authored membership for recipes that still exist, with nothing able to
-   * reconstruct it. {@link CraftingSystemManager#applyBulkEditToRecipes} orders the two the OTHER
-   * way for a reason absent here: its book write SETS the basis marker. Both settings go before
-   * actors, because a caller whose `SETTINGS_MODIFY` has been revoked genuinely throws on the
-   * setting write and must mutate no actor flags.
+   * Write order is `recipes`, then `craftingSystems`, then actor flags: a failed book write after
+   * the recipe write leaves dangling book ids, repaired by the next delete, whereas books first
+   * could lose membership of surviving recipes. (`applyBulkEditToRecipes` orders them the other
+   * way because its book write sets the basis marker.) Settings go before actors so a caller
+   * whose `SETTINGS_MODIFY` is revoked mutates no actor flags.
    *
-   * THE `craftingSystems` HALF TAKES A RESTORE POINT, exactly as the `recipes` half does: the
-   * prune mutates the LIVE `entry.definition.recipeIds` and then saves, so a refused second write
-   * would leave this client showing pruned state while every peer still reads the dangling ids.
-   * The snapshot is per-pruned-definition and shallow, which is enough for a whole-array
-   * replacement of one field.
+   * The `craftingSystems` half takes a restore point, since the prune mutates live `recipeIds`
+   * before saving. It writes the arrays directly via
+   * {@link CraftingSystemManager#_normalizeMembershipRecipeIds} and never sets, reads or seeds
+   * the membership-basis marker (issue 1011): seeding would turn legacy membership into authored
+   * membership. Both change hooks fire, gated per axis, for the reason in `applyBulkEditToRecipes`.
    *
-   * THE `craftingSystems` WRITE MUST NOT TOUCH THE MEMBERSHIP-BASIS MARKER.
-   * {@link CraftingSystemManager#updateRecipeItemDefinition} is its single choke point (issue
-   * 1011), and looping that would be N writes AND would flip a legacy system's basis irreversibly
-   * as a side effect of a delete authored for another reason. So this writes the array directly,
-   * reusing {@link CraftingSystemManager#_normalizeMembershipRecipeIds}, and neither sets nor
-   * reads the marker — deliberately departing from `applyBulkEditToRecipes`, because
-   * `_seedMembershipFromLegacyScalars` PUSHES onto existing arrays, so seeding on the way to
-   * removing an id would materialise legacy membership as authored membership.
-   *
-   * BOTH CHANGE HOOKS, NOT ONE: the batch writes both settings, so it emits both signals, gated
-   * per-axis. On the writing client `reload()` returns `false`, so the socket bridge re-emits
-   * nothing and a book change announced only as `recipesChanged` would be invisible to the GM's
-   * own other windows.
-   *
-   * @param {object|null} system The LIVE normalized system from `this.systems`, never a snapshot:
-   *   the mode-change caller runs inside `updateSystem`, which saves again afterwards.
+   * @param {object|null} system The live normalized system, never a snapshot: the mode-change
+   *   caller runs inside `updateSystem`, which saves again afterwards.
    */
   async _deleteRecipeSet(system, recipeIds, options = {}) {
     const requested = normalizeSelectionIds(recipeIds);
@@ -3305,33 +2981,27 @@ export class CraftingSystemManager {
     }
     const doomedIds = recipes.map((recipe) => String(recipe.id));
 
-    // Counted BEFORE the flag pass below clears the very entries it counts, and through the
-    // same writable-actor selector the cascade walks.
+    // Counted before the flag pass clears these entries, through the cascade's actor selector.
     const learnerIds = selectLearnerActorIds(
       buildLearnedRecipeActorIndex(globalThis.game?.actors),
       doomedIds
     );
 
-    // Planned BEFORE the recipes leave the map: under the legacy basis membership resolves
-    // through the RECIPE's own scalar, which is unreadable once the recipe is gone.
+    // Planned before the recipes leave the map: legacy membership resolves through the recipe.
     const plan = planRecipeItemMembershipPrune(
       system?.recipeItemDefinitions,
       recipes,
       system?.membershipResolvesByRecipeIds === true
     );
 
-    // ---- 1. the `recipes` setting -----------------------------------------------------
     const outcome = await this.recipeManager.deleteRecipes(doomedIds, {
       notify: options.notify,
       emitChange: false,
       cleanupFlags: false,
     });
 
-    // ---- 2. the `craftingSystems` setting ---------------------------------------------
-    // Skipped outright when this half changed nothing, as `applyBulkEditToRecipes` skips
-    // each of its two writes: the guarantee is at most ONE write of each, not one write
-    // unconditionally. On a legacy-basis system that is every time, and it is a theorem
-    // rather than a basis check — see `planRecipeItemMembershipPrune`.
+    // Skipped when this half changed nothing, which is always on a legacy-basis system (see
+    // `planRecipeItemMembershipPrune`).
     const membershipRestore = plan.prunes.map((entry) => [
       entry.definition,
       entry.definition.recipeIds,
@@ -3344,31 +3014,21 @@ export class CraftingSystemManager {
       try {
         await this.save({ put: system, domains: RECIPE_ITEM_FACTS });
       } catch (error) {
-        // Put the live definitions back before rethrowing: this client must not go on
-        // rendering a prune the world never received.
+        // Restore the live definitions before rethrowing, so this client never shows a prune the
+        // world did not receive.
         for (const [definition, recipeIds] of membershipRestore) definition.recipeIds = recipeIds;
         throw error;
       }
     }
 
-    // ---- 3. actor flags ---------------------------------------------------------------
-    // ONE clean-up, which is TWO writable-actor walks: `CraftingRunManager.cleanupInvalidRuns`
-    // and then `RecipeVisibilityService.cleanupLearnedRecipes`. Pre-existing and correct —
-    // they clear different stores — but it is one clean-up per SET rather than per recipe,
-    // which is the batching claim, and "a single actor-flag pass" was never true of it.
+    // One clean-up per set, which is two actor walks: `CraftingRunManager.cleanupInvalidRuns` and
+    // `RecipeVisibilityService.cleanupLearnedRecipes`.
     await this.recipeManager.cleanupOrphanedRecipeFlags?.({ removedRecipeIds: outcome.recipeIds });
 
-    // ---- 4. both change hooks ---------------------------------------------------------
     if (recipeItemsRewritten > 0 && options.notifySystems !== false) this._notifySystemsChanged();
     if (options.emitChange !== false) {
-      // The payload shape is the singular `{recipeId}` widened to the id SET. Confirmed
-      // safe: `_notifyRecipesChanged` spreads `details`, a plural `recipeIds` payload
-      // already exists on the bulk edit above, and every in-repo listener is arity-0.
-      //
-      // The SINGULAR key is emitted too when the set holds exactly one id, so the payload
-      // does not become path-dependent: `RecipeManager.deleteRecipe` is still live for
-      // `deleteSystem` and the importer and emits `{…, recipeId}`, and "every listener is
-      // arity-0" is a fact about THIS repo, not about a third-party module reading the hook.
+      // The singular `{recipeId}` payload widened to the id set; the singular key is also emitted
+      // for a one-id set, so the payload shape matches `RecipeManager.deleteRecipe`'s.
       const details = { action: 'delete', recipeIds: outcome.recipeIds };
       if (outcome.recipeIds.length === 1) details.recipeId = outcome.recipeIds[0];
       this.recipeManager.notifyRecipesChanged?.(details);
@@ -3377,11 +3037,7 @@ export class CraftingSystemManager {
     return {
       deleted: outcome.deleted,
       recipeIds: outcome.recipeIds,
-      // BOTH numbers. `plan.affectedIds` is what the card promised the GM and was being
-      // computed and discarded, so the toast reported the implementation figure instead:
-      // on a legacy-basis system the card read "Will be removed from 1 book or scroll" and
-      // the toast then omitted the clause entirely, making the operation look as though it
-      // had done less than it said it would.
+      // Both numbers: `plan.affectedIds` is what the confirmation card promised the GM.
       recipeItemsAffected: plan.affectedIds.length,
       recipeItemsRewritten,
       learnersAffected: learnerIds.length,
@@ -3405,21 +3061,12 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Delete a SET of components in ONE `craftingSystems` write and ONE `recipes` write (issue 1129).
-   *
-   * THE BATCHED RECIPE CASCADE IS THE POINT OF THIS METHOD EXISTING, exactly as it is for
-   * {@link CraftingSystemManager#deleteEssences}. Looping
-   * {@link CraftingSystemManager#deleteItem} would issue one `craftingSystems` write per
-   * component AND, because {@link RecipeManager#updateRecipe} ends in its own full-replace
-   * `save()`, one `recipes` write per rewritten recipe per component, each triggering a
-   * serialization diff plus `Hooks.callAll` on EVERY connected client — and a recipe referencing
-   * two deleted components would be written and COUNTED twice. Instead the union rewrite is
-   * computed per recipe ONCE and exactly one save of each follows. Because both settings are
-   * REPLACED rather than merged, neither needs a `-=` deletion key.
-   *
-   * In-use components are NOT refused: deletion is warned, not blocked. `recipesDisabled` counts
-   * recipes this call took from enabled to disabled, because the number exists to warn about
-   * craftability the GM is about to lose, not to restate what was already off.
+   * Delete a set of components in one `craftingSystems` write and one `recipes` write (issue 1129).
+   * Looping {@link CraftingSystemManager#deleteItem} would write both settings per component, each
+   * write diffed and hooked on every client, and double-count a recipe referencing two deleted
+   * components; the union rewrite instead runs once per recipe. Both settings are replaced, so no
+   * `-=` key is needed. In-use components are warned about, not refused; `recipesDisabled` counts
+   * recipes this call took from enabled to disabled.
    */
   async deleteComponents(systemId, componentIds) {
     this._assertGM('delete components');
@@ -3448,20 +3095,13 @@ export class CraftingSystemManager {
 
   /**
    * The shared body of {@link CraftingSystemManager#deleteItem} and
-   * {@link CraftingSystemManager#deleteComponents}: remove the components, repair every reference
-   * to them, and persist once. Both route through here so they cannot disagree about what
-   * deleting a component reaches. It deliberately does NOT assert GM, notify, or reconcile alchemy
-   * signatures — each caller owns its own message.
+   * {@link CraftingSystemManager#deleteComponents}: remove the components, repair references and
+   * persist once. It does not assert GM, notify or reconcile alchemy signatures.
    *
-   * The recipe rewrites run BEFORE `await this.save()`, as both essence deletes already do. That
-   * ordering is only safe because the activation blocker lives in `_validateRecipeForActivation`
-   * and NOT in `_validateRecipeForPersistence`: a persistence-level blocker would throw partway
-   * through the loop with the system already mutated in memory and nothing persisted.
-   *
-   * ONE REFERENCE CLASS IS DELIBERATELY LEFT DANGLING: a SURVIVING component's
-   * `salvage.resultGroups[].results` may name a deleted component, and nothing here repairs it,
-   * exactly as the shipped `deleteItem` did not. The consequence is bounded and visible, because
-   * the bulk panel's impact statement claims no salvage coverage.
+   * The recipe rewrites run before `save()`, which is safe only because the activation blocker
+   * lives in `_validateRecipeForActivation`, not `_validateRecipeForPersistence`. A surviving
+   * component's `salvage.resultGroups[].results` naming a deleted component is deliberately left
+   * dangling; the bulk panel's impact statement claims no salvage coverage.
    */
   async _deleteComponentSet(systemId, componentIds) {
     const system = this.getSystem(systemId);
@@ -3521,12 +3161,10 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Strip every deleted component from every referencing recipe in ONE `recipes` write. Each
-   * recipe is rewritten ONCE for the whole set — a recipe referencing two deleted components must
-   * not be written or counted twice — and only recipes that actually reference one are touched.
-   * The rewrite and the "no longer craftable" decision both live in
-   * `src/utils/recipeComponentReferences.js`, which the bulk panel's impact statement also counts
-   * through, so the stated numbers and the executed write cannot drift.
+   * Strip the deleted components from referencing recipes in one `recipes` write, each recipe
+   * rewritten once. The rewrite and the "no longer craftable" decision live in
+   * `src/utils/recipeComponentReferences.js`, which the bulk panel's impact statement counts
+   * through too.
    */
   async _stripComponentsFromRecipes(systemId, removedIdSet) {
     const recipes = this.recipeManager
@@ -3554,12 +3192,9 @@ export class CraftingSystemManager {
 
     if (recipes.length > 0) {
       await this.recipeManager.save();
-      // ONE change signal for the whole batch, restoring what `emitChange: false` suppressed, and
-      // load-bearing rather than tidy: `settingChangeBridge` re-emits only when
-      // `recipeManager.reload()` returns truthy, and on the WRITING client the in-memory map
-      // already equals the saved setting, so without this a GM's own crafting window keeps
-      // offering pre-rewrite recipes. The COMPONENT-side attribution travels with it (issue 1078
-      // part B1), because the singular delete drains no system-side attribution of its own.
+      // One change signal for the batch, restoring what `emitChange: false` suppressed:
+      // `settingChangeBridge` re-emits only when `reload()` returns truthy, which it does not on
+      // the writing client. The component-side attribution travels with it (issue 1078).
       this.recipeManager.notifyRecipesChanged({
         action: 'update',
         domains: ESSENCE_FACTS,
@@ -3569,13 +3204,8 @@ export class CraftingSystemManager {
     return { recipesUpdated: recipes.length, recipesDisabled };
   }
 
-  /**
-   * After an essence/component deletion in an alchemy system, re-run the signature uniqueness check
-   * and disable every recipe that now participates in a conflict, notifying the GM of their names.
-   * No-op for non-alchemy systems.
-   * @param {object} system
-   * @private
-   */
+  /** After a deletion in an alchemy system, disable every recipe now in a signature conflict and
+   * notify the GM of their names; no-op otherwise. */
   async _reconcileAlchemySignaturesAfterDeletion(system) {
     if (system?.resolutionMode !== 'alchemy') return;
     const disabled = await this.recipeManager.disableSignatureConflicts(system.id);
@@ -3588,26 +3218,13 @@ export class CraftingSystemManager {
   }
 
   /**
-   * MAKE THE ESSENCE DELETE AN OVERRIDE before it strips (issue 1371).
-   *
-   * THE DEFECT THIS CLOSES: the cascade strips the essence from `system.components`, the
-   * PERSISTED in-system rows, but since the `1.32.0` election a component's `essences` are a
-   * WORLD SECTION every system INHERITS unless it overrides, and `unionScopedDefinitions`
-   * overwrites an inheriting row's map wholesale with the world one. So on a post-upgrade world
-   * the strip changed nothing anybody resolves.
-   *
-   * THE ANSWER IS THIS REVISION'S OWN RULE: a system-scope essence write is an OVERRIDE, and a
-   * delete is a write, so each affected pair that INHERITS is flipped to override FIRST and the
-   * strip lands on the row that system now resolves. The world map is untouched, so every OTHER
-   * system keeps the essence. WHICH PAIRS ARE SHADOWED IS NOT DECIDED HERE: this method knows the
-   * cascade's REACH and hands it to the seam, which is `componentEssenceOverride`'s cohort unit.
-   *
-   * AND THE ROW IS SEEDED FROM WHAT THE PAIR RESOLVED, because flipping alone would be a second
-   * data loss: an inheriting pair's own row is DORMANT, so overriding onto it would silently drop
-   * every OTHER essence the GM can see. The resolved map is read BEFORE the flip, because the
-   * flip changes what the pair resolves. NO SEAM MEANS NO FLIP, the honest degradation. A pair
-   * whose flag write is REFUSED still inherits, which is logged rather than thrown and returned
-   * as `unreachable`, because blocking would leave a definition the GM asked to remove in place.
+   * Make the essence delete an override before it strips (issue 1371). Since the `1.32.0` election
+   * a component's `essences` are a world section a system inherits unless it overrides, so
+   * stripping the in-system row alone changes nothing resolved. A system-scope essence write is an
+   * override, so each affected inheriting pair is flipped first, seeded from the map it resolved
+   * (read before the flip, or other essences would be lost); the world map and other systems are
+   * untouched. `componentEssenceOverride` decides which pairs are shadowed. No seam means no flip;
+   * a refused flag write is logged and returned as `unreachable`, never thrown.
    */
   async _overrideInheritedEssencesBeforeStrip(system, essenceIds, overrideInheritedEssences) {
     if (typeof overrideInheritedEssences !== 'function') {
@@ -3617,9 +3234,8 @@ export class CraftingSystemManager {
     const resolved = resolvedComponentEssencesById(this, system.id);
     if (!resolved) return { overridden: [], unreachable: [] };
 
-    // ONE pass over the rows, holding each affected row BESIDE the map it resolved: the second
-    // walk this used to make was a second raw read of `system.components` for no new information,
-    // and `tests/world-scope-reader-ledger.test.js` counts every one of those.
+    // One pass holding each affected row beside its resolved map;
+    // `tests/world-scope-reader-ledger.test.js` counts every raw `system.components` read.
     const affected = new Map();
     for (const component of system.components || []) {
       const id = String(component?.id ?? '');
@@ -3650,14 +3266,10 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Delete an essence definition and strip it from any recipe ingredient sets that reference it.
-   * Only referencing recipes are re-saved, one summary notification is emitted, and recipes left
-   * with no usable ingredient sets or results are disabled.
-   *
-   * `overrideInheritedEssences` is how the component half of the cascade reaches a pair that
-   * INHERITS its essence map from the world record — see
-   * {@link _overrideInheritedEssencesBeforeStrip}. It is supplied by the caller, because the flag
-   * it writes is a world-scope setting and this manager holds no write path to one.
+   * Delete an essence definition and strip it from referencing ingredient sets, re-saving only
+   * those recipes, emitting one summary and disabling recipes left without sets or results.
+   * `overrideInheritedEssences` is supplied by the caller because the flag it writes is a
+   * world-scope setting this manager cannot write; see {@link _overrideInheritedEssencesBeforeStrip}.
    */
   async deleteEssence(systemId, essenceId, { overrideInheritedEssences } = {}) {
     this._assertGM('delete essence');
@@ -3668,8 +3280,7 @@ export class CraftingSystemManager {
     const removed = definitions.find((def) => def.id === essenceId);
     if (!removed) return false;
 
-    // BEFORE the definitions move, because the seam reads what the pair RESOLVES and the read
-    // union is derived from this system's record.
+    // Before the definitions move: the seam reads what the pair resolves.
     await this._overrideInheritedEssencesBeforeStrip(
       system,
       [essenceId],
@@ -3679,8 +3290,7 @@ export class CraftingSystemManager {
     system.essenceDefinitions = definitions.filter((def) => def.id !== essenceId);
     system.essences = system.essenceDefinitions.map((def) => def.id);
 
-    // Strip the essence from any component that still carries it. Deletion is warned, not
-    // blocked, so this cascade is what keeps component references from dangling after a delete.
+    // Strip the essence from components still carrying it, so references do not dangle.
     for (const component of system.components || []) {
       if (component.essences && essenceId in component.essences) {
         delete component.essences[essenceId];
@@ -3726,21 +3336,14 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Apply a bulk edit — any of icon, colour and enabled status — to a SET of essence definitions
-   * in ONE `craftingSystems` write (issue 1036). The essence twin of
-   * {@link CraftingSystemManager#applyBulkEditToComponents}, routed through
-   * {@link CraftingSystemManager#updateSystem} rather than mutating `system.essenceDefinitions`
-   * directly, because that is where the alchemy guard lives: an essences edit to an
-   * ALREADY-alchemy system runs `_assertNoAlchemySignatureCollisions`, which THROWS, so a status
-   * flip that would collapse two recipes onto one signature is BLOCKED per
-   * `destructive-changes-and-migrations/spec.md` §Alchemy Uniqueness Revalidation clauses 3 and 5.
+   * Apply a bulk edit (icon, colour, enabled) to a set of essence definitions in one
+   * `craftingSystems` write (issue 1036), through {@link CraftingSystemManager#updateSystem} so
+   * the alchemy guard runs: a status flip collapsing two recipes onto one signature throws
+   * (`destructive-changes-and-migrations/spec.md` Alchemy Uniqueness Revalidation, clauses 3 and
+   * 5). Every axis is presence-gated with `Object.hasOwn`, since `enabled: false` and
+   * `colorToken: null` are real edits; an empty `edit` writes nothing.
    *
-   * EVERY AXIS IS PRESENCE-GATED ON `Object.hasOwn`, NEVER TRUTHINESS: `enabled: false` and
-   * `colorToken: null` are FALSY BUT REAL staged edits, and a truthiness test would drop the two
-   * most ordinary operations the panel offers. An empty `edit` is a no-op issuing NO write.
-   *
-   * @returns {Promise<{updated: number, essenceIds: string[]}>} the resolved cohort the edit was
-   *   APPLIED TO, not a diff, so `updated` is a selection size.
+   * @returns {Promise<{updated: number, essenceIds: string[]}>} the cohort the edit was applied to.
    * @throws {Error} when the system does not resolve, or the result would carry a collision.
    */
   async applyBulkEditToEssences(systemId, essenceIds, edit = {}) {
@@ -3776,22 +3379,11 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Delete a SET of essence definitions in ONE `craftingSystems` write and ONE `recipes` write
-   * (issue 1036).
-   *
-   * THE BATCHED RECIPE CASCADE IS THE POINT OF THIS METHOD EXISTING:
-   * {@link RecipeManager#updateRecipe} ends in its own full-replace `save()`, so looping
-   * {@link CraftingSystemManager#deleteEssence} would issue one `recipes` write per rewritten
-   * recipe, each triggering `reload()` plus a serialization diff plus `Hooks.callAll` on EVERY
-   * connected client, and a recipe referencing two deleted essences would be written twice.
-   * Instead the union rewrite is computed per recipe ONCE and exactly one save of each follows.
-   * Because both settings are REPLACED rather than merged, neither needs a `-=` deletion key.
-   *
-   * The recipe rewrites deliberately run BEFORE `await this.save()`, which is only safe because
-   * the disabled-essence activation blocker lives in `_validateRecipeForActivation` and NOT in
-   * `_validateRecipeForPersistence`. In-use essences are NOT refused: deletion is warned, not
-   * blocked. `recipesDisabled` counts recipes this call took from enabled to disabled, because
-   * the number warns about craftability the GM is about to lose.
+   * Delete a set of essence definitions in one `craftingSystems` write and one `recipes` write
+   * (issue 1036); looping {@link CraftingSystemManager#deleteEssence} would write `recipes` per
+   * recipe. Both settings are replaced, so no `-=` key is needed. The recipe rewrites run before
+   * `save()`, safe only because the disabled-essence blocker is activation-level. In-use essences
+   * are warned about, not refused; `recipesDisabled` counts recipes newly disabled.
    */
   async deleteEssences(systemId, essenceIds, { overrideInheritedEssences } = {}) {
     this._assertGM('delete essences');
@@ -3808,9 +3400,8 @@ export class CraftingSystemManager {
     const removedIds = removed.map((def) => String(def.id));
     const removedIdSet = new Set(removedIds);
 
-    // ONE cohort for the whole set, before the definitions move — the singular's reason, and the
-    // batching reason this method exists for: a component carrying two deleted essences must not
-    // be flipped twice.
+    // One cohort for the whole set, before the definitions move, so a component carrying two
+    // deleted essences is flipped once.
     await this._overrideInheritedEssencesBeforeStrip(system, removedIds, overrideInheritedEssences);
 
     system.essenceDefinitions = definitions.filter(
@@ -3818,7 +3409,7 @@ export class CraftingSystemManager {
     );
     system.essences = system.essenceDefinitions.map((def) => def.id);
 
-    // Defensively strip every deleted essence from any component that still carries it.
+    // Strip every deleted essence from components still carrying it.
     for (const component of system.components || []) {
       if (!component.essences) continue;
       for (const essenceId of removedIds) {
@@ -3845,9 +3436,8 @@ export class CraftingSystemManager {
     return { deleted: removedIds.length, essenceIds: removedIds, recipesUpdated, recipesDisabled };
   }
 
-  /** Strip every deleted essence from every referencing recipe in ONE `recipes` write. Each recipe
-   * is rewritten ONCE for the whole set — a recipe referencing two deleted essences must not be
-   * written twice — and the trailing `save()` is the only persist. */
+  /** Strip the deleted essences from referencing recipes in one `recipes` write, each recipe
+   * rewritten once; the trailing `save()` is the only persist. */
   async _stripEssencesFromRecipes(systemId, removedIds) {
     const recipes = this.recipeManager
       .getRecipes({})
@@ -3884,43 +3474,28 @@ export class CraftingSystemManager {
     return { recipesUpdated: recipes.length, recipesDisabled };
   }
 
-  /** Whether a rewritten recipe has lost its ingredient sets or its results entirely and must
-   * therefore be clamped to disabled. Shared by the single and set essence deletes so the two
-   * cannot disagree about what "no longer craftable" means. Both callers pass `recipe.toJSON()`,
-   * whose result data lives in `resultGroups` alone since the flat `results` alias was retired
-   * (issue 1087). */
+  /** Whether a rewritten recipe lost all ingredient sets or results and must be disabled; shared
+   * by both essence deletes. Callers pass `recipe.toJSON()`, whose results live in `resultGroups`
+   * alone (issue 1087). */
   _recipeLostItsShape(updated) {
     return recipeLostItsShape(updated);
   }
 
-  /** Whether a recipe references the given component in any ingredient set or result, using the
-   * same field matching as the strip logic the component deletes execute. Delegates to the shared
-   * leaf (issue 1129) so this predicate, the strip and the admin store's recipe-usage projection
-   * are one implementation rather than three. */
+  /** Whether a recipe references the component in any ingredient set or result, via the shared
+   * leaf (issue 1129) the strip and the admin store's usage projection also use. */
   _recipeReferencesComponent(recipe, itemId) {
     return recipeReferencesComponent(recipe, itemId);
   }
 
   /**
-   * Strip an essence from an ingredient-set array: remove the legacy per-set map key AND any
-   * first-class essence OPTION for that essence from each group, dropping a group left with no
-   * options, then drop a set left with no groups, ingredients or essences.
+   * Strip an essence from ingredient sets: remove the legacy per-set map key and any essence option
+   * from each group, drop groups left with no options, then sets left with nothing.
    *
-   * `ingredients` IS RESOLVED, NEVER CARRIED THROUGH THE SPREAD (issue 1036). It is the flat
-   * legacy mirror `IngredientSet` derives from `ingredientGroups`, and a payload written before
-   * issue 1135 still carries it alongside the groups, so a `...set` spread hands the STALE mirror
-   * to both the retention filter and the `IngredientSet` constructor. Two live defects followed:
-   * the retention filter reads `set.ingredients?.length`, so a set whose ONLY requirement was the
-   * deleted essence survived the drop and then raised at PERSISTENCE level, aborting the cascade
-   * with the system mutated in memory and nothing written; and `IngredientSet`'s constructor
-   * rebuilds groups from `data.ingredients` when `ingredientGroups` is empty, RESURRECTING the
-   * deleted essence option.
-   *
-   * Since issue 1135 the mirror is DROPPED rather than recomputed for a set authored with groups,
-   * so the patch carries ONE ingredient authority and no consumer can read a mirror that disagrees
-   * with the groups beside it. Dropping it UNCONDITIONALLY would not be safe: for a set authored
-   * in the LEGACY flat shape that array is the only ingredient data, so it is filtered in place
-   * and kept. The same reasoning retires `essences: {}`.
+   * `ingredients` is resolved, never spread through (issue 1036): pre-1135 payloads carry a stale
+   * flat mirror beside the groups, which would let a set whose only requirement was the deleted
+   * essence survive and fail persistence mid-cascade, and let `IngredientSet` resurrect the
+   * option. A group-authored set drops the mirror (issue 1135); a legacy flat-shape set keeps it,
+   * filtered, as its only ingredient data. `essences: {}` retires on the same reasoning.
    */
   _stripEssenceFromSets(sets, essenceId) {
     const isDeletedEssence = (ref) =>
@@ -3952,18 +3527,13 @@ export class CraftingSystemManager {
       );
   }
 
-  /** Whether a recipe references the given essence in any ingredient set — a thin delegator to the
-   * shared {@link recipeReferencesEssence} leaf (issue 1036), which the admin store's
-   * `recipeUsageCount` projection also reads, so the row's count cannot disagree with the cascade
-   * this manager performs. Retained as a method so existing callers are unaffected. */
+  /** Whether a recipe references the essence in any ingredient set, via the shared
+   * {@link recipeReferencesEssence} leaf (issue 1036) the admin store's `recipeUsageCount` reads. */
   _recipeReferencesEssence(recipe, essenceId) {
     return recipeReferencesEssence(recipe, essenceId);
   }
 
-  /**
-   * Returns the ResolutionModeService instance from game.fabricate, or null.
-   * @returns {object|null}
-   */
+  /** The ResolutionModeService from `game.fabricate`, or null. */
   _getResolutionModeService() {
     return game.fabricate?.getResolutionModeService?.() || null;
   }
@@ -3992,14 +3562,8 @@ export class CraftingSystemManager {
     return game.fabricate?.getRecipeVisibilityService?.() || null;
   }
 
-  /**
-   * For each component with salvage.enabled=true, validate it against the new mode
-   * using ResolutionModeService. Disable any that are invalid and return their names.
-   * Mutates system.components in-place.
-   * @param {object} system - Normalised system object (post-update)
-   * @param {string} oldMode - The previous salvageResolutionMode
-   * @returns {string[]} Names of disabled components
-   */
+  /** Validate each salvage-enabled component against the new mode, disable the invalid ones in
+   * place and return their names. */
   _disableInvalidSalvageConfigs(system, oldMode) {
     if (!system.features?.salvage) return [];
     if (system.salvageResolutionMode === oldMode) return [];
@@ -4020,10 +3584,8 @@ export class CraftingSystemManager {
     return disabled;
   }
 
-  /** Detect components whose surplus Simple-mode salvage success groups were dropped by the
-   * `_normalizeSalvage` clamp (issue 764), comparing the pre-normalization input against the
-   * normalized result, so `updateSystem` can disclose the deletion. A dropped reserved failure
-   * group is NOT reported — this counts SUCCESS groups only, matching the ruled invariant. */
+  /** Components whose surplus Simple-mode salvage success groups the `_normalizeSalvage` clamp
+   * dropped (issue 764), for `updateSystem` to disclose; a dropped failure group is not counted. */
   _detectDroppedSimpleSalvageGroups(inputSystem, normalizedSystem) {
     if (normalizedSystem?.salvageResolutionMode !== 'simple') return [];
     const rawItems = Array.isArray(inputSystem?.components)
@@ -4054,11 +3616,7 @@ export class CraftingSystemManager {
     return dropped;
   }
 
-  /**
-   * Remove salvage run history entries for a given system from all actors' flags.
-   * Called when features.salvage is set to false.
-   * @param {string} systemId
-   */
+  /** Remove a system's salvage run history from every actor, when `features.salvage` turns off. */
   async _cleanupSalvageRunsForSystem(systemId) {
     const salvageRunManager = this._getSalvageRunManager();
     if (salvageRunManager) {
@@ -4081,11 +3639,7 @@ export class CraftingSystemManager {
     }
   }
 
-  /**
-   * Remove salvage run history entries referencing a deleted component from all actors' flags.
-   * Called when a component is deleted.
-   * @param {string} componentId
-   */
+  /** Remove salvage run history referencing a deleted component from every actor. */
   async _cleanupSalvageRunsForComponent(componentId, systemId = null) {
     const salvageRunManager = this._getSalvageRunManager();
     if (salvageRunManager) {
@@ -4112,23 +3666,12 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Reconcile the GM's crafting preferences against the live corpus, gated on the VALID ID BASIS
-   * (issue 1226). Entirely CORPUS-DERIVED and entirely a whole-value replacement, and under
-   * `user` scope `progressiveResultOrder` is a REPLICATED document write, destructive across
-   * every device the player uses, so a partial corpus here is not a cosmetic loss.
-   *
-   * `targeted: null` IS THE PREFERENCE EXEMPTION, not "nothing names a subject" — the deletion
-   * entrance holds both the removed system id and the removed recipe ids. The reason is the one
-   * `data-models/spec.md` names: a stale PREFERENCE is bounded and self-healing where a stale
-   * ACTOR FLAG is not, and a targeted prune here would add a fresh write to a replicated
-   * `user`-scoped document on a path whose defining condition is that this client cannot describe
-   * the world it is writing to.
-   *
-   * THE COMPONENT IDS ARE PASSED (issue 1226). They never were, so `validComponentIds` took its
-   * empty-set default and every `salvage:<componentId>` key was dropped on every mode change and
-   * system deletion — this gate's own failure mode, reached without any conversion at all. The
-   * union declaration in `MUTATION_CLEANUP_ENTITY_KINDS` keeps the halves honest, because this
-   * pass rewrites ONE map holding both key scopes.
+   * Reconcile the GM's crafting preferences against the live corpus, gated on the Valid Id Basis
+   * (issue 1226): a corpus-derived whole-value replacement, and `progressiveResultOrder` is a
+   * replicated `user`-scope write. `targeted: null` is the preference exemption named by
+   * `data-models/spec.md`: a stale preference is bounded and self-healing, so no targeted prune
+   * writes here. Component ids are passed, or every `salvage:<componentId>` key would be dropped;
+   * `MUTATION_CLEANUP_ENTITY_KINDS` declares the union because one map holds both key scopes.
    */
   async _cleanupCraftingPreferences({ subject = 'a crafting-system change' } = {}) {
     const systems = this.getSystems();
@@ -4152,10 +3695,8 @@ export class CraftingSystemManager {
         },
       ],
       subject,
-      // The ONE mutation-time pass that prunes against COMPONENT ids, so the ONE that has to
-      // answer whether those ids are still current (issue 1363). The startup door asks the
-      // same question at `composeStartupPassList`; the two doors call the same collaborator
-      // and a kind declared on one and not the other is a gate that disagrees with itself.
+      // The one mutation-time pass pruning against component ids (issue 1363); the startup door
+      // asks the same in `composeStartupPassList`, through the same collaborator.
       basis: {
         ...WHOLE_CORPUS_ID_BASIS,
         componentIdentityRemap: !hasPendingWorldScopeRekey(getSetting),

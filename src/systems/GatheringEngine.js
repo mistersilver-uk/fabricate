@@ -125,37 +125,24 @@ const FAILURE_KEYWORDS = new Set([
 ]);
 
 /**
- * Composes gathering stores, visibility evaluation and runtime gate checks into player-facing
- * listing state and guarded attempt starts. Listings carry active timed runs and recent terminal
- * history even when browsing rows are empty or blocked. Non-timed attempts resolve immediately
- * into terminal routed/progressive outcomes, persist terminal history, then commit irreversible
- * result, tool and failure-feedback effects; timed attempts resume through
- * `processWorldTime(worldTime)`, which writes terminal history before post-history effects.
- *
- * With a `locationResolver` (GatheringLocationService) injected, listings also evaluate each
- * environment against the party's resolved current realms — emitting a redaction-safe `location`
- * field plus `LOCATION_BLOCKED` / `NO_CURRENT_REALM` blocked reasons — and attempt starts
- * re-resolve location fresh so a stale listing cannot start a location-gated attempt.
+ * Composes gathering stores, visibility and runtime gates into player listings and guarded
+ * attempt starts; listings carry active timed runs and recent terminal history even when rows
+ * are empty or blocked. Immediate attempts persist terminal history before committing result,
+ * tool and failure-feedback effects; timed attempts resume through `processWorldTime`, which
+ * does the same. With a `locationResolver`, listings evaluate environments against the party's
+ * current realms (a redaction-safe `location` field, `LOCATION_BLOCKED` / `NO_CURRENT_REALM`),
+ * and starts re-resolve location so a stale listing cannot start a location-gated attempt.
  */
 export class GatheringEngine {
-  /**
-   * World-setting-backed secret store for in-flight blind runs (issue 901). Installed by
-   * {@link GatheringEngine#installBlindRunRelay} rather than through the constructor.
-   * @type {import('./GatheringBlindRunStore.js').GatheringBlindRunStore|null}
-   */
+  /** @type {import('./GatheringBlindRunStore.js').GatheringBlindRunStore|null} Blind-run secret
+   * store (issue 901), installed by {@link GatheringEngine#installBlindRunRelay}. */
   blindRunStore = null;
 
-  /**
-   * Player→active-GM relay for a blind start this client may not write.
-   * @type {Function|null}
-   */
+  /** @type {Function|null} Player→active-GM relay for a blind start this client may not write. */
   relayBlindStart = null;
 
-  /**
-   * Complication delivery writer (issue 1286). Installed by
-   * {@link GatheringEngine#installComplicationDelivery} rather than through the constructor.
-   * @type {?{deliver: (args: object) => boolean}}
-   */
+  /** @type {?{deliver: (args: object) => boolean}} Complication delivery writer (issue 1286),
+   * installed by {@link GatheringEngine#installComplicationDelivery}. */
   complicationDeliveryWriter = null;
 
   /** @type {object|null} Authoritative command adapter for lifecycle-v1 mutations. */
@@ -173,9 +160,8 @@ export class GatheringEngine {
     isGamePaused = null,
     sceneAccess = null,
     toolAvailability = null,
-    // Optional progressive-resolution seam (`resolveProgressive`). Routed resolution routes
-    // exclusively through the system-level gathering check formula; production wires nothing
-    // here, so progressive falls through to the built-in `resolveProgressiveAward`.
+    // Optional progressive seam (`resolveProgressive`); production wires none, so progressive
+    // falls through to `resolveProgressiveAward`. Routed resolution uses only the system formula.
     resultResolver = null,
     resultCreator = null,
     toolBreakage = null,
@@ -187,29 +173,26 @@ export class GatheringEngine {
     travelStore = null,
     random = Math.random,
     localize = defaultLocalize,
-    // Stamina regen / node respawn run on world-time advance and write shared
-    // state, so they must run exactly once — only on the primary GM client.
+    // Stamina regen and node respawn write shared state on world-time advance, so they run
+    // exactly once, on the primary GM.
     isPrimaryGM = () =>
       Boolean(
         globalThis.game?.user?.isGM &&
         globalThis.game?.users?.activeGM?.id === globalThis.game?.user?.id
       ),
-    // Primary-GM gate for RESUMING matured timed runs. It fails OPEN — resumption is a run's
-    // only completion path, so a closed default would stop every unit fixture resolving
-    // anything — and the real check is WIRED at construction in main.js (issue 656).
-    // `isPrimaryGM` above gates maintenance and has the opposite safe default.
+    // Primary-GM gate for resuming matured timed runs. It fails open, since resumption is a run's
+    // only completion path; main.js wires the real check (issue 656). `isPrimaryGM` above gates
+    // maintenance and has the opposite safe default.
     resumeTimedRuns = () => true,
     getActors = () => [...(globalThis.game?.actors?.contents ?? globalThis.game?.actors ?? [])],
-    // Scene graph + scoped-behaviour writer seams for interactable-scoped node respawn (issue
-    // 302). Injected by main.js (fake in tests); absent → no scoped respawn pass.
+    // Scene graph and scoped-behaviour writer seams for interactable node respawn (issue 302);
+    // absent means no scoped respawn pass.
     scenes = () => globalThis.game?.scenes ?? null,
     applyInteractableBehaviorUpdate = null,
-    // GM-gated world-time maintenance collaborator (issue 374): stamina regen plus environment
-    // and interactable node respawn. Default-constructed below when not injected; the engine's
-    // `isPrimaryGM()` guard is the only gate.
+    // World-time maintenance (issue 374): stamina regen plus environment and interactable node
+    // respawn, gated only by `isPrimaryGM()`.
     worldTimeProcessor = null,
-    // Player-facing listing / view-model builder (issue 375): owns the bodies of listForActor
-    // and getTaskDropBreakdown. Default-constructed below when not injected.
+    // Listing and view-model builder (issue 375) behind `listForActor` and `getTaskDropBreakdown`.
     listingBuilder = null,
   } = {}) {
     this.environmentStore = environmentStore;
@@ -228,12 +211,10 @@ export class GatheringEngine {
     this.toolBreakage = toolBreakage;
     this.failureFeedback = failureFeedback;
     this.eventSceneTrigger = eventSceneTrigger;
-    // Public hook publisher (GatheringHookPublisher): emits the documented
-    // `fabricate.gathering.*` integration hooks on terminal completion. Optional.
+    // Optional publisher of the documented `fabricate.gathering.*` hooks on terminal completion.
     this.hookPublisher = hookPublisher;
     this.getRunViewer = getRunViewer;
-    // Constructor-injected current-realm resolver (GatheringLocationService),
-    // NOT a module import — keeps the engine system-agnostic and testable.
+    // Injected current-realm resolver, not an import, keeping the engine system-agnostic.
     this.locationResolver = locationResolver;
     // The WORLD travel configuration (issue 1282): the realm library and the reveal mode.
     this.travelStore = travelStore;
@@ -293,26 +274,20 @@ export class GatheringEngine {
   }
 
   /**
-   * Install the blind-run secret store and the player→GM start relay (issue 901).
+   * Install the blind-run secret store and the player→GM start relay (issue 901), a
+   * post-construction seam. Both fields are read with `?.`, so an engine that never calls this
+   * writes blind runs directly, which suits a GM-only world and fixtures.
    *
-   * A post-construction seam rather than two more constructor parameters. Both fields are
-   * optional everywhere they are read (`?.`), so an engine that never calls this writes blind
-   * runs directly — correct for a GM-only world and for unit fixtures.
-   *
-   * @param {object} deps
    * @param {import('./GatheringBlindRunStore.js').GatheringBlindRunStore|null} [deps.store]
-   *   World-setting-backed secret store. Reads work on any client; writes are GM-only and the
-   *   store fails them closed.
+   *   Readable on any client; writes are GM-only and fail closed.
    * @param {Function|null} [deps.relayStart] `({ environmentId, actorUuid, taskId,
-   *   interactableRef }) => boolean` — routes a start this client cannot write to the active GM.
-   *   Returns false when nothing could be routed (no active GM).
-   * @returns {GatheringEngine} this, for chaining at the bootstrap site.
+   *   interactableRef }) => boolean`, routing a start to the active GM; false when none is active.
+   * @returns {GatheringEngine} this, for chaining.
    */
   installBlindRunRelay({ store = null, relayStart = null } = {}) {
     this.blindRunStore = store;
     this.relayBlindStart = typeof relayStart === 'function' ? relayStart : null;
-    // The GM's listing must show the real task behind an in-flight blind run, marked as a
-    // secret preview.
+    // The GM's listing shows the real task behind an in-flight blind run as a secret preview.
     this.listingBuilder?.useBlindRunSecrets?.((runId) => this._blindRunSecret(runId));
     return this;
   }
@@ -323,26 +298,19 @@ export class GatheringEngine {
   }
 
   /**
-   * Install the complication delivery writer (issue 1286). Post-construction for exactly the
-   * reason {@link installBlindRunRelay} records. Progressive gathering remains unavailable from
-   * the current authoring surface, so this writer is reached only through legacy or
-   * externally-authored progressive tasks.
+   * Install the complication delivery writer (issue 1286), post-construction like
+   * {@link installBlindRunRelay}. Only legacy or externally-authored progressive tasks reach it.
    *
-   * @param {object} deps
-   * @param {?{deliver: (args: object) => boolean}} [deps.writer] The delivery writer composed in
-   *   `main.js`, which owns the emit and mints the resolution id.
-   * @returns {GatheringEngine} this, for chaining at the bootstrap site.
+   * @param {?{deliver: (args: object) => boolean}} [deps.writer] The `main.js` writer, which owns
+   *   the emit and mints the resolution id.
+   * @returns {GatheringEngine} this, for chaining.
    */
   installComplicationDelivery({ writer = null } = {}) {
     this.complicationDeliveryWriter = writer;
     return this;
   }
 
-  /**
-   * The complication delivery writer, injected or ambient.
-   * @private
-   * @returns {?{deliver: (args: object) => boolean}}
-   */
+  /** @returns {?{deliver: (args: object) => boolean}} The delivery writer, injected or ambient. */
   _complicationWriter() {
     return (
       this.complicationDeliveryWriter ||
@@ -352,24 +320,14 @@ export class GatheringEngine {
   }
 
   /**
-   * FIRE the component complications a committed progressive gathering award earned (issue
-   * 1286).
+   * Fire the component complications a committed progressive gathering award earned (issue
+   * 1286). The award is already on the actor, so planning, triggers, firing and delivery all sit
+   * in one `try` and never throw the attempt; {@link fireComplications} resolves rather than
+   * rejects. The delivery writer owns the emit and the resolution id.
    *
-   * A complication is strictly downstream of a committed award — the items are on the actor and
-   * the run record is written — so nothing here may turn that into a thrown attempt: the plan,
-   * the trigger evaluation, the firing and the delivery are all inside one `try` (guard 3 of 3;
-   * the per-complication and per-effect guards live inside {@link fireComplications}, which
-   * resolves rather than rejects). The delivery writer owns the emit AND mints the resolution
-   * id; this engine does neither.
-   *
-   * @private
-   * @param {object} options
-   * @param {?object} options.actor the acting actor
-   * @param {?object} options.system the owning crafting system
-   * @param {?object} options.task the runtime task, whose FIRST result group is the ordered
-   *   stage list — gathering has no player reorder, so authored order IS fire order
-   * @param {?object} options.outcome the terminal outcome, carrying the award report on
-   *   `checkResult.resolutionMeta`
+   * @param {?object} options.task the runtime task, whose first result group is the ordered stage
+   *   list; gathering has no player reorder, so authored order is fire order
+   * @param {?object} options.outcome carries the award report on `checkResult.resolutionMeta`
    * @returns {Promise<?object>} `fireComplications`'s return, or null when nothing ran.
    */
   async _fireGatheringComplications({ actor, system, task, outcome }) {
@@ -428,15 +386,11 @@ export class GatheringEngine {
   }
 
   /**
-   * Public start entry point (issue 901). Routes a blind start this client may not write to the
-   * active GM, and otherwise starts the attempt locally. `main.js` calls this rather than
-   * {@link GatheringEngine#startAttempt} so the routing decision is made once, before the blind
-   * draw; `startAttempt` stays the direct, non-routing entry for the GM's relay handler, macros
-   * and tests.
+   * Public start entry point (issue 901): routes a blind start this client may not write to the
+   * active GM before the blind draw, else starts locally. `startAttempt` stays the direct entry
+   * for the GM's relay handler, macros and tests.
    *
-   * @param {object} [options] Same options as {@link GatheringEngine#startAttempt}.
-   * @returns {Promise<object>} A start result. A relayed start reports `state: 'relayed'` with a
-   *   null `runId` — the run appears when the GM's write replicates.
+   * @returns {Promise<object>} A relayed start reports `state: 'relayed'` with a null `runId`.
    */
   async requestStart(options = {}) {
     if (Object.hasOwn(options, 'lifecycleVersion')) {
@@ -824,12 +778,9 @@ export class GatheringEngine {
   }
 
   /**
-   * Resume matured timed gathering runs for the supplied Foundry world time.
-   *
-   * Non-matured waitingTime runs are filtered by GatheringRunManager. Matured paths call
-   * completeRun with planned result/tool/check refs before committing result creation, tool
-   * usage or failure feedback; if terminal history persistence throws or returns null, those
-   * post-history side effects are skipped.
+   * Resume matured timed runs for the given world time. Matured paths call `completeRun` with the
+   * planned refs before creating results, using tools or posting failure feedback; if history
+   * persistence throws or returns null, those effects are skipped.
    */
   async processWorldTime(worldTime) {
     const processed = [];
@@ -837,13 +788,10 @@ export class GatheringEngine {
     const cancelled = [];
     const cleared = [];
     const errors = [];
-    // Primary-GM gate (mirrors the issue-656 fix in CraftingRunManager). `updateWorldTime` is
-    // synced, so this runs on EVERY connected client and `getMaturedWaitingRuns` walks ALL of
-    // `game.actors`. Maturation writes run flags, CREATES the gathered items, burns tool
-    // durability, posts chat and depletes the node pool, and `completeRun` returning null for
-    // the loser is a race rather than a lock, so without this gate two clients can both
-    // double-apply every one of those effects. Uses the fail-open `resumeTimedRuns` wired in
-    // main.js, not the `isPrimaryGM` maintenance gate.
+    // Primary-GM gate (like issue 656 in CraftingRunManager): `updateWorldTime` is synced, so
+    // this runs on every client, and `completeRun` returning null for the loser is a race, not a
+    // lock; ungated, two clients would double-apply every maturation effect. Uses the fail-open
+    // `resumeTimedRuns`, not the `isPrimaryGM` maintenance gate.
     const readyRuns = this.resumeTimedRuns()
       ? normalizeList(await this.runManager?.getMaturedWaitingRuns?.(worldTime))
       : [];
@@ -873,8 +821,7 @@ export class GatheringEngine {
       }
     }
 
-    // Drive stamina regeneration and node respawn off the same world-time tick that matures
-    // timed runs. Guarded to the primary GM so connected clients never double-apply.
+    // Stamina regen and node respawn ride the same tick, on the primary GM only.
     let staminaRegen = [];
     let nodeRespawn = [];
     let interactableNodeRespawn = [];
@@ -935,13 +882,7 @@ export class GatheringEngine {
     return result;
   }
 
-  /**
-   * Thin delegate to the world-time processor's interactable-scoped node respawn pass (issue
-   * 374), kept so callers that drive the pass directly stay green after the extraction.
-   *
-   * @param {number} worldTime
-   * @returns {Promise<Array<{sceneId:string, regionId:string, behaviorId:string}>>}
-   */
+  /** Delegate to the world-time processor's interactable node respawn pass (issue 374). */
   _processInteractableNodeRespawn(...args) {
     return this.worldTimeProcessor._processInteractableNodeRespawn(...args);
   }
@@ -953,15 +894,13 @@ export class GatheringEngine {
       rememberedActorId = null,
       environmentId = null,
       taskId = null,
-      // Virtual-present tools injected by an active canvas Tool station: a `{ systemId,
-      // componentIds }` payload satisfying a tool prerequisite WITHOUT an owned item (and
-      // excluded from breakage/usage) ONLY for tasks in the matching crafting system.
+      // Virtual-present tools from an active canvas Tool station (`{ systemId, componentIds }`)
+      // satisfy a tool without an owned item, and skip breakage, only in the matching system.
       presentTools = null,
-      // Optional scene-interactable ref ({sceneId, regionId, behaviorId}) when the attempt was
-      // opened against an interactable owning its own scoped node pool (issue 302).
+      // Scene-interactable ref when the attempt targets an interactable's own node pool
+      // (issue 302).
       interactableRef = null,
-      // Opt-in interactive roll: surfaces the confirm-roll dialog and posts the roll to chat.
-      // Defaults false so the programmatic API and timed maturation stay silent.
+      // Opt-in confirm-roll dialog and chat post; off for the API and timed maturation.
       interactive = false,
       lifecycleVersion,
     } = {},
@@ -1013,8 +952,8 @@ export class GatheringEngine {
       });
     }
 
-    // System-validity gate: a system with a `blocks: 'system'` validation issue is unusable, so
-    // a non-GM attempt is rejected. GMs bypass so they can still diagnose a broken system.
+    // System-validity gate: a `blocks: 'system'` issue rejects a non-GM attempt; GMs bypass to
+    // diagnose.
     if (viewer?.isGM !== true && this._isSystemBlockedForGathering(system, new Map())) {
       return this._blockedStart({
         viewer,
@@ -1035,9 +974,8 @@ export class GatheringEngine {
       });
     }
 
-    // Fresh location re-resolution at attempt time (no listing cache) so a stale
-    // listing state — e.g. an override cleared between list and start — cannot
-    // start a location-gated attempt.
+    // Re-resolve location now, with no listing cache, so a stale listing cannot start a
+    // location-gated attempt.
     const locationGuard = this._locationBlockedReasons({
       environment,
       system,
@@ -1191,9 +1129,8 @@ export class GatheringEngine {
     }
 
     if (hasTimeRequirement(task)) {
-      // Waiting runs mature later (no open session / canvas tool), so terminal
-      // tool side-effects use no virtual-present set; the gate above already
-      // passed for this attempt.
+      // Waiting runs mature with no session or canvas tool, so terminal tool effects use no
+      // virtual-present set; this attempt's gate already passed.
       return this._startWaitingAttempt({
         viewer,
         actor: selectedActor,
@@ -1322,25 +1259,12 @@ export class GatheringEngine {
       : this._clearMisconfiguredWaitingRun({ ...cleared, run: activeRun });
   }
 
-  /**
-   * Public read API — a thin delegator to the GatheringListingBuilder collaborator (issue
-   * 375), kept on the engine because external callers dispatch by method name on the instance.
-   *
-   * @param {object} [args]
-   * @returns {Promise<object>}
-   */
+  /** Delegates to `GatheringListingBuilder` (issue 375); kept because callers dispatch by name. */
   async listForActor(args = {}) {
     return this.listingBuilder.listForActor(args);
   }
 
-  /**
-   * Public read API — delegates to the GatheringListingBuilder collaborator
-   * (issue 375). Thin delegator for the same method-name-dispatch reason as
-   * `listForActor`; the body moved into the builder.
-   *
-   * @param {object} [args]
-   * @returns {Promise<object>}
-   */
+  /** Delegates to `GatheringListingBuilder` (issue 375); kept because callers dispatch by name. */
   async getTaskDropBreakdown(args = {}) {
     return this.listingBuilder.getTaskDropBreakdown(args);
   }
@@ -1441,9 +1365,8 @@ export class GatheringEngine {
       system,
       environment: snapshotEnvironment || environment,
       task,
-      // Scoped-node ref persisted at start (issue 302); null for the env flow.
-      // `_resolveNodeSource` falls back to the environment branch if the behaviour
-      // no longer resolves at maturity, so the decrement is never dropped.
+      // Scoped-node ref persisted at start (issue 302), null for the environment flow;
+      // `_resolveNodeSource` falls back to the environment if the behaviour is gone.
       interactableRef: normalizeInteractableRef(run?.interactableRef),
     };
   }
@@ -1475,10 +1398,8 @@ export class GatheringEngine {
 
   _playerCandidateEnvironments(systems, viewer) {
     const environments = normalizeList(this.environmentStore?.list?.());
-    // System-validity gate: a system with a `blocks: 'system'` issue exposes
-    // nothing to non-GM viewers (its environments are dropped before any task
-    // gating). GMs bypass so they still reach a broken system to fix it. Computed
-    // at most once per system per listing call, NOT a full overview rebuild.
+    // System-validity gate: a `blocks: 'system'` issue hides the system's environments from
+    // non-GMs; GMs bypass to fix it. Computed at most once per system per listing.
     const isGM = viewer?.isGM === true;
     const blockedCache = new Map();
     return environments
@@ -1498,16 +1419,9 @@ export class GatheringEngine {
   }
 
   /**
-   * Whether a gathering system is hidden by a `blocks: 'system'` validation
-   * issue. Cached per listing call (keyed by system id) so a multi-environment
-   * system is evaluated once. Fail-open (false) when the system or recipe manager
-   * is unavailable so a missing collaborator never blanks a player's gathering
-   * listing. GM bypass is the caller's concern.
-   *
-   * @param {object|null|undefined} system
-   * @param {Map<string, boolean>} cache Per-call blocker cache, keyed by system id.
-   * @returns {boolean}
-   * @private
+   * Whether a system is hidden by a `blocks: 'system'` validation issue, cached per listing by
+   * system id. Fails open (false) without a system or recipe manager, so a missing collaborator
+   * never blanks a listing. The GM bypass is the caller's.
    */
   _isSystemBlockedForGathering(system, cache) {
     const systemId = system?.id;
@@ -1532,12 +1446,10 @@ export class GatheringEngine {
   }
 
   /**
-   * A static, drop-rate-only approximation of the chance a d100 task yields at least one item:
-   * `1 − ∏(1 − dropRate_i/100)` over enabled drop rows. It ignores actor/condition modifiers,
-   * attempt limits, node depletion, stamina, tools and the d100 success threshold, so it means
-   * "chance at least one drop rolls", not whole-attempt success.
+   * A drop-rate-only approximation of a d100 task yielding at least one item,
+   * `1 − ∏(1 − dropRate_i/100)` over enabled rows, ignoring modifiers, limits, nodes, stamina,
+   * tools and the success threshold.
    *
-   * @param {object} task A composed/normalized gathering task.
    * @returns {number|null} A 0–1 fraction, or `null` for non-d100 tasks or no enabled rows.
    */
   _taskSuccessChance(task) {
@@ -1616,21 +1528,9 @@ export class GatheringEngine {
     return blockedReasons;
   }
 
-  /**
-   * Resolve the current-realm context for one system once per listing call.
-   * Memoized by systemId in the supplied cache so the per-environment loop in
-   * `listForActor` does not re-resolve for every environment of a system.
-   *
-   * @param {object} args
-   * @param {object} args.actor Selected actor.
-   * @param {string} args.systemId Owning crafting system id.
-   * @param {Map<string, object>|null} [args.cache]
-   * @returns {object} Current-realm context (resolved/source/realms/...).
-   */
+  /** The current-realm context for one listing call, memoized in the supplied cache. */
   _resolveRealmContext({ actor, cache = null }) {
-    // ONE cache entry, not one per system (issue 1282). Where the actor's party is standing is
-    // world-wide now, so keying this by `systemId` would recompute an identical answer once
-    // per crafting system in the listing.
+    // One cache entry, not one per system (issue 1282): the party's location is world-wide.
     const key = 'world';
     if (cache && cache.has(key)) return cache.get(key);
     const context =
@@ -1642,22 +1542,16 @@ export class GatheringEngine {
   }
 
   /**
-   * Evaluate location availability for an environment and produce blocked reasons plus a
-   * redaction-safe `location` listing field. Fast-exits with no reasons and an ungated
-   * `location` when no resolver is wired or the environment declares no location rules, so
-   * legacy ungated environments are preserved exactly. Non-GM blocked-reason `data` is built
-   * entirely from `buildTravelGuidance`, whose destinations flow through `buildRealmDisclosure`,
-   * so secret undiscovered realm ids/names never appear in player-facing data.
+   * Location blocked reasons plus a redaction-safe `location` field for an environment. With no
+   * resolver or no location rules it fast-exits ungated. Non-GM reason `data` comes only from
+   * `buildTravelGuidance`, whose destinations pass through `buildRealmDisclosure`, so
+   * undiscovered realm ids and names never reach players.
    *
-   * @param {object} args
    * @returns {{ blockedReasons: object[], location: object }}
    */
   _locationBlockedReasons({ environment, system = null, viewer, actor, realmContextCache = null }) {
-    // When the realm/travel subsystem is disabled for this system, behave as if
-    // no environment is location-gated and no travel exists: every environment
-    // is available and the listing `location` field is the ungated shape. This
-    // is the central choke point (the listing `location` field and the
-    // start-attempt location guard both flow through here).
+    // Realms disabled: nothing is location-gated and `location` is ungated. The listing field and
+    // the start guard both flow through this choke point.
     if (!isGatheringRealmsEnabled(system)) {
       return {
         blockedReasons: [],
@@ -1689,8 +1583,7 @@ export class GatheringEngine {
     const availability = evaluateLocationAvailability(environment, context);
     const isGM = viewer?.isGM === true;
     const revealMode = this._realmRevealMode();
-    // The FULL world library, not `context.realms`: this feeds `buildTravelGuidance`, which
-    // names the destinations a player could travel to, not merely the ones they are in.
+    // The full world library, since `buildTravelGuidance` names every reachable destination.
     const worldRealms = this.travelStore?.list?.();
     const realmsById = new Map(
       (Array.isArray(worldRealms) ? worldRealms : []).map((realm) => [realm.id, realm])
@@ -1738,12 +1631,9 @@ export class GatheringEngine {
   }
 
   /**
-   * Resolve the party's current-realm summary for the header bar, independent of whether THIS
-   * environment is location-gated, so the header can show "current realm / no realm selected"
-   * whenever the realm/travel subsystem is enabled. Reuses the per-listing realm-context cache
-   * and the same `buildRealmDisclosure` redaction policy as the gated path.
+   * The party's current-realm summary for the header, whether or not this environment is gated,
+   * using the listing's realm cache and `buildRealmDisclosure` redaction.
    *
-   * @param {object} args
    * @returns {{ realmsEnabled: boolean, currentRealms: object[] }}
    */
   _currentRealmSummary({ environment, system = null, viewer, actor, realmContextCache = null }) {
@@ -1766,16 +1656,10 @@ export class GatheringEngine {
   }
 
   /**
-   * Resolve the listing-level current-realm context for the player header chip, independent of
-   * which environment (if any) is selected: the current realm is a property of the party and
-   * the world, so the chip must surface it even when every environment is realm-locked.
+   * The listing-level current-realm context for the header chip, independent of the selected
+   * environment. Realms go through `_currentRealmSummary` for identical redaction, and the keys
+   * follow the store contract (`enabled`/`realms`) so the View passes it to `setRealmContext`.
    *
-   * The realms are resolved through `_currentRealmSummary` (NOT raw `context.realms`) so
-   * disclosure/redaction stays identical to the per-environment path. The returned object uses
-   * the STORE contract keys (`enabled`/`realms`, not `realmsEnabled`/`currentRealms`) so the
-   * View can pass it straight through `setRealmContext` with no remapping.
-   *
-   * @param {object} args
    * @returns {{ enabled: boolean, realms: object[], systemId: string|null }}
    */
   _listingRealmContext({
@@ -1794,9 +1678,8 @@ export class GatheringEngine {
           .filter(Boolean)
       ),
     ];
-    // The chip shows whenever at least one realm-enabled system participates (issue 1282): the
-    // realm library, the reveal mode and the party's location are world-wide, so every enabled
-    // system answers identically. Zero participating systems hides it.
+    // Shown when at least one realm-enabled system participates (issue 1282); every such system
+    // answers alike because realms are world-wide.
     if (realmEnabledSystemIds.length === 0) {
       return { enabled: false, realms: [], systemId: null };
     }
@@ -1818,13 +1701,8 @@ export class GatheringEngine {
     };
   }
 
-  /**
-   * How realm names are disclosed to players — a WORLD fact since issue 1282.
-   *
-   * Read through the shared helper rather than inline, because the old per-system read
-   * coerced a missing value to `'manual'`: a reader left pointing at the retired field would
-   * have turned every `alwaysVisible` world into a `manual` one silently, with no error.
-   */
+  /** How realm names are disclosed to players, a world fact since issue 1282, read through the
+   * shared helper so no reader can coerce a missing value to `'manual'`. */
   _realmRevealMode() {
     return getRealmRevealMode(this.travelStore?.get?.());
   }
@@ -1837,18 +1715,12 @@ export class GatheringEngine {
   }
 
   /**
-   * Collect the blocked-reason list for a single task (game-paused, duplicate run, tool,
-   * conditions, scene, and rich-attempt gates).
+   * The blocked reasons for one task: paused game, duplicate run, tools, conditions, scene and
+   * rich-attempt gates.
    *
-   * @param {object} args
-   * @param {object} args.environment Composed environment.
-   * @param {object} args.system Owning crafting system.
-   * @param {object} args.task Composed/normalized task.
-   * @param {object} args.actor Selected actor.
-   * @param {object} args.viewer Foundry user requesting the listing.
-   * @param {boolean} [args.transparent=false] Bypass the `_isOpaqueBlindTask` redaction so a
-   *   revealed blind task keeps its real required-weather/time and missing-tool details.
-   * @returns {Promise<object[]>} The task's blocked reasons.
+   * @param {boolean} [args.transparent=false] Skip the `_isOpaqueBlindTask` redaction so a
+   *   revealed blind task keeps its real weather/time and missing-tool details.
+   * @returns {Promise<object[]>}
    */
   async _taskBlockedReasons({
     environment,
@@ -1860,9 +1732,7 @@ export class GatheringEngine {
     presentTools = null,
   }) {
     const blockedReasons = [];
-    // For a revealed/discovered blind task (`transparent`), keep the real
-    // blocked-reason data — the row needs the actual required weather/time and
-    // missing-tool details. For an opaque blind task, the data stays nulled.
+    // A revealed blind task keeps its real reason data; an opaque one stays nulled.
     const redact = !transparent && this._isOpaqueBlindTask({ environment, viewer });
     if (this._gamePaused()) {
       blockedReasons.push(this._blockedReason('GAME_PAUSED'));
@@ -1904,9 +1774,7 @@ export class GatheringEngine {
       }
     }
 
-    // Weather/time-of-day are runtime gates: a task may match the environment
-    // (biome/danger) but be inactive when current conditions don't satisfy its
-    // required `weather` / `timeOfDay` values.
+    // Weather and time of day are runtime gates on the task's required values.
     const conditionsResult = evaluateEnvironmentMatch(
       task,
       environment,
@@ -1965,14 +1833,9 @@ export class GatheringEngine {
   }
 
   /**
-   * Build the player-facing required-tools list for a task, each entry tagged with the actor's
-   * per-tool state: `{ id, name, img, state: 'present'|'damaged'|'missing', required: true }`.
-   *
-   * Resolved tools are classified via {@link classifyGatheringToolStates} — the same matcher
-   * attempt validation uses, so the state agrees with whether the attempt is blocked — while
-   * unresolved or disabled library tool refs are surfaced as `missing`. Display `name`/`img`
-   * come from the tool's `componentId` resolved against the system's components (tool `label`
-   * wins when set). Tolerant of a null actor/system.
+   * The required-tools list for a task, each `{ id, name, img, state, required: true }` with
+   * `state` from {@link classifyGatheringToolStates}, the matcher attempt validation uses;
+   * unresolved or disabled tool refs are `missing`. Tolerates a null actor or system.
    *
    * @returns {Array<{id: string|null, name: string, img: string,
    *                  state: 'present'|'damaged'|'missing', required: boolean}>}
@@ -1994,10 +1857,8 @@ export class GatheringEngine {
 
     const resolved = states.map(({ tool, state }) => {
       const component = componentsById.get(stringOrNull(tool?.componentId)) ?? null;
-      // The shared `data-models` requirement-13 precedence: authored label, then the
-      // registration snapshot, then the linked component. Consulting the component alone
-      // rendered "Unknown tool" + the item-bag glyph for every item-sourced Tool, which
-      // carries `componentId: null` by construction (issue 1119).
+      // `data-models` requirement 13 precedence: authored label, registration snapshot, then the
+      // linked component; item-sourced Tools have `componentId: null` (issue 1119).
       const name = resolveToolDisplayName(tool, component, this.localize(UNKNOWN_TOOL_LABEL_KEY));
       const img = resolveToolDisplayImage(tool, component);
       return {
@@ -2009,9 +1870,7 @@ export class GatheringEngine {
       };
     });
 
-    // Unresolved (missing) and disabled library tool references can't be matched
-    // against actor inventory; surface them as missing so the player still sees
-    // an entry. Their display falls back to the raw id.
+    // Unresolved and disabled tool refs cannot be matched, so they show as missing by raw id.
     for (const toolId of [...normalizeList(missingToolIds), ...normalizeList(disabledToolIds)]) {
       const id = stringOrNull(toolId);
       if (!id) continue;
@@ -2030,10 +1889,8 @@ export class GatheringEngine {
   _componentsById(system) {
     const map = new Map();
     if (!system?.id) return map;
-    // MOVED OFF `getItems` at issue 1370. `getItems` is the AUTHORING and browse accessor and
-    // stays on the persisted record; `getComponentsForSystem` is the repointed READ accessor.
-    // A manager double that stubs only `getItems` still answers, and a record-only fixture
-    // falls through to the shared read seam.
+    // Read through `getComponentsForSystem` (issue 1370), not the authoring `getItems`; a double
+    // stubbing only `getItems` still answers, and a record-only fixture reaches the read seam.
     let components;
     try {
       if (typeof this.systemManager?.getComponentsForSystem === 'function') {
@@ -2084,9 +1941,8 @@ export class GatheringEngine {
         })
       );
     }
-    // Fallback: treat a tool as satisfied when virtually present (canvas Tool).
-    // System-scoped: a present tool only counts when the active tool's systemId
-    // matches this task's crafting system (componentId is a per-system id).
+    // A tool is also satisfied when virtually present, only for this task's system, since
+    // componentId is per system.
     const presentScope = { presentTools, systemId: system?.id ?? task?.craftingSystemId ?? null };
     const presentSet = resolvePresentComponentIds(presentScope);
     // An item-sourced Tool station has no componentId to key on (issue 1119).
@@ -2100,22 +1956,11 @@ export class GatheringEngine {
   }
 
   /**
-   * Build the per-task model surfaced in the player listing. For an opaque blind task (non-GM
-   * viewer of a blind environment) it returns the collapsed `blindGather` action with task
-   * identity redacted; otherwise the full transparent model, including a `successChance` (see
-   * {@link GatheringEngine#_taskSuccessChance}). The opaque branch never carries
-   * `successChance`, so aggregate drop info cannot leak.
+   * The per-task listing model. An opaque blind task (non-GM viewer, blind environment) collapses
+   * to the `blindGather` action with identity redacted and no `successChance`, so drop odds
+   * cannot leak; otherwise the full model with {@link GatheringEngine#_taskSuccessChance}.
    *
-   * @param {object} args
-   * @param {object} args.task Composed/normalized task.
-   * @param {object} args.environment Composed environment.
-   * @param {object|null} [args.actor=null] Selected actor.
-   * @param {object} args.viewer Foundry user requesting the listing.
-   * @param {object} args.visibility Resolved task visibility metadata.
-   * @param {object[]} args.blockedReasons Precomputed blocked reasons for the task.
-   * @param {boolean} [args.forceVisible=false] Skip the opaque blind collapse — used for
-   *   already-revealed tasks in the "Discovered Tasks" list.
-   * @returns {object} The task model.
+   * @param {boolean} [args.forceVisible=false] Skip the collapse for already-revealed tasks.
    */
   _taskModel({
     task,
@@ -2128,9 +1973,7 @@ export class GatheringEngine {
     tools = null,
   }) {
     const blind = environment.selectionMode === 'blind';
-    // `forceVisible` builds a transparent model for an already-revealed blind
-    // task (the "Discovered Tasks" list) — it bypasses the opaque collapse that
-    // otherwise hides task identity from non-GM viewers of a blind environment.
+    // `forceVisible` builds a transparent model for an already-revealed blind task.
     const opaqueBlind = !forceVisible && this._isOpaqueBlindTask({ environment, viewer });
     const rich = this._richListingMetadata({ environment, task, actor, viewer });
 
@@ -2199,17 +2042,9 @@ export class GatheringEngine {
   }
 
   /**
-   * Evaluate the rich-state attempt gate for a task and map its blocked reasons into the
-   * listing's blocked-reason shape.
+   * The rich-state attempt gate for a task, mapped into listing blocked reasons.
    *
-   * @param {object} args
-   * @param {object} args.actor Selected actor.
-   * @param {object} args.viewer Foundry user requesting the listing.
-   * @param {object} args.system Owning crafting system.
-   * @param {object} args.environment Composed environment.
-   * @param {object} args.task Composed/normalized task.
-   * @param {boolean} [args.transparent=false] Keep the real per-reason `data` for a revealed
-   *   blind task instead of nulling it via the `_isOpaqueBlindTask` redaction.
+   * @param {boolean} [args.transparent=false] Keep real reason `data` for a revealed blind task.
    * @returns {Promise<{blockedReasons: object[], evidence: object}>}
    */
   async _evaluateRichAttempt({
@@ -2253,14 +2088,12 @@ export class GatheringEngine {
   }
 
   /**
-   * Whether run HISTORY must still name this run's task generically for this viewer (D-027).
-   *
-   * Owning the actor never discloses a blind task, and a run the GM executed persists the REAL
-   * task id, so the record's marker cannot answer it — the environment plus the recorded reveal
-   * can, which is exactly what {@link GatheringEngine#_isBlindIdentityHidden} answers for the card.
+   * Whether run history must still name this run's task generically for this viewer. Owning the
+   * actor never discloses a blind task, and a GM-executed run persists the real id, so the
+   * environment and the recorded reveal decide, as {@link GatheringEngine#_isBlindIdentityHidden}
+   * does for the card.
    *
    * @param {{actor: ?object, viewer: ?object, environmentId: ?string, taskId: ?string}} args
-   * @returns {boolean} True when history must show the generic blind label.
    */
   isHistoricalBlindIdentityHidden({ actor = null, viewer = null, environmentId, taskId } = {}) {
     const environment = this._findEnvironment(environmentId);
@@ -2269,21 +2102,10 @@ export class GatheringEngine {
   }
 
   /**
-   * Whether this viewer must still be told WHICH task an attempt resolved to via the generic
-   * blind label rather than its real name. Distinct from
-   * {@link GatheringEngine#_isOpaqueBlindTask}, which stays true forever even for a task the
-   * reveal policy has disclosed: identity is hidden only while the task is opaque to this
-   * viewer AND the actor has no reveal recorded at the environment's reveal scope. Reading the
-   * recorded reveal, rather than re-deriving the policy, is what keeps the chat card in step
-   * with the listing.
-   *
-   * @private
-   * @param {object} args
-   * @param {object} args.environment Composed environment.
-   * @param {?object} args.viewer Active viewer payload.
-   * @param {?object} args.actor Acting actor, whose flag holds the reveal state.
-   * @param {?object} args.task Resolved task.
-   * @returns {boolean} True when the real task identity must not be disclosed.
+   * Whether this viewer must still see the generic blind label instead of the task's name: the
+   * task is opaque to them and the actor has no recorded reveal at the environment's reveal
+   * scope. Unlike {@link GatheringEngine#_isOpaqueBlindTask}, which stays true after a reveal;
+   * reading the recorded reveal keeps the chat card in step with the listing.
    */
   _isBlindIdentityHidden({ environment, viewer, actor, task }) {
     if (!this._isOpaqueBlindTask({ environment, viewer })) return false;
@@ -2306,16 +2128,10 @@ export class GatheringEngine {
   }
 
   /**
-   * Decide whether a start must be routed to the active GM, and route it.
-   *
-   * A blind run's secret state lives in a world setting only a GM may write, and the DRAW must
-   * happen somewhere the acting player cannot rig it. A blind start that will create a waiting
-   * run is therefore handed to the active GM, which re-runs the whole attempt with the
-   * requesting user as the viewer: gates, draw, node reservation and both records are all
-   * GM-side. Returns null — "start locally, unchanged" — when this client may write the setting
-   * itself, when there is no relay, or when the start cannot produce a persisted in-flight run.
-   *
-   * @returns {Promise<object|null>} A relayed start result, or null.
+   * Route a start to the active GM when needed. A blind run's secret lives in a GM-only world
+   * setting and its draw must happen where the player cannot rig it, so a blind start that will
+   * create a waiting run is re-run by the active GM with the requester as viewer. Returns null
+   * ("start locally") when this client may write, there is no relay, or no in-flight run results.
    */
   async _relayBlindStartIfNeeded({
     viewer = null,
@@ -2332,8 +2148,7 @@ export class GatheringEngine {
       rememberedActorId,
       environmentId,
     });
-    // Let `startAttempt` produce the real blocked reason for an unresolvable
-    // start rather than duplicating its diagnostics here.
+    // `startAttempt` reports the real blocked reason for an unresolvable start.
     if (targets.blockedReason) return null;
     const { selectedActor, environment } = targets;
     if (!this._isOpaqueBlindTask({ environment, viewer })) return null;
@@ -2358,14 +2173,8 @@ export class GatheringEngine {
   }
 
   /**
-   * Whether a blind start will leave persisted in-flight state — i.e. whether it can create a
-   * WAITING run, the only case that needs the GM.
-   *
-   * A targeted start names its task, so this is exact. An automatic start does not yet know its
-   * task, so it is answered conservatively from the environment's shape: if ANY task there is
-   * timed, the draw could land on one. A wholly immediate blind environment never routes.
-   *
-   * @returns {boolean}
+   * Whether a blind start can create a waiting run, the only case needing the GM: exact for a
+   * targeted start, and for an automatic one true if any task in the environment is timed.
    */
   _blindStartPersistsRun({ environment, taskId }) {
     const targeted = this._findStartTask({ environment, taskId });
@@ -2373,13 +2182,7 @@ export class GatheringEngine {
     return normalizeList(environment?.tasks).some((task) => hasTimeRequirement(task));
   }
 
-  /**
-   * The result of a start handed to the active GM. Accepted but not yet started
-   * on this client: there is no run id to report, because the run is created by
-   * the GM and arrives when the actor-flag write replicates.
-   *
-   * @returns {object}
-   */
+  /** A start handed to the active GM: accepted, with no run id until the GM's write replicates. */
   _relayedStart({ viewer, actor, environment }) {
     return {
       accepted: true,
@@ -2396,9 +2199,8 @@ export class GatheringEngine {
   }
 
   /**
-   * Resolve the actor, environment and crafting system a start addresses — everything the start
-   * context needs BEFORE any task is chosen, so the player→GM blind-start relay can decide
-   * whether to route WITHOUT drawing the blind task first (issue 901).
+   * The actor, environment and system a start addresses, resolved before any task is chosen so
+   * the blind-start relay can route without drawing the task first (issue 901).
    *
    * @returns {Promise<{selectedActor?: object, system?: object, environment?: object,
    *   actor?: object|null, blockedReason?: object}>}
@@ -2507,17 +2309,11 @@ export class GatheringEngine {
   }
 
   /**
-   * Resolve which task a blind gather attempt starts. Builds the candidate pool
-   * from visible+enabled tasks, gates by attemptability when the system's
-   * `blindCandidateGate` is `attemptableOnly` (default), then draws via weighted
-   * random over `blindSelection.weights` (default weight `1`, non-positive
-   * excludes). Returns null when the pool is empty.
-   *
-   * Candidates whose node pool is already fully spoken for by OUTSTANDING BLIND
-   * RESERVATIONS are excluded (issue 901). The plain `current > 0` gate cannot
-   * see them: a reservation is deliberately not a `nodeRuntime` decrement, so
-   * without this a party could hold more in-flight blind runs than the pool can
-   * ever pay out and over-harvest it at maturity.
+   * The task a blind attempt starts: a weighted draw over `blindSelection.weights` (default 1,
+   * non-positive excluded) from visible, enabled tasks, gated by attemptability under
+   * `blindCandidateGate: 'attemptableOnly'` (the default); null for an empty pool. Tasks whose
+   * node pool outstanding reservations already cover are excluded (issue 901), since a
+   * reservation is not a `nodeRuntime` decrement and the pool could otherwise be over-harvested.
    */
   async _selectBlindStartTask({ environment, system, actor, viewer }) {
     const visibleTasks = await this._visibleTaskListings({ environment, system, viewer, actor });
@@ -2547,8 +2343,8 @@ export class GatheringEngine {
   }
 
   /**
-   * The provisional node claim a blind waiting run takes on a task, or null when
-   * the task has no finite node pool or the system's node economy is off.
+   * The provisional node claim a blind waiting run takes, or null without a finite pool or node
+   * economy.
    *
    * @returns {{environmentId: string, taskId: string, units: number, scope: string}|null}
    */
@@ -2564,14 +2360,8 @@ export class GatheringEngine {
     };
   }
 
-  /**
-   * Whether one more blind run could still be paid out of a task's node pool
-   * once every outstanding reservation is subtracted. True when there is no
-   * reservation to take (no pool, or node economy disabled), so the check is
-   * inert for every environment that does not use finite nodes.
-   *
-   * @returns {boolean}
-   */
+  /** Whether one more blind run fits a task's node pool after outstanding reservations; true when
+   * there is nothing to reserve. */
   _blindNodeReservable({ environment, task }) {
     const reservation = this._blindNodeReservation({ environment, task });
     if (!reservation) return true;
@@ -2742,9 +2532,8 @@ export class GatheringEngine {
         });
       }
 
-      // The secret record must land before the run is treated as started: without
-      // it a blind run has no task and no snapshot to mature against, so a failed
-      // write is rolled back rather than left as an unresolvable run.
+      // The secret must land before the run counts as started, or the run has no task or
+      // snapshot to mature against; a failed write is rolled back.
       const secret = await this._recordBlindRunSecret({
         run,
         actor,
@@ -2776,9 +2565,8 @@ export class GatheringEngine {
         actor,
         system,
         environment,
-        // A blind run's claim on a node is the RESERVATION recorded above, not a
-        // `nodeRuntime` decrement, so the start commit must not consume one. It
-        // still spends stamina, so a blind attempt is never free up front.
+        // A blind run's node claim is the reservation above, not a `nodeRuntime` decrement, so
+        // this commit consumes none; it still spends stamina.
         task: waitingStartCommitTask(task, opaqueBlind),
         outcome: { status: 'waitingTime' },
         viewer,
@@ -2914,18 +2702,13 @@ export class GatheringEngine {
   }
 
   /**
-   * Build the payload persisted on the ACTOR for a waiting run.
+   * The payload persisted on the actor for a waiting run. For an opaque-blind run this is the
+   * integrity boundary (issue 901): the player-readable flag carries the `blind:<environmentId>`
+   * marker instead of the task id, omits the runtime snapshot, and reports the environment's risk
+   * rather than the task's `riskOverride`, which would fingerprint it. The real id and snapshot
+   * go to the GM-owned blind-run store.
    *
-   * For an opaque-blind run this is the integrity boundary (issue 901). The player-readable
-   * flag carries the `blind:<environmentId>` marker instead of the drawn task's id, omits the
-   * runtime snapshot (which embeds the whole task), and reports the ENVIRONMENT's risk rather
-   * than the task's `riskOverride`, which would fingerprint the drawn task. The real id and the
-   * snapshot go to the GM-owned blind-run store; what remains describes only facts the acting
-   * player can already observe.
-   *
-   * @param {object} args
    * @param {boolean} args.opaqueBlind Whether this viewer sees the task as blind.
-   * @returns {object} The run data handed to `createWaitingRun`.
    */
   _waitingRunData({
     system,
@@ -2941,21 +2724,17 @@ export class GatheringEngine {
       craftingSystemId: stringOrNull(system.id),
       environmentId: stringOrNull(environment.id),
       taskId: opaqueBlind ? blindWaitingTaskId(environment) : stringOrNull(task.id),
-      // The run belongs to the VIEWER who requested it, not to whoever is running this
-      // (issue 1288). A relayed blind start executes on the elected GM's client, and the
-      // run manager's fallback would otherwise stamp the GM — which `getGatheringRunViewer`
-      // reads back at maturity as a GM viewer, un-blinding the terminal history it writes
-      // to the player's own actor flag. Null falls back to the manager's ambient default,
-      // which is right for the direct in-session start that supplies no viewer.
+      // The run belongs to the requesting viewer (issue 1288): a relayed blind start runs on the
+      // GM's client, and stamping the GM would un-blind the history written at maturity. Null
+      // falls back to the manager's default, right for a direct in-session start.
       userId: idOf(viewer),
     };
     if (versionedContext) {
       runData.lifecycleVersion = 1;
       runData.completionMode = versionedContext.completionMode || 'manual';
     }
-    // Persist the scene-interactable ref so a timed run that matures later
-    // decrements the SAME scoped node it gated against (issue 302). Null/absent
-    // for the environment-scoped flow (no behaviour stored).
+    // Persist the interactable ref so maturity decrements the same scoped node it gated against
+    // (issue 302).
     const persistedRef = normalizeInteractableRef(interactableRef);
     if (persistedRef) runData.interactableRef = persistedRef;
     if (!opaqueBlind || hasRichGatheringData(environment, task) || task.resolutionMode === 'd100') {
@@ -2973,20 +2752,11 @@ export class GatheringEngine {
     return runData;
   }
 
-  /**
-   * Pre-creation guards that apply only to an opaque-blind waiting start:
-   * the marker-keyed duplicate check and the reservation-aware node check.
-   * Returns a blocked start result, or null when the start may proceed.
-   *
-   * @returns {object|null}
-   */
+  /** Guards for an opaque-blind waiting start: the marker-keyed duplicate check and the
+   * reservation-aware node check. Returns a blocked result, or null to proceed. */
   _blindWaitingStartGuard({ viewer, actor, environment, task, runData }) {
-    // The duplicate check `startAttempt` already made was against the REAL task
-    // id, which no blind run is stored under, so it cannot see an in-flight blind
-    // run in this environment. Re-check against the marker the run is actually
-    // keyed by — that is what enforces "one active blind run per blind
-    // environment" — or `createWaitingRun` would reject the second attempt as a
-    // run-creation failure instead of the duplicate it is.
+    // The earlier duplicate check used the real task id, which no blind run is stored under;
+    // re-check against the marker to enforce one active blind run per blind environment.
     if (this.runManager?.findActiveRunForTask?.(actor, runData.taskId)) {
       return this._blockedStart({
         viewer,
@@ -2998,9 +2768,8 @@ export class GatheringEngine {
         }),
       });
     }
-    // Re-check availability against outstanding reservations immediately before
-    // taking one, not only when the candidate pool was built, so two
-    // near-simultaneous starts cannot both claim the last node.
+    // Re-check reservations just before taking one, so two near-simultaneous starts cannot both
+    // claim the last node.
     if (!this._blindNodeReservable({ environment, task })) {
       return this._blockedStart({
         viewer,
@@ -3016,13 +2785,11 @@ export class GatheringEngine {
   }
 
   /**
-   * Write a blind run's secret state — drawn task, start-time snapshot and provisional node
-   * reservation — into the GM-owned blind-run store. The snapshot is taken at START so the run
-   * resolves against the environment as it was when the player set out; the reservation is
-   * taken here so a party cannot start more blind runs than the pool can pay out.
+   * Write a blind run's secret (drawn task, start snapshot, provisional reservation) to the
+   * GM-owned store. The snapshot is taken at START so the run resolves against the environment
+   * as it was.
    *
-   * @returns {Promise<object|null|false>} The stored record, `null` when this run needs none
-   *   (not blind), or `false` when the write was refused or failed.
+   * @returns {Promise<object|null|false>} The record, `null` when not blind, `false` when refused.
    */
   async _recordBlindRunSecret({
     run,
@@ -3050,28 +2817,16 @@ export class GatheringEngine {
     return stored ?? false;
   }
 
-  /**
-   * The blind-run secret record for a run id, or null. Reads only — every client
-   * can read a world setting, but only the GM's listing is allowed to render it.
-   *
-   * @param {string} runId
-   * @returns {object|null}
-   */
+  /** The blind-run secret record for a run id, or null. Any client can read it; only the GM's
+   * listing renders it. */
   _blindRunSecret(runId) {
     return this.blindRunStore?.get?.(runId) ?? null;
   }
 
   /**
-   * Fold a blind run's GM-held secret state back onto the run record so the maturity path can
-   * resolve it with the code that already reads a run's own `taskId` and
-   * `economyEvidence.runtimeSnapshot`.
-   *
-   * BACK-COMPAT: a run whose `taskId` is a real id is returned untouched. A blind-marked run
-   * with no store record returns a null `taskId`, routing into the blind-redacted
-   * missing-reference cancellation rather than resolving against an arbitrary task.
-   *
-   * @param {object} run
-   * @returns {object} The run to resolve the maturity context from.
+   * Fold a blind run's secret state back onto the run, so maturity reads its `taskId` and
+   * `economyEvidence.runtimeSnapshot` as usual. A run with a real `taskId` is untouched; a
+   * blind-marked run without a record gets a null `taskId` and is cancelled, redacted.
    */
   _hydrateBlindWaitingRun(run) {
     if (!isBlindWaitingTaskId(run?.taskId)) return run;
@@ -3088,15 +2843,10 @@ export class GatheringEngine {
   }
 
   /**
-   * Release a blind run's provisional node reservation once the run is terminal — completed,
-   * cancelled or cleared. A released reservation never touched the real `nodeRuntime` pool, so
-   * nothing has to be given back. Keyed by RUN ID, not by the blind marker, so it works on the
-   * persisted run and on its hydrated copy alike; a run with no record is a no-op, as is any
-   * client that may not write the world setting. A THROWN maturity is deliberately released
-   * nowhere: the run stays active, matures again next tick, and must keep its reservation.
-   *
-   * @param {object} run
-   * @returns {Promise<object|null>} The released record, or null.
+   * Release a blind run's provisional reservation once it is terminal. Nothing returns to
+   * `nodeRuntime`, which was never touched. Keyed by run id, so it works on the persisted and the
+   * hydrated run; a missing record or a non-writing client is a no-op. A thrown maturity keeps its
+   * reservation, because the run stays active and retries next tick.
    */
   async _releaseBlindReservation(run) {
     const runId = stringOrNull(run?.id);
@@ -3314,11 +3064,8 @@ export class GatheringEngine {
       const toolBroke =
         Array.isArray(usedTools) && usedTools.some((entry) => entry?.broken === true);
       if (toolBroke && resolveToolBreakagePolicy(environment) === 'failureOnBreak') {
-        // A VOIDED SUCCESS, not an authored failure (issue 1098). Clearing the groups
-        // here is what keeps `failureOnBreak` out of failure awarding under `always`:
-        // `awardsResultsFor` selects on the surviving group list, so an attempt the
-        // tool-breakage policy voided has nothing left to award and cannot convert
-        // "the attempt is void" into "award the failure loot".
+        // A voided success, not an authored failure (issue 1098): clearing the groups keeps
+        // `failureOnBreak` out of failure awarding, since `awardsResultsFor` reads what survives.
         outcome.status = 'failed';
         outcome.resultGroups = [];
         outcome.failureAward = false;
@@ -3433,10 +3180,8 @@ export class GatheringEngine {
   }
 
   /**
-   * @param {object} args
-   * @param {'immediate'|'waitingStart'|'timedMaturity'} [args.phase='immediate'] Which
-   *   of a run's commits this is. A TIMED run commits twice (start + maturity); the
-   *   rich state uses this to consume the node exactly once per run.
+   * @param {'immediate'|'waitingStart'|'timedMaturity'} [args.phase='immediate'] A timed run
+   *   commits at start and maturity; the rich state consumes the node once per run.
    */
   async _commitRichAttempt({
     actor,
@@ -3781,13 +3526,9 @@ export class GatheringEngine {
     checkResult,
     presentTools = null,
   }) {
-    // THE MIRRORED HALF of the gate in `_terminalSideEffectPlan` (issue 1098, AF4/CF6). Both run
-    // on both flows and the PLAN's `createdResults` feeds the run record, the response and the
-    // chat card, so the two must read the SAME predicate.
-    //
-    // REDACTED AT THE SOURCE (issue 1286): the raw fired list never leaves this method — what
-    // comes back is `publicComplications`' output, so the caller has no unredacted list to
-    // thread into a player-visible response by mistake.
+    // The mirrored half of `_terminalSideEffectPlan`'s gate (issue 1098): both feed the run
+    // record, response and card, so they read the same predicate. The fired list is redacted
+    // here (issue 1286), so no caller holds an unredacted list.
     let complications = [];
     let createdResults = [];
     try {
@@ -3800,10 +3541,8 @@ export class GatheringEngine {
           task,
           outcome,
         });
-        // Component complications (issue 1286), INSIDE the award gate and immediately after
-        // the award: an outcome this predicate refuses awarded nothing, so its stages never
-        // happened. Progressive attempts only — every d100 and routed outcome returns
-        // without planning anything. The chat card is posted by the caller, after this.
+        // Component complications (issue 1286), inside the award gate right after the award;
+        // only progressive attempts plan any. The caller posts the chat card.
         const fired = await this._fireGatheringComplications({ actor, system, task, outcome });
         complications = publicComplications(fired?.fired);
       }
@@ -3852,11 +3591,8 @@ export class GatheringEngine {
     interactive = false,
     resolvedCheckResult = null,
   }) {
-    // Routed gathering resolves exclusively through the system-level gathering
-    // check (Checks editor): roll the configured routed formula and map its total
-    // onto a named outcome tier, then route that tier name to a result group by
-    // name — the same name-matching the crafting/salvage routed paths use as their
-    // tier fallback. With no system routed roll formula the task is misconfigured.
+    // Routed gathering rolls the system routed formula, maps the total to a named tier, and routes
+    // that name to a result group, as crafting and salvage do; no formula is a misconfiguration.
     const routed = system?.gatheringCraftingCheck?.routed;
     const rollFormula = stringOrNull(routed?.rollFormula);
     if (!rollFormula) {
@@ -3878,12 +3614,9 @@ export class GatheringEngine {
   }
 
   /**
-   * Resolve a routed gathering outcome from the system-level routed roll formula. Rolls via the
-   * shared {@link runFormulaRouted}, with the base DC resolved as the per-task `dcOverride`
-   * (when finite) else the routed check's own `dc` (default 15). The matched tier NAME routes
-   * to a result group whose name matches it (case-insensitive); a failing or unmatched tier
-   * produces a terminal failure.
-   * @private
+   * A routed gathering outcome via {@link runFormulaRouted}, with base DC the task's finite
+   * `dcOverride`, else the routed `dc` (default 15). The tier name routes to a same-named group
+   * (case-insensitive); a failing or unmatched tier is a terminal failure.
    */
   async _resolveRoutedFormulaOutcome({
     routed,
@@ -3910,8 +3643,7 @@ export class GatheringEngine {
         actor,
         label: 'Gathering',
         craftingModifier,
-        // Clamp a below-lowest relative total to the closest tier (as crafting/salvage);
-        // a per-task dcOverride never opens a null-outcome dead zone.
+        // Clamp a below-lowest total to the closest tier, as crafting and salvage do.
         clampToNearest: true,
         rollOptions: buildInteractiveRollOptions({
           interactive,
@@ -3923,8 +3655,7 @@ export class GatheringEngine {
         }),
       }));
 
-    // The player cancelled the interactive roll: propagate a cancelled outcome so
-    // `_resolveImmediateAttempt` aborts with zero mutation.
+    // A cancelled interactive roll aborts `_resolveImmediateAttempt` with zero mutation.
     if (rolled.cancelled) {
       return { status: 'cancelled', resultGroups: [], checkResult: null };
     }
@@ -3935,17 +3666,13 @@ export class GatheringEngine {
       value: rolled.value,
       success: rolled.success === true,
       data: rolled.data ?? {},
-      // Engine-evaluated (issue 419): the shared `evaluateCheckBreakage` seam honours
-      // the legacy `data.breakTools` and `checkBreakage` triggers only for
-      // engine-evaluated checks (a macro check never force-breaks tools).
+      // Only engine-evaluated checks may honour `data.breakTools` and `checkBreakage` (issue 419).
       engineEvaluated: true,
     };
 
-    // A failing tier routes to a terminal failure and, since issue 1098, CARRIES the failure
-    // tier's matched result group so the award gate downstream has something to award;
-    // `_terminalSideEffectPlan` and `_commitTerminalSideEffects` own that policy decision.
-    // A NULL `outcomeName` — a fixed-tier total outside every authored range — carries NOTHING
-    // and never awards: there is no tier, so there is no authored failure output to select.
+    // A failing tier is a terminal failure carrying its matched group (issue 1098), leaving the
+    // award policy to `_terminalSideEffectPlan`. A null `outcomeName` (outside every fixed range)
+    // carries nothing and never awards.
     if (rolled.success !== true || !outcomeName) {
       const failureGroups = outcomeName
         ? matchResultGroupsByName(outcomeName, normalizeList(task.resultGroups), {
@@ -3970,13 +3697,9 @@ export class GatheringEngine {
     const matched = matchResultGroupsByName(outcomeName, normalizeList(task.resultGroups), {
       firstOnly: false,
     });
-    // A success tier that matches NO group routes nowhere, which would spend the node and the
-    // stamina and award nothing. Gathering routes by NAME (crafting routes by tier id), so
-    // renaming a tier on the SYSTEM silently unroutes every task whose groups were named for
-    // the old tier; reporting it as misconfigured surfaces the drift on the first roll and —
-    // because `_resolveImmediateAttempt` turns a misconfigured outcome into a blocked start —
-    // costs the player nothing. A group that EXISTS and is empty is deliberate authoring, is
-    // matched by name, and renders the explicit nothing-found card from issue 1027.
+    // A success tier matching no group is reported misconfigured, which blocks the start at no
+    // cost to the player: gathering routes by name, so renaming a system tier silently unroutes
+    // tasks. An existing empty group is deliberate and renders the nothing-found card (issue 1027).
     const matchError = routedGroupMatchError({ outcomeName, matched, task, checkResult });
     if (matchError) return matchError;
     return normalizeTerminalOutcome({
@@ -3987,12 +3710,8 @@ export class GatheringEngine {
     });
   }
 
-  /**
-   * Resolve the routed gathering check base DC: the per-task `dcOverride` (when a
-   * finite number) else the routed check sub-object's `dc` (fallback 15). Mirrors
-   * the salvage `_resolveSalvageDc` resolution.
-   * @private
-   */
+  /** The routed base DC: a finite task `dcOverride`, else the routed `dc` (default 15), like
+   * salvage's `_resolveSalvageDc`. */
   _resolveGatheringRoutedDc(routed, task) {
     const override = task?.dcOverride;
     if (Number.isFinite(override)) return Math.trunc(override);
@@ -4014,26 +3733,18 @@ export class GatheringEngine {
       environment?.eventModifier?.value ?? environment?.eventModifier ?? 0
     );
 
-    // A blind draw the reveal policy has not disclosed yet must not be named to ANYONE —
-    // not in the roll prompt this player is about to read, and not in the flavour of the
-    // pooled `Nd100` message, which `toMessage` posts to the whole table. The label is the
-    // same generic one the listing shows, so the roll says no more than the button did.
-    // Resolved BEFORE the attempt, so it reflects what the player knew when they clicked;
-    // a reveal this attempt earns names the task on the result card instead.
+    // An undisclosed blind draw is named to no one, neither in the roll prompt nor in the pooled
+    // `Nd100` flavour `toMessage` posts to the table. Resolved before the attempt, so a reveal
+    // this attempt earns names the task on the result card instead.
     const identityHidden = this._isBlindIdentityHidden({ environment, viewer, actor, task });
     const rollLabel = identityHidden
       ? this.localize(BLIND_TASK_LABEL_KEY)
       : (task?.name ?? 'Gathering');
 
-    // Interactive d100 (opt-in): the d100 path does NOT use a Foundry `Roll` DC —
-    // each drop row / event is an independent percentile check. So there is no DC
-    // to show; the prompt just confirms the attempt and collects an optional flat
-    // situational modifier applied to every throw. A dismissed prompt returns a
-    // cancelled outcome the caller maps to a zero-mutation `_cancelledStart`.
+    // Interactive d100: each row and event is its own percentile check, so there is no DC; the
+    // prompt collects a flat situational modifier, and a dismissal is a zero-mutation cancel.
     let extraModifier = 0;
     if (interactive) {
-      // No DC is passed: the d100 path has no single DC (each row/event is an
-      // independent percentile check), so the dialog shows no DC line.
       const choice = await promptCheckRoll({
         label: `${rollLabel} — Gathering`,
         name: identityHidden ? rollLabel : task?.name,
@@ -4043,10 +3754,8 @@ export class GatheringEngine {
       if (!choice || choice.confirmed === false) {
         return { status: 'cancelled', resultGroups: [], checkResult: null };
       }
-      // The bonus field is free text, so `Number(...)` alone silently turned a dice
-      // expression ("2d20", "1d4 + 1") into NaN and then 0. Reduce it to a scalar —
-      // rolling it when it is not already a plain number — because each percentile
-      // throw takes a flat numeric modifier, not a formula.
+      // The bonus is free text, so a dice expression is rolled to a scalar rather than becoming
+      // NaN and then 0; each throw takes a flat modifier.
       extraModifier = await evaluateSituationalBonus(choice.bonus, actor);
     }
 
@@ -4058,8 +3767,7 @@ export class GatheringEngine {
       system,
       gatheringModifier: Number.isFinite(gatheringModifier) ? gatheringModifier : 0,
       eventModifier: Number.isFinite(eventModifier) ? eventModifier : 0,
-      // DSN animation + the situational bonus flow only for an interactive attempt;
-      // the automated/timed path leaves the resolver's behaviour untouched.
+      // Dice So Nice and the bonus apply only to an interactive attempt.
       animate: interactive === true,
       extraModifier,
       rollMode: globalThis.game?.settings?.get?.('core', 'rollMode'),
@@ -4120,9 +3828,8 @@ export class GatheringEngine {
         task,
         interactive,
       }));
-    // The player cancelled the interactive roll: propagate a cancelled outcome so
-    // `_resolveImmediateAttempt` aborts with zero mutation (before normalization,
-    // which does not model a cancel).
+    // A cancelled interactive roll aborts `_resolveImmediateAttempt` with zero mutation, before
+    // normalization, which does not model a cancel.
     if (checkResult?.cancelled) {
       return { status: 'cancelled', resultGroups: [], checkResult: null };
     }
@@ -4177,15 +3884,12 @@ export class GatheringEngine {
   }
 
   async _evaluateGatheringCheck({ actor, system, task = null, interactive = false }) {
-    // System-level gathering check (Checks editor) drives progressive
-    // resolution: roll the configured formula and map its numeric total onto the
-    // check-result shape the progressive resolver expects (`{ success, status,
-    // value }`). Progressive has no DC, so `task.dcOverride` never applies here.
+    // Progressive rolls the system formula and maps the total to `{ success, status, value }`;
+    // progressive has no DC, so `task.dcOverride` never applies.
     const progressive = system?.gatheringCraftingCheck?.progressive;
     const rollFormula = stringOrNull(progressive?.rollFormula);
     if (rollFormula) {
-      // Progressive gathering remains unavailable from the current authoring surface, but
-      // legacy and externally-authored runtime tasks can still reach this compatibility path.
+      // Unavailable from the authoring surface, but legacy and external tasks still reach it.
       const rolled = await runFormulaProgressive({
         formula: rollFormula,
         triggers: progressive.checkBreakage?.triggers,
@@ -4200,15 +3904,12 @@ export class GatheringEngine {
           img: task?.img,
         }),
       });
-      // The player cancelled the interactive roll: surface a cancel marker so
-      // `_resolveProgressiveOutcome` aborts with zero mutation.
+      // A cancelled roll makes `_resolveProgressiveOutcome` abort with zero mutation.
       if (rolled.cancelled) {
         return { success: false, status: null, value: null, cancelled: true };
       }
-      // Progressive is value-driven, not pass/fail: leave `status` null so the
-      // award logic (in `resolveProgressiveAward`) decides succeeded/failed from
-      // the numeric `value`. A roll-evaluation error surfaces `success: false`,
-      // which the resolver short-circuits to a terminal failure.
+      // Value-driven: `status` stays null so `resolveProgressiveAward` decides from `value`; a
+      // roll error surfaces `success: false`, a terminal failure.
       return {
         success: rolled.success === false ? false : null,
         status: null,
@@ -4319,8 +4020,7 @@ export class GatheringEngine {
         presentTools,
         outcomeStatus: outcome.status,
         checkResult: checkResult ?? outcome.checkResult ?? null,
-        // Active gathering check's checkBreakage (issue 419) so the shared runtime's
-        // checkDriven override can fire, reaching crafting/salvage parity.
+        // The gathering check's `checkBreakage` (issue 419), so checkDriven can fire.
         checkBreakage: this._resolveGatheringCheckBreakage(system, task),
       });
       return Array.isArray(planned) ? planned : [];
@@ -4361,13 +4061,8 @@ export class GatheringEngine {
     });
   }
 
-  /**
-   * Resolve the active gathering check's `checkBreakage` block for the task's
-   * resolution mode (issue 419). Routed gathering authors on the routed check,
-   * progressive on the progressive check; d100 has no check sub-object so it carries
-   * no checkBreakage. Returns null when none is configured.
-   * @private
-   */
+  /** The active gathering check's `checkBreakage` (issue 419): routed on the routed check,
+   * progressive on the progressive check, none for d100. */
   _resolveGatheringCheckBreakage(system, task) {
     const check = system?.gatheringCraftingCheck || {};
     if (task?.resolutionMode === 'routed') return check.routed?.checkBreakage ?? null;
@@ -4408,16 +4103,14 @@ export class GatheringEngine {
     createdResults,
     usedTools = [],
     checkResult,
-    // ALREADY REDACTED by `_commitTerminalSideEffects`, which applies `publicComplications`
-    // at the source (issue 1286). Nothing here re-filters, and nothing here may widen it.
+    // Already redacted by `_commitTerminalSideEffects` (issue 1286); never widen it here.
     complications = [],
     initiatedBy = 'immediate',
   }) {
     await this._maybeRevealBlindTask({ actor, environment, task, status });
     const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
-    // Read AFTER `_maybeRevealBlindTask`, so an attempt that earns its own reveal
-    // (`onAttempt`, or `onSuccess` on a success) names the task on the card it produced,
-    // while `never` — and `onSuccess` on a failure — keep the generic label.
+    // Read after `_maybeRevealBlindTask`, so an attempt earning its own reveal names the task on
+    // its card, while `never` (or `onSuccess` on a failure) keeps the generic label.
     const identityHidden = this._isBlindIdentityHidden({ environment, viewer, actor, task });
     const publicRun = opaqueBlind
       ? redactBlindTerminalRun(run)
@@ -4445,16 +4138,14 @@ export class GatheringEngine {
       response.createdResults = createdResults;
       response.usedTools = usedTools;
       if (checkResult !== undefined) response.checkResult = checkResult;
-      // Inside the opaque-blind guard with everything else a blind attempt withholds, and
-      // set only when something fired, so a transparent attempt with no complications
-      // returns exactly the response it did before this feature existed.
+      // Inside the opaque-blind guard and set only when something fired, so a transparent
+      // attempt without complications returns its usual response.
       if (complications.length > 0) response.complications = complications;
     }
 
-    // Posted for EVERY terminal attempt, blind included: the card is the outcome channel the
-    // whole gathering UI relies on, and the start response withholds `createdResults` by design,
-    // so a blind attempt without one reports nothing at all. Blindness is about WHICH task was
-    // drawn, so the card carries the real haul and withholds only the identity.
+    // Posted for every terminal attempt, blind included: the card is the outcome channel and the
+    // start response withholds `createdResults`, so it carries the real haul and hides only the
+    // task identity.
     await this._postGatheringChatMessage({
       actor,
       system,
@@ -4468,10 +4159,8 @@ export class GatheringEngine {
       identityHidden,
     });
 
-    // Publish the documented public completion hook(s) after side effects are committed, so
-    // subscribers observe the final state; a no-op when no publisher is injected. A timed
-    // completion is additionally gated to the primary GM, because `processWorldTime` fires on
-    // every client via Foundry's synced `updateWorldTime` hook and must fire exactly once.
+    // Publish completion hooks after side effects commit (no-op without a publisher). A timed
+    // completion is gated to the primary GM, as `updateWorldTime` fires on every client.
     const timedOnNonPrimaryGM = initiatedBy === 'timed' && this.isPrimaryGM() !== true;
     if (!timedOnNonPrimaryGM) {
       this.hookPublisher?.publishAttemptCompleted({
@@ -4494,24 +4183,14 @@ export class GatheringEngine {
   }
 
   /**
-   * Post an automatic gathering result chat card summarizing the attempt: gathered components,
-   * events encountered, broken tools, stamina spent and remaining nodes, each with its image.
+   * Post the gathering result card (components, events, broken tools, stamina, remaining nodes).
+   * Gated by `features.chatOutput` (default true); silent when off or the system is unresolved,
+   * and never throws into the attempt.
    *
-   * Gated by the crafting system's `features.chatOutput` toggle (default true); returns silently
-   * when off or when the system cannot be resolved, and never throws into the attempt flow.
-   *
-   * @param {object} params
-   * @param {object}  params.actor          - The gathering actor (speaker).
-   * @param {object}  params.system         - The crafting system (carries features).
-   * @param {object}  params.task           - The resolved task.
    * @param {string}  params.status         - 'succeeded' | 'failed'.
    * @param {Array}   params.createdResults - Gathered item refs `{actorUuid,itemUuid,quantity}`.
-   * @param {Array}   params.usedTools      - Tool breakage plan entries.
-   * @param {object}  [params.checkResult]  - Outcome detail (events, items).
-   * @param {object}  params.run            - Terminal run (carries economyEvidence).
-   * @param {Array}   [params.complications] - Fired component complications, ALREADY redacted
-   *   to the player-visible set by `_commitTerminalSideEffects` (issue 1286).
-   * @private
+   * @param {Array}   [params.complications] - Fired complications, already redacted by
+   *   `_commitTerminalSideEffects` (issue 1286).
    */
   async _postGatheringChatMessage({
     actor,
@@ -4537,10 +4216,8 @@ export class GatheringEngine {
 
       const components = normalizeList(createdResults).map((entry) => {
         const itemUuid = stringOrNull(entry?.itemUuid);
-        // Prefer the identity the award itself carries. Falling back to the
-        // uuid→componentId join alone left component-sourced awards (which have no uuid
-        // before their document exists) with nothing to look up, so they rendered as a
-        // bare uuid or an empty name.
+        // Prefer the award's own identity: a component-sourced award has no uuid to join on
+        // before its document exists.
         const componentId =
           stringOrNull(entry?.componentId) || stringOrNull(itemsByUuid.get(itemUuid)?.componentId);
         const component = componentId ? componentsById.get(componentId) : null;
@@ -4582,11 +4259,8 @@ export class GatheringEngine {
           };
         });
 
-      // `position` is where this firing's entry sits in the ordered stage list — gathering
-      // has no player reorder, so that is the AUTHORED order, which is also the order this
-      // task's results are shown in. It rides along so the shared renderer can tell two
-      // legitimate firings of one complication on one twice-staged component apart; the
-      // renderer decides whether to draw it, because only it sees the final row set.
+      // `position` is the firing's place in the authored stage list, letting the renderer tell
+      // two firings of one complication apart.
       const complicationRows = normalizeList(complications).map((entry) => ({
         name: stringOrEmpty(entry?.name),
         description: stringOrEmpty(entry?.description),
@@ -4607,14 +4281,9 @@ export class GatheringEngine {
           brokenTools,
           complications: complicationRows,
           staminaSpent: run?.economyEvidence?.stamina?.spent ?? null,
-          // A chat message is a permanent world document, so never state a node count
-          // this client only guessed. When the depletion was relayed to the active GM
-          // the evidence is flagged non-authoritative and the stat is omitted rather
-          // than published wrong (`renderStat` drops a null value).
-          // The in-memory run carries UNREDACTED rich evidence (`_commitRichAttempt`'s
-          // return is merged onto it after the redacted history write), so a hidden-identity
-          // blind card would otherwise publish the drawn task's own node count — a number
-          // a non-GM is never shown for a blind task — into a permanent world document.
+          // A chat message is permanent, so a node count this client only guessed (a depletion
+          // relayed to the GM) is omitted. The in-memory run holds unredacted evidence, so a
+          // hidden-identity blind card must not publish the drawn task's node count either.
           nodesRemaining:
             identityHidden || run?.economyEvidence?.node?.authoritative === false
               ? null
@@ -4632,13 +4301,8 @@ export class GatheringEngine {
     }
   }
 
-  /**
-   * Reveal the resolved task after a blind attempt terminates, per the
-   * system-level reveal policy. `onSuccess` reveals only on success;
-   * `onAttempt` reveals on success or failure; `never` is a no-op. Reveal is
-   * best-effort and never blocks the attempt result. Only applies to blind
-   * environments.
-   */
+  /** Reveal a blind attempt's task per the reveal policy (`onSuccess`, `onAttempt`, `never`);
+   * best-effort, never blocking the result. */
   async _maybeRevealBlindTask({ actor, environment, task, status }) {
     if (environment?.selectionMode !== 'blind') return;
     if (typeof this.richState?.revealTask !== 'function') return;
@@ -4836,8 +4500,7 @@ export class GatheringEngine {
     errors = null,
     outcome = null,
   }) {
-    // A cleared run is terminal for the pool: release its provisional claim
-    // without the real `nodeRuntime` count ever having moved (issue 901).
+    // A cleared run releases its provisional claim; `nodeRuntime` never moved (issue 901).
     await this._releaseBlindReservation(run);
     if (typeof this.runManager?.clearActiveRun !== 'function') {
       throw Object.assign(
@@ -4919,8 +4582,7 @@ export class GatheringEngine {
   }
 
   async _cancelMissingReferenceRun({ viewer, actor, run, resolved }) {
-    // A cancelled run is terminal for the pool: release its provisional claim
-    // without the real `nodeRuntime` count ever having moved (issue 901).
+    // A cancelled run releases its provisional claim; `nodeRuntime` never moved (issue 901).
     await this._releaseBlindReservation(run);
     const persistence = this._cancelledRunWriteData({
       run,
@@ -5015,8 +4677,8 @@ export class GatheringEngine {
       timeGate: plainObjectOrNull(run?.timeGate),
       run: publicRun,
       blockedReasons: [],
-      // Execution is still required, but not yet: this one matures at GM-gated world time, and
-      // completing it early would spend the wait the task declares.
+      // Execution is required, but only at GM-gated world time; completing early would skip the
+      // task's wait.
       requiresExecution: true,
       canExecuteImmediately: false,
     };
@@ -5037,11 +4699,8 @@ export class GatheringEngine {
       runStatus: stringOrNull(run?.status) || 'inProgress',
       run: opaqueBlind ? redactBlindRun(run) : stripRuntimeSnapshotFromRun(run),
       blockedReasons: [],
-      // Said in the crafting engine's vocabulary on purpose. `state` is the gathering-native
-      // word and the journal command layer's result normaliser drops it, so a caller reading a
-      // normalised start -- which is every public caller -- could not tell a run that can
-      // execute now from one waiting on the clock. These two fields it does forward, and
-      // `executePublicGather` keys the one-call completion on them (issue 1759).
+      // In the crafting engine's vocabulary: the journal command normaliser drops `state` but
+      // forwards these, and `executePublicGather` keys one-call completion on them (issue 1759).
       requiresExecution: true,
       canExecuteImmediately: true,
     };
@@ -5061,13 +4720,8 @@ export class GatheringEngine {
     };
   }
 
-  /**
-   * Build the quiet result returned when the player dismisses the interactive
-   * roll dialog. Not `accepted`, but carries no `blockedReasons` and sets
-   * `cancelled: true` so the UI treats it as a SILENT no-op (no notification) —
-   * distinct from a genuinely blocked attempt.
-   * @private
-   */
+  /** The quiet result for a dismissed interactive roll: not `accepted`, no `blockedReasons`, and
+   * `cancelled: true`, so the UI treats it as a silent no-op. */
   _cancelledStart({ viewer, actor = null, environment = null, task = null }) {
     const opaqueBlind = environment && task && this._isOpaqueBlindTask({ environment, viewer });
     return {
@@ -5140,12 +4794,8 @@ function normalizeToolResult(result) {
 }
 
 /**
- * @param {object} raw
- * @param {object} [options]
- * @param {boolean} [options.retainFailureResultGroups] Carry `raw.resultGroups` through a FAILED
- *   outcome instead of clearing it (issue 1098). Opt-in, and used by exactly one caller — the
- *   routed failure branch — so a resolver that hands back groups alongside a failure does not
- *   start awarding them.
+ * @param {boolean} [options.retainFailureResultGroups] Carry `raw.resultGroups` through a failed
+ *   outcome (issue 1098); only the routed failure branch opts in.
  */
 function normalizeTerminalOutcome(raw, { retainFailureResultGroups = false } = {}) {
   if (!raw || typeof raw !== 'object') {
@@ -5185,13 +4835,9 @@ function normalizeTerminalOutcome(raw, { retainFailureResultGroups = false } = {
     return {
       status: 'failed',
       resultGroups: retained,
-      // THE OPT-IN MARKER (issue 1098). A failed outcome carrying groups is NOT by
-      // itself an authored failure award: the d100 resolver's `failureWithEvent` policy
-      // returns exactly that shape — a failed attempt whose matched drop rows are what
-      // the "nothing found" card reports — and awarding those would change d100
-      // behaviour, which this issue must not do. Only the routed seam that deliberately
-      // matched a FAILURE TIER'S group sets this, so the gate can tell the two apart
-      // without inspecting the resolution mode from the far side of the engine.
+      // The opt-in marker (issue 1098): d100's `failureWithEvent` also returns a failed outcome
+      // with groups (the rows the nothing-found card reports), which must not be awarded; only
+      // the routed failure-tier seam sets this.
       ...(retained.length > 0 && { failureAward: true }),
       checkResult: normalizeOutcomeCheckResult(raw),
     };
@@ -5259,8 +4905,7 @@ function normalizeCheckResult(raw) {
     data: plainObjectOrNull(raw.data) ?? {},
     reasonCode: stringOrNull(raw.reasonCode),
     diagnostic: raw.diagnostic ?? null,
-    // Preserve the engine-evaluated flag (issue 419) so the shared breakage seam
-    // can honour `data.breakTools` / `checkBreakage` triggers under checkDriven.
+    // Preserve the engine-evaluated flag (issue 419) for the shared breakage seam.
     ...(raw.engineEvaluated === true && { engineEvaluated: true }),
   };
 }
@@ -5326,12 +4971,9 @@ function resolveProgressiveAward({ system, task, checkResult }) {
     ? requestedAwardMode
     : 'equal';
 
-  // Divergence 4 stays here: gathering already validated `Number.isFinite(value)`
-  // above and clamps `Math.max(0, value)` before handing the budget to the shared
-  // loop. Divergence 1 is `invalidCost: 'fail'` — an invalid per-result difficulty
-  // short-circuits with `invalidResultId`, which we raise as a misconfiguration
-  // here (the loop never builds that shape). Divergence 2 zeroes the budget after a
-  // `partial` tail award (`zeroRemainingOnPartial: true`).
+    // Gathering validated `value` above and clamps it at zero before the shared loop.
+    // `invalidCost: 'fail'` short-circuits with `invalidResultId`, raised here as a
+    // misconfiguration; the budget is zeroed after a `partial` tail award.
   const { awarded, remaining, invalidResultId, partialResult, haltedResult, skippedResults } =
     resolveProgressiveAwardLoop({
       results: normalizeList(group.results),
@@ -5343,10 +4985,8 @@ function resolveProgressiveAward({ system, task, checkResult }) {
     });
 
   if (invalidResultId !== undefined) {
-    // A gathering resolution aborted on an invalid cost fires NO complications, matching
-    // the crafting misconfiguration gate: a GM authoring gap is not a narrative outcome
-    // (issue 1286). Nothing needs to enforce that here — the abort returns before the
-    // award, so `_commitTerminalSideEffects` is never reached.
+    // An invalid-cost abort fires no complications (issue 1286): it returns before the award, so
+    // `_commitTerminalSideEffects` is never reached.
     return misconfiguredOutcome({
       code: 'INVALID_PROGRESSIVE_DIFFICULTY',
       message: 'Progressive gathering result references a component without valid difficulty',
@@ -5359,9 +4999,8 @@ function resolveProgressiveAward({ system, task, checkResult }) {
     resultGroups: [{ ...group, results: awarded }],
     checkResult: {
       ...checkResult,
-      // The same FLAT five keys `ResolutionModeService._resolveProgressiveResultGroups`
-      // publishes (issue 1286), so a consumer classifying stages reads one shape across
-      // all three activities rather than one per activity.
+      // The same five flat keys `ResolutionModeService._resolveProgressiveResultGroups` publishes
+      // (issue 1286), one shape across all three activities.
       resolutionMeta: {
         awardedResultIds: awarded.map((result) => result.id),
         remaining,
@@ -5386,21 +5025,14 @@ function hasAwardedResults(resultGroups) {
 }
 
 /**
- * May this terminal outcome award its result groups? — THE ONE PREDICATE both halves of
- * gathering's mirrored award gate read (issue 1098, AF4/CF6/CF10).
- *
- * A succeeded outcome always may. A FAILED one may only when
- * `gatheringCraftingCheck.failureResultPolicy` permits results on failure AND the outcome still
- * carries a group, which excludes without a special case each: a `failureOnBreak`-voided
- * attempt; a `null` outcome name (a fixed-tier total outside every authored range); a
- * `ROUTED_TIER_UNROUTED` misconfiguration, whose status is `misconfigured` rather than `failed`;
- * and EVERY d100 outcome, whose `failureWithEvent` policy returns a failed outcome still
- * carrying its matched drop rows. `failureAward` is set by `normalizeTerminalOutcome` only for
- * the routed failure seam, which d100 outcomes never pass through.
+ * May this terminal outcome award its result groups: the one predicate both halves of
+ * gathering's award gate read (issue 1098). A success always may; a failure only when
+ * `gatheringCraftingCheck.failureResultPolicy` permits it and the outcome still carries a group
+ * with `failureAward`. That excludes a `failureOnBreak`-voided attempt, a null outcome name, a
+ * `misconfigured` unrouted tier, and every d100 outcome, since only the routed failure seam sets
+ * `failureAward`.
  *
  * @param {?{status?: string, resultGroups?: Array}} outcome
- * @param {?object} system
- * @returns {boolean}
  */
 function awardsResultsFor(outcome, system) {
   if (outcome?.status === 'succeeded') return true;
@@ -5570,10 +5202,8 @@ function validateResultGroupNames(resultGroups) {
   const seen = new Map();
 
   for (const group of resultGroups) {
-    // Routed `ResultGroup.name` validation uses the SAME normalizer as the routed
-    // match path (`normalizeRoutedName`), so a name can never validate yet fail to
-    // route (or vice versa). The `String(value ?? '')` vs `String(name || '')`
-    // edge (0/false → '') is immaterial for outcome-name strings.
+    // Validation uses the routed match path's `normalizeRoutedName`, so a name can never
+    // validate yet fail to route.
     const normalizedName = normalizeRoutedName(group?.name);
     if (!normalizedName) {
       errors.push('Gathering result groups require names');
@@ -5594,26 +5224,16 @@ function validateResultGroupNames(resultGroups) {
   return errors;
 }
 
-/**
- * Whether a task actually takes time — i.e. carries at least one POSITIVE duration field.
- *
- * An empty or all-zero `timeRequirement` is what the editor persists once a duration has been
- * opened and cleared back to nothing, and it plainly means "no duration": authoring, not
- * misconfiguration, so it must resolve immediately.
- *
- * @param {?object} task
- * @returns {boolean}
- */
+/** Whether a task takes time: at least one positive duration field. An empty or all-zero
+ * `timeRequirement` is a cleared duration, so it resolves immediately. */
 function hasTimeRequirement(task) {
   return normalizeTimeRequirement(task?.timeRequirement) !== null;
 }
 
 /**
- * Duration fields a GM authored but that cannot be used — present and non-blank, yet not a
- * finite non-negative number. An ABSENT or zero field is not one of these: it is the ordinary
- * way to say "no duration".
+ * Duration fields present and non-blank yet not a finite non-negative number; an absent or zero
+ * field just means "no duration".
  *
- * @param {?object} timeRequirement
  * @returns {string[]} Offending field names.
  */
 function unusableTimeRequirementFields(timeRequirement) {
@@ -5627,11 +5247,9 @@ function unusableTimeRequirementFields(timeRequirement) {
 }
 
 /**
- * Which commit phase a matured run's rich-state commit runs as.
- *
- * A timed run normally commits twice, so `timedMaturity` suppresses the node consumption
- * already taken at `waitingStart`. A blind run took a PROVISIONAL RESERVATION at start instead,
- * so it converts that reservation here and runs as the single-commit `immediate` case.
+ * The commit phase for a matured run: `timedMaturity` skips the node consumption taken at start,
+ * while a blind run, which took a reservation instead, converts it as the single-commit
+ * `immediate` case.
  *
  * @param {object} run The run as persisted, before blind hydration.
  * @returns {'immediate'|'timedMaturity'}
@@ -5640,26 +5258,14 @@ function maturityCommitPhase(run) {
   return isBlindWaitingTaskId(run?.taskId) ? 'immediate' : 'timedMaturity';
 }
 
-/**
- * A copy of a task carrying no node configuration: a blind run's START commit spends stamina
- * but must NOT decrement the real `nodeRuntime` pool, because its claim is a reservation held
- * in the blind-run store that a cancelled run releases without the pool ever having moved.
- *
- * @param {object} task
- * @returns {object}
- */
+/** A task copy without node configuration: a blind run's START commit spends stamina but must not
+ * decrement `nodeRuntime`, as its claim is a releasable reservation. */
 function withoutNodeReservation(task) {
   return { ...task, nodes: null };
 }
 
-/**
- * The task a waiting run's START commit spends against: the real task, or a
- * node-free copy for a blind run whose node claim is a reservation.
- *
- * @param {object} task
- * @param {boolean} opaqueBlind
- * @returns {object}
- */
+/** The task a waiting START commit spends against: the real task, or a node-free copy for a blind
+ * run. */
 function waitingStartCommitTask(task, opaqueBlind) {
   return opaqueBlind ? withoutNodeReservation(task) : task;
 }
@@ -5871,11 +5477,8 @@ function defaultLocalize(key) {
   return key;
 }
 
-/**
- * Best-effort synchronous resolution of an item document by UUID, used only to
- * recover a display name/image when a gathered result or broken tool cannot be
- * matched to a system component. Returns null outside Foundry or on any error.
- */
+/** Best-effort synchronous item lookup by UUID, only to recover a display name/image for an
+ * unmatched result or tool; null outside Foundry or on error. */
 function resolveItemDoc(uuid) {
   if (!uuid || typeof globalThis.fromUuidSync !== 'function') return null;
   try {
