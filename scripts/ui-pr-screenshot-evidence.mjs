@@ -177,7 +177,7 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-systems',
     label: 'Manager systems browser',
     smokeLabels: ['manager-default-selection', 'manager-selected-normal', 'manager-selected-stacked'],
-    matches: [...PAGE_HEADER_MATCHES, /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
+    matches: [...PAGE_HEADER_MATCHES, /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/],
   },
   {
     id: 'manager-rail-expanded',
@@ -613,6 +613,8 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/presenters\/importReportContent\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/ImportReportModal\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerModal\.svelte$/,
+      // The model that opens both import-flow modals (issue 1721).
+      /^src\/ui\/svelte\/apps\/manager\/importFlowModel\.svelte\.js$/,
     ],
   },
   // Issue 771: folder-aware categorization mapping modal, shown before a folder / whole-pack
@@ -627,6 +629,7 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ManagerModal\.svelte$/,
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
       /^src\/ui\/managerServices\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/importFlowModel\.svelte\.js$/,
     ],
   },
   // The gated Crafting nav group (issue 511) publishes three distinct frames — the expanded group

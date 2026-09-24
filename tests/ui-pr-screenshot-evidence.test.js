@@ -1124,6 +1124,19 @@ describe('UI PR screenshot evidence', () => {
     assert.ok(editorIds.includes('manager-recipe-item-validation-blocked'));
   });
 
+  // Issue 1721 moved the systems library inspector out of the root, and the import report and the
+  // folder-aware drop into a model that opens both import-flow modals.
+  it('maps the systems inspector and the import flow model to the frames they draw', () => {
+    const inspectorIds = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/SystemBrowserInspector.svelte',
+    ]).map(view => view.id);
+    assert.deepEqual(inspectorIds, ['manager-systems']);
+    const flowIds = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/importFlowModel.svelte.js',
+    ]).map(view => view.id);
+    assert.deepEqual(flowIds, ['manager-import-report', 'manager-import-folder-mapping']);
+  });
+
   it('maps the #492 import-report render files to the manager-import-report recipe', () => {
     for (const file of [
       'src/ui/SvelteCraftingSystemManagerApp.svelte.js',

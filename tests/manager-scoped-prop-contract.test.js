@@ -78,8 +78,6 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // THE SHIPPED TWO-STEP DESTRUCTIVE CONTROL, for the world Tool entry's HEADER `Delete` (issue
   // 1373's parity round).
   '../../components/ArmedDangerButton.svelte',
-  // MOVED BY ISSUE 1506, not added.
-  '../../components/Chip.svelte',
   // Moved by issue 1710, not added.
   '../../components/EmptyState.svelte',
   '../../components/ManagerButton.svelte',
@@ -116,6 +114,9 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './RecipeEditView.svelte',
   './RecipeItemEditor.svelte',
   './RecipesBrowserView.svelte',
+  // Added by issue 1721: the systems library inspector is its own unit, which took the only
+  // `Chip` the root rendered, so `../../components/Chip.svelte` left this list.
+  './SystemBrowserInspector.svelte',
   './SystemEditView.svelte',
   './SystemsBrowserView.svelte',
   './TagsCategoriesView.svelte',
@@ -146,6 +147,8 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // Added by issue 1720: the page header's six answers are their own unit, and the root no longer
   // resolves the eyebrow, title, lede or action-group name itself.
   './headerModel.svelte.js',
+  // Added by issue 1721: the import report and the folder-aware component drop are their own unit.
+  './importFlowModel.svelte.js',
   './navRailModel.svelte.js',
   './recipes/RecipeBrowserInspector.svelte',
   './recipes/RecipeBulkEditPanel.svelte',
