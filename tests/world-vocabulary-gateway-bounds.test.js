@@ -1,52 +1,36 @@
 /**
- * The two BOUNDS this change claims for itself, each as a recorded golden (issue 1392, epic 1357,
- * PR 7a).
+ * The two BOUNDS this change claims for itself (issue 1392, epic 1357, PR 7a).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
+import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
+import { normalizeCustomComponentCategories } from '../src/utils/componentCategories.js';
+import { parseModule } from './helpers/moduleAst.js';
+import { moduleAstOf } from './helpers/parsedSource.js';
+import { defineStructureContract } from './helpers/structureContract.js';
+import { shapeOf } from './helpers/structureShapes.js';
+
 const repoRoot = resolve(import.meta.dirname, '..');
-const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
+const CSM = 'src/systems/CraftingSystemManager.js';
 
-/** Every top-level `import` statement of a module, in source order. */
-export function importSurface(source) {
-  return (source.match(/^import\b[^;]*;/gm) ?? []).join('\n');
-}
-
-/**
- * One named function or method's source, comment-stripped.
- *
- * @param {string} declaration the declaration line, verbatim and including its indentation.
- */
-export function strippedFunction(source, declaration) {
-  const start = source.indexOf(declaration);
-  if (start === -1) return '';
-  const indent = declaration.slice(0, declaration.length - declaration.trimStart().length);
-  const lines = source.slice(start).split('\n');
-  const body = [lines[0]];
-  for (const line of lines.slice(1)) {
-    body.push(line);
-    if (line === `${indent}}`) break;
-  }
-  return body
-    .filter((line) => {
-      const trimmed = line.trim();
-      return trimmed !== '' && !trimmed.startsWith('//') && !trimmed.startsWith('*') && !trimmed.startsWith('/*');
-    })
-    .join('\n');
-}
+/** Every top-level `import` of a module, as its shape, in source order. */
+const importShapes = (ast) =>
+  ast.body.filter((node) => node.type === 'ImportDeclaration').map(shapeOf);
 
 test('the admin store gateway keeps its lane-base IMPORT SURFACE', () => {
-  const golden = read('tests/fixtures/adminStoreImportSurface.golden.txt').trimEnd();
-  assert.ok(golden.length > 0, 'the golden is empty, so the comparison below is vacuous');
+  const goldenPath = resolve(repoRoot, 'tests/fixtures/adminStoreImportSurface.golden.txt');
+  const golden = importShapes(parseModule(readFileSync(goldenPath, 'utf8')).ast);
   assert.ok(
-    golden.includes('createWorldScopeActions'),
+    golden.some(({ specifiers }) =>
+      specifiers.some(({ local }) => local.name === 'createWorldScopeActions')
+    ),
     'the golden does not look like this module’s imports at all'
   );
-  assert.equal(
-    importSurface(read('src/ui/svelte/stores/adminStore.js')),
+  assert.deepEqual(
+    importShapes(moduleAstOf('src/ui/svelte/stores/adminStore.js').ast),
     golden,
     'ONE argument at the world-scope projection’s call site is the whole executable diff this ' +
       'lane claims in a gateway file. Computing the reference counts HERE instead would need ' +
@@ -54,23 +38,56 @@ test('the admin store gateway keeps its lane-base IMPORT SURFACE', () => {
   );
 });
 
-test('the crafting system manager is opened for a COMMENT ONLY', () => {
-  const source = read('src/systems/CraftingSystemManager.js');
-  const current = [
-    strippedFunction(source, 'function _vocabularyBasis(vocabulary) {'),
-    strippedFunction(source, '  _scopeBasis(system) {'),
-  ].join('\n\n');
-  const golden = read('tests/fixtures/vocabularyBasisSource.golden.txt').trimEnd();
-  assert.ok(
-    golden.includes('vocabulary.length > 0 ? vocabulary : null'),
-    'the golden does not carry the basis expression, so the extractor or the golden is stale'
-  );
-  assert.ok(golden.includes('componentCategories: _vocabularyBasis('), 'and it reaches _scopeBasis');
-  assert.equal(
-    current,
-    golden,
-    'union the world vocabulary into `_vocabularyBasis` and this reds — which is the point. ' +
-      'A widened basis is KNOWN wherever either half is known, so it would arm the sharpest of ' +
-      'the seven prune sites in a state that prunes nothing today.'
-  );
+// Union the world vocabulary into `_vocabularyBasis` and these red: a widened basis is KNOWN
+// wherever either half is known, so it would arm the sharpest of the seven prune sites in a state
+// that prunes nothing today.
+defineStructureContract('the crafting system manager is opened for a COMMENT ONLY', CSM, {
+  contains: [
+    'function _vocabularyBasis(vocabulary) { return vocabulary.length > 0 ? vocabulary : null; }',
+  ],
+});
+defineStructureContract(
+  'and the basis reaches the system’s own vocabularies alone',
+  { file: CSM, member: '_scopeBasis' },
+  {
+    contains: [
+      `return {
+      componentIds: _scopeEntityBasis(
+        _resolveStoreSeam(this._componentScopeStore),
+        system?.components ?? system?.managedItems ?? system?.items
+      ),
+      essenceIds: _scopeEntityBasis(
+        _resolveStoreSeam(this._essenceScopeStore),
+        system?.essenceDefinitions ?? system?.essences
+      ),
+      toolIds: _scopeEntityBasis(_resolveStoreSeam(this._toolScopeStore), system?.tools),
+      componentCategories: _vocabularyBasis(
+        normalizeCustomComponentCategories(system?.componentCategories)
+      ),
+      recipeCategories: _vocabularyBasis(normalizeCustomRecipeCategories(system?.categories)),
+    };`,
+    ],
+  }
+);
+
+test('a world vocabulary on the facade leaves an unauthored system basis unknown', () => {
+  const world = { list: () => [{ id: 'world-ore', name: 'World ore' }], isSeeded: () => true };
+  const previous = globalThis.game;
+  globalThis.game = {
+    fabricate: { getVocabularyScopeStore: () => world, worldVocabularyStore: world },
+  };
+  try {
+    const manager = new CraftingSystemManager({ getRecipes: () => [] });
+    const unauthored = manager._scopeBasis({ componentCategories: [], categories: [] });
+    assert.equal(unauthored.componentCategories, null, 'no system vocabulary is an UNKNOWN basis');
+    assert.equal(unauthored.recipeCategories, null);
+    const authored = manager._scopeBasis({ componentCategories: ['Ore'], categories: [] });
+    assert.deepEqual(
+      authored.componentCategories,
+      normalizeCustomComponentCategories(['Ore']),
+      'and an authored one is the system’s own, with nothing of the world’s beside it'
+    );
+  } finally {
+    globalThis.game = previous;
+  }
 });

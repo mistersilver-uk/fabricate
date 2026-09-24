@@ -3,16 +3,13 @@
  * epic 1357).
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
 import { describe, it } from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import { get } from 'svelte/store';
 
 import { createAdminStore } from '../src/ui/svelte/stores/adminStore.js';
 import { createServices, makeSystem } from './helpers/adminStoreServices.js';
-import { declaredPropNames } from './helpers/sveltePropsDeclaration.js';
+import { defineStructureContract } from './helpers/structureContract.js';
 import {
   ESSENCE_SYSTEM_STATES,
   essenceEffectSourceReferent,
@@ -39,18 +36,20 @@ import {
 } from '../src/ui/model/essenceValidation.js';
 import { essenceValidationPresentation } from '../src/ui/svelte/apps/manager/essences/essenceStudio.js';
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const ROOT_PATH = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
-const rootSource = readFileSync(resolve(repoRoot, ROOT_PATH), 'utf8');
-// The page header's action ladder is its own unit since issue 1720, so the three seams below
-// are rendered there while the gateway still declares their handlers.
-const HEADER_ACTIONS_PATH = 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte';
-const headerActionsSource = readFileSync(resolve(repoRoot, HEADER_ACTIONS_PATH), 'utf8');
-const PAGE_HEADER_PATH = 'src/ui/svelte/apps/manager/ManagerPageHeader.svelte';
-const pageHeaderSource = readFileSync(resolve(repoRoot, PAGE_HEADER_PATH), 'utf8');
-
-/** The four keys `essenceScopeProps` supplies at every one of its call sites. */
-const BUNDLE_KEYS = ['actions', 'scope', 'systemId', 'systems'];
+const MANAGER = 'src/ui/svelte/apps/manager';
+const ROOT = `${MANAGER}/CraftingSystemManagerRoot.svelte`;
+// The page header's action ladder is its own unit since issue 1720, so the seams below are rendered
+// there while the gateway still declares their handlers.
+const HEADER_ACTIONS = `${MANAGER}/ManagerHeaderActions.svelte`;
+const PAGE_HEADER = `${MANAGER}/ManagerPageHeader.svelte`;
+const CATALOGUE_PAGE = `${MANAGER}/scoped/WorldEssenceCataloguePage.svelte`;
+const ENTRY_PAGE = `${MANAGER}/scoped/WorldEssenceEntryPage.svelte`;
+const EDIT_VIEW = `${MANAGER}/EssenceEditView.svelte`;
+const ESSENCE_PAIR = {
+  at: 'ScopedEntryHeaderActions',
+  where: ['backAttribute', 'data-world-essence-back'],
+};
+const CREATE_BUTTON = { at: 'ManagerButton', where: ['data-world-essence-create', true] };
 
 const ROSTER = [
   { id: 'sys-a', name: 'Mythwright Forge' },
@@ -70,197 +69,158 @@ function corpusOf({ membership = [], defaults = [] } = {}) {
   };
 }
 
-// ── (1) THE SOURCE CONTRACT: NO SCREEN DECLARES A PROP ITS CALL SITE DOES NOT SUPPLY ──────────
-
-/** The attribute names one call site passes, read off the owning unit's markup. */
-function staticAttributesAt(componentName, source = rootSource) {
-  const lines = source.split('\n');
-  const index = lines.findIndex((line) => line.trim() === `<${componentName}`);
-  assert.ok(index >= 0, `${componentName} is not rendered by the unit this call names`);
-  const indent = lines[index].slice(0, lines[index].length - lines[index].trimStart().length);
-  const end = lines.findIndex((line, at) => at > index && line === `${indent}/>`);
-  assert.ok(end > index, `${componentName} never closes on its own indentation`);
-  const names = [];
-  for (const line of lines.slice(index + 1, end)) {
-    const trimmed = line.trim();
-    const bound = /^bind:([A-Za-z][A-Za-z0-9_$]*)=/.exec(trimmed);
-    if (bound) {
-      names.push(bound[1]);
-      continue;
-    }
-    const named = /^([A-Za-z][A-Za-z0-9_$]*)=/.exec(trimmed);
-    if (named) {
-      names.push(named[1]);
-      continue;
-    }
-    const shorthand = /^\{([A-Za-z][A-Za-z0-9_$]*)\}$/.exec(trimmed);
-    if (shorthand) names.push(shorthand[1]);
-  }
-  return names;
-}
-
-// (1b) THE REQUIREMENT-7 CORRECTION, EVIDENCED ON THE REOPENING CHANGE'S OWN DIFF. `## GM World
-// Scoped Entity Routes` requirement 7 closes `CraftingSystemManagerRoot.svelte` to this epic's
-// later lanes, and its own amendment says the closure "is void for a seam the enumeration does not
-// name": reopening the file to supply a NAMED missing seam is a correction, reopening it to build a
-// screen is a violation, and "the distinction is not decidable from a diff's file names, so a
-// correction claim is EVIDENCED on the reopening change's own diff — by an unchanged-render or
-// import-surface assertion" (issue 1372).
+// (1b) THE REQUIREMENT-7 CORRECTION. `## GM World Scoped Entity Routes` requirement 7 closes
+// `CraftingSystemManagerRoot.svelte` to this epic's later lanes except to supply a NAMED missing
+// seam, and a correction claim is evidenced by an unchanged-render or import-surface assertion
+// (issue 1372).
 
 describe('requirement 7 correction — the reopened gateway grew a seam, not a dependency', () => {
-  /** Every module specifier the gateway imports, in source order. */
-  function gatewayImportSpecifiers() {
-    return [...rootSource.matchAll(/from '([^']+)'/g)].map((match) => match[1]);
-  }
-
-  it('IMPORT SURFACE: the essence-family dependency set grows by exactly one pure leaf', () => {
-    const specifiers = gatewayImportSpecifiers();
-    // NON-VACUITY first: an empty match set would make the equality below assert nothing.
-    assert.ok(specifiers.length > 50, 'the gateway import scan found no imports at all');
-    assert.deepEqual(
-      specifiers.filter((specifier) => /essence/i.test(specifier)).sort(),
-      [
-        '../../../model/essenceBrowserModel.js',
-        '../../../model/essenceBulkEditModel.js',
-        './EssenceBrowserView.svelte',
-        './EssenceEditView.svelte',
-        './essences/EssenceBehaviorPreview.svelte',
-        './essences/EssenceBrowserInspector.svelte',
-        './essences/EssenceBulkEditPanel.svelte',
-        './scoped/WorldEssenceCataloguePage.svelte',
-        './scoped/WorldEssenceEntryPage.svelte',
-        './scoped/essenceScoped.js',
-      ],
-      'a correction that had to import a COMPONENT would be building here, not carrying a seam'
-    );
-  });
-
-  it('SEAM 2 imports NAMED helpers from a leaf that imports nothing itself', () => {
-    // A NAMESPACE import would turn this line into a permanent door: every future addition to the
-    // leaf would be reachable from the gateway with no diff here at all.
-    assert.match(
-      rootSource,
-      /import \{ essenceShortValueName, mintEssenceId \} from '\.\/scoped\/essenceScoped\.js';/,
-      'the gateway takes exactly those two, by name'
-    );
-    const leaf = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/essenceScoped.js'),
-      'utf8'
-    );
-    assert.ok(leaf.length > 500, 'the leaf source read produced nothing, so the scan below is empty');
-    assert.deepEqual(
-      [...leaf.matchAll(/^import\s/gm)].map((match) => match[0]),
-      [],
-      'and that leaf still imports nothing, so the gateway inherits no new dependency through it'
-    );
-  });
-
-  it('SEAM 2 renders ONE header control and composes two things the shell already owns', () => {
-    // The RENDER bound: one branch, one button, in the header-actions chain — no new element type,
-    // no new region, no screen.
-    const branches = [...headerActionsSource.matchAll(/data-world-essence-create/g)];
-    assert.equal(branches.length, 1, 'the header carries exactly one create control');
-    assert.match(
-      headerActionsSource,
-      /<ManagerButton role="primary" data-world-essence-create onclick=\{createWorldEssence\}>/,
-      'and it is the shipped button primitive, not hand-rolled markup'
-    );
-    // The HANDLER bound: the write is the store family the pages are already handed, and the
-    // navigation is the same route-exit-gated function the row's pen uses.
-    assert.match(
-      rootSource,
-      /store\?\.worldScope\?\.essence\?\.createEntity\?\./,
-      'the write goes through the essence write family, not a new path'
-    );
-    assert.match(
-      rootSource,
-      /openWorldScopedEntry\('world-essence-entry', id\)/,
-      'and the navigation is the shell function three other sites already call'
-    );
-  });
-
-  it('the deep link is wired from a shell function that already served three other sites', () => {
-    assert.ok(
-      /function openWorldScopedEntry\(/.test(rootSource),
-      'the navigation the seam delegates to is the shell’s own, declared in this file'
-    );
-    const attributes = staticAttributesAt('EssenceBrowserInspector');
-    assert.ok(
-      attributes.includes('onOpenWorldDefinition'),
-      'the inspector call site carries the one callback the seam needs'
-    );
-    // The RENDER bound, pinned to a literal (issue 1372).
-    assert.deepEqual(
-      attributes,
+  defineStructureContract('IMPORT SURFACE: the essence-family set is exactly this', ROOT, {
+    importSpecifiers: [
       [
         'essence',
-        'showSourceUi',
-        'showPropertyMacroUi',
-        'managedItemOptions',
-        'sourceUuid',
-        'systemName',
-        'inherited',
-        'systemRows',
-        'memberCount',
-        'rosterSize',
-        'membershipActions',
-        'onOpenSystemRules',
-        'onEdit',
-        'onOpenWorldDefinition',
-        'onDelete',
-        'onEditComponent',
-        'onCopySource',
-        'onUnlinkSource',
-        'onSourceDrop',
-        'onSourceSelect',
+        [
+          '../../../model/essenceBrowserModel.js',
+          '../../../model/essenceBulkEditModel.js',
+          './EssenceBrowserView.svelte',
+          './EssenceEditView.svelte',
+          './essences/EssenceBehaviorPreview.svelte',
+          './essences/EssenceBrowserInspector.svelte',
+          './essences/EssenceBulkEditPanel.svelte',
+          './scoped/WorldEssenceCataloguePage.svelte',
+          './scoped/WorldEssenceEntryPage.svelte',
+          './scoped/essenceScoped.js',
+        ],
       ],
-      'the reopening changes an existing call site and adds no element, branch or screen'
-    );
-    // And the callback actually navigates, rather than being a declared-but-inert prop.
-    assert.match(
-      rootSource,
-      /onOpenWorldDefinition=\{\(id\) => openWorldScopedEntry\('world-essence-entry', id\)\}/,
-      'the seam routes to the world essence entry through the shared route-exit gate'
-    );
+    ],
+    // A NAMESPACE import would be a permanent door: the leaf's next export reachable, no diff here.
+    contains: ["import { essenceShortValueName, mintEssenceId } from './scoped/essenceScoped.js';"],
   });
 
-  it('SEAM 3 renders the action pair through ONE shared component, not a hand-rolled pair', () => {
-    // The RENDER bound: ONE ELEMENT PER WORLD ENTRY ROUTE, each in its own branch, and never a pair
-    // of buttons a screen spells out for itself (issue 1373).
-    assert.equal(
-      [...headerActionsSource.matchAll(/<ScopedEntryHeaderActions\b/g)].length,
-      3,
-      'one scoped-entry action pair per world entry route, and no route carrying two'
-    );
-    const attributes = staticAttributesAt('ScopedEntryHeaderActions', headerActionsSource);
-    assert.deepEqual(
-      attributes,
-      [
-        'backAttribute',
-        'saveAttribute',
-        'backLabel',
-        'saveLabel',
-        'saveDisabled',
-        'saving',
-        'onBack',
-        'onSave',
+  defineStructureContract(
+    'SEAM 2 takes its helpers from a leaf that imports nothing itself',
+    `${MANAGER}/scoped/essenceScoped.js`,
+    { importSpecifiers: [['', []]], exports: ['mintEssenceId', 'essenceShortValueName'] }
+  );
+
+  defineStructureContract(
+    'SEAM 2 renders ONE header control, and it is the shipped button primitive',
+    HEADER_ACTIONS,
+    {
+      rendersTimes: [[{ where: CREATE_BUTTON.where }, 1]],
+      gives: [
+        { ...CREATE_BUTTON, attribute: 'role', is: 'primary' },
+        { ...CREATE_BUTTON, attribute: 'onclick', is: 'createWorldEssence' },
       ],
-      'the pair is configured by props alone; a per-screen tweak here would be a second pair'
-    );
-    // The two hooks the capture registry and the mounted suites name are still rendered, and are
-    // rendered BY THIS FILE — the component takes them as props precisely so it cannot rename a
-    // selector out from under a site.
-    assert.match(headerActionsSource, /backAttribute="data-world-essence-back"/);
-    assert.match(headerActionsSource, /saveAttribute="data-world-essence-save"/);
-    // The tool entry's own two, for the same reason: they are per-site selectors the capture
-    // registry and the mounted suites name, and the component takes them as props so that a
-    // shared change cannot rename one site out from under the other.
-    assert.match(headerActionsSource, /backAttribute="data-world-tool-back"/);
-    assert.match(headerActionsSource, /saveAttribute="data-world-tool-save"/);
+    }
+  );
+
+  defineStructureContract(
+    'SEAM 2 writes through the essence family, mints against the retired ids, and navigates ' +
+      'through the shell function the other sites call',
+    { file: ROOT, fn: 'createWorldEssence' },
+    {
+      contains: [
+        'store?.worldScope?.essence?.createEntity',
+        "openWorldScopedEntry('world-essence-entry', id)",
+        // Issue 1654: the live roster AND the retired ids, or a retired id is reissued.
+        'mintEssenceId(name, worldScopeState.essence?.entities ?? [], ' +
+          'worldScopeState.essence?.retiredIds ?? [])',
+      ],
+    }
+  );
+
+  defineStructureContract(
+    'the navigation the deep link delegates to passes the route-exit gate',
+    { file: ROOT, fn: 'openWorldScopedEntry' },
+    { calls: ['confirmRouteExit', 'afterTruthyResult'] }
+  );
+
+  defineStructureContract('the inspector call site changed, and adds no element or branch', ROOT, {
+    attributeOrder: [
+      {
+        at: 'EssenceBrowserInspector',
+        names: [
+          'essence',
+          'showSourceUi',
+          'showPropertyMacroUi',
+          'managedItemOptions',
+          'sourceUuid',
+          'systemName',
+          'inherited',
+          'systemRows',
+          'memberCount',
+          'rosterSize',
+          'membershipActions',
+          'onOpenSystemRules',
+          'onEdit',
+          'onOpenWorldDefinition',
+          'onDelete',
+          'onEditComponent',
+          'onCopySource',
+          'onUnlinkSource',
+          'onSourceDrop',
+          'onSourceSelect',
+        ],
+      },
+    ],
+    gives: [
+      {
+        at: 'EssenceBrowserInspector',
+        attribute: 'onOpenWorldDefinition',
+        is: "(id) => openWorldScopedEntry('world-essence-entry', id)",
+      },
+      {
+        at: 'EssenceBrowserInspector',
+        attribute: 'onOpenSystemRules',
+        is: '(entityId, systemId) => openSystemEssenceRules(entityId, systemId)',
+      },
+    ],
+  });
+
+  defineStructureContract('the world essence pages reach the shell handlers they name', ROOT, {
+    gives: [
+      {
+        at: 'WorldEssenceCataloguePage',
+        attribute: 'onOpenSystemRules',
+        is: '(entityId, systemId) => openSystemEssenceRules(entityId, systemId)',
+      },
+      { at: 'WorldEssenceEntryPage', attribute: 'onDirtyChange', is: 'handleWorldEssenceEntryDirty' },
+    ],
+  });
+
+  // SEAM 3: one element per world entry route, configured by props alone, and the per-site
+  // selectors the capture registry and the mounted suites name rendered BY THIS FILE.
+  defineStructureContract('SEAM 3 renders the action pair through ONE component', HEADER_ACTIONS, {
+    rendersTimes: [['ScopedEntryHeaderActions', 3]],
+    attributeOrder: [
+      {
+        ...ESSENCE_PAIR,
+        names: [
+          'backAttribute',
+          'saveAttribute',
+          'backLabel',
+          'saveLabel',
+          'saveDisabled',
+          'saving',
+          'onBack',
+          'onSave',
+        ],
+      },
+    ],
+    attributes: [
+      ['saveAttribute', 'data-world-essence-save'],
+      ['backAttribute', 'data-world-tool-back'],
+      ['saveAttribute', 'data-world-tool-save'],
+    ],
+    // A button never disabled cannot say whether the last edit landed.
+    gives: [
+      { ...ESSENCE_PAIR, attribute: 'saveDisabled', is: '!worldEssenceEntryDirty' },
+      { ...ESSENCE_PAIR, attribute: 'saving', is: 'worldEssenceEntrySaving' },
+    ],
   });
 
   it('SEAM 3 puts the editor in the route-exit chain, so the rail and the breadcrumb prompt too', () => {
-    // THE HALF A MOUNT CANNOT REACH, read as the table's own data rather than as source text.
     const guard = ROUTE_EXIT_GUARDS.find((row) => row.view === 'world-essence-entry');
     assert.ok(Boolean(guard), 'the shell declares no world-entry route-exit guard');
     assert.equal(
@@ -268,147 +228,68 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
       0,
       'the guard is declared but never reached from the cascade every navigation passes through'
     );
-    // …and it delegates rather than restating the shape: the three-way answer, the save-gated
-    // navigation and the synchronous clean path are all `scopedEntryDraft.js`'s.
+    // The three-way answer, the save-gated navigation and the clean path: `scopedEntryDraft.js`.
     assert.equal(
       guard.finish,
       'scoped-entry',
       'the guard hand-rolls the three-way prompt shape instead of taking the shared one'
     );
-    assert.match(
-      rootSource,
-      /confirm: \(\) => store\?\.confirmDiscardDirtyEssenceDraft\?\.\(\),/,
-      'the prompt is the shipped essence one, not a second dialog saying the same thing'
-    );
   });
 
-  it('SEAM 3 gates navigation on the SAVE landing, and disables the button when nothing is dirty', () => {
-    // Both halves are one-line reads and both are the difference between a Save control and a
-    // decoration: a guard that ignored the result navigates away from work nothing persisted, and
-    // a button that is never disabled says nothing about whether the last edit landed.
-    assert.match(
-      rootSource,
-      /return \(await worldEssenceEntryHandle\.save\(\)\) !== false;/,
-      'the shell discards what the flush answered, so a refused write still navigates'
-    );
-    assert.match(
-      headerActionsSource,
-      /saveDisabled=\{!worldEssenceEntryDirty\}/,
-      'the Save button is never disabled, so it cannot say whether there is anything to save'
-    );
-  });
+  defineStructureContract(
+    'the prompt is the shipped essence one, not a second dialog saying the same thing',
+    { file: ROOT, constant: 'routeExitGuards', property: ['world-essence-entry', 'confirm'] },
+    { contains: ['() => store?.confirmDiscardDirtyEssenceDraft?.()'] }
+  );
+
+  defineStructureContract(
+    'SEAM 3 gates navigation on the SAVE landing, so a refused write does not navigate',
+    { file: ROOT, fn: 'saveWorldEssenceEntry' },
+    { contains: ['return (await worldEssenceEntryHandle.save()) !== false;'] }
+  );
 });
 
 // ── (1d) THE ENTRY EDITOR'S BUFFERED IDENTITY FIELD LIST IS A MIRROR ──────────────────────────
+// `WorldEssenceEntryPage` states the list rather than importing it, because its dependency graph is
+// copied into three hand-rolled mounted trees, where an omission HANGS a suite rather than failing.
 
-describe('the entry editor buffers exactly the identity fields an essence lifts to world scope', () => {
-  it('declares the SAME list as `WORLD_IDENTITY_FIELDS.essences`, in the same order', () => {
-    // `WorldEssenceEntryPage` states the list rather than importing it, because its dependency
-    // graph is copied module by module into three hand-rolled mounted trees and an omission there
-    // HANGS a suite rather than failing it.
-    const entrySource = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte'),
-      'utf8'
-    );
-    const declaration = /const IDENTITY_FIELDS = Object\.freeze\(\[([^\]]*)\]\)/.exec(entrySource);
-    assert.ok(declaration, 'the entry editor declares no frozen IDENTITY_FIELDS list');
-    const declared = [...declaration[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
-    assert.ok(declared.length > 0, 'the declaration parsed to an empty list, so the equality below is vacuous');
-    assert.deepEqual(
-      declared,
-      [...WORLD_IDENTITY_FIELDS.essences],
-      'the entry editor buffers a different set of identity fields from the one an essence ' +
-        'actually lifts to world scope, so at least one of them is uneditable or unsaveable'
-    );
-  });
-});
+defineStructureContract(
+  'the entry editor buffers exactly `WORLD_IDENTITY_FIELDS.essences`, in the same order',
+  { file: ENTRY_PAGE, constant: 'IDENTITY_FIELDS' },
+  { contains: [`Object.freeze(${JSON.stringify([...WORLD_IDENTITY_FIELDS.essences])})`] }
+);
 
 // (1c) THE ENTRY EDITOR'S LIVE-PREVIEW FOOTER. `EssenceBehaviorPreview` renders the footer strip,
 // and it is no longer optional (issue 1372).
 
 describe('the world essence entry editor keeps the live-preview note', () => {
-  const entrySource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte'),
-    'utf8'
-  );
-  const previewSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte'),
-    'utf8'
-  );
-
-  it('does not suppress it, and the primitive offers no way to', () => {
-    assert.ok(
-      entrySource.includes('<EssenceBehaviorPreview'),
-      'NON-VACUITY: the entry page renders the preview at all'
-    );
-    assert.ok(
-      !entrySource.includes('showLiveNote'),
-      'the editor whose preview recomputes on every keystroke is the one that must say so'
-    );
-    // The prop is gone with its one former caller. The comment naming the three retired props
-    // is the only surviving mention, so the check is against a DECLARATION rather than the name.
-    assert.ok(
-      !/showLiveNote\s*=/.test(previewSource),
-      'and the prop is gone with its one former caller, so no site can suppress it silently'
-    );
-    assert.ok(
-      previewSource.includes('data-essence-preview-live'),
-      'while the note itself is still rendered, unconditionally'
-    );
+  defineStructureContract('the entry renders the preview, never the retired switch', ENTRY_PAGE, {
+    renders: ['EssenceBehaviorPreview'],
+    writesNo: ['showLiveNote'],
+    spellsNo: ['showLiveNote'],
   });
+  defineStructureContract(
+    'and the preview offers no such prop, while still rendering the note',
+    `${MANAGER}/essences/EssenceBehaviorPreview.svelte`,
+    { namesNo: ['showLiveNote'], writes: ['data-essence-preview-live'] }
+  );
 });
 
+// A name declared that the site does not pass falls THROUGH to the spread, so every reader of it
+// subscribes to `essenceScopeProps`, a new object on every world-corpus publish, for `undefined`.
 describe('criterion 3 — no essence screen declares a prop its call site does not supply', () => {
-  const SCREENS = [
-    ['WorldEssenceCataloguePage', 'src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte'],
-    ['WorldEssenceEntryPage', 'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte'],
-    ['EssenceBrowserView', 'src/ui/svelte/apps/manager/EssenceBrowserView.svelte'],
-    ['EssenceEditView', 'src/ui/svelte/apps/manager/EssenceEditView.svelte'],
-  ];
-
-  it('NON-VACUITY: each site parses a real attribute list and each file a real destructure', () => {
-    // The cheapest green available to a broken parser is an empty set being a subset of anything.
-    for (const [component, path] of SCREENS) {
-      assert.ok(
-        staticAttributesAt(component).length > 0,
-        `${component}'s call site parsed no attributes at all`
-      );
-      assert.ok(
-        declaredPropNames(readFileSync(resolve(repoRoot, path), 'utf8')).length > 0,
-        `${path} parsed no declared props at all`
-      );
-    }
-  });
-
-  for (const [component, path] of SCREENS) {
-    it(`${component} declares a SUBSET of the four bundle keys plus its own attributes`, () => {
-      // THE HAZARD THIS MEASURES, in the root's own words at `CraftingSystemManagerRoot.svelte`:
-      // a name declared here that the site does not pass makes the lookup fall THROUGH to the
-      // spread, and every reader of it becomes a live subscriber to `essenceScopeProps` — a new
-      // object on every world-corpus publish — for a value that is always `undefined`.
-      const known = new Set([...BUNDLE_KEYS, ...staticAttributesAt(component)]);
-      const declared = declaredPropNames(readFileSync(resolve(repoRoot, path), 'utf8'));
-      const unsupplied = declared.filter((name) => !known.has(name));
-      assert.deepEqual(
-        unsupplied,
-        [],
-        `${path} declares ${unsupplied.join(', ')}, which neither the bundle nor its call site ` +
-          'supplies'
-      );
+  for (const [component, file] of [
+    ['WorldEssenceCataloguePage', CATALOGUE_PAGE],
+    ['WorldEssenceEntryPage', ENTRY_PAGE],
+    ['EssenceBrowserView', `${MANAGER}/EssenceBrowserView.svelte`],
+    ['EssenceEditView', EDIT_VIEW],
+  ]) {
+    defineStructureContract(`${component} declares only what its call site supplies`, ROOT, {
+      suppliesProps: [{ component, file }],
     });
-
-    it(`${component} READS every name it declares, so the subset check is over a real set`, () => {
-      // The positive half. A file that declared nothing would satisfy the subset clause above
-      // vacuously, and a file that declared a name it never reads is dead configuration that
-      // reads exactly like a live prop.
-      const source = readFileSync(resolve(repoRoot, path), 'utf8');
-      const declared = declaredPropNames(source);
-      const start = source.indexOf('let {');
-      const body = source.slice(source.indexOf('} = $props();', start));
-      const unread = declared.filter(
-        (name) => !new RegExp(`\\b${name}\\b`).test(body)
-      );
-      assert.deepEqual(unread, [], `${path} declares ${unread.join(', ')} and never reads them`);
+    // The positive half: a declared name never read is dead configuration that reads like a prop.
+    defineStructureContract(`${component} READS every name it declares`, file, {
+      propsUnread: [[]],
     });
   }
 });
@@ -733,43 +614,37 @@ describe('the effectSource SECTION is a block, and every screen that names it re
     assert.equal(essenceEffectSourceReferent('Item.ruby'), 'Item.ruby');
   });
 
-  it('is what all THREE world-default readers call for this section', () => {
-    // A MIRROR GUARD. Each of these is a single call in a `.svelte`, and the failure it catches is
-    // a fourth reader added later that goes back to reading the block as a scalar — which is
-    // silent, because the screen then reports an authored default as unset and nothing reds.
-    const readers = [
-      'src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte',
-      'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte',
-      'src/ui/svelte/apps/manager/EssenceEditView.svelte',
-    ];
-    for (const reader of readers) {
-      const source = readFileSync(resolve(repoRoot, reader), 'utf8');
-      assert.match(
-        source,
-        /essenceEffectSourceReferent\(/,
-        `${reader} must read the effectSource block through the shared referent reader`
-      );
-      // NON-VACUITY: it also has to be reached for the effectSource section specifically, not
-      // merely imported.
-      assert.match(source, /essenceEffectSourceReferent\([^)]*effectSource/);
-    }
-  });
 
-  it('and the locked cards render the WORLD layer rather than the draft', () => {
-    // The `World default` pill sat over the two fields the UNLOCKED card edits — the draft's own
-    // source and macro — so a locked card labelled this system's own value as the world's.
-    const tab = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte'),
-      'utf8'
-    );
-    assert.match(tab, /worldDefaults = \{\}/, 'the tab takes the world layer as a prop');
-    assert.match(tab, /lockedSourceName \|\|/, 'and the locked source card renders it');
-    assert.match(tab, /lockedMacroName \|\|\s*lockedMacroUuid/, 'as does the locked macro card');
-    const editor = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/manager/EssenceEditView.svelte'),
-      'utf8'
-    );
-    assert.match(editor, /worldDefaults=\{worldDefaultCards\}/, 'and the editor supplies it');
+  // A MIRROR GUARD: a fourth reader that reads the block as a scalar reports an authored default
+  // as unset, and nothing reds.
+  for (const [reader, call] of [
+    [CATALOGUE_PAGE, 'essenceEffectSourceReferent(defaults?.effectSource)'],
+    [ENTRY_PAGE, 'essenceEffectSourceReferent(defaults?.effectSource)'],
+    [EDIT_VIEW, 'essenceEffectSourceReferent(worldEntry?.defaults?.effectSource)'],
+  ]) {
+    defineStructureContract(`${reader} reads the effectSource block through the referent`, reader, {
+      contains: [call],
+    });
+  }
+
+  // The `World default` pill sat over the two fields the UNLOCKED card edits, so a locked card
+  // labelled this system's own value as the world's.
+  defineStructureContract(
+    'and the locked cards render the WORLD layer rather than the draft',
+    `${MANAGER}/essences/EssenceOnCraftTab.svelte`,
+    {
+      declaresProp: ['worldDefaults'],
+      contains: [
+        "const lockedSourceName = $derived(String(worldDefaults?.sourceName ?? '').trim());",
+        "const lockedMacroName = $derived(String(worldDefaults?.macroName ?? '').trim());",
+        "lockedSourceName || text('FABRICATE.Admin.Manager.Essence.SourceNoneShort', 'None')",
+        'lockedMacroName || lockedMacroUuid || ' +
+          "text('FABRICATE.Admin.Manager.Essence.Macro.Unnamed', 'the linked property macro')",
+      ],
+    }
+  );
+  defineStructureContract('and the editor supplies the world layer', EDIT_VIEW, {
+    gives: [{ at: 'EssenceOnCraftTab', attribute: 'worldDefaults', is: 'worldDefaultCards' }],
   });
 });
 
@@ -918,98 +793,70 @@ describe('a retired essence id is never reissued', () => {
       'as does a publish that was handed no merge map at all'
     );
   });
-
-  it('is WIRED — the guard is unreachable unless the shell mints against it', () => {
-    // Matched as a live statement, never as a substring: a bare `match` is satisfied by the call
-    // commented out, which is the shape a bisect or a revert produces, so the pin would certify a
-    // shell that mints a hardcoded id and reclaims a retired one on the next press.
-    const [, args] =
-      rootSource.match(/\n {4}const id = mintEssenceId\(([\s\S]*?)\n {4}\);/) ?? [];
-    assert.ok(args, 'the shell mints the new world essence id from a LIVE statement');
-    assert.match(args, /worldScopeState\.essence\?\.entities/, 'against the live roster');
-    assert.match(args, /worldScopeState\.essence\?\.retiredIds/, 'AND the retired ids');
-  });
 });
 
 // ── (14) The shared-definition callout names the world record (issue 1654) ────────────────────
+// `World definition` was true by construction while the `1.30.0` lift was 1:1; after `1.34.0` one
+// world entity backs N in-system records whose `icon` is outside the equivalence key. Maintainer
+// ruling M29: `colorToken` is the one identity field the world overlay carries into the in-system
+// projection, so the tint stays on it.
 
-describe('the shared-definition callout names the record its pill claims', () => {
-  const editorSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/EssenceEditView.svelte'),
-    'utf8'
-  );
-  const [calloutSource] = editorSource.match(/<SharedDefinitionCallout[\s\S]*?\/>/) ?? [];
+const CALLOUT = 'SharedDefinitionCallout';
 
-  it("draws name and icon from the world entry rather than this system's projection", () => {
-    // `World definition` and "Name, icon and colour are world vocabulary" were true by construction
-    // while the `1.30.0` lift was 1:1; after `1.34.0` one world entity backs N in-system records
-    // whose `icon` is outside the equivalence key, so the caption could carry a per-system glyph.
-    assert.ok(calloutSource, 'the rules tab renders the callout');
-    assert.match(calloutSource, /World definition/, 'under the world-definition pill');
-    assert.match(calloutSource, /name=\{worldEntry\?\.entity\?\.name/);
-    assert.match(calloutSource, /icon=\{normalizeEssenceIcon\(\s*worldEntry\?\.entity\?\.icon/);
-  });
-
-  it('and keeps the in-system colorToken as the tint, because THAT one is the world value', () => {
-    // Maintainer ruling M29: `colorToken` is the single identity field the world overlay carries
-    // into the in-system projection, so re-routing it through `worldEntry` would swap one correct
-    // read for another and make the expression look uniform at the cost of saying less.
-    assert.match(calloutSource, /tint=\{normalizeEssenceColorToken\(essence\?\.colorToken\)/);
-  });
+defineStructureContract('the shared-definition callout names the world record', EDIT_VIEW, {
+  gives: [
+    {
+      at: CALLOUT,
+      attribute: 'pillLabel',
+      is: "text('FABRICATE.Admin.Manager.Scoped.Essence.WorldDefinitionPill', 'World definition')",
+    },
+    { at: CALLOUT, attribute: 'name', is: "worldEntry?.entity?.name ?? essence?.name ?? ''" },
+    {
+      at: CALLOUT,
+      attribute: 'icon',
+      is: 'normalizeEssenceIcon(worldEntry?.entity?.icon || essence?.icon || DEFAULT_ESSENCE_ICON)',
+    },
+    { at: CALLOUT, attribute: 'tint', is: "normalizeEssenceColorToken(essence?.colorToken) || ''" },
+  ],
 });
 
 /**
  * The rules route draws two medallions for one essence — this callout and the page header's
- * `Medallion` + `<h1>`, whose name the breadcrumb repeats — rendered from different files, and
- * requirement 13 makes sourcing them from different layers a defect.
+ * `Medallion` + `<h1>`, whose name the breadcrumb repeats — and requirement 13 makes sourcing
+ * them from different layers a defect. `essenceRulesWorldEntry` is null for a create draft and
+ * for a corpus that cannot answer, so the draft stays in the chain, after the world record.
  */
 describe('the rules route header draws the same layer the callout below it does', () => {
-  /**
-   * One whole top-level `$derived` declaration from the shell, or `''`.
-   *
-   * @returns {string} the statement text, closing paren included.
-   */
-  function shellDerived(name) {
-    const pattern = new RegExp(`\\n {2}const ${name} = \\$derived\\(([\\s\\S]*?)\\n {2}\\);`);
-    return rootSource.match(pattern)?.[1] ?? '';
+  for (const [binding, field, fallback] of [
+    ['essenceEditName', 'name', "''"],
+    ['essenceEditIcon', 'icon', "'fas fa-mortar-pestle'"],
+  ]) {
+    defineStructureContract(
+      `${binding} leads with the WORLD record, then the draft`,
+      { file: ROOT, constant: binding },
+      {
+        contains: [
+          `$derived(essenceRulesWorldEntry?.entity?.${field} || essenceEditDraft?.${field} || ` +
+            `selectedEssenceStrict?.${field} || ${fallback})`,
+        ],
+      }
+    );
   }
-
-  it('leads the name and the glyph with the WORLD record, not this system’s projection', () => {
-    for (const binding of ['essenceEditName', 'essenceEditIcon']) {
-      const body = shellDerived(binding);
-      assert.ok(body, `${binding} is declared as a live \`$derived\` in the shell`);
-      const world = body.indexOf('essenceRulesWorldEntry?.entity?.');
-      const draft = body.indexOf('essenceEditDraft?.');
-      assert.ok(world >= 0, `${binding} reads the world entry the callout reads`);
-      assert.ok(draft >= 0, `${binding} still carries its draft fallback`);
-      assert.ok(world < draft, `${binding} lets the WORLD record win, not the in-system copy`);
-    }
-  });
-
-  it('still leads with the DRAFT on a create, because there is no world record to contradict', () => {
-    // `essenceRulesWorldEntry` is null for exactly two states — a create draft and a world corpus
-    // that cannot answer — and in both the in-system record is the record, so the fix is the order
-    // of one chain rather than a branch. Remove the draft term and a create heading prints empty.
-    assert.match(shellDerived('essenceEditName'), /essenceEditDraft\?\.name/);
-    assert.match(shellDerived('essenceEditIcon'), /essenceEditDraft\?\.icon/);
-    // Non-vacuity for the whole describe: the derivation this precedence is measured against is
-    // the one the header and the breadcrumb actually render.
-    assert.match(
-      pageHeaderSource,
-      /<Medallion icon=\{essenceEditIcon\} tint=\{essenceEditTint\}/
-    );
-    assert.match(pageHeaderSource, /<h1 class="manager-title" title=\{essenceEditName\}>/);
-  });
-
-  it('leaves the TINT reading the in-system projection, because M29 already put the world colour there', () => {
-    // `adminStore` overlays the world `colorToken` onto the in-system row, so routing the tint
-    // through `essenceRulesWorldEntry` would swap one correct read for another.
-    const tint = shellDerived('essenceEditTint');
-    assert.ok(tint, 'the tint is declared as a live `$derived` too');
-    assert.ok(
-      !tint.includes('essenceRulesWorldEntry'),
-      'the tint takes no world read of its own; the projection already carries the world colour'
-    );
+  defineStructureContract(
+    'the TINT takes no world read: the projection already carries the world colour',
+    { file: ROOT, constant: 'essenceEditTint' },
+    { namesNo: ['essenceRulesWorldEntry'], names: ['essenceEditDraft'] }
+  );
+  defineStructureContract('and the header and breadcrumb render those derivations', PAGE_HEADER, {
+    gives: [
+      {
+        at: 'Medallion',
+        where: ['icon', 'essenceEditIcon'],
+        attribute: 'tint',
+        is: 'essenceEditTint',
+      },
+      { at: 'h1', where: ['title', 'essenceEditName'], attribute: 'class', is: 'manager-title' },
+    ],
   });
 });
 
