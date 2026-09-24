@@ -4,11 +4,9 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { installFoundryEnv } from './helpers/foundryEnv.js';
+import { defineStructureContract } from './helpers/structureContract.js';
 import { describeRecipeDeleteImpact } from '../src/utils/recipeDeleteImpact.js';
 
 installFoundryEnv();
@@ -18,6 +16,7 @@ const { Recipe } = await import('../src/models/Recipe.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
+const { CompendiumImporter } = await import('../src/systems/CompendiumImporter.js');
 
 const SYSTEM_ID = 'sys1';
 const hookCalls = [];
@@ -492,28 +491,45 @@ describe('the resolution-mode migration calls the SET form once', () => {
 });
 
 describe('the routed callers', () => {
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-  const source = (relative) => readFileSync(resolve(__dirname, relative), 'utf8');
-
-  it("exempts the compendium importer's ORPHAN-PRUNE PHASE, and only that phase", () => {
-    // The pack owns the whole definition set it just wrote in phase 3, and the prune deliberately
-    // batches to a single `recipes` write, which a per-delete `craftingSystems` write would break.
-    const importer = source('../src/systems/CompendiumImporter.js');
-    assert.ok(
-      /_pruneOrphanedRecipes[\s\S]*?this\._recipeManager\.deleteRecipe\(/.test(importer),
-      'the prune phase still calls the non-cascading leaf'
+  // The pack owns the whole definition set it just wrote in phase 3, and the prune deliberately
+  // batches to a single `recipes` write, which a per-delete `craftingSystems` write would break.
+  it("exempts the compendium importer's ORPHAN-PRUNE PHASE, which calls the leaf", async () => {
+    const deleted = [];
+    const recipeManager = {
+      getRecipes: () => [
+        { id: 'kept', importSource: { systemId: 'pack-sys' } },
+        { id: 'orphan', importSource: { systemId: 'pack-sys' } },
+        { id: 'foreign', importSource: { systemId: 'other-pack' } },
+      ],
+      deleteRecipe: async (id, options) => deleted.push([id, options]),
+    };
+    const summary = { recipes: { pruned: 0 }, orphans: [] };
+    await CompendiumImporter.prototype._pruneOrphanedRecipes.call(
+      { _recipeManager: recipeManager },
+      { id: SYSTEM_ID },
+      [{ id: 'kept' }],
+      'pack-sys',
+      summary
     );
-    assert.ok(
-      !importer.includes('deleteRecipes('),
-      'and nothing in the importer routes through the cascading set form'
-    );
+    assert.deepEqual(deleted, [
+      ['orphan', { notify: false, emitChange: false, persist: false, cleanupFlags: false }],
+    ]);
+    assert.equal(summary.recipes.pruned, 1);
   });
 
-  it('records on the leaf that it does NOT cascade, and names the entry point that does', () => {
-    const recipeManager = source('../src/systems/RecipeManager.js');
-    assert.ok(
-      /This is the LEAF, and it does NOT cascade[\s\S]{0,900}deleteRecipes/.test(recipeManager),
-      'RecipeManager.deleteRecipe carries the non-cascading note'
-    );
+  defineStructureContract(
+    'and nothing in the importer routes through the cascading set form',
+    'src/systems/CompendiumImporter.js',
+    { callsNo: ['deleteRecipes'] }
+  );
+
+  it('keeps the leaf non-cascading: the membership prune belongs to the set form', async () => {
+    const fixture = makeFixture({
+      system: systemData({ definitions: [bookDefinition('book-a', ['r1', 'r2'])] }),
+    });
+    await fixture.recipeManager.deleteRecipe('r1', { notify: false });
+    assert.deepEqual(fixture.persistedRecipeIds(), ['r2', 'r3'], 'the leaf deletes the recipe');
+    assert.deepEqual(persistedMembership(fixture, 'book-a'), ['r1', 'r2'], 'but prunes nothing');
+    assert.equal(fixture.writesOf(SETTING_KEYS.CRAFTING_SYSTEMS), 0, 'nor writes the systems');
   });
 });

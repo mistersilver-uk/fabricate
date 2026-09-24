@@ -3,7 +3,6 @@
  */
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import { ActorPropertyCoinSpender } from '../src/systems/CoinSpenders.js';
@@ -37,8 +36,10 @@ import {
   installFacadeGame,
   makeFacadeActor,
 } from './helpers/fabricateFacadeHarness.js';
+import { defineStructureContract } from './helpers/structureContract.js';
 
 const KEY = 'FABRICATE.Currency.Credit';
+const AFFORDANCE = 'src/systems/currencyAffordance.js';
 const GM = { id: 'user-gm', isGM: true };
 
 /**
@@ -167,19 +168,6 @@ function inventorySpender({ balances = [1000, 1000], refund } = {}) {
 // AC-10 — ONE denomination resolution, not two
 
 describe('AC-10 — the check and the credit resolve the same coin the same way', () => {
-  const SOURCE = readFileSync(
-    new URL('../src/systems/currencyAffordance.js', import.meta.url),
-    'utf8'
-  );
-
-  /** One exported free function's text, bounded at its own closing brace. */
-  function functionSource(signature) {
-    const start = SOURCE.indexOf(signature);
-    assert.ok(start >= 0, `${signature} is no longer in currencyAffordance.js`);
-    const end = SOURCE.indexOf('\n}', start);
-    assert.ok(end > start, `${signature} has no closing brace, so this pin would be vacuous`);
-    return SOURCE.slice(start, end);
-  }
 
   it('hands both spenders the same unit, priced at the same base value', async () => {
     const seen = [];
@@ -214,18 +202,21 @@ describe('AC-10 — the check and the credit resolve the same coin the same way'
     }
   });
 
-  it('names the ONE shared resolver in both bodies, at source', () => {
-    for (const signature of [
-      'export async function checkWorldCurrencyAffordability(',
-      'export async function creditWorldCurrency(',
-    ]) {
-      const body = functionSource(signature);
-      assert.ok(
-        body.includes('resolveWorldCurrencyRequest('),
-        `${signature} stopped composing the shared request resolution, so the two can drift`
-      );
+  // A second resolution in either member would let the two drift on fixtures they still agree on.
+  defineStructureContract(
+    'the check composes the ONE shared request resolution',
+    { file: AFFORDANCE, fn: 'checkWorldCurrencyAffordability' },
+    { contains: ['const request = resolveWorldCurrencyRequest(unitId, amount, seams);'] }
+  );
+  defineStructureContract(
+    'and so does the credit, with its own amount rule only',
+    { file: AFFORDANCE, fn: 'creditWorldCurrency' },
+    {
+      contains: [
+        'const request = resolveWorldCurrencyRequest(unitId, amount, seams, resolveCreditAmount);',
+      ],
     }
-  });
+  );
 });
 
 // AC-11 / AC-13 — the right macro, and never `refundCurrencySpends`
@@ -259,14 +250,11 @@ describe('AC-11 — the credit runs the INCREMENT macro, as an award', () => {
 });
 
 describe('AC-13 — `refundCurrencySpends` is not on the path', () => {
-  it('never names it in the member’s own body', () => {
-    const source = readFileSync(
-      new URL('../src/systems/currencyAffordance.js', import.meta.url),
-      'utf8'
-    );
-    const body = source.slice(source.indexOf('export async function creditWorldCurrency('));
-    assert.equal(body.includes('refundCurrencySpends'), false);
-  });
+  defineStructureContract(
+    'never names it in the member’s own body',
+    { file: AFFORDANCE, fn: 'creditWorldCurrency' },
+    { namesNo: ['refundCurrencySpends'] }
+  );
 
   it('credits through the spender itself, with a refund call count of ONE', async () => {
     // The counterfactual is a SILENT SUCCESS: handed `recipe: null`, `refundCurrencySpends`
@@ -820,17 +808,10 @@ describe('AC-34 — four spellings of "the macro never ran", answered identicall
     });
   }
 
-  it('keeps the script gate at the CALL SITE, never in the executor', () => {
-    // The other half of this criterion — "`MacroExecutor.js` is unchanged by this PR" — is a DIFF
-    // check, which no unit test can make; it is discharged from the changed-file list at review.
-    const executor = readFileSync(
-      new URL('../src/utils/MacroExecutor.js', import.meta.url),
-      'utf8'
-    );
-    const code = executor.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/\/\/.*$/gm, '');
-    assert.equal(/\.type\b/.test(code), false, 'the executor reads no macro type');
-    assert.equal(/script/i.test(code), false, 'and names no script gate');
-  });
+  // The executor half — no type read and no script token in `MacroExecutor.js` — is the row
+  // `the executor reads the command and never the macro type` in `tests/macro-executor.test.js`;
+  // the call-site half is the refusal above. "`MacroExecutor.js` is unchanged by this PR" is a
+  // DIFF check, discharged from the changed-file list at review.
 });
 
 describe('AC-35 — the shipped ZERO-UPDATE refund still succeeds', () => {

@@ -9,6 +9,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { deletedKey, forEachDeletionForm, recordWrite } from './helpers/forcedDeletion.js';
+import { defineStructureContract } from './helpers/structureContract.js';
 
 // Foundry globals
 
@@ -4608,59 +4609,52 @@ test('LEARN.scope=total - a writable pool still reports a genuinely spent budget
   assert.equal(refused.message, 'FABRICATE.Knowledge.LearnBudgetSpent', 'spent is still spent');
 });
 
-// 1289 — the observability predicate, the shared flag key, and the byte-identical pin on the learn
-// gate it is a SIBLING of.
+// 1289 — the observability predicate, the shared flag key, and the unchanged learn gate it is a
+// SIBLING of.
 
-const { readFileSync } = await import('node:fs');
 const { LEARNED_RECIPES_FLAG_KEY } = await import('../src/config/flags.js');
 
-const VISIBILITY_SERVICE_SOURCE = readFileSync('src/systems/RecipeVisibilityService.js', 'utf8');
+const VISIBILITY_SERVICE = 'src/systems/RecipeVisibilityService.js';
 
-// The whole of `_isLearnModeEnabled` — its comment and its body — exactly as it stands.
-// Held as lines rather than one template literal because the comment is full of backticks.
-const LEARN_GATE_SOURCE = [
-  "  // Whether a system permits learning at all (spec §Learning Recipes → Preconditions).",
-  "  // The flat `visibilityMode` is canonical when authored, so learning requires the",
-  "  // resolved mode to be `'knowledge'` — a flat `item`/`global`/`restricted` system is",
-  "  // rejected even though it retains the normalizer's residual `knowledge.mode` default",
-  "  // of `itemOrLearned`. A legacy system with no authored flat mode still honours its",
-  "  // `learned`/`itemOrLearned` sub-mode. Shared by `learnRecipe`,",
-  "  // `learnRecipeFromOwnedBook`, and `_isRecipeEligibleForOwnedItemLearning` so the gate",
-  "  // cannot drift between the explicit-learn and drop/picker paths.",
-  "  _isLearnModeEnabled(system) {",
-  "    if (this._getVisibilityMode(system) !== 'knowledge') return false;",
-  "    const knowledge = this._getKnowledgeConfig(system);",
-  "    return ['learned', 'itemOrLearned'].includes(knowledge?.mode || 'itemOrLearned');",
-  "  }"
-].join('\n');
+// A structure row, not a behavioural one, and that is the whole point: issue 1289's D4 WITHDREW a
+// disjunct that an earlier revision would have added to this method, so the proof it shipped as
+// designed is that the method is unchanged, shape for shape. The flat `visibilityMode` is canonical
+// when authored, and a legacy system with no flat mode still honours its sub-mode.
+defineStructureContract(
+  '1289 C8 `_isLearnModeEnabled` is unchanged, and observability is not built on it',
+  { file: VISIBILITY_SERVICE, member: '_isLearnModeEnabled' },
+  {
+    contains: [
+      `(function (system) {
+        if (this._getVisibilityMode(system) !== 'knowledge') return false;
+        const knowledge = this._getKnowledgeConfig(system);
+        return ['learned', 'itemOrLearned'].includes(knowledge?.mode || 'itemOrLearned');
+      })`,
+    ],
+    callsNo: ['isLearnedKnowledgeObservable'],
+  }
+);
 
-test('1289 C8 `_isLearnModeEnabled` is BYTE-IDENTICAL, comment and body', () => {
-  // A source pin, not a behavioural one, and that is the whole point: issue 1289's D4 WITHDREW a
-  // disjunct that an earlier revision would have added to this method, so the proof it shipped as
-  // designed is that the method is unchanged.
-  assert.ok(
-    VISIBILITY_SERVICE_SOURCE.includes(LEARN_GATE_SOURCE),
-    'the learn gate must not drift while observability is added beside it'
-  );
-});
+// Shared so the gate cannot drift between the explicit-learn and drop/picker paths.
+defineStructureContract(
+  '1289 the learn gate is the one the explicit-learn and drop/picker paths share',
+  VISIBILITY_SERVICE,
+  {
+    callers: [
+      [
+        '_isLearnModeEnabled',
+        ['learnRecipe', 'learnRecipeFromOwnedBook', '_isRecipeEligibleForOwnedItemLearning'],
+      ],
+    ],
+  }
+);
 
-test('1289 the two predicates are siblings: neither is expressed in terms of the other', () => {
-  // The capability control for the scan above: applied to the SIBLING it must find the method, so a
-  // scan that could never match anything fails here rather than passing silently over both.
-  const slice = VISIBILITY_SERVICE_SOURCE.slice(
-    VISIBILITY_SERVICE_SOURCE.indexOf('  isLearnedKnowledgeObservable(system) {'),
-    VISIBILITY_SERVICE_SOURCE.indexOf('  // Per-recipe-item use/learn caps (issue 511)')
-  );
-  assert.ok(slice.length > 0, 'the sibling predicate exists and sits beside the learn gate');
-  assert.ok(
-    !slice.includes('_isLearnModeEnabled'),
-    'observability must be derived from the reveal switch, never built on the learn gate'
-  );
-  assert.ok(
-    !LEARN_GATE_SOURCE.includes('isLearnedKnowledgeObservable'),
-    'and the learn gate must not be built on observability either'
-  );
-});
+// Observability is derived from the reveal switch, never built on the learn gate.
+defineStructureContract(
+  '1289 the two predicates are siblings: neither is expressed in terms of the other',
+  { file: VISIBILITY_SERVICE, member: 'isLearnedKnowledgeObservable' },
+  { callsNo: ['_isLearnModeEnabled'] }
+);
 
 test('1289 the observability predicate matches the reveal switch, arm by arm', () => {
   const service = buildService();
@@ -4766,18 +4760,25 @@ test('1289 the learned-map accessors key on the SHARED constant, not a bare lite
   );
   assert.deepEqual(service._getLearnedMap(actor), { 'r-a': { learnedAt: 1, sourceItemUuid: null } });
 
-  // And a source pin, because the constant and the literal it replaced resolve to the SAME
-  // string: a regression to `'learnedRecipes'` would leave every behavioural test green
-  // while re-opening the two-spellings-of-one-persisted-key hazard the constant exists for.
-  assert.ok(
-    !/getFabricateFlag\(actor, 'learnedRecipes'/.test(VISIBILITY_SERVICE_SOURCE),
-    'no bare learned-recipes literal survives on the read side'
-  );
-  assert.ok(
-    !/setFabricateFlag\(actor, 'learnedRecipes'/.test(VISIBILITY_SERVICE_SOURCE),
-    'nor on the write side'
-  );
 });
+
+// The constant and the literal it replaced resolve to the SAME string: a regression to
+// `'learnedRecipes'` would leave every behavioural test green while re-opening the
+// two-spellings-of-one-persisted-key hazard the constant exists for.
+defineStructureContract(
+  '1289 no bare learned-recipes literal survives on either side of the flag',
+  VISIBILITY_SERVICE,
+  {
+    callsWith: [
+      ['getFabricateFlag', 'LEARNED_RECIPES_FLAG_KEY'],
+      ['setFabricateFlag', 'LEARNED_RECIPES_FLAG_KEY'],
+    ],
+    callsLiteralNo: [
+      ['getFabricateFlag', 'learnedRecipes'],
+      ['setFabricateFlag', 'learnedRecipes'],
+    ],
+  }
+);
 
 test('1289 C7 neither book learn path writes `granted` or `grantedBy`', async () => {
   const system = buildUncappedLearnSystem({ consumeOnLearn: false });

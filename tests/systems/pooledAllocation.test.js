@@ -4,12 +4,10 @@
  */
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
 import { describe, it } from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import { getByPath, setByPath } from '../../src/utils/objectPath.js';
+import { defineStructureContract } from '../helpers/structureContract.js';
 
 globalThis.foundry = {
   utils: {
@@ -29,8 +27,6 @@ const { readStackQuantity, updateStackQuantity } = await import(
   '../../src/systems/itemStackQuantity.js'
 );
 const { CraftingEngine } = await import('../../src/systems/CraftingEngine.js');
-
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /**
  * An owned-item fake that records every write against it, in order.
@@ -455,23 +451,13 @@ describe('_consumeComponentItems equivalence', () => {
     ]);
   });
 
-  it('delegates the allocation instead of carrying its own copy of the loop', () => {
-    const source = readFileSync(resolve(REPO_ROOT, 'src', 'systems', 'CraftingEngine.js'), 'utf8');
-    const start = source.indexOf('async _consumeComponentItems(');
-    assert.ok(start > 0, '_consumeComponentItems is still declared in CraftingEngine.js');
-    const body = source.slice(start, source.indexOf('\n  }\n', start));
-
-    assert.ok(
-      body.replace(/\s+/g, ' ').includes('planFirstFitDrain(snapshots, quantity)'),
-      'the method drains through the extracted policy, over the persisted source of the items and the quantity it was given'
-    );
-    assert.ok(
-      !body.includes('Math.min('),
-      'the take arithmetic lives in pooledAllocation.js, not re-inlined here'
-    );
-    assert.ok(
-      !body.includes('readStackQuantity('),
-      'the capacity read lives in pooledAllocation.js, not re-inlined here'
-    );
-  });
+  // The take arithmetic and the capacity read live in pooledAllocation.js, not re-inlined here.
+  defineStructureContract(
+    'delegates the allocation instead of carrying its own copy of the loop',
+    { file: 'src/systems/CraftingEngine.js', member: '_consumeComponentItems' },
+    {
+      contains: ['const plan = planFirstFitDrain(snapshots, quantity);'],
+      callsNo: ['min', 'readStackQuantity'],
+    }
+  );
 });

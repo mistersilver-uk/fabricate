@@ -10,14 +10,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { MacroExecutor } from '../src/utils/MacroExecutor.js';
+import { defineStructureContract } from './helpers/structureContract.js';
 
 const MACRO_EXECUTOR_SOURCE = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'utils', 'MacroExecutor.js'),
   'utf8'
 );
-
-/** The same source with every comment removed. */
-const MACRO_EXECUTOR_CODE = MACRO_EXECUTOR_SOURCE.replaceAll(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
 
 /** The same source as ONE line, with comment leaders and line breaks collapsed to single spaces. */
 const MACRO_EXECUTOR_PROSE = MACRO_EXECUTOR_SOURCE.replaceAll(
@@ -113,6 +111,8 @@ test('MacroExecutor.run still bypasses canUserExecute — the code is deliberate
   assert.equal(result, 42, 'the command ran without consulting the document gate');
 });
 
+// A deliberate prose pin (issue 1933 retains it): a comment is the only carrier this reasoning has,
+// and the chain it names is exercised by `tests/component-complications-socket.test.js`.
 test('the bypass justification records GM-side execution, not "no added authority"', () => {
   // The retired claim, which was true only while every macro ran on the acting player's
   // client. Complication macros run on an elected GM, who is OWNER of every document.
@@ -130,27 +130,36 @@ test('the bypass justification records GM-side execution, not "no added authorit
   for (const link of ['ADDRESSING ONLY', 'ATTESTED SENDER', 'ACTOR AUTHORIZATION']) {
     assert.ok(MACRO_EXECUTOR_PROSE.includes(link), `the justification names ${link}`);
   }
-
-  assert.ok(
-    /MACRO_SCRIPT stays UNCONSULTED, deliberately/.test(MACRO_EXECUTOR_PROSE),
-    'and records that the world script permission is left unconsulted on purpose'
-  );
 });
 
-test('the type === script gate is NOT centralised into this module', () => {
-  // `recipes-and-steps` requires a craft-time type check at the call site, and centralising
-  // it here would turn a chat-type essence property macro from a silent console.warn into a
-  // per-essence-per-result error notification. Assert the absence, not just the prose.
-  assert.ok(
-    !/\.type\b/.test(MACRO_EXECUTOR_CODE),
-    'the executable body reads no `type` property off the resolved Macro'
-  );
-  assert.ok(
-    !/script/i.test(MACRO_EXECUTOR_CODE),
-    'and names no macro type token, so there is nothing here to discriminate on'
-  );
-  assert.ok(
-    MACRO_EXECUTOR_PROSE.includes('must not be, centralised here'),
-    'and the source says why, so the next reader does not re-derive it as an optimisation'
-  );
+test('MacroExecutor.run consults no world script permission, deliberately', async () => {
+  // MACRO_SCRIPT governs whether a USER may author script macros; the script run here is the
+  // GM's, so gating on it would silently disable GM-authored automation for those players.
+  const asked = [];
+  const refuse = (name) => (...args) => asked.push([name, ...args]) && false;
+  const user = { isGM: false, role: 1, can: refuse('can'), hasPermission: refuse('hasPermission') };
+  const result = await withFakeFoundry('return 7;', () => MacroExecutor.run('Macro.x', {}), {
+    game: { user, permissions: { MACRO_SCRIPT: [4] } },
+  });
+  assert.equal(result, 7, 'a user refused MACRO_SCRIPT still runs the GM-selected macro');
+  assert.deepEqual(asked, [], 'and neither permission check was asked');
 });
+
+// `recipes-and-steps` requires a craft-time type check at the call site; centralising it here
+// would turn a chat-type essence property macro from a silent console.warn into a
+// per-essence-per-result error notification.
+test('the type === script gate is NOT centralised into this module', async () => {
+  for (const type of ['script', 'chat', undefined]) {
+    const macro = { type, command: 'return scope.dc;' };
+    const result = await withFakeFoundry('unused', () => MacroExecutor.run('Macro.x', { dc: 9 }), {
+      fromUuid: async () => macro,
+    });
+    assert.equal(result, 9, `a ${type ?? 'typeless'} macro runs its command unchanged`);
+  }
+});
+
+defineStructureContract(
+  'the executor reads the command and never the macro type',
+  'src/utils/MacroExecutor.js',
+  { reads: ['macro.command'], propertyReads: [['type', []]], spellsNo: ['script', 'Script'] }
+);

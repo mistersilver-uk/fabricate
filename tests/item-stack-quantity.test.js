@@ -1,11 +1,18 @@
 /** The canonical item stack-quantity accessor (issue 1024, #853 proposal 1). */
 
-import { describe, it } from 'node:test';
+import { describe, it, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { collectSources, repoRoot, stripComments } from './helpers/sourceScan.js';
+import { handlerOf, recordNoticeOutput } from './helpers/bootContractProbes.js';
+import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
+import { calledName, walkNodes } from './helpers/moduleAst.js';
+import { componentAstOf, moduleAstOf } from './helpers/parsedSource.js';
+import { readScannedDirectory, repoRoot } from './helpers/sourceScan.js';
+import { defineStructureContract } from './helpers/structureContract.js';
+import { keyName, shapeCount } from './helpers/structureShapes.js';
+import { applyItemStackQuantityPathSetting } from '../src/bootstrap/hooks.js';
 import {
   DEFAULT_ITEM_STACK_QUANTITY_PATH,
   ITEM_STACK_QUANTITY_PATH_PRESETS,
@@ -149,7 +156,7 @@ const SITE_MAPPING = [
     file: 'src/systems/componentStacking.js',
     accessor: 'readStackQuantity',
     sites: 1,
-    anchors: [/return readStackQuantity\(item\);/],
+    anchors: ['return readStackQuantity(item);'],
   },
   {
     site: 'runHistoryEvidence.sourceItemQuantity stored source read',
@@ -157,23 +164,23 @@ const SITE_MAPPING = [
     accessor: 'readStoredStackQuantity',
     sites: 1,
     absentDefault: null,
-    anchors: [
-      /readStoredStackQuantity\(source, \{ path, absentDefault: null \}\)/,
-    ],
+    anchors: ['readStoredStackQuantity(source, { path, absentDefault: null })'],
   },
   {
     site: 'runHistoryEvidence.writeItemAward increment write',
     file: 'src/systems/runHistoryEvidence.js',
     accessor: 'updateStackQuantity',
     sites: 1,
-    anchors: [/updateStackQuantity\(existing, before \+ quantity, path, {/],
+    anchors: [
+      'updateStackQuantity(existing, before + quantity, path, { throwOnRefusal: true })',
+    ],
   },
   {
     site: 'runHistoryEvidence.sourceItemQuantity presence before caller default',
     file: 'src/systems/runHistoryEvidence.js',
     accessor: 'hasStackQuantity',
     sites: 1,
-    anchors: [/hasStackQuantity\(source, path\)/],
+    anchors: ['hasStackQuantity(source, path)'],
   },
   {
     site: 'salvagePipeline.selectedQuantityItems + salvage totalAvailable',
@@ -183,7 +190,7 @@ const SITE_MAPPING = [
     // Neither is a delete-on-underrun site any more: the salvage consume's capacity read moved to
     // `pooledAllocation.planFirstFitDrain` (issue 1342) and took its delete site with it, one row
     // below.
-    anchors: [/remaining -= readStackQuantity\(item\);/, /sum \+ readStackQuantity\(item\)/],
+    anchors: ['remaining -= readStackQuantity(item)', 'sum + readStackQuantity(item)'],
   },
   {
     site: 'pooledAllocation.planFirstFitDrain capacity read (was _consumeComponentItems)',
@@ -196,7 +203,7 @@ const SITE_MAPPING = [
     file: 'src/systems/CraftingEngine.js',
     accessor: 'hasStackQuantity',
     sites: 1,
-    anchors: [/if \(hasStackQuantity\(itemData\) \|\| !sourceItem\)/],
+    anchors: ['hasStackQuantity(itemData) || !sourceItem'],
   },
   {
     site: 'CraftingEngine versioned alchemy validation (#1648)',
@@ -204,9 +211,7 @@ const SITE_MAPPING = [
     accessor: 'readStoredStackQuantity',
     sites: 1,
     absentDefault: 1,
-    anchors: [
-      /if \(readStoredStackQuantity\(item, \{ absentDefault: 1 \}\) < count\)/,
-    ],
+    anchors: ['readStoredStackQuantity(item, { absentDefault: 1 }) < count'],
   },
   {
     // The DELETE half of the boundary below, and the reason it reads the present-item accessor
@@ -217,7 +222,7 @@ const SITE_MAPPING = [
     file: 'src/systems/CraftingEngine.js',
     accessor: 'readStackQuantity',
     sites: 1,
-    anchors: [/const whole = readStackQuantity\(item\?\._source \?\? item, path\);/],
+    anchors: ['const whole = readStackQuantity(item?._source ?? item, path);'],
   },
   {
     site: 'CraftingEngine._consumeItemQuantity shared decrement write (#1648)',
@@ -225,21 +230,21 @@ const SITE_MAPPING = [
     accessor: 'updateStackQuantity',
     sites: 1,
     deleteSites: 1,
-    anchors: [/updateStackQuantity\(item, before - quantity, path, {/],
+    anchors: ['updateStackQuantity(item, before - quantity, path, { throwOnRefusal: true })'],
   },
   {
     site: 'RunJournalBuilder candidate held quantity (#1648)',
     file: 'src/ui/presenters/RunJournalBuilder.js',
     accessor: 'readStackQuantity',
     sites: 1,
-    anchors: [/const held = readStackQuantity\(item\);/],
+    anchors: ['const held = readStackQuantity(item);'],
   },
   {
     site: 'CraftingEngine._restoreComponentItem + award creation (payload writes)',
     file: 'src/systems/CraftingEngine.js',
     accessor: 'setStackQuantity',
     sites: 2,
-    anchors: [/setStackQuantity\(itemData, qty\);/, /setStackQuantity\(itemData, amount\);/],
+    anchors: ['setStackQuantity(itemData, qty);', 'setStackQuantity(itemData, amount);'],
   },
   {
     // The three re-derived held totals the display states report: a group's own `have`, one
@@ -248,11 +253,8 @@ const SITE_MAPPING = [
     file: 'src/systems/recipeDisplayStates.js',
     accessor: 'readStackQuantity',
     sites: 3,
-    anchors: [
-      /have: matching\.reduce\(\(sum, item\) => sum \+ readStackQuantity\(item\), 0\)/,
-      /const have = matchingItems\.reduce\(\(sum, item\) => sum \+ readStackQuantity\(item\), 0\)/,
-      /have: readStackQuantity\(item\),/,
-    ],
+    // One probe for all three: the third sits in an object key, which no probe can parse alone.
+    anchors: ['readStackQuantity(item)'],
   },
   {
     site: 'InventoryListingBuilder owned counts',
@@ -316,14 +318,14 @@ const SITE_MAPPING = [
     file: 'src/gatheringResultCreation.js',
     accessor: 'hasStackQuantity',
     sites: 1,
-    anchors: [/if \(hasStackQuantity\(itemData\) \|\| result\.quantity\)/],
+    anchors: ['hasStackQuantity(itemData) || result.quantity'],
   },
   {
     site: 'gatheringResultCreation new-award payload write',
     file: 'src/gatheringResultCreation.js',
     accessor: 'setStackQuantity',
     sites: 1,
-    anchors: [/setStackQuantity\(itemData, quantity\)/],
+    anchors: ['setStackQuantity(itemData, quantity)'],
   },
   {
     site: 'toolBreakageRuntime replacement payload write',
@@ -336,14 +338,14 @@ const SITE_MAPPING = [
     file: 'src/systems/companionComponentAward.js',
     accessor: 'hasStackQuantity',
     sites: 1,
-    anchors: [/if \(hasStackQuantity\(itemData, quantityPath\) \|\| !sourceItem\)/],
+    anchors: ['hasStackQuantity(itemData, quantityPath) || !sourceItem'],
   },
   {
     site: 'companionComponentAward payload quantity write',
     file: 'src/systems/companionComponentAward.js',
     accessor: 'setStackQuantity',
     sites: 1,
-    anchors: [/setStackQuantity\(itemData, quantity, quantityPath\)/],
+    anchors: ['setStackQuantity(itemData, quantity, quantityPath)'],
   },
   {
     site: 'companionComponentAward WRITTEN-VALUE test on the payload',
@@ -355,7 +357,7 @@ const SITE_MAPPING = [
     // just written, which is what a presence test cannot see: a GM who configures the PARENT
     // of the count leaves `hasStackQuantity` answering true while the write no-ops.
     anchors: [
-      /readStoredStackQuantity\(itemData, \{ absentDefault: 1, path: quantityPath \}\) !== quantity/,
+      'readStoredStackQuantity(itemData, { absentDefault: 1, path: quantityPath }) !== quantity',
     ],
   },
   {
@@ -365,16 +367,14 @@ const SITE_MAPPING = [
     sites: 1,
     // A missing stack base creates a separate document rather than inventing a count.
     absentDefault: null,
-    anchors: [
-      /readStoredStackQuantity\(target, \{ absentDefault: null, path: quantityPath \}\)/,
-    ],
+    anchors: ['readStoredStackQuantity(target, { absentDefault: null, path: quantityPath })'],
   },
   {
     site: 'companionComponentAward stack write',
     file: 'src/systems/companionComponentAward.js',
     accessor: 'updateStackQuantity',
     sites: 1,
-    anchors: [/updateStackQuantity\(target, before \+ quantity, quantityPath\)/],
+    anchors: ['updateStackQuantity(target, before + quantity, quantityPath)'],
   },
   {
     // The pooled holdings READ counts what a party is carrying (issue 1342), and it must count it
@@ -393,8 +393,8 @@ const SITE_MAPPING = [
     accessor: 'stackQuantityUpdate',
     sites: 2,
     anchors: [
-      /stackQuantityUpdate\(take\.item, take\.remainingQuantity\)/,
-      /stackQuantityUpdate\(take\.item, take\.available\)/,
+      'stackQuantityUpdate(take.item, take.remainingQuantity)',
+      'stackQuantityUpdate(take.item, take.available)',
     ],
   },
 ];
@@ -402,20 +402,39 @@ const SITE_MAPPING = [
 /** The accessor module itself, which DEFINES these names and must not be counted. */
 const ACCESSOR_MODULE = 'src/systems/itemStackQuantity.js';
 
+/** Every `src/` module and component as `[repo-relative path, AST]`, read through the AST seam. */
+const srcSyntaxTrees = (() => {
+  let trees;
+  const walk = (dir) => {
+    for (const entry of readScannedDirectory(join(repoRoot, dir), { isRoot: dir === 'src' })) {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(path);
+      else if (path.endsWith('.svelte')) trees.push([path, componentAstOf(path)]);
+      else if (/\.m?js$/.test(path)) trees.push([path, moduleAstOf(path).ast]);
+    }
+  };
+  return () => {
+    if (!trees) {
+      trees = [];
+      walk('src');
+    }
+    return trees.filter(([path]) => path !== ACCESSOR_MODULE);
+  };
+})();
+
 /**
- * Count comment-stripped `accessor(` occurrences per file across the whole `src` tree.
+ * Count the calls of each accessor per file across the whole `src` tree; a comment is no call.
  *
  * @returns {Map<string, number>} `${file}::${accessor}` -> occurrences.
  */
 function countAccessorCallSites() {
-  const sources = collectSources(join(repoRoot, 'src'));
   const counts = new Map();
-  for (const [path, text] of Object.entries(sources)) {
-    if (path === ACCESSOR_MODULE) continue;
-    const code = stripComments(text);
-    for (const accessor of ACCESSORS) {
-      const matches = code.match(new RegExp(String.raw`\b${accessor}\s*\(`, 'g'));
-      if (matches?.length) counts.set(`${path}::${accessor}`, matches.length);
+  for (const [path, ast] of srcSyntaxTrees()) {
+    for (const node of walkNodes(ast)) {
+      const accessor = calledName(node);
+      if (!ACCESSORS.includes(accessor)) continue;
+      const key = `${path}::${accessor}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
     }
   }
   return counts;
@@ -434,23 +453,20 @@ function declaredAccessorCallSites() {
 /** `[key, count]` pairs, sorted, so a diff names the file and accessor that drifted. */
 const asSortedPairs = (counts) => [...counts.entries()].sort(([a], [b]) => a.localeCompare(b));
 
-/** Comment-stripped occurrences of `absentDefault: <value>` per file. */
+/** The `absentDefault: <value>` keys each file writes, as literals. */
 function countAbsentDefaults(value) {
-  const sources = collectSources(join(repoRoot, 'src'));
   const counts = new Map();
-  for (const [path, text] of Object.entries(sources)) {
-    if (path === ACCESSOR_MODULE) continue;
-    const matches = stripComments(text).match(
-      new RegExp(String.raw`absentDefault:\s*${value}\b`, 'g')
-    );
-    if (matches?.length) counts.set(path, matches.length);
+  for (const [path, ast] of srcSyntaxTrees()) {
+    const matches = [...walkNodes(ast)].filter(
+      (node) =>
+        node.type === 'Property' &&
+        keyName(node) === 'absentDefault' &&
+        node.value?.type === 'Literal' &&
+        node.value.value === value
+    ).length;
+    if (matches > 0) counts.set(path, matches);
   }
   return counts;
-}
-
-/** Occurrences of `pattern` in `text`, counted with a fresh global regex. */
-function countMatches(text, pattern) {
-  return text.match(new RegExp(pattern.source, 'g'))?.length ?? 0;
 }
 
 /** Files contributing more than one row, which therefore have accessors to swap. */
@@ -470,15 +486,15 @@ describe('the per-site accessor mapping', () => {
   });
 
   it('pins every row of a multi-row file to the source snippet it serves', () => {
-    // The assertion the per-file counts cannot make.
-    const sources = collectSources(join(repoRoot, 'src'));
+    // The assertion the per-file counts cannot make. Each anchor is a parsed probe, counted
+    // shape for shape, so a comment or a reflow neither satisfies nor breaks it.
     for (const entry of SITE_MAPPING) {
       if (!entry.anchors) continue;
-      const code = stripComments(sources[entry.file] ?? '');
+      const { ast } = moduleAstOf(entry.file);
       let matched = 0;
       for (const anchor of entry.anchors) {
-        const occurrences = countMatches(code, anchor);
-        assert.ok(occurrences > 0, `${entry.site}: ${anchor} matches nothing in ${entry.file}`);
+        const occurrences = shapeCount(ast, anchor);
+        assert.ok(occurrences > 0, `${entry.site}: \`${anchor}\` matches nothing in ${entry.file}`);
         matched += occurrences;
       }
       assert.equal(matched, entry.sites, `${entry.site}: anchors must account for every site`);
@@ -554,7 +570,7 @@ describe('the per-site accessor mapping', () => {
     );
     // Sorted, like its sibling below (issue 1648).
     assert.deepEqual(
-      asSortedPairs(countAbsentDefaults('null')),
+      asSortedPairs(countAbsentDefaults(null)),
       asSortedPairs(
         new Map([
           ['src/systems/companionComponentAward.js', 1],
@@ -954,20 +970,11 @@ describe('stackQuantityAdvisory', () => {
 // `openspec/specs/data-models/spec.md` commits the ingredient model to being Foundry-free, so this
 // is a contract, not a preference.
 
-describe('the accessor never reaches for a Foundry global', () => {
-  it('names none of game, ui, Hooks or CONFIG', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const source = readFileSync(
-      resolve(import.meta.dirname, '../src/systems/itemStackQuantity.js'),
-      'utf8'
-    );
-    // Strip the module docblock and comments' prose mentions by matching CODE shapes.
-    for (const forbidden of [/\bgame\s*[.?]/, /\bui\s*[.?]/, /\bHooks\s*[.?]/, /\bCONFIG\s*[.?]/]) {
-      assert.equal(forbidden.test(source), false, `must not reference ${forbidden}`);
-    }
-  });
-});
+defineStructureContract(
+  'the accessor never reaches for a Foundry global',
+  ACCESSOR_MODULE,
+  { namesNo: ['game', 'ui', 'Hooks', 'CONFIG'], exports: ['readStackQuantity'] }
+);
 
 // Registration: the per-system default overlay, and the player-write guardrail.
 
@@ -1112,89 +1119,133 @@ describe('the item stack-quantity path setting', () => {
   });
 });
 
-// Criterion 10's wiring half. `src/bootstrap/hooks.js` reaches Foundry globals at call time, so
-// its wiring is pinned against its SOURCE — the same shape the actor-type lane's criterion-14 pins
-// use. The ORDERING half — registerSettings, then the path, then the migration pass — is pinned
-// behaviourally by `tests/bootstrap/fabricate-boot-contract.test.js`'s composition log (issue
-// 1715), which a source-order comparison could not follow once the three sites left one file.
+// Criterion 10's wiring half: `applyItemStackQuantityPathSetting` is the edge both the ready pass
+// and the shared setting listener call. The ORDERING half — registerSettings, then the path, then
+// the migration pass — is pinned by the composition log in
+// `tests/bootstrap/fabricate-boot-contract.test.js` (issue 1715), which also holds
+// `createSetting` and `updateSetting` to one listener.
 
-describe('bootstrap wiring', () => {
-  const mainSource = (async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    return readFileSync(resolve(import.meta.dirname, '../src/bootstrap/hooks.js'), 'utf8');
-  })();
+describe('the hooks edge configures the stored path, then probes it', () => {
+  /** Run the edge in a world storing `stored`, recording what it formats and posts. */
+  function applyInWorld({ stored, items, systemId = 'tormenta20', isGM = true, notify = true }) {
+    const formatted = [];
+    const warned = [];
+    const previous = { game: globalThis.game, ui: globalThis.ui };
+    globalThis.game = {
+      user: { isGM },
+      system: { id: systemId },
+      items,
+      settings: {
+        get: (namespace, key) => {
+          assert.deepEqual([namespace, key], ['fabricate', SETTING_KEYS.ITEM_STACK_QUANTITY_PATH]);
+          return stored;
+        },
+      },
+      i18n: { format: (key, data) => formatted.push({ key, data }) && `formatted ${key}` },
+    };
+    globalThis.ui = { notifications: { warn: (...args) => warned.push(args) } };
+    try {
+      return { path: applyItemStackQuantityPathSetting({ notify }), formatted, warned };
+    } finally {
+      Object.assign(globalThis, previous);
+      resetItemStackQuantityPath();
+    }
+  }
 
-  it('suggests the ACTIVE SYSTEM preset, not the built-in default', async () => {
+  const heldAt = (path) => [itemAt(path, 3), itemAt(path, 5)];
+
+  it('suggests the ACTIVE SYSTEM preset, formatted from the shared pure selector', () => {
     // `stackQuantityAdvisory` puts `report.defaultPath` into `{default}`, so whatever the edge
-    // passes here is literally the field the GM is told to type.
-    const source = await mainSource;
-    assert.match(
-      source,
-      /probeStackQuantityPath\(game\.items \?\? \[], \{\s*path,\s*defaultPath: stackQuantityPathPresetFor\(game\.system\?\.id\),\s*}\)/,
-      'the probe must be given the active system preset as its suggested correction'
-    );
-    assert.match(
-      source,
-      /import \{ stackQuantityPathPresetFor } from '\.\.\/config\/stackQuantityPathPresets\.js';/
-    );
+    // passes is literally the field the GM is told to type; the three-way branch lives in the
+    // accessor module, so the edge must not re-spell the keys it selects.
+    const schemaDiscard = [itemWithSource({ prepared: { count: 3 }, source: { quantity: 3 } })];
+    const keys = [];
+    for (const items of [heldAt('system.quantity'), schemaDiscard]) {
+      const { formatted, warned } = applyInWorld({ stored: 'system.count', items });
+      const report = probeStackQuantityPath(items, {
+        path: 'system.count',
+        defaultPath: stackQuantityPathPresetFor('tormenta20'),
+      });
+      const advisory = stackQuantityAdvisory(report);
+      assert.equal(advisory.data.default, 'system.qtd', 'the tormenta20 preset, not the default');
+      assert.deepEqual(formatted, [{ key: advisory.key, data: advisory.data }]);
+      assert.deepEqual(warned, [[`formatted ${advisory.key}`, { permanent: true }]]);
+      keys.push(advisory.key);
+    }
+    assert.deepEqual(keys, [
+      STACK_QUANTITY_ADVISORY_KEYS.unresolved,
+      STACK_QUANTITY_ADVISORY_KEYS.schemaDiscard,
+    ]);
   });
 
-  it('formats the advisory from the shared pure selector', async () => {
-    // The three-way branch lives in the accessor module because `main.js` cannot be
-    // imported here; if it moved back inline, the branch would only ever be grep-pinned.
-    const source = await mainSource;
-    assert.match(source, /stackQuantityAdvisory\(report\)/);
-    assert.match(source, /game\.i18n\?\.format\?\.\(advisory\.key, advisory\.data\)/);
-    assert.equal(
-      /'FABRICATE\.Settings\.ItemStackQuantityPath\.(Unresolved|SchemaDiscard)'/.test(source),
-      false,
-      'the hooks edge must not re-spell the advisory keys it no longer selects'
-    );
+  it('RE-CONFIGURES before it probes', () => {
+    // Otherwise a GM editing the path mid-session is told about the NEW path while every read and
+    // write continues on the OLD one until reload. Healthy at the new path: nothing to report.
+    const { path, warned } = applyInWorld({ stored: 'system.qtd', items: heldAt('system.qtd') });
+    assert.equal(path, 'system.qtd');
+    assert.deepEqual(warned, [], 'the probe read the path just configured');
   });
 
-  it('RE-CONFIGURES before it probes', async () => {
-    const source = await mainSource;
-    // Without this ordering a GM editing the path mid-session gets a notification
-    // reporting counts for the NEW path while every engine read and write continues on
-    // the OLD one until reload — an advisory asserting a state that is not live.
-    assert.ok(
-      source.indexOf('configureItemStackQuantityPath(stored)') <
-        source.indexOf('probeStackQuantityPath('),
-      'configure must precede the probe'
-    );
-  });
-
-  it('drives re-configuration and the probe from the shared setting listener', async () => {
-    const source = await mainSource;
-    const listener = source.slice(
-      source.indexOf('const handleFabricateSettingDocumentChange = (setting) => {'),
-      source.indexOf("Hooks.on('updateSetting', handleFabricateSettingDocumentChange);")
-    );
-    assert.ok(listener.length > 0, 'the shared listener exists');
-    assert.match(listener, /SETTING_KEYS\.ITEM_STACK_QUANTITY_PATH/);
-    assert.match(listener, /applyItemStackQuantityPathSetting\(\{ notify: true }\)/);
-    // The listener body is wrapped so a failure in ONE branch is logged as Fabricate's own line
-    // naming the setting, rather than as a core `Hooks.onError` entry against an anonymous
-    // listener.
-    assert.match(listener, /try \{/, 'the listener body is wrapped in try/catch');
-    assert.match(listener, /} catch \(error\) \{/);
-  });
-
-  it('registers the listener on BOTH createSetting and updateSetting', async () => {
-    const source = await mainSource;
-    for (const hook of ['updateSetting', 'createSetting']) {
-      assert.ok(
-        source.includes(`Hooks.on('${hook}', handleFabricateSettingDocumentChange);`),
-        `${hook} must reach the shared listener — the FIRST ever write is a create`
-      );
+  it('configures on every client, and notifies only a GM that asked', () => {
+    for (const [isGM, notify] of [
+      [false, true],
+      [true, false],
+    ]) {
+      const items = heldAt('system.quantity');
+      const run = applyInWorld({ stored: 'system.count', items, isGM, notify });
+      assert.equal(run.path, 'system.count', 'the engine path is live everywhere');
+      assert.deepEqual([run.formatted, run.warned], [[], []], 'and nobody else is told');
     }
   });
+});
 
-  it('also runs the probe from the ready pass', async () => {
-    const source = await mainSource;
-    const occurrences = source.split('applyItemStackQuantityPathSetting({ notify: true })').length - 1;
-    assert.equal(occurrences, 2, 'the setting listener AND the ready pass');
+const LAB_BOOT = { timeout: 300000 };
+
+test('the ready pass and the setting listener both reach the edge, wrapped', LAB_BOOT, async () => {
+  await withFabricateLifecycleReplay(async ({ ready, loadModule }) => {
+    await loadModule('/src/main.js');
+    const lab = await loadModule('/src/systems/itemStackQuantity.js');
+    const store = (path) =>
+      globalThis.game.settings.set('fabricate', SETTING_KEYS.ITEM_STACK_QUANTITY_PATH, path);
+    const probed = (output, path) =>
+      output.posted.some(
+        ([level, message, options]) =>
+          level === 'warn' && String(message).includes(path) && options?.permanent === true
+      );
+
+    await store('system.labready');
+    const booted = await recordNoticeOutput(() => ready());
+    assert.equal(lab.itemStackQuantityPath(), 'system.labready', 'the ready pass configures');
+    assert.ok(probed(booted, 'system.labready'), 'and probes, notifying the GM');
+
+    // Core `createSetting` passes `(document, options, userId)`; the first write is a create.
+    const listener = handlerOf('createSetting');
+    const key = `fabricate.${SETTING_KEYS.ITEM_STACK_QUANTITY_PATH}`;
+    await store('system.labedit');
+    const edited = await recordNoticeOutput(() => listener({ key }, {}, 'user-lab-gm'));
+    assert.equal(lab.itemStackQuantityPath(), 'system.labedit', 'the listener re-configures');
+    assert.ok(probed(edited, 'system.labedit'), 'and probes on change, not only at startup');
+
+    // A failure in one branch is logged as Fabricate's own line naming the setting change, not a
+    // core `Hooks.onError` entry against an anonymous listener.
+    const items = Object.getOwnPropertyDescriptor(globalThis.game, 'items');
+    Object.defineProperty(globalThis.game, 'items', {
+      configurable: true,
+      get: () => {
+        throw new Error('the world scan exploded');
+      },
+    });
+    try {
+      const failed = await recordNoticeOutput(() => listener({ key }, {}, 'user-lab-gm'));
+      assert.ok(
+        failed.logged.some(
+          ([level, line]) =>
+            level === 'error' && line === 'Fabricate | Failed to handle a Fabricate setting change'
+        )
+      );
+    } finally {
+      Object.defineProperty(globalThis.game, 'items', items);
+    }
   });
 });
 
@@ -1219,48 +1270,21 @@ describe('player-write guardrail for the stack-quantity key', () => {
   });
 });
 
-describe('the pooled reduction and its inverse, pinned FUNCTION BY FUNCTION', () => {
-  /** The hole the two `stackQuantityUpdate` anchors in `SITE_MAPPING` cannot close. */
-  const CONSUMPTION_MODULE = 'src/systems/companionPooledConsumption.js';
-
-  /**
-   * One top-level function's body, sliced at its own closing brace.
-   *
-   * @param {string} source The module text.
-   * @param {string} name The function to slice.
-   * @returns {string} That function's body.
-   */
-  function functionBody(source, name) {
-    const declaration = `async function ${name}(`;
-    const start = source.indexOf(declaration);
-    assert.ok(start >= 0, `${name} is no longer declared in ${CONSUMPTION_MODULE}`);
-    const end = source.indexOf('\n}', start);
-    assert.ok(end > start, `${name}'s body has no closing brace`);
-    return source.slice(start, end);
-  }
-
-  it('reduces to the remainder and restores to the value the plan read', () => {
-    const source = stripComments(collectSources(join(repoRoot, 'src'))[CONSUMPTION_MODULE] ?? '');
-    assert.ok(source.length > 500, `non-vacuity: read ${source.length} characters`);
-    const PAIRS = [
-      ['reduceStacks', 'take.remainingQuantity', 'take.available'],
-      ['restoreStacks', 'take.available', 'take.remainingQuantity'],
-    ];
-
-    for (const [name, own, other] of PAIRS) {
-      const body = functionBody(source, name);
-      assert.ok(
-        body.includes(`stackQuantityUpdate(take.item, ${own})`),
-        `${name} must write ${own}`
-      );
-      assert.equal(
-        body.includes(`stackQuantityUpdate(take.item, ${other})`),
-        false,
-        `${name} writes ${other}, which is the OTHER half of the pair`
-      );
+// The hole the two `stackQuantityUpdate` anchors in `SITE_MAPPING` cannot close: which function
+// writes which half of the pair.
+for (const [name, own, other] of [
+  ['reduceStacks', 'take.remainingQuantity', 'take.available'],
+  ['restoreStacks', 'take.available', 'take.remainingQuantity'],
+]) {
+  defineStructureContract(
+    `the pooled ${name} writes ${own}, never the other half of the pair`,
+    { file: 'src/systems/companionPooledConsumption.js', fn: name },
+    {
+      contains: [`stackQuantityUpdate(take.item, ${own})`],
+      containsNo: [`stackQuantityUpdate(take.item, ${other})`],
     }
-  });
-});
+  );
+}
 
 // A GUARD REFUSAL IS NOT A LOST ACKNOWLEDGEMENT (#1648 A4).
 
