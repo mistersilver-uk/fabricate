@@ -1647,7 +1647,28 @@
     "toolScopeStoreIsShared": true,
     "vocabularyScopeStoreIsShared": true,
     "readyFlag": true,
-    "whenReadyResolution": "resolved"
+    "whenReadyResolution": "resolved",
+    "gatheringEngineTookEnvironmentStore": true,
+    "gatheringEngineTookRunManager": true,
+    "gatheringEngineTookRichState": true,
+    "gatheringEngineTookEvaluator": true,
+    "gatheringEngineTookSystemManager": true,
+    "gatheringEngineTookSelectableActors": true,
+    "gatheringEngineTookRunViewer": true,
+    "gatheringEngineTookLocalize": true,
+    "gatheringEngineTookLocationResolver": true,
+    "gatheringEngineTookTravelStore": true,
+    "gatheringEngineTookBlindRunStore": true,
+    "gatheringEngineTookComplicationWriter": true,
+    "gatheringEngineTookJournalAuthority": true,
+    "gatheringEngineHasToolSeams": true,
+    "recipeManagerResolvesLiveSystemManager": true,
+    "recipeManagerResolvesLiveSystem": true,
+    "currencyStoreIsTheWorldStore": true,
+    "richStateDepletesThroughWriter": true,
+    "createSettingSharesUpdateSettingListener": true,
+    "journalPageDeleteSharesCreateRefresh": true,
+    "userConnectedSharesUpdateUserBootstrap": true
   },
   "compositionLog": [
     "bind:game.fabricate",
@@ -1820,5 +1841,81 @@
       "failsAttached": false,
       "failsDetached": true
     }
-  ]
+  ],
+  "publicHookNames": [
+    "fabricate.gathering.attemptCompleted",
+    "fabricate.gathering.eventTriggered",
+    "fabricate.manager.navProviderRegistered",
+    "fabricate.manager.navProviderUnregistered",
+    "fabricate.manager.surfaceMounted",
+    "fabricate.manager.surfaceTabChanged",
+    "fabricate.manager.surfaceUnmounted",
+    "fabricate.player.navProviderRegistered",
+    "fabricate.player.navProviderUnregistered",
+    "fabricate.player.surfaceMounted",
+    "fabricate.player.surfaceTabChanged",
+    "fabricate.player.surfaceUnmounted"
+  ],
+  "startupMarks": [
+    "fabricate:initialize:start",
+    "fabricate:migrations:start",
+    "fabricate:migrations:end",
+    "fabricate:data-load:start",
+    "fabricate:data-load:end",
+    "fabricate:startup-maintenance:start",
+    "fabricate:startup-maintenance:end",
+    "fabricate:initialize:end"
+  ],
+  "readySequence": [
+    "craftingRuns.processWorldTime",
+    "callAll:fabricate.ready"
+  ],
+  "gmGates": {
+    "gatheringResumeTimedRuns": {
+      "activeGmAllowed": true,
+      "assistantGmRefused": true,
+      "playerRefused": true
+    },
+    "craftingRunResume": {
+      "activeGmAllowed": true,
+      "assistantGmRefused": true,
+      "playerRefused": true
+    },
+    "salvageRunResume": {
+      "activeGmAllowed": true,
+      "assistantGmRefused": true,
+      "playerRefused": true
+    }
+  },
+  "settingBridge": [
+    "craftingSystemManager.reload",
+    "recipeManager.reload",
+    "gatheringEnvironmentStore.load"
+  ],
+  "worldTimeDispatch": {
+    "craftingRuns": 4242,
+    "salvage": 4242,
+    "gathering": 4242,
+    "versionedCrafting": {
+      "worldTime": 4242
+    }
+  },
+  "craftCommand": {
+    "suppressesChat": true,
+    "delegatesToFacadeCraft": true
+  },
+  "journalAuthorityHooks": [
+    "refresh",
+    "refresh",
+    "bootstrap",
+    "bootstrap"
+  ],
+  "socketRoutes": {
+    "depletionThrowContained": true,
+    "depletionsApplied": 30,
+    "depletionRateLimitRefusals": 1,
+    "complicationDuplicateDropped": true,
+    "complicationsApplied": 99,
+    "complicationRateLimitRefusals": 2
+  }
 }

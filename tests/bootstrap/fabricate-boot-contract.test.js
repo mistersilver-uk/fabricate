@@ -9,6 +9,16 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 
+import {
+  installReadyRecorders,
+  probeCraftCommand,
+  probeGmGates,
+  probeJournalAuthorityHooks,
+  probeSettingBridge,
+  probeSocketRoutes,
+  probeWorldTimeDispatch,
+  wiringReferences,
+} from '../helpers/bootContractProbes.js';
 import { withFabricateLifecycleReplay } from '../helpers/extension-composition-harness.js';
 
 const GOLDEN_PATH = resolve(import.meta.dirname, '../fixtures/fabricateBootContract.golden.json');
@@ -326,11 +336,13 @@ async function measureBootContract({ init, ready, loadModule }) {
     configurable: true,
   });
   const socketListeners = installSocketRecorder();
+  const readyRecorders = await installReadyRecorders(loadModule);
 
   const callAllLog = [];
   const originalCallAll = hooks.callAll;
   hooks.callAll = function callAll(name, ...rest) {
     callAllLog.push({ name, registrationsBefore: hooks.registrations.size });
+    if (name === 'fabricate.ready') readyRecorders.readySequence.push('callAll:fabricate.ready');
     return originalCallAll.call(this, name, ...rest);
   };
 
@@ -363,6 +375,7 @@ async function measureBootContract({ init, ready, loadModule }) {
     console.warn = originalWarn;
     keybindingRecorder.restore();
     hooks.callAll = originalCallAll;
+    readyRecorders.restore();
     Object.defineProperty(gameGlobal, 'fabricate', {
       value: boundFacade,
       enumerable: true,
@@ -379,6 +392,8 @@ async function measureBootContract({ init, ready, loadModule }) {
     facade.whenReady().then(() => 'resolved'),
     new Promise((settle) => setTimeout(() => settle('pending'), 500)),
   ]);
+  const runtime = await loadModule('/src/bootstrap/gatheringRuntime.js');
+  const [socketListener] = socketListeners.get('module.fabricate') ?? [];
 
   return {
     hookEventsAtYield,
@@ -418,11 +433,23 @@ async function measureBootContract({ init, ready, loadModule }) {
         facade.getVocabularyScopeStore() === facade.worldVocabularyStore,
       readyFlag: facade.ready === true,
       whenReadyResolution: whenReady,
+      ...wiringReferences(facade, runtime),
     },
     compositionLog: composition.log,
     keybindingRegistrations: keybindingRecorder.rows,
     deprecationWarnings: recordDeprecationWarnings(facade),
     binding: await probeBinding(facade),
+    publicHookNames: Object.values(facade.api.HOOKS)
+      .flatMap((namespace) => Object.values(namespace))
+      .sort(byCodePoint),
+    startupMarks: readyRecorders.startupMarks,
+    readySequence: readyRecorders.readySequence,
+    gmGates: probeGmGates(facade, runtime),
+    settingBridge: probeSettingBridge(facade),
+    worldTimeDispatch: await probeWorldTimeDispatch(facade, runtime),
+    craftCommand: probeCraftCommand(facade),
+    journalAuthorityHooks: probeJournalAuthorityHooks(facade),
+    socketRoutes: probeSocketRoutes(facade, socketListener),
   };
 }
 
@@ -544,6 +571,20 @@ test('the boot contract golden is not vacuous', () => {
     [],
     'every reference-identity claim is positive; a regeneration must not bank a false one'
   );
+  assert.equal(golden.publicHookNames.length, 12);
+  assert.equal(golden.startupMarks.length, 8, 'four phases, each opened and closed');
+  assert.equal(golden.readySequence.at(-1), 'callAll:fabricate.ready');
+  assert.deepEqual(
+    Object.values(golden.gmGates)
+      .flatMap((row) => Object.values(row))
+      .filter((answer) => answer !== true),
+    [],
+    'every single-writer gate admits the active GM and refuses an assistant GM and a player'
+  );
+  assert.equal(golden.settingBridge.length, 3);
+  assert.equal(golden.journalAuthorityHooks.length, 4);
+  assert.equal(Object.keys(golden.worldTimeDispatch).length, 4);
+  assert.ok(golden.socketRoutes.depletionsApplied > 0 && golden.socketRoutes.complicationsApplied > 0);
   assert.ok(golden.binding.every((row) => typeof row.length === 'number'));
   assert.ok(
     golden.binding.some((row) => row.failsDetached && !row.failsAttached),

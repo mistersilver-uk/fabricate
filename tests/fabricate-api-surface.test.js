@@ -1,416 +1,430 @@
-import test from 'node:test';
+/**
+ * The published `game.fabricate` surface (issues 1922, 1933). Names are matched against the
+ * boot-contract golden, which `tests/bootstrap/fabricate-boot-contract.test.js` holds equal to a real
+ * boot; behaviour is driven through the real facade class and the published-surface builders.
+ */
+import test, { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { compileFunction } from 'node:vm';
+import { resolve } from 'node:path';
 
-import { FABRICATE_HOOKS, MANAGER_HOOKS, PLAYER_HOOKS } from '../src/config/hooks.js';
-import { FABRICATE_ENTRY_SOURCE } from './helpers/bootstrapEntrySource.js';
+import { Fabricate } from '../src/bootstrap/Fabricate.js';
+import { createJournalCommandsForFabricate } from '../src/bootstrap/journalOperations.js';
+import { bindFabricateGlobal, buildMacroApi } from '../src/bootstrap/publicApi.js';
+import { MANAGER_HOOKS, PLAYER_HOOKS } from '../src/config/hooks.js';
+import { GatheringLocationService } from '../src/systems/GatheringLocationService.js';
+import { GatheringPartyStore } from '../src/systems/GatheringPartyStore.js';
+import { GatheringRealmStore } from '../src/systems/GatheringRealmStore.js';
+import { JOURNAL_RUN_SOCKET_KIND } from '../src/systems/journalRunCommands.js';
+import { managerExtensions } from '../src/ui/managerExtensions.js';
+import { playerExtensions } from '../src/ui/playerExtensions.js';
+import { findMatchingComponent } from '../src/utils/essenceResolver.js';
+import { defineStructureContract } from './helpers/structureContract.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainSource = FABRICATE_ENTRY_SOURCE;
+const GOLDEN = JSON.parse(
+  readFileSync(resolve(import.meta.dirname, 'fixtures/fabricateBootContract.golden.json'), 'utf8')
+);
+const DOCUMENTED = readFileSync(resolve(import.meta.dirname, '../docs/api/index.md'), 'utf8');
+
+const member = (name, length) => ({ set: 'prototypeProperties', name, length });
+const published = (set, ...names) => names.map((name) => ({ set, name }));
 
 /**
- * Assert one public hook namespace is on the aggregate, correctly named, and documented.
- *
- * @param {string} domain Hook domain segment (`manager`, `player`).
- * @param {Readonly<Record<string, string>>} namespace The exported constant bag.
+ * Every public name the retired source pins spelled, each in the ONE golden set it belongs to, with
+ * the arity a real boot measured. `absent` rows are names that must stay unpublished.
  */
-function assertHookNamespace(domain, namespace) {
-  const documented = readFileSync(resolve(__dirname, '../docs/api/index.md'), 'utf8');
-  assert.ok(
-    mainSource.includes('HOOKS: FABRICATE_HOOKS'),
-    'game.fabricate.api.HOOKS should publish the whole aggregate'
-  );
-  assert.equal(FABRICATE_HOOKS[domain], namespace, `the ${domain} namespace is on the aggregate`);
-  const names = Object.values(namespace);
-  assert.ok(names.length > 0, `expected at least one ${domain} hook`);
-  const convention = new RegExp(`^fabricate\\.${domain}\\.[a-z][A-Za-z]*$`);
-  for (const name of names) {
-    assert.match(
-      name,
-      convention,
-      `${name} should follow the fabricate.<domain>.<eventCamelCase> convention`
-    );
-    assert.ok(documented.includes(`\`${name}\``), `${name} should be documented in docs/api`);
+const PUBLIC_MEMBERS = Object.freeze([
+  member('deleteRecipe', 1),
+  member('craft', 2),
+  member('hydrateCraftingRecipe', 0),
+  member('getGatheringPartyStore', 0),
+  member('getGatheringRealmStore', 0),
+  member('getGatheringLocationService', 0),
+  member('getGatheringLocationForActor', 0),
+  member('setGatheringPartyRealmOverride', 0),
+  member('clearGatheringPartyRealmOverride', 0),
+  member('revealGatheringRealmForActor', 0),
+  member('hideGatheringRealmForActor', 0),
+  member('getGatheringRegionStore', 0),
+  member('setGatheringPartyRegionOverride', 0),
+  member('clearGatheringPartyRegionOverride', 0),
+  member('revealGatheringRegionForActor', 0),
+  member('hideGatheringRegionForActor', 0),
+  member('executeJournalRunCommand', 2),
+  member('dismissJournalRun', 1),
+  member('getDismissedJournalRunKeys', 1),
+  member('getJournalRunAuthorityAvailability', 0),
+  member('setupJournalRunAuthority', 0),
+  member('reconcileJournalRunAuthority', 1),
+  member('getGatheringEnvironmentStore', 0),
+  member('getGatheringRunManager', 0),
+  member('getGatheringGateAndCheckEvaluator', 0),
+  member('listGatheringForActor', 0),
+  member('startGatheringAttempt', 0),
+  member('getGatheringDropBreakdown', 0),
+  ...published('macroApiKeys', 'deleteRecipe', 'craft'),
+  ...published(
+    'apiKeys',
+    'GatheringRealmStore',
+    'GatheringRegionStore',
+    'GatheringPartyStore',
+    'GatheringLocationService',
+    'HOOKS'
+  ),
+  ...published(
+    'gatheringKeys',
+    'getPartyStore',
+    'getRealmStore',
+    'getLocationForActor',
+    'setPartyRealmOverride',
+    'revealRealmForActor'
+  ),
+  // The engine is module-private: no accessor, and no instance field holding it.
+  { set: 'prototypeProperties', name: 'getGatheringEngine', absent: true },
+  { set: 'instanceProperties', name: 'gatheringEngine', absent: true },
+]);
+
+const nameOf = (row) => (typeof row === 'string' ? row : row.name);
+
+describe('the public member table matches the golden a real boot is held to', () => {
+  for (const row of PUBLIC_MEMBERS) {
+    it(`${row.set} ${row.absent ? 'omits' : 'publishes'} ${row.name}`, () => {
+      const set = GOLDEN[row.set];
+      assert.ok(Array.isArray(set) && set.length > 0, `${row.set} is a populated golden set`);
+      const found = set.find((entry) => nameOf(entry) === row.name);
+      assert.equal(Boolean(found), !row.absent);
+      if (row.length !== undefined) assert.equal(found.length, row.length, `${row.name} arity`);
+    });
   }
-}
-
-/**
- * Assert one page-session extension registry is imported once and bound to the public API.
- *
- * @param {string} name Registry export name.
- * @param {string} modulePath Module specifier as `main.js` writes it.
- */
-function assertRegistryBind(name, modulePath) {
-  assert.ok(
-    mainSource.includes(`import { ${name} } from '${modulePath}';`),
-    `main.js should import the ${name} page-session registry singleton`
-  );
-  assert.ok(
-    mainSource.includes(`${name}.bindPublicApi(game.fabricate.api);`),
-    `game.fabricate.api should receive the stable public registration object from ${name}`
-  );
-  assert.equal(
-    (mainSource.match(new RegExp(`const ${name}`, 'g')) || []).length,
-    0,
-    'bindFabricateGlobal must not recreate the registry during init/ready replay'
-  );
-}
-
-test('every public manager hook is namespaced, reachable on the API, and documented', () => {
-  assertHookNamespace('manager', MANAGER_HOOKS);
 });
 
-test('every public player hook is namespaced, reachable on the API, and documented', () => {
-  assertHookNamespace('player', PLAYER_HOOKS);
-});
-
-test('Fabricate publishes the stable manager extension API through both lifecycle binds', () => {
-  assertRegistryBind('managerExtensions', '../ui/managerExtensions.js');
-});
-
-test('Fabricate publishes the stable player extension API through both lifecycle binds', () => {
-  assertRegistryBind('playerExtensions', '../ui/playerExtensions.js');
-});
-
-test('Fabricate exposes deleteRecipe on the main Foundry API object', () => {
-  assert.ok(
-    mainSource.includes('async deleteRecipe(recipeId)'),
-    'Fabricate should expose a deleteRecipe method on the main game.fabricate API object'
-  );
-  // Issue 1132: it routes through the CASCADING set primitive rather than the `RecipeManager` leaf,
-  // so the public API and the GM studio cannot disagree about what deleting a recipe reaches.
-  assert.ok(
-    mainSource.includes(
-      'return await this.craftingSystemManager.deleteRecipes(recipe.craftingSystemId, [recipeId]);'
-    ),
-    'Fabricate.deleteRecipe should route through CraftingSystemManager.deleteRecipes'
-  );
-});
-
-test('Fabricate bridges replicated crafting-data setting changes into local refresh hooks', () => {
-  // Matched as a pattern rather than a literal line, so an added or removed named import from the
-  // same module cannot fail an assertion whose subject is the wiring.
-  assert.match(
-    mainSource,
-    /import \{[^}]*\bhandleFabricateSettingChange\b[^}]*\} from '\.\.?\/config\/settingChangeBridge\.js'/,
-    'main.js should import the setting-change bridge'
-  );
-  assert.ok(
-    mainSource.includes('handleFabricateSettingChange(key, fabricateSettingChangeTargets())'),
-    'the updateSetting hook should invoke the bridge with the changed key'
-  );
-  assert.ok(
-    mainSource.includes('craftingSystemManager: fabricate.craftingSystemManager') &&
-      mainSource.includes('recipeManager: fabricate.recipeManager'),
-    'the bridge should receive both live managers so cross-client reloads apply'
-  );
-});
-
-test('Fabricate routes gathering node depletion to the active GM', () => {
-  // A player cannot write the world setting the environment node pools live in, so the decrement
-  // MUST be relayed.
-  assert.ok(
-    mainSource.includes('createGatheringNodeDepletionWriter') &&
-      mainSource.includes('routeGatheringNodeDepleteMessage') &&
-      mainSource.includes("from '../systems/gatheringNodeSocket.js'"),
-    'main.js should import the gathering node depletion writer and router'
-  );
-  assert.ok(
-    mainSource.includes('allowSender: gatheringDepletionRateLimiter'),
-    'the inbound route should be rate limited per sender'
-  );
-  assert.ok(
-    /depleteEnvironmentNode: \(payload\) =>\s*fabricate\.gatheringNodeDepletionWriter\.deplete\(payload\)/.test(
-      mainSource
-    ),
-    'the rich-state service should receive the GM-routed depletion seam'
-  );
-  assert.ok(
-    mainSource.includes('routeGatheringNodeDepleteMessage(payload, {'),
-    'the module socket handler should route inbound depletion messages'
-  );
-  assert.ok(
-    mainSource.includes('gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore'),
-    'the setting-change bridge should receive the environment store so clients reload node counts'
-  );
-});
-
-test('Fabricate gates matured timed gathering runs to the primary GM', () => {
-  // `resumeTimedRuns` defaults to `() => true` so unit fixtures resume, which makes
-  // this wiring load-bearing: without it EVERY connected client resolves the same
-  // matured run and double-applies its items, tool wear and node depletion.
-  assert.ok(
-    mainSource.includes('resumeTimedRuns: isPrimaryGM'),
-    'the gathering engine should receive the real primary-GM check for timed resumption'
-  );
-});
-
-test('Fabricate wires RecipeManager to the live crafting-system manager', () => {
-  // BOTH seams are pinned. `getCraftingSystem` resolves one system; `getCraftingSystemManager`
-  // (issue 1072) is the manager itself, which the twelve paths that used to read `game.fabricate`
-  // inline now route through — including `_validateSignatures`.
-  assert.match(
-    mainSource,
-    /fabricate\.recipeManager\s*=\s*new RecipeManager\(\{\s*getCraftingSystem:\s*\(systemId\)\s*=>\s*fabricate\.craftingSystemManager\?\.getSystem\?\.\(systemId\)\s*\?\?\s*null,\s*getCraftingSystemManager:\s*\(\)\s*=>\s*fabricate\.craftingSystemManager\s*\?\?\s*null,\s*currencyConfigStore:\s*fabricate\.currencyConfigStore,?\s*\}\)/s,
-    'RecipeManager production initialization should receive the live crafting-system resolver and manager'
-  );
-});
-
-test('Fabricate wires the world currency config into both currency readers', () => {
-  // Currency is world scope since issue 1278, and `getCurrencyRequirementConfig` composes the
-  // per-system `enabled` flag with the world's ladder.
-  assert.ok(
-    mainSource.includes('fabricate.currencyConfigStore = new CurrencyConfigStore({'),
-    'main.js should construct the world currency config store'
-  );
-  assert.match(
-    mainSource,
-    /new CraftingEngine\([\s\S]*?currencyConfigStore:\s*fabricate\.currencyConfigStore/,
-    'CraftingEngine should receive the world currency config store'
-  );
-});
-
-test('Fabricate macro helper exposes deleteRecipe', () => {
-  assert.ok(
-    mainSource.includes('deleteRecipe: async (recipeId) => {'),
-    'the global fabricate helper should expose deleteRecipe'
-  );
-  assert.ok(
-    mainSource.includes('return await game.fabricate.deleteRecipe(recipeId);'),
-    'the global fabricate helper should delegate to game.fabricate.deleteRecipe'
-  );
-});
-
-test('Fabricate exposes the canonical gathering location getters and mutators', () => {
-  assert.ok(mainSource.includes('getGatheringPartyStore()'), 'getGatheringPartyStore method');
-  assert.ok(mainSource.includes('getGatheringRealmStore()'), 'getGatheringRealmStore method');
-  assert.ok(mainSource.includes('getGatheringLocationService()'), 'getGatheringLocationService method');
-  assert.ok(mainSource.includes('getGatheringLocationForActor('), 'getGatheringLocationForActor method');
-  assert.ok(mainSource.includes('setGatheringPartyRealmOverride('), 'setGatheringPartyRealmOverride method');
-  assert.ok(mainSource.includes('clearGatheringPartyRealmOverride('), 'clearGatheringPartyRealmOverride method');
-  assert.ok(mainSource.includes('revealGatheringRealmForActor('), 'revealGatheringRealmForActor method');
-  assert.ok(mainSource.includes('hideGatheringRealmForActor('), 'hideGatheringRealmForActor method');
-});
-
-test('Fabricate retains the deprecated *Region* delegates that forward to the realm methods', () => {
-  assert.ok(mainSource.includes('getGatheringRegionStore()'), 'getGatheringRegionStore delegate');
-  assert.ok(mainSource.includes('setGatheringPartyRegionOverride('), 'setGatheringPartyRegionOverride delegate');
-  assert.ok(mainSource.includes('clearGatheringPartyRegionOverride('), 'clearGatheringPartyRegionOverride delegate');
-  assert.ok(mainSource.includes('revealGatheringRegionForActor('), 'revealGatheringRegionForActor delegate');
-  assert.ok(mainSource.includes('hideGatheringRegionForActor('), 'hideGatheringRegionForActor delegate');
-  // The delegates forward to the canonical realm method via the shared deprecate() helper.
-  assert.ok(mainSource.includes("deprecate('getGatheringRegionStore', 'getGatheringRealmStore')"), 'getGatheringRegionStore warns + forwards');
-  assert.ok(mainSource.includes('return this.getGatheringRealmStore();'), 'delegate forwards to canonical realm method');
-});
-
-test('the location API methods gate on isGatheringRealmsEnabled (no-op when disabled)', () => {
-  // The five public location entry points must short-circuit when the
-  // realm/travel subsystem is disabled for the target system, reading the
-  // single shared predicate so the gate never drifts from the engine/resolver.
-  assert.ok(
-    mainSource.includes(
-      "import { getRealmRevealMode, isGatheringRealmsEnabled } from '../systems/gatheringRealms.js';"
-    ),
-    'main.js imports the shared gate predicate and the WORLD reveal-mode reader'
-  );
-  // Each guard resolves the system via craftingSystemManager and bails before doing work.
-  assert.ok(
-    mainSource.includes('if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;'),
-    'getGatheringLocationForActor / set / clear overrides no-op (null) when disabled'
-  );
-  assert.ok(
-    mainSource.includes('if (!isGatheringRealmsEnabled(system)) return Promise.resolve(false);'),
-    'revealGatheringRealmForActor no-ops (false) when disabled'
-  );
-  assert.ok(
-    /if \(!isGatheringRealmsEnabled\(this\.craftingSystemManager\?\.getSystem\(systemId\)\)\)\s*return Promise\.resolve\(false\);/.test(
-      mainSource
-    ),
-    'hideGatheringRealmForActor no-ops (false) when disabled'
-  );
-});
-
-test('Fabricate registers a GM-only discipline on realm mutators', () => {
-  // The reveal mutator validates the realm against the WORLD library (issue 1282).
-  assert.ok(
-    mainSource.includes('validateRealmExists: this.gatheringRealmStore?.get?.()'),
-    'reveal validates the realm exists in the world travel config'
-  );
-});
-
-test('game.fabricate.api exposes the canonical realm class + deprecated alias', () => {
-  assert.ok(mainSource.includes('GatheringRealmStore,'), 'GatheringRealmStore canonical in api');
-  assert.ok(mainSource.includes('GatheringRegionStore: GatheringRealmStore,'), 'GatheringRegionStore alias in api');
-  assert.ok(mainSource.includes('GatheringPartyStore,'), 'GatheringPartyStore in api');
-  assert.ok(mainSource.includes('GatheringLocationService,'), 'GatheringLocationService in api');
-});
-
-test('game.fabricate.gathering exposes the canonical realm helpers', () => {
-  assert.ok(mainSource.includes('getPartyStore: () => fabricate.getGatheringPartyStore()'), 'getPartyStore helper');
-  assert.ok(mainSource.includes('getRealmStore: () => fabricate.getGatheringRealmStore()'), 'getRealmStore helper');
-  assert.ok(mainSource.includes('getLocationForActor: (options) => fabricate.getGatheringLocationForActor(options)'), 'getLocationForActor helper');
-  assert.ok(mainSource.includes('setPartyRealmOverride: (options) => fabricate.setGatheringPartyRealmOverride(options)'), 'setPartyRealmOverride helper');
-  assert.ok(mainSource.includes('revealRealmForActor: (options) => fabricate.revealGatheringRealmForActor(options)'), 'revealRealmForActor helper');
-});
-
-test('Fabricate wires the crafting listing builder with a component resolver (issue 1075)', () => {
-  // The builder's privilege gates and matching logic are unit-tested directly, but the composition
-  // that hands them a resolver is not: without this line every crafting row's owned-material tally
-  // silently reads as if the player owns nothing, and no existing test goes red.
-  assert.ok(
-    /import \{ findMatchingComponent \} from '\.\.?\/utils\/essenceResolver\.js';/.test(mainSource),
-    'main.js should import the same component resolver InventoryListingBuilder matches with'
-  );
-  assert.ok(
-    mainSource.includes('resolveComponentForItem: findMatchingComponent,'),
-    'the crafting listing builder should receive the component resolver, or every player row silently reads "missing materials"'
-  );
-});
-
-test('Fabricate hydrates the crafting recipe detail phase through the crafting listing builder (issue 1075)', () => {
-  // `hydrateCraftingRecipe` is the detail-phase companion to the cheap `listCraftingForActor`
-  // summary rows (issue 1075).
-  assert.ok(
-    mainSource.includes(
-      'hydrateCraftingRecipe({ recipeId = null, actorId = null, componentSourceActorIds = null } = {}) {'
-    ),
-    'main.js should expose hydrateCraftingRecipe on the Fabricate API object'
-  );
-  assert.ok(
-    mainSource.includes('return this._getCraftingListingBuilder().buildRecipeDetail({'),
-    "hydrateCraftingRecipe should route through the crafting listing builder's detail phase"
-  );
-});
-
-test('Fabricate exposes the versioned Journal command and per-user dismissal seams', () => {
-  for (const method of [
-    'executeJournalRunCommand(command, options)',
-    // Two arguments, load-bearing. This pin used to read the one-argument form, and sat twelve
-    // lines above another pin whose comment claimed the options were forwarded (issue 1759).
-    'dismissJournalRun(options)',
-    'getDismissedJournalRunKeys(options)',
-    'getJournalRunAuthorityAvailability()',
-    'setupJournalRunAuthority()',
-    'reconcileJournalRunAuthority(options)',
+describe('every public hook is namespaced, published on the API, and documented', () => {
+  for (const [domain, namespace] of [
+    ['manager', MANAGER_HOOKS],
+    ['player', PLAYER_HOOKS],
   ]) {
-    assert.ok(mainSource.includes(method), `${method} should be exposed on game.fabricate`);
+    it(`the ${domain} hooks`, () => {
+      const names = Object.values(namespace);
+      assert.ok(names.length > 0, `expected at least one ${domain} hook`);
+      const convention = new RegExp(`^fabricate\\.${domain}\\.[a-z][A-Za-z]*$`);
+      for (const name of names) {
+        assert.match(name, convention, `${name} follows fabricate.<domain>.<eventCamelCase>`);
+        assert.ok(GOLDEN.publicHookNames.includes(name), `${name} is on game.fabricate.api.HOOKS`);
+        assert.ok(DOCUMENTED.includes(`\`${name}\``), `${name} should be documented in docs/api`);
+      }
+    });
   }
-  assert.ok(
-    mainSource.includes("Hooks.on('createJournalEntryPage', refreshJournalRunAuthorityAvailability)"),
-    'embedded authority-claim creation should refresh the synchronous availability cache'
-  );
-  assert.ok(
-    mainSource.includes("Hooks.on('deleteJournalEntryPage', refreshJournalRunAuthorityAvailability)"),
-    'embedded authority-claim release should refresh the synchronous availability cache'
-  );
-  assert.ok(
-    mainSource.includes("Hooks.on('updateUser', bootstrapJournalRunAuthority)"),
-    'a GM election update should trigger guarded recovery bootstrap in the newly active realm'
-  );
-  assert.ok(
-    mainSource.includes("Hooks.on('userConnected', bootstrapJournalRunAuthority)"),
-    'a GM connection transition should trigger guarded recovery bootstrap'
-  );
-  // `setupJournalRunAuthority()` survives as an idempotent ensure, not a one-shot provisioner:
-  // every world now provisions automatically, so refusing an existing ledger would make the
-  // documented API report a healthy world as broken.
-  assert.ok(
-    mainSource.includes(
-      'Ensure the private run-authority ledger exists, as the active GM. Idempotent: an existing'
-    ),
-    'setupJournalRunAuthority should be documented as an idempotent ensure'
-  );
-  assert.doesNotMatch(
-    mainSource,
-    /ledger-already-exists/,
-    'an existing ledger is no longer a refusal reason anywhere on the public surface'
-  );
 });
 
-test('the real Journal composition emitter survives socket serialization and preserves recipients', () => {
-  const start = mainSource.indexOf('function createJournalCommandsForFabricate(');
-  // Bounded at its own column-zero closing brace: the factory is the last declaration in
-  // `src/bootstrap/journalOperations.js`, so a following-comment bound would run into another file.
-  const end = mainSource.indexOf('\n}\n', start) + 2;
-  assert.ok(start >= 0 && end > start + 2, 'the journal command factory must be present');
-  let composed;
-  const received = [];
-  // Foundry V13.351/V14.365 handleCustomSocket destructures this argument: a
-  // default covers omission, but cannot cover undefined serialized as array null.
-  const handleCustomSocket = (event, message, { recipients } = {}) => {
-    received.push({ event, message, recipients });
+/** A `game` global for the published-surface builders, returning the recorded socket emits. */
+function installPublicGame({ user = { id: 'gm', isGM: true } } = {}) {
+  const emitted = [];
+  globalThis.game = {
+    user,
+    users: { activeGM: { id: 'gm' }, get: () => null },
+    socket: { emit: (...args) => emitted.push(JSON.parse(JSON.stringify(args))) },
+    modules: { get: () => null },
+    settings: { get: () => undefined },
   };
-  const dependencies = {
-    createFoundryJournalRunAuthority: () => ({}),
-    createJournalExecutionReconstructor: () => ({}),
-    createCraftingJournalOperations: () => ({}),
-    createGatheringJournalRunOperations: () => ({}),
-    createJournalRunCommandService: (options) => { composed = options; return {}; },
-    installCraftingJournalRunAuthority: () => {},
-    EVENT_SCENE_SOCKET: 'module.fabricate',
-    game: { socket: { emit: (...args) => handleCustomSocket(...JSON.parse(JSON.stringify(args))) } },
-  };
-  compileFunction(
-    `${mainSource.slice(start, end)}\nreturn createJournalCommandsForFabricate({});`,
-    Object.keys(dependencies)
-  )(...Object.values(dependencies));
-  const request = { kind: 'journalRunCommand', requestId: 'request' };
-  const reply = { kind: 'journalRunReply', requestId: 'request' };
-  composed.emit(request);
-  composed.emit(reply, { recipients: ['initiating-player'] });
-  assert.deepEqual(received, [
-    { event: 'module.fabricate', message: request, recipients: undefined },
-    { event: 'module.fabricate', message: reply, recipients: ['initiating-player'] },
-  ]);
+  globalThis.foundry = { utils: { randomID: () => 'request-id' } };
+  globalThis.Hooks = { callAll: () => true };
+  return emitted;
+}
+
+/** A facade stand-in whose every member records its call and answers its own name. */
+function recordingFacade() {
+  const calls = [];
+  const facade = new Proxy(
+    {},
+    {
+      get: (target, name) =>
+        name in target
+          ? target[name]
+          : (...args) => {
+              calls.push([name, ...args]);
+              return name;
+            },
+    }
+  );
+  return { facade, calls };
+}
+
+describe('bindFabricateGlobal publishes the stable namespaces', () => {
+  it('re-publishes the SAME extension registries through the init and ready binds', () => {
+    installPublicGame();
+    const { facade } = recordingFacade();
+    bindFabricateGlobal(facade, {});
+    const atInit = globalThis.game.fabricate.api;
+    bindFabricateGlobal(facade, {});
+    const atReady = globalThis.game.fabricate.api;
+    for (const registry of [managerExtensions, playerExtensions]) {
+      const key = Object.keys(atInit).find((name) => atInit[name] === registry.publicApi);
+      assert.ok(key, 'the registry publicApi is on game.fabricate.api');
+      assert.equal(atReady[key], registry.publicApi, 'a replay binds the page-session singleton');
+    }
+  });
+
+  it('publishes the canonical realm classes and the deprecated alias as the same class', () => {
+    installPublicGame();
+    bindFabricateGlobal(recordingFacade().facade, {});
+    const { api } = globalThis.game.fabricate;
+    assert.equal(api.GatheringRealmStore, GatheringRealmStore);
+    assert.equal(api.GatheringRegionStore, GatheringRealmStore);
+    assert.equal(api.GatheringPartyStore, GatheringPartyStore);
+    assert.equal(api.GatheringLocationService, GatheringLocationService);
+  });
+
+  const GATHERING_DELEGATES = [
+    ['getPartyStore', 'getGatheringPartyStore'],
+    ['getRealmStore', 'getGatheringRealmStore'],
+    ['getLocationForActor', 'getGatheringLocationForActor'],
+    ['setPartyRealmOverride', 'setGatheringPartyRealmOverride'],
+    ['revealRealmForActor', 'revealGatheringRealmForActor'],
+  ];
+  for (const [helper, target] of GATHERING_DELEGATES) {
+    it(`gathering.${helper} forwards to ${target}`, () => {
+      installPublicGame();
+      const { facade, calls } = recordingFacade();
+      bindFabricateGlobal(facade, {});
+      const options = { systemId: 'sys' };
+      globalThis.game.fabricate.gathering[helper](options);
+      assert.deepEqual(
+        calls.at(-1),
+        helper.startsWith('get') && helper.endsWith('Store') ? [target] : [target, options]
+      );
+    });
+  }
 });
 
-test('player-facing starts explicitly select the current journal lifecycle', () => {
-  assert.match(
-    mainSource,
-    /async craft\(actor, recipe, options = \{\}\)[\s\S]*?return executePublicCraft\(\{[\s\S]*?engine: this\.craftingEngine,[\s\S]*?runManager: this\.craftingRunManager,/,
-    'the general public craft facade should use the lifecycle-selecting boundary'
-  );
-  assert.match(
-    mainSource,
-    // The options are FORWARDED, not dropped: `executePublicCraft` asks for the
-    // non-interactive route, because the public API has no user to answer a roll dialog
-    // and `promptCheck` waits for one without a timeout (issue 1683).
-    /executeCommand: \(command, options\) => this\.executeJournalRunCommand\(command, options\),\s*resolveUuid: \(uuid\) => globalThis\.fromUuid\?\.\(uuid\),/,
-    'a ready public craft should execute through the command service and hydrate result UUIDs locally'
-  );
-  assert.match(
-    mainSource,
-    /async craftRecipe[\s\S]*?return await this\.craft\([\s\S]*?lifecycleVersion:\s*1,[\s\S]*?\n\s*}\);/,
-    'craftRecipe should start a versioned crafting run'
-  );
-  assert.match(
-    mainSource,
-    /async submitAlchemyAttempt[\s\S]*?this\.craftingEngine\.craftAlchemy\([\s\S]*?lifecycleVersion:\s*1,[\s\S]*?\n\s*}\);/,
-    'submitAlchemyAttempt should start a versioned alchemy run'
-  );
-  assert.match(
-    mainSource,
-    /startGatheringAttempt[\s\S]*?selectedActor[\s\S]*?actor:\s*selectedActor,\s*lifecycleVersion:\s*1[\s\S]*?'requestStart'/,
-    'startGatheringAttempt should start a versioned gathering run'
-  );
-  assert.ok(
-    mainSource.includes('installGatheringJournalRunAuthority({'),
-    'the constructed gathering engine should receive the journal authority adapter'
-  );
-  assert.ok(
-    /fabricate\s*\.craft\(actor, recipe\)\s*\.then\(\(result\) => \{/.test(mainSource),
-    'the /craft chat command should delegate through the public craft facade'
-  );
-  assert.ok(
-    mainSource.includes('return await game.fabricate.craft(actor, recipeId, options);'),
-    'the global craft helper should delegate through the public craft facade'
-  );
-  assert.match(
-    mainSource,
-    /start: async \(\{ actor, payload, executionGrant, requestId, sender \}\)[\s\S]*?start\.call\(fabricate\.craftingEngine, \{\s*viewer: sender,/,
-    'the crafting start handler should pass the socket-attested sender as the viewer'
-  );
+describe('the macro helpers delegate through game.fabricate', () => {
+  for (const [helper, args] of [
+    ['deleteRecipe', ['recipe-1']],
+    ['craft', [{ id: 'actor' }, 'recipe-1', { interactive: false }]],
+  ]) {
+    it(`fabricate.${helper}`, async () => {
+      installPublicGame();
+      const { facade, calls } = recordingFacade();
+      globalThis.game.fabricate = facade;
+      await buildMacroApi({})[helper](...args);
+      assert.deepEqual(calls, [[helper, ...args]]);
+    });
+  }
 });
+
+/** The real facade, ready, over the collaborators one question needs. */
+function readyFacade(collaborators = {}) {
+  return Object.assign(new Fabricate(), { ready: true, ...collaborators });
+}
+
+describe('the real facade routes each public member to its collaborator', () => {
+  it('deleteRecipe routes through the cascading CraftingSystemManager.deleteRecipes', async () => {
+    const deleted = [];
+    const facade = readyFacade({
+      recipeManager: { getRecipe: (id) => ({ id, craftingSystemId: 'sys-1' }) },
+      craftingSystemManager: { deleteRecipes: async (...args) => deleted.push(args) },
+    });
+    await facade.deleteRecipe('recipe-1');
+    assert.deepEqual(deleted, [['sys-1', ['recipe-1']]]);
+  });
+
+  it('getGatheringRegionStore forwards to the realm store', () => {
+    const realmStore = { kind: 'realms' };
+    assert.equal(
+      readyFacade({ gatheringRealmStore: realmStore }).getGatheringRegionStore(),
+      realmStore
+    );
+  });
+
+  it('the crafting listing builder resolves held items with the shared component resolver', () => {
+    assert.equal(
+      readyFacade()._getCraftingListingBuilder()._resolveComponentForItem,
+      findMatchingComponent
+    );
+  });
+
+  it('hydrateCraftingRecipe answers through the builder detail phase for the resolved actor', () => {
+    const actor = { id: 'actor-1' };
+    globalThis.game = {
+      user: { id: 'gm', isGM: true },
+      actors: { get: (id) => (id === actor.id ? actor : null) },
+    };
+    const facade = readyFacade();
+    const details = [];
+    facade._craftingListingBuilder = {
+      buildRecipeDetail: (request) => details.push(request) && 'detail',
+    };
+    assert.equal(
+      facade.hydrateCraftingRecipe({
+        recipeId: 'recipe-1',
+        actorId: 'actor-1',
+        componentSourceActorIds: [],
+      }),
+      'detail'
+    );
+    assert.equal(details[0].recipeId, 'recipe-1');
+    assert.equal(details[0].craftingActor, actor);
+    assert.equal(details[0].viewer, globalThis.game.user);
+  });
+
+  it('craft starts a versioned run on the live engine and executes it with the caller options', async () => {
+    globalThis.game = { user: { id: 'gm', isGM: true } };
+    const started = [];
+    const executed = [];
+    const facade = readyFacade({
+      recipeManager: { getRecipe: (id) => ({ id }) },
+      craftingEngine: {
+        craft: async (...args) => {
+          started.push(args);
+          return {
+            success: true,
+            requiresExecution: true,
+            canExecuteImmediately: true,
+            runId: 'run-1',
+          };
+        },
+      },
+      journalRunCommands: {
+        executeJournalRunCommand: async (...args) => {
+          executed.push(args);
+          return { success: true };
+        },
+      },
+    });
+    const actor = { id: 'actor-1', uuid: 'Actor.actor-1' };
+
+    await facade.craft(actor, 'recipe-1', { interactive: true });
+
+    assert.equal(started[0][0], actor);
+    assert.equal(started[0][4].lifecycleVersion, 1, 'a new public craft starts a versioned run');
+    assert.equal(executed[0][0].runId, 'run-1');
+    assert.deepEqual(
+      executed[0][1],
+      { interactive: true },
+      'the options reach the command service'
+    );
+  });
+});
+
+describe('the location API no-ops when realms are disabled for the system', () => {
+  const REALMS_OFF = { id: 'sys-off', gatheringRealmSettings: { enabled: false } };
+  const REALMS_ON = { id: 'sys-on', gatheringRealmSettings: { enabled: true } };
+
+  /** A GM facade over one system, recording every party-store and discovery write. */
+  function locationFacade() {
+    const writes = [];
+    const actor = {
+      id: 'actor-1',
+      getFlag: () => undefined,
+      setFlag: async (...args) => writes.push(['setFlag', ...args]),
+    };
+    globalThis.game = { user: { id: 'gm', isGM: true }, actors: { get: () => actor } };
+    const facade = readyFacade({
+      craftingSystemManager: {
+        getSystem: (id) => [REALMS_OFF, REALMS_ON].find((system) => system.id === id),
+      },
+      gatheringLocationService: { buildCurrentRealmContext: () => writes.push(['context']) },
+      gatheringPartyStore: {
+        setCurrentRealmOverride: () => writes.push(['setOverride']),
+        clearCurrentRealmOverride: () => writes.push(['clearOverride']),
+      },
+      gatheringRealmStore: { get: () => ({ realms: [{ id: 'realm-1' }] }) },
+    });
+    return { facade, writes };
+  }
+
+  const CALLS = [
+    [
+      'getGatheringLocationForActor',
+      (facade, systemId) => facade.getGatheringLocationForActor({ actorId: 'actor-1', systemId }),
+      null,
+    ],
+    [
+      'setGatheringPartyRealmOverride',
+      (facade, systemId) =>
+        facade.setGatheringPartyRealmOverride({ partyId: 'p', systemId, realmIds: ['realm-1'] }),
+      null,
+    ],
+    [
+      'clearGatheringPartyRealmOverride',
+      (facade, systemId) => facade.clearGatheringPartyRealmOverride({ partyId: 'p', systemId }),
+      null,
+    ],
+    [
+      'revealGatheringRealmForActor',
+      (facade, systemId) =>
+        facade.revealGatheringRealmForActor({ actorId: 'actor-1', systemId, realmId: 'realm-1' }),
+      false,
+    ],
+    [
+      'hideGatheringRealmForActor',
+      (facade, systemId) =>
+        facade.hideGatheringRealmForActor({ actorId: 'actor-1', systemId, realmId: 'realm-1' }),
+      false,
+    ],
+  ];
+  for (const [name, call, disabledAnswer] of CALLS) {
+    it(`${name} answers ${disabledAnswer} and writes nothing, then acts once enabled`, async () => {
+      const off = locationFacade();
+      assert.equal(await call(off.facade, REALMS_OFF.id), disabledAnswer);
+      assert.deepEqual(off.writes, []);
+      const on = locationFacade();
+      await call(on.facade, REALMS_ON.id);
+      assert.ok(
+        on.writes.length > 0 || name === 'hideGatheringRealmForActor',
+        `${name} acts when enabled`
+      );
+    });
+  }
+
+  it('reveal validates the realm against the WORLD travel library', async () => {
+    const { facade, writes } = locationFacade();
+    const reveal = (realmId) =>
+      facade.revealGatheringRealmForActor({ actorId: 'actor-1', systemId: REALMS_ON.id, realmId });
+    assert.equal(await reveal('realm-unknown'), false);
+    assert.deepEqual(writes, [], 'an unknown realm writes no discovery');
+    assert.equal(await reveal('realm-1'), true);
+  });
+});
+
+test('the Journal composition emitter survives socket serialization with its options bag', async () => {
+  const emitted = installPublicGame({ user: { id: 'player', isGM: false } });
+  const service = createJournalCommandsForFabricate({
+    craftingEngine: { installVersionedRunAuthority: () => {} },
+  });
+  const command = {
+    actorUuid: 'Actor.a',
+    runType: 'crafting',
+    runId: 'run-1',
+    expectedRevision: 1,
+    action: 'execute',
+    payload: {},
+  };
+
+  const answer = service.executeJournalRunCommand(command, { interactive: false });
+  const [[channel, request, options]] = emitted;
+  service.handleSocketMessage(
+    {
+      ...command,
+      kind: JOURNAL_RUN_SOCKET_KIND.REPLY,
+      recipientId: 'player',
+      sessionId: request.sessionId,
+      requestId: request.requestId,
+      response: { success: true },
+    },
+    'gm'
+  );
+
+  assert.equal(channel, 'module.fabricate');
+  assert.equal(request.kind, JOURNAL_RUN_SOCKET_KIND.REQUEST);
+  // Core's `handleCustomSocket` destructures this argument: a default covers omission, but cannot
+  // cover `undefined` serialized as an array `null`.
+  assert.deepEqual(options, {}, 'an absent options bag is emitted as {}, never undefined');
+  assert.deepEqual(await answer, { success: true });
+});
+
+// The start handler runs behind the authority's claim, which no boot reaches without a ledger.
+defineStructureContract(
+  'the crafting start handler passes the socket-attested sender as the viewer',
+  { file: 'src/bootstrap/journalOperations.js', fn: 'buildRunStartOperations', property: 'start' },
+  { callsWith: [['call', 'sender']], keys: ['viewer'] }
+);

@@ -11,7 +11,13 @@ import { calledName, identifierNames, walkNodes } from './helpers/moduleAst.js';
 import { moduleAstOf } from './helpers/parsedSource.js';
 
 /** The slice modules `Fabricate.js` installs, each exporting one object of the same name. */
-const SLICES = ['craftingFacade', 'gatheringFacade', 'companionFacade', 'bulkFacade', 'journalFacade'];
+const SLICES = [
+  'craftingFacade',
+  'gatheringFacade',
+  'companionFacade',
+  'bulkFacade',
+  'journalFacade',
+];
 
 /** Every member each slice declares, as `[name, functionNode]`. */
 function sliceMembers() {
@@ -51,7 +57,10 @@ function delegations() {
 test('every slice member really is installed on the prototype', () => {
   // The export exists so the install is asserted rather than inferred: a slice dropped from the
   // list, or a name declared twice across two slices, is visible here and nowhere else.
-  assert.ok(INSTALLED_FACADE_MEMBERS.length > 60, `expected the five slices, got ${INSTALLED_FACADE_MEMBERS.length}`);
+  assert.ok(
+    INSTALLED_FACADE_MEMBERS.length > 60,
+    `expected the five slices, got ${INSTALLED_FACADE_MEMBERS.length}`
+  );
   assert.equal(
     new Set(INSTALLED_FACADE_MEMBERS).size,
     INSTALLED_FACADE_MEMBERS.length,
