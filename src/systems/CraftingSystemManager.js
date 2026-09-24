@@ -10,10 +10,8 @@ import {
   isGatheringActorSelectableByUser,
 } from '../config/preferencesCleanup.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
-import { deriveToolSourceFromComponents } from '../migration/migrateToolsToFirstClass.js';
 import { Tool } from '../models/Tool.js';
 import { normalizeSelectionIds } from '../utils/bulkSelectionModel.js';
-import { normalizeCategoryIconMap } from '../utils/categoryIcons.js';
 import { normalizeCustomComponentCategories } from '../utils/componentCategories.js';
 import {
   advanceDefinitionRevision,
@@ -51,7 +49,6 @@ import {
   getItemIdentityReferences,
 } from '../utils/sourceUuid.js';
 
-import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
 import { resolveActiveCraftingCheckFormula } from './checkModifierResolver.js';
 import {
   craftingDataChange,
@@ -59,10 +56,8 @@ import {
   emitCraftingDataChanged,
 } from './craftingDataChange.js';
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
-import { normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { ALL_INVALIDATION_DOMAINS, domainsForSystemFields } from './invalidationDomains.js';
 import { migrateRecipeForModeChange } from './migrateRecipeForModeChange.js';
-import { normalizeModifierLibrary } from './modifierLibrary.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
 import { normalizeComponent } from './normalize/components.js';
 import {
@@ -104,6 +99,7 @@ import {
   normalizeToolIds,
   salvageNormalizationContext,
 } from './normalize/salvage.js';
+import { normalizeSystem } from './normalize/system.js';
 import {
   normalizeAlchemyConfig,
   normalizeCurrencyConfig,
@@ -203,13 +199,6 @@ function _scopeEntityBasis(store, legacy) {
  * It never reads `fabricate.worldVocabulary` (`## World Vocabulary` requirement 6). */
 function _vocabularyBasis(vocabulary) {
   return vocabulary.length > 0 ? vocabulary : null;
-}
-
-/** The names an icon map may carry: `general` plus the vocabulary for a known basis, or the map's
- * own keys for an unknown one, so keys are still normalized while nothing is pruned. */
-function _iconAllowance(icons, vocabulary) {
-  if (vocabulary !== null) return ['general', ...vocabulary];
-  return icons && typeof icons === 'object' && !Array.isArray(icons) ? Object.keys(icons) : [];
 }
 
 /** The Valid Id Basis for one library: the world list unioned with the system's legacy copy, or
@@ -403,194 +392,10 @@ export class CraftingSystemManager {
   }
 
   _normalizeSystem(system = {}) {
-    const systemId = system.id || foundry.utils.randomID();
-    const features = this._normalizeFeatures(system);
-    const essenceDefinitions = this._normalizeEssenceDefinitions(
-      system.essenceDefinitions ?? system.essences
-    );
-    const recipeItemDefinitions = this._normalizeRecipeItemDefinitions(
-      system.recipeItemDefinitions ?? system.recipeItems
-    );
-    // Prerequisites normalize before Tools. Both libraries are world scope (issue 1308), so the
-    // basis comes from `_characterLibraryBasis` and either half may be `null`; reading
-    // `system.characterPrerequisites` alone would strip tool prerequisites on an unmigrated world.
-    const { prerequisiteIds: validToolPrerequisiteIds, modifierIds: validCatalogueIds } =
-      this._characterLibraryBasis(system);
-    const _legacyModifiers = normalizeModifierLibrary(system.modifiers);
-    const _legacyCharacterPrerequisites = normalizeCharacterPrerequisiteList(
-      system.characterPrerequisites,
-      () => foundry.utils.randomID()
-    );
-    // The world-scope Valid Id Basis (issue 1359), judged on the raw stored system; its essence
-    // half uses the already-normalized definitions. `essenceIds` is `Set|null`, never defaulted.
-    const scopeBasis = this._scopeBasis({ ...system, essenceDefinitions });
-    const essenceIds = scopeBasis.essenceIds;
-    // Salvage-normalization context (issue 764), hoisted so `_normalizeSalvage`'s Simple-mode
-    // group clamp sees the system's mode and formula flag; both are component-independent.
-    const { salvageResolutionMode, salvageSimpleCheckHasFormula } =
-      this._salvageNormalizationContext(system);
-    // The one system-level modifier library (issue 1117), hoisted because the three checks
-    // validate against it. No read alias for its old locations: migrations and the export upcast
-    // carry legacy payloads.
-
-    const rawManagedItems = Array.isArray(system.components)
-      ? system.components
-      : Array.isArray(system.managedItems)
-        ? system.managedItems
-        : system.items;
-    const items = Array.isArray(rawManagedItems)
-      ? rawManagedItems.map((i) =>
-          this._normalizeComponent(i, {
-            validEssenceIds: essenceIds,
-            salvageResolutionMode,
-            salvageSimpleCheckHasFormula,
-          })
-        )
-      : [];
-    const itemIds = new Set(items.map((i) => i.id));
-    const itemById = new Map(items.map((i) => [i.id, i]));
-
-    // First-class Tools (issue 561): a component-linked tool derives source refs and snapshot from
-    // its component, after component normalization, so it matches owned items by source.
-    const normalizedTools = Array.isArray(system.tools)
-      ? system.tools.map((t) =>
-          this._normalizeTool(t, { validPrerequisiteIds: validToolPrerequisiteIds })
-        )
-      : [];
-    for (const normalizedTool of normalizedTools) {
-      if (deriveToolSourceFromComponents(normalizedTool, items) && !normalizedTool.description) {
-        normalizedTool.description = itemById.get(normalizedTool.componentId)?.description || '';
-      }
-    }
-
-    const resolvedEssenceDefinitions = essenceDefinitions.map((def) => {
-      const sourceComponentId =
-        def.sourceComponentId ||
-        def.associatedSystemItemId ||
-        (itemIds.has(def.sourceItemUuid) ? def.sourceItemUuid : null);
-      const sourceComponent = sourceComponentId ? itemById.get(sourceComponentId) || null : null;
-      // A source component absent from `items` nulls the uuid only under a known basis;
-      // otherwise the id may name a component this client cannot see, and nulling would be a
-      // persisted deletion.
-      const sourceItemUuid = sourceComponentId
-        ? sourceComponent?.originItemUuid ||
-          sourceComponent?.registeredItemUuid ||
-          (scopeBasis.componentIds === null && this._looksLikeDocumentUuid(def.sourceItemUuid)
-            ? def.sourceItemUuid
-            : null)
-        : this._looksLikeDocumentUuid(def.sourceItemUuid)
-          ? def.sourceItemUuid
-          : null;
-      return {
-        ...def,
-        sourceComponentId,
-        sourceItemUuid,
-        associatedSystemItemId: sourceComponentId, // transitional alias kept in sync
-      };
+    return normalizeSystem(system, {
+      characterLibraryBasis: (s) => this._characterLibraryBasis(s),
+      scopeBasis: (s) => this._scopeBasis(s),
     });
-
-    return {
-      id: systemId,
-      name: system.name || 'New Crafting System',
-      description: system.description || '',
-      enabled: system.enabled !== false,
-      resolutionMode: (function _normalizeResolutionMode(raw) {
-        if (raw === 'cauldron') return 'alchemy'; // T-189: legacy alias
-        // Legacy mode token aliases: `mapped` and bare `routed` → `routedByIngredients` (the 1.9.0
-        // migration's tie-break), `tiered` → `routedByCheck`.
-        if (raw === 'mapped' || raw === 'routed') return 'routedByIngredients';
-        if (raw === 'tiered') return 'routedByCheck';
-        return [
-          'simple',
-          'routedByIngredients',
-          'routedByCheck',
-          'progressive',
-          'alchemy',
-        ].includes(raw)
-          ? raw
-          : 'simple';
-      })(system.resolutionMode),
-      features,
-      itemTags: this._normalizeStringList(system.itemTags ?? system.tags),
-      // The flat system visibility enum (issue 511), gating the whole Crafting authoring surface;
-      // `recipeVisibility` stays for its residual `knowledge.learn.dragDropEnabled`.
-      visibilityMode: this._normalizeVisibilityMode(system.visibilityMode),
-      recipeVisibility: this._normalizeRecipeVisibility(system.recipeVisibility),
-      requirements: this._normalizeRequirements(system.requirements),
-      essenceDefinitions: resolvedEssenceDefinitions,
-      recipeItemDefinitions,
-      // Which basis resolves book membership for this system (issue 1011): monotonic, backfilled
-      // as an OR over the persisted value, so emptying the last array never flips it back.
-      membershipResolvesByRecipeIds:
-        system.membershipResolvesByRecipeIds === true ||
-        recipeItemDefinitions.some(
-          (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
-        ),
-      // A surviving legacy copy is carried through; only the migration removes it (issue 1308).
-      // Migrations run on the active GM alone, so players hydrate through here until it runs.
-      ...(_legacyModifiers.length > 0 && { modifiers: _legacyModifiers }),
-      craftingCheck: this._normalizeCraftingCheck(system.craftingCheck, validCatalogueIds),
-      // Derived above with the salvage context (issue 764), so both agree.
-      salvageResolutionMode,
-      // Tool-breakage authority (issue 419), absence-preserving since 1.30.0 (issue 1363) so the
-      // world half of `resolveToolBreakageAuthority` is reachable; every stored value is authored
-      // (`## Scoped Entity Definitions` `### Tool scope` requirement 5).
-      ...(function _normalizeToolBreakageAuthority(raw) {
-        return ['toolSpecific', 'checkDriven'].includes(raw?.authority)
-          ? { toolBreakage: { authority: raw.authority } }
-          : {};
-      })(system.toolBreakage),
-      salvageCraftingCheck: this._normalizeSalvageCraftingCheck(
-        system.salvageCraftingCheck,
-        validCatalogueIds
-      ),
-      gatheringCraftingCheck: this._normalizeGatheringCraftingCheck(
-        system.gatheringCraftingCheck,
-        validCatalogueIds
-      ),
-      alchemy: this._normalizeAlchemyConfig(
-        system.alchemy ?? system.cauldron,
-        system.resolutionMode
-      ),
-      teaserConfig: this._normalizeTeaserConfig(system.teaserConfig),
-
-      // The system-owned component category vocabulary (issue 676), never merged with or aliased to
-      // recipe `categories`; `general` is implied, never persisted.
-      componentCategories: scopeBasis.componentCategories ?? [],
-
-      // Per-category icons (issue 689), each map pruned against its own vocabulary
-      // (`## CraftingSystem` requirement 6b) and gated on the vocabulary basis (issue 1359).
-      categoryIcons: normalizeCategoryIconMap(
-        system.categoryIcons,
-        _iconAllowance(system.categoryIcons, scopeBasis.recipeCategories)
-      ),
-      componentCategoryIcons: normalizeCategoryIconMap(
-        system.componentCategoryIcons,
-        _iconAllowance(system.componentCategoryIcons, scopeBasis.componentCategories)
-      ),
-
-      // Transitional aliases for existing UI code paths
-      categories: scopeBasis.recipeCategories ?? [],
-      tags: this._normalizeStringList(system.tags ?? system.itemTags),
-      essences: resolvedEssenceDefinitions.map((def) => def.id),
-      enableTags: true,
-      enableEssences: features.essences === true,
-      enableCategories: true,
-      enableMultiStepRecipes: features.multiStepRecipes === true,
-      components: items,
-      // The canonical library Tools every consumer reads through `getSystem(id).tools`.
-      tools: normalizedTools,
-      // Carried through and removed like the modifier library above.
-      ...(_legacyCharacterPrerequisites.length > 0 && {
-        characterPrerequisites: _legacyCharacterPrerequisites,
-      }),
-      // Participation only (issue 1282): realms are world scope in `travelConfig`, and omitting
-      // `gatheringRealms` here removes the stale per-system copy, so the 1.27.0 migration must run
-      // before any system save.
-      gatheringRealmSettings: normalizeGatheringRealmSettings(
-        system.gatheringRealmSettings ?? system.gatheringRegionSettings
-      ),
-    };
   }
 
   _normalizeTool(tool, options) {
