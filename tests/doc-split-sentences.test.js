@@ -48,13 +48,14 @@ const DESTINATIONS = [
 ];
 
 /**
- * AGENTS.md as it stood at issue #1936's merge-base, checked alone and with no exceptions. Each
- * floor sits just under the fixture's count of sentences or of table rows and fenced lines.
+ * AGENTS.md as it stood at issue #1936's merge-base, checked alone and with no exceptions. The
+ * counts are pinned exactly, so a truncated or partly re-cut fixture fails instead of passing.
  */
 const PRE_1936 = {
   fixture: `${FIXTURES}/AGENTS.pre-1936.md`,
-  sentenceFloor: 515,
-  structureFloor: 84,
+  // Re-derived on every re-cut of the fixture.
+  sentenceCount: 518,
+  structureCount: 86,
 };
 
 /**
@@ -553,14 +554,14 @@ test('every sentence of the pre-split documents still exists somewhere', () => {
 test('every sentence, table row and fenced line of the pre-#1936 AGENTS.md still exists', () => {
   const text = readFileSync(path.join(REPOSITORY_ROOT, PRE_1936.fixture), 'utf8');
   const corpora = [
-    ['sentences', sentencesOf, PRE_1936.sentenceFloor],
-    ['table rows and fenced lines', structuralLinesOf, PRE_1936.structureFloor],
+    ['sentences', sentencesOf, PRE_1936.sentenceCount],
+    ['table rows and fenced lines', structuralLinesOf, PRE_1936.structureCount],
   ];
-  for (const [kind, extract, floor] of corpora) {
+  for (const [kind, extract, count] of corpora) {
     const before = extract(text);
     assert.ok(
-      before.length >= floor,
-      `${PRE_1936.fixture} yields ${before.length} ${kind}, under its floor of ${floor}`
+      before.length === count,
+      `${PRE_1936.fixture} yields ${before.length} ${kind}, not its pinned ${count}`
     );
     const lost = missingSentences(multiset(before), survivingLines(extract));
     assert.deepEqual(

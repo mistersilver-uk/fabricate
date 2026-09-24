@@ -638,7 +638,11 @@ function fencedHighRiskPaths(doc, md) {
 
 test('13. the harness documents mirror HIGH_RISK_PATHS, the thresholds, the pins, and the roster', () => {
   // (a) The fenced path list, entries AND order.
-  assert.deepEqual(fencedHighRiskPaths(WORKFLOW_PATH, WORKFLOW_MD), HIGH_RISK_PATHS);
+  assert.deepEqual(
+    fencedHighRiskPaths(WORKFLOW_PATH, WORKFLOW_MD),
+    HIGH_RISK_PATHS,
+    `${WORKFLOW_PATH} HIGH_RISK_PATHS fence drifted from scripts/lib/agentModelTiers.js`
+  );
 
   // (b) SMALL_MAX / MEDIUM_MAX per stage. One AGENTS.md row covers two stage keys.
   const thresholdRows = readMarkdownTable(
@@ -653,9 +657,13 @@ test('13. the harness documents mirror HIGH_RISK_PATHS, the thresholds, the pins
       documented[stage] = { smallMax: firstInt(smallCell), mediumMax: firstInt(mediumCell) };
     }
   }
-  assert.deepEqual(Object.keys(documented).sort(), Object.keys(STAGE_THRESHOLDS).sort());
+  assert.deepEqual(
+    Object.keys(documented).sort(),
+    Object.keys(STAGE_THRESHOLDS).sort(),
+    `${AGENTS_PATH} SMALL_MAX/MEDIUM_MAX stage set drifted`
+  );
   for (const [stage, limits] of Object.entries(STAGE_THRESHOLDS)) {
-    assert.deepEqual(documented[stage], limits, `AGENTS.md ${stage} thresholds drifted`);
+    assert.deepEqual(documented[stage], limits, `${AGENTS_PATH} ${stage} thresholds drifted`);
   }
   // The two post-implementation stages share one row, so they must share one object.
   assert.deepEqual(documented['post-implementation'], documented.docs);
@@ -675,7 +683,7 @@ test('13. the harness documents mirror HIGH_RISK_PATHS, the thresholds, the pins
       codexReasoningEffort: unbacktick(effortCell),
     };
   }
-  assert.deepEqual(pins, TIER_MODELS);
+  assert.deepEqual(pins, TIER_MODELS, `${WORKFLOW_PATH} model-tier pin table drifted`);
 
   // (d) The roster, parsed by the validator's OWN parser. A 7th family added to
   // AGENTS.md without updating FAMILIES here fails.

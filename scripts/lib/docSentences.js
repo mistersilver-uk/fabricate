@@ -49,10 +49,10 @@ export function structuralLinesOf(markdown) {
     }
     if (!trimmed.startsWith('|')) continue;
     const cells = trimmed
-      .replace(/^\||\|$/gu, '')
+      .replaceAll(/^\||\|$/gu, '')
       .split('|')
       .map((cell) => cell.trim());
-    if (!cells.every((cell) => /^:?-+:?$/u.test(cell))) lines.push(cells.join(' | '));
+    if (cells.some((cell) => !/^:?-+:?$/u.test(cell))) lines.push(cells.join(' | '));
   }
   return lines;
 }
