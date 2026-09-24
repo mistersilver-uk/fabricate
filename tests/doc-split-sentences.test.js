@@ -237,7 +237,7 @@ const SUPERSEDED_POLICY = [
       '`--channel early-access` and `--channel public` are the private-patron and public targets; each private channel derives its tester URLs from its own path secret, and a channel that declares tester groups with no secret set refuses to publish.',
     after:
       '`--channel early-access` and `--channel public` are the private-patron and public targets; each tester group derives its tester URLs from its own path secret, and a channel with any declared group whose secret is unset refuses to publish before building.',
-    survivesIn: 'AGENTS.md',
+    survivesIn: 'CONTRIBUTING.md',
   },
   {
     issue: '#1988',
@@ -245,7 +245,7 @@ const SUPERSEDED_POLICY = [
       'Every versioned zip carries `(fabricate-version, fabricate-source-sha, fabricate-build-profile)` metadata — pass `--source-sha` explicitly, since `GITHUB_SHA` is stale after a `git checkout <tag>`; manifest writes are conditional (`IfMatch`) and every write is read back.',
     after:
       'Every versioned zip carries `(fabricate-version, fabricate-source-sha, fabricate-build-profile)` metadata — pass `--source-sha` explicitly, since `GITHUB_SHA` names the workflow ref rather than the tag being built; manifest writes are conditional (`IfMatch`) and every write is read back.',
-    survivesIn: 'AGENTS.md',
+    survivesIn: 'CONTRIBUTING.md',
   },
   {
     issue: '#1988',
