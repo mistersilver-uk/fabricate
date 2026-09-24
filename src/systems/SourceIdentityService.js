@@ -1,7 +1,7 @@
 /**
- * Source-identity STAMPING and REPAIR (issue 1699): the durable-flag writes, the three one-shot auto-stamps
- * and the GM "Repair Item Data" pass, extracted from `CraftingSystemManager`. Every collaborator arrives in
- * `io`, rebuilt per call, so an instance patch is still observed. Nothing here reads a Foundry global.
+ * Source-identity stamping and repair (issue 1699): the durable-flag writes, the three one-shot
+ * auto-stamps and the GM "Repair Item Data" pass. Every collaborator arrives in `io`, rebuilt per
+ * call so an instance patch is observed; nothing here reads a Foundry global.
  */
 import { FABRICATE_FLAG_NAMESPACE, getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import {
@@ -30,10 +30,8 @@ async function stripCloneSourceProvenance(source) {
   return true;
 }
 
-/** Core identity write, KIND-GENERIC over the durable flag key: strip a clone's stale `_stats`
- * provenance and stamp `flags.fabricate.<flagKey>`, overwriting an inherited marker. Writes
- * stay conditional, and the caller is assumed to have checked writability. Shared by every
- * registered kind (issue 561) and by the one-shot auto-stamp. */
+/** Strip a clone's stale provenance and stamp `flags.fabricate.<flagKey>`, overwriting an
+ * inherited marker, for any kind (issue 561). Writes are conditional; the caller checks access. */
 async function writeSourceIdentity(source, flagKey, id) {
   const stripped = await stripCloneSourceProvenance(source);
   let stamped = false;
@@ -45,15 +43,11 @@ async function writeSourceIdentity(source, flagKey, id) {
 }
 
 /**
- * Persist a transferable durable identity (`flags.fabricate.<flagKey>`) on a registered source
- * WORLD item, so a future inventory copy inherits it even when Foundry's transitive
- * `_stats.duplicateSource` points at a template. KIND-GENERIC, and a no-op for a non-Item
- * source or any pack-resident source, whatever its lock state, whose copies resolve via uuid.
- *
- * The clone-gate is safe HERE, and only here and in world/pack source repair, because a
- * registered SOURCE carrying `duplicateSource` is a genuine sidebar-Duplicate. It must NEVER
- * be applied to actor-owned copies, which carry it legitimately from every non-compendium
- * drag-drop; `matchRecipeItemDefinition` is the runtime matcher that deliberately has no gate.
+ * Stamp a durable identity on a registered source world Item, so a future copy inherits it even
+ * when Foundry's transitive `_stats.duplicateSource` points at a template; a no-op for a non-Item
+ * or any pack source. The clone-gate is safe only on a source, where `duplicateSource` means a
+ * sidebar Duplicate, never on an actor-owned copy, which carries it from every non-compendium
+ * drop; `matchRecipeItemDefinition` deliberately has no gate.
  */
 export async function stampSourceIdentity(source, flagKey, id) {
   if (!id) return;
@@ -65,11 +59,7 @@ export async function stampSourceIdentity(source, flagKey, id) {
   }
 }
 
-/**
- * Clear a stale `flags.fabricate.<flagKey>` from a world item that no longer sources
- * the given registration (used when a definition/component is re-pointed to a new
- * source). KIND-GENERIC.
- */
+/** Clear a stale durable flag from a world item that no longer sources the registration. */
 export async function clearSourceFlag(io, registeredItemUuid, flagKey, id) {
   if (!registeredItemUuid || !id) return;
   let doc;
@@ -88,11 +78,10 @@ export async function clearSourceFlag(io, registeredItemUuid, flagKey, id) {
 }
 
 /**
- * The shared body of the three one-shot auto-stamps. A dotted (unsafe) system id cannot serve as a
- * `roles` map key, so `flagKeyFor` answers null and the whole system is skipped rather than nesting
- * garbage; its entries still resolve via the raw-ref (and, for recipe items, legacy-scalar)
- * fall-through. Locked packs and unresolvable sources are counted and skipped, and a second run
- * performs zero writes. Callers gate this on primary-GM plus the one-shot setting version.
+ * The three auto-stamps' shared body. A dotted system id cannot key `roles`, so its system is
+ * skipped and resolves through raw refs instead. Locked packs and unresolvable sources are counted
+ * and skipped, and a second run writes nothing. Callers gate on the primary GM and the one-shot
+ * setting version.
  */
 async function autoStampSources(io, { flagKeyFor, entriesOf, uuidOf }) {
   const summary = { scanned: 0, stamped: 0, stripped: 0, skippedLocked: 0, skippedMissing: 0 };
@@ -129,13 +118,10 @@ async function autoStampSources(io, { flagKeyFor, entriesOf, uuidOf }) {
 }
 
 /**
- * One-shot auto-stamp (issues 555, 567): backfill the durable per-system
- * `roles[system.id].recipeItemDefinitionId` on every registered recipe-item definition's writable
- * source Item. A shared source registered in BOTH system A and system B is stamped once per owning
- * system, so it carries both leaves. Sources only: owned copies are covered by future drags and by
- * the manual repair, and the legacy scalar is NOT stripped, remaining the transitional fallback for
- * pre-upgrade owned copies. This arm reads `originItemUuid` alone, deliberately unlike the other
- * two, so a definition carrying only a registered uuid is never stamped.
+ * Backfill `roles[system.id].recipeItemDefinitionId` on each recipe-item source (issues 555, 567),
+ * once per owning system. Sources only; the legacy scalar stays as the fallback for older copies.
+ * Unlike the other two it reads `originItemUuid` alone, so a registered-uuid-only definition is
+ * never stamped.
  */
 export async function autoStampRecipeItemSources(io) {
   return autoStampSources(io, {
@@ -145,10 +131,7 @@ export async function autoStampRecipeItemSources(io) {
   });
 }
 
-/** Issue 556 one-shot auto-stamp: backfill the durable per-system
- * `roles[system.id].componentId` on every registered component's writable source Item. Callers
- * gate this on primary-GM plus the one-shot setting version, so it does no gating of its own
- * beyond writability. */
+/** Backfill `roles[system.id].componentId` on each component's source (issue 556). */
 export async function autoStampComponentSources(io) {
   return autoStampSources(io, {
     flagKeyFor: (systemId) => io.componentRoleFlagKey(systemId),
@@ -157,10 +140,8 @@ export async function autoStampComponentSources(io) {
   });
 }
 
-/** Issue 561 one-shot auto-stamp: backfill the durable per-system `roles[system.id].toolId` on
- * every registered tool's writable source Item — a clone of {@link autoStampComponentSources}.
- * A tool with no source refs is skipped. ORDERING: it reads the tool source refs that the `1.15.0`
- * `migrateToolsToFirstClass` migration populates, so it MUST run after that migration persists. */
+/** Backfill `roles[system.id].toolId` on each tool's source (issue 561). It reads refs the
+ * `1.15.0` `migrateToolsToFirstClass` migration populates, so it must run after that persists. */
 export async function autoStampToolSources(io) {
   return autoStampSources(io, {
     flagKeyFor: (systemId) => io.toolRoleFlagKey(systemId),
@@ -169,11 +150,9 @@ export async function autoStampToolSources(io) {
   });
 }
 
-/** Resolve the existing definition a registered source maps to. A NON-clone source's durable
- * identity flag is authoritative even if the recorded `originItemUuid` drifted: the per-system
- * `roles[system.id].recipeItemDefinitionId` leaf (issue 567) is read FIRST, then the legacy
- * scalar as a transitional fallback. A CLONE's inherited flag belongs to the ORIGINAL and is
- * ignored, so a duplicated source becomes its own definition (issue 555, flow 4b). */
+/** The definition a registered source maps to. A non-clone's durable flag wins even over a
+ * drifted `originItemUuid`, the per-system leaf (issue 567) before the legacy scalar; a clone's
+ * inherited flag is ignored, so a duplicate becomes its own definition (issue 555). */
 export function findRecipeItemDefinitionForSource(io, system, snapshot, source) {
   const definitions = Array.isArray(system.recipeItemDefinitions)
     ? system.recipeItemDefinitions
@@ -191,19 +170,14 @@ export function findRecipeItemDefinitionForSource(io, system, snapshot, source) 
       if (byFlag) return byFlag;
     }
   }
-  // Union find-existing over the snapshot's full ref set. The snapshot's refs are
-  // already clone-gated by `_resolveImportedSourceData` (a clone contributes only its
-  // own uuid), so a duplicated source can never collide with the original here — the
-  // 4b overwrite stays fixed even with union matching.
+  // The snapshot's refs are already clone-gated, so a duplicate cannot match the original.
   const claimed = new Set(getItemMatchUuids(snapshot));
   if (claimed.size === 0) return null;
   return definitions.find((def) => getItemMatchUuids(def).some((ref) => claimed.has(ref))) || null;
 }
 
-// Normalize a name for the name-assisted re-point: trim, collapse internal
-// whitespace, and lowercase. Exact (post-normalization) equality only — no fuzzy or
-// substring matching. Names are literal snapshot strings captured at registration,
-// not localized keys, so a client-language change cannot move the match.
+// Trimmed, whitespace-collapsed and lowercased for exact matching; names are registration
+// snapshots, not localized keys, so the client language cannot move a match.
 function normalizeMatchName(name) {
   return String(name ?? '')
     .trim()
@@ -211,12 +185,8 @@ function normalizeMatchName(name) {
     .toLowerCase();
 }
 
-// Resolve a definition by exact name, unique WITHIN the per-system definition set passed
-// in (recipe-item repair is per-system since issue 567, so the caller only ever hands
-// this ONE system's `kind.definitions`). Returns the single match, `'ambiguous'` when two
-// or more of that system's definitions share the name, or `null` when none match. A source
-// registered in two systems is reconciled independently in each, so name uniqueness is
-// scoped to the system being reconciled, never global.
+// The one definition of this system with the name, `'ambiguous'` for two or more, else `null`;
+// uniqueness is per system (issue 567), never global.
 function uniqueDefinitionByName(name, definitions) {
   const normalized = normalizeMatchName(name);
   if (!normalized) return null;
@@ -226,11 +196,8 @@ function uniqueDefinitionByName(name, definitions) {
   return matches[0];
 }
 
-// Owner resolution for a WORLD / WRITABLE-PACK SOURCE item. Clone-gated: a source
-// carrying `_stats.duplicateSource` is a sidebar-Duplicate, so it must NOT be
-// identity-matched onto the ORIGINAL through its inherited `compendiumSource` (the
-// self-corruption hazard — it would be stamped with the original's id). A clone
-// keys on its own uuid only; a non-clone keys on uuid + compendium source.
+// A world or writable-pack source's owner, clone-gated: a clone keys on its own uuid alone, or
+// its inherited `compendiumSource` would stamp it with the original's id.
 function resolveSourceRepairOwner(item, kind) {
   const isClone = !!getDuplicateSourceUuid(item);
   const refs = new Set(
@@ -244,18 +211,13 @@ function resolveSourceRepairOwner(item, kind) {
   );
 }
 
-// Owner resolution for an ACTOR-OWNED item, returning `{definition, tier}`. NO
-// clone-gate: an owned copy legitimately carries `duplicateSource` (Foundry stamps it
-// on drag-drop) and its `compendiumSource` is real provenance, so it resolves through
-// the ordinary runtime matchers — the four-tier recipe-item matcher (which surfaces the
-// tier), or the component source matcher (`tier: null`).
+// An actor-owned item's `{definition, tier}`, with no clone-gate: Foundry stamps
+// `duplicateSource` on drag-drop, so the ordinary runtime matchers apply.
 function resolveOwnedRepairOwner(item, kind) {
   if (kind.bucket === 'recipeItems') {
     return matchRecipeItemDefinition(item, kind.definitions, kind.systemId);
   }
-  // A first-class Tool carries its OWN identity, so it MUST resolve through the Tool
-  // resolver — routing the tools bucket through the component resolver would mis-resolve
-  // it via component legacy-scalar logic (issue 561, D-F(repair) / A9).
+  // A tool has its own identity; the component resolver would misread it (issue 561).
   if (kind.bucket === 'tools') {
     const definition = resolveToolForItem(item, kind.definitions, kind.systemId);
     return { definition, tier: null };
@@ -264,10 +226,8 @@ function resolveOwnedRepairOwner(item, kind) {
   return { definition, tier: null };
 }
 
-/** Write the durable identity onto ONE item given its already-resolved owner definition, shared
- * by the world/pack-source and actor-owned passes for both kinds. Strips a lingering
- * `_stats.duplicateSource` when an owner is found, stamps the kind's durable flag, and clears a
- * stale flag when the item sources nothing; writes stay conditional. */
+/** Stamp one item from its resolved owner, stripping `_stats.duplicateSource`, or clear a stale
+ * flag when it sources nothing; writes are conditional. */
 async function repairSourceItem(item, owner, kind, summary) {
   if (!item || typeof item.update !== 'function') return;
   const currentFlag = getFabricateFlag(item, kind.flagKey, null);
@@ -291,29 +251,23 @@ async function repairSourceItem(item, owner, kind, summary) {
   }
 }
 
-/** Reconcile ONE actor-owned item for one kind. A flagged owned copy is authoritative and left
- * untouched; otherwise it resolves through the ordinary runtime matcher and, for recipe items
- * only, may be re-pointed by name when an unflagged copy's name uniquely matches a DIFFERENT
- * definition than its `duplicateSource` names. This never triggers a learn. */
+/** Reconcile one owned item. A flagged copy is authoritative and untouched; a recipe item matched
+ * only by `duplicateSource` is stamped only when its name uniquely confirms a definition, which may
+ * re-point it. Never triggers a learn. */
 async function repairOwnedItem(item, kind, summary, auditLog) {
   if (!item || typeof item.update !== 'function') return;
-  // A flagged owned copy already carries its identity-of-record — authoritative,
-  // left exactly as-is (no re-point, no strip, no learn).
   if (getFabricateFlag(item, kind.flagKey, null)) return;
 
   const { definition, tier } = resolveOwnedRepairOwner(item, kind);
 
-  // Components, and recipe items matched by a RELIABLE tier (durable flag / own uuid /
-  // compendium source), are stamped directly to the resolved owner.
+  // Components, and recipe items matched by a reliable tier, are stamped directly.
   if (kind.bucket !== 'recipeItems' || (definition && tier !== 'duplicate')) {
     await repairSourceItem(item, definition, kind, summary);
     return;
   }
 
-  // Recipe item matched ONLY via tier 4 (duplicateSource), or unmatched. Tier 4 is the
-  // unreliable signal at the heart of issue 555, so an owned copy here is only stamped
-  // when its NAME confirms an identity. Without a duplicateSource there is nothing to
-  // re-point against, so stamp whatever (if anything) matched.
+  // Tier 4 (`duplicateSource`) is unreliable (issue 555); with no duplicate there is nothing to
+  // re-point against.
   if (!getDuplicateSourceUuid(item)) {
     await repairSourceItem(item, definition, kind, summary);
     return;
@@ -321,19 +275,14 @@ async function repairOwnedItem(item, kind, summary, auditLog) {
 
   const byName = uniqueDefinitionByName(item?.name, kind.definitions);
   if (byName === 'ambiguous') {
-    // A name matching two or more definitions cannot be safely resolved — leave the
-    // copy untouched (it stays a tier-4 fallback, which R5 refuses for bulk auto-learn).
+    // Left as a tier-4 fallback, which bulk auto-learn refuses.
     summary.skippedAmbiguous += 1;
     return;
   }
   if (!byName) {
-    // No name confirmation for a tier-4-only copy — leave it as-is.
     return;
   }
-  // The copy's name uniquely names a definition. When that differs from the one its
-  // duplicateSource resolves to, it is a re-point (the duplicated-scroll-mislabelled
-  // case); log an auditable, reversible record. When it confirms the same definition,
-  // stamp it without counting a re-point.
+  // A different definition is a re-point, logged as an auditable, reversible record.
   if (!definition || byName.id !== definition.id) {
     auditLog.push({
       itemUuid: item.uuid || null,
@@ -345,12 +294,7 @@ async function repairOwnedItem(item, kind, summary, auditLog) {
   await repairSourceItem(item, byName, kind, summary);
 }
 
-/**
- * The source reference a DEFINITION owns, for resolving its own authoritative
- * document. Prefers the live registered uuid, then the canonical origin uuid, then
- * any recorded alias. Distinct from the item-driven repair walk, which starts from
- * an ITEM and asks which definition claims it.
- */
+/** A definition's own source uuid: registered, then origin, then the first alias. */
 function definitionSourceUuid(definition = null) {
   const refs = [
     definition?.registeredItemUuid,
@@ -364,22 +308,16 @@ function definitionSourceUuid(definition = null) {
   return '';
 }
 
-/** Record one skipped description against BOTH the split reason counter and the flat `skipped`
- * total. The split exists so a GM can tell a broken source link, their problem to fix, from a
- * source that simply has no description. */
+/** Count a skipped description by reason and in the flat `skipped` total. */
 function countSkippedDescription(summary, reason) {
   summary.descriptions[reason] += 1;
   summary.descriptions.skipped += 1;
 }
 
 /**
- * DEFINITION-DRIVEN description refresh, run as part of {@link repairItemData}. It shares the
- * button, the `_assertGM` gate and the summary object with the identity repair, but deliberately
- * NOT its traversal: the item-driven walk SKIPS LOCKED PACKS, because identity repair writes
- * flags into pack items, whereas descriptions only READ through the uuid resolver — and a locked
- * system pack is exactly where the reported raw `@UUID[Compendium.…]` lives. Riding the item walk
- * would also invert authority, making an actor-owned COPY a candidate writer of the DEFINITION's
- * description. Tools are excluded by design, because a tool snapshot carries no description.
+ * The definition-driven description refresh of {@link repairItemData}, not its item walk: the
+ * walk skips locked packs, where the raw `@UUID[Compendium.…]` text lives and descriptions are
+ * only read, and would let an owned copy write a definition's description. Tools carry none.
  */
 async function refreshDefinitionDescriptions(io, summary) {
   const targets = [];
@@ -391,10 +329,7 @@ async function refreshDefinitionDescriptions(io, summary) {
     }
   }
 
-  // Sweep 1 — resolve each definition's OWN source document and collect its raw
-  // description. Doing this up front is what makes priming correct: the enricher
-  // cache is warmed ONCE from every reference in the world, instead of core's
-  // per-`enrichHTML` priming costing one round-trip per description.
+  // Resolve every source first, so the enricher cache is primed once, not per `enrichHTML`.
   const resolved = [];
   const rawTexts = [];
   for (const definition of targets) {
@@ -410,8 +345,7 @@ async function refreshDefinitionDescriptions(io, summary) {
       source = null;
     }
     if (!source) {
-      // The item, its pack, or the module that provided it is gone. Distinct from a
-      // blank source below, because THIS one is actionable by the GM.
+      // A vanished source is the GM's to fix, unlike a blank one below.
       countSkippedDescription(summary, 'skippedUnresolved');
       continue;
     }
@@ -431,9 +365,7 @@ async function refreshDefinitionDescriptions(io, summary) {
       summary.descriptions.unchanged += 1;
       continue;
     }
-    // Never let a source with no description at all WIPE text a definition already
-    // carries — that would be data loss dressed up as a repair. Pinned by
-    // `tests/repair-item-data.test.js`; deleting this guard must fail that test.
+    // A blank source never wipes a stored description (`tests/repair-item-data.test.js`).
     if (!next) {
       countSkippedDescription(summary, 'skippedEmpty');
       continue;
@@ -447,25 +379,17 @@ async function refreshDefinitionDescriptions(io, summary) {
 }
 
 /**
- * The per-system repair KINDS. Components, tools, AND recipe items all resolve PER SYSTEM: their
- * definition ids are not globally unique (copy-import preserves component ids; recipe-item ids are
- * generated against a per-system uniqueness set), and each durable identity is a per-system map key
- * `roles.<systemId>.<role>`. A per-system kind means each system's pass reads and writes ONLY its
- * own leaf, so a non-owning system's null-owner pass finds its leaf unset and no-ops — it can never
- * clear another system's identity, regardless of `getSystems()` order (issue 556 Fix 2, extended to
- * recipe items by issue 567).
+ * The per-system repair kinds: definition ids are not globally unique and each identity is a
+ * `roles.<systemId>.<role>` leaf, so each pass touches only its own leaf and cannot clear another
+ * system's, whatever the `getSystems()` order (issues 556, 567).
  */
 function buildRepairKinds(io) {
   const kinds = [];
   for (const system of io.getSystems()) {
-    // A dotted (unsafe) system id cannot serve as a `roles` map key, so the whole system is
-    // skipped — tools and recipe items included, because all three key derivations gate on the
-    // same id check. Its definitions still resolve via raw refs. Fresh ids are validated at
-    // creation/import.
+    // A dotted system id cannot key `roles`, so the whole system is skipped, all three kinds.
     const flagKey = io.componentRoleFlagKey(system.id);
     if (!flagKey) continue;
-    // DELIBERATELY NOT REPOINTED at issue 1370: the subject of the restamp is the PERSISTED
-    // record whose durable identity is being repaired, not a merged read row.
+    // The persisted record, not the read union, is what the restamp repairs (issue 1370).
     kinds.push({
       bucket: 'components',
       flagKey,
@@ -473,13 +397,9 @@ function buildRepairKinds(io) {
       definitions: system.components || [],
       refExtractor: (def) => getItemMatchUuids(def),
     });
-    // First-class Tools are ALSO a per-system kind (issue 561): each system's pass reads
-    // and writes ONLY its own `roles.<systemId>.toolId` leaf. Item-sourced tools reconcile
-    // via their own source references (owned copies through `resolveToolForItem`).
     const toolFlagKey = io.toolRoleFlagKey(system.id);
     if (toolFlagKey) {
-      // DELIBERATELY NOT REPOINTED at issue 1370, for the same reason as the component kind
-      // above. A tool with no source refs is filtered out, unlike the other two kinds.
+      // Persisted too; a tool with no source refs is filtered out.
       kinds.push({
         bucket: 'tools',
         flagKey: toolFlagKey,
@@ -490,8 +410,6 @@ function buildRepairKinds(io) {
         refExtractor: (def) => getItemMatchUuids(def),
       });
     }
-    // Recipe items are ALSO a per-system kind (issue 567), so a shared source registered in
-    // two systems keeps a durable claim in each and neither clobbers the other.
     const recipeFlagKey = io.recipeItemRoleFlagKey(system.id);
     if (recipeFlagKey) {
       kinds.push({
@@ -506,8 +424,7 @@ function buildRepairKinds(io) {
   return kinds;
 }
 
-/** The repair summary before the walk: flat totals kept for back-compat with the
- * component-source repair contract, a per-bucket split, and the issue 800 description bucket. */
+/** Flat totals for the component-repair contract, a per-bucket split, and descriptions. */
 function emptyRepairSummary() {
   return {
     scanned: 0,
@@ -521,11 +438,8 @@ function emptyRepairSummary() {
     components: { stamped: 0, stripped: 0, cleared: 0 },
     tools: { stamped: 0, stripped: 0, cleared: 0 },
     recipeItems: { stamped: 0, stripped: 0, cleared: 0 },
-    // Description refresh outcomes (issue 800), deliberately a bucket of its own so the identity
-    // counts above keep their existing meaning. Tools are excluded because first-class Tool source
-    // snapshots are captured at registration/relink and deliberately do not auto-refresh.
-    // `skipped` is the flat total; `skippedUnresolved` (source item/pack/module gone — actionable)
-    // and `skippedEmpty` (source resolved but carries no description) split it by cause.
+    // Issue 800, apart from the identity counts. `skipped` totals `skippedUnresolved` (the
+    // source is gone, actionable) and `skippedEmpty` (it has no description).
     descriptions: {
       refreshed: 0,
       unchanged: 0,
@@ -538,19 +452,11 @@ function emptyRepairSummary() {
 }
 
 /**
- * GM maintenance ("Repair Item Data"): reconcile EVERY PROJECTION of a definition's resolved
- * source document — durable identity and derived display snapshots alike.
- *
- * The identity leg is item-driven: every component, tool and recipe-item definition's identity
- * is reconciled across world items, writable packs and actor-owned items. World/pack SOURCE
- * items are strip-and-stamped with a clone-gated identity, so a duplicated source becomes its
- * own definition; actor-owned copies resolve through the ordinary runtime matchers and, for
- * recipe items, a guardrailed name-assisted re-point. Locked packs are skipped, synthetic and
- * compendium-resident actors are never scanned, and nothing triggers a learn.
- *
- * The description leg is definition-driven (issue 800): each definition resolves its OWN source
- * reference, including sources in LOCKED packs, and its stored description is refreshed to the
- * enricher-resolved plain text. See {@link refreshDefinitionDescriptions}.
+ * GM "Repair Item Data": reconcile every projection of each definition's source. Identity is
+ * item-driven over world items, writable packs and actor-owned items: sources are clone-gated and
+ * stamped, owned copies go through the runtime matchers and the name-assisted re-point. Locked
+ * packs are skipped, synthetic and compendium actors never scanned, and nothing triggers a learn.
+ * Descriptions are definition-driven, locked packs included (issue 800).
  */
 export async function repairItemData(io, { includeCompendiums = true } = {}) {
   const kinds = buildRepairKinds(io);
@@ -587,8 +493,6 @@ export async function repairItemData(io, { includeCompendiums = true } = {}) {
     }
   }
 
-  // Actor-owned copies. Guarded exactly like the world-item and pack thunks above, so a world
-  // with no `actors` collection (e.g. the pure-logic test harness) is a clean no-op.
   for (const actor of io.actors()) {
     const items = actor?.items ? [...actor.items] : [];
     for (const item of items) {
@@ -599,8 +503,7 @@ export async function repairItemData(io, { includeCompendiums = true } = {}) {
     }
   }
 
-  // Description leg — definition-driven, unaffected by `includeCompendiums` and by
-  // `pack.locked` (it reads through the uuid resolver rather than writing into packs).
+  // Unaffected by `includeCompendiums` and `pack.locked`: it only reads through the resolver.
   const descriptionsChanged = await refreshDefinitionDescriptions(io, summary);
   if (descriptionsChanged) {
     await io.persistItemMetadata();

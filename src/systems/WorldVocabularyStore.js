@@ -4,98 +4,30 @@ import { SettingsBackedStore } from './SettingsBackedStore.js';
 import { normalizeWorldVocabularyEntries, WORLD_VOCABULARY_KINDS } from './worldVocabulary.js';
 
 /**
- * The persistence shell behind `fabricate.worldVocabulary` (issue 1392, epic 1357, PR 7a).
+ * The persistence shell behind `fabricate.worldVocabulary` (issue 1392): one key,
+ * `{ componentCategories, componentTags, recipeCategories }`, each a list of `{id, name}`. Unlike
+ * the scope stores it persists only the kinds ever written, so "never authored" and "emptied" stay
+ * distinct across a reload; a world setting keeps key absence, unlike `setFlag`. `_normalize` is
+ * an allowlist rebuild over `WORLD_VOCABULARY_KINDS`, so a new sub-key must extend it too.
  *
- * ONE KEY, THREE VOCABULARIES:
- *
- * ```jsonc
- * {
- *   "componentCategories": [{ "id": "reagent", "name": "Reagent" }],
- *   "componentTags":       [{ "id": "herb",    "name": "herb" }],
- *   "recipeCategories":    [{ "id": "potions", "name": "Potions" }]
- * }
- * ```
- *
- * ## Why ONE key here and THREE for the scoped entities
- *
- * `settings.js` records why `componentScope` / `essenceScope` / `toolScope` could not share a
- * key: on a shared key `isSeeded()` cannot be honest per entity type, because a store writes the
- * whole object and one type's first write persists the others as EMPTY — converting an UNKNOWN
- * prune basis into a real, empty, PRUNABLE one in a single keystroke.
- *
- * This store closes that hole from the other end instead, and that is the ONE place it departs
- * from both shipped shells. `ScopedDefinitionStore._persist` and `CharacterLibrariesStore._persist`
- * mark EVERY sub-key seeded on ANY write. This one persists ONLY the kinds that have actually been
- * written, and re-derives seededness from raw key presence on the next `load()` — so "never
- * authored" and "authored and then emptied" stay distinguishable across a reload, on one key, for
- * all three vocabularies. A world setting preserves key absence (unlike `setFlag`, whose merge
- * resurrects a removed key), and `type: Object` applies no schema, so the absence survives on
- * disk rather than only in memory.
- *
- * Nothing destructive rides on that predicate today — `CraftingSystemManager._vocabularyBasis`
- * deliberately does not consult this store (`## World Vocabulary` requirement 6) — but the shape
- * is what lets issue 1411 add an `optOuts` sub-key with NO MIGRATION: an unwritten key stays
- * absent on disk, so an older client and a newer one read the same payload. That is not the same
- * as free. `carriedKinds`, `_normalize` and `_persistedShape` all iterate
- * `WORLD_VOCABULARY_KINDS`, and `_normalize` is an allowlist rebuild, so a sub-key outside that
- * list is DROPPED on the next load rather than round-tripped: adding one means extending both
- * rebuilds as well as the list.
- *
- * ## The rules it shares with `ScopedDefinitionStore`
- *
- * - THE SEAMS ARE INJECTED, NOT IMPORTED. `getSetting` / `setSetting` are constructor parameters
- *   with no module-level default, so this module does not import `src/config/settings.js` —
- *   which transitively pulls in `src/ui/theme.js`. `src/main.js` is the composition root that
- *   binds the real accessors.
- * - PUBLISH THE CACHE BEFORE AWAITING THE WRITE. A GM authoring incrementally fires one write
- *   per add, so a second edit routinely starts while the first is in flight; publishing after
- *   the await would have that second edit read the pre-first-edit corpus and clobber it.
- * - `load()` IS GUARDED AND NEVER THROWS. An unreadable setting must degrade to an empty
- *   vocabulary, not take the manager's publish down.
- * - PERSISTENCE IS NEVER GATED ON VALIDITY. The normalizer is total, so a transiently odd
- *   payload is cleaned rather than refused.
- * - ONE STABLE CORPUS, REPLACED WHOLESALE. `projectWorldVocabulary` builds NEW row objects into
- *   NEW arrays per kind precisely because this object is the store's cache: decorating the
- *   corpus's own arrays in place would write the projection's per-row fields into it.
- *
- * ## The recorded cost of publish-before-await
- *
- * A REJECTED write leaves the in-memory cache ahead of the setting, and unlike a landed write no
- * `createSetting` / `updateSetting` fires — so the replication bridge's `load()` does not run and
- * the divergence persists until reload. That is why the deletion cascade in `worldScopeActions`
- * gates its second write on the first's success, and why `tests/world-vocabulary-actions.test.js`
- * asserts on the PERSISTED payload read back through the seam rather than on `store.get()`.
+ * As in `ScopedDefinitionStore`: the setting seams are injected, the cache is published before the
+ * write is awaited, `load()` never throws, saves are never gated on validity, and the corpus is
+ * replaced wholesale. A rejected write leaves the cache ahead of the setting until reload, since no
+ * setting hook fires, so `worldScopeActions` gates a cascade's second write on the first and
+ * `tests/world-vocabulary-actions.test.js` asserts on the persisted payload.
  */
 
 /**
- * The world setting key this store owns.
- *
- * RESTATED rather than imported, because importing `src/config/settings.js` is exactly what the
- * injected-seams rule exists to avoid. It is a mirror, so it is guarded:
- * `tests/world-vocabulary-store.test.js` asserts it equals `SETTING_KEYS.WORLD_VOCABULARY`.
- *
- * @type {string}
+ * The owned setting key, restated to avoid importing `src/config/settings.js`;
+ * `tests/world-vocabulary-store.test.js` pins it to `SETTING_KEYS.WORLD_VOCABULARY`.
  */
 export const WORLD_VOCABULARY_SETTING_KEY = 'worldVocabulary';
 
-/**
- * A plain object, or `{}` for anything that cannot be one.
- *
- * @param {unknown} value
- * @returns {object}
- */
 function plainObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
-/**
- * Which of the three kinds the RAW payload actually carries — i.e. which have been WRITTEN, as
- * against synthesized from the registered default. An array or a scalar is not a payload this
- * store ever wrote, so every kind reads as unseeded.
- *
- * @param {unknown} raw
- * @returns {Record<string, boolean>}
- */
+/** Which kinds the raw payload carries; an array or a scalar carries none. */
 function carriedKinds(raw) {
   const source = plainObject(raw);
   const carried = {};
@@ -105,16 +37,7 @@ function carriedKinds(raw) {
   return carried;
 }
 
-/**
- * Build the world vocabulary store.
- *
- * @param {object} seams
- * @param {(key: string) => unknown} seams.getSetting
- * @param {(key: string, value: unknown) => Promise<unknown>} seams.setSetting
- * @param {string} [seams.settingKey] Overridable for tests; defaults to
- *   {@link WORLD_VOCABULARY_SETTING_KEY}.
- * @returns {WorldVocabularyStore}
- */
+/** Build the world vocabulary store; `settingKey` is overridable for tests. */
 export function createWorldVocabularyStore({
   getSetting,
   setSetting,
@@ -127,7 +50,6 @@ export function createWorldVocabularyStore({
 class WorldVocabularyStore extends SettingsBackedStore {
   constructor({ getSetting, setSetting, settingKey }) {
     super({ getSetting, setSetting, settingKey });
-    /** @type {Record<string, Array<{id: string, name: string}>>|null} */
     this._corpus = null;
     this.seeded = {};
     for (const kind of WORLD_VOCABULARY_KINDS) this.seeded[kind] = false;
@@ -137,15 +59,7 @@ class WorldVocabularyStore extends SettingsBackedStore {
     this._corpus = corpus;
   }
 
-  /**
-   * Read, record raw key presence, then normalize — and the ORDER is the whole point, exactly as
-   * it is in `ScopedDefinitionStore#load`: normalizing first would make every kind look present.
-   *
-   * GUARDED. An unreadable setting degrades to an empty vocabulary rather than taking the
-   * module down.
-   *
-   * @returns {object} The published corpus.
-   */
+  /** Read raw, record key presence, then normalize; never throws. */
   load() {
     const raw = this._readSettingGuarded();
     this.seeded = carriedKinds(raw);
@@ -153,11 +67,6 @@ class WorldVocabularyStore extends SettingsBackedStore {
     return this._corpus;
   }
 
-  /**
-   * @param {unknown} raw
-   * @returns {Record<string, Array<{id: string, name: string}>>}
-   * @private
-   */
   _normalize(raw) {
     const source = plainObject(raw);
     const corpus = {};
@@ -167,44 +76,22 @@ class WorldVocabularyStore extends SettingsBackedStore {
     return corpus;
   }
 
-  /**
-   * The published vocabulary corpus, BY REFERENCE.
-   *
-   * Deliberately not a clone: `buildWorldScopeState` reads it on every publish, and the
-   * projection already builds new row objects into new arrays, so a per-call clone here would
-   * be pure waste. Callers that intend to EDIT use {@link WorldVocabularyStore#get}.
-   *
-   * @returns {Record<string, Array<{id: string, name: string}>>}
-   */
+  /** The corpus by reference; a caller that edits uses {@link WorldVocabularyStore#get}. */
   corpus() {
     this._ensureLoaded();
     return this._corpus;
   }
 
-  /** One vocabulary, by reference. @param {string} kind @returns {Array<object>} */
+  /** One vocabulary, by reference. */
   list(kind) {
     const corpus = this.corpus();
     return Array.isArray(corpus?.[kind]) ? corpus[kind] : [];
   }
 
   /**
-   * Whether a vocabulary has ever actually been WRITTEN, as against reading back the registered
-   * default.
-   *
-   * PER KIND when given one, and `false` — NEVER A THROW — for a kind this store does not carry.
-   * That refusal-by-answer is deliberate and is the one place a throw would be actively harmful:
-   * `worldScopeProjection`'s `readCorpus` is shared with the three scoped-entity legs and asks
-   * THIS store `isSeeded('entities')`, `isSeeded('defaults')` and `isSeeded('membership')` inside
-   * a `try`/`catch` that converts any throw into `{corpus: null}` — which publishes as
-   * `{available: false, total: 0}`, a legitimate shape, with no error and no red test. So a
-   * throwing `isSeeded` would silently blank the whole screen and its badge. The refusal of an
-   * unknown kind belongs on the WRITE path, where `worldScopeActions` answers `false`.
-   *
-   * With no kind it answers the aggregate question — has this world authored any vocabulary at
-   * all — which is what the screen's own empty state asks.
-   *
-   * @param {string|null} [kind]
-   * @returns {boolean}
+   * Whether a kind was ever written; with no kind, whether any was. An unknown kind answers
+   * `false`, never a throw: `worldScopeProjection`'s shared `readCorpus` asks this store for the
+   * scope sub-keys and turns a throw into a silently blank screen.
    */
   isSeeded(kind = null) {
     this._ensureLoaded();
@@ -212,25 +99,12 @@ class WorldVocabularyStore extends SettingsBackedStore {
     return this.seeded[kind] === true;
   }
 
-  /**
-   * A deep copy of the PERSISTED shape — which omits a kind that has never been written — for a
-   * caller that intends to edit.
-   *
-   * @returns {Record<string, Array<{id: string, name: string}>>}
-   */
+  /** A deep copy of the persisted shape, which omits an unwritten kind. */
   get() {
     this._ensureLoaded();
     return cloneJson(this._persistedShape(this._corpus, this.seeded));
   }
 
-  /**
-   * The persisted projection of a normalized corpus: the seeded kinds only.
-   *
-   * @param {object} corpus
-   * @param {Record<string, boolean>} seeded
-   * @returns {object}
-   * @private
-   */
   _persistedShape(corpus, seeded) {
     const payload = {};
     for (const kind of WORLD_VOCABULARY_KINDS) {
@@ -247,18 +121,8 @@ class WorldVocabularyStore extends SettingsBackedStore {
   }
 
   /**
-   * Replace the whole vocabulary wholesale.
-   *
-   * NOT GATED ON VALIDITY, deliberately, exactly as `ScopedDefinitionStore#save` is not.
-   *
-   * SEEDEDNESS IS THE UNION of what was already seeded and what this payload CARRIES, which is
-   * what keeps an emptied vocabulary distinguishable from an unauthored one: deleting the last
-   * component category writes `componentCategories: []`, and the key's presence says the GM
-   * authored that emptiness. A kind absent from the payload and never written before stays
-   * absent on disk.
-   *
-   * @param {unknown} raw
-   * @returns {Promise<object>}
+   * Replace the whole vocabulary, ungated. Seededness is what was seeded plus what the payload
+   * carries, so an emptied kind persists as `[]` and a never-written one stays absent.
    */
   async save(raw) {
     this._ensureLoaded();

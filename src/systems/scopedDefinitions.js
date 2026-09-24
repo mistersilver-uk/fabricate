@@ -1,120 +1,32 @@
 /**
- * The generic three-layer resolution primitive behind Scoped Entity Definitions (issue 1358, part
- * of epic 1357), and the normalizers for the two records it resolves over.
- *
- * THE THREE-LAYER RESOLVER IS ON A LIVE PATH as of issue 1370: `resolveScopedDefinition` runs
- * once per merged row on every read union, and every non-UI reader of a system's components,
- * essence definitions or tools now enters through one. Two earlier claims here were retired on
- * the way: "nothing in the shipped runtime imports this module" was already false when written
- * (`scopedDefinitionStore.js` imports `findWorldDefault` and `membershipKey`), and "no live
- * resolution path reaches the resolver yet" is what 8a ended.
- *
- * READING IS NOT AUTHORITY. While `## CraftingSystem` requirement 36 holds, the in-system
- * record decides every key it carries, the row order and the row set, so what this resolver
- * contributes to a merged row is the keys that record does NOT carry — plus `member` and
- * `inherited`, which no stored record carries at all. `## Component`, `## EssenceDefinition`
- * and `## Tool` therefore still describe the live per-system shape, and
- * `## Scoped Entity Definitions` describes what this module implements.
- *
- * THE THREE LAYERS, in strict precedence:
- *   1. the World Component / World Essence / World Tool  - identity, one per entity, world scoped;
- *   2. the world defaults                                - the behaviour every system inherits;
- *   3. the system membership record                      - per `(entity, system)` behaviour, and
- *                                                          the fact of membership itself.
- *
- * RESOLUTION IS PER SECTION, NEVER PER FIELD. A section is the unit of the inherit decision AND
- * the unit of the answer: an overriding section's stored value is the whole answer for that
- * section, and no field inside it falls back to the world. That is deliberate rather than
- * incidental - turning a switch OFF SEEDS the local block from the current world value
- * (`setSectionInheritance` below), so an override is complete the moment it exists and a per-field
- * fallback would only ever paper over a record no authoring path can produce.
- *
- * SECTION VALUES ARE OPAQUE HERE. This module never looks inside one, never walks one, and never
- * clones one; the per-entity modules own whatever shape a section carries. That is what makes
- * normalization total on adversarial input: a self-referential section value cannot starve a
- * normalizer that does not descend into it. A per-entity module that DOES have something to say
- * about its own section's shape says it through `coerceSection` (`defineScope` below), which runs
- * inside normalization so both resolution branches carry the same guarantee.
- *
- * A NORMALIZED SECTION VALUE IS COPIED BY REFERENCE, never cloned, which follows directly from
- * that opacity: a normalized record ALIASES the caller's section values. That is deliberate, and
- * `## Scoped Entity Definitions` requirement 11 states it, so a store built on these records
- * treats the corpus it hands in as given away rather than as still its own to mutate.
- *
- * IT LIVES HERE, beside `modifierLibrary.js` and for the same reason: the eventual callers - the
- * world store, the migration, the export upcast and the GM screens - must agree byte for byte
- * about the normalized shape, and a second implementation of a normalizer is how a persisted shape
- * and its migration drift apart.
- *
- * THE DEPENDENCY RUNS ONE WAY. This module must not depend on the per-entity scope modules that
- * configure it; they depend on it. The boundary is pinned by an ESLint `no-restricted-imports`
- * entry scoped to this file and by a test that parses this file's real import specifiers.
+ * The three-layer resolution primitive behind Scoped Entity Definitions (issue 1358) and the
+ * normalizers for its two records: world entity (identity), world defaults (inherited behaviour),
+ * then the per-`(entity, system)` membership record. Resolution is per section, never per field,
+ * and section values are opaque here: never walked or cloned, so a normalized record aliases the
+ * caller's section values. It runs once per merged row of every read union (issue 1370), where
+ * the in-system record still wins every key it carries. The dependency runs one way: this module
+ * must not import the per-entity scope modules, pinned by an ESLint `no-restricted-imports` entry
+ * and `tests/scoped-definitions.test.js`. Contract: `data-models/spec.md` § Scoped Entity
+ * Definitions requirements 1 to 12.
  */
 
-/**
- * The separator between an entity id and a system id in a membership key.
- *
- * @type {string}
- */
+/** The separator between an entity id and a system id in a membership key. */
 export const MEMBERSHIP_KEY_SEPARATOR = '|';
 
-/**
- * The key a membership record is addressed by.
- *
- * @param {string} entityId
- * @param {string} systemId
- * @returns {string}
- */
+/** The key a membership record is addressed by. */
 export function membershipKey(entityId, systemId) {
   return `${entityId}${MEMBERSHIP_KEY_SEPARATOR}${systemId}`;
 }
 
-/**
- * Trim a candidate id, answering `null` for anything that is not a usable one.
- *
- * @param {unknown} value
- * @returns {string|null}
- */
 function trimmedId(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 /**
- * Describe one entity's scope: the sections it resolves over, whether it carries an `enabled` flag
- * at all, and the per-entity fields its two records carry beside the sections.
- *
- * `enableable` is a STRUCTURAL switch rather than a default. A component carries no enabled flag -
- * the maintainer ruling behind epic 1357 is that component enabling serves no purpose and is not
- * implemented - so the component scope declares `enableable: false` and the resolver OMITS the key
- * from its answer rather than answering `false`. A resolver that computed `enabled: false` for
- * every entity would satisfy every statement about the record and still hand a screen the exact
- * value it would read to draw the toggle that ruling removes.
- *
- * `coerceSection` is how a per-entity module states a rule about its OWN section's shape without
- * this module learning that shape. It runs inside normalization, on BOTH records, and answering
- * `undefined` means ABSENT. It exists because a rule applied only on the resolver's inheriting
- * branch is not a guarantee: the overriding branch hands back the stored value verbatim, so a
- * coercion that lived there would let `'  ingot  '` resolve untrimmed for an overriding system and
- * trimmed for an inheriting one. Normalizing is the chokepoint every writer passes through, so it
- * is the one place a shape rule holds for both branches at once.
- *
- * `worldEnableable` is the WORLD MASTER SWITCH, and it is a SECOND structural switch rather than a
- * widening of the first. `enableable` says the entity carries a per-`(entity, system)` `enabled`
- * flag; `worldEnableable` says its WORLD DEFAULTS carry one too, and that the resolver ANDs the
- * two. Only the tool declares it today: an entity type whose world screens have no master switch
- * must not acquire a persisted field its GM cannot see or clear, and a single flag covering both
- * would mint exactly that.
- *
- * @param {object} descriptor
- * @param {string[]} descriptor.sections Section names, in the order they are answered.
- * @param {boolean} [descriptor.enableable] Whether the entity carries an `enabled` flag.
- * @param {boolean} [descriptor.worldEnableable] Whether the WORLD DEFAULTS carry an `enabled`
- *   flag that vetoes the per-system one. Requires `enableable`.
- * @param {(section: string, value: unknown) => unknown} [descriptor.coerceSection] Per-entity
- *   section coercion; `undefined` means the section is absent.
- * @param {(entry: object) => object} [descriptor.worldExtras] Per-entity world-default fields.
- * @param {(entry: object) => object} [descriptor.membershipExtras] Per-entity membership fields.
- * @returns {Readonly<object>}
+ * Describe one entity's scope. `enableable` is structural: a non-enableable resolver omits
+ * `enabled` rather than answering `false`. `worldEnableable` adds a world master switch ANDed with
+ * the per-system flag (tools only). `coerceSection` states a per-entity section rule inside
+ * normalization, so both resolution branches honour it; `undefined` means absent.
  */
 export function defineScope({
   sections,
@@ -135,21 +47,8 @@ export function defineScope({
 }
 
 /**
- * Copy the authored sections of a raw record onto a normalized one.
- *
- * ABSENCE-PRESERVING, in both directions: an unauthored section stays ABSENT rather than becoming
- * `null` or a minted default, and an unknown section key is DROPPED rather than carried. That
- * matters most for the component category, whose absent world default must never normalize to the
- * reserved `general` bucket (`## CraftingSystem` requirement 6a) - treating it as authored would
- * silently reset every inheriting system's category on the first resolve.
- *
- * The scope's `coerceSection` may answer `undefined` for a value it will not accept, which is the
- * same ABSENCE an unauthored section carries - and it must be, because a coerced-away section has
- * to reach the resolver as "not an override" rather than as an override of nothing.
- *
- * @param {object} source
- * @param {object} target
- * @param {Readonly<object>} scope
+ * Copy authored sections, absence-preserving: an unauthored or coerced-away section stays absent
+ * (never `null` or a minted default such as `general`), and an unknown key is dropped.
  */
 function attachAuthoredSections(source, target, scope) {
   for (const section of scope.sections) {
@@ -159,31 +58,15 @@ function attachAuthoredSections(source, target, scope) {
   }
 }
 
-/**
- * Normalize one world-defaults record, or `null` when the entry cannot be one.
- *
- * @param {unknown} entry
- * @param {Readonly<object>} scope
- * @returns {object|null}
- */
 function normalizeWorldDefault(entry, scope) {
   if (!entry || typeof entry !== 'object') return null;
   const id = trimmedId(entry.id);
   if (!id) return null;
   const normalized = { id };
-  // THE WORLD MASTER SWITCH, AND IT IS ABSENCE-PRESERVING, unlike the membership record's
-  // `enabled` two functions below, which is minted true on every normalize.
-  //
-  // The asymmetry is the whole compatibility story. A membership record only exists because a
-  // GM added the entity to a system, so minting `true` on it states a fact that write already
-  // established. A world default exists on every entity the migration touched, and no GM has
-  // ever seen a world master switch: minting `true` there would rewrite every persisted world
-  // default in the corpus on the next `load()` to say something nobody authored.
-  //
-  // ABSENT therefore stays ABSENT, and `resolveScopedDefinition` reads `!== false`, so an
-  // existing world resolves exactly as it did before this switch existed. A world SETTING
-  // preserves key absence (unlike `setFlag`, whose merge resurrects a removed key), so the
-  // absence survives the round trip rather than only the first read.
+  // The world master switch is absence-preserving, unlike the membership `enabled` minted below:
+  // minting it here would rewrite every world default on load. The resolver reads `!== false`. A
+  // world setting, unlike `setFlag`, keeps that absence across a save
+  // (`.agents/docs/foundry-and-architecture.md`).
   if (scope.worldEnableable && typeof entry.enabled === 'boolean') {
     normalized.enabled = entry.enabled;
   }
@@ -192,17 +75,8 @@ function normalizeWorldDefault(entry, scope) {
 }
 
 /**
- * Normalize the world defaults for one entity type.
- *
- * TOTAL, NON-THROWING AND IDEMPOTENT, on the `normalizeModifierLibrary` contract
- * (`## ModifierLibrary` requirement 2): a non-array answers an empty list, a non-object or id-less
- * entry is DROPPED rather than repaired, ids are trimmed and de-duplicated first-wins, and an
- * unknown section key is dropped. Idempotence is required rather than incidental - the store, the
- * migration and the export upcast will each normalize possibly-already-normalized data.
- *
- * @param {unknown} raw
- * @param {Readonly<object>} scope
- * @returns {Array<object>}
+ * Normalize one entity type's world defaults: total, non-throwing and idempotent. A bad or id-less
+ * entry is dropped, and ids are trimmed and de-duplicated first-wins.
  */
 export function normalizeWorldDefaults(raw, scope) {
   const entries = Array.isArray(raw) ? raw : [];
@@ -217,17 +91,7 @@ export function normalizeWorldDefaults(raw, scope) {
   return normalized;
 }
 
-/**
- * Normalize a membership record's inherit map.
- *
- * An unknown key is dropped, and a non-boolean value is dropped rather than coerced. A map that
- * OMITS a section reads as INHERITING it, because that is the state a record created by "add to
- * system" is in - so a dropped key and an authored `true` mean the same thing.
- *
- * @param {unknown} raw
- * @param {readonly string[]} sections
- * @returns {{[section: string]: boolean}}
- */
+/** Keep only boolean switches for known sections; an omitted section reads as inheriting. */
 function normalizeInherit(raw, sections) {
   const source = raw && typeof raw === 'object' ? raw : {};
   const inherit = {};
@@ -237,17 +101,7 @@ function normalizeInherit(raw, sections) {
   return inherit;
 }
 
-/**
- * Normalize one membership record, or `null` when the entry cannot be one.
- *
- * A DORMANT OVERRIDE IS RETAINED. A section value is copied across whether or not its switch says
- * the section is inherited, because re-inheriting flips the switch only: the local block stays on
- * disk and re-overriding restores it rather than re-seeding from the world.
- *
- * @param {unknown} entry
- * @param {Readonly<object>} scope
- * @returns {object|null}
- */
+/** One membership record; a dormant override is kept whatever its switch says. */
 function normalizeMembership(entry, scope) {
   if (!entry || typeof entry !== 'object') return null;
   const entityId = trimmedId(entry.entityId);
@@ -258,23 +112,15 @@ function normalizeMembership(entry, scope) {
     systemId,
     inherit: normalizeInherit(entry.inherit, scope.sections),
   };
-  // Read as `!== false` so the flag DEFAULTS TO TRUE, matching `## EssenceDefinition`
-  // requirement 6: a record created by "add to system" is a member that is on.
+  // Defaults to true: a record created by "add to system" is a member that is on.
   if (scope.enableable) normalized.enabled = entry.enabled !== false;
   attachAuthoredSections(entry, normalized, scope);
   return Object.assign(normalized, scope.membershipExtras(entry));
 }
 
 /**
- * Normalize the system membership records for one entity type.
- *
- * De-duplication is on the `(entityId, systemId)` PAIR, first wins, because that pair is the
- * record's identity. An `enabled` key on a non-enableable entity is dropped here rather than
- * preserved: the component path has no such field, and adversarial input must not mint one.
- *
- * @param {unknown} raw
- * @param {Readonly<object>} scope
- * @returns {Array<object>}
+ * Normalize one entity type's membership records, de-duplicated first-wins on the
+ * `(entityId, systemId)` pair. A non-enableable entity never carries `enabled`.
  */
 export function normalizeMemberships(raw, scope) {
   const entries = Array.isArray(raw) ? raw : [];
@@ -291,27 +137,12 @@ export function normalizeMemberships(raw, scope) {
   return normalized;
 }
 
-/**
- * Find one entity's world defaults in a normalized list.
- *
- * @param {Array<object>} worldDefaults
- * @param {string} entityId
- * @returns {object|null}
- */
 export function findWorldDefault(worldDefaults, entityId) {
   const id = trimmedId(entityId);
   if (!id || !Array.isArray(worldDefaults)) return null;
   return worldDefaults.find((entry) => entry?.id === id) ?? null;
 }
 
-/**
- * Find one `(entity, system)` membership record in a normalized list.
- *
- * @param {Array<object>} memberships
- * @param {string} entityId
- * @param {string} systemId
- * @returns {object|null}
- */
 export function findMembership(memberships, entityId, systemId) {
   const entity = trimmedId(entityId);
   const system = trimmedId(systemId);
@@ -321,62 +152,18 @@ export function findMembership(memberships, entityId, systemId) {
   );
 }
 
-/**
- * Whether a membership record inherits a section.
- *
- * An ABSENT record inherits everything: a non-member has nothing of its own, and its sections are
- * still answered from the world defaults so the world-scope preview can render them.
- *
- * @param {object|null} membership
- * @param {string} section
- * @returns {boolean}
- */
+/** An absent record inherits every section, so a non-member still previews the world value. */
 export function isSectionInherited(membership, section) {
   if (!membership || typeof membership !== 'object') return true;
   return membership.inherit?.[section] !== false;
 }
 
 /**
- * Resolve one `(entity, system)` pair over the three layers.
- *
- * SECTIONS ARE POPULATED EVEN FOR A NON-MEMBER, falling to the world-defaults branch, and that is
- * intentional: the world-scope preview resolves with no system at all and needs exactly those
- * values. `member` is therefore the gate a caller must check - a populated section says nothing
- * about whether the entity exists in the system.
- *
- * `enabled` is answered ONLY for an enableable entity, and answers `false` for a non-member
- * because it is NOT A MEMBER rather than because it inherited an off.
- *
- * FOR A `worldEnableable` SCOPE IT IS ALSO THE AND OF TWO FLAGS, and this function is the ONE
- * place that AND happens. `enabled = worldEnabled && systemEnabled`: a world-disabled entity is
- * off in every system whatever each system says, and the per-system flag keeps its own meaning
- * and simply cannot re-enable a world-disabled record. WORLD OFF WINS.
- *
- * The two halves are also answered SEPARATELY, as `worldEnabled` and `systemEnabled`, because an
- * AUTHORING surface needs the layer it writes and a CONSUMER needs the truth. A screen that read
- * the AND to paint its per-system toggle would draw every system off the moment the world switch
- * went off, and its writes would then appear to do nothing.
- *
- * Nothing above this function re-derives the AND: doing it at a screen is how one scope's answer
- * and another's diverge.
- *
- * AN OVERRIDING SECTION THAT STORES NOTHING IS NOT AN OVERRIDE, and falls back to the world value.
- * That is still per-SECTION rather than per-FIELD: an ABSENT section is not a partial one, so
- * nothing inside a stored block ever falls back. The state is reachable and is not junk -
- * `setSectionInheritance` legitimately produces switch-off-with-no-value when the world default is
- * itself unauthored, and `normalizeMembership` emits it happily for import, copy-mode and the
- * `1.30.0` migration, none of which pass through the UI's seeding path. Without this the record
- * `{inherit: {breakage: false}}` resolves to NO breakage at all - a tool that stops breaking - and
- * `{inherit: {macro: false}}` silently stops running the world's property macro.
- *
- * `inherited[section]` still answers the switch AS AUTHORED (`false`), never a repair: a switch
- * that is off while the world value shows is exactly the seed state a UI renders, and flipping it
- * back to `true` here would misreport the GM's own toggle.
- *
- * @param {object|null} worldDefault
- * @param {object|null} membership
- * @param {Readonly<object>} scope
- * @returns {{member: boolean, inherited: {[section: string]: boolean}, enabled?: boolean}}
+ * Resolve one `(entity, system)` pair. Sections are filled even for a non-member, so `member` is
+ * the gate. For a `worldEnableable` scope this is the one place `enabled = worldEnabled &&
+ * systemEnabled` is computed (world off wins), with both halves also returned for the authoring
+ * screens. An overriding section that stores nothing falls back to the world value, while
+ * `inherited[section]` still reports the switch as authored.
  */
 export function resolveScopedDefinition(worldDefault, membership, scope) {
   const world = worldDefault && typeof worldDefault === 'object' ? worldDefault : {};
@@ -387,7 +174,7 @@ export function resolveScopedDefinition(worldDefault, membership, scope) {
     const inheritsSection = isSectionInherited(record, section);
     inherited[section] = inheritsSection;
     const local = record?.[section];
-    // An ABSENT local section is not an override, so falling back is not per-field inheritance.
+    // An absent local section is not an override, so falling back is not per-field inheritance.
     const value = inheritsSection || local === undefined ? world[section] : local;
     if (value !== undefined) resolved[section] = value;
   }
@@ -407,45 +194,15 @@ export function resolveScopedDefinition(worldDefault, membership, scope) {
   return resolved;
 }
 
-/**
- * Whether a world default leaves the entity ENABLED at world scope.
- *
- * ABSENT READS AS ENABLED, which is what makes the switch invisible to every world that has
- * never touched it: the flag is absence-preserving on disk (see `normalizeWorldDefault`), so a
- * corpus written before the switch existed, and every record a GM has never toggled, answers
- * `true` here.
- *
- * ONLY `false` DISABLES. A non-boolean is not an off — a hand-edited `enabled: "no"` is junk the
- * normalizer already dropped, and treating junk as a world-wide kill switch would be the worst
- * possible reading of it.
- *
- * @param {object|null|undefined} worldDefault
- * @returns {boolean}
- */
+/** Only `false` disables at world scope; absent or junk reads as enabled. */
 export function isWorldEnabled(worldDefault) {
   return worldDefault?.enabled !== false;
 }
 
 /**
- * Re-apply the WORLD master switch over a set of already-merged rows.
- *
- * ── WHY THIS EXISTS AT ALL, GIVEN THE RESOLVER ABOVE ALREADY ANDS ───────────────────────────
- * `unionScopedDefinitions` spreads the IN-SYSTEM record LAST, so while `## CraftingSystem`
- * requirement 36 holds, the in-system record decides every key it carries — and a normalized
- * in-system tool carries `enabled` unconditionally. The resolver's AND is therefore overwritten
- * on the read-union path, exactly as `enabled` already was before this switch existed.
- *
- * That precedence is right for a value the system AUTHORED, and wrong for a world-scope VETO:
- * "world off wins" means the world's off cannot be outvoted by anything. So the veto is
- * re-applied here, on the merged rows, and it is a VETO ONLY — it never turns a row ON, so a
- * corpus with no world-disabled record cannot change a single answer.
- *
- * The rows array is returned BY IDENTITY when nothing is disabled, which is the same
- * memo-and-identity concern `scopedEntityReads.js` documents for its unknown-half passthrough.
- *
- * @param {Array<object>} rows Merged rows, each keyed by the world entity id.
- * @param {unknown} worldDefaults The corpus's normalized world-defaults list.
- * @returns {Array<object>}
+ * Re-apply the world master switch over merged rows, since the read union's in-system re-spread
+ * overwrites the resolver's AND. A veto only, never turning a row on; the rows array is returned by
+ * identity when nothing is disabled.
  */
 export function applyWorldEnabledVeto(rows, worldDefaults) {
   const disabled = new Set();
@@ -460,19 +217,9 @@ export function applyWorldEnabledVeto(rows, worldDefaults) {
 }
 
 /**
- * Flip one section's inherit switch on a membership record, answering a NEW record.
- *
- * Turning a switch OFF (`inherit: false`) SEEDS the local block from the current world value, so
- * no field is blank on first override - unless the record already carries a retained value, which
- * is RESTORED rather than re-seeded. Turning it back ON flips the switch ONLY: the local block
- * stays on disk, dormant and ignored by resolution. Nothing is lost, so no confirmation is
- * required and the inherit row's copy stays "fall back".
- *
- * @param {object} membership The normalized record to change.
- * @param {string} section
- * @param {boolean} inherit
- * @param {object|null} [worldDefault] The world defaults the seed is taken from.
- * @returns {object}
+ * Flip one section's switch, answering a new record. Off seeds the local block from the world
+ * value unless a retained value exists, which is restored; on flips the switch only and keeps
+ * the block dormant.
  */
 export function setSectionInheritance(membership, section, inherit, worldDefault = null) {
   const record = membership && typeof membership === 'object' ? membership : {};
@@ -485,17 +232,7 @@ export function setSectionInheritance(membership, section, inherit, worldDefault
   return next;
 }
 
-/**
- * The systems that inherit one section of one entity's world defaults.
- *
- * A system with NO membership record is NOT counted: the entity does not exist there, so editing
- * the world default changes nothing for it.
- *
- * @param {Array<object>} memberships
- * @param {string} entityId
- * @param {string} section
- * @returns {string[]}
- */
+/** The member systems inheriting one section; a system with no membership record is not one. */
 export function inheritingSystemIds(memberships, entityId, section) {
   const id = trimmedId(entityId);
   if (!id || !Array.isArray(memberships)) return [];
@@ -504,17 +241,7 @@ export function inheritingSystemIds(memberships, entityId, section) {
     .map((entry) => entry.systemId);
 }
 
-/**
- * How many systems a world-defaults edit will change.
- *
- * Every world-defaults editor states this before the change lands, because editing one value
- * changes behaviour in every inheriting system at once.
- *
- * @param {Array<object>} memberships
- * @param {string} entityId
- * @param {string} section
- * @returns {number}
- */
+/** How many systems a world-defaults edit changes, which every such editor states first. */
 export function countInheritingSystems(memberships, entityId, section) {
   return inheritingSystemIds(memberships, entityId, section).length;
 }
