@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { handleFabricateSettingChange } from '../src/config/settingChangeBridge.js';
 import { SETTING_KEYS } from '../src/config/settings.js';
+import { domainsForSystemFields } from '../src/systems/invalidationDomains.js';
 import { handlerOf } from './helpers/bootContractProbes.js';
 import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
 
@@ -393,6 +394,9 @@ const RELOADED_BY_KEY = Object.freeze({
   'fabricate.worldVocabulary': ['worldVocabularyStore.load'],
 });
 
+/** What every recorder's `getSystems` answers, so a hook payload can be traced to it. */
+const LIVE_SYSTEMS = Object.freeze([{ id: 'probe-system' }]);
+
 /** Swap every object-valued facade field for a recorder AFTER the boot, logging each read. */
 function recordFacadeFields(facade) {
   const read = new Set();
@@ -402,7 +406,7 @@ function recordFacadeFields(facade) {
     const own = Object.getOwnPropertyDescriptor(facade, name);
     if (typeof own.value !== 'object' || own.value === null) continue;
     const recorder = {
-      getSystems: () => [],
+      getSystems: () => LIVE_SYSTEMS,
       load: () => reached.push(`${name}.load`),
       reload: () => reached.push(`${name}.reload`) && false,
     };
@@ -424,7 +428,7 @@ describe('the boot-registered settings listener', () => {
       const hooks = globalThis.Hooks;
       const { callAll } = hooks;
       const emitted = [];
-      hooks.callAll = (hook) => emitted.push(hook);
+      hooks.callAll = (hook, payload) => emitted.push([hook, payload]);
       const fields = recordFacadeFields(facade);
       const change = (key) => {
         fields.reached.length = 0;
@@ -452,11 +456,27 @@ describe('the boot-registered settings listener', () => {
         );
 
         assert.deepEqual(change('fabricate.currencyConfig').emitted, [
-          'fabricate.craftingSystemsChanged',
+          ['fabricate.craftingSystemsChanged', LIVE_SYSTEMS],
         ]);
         assert.deepEqual(
+          change('fabricate.componentScope').emitted,
+          [
+            ['fabricate.craftingSystemsChanged', LIVE_SYSTEMS],
+            [
+              'fabricate.craftingDataChanged',
+              {
+                source: 'systems',
+                scopes: [
+                  { systemId: 'probe-system', domains: domainsForSystemFields(['components']) },
+                ],
+              },
+            ],
+          ],
+          'each hook carries its payload through the live Hooks.callAll'
+        );
+        assert.deepEqual(
           change(`fabricate.${SETTING_KEYS.ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES}`).emitted,
-          ['fabricate.playerCharacterTypesChanged'],
+          [['fabricate.playerCharacterTypesChanged', undefined]],
           'the create leg carries the player-character types too, on the live Hooks.callAll'
         );
       } finally {

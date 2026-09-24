@@ -1977,24 +1977,24 @@
   ],
   "importerSeams": {
     "reached": [
-      "gatheringEnvironmentStore.list",
-      "gatheringEnvironmentStore.load",
-      "gatheringEnvironmentStore.save",
-      "gatheringRealmStore.get",
-      "gatheringRealmStore.save",
-      "componentScopeStore.isSeeded",
-      "componentScopeStore.get",
-      "componentScopeStore.save",
-      "essenceScopeStore.isSeeded",
-      "essenceScopeStore.get",
-      "essenceScopeStore.save",
-      "toolScopeStore.isSeeded",
-      "toolScopeStore.get",
-      "toolScopeStore.save"
+      "gatheringEnvironmentStore.list []",
+      "gatheringEnvironmentStore.load []",
+      "gatheringEnvironmentStore.save [[{\"id\":\"probe-environment\"}]]",
+      "gatheringRealmStore.get []",
+      "gatheringRealmStore.save [{\"probe\":\"travel\"}]",
+      "componentScopeStore.isSeeded [\"entities\"]",
+      "componentScopeStore.get []",
+      "componentScopeStore.save [{\"probe\":\"components\"}]",
+      "essenceScopeStore.isSeeded [\"entities\"]",
+      "essenceScopeStore.get []",
+      "essenceScopeStore.save [{\"probe\":\"essences\"}]",
+      "toolScopeStore.isSeeded [\"entities\"]",
+      "toolScopeStore.get []",
+      "toolScopeStore.save [{\"probe\":\"tools\"}]"
     ],
     "settings": [
       "get fabricate.gatheringConfig",
-      "set fabricate.gatheringConfig"
+      "set fabricate.gatheringConfig {\"probe\":\"gatheringConfig\"}"
     ],
     "admits": {
       "activeGm": true,

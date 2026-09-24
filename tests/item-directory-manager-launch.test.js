@@ -121,7 +121,7 @@ test(
         setupDOM();
         try {
           const directory = itemsDirectory();
-          handlerOf('renderItemDirectory')(directory);
+          handlerOf('renderItemDirectory')(directory, directory.element, {}, { force: true });
           directory.element.querySelector('button[data-fabricate-action="manage"]').click();
           await new Promise((settle) => setTimeout(settle, 20));
         } finally {

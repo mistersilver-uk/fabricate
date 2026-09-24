@@ -11,7 +11,7 @@ import {
 } from '../src/systems/worldScopeEntityNotice.js';
 import { reportWorldIdentityDrift } from '../src/systems/worldIdentityDrift.js';
 import { MIGRATION_NOTICE_DETAIL_CONSOLE_MESSAGE } from '../src/migration/migrationNoticeDetail.js';
-import { ASSISTANT_GM, asLabUser } from './helpers/bootContractProbes.js';
+import { ASSISTANT_GM, asLabUser, recordNoticeOutput } from './helpers/bootContractProbes.js';
 import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
 import { defineStructureContract } from './helpers/structureContract.js';
 
@@ -649,22 +649,10 @@ describe('the world identity drift report', () => {
         },
       });
       const boot = async (user) => {
-        const seen = { logged: [], toasted: [] };
-        const { info, debug } = console;
-        const { notifications } = globalThis.ui;
-        console.info = (...args) => seen.logged.push(['info', ...args]);
-        console.debug = (...args) => seen.logged.push(['debug', ...args]);
-        const toast = (message) => seen.toasted.push(String(message));
-        globalThis.ui.notifications = { ...notifications, info: toast, warn: toast, error: toast };
-        try {
-          await asLabUser(user, ready);
-        } finally {
-          Object.assign(console, { info, debug });
-          globalThis.ui.notifications = notifications;
-        }
+        const { logged, posted } = await recordNoticeOutput(() => asLabUser(user, ready));
         return {
-          drift: seen.logged.filter(([, , detail]) => String(detail).startsWith('world identity drift')),
-          toasted: seen.toasted.filter((message) => message.includes(component.id)),
+          drift: logged.filter(([, , detail]) => String(detail).startsWith('world identity drift')),
+          toasted: posted.filter(([, message]) => String(message).includes(component.id)),
         };
       };
 

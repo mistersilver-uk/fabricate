@@ -125,6 +125,38 @@ export async function asLabUser(user, work) {
   }
 }
 
+const RECORDED_CONSOLE = Object.freeze(['info', 'debug', 'log', 'warn', 'error']);
+const RECORDED_NOTIFICATIONS = Object.freeze(['info', 'warn', 'error']);
+
+/**
+ * Run `work` with every console level and notification channel recorded rather than printed.
+ *
+ * @returns {Promise<{posted: Array, logged: Array, result: unknown}>} `[level, message, options]`
+ * per notification and `[level, ...args]` per console line.
+ */
+export async function recordNoticeOutput(work) {
+  const posted = [];
+  const logged = [];
+  const originalConsole = Object.fromEntries(
+    RECORDED_CONSOLE.map((level) => [level, console[level]])
+  );
+  const { notifications } = globalThis.ui;
+  for (const level of RECORDED_CONSOLE) {
+    console[level] = (...args) => logged.push([level, ...args]);
+  }
+  const post = (level) => (message, options) => posted.push([level, message, options]);
+  globalThis.ui.notifications = {
+    ...notifications,
+    ...Object.fromEntries(RECORDED_NOTIFICATIONS.map((level) => [level, post(level)])),
+  };
+  try {
+    return { posted, logged, result: await work() };
+  } finally {
+    Object.assign(console, originalConsole);
+    globalThis.ui.notifications = notifications;
+  }
+}
+
 /** Ask each wired single-writer gate as the active GM, an assistant GM and a player. */
 export function probeGmGates(facade, runtime) {
   const game = globalThis.game;
@@ -503,10 +535,11 @@ const IMPORTER_SEAM_FIELDS = Object.freeze([
 ]);
 
 /**
- * What the shared importer's seams reach once each facade field has been replaced, which only a
- * LAZY seam follows; what its setting pair reads and writes; and which users its GM gate admits.
+ * What the shared importer's seams reach, with the arguments they forward, once each facade field
+ * has been replaced, which only a LAZY seam follows; what its setting pair reads and writes; and
+ * which users its GM gate admits.
  */
-export function probeImporterSeams(facade) {
+export async function probeImporterSeams(facade) {
   const game = globalThis.game;
   const importer = facade.compendiumImporter;
   const reached = [];
@@ -514,48 +547,42 @@ export function probeImporterSeams(facade) {
     Object.fromEntries(
       ['list', 'load', 'save', 'get', 'isSeeded'].map((method) => [
         method,
-        () => reached.push(`${field}.${method}`) > 0,
+        (...args) => reached.push(`${field}.${method} ${JSON.stringify(args)}`) > 0,
       ])
     );
   const settings = [];
   const restores = [
     ...IMPORTER_SEAM_FIELDS.map((field) => spyOn(facade, field, recorder(field))),
     spyOn(game.settings, 'get', (namespace, key) => settings.push(`get ${namespace}.${key}`)),
-    spyOn(game.settings, 'set', (namespace, key) => settings.push(`set ${namespace}.${key}`)),
+    spyOn(game.settings, 'set', (namespace, key, value) =>
+      settings.push(`set ${namespace}.${key} ${JSON.stringify(value)}`)
+    ),
   ];
   try {
     const environments = importer._environmentStore;
     environments.list();
     environments.load();
-    environments.save([]);
+    environments.save([{ id: 'probe-environment' }]);
     importer._travelStore.get();
-    importer._travelStore.save({});
-    for (const seam of Object.values(importer._scopeStoreSeams)) {
+    importer._travelStore.save({ probe: 'travel' });
+    for (const [kind, seam] of Object.entries(importer._scopeStoreSeams)) {
       seam.isSeeded('entities');
       seam.get();
-      seam.save({});
+      seam.save({ probe: kind });
     }
     importer._getSetting('gatheringConfig');
-    importer._setSetting('gatheringConfig', {});
+    importer._setSetting('gatheringConfig', { probe: 'gatheringConfig' });
   } finally {
     for (const restore of restores) restore();
   }
-  const admits = (user) => {
-    const previous = game.user;
-    game.user = user;
-    try {
-      return importer._isGM();
-    } finally {
-      game.user = previous;
-    }
-  };
+  const admits = (user) => asLabUser(user, () => importer._isGM());
   return {
     reached,
     settings,
     admits: {
-      activeGm: admits(game.user),
-      assistantGm: admits(ASSISTANT_GM),
-      player: admits(game.users.get('user-lab-player')),
+      activeGm: await admits(game.user),
+      assistantGm: await admits(ASSISTANT_GM),
+      player: await admits(game.users.get('user-lab-player')),
     },
   };
 }

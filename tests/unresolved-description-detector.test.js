@@ -6,13 +6,8 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 globalThis.foundry = { utils: { getProperty: () => undefined } };
 
@@ -213,15 +208,21 @@ test('the composed manager enriches through Foundry, and ready tells the GM once
     const enriched = [];
     const fetched = [];
     const pack = { get: () => null, getDocuments: async (query) => fetched.push(query) };
+    const source = { uuid: 'Item.source' };
     editor.enrichHTML = async (text, options) => {
-      enriched.push([text, options.secrets, options.rolls]);
+      enriched.push([text, options.secrets, options.rolls, options.relativeTo === source]);
       return '<p>enriched</p>';
     };
     foundry.utils.parseUuid = () => ({ collection: pack, primaryId: 'probe-id' });
     try {
       const manager = facade.craftingSystemManager;
-      assert.equal(await manager._enrichToHtml('@UUID[Item.x]', {}), '<p>enriched</p>');
-      assert.deepEqual(enriched, [['@UUID[Item.x]', false, false]], 'as GM, stored for players');
+      const html = await manager._enrichToHtml('@UUID[Item.x]', { relativeTo: source });
+      assert.equal(html, '<p>enriched</p>');
+      assert.deepEqual(
+        enriched,
+        [['@UUID[Item.x]', false, false, true]],
+        'as GM, stored for players, relative links resolved against the source document'
+      );
       await manager._primeEnricherCache(['@UUID[Compendium.probe.items.Item.probe-id]']);
       assert.deepEqual(fetched, [{ _id__in: ['probe-id'] }], 'one fetch primes the pack');
     } finally {
@@ -231,11 +232,11 @@ test('the composed manager enriches through Foundry, and ready tells the GM once
 
     const count = countUnresolvedDirectiveDescriptions(facade.craftingSystemManager.getSystems());
     assert.ok(count > 0, 'the premise: the lab world holds a label-less content link');
-    const lang = JSON.parse(readFileSync(resolve(__dirname, '../lang/en.json'), 'utf8'));
-    const expected = lang.FABRICATE.Settings.RepairItemData.UnresolvedDetected.replace(
-      '{count}',
-      String(count)
+    const expected = globalThis.game.i18n.format(
+      'FABRICATE.Settings.RepairItemData.UnresolvedDetected',
+      { count }
     );
+    assert.notEqual(expected, 'FABRICATE.Settings.RepairItemData.UnresolvedDetected');
     const infos = [];
     const { info } = globalThis.ui.notifications;
     globalThis.ui.notifications.info = (message) => infos.push(message);

@@ -6,15 +6,23 @@
 import { runMigrations } from '../../src/bootstrap/migrations.js';
 import { MigrationRunner } from '../../src/migration/MigrationRunner.js';
 import { MIGRATION_NOTICE_DETAIL_CONSOLE_MESSAGE } from '../../src/migration/migrationNoticeDetail.js';
+import { recordNoticeOutput } from './bootContractProbes.js';
 
 /** The role-4 GAMEMASTER the pass runs on: `game.users.activeGM`. */
 export const ACTIVE_GM = Object.freeze({ id: 'gm', isGM: true, role: 4, active: true });
 
-/** A connected role-3 assistant, who holds `isGM` but is not the active GM. */
-export const ASSISTANT = Object.freeze({ id: 'assistant', isGM: true, role: 3, active: true });
-
 /** A connected role-1 player. */
 export const PLAYER = Object.freeze({ id: 'player', isGM: false, role: 1, active: true });
+
+/** An actor whose bare run-container read throws: one `skippedErrors` in either remap pass. */
+export const brokenActor = () => ({
+  id: 'probe-broken',
+  items: [],
+  getFlag: (scope, key) => {
+    if (key === 'gatheringRuns') throw new Error('probe: the document refused the read');
+    return null;
+  },
+});
 
 /** The console line `logMigrationNoticeDetail` writes, the one the release build keeps. */
 export const detailLine = (label, detail) => [
@@ -23,32 +31,21 @@ export const detailLine = (label, detail) => [
   `${label}\n${detail}`,
 ];
 
-const RECORDED_CONSOLE = Object.freeze(['info', 'debug', 'log', 'error']);
-
-/**
- * @returns {Promise<{posted: Array, logged: Array}>} `[level, message, options]` per notification
- * and `[level, ...args]` per console line, `game.i18n` answering nothing so every string is the
- * composed English fallback.
- */
+/** `game.i18n` answers nothing, so every string recorded is the composed English fallback. */
 export async function dispatchMigrationSummary(summary, user = ACTIVE_GM) {
-  const posted = [];
-  const logged = [];
   const { run } = MigrationRunner.prototype;
-  const original = Object.fromEntries(RECORDED_CONSOLE.map((level) => [level, console[level]]));
+  const { game, ui } = globalThis;
   MigrationRunner.prototype.run = async () => summary;
-  for (const level of RECORDED_CONSOLE) {
-    console[level] = (...args) => logged.push([level, ...args]);
-  }
   globalThis.game = { user, users: { activeGM: ACTIVE_GM }, i18n: {} };
-  const post = (level) => (message, options) => posted.push([level, message, options]);
-  globalThis.ui = {
-    notifications: { info: post('info'), warn: post('warn'), error: post('error') },
-  };
+  globalThis.ui = { notifications: {} };
   try {
-    await runMigrations({ _promptMigrationRecovery: () => {} });
+    const { posted, logged } = await recordNoticeOutput(() =>
+      runMigrations({ _promptMigrationRecovery: () => {} })
+    );
+    return { posted, logged };
   } finally {
     MigrationRunner.prototype.run = run;
-    Object.assign(console, original);
+    globalThis.game = game;
+    globalThis.ui = ui;
   }
-  return { posted, logged };
 }

@@ -11,10 +11,10 @@ import {
   MigrationRunner,
 } from '../src/migration/MigrationRunner.js';
 import { buildWorldEssenceMergeRemapNotice } from '../src/systems/remapWorldScopeIdentityFlags.js';
-import { asLabUser } from './helpers/bootContractProbes.js';
+import { ASSISTANT_GM, asLabUser, recordNoticeOutput } from './helpers/bootContractProbes.js';
 import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
 import {
-  ASSISTANT,
+  brokenActor,
   detailLine,
   dispatchMigrationSummary,
   PLAYER,
@@ -653,7 +653,7 @@ test('the 1.34.0 merge notice is ALWAYS a permanent warning, off a key the runne
 test('the migration notices reach the active GM alone', async () => {
   const summary = { worldScopeEntityReport: fullReport(), worldEssenceMergeReport: mergeReport() };
   assert.equal((await dispatchMigrationSummary(summary)).posted.length, 2, 'the premise');
-  for (const user of [ASSISTANT, PLAYER]) {
+  for (const user of [ASSISTANT_GM, PLAYER]) {
     const { posted, logged } = await dispatchMigrationSummary(summary, user);
     assert.deepEqual([posted, logged], [[], []], `${user.id} is told nothing`);
   }
@@ -668,16 +668,8 @@ test('both remap repairs post their notice to a GM, permanent, with the detail l
     const labLocalize = (key, data) => (data ? game.i18n.format(key, data) : game.i18n.localize(key));
     const player = game.users.get('user-lab-player');
     // A bare run-container read that throws is one document the identity remap cannot update.
-    const broken = {
-      id: 'probe-broken',
-      items: [],
-      getFlag: (scope, key) => {
-        if (key === 'gatheringRuns') throw new Error('probe: the document refused the read');
-        return null;
-      },
-    };
     const actors = game.actors;
-    game.actors = [broken];
+    game.actors = [brokenActor()];
     const repairs = [
       [
         'applyWorldScopeIdentityFlagRemap',
@@ -692,29 +684,22 @@ test('both remap repairs post their notice to a GM, permanent, with the detail l
         buildWorldEssenceMergeRemapNotice,
       ],
     ];
-    const { info, debug } = console;
-    const { warn } = globalThis.ui.notifications;
     try {
       for (const [repair, map, label, compose] of repairs) {
-        const run = async (user) => {
-          const seen = { posted: [], logged: [] };
-          globalThis.ui.notifications.warn = (message, options) => seen.posted.push([message, options]);
-          console.info = (...args) => seen.logged.push(['info', ...args]);
-          console.debug = () => {};
-          seen.summary = await asLabUser(user, () => migrations[repair](map));
-          return seen;
-        };
+        const run = (user) =>
+          recordNoticeOutput(() => asLabUser(user, () => migrations[repair](map)));
         const posted = await run(game.user);
-        const notice = compose(posted.summary, labLocalize);
+        const notice = compose(posted.result, labLocalize);
         assert.ok(notice.message, `the premise: ${repair} reports something the GM must act on`);
-        assert.deepEqual(posted.posted, [[notice.message, { permanent: true }]]);
-        assert.deepEqual(posted.logged, [detailLine(label, notice.detail)]);
+        assert.deepEqual(posted.posted, [['warn', notice.message, { permanent: true }]]);
+        assert.deepEqual(
+          posted.logged.filter(([level]) => level === 'info'),
+          [detailLine(label, notice.detail)]
+        );
         assert.deepEqual((await run(player)).posted, [], `${repair} tells a player nothing`);
       }
     } finally {
       game.actors = actors;
-      globalThis.ui.notifications.warn = warn;
-      Object.assign(console, { info, debug });
     }
   });
 });

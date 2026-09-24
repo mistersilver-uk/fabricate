@@ -11,9 +11,9 @@ import { fileURLToPath } from 'node:url';
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
 import { RETIRED_PLACEMENT_CORPUS } from './helpers/retiredPlaceholderOracle.js';
 import { migrateExportPayload } from '../src/migration/migrateExportPayload.js';
+import { ASSISTANT_GM } from './helpers/bootContractProbes.js';
 import {
   ACTIVE_GM,
-  ASSISTANT,
   detailLine,
   dispatchMigrationSummary,
   PLAYER,
@@ -575,7 +575,7 @@ test('the startup pass says nothing for a clean world, a transient field, or a n
   for (const [summary, user, why] of [
     [{ retiredCraftingModCounts: [] }, ACTIVE_GM, 'an empty report is a clean world'],
     [{ _retiredCraftingModCounts: counts }, ACTIVE_GM, 'the runner deletes the transient field'],
-    [{ retiredCraftingModCounts: counts }, ASSISTANT, 'an assistant GM is not the active GM'],
+    [{ retiredCraftingModCounts: counts }, ASSISTANT_GM, 'an assistant GM is not the active GM'],
     [{ retiredCraftingModCounts: counts }, PLAYER, 'a player is never told'],
   ]) {
     assert.deepEqual((await dispatchMigrationSummary(summary, user)).posted, [], why);

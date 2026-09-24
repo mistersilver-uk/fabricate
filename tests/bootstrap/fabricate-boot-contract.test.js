@@ -497,7 +497,7 @@ async function measureBootContract({ init, ready, loadModule }) {
       facade,
       runtime
     ),
-    importerSeams: probeImporterSeams(facade),
+    importerSeams: await probeImporterSeams(facade),
   };
 }
 
@@ -658,9 +658,20 @@ test('the boot contract golden is not vacuous', () => {
     'each store loads before the drift audit reads it, and nothing is written before both managers'
   );
   assert.equal(golden.importerSeams.reached.length, 14, 'every importer seam follows its field');
+  assert.deepEqual(
+    golden.importerSeams.reached.filter((call) => call.includes('.save ')),
+    [
+      'gatheringEnvironmentStore.save [[{"id":"probe-environment"}]]',
+      'gatheringRealmStore.save [{"probe":"travel"}]',
+      'componentScopeStore.save [{"probe":"components"}]',
+      'essenceScopeStore.save [{"probe":"essences"}]',
+      'toolScopeStore.save [{"probe":"tools"}]',
+    ],
+    'every save forwards the value it was handed'
+  );
   assert.deepEqual(golden.importerSeams.settings, [
     'get fabricate.gatheringConfig',
-    'set fabricate.gatheringConfig',
+    'set fabricate.gatheringConfig {"probe":"gatheringConfig"}',
   ]);
   assert.deepEqual(
     golden.importerSeams.admits,

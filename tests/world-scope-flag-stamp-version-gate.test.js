@@ -25,20 +25,11 @@ import {
 } from '../src/systems/remapWorldScopeIdentityFlags.js';
 import { ASSISTANT_GM, asLabUser } from './helpers/bootContractProbes.js';
 import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
+import { ACTIVE_GM, brokenActor, PLAYER } from './helpers/migrationPassDriver.js';
 
 const LAB_BOOT = { timeout: 300000 };
 const write = (key, value) => globalThis.game.settings.set('fabricate', key, value);
 const read = (key) => globalThis.game.settings.get('fabricate', key);
-
-/** An actor whose bare run-container read throws: one `skippedErrors` in either remap pass. */
-const brokenActor = () => ({
-  id: 'probe-broken',
-  items: [],
-  getFlag: (scope, key) => {
-    if (key === 'gatheringRuns') throw new Error('probe: the document refused the read');
-    return null;
-  },
-});
 
 /** Replace what the remap passes walk, keeping the lab collection's other members; `walked` counts. */
 function walkOnly(actors) {
@@ -152,12 +143,19 @@ test(
     await withFabricateLifecycleReplay(async ({ loadModule }) => {
       const { runWorldScopeIdentityFlagRemap } = await loadModule('/src/main.js');
       const player = globalThis.game.users.get('user-lab-player');
+      // Factories: the lab keeps the object a caller writes, so a shared literal would compare a
+      // map an in-place edit had changed against itself.
+      const pending = () => ({ 'sys-a': { components: { old: 'new' } } });
+      const essencePending = () => ({
+        [WORLD_ESSENCE_MERGE_SYSTEMS_LEG]: { 'sys-a': { essences: { loser: 'survivor' } } },
+      });
       const arrange = async (rekeyMap) => {
         await write(SETTING_KEYS.MIGRATION_VERSION, '1.30.0');
         await write(SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION, 0);
         await write(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, rekeyMap);
+        await write(SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION, 0);
+        await write(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, essencePending());
       };
-      const pending = { 'sys-a': { components: { old: 'new' } } };
 
       // Nothing to re-key: no walk, and the advance still lands so the pass stops re-checking.
       await arrange({});
@@ -168,12 +166,12 @@ test(
       assert.equal(read(SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION), 1);
 
       // A partial pass keeps its decision record and its version.
-      await arrange(pending);
+      await arrange(pending());
       const partial = walkOnly([brokenActor()]);
       const warnings = await recordingWarnings(() => runWorldScopeIdentityFlagRemap());
       partial.restore();
       assert.equal(partial.walked.count, 1, 'the pending map is walked');
-      assert.deepEqual(read(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP), pending, 'the map is retained');
+      assert.deepEqual(read(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP), pending(), 'the map is retained');
       assert.equal(read(SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION), 0, 'and the version too');
       assert.ok(warnings.some((line) => line.includes('RETAINED: 1 document(s)')));
 
@@ -189,6 +187,14 @@ test(
         1,
         'the active GM admitted'
       );
+      assert.deepEqual(
+        [
+          read(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP),
+          read(SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION),
+        ],
+        [essencePending(), 0],
+        'the 1.30.0 advance never touches the 1.34.0 decision record or its version'
+      );
     });
   }
 );
@@ -199,10 +205,10 @@ test('the 1.34.0 essence one-shot, through the ready sequence', LAB_BOOT, async 
     // The migration pass would advance `migrationVersion` before the one-shot reads it.
     facade._runMigrations = async () => {};
     const player = globalThis.game.users.get('user-lab-player');
-    const retired = { loser: { name: 'Loser' } };
+    const retired = () => ({ loser: { name: 'Loser' } });
     const pending = () => ({
       [WORLD_ESSENCE_MERGE_SYSTEMS_LEG]: { 'sys-a': { essences: { loser: 'survivor' } } },
-      [WORLD_ESSENCE_MERGE_RETIRED_LEG]: retired,
+      [WORLD_ESSENCE_MERGE_RETIRED_LEG]: retired(),
     });
     const boot = async ({
       migrationVersion = '1.34.0',
@@ -245,7 +251,7 @@ test('the 1.34.0 essence one-shot, through the ready sequence', LAB_BOOT, async 
     );
     assert.deepEqual(
       cleared.mergeMap[WORLD_ESSENCE_MERGE_RETIRED_LEG],
-      retired,
+      retired(),
       'the tombstone stays'
     );
     assert.equal(cleared.version, WORLD_ESSENCE_MERGE_FLAG_TARGET);
@@ -267,8 +273,6 @@ test('the 1.34.0 essence one-shot, through the ready sequence', LAB_BOOT, async 
 });
 
 describe('the public recovery actions run on the active GM alone', () => {
-  const GM = { id: 'gm', isGM: true, role: 4, active: true };
-  const PLAYER = { id: 'player', isGM: false, role: 1, active: true };
   const ACTIONS = [
     ['remapWorldScopeIdentityFlags', 'applyWorldScopeIdentityFlagRemap', 'WORLD_SCOPE_REKEY_MAP'],
     [
@@ -291,7 +295,7 @@ describe('the public recovery actions run on the active GM alone', () => {
     const values = new Map([[SETTING_KEYS[mapKey], map]]);
     globalThis.game = {
       user,
-      users: { activeGM: GM },
+      users: { activeGM: ACTIVE_GM },
       settings: { get: (_, key) => values.get(key) },
     };
     return repairs;
@@ -313,13 +317,13 @@ describe('the public recovery actions run on the active GM alone', () => {
     });
 
     it(`${method} repairs a PENDING map on the active GM and is inert on a cleared one`, async () => {
-      const repairs = arrange(GM, mapKey, PENDING[mapKey]);
+      const repairs = arrange(ACTIVE_GM, mapKey, PENDING[mapKey]);
       assert.equal(await new Fabricate()[method](), 'repaired');
       assert.deepEqual(
         repairs.map(([, value]) => value),
         [PENDING[mapKey]]
       );
-      const idle = arrange(GM, mapKey, {});
+      const idle = arrange(ACTIVE_GM, mapKey, {});
       assert.equal(await new Fabricate()[method](), null, 'a consumed map has nothing to recover');
       assert.deepEqual(idle, []);
     });

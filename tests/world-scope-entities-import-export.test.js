@@ -1273,20 +1273,26 @@ async function captureImport(run) {
   return captured;
 }
 
-/** The destination the two call sites read, and a file carrying one component linked into it. */
+/** A seeded scope holding one world entity. */
+const heldScope = (entity) => ({ entities: [entity], defaults: {}, membership: {} });
+
+/**
+ * The destination the two call sites read, and a file carrying one component linked into it plus an
+ * essence and a tool that collide with its world entities by id, each on distinct refs.
+ */
 async function linkedImport() {
   const world = await destinationWorld({
-    componentScope: {
-      entities: [{ id: 'dest-1', name: 'Held', registeredItemUuid: 'Item.held' }],
-      defaults: {},
-      membership: {},
-    },
-    essenceScope: emptySeededScope(),
-    toolScope: emptySeededScope(),
+    componentScope: heldScope({ id: 'dest-1', name: 'Held', registeredItemUuid: 'Item.held' }),
+    essenceScope: heldScope({ id: 'e1', name: 'Held essence', sourceItemUuid: 'Item.dest-e' }),
+    toolScope: heldScope({ id: 't1', name: 'Held tool', registeredItemUuid: 'Item.dest-t' }),
   });
   const text = JSON.stringify(
     envelope({
-      system: { components: [{ id: 'incoming', name: 'Incoming', originItemUuid: 'Item.held' }] },
+      system: {
+        components: [{ id: 'incoming', name: 'Incoming', originItemUuid: 'Item.held' }],
+        essenceDefinitions: [{ id: 'e1', name: 'Essence', sourceItemUuid: 'Item.src-e' }],
+        tools: [{ id: 't1', name: 'Tool', registeredItemUuid: 'Item.src-t' }],
+      },
     })
   );
   const accessors = {
@@ -1319,11 +1325,23 @@ test('11: both import call sites bind against the destination index their access
     createManagerServices({ adminStore: () => ({ refresh: async () => {} }) }).renderSystemImportDialog()
   );
 
+  // Each leg against its OWN store: the ids are disjoint across kinds, so a dropped or cross-wired
+  // essence or tool leg loses its collision entry.
   for (const [site, [{ packData }]] of [['the public API', published], ['the Manager', manager]]) {
     assert.deepEqual(
       packData.system.components.map((entry) => entry.id),
       ['dest-1'],
       `${site} binds the linked component to the destination entity`
+    );
+    assert.deepEqual(
+      packData.worldScopeReferences
+        .filter((entry) => entry.kind === REFERENCE_KINDS.WORLD_ENTITY_COLLISION)
+        .map((entry) => [entry.ownerType, entry.referenceValue]),
+      [
+        ['essence', 'e1'],
+        ['tool', 't1'],
+      ],
+      `${site} reports the essence and the tool colliding with the destination by id`
     );
   }
   // THE MERGE'S ONLY PRODUCTION WIRING, and it fails CLOSED: an absent seam SKIPS the merge and
