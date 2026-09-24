@@ -6,12 +6,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { parseModule } from './helpers/moduleAst.js';
 import { moduleAstOf } from './helpers/parsedSource.js';
 import { parseComponent } from './helpers/svelteStructureContract.js';
 import {
   CONTRACT_CLAIMS,
   claimsAcross,
   claimsForComponent,
+  claimsOverCode,
   classMemberAst,
   labelOf,
   namedCodeAst,
@@ -77,4 +79,26 @@ test('the order claim spans kinds, and CONTRACT_CLAIMS wires both new kinds to t
   assert.equal(CONTRACT_CLAIMS.rendersBefore.ask, 'rendersBefore');
   assert.equal(CONTRACT_CLAIMS.styleDeclares.holds, true);
   assert.equal(CONTRACT_CLAIMS.styleDeclaresNo.holds, false);
+});
+
+const CENSUS = [
+  'class Manager {',
+  '  basis() { return null; }',
+  '  create(system) { const { ids } = this.basis(system); return ids; }',
+  '  update(system) { return this.basis(system)?.ids ?? new Set(); }',
+  '  list() { return []; }',
+  '}',
+].join('\n');
+
+test('the census claim is an exact member set, and the fallback claim finds a defaulted call', () => {
+  const subject = claimsOverCode(parseModule(CENSUS).ast);
+  assert.equal(subject.callers(['basis', ['update', 'create']]), true, 'order-free');
+  assert.equal(subject.callers(['basis', ['create']]), false, 'an unnamed site fails');
+  assert.equal(subject.callers(['basis', ['create', 'update', 'list']]), false, 'so does a gone one');
+  assert.equal(subject.fallsBack(['basis', 'Set']), true);
+  assert.equal(subject.fallsBack(['list', 'Set']), false, 'a fallback from another call is not it');
+  const other = claimsOverCode(parseModule('const ids = basis() || new Map();').ast);
+  assert.equal(other.fallsBack(['basis', 'Set']), false, 'nor is a fallback to another class');
+  assert.equal(CONTRACT_CLAIMS.callers.ask, 'callers');
+  assert.equal(CONTRACT_CLAIMS.fallsBackNo.holds, false);
 });

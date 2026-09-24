@@ -17,6 +17,7 @@ import {
   probeGatheringResultCreator,
   probeGatheringSceneFollowsRequester,
   probeGmGates,
+  probeImporterSeams,
   probeJournalAuthorityHooks,
   probeSettingBridge,
   probeSocketRoutes,
@@ -68,6 +69,14 @@ const COMPOSED_FIELDS = Object.freeze([
 
 /** Prototype members whose call position orders the composition root. */
 const COMPOSED_CALLS = Object.freeze(['registerSettings', '_runMigrations']);
+
+/** The world stores both managers derive their basis from, and the drift audit reads (1359). */
+const ORDERED_STORES = Object.freeze([
+  'componentScopeStore',
+  'essenceScopeStore',
+  'toolScopeStore',
+  'worldVocabularyStore',
+]);
 
 /** Setting reads whose position is load-bearing: the theme and the stack-quantity path. */
 const WATCHED_SETTING_READS = Object.freeze(['theme', 'itemStackQuantityPath']);
@@ -137,6 +146,24 @@ function installCompositionRecorder(instance) {
   const restore = [];
   const seenReads = new Set();
   let registered = false;
+  // From the first world store to the second manager: each store's load and corpus read, and any
+  // setting write, in the order the composition makes them.
+  const storeOrder = [];
+  let recordingStores = false;
+  const recordStoreOrder = (field, value) => {
+    if (field === ORDERED_STORES[0]) recordingStores = true;
+    if (!recordingStores) return;
+    storeOrder.push(`assign:${field}`);
+    if (field === 'craftingSystemManager') recordingStores = false;
+    if (!ORDERED_STORES.includes(field)) return;
+    for (const method of ['load', 'corpus']) {
+      const original = value[method];
+      value[method] = function recordStoreCall(...args) {
+        if (recordingStores) storeOrder.push(`${method}:${field}`);
+        return original.apply(this, args);
+      };
+    }
+  };
 
   for (const name of COMPOSED_CALLS) {
     const original = prototype[name];
@@ -167,6 +194,7 @@ function installCompositionRecorder(instance) {
       set(value) {
         log.push(`assign:${field}`);
         held = value;
+        recordStoreOrder(field, value);
       },
       enumerable: true,
       configurable: true,
@@ -188,6 +216,7 @@ function installCompositionRecorder(instance) {
   const settings = globalThis.game.settings;
   const originalRegister = settings.register;
   const originalGet = settings.get;
+  const originalSet = settings.set;
   settings.register = function register(...args) {
     if (!registered) {
       registered = true;
@@ -202,13 +231,19 @@ function installCompositionRecorder(instance) {
     }
     return originalGet.call(this, namespace, key, ...rest);
   };
+  settings.set = function set(namespace, key, ...rest) {
+    if (recordingStores) storeOrder.push(`set:${key}`);
+    return originalSet.call(this, namespace, key, ...rest);
+  };
   restore.push(() => {
     settings.register = originalRegister;
     settings.get = originalGet;
+    settings.set = originalSet;
   });
 
   return {
     log,
+    storeOrder,
     restore: () => {
       for (const undo of restore.reverse()) undo();
     },
@@ -440,6 +475,7 @@ async function measureBootContract({ init, ready, loadModule }) {
       ...wiringReferences(facade, runtime),
     },
     compositionLog: composition.log,
+    worldStoreOrder: composition.storeOrder,
     keybindingRegistrations: keybindingRecorder.rows,
     deprecationWarnings: recordDeprecationWarnings(facade),
     binding: await probeBinding(facade),
@@ -461,6 +497,7 @@ async function measureBootContract({ init, ready, loadModule }) {
       facade,
       runtime
     ),
+    importerSeams: probeImporterSeams(facade),
   };
 }
 
@@ -609,6 +646,27 @@ test('the boot contract golden is not vacuous', () => {
     'the result creator resolves a component through the live crafting system manager'
   );
   assert.equal(Object.keys(golden.worldTimeDispatch).length, 4);
+  const stores = ['componentScopeStore', 'essenceScopeStore', 'toolScopeStore'];
+  assert.deepEqual(
+    golden.worldStoreOrder,
+    [
+      ...[...stores, 'worldVocabularyStore'].flatMap((store) => [`assign:${store}`, `load:${store}`]),
+      ...stores.map((store) => `corpus:${store}`),
+      'assign:recipeManager',
+      'assign:craftingSystemManager',
+    ],
+    'each store loads before the drift audit reads it, and nothing is written before both managers'
+  );
+  assert.equal(golden.importerSeams.reached.length, 14, 'every importer seam follows its field');
+  assert.deepEqual(golden.importerSeams.settings, [
+    'get fabricate.gatheringConfig',
+    'set fabricate.gatheringConfig',
+  ]);
+  assert.deepEqual(
+    golden.importerSeams.admits,
+    { activeGm: true, assistantGm: true, player: false },
+    'the importer is GM-gated, not single-writer'
+  );
   assert.ok(golden.socketRoutes.depletionsApplied > 0 && golden.socketRoutes.complicationsApplied > 0);
   assert.ok(golden.binding.every((row) => typeof row.length === 'number'));
   assert.ok(

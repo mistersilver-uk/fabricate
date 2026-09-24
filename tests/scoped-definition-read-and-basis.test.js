@@ -8,7 +8,8 @@ import { describe, it } from 'node:test';
 
 import { resolve } from 'node:path';
 
-import { entrySources } from './helpers/bootstrapEntrySource.js';
+import { Fabricate } from '../src/bootstrap/Fabricate.js';
+import { defineStructureContract } from './helpers/structureContract.js';
 
 globalThis.foundry = {
   utils: { randomID: () => `rnd-${Math.random().toString(36).slice(2)}` },
@@ -28,16 +29,6 @@ const GOLDEN = JSON.parse(
   readFileSync(new URL('./fixtures/scopedDefinitionNormalize.golden.json', import.meta.url), 'utf8')
 );
 
-const MANAGER_SOURCE = readFileSync(
-  new URL('../src/systems/CraftingSystemManager.js', import.meta.url),
-  'utf8'
-);
-const MAIN_SOURCE = [
-  entrySources['src/bootstrap/composeServices.js'],
-  entrySources['src/bootstrap/migrations.js'],
-  entrySources['src/bootstrap/Fabricate.js'],
-  entrySources['src/bootstrap/hooks.js'],
-].join('\n');
 
 /** A manager with NO world stores at all — the unmigrated client every player boots as. */
 function unwiredManager() {
@@ -582,205 +573,64 @@ describe('the resolved-union memo', () => {
 
 // Criterion 8 — the census
 
+const MANAGER = 'src/systems/CraftingSystemManager.js';
+
+/** The five prune sites that BYPASS `_normalizeSystem`, each deriving its own basis. */
+const BYPASS_SITES = [
+  'addItemFromUuid',
+  'applyBulkEditToComponents',
+  'createItem',
+  'replaceItemSource',
+  'updateItem',
+];
+
 describe('the _scopeBasis call sites', () => {
-  /** Every method of `CraftingSystemManager` that calls `this._scopeBasis(`. */
-  function scopeBasisCallSites(source) {
-    const sites = new Set();
-    let current = null;
-    for (const line of source.split('\n')) {
-      const declaration = /^ {2}(?:async )?([A-Za-z_][\w$]*)\(/.exec(line);
-      if (declaration) current = declaration[1];
-      if (line.includes('this._scopeBasis(')) sites.add(current);
-    }
-    return [...sites].sort();
-  }
-
-  it('are exactly the six named prune sites and no others', () => {
-    // A seventh site added later fails here until it is named — which is the point: five of these
-    // six BYPASS `_normalizeSystem` entirely, so "the normalizer handles it" has already been an
-    // untrue assumption once, at issue 1308.
-    assert.deepEqual(scopeBasisCallSites(MANAGER_SOURCE), [
-      '_normalizeSystem',
-      'addItemFromUuid',
-      'applyBulkEditToComponents',
-      'createItem',
-      'replaceItemSource',
-      'updateItem',
-    ]);
+  // A seventh site added later fails here until it is named — which is the point: five of these
+  // six BYPASS `_normalizeSystem` entirely, so "the normalizer handles it" has already been an
+  // untrue assumption once, at issue 1308. And the whole mechanism is one `new Set()` away from a
+  // no-op that reads as a guard.
+  defineStructureContract('are exactly the six named prune sites, none defaulting the basis', MANAGER, {
+    callers: [['_scopeBasis', ['_normalizeSystem', ...BYPASS_SITES]]],
+    fallsBackNo: [['_scopeBasis', 'Set']],
   });
-
-  it('the census can see a site (it is not vacuously empty)', () => {
-    assert.equal(
-      scopeBasisCallSites('  createItem(a) {\n    const x = this._scopeBasis(a);\n  }\n').length,
-      1
-    );
-  });
-
-  it('addItemsFromPack reaches the basis through addItemFromUuid', () => {
-    // Named as a prune site by the delta, and it IS one — it just does not derive its own basis,
-    // because it loops `addItemFromUuid` per item.
-    assert.match(MANAGER_SOURCE, /async addItemsFromPack\(/);
-    const body = MANAGER_SOURCE.slice(MANAGER_SOURCE.indexOf('async addItemsFromPack('));
-    assert.match(body.slice(0, 4000), /await this\.addItemFromUuid\(/);
-  });
-
-  it('no site defaults the basis to an empty Set', () => {
-    // The whole mechanism is one `new Set()` away from being a no-op that reads as a guard.
-    assert.equal(
-      /_scopeBasis\([^)]*\)[^;]*\?\?\s*new Set\(\)/.test(MANAGER_SOURCE),
-      false,
-      'a `?? new Set()` anywhere on this path re-arms the exact failure it exists to prevent'
-    );
-    assert.equal(
-      MANAGER_SOURCE.includes('new Set((system.essenceDefinitions || []).map'),
-      false,
-      'and no site rebuilds the in-system-only basis by hand'
-    );
-  });
-});
-
-// Criterion 7 — construction order in the composition root. THIS DESCRIBE NOW CARRIES CRITERION 7 FOR TWO
-// PRs (issue 1363).
-
-describe('composition-root construction order', () => {
-  /**
-   * Source-order assertions, the idiom `tests/migration-runner-corpus-writeback.test.js` and
-   * `tests/setting-change-bridge.test.js` already use, because the composition root is not otherwise
-   * reachable by a unit test — and because a mis-ordering here is SILENT: reading an unregistered
-   * key throws inside `ClientSettings##assertSetting`, but `load()` is guarded, so the store simply
-   * stays unseeded forever with nothing in the console.
-   */
-  const at = (needle) => {
-    const index = MAIN_SOURCE.indexOf(needle);
-    assert.notEqual(index, -1, `the module entry and src/bootstrap/ no longer contain \`${needle}\``);
-    return index;
-  };
-
-  // FOUR STORES SINCE ISSUE 1392. The World Vocabulary store is not a scoped-entity store and is
-  // wired into no prune basis, so a mis-order for IT degrades to a permanently unseeded vocabulary,
-  // an empty screen and a rail badge reading 0 — visible rather than destructive.
-  for (const store of [
-    'componentScopeStore',
-    'essenceScopeStore',
-    'toolScopeStore',
-    'worldVocabularyStore',
-  ]) {
-    it(`constructs and loads ${store} after settings and migrations, before both managers`, () => {
-      const construction = at(`fabricate.${store} = create`);
-      const load = at(`fabricate.${store}.load();`);
-      assert.ok(at('fabricate.registerSettings();') < construction, 'settings must be registered first');
-      assert.ok(at('await fabricate._runMigrations();') < construction, 'migrations run before stores');
-      assert.ok(construction < load, 'constructed, then loaded');
-      assert.ok(load < at('fabricate.recipeManager = new RecipeManager('), 'before the recipe manager');
-      assert.ok(
-        load < at('fabricate.craftingSystemManager = new CraftingSystemManager('),
-        'and before the crafting system manager, which derives its basis from these stores'
-      );
+  for (const member of BYPASS_SITES) {
+    defineStructureContract(`${member} takes its basis from _scopeBasis alone`, { file: MANAGER, member }, {
+      calls: ['_scopeBasis'],
+      readsNo: ['system.essenceDefinitions'],
     });
   }
+  // Named as a prune site by the delta, and it IS one — it loops `addItemFromUuid` per item.
+  defineStructureContract(
+    'addItemsFromPack reaches the basis through addItemFromUuid',
+    { file: MANAGER, member: 'addItemsFromPack' },
+    { calls: ['addItemFromUuid'], callsNo: ['_scopeBasis'] }
+  );
+});
 
-  it('publishes an UNGATED accessor for each store', () => {
-    // Copy `getCharacterLibrariesStore`, NOT `getGatheringRealmStore`: the manager resolves these
-    // lazily during `initialize()` and its call site guards with optional chaining, which absorbs
-    // an absent accessor but NOT a throw.
-    for (const accessor of [
-      'getComponentScopeStore',
-      'getEssenceScopeStore',
-      'getToolScopeStore',
-      // Issue 1392. Its NAME is fixed by `adminStore`'s read and write legs, both of which
-      // shipped ahead of it inside a gateway file this lane may not open.
-      'getVocabularyScopeStore',
-    ]) {
-      // To the accessor's OWN closing brace, not a fixed-length slice: a fixed window runs past
-      // a short body into the next member and reddens this guard about a different method.
-      const start = at(`  ${accessor}() {`);
-      const body = MAIN_SOURCE.slice(start, MAIN_SOURCE.indexOf('\n  }', start));
-      assert.equal(
-        body.includes('_requireReady()'),
-        false,
-        `${accessor} must not throw on a not-yet-ready module`
-      );
+// Criterion 7 — construction order in the composition root, observed from a real boot by
+// `tests/bootstrap/fabricate-boot-contract.test.js`: `compositionLog` orders `registerSettings()`
+// and `_runMigrations()` before the four stores, and `worldStoreOrder` orders each store's load
+// before the drift audit's corpus reads, both before either manager, with no setting written
+// between. `tests/setting-change-bridge.test.js` hands all four stores to the bridge, and
+// `tests/world-scope-consumer-sweep.test.js` gates the audit on the ACTIVE GM, off the migration.
+
+describe('the scope store accessors', () => {
+  // The manager resolves these lazily during `initialize()` and its call site guards with optional
+  // chaining, which absorbs an absent accessor but NOT a throw.
+  it('answer before the module is ready, unlike the gated accessors', () => {
+    const facade = new Fabricate();
+    const stores = {
+      componentScopeStore: 'getComponentScopeStore',
+      essenceScopeStore: 'getEssenceScopeStore',
+      toolScopeStore: 'getToolScopeStore',
+      // Issue 1392. Its NAME is fixed by `adminStore`'s read and write legs.
+      worldVocabularyStore: 'getVocabularyScopeStore',
+    };
+    for (const [field, accessor] of Object.entries(stores)) {
+      facade[field] = { field };
+      assert.equal(facade.ready, false, 'the premise: startup has not finished');
+      assert.deepEqual(facade[accessor](), { field }, `${accessor} must not throw on a not-ready module`);
     }
-  });
-
-  it('hands all four stores to the setting-change bridge', () => {
-    // Without this the legs receive `undefined` and NO-OP silently.
-    for (const store of [
-      'componentScopeStore',
-      'essenceScopeStore',
-      'toolScopeStore',
-      'worldVocabularyStore',
-    ]) {
-      assert.match(MAIN_SOURCE, new RegExp(`${store}: fabricate\\.${store},`));
-    }
-  });
-
-  // Issue 1370 criterion 7(a) — the world identity drift audit's position and its gate
-
-  it('runs the world identity drift audit after the three loads and before either manager', () => {
-    const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
-    assert.ok(at('fabricate.toolScopeStore.load();') < audit, 'after the LAST of the three loads');
-    assert.ok(
-      audit < at('fabricate.recipeManager = new RecipeManager('),
-      'and before the recipe manager, which is the first thing that can read the union'
-    );
-    assert.ok(audit < at('fabricate.craftingSystemManager = new CraftingSystemManager('));
-  });
-
-  it('gates the audit on the ACTIVE GM, not on isGM', () => {
-    // `User#isGM` is `hasRole(ASSISTANT)` and `SETTINGS_MODIFY.defaultRole` is ASSISTANT, so an
-    // `isGM` gate posts this notice once for the full GM AND once per assistant.
-    const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
-    const gate = MAIN_SOURCE.lastIndexOf(
-      'game.users?.activeGM?.id === game.user?.id',
-      audit
-    );
-    assert.notEqual(gate, -1, 'the audit must sit under an active-GM gate');
-    assert.ok(
-      MAIN_SOURCE.slice(gate, audit).includes('{'),
-      'and the gate must OPEN a block the audit is inside, not merely precede it'
-    );
-    assert.equal(
-      MAIN_SOURCE.slice(gate, audit).includes('game.user?.isGM'),
-      false,
-      'an isGM gate would run the audit on every assistant GM as well'
-    );
-  });
-
-  // Issue 1370 criterion 8(b) — the audit REPORTS, and repairs nothing
-
-  it('sites the audit OUTSIDE _runMigrations and off the migration report guard', () => {
-    const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
-    assert.ok(
-      audit < at('export async function runMigrations(fabricate) {'),
-      'the audit is in the composition root, not in the migration pass'
-    );
-    const line = MAIN_SOURCE.slice(MAIN_SOURCE.lastIndexOf('\n', audit) + 1, audit);
-    assert.equal(
-      line.includes('worldScopeEntityReport'),
-      false,
-      'drift is not a migration event: guarding on the migration report would silence the audit ' +
-        'on every session after the one the migration ran in'
-    );
-  });
-
-  it('writes NOTHING between the audit and its notice dispatch', () => {
-    // 8(a) calls the detector twice to prove it is pure, and that only reds if a repair went INSIDE
-    // the detector — the least likely placement.
-    const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
-    // The report is CONSOLE ONLY (maintainer, 2026-09-06): its dispatch is the `info` line, not
-    // a toast, and there must be no toast at all for it.
-    const dispatch = at("logMigrationNoticeDetail('world identity drift', driftDetail);");
-    assert.ok(audit < dispatch, 'the report is logged after the audit');
-    const between = MAIN_SOURCE.slice(audit, dispatch);
-    assert.equal(between.includes('setSetting'), false, 'the audit must not write a setting');
-    assert.equal(between.includes('.save('), false, 'nor persist a store');
-    assert.equal(
-      MAIN_SOURCE.includes('ui.notifications?.info?.(driftNotice)') ||
-        MAIN_SOURCE.includes('ui.notifications?.warn?.(driftNotice)'),
-      false,
-      'and nothing reaches the notification bar: a permanent toast reads as an alarm for a ' +
-        'state the report itself calls harmless, and a warning would redden every View Lab capture'
-    );
+    assert.throws(() => facade.getGatheringRealmStore(), 'a gated accessor throws before ready');
   });
 });

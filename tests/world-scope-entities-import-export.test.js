@@ -1,14 +1,10 @@
 /** Issue 1364 (epic 1357, PR 4) — world-scope entity import/export, schema 6. */
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import { installFoundryUtilsEnv } from './helpers/foundryEnv.js';
 import { destinationWorld, emptySeededScope } from './helpers/worldScopeImportHarness.js';
-import { entrySources } from './helpers/bootstrapEntrySource.js';
 
 
 installFoundryUtilsEnv();
@@ -30,8 +26,9 @@ const { resolveComponentScope } = await import('../src/systems/componentScope.js
 const { CompendiumImporter, scopeStoreDelegate } = await import(
   '../src/systems/CompendiumImporter.js'
 );
+const { bindFabricateGlobal } = await import('../src/bootstrap/publicApi.js');
+const { createManagerServices } = await import('../src/ui/managerServices.js');
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE_SYSTEM_ID = 'sys-source';
 
 // Fixtures — one builder per shape, reused rather than re-authored per test
@@ -1227,51 +1224,6 @@ test('10: a copy-mode call with no worldEntityIndex throws, and the throw is the
 
 // Criterion 11 — both import call sites, in source AND in behaviour
 
-test('11: both prepareForImport call sites pass every parameter the exporter declares', () => {
-  // A guard on the guards, on the pattern the export-side signature pin sets.
-  const exporterSource = readFileSync(
-    resolve(ROOT, 'src/systems/CraftingSystemExporter.js'),
-    'utf8'
-  );
-  const signature = /export function prepareForImport\(([\s\S]*?)\) \{/.exec(exporterSource);
-  assert.ok(signature, "located prepareForImport's declaration");
-  const declared = signature[1]
-    .replaceAll(/\/\/[^\n]*/g, '')
-    .split(',')
-    .map((parameter) => parameter.split('=')[0].trim())
-    .filter(Boolean);
-  assert.deepEqual(
-    declared,
-    ['rawData', 'mode', 'options'],
-    'prepareForImport gained or lost a parameter — pin it in BOTH call-site guards below first'
-  );
-
-  const mainSource = entrySources['src/bootstrap/publicApi.js'];
-  const importStart = mainSource.indexOf('function buildImportSystem(fabricate) {');
-  assert.notEqual(importStart, -1, 'located the public-API import builder');
-  const publicApi = mainSource.slice(importStart, mainSource.indexOf('\n}\n', importStart));
-  assert.ok(publicApi.length > 0, 'located the public-API import closure');
-  assert.match(
-    publicApi,
-    /prepareForImport\(data, mode, \{ worldEntityIndex \}\)/,
-    'the public API must hand the destination index to prepareForImport'
-  );
-  assert.match(publicApi, /buildWorldEntityIndex\(fabricate\)/, 'and build it from the stores');
-
-  const managerSource = readFileSync(resolve(ROOT, 'src/ui/managerServices.js'), 'utf8');
-  assert.match(
-    managerSource,
-    /prepareForImport\(data, mode, \{ worldEntityIndex \}\)/,
-    "the Manager's Import button must hand it the same index"
-  );
-  for (const accessor of ['getComponentScopeStore', 'getEssenceScopeStore', 'getToolScopeStore']) {
-    assert.ok(
-      managerSource.includes(`game.fabricate.${accessor}?.()?.listEntities?.() ?? []`),
-      `the Manager builds the index leg through ${accessor}`
-    );
-  }
-});
-
 test('11: the index the call sites build has CONTENTS, and the contents are what bind', async () => {
   // THE BEHAVIOURAL ARM, and it exists because the source regexes above are satisfied by `{}`.
   const world = await destinationWorld({
@@ -1305,50 +1257,82 @@ test('11: the index the call sites build has CONTENTS, and the contents are what
   assert.notEqual(minted.system.components[0].id, 'dest-1', 'an EMPTY index mints instead');
 });
 
-/** The `new CompendiumImporter(...)` seam object one production source file writes. */
-function importerConstructionSite(source) {
-  const start = source.indexOf('new CompendiumImporter(');
-  assert.ok(start >= 0, 'located the CompendiumImporter construction');
-  const end = source.indexOf('});', start);
-  assert.ok(end > start, 'located the end of its seam object');
-  return source.slice(start, end);
+/** What each import call site hands the shared importer, captured instead of imported. */
+async function captureImport(run) {
+  const { importFromPackData } = CompendiumImporter.prototype;
+  const captured = [];
+  CompendiumImporter.prototype.importFromPackData = async function capture(packData) {
+    captured.push({ packData, seams: this._scopeStoreSeams });
+    return null;
+  };
+  try {
+    await run();
+  } finally {
+    CompendiumImporter.prototype.importFromPackData = importFromPackData;
+  }
+  return captured;
 }
 
-test('11: both CompendiumImporter call sites INJECT the three world-scope store seams', () => {
-  // THE MERGE'S ONLY PRODUCTION WIRING, and it fails CLOSED: an absent seam SKIPS the merge and
-  // reports nothing, so a call site that never injected them would leave every world-scope import
-  // silently doing nothing while the toast still said "Imported <system> with N components".
-  const importerSource = readFileSync(resolve(ROOT, 'src/systems/CompendiumImporter.js'), 'utf8');
-  const seamBlock = /_scopeStoreSeams = \{([\s\S]*?)\};/.exec(importerSource);
-  assert.ok(seamBlock, "located the importer's world-scope seam block");
-  const seamNames = [...seamBlock[1].matchAll(/seams\.(\w+)/g)].map((match) => match[1]);
-  assert.deepEqual(
-    seamNames,
-    ['componentScopeStore', 'essenceScopeStore', 'toolScopeStore'],
-    'the importer gained or lost a world-scope seam — pin it in both call-site guards below first'
+/** The destination the two call sites read, and a file carrying one component linked into it. */
+async function linkedImport() {
+  const world = await destinationWorld({
+    componentScope: {
+      entities: [{ id: 'dest-1', name: 'Held', registeredItemUuid: 'Item.held' }],
+      defaults: {},
+      membership: {},
+    },
+    essenceScope: emptySeededScope(),
+    toolScope: emptySeededScope(),
+  });
+  const text = JSON.stringify(
+    envelope({
+      system: { components: [{ id: 'incoming', name: 'Incoming', originItemUuid: 'Item.held' }] },
+    })
+  );
+  const accessors = {
+    getComponentScopeStore: () => world.stores.components,
+    getEssenceScopeStore: () => world.stores.essences,
+    getToolScopeStore: () => world.stores.tools,
+  };
+  return { world, text, accessors };
+}
+
+test('11: both import call sites bind against the destination index their accessors build', async () => {
+  // `prepareForImport` DEFAULTS its options, so a call site that drops the index mints instead.
+  const { world, text, accessors } = await linkedImport();
+  const published = await captureImport(async () => {
+    bindFabricateGlobal({ ...accessors, compendiumImporter: world.importer }, {});
+    await globalThis.game.fabricate.importSystemFromFile(text, { copyMode: true });
+  });
+
+  globalThis.game.fabricate = {
+    ...accessors,
+    getCraftingSystemManager: () => world.systemManager,
+    getRecipeManager: () => world.recipeManager,
+    getGatheringEnvironmentStore: () => null,
+  };
+  globalThis.foundry.applications = {
+    api: { DialogV2: { prompt: async () => ({ file: { text: async () => text }, conflictMode: 'copy' }) } },
+  };
+  globalThis.ui = { notifications: { info() {}, warn() {}, error: (message) => assert.fail(message) } };
+  const manager = await captureImport(() =>
+    createManagerServices({ adminStore: () => ({ refresh: async () => {} }) }).renderSystemImportDialog()
   );
 
-  const sites = {
-    'src/bootstrap/composeServices.js': entrySources['src/bootstrap/composeServices.js'],
-    'src/ui/managerServices.js': readFileSync(resolve(ROOT, 'src/ui/managerServices.js'), 'utf8'),
-  };
-  for (const [path, source] of Object.entries(sites)) {
-    const site = importerConstructionSite(source);
-    for (const seam of seamNames) {
-      assert.ok(site.includes(`${seam}:`), `${path} must inject ${seam}`);
-    }
-  }
-
-  // The composition root builds this importer INSIDE the same phase pass that constructs the three
-  // stores, so it is the one site with an ordering hazard — and the hazard is silent, because the
-  // merge fails closed.
-  const mainSite = importerConstructionSite(sites['src/bootstrap/composeServices.js']);
-  for (const seam of seamNames) {
-    assert.ok(
-      mainSite.includes(`${seam}: scopeStoreDelegate(() => fabricate.${seam})`),
-      `the composition root must resolve ${seam} lazily, not capture the field at construction`
+  for (const [site, [{ packData }]] of [['the public API', published], ['the Manager', manager]]) {
+    assert.deepEqual(
+      packData.system.components.map((entry) => entry.id),
+      ['dest-1'],
+      `${site} binds the linked component to the destination entity`
     );
   }
+  // THE MERGE'S ONLY PRODUCTION WIRING, and it fails CLOSED: an absent seam SKIPS the merge and
+  // reports nothing. The composition root's lazy seams are the boot contract's `importerSeams`.
+  assert.deepEqual(manager[0].seams, {
+    components: world.stores.components,
+    essences: world.stores.essences,
+    tools: world.stores.tools,
+  });
 });
 
 test('11: an importer WITHOUT the scope seams merges nothing, and the seamed one merges', async () => {
