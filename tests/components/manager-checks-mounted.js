@@ -3976,6 +3976,99 @@ export function registerChecksCases() {
     });
   }
 
+  // Each editor's update callback reaches its own slot draft, and Save sends that draft.
+  for (const row of [
+    {
+      activity: 'crafting',
+      options: {
+        alchemyResolutionMode: 'progressive',
+        craftingCheck: { enabled: true, progressive: { rollFormula: '1d20', awardMode: 'equal' } },
+      },
+      save: 'saveCraftingCheckProgressive',
+    },
+    {
+      activity: 'salvage',
+      options: {
+        salvageResolutionMode: 'routed',
+        salvageCraftingCheck: {
+          enabled: true,
+          routed: {
+            rollFormula: '1d20',
+            type: 'relative',
+            relativeOutcomes: [{ id: 's1', name: 'Scrap', success: true, dc: 0 }],
+          },
+        },
+      },
+      save: 'saveSalvageCheckRouted',
+    },
+  ]) {
+    it(`stages a ${row.activity} formula edit and saves it through ${row.save}`, async () => {
+      const calls = [];
+      await mountChecks(calls, row.options);
+      checksStore[row.save] = (draft) => calls.push([row.save, draft]);
+      await openChecksActivity(row.activity);
+      setInputValue(target.querySelector('[data-check-roll-formula]'), '2d10 + 4');
+      await tick();
+      flushSync();
+
+      target.querySelector('[data-checks-save]').click();
+      await settleRouteExit();
+      const saved = calls.filter((call) => call[0] === row.save);
+      assert.equal(saved.length, 1, 'Save writes the edited slot once');
+      assert.equal(saved[0][1].rollFormula, '2d10 + 4', 'and sends the staged formula');
+    });
+  }
+
+  it('reseeds the salvage and gathering drafts when the selected system switches', async () => {
+    await mountChecks([], {
+      ...routedGatheringOptions,
+      salvageResolutionMode: 'simple',
+      salvageCraftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
+    });
+    const formula = () => target.querySelector('[data-check-roll-formula]');
+    await openChecksActivity('salvage');
+    setInputValue(formula(), '1d20 + 3');
+    await openChecksActivity('gathering');
+    setInputValue(formula(), '2d6 + 1');
+    await tick();
+    flushSync();
+    for (const activity of ['salvage', 'gathering']) {
+      const marker = `[data-checks-nav-dirty="${activity}"]`;
+      assert.ok(target.querySelector(marker), `${activity} is staged`);
+    }
+
+    // Another system, whose gathering economy is routed too, so the same editor stays up.
+    checksStore.viewState.update((state) => ({
+      ...state,
+      selectedSystem: {
+        ...state.selectedSystem,
+        id: 'alchemy-reforged',
+        salvageCraftingCheck: { enabled: true, simple: { rollFormula: '3d6', dc: 12 } },
+        gatheringCraftingCheck: {
+          ...routedGatheringOptions.gatheringCraftingCheck,
+          routed: { ...routedGatheringOptions.gatheringCraftingCheck.routed, rollFormula: '4d4' },
+        },
+      },
+      gatheringConfig: {
+        ...state.gatheringConfig,
+        systems: {
+          ...state.gatheringConfig.systems,
+          'alchemy-reforged': state.gatheringConfig.systems.alchemy,
+        },
+      },
+    }));
+    await tick();
+    flushSync();
+
+    assert.equal(formula().value, '4d4', 'the gathering draft follows the new system');
+    await openChecksActivity('salvage');
+    assert.equal(formula().value, '3d6', 'and so does the salvage draft');
+    assert.ok(
+      !target.querySelector('[data-checks-nav-dirty]'),
+      'and the switch rebaselined both, so nothing reads unsaved'
+    );
+  });
+
   it('gives every outcome band its OWN colour, and keys the strip from the tier rows', async () => {
     // Deriving the fill from the `success` flag alone painted Standard and Masterwork
     // identically on a five-tier check — per-band identity is the whole reason this control
