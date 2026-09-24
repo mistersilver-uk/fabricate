@@ -25,6 +25,17 @@ export const DEFINITION_SENTENCES = {
     'System Membership Record': 3,
     'World Identity Snapshot': 2,
   },
+  'Acquisition, Knowledge, and Resolution Terms': {
+    Harvesting: 3,
+    'Choice Group': 3,
+    'Contention Component': 2,
+    'Tier Stepping': 2,
+    'Section Inheritance': [1, 6],
+    'Provider (vocabulary boundary)': 2,
+    'Depleted Behavior (task/node config; node-driven marker swap)': 2,
+    'Gathering Event': 2,
+    Inert: 2,
+  },
 };
 
 /** The headings whose moved body is replaced by a one-line pointer into `docs/domain/`. */
