@@ -335,6 +335,17 @@ The consequence for any caller reporting an amount: derive it from what the writ
 `Document#delete` also resolves `undefined` when a pre-delete veto drops the document on both V13.351 and V14.365; a successful deletion resolves the deleted document.
 Versioned consumption in `_consumeItemQuantity` in `src/systems/CraftingEngine.js` requires a document return before recording spending or allowing subsequent awards.
 A partially applied ingredient batch remains uncertain in the execution journal and requires reconciliation without replay or automatic rollback.
+- **An embedded Item re-created with `{keepId: true, keepEmbeddedIds: true}` from its pre-delete `toObject()` is exact except for `_stats` and, on an unlinked token, delta promotion.**
+On V13.351 and V14.365 the server backend assigns a new id only when `!(operation.keepId && data._id)`, so the `_id` and UUID survive, and `_generateEmbeddedDocumentIds(keepEmbeddedIds)` skips embedded documents that already carry an `_id`, so active effects keep theirs.
+`createdTime`, `modifiedTime` and `lastModifiedBy` are refreshed on both builds: creation data is stripped of `DocumentStatsField.managedFields` (V14.365 `_sanitizeType`, V13.351 `ServerDocumentMixin._deleteStats`) and every creation is re-stamped (V14.365 `ServerDocumentMixin#_tagStats`, V13.351 `tagModelStats` from `ServerDocumentMixin#_preCreate`).
+On an unlinked token the restore promotes an inherited item to a delta-managed record, so it stops tracking later base-actor edits; only core's `EmbeddedCollectionDelta#restoreDocuments` re-links one.
+The server rejects a `keepId` create onto an id the collection still holds, so a restore covers only the ids the delete answered.
+A restore fires `createItem` per document (`noHook` gates only the pre-hook) and yields a new JS object, so a held `Item` reference goes stale.
+`consumePooledHoldings` in `src/systems/companionPooledConsumption.js` relies on all of this (issue 1342).
+- **Batching embedded writes saves round trips, not hooks.**
+`deleteEmbeddedDocuments('Item', ids)` fires one `deleteItem` hook per document on V13 and V14, and `foundry.documents.modifyBatch`, the multi-parent transaction, is V14-only while `module.json` declares `minimum: "13"`.
+A batch answers short rather than rejecting: `deleteEmbeddedDocuments` omits a document a `preDelete` hook refused, and `updateEmbeddedDocuments` omits one for a `_preUpdate` refusal, a `preUpdate<Type>` hook refusal, a throwing `updateSource` or the empty-diff drop.
+`collection.get(id, {strict: true})` throws for an id that vanished between plan and write, which rejects the whole batch.
 - **A `Macro`'s `command` is a `StringField({ required: true, blank: true })` on EVERY macro type, so `typeof command === 'string'` does not mean "this is a script macro".**
 A `chat`-type macro passes that guard and has its chat text compiled as JavaScript by `MacroExecutor.run` (`src/utils/MacroExecutor.js`), so it throws for any body that is not also valid JS.
 Discriminating script from chat is therefore a **call-site** job, and deliberately not centralised: `MacroExecutor`'s own module docblock (`src/utils/MacroExecutor.js`) records that centralising it would turn a chat-type essence property macro from a silent `console.warn` into a per-essence-per-result error notification, and `tests/macro-executor.test.js` pins that decision as the ABSENCE of `/\.type\b/` and `/script/i` from the module's comment-stripped source.
