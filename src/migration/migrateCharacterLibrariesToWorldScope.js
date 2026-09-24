@@ -1,7 +1,6 @@
 /**
- * `1.28.0` — lift the character prerequisite and modifier libraries to world scope (issue 1308; spec
- * § Character Libraries World-Scope Migration owns the strip, and why COLLISIONS ARE THE NORMAL CASE
- * and are REPORTED rather than re-keyed). Pure, idempotent, version-gated.
+ * `1.28.0`: lift the character libraries to world scope (issue 1308); spec § Character Libraries
+ * World-Scope Migration owns the strip and why collisions are reported, not re-keyed.
  */
 
 import { normalizeCharacterPrerequisiteList } from '../systems/characterPrerequisites.js';
@@ -15,10 +14,7 @@ const LIBRARIES = Object.freeze([
   Object.freeze({ key: 'modifiers', normalize: normalizeModifierLibrary }),
 ]);
 
-/**
- * Normalize ONE entry through its library's normalizer, so sameness is judged on the persisted shape
- * rather than whatever the raw record happened to carry.
- */
+/** So sameness is judged on the persisted shape, not the raw record. */
 function normalizedEntry(entry, normalize) {
   try {
     const [normalized] = normalize([entry]) ?? [];
@@ -28,7 +24,7 @@ function normalizedEntry(entry, normalize) {
   }
 }
 
-/** Union one library across every system, first system winning an id collision. */
+/** The first system wins an id collision. */
 function buildLibrary(systems, library) {
   const entries = [];
   const seen = new Map();
@@ -47,8 +43,7 @@ function buildLibrary(systems, library) {
       if (seen.has(id)) {
         const kept = seen.get(id);
         const incoming = normalizedEntry(entry, library.normalize);
-        // Same id AND same meaning is the seeded-preset case: numerous, harmless, and reporting it
-        // would bury the collision that actually changed a rule.
+        // Same id and meaning is a seeded preset: harmless, and reporting it buries real ones.
         if (JSON.stringify(kept.normalized) === JSON.stringify(incoming)) continue;
         collisions.push({
           library: library.key,
@@ -67,7 +62,6 @@ function buildLibrary(systems, library) {
   return { entries, collisions };
 }
 
-/** Build the world character libraries by unioning every system's entries, per library. */
 export function buildWorldCharacterLibraries(systems) {
   const list = Array.isArray(systems) ? systems : [];
   const built = {};
@@ -82,9 +76,8 @@ export function buildWorldCharacterLibraries(systems) {
 }
 
 /**
- * Drop the named library keys — STRIPPING ONLY WHAT THE WORLD NOW HOLDS, which is load-bearing
- * rather than tidy: the lift is decided PER LIBRARY, so an unconditional strip would delete the
- * un-lifted one outright, with no error and no copy anywhere. Unchanged systems return BY REFERENCE.
+ * Only what the world now holds: the lift is per library, so an unconditional strip would silently
+ * delete an un-lifted one. Unchanged systems return by reference.
  */
 export function stripSystemCharacterLibraries(systems, keys = LIBRARIES.map((l) => l.key)) {
   const list = Array.isArray(systems) ? systems : [];
@@ -92,8 +85,7 @@ export function stripSystemCharacterLibraries(systems, keys = LIBRARIES.map((l) 
   if (strip.length === 0) return list;
   return mapSystems(list, (system) => {
     const carries = strip.some((key) => Object.prototype.hasOwnProperty.call(system, key));
-    // Returning the ORIGINAL reference matters: the runner detects change by JSON comparison over
-    // the whole corpus, so rebuilding every system would rewrite the entire corpus for nothing.
+    // The runner detects change by JSON comparison, so a rebuild rewrites the corpus for nothing.
     if (!carries) return system;
     const next = { ...system };
     for (const key of strip) delete next[key];
@@ -105,10 +97,8 @@ export function migrateCharacterLibrariesToWorldScope(data = {}) {
   const systems = Array.isArray(data.systems) ? data.systems : [];
   const existing = isPlainObject(data.characterLibraries) ? data.characterLibraries : {};
 
-  // THE IDEMPOTENCE GUARD IS PER LIBRARY, not a disjunction across the two: "either populated
-  // library proves the lift ran" is false of every way but the ACTIVE GM's own migration, so an
-  // assistant GM adding one modifier would make it true while every system still carried both — and
-  // the pass would then STRIP them without ever lifting them.
+  // Guarded per library, not by a disjunction: an assistant GM adding one modifier would make
+  // "either is populated" true, and the pass would strip both libraries unlifted.
   const built = buildWorldCharacterLibraries(systems);
   const collisions = Array.isArray(built._collisions) ? built._collisions : [];
   delete built._collisions;
@@ -129,11 +119,8 @@ export function migrateCharacterLibrariesToWorldScope(data = {}) {
   }
 
   const result = {
-    // ONLY the libraries the world now holds are stripped — see `stripSystemCharacterLibraries`.
     systems: stripSystemCharacterLibraries(systems, lifted),
-    // Return the ORIGINAL object when nothing was lifted: the runner detects change by JSON
-    // comparison, so emitting a freshly-built pair of empty arrays over a stored `{}` would write
-    // the setting in every world that never authored either library.
+    // Nothing lifted answers the original, or empty arrays over a stored `{}` write every world.
     characterLibraries:
       JSON.stringify(characterLibraries) === JSON.stringify(existing)
         ? existing

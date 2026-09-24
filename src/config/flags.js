@@ -1,20 +1,9 @@
 export const FABRICATE_FLAG_NAMESPACE = 'fabricate';
 
 /**
- * The durable-flag key the per-actor learned-recipe map is persisted under
- * (`flags.fabricate.fabricate.learnedRecipes`).
- *
- * Published as a constant because the map now has more than one writer: the two book
- * learn paths and the craft-time auto-learn write it through
- * `RecipeVisibilityService._getLearnedMap`/`_setLearnedMap`, and the companion contract's
- * GM knowledge grant writes it through injected flag seams that never reach into the
- * service's private members (see issue 1289's D3). A string literal repeated at each of
- * those sites is a persisted shape spelled four times: a typo at any one of them writes a
- * SECOND flag that reads back empty forever, with nothing failing. There is exactly one
- * spelling here instead.
- *
- * The value is load-bearing and may not be renamed: it names data already persisted in
- * every world.
+ * `flags.fabricate.fabricate.learnedRecipes`, spelled once for its several writers (issue 1289),
+ * since a typo at one writes a second flag that reads back empty forever. Never rename it: it
+ * names data persisted in every world.
  */
 export const LEARNED_RECIPES_FLAG_KEY = 'learnedRecipes';
 
@@ -24,18 +13,13 @@ export const LEARNED_RECIPES_FLAG_KEY = 'learnedRecipes';
  */
 export const FABRICATE_FLAG_KEY_SEGMENT_PATTERN = /^[A-Za-z0-9_-]+$/;
 
-/**
- * Whether a value is safe to interpolate as a single dotted-flag-path segment (see {@link
- * FABRICATE_FLAG_KEY_SEGMENT_PATTERN}).
- */
 export function isSafeFlagKeySegment(segment) {
   return typeof segment === 'string' && FABRICATE_FLAG_KEY_SEGMENT_PATTERN.test(segment);
 }
 
 /**
- * Stamp a durable per-system ROLE identity on a plain item-data payload's flags, BEFORE creation,
- * so the inventory/tool matchers attribute the created item to its OWN definition regardless of
- * naming collisions or Foundry's transitive `_stats.duplicateSource` chain.
+ * Before creation, so the matchers attribute the item to its own definition despite name
+ * collisions or Foundry's transitive `_stats.duplicateSource` chain.
  */
 export function stampItemDataRoleIdentity(itemData, systemId, roleKey, id) {
   if (!itemData || !id || !roleKey || !isSafeFlagKeySegment(systemId)) return;

@@ -51,7 +51,6 @@ export function createIngredientSolver({
             : greedyAllocate,
       };
       const deps = { ingredientGroups, seedRemaining, buildPassIndex };
-      // The per-pass resolution index (issue 1083).
       ctx.index = buildPassIndex(availableItems, matcher, ctx, deps);
 
       // Bounded item-level backtracking (issue 663): find a satisfying assignment if one exists.
@@ -61,9 +60,8 @@ export function createIngredientSolver({
       const searchStats = Object.freeze({ nodes: search.nodes, capHit: search.capHit });
       if (search.selection) return { ...search.selection, searchStats };
 
-      // Proven unsatisfiable, or the generous search bound was reached (a safeguard degradation that
-      // is never worse than the pre-663 behaviour and never double-counts): fall back to the
-      // author-order greedy pass.
+      // Unsatisfiable or out of search budget: the author-order greedy pass, which never
+      // double-counts.
       if (search.capHit) {
         console.warn(
           `Fabricate | IngredientSet ${ingredientSetId}: ingredient assignment search reached its ` +
@@ -76,10 +74,7 @@ export function createIngredientSolver({
   };
 }
 
-/**
- * The per-pass resolution index (issue 1083): everything both resolution paths would otherwise
- * re-derive per search node, derived once instead.
- */
+/** What both resolution paths would otherwise re-derive per search node (issue 1083). */
 export function buildPassIndexDefault(
   availableItems,
   matcher,
@@ -102,11 +97,7 @@ export function buildPassIndexDefault(
   };
 }
 
-/**
- * Index one group: record each non-currency option's matching stacks, collect its essence options
- * for the block index, and return the group's candidate item keys, which are the vertex data the
- * contention components join on.
- */
+/** Record each option's matching stacks; the returned item keys are what components join on. */
 function indexGroupCandidates(group, items, matcher, optionItems, essenceOptions) {
   const keys = new Set();
   for (const option of group.options || []) {
@@ -125,10 +116,7 @@ function indexGroupCandidates(group, items, matcher, optionItems, essenceOptions
   return keys;
 }
 
-/**
- * The groups that could still add a requirement to the essence block, and are therefore jointly
- * constrained by it however disjoint their item candidates are.
- */
+/** Groups the essence block constrains jointly, however disjoint their item candidates. */
 function groupsCarryingTheBlock(ingredientGroups, essence) {
   const carrying = new Set();
   if (!essence) return carrying;
@@ -142,9 +130,8 @@ function groupsCarryingTheBlock(ingredientGroups, essence) {
 }
 
 /**
- * A union-find (disjoint-set) forest over `size` vertices, with path compression and a deterministic
- * tie-break: a union always keeps the lower vertex as the root, so a component's root is its lowest
- * member and iterating roots in ascending order yields the components in author order.
+ * Union-find with path compression. A union keeps the lower vertex as root, so ascending roots
+ * yield the components in author order.
  */
 function unionFind(size) {
   const parent = Array.from({ length: size }, (_unused, vertex) => vertex);
@@ -166,11 +153,7 @@ function unionFind(size) {
   return { find, union };
 }
 
-/**
- * Partition the ingredient groups into contention components: the connected components of the graph
- * whose vertices are the groups (plus one vertex for the essence block) and whose edges join any two
- * that could draw on the same held stack.
- */
+/** Connected components over groups plus the essence block, joined where they share a stack. */
 function contentionComponents(index, ingredientGroups) {
   const groupCount = ingredientGroups.length;
   const blockVertex = groupCount;
@@ -188,18 +171,14 @@ function contentionComponents(index, ingredientGroups) {
   }
   if (blockLive) {
     const blockRoot = find(blockVertex);
-    // The block always shares a root with at least one group, because a live block exists only when
-    // some group carries a fundable essence option.
+    // A live block always shares a root with a group carrying a fundable essence option.
     if (byRoot.has(blockRoot)) byRoot.get(blockRoot).ownsBlock = true;
   }
 
   return [...byRoot].sort(([left], [right]) => left - right).map(([, component]) => component);
 }
 
-/**
- * Join every pair of groups sharing a candidate held stack, and report which group first claimed
- * each key so the block can be joined to it in one pass rather than by re-walking the group index.
- */
+/** Also reports each key's first claimant, so the block joins in one pass. */
 function joinGroupContention(index, groupCount, union) {
   const claimedBy = new Map();
   for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
@@ -212,11 +191,7 @@ function joinGroupContention(index, groupCount, union) {
   return claimedBy;
 }
 
-/**
- * Join the essence-block vertex to the groups it contends with, in both directions the block
- * contends: by membership (a group carrying a still-fundable essence option) and by draw (a group
- * whose candidates include one of the block's carrier stacks).
- */
+/** By membership (a fundable essence option) and by draw (a shared carrier stack). */
 function joinBlockContention(index, blockVertex, claimedBy, union) {
   for (const groupIndex of index.blockGroups) union(groupIndex, blockVertex);
   for (const key of index.essence.carrierKeys) {
@@ -225,18 +200,14 @@ function joinBlockContention(index, blockVertex, claimedBy, union) {
   }
 }
 
-/**
- * Item-level bounded backtracking over the ingredient groups (issue 663), staged by contention
- * (issue 1083).
- */
+/** Bounded item-level backtracking (issue 663), staged by contention (issue 1083). */
 function searchAssignment(
   availableItems,
   matcher,
   ctx,
   { ingredientGroups, seedRemaining, buildPassIndex }
 ) {
-  // A ctx that arrives without an index mints one here, so no caller silently falls back to the
-  // unindexed scans.
+  // Mint a missing index, so no caller silently gets the unindexed scans.
   ctx.index ??= buildPassIndex(availableItems, matcher, ctx, { ingredientGroups, seedRemaining });
   const budget = { nodes: 0, capHit: false };
   const frame = {
@@ -247,7 +218,7 @@ function searchAssignment(
     groups: ingredientGroups,
     index: ctx.index,
     remaining: seedRemaining(availableItems),
-    // The shared undo journal: `[key, previousValue, key, previousValue, ...]` in write order.
+    // `[key, previousValue, ...]` in write order.
     journal: [],
   };
 
@@ -299,10 +270,7 @@ function composeSelection(chosenByGroup, block) {
   };
 }
 
-/**
- * Resolve one contention component: either the indexed fast path or a search scoped to that
- * component's groups.
- */
+/** The indexed fast path, or a search scoped to the component's groups. */
 function resolveContentionComponent(component, frame) {
   if (component.groups.length === 1 && !component.ownsBlock) {
     const group = frame.groups[component.groups[0]];
@@ -323,16 +291,12 @@ function resolveContentionComponent(component, frame) {
   return searchComponentGroup(0, component, state, frame) ? state : null;
 }
 
-/**
- * The first choice a group yields against the current ledger, or null when it yields none (the group
- * cannot be satisfied at all).
- */
+/** Null when the group cannot be satisfied at all. */
 function firstGroupChoice(group, frame) {
   const { done, value } = groupChoices(group, frame).next();
   return done ? null : value;
 }
 
-/** Recursive depth-first body for one contention component. */
 function searchComponentGroup(position, component, state, frame) {
   const { budget } = frame;
   if (budget.capHit) return false;
@@ -356,13 +320,11 @@ function searchComponentGroup(position, component, state, frame) {
   return false;
 }
 
-/** The terminal node of one component's traversal. */
 function searchComponentTerminal(component, state, frame) {
   if (chargeNode(frame.budget)) return false;
   return component.ownsBlock ? settleEssenceBlock(state, frame) : true;
 }
 
-/** Commit one chosen choice. */
 function applyChoice(choice, state, frame) {
   if (choice.member) {
     state.essenceMembers.push(choice.member);
@@ -371,7 +333,7 @@ function applyChoice(choice, state, frame) {
   }
 }
 
-/** Undo a committed choice, reverting the ledger to the caller's `mark`. */
+/** Revert the ledger to the caller's `mark`. */
 function revertChoice(choice, state, frame, mark) {
   if (choice.member) {
     state.essenceMembers.pop();
@@ -381,10 +343,7 @@ function revertChoice(choice, state, frame, mark) {
   undoLedger(frame.remaining, frame.journal, mark);
 }
 
-/**
- * The search's terminal node: settle the whole set's essence block against whatever the
- * component/tag groups left in `remaining`.
- */
+/** Settle the essence block against what the component and tag groups left. */
 function settleEssenceBlock(state, frame) {
   const block = resolveEssenceBlock(
     state.essenceMembers,
@@ -398,7 +357,6 @@ function settleEssenceBlock(state, frame) {
   return true;
 }
 
-/** Lazily yield the ordered candidate choices for one group against the current `remaining`. */
 function* groupChoices(group, frame) {
   const { ctx } = frame;
   const options = group.options || [];
@@ -425,11 +383,7 @@ function* groupChoices(group, frame) {
   }
 }
 
-/**
- * Lazily yield the item-consumption candidates for a non-currency option against the current
- * `remaining`, greedy subset first (byte-identical to the plan builder's pick), then alternative
- * subsets that free contended items.
- */
+/** The plan builder's greedy subset first, then alternatives that free contended items. */
 function* optionItemChoices(option, group, restrictItemId, scan) {
   if (option?.match?.type === 'essence') {
     const member = essenceBlockMember(group, option);
@@ -440,10 +394,7 @@ function* optionItemChoices(option, group, restrictItemId, scan) {
   yield* componentTagOptionChoices(option, restrictItemId, scan);
 }
 
-/**
- * Candidate item plans for a component/tag option: the greedy front-loaded pick first, then every
- * distinct alternative unit-count assignment over the matching stacks that also meets `quantity`.
- */
+/** The greedy pick, then every distinct unit-count assignment that also meets `quantity`. */
 function* componentTagOptionChoices(option, restrictItemId, scan) {
   const { budget } = scan;
   const greedy = buildItemPlanForOption(option, restrictItemId, scan);
@@ -462,17 +413,13 @@ function* componentTagOptionChoices(option, restrictItemId, scan) {
   }
 }
 
-/**
- * The author-order greedy resolution (the pre-issue-663 behaviour), retained as the deterministic
- * `missingGroups` source and the bounded-search safeguard fallback.
- */
+/** The deterministic `missingGroups` source and the bounded search's fallback. */
 function resolveGreedy(availableItems, matcher, ctx, { ingredientGroups, seedRemaining }) {
   const pass = {
     availableItems,
     matcher,
     ctx,
-    // The greedy pass presents the same scan shape as the search, so the candidate generators read
-    // one shape whichever resolution stage drives them.
+    // The search's scan shape, so the candidate generators read one shape.
     index: ctx.index ?? null,
     remaining: seedRemaining(availableItems),
     plan: [],
@@ -497,14 +444,10 @@ function resolveGreedy(availableItems, matcher, ctx, { ingredientGroups, seedRem
   };
 }
 
-/**
- * Resolve one group in the greedy pass, mutating the pass accumulators for a component, tag or
- * currency choice.
- */
+/** Mutates the pass accumulators. */
 function resolveGroupGreedy(group, pass) {
   const options = group.options || [];
-  // Player override (issue 552): resolve the explicitly chosen option instead of the
-  // first-satisfiable default.
+  // A player override (issue 552) replaces the first-satisfiable default.
   const override = resolveGroupOverride(pass.ctx.optionOverrides, group, options);
   if (override) {
     return resolveOverriddenGroupGreedy(group, options[override.optionIndex], override, pass);
@@ -512,7 +455,7 @@ function resolveGroupGreedy(group, pass) {
   return resolveFirstSatisfiableGroupGreedy(group, options, pass);
 }
 
-/** The `optionOverrides` branch of the greedy pass: that option is resolved, satisfiable or not. */
+/** The override is resolved, satisfiable or not. */
 function resolveOverriddenGroupGreedy(group, option, override, pass) {
   if (option?.match?.type === 'currency') {
     const spend = currencySpendFor(option, pass.ctx.affordCurrency);
@@ -533,7 +476,7 @@ function resolveOverriddenGroupGreedy(group, option, override, pass) {
   return { option };
 }
 
-/** The default branch of the greedy pass: items first, then currency. */
+/** Items first, then currency. */
 function resolveFirstSatisfiableGroupGreedy(group, options, pass) {
   let bestMissing = null;
 
@@ -553,10 +496,7 @@ function resolveFirstSatisfiableGroupGreedy(group, options, pass) {
   return resolveCurrencyFallbackGreedy(group, options, bestMissing, pass);
 }
 
-/**
- * The greedy currency fallback: only when no item option satisfied, choose the first affordable
- * currency option, in author order among the currency options.
- */
+/** Only when no item option satisfied: the first affordable currency option. */
 function resolveCurrencyFallbackGreedy(group, options, bestMissing, pass) {
   let fallback = bestMissing;
   for (const option of options) {
@@ -571,10 +511,7 @@ function resolveCurrencyFallbackGreedy(group, options, bestMissing, pass) {
   return { missing: { group, ...fallback } };
 }
 
-/**
- * Emit `selectedIngredients` and `missingGroups` in author-group order, reading each deferred
- * essence group's verdict out of the block's per-requirement partition, parallel to `block.members`.
- */
+/** In author order; each essence group's verdict comes from the block partition. */
 function collectGreedyOutcomes(outcomes, block) {
   const stateByMember = new Map(
     block.members.map((member, index) => [member, block.requirements[index]])
@@ -595,9 +532,8 @@ function collectGreedyOutcomes(outcomes, block) {
         missingGroups.push({
           group: outcome.member.group,
           ingredient: outcome.member.option,
-          // The essence amount the partition assigns this requirement, never the ledger total of
-          // matching items held, which would render `6/4 ✗` for a player who allocated 2 of a
-          // needed 4 while holding 6.
+          // The partition's amount, not the ledger total, which renders `6/4 ✗` for a player
+          // who allocated 2 of a needed 4 while holding 6.
           have: state?.delivered ?? 0,
           need: outcome.member.need,
         });
@@ -608,10 +544,7 @@ function collectGreedyOutcomes(outcomes, block) {
   return { selectedIngredients, missingGroups };
 }
 
-/**
- * A validated `{ optionIndex, heldItemId }` override for a group, or null when there is no override
- * (or it names an out-of-range option, in which case the default author-order resolution applies).
- */
+/** Null when absent or out of range, so the author-order default applies. */
 function resolveGroupOverride(optionOverrides, group, options) {
   const raw = optionOverrides?.[group?.id];
   if (!raw) return null;
@@ -620,10 +553,7 @@ function resolveGroupOverride(optionOverrides, group, options) {
   return { optionIndex: idx, heldItemId: raw.heldItemId ?? null };
 }
 
-/**
- * The affordable currency spend for a currency option, or null when the option is not currency or
- * the actor cannot afford it.
- */
+/** Null for a non-currency option or an unaffordable one. */
 function currencySpendFor(option, affordCurrency) {
   if (option?.match?.type !== 'currency') return null;
   const handler = getMatchHandler(option.match);

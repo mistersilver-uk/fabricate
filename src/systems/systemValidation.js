@@ -1,69 +1,21 @@
 /**
- * Pure system-level validation aggregator.
- *
- * `evaluateSystemValidation(system, { recipes, environments, components })`
- * composes the existing per-entity readiness evaluators (recipe / environment /
- * salvage / signature) into one system-wide report of structured issues, plus a
- * set of NEW system-level blocker checks keyed on the system's own fields (the
- * check / progressive / multi-step / alchemy-signature gaps that make the whole
- * system unusable). The output is a derived/computed view — nothing here is
- * persisted on the `CraftingSystem`.
- *
- * The function is PURE: no Foundry runtime globals (`game`/`ui`/`Hooks`), no
- * store reads, no I/O. It only reads the plain `system`, `recipes`,
- * `environments`, and `components` passed in. This keeps it unit-testable with a
- * plain object graph and reusable from both the synchronous visibility hot-path
- * and the (PR-2) GM overview view.
- *
- * ## Composition contract
- *
- * The per-entity evaluators consume the admin-store PROJECTED shapes, not raw
- * model JSON. This module rebuilds the same projection the editors pass:
- *
- *  - recipes → {@link evaluateRecipeReadiness} with the projected recipe plus
- *    `{ systemComponents, routingProvider, routedOutcomeTierOptions }`, where
- *    `routingProvider` is derived from the system MODE (`'check'` for
- *    `routedByCheck`, the alchemy recipe provider for alchemy, else null) and
- *    `routedOutcomeTierOptions = routedTierOptionsForPolicy(system.craftingCheck?.routed,
- *    system.craftingCheck?.failureResultPolicy)` — the SAME policy-conditional set the
- *    recipe editor's picker offers (issue 1098),
- *    so #431's `unroutedResultGroup` / `unproducedOutcomeTier` warnings surface;
- *  - environments → {@link evaluateEnvironmentReadiness} with the per-environment
- *    composition view-model the caller precomputed (carried as
- *    `environment.composition`), or an empty composition when absent;
- *  - components → {@link ResolutionModeService#validateSalvage}; and
- *  - the system's recipes/components → {@link SignatureValidator#validateSystem}
- *    via an in-memory adapter (no `CraftingSystemManager`).
- *
- * The readiness evaluators live under `src/ui/svelte/apps/manager/...` and are
- * pure (no Svelte/Foundry). Importing them from `src/systems` is a documented
- * pragmatic layering exception — relocating them is an optional follow-up, NOT in
- * scope here. Do not relocate them.
+ * Pure system-level validation: composes the per-entity readiness evaluators (recipe, environment,
+ * salvage, alchemy signature) and the system-level blocker checks into one derived, never persisted
+ * report. It reads only its arguments, never a Foundry global or a store, so the synchronous
+ * visibility hot path and the GM Validation tab share it. The evaluators take the admin store's
+ * PROJECTED shapes, rebuilt here as the editors build them, and recipes get the policy-conditional
+ * `routedOutcomeTierOptions` the recipe editor's picker offers (issue 1098). Importing the
+ * readiness evaluators from `src/ui/svelte/apps/manager/` is a documented layering exception.
  *
  * @typedef {'recipe'|'environment'|'task'|'event'|'salvage'|'system'} IssueKind
- * @typedef {'enable'|'visibility'|'system'|undefined} IssueBlocks
- * @typedef {{ view: string, tab?: string }} IssueNav
- * @typedef {{
- *   kind: IssueKind,
- *   entityId: string|null,
- *   environmentId?: string|null,
- *   entityName: string,
- *   severity: 'critical'|'warning'|'info',
- *   blocks: IssueBlocks,
- *   code: string,
- *   message: string,
- *   nav: IssueNav,
- * }} SystemValidationIssue
- *
- * `environmentId` is the owning gathering environment's id, present on
- * environment-derived issues (`environment`/`task`/`event`). The GM overview's
- * deep-link selects the environment by this id because the environment editor
- * cannot deep-target an individual task/event row.
- * @typedef {{
- *   issues: SystemValidationIssue[],
- *   counts: { critical: number, warning: number, info: number, blockers: number },
- *   blocksSystem: boolean,
- * }} SystemValidationReport
+ * @typedef {{ kind: IssueKind, entityId: string|null, environmentId?: string|null,
+ *   entityName: string, severity: 'critical'|'warning'|'info',
+ *   blocks: 'enable'|'visibility'|'system'|undefined, code: string, message: string,
+ *   nav: { view: string, tab?: string } }} SystemValidationIssue `environmentId` names the owning
+ *   environment of an environment, task or event issue, the environment editor's deep-link target.
+ * @typedef {{ issues: SystemValidationIssue[], blocksSystem: boolean,
+ *   counts: { critical: number, warning: number, info: number, blockers: number } }}
+ *   SystemValidationReport
  */
 
 import { evaluateEnvironmentReadiness } from '../ui/svelte/apps/manager/environment/environmentReadiness.js';
@@ -83,15 +35,8 @@ function asArray(value) {
 }
 
 /**
- * `{ id, tags, essences }` projection of the managed components, matching the admin
- * store's `_buildComponentTagOptions`: tags are trimmed and blanks dropped so a tag
- * requirement's `match.tags` line up with a component's `tags` during expansion, and
- * `essences` carries the numeric-positive essence quantities so an essence option's
- * `expandToComponentIds` resolves the components carrying that essence (without it,
- * essence overlap detection would silently no-op).
- *
- * @param {object[]} components
- * @returns {{ id: string, tags: string[], essences: Record<string, number> }[]}
+ * The `{ id, tags, essences }` projection the admin store builds: trimmed non-blank tags, and the
+ * positive essence quantities without which essence overlap detection would silently no-op.
  */
 function projectComponentTagOptions(components) {
   return asArray(components).map((component) => ({
@@ -103,14 +48,7 @@ function projectComponentTagOptions(components) {
   }));
 }
 
-/**
- * Numeric-positive essence quantities of a component, keyed by trimmed essence id.
- * Mirrors the admin store's essence normalization so essence expansion agrees across
- * the readiness/signature layers.
- *
- * @param {object} essences
- * @returns {Record<string, number>}
- */
+/** A component's positive essence quantities by trimmed id, as the admin store normalizes them. */
 function normalizeComponentEssences(essences) {
   const out = {};
   if (!essences || typeof essences !== 'object') return out;
@@ -124,15 +62,7 @@ function normalizeComponentEssences(essences) {
   return out;
 }
 
-/**
- * Build the projected plain recipe the recipe editor passes to
- * `evaluateRecipeReadiness`. Mirrors the admin store's `_buildRecipeList`
- * projection (sourced from `toJSON()` so step / top-level shapes match
- * `Recipe._normalizeStep` exactly) plus the derived `incomplete` flag.
- *
- * @param {object} recipe Recipe model instance OR plain JSON.
- * @returns {object} Projected recipe.
- */
+/** The admin store's `_buildRecipeList` projection, from `toJSON()`, plus `incomplete`. */
 function projectRecipe(recipe) {
   const raw = typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe || {};
   return {
@@ -150,14 +80,8 @@ function projectRecipe(recipe) {
 }
 
 /**
- * Derive whether a recipe is an incomplete authoring shell — persistable but not
- * craftable. Uses the model's `validate()`/`validateStructure()` when available
- * (the authoritative completeness contract), else a coarse count-only fallback.
- * Mirrors the admin store's `_isRecipeIncomplete`.
- *
- * @param {object} recipe Recipe model instance OR plain JSON.
- * @param {object} raw The recipe's JSON projection.
- * @returns {boolean}
+ * A persistable but uncraftable shell, per the model's `validate()` and `validateStructure()` when
+ * present, else a count-only fallback (the admin store's `_isRecipeIncomplete`).
  */
 function isRecipeIncomplete(recipe, raw) {
   if (typeof recipe?.validate === 'function' && typeof recipe?.validateStructure === 'function') {
@@ -176,11 +100,7 @@ function isRecipeIncomplete(recipe, raw) {
   return asArray(raw?.ingredientSets).length === 0 || asArray(raw?.resultGroups).length === 0;
 }
 
-/**
- * Localized-copy-free message stems. The (PR-2) overview view maps issue `code`
- * to localized strings; this aggregator carries a stable default message so the
- * report is human-readable without the UI layer (logs, tests, headless callers).
- */
+/** Headless English per code; the Validation tab localizes by `code`. */
 const READINESS_ISSUE_MESSAGES = {
   noName: 'Recipe has no name.',
   noIngredientSet: 'A step is missing an ingredient set.',
@@ -204,14 +124,7 @@ function readinessMessage(code) {
   return READINESS_ISSUE_MESSAGES[code] || code;
 }
 
-/**
- * Re-tag a recipe readiness issue as a system-validation issue. Recipe issues
- * deep-link to the recipe editor (`recipe-edit`) with the issue's editor tab.
- *
- * @param {object} issue Issue from `evaluateRecipeReadiness`.
- * @param {object} recipe Projected recipe.
- * @returns {SystemValidationIssue}
- */
+/** A recipe readiness issue, deep-linking to its `recipe-edit` tab. */
 function tagRecipeIssue(issue, recipe) {
   return {
     kind: 'recipe',
@@ -226,18 +139,8 @@ function tagRecipeIssue(issue, recipe) {
 }
 
 /**
- * Re-tag an environment readiness issue. Issues bound to a task/event record
- * (`recordKind`) are kinded `task`/`event`; the rest are environment-level. All
- * three deep-link to the environment editor, which selects an environment by id
- * — so every environment-derived issue carries `environmentId` (the owning
- * environment) for the deep-link, while `entityId` stays the record's own id
- * (task/event record id, or the environment id) for display/identity. The
- * environment editor cannot deep-target an individual task/event row, so
- * selecting the owning environment is the resolvable deep-link target.
- *
- * @param {object} issue Issue from `evaluateEnvironmentReadiness`.
- * @param {object} environment The environment.
- * @returns {SystemValidationIssue}
+ * An environment readiness issue, kinded `task` or `event` when bound to one. The editor selects
+ * only an environment, so every such issue carries its owning `environmentId` for the deep link.
  */
 function tagEnvironmentIssue(issue, environment) {
   const recordKind =
@@ -261,36 +164,21 @@ function tagEnvironmentIssue(issue, environment) {
   };
 }
 
-/**
- * Evaluate the per-recipe readiness issues for every recipe, composing the
- * #431 routing context so its routed-check warnings surface.
- *
- * @param {object} system The crafting system.
- * @param {object[]} recipes Recipe models or JSON.
- * @param {{ id: string, tags: string[] }[]} systemComponents
- * @returns {SystemValidationIssue[]}
- */
+/** Every recipe's readiness issues, with the routing context the routed-check warnings need. */
 function collectRecipeIssues(system, recipes, systemComponents) {
-  // POLICY-CONDITIONAL, and it must read the SAME set the recipe editor's picker offers
-  // (issue 1098, decision 7): the picker swaps to the unfiltered tier list when the
-  // crafting failure-result policy permits results on failure, so a validator still
-  // reading the success-filtered list would report every authored failure-tier assignment
-  // as an unrouted group the moment a GM turned the policy on.
+  // POLICY-CONDITIONAL, the SAME set the recipe editor's picker offers (issue 1098): with failure
+  // results permitted it is the unfiltered tier list, or every failure-tier assignment would read
+  // as an unrouted group.
   const routedOutcomeTierOptions = routedTierOptionsForPolicy(
     system?.craftingCheck?.routed,
     system?.craftingCheck?.failureResultPolicy
   );
-  // The routing basis is the system MODE (not a per-recipe provider): a
-  // `routedByCheck` system routes every recipe by the routed-check outcome, so the
-  // #431 check-routing warnings apply to all its recipes. Alchemy keeps its
-  // per-recipe provider. Other modes route by neither, so no routed warnings fire.
   const mode = system?.resolutionMode || 'simple';
   const issues = [];
   for (const recipe of asArray(recipes)) {
     const projected = projectRecipe(recipe);
-    // The routing basis is the system MODE. Alchemy derives it from the
-    // system-level `alchemy.checkMode` (the retired per-recipe provider is gone):
-    // tiered routes by the routed check (`'check'`), None/Simple route by neither.
+    // The routing basis is the system MODE: `routedByCheck`, and alchemy with a tiered
+    // `alchemy.checkMode`, route by the check; every other mode routes by neither.
     let routingProvider = null;
     if (mode === 'routedByCheck') {
       routingProvider = 'check';
@@ -309,15 +197,7 @@ function collectRecipeIssues(system, recipes, systemComponents) {
   return issues;
 }
 
-/**
- * Evaluate the per-environment readiness issues. The caller precomputes each
- * environment's composition view-model (`{ counts, tasks, events }`) and carries
- * it as `environment.composition`; with none, an empty composition is used so the
- * aggregator stays pure and never reaches into a store.
- *
- * @param {object[]} environments
- * @returns {SystemValidationIssue[]}
- */
+/** Environment readiness issues over each precomputed `composition`, else an empty one. */
 function collectEnvironmentIssues(environments) {
   const issues = [];
   for (const environment of asArray(environments)) {
@@ -331,29 +211,19 @@ function collectEnvironmentIssues(environments) {
 }
 
 /**
- * Evaluate per-component salvage validity. A component whose salvage config is
- * invalid for the system's salvage mode surfaces a `salvage` issue that hides the
- * component's salvage at craft time (`blocks: 'visibility'`), deep-linking to the
- * component editor.
- *
- * @param {object} system The crafting system (with `components` for difficulty lookups).
- * @param {object[]} components
- * @returns {SystemValidationIssue[]}
+ * Components whose declared salvage is invalid for the system's mode, each hiding that salvage from
+ * players (`blocks: 'visibility'`).
  */
 function collectSalvageIssues(system, components) {
-  // Salvage is an optional feature: when off, its config is preserved on components
-  // but inert, so it raises no validation issues (mirrors the runtime/UI gating).
+  // Salvage switched off is preserved but inert, so it raises nothing.
   if (system?.features?.salvage === false) return [];
   const service = new ResolutionModeService();
-  // `validateSalvage` reads `system.components` for progressive difficulty; merge
-  // the passed component list so the check resolves difficulties purely.
+  // `validateSalvage` reads `system.components` for progressive difficulty.
   const systemForSalvage = { ...system, components: asArray(components) };
   const issues = [];
   for (const component of asArray(components)) {
     if (!component?.salvage) continue;
-    // A component with no salvage result sets is simply "not salvageable" — an
-    // opt-in state, not a misconfiguration. Only components that declare at least
-    // one salvage result set are validated against the system salvage mode.
+    // No salvage result sets means "not salvageable", an opt-in state, not a misconfiguration.
     const salvageGroups = Array.isArray(component.salvage.resultGroups)
       ? component.salvage.resultGroups
       : [];
@@ -376,16 +246,8 @@ function collectSalvageIssues(system, components) {
 }
 
 /**
- * Signature-collision blocker for ALCHEMY mode (subsumes #99). In alchemy mode
- * the engine infers the recipe from submitted ingredients, so overlapping
- * ingredient signatures make the whole system ambiguous and unusable. Runs the
- * pure `SignatureValidator` against an in-memory adapter built from the passed
- * recipes/components — no `CraftingSystemManager`.
- *
- * @param {object} system The crafting system.
- * @param {object[]} recipes Recipe models or JSON.
- * @param {object[]} components
- * @returns {SystemValidationIssue[]}
+ * Alchemy only: the engine infers the recipe from what was submitted, so a signature collision
+ * blocks the whole system. The validator runs on an in-memory adapter.
  */
 function collectAlchemySignatureBlockers(system, recipes, components) {
   if (system?.resolutionMode !== 'alchemy') return [];
@@ -412,16 +274,8 @@ function collectAlchemySignatureBlockers(system, recipes, components) {
 }
 
 /**
- * The NEW system-level blocker checks, keyed on the system's own fields. Each
- * makes the whole system unusable → `blocks: 'system'`. Distinct from #431's
- * per-recipe `severity: 'warning'` routed issues (those stay warnings with no
- * `blocks`). The alchemy signature collision is handled separately because it
- * needs the recipe/component graph.
- *
- * @param {object} system The crafting system.
- * @param {object[]} recipes Recipe models or JSON.
- * @param {object[]} components
- * @returns {SystemValidationIssue[]}
+ * The system-level checks on the system's own fields. A `blocks: 'system'` blocker hides the whole
+ * system, unlike the per-recipe routed warnings.
  */
 function collectSystemBlockers(system, recipes, components) {
   const blockers = [];
@@ -429,14 +283,9 @@ function collectSystemBlockers(system, recipes, components) {
   const features = system?.features || {};
   const check = system?.craftingCheck || {};
 
-  // A `routedByCheck` system routes EVERY recipe by the routed crafting-check
-  // outcome, so it needs a configured routed crafting-check roll formula for any
-  // craft to resolve. The only thing that makes a routed check usable is an
-  // authored `craftingCheck.routed.rollFormula` — NOT the `enabled` flag. Because
-  // the routing basis is now the MODE (not a per-recipe provider), a missing
-  // formula is an UNCONDITIONAL system blocker — independent of any recipe, with
-  // NO recipe scan. `routedByIngredients` routes by the chosen ingredient set and
-  // never raises `routedCheckNoFormula` at any formula state.
+  // `routedByCheck` routes every recipe by the routed check, so a missing
+  // `craftingCheck.routed.rollFormula` (never the `enabled` flag) is an unconditional blocker,
+  // with no recipe scan; `routedByIngredients` never raises it.
   if (mode === 'routedByCheck') {
     const hasRoutedFormula = Boolean(trimmed(check.routed?.rollFormula));
     if (!hasRoutedFormula) {
@@ -454,15 +303,10 @@ function collectSystemBlockers(system, recipes, components) {
     }
   }
 
-  // Routed SALVAGE (the system's own `salvageResolutionMode`, independent of the
-  // crafting `mode`) routes a salvage check outcome to a per-component result group
-  // by tier NAME, so it needs BOTH a routed salvage roll formula and at least one
-  // authored outcome tier. Salvage is a per-component opt-in, so "used" = at least
-  // one component declares salvage result groups; mirror the crafting rule's "warn
-  // always, escalate when used". A misconfigured optional feature must NOT hide the
-  // whole system, so these carry no `blocks` field — they surface as a single
-  // actionable issue rather than N per-component criticals (`validateSalvage` defers
-  // the no-tiers gap here precisely so this is the one place it is reported).
+  // Routed salvage needs a roll formula and at least one outcome tier. It warns always and
+  // escalates to critical once any component declares salvage result groups, but never blocks: a
+  // misconfigured optional feature must not hide the system. `validateSalvage` defers the no-tiers
+  // gap here so it is reported once.
   if (features.salvage !== false && system?.salvageResolutionMode === 'routed') {
     const salvageCheck = system?.salvageCraftingCheck || {};
     const hasSalvageFormula = Boolean(trimmed(salvageCheck.routed?.rollFormula));
@@ -499,10 +343,8 @@ function collectSystemBlockers(system, recipes, components) {
     }
   }
 
-  // Progressive mode with no progressive check, or components missing a usable
-  // difficulty: the progressive award math needs an authored progressive roll
-  // formula (a missing formula always blocks, mirroring routed) and per-component
-  // `difficulty >= 1`.
+  // Progressive needs an authored progressive roll formula (a missing one always blocks) and some
+  // component with `difficulty >= 1`.
   if (mode === 'progressive') {
     const progressive = check.progressive || {};
     const hasProgressiveCheck = Boolean(trimmed(progressive.rollFormula));
@@ -536,9 +378,7 @@ function collectSystemBlockers(system, recipes, components) {
     }
   }
 
-  // Multi-step recipes are incompatible with alchemy mode (alchemy attempts are
-  // single-step ingredient matches), so leaving the feature on in alchemy mode
-  // is a structural misconfiguration that breaks recipe authoring.
+  // Alchemy attempts are single-step, so multi-step recipes left on break recipe authoring.
   if (mode === 'alchemy' && features.multiStepRecipes === true) {
     blockers.push({
       kind: 'system',
@@ -552,11 +392,8 @@ function collectSystemBlockers(system, recipes, components) {
     });
   }
 
-  // Alchemy Simple/Tiered check modes make the crafting check MANDATORY, so the
-  // whole system cannot resolve a brew until the selected check slot has an
-  // authored roll formula (Tiered → `craftingCheck.routed`, Simple →
-  // `craftingCheck.simple`). None never checks and never blocks. Readiness is
-  // derived from `alchemy.checkMode`, NOT the retired per-recipe provider.
+  // Simple or Tiered alchemy makes the check MANDATORY on its slot (`simple` or `routed`); None
+  // never checks.
   if (mode === 'alchemy') {
     const alchemyCheckMode = system?.alchemy?.checkMode || 'none';
     const mandatorySlot =
@@ -579,12 +416,9 @@ function collectSystemBlockers(system, recipes, components) {
       });
     }
 
-    // Global alchemy visibility reveals a recipe ONLY from `learnedRecipes`, which has
-    // TWO writers: `alchemy.learnOnCraft`, and the companion contract's GM knowledge
-    // grant (issue 1289). Turning that flag off under Global therefore leaves every
-    // player's Known list empty of anything they can reach for themselves, while a GM
-    // can still grant into it — brewing still works either way, so this is a WARNING
-    // with no `blocks`, not a system blocker (issue 966).
+    // Global visibility reveals an alchemy recipe only from `learnedRecipes`, written by
+    // `learnOnCraft` and the GM knowledge grant (issue 1289); with learning off only a GM can fill
+    // it, and brewing still works, so this is a warning (issue 966).
     const alchemyVisibilityMode = system?.visibilityMode || null;
     if (alchemyVisibilityMode === 'global' && system?.alchemy?.learnOnCraft === false) {
       blockers.push({
@@ -604,18 +438,7 @@ function collectSystemBlockers(system, recipes, components) {
   return blockers;
 }
 
-/**
- * Aggregate every per-entity readiness issue plus the system-level blocker checks
- * into one report.
- *
- * @param {object} system The crafting system (plain projected shape or model).
- * @param {object} [collaborators]
- * @param {object[]} [collaborators.recipes] Recipes in the system (models or JSON).
- * @param {object[]} [collaborators.environments] Gathering environments (each may
- *   carry a precomputed `composition` view-model).
- * @param {object[]} [collaborators.components] Managed components in the system.
- * @returns {SystemValidationReport}
- */
+/** Every readiness issue and system blocker, as one report. */
 export function evaluateSystemValidation(system, { recipes, environments, components } = {}) {
   const systemComponents = projectComponentTagOptions(components);
 
@@ -638,23 +461,10 @@ export function evaluateSystemValidation(system, { recipes, environments, compon
 }
 
 /**
- * The lightweight visibility decision for the synchronous listing hot-path.
- * Computes ONLY the two facts the player-facing visibility gate needs:
- *
- *  - `blocksSystem`: any `blocks: 'system'` blocker is present → the system
- *    exposes NO recipes to non-GM users and the crafting guard rejects; and
- *  - `hiddenEntityIds`: the ids of entities carrying a `blocks: 'visibility'`
- *    issue (the per-entity display guard) — excluded only for non-GM users.
- *
- * It does NOT build localized messages or the full kind-grouped overview, so a
- * per-render listing read stays cheap. Callers should compute it once per
- * listing call (cache it) rather than re-evaluating per entity. GM bypass is the
- * caller's responsibility: a GM must see everything, so callers skip both tiers
- * when `game.user?.isGM` (the gate helpers below encapsulate that).
- *
- * @param {object} system The crafting system.
- * @param {object} [collaborators] Same shape as {@link evaluateSystemValidation}.
- * @returns {{ blocksSystem: boolean, hiddenEntityIds: Set<string> }}
+ * The visibility gate's two facts for the synchronous listing hot path, building no report:
+ * `blocksSystem` (no recipe reaches a non-GM, and crafting refuses) and `hiddenEntityIds` (the
+ * `blocks: 'visibility'` entities hidden from non-GMs). Compute it once per listing; the GM bypass
+ * is the caller's.
  */
 export function computeSystemVisibility(system, { recipes, environments, components } = {}) {
   const systemComponents = projectComponentTagOptions(components);

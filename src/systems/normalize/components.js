@@ -15,9 +15,7 @@ import { normalizeSalvage } from './salvage.js';
  * bag so `_normalizeSalvage` can apply the Simple-mode group-count clamp; a bare call leaves
  * salvage groups untouched. A legacy positional `validEssenceIds` Set is still accepted. */
 export function normalizeComponent(item = {}, options = {}) {
-  // Back-compat: a few call paths and tests still pass a bare `validEssenceIds` Set as
-  // the second positional argument. A Set is never a valid options bag, so treat it as
-  // the essence-ids and run with no salvage context (no clamp).
+  // A bare `validEssenceIds` Set is never an options bag, so it runs with no salvage context.
   const opts = options instanceof Set ? { validEssenceIds: options } : options || {};
   const { validEssenceIds = null, salvageResolutionMode, salvageSimpleCheckHasFormula } = opts;
   const difficulty = Number(item.difficulty);
@@ -64,10 +62,8 @@ export function normalizeComponent(item = {}, options = {}) {
     registeredItemUuid,
     aliasItemUuids,
     tier: item.tier || null,
-    // Single-valued grouping axis (issue 676). Defaults to the reserved `general`
-    // bucket — there is no "uncategorized" state — which is how every EXISTING
-    // component acquires a category with no migration. Distinct from `tags`, which
-    // is many-valued and does a different job.
+    // Single-valued (issue 676), defaulting to the reserved `general`, never "uncategorized",
+    // which is how every existing component gains one without a migration; `tags` is separate.
     category: normalizeComponentCategory(item.category),
     tags: Array.isArray(item.tags) ? item.tags : [],
     essences: normalizeEssenceQuantities(item.essences, validEssenceIds),

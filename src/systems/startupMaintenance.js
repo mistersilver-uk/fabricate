@@ -1,30 +1,10 @@
 /**
- * The entity kinds each startup pass derives its "still valid" answer from (issue 1224).
- *
- * Exported so the declaration can be asserted against the emitted pass list rather than
- * inspected: {@link buildStartupPassList} omits a pass that is NOT declared here, and that
- * rule is only testable while the declaration is a value a test can read and extend.
- *
- * Every pass is declared, including the one that is not hazard-bearing:
- * `pruneInstantaneousActiveRuns` treats an absent recipe as KEEP, the inverse of the
- * inference this gate exists to stop. It is gated for uniformity, and pinning that choice
- * here makes it deliberate rather than accidental.
- *
- * `stale preferences` is declared on the UNION and must not be decomposed. It rewrites one
- * progressive-order map keyed by both `recipe:<id>` and `salvage:<componentId>` as a
- * whole-map replacement, so gating it on the recipe basis alone would wipe every `salvage:`
- * key whenever the component basis is incomplete.
- *
- * `componentIdentityRemap` is a kind about CURRENCY rather than COMPLETENESS, and it is
- * declared only by the two passes that prune against COMPONENT ids (issue 1363). The `1.30.0`
- * world-scope migration MOVES component ids, and the pass that repairs every actor-side
- * reference to them runs later in the same `ready` tick and on the active GM alone. In that
- * window the corpus is complete — so `components: true` is honest — while an in-flight salvage
- * run and a `salvage:<componentId>` ordering key both still name the OLD id. Gating on
- * completeness alone deletes them. Crafting runs are NOT declared on it: they key on recipe
- * and system ids, and neither is ever re-keyed.
- *
- * @type {Readonly<Record<string, readonly string[]>>}
+ * The entity kinds each startup pass derives its "still valid" answer from (issue 1224), exported
+ * so a test can read and extend it. Every pass is declared, even the keep-biased phantom-run prune.
+ * `stale preferences` is declared on the UNION (DOMAIN.md "Valid Id Basis").
+ * `componentIdentityRemap` asks about CURRENCY (issue 1363): the `1.30.0` migration moves component
+ * ids and the actor-side repair runs later in the same `ready` tick on the active GM alone, so the
+ * two passes pruning against component ids declare it.
  */
 export const STARTUP_PASS_ENTITY_KINDS = Object.freeze({
   'crafting runs': Object.freeze(['recipes', 'systems']),
@@ -40,19 +20,8 @@ export const STARTUP_PASS_ENTITY_KINDS = Object.freeze({
 });
 
 /**
- * The id basis a whole-array corpus read yields: every entity kind complete.
- *
- * Each entity class's corpus arrives as ONE whole-array read that either returns the corpus
- * or throws (issue 1261), so no composition site can hold part of a corpus and believe it
- * holds all of it. Both sites therefore declare completeness with this constant rather than
- * computing it.
- *
- * The `basis` parameter it feeds is kept rather than collapsed, and it is not decorative: it
- * is what makes {@link buildStartupPassList} require a declared kind POSITIVELY, so a renamed
- * kind, a threading typo, or a future partial-corpus source omits the pass instead of running
- * it against ids it cannot vouch for.
- *
- * @type {Readonly<Record<string, boolean>>}
+ * Every kind complete, since each class's corpus arrives as one read that returns all of it or
+ * throws (issue 1261). The builder still requires each kind positively, so a typo omits the pass.
  */
 export const WHOLE_CORPUS_ID_BASIS = Object.freeze({
   recipes: true,
@@ -61,37 +30,11 @@ export const WHOLE_CORPUS_ID_BASIS = Object.freeze({
 });
 
 /**
- * Build the startup pass list, omitting any pass whose id basis is not known-complete
- * (issue 1224, `data-models/spec.md` § Valid Id Basis).
- *
- * **Pure.** It reads no globals and performs no work: the candidates arrive as labelled
- * thunks and leave as a subset of the same thunks, unwrapped and uninvoked. That is what
- * makes the omission directly assertable as a `deepEqual` on the emitted labels — the
- * requirement the spec states, and the reason the gate is applied by OMISSION rather than
- * by throwing. `runStartupMaintenance` below catches every throw into a failure label, so a
- * guard that throws from inside a pass arrives after the destructive work has landed.
- *
- * **Shared with the mutation-time door.** `mutationCleanupComposition.js` (issue 1226)
- * calls this same builder with its own `declarations` table, so the startup gate and the
- * gate on recipe/system deletion cannot drift into two gates with different rules. The
- * name is historical; nothing in the body is startup-specific.
- *
- * **An undeclared pass is omitted**, so a future destructive pass cannot ship ungated by
- * forgetting to declare a basis for it. A pass whose declared kind is missing from `basis`
- * is omitted for the same reason: `basis[kind] === true` is required positively, because
- * `basis[kind] !== false` would ship the pass on a renamed key or a threading typo.
- *
- * @param {object} options
- * @param {Array<[string, () => Promise<unknown>]>} options.candidates Every pass this boot
- *   would run if nothing were gated, in run order.
- * @param {Record<string, boolean>} options.basis Per entity kind, whether that kind's id
- *   basis is known-complete. See {@link WHOLE_CORPUS_ID_BASIS}.
- * @param {Readonly<Record<string, readonly string[]>>} [options.declarations] The pass ->
- *   entity-kinds map. A parameter so a test can inject an undeclared sixth pass.
- * @param {(omission: {label: string, incompleteKinds: string[]}) => void} [options.onOmit]
- *   Notified once per omitted pass, with the kinds that decided it. The composition site
- *   uses it to warn; the builder itself reports nothing.
- * @returns {Array<[string, () => Promise<unknown>]>} the passes that may run, in order.
+ * The candidates whose id basis is known-complete, in order (issue 1224, `data-models/spec.md`
+ * § Valid Id Basis). Pure, and it omits rather than throws, since `runStartupMaintenance` catches a
+ * throw only after the destructive work landed. An undeclared pass, or a declared kind not
+ * `=== true` in `basis`, is omitted and reported to `onOmit`. `mutationCleanupComposition.js`
+ * (issue 1226) calls it with its own `declarations`, so the two doors cannot drift.
  */
 export function buildStartupPassList({
   candidates,
@@ -104,7 +47,6 @@ export function buildStartupPassList({
     const [label] = candidate || [];
     const declaredKinds = declarations?.[label];
     if (!Array.isArray(declaredKinds)) {
-      // Undeclared: fail closed and say so, rather than run a pass nothing vouched for.
       onOmit({ label, incompleteKinds: [], undeclared: true });
       continue;
     }
@@ -119,27 +61,8 @@ export function buildStartupPassList({
 }
 
 /**
- * Run the startup housekeeping passes, isolating each one's failure (issue 970).
- *
- * These passes exist to tidy state that names deleted content — runs whose recipe
- * or system is gone, learned entries for a deleted recipe, stale preferences. None
- * of them is a precondition for Fabricate working, but all of them WRITE, so any
- * can reject.
- *
- * Before this guard a single rejection propagated out of `Fabricate#initialize`,
- * `ready` was never set, and every facade method then threw through
- * `_requireReady()` for the rest of the session — while the ready hook's remaining
- * steps (world-time processing and the flag auto-stamps) were skipped too. One
- * stale entry Foundry declined to clean took the whole module down for that client.
- *
- * A failure is reported and the remaining passes still run: they are independent,
- * and a world that cannot clean its salvage runs can still clean its learned
- * recipes.
- *
- * @param {Array<[string, () => Promise<unknown>]>} passes Labelled thunks, run in order.
- * @param {object} [options]
- * @param {(message: string, error: unknown) => void} [options.log] Failure reporter.
- * @returns {Promise<string[]>} The labels of the passes that failed, in order.
+ * Run the passes in order, isolating each failure (issue 970): every pass writes and may reject,
+ * and one escaping the boot would leave the facade unready all session. Answers the failed labels.
  */
 export async function runStartupMaintenance(passes, { log = console.error } = {}) {
   const failed = [];

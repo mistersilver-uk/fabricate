@@ -1,14 +1,9 @@
 /** game.fabricate alchemy owner-gate — the P0 non-owner read-leak boundary (issue 569). */
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import { createFabricateFacadeHarness, makeFacadeActor } from './helpers/fabricateFacadeHarness.js';
-import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
-
 
 // Fixtures — a single alchemy system with two recipes so a non-GM owner sees one learned recipe (+
 // one undiscovered count) while a GM sees both.
@@ -238,62 +233,10 @@ test('submitAlchemyAttempt: GM viewer reaches the engine (bypass)', async () => 
   assert.equal(result.success, true);
 });
 
-// SOURCE-CONTRACT guard — pin the real src/main.js gate.
+test('listAlchemyForActor: an id naming no world actor resolves to nothing, even for a GM', () => {
+  const { facade } = harnessFor(GM);
+  const listing = facade.listAlchemyForActor({ actorId: 'stale', craftingSystemId: 'sys-a' });
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const MAIN_SOURCE = entryModuleSource('src/bootstrap/craftingFacade.js');
-
-test('SOURCE CONTRACT: _resolveCraftingActor gates a non-GM viewer through the real ownership predicate', () => {
-  assert.ok(
-    MAIN_SOURCE.includes('const actor = actorId ? (game.actors?.get?.(actorId) ?? null) : null;'),
-    'resolves the actor id against game.actors, null when absent/stale'
-  );
-  assert.ok(
-    MAIN_SOURCE.includes('if (game.user?.isGM === true) return actor;'),
-    'GM bypass is present'
-  );
-  assert.ok(
-    MAIN_SOURCE.includes(
-      'return isGatheringActorSelectableByUser(actor, game.user) ? actor : null;'
-    ),
-    'a non-GM viewer must pass the ownership predicate or resolve to null (the read-leak boundary)'
-  );
-});
-
-test('SOURCE CONTRACT: listAlchemyForActor threads the owner-gated actor into the leak-safe builder', () => {
-  assert.ok(
-    /listAlchemyForActor\(\{\s*actorId = null,\s*craftingSystemId = null,\s*componentSourceActorIds = null,?\s*\} = \{\}\) \{/.test(
-      MAIN_SOURCE
-    ),
-    'the alchemy read facade exists with the expected signature'
-  );
-  // It must resolve through the shared owner gate and feed the resolved actor to the builder.
-  const facadeStart = MAIN_SOURCE.indexOf('listAlchemyForActor({');
-  assert.notEqual(facadeStart, -1, 'the alchemy read facade is locatable');
-  const facadeBody = MAIN_SOURCE.slice(facadeStart);
-  assert.ok(
-    facadeBody.includes('this._resolveCraftingSources({'),
-    'listAlchemyForActor resolves sources through the shared owner gate'
-  );
-  assert.ok(
-    facadeBody.includes('this._getAlchemyListingBuilder().buildListing({') &&
-      facadeBody.slice(0, facadeBody.indexOf('submitAlchemyAttempt')).includes('craftingActor,'),
-    'the resolved (possibly null) craftingActor is handed to the leak-safe builder'
-  );
-});
-
-test('SOURCE CONTRACT: submitAlchemyAttempt fails closed (disposition:error) when the owner gate denies the actor', () => {
-  const submitStart = MAIN_SOURCE.indexOf('async submitAlchemyAttempt({');
-  assert.notEqual(submitStart, -1, 'the alchemy submit facade is locatable');
-  const submitBody = MAIN_SOURCE.slice(submitStart);
-  assert.ok(
-    submitBody.includes('this._resolveCraftingSources({'),
-    'submitAlchemyAttempt resolves through the shared owner gate'
-  );
-  assert.ok(
-    /if \(!craftingActor\) \{\s*return \{\s*success: false,\s*results: null,\s*message: 'No crafting actor selected',\s*disposition: 'error',?\s*\};/.test(
-      submitBody
-    ),
-    'a denied (null) crafting actor short-circuits to disposition:error before the engine is reached'
-  );
+  assert.equal(listing.denied, true, 'a stale id is not silently retargeted');
+  assert.equal(listing.selectedActorId, null);
 });

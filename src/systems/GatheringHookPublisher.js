@@ -4,57 +4,22 @@ import { arrayOrWrapped as normalizeList, stringOrNull } from '../utils/scalars.
 const SCHEMA_VERSION = 1;
 
 /**
- * Publishes Fabricate's public gathering hooks for other module authors to
- * subscribe to. The publisher owns the payload contract: it normalizes the
- * engine's internal attempt data into a cloned, serializable, public shape and
- * emits it via Foundry's Hooks system. It never throws into the gathering flow —
- * payload building and emission are wrapped, so a malformed source object or a
- * misbehaving subscriber is logged and swallowed.
- *
- * Wired into {@link GatheringEngine} as an injected collaborator so the engine
- * stays free of global lookups and the payload shape has one testable home.
- *
- * @see module:config/hooks for the published hook names.
+ * Publishes the public gathering hooks named in `config/hooks.js` and owns their payload
+ * contract: a cloned, serializable public shape, emitted through `Hooks.callAll`. It never throws
+ * into the gathering flow; a malformed source or a failing subscriber is logged and swallowed.
  */
 export class GatheringHookPublisher {
-  /**
-   * @param {object} [deps]
-   * @param {object} [deps.hooks] - Foundry Hooks-like object exposing `callAll`.
-   *   Defaults to `globalThis.Hooks`. Injected as a fake in tests.
-   * @param {() => number} [deps.nowWorldTime] - Returns the current world time,
-   *   stamped onto the completion payload.
-   */
   constructor({ hooks = globalThis.Hooks, nowWorldTime = () => 0 } = {}) {
     this.hooks = hooks;
     this.nowWorldTime = typeof nowWorldTime === 'function' ? nowWorldTime : () => 0;
   }
 
   /**
-   * Emit the public completion hook for a terminal gathering attempt, then one
-   * event hook per triggered encounter. Called from
-   * {@link GatheringEngine#_terminalStart} after side effects are committed, so
-   * subscribers observe the final, authoritative state.
-   *
-   * For opaque blind attempts (a non-GM viewer of a blind task) the payload is
-   * redacted to match what that client may see: `taskId`/`taskName`,
-   * `gatheredItems`, `usedTools`, `events`, and `checkResult` are omitted and no
-   * per-event hook is emitted.
-   *
-   * The whole method is guarded: it never throws into the caller's flow.
-   *
-   * @param {object} params
-   * @param {object}  params.viewer         - The Foundry user viewing/initiating.
-   * @param {object}  params.actor          - The gathering actor.
-   * @param {object}  params.system         - The crafting system.
-   * @param {object}  params.environment    - The gathering environment.
-   * @param {object}  params.task           - The resolved task.
-   * @param {string}  params.status         - `'succeeded'` | `'failed'`.
-   * @param {object}  params.run            - The persisted terminal run.
-   * @param {Array}   [params.createdResults] - Gathered item refs.
-   * @param {Array}   [params.usedTools]      - Tool breakage plan entries.
-   * @param {object}  [params.checkResult]    - Resolution detail (carries events).
-   * @param {boolean} [params.opaqueBlind]    - True when the viewer may not see detail.
-   * @param {('immediate'|'timed')} [params.initiatedBy] - Resolution trigger.
+   * Emit the completion hook for a terminal attempt, then one event hook per triggered encounter,
+   * after side effects commit so subscribers see the final state. `status` is `succeeded` or
+   * `failed`, `initiatedBy` `immediate` or `timed`. An `opaqueBlind` attempt, a non-GM viewer
+   * of a blind task, nulls `taskId` and `taskName`, omits `gatheredItems`, `usedTools`,
+   * `events` and `checkResult`, and emits no event hooks.
    */
   publishAttemptCompleted({
     viewer,
@@ -100,8 +65,6 @@ export class GatheringHookPublisher {
         hook: GATHERING_HOOKS.ATTEMPT_COMPLETED,
       };
       if (opaqueBlind) {
-        // A non-GM viewer of a blind task sees neither the task identity nor any
-        // attempt detail — including anything nested under checkResult.
         completion.taskId = null;
         completion.taskName = null;
       } else {
@@ -136,12 +99,8 @@ export class GatheringHookPublisher {
   }
 
   /**
-   * Normalize gathered results to the public `{ actorUuid, itemUuid, componentId,
-   * quantity }` shape. `componentId` is dropped by the engine's run-item
-   * normalization, so it is recovered (best-effort) from the resolution's
-   * `checkResult.items` by `itemUuid` and is `null` when unknown.
-   *
-   * @private
+   * Public `{ actorUuid, itemUuid, componentId, quantity }` items. The run drops `componentId`,
+   * so it is recovered from `checkResult.items` by `itemUuid`, else `null`.
    */
   _normalizeGatheredItems(createdResults, checkResult) {
     const componentByItemUuid = new Map();
@@ -173,10 +132,8 @@ export class GatheringHookPublisher {
 }
 
 /**
- * Project an internal tool-breakage plan entry
- * (`{ componentId, itemRef:{actorUuid,itemUuid,quantity}, mode, broken, evidence }`)
- * onto the public `{ componentId, actorUuid, itemUuid, quantity, broken }` shape,
- * deliberately dropping breakage internals (`mode`, `evidence`, `onBreak`).
+ * A tool-breakage plan entry as the public `{ componentId, actorUuid, itemUuid, quantity,
+ * broken }`, without `mode`, `evidence` or `onBreak`.
  */
 function normalizeUsedTool(entry) {
   const ref = entry?.itemRef && typeof entry.itemRef === 'object' ? entry.itemRef : {};

@@ -9,20 +9,13 @@ import { IngredientSet } from './IngredientSet.js';
 import { isEmptyArray, isNull, omitReconstructibleDefaults } from './reconstructibleDefaults.js';
 import { Result } from './Result.js';
 
-/**
- * Canonical default/fallback image for a recipe with no custom image set.
- * Defined in the model (the lowest shared layer) so systems and UI can import
- * a single source of truth without a ui→model/systems layering violation.
- */
+/** The fallback recipe image, in the model so systems and UI share it without a layering break. */
 export const DEFAULT_RECIPE_IMAGE = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
 
 /** The teaser fields hidden by default when a recipe carries no authored teaser block. */
 const DEFAULT_TEASER_HIDDEN_FIELDS = ['ingredients', 'results', 'description'];
 
-/**
- * Whether a normalized teaser block is byte-for-byte the one `_normalizeTeaser` builds for a recipe
- * that has never had a teaser authored.
- */
+/** Whether a teaser block is exactly the one `_normalizeTeaser` builds when none is authored. */
 function isDefaultTeaser(teaser) {
   return (
     teaser?.enabled === true &&
@@ -45,18 +38,15 @@ export const RECIPE_OMITTED_WHEN_DEFAULT = {
   craftingSystemId: isNull,
   system: (value) => value === 'all',
   tags: isEmptyArray,
-  // `allowPlayerResultReorder: true` is omittable and `enabled: true` is NOT, and the difference is
-  // not about the model — both default true on absence — but about who reads the SERIALIZED
-  // payload.
+  // Both default true on absence, but `enabled` is not omittable: other readers of the serialized
+  // payload need it.
   allowPlayerResultReorder: (value) => value === true,
   locked: (value) => value === false,
   recipeItemId: isNull,
   linkedRecipeItemUuid: isNull,
   visibility: isNull,
-  // Both grant lists empty is the only omittable shape, and it is the only one that can co-exist
-  // with an omitted key: `_normalizeAccess` seeds `playerIds` from the legacy
-  // `visibility.allowedUserIds`, so a recipe whose legacy list held anything readable already
-  // reports a NON-empty grant here and is emitted.
+  // Only both-empty is omittable: `_normalizeAccess` seeds `playerIds` from the legacy
+  // `visibility.allowedUserIds`, so a legacy grant reports non-empty here and is emitted.
   access: (value) => value?.characterIds?.length === 0 && value?.playerIds?.length === 0,
   steps: isEmptyArray,
   toolIds: isEmptyArray,
@@ -73,17 +63,11 @@ export const RECIPE_OMITTED_WHEN_DEFAULT = {
   importSource: isNull,
 };
 
-/**
- * Drop every key of a serialized recipe whose value is the one the constructor rebuilds from
- * absence, preserving the emitted key order.
- */
+/** Drop every key the constructor rebuilds from absence, preserving key order. */
 const omitRecipeDefaults = (payload) =>
   omitReconstructibleDefaults(payload, RECIPE_OMITTED_WHEN_DEFAULT);
 
-/**
- * Serialize ONE result group — the recipe-level and step-level emitters share this so the two
- * cannot disagree about the group payload.
- */
+/** Shared by the recipe-level and step-level emitters, so their group payloads agree. */
 function serializeResultGroup(group) {
   const checkOutcomeIds = Array.isArray(group.checkOutcomeIds) ? [...group.checkOutcomeIds] : [];
   return {
@@ -95,10 +79,7 @@ function serializeResultGroup(group) {
   };
 }
 
-/**
- * Represents a crafting recipe Supports simple (A + B = C) and complex (multiple ingredient sets,
- * variable output, essences) modes
- */
+/** A crafting recipe; its Recipe mode (`complex`) is an authoring shape, not a resolution mode. */
 export class Recipe {
   constructor(data = {}) {
     this.id = data.id || foundry.utils.randomID();
@@ -110,19 +91,17 @@ export class Recipe {
     this.system = data.system || 'all';
     this.tags = Array.isArray(data.tags) ? data.tags : [];
     this.enabled = data.enabled === undefined ? true : data.enabled;
-    // GM-authored policy: may a player reorder this recipe's progressive result stages before the
-    // check roll is spent down them?
+    // May a player reorder the progressive result stages before the roll is spent down them?
     this.allowPlayerResultReorder =
       data.allowPlayerResultReorder === undefined ? true : data.allowPlayerResultReorder;
     this.locked = data.locked === true;
     this.recipeItemId = data.recipeItemId || null;
     this.linkedRecipeItemUuid = data.linkedRecipeItemUuid || null;
     this.visibility = this._normalizeVisibility(data.visibility);
-    // Per-recipe access grants (Books & Scrolls `restricted` visibility mode): which specific
-    // characters and players may see/read this recipe.
+    // Grants for the Books & Scrolls `restricted` visibility mode.
     this.access = this._normalizeAccess(data.access, data.visibility);
 
-    // Input requirements (at least one set must be satisfied)
+    // At least one set must be satisfied.
     this.ingredientSets = (data.ingredientSets || []).map((s) =>
       s instanceof IngredientSet ? s : IngredientSet.fromJSON(s)
     );
@@ -130,21 +109,17 @@ export class Recipe {
       ? data.steps.map((step, idx) => this._normalizeStep(step, idx))
       : [];
 
-    // Output groups (canonical).
     this.resultGroups = this._normalizeResultGroups(data);
     this.results = this.resultGroups.flatMap((group) => group.results);
 
-    // Authoring complexity: Simple (one ingredient set + one result set, streamlined UI) vs Complex
-    // (multiple sets, full UI).
+    // Derived from the shape when absent; a reserved `role: 'failure'` group keeps it Simple.
     this.complex = typeof data.complex === 'boolean' ? data.complex : this._deriveComplex(data);
 
-    // Recipe-level shared library tool references (per-system Tool ids).
     this.toolIds = this._normalizeToolIds(data.toolIds);
 
-    // Recipe-level duration for the implicit (single) step.
+    // The implicit single step's duration.
     this.timeRequirement = this._normalizeTimeRequirement(data.timeRequirement);
 
-    // Recipe behaviour
     this.isVariable = data.isVariable === undefined ? false : data.isVariable;
     this.transferEffects = data.transferEffects === undefined ? false : data.transferEffects;
     this.outcomeRouting =
@@ -152,23 +127,19 @@ export class Recipe {
         ? { ...data.outcomeRouting }
         : null;
     this.resultSelection = this._normalizeResultSelection(data.resultSelection);
-    // Optional reference to a simple-check recipe tier (its id).
     this.checkTierId =
       typeof data.checkTierId === 'string' && data.checkTierId.trim()
         ? data.checkTierId.trim()
         : null;
-    // Optional reference to a fixed-type routed check's success outcome tier (its id).
     this.minSuccessOutcomeId =
       typeof data.minSuccessOutcomeId === 'string' && data.minSuccessOutcomeId.trim()
         ? data.minSuccessOutcomeId.trim()
         : null;
-    // The recipe author's PICK of crafting-check modifiers (issues 770, 1055), honoured only under
-    // the system's `bySubject` combination rule.
+    // Honoured only under the system's `bySubject` combination rule (issues 770, 1055).
     this.craftingModifier = this._normalizeCraftingModifier(data.craftingModifier);
     this.currencyCost = this._normalizeCurrencyCost(data.currencyCost);
     this.teaser = this._normalizeTeaser(data.teaser);
 
-    // Metadata
     this.metadata = data.metadata || {
       created: Date.now(),
       modified: Date.now(),
@@ -176,16 +147,12 @@ export class Recipe {
       version: '1.0.0',
     };
 
-    // Durable settings-payload provenance stamped by the compendium importer (NOT a Foundry flag):
-    // identifies the source pack so a later reinstall can prune the recipes the pack dropped
-    // WITHOUT touching GM-authored recipes.
+    // The importer's provenance, not a Foundry flag: a reinstall prunes what the pack dropped
+    // without touching GM-authored recipes.
     this.importSource = this._normalizeImportSource(data.importSource);
   }
 
-  /**
-   * Normalize the recipe author's crafting-check modifier pick (issues 770, 1055) to `{ modifierIds
-   * } | null`.
-   */
+  /** To `{ modifierIds } | null` (issues 770, 1055). */
   _normalizeCraftingModifier(craftingModifier) {
     if (!craftingModifier || typeof craftingModifier !== 'object') return null;
     // The authored-ness of the set is decided HERE, before any filtering.
@@ -193,7 +160,7 @@ export class Recipe {
     return authoredCheckModifierIds(craftingModifier.modifierIds, 'modifierIds');
   }
 
-  /** Normalize durable import provenance to `{ systemId, importedAt } | null`. */
+  /** To `{ systemId, importedAt } | null`. */
   _normalizeImportSource(importSource) {
     if (!importSource || typeof importSource !== 'object') return null;
     const systemId = typeof importSource.systemId === 'string' ? importSource.systemId.trim() : '';
@@ -202,7 +169,6 @@ export class Recipe {
     return { systemId, importedAt: Number.isFinite(importedAt) ? importedAt : 0 };
   }
 
-  /** Get a simple description of what this recipe produces */
   getResultDescription() {
     if (this.resultGroups.length === 0) return 'No result';
     if (this.resultGroups.length === 1 && this.resultGroups[0].results.length === 1) {
@@ -211,9 +177,7 @@ export class Recipe {
     return `${this.resultGroups.length} result groups`;
   }
 
-  /** Check if this is a simple recipe (no advanced features) */
   isSimpleRecipe(craftingSystem = null) {
-    // Single ingredient set with exact item matching (no tags)
     const firstSet = this.ingredientSets[0];
     const groups = Array.isArray(firstSet?.ingredientGroups) ? firstSet.ingredientGroups : [];
     const hasSimpleIngredients =
@@ -247,28 +211,22 @@ export class Recipe {
   }
 
   /**
-   * Validate that this recipe has all required data, including completeness (ingredient sets and
-   * result groups required to craft). `Roll` is threaded to `Result.validate`, which reports
-   * nothing about a rolled amount without it.
+   * Structure plus completeness (the sets and groups a craft needs). Without `Roll`,
+   * `Result.validate` reports nothing about a rolled amount.
    */
   validate({ Roll } = {}) {
     return this._validate({ requireComplete: true, Roll });
   }
 
-  /**
-   * Validate this recipe's structural integrity only, waiving completeness (missing ingredient sets
-   * / result groups).
-   */
+  /** Structure only, waiving completeness. */
   validateStructure({ Roll } = {}) {
     return this._validate({ requireComplete: false, Roll });
   }
 
-  /** Internal validation implementation. */
   _validate({ requireComplete = true, Roll } = {}) {
-    // Structured, coded issues (issue 595): each carries a stable `code` + id-free params
-    // (step/set/result-group/result label as name-or-1-based-position, and a pre-composed
-    // `location` context phrase — `Recipe` or `Step "<label>"`), so the UI can localize every
-    // structural failure id-free. An UNCODED plain string passes through as `{ code: null }`.
+    // Coded issues (issue 595): a stable `code` plus id-free params and a `location` phrase
+    // (`Recipe` or `Step "<label>"`), so the UI localizes every failure without ids. An uncoded
+    // string passes through as `{ code: null }`.
     const issues = [];
     const plain = (message) => {
       issues.push({ code: null, params: {}, message });
@@ -339,7 +297,6 @@ export class Recipe {
       ? new Set(this.steps.flatMap((step) => (step.resultGroups || []).map((group) => group.id)))
       : resultGroupIds;
 
-    // Variable recipe validation.
     if (this.isVariable) {
       for (const [setIndex, ingredientSet] of this.ingredientSets.entries()) {
         for (const mappingId of ingredientSet.resultMapping) {
@@ -358,8 +315,7 @@ export class Recipe {
     if (this.outcomeRouting && typeof this.outcomeRouting === 'object') {
       for (const [outcome, resultGroupId] of Object.entries(this.outcomeRouting)) {
         if (resultGroupId && !routableResultGroupIds.has(resultGroupId)) {
-          // `outcome` is an authored routing keyword, not an id; the dangling group id is dropped
-          // rather than echoed.
+          // `outcome` is an authored keyword; the dangling group id is not echoed.
           issues.push(buildRecipeActivationIssue('outcomeRoutingInvalidResultGroup', { outcome }));
         }
       }
@@ -372,10 +328,7 @@ export class Recipe {
     };
   }
 
-  /**
-   * A human-readable label for a step / ingredient set / result group / result — the author-given
-   * `name` when present, otherwise a 1-based POSITION (issue 595).
-   */
+  /** The authored `name`, else a 1-based position (issue 595). */
   _entityLabel(entity, index) {
     const name = typeof entity?.name === 'string' ? entity.name.trim() : '';
     return name || String(index + 1);
@@ -398,10 +351,7 @@ export class Recipe {
     }));
   }
 
-  /**
-   * Validate one scope's result groups: unique ids, non-empty contents, each result valid.
-   * `requireResults` is false for a non-terminal step, whose groups may award nothing (issue 1907).
-   */
+  /** Unique ids, non-empty contents and valid results, per `requireResults` (issue 1907). */
   _validateResultGroups(
     resultGroups,
     location,
@@ -419,9 +369,8 @@ export class Recipe {
       }
       resultGroupIds.add(group.id);
       if (!Array.isArray(group.results) || group.results.length === 0) {
-        // Two exemptions from the contents rule: the reserved alchemy Simple failure group
-        // (`role: 'failure'`), empty-by-default on a failed check (issue 554), and any group on a
-        // non-terminal step, which may award nothing while the run advances (issue 1907).
+        // Exempt: the alchemy Simple failure group (`role: 'failure'`, issue 554) and any group
+        // on a non-terminal step (issue 1907).
         if (requireComplete && requireResults && group.role !== 'failure') {
           issues.push(
             buildRecipeActivationIssue('resultGroupEmpty', { location, group: groupLabel })
@@ -462,13 +411,10 @@ export class Recipe {
   ) {
     if (!requireComplete) return;
     const provider = resultSelection?.provider;
-    // Only a legacy provider routes by ResultGroup.name; a recipe with no resultSelection (every
-    // current mode after issue 554) is unaffected.
+    // Only a legacy provider routes by ResultGroup.name; no current mode has one (issue 554).
     if (!['ingredientSet', 'check'].includes(provider)) return;
 
-    // Reserved + unique ResultGroup.name rules apply under a legacy provider (spec 004
-    // §routedByCheck Validation), using the shared keyword set so the model and
-    // ResolutionModeService never drift.
+    // The shared keyword set, so the model and ResolutionModeService never drift.
     const seenNames = new Set();
     for (const group of resultGroups || []) {
       const normalized = normalizeRoutedName(group?.name);
@@ -491,7 +437,6 @@ export class Recipe {
     }
   }
 
-  /** Serialize to the canonical persisted recipe shape. */
   toJSON() {
     return omitRecipeDefaults({
       id: this.id,
@@ -541,7 +486,6 @@ export class Recipe {
     return new Recipe(data);
   }
 
-  /** Create a simple recipe with minimal configuration */
   static createSimple(name, ingredients, result) {
     return new Recipe({
       name,
@@ -577,7 +521,6 @@ export class Recipe {
     });
   }
 
-  /** Derive the default Complex flag from raw construction data. */
   _deriveComplex(data = {}) {
     const scopeHasFailureGroup = (scope) =>
       (Array.isArray(scope?.resultGroups) ? scope.resultGroups : []).some(
@@ -598,10 +541,8 @@ export class Recipe {
 
   _normalizeResultSelection(resultSelection) {
     if (!resultSelection || typeof resultSelection !== 'object') return null;
-    // `ingredientSet` and `check` are the only providers still recognised here, but the per-recipe
-    // provider is RETIRED (issue 554): alchemy routing moved to the system-level
-    // `alchemy.checkMode` and the routed crafting modes derive their basis from the system mode,
-    // so no live mode carries a `resultSelection`; this only round-trips a legacy provider.
+    // Retired per recipe (issue 554): no live mode carries a `resultSelection`, so this only
+    // round-trips a legacy `ingredientSet` or `check` provider.
     const VALID_PROVIDERS = ['ingredientSet', 'check'];
     const provider = String(resultSelection.provider || '').trim();
     if (!VALID_PROVIDERS.includes(provider)) return null;
@@ -613,11 +554,9 @@ export class Recipe {
       return data.resultGroups.map((group, idx) => ({
         id: group?.id || foundry.utils.randomID(),
         name: group?.name || `Result Group ${idx + 1}`,
-        // Reserved role discriminator for the alchemy Simple failure result group (`'failure'`;
-        // absent/other = success).
+        // `'failure'` marks the alchemy Simple failure group; anything else is success.
         ...(group?.role === 'failure' && { role: 'failure' }),
-        // Routed check-mode routing: ids of the system's routed-check outcome tiers that produce
-        // this group.
+        // The routed-check outcome tiers that produce this group.
         checkOutcomeIds: this._normalizeIdList(group?.checkOutcomeIds),
         results: (group?.results || []).map((r) => (r instanceof Result ? r : Result.fromJSON(r))),
       }));
@@ -636,7 +575,6 @@ export class Recipe {
     });
   }
 
-  /** Coerce a value into a deduped array of trimmed, non-empty id strings. */
   _normalizeIdList(value, { stringsOnly = false } = {}) {
     if (!Array.isArray(value)) return [];
     const seen = new Set();
@@ -651,10 +589,7 @@ export class Recipe {
     return out;
   }
 
-  /**
-   * Normalize per-recipe access grants into `{ characterIds, playerIds }`, each a deduped array of
-   * non-empty id strings (non-strings are ignored).
-   */
+  /** To `{ characterIds, playerIds }`, deduped non-empty strings. */
   _normalizeAccess(access, visibility) {
     const source = access && typeof access === 'object' ? access : {};
     const characterIds = this._normalizeIdList(source.characterIds, { stringsOnly: true });
@@ -685,10 +620,7 @@ export class Recipe {
     };
   }
 
-  /**
-   * Validate a step/recipe time requirement: every present unit must be a finite, non-negative
-   * number.
-   */
+  /** Every present unit must be a finite, non-negative number. */
   _validateTimeRequirement(timeRequirement, location, issues) {
     if (!timeRequirement) return;
     for (const unit of ['minutes', 'hours', 'days', 'months', 'years']) {
@@ -750,9 +682,6 @@ export class Recipe {
     };
   }
 
-  /**
-   * Normalize an array of library tool id strings: coerce to trimmed, non-empty, deduped strings.
-   */
   _normalizeToolIds(toolIds) {
     if (!Array.isArray(toolIds)) return [];
     const seen = new Set();

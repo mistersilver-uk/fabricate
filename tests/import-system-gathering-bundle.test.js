@@ -9,23 +9,12 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { entrySources } from './helpers/bootstrapEntrySource.js';
-
 
 const { makeHarness, exportCurrent } = await import('./helpers/authoringExportHarness.js');
 const { prepareForImport } = await import('../src/systems/CraftingSystemExporter.js');
 const { CompendiumImporter } = await import('../src/systems/CompendiumImporter.js');
 const { buildFullAuthoringFixture, FIXTURE_SYSTEM_ID } =
   await import('./helpers/fullAuthoringFixture.js');
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainSource = [
-  entrySources['src/bootstrap/composeServices.js'],
-  entrySources['src/bootstrap/publicApi.js'],
-].join('\n');
 
 // A thin delegating environment store that resolves its target lazily, reproducing
 // the exact seam `src/main.js` passes when the real store does not exist yet.
@@ -187,50 +176,6 @@ test('#699 keep-mode API-path round-trip preserves the gathering authoring bundl
   assert.deepEqual(second.gatheringConfig, first.gatheringConfig);
 });
 
-test('source contract: src/bootstrap/composeServices.js builds the shared CompendiumImporter with the gathering seams', () => {
-  const marker = 'fabricate.compendiumImporter = new CompendiumImporter(';
-  const start = mainSource.indexOf(marker);
-  assert.ok(start >= 0, 'located the shared CompendiumImporter construction in src/bootstrap/composeServices.js');
-  const closure = mainSource.slice(
-    start,
-    mainSource.indexOf('fabricate.craftingEngine = new CraftingEngine(')
-  );
-  assert.ok(closure.length > 0, 'isolated the importer construction closure');
-
-  // The mutation-sensitive assertion: the pre-fix 2-arg seamless construction
-  // (`new CompendiumImporter(this.craftingSystemManager, this.recipeManager);`)
-  // does NOT match and fails here.
-  assert.match(
-    closure,
-    /new CompendiumImporter\(\s*fabricate\.craftingSystemManager,\s*fabricate\.recipeManager,\s*\{/,
-    'the shared importer must be constructed with a seams object'
-  );
-
-  // Lazy resolution of the environment store (constructed AFTER the importer).
-  assert.ok(
-    closure.includes('fabricate.gatheringEnvironmentStore?.list'),
-    'environmentStore seam must resolve the field lazily'
-  );
-  assert.match(closure, /environmentStore:/, 'wires the environmentStore seam');
-
-  // The world realm store is constructed after the importer too, so its seam resolves lazily for
-  // the same reason. Dropping it sends the travel merge back to the raw setting write, which lands
-  // the library BEHIND the store's cache and leaves a hook-free world rejecting realm-gated
-  // environments (issue 1858).
-  assert.match(closure, /travelStore:/, 'wires the travelStore seam');
-  assert.ok(
-    closure.includes('fabricate.gatheringRealmStore?.'),
-    'travelStore seam must resolve fabricate.gatheringRealmStore lazily'
-  );
-  assert.match(
-    closure,
-    /getSetting:\s*\(key\)\s*=>\s*getSetting\(key\)/,
-    'wires the getSetting seam'
-  );
-  assert.match(
-    closure,
-    /setSetting:\s*\(key,\s*value\)\s*=>\s*setSetting\(key,\s*value\)/,
-    'wires the setSetting seam'
-  );
-  assert.match(closure, /isGM:\s*\(\)\s*=>\s*game\.user\?\.isGM === true/, 'wires the isGM gate');
-});
+// The composition root's own importer: its seams resolve each store LAZILY, its setting pair
+// reaches the world settings, and its GM gate admits GMs alone. A real boot proves all three in
+// `tests/bootstrap/fabricate-boot-contract.test.js`, the golden's `importerSeams`.

@@ -140,6 +140,11 @@ A thrown error propagates to the caller (no Foundry notification-swallow), which
 - `CraftingSystemManager` uses `getSystems()` and `getItems(systemId)`.
 - V13 `CalendarData#timeToComponents().day` is the day-*of-year* (0-based, and it resets every year), NOT a cumulative campaign day.
 Compose an absolute/monotonic day from `year` + `day` (plus a days-per-year seam) before showing it — see `daysPerYearFromCalendar` (`src/systems/foundryCalendar.js`) and `worldTimeLabel` (`src/ui/svelte/util/worldTimeLabel.js`).
+- **`src/systems/foundryCalendar.js` derives interval lengths from the world calendar, `game.time.calendar`, an instance of `CONFIG.time.worldCalendarClass` (core default `foundry.data.CalendarData`, the same schema on V13.351 and V14.365), through these fields.**
+A day is `days.hoursPerDay * days.minutesPerHour * days.secondsPerMinute`, else the measured difference `componentsToTime({ day: 1 }) - componentsToTime({ day: 0 })`, else the Earth day of 86,400 seconds.
+A week is the weekday count `days.values.length` times the day length, else seven days, and the Earth week of 604,800 seconds when there is no calendar at all.
+A year is `days.daysPerYear`, else the sum of `months.values[].days`, else unresolved, so the caller falls back to a within-year day.
+Fabricate fixes minutes and hours at 60 and 3,600 seconds and never reads them from the calendar, although `CalendarData` makes `days.secondsPerMinute` and `days.minutesPerHour` configurable, so under a custom calendar only Fabricate's day and week lengths follow it.
 - A run's persisted `componentSourceActorUuids` are UUIDs (not ids) — resolve them with `fromUuid`/`fromUuidSync`, never `game.actors.get`.
 See `resolveAdvanceSources` (`src/systems/advanceCraftingSources.js`).
 - **The player-path ownership gate lives in the `src/bootstrap/craftingFacade.js` facade, not in `CraftingEngine`.** `CraftingEngine.craft` / `salvage` contain **no ownership check at all** — they resolve the actor uuid they are handed and mutate that actor's Items directly.
@@ -314,9 +319,17 @@ Every collaborator in `InteractableManager` (`src/canvas/InteractableManager.js`
 - **V14 retired the `rollMode` chat vocabulary in favour of `messageMode`.**
 On 14.365 `core.rollMode` survives only as a deprecated shim setting, registered in `client/game.mjs`, that maps `core.messageMode` back to a legacy string, so any read of it returns a truthy value and trips `Roll#toMessage`'s own deprecation warning in `client/dice/roll.mjs` — which carries **no `once`**, so it fires once per roll rather than once per session, unlike the setting-read warning itself, which **is** `{once: true}`.
 Do not conflate the two: reading the setting warns once per session; the truthy value it hands to `Roll#toMessage` then warns again on every single roll, which is the one that matters for a bulk resolve.
-An unrecognised mode also changes failure shape across the boundary: on 13.351 `ChatMessage.applyRollMode` falls back to a GM whisper, while on 14.365 `applyMode` throws on `CONFIG.ChatMessage.modes[mode]` being undefined.
+An unrecognised mode also changes failure shape across the boundary: on 13.351 `ChatMessage.applyRollMode` treats every mode other than `publicroll` and `selfroll` as a GM whisper (keeping an already non-empty `whisper`) and sets `blind` only for `blindroll`, so a V14 key never posts publicly there but `blind` loses its blindness, while on 14.365 `applyMode` throws reading `handler` of an undefined `CONFIG.ChatMessage.modes[mode]`.
 Both fail safe on Fabricate's own check-roll path regardless, because the chat post is wrapped in a swallowed-error guard (`checkRoll.js`), so the roll still returns a valid total and only the chat message is lost.
 This narrows any future fix to threading `messageMode` instead of `rollMode`, not merely silencing the warning (issue 1293; reported by Foundry review, core source not in this tree).
+- **A roll-free chat card's visibility is applied to its data, with the applier and its vocabulary chosen together.**
+`ChatMessage#_preCreate` maps the legacy `rollMode` create option only inside `if ( this.isRoll )`, and `isRoll` is `rolls.length > 0` (`client/documents/chat-message.mjs`, V13.351 and V14.365), so `ChatMessage.create(data, {rollMode: 'blindroll'})` for a card carrying no rolls maps nothing and posts it publicly.
+V14.365 applies a `messageMode` create option outside that guard, but V13.351 has no such option.
+V13's `ChatMessage.applyRollMode` takes the legacy tokens (`publicroll`, `gmroll`, `blindroll`, `selfroll`) and V14's `ChatMessage.applyMode` takes `CONFIG.ChatMessage.modes` keys (`public`, `gm`, `blind`, `self`, `ic`), and neither applier accepts the other's vocabulary (the `rollMode` bullet above gives each build's failure shape), though V14.365 keeps `applyRollMode` as a deprecated static until V16 that maps legacy tokens through `Roll._mapLegacyRollMode`, so only an `applyMode` probe tells the builds apart.
+`Roll#toMessage` translates only its legacy `rollMode` option through `Roll._mapLegacyRollMode`, so a token passed as `messageMode` reaches `applyMode` untranslated (`client/dice/roll.mjs`, V14.365).
+`src/systems/bulkChatVisibility.js` therefore probes `typeof ChatMessage.applyMode === 'function'`, a static that a subclassed `CONFIG.ChatMessage.documentClass` inherits, and picks the applier and the vocabulary in that one step, translating through a copy of core's `_mapLegacyRollMode` table.
+An unmapped token passes through rather than defaulting to `public`, because V14.365's deprecated `core.rollMode` shim answers `ic` verbatim for an In-Character user, and a `?? 'public'` default would also downgrade a blind client default to public.
+`applyMode`'s `ic` branch reads `chatData.speaker.actor` unguarded, so every caller sets `speaker` before the visibility pass, and a build exposing neither applier makes `applyBulkChatVisibility` throw into the caller's `catch` rather than post with core's public default.
 - **`Localization#format` is a real, separately-declared method on V13 and a bare alias of `localize` on V14, with no deprecation warning either way.**
 On V13.351, `client/helpers/localization.mjs` declares `format(stringId, data={})` as its own method, calling `this.localize(stringId)` internally, and its `localize(stringId)` takes no `data` argument at all.
 On V14.365 the class declares only `localize(stringId, data)` — which now accepts `data` itself — and `format` is not declared as a method anywhere in the class body; it survives solely because the module ends with `Object.defineProperties(Localization.prototype, {format: {value: Localization.prototype.localize}})`, a non-enumerable alias pointing at the same function as `localize`.
@@ -415,6 +428,14 @@ The authority ledger MUST stay a world `JournalEntry`, and that is a correctness
 `JournalEntry.dump()` takes no user and applies no ownership filter, so the `ownership: {default: 0}` ledger is present in every player's `game.journal` from the connect payload alone.
 Every player-side read in `createFoundryJournalRunAuthority` in `src/systems/journalRunAuthority.js` relies on that: move the ledger into a compendium, or assume its absence, and each player client resolves `ledger-missing` and refuses every Journal run control permanently.
 The restored-availability announcement is local in the same way — `Hooks.callAll` never crosses the socket, so a remote client re-derives only because the core `deleteJournalEntryPage` hook fires its own refresh, which holds because the collection delete precedes the `callAll`.
+
+### What the boot contract's lab shim cannot show
+
+`tests/bootstrap/fabricate-boot-contract.test.js` boots the real entry inside the View Lab's Foundry shim, `installFoundryShim` in `tests/view-lab/foundry/installFoundryShim.js`, and four of that shim's limits bound what a boot claim can prove.
+The default lab user is both `game.user` and `game.users.activeGM`, so an `isGM`, active-GM or primary-GM gate cannot be told apart on it; `probeGmGates` in `tests/helpers/bootContractProbes.js` asks each wired gate again as an assistant GM and as a player.
+The lab world binds `game.fabricate` before the lifecycle replay and keeps `game.ready` true throughout, so an init-timing claim reads a member only `bindFabricateGlobal` installs rather than the global's identity or `game.ready`.
+The shim's `game.settings.register` keeps only a setting's default and its `set` never calls `onChange`, so a setting's `onChange` is asserted through a recorder on `register`, never through `game.settings.settings`.
+Its `Hooks.call` and `Hooks.callAll` run no listener and its `once` is `on`, so a hook claim asserts the recorded `callAll` name and arguments or calls the registered handler directly, never an effect further down.
 
 ### Manager confirm-discard guard
 

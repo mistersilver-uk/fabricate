@@ -1647,7 +1647,30 @@
     "toolScopeStoreIsShared": true,
     "vocabularyScopeStoreIsShared": true,
     "readyFlag": true,
-    "whenReadyResolution": "resolved"
+    "whenReadyResolution": "resolved",
+    "gatheringEngineTookEnvironmentStore": true,
+    "gatheringEngineTookRunManager": true,
+    "gatheringEngineTookRichState": true,
+    "gatheringEngineTookEvaluator": true,
+    "gatheringEngineTookSystemManager": true,
+    "gatheringEngineTookSelectableActors": true,
+    "gatheringEngineTookRunViewer": true,
+    "gatheringEngineTookLocalize": true,
+    "gatheringEngineTookLocationResolver": true,
+    "gatheringEngineTookTravelStore": true,
+    "gatheringEngineTookBlindRunStore": true,
+    "gatheringEngineTookComplicationWriter": true,
+    "gatheringEngineTookPauseCheck": true,
+    "gatheringEngineSelectsByOwnership": true,
+    "gatheringEngineTookJournalAuthority": true,
+    "gatheringEngineHasToolSeams": true,
+    "recipeManagerResolvesLiveSystemManager": true,
+    "recipeManagerResolvesLiveSystem": true,
+    "currencyStoreIsTheWorldStore": true,
+    "richStateDepletesThroughWriter": true,
+    "createSettingSharesUpdateSettingListener": true,
+    "journalPageDeleteSharesCreateRefresh": true,
+    "userConnectedSharesUpdateUserBootstrap": true
   },
   "compositionLog": [
     "bind:game.fabricate",
@@ -1687,6 +1710,21 @@
     "assign:gatheringBlindStartWriter",
     "assign:complicationDeliveryWriter",
     "assign:ready"
+  ],
+  "worldStoreOrder": [
+    "assign:componentScopeStore",
+    "load:componentScopeStore",
+    "assign:essenceScopeStore",
+    "load:essenceScopeStore",
+    "assign:toolScopeStore",
+    "load:toolScopeStore",
+    "assign:worldVocabularyStore",
+    "load:worldVocabularyStore",
+    "corpus:componentScopeStore",
+    "corpus:essenceScopeStore",
+    "corpus:toolScopeStore",
+    "assign:recipeManager",
+    "assign:craftingSystemManager"
   ],
   "keybindingRegistrations": [
     {
@@ -1820,5 +1858,148 @@
       "failsAttached": false,
       "failsDetached": true
     }
-  ]
+  ],
+  "publicHookNames": [
+    "fabricate.gathering.attemptCompleted",
+    "fabricate.gathering.eventTriggered",
+    "fabricate.manager.navProviderRegistered",
+    "fabricate.manager.navProviderUnregistered",
+    "fabricate.manager.surfaceMounted",
+    "fabricate.manager.surfaceTabChanged",
+    "fabricate.manager.surfaceUnmounted",
+    "fabricate.player.navProviderRegistered",
+    "fabricate.player.navProviderUnregistered",
+    "fabricate.player.surfaceMounted",
+    "fabricate.player.surfaceTabChanged",
+    "fabricate.player.surfaceUnmounted"
+  ],
+  "startupMarks": [
+    "fabricate:initialize:start",
+    "fabricate:migrations:start",
+    "fabricate:migrations:end",
+    "fabricate:data-load:start",
+    "fabricate:data-load:end",
+    "fabricate:startup-maintenance:start",
+    "fabricate:startup-maintenance:end",
+    "fabricate:initialize:end"
+  ],
+  "readySequence": [
+    "craftingSystemManager.initialize",
+    "gatheringEnvironmentStore.load",
+    "craftingRuns.processWorldTime",
+    "callAll:fabricate.ready"
+  ],
+  "gmGates": {
+    "gatheringResumeTimedRuns": {
+      "activeGmAllowed": true,
+      "assistantGmRefused": true,
+      "playerRefused": true
+    },
+    "craftingRunResume": {
+      "activeGmAllowed": true,
+      "assistantGmRefused": true,
+      "playerRefused": true
+    },
+    "salvageRunResume": {
+      "activeGmAllowed": true,
+      "assistantGmRefused": true,
+      "playerRefused": true
+    }
+  },
+  "settingBridge": [
+    "craftingSystemManager.reload",
+    "recipeManager.reload",
+    "gatheringEnvironmentStore.load"
+  ],
+  "worldTimeDispatch": {
+    "craftingRuns": [
+      4242
+    ],
+    "salvage": [
+      4242,
+      4343
+    ],
+    "gathering": [
+      4242,
+      4343
+    ],
+    "versionedCrafting": [
+      {
+        "worldTime": 4242
+      }
+    ]
+  },
+  "craftCommand": {
+    "suppressesChat": true,
+    "delegatesToFacadeCraft": true
+  },
+  "journalAuthorityHooks": [
+    "refresh",
+    "refresh",
+    "bootstrap",
+    "bootstrap"
+  ],
+  "environmentRunCleanup": [
+    [
+      "removeRunsForSystem",
+      "system-probe"
+    ],
+    [
+      "removeRunsForEnvironment",
+      "environment-probe"
+    ],
+    [
+      "removeRunsForTask",
+      "task-probe",
+      {
+        "probe": true
+      }
+    ]
+  ],
+  "socketRoutes": {
+    "depletionThrowContained": true,
+    "depletionsApplied": 30,
+    "depletionRateLimitRefusals": 1,
+    "complicationDuplicateDropped": true,
+    "complicationsApplied": 99,
+    "complicationRateLimitRefusals": 2
+  },
+  "complicationWriter": {
+    "channel": "module.fabricate",
+    "resolutionId": "minted-probe"
+  },
+  "gatheringSceneFollowsRequester": {
+    "remoteViewerOnSceneB": "allowed",
+    "currentUserViewingSceneB": "FABRICATE.Gathering.Blocked.SceneMissing"
+  },
+  "gatheringResultCreatorReadsLiveSystemManager": [
+    "probe"
+  ],
+  "importerSeams": {
+    "reached": [
+      "gatheringEnvironmentStore.list []",
+      "gatheringEnvironmentStore.load []",
+      "gatheringEnvironmentStore.save [[{\"id\":\"probe-environment\"}]]",
+      "gatheringRealmStore.get []",
+      "gatheringRealmStore.save [{\"probe\":\"travel\"}]",
+      "componentScopeStore.isSeeded [\"entities\"]",
+      "componentScopeStore.get []",
+      "componentScopeStore.save [{\"probe\":\"components\"}]",
+      "essenceScopeStore.isSeeded [\"entities\"]",
+      "essenceScopeStore.get []",
+      "essenceScopeStore.save [{\"probe\":\"essences\"}]",
+      "toolScopeStore.isSeeded [\"entities\"]",
+      "toolScopeStore.get []",
+      "toolScopeStore.save [{\"probe\":\"tools\"}]"
+    ],
+    "settings": [
+      "get fabricate.gatheringConfig",
+      "set fabricate.gatheringConfig {\"probe\":\"gatheringConfig\"}"
+    ],
+    "admits": {
+      "activeGm": true,
+      "assistantGm": true,
+      "player": false
+    }
+  }
 }

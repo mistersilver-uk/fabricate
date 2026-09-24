@@ -1,16 +1,8 @@
 /**
- * Component-creation stacking (issue 858).
- *
- * When Fabricate produces a component into an actor's inventory — salvage recovery
- * (the reported case) or crafting output — a produced item that matches a component
- * already present in the actor's inventory must INCREMENT that item's quantity
- * rather than spawn a duplicate stack. Both engine paths funnel their per-item
- * creation through {@link createOrStackComponentItem}, so the behaviour is shared.
- *
- * The stack-quantity read/write path is the GM-configured one resolved by
- * `itemStackQuantity.js` (issue 1024, #853 proposal 1). The `quantityPath` parameter on
- * {@link createOrStackComponentItem} remains as a pure test seam, now defaulting to the
- * configured path rather than to a hardcoded literal.
+ * Component-creation stacking (issue 858): a produced component matching one already held
+ * increments that stack rather than spawning a duplicate, for salvage and crafting alike through
+ * {@link createOrStackComponentItem}. The quantity path is the GM-configured one from
+ * `itemStackQuantity.js` (issue 1024).
  */
 
 import { itemStackQuantityPath, readStackQuantity } from './itemStackQuantity.js';
@@ -19,23 +11,14 @@ import { writeItemAward } from './runHistoryEvidence.js';
 const AWARDED_QUANTITY_KEY = '_fabricateAwardedQuantity';
 
 /**
- * Tag a produced/updated item with the quantity contributed by THIS award, so
- * downstream chat/run reporting shows the amount produced now rather than the
- * merged stack total after a stack. Non-enumerable and best-effort (a frozen stub
- * is tolerated; reporting then falls back to the item's own quantity).
- *
- * @param {object} item     - the produced or updated item.
- * @param {number} quantity - the amount awarded by this call.
- * @returns {object} the same item.
+ * Tag an item with the quantity this award contributed, summed across repeat awards onto the same
+ * item, so reporting shows the amount produced rather than the stack total. Non-enumerable and best
+ * effort: a frozen stub falls back to the item's own quantity.
  */
 export function tagAwardedQuantity(item, quantity) {
   if (!item) return item;
   const amount = Number(quantity);
   const add = Number.isFinite(amount) && amount > 0 ? amount : 1;
-  // ACCUMULATE across awards: when the SAME produced item is stacked onto more than
-  // once in one craft/salvage (the same managed component listed in multiple result
-  // rows), the tag must sum every award so reporting shows the total produced, not
-  // just the last award (issue 858 review).
   const prev = Number(item[AWARDED_QUANTITY_KEY]);
   const value = (Number.isFinite(prev) && prev > 0 ? prev : 0) + add;
   try {
@@ -51,15 +34,7 @@ export function tagAwardedQuantity(item, quantity) {
   return item;
 }
 
-/**
- * The quantity a produced item contributed to this award. Prefers the award tag
- * (present on items produced through {@link createOrStackComponentItem}) and
- * otherwise falls back to the item's own quantity — so untagged items and legacy
- * call sites read exactly as before.
- *
- * @param {object} item - the produced or updated item.
- * @returns {number} the awarded quantity (>= 1).
- */
+/** The award tag when present, else the item's own stack quantity. */
 export function awardedQuantityOf(item) {
   const tagged = Number(item?.[AWARDED_QUANTITY_KEY]);
   if (Number.isFinite(tagged) && tagged > 0) return tagged;
@@ -67,24 +42,9 @@ export function awardedQuantityOf(item) {
 }
 
 /**
- * Create a produced component item on `actor`, or — when `matchingItems` contains
- * an item already resolving to the same component — increment that existing item's
- * quantity by `awardedQuantity` instead of creating a duplicate (issue 858).
- *
- * Match resolution is the CALLER's responsibility: it owns the system-scoped
- * component resolver and passes the already-resolved candidate items. This seam
- * only decides create-vs-update and performs it, keeping the decision pure and
- * unit-testable with a stubbed actor/item.
- *
- * @param {object}   params
- * @param {object}   params.actor            - target actor (`createEmbeddedDocuments`).
- * @param {object}   params.itemData         - item payload for the create path.
- * @param {Array<object>} [params.matchingItems] - existing inventory items already
- *   resolved to the produced component; the first updatable one is stacked onto.
- * @param {number}   [params.awardedQuantity] - quantity produced by this call.
- * @param {string}   [params.quantityPath]   - dotted stack-quantity path; defaults to
- *   the GM-configured path (issue 1024) and stays injectable as a pure test seam.
- * @returns {Promise<object|null>} the created or updated item.
+ * Create the produced item, or stack onto the first updatable of `matchingItems`, which the caller
+ * resolves to the same component. `quantityPath` defaults to the configured path and stays a test
+ * seam.
  */
 export async function createOrStackComponentItem({
   actor,

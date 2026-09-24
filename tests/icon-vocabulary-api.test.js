@@ -4,8 +4,9 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { Fabricate } from '../src/bootstrap/Fabricate.js';
 import { findCuratedIconRecord, listCuratedIconVocabulary } from '../src/utils/iconVocabulary.js';
-import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
+import { defineStructureContract } from './helpers/structureContract.js';
 
 import {
   FOUNDRY_CURATED_ICON_DEFINITIONS,
@@ -13,7 +14,6 @@ import {
 } from '../src/ui/svelte/util/foundryIconVocabulary.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainSource = entryModuleSource('src/bootstrap/Fabricate.js');
 const apiDocs = readFileSync(resolve(__dirname, '../docs/api/index.md'), 'utf8');
 
 describe('the published icon vocabulary (issue 1269)', () => {
@@ -147,36 +147,28 @@ describe('resolving a name to a curated record (issue 1269)', () => {
 });
 
 describe('the icon vocabulary accessors on game.fabricate (issue 1269)', () => {
-  it('gates both accessors on readiness and delegates to the shared projection', () => {
-    // `src/main.js` imports Foundry globals and a stylesheet at module scope and cannot be imported
-    // under `node:test`, so its wiring is asserted against its source, as every other
-    // `game.fabricate` surface test in this repository does.
-    assert.match(
-      mainSource,
-      /listCuratedIcons\(\) \{\s*this\._requireReady\(\);\s*return listCuratedIconVocabulary\(\);\s*\}/,
-      'listCuratedIcons should throw through _requireReady() and return the shared projection'
-    );
-    assert.match(
-      mainSource,
-      /findCuratedIcon\(iconName\) \{\s*this\._requireReady\(\);\s*return findCuratedIconRecord\(iconName\);\s*\}/,
-      'findCuratedIcon should throw through _requireReady() and return the shared projection'
-    );
-    assert.ok(
-      mainSource.includes(
-        "import { findCuratedIconRecord, listCuratedIconVocabulary } from '../utils/iconVocabulary.js';"
-      ),
-      'the facade should take both projections from the shared module rather than re-implementing them'
-    );
+  it('gates both accessors on readiness by throwing, never by answering empty', () => {
+    const facade = new Fabricate();
+    assert.throws(() => facade.listCuratedIcons(), /not initialized/);
+    assert.throws(() => facade.findCuratedIcon('cog'), /not initialized/);
+  });
+
+  it('answers the shared projection once ready', () => {
+    const facade = Object.assign(new Fabricate(), { ready: true });
+    assert.deepEqual(facade.listCuratedIcons(), listCuratedIconVocabulary());
+    assert.deepEqual(facade.findCuratedIcon('cog'), findCuratedIconRecord('cog'));
+    assert.equal(facade.findCuratedIcon('no-such-icon'), null);
   });
 
   // A deliberate narrowing, pinned so reversing it is a decision rather than a slip.
-  it('reaches the vocabulary only through the projection', () => {
-    assert.equal(
-      /from '[^']*foundryIcon(Vocabulary|Catalogue)\.js'/.test(mainSource),
-      false,
-      'main.js must not import the vocabulary module directly, exclusion predicate included'
-    );
-  });
+  defineStructureContract(
+    'the facade reaches the vocabulary only through the projection',
+    'src/bootstrap/Fabricate.js',
+    {
+      imports: ['../utils/iconVocabulary.js'],
+      importsNo: ['../ui/svelte/util/foundryIconVocabulary.js', '../ui/svelte/util/foundryIconCatalogue.js'],
+    }
+  );
 });
 
 test('the API reference documents both icon vocabulary accessors', () => {
