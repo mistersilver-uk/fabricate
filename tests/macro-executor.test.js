@@ -161,5 +161,10 @@ test('the type === script gate is NOT centralised into this module', async () =>
 defineStructureContract(
   'the executor reads the command and never the macro type',
   'src/utils/MacroExecutor.js',
-  { reads: ['macro.command'], propertyReads: [['type', []]], spellsNo: ['script', 'Script'] }
+  {
+    reads: ['macro.command'],
+    propertyReads: [['type', []]],
+    keysNo: ['type'],
+    spellsNo: ['script', 'Script'],
+  }
 );

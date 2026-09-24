@@ -576,6 +576,7 @@ describe('AC-9 — the module rolls nothing and reaches nothing it was not given
   defineStructureContract('takes the CALL-SITE rule from the contract', MODULE, {
     importsName: [['./companionContract.js', 'gateCompanionCallSite']],
     namesNo: ['COMPANION_CALL_SITES'],
+    spellsNo: ['gmAction', 'broadcast'],
   });
   for (const member of ['rollActorCheck', 'resolveBulkCheckDecision']) {
     defineStructureContract(

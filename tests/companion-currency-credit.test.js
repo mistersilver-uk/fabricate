@@ -168,7 +168,6 @@ function inventorySpender({ balances = [1000, 1000], refund } = {}) {
 // AC-10 — ONE denomination resolution, not two
 
 describe('AC-10 — the check and the credit resolve the same coin the same way', () => {
-
   it('hands both spenders the same unit, priced at the same base value', async () => {
     const seen = [];
     const seams = creditSeams({
@@ -808,10 +807,7 @@ describe('AC-34 — four spellings of "the macro never ran", answered identicall
     });
   }
 
-  // The executor half — no type read and no script token in `MacroExecutor.js` — is the row
-  // `the executor reads the command and never the macro type` in `tests/macro-executor.test.js`;
-  // the call-site half is the refusal above. "`MacroExecutor.js` is unchanged by this PR" is a
-  // DIFF check, discharged from the changed-file list at review.
+  // The executor half is tests/macro-executor.test.js's "reads the command and never the macro type" row.
 });
 
 describe('AC-35 — the shipped ZERO-UPDATE refund still succeeds', () => {

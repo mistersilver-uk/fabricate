@@ -298,9 +298,11 @@ test('the updateActor hook drops only the cache its diff touches, via core hasPr
     assert.deepEqual(invalidated, [], 'an HP tick drops nothing');
     assert.ok(probed.length > 0, 'and was filtered through foundry.utils.hasProperty');
     update(expandedDiff('flags.fabricate.fabricate.==craftingRuns'));
+    update(expandedDiff('flags.fabricate.fabricate.salvageRuns'));
     update(expandedDiff('flags.fabricate.gatheringRuns'));
     assert.deepEqual(invalidated, [
       ['crafting', 'actor-1'],
+      ['salvage', 'actor-1'],
       ['gathering', 'Actor.actor-1'],
     ]);
   } finally {
