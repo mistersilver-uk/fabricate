@@ -1,7 +1,6 @@
 /**
- * Threshold-band labels for the Journal's routed outcome ladders — the "what a
- * roll has to beat" text beside each tier, for routed gathering and routed
- * crafting. Extracted from RunJournalBuilder so the giant does not grow.
+ * Threshold-band labels for the Journal's routed outcome ladders: the "what a roll has to beat"
+ * text beside each tier, for routed gathering and routed crafting.
  */
 
 import { normalizeList, numberOrNull } from './gatheringEngineInternals.js';
@@ -27,11 +26,7 @@ export function routedOutcomeBand(outcome, routed, task) {
   return `${exceed ? '>' : '≥'}${threshold}, ${exceed ? '≤' : '<'}${next}`;
 }
 
-/**
- * Band for one routed CRAFTING tier, on the same ladder geometry as its
- * gathering sibling. A crafting DC may be unresolved, in which case the band is
- * stated relative to `DC`.
- */
+/** A routed crafting tier's band; an unresolved crafting DC states it relative to `DC`. */
 export function craftingOutcomeBand(outcome, routed, dc) {
   if (routed?.type === 'fixed') return routedOutcomeBand(outcome, routed, null);
   const base = dc ?? 0;
@@ -45,11 +40,9 @@ export function craftingOutcomeBand(outcome, routed, dc) {
 }
 
 /**
- * Where one outcome's threshold sits on the ladder. The bottom tier has no lower
- * bound — routed crafting and routed gathering both resolve with
- * `clampToNearest`, so a total under every threshold lands there — so it renders
- * as an upper bound on the next tier, never as a `threshold+` that can print a
- * nonsensical `-5+`.
+ * Where a threshold sits on the ladder. Routed crafting and gathering both resolve with
+ * `clampToNearest`, so the bottom tier has no lower bound: it renders as an upper bound on the
+ * next tier, never as a `threshold+` such as `-5+`.
  */
 function outcomeBandPosition(routed, threshold, base) {
   const thresholds = normalizeList(routed?.relativeOutcomes).map(
