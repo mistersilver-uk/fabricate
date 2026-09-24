@@ -559,7 +559,7 @@ export function registerGatheringCases() {
 
   // The inspector and the editor draw with the presenters and flags the shell hands them.
   it('names the selected task and its drop through the shell’s presenters', async () => {
-    await openTasks();
+    const store = await openTasks();
     const inspector = () => target.querySelector('.manager-inspector');
     assert.equal(
       inspector().querySelector('[data-gathering-task-inspector] .manager-inspector-name').textContent.trim(),
@@ -584,6 +584,19 @@ export function registerGatheringCases() {
       biome.querySelector('.manager-character-modifier-icon i').getAttribute('class'),
       'fas fa-tree',
       'a biome modifier takes its vocabulary icon'
+    );
+
+    // The model reads the selected system live, so a republished component name reaches the drop.
+    store.viewState.update((state) => {
+      const managedItemOptions = state.selectedSystem.managedItemOptions.map((option) =>
+        option.id === 'c3' ? { ...option, name: 'Renamed Nightshade' } : option
+      );
+      return { ...state, selectedSystem: { ...state.selectedSystem, managedItemOptions } };
+    });
+    await settleRouteExit();
+    assert.equal(
+      inspector().querySelector('.manager-drop-inspector-stack .manager-inspector-name').textContent.trim(),
+      'Renamed Nightshade'
     );
   });
 

@@ -89,6 +89,7 @@ describe('drop-rate tiers', () => {
     [100, 'guaranteed'],
     [250, 'guaranteed'],
     [-5, 'none'],
+    ['x', 'legendary'],
   ];
 
   for (const [rate, tier] of BOUNDARIES) {

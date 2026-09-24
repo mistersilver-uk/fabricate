@@ -227,6 +227,7 @@ export function registerEnvironmentsCases() {
         ...state.environments.find((environment) => environment.id === 'env-forest'),
         name: 'Renamed Woods',
         selectionMode: 'blind',
+        description: 'a'.repeat(200),
       },
       environmentDraftDirty: true,
       environmentValidationState: { errors: ['one', 'two'] },
@@ -242,6 +243,11 @@ export function registerEnvironmentsCases() {
     assert.ok(inspector.textContent.includes('Blind'), 'the selection mode chip');
     assert.ok(inspector.textContent.includes('Unsaved'), 'the draft-state card');
     assert.ok(inspector.textContent.includes('2 validation issues'));
+    assert.ok(
+      inspector.textContent.includes(`${'a'.repeat(160)}…`) &&
+        !inspector.textContent.includes('a'.repeat(161)),
+      'the inspector cuts a long description at 160 characters'
+    );
   });
 
   it('offers the realm field in the environment editor only with Travel & Realms on', async () => {
