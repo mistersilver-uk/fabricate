@@ -542,7 +542,7 @@ Spec reference: openspec/specs/resolution-modes/spec.md
 ## Progressive
 
 `runFormulaProgressive` (`src/systems/checkRoll.js`) reports `success: true` for every completed roll that reaches a dice engine, however low the total, because a progressive award spends the rolled value against result difficulties rather than gating pass/fail on a DC; there is no low-roll failure branch to hit.
-The ONLY reachable progressive failure — for crafting, salvage or gathering alike — is `success: false` from the roll itself rejecting, in the dice-engine `catch` (`checkRoll.js:1029-1037`).
+The ONLY reachable progressive failure — for crafting, salvage or gathering alike — is `success: false` from the roll itself rejecting, in the dice-engine `catch` (the `catch` around `evaluateCheckRoll` in `runFormulaProgressive`, `src/systems/checkRoll.js`).
 A "progressive failure" test scenario must therefore be driven by a dice-engine rejection, never by an authored low roll, and this holds equally for progressive salvage.
 
 Canonical mapping: `resolutionMode: "progressive"`; `runFormulaProgressive` in `src/systems/checkRoll.js`
