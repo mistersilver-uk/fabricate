@@ -141,6 +141,8 @@ const MANAGER_HEADER_GATHERING_ACTIONS =
   'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte';
 const NAV_RAIL_MODEL = 'src/ui/svelte/apps/manager/navRailModel.svelte.js';
 const HEADER_MODEL = 'src/ui/svelte/apps/manager/headerModel.svelte.js';
+// The Checks Studio's drafts and rail group, extracted out of the root (issue 1721).
+const CHECKS_ROUTE_MODEL = 'src/ui/svelte/apps/manager/checks/checksRouteModel.svelte.js';
 const MANAGER_SYSTEM_NAV = 'src/ui/svelte/apps/manager/ManagerSystemNav.svelte';
 const MANAGER_WORLD_NAV = 'src/ui/svelte/apps/manager/ManagerWorldNav.svelte';
 const MANAGER_WORLD_DOWNTIME_NAV_GROUP =
@@ -712,6 +714,16 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract('keeps the systems library inspector free of Foundry globals', SYSTEM_BROWSER_INSPECTOR, {
     readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
+  });
+
+  // The checks model owns no effect: the shell's `$effect` runs `reseed()`, and the system-switch
+  // cases in `manager-checks-mounted.js` go red without it.
+  defineStructureContract('leaves the checks route model effect-free', CHECKS_ROUTE_MODEL, {
+    callsNo: ['$effect'],
+    readsNo: ['$effect.pre', '$effect.root'],
+  });
+  defineStructureContract('reseeds the checks drafts from the shell', MANAGER_ROOT, {
+    reads: ['checks.reseed'],
   });
 
   // Its cards are direct flex children of the shell's `aside.manager-inspector`.
@@ -1483,7 +1495,7 @@ describe('CraftingSystemManager source contract', () => {
   });
 
   // `duplicate` is not in this set (issue 1372), and the armed bulk delete is a deliberate
-  // deviation from the `AGENTS.md` dialog carve-out.
+  // deviation from the foundry-and-architecture.md dialog carve-out.
   defineStructureContract('extracts the inspector and its bulk panel', ESSENCE_STUDIO, {
     imports: [
       '../../../components/IconPicker.svelte',

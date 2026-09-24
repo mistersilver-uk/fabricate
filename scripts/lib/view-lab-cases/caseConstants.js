@@ -31,6 +31,10 @@ export const BULK_EDIT_CHROME_PATTERN =
  */
 export const BULK_DELETE_CARD_PATTERN = /^src\/ui\/svelte\/apps\/manager\/BulkDeleteCard\.svelte$/;
 
+/** The Checks Studio's route model and draft clones (issue 1721). */
+export const CHECKS_ROUTE_MODEL_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/;
+
 /** The trigger set the three `manager-recipes-bulk-edit*` frames share (issue 1010). */
 export const RECIPE_BULK_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/Recipe/,

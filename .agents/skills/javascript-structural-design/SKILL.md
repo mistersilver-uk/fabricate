@@ -83,6 +83,11 @@ Apply the direction, not dogma:
 Functions and closures are fine if dependencies stay explicit and the seam stays testable.
 - Foundry globals are unavoidable at runtime edges.
 Wrap or localize them instead of letting them leak through the whole call chain.
+- Keep modules and objects small and cohesive; if a unit naturally does X and Y, split it.
+- Keep constructors and factories boring; avoid hidden I/O, service lookup, and object graph assembly inside them.
+- Inject specific collaborators instead of passing context or container grab bags and digging through them later.
+- Prefer behavior-first APIs over getter or setter-heavy data bags.
+- Isolate global mutable state and runtime lookups at thin edges that are easy to test.
 
 ## Expected Output
 

@@ -384,12 +384,32 @@ Cite code by symbol name and file path only — for example `_playerListingField
 Some contributor-workflow deep-dives moved into `CONTRIBUTING.md`: the Foundry smoke harness (`npm run test:foundry` phases, outputs, Phase D0 selector drift) is the "Foundry integration (smoke) tests" section; UI PR screenshot evidence is the "UI PR screenshot evidence" section; the Foundry-vs-Fabricate CSS override map (button layout, focus rings, specificity ladder) is the "Foundry vs Fabricate CSS overrides" section.
 Interrupted or stale per-worktree smoke recovery is defined in `.agents/skills/fabricate-orchestrator/references/foundry-smoke-lifecycle.md`.
 
+- UI shells live in `src/ui/*.js` and `src/ui/*.svelte.js`.
+- `src/ui/model/` holds the Foundry-free view models the UI owns — pure filtering, sorting, pagination, selection and validation logic with no Foundry global and no importer outside `src/ui/`.
+- Svelte UI components live in `src/ui/svelte/apps/` and `src/ui/svelte/components/`.
+- Svelte stores live in `src/ui/svelte/stores/`.
+- Domain and runtime logic lives under `src/models/`, `src/systems/`, `src/utils/`, `src/integrations/`, `src/config/`, and related `src/` modules.
+- Tests live under `tests/`.
+- Styles live in `styles/`, primarily `styles/fabricate.css`.
+- When a Svelte component is shared between task and event (or similar `kind`-driven) contexts, split shared i18n keys into kind-specific siblings (`…Task` / `…Event`) and select with a ternary on `kind`.
+Reserve combined "tasks and events" / "task or event" wording for surfaces that genuinely mix kinds (overview hints, mixed validation issues, error messages).
+- Generic "record" / "records" wording in user-facing strings under `FABRICATE.Admin.Manager.EnvironmentEditor.*` is a known anti-pattern; environments don't have catalysts, they have tasks, events, and required tools.
+Use accurate domain terms when adding new strings.
+- Test files under `tests/components/` pin code shapes with `inspectorSource.includes(...)` / `listSource.includes(...)` string assertions.
+When renaming variables, refactoring markup, or removing i18n keys, grep these assertions and update them in lockstep — they fail at test time, not compile time.
+
 ### Extracted normalizer clusters under `src/systems/`
 
 `src/systems/normalize/` is the first subdirectory `src/systems/` has had, and it holds normalizer logic extracted out of `CraftingSystemManager` as free functions, starting with `src/systems/normalize/craftingCheck.js` and joined by six more clusters (issue #1713): `tools.js`, `systemFields.js`, `essences.js`, `recipeItems.js`, `salvage.js`, and `components.js`.
 Each cluster stays private to the `CraftingSystemManager` aggregate: nothing outside `CraftingSystemManager.js` and the two paired equivalence/delegate test suites per cluster imports it, and callers still reach it only through the manager's own delegate methods.
 The same shape also covers two flat `src/systems/` modules that sit beside `normalize/` rather than inside it: `SourceIdentityService.js` (durable-flag stamping, the three one-shot auto-stamps, and the GM "Repair Item Data" pass) and `sourceIdentitySnapshots.js` (the enricher-backed description resolver and the three per-kind source snapshots), both extracted out of `CraftingSystemManager` (issue #1699).
 Only `CraftingSystemManager.js` imports either module, and every collaborator arrives through an `io` bag the manager's delegate rebuilds on each call rather than a bag captured once, so a suite that patches a manager member after construction still observes it through the delegate.
+
+A disabled or absent control only refuses to *enter* a forbidden state through one surface.
+It cannot stop a record *becoming* forbidden by a removal path, and it is not on the path of the writers that have no UI at all — import (`CraftingSystemExporter.prepareForImport`), copy-mode, and migration.
+Enforce the rule where every writer passes instead: `_normalizeSystem` / `_normalizeComponent` / `_normalizeSalvage` in `src/systems/CraftingSystemManager.js` are that single chokepoint.
+Issue 676 is the worked example, and the claim "constraining the control makes the forbidden state unreachable by construction" was false in **both** directions: the sanctioned flow's exact reverse (enable at one result group, delete that group, save) persisted the forbidden state anyway, and then disabled the control that would have undone it.
+Keep the control constraint as UX, and **test the requirement** (normalizer input → output), never the control's `disabled` attribute — a control-shaped test reads green through every gap the control cannot close.
 
 ### Versioned Journal authority and recovery
 
@@ -449,6 +469,18 @@ Two corrections to the paragraph above, against the table as it ships: the map a
 The same-view rows are `environment-edit`, `recipe-edit`, `recipe-item-edit` and `system-edit`, and of those only `environment-edit` pairs a same-view skip with no `SCOPE_BROWSER_BY_VIEW` entry.
 
 **Anti-patterns:** adding `globalThis.confirm(message)` as a fallback (DialogV2 is always present in Foundry; missing-DialogV2 means a test environment that should stub the store helper); adding a `services?.confirmDiscard{Kind}Draft?.()` seam that nothing wires up in production; skipping the dirty check at the Svelte layer and relying solely on the store helper (the Svelte layer is the source of truth for which view is active and whether its draft is dirty; the store helper just asks the user).
+
+- **Carve-out: high-frequency destructive ROW actions.** A per-row destructive action a GM performs repeatedly down a list (deleting one owned copy, erasing one learned recipe) uses the inline two-step arm — `src/ui/svelte/components/ArmedDangerButton.svelte` — instead of a modal: the first click arms the control, the second executes.
+A modal per row is the wrong ergonomics at that frequency, and the arm still requires a deliberate second act.
+`confirmDialog` is RETAINED for the heavyweight cases: deleting a stacked (`quantity > 1`) document, and a reset action.
+The armed token MUST be keyed on the target document id, never a row index, because a projection can re-publish asynchronously between the two clicks.
+This carve-out does NOT retrofit `VocabularyPanel`'s expanding below-row confirm strip, which is a different idiom by design — it carries a reference-count consequence sentence no two-word button label can hold.
+- **Carve-out: a bulk action that states its own impact.** A bulk destructive action ALSO uses the inline two-step arm, in place of `confirmDialog`, when the panel states the impact of the pending action — what it affects and how much — in view BEFORE the control is armed.
+The stated impact is what a modal would otherwise exist to warn about, so the modal adds no safety once the panel already says it, and the arm still requires the same deliberate second act a row action does.
+A bulk action that does NOT state its impact in-panel still goes through `confirmDialog`; this does not relax the rule for a bulk action that stays silent about its consequences until the modal names them.
+The essence library's bulk delete (`EssenceBulkEditPanel.svelte`) is the worked example: it states how many essences, carrying components, and rewritten recipes are affected, then arms the same `ArmedDangerButton`, on an explicit maintainer decision (issue 1036).
+The Component Studio's bulk delete (`ComponentBulkEditPanel.svelte`) is the second (issue 1129) and shows the carve-out generalizing rather than staying a one-off: it states how many components, rewritten recipes, and newly disabled recipes are affected, then arms.
+Its impact is computed in the store and passed in as a prop rather than derived from the selected rows, because one of its numbers — how many recipes the delete leaves uncraftable — depends on the whole selection against real recipe bodies and cannot be answered per row.
 
 ### Root-hosted manager dialogs keep their state between opens
 
@@ -568,6 +600,7 @@ Before comparing two selectors' specificity, establish the layer each sits in; a
 - **Add.** Only when neither holds, and only with two or more independent callers, does a new primitive enter the set.
 That change adds its specimen to `openspec/specs/design-system/library.html` AND, once it ships, its row to `scripts/lib/designSystemPrimitives.json`, in the same change.
 A component under `src/ui/svelte/components/` with no specimen is an undocumented primitive, a specimen with no row for a shipped primitive is a name no diff can be attributed to, and `tests/design-system-coverage.test.js` is the gate that fails on either: it requires every file in that directory to carry a manifest row, and requires no library entry recorded as unbuilt to ship as a component.
+`tests/design-system-coverage.test.js` enforces this: it fails when a file in that directory carries no manifest row, and when the library and the manifest describe different vocabularies.
 
 A candidate that decomposes entirely into existing members is a composition and does not enter the set; it goes to the capability's ruled-out register with the composition that replaces it, so it is not re-proposed.
 Where a proposal conflicts with a shipped component, the shipped props are the specification — adopt them, or state in the same change why they are being replaced.
