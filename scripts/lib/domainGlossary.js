@@ -50,13 +50,6 @@ const LINK_LINE = /^\[Notes\]\((docs\/domain\/[\w-]+\.md)#([^)\s]+)\)$/u;
 const DOMAIN_LINK = /\]\((docs\/domain\/[\w-]+\.md)(?:#([^)\s]*))?\)/gu;
 const FENCE = /^ {0,3}(`{3,}|~{3,})/u;
 const ATX = /^ {0,3}(#{1,6})[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*$/u;
-/** Terminal punctuation and any closing marks after it; `:` and `;` never end a split sentence. */
-const TERMINAL = /[.!?][*_)\]"'”’]*$/u;
-/** The opening of the next sentence: a capital, or bold, emphasis or code before one. */
-const SENTENCE_START = /^(?:[A-Z]|\*\*[A-Z`_]|_[A-Z]|`)/u;
-/** Words whose trailing `.` the sentences-per-line rule never splits after. */
-const IGNORED_WORDS = ['eg.', 'e.g.', 'etc.', 'ex.', 'ie.', 'i.e.', 'vs.'];
-const TICK = '`';
 
 /** Every ATX heading outside a fence, as `{ index, level, text }`. */
 function headings(markdown) {
@@ -96,89 +89,6 @@ function dedupedSlugs(texts) {
 /** Every heading anchor in `markdown`. */
 export function headingSlugs(markdown) {
   return dedupedSlugs(headings(markdown).map(({ text }) => text));
-}
-
-/** The index after the code span opening at `start` as the lint rule reads it, or -1. */
-function ruleCodeSpanEnd(line, start) {
-  let index = start + 1;
-  while (line[index] === '`') {
-    index += 1;
-    if (index === line.length) return -1;
-  }
-  index = line.indexOf('`', index);
-  while (index !== -1 && line[index - 1] === '\\') index = line.indexOf('`', index + 1);
-  if (index === -1) return -1;
-  while (line[index] === '`') {
-    index += 1;
-    if (index === line.length) return -1;
-  }
-  return index;
-}
-
-/** Whether the sentences-per-line rule reads a sentence end at `line[index]`. */
-function ruleSplitsAt(line, index) {
-  if (!/^\. [A-Z]$/u.test(line.slice(index, index + 3))) return false;
-  const before = line.slice(0, index + 1).toLowerCase();
-  return IGNORED_WORDS.every((word) => !before.endsWith(word));
-}
-
-/** The index of the space before `line`'s second sentence by the lint rule's reading, or -1. */
-function ruleBreakAt(line) {
-  if (/^\s*#/u.test(line)) return -1;
-  let index = /^\s*\d+\./u.test(line) ? line.indexOf('.') + 1 : 0;
-  while (index < line.length - 2) {
-    if (line[index] === '`') index = ruleCodeSpanEnd(line, index);
-    if (index === -1 || index >= line.length - 2) return -1;
-    if (ruleSplitsAt(line, index)) return index + 1;
-    index += 1;
-  }
-  return -1;
-}
-
-/** `line` split wherever the sentences-per-line rule would split it. */
-function ruleLines(line) {
-  const lines = [];
-  let rest = line;
-  for (let at = ruleBreakAt(rest); at !== -1; at = ruleBreakAt(rest)) {
-    lines.push(rest.slice(0, at));
-    rest = rest.slice(at + 1);
-  }
-  return [...lines, rest];
-}
-
-/** The index after the code span opening at `start`, or after its backticks when unclosed. */
-function codeSpanEnd(text, start) {
-  const run = /^`+/u.exec(text.slice(start))[0].length;
-  const closing = new RegExp(`(?<!${TICK})${TICK.repeat(run)}(?!${TICK})`, 'u');
-  const close = closing.exec(text.slice(start + run));
-  return close ? start + run + close.index + run : start + run;
-}
-
-/** Whether the space at `text[index]` sits between two sentences. */
-function breaksSentence(text, index) {
-  const before = text.slice(0, index);
-  return (
-    TERMINAL.test(before) && endsSentence(before) && SENTENCE_START.test(text.slice(index + 1))
-  );
-}
-
-/**
- * `text` one sentence per line: split at each sentence end, including before a sentence opening
- * with bold, emphasis or code, then wherever the sentences-per-line rule would still split.
- */
-export function sentenceLines(text) {
-  const breaks = [-1];
-  let index = 0;
-  while (index < text.length) {
-    if (text[index] === '`') {
-      index = codeSpanEnd(text, index);
-      continue;
-    }
-    if (text[index] === ' ' && breaksSentence(text, index)) breaks.push(index);
-    index += 1;
-  }
-  breaks.push(text.length);
-  return breaks.slice(1).flatMap((end, at) => ruleLines(text.slice(breaks[at] + 1, end)));
 }
 
 const escapePipes = (cell) => cell.replaceAll('|', String.raw`\|`);

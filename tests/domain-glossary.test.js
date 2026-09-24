@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url';
 import {
   glossaryProblems,
   headingSlugs,
-  sentenceLines,
   slugify,
   termRowText,
 } from '../scripts/lib/domainGlossary.js';
@@ -126,20 +125,6 @@ describe('heading slugs follow the GitHub algorithm', () => {
   }
   it('a repeated heading takes a numbered suffix, and a fenced one is no heading', () => {
     assert.deepEqual(headingSlugs('## Foo\n\n```\n## Foo\n```\n\n## Foo\n'), ['foo', 'foo-1']);
-  });
-});
-
-describe('sentence splitting', () => {
-  it('splits before a bold, emphasis or code opener, never inside code or after e.g.', () => {
-    assert.deepEqual(sentenceLines('One. **Two** here. _Three_ too. `four` last.'), [
-      'One.',
-      '**Two** here.',
-      '_Three_ too.',
-      '`four` last.',
-    ]);
-    assert.deepEqual(sentenceLines('Keep `a. B` whole, e.g. This stays.'), [
-      'Keep `a. B` whole, e.g. This stays.',
-    ]);
   });
 });
 
