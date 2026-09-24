@@ -1913,7 +1913,7 @@ export class RecipeVisibilityService {
   async _forgetLearnedRecipesWhere(isStale) {
     for (const actor of selectWritableActors(game.actors)) {
       const learned = this._getLearnedMap(actor);
-      const staleIds = [...readLearnedRecipeEntries(learned).keys()].filter(isStale);
+      const staleIds = [...readLearnedRecipeEntries(learned).keys()].filter((id) => isStale(id));
       if (staleIds.length === 0) continue;
       // The shared deletion primitive uses forced deletions, since a map rebuilt through
       // `setFlag` merges and never deletes. `freeLearnBudget: false`: recipe deletion is
