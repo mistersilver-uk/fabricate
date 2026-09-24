@@ -4,7 +4,7 @@ scripts/foundry-smoke	24
 scripts/foundry-smoke/pageOps	10
 scripts/foundry-smoke/scenarios	10
 scripts/lib	15
-scripts/lib/view-lab-cases	10
+scripts/lib/view-lab-cases	11
 scripts/visual-parity	10
 scripts/visual-parity/lib	14
 src	21
@@ -17,7 +17,7 @@ src/integrations	27
 src/migration	19
 src/models	17
 src/models/match	24
-src/systems	35
+src/systems	33
 src/systems/normalize	25
 src/ui	20
 src/ui/model	14
@@ -59,13 +59,13 @@ src/utils	24
 styles	6
 tests	8
 tests/actions	9
-tests/bootstrap	13
+tests/bootstrap	11
 tests/canvas	6
 tests/canvas/regions	7
 tests/components	10
 tests/fixtures	12
 tests/fixtures/chip	49
-tests/fixtures/manager-select	17
+tests/fixtures/manager-select	15
 tests/fixtures/overlay-host	25
 tests/fixtures/player-select	22
 tests/fixtures/searchable-popover	52

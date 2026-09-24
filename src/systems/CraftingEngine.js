@@ -146,9 +146,8 @@ import {
   evaluateToolCheckContribution,
 } from './toolCheckBonus.js';
 
-/** Resolve the winning alchemy match by picking the unique MOST-SPECIFIC set (issue 774) — the
- * unique maximum of the {@link signatureDominates} partial order. No unique maximum FAILS SAFE
- * to no-match, so the caller fizzles rather than brewing one by iteration order. */
+/** The winning alchemy match: the unique most-specific set under {@link signatureDominates}
+ * (issue 774). No unique maximum fails safe to no-match, so the caller fizzles. */
 export function resolveMostSpecificSignatureMatch(candidates) {
   if (!Array.isArray(candidates) || candidates.length === 0) return { matched: false };
   const pick = (candidate) => ({
@@ -158,9 +157,8 @@ export function resolveMostSpecificSignatureMatch(candidates) {
   });
   if (candidates.length === 1) return pick(candidates[0]);
 
-  // The maximal candidates: those no other candidate strictly dominates. With a
-  // transitive domination relation, exactly one maximal element IS the unique
-  // maximum (the greatest); two or more means an incomparable tie → fail safe.
+  // The maximal candidates: with a transitive domination relation exactly one is the unique
+  // maximum; two or more is an incomparable tie, which fails safe.
   const maximal = candidates.filter((candidate) =>
     candidates.every((other) => other === candidate || !signatureDominates(other, candidate))
   );
@@ -217,10 +215,8 @@ function resolveLiveInventoryItemsByUuid(actors, itemUuids) {
   );
 }
 
-/** Stamp the durable per-system component identity on a crafted OUTPUT item's data, BEFORE
- * creation, so the inventory matcher attributes it to its OWN component despite naming
- * collisions or Foundry's transitive `_stats.duplicateSource` chain (issue 539). Delegates to
- * the shared {@link stampItemDataRoleIdentity} writer so the four creation sites cannot drift. */
+/** Stamp the durable per-system component identity on a crafted output before creation so the
+ * matcher attributes it to its component despite `_stats.duplicateSource` chains (issue 539). */
 function stampCraftedComponentIdentity(itemData, systemId, componentId) {
   stampItemDataRoleIdentity(itemData, systemId, 'componentId', componentId);
 }
@@ -237,7 +233,6 @@ function awardFromResolutionMeta(meta) {
   };
 }
 
-/** Handles the actual crafting process Validates ingredients, consumes items, creates outputs */
 export class CraftingEngine {
   constructor(
     recipeManager,
@@ -247,16 +242,14 @@ export class CraftingEngine {
     salvageRunManager = null,
     actorInventoryCoinSpender = null,
     actorPropertyCoinSpender = null,
-    // 8th positional options bag — additive, so existing call sites are unaffected.
-    // `getPlayerResultOrder` is read ONCE at run start and captured onto the run record (issue
-    // 651 D2). Deliberately NOT routed through `resolutionModeService`, which many callers omit.
+    // `getPlayerResultOrder` is read once at run start and captured onto the run record (issue
+    // 651), not routed through `resolutionModeService`, which many callers omit.
     {
       getPlayerResultOrder = () => null,
       getCraftingSystem = () => null,
       resolveItemUuid = async () => null,
-      // The world currency configuration (issue 1278). Optional: when absent, the shared
-      // affordance resolver falls back to the `game.fabricate` global, which keeps every
-      // existing construction site — production and fixture alike — working unchanged.
+      // The world currency configuration (issue 1278); when absent the affordance resolver
+      // falls back to the `game.fabricate` global.
       currencyConfigStore = null,
     } = {}
   ) {
@@ -265,9 +258,7 @@ export class CraftingEngine {
     this.resolutionModeService = resolutionModeService;
     this.itemPilesIntegration = itemPilesIntegration;
     this.salvageRunManager = salvageRunManager;
-    // Stubbable spend seams: the actorInventory spender is injected by tests (and wired in
-    // main.js) so they can assert which path ran; the actorProperty spender defaults to the
-    // generic implementation. Both flow to the shared currency-affordance resolver.
+    // Stubbable spend seams, both handed to the shared currency-affordance resolver.
     this.actorInventoryCoinSpender = actorInventoryCoinSpender;
     this.actorPropertyCoinSpender = actorPropertyCoinSpender;
     this.currencyConfigStore = currencyConfigStore;
@@ -661,9 +652,8 @@ export class CraftingEngine {
         requestId,
       });
     } catch (error) {
-      // A THROW is a refusal too, and the run this call created must not outlive it. Without the
-      // discard the run stayed active carrying a `recoveryRequired` journal, which makes every
-      // control false — cancel included — so nothing could clear it (issue 1648, F1).
+      // A throw is a refusal too, so the run this call created is discarded: an active run with a
+      // `recoveryRequired` journal disables every control, cancel included (issue 1648).
       return this._discardFailedVersionedStart(actor, run.id, error);
     }
     if (!opened.success) {
@@ -762,9 +752,9 @@ export class CraftingEngine {
     return versionedFailure(`Invalid recipe: ${(validation.errors || []).join(', ')}`);
   }
 
-  /** D-026/D-028: for the first stage, run start IS stage start, so the choice locks and the
-   * materials are spent here. EVERY first stage commits, the untimed one included (issue 1648,
-   * M24), and the gate is armed from the EFFECTIVE duration. */
+  /** For the first stage, run start is stage start, so the choice locks and the materials are
+   * spent here, for every first stage including an untimed one (issue 1648); the gate is armed
+   * from the effective duration. */
   async _startFirstVersionedStage({ sourceActors, run, recipe, step, ...commit }) {
     const seconds = this._craftingRunManager().durationToSeconds(step.timeRequirement);
     return this._commitVersionedStageStart({
@@ -973,9 +963,8 @@ export class CraftingEngine {
     if (!selectedSet)
       return versionedFailure('The selected crafting requirements are unavailable.');
     const started = this._versionedStageStarted(run, stepIndex);
-    // A stage armed before the start commit has TAKEN its start, so it is not startable: asking
-    // only `_versionedStageStarted` here deadlocked it against begin's own "already started"
-    // refusal. The other three readers already ask the compatibility-aware question.
+    // A stage armed before the start commit has taken its start, so it is not startable; asking
+    // only `_versionedStageStarted` deadlocks it against begin's "already started" refusal.
     const startable = !started && !this._versionedStageArmedBeforeStartCommit(run, stepIndex);
     if (!resuming && startable && this._versionedStageNeedsStart(recipe, step)) {
       if (trigger !== 'worldTime') {
@@ -1101,9 +1090,8 @@ export class CraftingEngine {
     if (run.executionJournal?.status === 'recoveryRequired') {
       return versionedFailure('The crafting run requires recovery.');
     }
-    // A started stage has already spent its materials (D-026), so cancelling returns them
-    // through the shared reversal — the same primitive and the same honest partial report
-    // the legacy cancel path uses. Only a run that spent nothing reports nothing returned.
+    // A started stage already spent its materials, so cancelling returns them through the
+    // shared reversal; only a run that spent nothing reports nothing returned.
     const refundIntended = this._shouldRefundOnCancel(run);
     let restoredCount = 0;
     let reversalOk = true;
@@ -1637,9 +1625,8 @@ export class CraftingEngine {
     const selectionPlan = run?.steps?.[stepIndex]?.selectionPlan ?? {};
     if (!this._versionedSelectionInputsComplete(selectedSet, selectionPlan, step)) return false;
     try {
-      // Asked through the shared phase seam, because run start now COMMITS this stage: a
-      // started stage holds what it needs and re-probing the inventory its own consumption
-      // emptied would answer "cannot execute" for every craft that had just paid (M24).
+      // Asked through the shared phase seam: a started stage holds what it needs, and
+      // re-probing the inventory its own consumption emptied would answer "cannot execute".
       const prepared = await this._versionedStagePreparation({
         started: this._versionedStageStarted(run, stepIndex),
         run,
@@ -2596,10 +2583,9 @@ export class CraftingEngine {
     };
   }
 
-  /** Install the complication delivery writer (issue 1286). A POST-CONSTRUCTION seam on the
-   * `GatheringEngine#installBlindRunRelay` precedent, so existing `new CraftingEngine(...)` sites
-   * keep working. Without it the writer falls back to `game.fabricate.complicationDeliveryWriter`;
-   * with NEITHER the GM requests are dropped and award, run record and chat card are untouched. */
+  /** Install the complication delivery writer (issue 1286), a post-construction seam like
+   * `GatheringEngine#installBlindRunRelay`. Without it the writer falls back to
+   * `game.fabricate.complicationDeliveryWriter`; with neither, GM requests are dropped. */
   installComplicationDelivery({ writer = null } = {}) {
     this.complicationDeliveryWriter = writer;
     return this;
@@ -2611,15 +2597,12 @@ export class CraftingEngine {
   }
 
   /**
-   * FIRE the component complications a committed progressive award earned — the one guarded seam
-   * all three engine call sites route through (issue 1286): the immediate craft path, the timed
-   * craft FINISH path, and salvage, each AFTER the award is committed and BEFORE the chat card
-   * is posted. It fires once per STEP resolution, so a collapsed three-step chain fires three
-   * times. Guard 3 of 3: a complication is strictly downstream of a committed award, so plan,
-   * trigger evaluation, firing and delivery are all inside one `try`, and the delivery writer
-   * OWNS the emit and mints the resolution id. `options.stages` is the ORDERED stage occurrence
-   * list in fire order; `options.deliver: false` returns the GM requests for a batching caller
-   * instead, because the rate limit in `complicationSocket.js` is sized on ONE message per run.
+   * Fire the component complications a committed progressive award earned (issue 1286): the one
+   * guarded seam for the immediate craft, timed FINISH and salvage paths, after the award commits
+   * and before the chat card posts, once per step resolution. Everything runs inside one `try`
+   * because a complication is strictly downstream of the award, and the delivery writer owns the
+   * emit. `options.stages` is the ordered stage list; `options.deliver: false` returns the GM
+   * requests for a batching caller, since `complicationSocket.js` limits one message per run.
    */
   async _fireComponentComplications({
     activity,
@@ -2684,10 +2667,7 @@ export class CraftingEngine {
     });
   }
 
-  /**
-   * The spend seams handed to the shared currency-affordance helpers
-   * ({@link buildCurrencyAffordProbe}, {@link checkCurrencySpends}, {@link spendCurrencySpends}).
-   */
+  /** The spend seams handed to the shared currency-affordance helpers. */
   _currencySeams() {
     return {
       actorInventoryCoinSpender: this.actorInventoryCoinSpender,
@@ -2696,29 +2676,23 @@ export class CraftingEngine {
     };
   }
 
-  /** The component resolver to inject through the craftability, selection and essence-context
-   * paths for THIS craft (issue 578). Only an alchemy attempt supplies the tier-4-aware
-   * {@link resolveAlchemySubmissionComponent}; every other craft gets `undefined` and defaults
-   * to the shared standard-craft resolver, so standard crafting never gains tier 4. */
+  /** This craft's component resolver (issue 578): only an alchemy attempt supplies the tier-4-aware
+   * {@link resolveAlchemySubmissionComponent}, so standard crafting never gains tier 4. */
   _alchemyComponentResolver(options) {
     return options?.isAlchemyAttempt === true ? resolveAlchemySubmissionComponent : undefined;
   }
 
-  /** A resolution `meta.disposition` representing a crafting-system MISCONFIGURATION (issue 85) —
-   * `misconfiguration`, `unrouted-tier` or `error`. A GM-side authoring gap, not a rolled player
-   * failure, so the craft aborts with ZERO mutation rather than a silent empty success. */
+  /** A `meta.disposition` naming a crafting-system misconfiguration (issue 85): a GM authoring
+   * gap, not a rolled failure, so the craft aborts with zero mutation. */
   _isMisconfigurationDisposition(disposition) {
     return ['misconfiguration', 'unrouted-tier', 'error'].includes(disposition);
   }
 
   /**
-   * Does this resolution `meta.disposition` identify an authored FAILURE output?
-   *
-   * THE FAILURE AWARD IS AN ALLOWLIST, NEVER A FALL-THROUGH (issue 1098). Only `'fail'` — the
-   * reserved `role: 'failure'` group selected BY ROLE — and `'failure'`, a `routedByCheck`
-   * failure-marked outcome tier, may be produced on a failed check. `routedByCheck`'s
-   * single-group exemption reports `'success'` for any non-keyword outcome, so falling through
-   * would hand a failed craft its full SUCCESS output; `routedByIngredients` reports none at all.
+   * Whether a `meta.disposition` names an authored failure output. An allowlist, never a
+   * fall-through (issue 1098): only `'fail'` (the `role: 'failure'` group) and `'failure'` (a
+   * failure-marked `routedByCheck` tier), because `routedByCheck` reports `'success'` for any
+   * non-keyword outcome and would hand a failed craft its success output.
    */
   _isFailureAwardDisposition(disposition) {
     return ['fail', 'failure'].includes(disposition);
@@ -2743,35 +2717,31 @@ export class CraftingEngine {
       // A thunk, not a sample: several awaits separate this block from the time gate, and
       // `core.time` moves from the socket, so the gate must read the clock at its own position.
       readWorldTime: () => Number(game.time?.worldTime || 0),
-      // Virtual-present tools injected by an active canvas Tool station (Phase 4). A componentId is
-      // satisfied without an owned item, and excluded from breakage/usage, ONLY when the active
-      // tool's systemId matches the recipe's system — componentId is a per-system id.
+      // Virtual-present tools from an active canvas Tool station: a componentId is satisfied
+      // without an owned item only when the tool's systemId matches, as ids are per system.
       presentTools:
         options?.presentTools && !Array.isArray(options.presentTools) ? options.presentTools : null,
-      // Per-group player option overrides (issue 552), threaded to BOTH the craftability gate and
-      // the single selection source so the display and the consumed plan resolve the same option.
+      // Per-group player option overrides (issue 552), threaded to both the craftability gate
+      // and the selection so display and consumption resolve the same option.
       ingredientOptionOverrides:
         options?.ingredientOptionOverrides && typeof options.ingredientOptionOverrides === 'object'
           ? options.ingredientOptionOverrides
           : null,
-      // The player's essence-block funding (issue 917), SCOPED rather than a bare map: item uuids
-      // are not step-scoped, and the run's step index can move between the `$derived` that built
-      // the payload and the click that sends it, so the check belongs HERE, not in the UI.
+      // The player's essence funding (issue 917), scoped to a step because item uuids are not,
+      // and the run's step can move between building the payload and sending it.
       ingredientEssenceAllocation:
         options?.ingredientEssenceAllocation &&
         typeof options.ingredientEssenceAllocation === 'object'
           ? options.ingredientEssenceAllocation
           : null,
       run: null,
-      // Track whether THIS call created the run and whether it reached a legitimate persisted
-      // state. A run created here but never resolved is a phantom, discarded in the caller's
-      // `finally`, so a failed craft never lingers as an "in progress" active run.
+      // Whether this call created the run and whether it reached a persisted state; a created
+      // but unresolved run is a phantom the caller's `finally` discards.
       createdThisCall: false,
       resolved: false,
       refusal: null,
     };
 
-    // Validate inputs
     if (!craftingActor) {
       ctx.refusal = { success: false, results: null, message: 'No crafting actor selected' };
       return ctx;
@@ -2811,11 +2781,8 @@ export class CraftingEngine {
     return ctx;
   }
 
-  /**
-   * A run created this call that never armed a time gate or completed a step is a phantom stranded
-   * by a pre-check early-return. Discard it with no history entry; completed runs have already
-   * moved to history, and a reused pre-existing run is never touched.
-   */
+  /** Discard a run this call created that never armed a gate or completed a step, with no
+   * history entry; a reused pre-existing run is never touched. */
   async _discardPhantomRun(ctx) {
     const { craftingActor, run, runManager } = ctx;
     if (
@@ -2832,18 +2799,13 @@ export class CraftingEngine {
   /**
    * Attempt to craft an item using a recipe.
    *
-   * @param {string} ingredientSetId Which ingredient set to use; the first satisfiable when null.
-   * @param {object|null} [options.ingredientOptionOverrides] Per-group player option overrides
-   *   (issue 552), keyed by `group.id`, so the consumed plan matches what the player chose. For a
-   *   time-gated step they apply at START, so the FINISH resume replays the chosen option/stack.
+   * @param {object|null} [options.ingredientOptionOverrides] Per-group option overrides keyed by
+   *   `group.id` (issue 552); a time-gated step applies them at START.
    * @param {{stepId: string|null, ingredientSetId: string|null,
    *   allocation: Record<string, number>}|null} [options.ingredientEssenceAllocation] The
-   *   player's essence-block funding (issue 917), SCOPED to the step and set it was computed
-   *   against and dropped wholesale — never clamped into the wrong step — when either id
-   *   disagrees. There is no timed snapshot: the source Items are deleted at START.
-   * @param {boolean} [options.interactive] Prompt with the confirm-roll dialog and post the roll
-   *   to chat; defaults false so automation stays silent, and a dismissed prompt returns
-   *   `cancelled: true` with zero mutation. A timed step's RESUME is always a player click.
+   *   player's essence funding (issue 917), dropped wholesale when either id disagrees.
+   * @param {boolean} [options.interactive] Prompt with the confirm-roll dialog and post the roll;
+   *   defaults false, and a dismissed prompt returns `cancelled: true` with zero mutation.
    * @returns {Promise<{success: boolean, results: Item[]|null, message: string, cancelled?: boolean}>}
    */
   async craft(craftingActor, componentSourceActors, recipe, ingredientSetId = null, options = {}) {
@@ -2901,8 +2863,7 @@ export class CraftingEngine {
       if (preflight) return settle(preflight);
 
       const award = await commitCraft(this, ctx, craftInputs);
-      // Step resolved: a multi-step recipe keeps an active run for the next step; a
-      // final step is already moved to history. Either way it is not a phantom.
+      // Step resolved: an active run for the next step, or already in history; not a phantom.
       ctx.resolved = true;
       await publishCraftSuccess(this, ctx, craftInputs, award);
       const chained = continueCollapsedChain(this, ctx);
@@ -2927,12 +2888,10 @@ export class CraftingEngine {
   }
 
   /**
-   * START phase of a time-gated step: validate craftability, resolve the single craft selection,
-   * run the afford / tool gates, then CONSUME components and currency NOW, before the gate is
-   * armed. Snapshots the resolved essences and a consumed-item summary onto the run step so
-   * FINISH can build results without re-reading the deleted source items. Any pre-arm failure
-   * removes the run, and tool BREAKAGE is NOT applied here — it is tied to the check outcome at
-   * FINISH. `ingredientEssenceAllocation` applies exactly once, HERE, and is NOT snapshotted.
+   * START phase of a time-gated step: gate, resolve the single selection, and consume components
+   * and currency before arming. Resolved essences and a consumed-item summary are snapshotted so
+   * FINISH never re-reads deleted items. A pre-arm failure removes the run; tool breakage waits
+   * for FINISH; `ingredientEssenceAllocation` applies once, here, and is not snapshotted.
    */
   async _startTimedStep({
     craftingActor,
@@ -2951,13 +2910,11 @@ export class CraftingEngine {
   }) {
     const executionRecipe = this._buildStepRecipeView(recipe, step);
 
-    // A timed alchemy attempt reaches canCraft/selection/essence-context here too (issue 578):
-    // inject the tier-4-aware submission resolver so a purely-tier-4 submission STARTS and its
-    // component's essences are snapshotted for the FINISH effect transfer.
+    // A timed alchemy attempt uses the tier-4-aware resolver too (issue 578), so a tier-4
+    // submission starts and its essences are snapshotted.
     const resolveComponent = this._alchemyComponentResolver(options);
 
-    // Remove the never-armed run on any pre-arm failure so no zombie lingers: a
-    // run this call created is discarded (no history); a reused run is cancelled.
+    // A pre-arm failure discards a run this call created (no history) or cancels a reused one.
     const abort = async (message) => {
       await (createdThisCall
         ? runManager.discardRun(craftingActor, run.id)
@@ -2987,9 +2944,8 @@ export class CraftingEngine {
       ingredientSet = canCraftCheck.satisfiableSet;
     }
 
-    // SINGLE SELECTION SOURCE (mirrors craft()): the item plan and currencySpends
-    // both come from ONE _resolveCraftSelection call so consumption never diverges
-    // from the gated/spent currency.
+    // One selection source, as in `craft()`: the item plan and `currencySpends` come from one
+    // `_resolveCraftSelection` call so consumption never diverges from the spend.
     const essenceAllocation = this._scopedEssenceAllocation(
       ingredientEssenceAllocation,
       step,
@@ -3043,7 +2999,7 @@ export class CraftingEngine {
       return abort(itemPilesAffordCheck.message);
     }
 
-    // Consume NOW (at START): items first, then currency (both gates passed).
+    // Items first, then currency; both gates have passed.
     await this._beginNativeStage({
       craftingActor,
       run,
@@ -3060,9 +3016,8 @@ export class CraftingEngine {
       runManager,
       stepIndex,
     });
-    // The deduction deliberately does not abort the craft on failure (clause 4 forbids
-    // both aborting and rolling back), so the run must record what SETTLED rather than
-    // what was planned — otherwise a cancel refunds currency the actor never paid.
+    // The deduction never aborts or rolls back, so the run records what settled, not what was
+    // planned; otherwise a cancel refunds currency never paid.
     const currencySettlement = await this._spendCraftCurrency(
       craftingActor,
       executionRecipe,
@@ -3070,18 +3025,15 @@ export class CraftingEngine {
     );
     await this._deductItemPilesCurrencyCost(craftingActor, recipe);
 
-    // Snapshot for the FINISH resume: essence quantities are precomputed here
-    // because the source items are deleted before the check runs; the consumed
-    // summary carries only what chat / history / property-macro ingredientPool need.
+    // Snapshot for FINISH: essences are precomputed because the source items are deleted first.
     const { resolvedEssences } = this._buildEssenceContext(
       consumedItems,
       executionRecipe,
       null,
       resolveComponent
     );
-    // Enabled-ness is snapshotted HERE, at START, alongside the quantities (issue 1036):
-    // evaluating the behaviour gate at FINISH would let a mid-run GM toggle change the
-    // outcome of a craft whose inputs are already gone.
+    // Enabled-ness is snapshotted at START with the quantities (issue 1036), so a mid-run GM
+    // toggle cannot change a craft whose inputs are gone.
     const essenceEnabled = this._snapshotEssenceEnabled(
       resolvedEssences,
       this._getRecipeSystem(executionRecipe)
@@ -3123,20 +3075,18 @@ export class CraftingEngine {
         success: false,
         results: null,
         message: `Step "${stepLabel}" is still in progress (${remaining}s remaining)`,
-        // A START is a SUCCESSFUL arming, not a failure: inputs are secured and the run is live.
-        // `success` stays false because nothing was produced, so the disposition is what tells a
-        // caller the two apart (issue 966).
+        // A START is a successful arming, not a failure; `success` stays false because nothing
+        // was produced, and the disposition tells the two apart (issue 966).
         disposition: 'timed-start',
       },
     };
   }
 
   /**
-   * FINISH phase of a time-gated step: the gate has matured, so this runs the crafting check and
-   * creates results from the START-phase snapshot. Components and currency were consumed at
-   * START, so it NEVER re-consumes, re-spends or refunds, and essence transfer uses the
-   * precomputed `resolvedEssences` because the source items are deleted. A rolled failure only
-   * breaks tools per the policy; a misconfigured or cancelled check leaves the run resumable.
+   * FINISH phase of a time-gated step: run the check and create results from the START snapshot.
+   * Inputs were consumed at START, so this never re-consumes, re-spends or refunds. A rolled
+   * failure only breaks tools per the policy; a misconfigured or cancelled check leaves the run
+   * resumable.
    */
   async _finishTimedStep({
     craftingActor,
@@ -3157,8 +3107,7 @@ export class CraftingEngine {
       prepared.resolvedEssences && typeof prepared.resolvedEssences === 'object'
         ? prepared.resolvedEssences
         : {};
-    // Enabled-ness is read from the START snapshot, never live (issue 1036): a mid-run
-    // toggle must not change the outcome of a craft whose inputs are already consumed.
+    // Enabled-ness comes from the START snapshot, never live (issue 1036).
     const essenceEnabled = this._resumedEssenceEnabled(prepared);
     const summary = Array.isArray(prepared.consumedSummary) ? prepared.consumedSummary : [];
     const consumedLiveItems = resolveLiveInventoryItemsByUuid(
@@ -3166,9 +3115,8 @@ export class CraftingEngine {
       summary.map((entry) => entry?.itemUuid).filter(Boolean)
     );
 
-    // Reconstruct lightweight consumed-item snapshots. The real Foundry items were
-    // deleted at START, so these carry only what chat / history / property-macro
-    // ingredientPool and essence transfer need.
+    // Lightweight snapshots of the items deleted at START, carrying only what chat, history,
+    // the property macro and effect transfer read.
     const consumedItems = summary.map((entry) => ({
       item: {
         uuid: entry.itemUuid ?? null,
@@ -3182,17 +3130,15 @@ export class CraftingEngine {
         ? { componentId: entry.componentId, systemItemId: entry.componentId }
         : null,
     }));
-    // Route the reconstructed snapshots through the same mapper the immediate craft paths use, so
-    // the persisted run refs carry the consume-time name/img and the summary's componentId — the
-    // Journal projection falls back to it when a live lookup fails.
+    // The same mapper the immediate paths use, so run refs keep the consume-time name/img and
+    // `componentId` the Journal falls back to.
     const consumedRunRefs = consumedItems.map((consumed) => ({
       ...mapConsumedIngredientRef(consumed),
       componentId: consumed.ingredient?.componentId ?? null,
     }));
 
-    // Tools are reusable and were NOT consumed at START, so re-resolve them here
-    // for breakage (tied to the check outcome). A tool that went missing since
-    // START simply yields no breakable pairs — the components are already spent.
+    // Tools were not consumed at START, so re-resolve them for breakage; a tool gone since START
+    // yields no breakable pairs.
     const toolsForSet =
       typeof this.recipeManager.getToolsForSet === 'function'
         ? this.recipeManager.getToolsForSet(executionRecipe, ingredientSet)
@@ -3223,16 +3169,14 @@ export class CraftingEngine {
     );
 
     if (checkResult.misconfigured) {
-      // GM-side gap: components stay consumed (no refund), but the run remains
-      // active/resumable so a fixed check completes it later.
+      // GM-side gap: inputs stay consumed, and the run stays resumable for a fixed check.
       return {
         resolved: true,
         result: { success: false, results: null, message: checkResult.message },
       };
     }
     if (checkResult.cancelled) {
-      // Player dismissed the roll: retryable. Components stay consumed (no refund);
-      // the run remains active so a later Finish can resolve it.
+      // A dismissed roll is retryable: inputs stay consumed and the run stays active.
       return {
         resolved: true,
         result: { success: false, cancelled: true, results: null, message: 'Crafting cancelled' },
@@ -3249,9 +3193,8 @@ export class CraftingEngine {
       componentSourceActors,
     });
 
-    // Shared timed-step failure recorder: components are already gone (consumed at
-    // START), so NEVER re-consume or refund — only break tools per the failure
-    // policy, archive the failed run, and post the failure chat.
+    // Timed failure recorder: inputs were consumed at START, so only break tools per policy,
+    // archive the run and post the failure chat.
     const recordFailure = async (message) => {
       const failurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
       let usedToolPairs = [];
@@ -3274,9 +3217,8 @@ export class CraftingEngine {
       } catch (breakageError) {
         console.error('Fabricate | Error during timed-step failure tool breakage:', breakageError);
       }
-      // THE FAILURE AWARD, timed twin (issue 1098): a timed craft that fails must produce what an
-      // immediate one would, because the delay is a scheduling property. The START snapshot is
-      // threaded because the source items are already gone.
+      // The failure award, timed twin (issue 1098): the delay is scheduling, so a timed failure
+      // produces what an immediate one would, from the START snapshot.
       const failureResults = await this._produceCraftingFailureResults({
         craftingActor,
         executionRecipe,
@@ -3323,9 +3265,9 @@ export class CraftingEngine {
     };
 
     if (!checkResult.success) {
-      // Matched Simple alchemy attempt (timed twin): produce the reserved failure group and learn
-      // WITHOUT re-consuming. Keyed on the RECIPE'S SYSTEM, never on `options.isAlchemyAttempt`
-      // (issue 966), which `advanceCraftingRun` cannot carry.
+      // Matched Simple alchemy attempt (timed twin): produce the failure group and learn without
+      // re-consuming. Keyed on the recipe's system, as `advanceCraftingRun` cannot carry
+      // `options.isAlchemyAttempt` (issue 966).
       if (this._getAlchemyCheckMode(executionRecipe) === 'simple') {
         return this._finishAlchemySimpleFailure({
           craftingActor,
@@ -3355,7 +3297,6 @@ export class CraftingEngine {
       );
     }
 
-    // SUCCESS tool breakage (tied to the check outcome, applied here at FINISH).
     const successBreakDecision = this._resolveCraftingBreakageDecision(
       this._getRecipeSystem(executionRecipe),
       executionRecipe,
@@ -3368,9 +3309,7 @@ export class CraftingEngine {
       triggerId: successBreakDecision.triggerId,
     });
 
-    // Create results from the snapshot: essence transfer uses the precomputed
-    // resolvedEssences (source items are deleted); chat/history/property-macro use
-    // the snapshot consumedItems.
+    // Results come from the snapshot: precomputed essences and the snapshot consumed items.
     const { items: resultItems, resolutionMeta } = await this._createResultItems(
       craftingActor,
       executionRecipe,
@@ -3383,9 +3322,8 @@ export class CraftingEngine {
       { precomputedEssences: resolvedEssences, essenceEnabled }
     );
 
-    // Timed misconfiguration (issue 85). A timed step consumed its inputs at START, so this can
-    // only record a failure with NO refund, never a zero-mutation abort. The shared predicate
-    // covers `unrouted-tier`, which would otherwise complete as a false success with lost inputs.
+    // Timed misconfiguration (issue 85): inputs went at START, so this records a failure with no
+    // refund, never a zero-mutation abort. The predicate covers `unrouted-tier` too.
     if (this._isMisconfigurationDisposition(resolutionMeta?.disposition)) {
       const message = resolutionMeta.error || 'Crafting resolution failed';
       await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
@@ -3443,17 +3381,15 @@ export class CraftingEngine {
         craftingActor,
         componentSourceActors,
       });
-      // Learn on match for a matured timed alchemy brew too, gated inside `learnRecipeOnCraft`.
-      // Keyed on the recipe's own system for the reason given at the Simple-failure branch: the
-      // resume path cannot carry `options.isAlchemyAttempt` (issue 966).
+      // Learn on match for a matured timed alchemy brew (gated inside `learnRecipeOnCraft`),
+      // keyed on the recipe's system for the reason above (issue 966).
       if (this._getAlchemyCheckMode(recipe) !== null) {
         await visibilityService.learnRecipeOnCraft(recipe, craftingActor);
       }
     }
 
-    // Component complications (issue 1286). The timed path reaches this point only
-    // after the matured FINISH created its results and `completeStepSuccess` archived
-    // the run, so the award is as committed here as it is on the immediate path.
+    // Component complications (issue 1286): the results exist and `completeStepSuccess`
+    // archived the run, so the award is committed here as on the immediate path.
     const firedComplications = await this._fireCraftComplications({
       actor: craftingActor,
       recipe: executionRecipe,
@@ -3489,12 +3425,11 @@ export class CraftingEngine {
   }
 
   /**
-   * Produce the authored FAILURE result for a failed crafting check (issue 1098), or nothing —
-   * the seam both crafting failure paths call so the two cannot diverge. `never` short-circuits
-   * BEFORE any group is selected; `perRecord` and `always` are ONE predicate,
-   * {@link activityPermitsFailureResults}, because the policy SELECTS an authored output and
-   * never fabricates one. IT DECIDES NOTHING ABOUT COST: consumption and tool breakage are
-   * governed by `craftingCheck.consumption` and applied by the caller BEFORE this runs.
+   * The authored failure result for a failed crafting check (issue 1098), or nothing; both
+   * failure paths call it. `never` short-circuits before any group is selected, and
+   * `perRecord`/`always` share {@link activityPermitsFailureResults}: the policy selects an
+   * authored output, never fabricates one. Cost is not decided here; the caller applies
+   * `craftingCheck.consumption` and tool breakage first.
    */
   async _produceCraftingFailureResults({
     craftingActor,
@@ -3512,9 +3447,8 @@ export class CraftingEngine {
       return [];
     }
     try {
-      // PREFLIGHT THE DISPOSITION BEFORE CREATING ANYTHING. Resolution is pure and deterministic,
-      // so asking it twice agrees with itself — the same argument the pre-consumption gate in
-      // `craft()` makes. Asking after creation would be too late: the items would be on the actor.
+      // Preflight the disposition before creating anything: resolution is pure, so asking twice
+      // agrees, and asking after creation would leave items on the actor.
       const resolutionService =
         this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
       if (typeof resolutionService?.resolveResultGroups !== 'function') return [];
@@ -3548,10 +3482,9 @@ export class CraftingEngine {
     }
   }
 
-  /** Shared tail for a matched Simple alchemy FAILURE (immediate and timed alike): apply tool
-   * breakage unless the caller already did, produce the reserved `role: 'failure'` group, record
-   * the run as a failure, learn on match and post the distinct failure banner. Consumption
-   * differs per caller, so it is passed in as `consumedItems`/`consumedRunRefs`. */
+  /** Shared tail for a matched Simple alchemy failure, immediate or timed: tool breakage unless
+   * already applied, the `role: 'failure'` group, the failure record, learn on match and the
+   * failure banner. Consumption differs per caller, so it arrives as `consumedItems`. */
   async _produceAlchemyFailureResults({
     craftingActor,
     componentSourceActors,
@@ -3630,8 +3563,8 @@ export class CraftingEngine {
       );
     }
 
-    // Learn on MATCH regardless of pass/fail; `learnRecipeOnCraft` internally gates
-    // on `alchemy.learnOnCraft === true`. Mirror the success path's recipe-item use.
+    // Learn on match regardless of pass/fail (`learnRecipeOnCraft` gates on `learnOnCraft`),
+    // mirroring the success path's recipe-item use.
     const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
     if (visibilityService) {
       await visibilityService.applyRecipeItemUseOnCraft({
@@ -3665,9 +3598,8 @@ export class CraftingEngine {
     };
   }
 
-  /** Timed twin of {@link _resolveAlchemySimpleFailure}. Components were already consumed at
-   * START, so this NEVER re-consumes — it defers to {@link _produceAlchemyFailureResults} using
-   * the START snapshot (`resolvedEssences`). */
+  /** Timed twin of {@link _resolveAlchemySimpleFailure}: inputs went at START, so it never
+   * re-consumes and uses the START snapshot. */
   async _finishAlchemySimpleFailure({
     craftingActor,
     componentSourceActors,
@@ -3767,9 +3699,8 @@ export class CraftingEngine {
 
     const consumedRunRefs = consumedItems.map(mapConsumedIngredientRef);
 
-    // Build a tier-4-aware essence snapshot over the consumed items (issue 578) so the reserved
-    // Simple-failure group's effect transfer credits a purely-tier-4 submission its component's
-    // essences, mirroring how the timed twin forwards the START snapshot.
+    // A tier-4-aware essence snapshot over the consumed items (issue 578), so the failure group's
+    // effect transfer credits a tier-4 submission, as the timed twin does.
     const { resolvedEssences } = this._buildEssenceContext(
       consumedItems,
       executionRecipe,
@@ -3798,13 +3729,11 @@ export class CraftingEngine {
   }
 
   /**
-   * Attempt to craft using the alchemy discovery mode. Submitted items are matched against the
-   * component signatures of all enabled recipes; recipe names and ingredient lists stay hidden.
-   * Requires `resolutionMode: 'alchemy'`.
+   * Craft in alchemy discovery mode (`resolutionMode: 'alchemy'`): submitted items are matched
+   * against every enabled recipe's signature, keeping names and ingredients hidden.
    *
    * @param {Array<{item: object, componentId: string}>} submittedItems Pre-bucketed records from
-   *   {@link resolveAlchemySubmissions} (issue 572). The engine CONSUMES the bucketed
-   *   `componentId` rather than re-deriving identity, so palette, collector and engine agree.
+   *   {@link resolveAlchemySubmissions} (issue 572); their `componentId` is used, never re-derived.
    */
   async craftAlchemy(craftingActor, componentSourceActors, submittedItems, options = {}) {
     if (options?.lifecycleVersion === 1 && !options?.[VERSIONED_EXECUTION_CONTEXT]) {
@@ -3945,32 +3874,26 @@ export class CraftingEngine {
       ...options,
       isAlchemyAttempt: true,
       alchemySubmittedItems: submissionItems,
-      // An alchemy brew has no requirement rail and no player-chosen essence funding: the recipe
-      // and its ingredient set are DISCOVERED by matching the submission, so any allocation
-      // riding on `options` was scoped to something else entirely (issue 917).
+      // A brew's recipe and set are discovered by matching, so any allocation on `options` was
+      // scoped to something else (issue 917).
       ingredientEssenceAllocation: null,
     });
   }
 
   /**
-   * Match submitted items against all recipe signatures in the system.
-   *
-   * Matching is quantity-aware and counts by OCCURRENCE: the workbench expands a stack into one
-   * submission per unit, so a submission contributes at most one unit per group and stack
-   * quantities are never read, differing deliberately from
-   * {@link IngredientSet#resolveIngredientSelection}. Component identity is NOT resolved here
-   * (issue 572): each record arrives already bucketed by the collector's shared resolver.
+   * Match submitted items against every recipe signature in the system. Counting is by
+   * occurrence: a stack arrives as one submission per unit, so stack quantities are never read,
+   * unlike {@link IngredientSet#resolveIngredientSelection}. Records arrive already bucketed
+   * (issue 572).
    */
   _matchAlchemySignature(submittedItems, recipes, components, signatureValidator, options = {}) {
     const system = options?.system;
 
-    // Consume the component id each submission was bucketed to ONCE at the collector (issue 572),
-    // never re-deriving identity here; `null` when it resolved to no component. Re-resolving per
-    // candidate would double-count a submission matching several components of one group.
+    // The component id each submission was bucketed to at the collector (issue 572); re-resolving
+    // per candidate would double-count a submission matching several components of one group.
     const resolvedComponentIds = submittedItems.map((record) => record?.componentId ?? null);
 
-    // Count submissions whose resolved component id is one of the given ids. Each resolved to
-    // exactly one component, so it contributes at most one unit toward a group.
+    // Submissions resolved to one of these ids; each contributes at most one unit to a group.
     const availableForComponentIds = (componentIds) => {
       const idSet = componentIds instanceof Set ? componentIds : new Set(componentIds);
       let available = 0;
@@ -3980,12 +3903,10 @@ export class CraftingEngine {
       return available;
     };
 
-    // Check whether the system supports essences
     const essencesEnabled = system?.features?.essences === true;
 
-    // Accumulate essences from the PRE-BUCKETED submission records (duplicates count multiple
-    // times). Reading the collector's `componentId`, rather than the tier-4-blind
-    // `findMatchingComponent`, keeps essence attribution on the id group counting reads.
+    // Essences accumulate from the collector's `componentId` (duplicates count again), keeping
+    // essence attribution on the id group counting reads rather than tier-4-blind matching.
     let submittedEssences = null;
     if (essencesEnabled) {
       submittedEssences = accumulateSubmissionEssences(submittedItems, {
@@ -4001,9 +3922,8 @@ export class CraftingEngine {
       return opts.length > 0 && opts.every((option) => option?.match?.type === 'essence');
     };
 
-    // Whether a single group is satisfied by the submitted multiset: options are alternatives, so
-    // any one satisfying option satisfies the group. An essence option is amount-based, not
-    // occurrence-based, and is ignored under `skipEssence` so the group falls to its other arm.
+    // A group is satisfied by any one option. An essence option is amount-based and ignored
+    // under `skipEssence`, so the group falls to its other options.
     const groupSatisfied = (group, groupComponentIds, skipEssence) => {
       const groupOptions = Array.isArray(group?.options) ? group.options : [];
       if (groupOptions.length === 0) {
@@ -4029,27 +3949,23 @@ export class CraftingEngine {
       });
     };
 
-    // Collect EVERY set that matches this submission, then resolve the unique most-specific one
-    // (issue 774) instead of early-returning the first authored match: a superset submission can
-    // satisfy several nested sets, and an incomparable tie must fail safe rather than pick one.
+    // Collect every matching set, then pick the unique most-specific one (issue 774): a superset
+    // submission can satisfy nested sets, and an incomparable tie fails safe.
     const candidates = [];
     for (const recipe of recipes) {
       if (!recipe.enabled) continue;
       const ingredientSets = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
       for (const set of ingredientSets) {
-        // The signature is computed 1:1 from `set.ingredientGroups`, so they align by index.
-        // Counting is by submission occurrence, not by summed stack quantity.
+        // The signature aligns with `set.ingredientGroups` by index.
         const signature = signatureValidator.computeSignature(set, components);
         const groups = Array.isArray(set.ingredientGroups) ? set.ingredientGroups : [];
-        // Legacy back-compat READ of the retired per-set essences map (one release):
-        // migrated data carries essences as groups instead, so `setEssences` is {}.
+        // Legacy read of the retired per-set essences map; migrated data carries essence groups.
         const setEssences = set.essences || {};
         const hasEssences = essencesEnabled && Object.keys(setEssences).length > 0;
 
         if (!essencesEnabled) {
-          // Group-granular essences-disabled rule (issue 649): evaluate only the non-essence-only
-          // groups and skip essence options inside them, so a set whose every group is
-          // essence-only is unmatchable.
+          // Essences disabled (issue 649): evaluate only non-essence-only groups, skipping essence
+          // options, so an all-essence-only set is unmatchable.
           const nonEssenceGroupIndexes = [];
           for (const [index, group] of groups.entries()) {
             if (!isEssenceOnlyGroup(group)) nonEssenceGroupIndexes.push(index);
@@ -4064,15 +3980,14 @@ export class CraftingEngine {
           continue;
         }
 
-        // Essences enabled: evaluate every group (essence options amount-based).
-        // Skip sets that carry neither ingredient groups nor a legacy essence map.
+        // Essences enabled: evaluate every group; skip sets with no groups and no legacy map.
         if (signature.length === 0 && !hasEssences) continue;
 
         const allGroupsSatisfied = signature.every((groupComponentIds, groupIndex) =>
           groupSatisfied(groups[groupIndex], groupComponentIds, false)
         );
 
-        // Legacy per-set essences map (back-compat read): AND-required as before.
+        // Legacy per-set essences map: every entry is required.
         let essencesSatisfied = true;
         if (hasEssences && submittedEssences) {
           for (const [essenceType, requiredQty] of Object.entries(setEssences)) {
@@ -4089,9 +4004,7 @@ export class CraftingEngine {
       }
     }
 
-    // The specificity tiebreak is only consulted when more than one set matched, so
-    // defer computing each candidate's `groupOptions` (the domination input) until
-    // then — a single match returns directly and never needs it.
+    // Domination inputs are only needed to break a tie, so a single match skips them.
     if (candidates.length > 1) {
       for (const candidate of candidates) {
         candidate.groupOptions = signatureValidator.computeGroupOptions(candidate.set, components);
@@ -4101,11 +4014,9 @@ export class CraftingEngine {
   }
 
   /**
-   * For a matched alchemy attempt, consume any submitted items that standard ingredient matching
-   * did not already consume (essence-option contributors and surplus). Mutates `consumedItems`
-   * in place with `{ item, quantity, ingredient: null }` entries. Shared by the success path AND
-   * the Simple failure path so a matched fail consumes the same submitted multiset as a pass.
-   * No-op unless this is an alchemy attempt carrying `alchemySubmittedItems`.
+   * Consume the submitted items standard matching did not (essence-option contributors and
+   * surplus), appending `{ item, quantity, ingredient: null }` to `consumedItems`. Shared by the
+   * success and Simple failure paths so both consume the same multiset.
    */
   async _consumeAlchemyExtraItems(consumedItems, componentSourceActors, options) {
     if (!options?.isAlchemyAttempt || !Array.isArray(options?.alchemySubmittedItems)) return;
@@ -4135,10 +4046,7 @@ export class CraftingEngine {
     }
   }
 
-  /**
-   * Consume submitted alchemy items (no-match failure path).
-   * Best-effort: removes items by UUID from component source actors.
-   */
+  /** Best-effort consumption of submitted alchemy items by UUID (no-match failure path). */
   async _consumeSubmittedAlchemyItems(componentSourceActors, submittedItems) {
     const consumeCounts = new Map();
     for (const item of submittedItems) {
@@ -4158,10 +4066,9 @@ export class CraftingEngine {
   }
 
   /**
-   * Map submission records to a plain-component multiset `{ componentId: units }` from the SAME
-   * `componentId` each was bucketed to at the collector (issue 572), so the dead-end key can
-   * never drift from the signature {@link _matchAlchemySignature} matched against. Each record
-   * contributes at most one unit; a record with no component id is skipped.
+   * The `{ componentId: units }` multiset from each record's collector-bucketed `componentId`
+   * (issue 572), so the dead-end key matches the signature {@link _matchAlchemySignature} used.
+   * One unit per record; records without an id are skipped.
    */
   _submittedComponentMultiset(submittedItems) {
     const multiset = {};
@@ -4174,10 +4081,8 @@ export class CraftingEngine {
   }
 
   /**
-   * Record a fizzled alchemy attempt's canonical signature key on the crafting actor, under a
-   * per-system append-only, deduped array (`alchemyDeadEnds[craftingSystemId] = [signatureKey]`).
-   * Written ONLY when the system's `showAttemptHistoryToPlayers` is true. No-ops on an empty or
-   * duplicate key, or an actor without flag support.
+   * Record a fizzled attempt's signature key in the actor's per-system, append-only, deduped
+   * `alchemyDeadEnds[craftingSystemId]`, only when `showAttemptHistoryToPlayers` is true.
    */
   async _recordAlchemyDeadEnd(craftingActor, systemId, submittedItems, alchemyCfg) {
     if (alchemyCfg?.showAttemptHistoryToPlayers !== true) return;
@@ -4195,11 +4100,9 @@ export class CraftingEngine {
   }
 
   /**
-   * Deduct the chosen currency spends for a craft, after item consumption; the afford gate in
-   * {@link craft} already confirmed affordability, so a spend failure is logged, never refunded,
-   * and does not abort the craft. It RETURNS the settlement (issue 902), which only the
-   * time-gated START path consumes, because only it persists a record a later cancel reversal
-   * would hand back. Never throws: a thrown deduction reports total non-settlement.
+   * Deduct a craft's currency spends after item consumption. Affordability was already gated, so
+   * a failure is logged, never refunded, and never aborts the craft. Returns the settlement
+   * (issue 902), which timed START persists for a cancel to reverse; never throws.
    */
   async _spendCraftCurrency(craftingActor, recipe, currencySpends) {
     if (!currencySpends?.length) return { valid: true, groups: [], settledSpends: [] };
@@ -4226,10 +4129,8 @@ export class CraftingEngine {
   }
 
   /**
-   * Refund the currency a craft spent at START — the inverse of {@link _spendCraftCurrency}. A
-   * failure is logged, never thrown, so a cancel that cannot refund still removes the run. FAILS
-   * CLOSED (issue 902): a refund that throws reports total failure with NO group detail, and
-   * absent detail is read as unknown-and-failed.
+   * Refund the currency a craft spent at START; a failure is logged, never thrown. Fails closed
+   * (issue 902): a throwing refund reports total failure with no group detail.
    */
   async _refundCraftCurrency(craftingActor, recipe, currencySpends) {
     if (!currencySpends?.length) return { valid: true, groups: [] };
@@ -4255,11 +4156,9 @@ export class CraftingEngine {
   }
 
   /**
-   * Recreate a single consumed component's item back on an actor (issue 848), mirroring
-   * {@link _createSingleResult}: the component's `registeredItemUuid` source item is cloned, the
-   * quantity is set, and the durable per-system component identity is stamped so the restored
-   * item resolves to its OWN component. With no component/source, a lightweight item is built
-   * from the consume-time name/img snapshot so the player gets a stand-in rather than nothing.
+   * Recreate one consumed component on an actor (issue 848), like {@link _createSingleResult}:
+   * clone `registeredItemUuid`, set the quantity and stamp the component identity. Without a
+   * component or source, a stand-in is built from the consume-time name/img.
    */
   async _restoreComponentItem({ actor, system, componentId, quantity, name, img }) {
     if (!actor || typeof actor.createEmbeddedDocuments !== 'function') return null;
@@ -4303,22 +4202,16 @@ export class CraftingEngine {
     return created ?? null;
   }
 
-  /**
-   * Restore every consumed ingredient captured in a step's START-phase snapshot back onto its
-   * source actor (issue 848), falling back to the crafting actor when the recorded source actor
-   * no longer resolves.
-   */
+  /** Restore a step's START-snapshot ingredients to their source actors (issue 848), or to the
+   * crafting actor when the source no longer resolves. */
   async _restoreConsumedIngredients(craftingActor, systemId, consumedSummary = []) {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId) || null;
     const restored = [];
     let failures = 0;
     for (const entry of Array.isArray(consumedSummary) ? consumedSummary : []) {
-      // Best-effort per entry: a create that throws (permission, invalid item type)
-      // must NOT abort the reversal or propagate out of cancelCraft — otherwise the
-      // run would stay active and re-cancelling it would double-restore the entries
-      // that already succeeded. Record the failure and continue.
-      // A degenerate zero-quantity entry is nothing to restore, not a failure.
+      // Best-effort per entry: a throwing create must not abort the reversal, or the run stays
+      // active and a re-cancel double-restores. A zero-quantity entry is not a failure.
       const qty = Math.max(0, Math.trunc(Number(entry?.quantity) || 0));
       if (qty <= 0) continue;
       try {
@@ -4341,10 +4234,7 @@ export class CraftingEngine {
     return { restored, failures };
   }
 
-  /**
-   * Resolve the actor a consumed ingredient should be restored to: the recorded
-   * source actor uuid, or the crafting actor when it no longer resolves.
-   */
+  /** The restore target: the recorded source actor, else the crafting actor. */
   _resolveRestoreActor(craftingActor, actorUuid) {
     if (actorUuid && typeof globalThis.fromUuidSync === 'function') {
       try {
@@ -4358,14 +4248,10 @@ export class CraftingEngine {
   }
 
   /**
-   * Reverse the START-phase consumption of an in-progress run — restore consumed ingredients and
-   * refund spent currency for every step CONSUMED but not yet resolved. The shared "un-consume"
-   * primitive for player self-cancel (issue 848) and GM cancel/reverse (issue 847); it never
-   * touches the run record, so callers own removing or archiving it.
-   *
-   * Best-effort: per-entry restore failures are caught so a throw can never strand the run
-   * active, `ok` reports whether the reversal was COMPLETE, and the currency half reports a
-   * `currencyRefund` VALUE rather than a boolean (issue 902) — read `status`, never the object.
+   * Reverse the START consumption of an in-progress run for every step consumed but not
+   * resolved: the shared primitive for player cancel (issue 848) and GM cancel (issue 847). It
+   * never touches the run record. Best-effort; `ok` reports a complete reversal, and
+   * `currencyRefund` is a value (issue 902), so read its `status`.
    */
   async reverseRunConsumption(craftingActor, run) {
     const restored = [];
@@ -4379,8 +4265,7 @@ export class CraftingEngine {
     const steps = Array.isArray(run?.steps) ? run.steps : [];
     for (const step of steps) {
       const prepared = step?.preparedConsumption;
-      // Only a consumed-but-not-produced step holds recoverable inputs. A resolved
-      // step (succeeded/failed) already turned its inputs into an outcome.
+      // Only a consumed-but-unresolved step holds recoverable inputs.
       if (!prepared || step.status === 'succeeded' || step.status === 'failed') continue;
       const outcome = await this._restoreConsumedIngredients(
         craftingActor,
@@ -4389,8 +4274,7 @@ export class CraftingEngine {
       );
       restored.push(...outcome.restored);
       restoreFailures += outcome.failures;
-      // The record holds only the spends that SETTLED, so an empty array correctly skips
-      // the refund: there is nothing the actor paid and nothing to hand back.
+      // The record holds only settled spends, so an empty array has nothing to refund.
       if (Array.isArray(prepared.currencySpends) && prepared.currencySpends.length > 0) {
         currencyAttempted = true;
         const refund = await this._refundCraftCurrency(
@@ -4398,8 +4282,7 @@ export class CraftingEngine {
           recipe,
           prepared.currencySpends
         );
-        // Count the groups that DEMONSTRABLY came back. Absent group detail (a refund that
-        // threw) therefore counts zero — unknown-and-failed, never "all refunded".
+        // Count only groups demonstrably refunded; absent detail counts zero.
         refundedGroups += (refund?.groups || []).filter((group) => group.refunded === true).length;
         // Any failed refund makes the whole reversal incomplete (fail-closed on truth).
         if (refund?.valid !== true) currencyFailed = true;
@@ -4410,8 +4293,7 @@ export class CraftingEngine {
       failed: currencyFailed,
       refundedGroups,
     });
-    // A refund that was never attempted is not a failure; the reversal is complete only
-    // when nothing failed to restore and no attempted currency refund reported failure.
+    // An unattempted refund is not a failure.
     const ok =
       restoreFailures === 0 &&
       (currencyRefund.status === 'none' || currencyRefund.status === 'full');
@@ -4430,17 +4312,13 @@ export class CraftingEngine {
   }
 
   /**
-   * Cancel a player's in-progress craft (issue 848). Owner-scoped: the craft engine writes items
-   * directly with no GM relay, so a player may cancel only a run on an OWNED actor. The run is
-   * archived as `cancelled`, nothing is produced, any rolled check outcome is discarded, and —
-   * when `features.refundOnPlayerCancel` is on (default) — {@link reverseRunConsumption} restores
-   * the START-phase consumption. With the flag off the inputs are forfeit. The recipe becomes
-   * craftable again either way; `options.refund` overrides the system flag.
+   * Cancel a player's in-progress craft (issue 848). Owner-scoped, since the engine writes items
+   * with no GM relay. The run is archived `cancelled` with nothing produced; with
+   * `features.refundOnPlayerCancel` (default on, overridden by `options.refund`)
+   * {@link reverseRunConsumption} restores the START consumption, else the inputs are forfeit.
    */
   async cancelCraft(craftingActor, componentSourceActors, runId, options = {}) {
-    // Owner scope: refuse a cancel on an actor the caller demonstrably does not own.
-    // The advance/cancel edge already guards via resolveAdvanceSources; this is a
-    // defensive fail-closed for a non-owner reaching the engine directly.
+    // Owner scope, failing closed for a non-owner reaching the engine directly.
     if (craftingActor?.isOwner === false) {
       return { success: false, message: 'You must own this character to cancel its craft.' };
     }
@@ -4478,22 +4356,18 @@ export class CraftingEngine {
         const reversal = await this.reverseRunConsumption(craftingActor, run);
         restoredCount = reversal.restored.length;
         reversalOk = reversal.ok;
-        // A partial reversal (some inputs back, some lost) is worth flagging distinctly
-        // from a total failure so callers can message honestly. Both operands must be
-        // re-derived rather than read from `currencyRefund` directly: it is an OBJECT and
-        // would collapse this whole expression to `!reversal.ok` in boolean context. A
-        // refund that was never attempted recovered nothing, so it is not partial either.
+        // A partial reversal is reported distinctly from a total failure. Both operands are
+        // re-derived because `currencyRefund` is an object and would be truthy in boolean
+        // context; an unattempted refund recovered nothing.
         const currencyRecovered = reversal.currencyRefund.refundedGroups > 0;
         partialRefund = !reversal.ok && (reversal.restored.length > 0 || currencyRecovered);
       }
     } finally {
-      // Always archive the run, even if the reversal threw or partially failed, so the
-      // run can never be re-cancelled (which would double-restore the succeeded entries).
+      // Always archive, even after a failed reversal, so the run can never be re-cancelled.
       await runManager.cancelRun(craftingActor, runId);
     }
 
-    // Report the ACTUAL outcome, not the policy intent: `refunded` is true only when a
-    // refund was intended AND the reversal completed fully.
+    // Report the outcome, not the intent: `refunded` needs a complete reversal.
     return {
       success: true,
       cancelled: true,
@@ -4503,10 +4377,8 @@ export class CraftingEngine {
     };
   }
 
-  /**
-   * Whether a player cancel should refund the consumed inputs. An explicit `options.refund` wins;
-   * otherwise the owning system's `features.refundOnPlayerCancel` decides, defaulting ON.
-   */
+  /** Whether a player cancel refunds: `options.refund`, else `features.refundOnPlayerCancel`,
+   * defaulting on. */
   _shouldRefundOnCancel(run, options = {}) {
     if (typeof options.refund === 'boolean') return options.refund;
     const system = game.fabricate?.getCraftingSystemManager?.()?.getSystem?.(run?.craftingSystemId);
@@ -4514,12 +4386,9 @@ export class CraftingEngine {
   }
 
   /**
-   * Resolve the single craft selection for a step: the widened ingredient-set selection with the
-   * currency afford probe bound to the crafting actor, carrying the item `plan` and the
-   * `currencySpends`. Computed ONCE in {@link craft} so consumption and the currency spend never
-   * diverge. `resolveComponent` is the alchemy-path resolver (issue 578); `essenceAllocation` is
-   * the player's step-scoped funding (issue 917), so the consumed plan is exactly what the
-   * requirement rail displayed.
+   * The single craft selection for a step: the ingredient-set selection with the currency probe
+   * bound to the actor, carrying the item `plan` and `currencySpends`. Computed once in
+   * {@link craft} so consumption and the spend never diverge.
    */
   _resolveCraftSelection(
     componentSourceActors,
@@ -4535,8 +4404,7 @@ export class CraftingEngine {
       this.recipeManager.ingredientMatchesItem(recipe, ingredient, item, resolveComponent);
     if (typeof ingredientSet?.resolveIngredientSelection === 'function') {
       const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe, this._currencySeams());
-      // Bind the component-aware essence resolver so an essence GROUP option consumes
-      // items carrying that essence at craft time (issue 649).
+      // An essence group option consumes items carrying that essence (issue 649).
       const resolveItemEssences =
         typeof this.recipeManager?._buildEssenceOptionResolver === 'function'
           ? this.recipeManager._buildEssenceOptionResolver(recipe, resolveComponent)
@@ -4548,8 +4416,7 @@ export class CraftingEngine {
         resolveItemEssences,
       });
     }
-    // Back-compat: an ingredient set exposing only matchIngredients (older duck-typed
-    // shapes) yields an item-only plan with no currency spends.
+    // A duck-typed set with only `matchIngredients` yields an item-only plan.
     if (typeof ingredientSet?.matchIngredients === 'function') {
       return {
         success: true,
@@ -4562,23 +4429,18 @@ export class CraftingEngine {
   }
 
   /**
-   * The player's essence allocation IF it was computed for the step and ingredient set this craft
-   * actually resolved, else null (issue 917). `step` here is the step resolved from
-   * `run.currentStepIndex`, not the one the UI believed was active, so a UI-side guard would be
-   * stale by construction. On a mismatch the allocation is DROPPED, never clamped into the
-   * resolved step — item uuids carry no step identity, so a step-1 map applied to step 2 would
-   * look plausible while steering the wrong consumption.
+   * The player's essence allocation if it was computed for the step and set this craft resolved,
+   * else null (issue 917). A mismatch drops it, never clamps it: item uuids carry no step, so a
+   * step-1 map applied to step 2 would steer the wrong consumption.
    */
   _scopedEssenceAllocation(payload, step, ingredientSet) {
     return scopedEssenceAllocation(payload, step?.id, ingredientSet?.id);
   }
 
   /**
-   * The missing-materials message for a craft whose PLAYER-SUPPLIED essence allocation does not
-   * fund the set, else null (issue 917). A short allocation is honoured and never topped up, so
-   * the resolved selection comes back `success: false` with a partial plan; `RecipeManager.canCraft`
-   * ran BEFORE the allocation was applied, so without this the engine would consume the partial
-   * plan and still award the result. Scoped to the supplied-allocation case.
+   * The missing-materials message when a player-supplied essence allocation does not fund the
+   * set, else null (issue 917). A short allocation is never topped up, and `canCraft` ran before
+   * it applied, so without this the partial plan would be consumed and still awarded.
    */
   _allocationShortfallMessage(essenceAllocation, craftSelection, executionRecipe) {
     if (!essenceAllocation || craftSelection?.success !== false) return null;
@@ -4600,9 +4462,8 @@ export class CraftingEngine {
   }
 
   /**
-   * Consume the item plan from the single craft selection, computed once in {@link craft} and
-   * passed in, so this never recomputes the match against possibly-mutated items. Every
-   * consumption requires document acknowledgement; there is no unconfirmed mode.
+   * Consume the item plan from the single craft selection; every consumption requires document
+   * acknowledgement.
    * @param {Array<{item: Item, quantity: number, ingredient: object}>} consumptionPlan
    */
   async _consumeIngredients(consumptionPlan = []) {
@@ -4625,9 +4486,8 @@ export class CraftingEngine {
         if (actual !== quantity) throw unconfirmedHistoryError('Partial consumption');
       }
     } catch (error) {
-      // A path-guard refusal reached no database at all. With nothing consumed yet that is a
-      // DEFINITE failure, not the uncertain effect reconciliation exists for; once an earlier
-      // item has already been decremented the partial effect is real and stays uncertain.
+      // A path-guard refusal before anything was consumed is a definite failure; after an earlier
+      // decrement the partial effect is real and stays uncertain.
       if (error?.code === 'STACK_QUANTITY_PATH_REFUSED' && consumedItems.length === 0) throw error;
       const failure = unconfirmedHistoryError(
         'Consumption requires reconciliation',
@@ -4647,9 +4507,8 @@ export class CraftingEngine {
     const captured = mapConsumedIngredientRef({ item, quantity });
     if (before === null || receiptQuantity(quantity) === null)
       throw unconfirmedHistoryError('Unknown consumption quantity');
-    // A whole-document delete yields what the PLAN counted it as, and every consumption
-    // plan reads capacity with `readStackQuantity` ("a present item is at least one"):
-    // the stored value answers 0 for a stored-`0` stack and refuses the consumption.
+    // A whole-document delete yields what the plan counted, and plans read capacity with
+    // `readStackQuantity`, which refuses a stored-`0` stack.
     const whole = readStackQuantity(item?._source ?? item, path);
     const result = await (quantity >= before
       ? item.delete()
@@ -4667,17 +4526,12 @@ export class CraftingEngine {
   }
 
   /**
-   * Validate that all required library Tools resolved for this recipe/step are present (a
-   * matching, non-broken item) on the component source actors, returning the matched
-   * `{ tool, item, breakable }` pairs so the caller can apply usage/breakage.
+   * Validate that every required library Tool is present (a matching, non-broken item) on the
+   * source actors, returning `{ tool, item, breakable }` pairs for usage and breakage.
    *
-   * Durable-identity selection (issue 557): the PREFERRED item matches by durable identity — the
-   * only kind that may be consumed or destroyed — and a presence-only match satisfies the
-   * presence gate alone, returned `breakable: false` so {@link _applyToolBreakage} spares it.
-   * Virtual-present injection (Phase 4): a tool in the active canvas Tool's `presentTools` payload
-   * whose system matches is satisfied WITHOUT an owned item and returned `virtual: true`; an
-   * owned, non-broken item still takes precedence, and {@link resolvePresentComponentIds}
-   * enforces the system scope.
+   * A durable-identity match is preferred (issue 557); a presence-only match satisfies the gate
+   * alone and is `breakable: false`. A tool in the active canvas Tool's `presentTools` for the
+   * same system is satisfied without an owned item (`virtual: true`), though an owned item wins.
    */
   async _validateTools(
     actors,
@@ -4731,10 +4585,8 @@ export class CraftingEngine {
     const presentToolSet = resolvePresentToolIds(presentScope);
 
     for (const tool of tools) {
-      // Durable-identity selection (issue 557): PREFER an owned item matching the tool by durable
-      // identity, and fall back to a presence-only match ONLY to satisfy the presence gate,
-      // tagging that pair `breakable: false`. When an actor owns both the durably-identified
-      // tool and a decoy, the durable tool is the one carried into breakage.
+      // Prefer a durable-identity match (issue 557); a presence-only match only satisfies the
+      // gate, as `breakable: false`, so with a decoy present the real tool is the one broken.
       const hasIdentityMatcher =
         typeof this.recipeManager?.toolMatchesItemByIdentity === 'function';
       let identityItem = null;
@@ -4760,9 +4612,7 @@ export class CraftingEngine {
 
       const found = identityItem ?? presenceItem;
       if (found) {
-        // When the manager exposes no identity matcher (legacy/test managers) preserve
-        // prior behaviour and treat a presence match as breakable; otherwise only a
-        // durable-identity match is breakable.
+        // With no identity matcher (legacy managers), a presence match stays breakable.
         const breakable = hasIdentityMatcher ? identityItem != null : true;
         toolItems.push({ tool, item: found, breakable });
       } else if (presentToolSet.has(tool?.id) || presentSet.has(tool?.componentId)) {
@@ -4808,16 +4658,13 @@ export class CraftingEngine {
   }
 
   /**
-   * Apply usage and breakage to matched tools, delegating to the shared
-   * {@link applyToolUsageAndBreakage} runtime and returning `usedTools` evidence in the
-   * run-record item-ref shape. `forceBreak` passes a `planned: { mode: 'forced', broken: true }`
-   * override.
+   * Apply usage and breakage to matched tools through {@link applyToolUsageAndBreakage},
+   * returning `usedTools` in the run-record item-ref shape.
    *
-   * Authority (issue 419): under `checkDriven` an `immune` tool is filtered OUT of the forced set
-   * and recorded as `skippedImmune`, virtual tools are recorded as skipped, and a forced break
-   * attaches its `authority`/`reason`/`triggerId`. Under `toolSpecific` each tool's own mode
-   * decides. Durable-identity gate (issue 557): an item is used OR broken only when it matches
-   * the tool by durable identity, re-checked here so a presence-only item never reaches `delete()`.
+   * Under `checkDriven` (issue 419) an `immune` tool leaves the forced set as `skippedImmune`,
+   * virtual tools are recorded as skipped, and a forced break carries `authority`/`reason`/
+   * `triggerId`; under `toolSpecific` each tool's own mode decides. An item is used or broken
+   * only on a durable-identity match (issue 557), re-checked here before any `delete()`.
    */
   async _applyToolBreakage(
     recipe,
@@ -4834,9 +4681,8 @@ export class CraftingEngine {
     const evidence = [];
     for (const { tool: toolData, item, virtual, breakable: selectedBreakable } of toolItems) {
       const tool = toolData instanceof Tool ? toolData : Tool.fromJSON(toolData);
-      // Virtual-present (canvas-tool) matches have no owned item to use/break.
-      // Under checkDriven they are recorded as skipped evidence (not mutated);
-      // under toolSpecific they are silent (today's behaviour).
+      // Virtual canvas tools have no item: recorded as skipped under checkDriven, silent under
+      // toolSpecific.
       if (virtual || !item) {
         if (checkDriven) {
           evidence.push({
@@ -4852,10 +4698,8 @@ export class CraftingEngine {
         }
         continue;
       }
-      // Durable-identity gate (issue 557): an owned item is used OR broken only when it matches
-      // the tool by durable identity, re-checked authoritatively here so a mis-tagged,
-      // presence-only item can never reach delete(); with no identity matcher fall back to the
-      // selection tag, defaulting to breakable. A spared item is left untouched.
+      // Durable-identity gate (issue 557), re-checked here so a presence-only item never reaches
+      // delete(); with no matcher the selection tag decides. A spared item is untouched.
       const identityMatcher = this.recipeManager?.toolMatchesItemByIdentity;
       const breakable =
         typeof identityMatcher === 'function'
@@ -4878,9 +4722,8 @@ export class CraftingEngine {
       }
       const actor = item?.parent ?? null;
       const isImmune = tool.checkBreakable === false || tool.breakage?.mode === 'immune';
-      // checkDriven: `checkBreakable: false` excludes a Tool from the forced set;
-      // every other required Tool breaks when forceBreak. toolSpecific: this flag
-      // does not grant immunity. The retained Tool-specific breakage mode decides.
+      // checkDriven: `checkBreakable: false` leaves the forced set and every other required Tool
+      // breaks on forceBreak. toolSpecific: the Tool's own breakage mode decides.
       let planned;
       const extra = {};
       if (checkDriven) {
@@ -4899,8 +4742,6 @@ export class CraftingEngine {
           extra.authority = authority;
         }
       } else if (isImmune) {
-        // `checkBreakable` governs check-driven participation only. Under
-        // toolSpecific, defer to the Tool's retained breakage-mode evaluation.
         planned = undefined;
       } else {
         planned = forceBreak ? { mode: 'forced', broken: true, evidence: {} } : undefined;
@@ -4931,11 +4772,8 @@ export class CraftingEngine {
     return evidence;
   }
 
-  /**
-   * Build a `replaceWith` creator that resolves component targets through the
-   * recipe's crafting system and direct-Item targets by UUID, then creates the
-   * replacement item on the actor.
-   */
+  /** A `replaceWith` creator resolving component targets through the recipe's system and Item
+   * targets by UUID. */
   _makeToolReplacementCreator(recipe) {
     const system = this.getCraftingSystem(recipe?.craftingSystemId);
     return createToolReplacementCreator({
@@ -4950,10 +4788,8 @@ export class CraftingEngine {
     });
   }
 
-  /**
-   * The three essence-resolution inputs travel in one trailing options bag, matching
-   * {@link CraftingEngine#_createSingleResult}; only the time-gated FINISH path supplies them.
-   */
+  /** Essence-resolution inputs travel in the trailing options bag, as in
+   * {@link CraftingEngine#_createSingleResult}; only timed FINISH supplies them. */
   async _createResultItems(
     craftingActor,
     recipe,
@@ -5143,8 +4979,8 @@ export class CraftingEngine {
     // `createOrStackComponentItem` discards `itemData` when it stacks, losing every mutation.
     const hasPropertyUpdates = Boolean(essenceMacrosApplied || resultMacroApplied);
 
-    // The durable component identity, so the inventory matcher attributes this output to its OWN
-    // component and not a sibling reached through `_stats.duplicateSource` (issue 539).
+    // The durable component identity, so this output is not attributed to a sibling reached
+    // through `_stats.duplicateSource` (issue 539).
     stampCraftedComponentIdentity(itemData, recipe.craftingSystemId, managedItem?.id);
 
     // Both flags must be set, and a transferring output never merges into an existing stack.
@@ -5179,8 +5015,7 @@ export class CraftingEngine {
 
     const stacked = matchingItems.includes(resultItem);
 
-    // Only ever a freshly created item: a stacked one keeps its own effects and, by construction,
-    // `transfersEffects` is false when stacking.
+    // Only a freshly created item: `transfersEffects` is false whenever an item stacks.
     if (!stacked && transfersEffects) {
       await this._transferEffects(
         resultItem,
@@ -5196,13 +5031,10 @@ export class CraftingEngine {
   }
 
   /**
-   * Transfer active effects from essence source items to the result item, per spec 005
-   * §"Effect Transfer Semantics": determine the contributing essence IDs from the resolved
-   * ingredients, collect active effects from each `EssenceDefinition.sourceItemUuid` that
-   * resolves, and transfer them via `createEmbeddedDocuments`. A DISABLED essence carries no
-   * behaviour (issue 1036) but its quantities still match, accumulate and are consumed —
-   * `enabled` gates essence-carried BEHAVIOUR, never essence ARITHMETIC. This walk stays SEPARATE
-   * from the property-macro loop, whose GM-authorable order would change the `effectsData` order.
+   * Transfer active effects from each contributing essence's `sourceItemUuid` to the result item
+   * (spec 005 "Effect Transfer Semantics"). A disabled essence carries no behaviour (issue 1036)
+   * but still counts in essence arithmetic. Kept apart from the property-macro loop, whose
+   * authorable order would reorder `effectsData`.
    */
   async _transferEffects(
     resultItem,
@@ -5212,13 +5044,11 @@ export class CraftingEngine {
     resolveComponent = findMatchingComponent,
     essenceEnabled = null
   ) {
-    // 1. Get the crafting system and verify essences are enabled
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(recipe.craftingSystemId);
     if (!system?.features?.essences) return;
 
-    // 2. Build essence context — resolvedEssences maps essenceId -> total quantity
-    // contributed (or the precomputed snapshot on the time-gated FINISH path).
+    // `resolvedEssences` maps essenceId -> quantity, or is the timed FINISH snapshot.
     const { resolvedEssences } = this._buildEssenceContext(
       consumedItems,
       recipe,
@@ -5228,15 +5058,13 @@ export class CraftingEngine {
     const contributingEssenceIds = Object.keys(resolvedEssences);
     if (contributingEssenceIds.length === 0) return;
 
-    // 3. For each contributing essence, find its EssenceDefinition and resolve the source item
     const essenceDefinitions = resolvedEssencesFor(system);
     const effectsData = [];
 
     for (const essenceId of contributingEssenceIds) {
       const definition = essenceDefinitions.find((d) => d.id === essenceId);
-      // BEFORE `_sourceUuidForEssenceDefinition`, and null-safe: `.find(...)` returns
-      // `undefined` for an essence deleted between a timed craft's START and FINISH, a
-      // state the shipped code survives only because that helper guards `!definition`.
+      // Before `_sourceUuidForEssenceDefinition`, and null-safe: an essence deleted between a
+      // timed craft's START and FINISH leaves `definition` undefined.
       if (!this._essenceCarriesBehaviour(definition, essenceId, essenceEnabled)) continue;
       const sourceItemUuid = this._sourceUuidForEssenceDefinition(definition, system);
       if (!sourceItemUuid) continue;
@@ -5250,18 +5078,14 @@ export class CraftingEngine {
       }
     }
 
-    // 4. Transfer all collected effects to the result item
     if (effectsData.length === 0) return;
     await resultItem.createEmbeddedDocuments('ActiveEffect', effectsData);
   }
 
   /**
-   * Whether an essence carries its BEHAVIOUR onto this result — the ONE predicate behind both
-   * essence-carried behaviours (issue 1036), so the effect transfer and the property macro can
-   * never disagree. A time-gated craft evaluates the SNAPSHOT taken at START, never the live
-   * definition, so a mid-run GM toggle cannot change a craft whose inputs are already consumed;
-   * the snapshot is COMPLETE over the START keys, and an ABSENT key falls through to the live
-   * definition and reads as enabled.
+   * Whether an essence carries its behaviour onto this result: the one predicate behind effect
+   * transfer and the property macro (issue 1036). A timed craft reads the START snapshot, so a
+   * mid-run toggle cannot change it; a key absent from the snapshot reads the live definition.
    */
   _essenceCarriesBehaviour(definition, essenceId, essenceEnabled = null) {
     if (
@@ -5275,14 +5099,10 @@ export class CraftingEngine {
   }
 
   /**
-   * The enabled-ness map a RESUMING time-gated step evaluates its behaviour gate from.
-   *
-   * A run armed BEFORE `essenceEnabled` existed carries no map and must read as ALL-ENABLED — the
-   * behaviour it was armed under — so this synthesises a complete all-true map over the START
-   * keys rather than returning `null`, which means "no snapshot at all, evaluate live" and is the
-   * COLLAPSED-chain carve-out. An EMPTY stored map is deliberately not distinguished from an
-   * absent one: `_snapshotEssenceEnabled` emits one entry per START key, so the two readings
-   * coincide, and `tests/essence-timed-craft-gate.test.js` fails on a dropped key at either site.
+   * The enabled-ness map a resuming timed step evaluates. A run armed before `essenceEnabled`
+   * existed reads as all-enabled, so this synthesises an all-true map over the START keys;
+   * `null` would mean "evaluate live", the collapsed-chain case. An empty stored map equals an
+   * absent one (`tests/essence-timed-craft-gate.test.js`).
    */
   _resumedEssenceEnabled(prepared) {
     const stored = prepared?.essenceEnabled;
@@ -5293,11 +5113,9 @@ export class CraftingEngine {
   }
 
   /**
-   * The START-phase enabled-ness snapshot for a time-gated step: one entry for EVERY contributing
-   * essence, not only the disabled ones (issue 1036). Completeness is load-bearing — the
-   * `actor.setFlag` merge cannot delete a key inside a SURVIVING run, so an omitted key
-   * resurrects with its old value, and a disabled-ids-only map would be indistinguishable from
-   * the absent map that has to keep meaning "evaluate live".
+   * The START enabled-ness snapshot: one entry for every contributing essence (issue 1036).
+   * Completeness matters because the `actor.setFlag` merge cannot delete a key inside a
+   * surviving run, and a disabled-only map would look like the absent "evaluate live" map.
    */
   _snapshotEssenceEnabled(resolvedEssences, system) {
     const definitions = resolvedEssencesFor(system);
@@ -5310,19 +5128,14 @@ export class CraftingEngine {
   }
 
   /**
-   * Run every contributing essence's own property macro against the crafted item data, before the
-   * result's own macro (issue 1036). The seam is `_createSingleResult`, after `itemData` is
-   * populated and before the item is created, so this runs for SALVAGE awards too.
+   * Run each contributing essence's property macro on the crafted item data before the result's
+   * own macro (issue 1036); called from `_createSingleResult`, so salvage awards run it too.
+   * Ordered by `essenceDefinitions` library position, never `resolvedEssences` key order, and
+   * applied per macro because returns are string paths. Gated on `features.propertyMacros` and
+   * `features.essences`, with the context resolved once per result.
    *
-   * Ordering is by `essenceDefinitions` LIBRARY POSITION, filtered to the contributing set —
-   * never by iterating `resolvedEssences`, whose key order is neither stable nor authorable.
-   * Updates are applied per macro, in loop order, never spread-merged, because the returns are
-   * string PATHS. TWO gates apply: `features.propertyMacros` (default false) AND
-   * `features.essences`; the system, both gates and the essence context are resolved ONCE
-   * rather than per essence, which would rebuild the identical context N+1 times per result.
-   *
-   * @returns {Promise<boolean>} whether ANY essence macro applied at least one path — the essence
-   *   half of `_createSingleResult`'s `hasPropertyUpdates` stacking veto.
+   * @returns {Promise<boolean>} whether any essence macro applied a path, the essence half of the
+   *   `hasPropertyUpdates` stacking veto.
    */
   async _runEssencePropertyMacros(
     itemData,
@@ -5346,8 +5159,7 @@ export class CraftingEngine {
     const definitions = resolvedEssencesFor(system);
     if (definitions.length === 0) return false;
 
-    // Everything this predicate reads is on the definition itself, so it is decidable
-    // BEFORE the essence context exists. Only the contributing-set membership below is not.
+    // Decidable from the definition alone, before the essence context exists.
     const carriesRunnableMacro = (definition) =>
       typeof definition?.propertyMacroUuid === 'string' &&
       definition.propertyMacroUuid !== '' &&
@@ -5390,10 +5202,8 @@ export class CraftingEngine {
 
     let applied = false;
     for (const definition of runnable) {
-      // Each macro is ISOLATED: a throw fails that essence only and every later macro
-      // still runs and still applies. `essence` and `essenceQuantity` are what let the
-      // archetypal macro ("+1 damage per unit of Fire") find its OWN contribution —
-      // without them a shared macro cannot tell which essence invoked it.
+      // Each macro is isolated: a throw fails that essence only. `essence` and `essenceQuantity`
+      // let a shared macro find its own contribution.
       const updates = await this._runOneEssencePropertyMacro(definition, {
         ...context,
         essence: definition,
@@ -5406,17 +5216,11 @@ export class CraftingEngine {
   }
 
   /**
-   * Apply ONE macro's flat path -> value map to the crafted item data, isolating a failure to
-   * that essence.
-   *
-   * Without this guard a craft aborts AFTER consumption: `foundry.utils.setProperty` vivifies an
-   * intermediate only when it is `=== undefined`, so a `null` or primitive intermediate throws
-   * from inside core — and `itemData` is `sourceItem.toObject()`, where both shapes are ordinary.
-   * `craft()` has no try around `_createResultItems`, so the unguarded outcome is inputs consumed
-   * and NO result item. Logged, not toasted, because it is a GM-side authoring defect that would
-   * otherwise raise one notification per essence per result on the PLAYER's screen. A partial
-   * application still counts as applied, so the stacking veto fires and the landed mutations are
-   * not silently merged away; later essences still run.
+   * Apply one macro's flat path -> value map to the crafted item data, isolating a failure.
+   * `foundry.utils.setProperty` vivifies an intermediate only when it is `=== undefined`, so a
+   * `null` or primitive one throws, and `craft()` has no try around `_createResultItems`:
+   * unguarded, inputs are consumed with no result. Logged, not toasted (a GM authoring defect).
+   * A partial application still counts as applied, so the stacking veto fires.
    */
   _applyEssencePropertyUpdates(itemData, updates, definition) {
     let applied = false;
@@ -5435,16 +5239,11 @@ export class CraftingEngine {
   }
 
   /**
-   * Run ONE essence property macro and return its flat path -> value map, or `null`.
-   *
-   * An UNRESOLVABLE `propertyMacroUuid` is logged and skipped SILENTLY rather than raising
-   * `ui.notifications.error`, which would fire once per essence per result on the crafting
-   * PLAYER's screen for a defect only the GM can fix. `type === 'script'` is checked here and not
-   * left to the drop handler: `command` is required on BOTH Macro types and `type` DEFAULTS to
-   * `chat`, and imports and hand-edited settings arrive unguarded. The uuid is resolved here AND
-   * again inside `MacroExecutor.run` DELIBERATELY — `run` THROWS for an unresolvable uuid, and
-   * settling "is the GM's link broken" before entering the try is what keeps that case silent.
-   * Return handling matches the result macro: a non-object or Array return is warned and ignored.
+   * Run one essence property macro and return its flat path -> value map, or `null`. An
+   * unresolvable `propertyMacroUuid` is logged and skipped silently, not toasted on the player's
+   * screen. `type === 'script'` is checked here because `command` exists on both Macro types and
+   * `type` defaults to `chat`. The uuid is resolved before `MacroExecutor.run`, which throws for
+   * an unresolvable one. A non-object or Array return is warned and ignored.
    */
   async _runOneEssencePropertyMacro(definition, context) {
     const macroUuid = definition.propertyMacroUuid;
@@ -5481,8 +5280,7 @@ export class CraftingEngine {
     const sourceComponentId =
       definition.sourceComponentId || definition.associatedSystemItemId || '';
     if (sourceComponentId) {
-      // The legacy `items` alias is NOT a scoped corpus and keeps its raw read: it predates
-      // `components` and no world entity has ever been lifted from it.
+      // The legacy `items` alias is not a scoped corpus and keeps its raw read.
       const components = Array.isArray(system?.components)
         ? resolvedComponentsFor(system)
         : Array.isArray(system?.items)
@@ -5510,16 +5308,13 @@ export class CraftingEngine {
     const consumption = system.craftingCheck?.consumption || {};
     return {
       consumeIngredientsOnFail: consumption.consumeIngredientsOnFail !== false,
-      // Normalized systems carry `breakToolsOnFail`; tolerate the legacy
-      // `consumeCatalystsOnFail` defensively for any un-normalized path.
+      // Tolerate the legacy `consumeCatalystsOnFail` for an un-normalized path.
       breakToolsOnFail:
         (consumption.breakToolsOnFail ?? consumption.consumeCatalystsOnFail) === true,
     };
   }
 
-  /**
-   * Check Item Piles currency cost on a recipe, if the integration is enabled.
-   */
+  /** Check a recipe's Item Piles currency cost, when the integration is enabled. */
   async _checkItemPilesCurrencyCost(craftingActor, recipe) {
     const cost = recipe?.currencyCost;
     if (!cost?.currencies?.length) return { valid: true };
@@ -5546,10 +5341,8 @@ export class CraftingEngine {
     }
   }
 
-  /**
-   * Deduct Item Piles currency cost from actor after a successful craft.
-   * Errors are logged but do not throw, to avoid losing crafting results.
-   */
+  /** Deduct a recipe's Item Piles currency cost after a successful craft; errors are logged, never
+   * thrown, so results are not lost. */
   async _deductItemPilesCurrencyCost(craftingActor, recipe) {
     const cost = recipe?.currencyCost;
     if (!cost?.currencies?.length) return;
@@ -5569,25 +5362,19 @@ export class CraftingEngine {
   }
 
   /**
-   * Run the crafting check for an attempt, if one is required or enabled. A check is REQUIRED —
-   * run even when the system has crafting checks disabled — when the recipe needs a check outcome
-   * to select its result: `progressive` or `routedByCheck`. `routedByIngredients` selects by the
-   * chosen ingredient set, so its check is the same optional pass/fail check as `simple`/`alchemy`
-   * on the shared `craftingCheck.simple` slot. `simple` honours the crafting-checks toggle;
-   * alchemy and `routedByIngredients` run on an authored roll formula alone.
+   * Run the crafting check for an attempt, if required or enabled. It is required, even with
+   * checks disabled, for `progressive` and `routedByCheck`, which select results by outcome.
+   * `routedByIngredients` uses the optional pass/fail check on `craftingCheck.simple` like
+   * `simple`/`alchemy`; `simple` honours the checks toggle, the others need only a formula.
    */
   async _runCraftingCheck(
     recipe,
     craftingActor,
     componentSourceActors,
     ingredientSet,
-    // The routing basis is now a property of the system MODE, so the check no
-    // longer reads the step's `resultSelection`; the param is retained for the
-    // positional call signature.
+    // Routing is a property of the system mode; the param keeps the positional signature.
     _step = null,
-    // Interactive-roll options threaded from `craft()`. `{ interactive }` opts a
-    // UI-triggered craft into the confirm-roll dialog + chat post; defaults to
-    // non-interactive so the programmatic API stays silent.
+    // `interactive` opts a UI-triggered craft into the confirm-roll dialog and chat post.
     { interactive = false, toolItems = [] } = {}
   ) {
     const resolutionService =
@@ -5604,22 +5391,13 @@ export class CraftingEngine {
 
     const mode = resolutionService?.getMode(recipe) || system?.resolutionMode || 'simple';
 
-    // WHETHER THE ACTIVE CHECK CAN ROLL AT ALL, asked ONCE, of the same selector every GM surface
-    // asks (issue 1094). Testing each slot's RAW `rollFormula` diverged once the retirement shim
-    // landed: on alchemy `simple` the brew succeeded UNCONDITIONALLY with the DC ignored, and on
-    // `routedByCheck`/`progressive` the `requiresCheck` abort never fired, so the craft consumed
-    // its ingredients and routed to nothing. `checkUsable` makes a strip-to-empty formula take
-    // exactly the path a blank one takes.
+    // Whether the active check can roll, asked once of the selector every GM surface asks
+    // (issue 1094), so a formula the retirement shim strips to empty behaves as a blank one.
     const activeCheck = resolveActiveCraftingCheckFormula({ ...system, resolutionMode: mode });
 
-    // Alchemy: routing and check-ness are driven by the SYSTEM-level `alchemy.checkMode`, NOT the
-    // generic `checksEnabled` master toggle, and are dispatched entirely here so the shared
-    // non-alchemy logic below never applies.
-    //  - `none`   → unconditional no-op success: a matched brew always succeeds.
-    //  - `simple` → the mandatory pass/fail check, run whenever a formula exists; a MISSING
-    //               formula is a misconfiguration, so craft() aborts with zero mutation.
-    //  - `tiered` → the mandatory routed check; a missing routed formula is likewise a
-    //               misconfiguration.
+    // Alchemy is driven by `alchemy.checkMode`, not `checksEnabled`, and dispatched entirely here:
+    // `none` always succeeds; `simple` is the mandatory pass/fail check and `tiered` the routed
+    // one, and a missing formula for either is a misconfiguration (zero-mutation abort).
     if (mode === 'alchemy') {
       const alchemyCheckMode = system?.alchemy?.checkMode || 'none';
       if (alchemyCheckMode === 'none') {
@@ -5641,7 +5419,6 @@ export class CraftingEngine {
           toolItems,
         });
       }
-      // tiered
       if (!activeCheck.checkUsable) {
         return {
           success: false,
@@ -5653,11 +5430,8 @@ export class CraftingEngine {
             'alchemy tiered check mode requires a configured routed crafting check roll formula',
         };
       }
-      // The per-recipe minimum-success-tier gate (`minSuccessOutcomeId`) is scoped to
-      // `routedByCheck` only: its authoring control auto-hides for alchemy, so a value
-      // carried here (authored before a mode switch, or imported) is unclearable. Pass
-      // `applyMinSuccessOutcome: false` so a carried id stays inert on an alchemy brew —
-      // tiered outcomes already gate success via each tier's `success` flag.
+      // `minSuccessOutcomeId` is `routedByCheck`-only, and its control hides for alchemy, so a
+      // carried id would be unclearable; `applyMinSuccessOutcome: false` keeps it inert.
       return this._runRoutedCheck(system, recipe, ingredientSet, craftingActor, {
         interactive,
         applyMinSuccessOutcome: false,
@@ -5670,26 +5444,19 @@ export class CraftingEngine {
     const checksEnabled =
       features.craftingChecks === true || system?.craftingCheck?.enabled === true;
 
-    // Simple pass/fail check for the simple AND routedByIngredients modes, used when a roll
-    // formula is configured (alchemy is dispatched above and never reaches here). The
-    // `craftingCheck.simple` slot backs both modes and is NOT simple-mode-only: optional in
-    // simple (gated by `checksEnabled`) and in routedByIngredients, which routes result groups
-    // by ingredient set so its check never gates routing. "Unusable" is `activeCheck.checkUsable`,
-    // which covers both an empty formula and one the retirement shim strips to empty.
+    // Simple pass/fail for `simple` and `routedByIngredients` when a usable formula exists; the
+    // shared `craftingCheck.simple` slot is optional in both (`routedByIngredients` routes by
+    // ingredient set, so its check never gates routing).
     const useSimpleCheck =
       ['simple', 'routedByIngredients'].includes(mode) &&
       activeCheck.checkUsable &&
       (mode === 'routedByIngredients' || checksEnabled);
 
-    // Progressive check (Checks editor) for progressive mode: rolls a formula
-    // whose total becomes the numeric `value` the progressive result-awarding
-    // spends against result difficulties. Usable only when a roll formula is
-    // configured; with no formula the required-check guard below fails the attempt.
+    // Progressive: the rolled total is the `value` awarding spends against result difficulties;
+    // with no formula the required-check guard fails the attempt.
     const useProgressiveCheck = mode === 'progressive' && activeCheck.checkUsable;
 
-    // Routed check for `routedByCheck` ONLY: rolls the routed formula and maps the total to an
-    // outcome tier whose NAME drives the routing. The check is required, so a missing formula
-    // fails via the required-check guard below; `routedByIngredients` reads `craftingCheck.simple`.
+    // Routed check for `routedByCheck` only: the total maps to an outcome tier whose name routes.
     const useRoutedCheck = mode === 'routedByCheck' && activeCheck.checkUsable;
 
     if (
@@ -5714,21 +5481,15 @@ export class CraftingEngine {
     }
 
     if (useRoutedCheck) {
-      // Only `routedByCheck` uses the tier-routing path (its check total maps to an
-      // outcome tier whose name drives routing). `routedByIngredients` routes result
-      // groups by the chosen ingredient set and runs its optional pass/fail check
-      // through `useSimpleCheck` above against `craftingCheck.simple`.
+      // Only `routedByCheck` routes by tier; `routedByIngredients` uses `useSimpleCheck` above.
       return this._runRoutedCheck(system, recipe, ingredientSet, craftingActor, {
         interactive,
         toolItems,
       });
     }
 
-    // No usable roll-formula check path applied. A check is only "usable" when its
-    // resolution mode has an authored roll formula (handled above). When a check is
-    // REQUIRED (progressive, or routedByCheck) but no roll formula is configured,
-    // fail loudly so the misconfiguration is visible; otherwise this is an optional
-    // check with nothing to run, so treat it as a no-op success.
+    // No usable formula applied: a required check (progressive, routedByCheck) fails loudly,
+    // and an optional one is a no-op success.
     if (checkRequired) {
       return {
         success: false,
@@ -5743,9 +5504,8 @@ export class CraftingEngine {
   }
 
   /**
-   * Evaluate the simple pass/fail crafting check: roll the formula, resolve the DC (static
-   * default, the recipe's selected tier, or a dynamic macro), and compare. A configured critical
-   * raw roll on any die auto-fails or auto-succeeds, overriding the comparison.
+   * The simple pass/fail check: roll, resolve the DC (static, the recipe's tier, or a macro) and
+   * compare; a configured critical raw roll on any die overrides the comparison.
    *
    * @returns {Promise<{success: boolean, outcome: string, value: number|null, data: object, message: string|null}>}
    */
@@ -5767,10 +5527,8 @@ export class CraftingEngine {
   }
 
   /**
-   * Evaluate a pass/fail crafting check against an arbitrary check sub-config — the shared
-   * `simple` slot backing `simple`/`routedByIngredients` and the alchemy `simple` mode. The DC
-   * resolves via {@link _resolveSimpleCheckDc} parameterized over `config`, so a recipe
-   * `checkTierId` or dynamic-DC macro still applies, and the roll goes through the shared
+   * A pass/fail check against any check sub-config: the shared `simple` slot and alchemy
+   * `simple`. The DC resolves via {@link _resolveSimpleCheckDc} and the roll via
    * {@link runFormulaPassFail}, which honours forced outcomes and interactive cancel.
    */
   async _runPassFailCheck(
@@ -5818,21 +5576,17 @@ export class CraftingEngine {
   }
 
   /**
-   * Evaluate the authored routed crafting check: roll the routed formula and map its total onto
-   * one of the configured outcome tiers, returning the matched tier's NAME as `outcome`. Unlike
-   * recipe-less salvage and gathering, which pass the flat `routed.dc`, the base DC resolves via
-   * the SAME recipe-tier / dynamic-macro path as {@link _runSimpleCheck}, because routed crafting
-   * carries `recipe.checkTierId` and relative tiers shift each threshold by `dc + outcome.dc`.
-   * Not reached when no routed formula is configured: the caller's required-check guard fails.
+   * The routed crafting check: the total maps to an outcome tier whose name is `outcome`. Unlike
+   * salvage and gathering's flat `routed.dc`, the base DC follows the recipe-tier / macro path of
+   * {@link _runSimpleCheck}, since relative tiers shift each threshold by `dc + outcome.dc`.
    */
   async _runRoutedCheck(
     system,
     recipe,
     ingredientSet,
     craftingActor,
-    // `applyMinSuccessOutcome` gates the recipe minimum-tier bump: `routedByCheck`
-    // applies it, the alchemy tiered dispatch passes false so a carried (unclearable)
-    // `minSuccessOutcomeId` has no runtime effect on an alchemy brew.
+    // `applyMinSuccessOutcome` is false on the alchemy tiered dispatch, keeping a carried
+    // `minSuccessOutcomeId` inert.
     { interactive = false, applyMinSuccessOutcome = true, toolItems = [] } = {}
   ) {
     const routed = system?.craftingCheck?.routed || {};
@@ -5859,9 +5613,8 @@ export class CraftingEngine {
       // A total below every relative threshold clamps to the lowest tier, so a
       // recipe-tier / dynamic DC bump never leaves a craft rolled-but-unrouted.
       clampToNearest: true,
-      // Fixed-type only: a recipe may require a minimum success tier; a roll below it
-      // fails the craft outright. Null for relative / unset recipes (no-op), and forced
-      // null for the alchemy tiered path (its authoring control is `routedByCheck`-only).
+      // Fixed-type only: a roll below the recipe's minimum success tier fails outright; forced
+      // null for alchemy tiered.
       minOutcomeId: applyMinSuccessOutcome ? (recipe?.minSuccessOutcomeId ?? null) : null,
       rollOptions: buildInteractiveRollOptions({
         interactive,
@@ -5869,8 +5622,7 @@ export class CraftingEngine {
         name: recipe?.name,
         activity: 'Crafting',
         img: this._resolveRecipePromptImg(recipe),
-        // Fixed-type routed checks match by value range, not DC, so the prompt must
-        // not advertise a (meaningless) DC. Undefined suppresses the chip + flavor.
+        // Fixed-type checks match by value range, so no DC chip or flavor is shown.
         dc: routed.type === 'fixed' ? undefined : dc,
         modifierChoice: this._buildInteractiveModifierChoice(
           formula,
@@ -5890,22 +5642,17 @@ export class CraftingEngine {
   }
 
   /**
-   * Build the deferred interactive `playerPicks` modifier-choice descriptor (issues 770, 1055,
-   * 1094). Returned ONLY for an interactive roll over an authored roll formula, under
-   * `playerPicks`, with at least TWO eligible modifiers; otherwise `null`, so every other rule
-   * threads a byte-identical `rollOptions` bag. THE FORMULA CONDITION IS USABILITY, NOT TOKEN
-   * PRESENCE (issue 1094). `bySubject` defers to the subject AUTHOR, so it is never prompted.
+   * The deferred interactive `playerPicks` modifier-choice descriptor (issues 770, 1055, 1094),
+   * only for an interactive roll over a usable formula with at least two eligible modifiers;
+   * otherwise `null`, so every other rule threads an identical `rollOptions`. `bySubject` defers
+   * to the subject's author and is never prompted.
    */
   _buildInteractiveModifierChoice(formula, craftingModifierContext, craftingActor, interactive) {
     if (interactive !== true) return null;
-    // No authored (post-shim) roll formula means no check to modify, so a choice would be
-    // meaningless — and `evaluateCheckRoll` would short-circuit that roll anyway.
+    // No usable formula means no check to modify.
     if (stripRetiredModifierPlaceholder(String(formula ?? '')).trim() === '') return null;
     if (resolveModifierPolicy(craftingModifierContext) !== 'playerPicks') return null;
-    // Returns the descriptor, or null when fewer than two modifiers are eligible (a
-    // one-option group is not a choice — the deterministic scalar IS the only possible
-    // pick, so the prompt falls through to it);
-    // `buildInteractiveRollOptions` omits the `modifierChoice` key for a falsy value.
+    // Null when fewer than two modifiers are eligible: a one-option group is no choice.
     return buildCheckModifierChoice(
       craftingModifierContext,
       makeRollDataExpressionResolver(craftingActor)
@@ -5954,9 +5701,8 @@ export class CraftingEngine {
     return this._markEngineEvaluated(result);
   }
 
-  /** Resolve the active crafting check's `checkBreakage` block for the resolution mode (issue
-   * 419): simple/routedByIngredients on the shared simple check, routedByCheck on the routed
-   * check, progressive on the progressive check, alchemy per `alchemy.checkMode`. */
+  /** The active crafting check's `checkBreakage` block for the mode (issue 419), with alchemy
+   * following `alchemy.checkMode`. */
   _resolveCraftingCheckBreakage(system, recipe) {
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
@@ -5970,9 +5716,8 @@ export class CraftingEngine {
     return check.simple?.checkBreakage ?? null;
   }
 
-  /** Resolve the active salvage check's `checkBreakage` block via the shared
-   * {@link resolveSalvageCheck} derivation (issue 419/859). An UNSUPPORTED mode breaks nothing:
-   * an invalid config aborts `misconfigured` with zero mutation before breakage is reached. */
+  /** The salvage check's `checkBreakage` via {@link resolveSalvageCheck} (issues 419, 859); an
+   * unsupported mode breaks nothing, as its config aborts `misconfigured` first. */
   _resolveSalvageCheckBreakage(system) {
     const { config, unsupportedMode } = resolveSalvageCheck(system);
     if (unsupportedMode) return null;
@@ -5982,14 +5727,10 @@ export class CraftingEngine {
   /** Resolve the salvage breakage decision via the shared {@link evaluateCheckBreakage} seam,
    * bringing salvage to parity with crafting (issue 419). */
   _resolveSalvageBreakageDecision(system, checkResult) {
-    // Routed through the world scope at issue 1363: the crafting-system normalizer is
-    // absence-preserving now, so a local `?? toolSpecific` here would silently ignore an
-    // authored world authority and make the flip inert at this reader.
+    // Through the world scope (issue 1363): the normalizer preserves absence, so a local
+    // `?? toolSpecific` would ignore an authored world authority.
     const authority = effectiveToolBreakageAuthority(system);
-    // Either-or authority (issue 419): a check can only break tools under
-    // `checkDriven`. Under `toolSpecific` tools break solely by their own modes, so
-    // the check-driven force-break (and the routed per-tier legacy bridge) is not
-    // consulted.
+    // Either-or authority (issue 419): only `checkDriven` lets a check break tools.
     if (authority !== 'checkDriven') {
       return { forceBreak: false, triggerId: null, reason: null, authority };
     }
@@ -5998,18 +5739,13 @@ export class CraftingEngine {
     return { ...decision, authority };
   }
 
-  /** Resolve the breakage decision for a crafting attempt via the shared
-   * {@link evaluateCheckBreakage} seam (issue 419), plus the system's `authority`. Strictly
-   * either-or: `toolSpecific` NEVER breaks tools from a check, `checkDriven` lets the active
-   * check's triggers decide, and only engine-evaluated roll-formula results can force-break. */
+  /** The crafting breakage decision via {@link evaluateCheckBreakage} (issue 419), plus the
+   * system's `authority`: `toolSpecific` never breaks from a check, and only engine-evaluated
+   * roll-formula results can force-break under `checkDriven`. */
   _resolveCraftingBreakageDecision(system, recipe, checkResult) {
-    // Routed through the world scope at issue 1363, for the reason
-    // `_resolveSalvageBreakageDecision` states.
+    // Through the world scope (issue 1363); see `_resolveSalvageBreakageDecision`.
     const authority = effectiveToolBreakageAuthority(system);
-    // Either-or authority (issue 419): a check can only break tools under
-    // `checkDriven`. Under `toolSpecific` tools break solely by their own modes, so
-    // the check-driven force-break (and the routed per-tier legacy bridge) is not
-    // consulted.
+    // Either-or authority (issue 419): only `checkDriven` lets a check break tools.
     if (authority !== 'checkDriven') {
       return { forceBreak: false, triggerId: null, reason: null, authority };
     }
@@ -6018,16 +5754,13 @@ export class CraftingEngine {
     return { ...decision, authority };
   }
 
-  /**
-   * Resolve the system for a recipe (or salvage synthetic recipe) from the manager.
-   */
+  /** The system for a recipe or a salvage synthetic recipe. */
   _getRecipeSystem(recipe) {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     return systemManager?.getSystem(recipe?.craftingSystemId) ?? null;
   }
 
-  /** Whether the recipe's system applies time requirements. When off, timed steps resolve
-   * immediately. Defaults ON, so only an explicit `false` disables gating. */
+  /** Whether the recipe's system applies time requirements; only an explicit `false` disables. */
   _timeRequirementsEnabled(recipe) {
     return this._getRecipeSystem(recipe)?.requirements?.time?.enabled !== false;
   }
@@ -6036,16 +5769,13 @@ export class CraftingEngine {
    * `steps[]` but its system has the multi-step feature OFF. The steps are never deleted, so
    * re-enabling the feature restores the full flow. */
   _isCollapsedChain(recipe) {
-    // Only a genuine MULTI-step recipe (> 1 authored step) collapses; a single
-    // explicit step behaves exactly like a normal single-step recipe (including its
-    // consume-at-start timed path), so it is never treated as a chain.
+    // Only a recipe with more than one authored step collapses.
     if (!Array.isArray(recipe?.steps) || recipe.steps.length <= 1) return false;
     return this._getRecipeSystem(recipe)?.features?.multiStepRecipes !== true;
   }
 
-  /** The single summed time gate for a collapsed chain: every authored step's `timeRequirement`
-   * in seconds, or 0 when time requirements are disabled. ONE gate for the total rather than one
-   * per step, so the whole atomic action waits once and then runs every step at maturity. */
+  /** The collapsed chain's single time gate: every step's `timeRequirement` summed, or 0 when
+   * time requirements are off, so the atomic action waits once. */
   _collapsedChainSeconds(recipe, executionSteps, runManager) {
     if (!runManager || !Array.isArray(executionSteps)) return 0;
     if (!this._timeRequirementsEnabled(recipe)) return 0;
@@ -6056,10 +5786,8 @@ export class CraftingEngine {
     );
   }
 
-  /** Arm / resume / advance the collapsed chain's single summed time gate, called once at the
-   * chain entry. `waiting: true` leaves the run active for a later resume; `waiting: false` means
-   * the caller executes the steps back-to-back. The chain consumes NOTHING when the gate is
-   * armed, so there is no prepared-consumption snapshot to manage. */
+  /** Arm, resume or advance the collapsed chain's single gate at chain entry. `waiting: false`
+   * means the caller runs the steps back-to-back; the chain consumes nothing when it arms. */
   async _handleCollapsedChainGate({ craftingActor, recipe, executionSteps, runManager, run }) {
     const summedSeconds = this._collapsedChainSeconds(recipe, executionSteps, runManager);
     if (summedSeconds <= 0) return { waiting: false, run };
@@ -6102,12 +5830,10 @@ export class CraftingEngine {
     return system?.alchemy?.checkMode || 'none';
   }
 
-  /** Resolve the engine check's DC: a dynamic macro's returned number, the recipe's selected
-   * static tier, or the static default. Any failure falls back to the default DC. Parameterized
-   * over the check config so the routed check resolves its base DC the same way. */
+  /** The check DC: a dynamic macro's number, else the recipe's static tier, else the default;
+   * any failure falls back to the default. Shared with the routed base DC. */
   async _resolveSimpleCheckDc(system, simple, recipe, ingredientSet, craftingActor) {
-    // THE ANCHOR, resolved FIRST and always: the record's selected difficulty tier when it
-    // names one that still exists, else the static default.
+    // The anchor first: the selected tier when it still exists, else the static default.
     const anchor = this._resolveCheckAnchorDc(simple, recipe);
     if (simple.dcMode !== 'dynamic') return anchor;
     if (!simple.macroUuid) return anchor;
@@ -6117,10 +5843,8 @@ export class CraftingEngine {
         craftingSystem: system,
         craftingActor,
         candidateIngredientSet: ingredientSet,
-        // THE MACRO RECEIVES THE ANCHOR AND RETURNS THE FINAL NUMBER (issue 1096). The tier sets
-        // the anchor and the macro adjusts it, so the two COMPOSE rather than compete, and
-        // neither the tiers nor the tier list are hidden under dynamic. Additive to a NAMED bag,
-        // so a shipped macro that destructures the fields it wants is unaffected.
+        // The macro receives the anchor and returns the final number (issue 1096), so tier and
+        // macro compose. Additive to a named bag, so existing macros are unaffected.
         anchorDc: anchor,
       });
       const numeric = Number(value);
@@ -6131,9 +5855,8 @@ export class CraftingEngine {
     }
   }
 
-  /** The DC before any macro runs: the record's selected difficulty tier, else the static default.
-   * Split out of {@link _resolveSimpleCheckDc} because it is needed TWICE there, and a second
-   * inline copy would be two chances to disagree about what "the anchor" means. */
+  /** The DC before any macro: the selected difficulty tier, else the static default; one
+   * definition because {@link _resolveSimpleCheckDc} needs it twice. */
   _resolveCheckAnchorDc(config, recipe) {
     const fallback = Number.isFinite(Number(config?.dc)) ? Math.trunc(Number(config.dc)) : 15;
     const tierId = recipe?.checkTierId;
@@ -6145,11 +5868,9 @@ export class CraftingEngine {
   }
 
   /**
-   * The PLAYER-SAFE chat rows for a resolution's fired complications (issue 1286).
-   * `publicComplications` is the audience filter, applied on the way INTO the card, so a `gmOnly`
-   * complication has no row here on any client, INCLUDING a GM's. One row per FIRING, repeats
-   * NOT collapsed — collapsing would tell a player one `1d6` was rolled when two were — told
-   * apart by `position`, each firing's place in the ordered stage list.
+   * The player-safe chat rows for fired complications (issue 1286). `publicComplications`
+   * filters on the way in, so a `gmOnly` complication has no row on any client, a GM's included.
+   * One row per firing, never collapsed, told apart by `position`.
    */
   _complicationChatEntries(fired, system) {
     const componentIndex = getDefinitionIndex(resolvedComponentsFor(system));
@@ -6163,12 +5884,11 @@ export class CraftingEngine {
   }
 
   /**
-   * Post an automatic crafting summary chat message. Checks `system.features.chatOutput` and
-   * returns silently when the toggle is off or the system cannot be resolved;
-   * `ChatMessage.create` errors are caught so they never propagate up the `craft()` call stack.
+   * Post the crafting summary chat message when `features.chatOutput` is on;
+   * `ChatMessage.create` errors never propagate into `craft()`.
    *
-   * @param {Array|null} [params.firedComplications] The UNREDACTED fired list (issue 1286),
-   *   redacted here via {@link _complicationChatEntries}; an absent list renders nothing.
+   * @param {Array|null} [params.firedComplications] The unredacted fired list (issue 1286),
+   *   redacted via {@link _complicationChatEntries}.
    */
   async _postCraftChatMessage({
     success,
@@ -6212,8 +5932,8 @@ export class CraftingEngine {
       localize
     );
 
-    // The rolls sound the dice and animate Dice So Nice. The custom `content` survives them because
-    // the card has child elements, and a result card is never whispered, so they hide it from nobody.
+    // The rolls sound the dice and animate Dice So Nice; the custom `content` survives them
+    // because the card has child elements, and a result card is never whispered.
     try {
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor: craftingActor }),
@@ -6225,9 +5945,8 @@ export class CraftingEngine {
     }
   }
 
-  /** Resolve `[{ tool, item }]` matches to `{ name, img }` chat entries. Tools render by their
-   * AUTHORED name, not the matched item's, because one owned item can satisfy more than one tool
-   * slot; de-duped by component id and shared by the crafting and salvage cards. */
+  /** `[{ tool, item }]` matches as `{ name, img }` chat entries by the tool's authored name, since
+   * one item can fill several slots; de-duped by component id, shared by crafting and salvage. */
   _resolveToolChatEntries(tools, system) {
     const componentById = new Map(
       resolvedComponentsFor(system).map((component) => [component?.id, component])
@@ -6259,15 +5978,13 @@ export class CraftingEngine {
     return img === TOOL_IMAGE_SENTINEL ? '' : img;
   }
 
-  /** Resolve the `_applyToolBreakage` evidence records that BROKE this salvage to `{ name, img }`
-   * chat entries, de-duped by `componentId`. Non-broken evidence is skipped, so the card names
-   * only what was actually lost. */
+  /** Chat entries for the tools that broke in this salvage, de-duped by `componentId`. */
   _resolveBrokenToolChatEntries(usedTools, system) {
     const componentById = new Map(
       resolvedComponentsFor(system).map((component) => [component?.id, component])
     );
-    // The evidence carries `toolId` (issue 1119) precisely so this card can reach a Tool an
-    // item sourced, which has no component to name and so resolves to nothing by `componentId`.
+    // The evidence carries `toolId` (issue 1119) so an item-sourced Tool, with no component,
+    // still resolves.
     const toolById = new Map(resolvedToolsFor(system).map((tool) => [tool?.id, tool]));
     const entries = [];
     const seen = new Set();
@@ -6288,12 +6005,12 @@ export class CraftingEngine {
   }
 
   /**
-   * The salvage analogue of {@link _postCraftChatMessage} (issue 675), on the SAME
-   * `features.chatOutput` toggle and posted only for a resolved success or a rolled failure.
+   * The salvage analogue of {@link _postCraftChatMessage} (issue 675), on `features.chatOutput`,
+   * for a resolved success or a rolled failure.
    *
-   * @param {boolean} [params.suppressed] Post nothing (issue 859) because a bulk salvage posts
-   *   ONE aggregated card; gated with `features.chatOutput` so there is one early return.
-   * @param {Array|null} [params.firedComplications] The UNREDACTED fired list, redacted here.
+   * @param {boolean} [params.suppressed] Post nothing, because a bulk salvage posts one
+   *   aggregated card (issue 859).
+   * @param {Array|null} [params.firedComplications] The unredacted fired list, redacted here.
    */
   async _postSalvageChatMessage({
     success,
@@ -6419,9 +6136,8 @@ export class CraftingEngine {
     }
   }
 
-  /** Build the essence context from consumed items. `precomputedEssences` is supplied by the
-   * time-gated FINISH path, whose source items are deleted, and used verbatim.
-   * `resolveComponent` is the alchemy-path resolver (issue 578). */
+  /** The essence context for consumed items. Timed FINISH supplies `precomputedEssences`, used
+   * verbatim; `resolveComponent` is the alchemy resolver (issue 578). */
   _buildEssenceContext(
     consumedItems,
     recipe = null,
@@ -6471,10 +6187,8 @@ export class CraftingEngine {
     return resolvedComponentsFor(system);
   }
 
-  /**
-   * The recipe's normalized currency units, or `[]` when the recipe names no system, currency is
-   * unconfigured, or the read throws — degrading to `formatCurrencyRequirement`'s raw-id fallback.
-   */
+  /** The recipe's normalized currency units, or `[]` when unavailable, falling back to
+   * `formatCurrencyRequirement`'s raw id. */
   _missingItemsCurrencyUnits(recipe) {
     try {
       const units = getCurrencyRequirementConfig(recipe, this._currencySeams())?.units || [];
@@ -6485,11 +6199,9 @@ export class CraftingEngine {
   }
 
   /**
-   * Why the world's currency configuration cannot be spent against for this recipe, or `null`
-   * when it can (issue 1493). An unresolvable currency option is refused at SELECTION, so the
-   * craft dies in the missing-items message — the only surface the player reads — accusing them
-   * of being poor for a cost the system could not price. {@link _formatMissingItems} uses the
-   * return as a presence flag only.
+   * Why the world currency configuration cannot be spent for this recipe, or `null` (issue 1493).
+   * An unresolvable option is refused at selection, so without this the missing-items message
+   * blames the player for a cost the system could not price. Used as a presence flag.
    */
   _missingItemsCurrencyReason(recipe) {
     try {
@@ -6500,14 +6212,11 @@ export class CraftingEngine {
     }
   }
 
-  /** Format a human-readable "missing required items" message. With a `recipe`, a component-match
-   * ingredient renders with the component's display name — `"2x Iron Rivet: have 0, need 2"` —
-   * instead of the nameless `"2x component"` fallback. */
+  /** A "missing required items" message; with a `recipe`, component ingredients use the
+   * component's name ("2x Iron Rivet: have 0, need 2") instead of "2x component". */
   _formatMissingItems(missing, recipe = null) {
     const components = this._getSystemComponents(recipe);
-    // Resolved ONCE for the whole message, not per line: `getCurrencyRequirementConfig` is a
-    // corpus-scaled read the performance programme instruments (see its own comment), and a
-    // missing-items list can carry many ingredients.
+    // Resolved once per message: the currency config read is corpus-scaled.
     const currencyUnits = this._missingItemsCurrencyUnits(recipe);
     const currencyReason = this._missingItemsCurrencyReason(recipe);
     const lines = [];
@@ -6522,19 +6231,16 @@ export class CraftingEngine {
           line = `${need}x ${name}: have ${have}, need ${need}`;
         }
       }
-      // Currency needs the same name resolution components get (issue 1410), on the surface that
-      // renders precisely when the player CANNOT AFFORD the cost: `Ingredient.getDescription()`
-      // prints `match.unit` verbatim, so the player was told "Requires 1 9KJkn2dfmziq29Gq".
+      // Currency gets component-style name resolution (issue 1410); `getDescription()` prints
+      // `match.unit` verbatim, a raw id.
       if (
         !line &&
         ingredient?.match?.type === 'currency' &&
         getMatchHandler(ingredient.match).isComplete(ingredient.match)
       ) {
-        // The cost is the SAME sentence `Ingredient.getDescription` produces, with only the unit
-        // resolved (issue 1410). Three departures from the item branch, all issue 1493: a
-        // configuration reason REPLACES the shortfall framing; `: have N, need N` is dropped,
-        // because those are occurrence counts rather than coins; and the reason is NOT composed
-        // into the sentence, because this is a 5000ms toast.
+        // The `getDescription` sentence with the unit resolved (issue 1410). Per issue 1493, a
+        // configuration reason replaces the shortfall framing, `: have N, need N` is dropped
+        // (occurrence counts, not coins), and the reason is not joined into the toast.
         const cost = formatCurrencyRequirement(ingredient.match, currencyUnits);
         if (currencyReason) {
           console.warn('Fabricate | Currency requirement could not be priced:', currencyReason);
@@ -6564,10 +6270,9 @@ export class CraftingEngine {
     return lines.join('\n');
   }
 
-  /** The recipe narrowed to one execution step, via the SHARED {@link buildStepRecipeView} that
-   * `CraftingListingBuilder` also uses (issue 917), so the read side evaluates craftability
-   * against exactly the view this engine crafts against. The engine drops `toolBonusModes` and
-   * takes step-else-recipe precedence for routing/selection. */
+  /** The recipe narrowed to one step via the shared {@link buildStepRecipeView}, as
+   * `CraftingListingBuilder` does (issue 917); the engine drops `toolBonusModes` and takes
+   * step-else-recipe precedence for routing and selection. */
   _buildStepRecipeView(recipe, step) {
     const view = buildStepRecipeView(recipe, step);
     delete view.toolBonusModes;
@@ -6597,22 +6302,19 @@ export class CraftingEngine {
   }
 
   /**
-   * Perform the salvage pipeline for a component: resolve actor, system and component, then
-   * validate -> tool check -> salvage check -> failure policy -> consume -> create results ->
-   * record run.
+   * The salvage pipeline for a component: validate, tool check, salvage check, failure policy,
+   * consume, create results, record the run.
    *
-   * THIS METHOD PERFORMS NO OWNERSHIP CHECK (corrected by issue 675): it resolves `actorUuid`
-   * through `fromUuid` and mutates that actor's Items directly. The only ownership gate is at the
-   * facade, `Fabricate#salvageComponent`, which takes an ACTOR ID. No UI may plumb a uuid here.
+   * It performs no ownership check (issue 675): it resolves `actorUuid` through `fromUuid` and
+   * mutates that actor's Items. The only gate is `Fabricate#salvageComponent`, which takes an
+   * actor id, so no UI may plumb a uuid here.
    *
-   * @param {object|null} [options.rollDecision] A PRE-RESOLVED roll decision so ONE prompt answer
-   *   drives every roll of a bulk run (issue 859); no dialog is shown when set.
-   * @param {boolean} [options.suppressChat] Suppress this call's per-item card (issue 859)
-   *   because a bulk run posts ONE aggregated card. It does NOT suppress the roll's own
-   *   `Roll#toMessage` post, which is the Dice So Nice trigger.
-   * @param {boolean} [options.deferComplicationDelivery] Still FIRE complications but do not emit
-   *   them, returning the GM requests on `complicationRequests` for the caller to batch into ONE
-   *   socket message (issue 1286) — the GM-side rate limiter is sized on one message per run.
+   * @param {object|null} [options.rollDecision] A pre-resolved roll decision so one prompt drives
+   *   every roll of a bulk run (issue 859).
+   * @param {boolean} [options.suppressChat] Suppress the per-item card for a bulk run, but not
+   *   the roll's own `Roll#toMessage` (the Dice So Nice trigger).
+   * @param {boolean} [options.deferComplicationDelivery] Fire complications but return the GM
+   *   requests on `complicationRequests` for one batched socket message (issue 1286).
    */
   async salvage(actorUuid, craftingSystemId, componentId, options = {}) {
     const ctx = await this._openSalvageContext(actorUuid, craftingSystemId, componentId, options);
@@ -6625,9 +6327,8 @@ export class CraftingEngine {
     if (opened) return opened.result;
     const checked = await runSalvageCheck(this, ctx);
     if (checked) return checked.result;
-    // The settlement write stays outside the bracket, where `try` opened before this split: it is
-    // an actor-flag write whose rejection must escape uncaught, because inside the bracket
-    // `_recordSalvageUncertainty` would answer it with a second write to the same flag.
+    // The settlement write stays outside the bracket: its rejection must escape uncaught, since
+    // inside it `_recordSalvageUncertainty` would answer with a second write to the same flag.
     await beginSalvageSettlement(this, ctx);
     try {
       await resolveSalvageFailure(this, ctx);
@@ -6643,10 +6344,8 @@ export class CraftingEngine {
     }
   }
 
-  /**
-   * The Foundry edge, the call inputs and the component this salvage runs against. A `refusal` is
-   * the caller's own return; every one of them is reached before any salvage run exists.
-   */
+  /** The Foundry edge, call inputs and component for this salvage; every `refusal` is reached
+   * before any salvage run exists. */
   async _openSalvageContext(actorUuid, craftingSystemId, componentId, options) {
     const ctx = {
       actorUuid,
@@ -6699,15 +6398,13 @@ export class CraftingEngine {
       return ctx;
     }
 
-    // 4. Validate salvage configuration via ResolutionModeService
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
     if (resolutionService) {
       const validation = resolutionService.validateSalvage(ctx.component, ctx.system);
       if (!validation.valid) {
-        // The SAME additive discriminator the misconfigured-check abort carries (issue 859).
-        // This gate runs BEFORE `_runSalvageCraftingCheck`, so without the flag a caller reads
-        // a GM-side config error as a rolled failure and tells the player "nothing recovered".
+        // The same discriminator the misconfigured-check abort carries (issue 859), so a caller
+        // does not read a config error as a rolled failure.
         ctx.refusal = salvageRefusal(
           `Invalid salvage configuration: ${validation.errors.join(', ')}`,
           { misconfigured: true }
@@ -6740,11 +6437,9 @@ export class CraftingEngine {
   }
 
   /**
-   * Find items on an actor that match a managed component through the shared, list-aware,
-   * system-scoped resolver, falling back to a case-SENSITIVE exact name match when none resolve
-   * (closure deferred to issue 557). Public because DESTROY must match exactly what SALVAGE
-   * matches: the sibling matchers fall back case-INSENSITIVELY, so matching more broadly would
-   * delete items belonging to a differently-cased component.
+   * Items on an actor matching a managed component via the shared system-scoped resolver, else a
+   * case-sensitive exact name match (issue 557). Public because destroy must match exactly what
+   * salvage matches; the case-insensitive sibling matchers would delete the wrong items.
    */
   findComponentItems(actor, component, system) {
     const items = [...actor.items];
@@ -6759,9 +6454,7 @@ export class CraftingEngine {
       );
       if (byUuid.length > 0) return byUuid;
     }
-    // Name fallback (issue 557). Shared, telemetry-bearing helper (issue 540); this
-    // salvage path stays case-SENSITIVE (`item.name === component.name`), unlike the
-    // three case-insensitive read/craft sites.
+    // Name fallback (issues 540, 557), case-sensitive here unlike the read/craft sites.
     if (component.name) {
       return items.filter((item) =>
         matchComponentByName(item, component, { caseSensitive: true, systemId: system?.id })
@@ -6776,10 +6469,9 @@ export class CraftingEngine {
     return this.findComponentItems(actor, component, system);
   }
 
-  /** Consume a specific total quantity from component items on the actor, deleting items when
-   * fully consumed and reducing quantity otherwise. WHICH items pay is the first-fit drain policy
-   * in {@link planFirstFitDrain} (issue 1342), shared with the pooled companion consume; only the
-   * WRITES stayed here, preserving this site's `readStackQuantity` reader. `actor` is UNUSED. */
+  /** Consume a total quantity from component items, deleting drained items. Which items pay is
+   * {@link planFirstFitDrain} (issue 1342); only the writes, via `readStackQuantity`, live here.
+   * `actor` is unused. */
   async _consumeComponentItems(actor, items, quantity) {
     const snapshots = items.map((item) => ({ ...(item._source ?? item), original: item }));
     const plan = planFirstFitDrain(snapshots, quantity);
@@ -6856,14 +6548,12 @@ export class CraftingEngine {
   }
 
   /**
-   * Resolve which salvage result groups to use based on mode and check result.
-   *
-   * `disposition: 'success'` — the DEFAULT — is the prior behaviour: `simple` awards
-   * `resultGroups[0]` BY INDEX (the retain-one clamp guarantees the SUCCESS group sits there),
-   * `routed` routes by `outcomeRouting[outcome]`, `progressive` spends the budget. `'failure'`
-   * (issue 1098, CF1) takes the reserved `role: 'failure'` group BY ROLE, NEVER BY INDEX, routes
-   * the FAILING tier's name, or returns `[]` for progressive. The CALLER owns the policy gate,
-   * and `salvageRun` carries the order captured at start (issue 651 D2), never settings.
+   * The salvage result groups for the mode and check result. On success (the default) `simple`
+   * awards `resultGroups[0]` by index (the retain-one clamp puts the success group there),
+   * `routed` routes by `outcomeRouting[outcome]` and `progressive` spends the budget. On
+   * `'failure'` (issue 1098) it takes the `role: 'failure'` group by role, never index, routes the
+   * failing tier, or returns `[]` for progressive. The caller owns the policy gate, and
+   * `salvageRun` carries the order captured at start (issue 651).
    */
   _resolveSalvageResultGroups(
     component,
@@ -6872,9 +6562,8 @@ export class CraftingEngine {
     salvageRun = null,
     disposition = 'success'
   ) {
-    // The mode comes from the shared derivation (issue 859), which also flags a token outside
-    // `simple|routed|progressive`. Legacy tokens are rewritten by the manager and the 1.4.0
-    // migration, so an unsupported token is a CONFIG DEFECT: award nothing rather than guess.
+    // From the shared derivation (issue 859); legacy tokens are rewritten by the manager and the
+    // 1.4.0 migration, so an unsupported token is a config defect that awards nothing.
     const { mode, unsupportedMode } = resolveSalvageCheck(system);
     if (unsupportedMode) return [];
 
@@ -6884,9 +6573,7 @@ export class CraftingEngine {
     const failureAward = disposition === 'failure';
 
     if (mode === 'simple') {
-      // BY ROLE on failure, BY INDEX on success. See the header: the retain-one clamp
-      // puts the SUCCESS group at index 0, so an index-based failure selection would
-      // award the full success salvage output on a failed check.
+      // By role on failure, by index on success: index 0 is the success group.
       if (failureAward) {
         const failureGroup = allGroups.find((group) => group?.role === 'failure');
         return failureGroup ? [failureGroup] : [];
@@ -6894,9 +6581,7 @@ export class CraftingEngine {
       return allGroups.slice(0, 1);
     }
 
-    // One success group against a budget, and no tier to mark: a failing check has
-    // nothing to select here, so `progressive` awards nothing on failure whatever the
-    // policy says (issue 1098).
+    // Progressive has no failure tier to select, so it awards nothing on failure (issue 1098).
     if (mode === 'progressive' && failureAward) return [];
 
     if (mode === 'routed') {
@@ -6916,9 +6601,8 @@ export class CraftingEngine {
       );
       if (!resolved) return [];
 
-      // Progressive results are a quantity-less ordered list: the loop awards each entry ONCE, so
-      // the GM expresses "more of X" by listing X again. `quantity: 1` and the dropped formula are
-      // forced on the award path, never in the award resolver (issues 676, 1645).
+      // Progressive results are a quantity-less ordered list, each awarded once; `quantity: 1`
+      // and the dropped formula are forced here, never in the resolver (issues 676, 1645).
       return [
         {
           ...resolved.group,
@@ -6931,20 +6615,15 @@ export class CraftingEngine {
       ];
     }
 
-    // Unreachable: `mode` is one of `simple | routed | progressive` by construction and
-    // every one of the three returns above. Kept as an explicit exhaustiveness fallback
-    // that awards NOTHING, never `allGroups`.
+    // Unreachable exhaustiveness fallback, which awards nothing, never `allGroups`.
     return [];
   }
 
   /**
-   * Resolve a progressive SALVAGE award, returning the plan inputs rather than the award-shaped
-   * result groups (issue 1286). Split out of {@link _resolveSalvageResultGroups} because two
-   * callers need two halves of one computation: the awarded results to grant, and the WHOLE
-   * ordered list plus the loop's report of why it stopped. Salvage does NOT zero the budget after
-   * a `partial` tail award, which is why the loop reports `partialResult` itself (see #431).
-   * `salvageRun` carries the order captured at START; no run means AUTHORED ORDER, with
-   * deliberately NO settings fallback (issue 651 D2).
+   * A progressive salvage award's plan inputs (issue 1286): the awarded results plus the whole
+   * ordered list and the loop's stop report. Salvage does not zero the budget after a `partial`
+   * tail award, so the loop reports `partialResult` itself. `salvageRun` carries the START
+   * order; no run means authored order, with no settings fallback (issue 651).
    */
   _resolveProgressiveSalvageAward(component, system, checkResult, salvageRun = null) {
     const allGroups = Array.isArray(component?.salvage?.resultGroups)
@@ -6959,9 +6638,7 @@ export class CraftingEngine {
         ? authored
         : applyPlayerResultOrder(authored, salvageRun?.resultOrder ?? null);
 
-    // Resolved ONCE for the whole award rather than per result: `costFor` is called for
-    // every result in the group, and every bulk row calls this method, so a scan here was
-    // a `rows x results x components` term.
+    // Resolved once per award: `costFor` runs per result and per bulk row.
     const managedItemIndex = getDefinitionIndex(resolvedComponentsFor(system));
     const award = resolveProgressiveAward({
       results,
@@ -6977,11 +6654,9 @@ export class CraftingEngine {
   }
 
   /**
-   * The salvage stage occurrences and award report a firing needs, or null when this salvage is
-   * not progressive (issue 1286). Called at the RESOLVE site and held in a local until the award
-   * is committed: `completeRun` reassigns `salvageRun`, so re-resolving afterwards would fall
-   * back to the AUTHORED order and name the wrong stage. It runs the award loop a SECOND time,
-   * deliberately and cheaply, because the loop is pure.
+   * The stage occurrences and award report a firing needs, or null when not progressive
+   * (issue 1286). Resolved at the resolve site and held until the award commits, because
+   * `completeRun` reassigns `salvageRun`; it reruns the pure award loop.
    */
   _progressiveSalvagePlanInputs(component, system, checkResult, salvageRun = null) {
     const { mode, unsupportedMode } = resolveSalvageCheck(system);
@@ -7023,16 +6698,10 @@ export class CraftingEngine {
   }
 
   /**
-   * Run the salvage crafting check for the active salvage resolution mode, dispatching on the
-   * `(mode, checkUsable)` PAIR from the shared {@link resolveSalvageCheck} derivation (issue 859).
-   * A check is usable only over an authored, NON-EMPTY roll formula, so a whitespace-only formula
-   * reads as "no check" everywhere instead of rolling `"   "`. Routed maps the total onto a named
-   * outcome tier; routed/progressive with no formula fail loudly, and every other mode with no
-   * usable formula is a no-op success.
-   *
-   * THE CHECK-MODIFIER CONTEXT IS BUILT ONCE, HERE (issue 1095), and threaded to whichever runner
-   * dispatch selects, so a fourth runner cannot ship without one. `salvageCraftingCheck`'s own
-   * modifier triple selects over the system catalogue, with the COMPONENT as the subject.
+   * Run the salvage check for the active mode, dispatching on `(mode, checkUsable)` from
+   * {@link resolveSalvageCheck} (issue 859); a whitespace-only formula is "no check". Routed and
+   * progressive with no formula fail loudly; other modes with none are a no-op success. The
+   * check-modifier context is built once here (issue 1095), with the component as subject.
    */
   async _runSalvageCraftingCheck(
     component,
@@ -7049,10 +6718,8 @@ export class CraftingEngine {
       craftingModifier: buildCheckModifierContext(system, 'salvage', component),
     };
 
-    // A mode outside `simple|routed|progressive` is a GM-side config defect, not a rolled failure:
-    // report it exactly as a missing required formula is reported so `salvage()` aborts with ZERO
-    // mutation, matching `ResolutionModeService.validateSalvage`. The authored token is read HERE
-    // for the MESSAGE only — never to dispatch on.
+    // An unsupported mode is a GM config defect, reported like a missing required formula so
+    // `salvage()` aborts with zero mutation, as `ResolutionModeService.validateSalvage` does.
     if (unsupportedMode) {
       return {
         success: false,
@@ -7100,13 +6767,10 @@ export class CraftingEngine {
   }
 
   /**
-   * The interactive roll-options bag every salvage check runner passes to its shared formula
-   * runner: {@link buildInteractiveRollOptions} plus the optional PRE-RESOLVED `rollDecision`
-   * (issue 859). The decision attaches ONLY when truthy, so a single-item salvage's bag stays
-   * byte-identical and `evaluateCheckRoll` keeps taking the prompt path. One helper rather than
-   * three inline spreads, so a fourth runner cannot silently ship without it. `modifierChoice`
-   * (issue 1095) is built through the SAME {@link CraftingEngine#_buildInteractiveModifierChoice}
-   * crafting uses, so salvage's `playerPicks` prompt renders on exactly crafting's terms.
+   * The roll-options bag every salvage runner passes: {@link buildInteractiveRollOptions} plus a
+   * pre-resolved `rollDecision` only when truthy (issue 859), so a single-item bag is unchanged.
+   * `modifierChoice` (issue 1095) comes from
+   * {@link CraftingEngine#_buildInteractiveModifierChoice}, so `playerPicks` matches crafting.
    */
   _salvageRollOptions({
     interactive,
@@ -7144,9 +6808,7 @@ export class CraftingEngine {
     { interactive = false, toolItems = [], rollDecision = null, craftingModifier = null } = {}
   ) {
     const dc = this._resolveSalvageDc(simple, component);
-    // Tool bonuses append FIRST and the modifier term after them, exactly as on crafting:
-    // `_appendToolCheckBonuses` rewrites the formula here, and `evaluateCheckRoll` appends
-    // the resolved modifier scalar to whatever it is handed.
+    // Tool bonuses append first and the modifier term after, as in crafting.
     const formula = await this._appendToolCheckBonuses(simple.rollFormula, toolItems);
     const result = await runFormulaPassFail({
       formula,
@@ -7198,11 +6860,9 @@ export class CraftingEngine {
   }
 
   /**
-   * Salvage routed check: roll the routed formula and map its total onto one of the configured
-   * outcome tiers. The matched tier's NAME becomes the `outcome`
-   * {@link _resolveSalvageResultGroups} feeds through `component.salvage.outcomeRouting`. The
-   * base DC is the resolved salvage DC, so a per-component `dcOverride` shifts every relative
-   * threshold. Delegates to the shared {@link runFormulaRouted}.
+   * The salvage routed check: the total maps to an outcome tier whose name feeds
+   * `component.salvage.outcomeRouting`; a per-component `dcOverride` shifts every relative
+   * threshold. Delegates to {@link runFormulaRouted}.
    */
   async _runSalvageRoutedCheck(
     routed,
@@ -7223,8 +6883,7 @@ export class CraftingEngine {
       actor,
       label: 'Salvage',
       craftingModifier,
-      // Clamp a below-lowest total to the closest tier (mirrors crafting); a per-
-      // component dcOverride never opens a null-outcome dead zone.
+      // Clamp a below-lowest total to the closest tier, as crafting does.
       clampToNearest: true,
       rollOptions: this._salvageRollOptions({
         interactive,
@@ -7307,7 +6966,6 @@ function versionedToolPlan(toolValidation) {
   };
 }
 
-/** Resolve a started stage from what it actually spent, never from live inventory. */
 /** A refunded stage spent nothing, so it records nothing - the legacy failure path's shape. */
 function clearRefundedStageState(state) {
   state.consumedItems = [];
