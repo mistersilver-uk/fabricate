@@ -74,8 +74,7 @@ const SCAN_TOTALS = Object.freeze({
   // #1923 moved five normalizer reads into `normalize/system.js` (`files` 21 -> 22); the rest hold.
   // It then moved eight item-source lines into `manager/itemSources.js` (+1 file);
   // pairs/collisions re-derived. Ten tool-source lines moved to `manager/toolSources.js` (+1 file).
-  // Five bulk-edit lines moved to `manager/bulkEdits.js` (+1 file); one was the third copy of a
-  // manager line, so that group keeps two sites (`collisionSites` -1) and its move adds a pair.
+  // Five bulk-edit lines moved to `manager/bulkEdits.js` (+1 file).
   matches: 168,
   lines: 153,
   files: 25,
