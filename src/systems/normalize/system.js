@@ -29,7 +29,10 @@ import {
 } from './systemFields.js';
 import { normalizeTool } from './tools.js';
 
-/** The basis an omitted `basis` answers: every half UNKNOWN (`null`), so nothing is pruned. */
+/**
+ * The basis an omitted `basis` answers: every half unknown (`null`), so no id is pruned, though
+ * both category vocabularies emit `[]`.
+ */
 const unknownCharacterLibraryBasis = () => ({ prerequisiteIds: null, modifierIds: null });
 const unknownScopeBasis = () => ({
   componentIds: null,
@@ -207,7 +210,7 @@ function systemLibraryFields(system, parts) {
 /**
  * Normalize one stored crafting system. `basis.characterLibraryBasis(system)` and
  * `basis.scopeBasis(system)` answer the Valid Id Bases at their original call positions; an
- * omitted `basis` is UNKNOWN throughout, never an empty Set.
+ * omitted `basis` is unknown throughout, never an empty Set.
  */
 export function normalizeSystem(system = {}, basis) {
   const systemId = system.id || foundry.utils.randomID();

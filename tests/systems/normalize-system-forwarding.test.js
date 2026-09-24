@@ -77,7 +77,12 @@ const LEGACY_ESSENCE_IDS = {
 
 const PRUNABLE = {
   id: 'sys-prunable',
-  essenceDefinitions: [{ id: 'ess-local' }],
+  essenceDefinitions: [
+    { id: 'ess-local' },
+    { id: 'ess-linked', sourceComponentId: 'comp-hidden', sourceItemUuid: 'Item.hidden' },
+  ],
+  categoryIcons: { weapons: 'fa-solid fa-sword' },
+  componentCategoryIcons: { metals: 'fa-solid fa-cube' },
   components: [{ id: 'comp-1', essences: { 'ess-local': 1, 'ess-world': 1, ghost: 1 } }],
   tools: [
     {
