@@ -13,6 +13,7 @@ import {
   missingSentences,
   multiset,
   sentencesOf,
+  structuralLinesOf,
   withoutCounts,
   withoutLinkTargets,
 } from '../scripts/lib/docSentences.js';
@@ -42,7 +43,22 @@ const DESTINATIONS = [
   '.agents/docs/foundry-and-architecture.md',
   // Issue #1984: the detailed final-delivery procedure moved out of always-loaded guidance.
   '.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md',
+  // Issue #1936: the workflow procedure moved out of AGENTS.md.
+  '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  // Issue #1936: the generic JS-structure rules moved into the skill that owns them.
+  '.agents/skills/javascript-structural-design/SKILL.md',
 ];
+
+/**
+ * AGENTS.md as it stood at issue #1936's merge-base, checked alone and with no exceptions. The
+ * counts are pinned exactly, so a truncated or partly re-cut fixture fails instead of passing.
+ */
+const PRE_1936 = {
+  fixture: `${FIXTURES}/AGENTS.pre-1936.md`,
+  // Re-derived on every re-cut of the fixture.
+  sentenceCount: 518,
+  structureCount: 86,
+};
 
 /**
  * Sentences deliberately dropped, each naming the location that still carries them. Empty, because
@@ -124,9 +140,9 @@ const DECOUNTED_COUNT = 4;
 
 /**
  * Historical policy sentences deliberately replaced, with both sides and the current destination
- * pinned so an ordinary lost instruction cannot hide in the exception (issues #1984, #1988).
+ * pinned so an ordinary lost instruction cannot hide in the exception (issues #1984, #1988, #1934).
  */
-const APPROVING_ISSUES = new Set(['#1984', '#1988']);
+const APPROVING_ISSUES = new Set(['#1984', '#1988', '#1934']);
 
 const SUPERSEDED_POLICY = [
   {
@@ -223,7 +239,7 @@ const SUPERSEDED_POLICY = [
       '`--channel early-access` and `--channel public` are the private-patron and public targets; each private channel derives its tester URLs from its own path secret, and a channel that declares tester groups with no secret set refuses to publish.',
     after:
       '`--channel early-access` and `--channel public` are the private-patron and public targets; each tester group derives its tester URLs from its own path secret, and a channel with any declared group whose secret is unset refuses to publish before building.',
-    survivesIn: 'AGENTS.md',
+    survivesIn: 'CONTRIBUTING.md',
   },
   {
     issue: '#1988',
@@ -231,7 +247,7 @@ const SUPERSEDED_POLICY = [
       'Every versioned zip carries `(fabricate-version, fabricate-source-sha, fabricate-build-profile)` metadata — pass `--source-sha` explicitly, since `GITHUB_SHA` is stale after a `git checkout <tag>`; manifest writes are conditional (`IfMatch`) and every write is read back.',
     after:
       'Every versioned zip carries `(fabricate-version, fabricate-source-sha, fabricate-build-profile)` metadata — pass `--source-sha` explicitly, since `GITHUB_SHA` names the workflow ref rather than the tag being built; manifest writes are conditional (`IfMatch`) and every write is read back.',
-    survivesIn: 'AGENTS.md',
+    survivesIn: 'CONTRIBUTING.md',
   },
   {
     issue: '#1988',
@@ -273,10 +289,25 @@ const SUPERSEDED_POLICY = [
       'Generate each once and set it before publishing; the publish **refuses to run**, before building, when any tester group a channel declares has its secret unset, so the feed can never fall back to a guessable URL.',
     survivesIn: '.github/workflows/README.md',
   },
+  {
+    issue: '#1934',
+    // Foundry review corrected the V13.351 fallback: a V14 key whispers to the GM but loses `blind`.
+    before:
+      'An unrecognised mode also changes failure shape across the boundary: on 13.351 ' +
+      '`ChatMessage.applyRollMode` falls back to a GM whisper, while on 14.365 `applyMode` throws on ' +
+      '`CONFIG.ChatMessage.modes[mode]` being undefined.',
+    after:
+      'An unrecognised mode also changes failure shape across the boundary: on 13.351 ' +
+      '`ChatMessage.applyRollMode` treats every mode other than `publicroll` and `selfroll` as a GM ' +
+      'whisper (keeping an already non-empty `whisper`) and sets `blind` only for `blindroll`, so a ' +
+      'V14 key never posts publicly there but `blind` loses its blindness, while on 14.365 ' +
+      '`applyMode` throws reading `handler` of an undefined `CONFIG.ChatMessage.modes[mode]`.',
+    survivesIn: '.agents/docs/foundry-and-architecture.md',
+  },
 ];
 
 /** Pinned exactly: every entry excuses one historical sentence. */
-const SUPERSEDED_POLICY_COUNT = 17;
+const SUPERSEDED_POLICY_COUNT = 18;
 
 /**
  * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue
@@ -481,16 +512,19 @@ const RENAMED = [
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
 const RENAMED_COUNT = 26;
 
-/** Every sentence of the post-split set, as one multiset. */
-function survivingSentences() {
+/** Everything `extract` yields from the post-split set, as one multiset. */
+function survivingLines(extract) {
   const all = [];
   for (const destination of DESTINATIONS) {
     const absolute = path.join(REPOSITORY_ROOT, destination);
     assert.ok(existsSync(absolute), `DESTINATIONS names ${destination}, which is not in the checkout`);
-    all.push(...sentencesOf(readFileSync(absolute, 'utf8')));
+    all.push(...extract(readFileSync(absolute, 'utf8')));
   }
   return multiset(all);
 }
+
+/** Every sentence of the post-split set, as one multiset. */
+const survivingSentences = () => survivingLines(sentencesOf);
 
 test('the frozen fixtures are the documents they claim to be', () => {
   // A checker fed an empty or unreadable OLD passes trivially, which is the commonest way a
@@ -532,6 +566,27 @@ test('every sentence of the pre-split documents still exists somewhere', () => {
       'the number is generated now, DECOUNTED and DECOUNTED_COUNT; if only a renamed identifier ' +
       'changed, RENAMED and RENAMED_COUNT.'
   );
+});
+
+test('every sentence, table row and fenced line of the pre-#1936 AGENTS.md still exists', () => {
+  const text = readFileSync(path.join(REPOSITORY_ROOT, PRE_1936.fixture), 'utf8');
+  const corpora = [
+    ['sentences', sentencesOf, PRE_1936.sentenceCount],
+    ['table rows and fenced lines', structuralLinesOf, PRE_1936.structureCount],
+  ];
+  for (const [kind, extract, count] of corpora) {
+    const before = extract(text);
+    assert.ok(
+      before.length === count,
+      `${PRE_1936.fixture} yields ${before.length} ${kind}, not its pinned ${count}`
+    );
+    const lost = missingSentences(multiset(before), survivingLines(extract));
+    assert.deepEqual(
+      lost.map(({ sentence, before: was, after: now }) => `(${was} -> ${now}) ${sentence}`),
+      [],
+      `these ${kind} predate issue #1936 in AGENTS.md and are in no DESTINATIONS file`
+    );
+  }
 });
 
 test('every deduplication claim names a place that really carries the sentence', () => {
@@ -769,4 +824,8 @@ test('normalisation forgives formatting and nothing else', () => {
   // Structure carries no rule and is dropped, so a table reflow or a fence move is not a loss.
   assert.deepEqual(sentencesOf('| a | b |\n| --- | --- |\n---\n<!-- x -->\n[ref]: https://e.com\n'), []);
   assert.deepEqual(sentencesOf('```js\nconst a = 1;\n```\n'), []);
+  assert.deepEqual(
+    structuralLinesOf('| a |  b |\n|:---|---:|\n```text\n  x\n```\nprose.\n'),
+    ['a | b', 'x']
+  );
 });

@@ -1,18 +1,10 @@
 /**
- * Shared, world-level "total" learn pool for recipe items (issue 511, PR-B).
- *
- * A recipe item whose `learn.learnScope === 'total'` draws every actor's learns
- * from ONE shared budget keyed by the recipe-item definition (i.e. across every copy
- * of the source item), rather than the per-copy (`perInstance`) document count. The
- * counter therefore lives
- * at world scope, and — like every other externally-observable world write in the
- * module — its increments are GM-authoritative: only a GM mutates the shared count,
- * and a non-GM path degrades safely (the write is skipped and reported as failed)
- * instead of throwing or letting a client fork the shared budget.
- *
- * The store is injected into `RecipeVisibilityService` so it is trivially fakeable
- * in unit tests; the default implementation persists to a hidden world setting,
- * registered lazily on first use so this module owns its storage end-to-end.
+ * The world-level `total` learn pool for recipe items (issue 511). A recipe item whose
+ * `learn.learnScope === 'total'` draws every actor's learns from one budget keyed by the
+ * recipe-item definition, across every copy, rather than the per-copy `perInstance` count. Writes
+ * are GM-authoritative: a non-GM increment or decrement is skipped and answers `false`, never
+ * throwing or forking the shared budget. The store is injected into `RecipeVisibilityService`; this
+ * default persists to a hidden world setting it registers lazily on first use.
  */
 
 const SETTING_SCOPE = 'fabricate';
@@ -53,9 +45,8 @@ function _readPool() {
 }
 
 /**
- * Build the default, world-setting-backed party learn pool store.
- *
- * @returns {{ get(key: string): number, increment(key: string): Promise<boolean>, decrement(key: string): Promise<boolean> }}
+ * The default store: `get(key)`, `writable()`, and `increment`/`decrement(key)` resolving whether
+ * the write landed.
  */
 export function createDefaultPartyLearnPool() {
   return {
@@ -63,20 +54,10 @@ export function createDefaultPartyLearnPool() {
       const pool = _readPool();
       return Number(pool?.[key] || 0);
     },
-    /**
-     * Whether THIS client may mutate the shared pool at all. Distinct from a failed
-     * increment: a non-GM is REFUSED, which is not the same as the budget being
-     * spent, and callers previously collapsed the two into "no learning uses left" —
-     * telling a player their budget was gone when it was untouched. Exposed so the
-     * caller can report the real reason.
-     *
-     * @returns {boolean}
-     */
+    /** Whether this client may mutate the pool; a refused non-GM is not a spent budget. */
     writable: () => _isGM(),
     async increment(key) {
-      // GM-authoritative: a world-setting write requires a GM, and letting a
-      // non-GM client "increment" locally would fork the shared budget. Degrade
-      // safely by reporting the write did not happen so the caller fails closed.
+      // A local non-GM increment would fork the shared budget; `false` fails the caller closed.
       if (!_isGM() || !_ensureRegistered()) return false;
       try {
         const pool = { ..._readPool() };
@@ -88,11 +69,7 @@ export function createDefaultPartyLearnPool() {
       }
     },
     async decrement(key) {
-      // GM-authoritative and symmetric with `increment`: freeing a shared slot on
-      // knowledge reset/erase decrements the pooled count, floored at 0 so a
-      // double-free (or a stale slot) can never drive the shared budget negative.
-      // A non-GM path degrades safely (skipped, reported failed) exactly as
-      // `increment` does, so a client never mutates the shared budget.
+      // Floored at 0, so a double-free or a stale slot never drives the shared budget negative.
       if (!_isGM() || !_ensureRegistered()) return false;
       try {
         const pool = { ..._readPool() };

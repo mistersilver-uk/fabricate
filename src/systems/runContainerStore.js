@@ -26,16 +26,12 @@ const HISTORY_LIMIT = 50;
  * container normalizer is actor-aware, and it keys by actor uuid rather than `actor.id`.
  */
 export class RunContainerManagerBase {
-  /**
-   * @param {object} args
-   * @param {string} args.flagKey the container flag key ('craftingRuns' | 'salvageRuns')
-   */
+  /** `flagKey` is the container flag, `'craftingRuns'` or `'salvageRuns'`. */
   constructor({ flagKey }) {
     this._flagKey = flagKey;
     this._cache = new Map(); // actorId -> container
-    // actorId -> { activeKeys, historyIds } this manager last observed, so `_persist`
-    // can reconcile against the document and remove only what THIS writer dropped
-    // (never another client's concurrently-added run). See runContainerCoherence.
+    // actorId -> the `{ activeKeys, historyIds }` last observed, so `_persist` removes only what
+    // THIS writer dropped, never another client's concurrent run (see runContainerCoherence).
     this._baseline = new Map();
   }
 
@@ -131,9 +127,8 @@ export class RunContainerManagerBase {
     const container = this._cache.has(actor.id)
       ? this._cache.get(actor.id)
       : this._normalizeContainer(getFabricateFlag(actor, this._flagKey, null));
-    // Snapshot the active keys + history ids the caller is about to mutate from, so
-    // `_persist` can distinguish an intentional removal from a run this manager never
-    // observed (another client's concurrent write).
+    // Snapshot what the caller is about to mutate from, so `_persist` can tell an intentional
+    // removal from a run another client added concurrently.
     this._recordBaseline(actor.id, container);
     return structuredClone(container);
   }

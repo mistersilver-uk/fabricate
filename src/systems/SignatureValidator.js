@@ -1,90 +1,43 @@
 /**
- * Validates uniqueness of satisfiable ingredient signatures across recipes in a crafting system.
- *
- * A "signature" is the set of components that can satisfy a given ingredient set.
- * If two ingredient sets from different recipes (or the same recipe) overlap in their
- * satisfiable components, the runtime cannot unambiguously choose which recipe a player
- * is attempting to craft — this is a conflict.
- *
- * Usage: instantiate with a craftingSystemManager that exposes:
- *   - getSystem(systemId)
- *   - getRecipesForSystem(systemId)
- *   - getComponentsForSystem(systemId)
- *
- * `CraftingSystemManager` implements all three (issue 1072) — until then the contract was
- * documented here but implemented nowhere, and every caller supplied an ad-hoc adapter
- * closure. Adapters remain legitimate where the source genuinely is not the live store:
- * the enable-time gate substitutes the candidate recipe, and the validation/migration
- * paths pass a JSON snapshot of a system that has not been persisted yet.
+ * Enable-time alchemy signature validation (`resolution-modes/spec.md`, signature inseparability):
+ * a signature is, per group of an ingredient set, the component ids able to satisfy it. The
+ * manager exposes `getSystem`, `getRecipesForSystem` and `getComponentsForSystem`; an adapter
+ * stands in for a candidate recipe or a snapshot of a system not yet persisted.
  */
 import { getMatchHandler } from '../models/match/matchTypes.js';
 
 import { AlchemySignatureReport } from './AlchemySignatureReport.js';
 
-// ---------------------------------------------------------------------------
-// Instrumentation
-// ---------------------------------------------------------------------------
-
 /**
- * Module-level operation counters, mirroring `src/utils/definitionIndex.js` (issue 1074).
- *
- * The pair-comparison count is the number issue 1074 has to move, and it cannot be
- * observed from outside: the row path constructs its own validator deep inside
- * `RecipeManager`, so a per-instance wrapper in the benchmark harness can only see the
- * instances the harness itself built. A module counter sees every comparison the process
- * makes, which is exactly the claim under test — "a candidate is compared with an indexed
- * cohort, not with every pair in the system".
- *
- * `reportBuilds` is its companion: a cache that avoided comparisons by answering a STALE
- * question would move the first number and not the second, so both are reported.
+ * Process-wide counters (issue 1074), since the row path builds its validator deep inside
+ * `RecipeManager`; `reportBuilds` exposes a cache that saved comparisons by answering stale.
  */
 const _counters = {
   signatureComparisons: 0,
   reportBuilds: 0,
 };
 
-/**
- * A snapshot of the signature counters.
- *
- * @returns {{signatureComparisons: number, reportBuilds: number}}
- */
 export function readSignatureCounters() {
   return { ..._counters };
 }
 
-/**
- * Zero the signature counters. Call before a measured region; they are process-global and
- * monotonic otherwise.
- *
- * @returns {void}
- */
+/** Zero the counters before a measured region; they are process-global and monotonic. */
 export function resetSignatureCounters() {
   _counters.signatureComparisons = 0;
   _counters.reportBuilds = 0;
 }
 
 /**
- * All coverage masks an option can contribute: every union of between 1 and
- * `capacity` DISTINCT component coverage masks drawn from the option. A
- * `capacity: 1` option contributes each component's mask singly; a
- * `capacity: 2` option additionally contributes the pairwise unions, and so on.
- *
- * Module-level pure primitive (reads no `this`) so the enable-time guard
- * (`signaturesOverlap`) and the runtime specificity tiebreak
- * ({@link signatureDominates}) derive from ONE notion of "a transversal covers a
- * signature" and can never drift into two conflicting definitions of specificity.
- *
- * @param {{ ids: Set<string>, capacity: number }} option
- * @param {(id: string) => number} coverageOf
- * @returns {Set<number>}
+ * Every union of 1 to `capacity` distinct component coverage masks an option can contribute: the
+ * one notion of "a transversal covers a signature" the overlap guard and the specificity tiebreak
+ * share, so the two cannot drift.
  */
 function optionCoverageMasks(option, coverageOf) {
   const distinct = new Set();
   for (const id of option.ids) {
     distinct.add(coverageOf(id));
   }
-  // BFS over unions of ≤ capacity distinct masks. `achievable` accumulates every
-  // union achievable so far; each round unions one more distinct mask in.
+  // BFS: each round unions one more distinct mask into every union achievable so far.
   const achievable = new Set(distinct);
   let frontier = new Set(distinct);
   for (let picks = 2; picks <= option.capacity && frontier.size > 0; picks++) {
@@ -104,20 +57,9 @@ function optionCoverageMasks(option, coverageOf) {
 }
 
 /**
- * Whether some transversal of `fromGroupOptions` (one option chosen per group,
- * supplying up to its `capacity` distinct components) satisfies every group of
- * `toSignature` (each `toSignature` group contains at least one supplied
- * component).
- *
- * A supplied component's only relevance to `toSignature` is which of its groups
- * contain the component — its **coverage mask**. So each chosen option
- * contributes the union of up to `capacity` distinct component coverage masks;
- * we enumerate the achievable per-group masks and DP over the reachable set of
- * covered-`toSignature` masks. Feasible iff the fully-covered mask is reachable.
- *
- * @param {{ ids: Set<string>, capacity: number }[][]} fromGroupOptions
- * @param {Set<string>[]} toSignature - the groups that must all be covered
- * @returns {boolean}
+ * Whether some transversal of `fromGroupOptions` (one option per group, supplying up to its
+ * `capacity` distinct components) satisfies every group of `toSignature`. A component matters only
+ * through its coverage mask, so this is a DP over the reachable covered masks.
  */
 export function someTransversalSatisfies(fromGroupOptions, toSignature) {
   const fullMask = (1 << toSignature.length) - 1;
@@ -133,8 +75,7 @@ export function someTransversalSatisfies(fromGroupOptions, toSignature) {
 
   let reachable = new Set([0]);
   for (const options of fromGroupOptions) {
-    // The distinct masks this whole group can contribute: for each of its
-    // options, every union of up to `capacity` distinct component masks.
+    // Every mask any option of this group can contribute.
     const groupMasks = new Set();
     for (const option of options) {
       for (const mask of optionCoverageMasks(option, coverageOf)) {
@@ -154,14 +95,7 @@ export function someTransversalSatisfies(fromGroupOptions, toSignature) {
   return reachable.has(fullMask);
 }
 
-/**
- * A signature entry is unsatisfiable — it can never match any runtime submission —
- * when it has no groups or carries a group no component can satisfy. Such a set is
- * inert for both overlap and domination reasoning.
- *
- * @param {{ signature: Set<string>[] }} entry
- * @returns {boolean}
- */
+/** Never matchable (no groups, or a group nothing satisfies): inert for overlap and dominance. */
 function isInertSignature(entry) {
   const signature = entry?.signature;
   if (!Array.isArray(signature) || signature.length === 0) return true;
@@ -169,24 +103,10 @@ function isInertSignature(entry) {
 }
 
 /**
- * The runtime specificity partial order (LOAD-BEARING, issue 774). Entry `A`
- * **dominates** entry `B` — is strictly MORE SPECIFIC — iff a natural transversal
- * of `A` also satisfies every group of `B` (so `A`'s required-group structure
- * CONTAINS `B`'s) while no transversal of `B` satisfies `A` (so `B` is strictly
- * smaller). This is exactly the asymmetric half of the enable-time inseparability
- * test: {@link SignatureValidator#signaturesOverlap} rejects the SYMMETRIC case
- * (both directions satisfy — identical signatures, or the tag/OR case), and the
- * runtime matcher ({@link resolveMostSpecificSignatureMatch}) breaks a multi-match
- * tie by picking the unique dominator. Both consume this same
- * {@link someTransversalSatisfies} primitive so the guard and the runtime can never
- * disagree about which of two matching sets is more specific.
- *
- * Domination is a proper-superset relation on required-group structure, NOT on
- * units consumed (alchemy consumes ALL submitted units regardless).
- *
- * @param {{ signature: Set<string>[], groupOptions: object[][] }} entryA
- * @param {{ signature: Set<string>[], groupOptions: object[][] }} entryB
- * @returns {boolean}
+ * The runtime specificity order (issue 774): `A` dominates `B` when a transversal of `A` satisfies
+ * `B` and none of `B` satisfies `A`, containment of required groups rather than units consumed.
+ * The enable-time guard rejects the symmetric case and the runtime matcher picks the unique
+ * dominator, both through `someTransversalSatisfies`, so they never disagree.
  */
 export function signatureDominates(entryA, entryB) {
   if (isInertSignature(entryA) || isInertSignature(entryB)) return false;
@@ -200,13 +120,7 @@ export class SignatureValidator {
     this._csm = craftingSystemManager;
   }
 
-  /**
-   * Expand a single ingredient option to the set of component IDs that can satisfy it.
-   *
-   * @param {object} ingredient - Ingredient-like object with a `match` property
-   * @param {object[]} systemComponents - All managed components in the system
-   * @returns {Set<string>} component IDs that can match this ingredient
-   */
+  /** The component ids able to satisfy one ingredient option. */
   expandIngredientToComponentIds(ingredient, systemComponents) {
     return getMatchHandler(ingredient?.match).expandToComponentIds(
       ingredient?.match,
@@ -214,14 +128,7 @@ export class SignatureValidator {
     );
   }
 
-  /**
-   * Expand an ingredient group (one of several options satisfies the group)
-   * to the union of all component IDs that can satisfy any option.
-   *
-   * @param {object} group - IngredientGroup with `options` array
-   * @param {object[]} systemComponents
-   * @returns {Set<string>}
-   */
+  /** The union of the ids able to satisfy any option of a group. */
   expandGroupToComponentIds(group, systemComponents) {
     const expanded = new Set();
     for (const option of group.options || []) {
@@ -232,15 +139,7 @@ export class SignatureValidator {
     return expanded;
   }
 
-  /**
-   * Compute the signature for an ingredient set: an array of expanded group sets.
-   * Each element of the array represents one required group, and the set within
-   * contains all component IDs that could satisfy that group.
-   *
-   * @param {object} ingredientSet - IngredientSet with `ingredientGroups`
-   * @param {object[]} systemComponents
-   * @returns {Set<string>[]}
-   */
+  /** A set's signature: one id set per required group. */
   computeSignature(ingredientSet, systemComponents) {
     return (ingredientSet.ingredientGroups || []).map((g) =>
       this.expandGroupToComponentIds(g, systemComponents)
@@ -248,33 +147,17 @@ export class SignatureValidator {
   }
 
   /**
-   * Compute the per-group option contributions for an ingredient set, preserving
-   * each option's required **quantity** (which {@link computeSignature}
-   * discards).
-   *
-   * Each group becomes an array of options `{ ids, capacity }`, where `ids` is
-   * the set of component IDs that can satisfy the option and `capacity` is the
-   * maximum number of DISTINCT components a natural craft can supply for that
-   * option — `min(quantity, ids.size)`. This matters because the runtime
-   * satisfies a `quantity: N` option by counting N matching submissions, and
-   * those N units can be N *distinct* components (a `quantity: 2` "metal"-tag
-   * option is naturally crafted as iron + gold), each of which contributes its
-   * own coverage toward another set's groups.
-   *
-   * Options that expand to no component (e.g. currency) are dropped.
-   *
-   * @param {object} ingredientSet - IngredientSet with `ingredientGroups`
-   * @param {object[]} systemComponents
-   * @returns {{ ids: Set<string>, capacity: number }[][]}
+   * Per group, each option's `{ ids, capacity }`, `capacity` being `min(quantity, ids.size)`: a
+   * `quantity: N` option can be crafted from N distinct components, each covering other groups.
+   * An option expanding to no component (such as currency) is dropped.
    */
   computeGroupOptions(ingredientSet, systemComponents) {
     return (ingredientSet.ingredientGroups || []).map((group) =>
       (group.options || [])
         .map((option) => {
           const ids = this.expandIngredientToComponentIds(option, systemComponents);
-          // An essence option carries its count on `match.amount` (quantity stays 1),
-          // so its capacity derives from the amount, not the option quantity — else
-          // `amount: 3` would cap capacity at 1 and fail-OPEN overlap detection.
+          // An essence option counts `match.amount` (its quantity stays 1); capping it at the
+          // quantity would fail overlap detection OPEN.
           const count =
             option?.match?.type === 'essence'
               ? Math.max(1, Number(option?.match?.amount) || 1)
@@ -286,52 +169,15 @@ export class SignatureValidator {
   }
 
   /**
-   * Check whether two ingredient sets are INSEPARABLE — genuinely ambiguous in a
-   * way no added or different ingredient can ever resolve, so the runtime could
-   * never distinguish them (issue 774).
-   *
-   * The runtime signature matcher (`CraftingEngine._matchAlchemySignature`) is
-   * superset-tolerant (`>= required`, extras consumed) and, since issue 774, picks
-   * the MOST-SPECIFIC matching set (the unique dominator under
-   * {@link signatureDominates}), fizzling safely when no unique maximum exists.
-   * That runtime disambiguates any pair related by strict subset/superset (the
-   * superset dominates) and safely fizzles an ambiguous over-submission of
-   * incomparable siblings. So a pair is only unenablable when it is INSEPARABLE:
-   * a plausible submission of EACH set also fully satisfies the OTHER — the
-   * SYMMETRIC transversal case, where neither dominates and no ingredient choice
-   * can pick a winner.
-   *
-   * The plausible submissions for a set are its **transversals**: for each group,
-   * pick one satisfying option and supply exactly its required quantity of units
-   * (the natural "the ingredients each requirement calls for" craft), choosing
-   * WHICH components those units are to maximise the chance of also matching the
-   * other set. A `quantity: N` option can therefore contribute up to N distinct
-   * components. Symmetric-transversal overlap covers exactly: identical signatures;
-   * the tag/OR case where one item satisfies both (a `mithril` tagged both `rare`
-   * and `metal` for `A={rare}` / `B={metal}`, ambiguous via the one-item
-   * `{mithril}` submission); and an OR-option set that fully shadows a narrower one.
-   * By contrast a strict subset/superset pair (`{Water}` vs `{Water},{Herb}`) is
-   * ONE-directional and now ALLOWED — the runtime brews the superset when Herb is
-   * added and the base when it is not — and incomparable siblings
-   * (`{S,V,E}` / `{S,V,R}`) satisfy neither direction and are also allowed.
-   *
-   * @param {object} entryA - `{ signature: Set<string>[], groupOptions }`
-   * @param {object} entryB - `{ signature: Set<string>[], groupOptions }`
-   * @returns {boolean}
+   * Whether two ingredient sets are INSEPARABLE (issue 774): a transversal of each satisfies the
+   * other. The superset-tolerant runtime matcher resolves a one-directional pair to its dominator
+   * and fizzles on incomparable siblings, so only this symmetric case blocks enabling.
    */
   signaturesOverlap(entryA, entryB) {
     _counters.signatureComparisons += 1;
 
-    // A set carrying no groups, or a group no component can satisfy, is
-    // unsatisfiable: it can never match a submission at runtime, so it cannot be
-    // the source of any ambiguity and never conflicts with another set.
     if (isInertSignature(entryA) || isInertSignature(entryB)) return false;
 
-    // Inseparable == SYMMETRIC transversal satisfaction: a natural craft of EACH
-    // set also satisfies the OTHER. One-directional satisfaction (strict
-    // subset/superset) is disambiguated by the runtime's most-specific pick, and
-    // neither-directional (incomparable siblings) fizzles safely, so only the
-    // symmetric (`&&`) case is rejected at enable time (issue 774).
     return (
       someTransversalSatisfies(entryA.groupOptions, entryB.signature) &&
       someTransversalSatisfies(entryB.groupOptions, entryA.signature)
@@ -339,19 +185,8 @@ export class SignatureValidator {
   }
 
   /**
-   * The managed-component NAMES shared by two overlapping signatures — the
-   * components a player could submit that satisfy both sets, and therefore the
-   * concrete reason the runtime cannot tell the recipes apart. Used to describe a
-   * conflict to the user without leaking ids (issue 550). A component that expands
-   * to an id with no managed name is dropped rather than falling back to its id,
-   * so no raw id can ever reach the user through this label. Result is sorted for
-   * a deterministic message.
-   *
-   * @param {object} entryA - `{ signature: Set<string>[] }`
-   * @param {object} entryB - `{ signature: Set<string>[] }`
-   * @param {object[]} systemComponents
-   * @returns {string[]}
-   * @private
+   * The sorted managed-component names both signatures share, naming a conflict without leaking an
+   * id (issue 550): an id with no managed name is dropped, never shown.
    */
   _overlapComponentNames(entryA, entryB, systemComponents) {
     const idsA = new Set();
@@ -369,22 +204,10 @@ export class SignatureValidator {
   }
 
   /**
-   * Validate all ENABLED recipes in a crafting system for ingredient signature
-   * conflicts.
-   *
-   * The scan is scoped to enabled recipes — the exact complement of the runtime
-   * matcher's `if (!recipe.enabled) continue;` skip in
-   * `CraftingEngine._matchAlchemySignature` — so the scanned set equals the
-   * matchable set. Because every gate consumer (`collectAlchemySignatureBlockers`
-   * → `blocksSystem`, `_assertNoAlchemySignatureCollisions`, `disableSignatureConflicts`,
-   * the adminStore validator, and the 1.17.0 migration reconciliation) funnels
-   * through this method, the invariant they all enforce is "the set of ENABLED
-   * recipes is collision-free" — the only invariant the runtime needs. Disabling all
-   * participants of a conflict genuinely clears it; re-enabling a disabled collider
-   * is re-caught at that mutation by the same save-block.
-   *
-   * @param {string} systemId
-   * @returns {{ valid: boolean, conflicts: object[] }}
+   * Audit the system's ENABLED recipes, the exact set the runtime matcher considers, so every gate
+   * funnelling through here (`blocksSystem`, the save block, `disableSignatureConflicts`, the
+   * adminStore validator, the 1.17.0 migration) enforces one invariant: enabled recipes never
+   * collide. Disabling every participant clears a conflict, and re-enabling one is re-caught.
    */
   validateSystem(systemId) {
     const compiled = this.compileSystemEntries(systemId);
@@ -398,22 +221,10 @@ export class SignatureValidator {
   }
 
   /**
-   * Flatten a system's ENABLED recipes into `(recipe, ingredient set)` entries, with the
-   * facts an incremental re-check needs to reproduce a full audit's ordering.
-   *
-   * Each entry tracks its set's 1-based POSITION within its recipe so a conflict can be
-   * reported by position (issue 550) — never by the raw Foundry set id, which is opaque to
-   * the user and cannot be mapped back to anything in the editor. A set's author-given
-   * `name` (when present) is safe to show; an absent name falls back to the position, NOT
-   * the id.
-   *
-   * `cohortIndexByRecipeId` covers the WHOLE cohort, disabled recipes included, because
-   * the enable-time gate substitutes a currently-disabled candidate into the scan and needs
-   * to know where in the audit order it would have landed.
-   *
-   * @param {string} systemId
-   * @returns {{system: object, components: object[], entries: object[],
-   *   cohortIndexByRecipeId: Map<*, number>}|null} `null` for an unknown system.
+   * The enabled recipes' `(recipe, ingredient set)` entries, each with its 1-based set position (a
+   * conflict names a set by its author name or position, never the raw id, issue 550), and
+   * `cohortIndexByRecipeId` over the WHOLE cohort, so the enable-time gate can place a disabled
+   * candidate in audit order. `null` for an unknown system.
    */
   compileSystemEntries(systemId) {
     const system = this._csm.getSystem(systemId);
@@ -425,25 +236,13 @@ export class SignatureValidator {
     const cohortIndexByRecipeId = new Map();
     for (const [cohortIndex, recipe] of cohort.entries()) {
       cohortIndexByRecipeId.set(recipe?.id, cohortIndex);
-      // The scan is scoped to enabled recipes — the exact complement of the runtime
-      // matcher's `if (!recipe.enabled) continue;` skip.
       if (!recipe?.enabled) continue;
       entries.push(...this.compileRecipeEntries(recipe, components, cohortIndex));
     }
     return { system, components, entries, cohortIndexByRecipeId };
   }
 
-  /**
-   * Compile ONE recipe's ingredient sets into audit entries.
-   *
-   * Shared by the full audit and by the enable-time candidate check, so a candidate is
-   * always compiled exactly as the audit would have compiled it (issue 1074).
-   *
-   * @param {object} recipe
-   * @param {object[]} components
-   * @param {number} [cohortIndex] The recipe's position in the unfiltered system cohort.
-   * @returns {object[]}
-   */
+  /** One recipe's audit entries; the candidate check compiles through it too (issue 1074). */
   compileRecipeEntries(recipe, components, cohortIndex = 0) {
     return (recipe?.ingredientSets || []).map((set, index) => ({
       recipe: { id: recipe.id, name: recipe.name },
@@ -458,16 +257,8 @@ export class SignatureValidator {
   }
 
   /**
-   * The UNPRUNED pairwise audit — every pair, in `i < j` order.
-   *
-   * Deliberately left unpruned while {@link AlchemySignatureReport} answers a candidate
-   * from an inverted index: the two are differentially tested against each other, and an
-   * oracle that shared the optimisation could not falsify it.
-   *
-   * @param {object[]} entries
-   * @param {object[]} components
-   * @returns {object[]}
-   * @private
+   * The unpruned `i < j` pairwise audit, kept unpruned as the oracle that
+   * `AlchemySignatureReport`'s indexed answer is differentially tested against.
    */
   _auditEntries(entries, components) {
     const conflicts = [];
@@ -487,15 +278,7 @@ export class SignatureValidator {
     return conflicts;
   }
 
-  /**
-   * The reported conflict for one overlapping pair, `entryA` being the side a full audit's
-   * `i < j` walk would have visited first.
-   *
-   * @param {object} entryA
-   * @param {object} entryB
-   * @param {object[]} components
-   * @returns {object}
-   */
+  /** One overlapping pair's conflict, `entryA` being the side an `i < j` walk visits first. */
   describeConflict(entryA, entryB, components) {
     const componentNames = this._overlapComponentNames(entryA, entryB, components);
     const setA = entryA.setName || String(entryA.setPosition);
@@ -506,10 +289,8 @@ export class SignatureValidator {
       ingredientSetA: entryA.setId,
       recipeB: entryB.recipe,
       ingredientSetB: entryB.setId,
-      // Stable code + human-readable params so the UI can localize the
-      // conflict (issue 550), mirroring the `systemValidation` issue-code
-      // pattern. `setA`/`setB` are author names or 1-based positions;
-      // `components` are managed-component NAMES — never raw ids.
+      // A stable code and params the UI localizes (issue 550): set names or positions and
+      // component names, never raw ids.
       code: 'signatureCollision',
       params: {
         recipeA: entryA.recipe.name,
@@ -518,8 +299,7 @@ export class SignatureValidator {
         setB,
         components: componentsLabel,
       },
-      // Default English for headless/console callers. Keeps the recipe
-      // names and the "Overlapping signatures" phrase (no set id).
+      // Headless English for console callers, naming no set id.
       message: componentsLabel
         ? `Overlapping signatures between "${entryA.recipe.name}" and "${entryB.recipe.name}" (shared components: ${componentsLabel})`
         : `Overlapping signatures between "${entryA.recipe.name}" and "${entryB.recipe.name}"`,
@@ -527,15 +307,8 @@ export class SignatureValidator {
   }
 
   /**
-   * Compile the whole system into a reusable {@link AlchemySignatureReport}: the audit's
-   * entries, its conflicts, and the cohort map an incremental candidate check needs.
-   *
-   * This is the COLD build — it costs exactly one full audit, which is the budget issue
-   * 1074's acceptance criteria allow per revision. `RecipeManager` owns the revision guard
-   * that decides when to call it.
-   *
-   * @param {string} systemId
-   * @returns {AlchemySignatureReport|null} `null` for an unknown system.
+   * The cold build of a reusable `AlchemySignatureReport`: one full audit, the per-revision budget
+   * issue 1074 allows; `RecipeManager` owns the revision guard. `null` for an unknown system.
    */
   compileReport(systemId) {
     const compiled = this.compileSystemEntries(systemId);
@@ -551,13 +324,7 @@ export class SignatureValidator {
     });
   }
 
-  /**
-   * Validate a single recipe against all others in its system.
-   *
-   * @param {object} recipe - Recipe object with `id`, `craftingSystemId`, `ingredientSets`
-   * @param {string} systemId
-   * @returns {{ valid: boolean, conflicts: object[] }}
-   */
+  /** The system audit's conflicts naming one recipe. */
   validateRecipe(recipe, systemId) {
     const result = this.validateSystem(systemId);
     const recipeConflicts = result.conflicts.filter(

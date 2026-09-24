@@ -33,7 +33,6 @@ export async function applyGuardedRunMutation(mutate) {
 
 /**
  * Classify without coercion or migration. A present undefined/null/string version is unsupported.
- * @param {object|null} run
  * @returns {'legacy'|'current'|'unsupported'}
  */
 export function getRunLifecycleContract(run) {
@@ -44,8 +43,6 @@ export function getRunLifecycleContract(run) {
 /**
  * Build explicitly opted-in lifecycle fields with revision zero and manual completion by default.
  * Unstamped callers receive no lifecycle fields. Unsupported versions throw.
- * @param {object} [data]
- * @returns {object}
  */
 export function buildNewRunLifecycleFields(data = {}) {
   const contract = getRunLifecycleContract(data);
@@ -62,8 +59,6 @@ export function buildNewRunLifecycleFields(data = {}) {
 /**
  * Project lifecycle fields for persistence without upgrading legacy or unsupported records.
  * For an unsupported contract, only its version is returned by this helper.
- * @param {object} [data]
- * @returns {object}
  */
 export function preserveRunLifecycleFields(data = {}) {
   const contract = getRunLifecycleContract(data);
@@ -77,7 +72,6 @@ export function preserveRunLifecycleFields(data = {}) {
 /**
  * Refuse unsupported, recovery-required, paused or stale mutations as applicable.
  * This guard does not acquire authority, validate resources or persist a transition.
- * @param {object} run
  * @param {{currentOnly?: boolean, expectedRevision?: number, allowPaused?: boolean}} [options]
  * @returns {'legacy'|'current'}
  * @throws {RunLifecycleError}
@@ -126,7 +120,6 @@ export function incrementRunRevision(run) {
 /**
  * Set a current run's preference in place and increment its revision.
  * Preference is intent, not automatic-execution eligibility or permission to spend materials.
- * @param {object} run
  * @param {'manual'|'worldTime'} completionMode
  * @param {{expectedRevision?: number}} [options]
  * @returns {object} The mutated run, not yet persisted.
@@ -146,7 +139,6 @@ export function applyCompletionMode(run, completionMode, options = {}) {
 /**
  * Freeze remaining world-time seconds in place, retaining selections and completion preference.
  * The caller validates that this is a pausable waiting gate.
- * @param {object} run
  * @param {{now?: number, availableAt?: number, expectedRevision?: number}} [options]
  * @returns {object} The mutated run, not yet persisted.
  */
@@ -166,7 +158,6 @@ export function applyPause(run, { now, availableAt, expectedRevision } = {}) {
 /**
  * Clear pause in place and accumulate paused duration, returning the new gate deadline.
  * The caller assigns `availableAt` to the gate and persists it with the run.
- * @param {object} run
  * @param {{now?: number, expectedRevision?: number}} [options]
  * @returns {{run: object, availableAt: number}}
  */

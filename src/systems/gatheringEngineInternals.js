@@ -1,10 +1,6 @@
 /**
- * Internal helpers shared by GatheringEngine and its extracted collaborators
- * (e.g. GatheringWorldTimeProcessor, GatheringListingBuilder). These are
- * intentionally tiny, dependency-free coercions, collection-normalizers, and
- * player-safe run redactors; they live in one module so the engine and its
- * collaborators reuse a single definition instead of duplicating it (the
- * duplication gate forbids a second copy in the builder).
+ * Dependency-free helpers shared by `GatheringEngine` and its collaborators, so each has one
+ * definition; the duplication gate forbids a copy.
  */
 
 import {
@@ -15,73 +11,27 @@ import {
 } from '../utils/scalars.js';
 
 /**
- * Sentinel `taskId` prefix persisted on an opaque-blind WAITING run in place of
- * the drawn task's real id (issue 901).
- *
- * A gathering run lives in `flags.fabricate.gatheringRuns` on the gathering
- * actor, and Foundry pushes an owned Actor's full source — flags included — to
- * that client, which made the drawn task both readable AND forgeable there. The
- * real id now lives in the `fabricate.gatheringBlindRuns` WORLD setting, which
- * only a GM may write.
- *
- * The marker is environment-scoped, so `findActiveRunForTask` still separates
- * concurrent blind runs in different environments — that is what enforces "one
- * active blind run per blind environment" ("you can't be in more than one place
- * searching at once"). It cannot collide with a real task id unless an imported
- * id literally starts with `blind:`.
- *
- * Lives here rather than in GatheringEngine because the engine, the gathering
- * listing builder, and the Journal's RunJournalBuilder all have to recognise the
- * marker, and the duplication gate forbids a second copy.
- *
- * @type {string}
+ * The `taskId` prefix an opaque-blind waiting run persists instead of the drawn task (issue 901):
+ * an owner receives the actor's flags, so the real id lives in the GM-only
+ * `fabricate.gatheringBlindRuns` setting. Environment-scoped, keeping one active blind run per
+ * blind environment; only an imported id starting `blind:` could collide.
  */
 export const BLIND_WAITING_TASK_PREFIX = 'blind:';
 
-/**
- * The environment-scoped sentinel an opaque-blind waiting run is persisted under.
- *
- * @param {object} environment
- * @returns {string}
- */
 export function blindWaitingTaskId(environment) {
   return `${BLIND_WAITING_TASK_PREFIX}${stringOrEmpty(environment?.id)}`;
 }
 
-/**
- * Whether a persisted run's `taskId` is the blind sentinel rather than a real
- * task id.
- *
- * This is also the BACK-COMPAT switch. It is false for every run written before
- * issue 901, so an in-flight run that already carries a real `taskId` and its own
- * `economyEvidence.runtimeSnapshot` keeps resolving from those exactly as it did
- * — no migration, and no blind-store record required.
- *
- * @param {*} taskId
- * @returns {boolean}
- */
+/** Whether a `taskId` is the blind sentinel; false for a pre-901 run, which needs no migration. */
 export function isBlindWaitingTaskId(taskId) {
   return typeof taskId === 'string' && taskId.startsWith(BLIND_WAITING_TASK_PREFIX);
 }
 
-/**
- * Resolve a document's stable id, preferring `id` then `uuid`.
- *
- * @param {*} document
- * @returns {string|null}
- */
 export function idOf(document) {
   return stringOrNull(document?.id) || stringOrNull(document?.uuid);
 }
 
-/**
- * Iterate a Foundry collection / array / EmbeddedCollection (scenes, regions,
- * behaviours) tolerantly, mirroring the scan in `interactableMarkerDepletion`.
- * Returns an empty array for nullish input so callers can `for...of` safely.
- *
- * @param {*} collection
- * @returns {Iterable<*>}
- */
+/** Iterate an array, a Foundry collection or an `EmbeddedCollection`; nullish yields nothing. */
 export function iterateCollection(collection) {
   if (!collection) return [];
   if (typeof collection[Symbol.iterator] === 'function') return collection;
@@ -90,31 +40,12 @@ export function iterateCollection(collection) {
   return [];
 }
 
-/**
- * Shallow-clone a plain object, or null for arrays / nullish / non-objects.
- *
- * @param {*} value
- * @returns {object|null}
- */
 export function plainObjectOrNull(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   return { ...value };
 }
 
-/**
- * Structured deep clone via JSON round-trip. Returns `undefined` for
- * `undefined` input (so optional fields stay absent rather than becoming null).
- *
- * @param {*} value
- * @returns {*}
- */
-/**
- * Normalize a value into a de-duplicated array of trimmed non-empty strings.
- * A non-array scalar is treated as a single-element list.
- *
- * @param {*} value
- * @returns {string[]}
- */
+/** De-duplicated trimmed non-empty strings; a scalar is a one-element list. */
 export function normalizeStringList(value) {
   return [
     ...new Set(
@@ -125,13 +56,7 @@ export function normalizeStringList(value) {
   ];
 }
 
-/**
- * De-duplicate a list of blocked-reason objects by `code`, keeping the first
- * occurrence of each code.
- *
- * @param {Array<{code?: string}>} reasons
- * @returns {Array<object>}
- */
+/** Blocked reasons de-duplicated by `code`, first wins. */
 export function uniqueReasons(reasons) {
   const byCode = new Map();
   for (const reason of reasons) {
@@ -141,12 +66,6 @@ export function uniqueReasons(reasons) {
   return [...byCode.values()];
 }
 
-/**
- * Build the player-facing actor option `{ id, uuid, name, img }`.
- *
- * @param {*} actor
- * @returns {{id: string|null, uuid: string|null, name: string, img: string|null}}
- */
 export function actorToOption(actor) {
   return {
     id: idOf(actor),
@@ -156,74 +75,33 @@ export function actorToOption(actor) {
   };
 }
 
-/**
- * Whether an actor matches a remembered id by `id` or `uuid`.
- *
- * @param {*} actor
- * @param {*} actorId
- * @returns {boolean}
- */
 export function actorMatchesId(actor, actorId) {
   const id = String(actorId);
   return actor?.id === id || actor?.uuid === id;
 }
 
-/**
- * Whether two actor references denote the same actor (identity, `id`, or `uuid`).
- *
- * @param {*} left
- * @param {*} right
- * @returns {boolean}
- */
 export function sameActor(left, right) {
   return Boolean(
     left && right && (left === right || left.id === right.id || left.uuid === right.uuid)
   );
 }
 
-/**
- * Whether an actor's `uuid` matches a run's persisted `actorUuid`.
- *
- * @param {*} actor
- * @param {*} actorUuid
- * @returns {boolean}
- */
 export function sameActorUuid(actor, actorUuid) {
   const runActorUuid = stringOrNull(actorUuid);
   if (!runActorUuid) return false;
   return stringOrNull(actor?.uuid) === runActorUuid;
 }
 
-/**
- * Normalize a value into an array with falsy entries removed.
- *
- * @param {*} value
- * @returns {Array<*>}
- */
 export function normalizeActorList(value) {
   return normalizeList(value).filter(Boolean);
 }
 
-/**
- * Invoke `fn(payload)` when callable, otherwise resolve to an empty array.
- * Used to call optional async collaborators (e.g. `getSelectableActors`).
- *
- * @param {*} fn
- * @param {*} payload
- * @returns {Promise<*>}
- */
+/** Call an optional collaborator, or resolve `[]` when it is absent. */
 export async function callMaybe(fn, payload) {
   return typeof fn === 'function' ? fn(payload) : [];
 }
 
-/**
- * Normalize a scene-interactable ref to `{sceneId, regionId, behaviorId}` (issue
- * 302), or null when any id is missing. Used to persist the ref on a waiting run
- * and resolve it back at maturity.
- *
- * @param {object|null} ref
- * @returns {{sceneId:string, regionId:string, behaviorId:string}|null}
- */
+/** An interactable ref `{sceneId, regionId, behaviorId}`, or `null` if incomplete (issue 302). */
 export function normalizeInteractableRef(ref) {
   if (!ref || typeof ref !== 'object') return null;
   const sceneId = stringOrNull(ref.sceneId);
@@ -234,13 +112,8 @@ export function normalizeInteractableRef(ref) {
 }
 
 /**
- * Redact a run's rich economy evidence to a player-safe shape: collapse node
- * details to availability only, flatten matched events, redact character
- * modifier snapshots to bare contributions, and drop item/roll/snapshot
- * internals. Used for opaque-blind runs so aggregate drop info cannot leak.
- *
- * @param {object} [evidence]
- * @returns {object}
+ * A blind run's player-safe evidence: node availability only, events as bare matches, modifier
+ * snapshots as bare contributions, and no items, rolls or snapshots, so no drop info leaks.
  */
 export function redactRichEvidence(evidence = {}) {
   const redacted = cloneJson(evidence) || {};
@@ -282,14 +155,7 @@ export function redactRichEvidence(evidence = {}) {
   return redacted;
 }
 
-/**
- * Deep-clone a run and strip the internal `economyEvidence.runtimeSnapshot` so a
- * transparent (non-blind) terminal/waiting run can be surfaced to players
- * without leaking the resume-time snapshot.
- *
- * @param {object} run
- * @returns {object}
- */
+/** A deep clone without the resume-time `economyEvidence.runtimeSnapshot`, for players. */
 export function stripRuntimeSnapshotFromRun(run) {
   if (!run || typeof run !== 'object') return run;
   const publicRun = cloneJson(run);

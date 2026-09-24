@@ -8,7 +8,7 @@
   | --- | --- | --- | --- |
   | `navRail` | the `navRailModel` instance | — | supplies group expansion, the locks and `toggleGroup` |
   | `experimentalFeaturesEnabled` | `boolean` | `false` | gates the Graph placeholder, which `isViewAvailableForSystem` reads |
-  | `craftingNavItems` / `checksNavItems` / `visibleGatheringNavItems` | entry arrays | `[]` | already built by the root's own tables |
+  | `craftingNavItems` / `checksNavItems` / `visibleGatheringNavItems` | entry arrays | `[]` | built by the root and the checks route model |
 
   Invariants:
   - The rail id and its label are authored three lines apart here, because

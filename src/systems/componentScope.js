@@ -8,107 +8,24 @@ import {
 import { unionScopedDefinitions } from './scopedDefinitionStore.js';
 
 /**
- * The component half of Scoped Entity Definitions (issue 1358, part of epic 1357).
- *
- * `## Component` describes the shipped per-system shape and stays authoritative while `## CraftingSystem` requirement 36 holds. Issue 1370
- * repointed every non-UI reader at the read union, and READING IS NOT AUTHORITY: while that
- * requirement holds the in-system record decides every key it carries, the row order and the
- * row set, so the arrays did not lose authority when the readers moved. The `1.30.0` world-scope migration
- * (PR 3) makes this module's read union correct for a migrated world and seeds the world corpus
- * it reads; it deliberately does NOT shed the in-system array, because every lifted field still
- * has live production readers.
- *
- * **THE `category` INHERIT SWITCH IS LIVE AND ITS ANSWER IS CONSUMED (issue 1372, authored at
- * issue 1371).** `unionScopedDefinitions` applies each INHERITING section from the world default
- * AFTER the in-system re-spread, on the shipped field name, so an inheriting system's `category`
- * really does resolve from the world layer and really does change when the world default moves.
- * The world Component catalogue and entry are the surfaces that author that default.
- *
- * **AND SO IS `essences` (issue 1371 r18-store, maintainer ruling M31).** The world record
- * carries an `essences` SECTION beside `category`, on the category model exactly: a map
- * `essenceId -> quantity` over the WORLD essence catalogue's ids, persisted on the world default,
- * inherited by every system that has rules for the component unless that system overrides with
- * its own map. It exists because the world catalogue's essence values were being written into
- * per-system rules that no world screen reads, so the maintainer's edit "did not persist or show
- * anywhere". The section is spelled over the shipped in-system `Component.essences` map, so its
- * union writer is an assignment (`scopedDefinitionStore.js`), and its SHAPE rule — a map of
- * positive quantities, an EMPTY map being an authored "no essences" rather than absence — is
- * stated once at the normalizer (`normalizeComponentEssenceMap`, through `coerceComponentSection`)
- * so both resolution branches carry it. The `1.32.0` migration elects each world map from the
- * oldest system holding rules and marks each system inheriting only where its own map equals the
- * elected one (`src/migration/migrateComponentEssenceSections.js`).
- *
- * Those two are the keys on this path with a live world parent: identity is re-derived from the
- * in-system record unconditionally, and `tags` is not a section at all — see below — so both are
- * authored at world scope and read back only by the world screens themselves.
- *
- * A COMPONENT MEMBERSHIP RECORD CARRIES NO `enabled` FLAG, and that absence is STRUCTURAL rather
- * than conventional. The maintainer ruling behind epic 1357 is that essence enabling toggles
- * effect transfer and macros and tool enabling evokes a drained leyline, but component enabling
- * serves no purpose and is not implemented: component membership is binary, present or absent.
- * The scope therefore declares `enableable: false`, so `resolveComponent` OMITS the key entirely
- * rather than answering `false` - a resolver that answered `false` would hand a later screen the
- * exact value it would read to draw the toggle this ruling removes.
- *
- * TWO FIELDS DEPART FROM THE PLAIN SECTION PATTERN, each with its own named helper rather than a
- * special case inside the generic resolver:
- *
- * - `category` is a section, but its INHERITING branch is special: the world category wins IF
- *   AUTHORED, and otherwise the local value falls through. See `resolveComponentCategory`. Its
- *   SHAPE rule - a trimmed non-empty string, or absence - is stated once at the normalizer
- *   (`coerceComponentSection`) rather than on that branch, so the overriding branch, which hands
- *   the stored value straight back, is bound by it too.
- * - `tags` is NOT a section and has no inherit switch at all: the effective set is additive, with
- *   per-tag muting. See `resolveComponentTags`. **ITS ANSWER IS RESOLVER-ONLY AND THE READ UNION
- *   DISCARDS IT**: `tags` carries no writer in `INHERITED_SECTION_WRITERS.components`, and
- *   `_normalizeComponent` emits `tags` unconditionally, so the union's trailing in-system
- *   re-spread overwrites the merged set on every read. A world tag and a mute are therefore
- *   AUTHORED-AND-UNCONSUMED today; routing the merge through the union is deliberately deferred,
- *   because the resolver's system half is the MEMBERSHIP record's migration-time `tags` copy
- *   while the in-system record's own `tags` is edited live, so routing it now would revert every
- *   member system's live tag list to its migration-time state.
- *
- * NEITHER HELPER READS A VOCABULARY. The world component-category and component-tag vocabularies,
- * their icon maps and their deletion semantics are the World Vocabulary, which epic 1357 models in
- * PR 7; both helpers take the world value as an EXPLICIT ARGUMENT, which is what stops this
- * resolver quietly acquiring a fourth layer. The reserved `general` category is not part of that
- * vocabulary and stays implicit.
+ * The component half of Scoped Entity Definitions (issue 1358). `category` and `essences` are
+ * sections whose inherit switch the read union honours (issues 1371, 1372). A component carries no
+ * `enabled` flag, structurally, so the resolver omits the key. `tags` is not a section: additive
+ * with per-tag muting, and the union's in-system re-spread discards the resolved set, so world tags
+ * and mutes are authored but unconsumed. Neither helper reads a vocabulary; each takes the world
+ * value as an argument. Contract: `data-models/spec.md` § Scoped Entity Definitions, Component
+ * scope.
  */
 
 /**
- * The component sections resolution reads through, and the only keys a component membership
- * record's `inherit` map may carry.
- *
- * `essences` joined `category` at issue 1371 r18-store (M31). Adding a name here is what makes
- * `normalizeInherit` read an ABSENT switch for it as INHERITING, which is why the section came
- * with the `1.32.0` migration that marks every pre-existing record, and why a third section
- * would need the same.
- *
- * @type {readonly string[]}
+ * The component sections, and the only keys an `inherit` map may carry. An absent switch reads as
+ * inheriting, so a new section needs a migration that marks every existing record (`1.32.0`).
  */
 export const COMPONENT_SECTIONS = Object.freeze(['category', 'essences']);
 
 /**
- * Normalize an essence map — `essenceId -> quantity` — to trimmed ids and POSITIVE, FINITE
- * quantities, answering ABSENCE for anything that is not a plain object.
- *
- * THE SHAPE RULE OF THE `essences` SECTION, stated once and applied on both records through
- * `coerceComponentSection`, exactly as `category`'s trim is. It mirrors what the in-system
- * normalizer (`CraftingSystemManager#_normalizeEssenceQuantities`) keeps of a component's map,
- * minus the per-system roster filter: a world map is over the WORLD essence catalogue's ids, and
- * which of those a given system holds is that system's own concern at read time.
- *
- * AN EMPTY MAP IS A VALUE, NOT ABSENCE. `{}` is an authored "this component carries no essences",
- * which an inheriting system must take rather than keep its own — the same reading the essence
- * scope gives `effectSource: {}`. Only a non-object is absence, so a world default that never
- * authored the section stays distinguishable from one that authored none.
- *
- * ALWAYS A NEW OBJECT for a plain-object input, so a normalized record never aliases the
- * caller's map. A quantity of zero or less is dropped rather than stored: the bulk panels use `0`
- * as "strip this essence", and the in-system normalizer drops it too.
- *
- * @param {unknown} raw
- * @returns {Record<string, number>|undefined}
+ * The `essences` section's shape rule: trimmed ids to positive finite quantities, in a new object;
+ * a non-object is absence. `{}` is an authored "no essences", not absence.
  */
 export function normalizeComponentEssenceMap(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
@@ -123,16 +40,7 @@ export function normalizeComponentEssenceMap(raw) {
   return normalized;
 }
 
-/**
- * Whether two essence maps carry the SAME quantities, compared by normalized content.
- *
- * Absence and a non-map read as EMPTY, so an unelected world map equals a system that authored
- * no essences — which is the equality the `1.32.0` migration marks a system inheriting on.
- *
- * @param {unknown} left
- * @param {unknown} right
- * @returns {boolean}
- */
+/** Equal normalized quantities, absence reading as empty; the `1.32.0` migration's test. */
 export function componentEssenceMapsEqual(left, right) {
   const a = normalizeComponentEssenceMap(left) ?? {};
   const b = normalizeComponentEssenceMap(right) ?? {};
@@ -141,12 +49,6 @@ export function componentEssenceMapsEqual(left, right) {
   return keys.every((id) => b[id] === a[id]);
 }
 
-/**
- * Normalize a list of trimmed, de-duplicated, order-preserving labels.
- *
- * @param {unknown} raw
- * @returns {string[]}
- */
 function normalizeLabels(raw) {
   const entries = Array.isArray(raw) ? raw : [];
   const seen = new Set();
@@ -160,68 +62,26 @@ function normalizeLabels(raw) {
   return labels;
 }
 
-/**
- * Attach a label list only when it carries something.
- *
- * ABSENCE-PRESERVING, on the `complications` doctrine (`## Component` requirement 20): an authored
- * empty tag list carries no meaning distinct from absence, so it normalizes to ABSENT and no
- * reader may distinguish the two.
- *
- * @param {object} target
- * @param {string} key
- * @param {unknown} raw
- * @returns {object}
- */
+/** An empty label list normalizes to absent; no reader may tell the two apart. */
 function attachLabels(target, key, raw) {
   const labels = normalizeLabels(raw);
   if (labels.length > 0) target[key] = labels;
   return target;
 }
 
-/**
- * Whether a category token was actually authored.
- *
- * "Authored" is ABSENCE, not truthiness, and specifically not the `general` default
- * `## Component` requirement 13 gives `Component.category`.
- *
- * @param {unknown} category
- * @returns {boolean}
- */
 function isAuthoredCategory(category) {
   return typeof category === 'string' && category.trim().length > 0;
 }
 
-/**
- * Coerce a component section at NORMALIZATION time, so both resolution branches carry one rule.
- *
- * A category is a token matched against `CraftingSystem.componentCategories`, so an untrimmed or
- * non-string one is not a category at all and normalizes to ABSENCE. Doing this here rather than
- * in `resolveComponentCategory` is the whole point: that helper only runs on the INHERITING
- * branch, and the overriding branch hands back the stored value verbatim, so `'  ingot  '` would
- * otherwise resolve trimmed for one system and untrimmed - and unmatchable - for the next.
- *
- * An essence map takes {@link normalizeComponentEssenceMap} for the same reason: an overriding
- * system's stored `{ ' fire ': '2', water: 0 }` must resolve to the same `{fire: 2}` an
- * inheriting one would read.
- *
- * @param {string} section
- * @param {unknown} value
- * @returns {unknown}
- */
+/** Coerce at normalization, so an overriding system's stored value obeys the same rule. */
 function coerceComponentSection(section, value) {
   if (section === 'category') return isAuthoredCategory(value) ? value.trim() : undefined;
   if (section === 'essences') return normalizeComponentEssenceMap(value);
   return value;
 }
 
-/**
- * The component scope descriptor.
- *
- * @type {Readonly<object>}
- */
 export const COMPONENT_SCOPE = defineScope({
   sections: COMPONENT_SECTIONS,
-  // Structural, not a default. See the module note.
   enableable: false,
   coerceSection: coerceComponentSection,
   worldExtras: (entry) => attachLabels({}, 'tags', entry.tags),
@@ -232,74 +92,29 @@ export const COMPONENT_SCOPE = defineScope({
 });
 
 /**
- * Normalize the world component defaults.
- *
- * THE WORLD CATEGORY IS ABSENCE-PRESERVING and the normalizer MUST NOT emit `general` for an
- * unauthored one. `general` is the reserved implicit component category that is always enabled,
- * cannot be removed, and must never be persisted (`## CraftingSystem` requirement 6a); treating an
- * unauthored world category as authored would silently reset every inheriting system's category to
- * `general` on the first resolve. The failure this prevents is a RESET to `general`, not a blank -
- * a blank is unreachable, because an absent world category falls through to the local value.
- *
- * An authored category is TRIMMED here, and a whitespace-only or non-string one normalizes to
- * ABSENCE. See `coerceComponentSection`.
- *
- * @param {unknown} raw
- * @returns {Array<object>}
+ * Normalize the world component defaults. An unauthored category stays absent and is never
+ * `general`, which must not persist and would reset every inheriting system's category.
  */
 export function normalizeComponentWorldDefaults(raw) {
   return normalizeWorldDefaults(raw, COMPONENT_SCOPE);
 }
 
-/**
- * Normalize the component system membership records.
- *
- * An `enabled` key in the input is DROPPED rather than carried: the component path has no such
- * field, and adversarial or hand-edited input must not mint one.
- *
- * The record's own category is trimmed and absence-coerced by the SAME rule the world defaults
- * get, which is what makes an overriding system's category as matchable as an inheriting one's.
- *
- * @param {unknown} raw
- * @returns {Array<object>}
- */
+/** Normalize the component memberships; an input `enabled` key is dropped. */
 export function normalizeComponentMemberships(raw) {
   return normalizeMemberships(raw, COMPONENT_SCOPE);
 }
 
 /**
- * Resolve a component's effective category on the INHERITING branch.
- *
- * The world category wins when it is AUTHORED; when it is absent or empty the local value falls
- * through rather than resetting to the reserved `general`. A world category the GM later deletes
- * reaches this helper as absence and takes that same path - the deletion behaviour itself is the
- * World Vocabulary's (epic 1357, PR 7), and `## CraftingSystem` requirement 6d governs the
- * system-scope case today.
- *
- * @param {unknown} worldCategory The world default category, taken explicitly.
- * @param {unknown} localCategory The membership record's retained category.
- * @returns {string|undefined} The effective category, or `undefined` when neither is authored.
+ * The inheriting branch's category: an authored world category wins, else the local one, else
+ * absence, never the reserved `general`.
  */
 export function resolveComponentCategory(worldCategory, localCategory) {
   if (isAuthoredCategory(worldCategory)) return worldCategory.trim();
   if (isAuthoredCategory(localCategory)) return localCategory.trim();
-  // ABSENCE is the answer when neither scope authored one. Minting the reserved `general` bucket
-  // here is exactly the reset this helper exists to prevent.
   return;
 }
 
-/**
- * Resolve a component's effective tag set.
- *
- * ADDITIVE, NEVER OVERRIDDEN: the effective set is the world tags minus the record's muted list,
- * plus the record's own tags. There is no inherit switch on this path at all, so the generic
- * section machinery is deliberately not given one - muting is per tag, which a single per-section
- * switch cannot express.
- *
- * @param {unknown} worldTags The world default tags, taken explicitly.
- * @param {object|null} [membership] The system membership record, when there is one.
- * @returns {string[]}
- */
+/** The effective tags: world tags minus the record's `mutedTags`, plus its own `tags`. */
 export function resolveComponentTags(worldTags, membership = null) {
   const record = membership && typeof membership === 'object' ? membership : {};
   const muted = new Set(normalizeLabels(record.mutedTags));
@@ -314,19 +129,9 @@ export function resolveComponentTags(worldTags, membership = null) {
 }
 
 /**
- * Resolve one `(component, system)` pair.
- *
- * The answer carries `category` (when either scope authored one), `essences` (when either scope
- * authored a map — on the PLAIN section pattern, with no helper of its own), the effective
- * `tags`, `member`, and the per-section `inherited` map. It carries NO `enabled` key -
- * `'enabled' in result` is `false`, not `enabled: false`.
- *
- * Sections are populated even for a non-member, so `member` is the gate a caller must check.
- *
- * @param {object|null} worldDefault
- * @param {object|null} membership
- * @returns {{category?: string, essences?: Record<string, number>, tags: string[],
- *   member: boolean, inherited: {[section: string]: boolean}}}
+ * Resolve one `(component, system)` pair: `category` and `essences` when authored, `tags`,
+ * `member` (the gate, since sections fill for a non-member) and `inherited`. `'enabled' in result`
+ * is `false`.
  */
 export function resolveComponent(worldDefault, membership) {
   const world = worldDefault && typeof worldDefault === 'object' ? worldDefault : {};
@@ -342,42 +147,9 @@ export function resolveComponent(worldDefault, membership) {
 }
 
 /**
- * THE READ UNION for a component: what a crafting system's components list IS (issue 1359).
- *
- * The system's surviving in-system array, merged with the world components whose membership
- * record for this system is PRESENT, each RESOLVED through the three-layer resolver above.
- *
- * **While `## CraftingSystem` requirement 36 holds, the IN-SYSTEM RECORD DECIDES: the union
- * answers every KEY that record carries, its ROW ORDER and its ROW SET, re-derived from it at
- * read time, and the world layer supplies only the keys it does not carry. The world-wins
- * precedence below is the TARGET contract and is SUSPENDED, not consumed, for the duration; it
- * re-arms when requirement 36 retires.**
- *
- * **WITH ONE ARMED EXCEPTION: AN INHERITING SECTION (issue 1372).** `applyInheritedSections` runs
- * AFTER that re-spread and after the identity delete, so a `category` whose membership record
- * marks it inheriting resolves from the world default and the in-system value does NOT win. That
- * is the one place the suspension does not apply, and it is why the world catalogue's category
- * picker is a real write with real reach rather than an authored-and-unread one. An UNAUTHORED
- * world `category` still applies nothing, so an inheriting system keeps its own value. The
- * `essences` section takes the same path since M31: an inheriting system's `essences` IS the
- * world map, whole, and an overriding system's is its own in-system row.
- * So the surviving record supplies `salvage`, `difficulty` and `complications` as it always did, `essences` where it overrides, AND every
- * identity and behaviour key it carries; a lifted identity field it does NOT carry is DELETED
- * from the merged row, because absence is a value. A lane adding a world-scope WRITER here
- * must not implement against world-wins precedence: doing so reverts the GM's own edits on
- * the very next read, which is the defect this inversion exists to prevent.
- *
- * IT IS MEMBERSHIP-FILTERED AND RESOLVED, and the BASIS union
- * (`CraftingSystemManager#_scopeBasis`) is neither. That difference is the point: an absent
- * membership record is a REFUSAL, never a PRUNE, so a reference to a world component this system is
- * not a member of must be ABSENT from this answer and PRESENT in the basis. Filtering the basis by
- * membership would convert that refusal into a silent, persisted deletion on the first normalize.
- *
- * @param {{entities: Array<object>, defaults: Array<object>, membership: Array<object>}|null}
- *   worldCorpus The world scope store's published corpus.
- * @param {string} systemId
- * @param {unknown} systemComponents The system's surviving in-system array.
- * @returns {Array<object>}
+ * The read union for components, membership-filtered and resolved; see `unionScopedDefinitions`.
+ * The in-system record still supplies `salvage`, `difficulty`, `complications` and every key it
+ * carries except an inheriting section, so a world-scope writer must not assume world-wins.
  */
 export function resolveComponentScope(worldCorpus, systemId, systemComponents) {
   return unionScopedDefinitions({

@@ -1,38 +1,16 @@
 /**
- * The startup maintenance COMPOSITION SITE (issue 1224).
+ * The startup maintenance composition site (issue 1224), a module of its own because the boot
+ * cannot load under `node --test` and the spec requires the pass list from "a pure, exported
+ * builder that the composition site calls, so the omission is directly assertable".
  *
- * `Fabricate#initialize` used to hold this as an inline array literal, which made the pass
- * list untestable in principle: `src/main.js` imports the global stylesheet and Svelte UI
- * roots at module load, so it cannot be imported under `node --test` at all. Extracting the
- * composition to this module is what gives the gate a seam — the spec requires the pass list
- * to be "constructed by a pure, exported builder that the composition site calls, so the
- * omission is directly assertable", and an assertion needs something importable to assert
- * against.
- *
- * ## Why the id sets are read HERE
- *
- * The valid-id sets are derived from the live managers, after both have completed
- * `initialize()`, so every pass prunes against the corpus this boot actually loaded rather
- * than one sampled earlier. Each class's corpus arrives as one whole-array read that either
- * returns the corpus or throws, so a set derived here is complete or the boot failed
- * (issue 1261) — which is what {@link WHOLE_CORPUS_ID_BASIS} declares to the builder.
- *
- * ## Why the basis is EXTENDED here rather than in the shared constant
- *
- * {@link WHOLE_CORPUS_ID_BASIS} answers "did we read the WHOLE corpus", and it is shared with
- * the mutation-time cleanup door, which has no `1.30.0` re-key window to reason about. The
- * `componentIdentityRemap` kind is computed HERE, per boot, from the persisted re-key map, and
- * is spread OVER that constant — so the shared literal keeps meaning exactly what it says and
- * the currency question is answered only where it is asked. See `worldScopeRekeyPending.js`
- * for why completeness and currency are different questions and why this one fails closed.
- *
- * ## Why it warns
- *
- * `runStartupMaintenance` returns only FAILED labels and the caller discards the return, so
- * a gate that omitted every pass is otherwise indistinguishable from a clean boot — and
- * `tests/startup-cleanup-scoping.test.js` would sit green forever reading as a positive
- * health signal. The warning names the omitted labels and the deciding kinds so an omission
- * is visible rather than silent. It does not fail the boot.
+ * The valid-id sets are read from the live managers after both finished `initialize()`, as
+ * whole-array reads that return the corpus or throw, so a set derived here is complete or the boot
+ * failed (issue 1261): what `WHOLE_CORPUS_ID_BASIS` declares. `componentIdentityRemap` is computed
+ * here per boot and spread over that shared constant, which the mutation-time cleanup also reads
+ * and which has no `1.30.0` re-key window; `worldScopeRekeyPending.js` says why that currency
+ * question fails closed. An omission warns, naming the labels and the deciding kinds, because
+ * `runStartupMaintenance` returns only failures and a gate that omitted every pass would otherwise
+ * look like a clean boot. It never fails the boot.
  */
 
 import { cleanupStalePreferences } from '../config/preferencesCleanup.js';
@@ -41,27 +19,9 @@ import { buildStartupPassList, WHOLE_CORPUS_ID_BASIS } from './startupMaintenanc
 import { hasPendingWorldScopeRekey } from './worldScopeRekeyPending.js';
 
 /**
- * Compose the startup housekeeping pass list for this boot.
- *
- * Reads no globals: every collaborator, both setting accessors and the reporter are
- * parameters, so the whole composition — including which passes the builder omits — is
- * drivable from a fixture.
- *
- * @param {object} options
- * @param {object} options.recipeManager Supplies the recipe corpus and the per-id lookup the
- *   phantom-run prune walks.
- * @param {object} options.craftingSystemManager Supplies the crafting systems and, inside
- *   them, the salvage components.
- * @param {object} options.craftingRunManager
- * @param {object} options.salvageRunManager
- * @param {object} options.recipeVisibilityService
- * @param {(key: string) => *} options.getSetting
- * @param {(key: string, value: *) => Promise<*>} options.setSetting
- * @param {(actorId: string) => object|null} options.resolveGatheringActor
- * @param {(actor: object) => boolean} options.isSelectableGatheringActor
- * @param {(message: string, detail: object) => void} [options.warn] Omission reporter.
- * @returns {Array<[string, () => Promise<unknown>]>} labelled thunks for
- *   `runStartupMaintenance`, with every undeclared or basis-incomplete pass omitted.
+ * This boot's labelled passes for `runStartupMaintenance`, every undeclared or basis-incomplete
+ * one omitted. It reads no globals: the collaborators, both setting accessors and the `warn`
+ * omission reporter are parameters, so the whole composition is drivable from a fixture.
  */
 export function composeStartupPassList({
   recipeManager,
@@ -85,18 +45,16 @@ export function composeStartupPassList({
         new Set((system.components || []).map((component) => component.id)),
       ])
   );
-  // Flatten the per-system salvage component sets the run cleanup already computed: the
-  // progressive-order map's `salvage:<componentId>` keys are not system-scoped, so the
-  // prune needs one flat id set.
+  // One flat id set, because the progressive-order map's `salvage:<componentId>` keys are not
+  // system-scoped.
   const validComponentIds = new Set(
     [...validSalvageComponentsBySystem.values()].flatMap((ids) => [...ids])
   );
 
   const candidates = [
     ['crafting runs', () => craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems)],
-    // Prune legacy phantom crafting runs: a single-step recipe with no time requirement
-    // can never legitimately persist an active run, so any such run left in the active
-    // store predates the craft() cleanup guard and is stranded.
+    // A single-step recipe with no time requirement never legitimately persists an active run, so
+    // such a run predates the craft() cleanup guard and is stranded.
     [
       'phantom crafting runs',
       () => craftingRunManager.pruneInstantaneousActiveRuns((id) => recipeManager.getRecipe(id)),

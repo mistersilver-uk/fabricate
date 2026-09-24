@@ -65,13 +65,7 @@ export function canMutateOwnedItem(item, actor, user = globalThis.game?.user) {
   return item.isOwner === true || actor.isOwner === true;
 }
 
-/**
- * Register the createItem hook for automatic recipe-item learning.
- *
- * @param {RecipeVisibilityService} visibilityService
- * @param {object} [deps]
- * @returns {Function} The hook handler
- */
+/** Register the `createItem` hook that auto-learns recipe items, answering the handler. */
 export function registerRecipeItemLearningHook(visibilityService, deps = {}) {
   const hooks = deps.Hooks || globalThis.Hooks;
   const game = deps.game || globalThis.game;

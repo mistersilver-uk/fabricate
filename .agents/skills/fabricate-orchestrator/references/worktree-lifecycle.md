@@ -115,7 +115,7 @@ It then disposes that proven-clean lane under the guarded-cleanup exception belo
 An escalation does not consume a loop revision, and at most one escalation is permitted per `(family, stage, revision)` — the fresh lane inherits the spent budget, so a second escalation in the same revision is `BLOCKED`.
 `ESCALATE_TIER` returned by a lane already at the most capable model tier is a protocol error the driver converts to `BLOCKED`.
 
-The selection ladder, its stage thresholds, the model-tier floors, and the `HIGH_RISK_PATHS` list live in `AGENTS.md`.
+The selection ladder and its stage thresholds live in `AGENTS.md`; the model-tier floors and the `HIGH_RISK_PATHS` list live in `.agents/skills/fabricate-orchestrator/references/agentic-workflow.md`.
 
 ## Mutable lane handoff
 
