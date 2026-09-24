@@ -64,7 +64,7 @@ function headings(markdown) {
   let fence = null;
   for (const [index, line] of markdown.split('\n').entries()) {
     const opening = FENCE.exec(line)?.[1];
-    if (opening && (fence === null || opening[0] === fence)) {
+    if (opening && (fence === null || opening.startsWith(fence))) {
       fence = fence === null ? opening[0] : null;
       continue;
     }
@@ -259,7 +259,8 @@ function serializeNotes(title, sections) {
       .filter(Boolean)
       .join('\n\n')
   );
-  return `${[`# ${title}`, ...blocks].join('\n\n')}\n`;
+  const text = [`# ${title}`, ...blocks].join('\n\n');
+  return `${text}\n`;
 }
 
 /** A notes file's `##` sections, and its non-blank lines before the first as `{ index, line }`. */

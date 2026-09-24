@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import { convertSection, DEFINITION_SENTENCES, verifyConversion } from './lib/domainGlossary.js';
+import { resolveExecutable } from './lib/resolveExecutable.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -31,7 +32,10 @@ const REVERSE_PAIRS = [
   { current: '`DOMAIN.md` (**Projection Tier**)', base: '`DOMAIN.md:161` (**Projection Tier**)' },
 ];
 
-const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' });
+/** The git executable, resolved once to an absolute path in an absolute `PATH` directory. */
+const GIT_EXECUTABLE = resolveExecutable('git');
+
+const git = (...args) => execFileSync(GIT_EXECUTABLE, args, { cwd: ROOT, encoding: 'utf8' });
 
 /** Every working-tree `docs/domain/*.md`, keyed by its repository-relative path. */
 function readNotes() {
@@ -55,6 +59,10 @@ function readBaseNotes(base) {
 }
 
 function verify(section) {
+  if (!GIT_EXECUTABLE) {
+    console.error('could not find "git" in any absolute PATH directory');
+    return 2;
+  }
   const base = git('merge-base', 'HEAD', 'origin/main').trim();
   const { problems, rows, rebuilt } = verifyConversion({
     base: git('show', `${base}:DOMAIN.md`),
