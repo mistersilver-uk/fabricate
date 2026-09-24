@@ -4971,9 +4971,9 @@ function resolveProgressiveAward({ system, task, checkResult }) {
     ? requestedAwardMode
     : 'equal';
 
-    // Gathering validated `value` above and clamps it at zero before the shared loop.
-    // `invalidCost: 'fail'` short-circuits with `invalidResultId`, raised here as a
-    // misconfiguration; the budget is zeroed after a `partial` tail award.
+  // Gathering validated `value` above and clamps it at zero before the shared loop.
+  // `invalidCost: 'fail'` short-circuits with `invalidResultId`, raised here as a
+  // misconfiguration; the budget is zeroed after a `partial` tail award.
   const { awarded, remaining, invalidResultId, partialResult, haltedResult, skippedResults } =
     resolveProgressiveAwardLoop({
       results: normalizeList(group.results),

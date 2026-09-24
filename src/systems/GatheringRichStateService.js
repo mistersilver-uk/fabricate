@@ -1206,8 +1206,8 @@ export class GatheringRichStateService {
     return true;
   }
 
-  /** The number of distinct task ids an actor revealed for an environment at a scope: the length
-   * of {@link GatheringRichStateService#listRevealedTaskIds}. `0` on missing state; never throws. */
+  /** How many distinct task ids an actor revealed for an environment at a scope: the length of
+   * {@link GatheringRichStateService#listRevealedTaskIds}. `0` on missing state; never throws. */
   countRevealedTasks({ actor, environmentId, scope = 'actor' } = {}) {
     return this.listRevealedTaskIds({ actor, environmentId, scope }).length;
   }
@@ -1368,9 +1368,9 @@ export class GatheringRichStateService {
         consumed: 1,
         remaining: node.current,
         scope: source.kind,
-        // False when relayed: `remaining` is then a local guess that can be wrong, so consumers
-        // publishing a durable number must suppress it (`GatheringEngine#_postGatheringChatMessage`).
-        // `redactRichEvidence` still reads `remaining` for blind `available` reporting.
+        // False when relayed: `remaining` is then a possibly wrong local guess, so consumers
+        // publishing a durable number (`GatheringEngine#_postGatheringChatMessage`) must suppress
+        // it. `redactRichEvidence` still reads `remaining` for blind `available` reporting.
         authoritative: source.routed !== true,
       };
     }

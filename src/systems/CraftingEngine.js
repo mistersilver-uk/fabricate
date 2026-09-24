@@ -215,8 +215,8 @@ function resolveLiveInventoryItemsByUuid(actors, itemUuids) {
   );
 }
 
-/** Stamp the durable per-system component identity on a crafted output before creation, so the
- * matcher attributes it to its own component despite `_stats.duplicateSource` chains (issue 539). */
+/** Stamp the durable per-system component identity on a crafted output before creation so the
+ * matcher attributes it to its component despite `_stats.duplicateSource` chains (issue 539). */
 function stampCraftedComponentIdentity(itemData, systemId, componentId) {
   stampItemDataRoleIdentity(itemData, systemId, 'componentId', componentId);
 }
@@ -2676,8 +2676,8 @@ export class CraftingEngine {
     };
   }
 
-  /** The component resolver for this craft (issue 578): only an alchemy attempt supplies the
-   * tier-4-aware {@link resolveAlchemySubmissionComponent}, so standard crafting never gains tier 4. */
+  /** This craft's component resolver (issue 578): only an alchemy attempt supplies the tier-4-aware
+   * {@link resolveAlchemySubmissionComponent}, so standard crafting never gains tier 4. */
   _alchemyComponentResolver(options) {
     return options?.isAlchemyAttempt === true ? resolveAlchemySubmissionComponent : undefined;
   }
@@ -2999,6 +2999,7 @@ export class CraftingEngine {
       return abort(itemPilesAffordCheck.message);
     }
 
+    // Items first, then currency; both gates have passed.
     await this._beginNativeStage({
       craftingActor,
       run,
@@ -5217,9 +5218,9 @@ export class CraftingEngine {
   /**
    * Apply one macro's flat path -> value map to the crafted item data, isolating a failure.
    * `foundry.utils.setProperty` vivifies an intermediate only when it is `=== undefined`, so a
-   * `null` or primitive one throws, and `craft()` has no try around `_createResultItems`: unguarded,
-   * inputs are consumed with no result. Logged, not toasted (a GM authoring defect). A partial
-   * application still counts as applied, so the stacking veto fires.
+   * `null` or primitive one throws, and `craft()` has no try around `_createResultItems`:
+   * unguarded, inputs are consumed with no result. Logged, not toasted (a GM authoring defect).
+   * A partial application still counts as applied, so the stacking veto fires.
    */
   _applyEssencePropertyUpdates(itemData, updates, definition) {
     let applied = false;

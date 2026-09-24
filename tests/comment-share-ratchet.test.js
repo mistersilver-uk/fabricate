@@ -271,8 +271,9 @@ function findSymlinkedDirectories(root) {
   return found;
 }
 
+let corpus;
 /** The one read of the corpus; the per-file `src/systems` cap below filters it too. */
-const readCorpus = () => collectWorkingTreeSources(SCAN_ROOTS, SCAN_EXTENSIONS);
+const readCorpus = () => (corpus ??= collectWorkingTreeSources(SCAN_ROOTS, SCAN_EXTENSIONS));
 
 const gate = ceilingLedgerGate({
   test,

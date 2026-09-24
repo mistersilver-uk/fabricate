@@ -857,7 +857,7 @@ export class CraftingSystemManager {
 
   /** Persist a crafting-system mutation through the repository (issue 1089). Argument-less
    * `save()` is the whole-corpus write; other sites name what they touched, scoping the revision
-   * advance (issue 1078). Omitted `domains` means every domain; a `batch` may key them per record. */
+   * advance (issue 1078). No `domains` means every domain; a `batch` may key them per record. */
   async save(change = null) {
     // The systems-scope revision advance (issue 1076), announced once at this chokepoint; a
     // whole-corpus save advances every system.
@@ -994,7 +994,8 @@ export class CraftingSystemManager {
     return Array.isArray(system.recipeItemDefinitions) ? [...system.recipeItemDefinitions] : [];
   }
 
-  /** One recipe-item definition by id, indexed like {@link CraftingSystemManager#getEssenceDefinition}. */
+  /** One recipe-item definition by id, indexed like
+   * {@link CraftingSystemManager#getEssenceDefinition}. */
   getRecipeItemDefinition(systemId, recipeItemId) {
     const system = this.getSystem(systemId);
     if (!system || !recipeItemId) return null;
@@ -1373,7 +1374,7 @@ export class CraftingSystemManager {
   }
 
   /** Persist one normalized Tool, optionally registering or relinking its Item source. Sources
-   * resolve before the system is mutated; a failed write restores the Tool array with no flag writes. */
+   * resolve before mutation; a failed write restores the Tool array with no flag writes. */
   async upsertTool(systemId, data = {}, { itemUuid } = {}) {
     this._assertGM('add tool from uuid');
     const system = this.getSystem(systemId);
@@ -1602,8 +1603,8 @@ export class CraftingSystemManager {
     return seeded;
   }
 
-  /** Index definitions by id and by `originItemUuid` for
-   * {@link CraftingSystemManager#_seedMembershipFromLegacyScalars}, ensuring each has `recipeIds`. */
+  /** Index definitions by id and by `originItemUuid`, ensuring each has `recipeIds`, for
+   * {@link CraftingSystemManager#_seedMembershipFromLegacyScalars}. */
   _indexRecipeItemDefinitionsForLegacySeed(definitions) {
     const byId = new Map();
     const bySource = new Map();
@@ -2125,7 +2126,7 @@ export class CraftingSystemManager {
     };
   }
 
-  /** An existing component claiming any of the given source references, ignoring `excludeItemId`. */
+  /** An existing component claiming any given source reference, ignoring `excludeItemId`. */
   _findComponentBySourceReferences(system, references, excludeItemId = null) {
     const claimedRefs = new Set((references || []).filter(Boolean));
     if (claimedRefs.size === 0) return null;
@@ -3268,8 +3269,8 @@ export class CraftingSystemManager {
   /**
    * Delete an essence definition and strip it from referencing ingredient sets, re-saving only
    * those recipes, emitting one summary and disabling recipes left without sets or results.
-   * `overrideInheritedEssences` is supplied by the caller because the flag it writes is a
-   * world-scope setting this manager cannot write; see {@link _overrideInheritedEssencesBeforeStrip}.
+   * `overrideInheritedEssences` is caller-supplied because the flag it writes is a world-scope
+   * setting this manager cannot write; see {@link _overrideInheritedEssencesBeforeStrip}.
    */
   async deleteEssence(systemId, essenceId, { overrideInheritedEssences } = {}) {
     this._assertGM('delete essence');
@@ -3379,11 +3380,12 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Delete a set of essence definitions in one `craftingSystems` write and one `recipes` write
-   * (issue 1036); looping {@link CraftingSystemManager#deleteEssence} would write `recipes` per
-   * recipe. Both settings are replaced, so no `-=` key is needed. The recipe rewrites run before
-   * `save()`, safe only because the disabled-essence blocker is activation-level. In-use essences
-   * are warned about, not refused; `recipesDisabled` counts recipes newly disabled.
+   * Delete essence definitions in one `craftingSystems` and one `recipes` write (issue 1036).
+   * Looping {@link CraftingSystemManager#deleteEssence} would write `recipes` per recipe, each
+   * write a `reload()`, serialization diff and `Hooks.callAll` on every connected client, and
+   * twice for a recipe naming two deleted essences. Both settings are replaced, so no `-=` key.
+   * Recipe rewrites precede `save()`, safe only as the disabled-essence blocker gates activation.
+   * In-use essences are warned, not refused; `recipesDisabled` counts recipes newly disabled.
    */
   async deleteEssences(systemId, essenceIds, { overrideInheritedEssences } = {}) {
     this._assertGM('delete essences');
@@ -3527,8 +3529,8 @@ export class CraftingSystemManager {
       );
   }
 
-  /** Whether a recipe references the essence in any ingredient set, via the shared
-   * {@link recipeReferencesEssence} leaf (issue 1036) the admin store's `recipeUsageCount` reads. */
+  /** Whether a recipe references the essence in any ingredient set, via the shared leaf
+   * {@link recipeReferencesEssence} (issue 1036) the admin store's `recipeUsageCount` reads. */
   _recipeReferencesEssence(recipe, essenceId) {
     return recipeReferencesEssence(recipe, essenceId);
   }
