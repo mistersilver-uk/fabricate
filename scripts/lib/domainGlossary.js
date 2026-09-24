@@ -8,37 +8,16 @@ const SECTION_FILES = {
 };
 
 /**
- * The Definition sentences an entry shows where the first alone misstates or part-states its term:
- * a leading count, or ascending 1-based indices. Rebuilding a row reads the indices back.
+ * The 1-based row sentences an entry's definition lines stand at, one index per line, for the
+ * entries whose lines do not simply lead the row; a rebuilt row puts them back there.
  */
-export const DEFINITION_SENTENCES = {
-  'Aggregates and Records': {
-    Component: 2,
-    'Phantom-Run `resolved`': 2,
-    'Inventory Card / System Participation': 2,
-    'Player Result Order': 2,
-    'Result Order Asymmetry': 3,
-    'Manager Navigation Surface / Provider Seam': 2,
-    'Rail Marker Family': 2,
-    'World Defaults': [1, 10],
-    'System Membership Record': 3,
-    'World Identity Snapshot': 2,
-  },
-  'Acquisition, Knowledge, and Resolution Terms': {
-    Harvesting: 3,
-    'Choice Group': 3,
-    'Contention Component': 2,
-    'Tier Stepping': 2,
-    'Section Inheritance': [1, 6],
-    'Provider (vocabulary boundary)': 2,
-    'Depleted Behavior (task/node config; node-driven marker swap)': 2,
-    'Gathering Event': 2,
-    Inert: 2,
-  },
+export const DEFINITION_ORDER = {
+  'Aggregates and Records': { 'World Defaults': [1, 10] },
+  'Acquisition, Knowledge, and Resolution Terms': { 'Section Inheritance': [1, 6] },
 };
 
 /** The headings whose moved body is replaced by a one-line pointer into `docs/domain/`. */
-const POINTER_HEADINGS = [
+export const POINTER_HEADINGS = [
   'Remaining Drift to Track',
   'Research Notes',
   'Current Realm Resolution (Phase 1 shipped)',
@@ -128,23 +107,34 @@ function rebuildRow(entry, notes, order) {
   return `| ${cells.join(' | ')} |`;
 }
 
-/** A notes file's `##` sections, and its non-blank lines before the first as `{ index, line }`. */
+/** The part a notes line belongs to: the one its label opens, or `current`. */
+function partOf(line, current) {
+  if (line.startsWith(MAPPING)) return 'mapping';
+  return line.startsWith(SPEC) ? 'spec' : current;
+}
+
+/**
+ * A notes file's `##` sections, each with the part every paragraph opens in, and its non-blank
+ * lines before the first section as `{ index, line }`.
+ */
 function parseNotes(text) {
   const preamble = [];
   const sections = [];
-  let paragraph = 'rest';
+  let part = 'rest';
+  let opens = true;
   for (const [index, line] of text.split('\n').entries()) {
     const heading = /^## (.+)$/u.exec(line);
     if (heading) {
-      sections.push({ heading: heading[1], rest: [], mapping: [], spec: [] });
-      paragraph = 'rest';
+      sections.push({ heading: heading[1], rest: [], mapping: [], spec: [], paragraphs: [] });
+      part = 'rest';
     } else if (line !== '' && sections.length === 0) {
       preamble.push({ index, line });
     } else if (line !== '') {
-      if (line.startsWith(MAPPING)) paragraph = 'mapping';
-      if (line.startsWith(SPEC)) paragraph = 'spec';
-      sections.at(-1)[paragraph].push(line);
+      part = partOf(line, part);
+      if (opens) sections.at(-1).paragraphs.push(part);
+      sections.at(-1)[part].push(line);
     }
+    opens = line === '' || heading !== null;
   }
   return { preamble, sections };
 }
@@ -186,14 +176,14 @@ function parseEntries(domain) {
 
 /**
  * The rebuilt table row for glossary `term`, or null when it has no entry and notes section.
- * `overrides` defaults to the `DEFINITION_SENTENCES` of the entry's section.
+ * `overrides` defaults to the `DEFINITION_ORDER` of the entry's section.
  */
 export function termRowText(term, { domain, readNote, overrides }) {
   const entry = parseEntries(domain).find((candidate) => candidate.heading === term);
   const notes = entry?.link && readNote(entry.link.file);
   const section = notes && parseNotes(notes).sections.find(({ heading }) => heading === term);
   if (!section) return null;
-  return rebuildRow(entry, section, (overrides ?? DEFINITION_SENTENCES[entry.section])?.[term]);
+  return rebuildRow(entry, section, (overrides ?? DEFINITION_ORDER[entry.section])?.[term]);
 }
 
 /** Code spans removed, so markup inside them is not counted as markup. */
@@ -242,7 +232,33 @@ function pairingProblems(section, entries, readNote) {
       problems.push(`the link line of "${heading}" must be ${file}#${anchors[index]}`);
     }
   }
-  return problems;
+  return [...problems, ...shapeProblems(file, sections)];
+}
+
+/** Why a notes section is not notes, then one mapping paragraph, then one spec paragraph. */
+function shapeProblems(file, sections) {
+  const shaped = ({ paragraphs }) =>
+    paragraphs.filter((part) => part !== 'rest').join(' ') === 'mapping spec';
+  return sections
+    .filter((section) => !shaped(section))
+    .map(
+      ({ heading }) =>
+        `${file} section "${heading}" is not notes, then one "${MAPPING}" paragraph, ` +
+        `then one "${SPEC}" paragraph`
+    );
+}
+
+/** Why `order` names a term with no entry in its section, or not one index per definition line. */
+function orderProblems(entries, order) {
+  return Object.entries(order).flatMap(([section, terms]) =>
+    Object.entries(terms).flatMap(([term, indices]) => {
+      const entry = entries.find((one) => one.section === section && one.heading === term);
+      if (!entry) return [`the "${section}" order names "${term}", which has no entry`];
+      const lines = entry.definition.length;
+      if (indices.length === lines) return [];
+      return [`the definition order of "${term}" names ${indices.length} lines, not ${lines}`];
+    })
+  );
 }
 
 /** Why a `docs/domain/` link does not resolve to a file and one of its headings, if it does not. */
@@ -283,6 +299,9 @@ function pointerProblems(domain, required) {
     if (links.length !== 1) {
       problems.push(`a pointer under "${heading}" carries ${links.length} links`);
     }
+    if (links.some((link) => !link[2])) {
+      problems.push(`a pointer under "${heading}" names no anchor`);
+    }
   }
   const placed = new Set(found.map(({ index }) => index));
   for (const [index, line] of domain.split('\n').entries()) {
@@ -312,6 +331,7 @@ export function glossaryProblems({
   floors = {},
   totalFloor = 0,
   pointerHeadings = [],
+  order = {},
 }) {
   const entries = parseEntries(domain);
   const problems = entries.flatMap((entry) => [
@@ -331,5 +351,6 @@ export function glossaryProblems({
     ...floorProblems(entries, floors, totalFloor),
     ...linkProblems(domain, readNote),
     ...pointerProblems(domain, pointerHeadings),
+    ...orderProblems(entries, order),
   ];
 }

@@ -6,8 +6,10 @@ import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
+  DEFINITION_ORDER,
   glossaryProblems,
   headingSlugs,
+  POINTER_HEADINGS,
   slugify,
   termRowText,
 } from '../scripts/lib/domainGlossary.js';
@@ -18,14 +20,7 @@ const SECTION = 'Aggregates and Records';
 
 /** Minimum entries per notes file, so a gate over an emptied glossary cannot pass. */
 const FLOORS = { [RECORDS]: 50, 'docs/domain/terms.md': 130 };
-const TOTAL_FLOOR = 150;
-
-/** The headings whose moved body leaves exactly one pointer into `docs/domain/`. */
-const POINTER_HEADINGS = [
-  'Current Realm Resolution (Phase 1 shipped)',
-  'Remaining Drift to Track',
-  'Research Notes',
-];
+const TOTAL_FLOOR = 190;
 
 const readRepoNote = (file) => {
   const absolute = path.join(ROOT, file);
@@ -105,7 +100,12 @@ function assertReports(problems, reason) {
 describe('the real glossary', () => {
   it('meets the entry contract with its notes', () => {
     const real = readFileSync(path.join(ROOT, 'DOMAIN.md'), 'utf8');
-    const options = { floors: FLOORS, totalFloor: TOTAL_FLOOR, pointerHeadings: POINTER_HEADINGS };
+    const options = {
+      floors: FLOORS,
+      totalFloor: TOTAL_FLOOR,
+      pointerHeadings: POINTER_HEADINGS,
+      order: DEFINITION_ORDER,
+    };
     assert.deepEqual(glossaryProblems({ domain: real, readNote: readRepoNote, ...options }), []);
   });
 });
@@ -159,11 +159,21 @@ describe('the gate fails in every direction it claims', () => {
     ['a required pointer that is missing', '0 pointers, not exactly one', () =>
       gate(domain, undefined, { pointerHeadings: ['Remaining Drift to Track'] })],
     ['a pointer carrying two links', 'carries 2 links', () =>
-      gate(edit(domain, 'Drift line one.', '[a](docs/domain/records.md) [b](docs/domain/records.md)'))],
+      gate(edit(domain, 'Drift line one.', '[a](docs/domain/records.md#beta) [b](docs/domain/records.md#beta)'))],
+    ['a pointer that names no anchor', 'under "Remaining Drift to Track" names no anchor', () =>
+      gate(edit(domain, 'Drift line one.', 'Moved to [notes](docs/domain/records.md).'))],
     ['a pointer that resolves to no file', 'history.md does not exist', () =>
       gate(edit(domain, 'Drift line one.', 'Moved to [history](docs/domain/history.md#drift).'))],
     ['a link whose anchor names no heading', 'records.md#nowhere names no heading', () =>
       gate(edit(domain, 'Drift line one.', 'Moved to [notes](docs/domain/records.md#nowhere).'))],
+    ['a notes section with no mapping paragraph', 'section "Beta" is not notes, then one', () =>
+      gate(domain, notesOf(edit(notes, 'Canonical mapping: `Beta`.\nMapped twice.\n\n', '')))],
+    ['a notes section with a second mapping paragraph', 'section "Beta" is not notes, then one', () =>
+      gate(domain, notesOf(edit(notes, 'Mapped twice.\n', 'Mapped twice.\n\nA stray line.\n')))],
+    ['a definition order naming no entry', 'order names "Gamma", which has no entry', () =>
+      gate(domain, undefined, { order: { [SECTION]: { Gamma: [1, 2] } } })],
+    ['a definition order of the wrong length', 'order of "Beta" names 2 lines, not 1', () =>
+      gate(domain, undefined, { order: { [SECTION]: { Beta: [1, 2] } } })],
     ['an entry count under its floor', 'under its floor of 3', () =>
       glossaryProblems({ domain, readNote: readerOf(notesOf(notes)), floors: { [RECORDS]: 3 } })],
     ['a total entry count under its floor', '2 entries in all, under the floor of 3', () =>
@@ -172,6 +182,14 @@ describe('the gate fails in every direction it claims', () => {
   for (const [name, reason, run] of cases) {
     it(name, () => assertReports(run(), reason));
   }
+
+  it('numbers a term whose anchor repeats an earlier heading, the section title included', () => {
+    const files = notesOf(edit(notes, '## Beta\n', '## Alpha-Record\n'));
+    const renamed = edit(domain, '#### Beta\n', '#### Alpha-Record\n');
+    const linked = (anchor) => gate(edit(renamed, '#beta)', `#${anchor})`), files);
+    assert.deepEqual(linked('alpha-record-1'), []);
+    assertReports(linked('alpha-record'), `must be ${RECORDS}#alpha-record-1`);
+  });
 });
 
 describe('a rebuilt row', () => {
