@@ -15,10 +15,7 @@ import {
 } from '../utils/definitionIndex.js';
 import { normalizeFailureResultPolicy } from '../utils/failureResultPolicy.js';
 import { plainTextDescription, descriptionTextCandidate } from '../utils/plainTextDescription.js';
-import {
-  normalizeCustomRecipeCategories,
-  normalizeRecipeCategory,
-} from '../utils/recipeCategories.js';
+import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
 import {
   recipeLostItsShape,
   recipeReferencesAnyComponent,
@@ -35,10 +32,8 @@ import {
   recipeItemDefinitionsContaining,
   resolveLegacyMembershipDefinition,
 } from '../utils/recipeItemMembership.js';
-import { resolveRecipeCheckTierOptions } from '../utils/routedOutcomeKeywords.js';
 import { getItemMatchUuids } from '../utils/sourceUuid.js';
 
-import { resolveActiveCraftingCheckFormula } from './checkModifierResolver.js';
 import {
   craftingDataChange,
   domainsForRecord,
@@ -46,6 +41,12 @@ import {
 } from './craftingDataChange.js';
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
 import { ALL_INVALIDATION_DOMAINS, domainsForSystemFields } from './invalidationDomains.js';
+import {
+  applyBulkEditToComponents,
+  applyBulkEditToEssences,
+  applyBulkEditToRecipes,
+  bulkEditsCollaborators,
+} from './manager/bulkEdits.js';
 import {
   COMPONENT_FACTS,
   ESSENCE_FACTS,
@@ -122,8 +123,6 @@ import {
   normalizeToolPrerequisites,
   normalizeToolRequirement,
 } from './normalize/tools.js';
-import { RecipeActivationError } from './RecipeActivationError.js';
-import { RecipePersistenceError } from './RecipePersistenceError.js';
 import { resolvedComponentEssencesById } from './resolvedComponentEssences.js';
 import { RevisionBookkeeping } from './revisionBookkeeping.js';
 import { corpusDelta, patchCorpusInPlace, REVISION_SCOPES } from './revisionTokens.js';
@@ -1703,348 +1702,18 @@ export class CraftingSystemManager {
     return system.components[idx];
   }
 
-  /** Lowercase, trim and drop empty tags, preserving order; de-duplication is the caller's job. */
-  _normalizeBulkTagList(tags) {
-    if (!Array.isArray(tags)) return [];
-    return tags
-      .map((tag) =>
-        String(tag || '')
-          .trim()
-          .toLowerCase()
-      )
-      .filter(Boolean);
-  }
-
-  /**
-   * Apply a bulk edit (category, tag additions and removals, essences, progressive DC) to a set of
-   * components in one `save()`, for folder-aware import (issue 771) and bulk edit (issue 772).
-   *
-   * Axes follow `Component` semantics: `category` overwrites; `addTags` unions case-insensitively,
-   * stored lowercase; `removeTags` applies after `addTags`; `essences` replaces the map when
-   * present; `difficulty` is cleared by `0`/`null`/`''`. `essences` and `difficulty` test
-   * presence, not truthiness. Changed components re-normalize under the system's essence and
-   * salvage context, so Simple mode runs the retain-one clamp (issue 764).
-   *
-   * @returns {Promise<{updated: number, componentIds: string[]}>} the cohort the edit was applied
-   *   to, not a diff, as in {@link CraftingSystemManager#applyBulkEditToEssences}.
-   */
   async applyBulkEditToComponents(systemId, componentIds, edit = {}, options = {}) {
-    this._assertGM('apply a bulk edit to components');
-    const system = this.getSystem(systemId);
-    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-
-    const targetIds = new Set(Array.from(componentIds || [], String));
-    if (targetIds.size === 0) return { updated: 0, componentIds: [] };
-
-    const bulkEdit = edit && typeof edit === 'object' ? edit : {};
-    const rawCategory = typeof bulkEdit.category === 'string' ? bulkEdit.category.trim() : '';
-    const hasCategory = rawCategory !== '';
-    const addTags = this._normalizeBulkTagList(bulkEdit.addTags);
-    const removeTags = new Set(this._normalizeBulkTagList(bulkEdit.removeTags));
-    const hasEssences = Object.hasOwn(bulkEdit, 'essences');
-    const hasDifficulty = Object.hasOwn(bulkEdit, 'difficulty');
-    const staged =
-      hasCategory || addTags.length > 0 || removeTags.size > 0 || hasEssences || hasDifficulty;
-    if (!staged) return { updated: 0, componentIds: [] };
-
-    // A `_normalizeSystem` bypass site (issue 1359): same basis, `Set|null`; see `_scopeBasis`.
-    const { essenceIds: validEssenceIds } = this._scopeBasis(system);
-    const salvageContext = this._salvageNormalizationContext(system);
-    const changedIds = [];
-    for (let idx = 0; idx < system.components.length; idx += 1) {
-      const component = system.components[idx];
-      if (!targetIds.has(String(component.id))) continue;
-
-      const currentTags = Array.isArray(component.tags) ? component.tags : [];
-      let nextTags = currentTags;
-      if (addTags.length > 0) {
-        const seen = new Set(currentTags.map((tag) => String(tag).toLowerCase()));
-        nextTags = [...currentTags];
-        for (const tag of addTags) {
-          if (seen.has(tag)) continue;
-          seen.add(tag);
-          nextTags.push(tag);
-        }
-      }
-      // AFTER the union, so a tag in both lists loses.
-      if (removeTags.size > 0) {
-        nextTags = nextTags.filter((tag) => !removeTags.has(String(tag).toLowerCase()));
-      }
-
-      system.components[idx] = this._normalizeComponent(
-        {
-          ...component,
-          category: hasCategory ? rawCategory : component.category,
-          tags: nextTags,
-          essences: hasEssences ? bulkEdit.essences : component.essences,
-          difficulty: hasDifficulty ? bulkEdit.difficulty : component.difficulty,
-          id: component.id,
-        },
-        { validEssenceIds, ...salvageContext }
-      );
-      changedIds.push(String(component.id));
-    }
-    if (changedIds.length > 0) advanceDefinitionRevision(system.components);
-
-    if (changedIds.length > 0 && options.persist !== false)
-      await this.save({ put: system, domains: COMPONENT_FACTS });
-    return { updated: changedIds.length, componentIds: changedIds };
+    return applyBulkEditToComponents(
+      bulkEditsCollaborators(this),
+      systemId,
+      componentIds,
+      edit,
+      options
+    );
   }
 
-  /**
-   * Apply a bulk edit (category, status, lock, check tier, book membership) to a set of recipes in
-   * one `recipes` write and one `craftingSystems` write (issue 1010). Lives here because the book
-   * axis writes `recipeItemDefinitions[].recipeIds`; recipe fields go through `updateRecipe`.
-   *
-   * `edit` carries `toBulkRecipeEdit`'s six keys only when staged; `enabled: false`,
-   * `locked: false` and `checkTierId: null` are real, so presence is tested with `Object.hasOwn`.
-   *
-   * Books are written first, because the membership-basis marker makes later membership reads
-   * well-defined; each setting's save is skipped when its half changed nothing. The activation
-   * gate runs per recipe in batch order inside `updateRecipe`, so a second alchemy candidate sees
-   * the first enabled; {@link RecipeManager#canActivateRecipe} is only a lower bound. It maintains
-   * the marker itself, since it bypasses `updateRecipeItemDefinition`.
-   */
   async applyBulkEditToRecipes(systemId, recipeIds, edit = {}) {
-    this._assertGM('apply a bulk edit to recipes');
-    const system = this.getSystem(systemId);
-    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-
-    const result = {
-      updated: 0,
-      recipeIds: [],
-      blockedEnables: 0,
-      blockedRecipeIds: [],
-      rejected: 0,
-      rejectedRecipeIds: [],
-      booksUpdated: 0,
-      bookIds: [],
-      bookAdditions: 0,
-      bookRemovals: 0,
-    };
-
-    // Resolves, and rejects, the staged check tier before anything is mutated.
-    const axes = this._resolveBulkRecipeAxes(system, edit);
-    if (!axes.staged) return result;
-
-    const targetIds = new Set(normalizeSelectionIds(recipeIds));
-    if (targetIds.size === 0) return result;
-
-    const cohort = (this.recipeManager?.getRecipes?.({ craftingSystemId: systemId }) ?? []).filter(
-      (recipe) => targetIds.has(String(recipe?.id ?? ''))
-    );
-
-    const books = this._applyBulkRecipeBookMembership(system, cohort, axes);
-    result.bookIds = books.bookIds;
-    result.booksUpdated = books.bookIds.length;
-    result.bookAdditions = books.additions;
-    result.bookRemovals = books.removals;
-    if (books.changed) {
-      system.membershipResolvesByRecipeIds = true;
-      await this.save({ put: system, domains: RECIPE_ITEM_FACTS });
-    }
-
-    const outcome = await this._applyBulkRecipePatches(cohort, axes);
-    result.recipeIds = outcome.recipeIds;
-    result.updated = outcome.recipeIds.length;
-    result.blockedRecipeIds = outcome.blockedRecipeIds;
-    result.blockedEnables = outcome.blockedRecipeIds.length;
-    result.rejectedRecipeIds = outcome.rejectedRecipeIds;
-    result.rejected = outcome.rejectedRecipeIds.length;
-
-    if (result.updated > 0) await this.recipeManager.save();
-
-    // At most one of each change hook. On the writing client `reload()` returns `false` and the
-    // socket bridge re-emits nothing, so a book change needs its own signal for the GM's windows.
-    if (books.changed) this._notifySystemsChanged();
-    if (result.updated > 0) {
-      this.recipeManager.notifyRecipesChanged?.({
-        action: 'bulkEdit',
-        recipeIds: result.recipeIds,
-      });
-    }
-
-    return result;
-  }
-
-  /**
-   * Read the six-key `edit` into an axis descriptor by presence, resolving the check tier against
-   * this system's tiers. The tier throws here, before any mutation: a bulk write is stricter than
-   * the single-recipe editor, which tolerates a dangling `checkTierId`.
-   */
-  _resolveBulkRecipeAxes(system, edit) {
-    const bulkEdit = edit && typeof edit === 'object' ? edit : {};
-    const axes = {
-      hasCategory: Object.hasOwn(bulkEdit, 'category'),
-      category: bulkEdit.category,
-      hasEnabled: Object.hasOwn(bulkEdit, 'enabled'),
-      enabled: bulkEdit.enabled === true,
-      hasLocked: Object.hasOwn(bulkEdit, 'locked'),
-      locked: bulkEdit.locked === true,
-      hasCheckTier: Object.hasOwn(bulkEdit, 'checkTierId'),
-      checkTierId: null,
-      // A staged book set is a selection, so it takes `normalizeSelectionIds`.
-      addBookIds: new Set(normalizeSelectionIds(bulkEdit.addBookIds)),
-      removeBookIds: new Set(normalizeSelectionIds(bulkEdit.removeBookIds)),
-    };
-    axes.staged =
-      axes.hasCategory ||
-      axes.hasEnabled ||
-      axes.hasLocked ||
-      axes.hasCheckTier ||
-      Object.hasOwn(bulkEdit, 'addBookIds') ||
-      Object.hasOwn(bulkEdit, 'removeBookIds');
-    if (axes.hasCheckTier)
-      axes.checkTierId = this._resolveBulkCheckTierId(system, bulkEdit.checkTierId);
-    return axes;
-  }
-
-  /**
-   * Resolve a staged check-tier id against the tiers this system's crafting check authors, or
-   * throw. `null`/empty means Default DC; anything else must be an option from
-   * `resolveRecipeCheckTierOptions` over the active check slot, which the editor dropdown and the
-   * bulk panel also read. The slot comes from the resolver itself (issue 1096); a `null` slot
-   * accepts only Default DC.
-   */
-  _resolveBulkCheckTierId(system, rawTierId) {
-    const tierId = typeof rawTierId === 'string' ? rawTierId.trim() : '';
-    if (!tierId) return null;
-
-    const options = resolveRecipeCheckTierOptions(
-      system?.craftingCheck,
-      resolveActiveCraftingCheckFormula(system).slot
-    );
-    const known = options.some((tier) => String(tier?.id ?? '') === tierId);
-    if (!known) {
-      throw new Error(`Check tier not authored by crafting system ${system?.id}: ${tierId}`);
-    }
-    return tierId;
-  }
-
-  /**
-   * Apply the book axis per definition: `addBookIds` and `removeBookIds` are disjoint, so each
-   * touched definition takes one operation and is written once (a definition named by both loses
-   * to remove). Edge counts are taken against the seeded arrays and exclude the seed's own
-   * writes; `changed` is true when any definition was mutated, seed included.
-   */
-  _applyBulkRecipeBookMembership(system, cohort, axes) {
-    const bookIds = [];
-    let additions = 0;
-    let removals = 0;
-    const touched = axes.addBookIds.size > 0 || axes.removeBookIds.size > 0;
-    const selectedIds = cohort.map((recipe) => String(recipe?.id ?? '')).filter(Boolean);
-    if (!touched || selectedIds.length === 0) {
-      return { changed: false, bookIds, additions, removals };
-    }
-
-    // Seed before any array is replaced, while the legacy resolution is live, or the marker set
-    // below would orphan every other book's scalar-only members.
-    const seeded = this._seedMembershipFromLegacyScalars(system);
-    const selected = new Set(selectedIds);
-
-    for (const definition of system.recipeItemDefinitions || []) {
-      const definitionId = String(definition?.id ?? '');
-      const remove = axes.removeBookIds.has(definitionId);
-      const add = !remove && axes.addBookIds.has(definitionId);
-      if (!add && !remove) continue;
-
-      const current = this._normalizeMembershipRecipeIds(definition.recipeIds);
-      const next = remove
-        ? current.filter((id) => !selected.has(id))
-        : this._normalizeMembershipRecipeIds([...current, ...selectedIds]);
-      if (next.length === current.length && next.every((id, index) => id === current[index])) {
-        continue;
-      }
-
-      definition.recipeIds = next;
-      bookIds.push(definitionId);
-      // One operation per definition, so the delta is the edge count.
-      if (remove) removals += current.length - next.length;
-      else additions += next.length - current.length;
-    }
-    // Membership rewritten in place on elements (issue 1076).
-    if (bookIds.length > 0) advanceDefinitionRevision(system.recipeItemDefinitions);
-
-    return { changed: seeded || bookIds.length > 0, bookIds, additions, removals };
-  }
-
-  /**
-   * The per-recipe half of the batch. Its atomicity is microtask-only: `updateRecipe` with
-   * `persist: false` does no real I/O, but anything awaiting real I/O here would let `reload()`
-   * replace the recipes map between iterations and discard staged edits, with no compare-and-set
-   * to catch it.
-   */
-  async _applyBulkRecipePatches(cohort, axes) {
-    const recipeIds = [];
-    const blockedRecipeIds = [];
-    const rejectedRecipeIds = [];
-
-    for (const recipe of cohort) {
-      const updates = this._buildBulkRecipePatch(recipe, axes);
-      if (Object.keys(updates).length === 0) continue;
-
-      const recipeId = String(recipe.id);
-      const outcome = await this._writeBulkRecipePatch(recipeId, updates);
-      if (outcome.updated) recipeIds.push(recipeId);
-      if (outcome.blocked) blockedRecipeIds.push(recipeId);
-      if (outcome.rejected) rejectedRecipeIds.push(recipeId);
-    }
-
-    return { recipeIds, blockedRecipeIds, rejectedRecipeIds };
-  }
-
-  /**
-   * The minimal patch for one recipe: only staged fields that differ, so an agreeing recipe gets
-   * no `updateRecipe` call. The category is normalized first, as `Recipe` does, or `'General'`
-   * would differ from a stored `'general'`.
-   */
-  _buildBulkRecipePatch(recipe, axes) {
-    const updates = {};
-    if (axes.hasCategory) {
-      const category = normalizeRecipeCategory(axes.category);
-      if (category !== recipe.category) updates.category = category;
-    }
-    if (axes.hasEnabled && (recipe.enabled === true) !== axes.enabled) {
-      updates.enabled = axes.enabled;
-    }
-    if (axes.hasLocked && (recipe.locked === true) !== axes.locked) {
-      updates.locked = axes.locked;
-    }
-    if (axes.hasCheckTier && (recipe.checkTierId ?? null) !== axes.checkTierId) {
-      updates.checkTierId = axes.checkTierId;
-    }
-    return updates;
-  }
-
-  /**
-   * Write one recipe's minimal patch. A `RecipeActivationError` (refused enable) records the id and
-   * retries without `enabled`, which is clean because `updateRecipe` throws before
-   * `this.recipes.set`. A `RecipePersistenceError` (unsaveable even under `allowIncomplete`) is
-   * logged and the batch continues, since the books save has already committed.
-   */
-  async _writeBulkRecipePatch(recipeId, updates) {
-    // `persist: false` mutates memory per recipe for one trailing `save()`; `allowIncomplete` keeps
-    // an authoring shell editable.
-    const options = { persist: false, notify: false, emitChange: false, allowIncomplete: true };
-    try {
-      await this.recipeManager.updateRecipe(recipeId, updates, options);
-      return { updated: true, blocked: false, rejected: false };
-    } catch (error) {
-      if (error instanceof RecipePersistenceError) {
-        console.warn(
-          `Fabricate | bulk recipe edit could not save recipe ${recipeId}: ${error.message}`
-        );
-        return { updated: false, blocked: false, rejected: true };
-      }
-      if (!(error instanceof RecipeActivationError)) throw error;
-
-      delete updates.enabled;
-      if (Object.keys(updates).length === 0) {
-        return { updated: false, blocked: true, rejected: false };
-      }
-      await this.recipeManager.updateRecipe(recipeId, updates, options);
-      return { updated: true, blocked: true, rejected: false };
-    }
+    return applyBulkEditToRecipes(bulkEditsCollaborators(this), systemId, recipeIds, edit);
   }
 
   /**
@@ -2453,47 +2122,8 @@ export class CraftingSystemManager {
     return true;
   }
 
-  /**
-   * Apply a bulk edit (icon, colour, enabled) to a set of essence definitions in one
-   * `craftingSystems` write (issue 1036), through {@link CraftingSystemManager#updateSystem} so
-   * the alchemy guard runs: a status flip collapsing two recipes onto one signature throws
-   * (`destructive-changes-and-migrations/spec.md` Alchemy Uniqueness Revalidation, clauses 3 and
-   * 5). Every axis is presence-gated with `Object.hasOwn`, since `enabled: false` and
-   * `colorToken: null` are real edits; an empty `edit` writes nothing.
-   *
-   * @returns {Promise<{updated: number, essenceIds: string[]}>} the cohort the edit was applied to.
-   * @throws {Error} when the system does not resolve, or the result would carry a collision.
-   */
   async applyBulkEditToEssences(systemId, essenceIds, edit = {}) {
-    this._assertGM('apply a bulk edit to essences');
-    const system = this.getSystem(systemId);
-    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-
-    const targetIds = new Set(normalizeSelectionIds(essenceIds));
-    if (targetIds.size === 0) return { updated: 0, essenceIds: [] };
-
-    const bulkEdit = edit && typeof edit === 'object' ? edit : {};
-    const hasIcon = Object.hasOwn(bulkEdit, 'icon') && String(bulkEdit.icon || '').trim() !== '';
-    const hasColorToken = Object.hasOwn(bulkEdit, 'colorToken');
-    const hasEnabled = Object.hasOwn(bulkEdit, 'enabled');
-    if (!hasIcon && !hasColorToken && !hasEnabled) return { updated: 0, essenceIds: [] };
-
-    const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
-    const changedIds = [];
-    const next = definitions.map((definition) => {
-      if (!targetIds.has(String(definition?.id ?? ''))) return definition;
-      changedIds.push(String(definition.id));
-      return {
-        ...definition,
-        icon: hasIcon ? String(bulkEdit.icon).trim() : definition.icon,
-        colorToken: hasColorToken ? bulkEdit.colorToken : definition.colorToken,
-        enabled: hasEnabled ? bulkEdit.enabled === true : definition.enabled !== false,
-      };
-    });
-    if (changedIds.length === 0) return { updated: 0, essenceIds: [] };
-
-    await this.updateSystem(systemId, { essenceDefinitions: next });
-    return { updated: changedIds.length, essenceIds: changedIds };
+    return applyBulkEditToEssences(bulkEditsCollaborators(this), systemId, essenceIds, edit);
   }
 
   /**
