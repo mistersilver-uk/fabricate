@@ -71,9 +71,10 @@ const SCAN_TOTALS = Object.freeze({
   // the new `SourceIdentityService.js` (`files` 20 -> 21) and retired two auto-stamp loop headers
   // for two per-arm selectors (`pairs` 127 -> 128, and the component-loop collision group 5 -> 4,
   // so `collisionSites` 43 -> 42); `matches` and `lines` are conserved, because nothing was added.
+  // #1923 moved five normalizer reads into `normalize/system.js` (`files` 21 -> 22); the rest hold.
   matches: 168,
   lines: 153,
-  files: 21,
+  files: 22,
   pairs: 128,
   collisionGroups: 17,
   collisionSites: 42,
@@ -138,11 +139,12 @@ const LEDGER = Object.freeze([
   ['src/systems/CraftingSystemManager.js', "system?.components ?? system?.managedItems ?? system?.items", 1, 'basis'],
   ['src/systems/CraftingSystemManager.js', "system?.essenceDefinitions ?? system?.essences", 1, 'basis'],
   ['src/systems/CraftingSystemManager.js', "toolIds: _scopeEntityBasis(_resolveStoreSeam(this._toolScopeStore), system?.tools),", 1, 'basis'],
-  ['src/systems/CraftingSystemManager.js', "system.essenceDefinitions ?? system.essences", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const rawManagedItems = Array.isArray(system.components)", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "? system.components", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const normalizedTools = Array.isArray(system.tools)", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "? system.tools.map((t) =>", 1, 'writer'],
+  // #1923: the system normalizer moved to `normalize/system.js`; the tools line collapsed to one.
+  ['src/systems/normalize/system.js', "system.essenceDefinitions ?? system.essences", 1, 'writer'],
+  ['src/systems/normalize/system.js', "const rawManagedItems = Array.isArray(system.components)", 1, 'writer'],
+  ['src/systems/normalize/system.js', "? system.components", 1, 'writer'],
+  ['src/systems/normalize/system.js', "const normalizedTools = Array.isArray(system.tools)", 1, 'writer'],
+  ['src/systems/normalize/system.js', "? system.tools.map((t) => normalizeTool(t, { validPrerequisiteIds: validToolPrerequisiteIds }))", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "const managedItems = system.components || [];", 1, 'authoring-accessor'],
   ['src/systems/CraftingSystemManager.js', "system.tools = previousTools;", 3, 'writer'],
   ['src/systems/CraftingSystemManager.js', "const tools = Array.isArray(system.tools) ? system.tools : [];", 2, 'writer'],

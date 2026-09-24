@@ -18,7 +18,7 @@ src/migration	15
 src/models	9
 src/models/match	15
 src/systems	16
-src/systems/normalize	25
+src/systems/normalize	23
 src/ui	20
 src/ui/model	14
 src/ui/presenters	34
@@ -74,7 +74,7 @@ tests/helpers/manager	13
 tests/helpers/scale	18
 tests/journal	5
 tests/stores	6
-tests/systems	8
+tests/systems	7
 tests/ui	8
 tests/util	7
 tests/view-lab	26
