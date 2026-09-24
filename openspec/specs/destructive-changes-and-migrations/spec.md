@@ -539,7 +539,7 @@ The `1.13.0` inversion drops the book-only `recipe.recipeItemId` reverse ref unc
 5. When multiple recipes in one system share the same legacy UUID, they must reuse the same generated `RecipeItemDefinition`.
 6. `linkedRecipeItemUuid` is dropped **only** when it was itself the alias that resolved to a book; it is **preserved** when it links a standalone alchemy formula item (never unconditionally removed).
 
-The surviving init-time reconciler `_migrateLegacyRecipeItems` (`src/systems/CraftingSystemManager.js`) reconciles legacy recipe-item links on read.
+The surviving init-time reconciler `_migrateLegacyRecipeItems` (`src/systems/CraftingSystemManager.js`, delegating to `migrateLegacyRecipeItems` in `src/systems/manager/itemSources.js`) reconciles legacy recipe-item links on read.
 It matches on the trigger "no valid `recipeItemId` and a non-empty `linkedRecipeItemUuid`", generating or reusing a definition, silently deriving fallback metadata for an unresolved UUID (no migration warning), and — transitionally — still writing the retired reverse ref `recipe.recipeItemId = definition.id`.
 Treat that reverse-ref write as a transitional shim, not canonical output.
 A post-`1.13.0` **preserved alchemy-formula** `linkedRecipeItemUuid` still satisfies the reconciler's trigger; the current, intended behaviour is that the reconciler may re-process such preserved formula links (they are not exempt from the trigger).

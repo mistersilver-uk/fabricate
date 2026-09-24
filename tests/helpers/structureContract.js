@@ -218,15 +218,20 @@ function callsWithLiteral(node, [name, value]) {
   return false;
 }
 
-/** The class members whose own body calls `name`, sorted: the census a prune seam is held to. */
-function membersCalling(node, name) {
-  const members = [];
+/**
+ * The class members, or with `FunctionDeclaration` the named functions, whose own body calls
+ * `name`, sorted: the census a prune seam is held to.
+ */
+function sitesCalling(node, name, type = 'MethodDefinition') {
+  const sites = [];
   for (const inner of walkNodes(node)) {
-    if (inner.type !== 'MethodDefinition' || !callNames(inner.value).has(name)) continue;
-    members.push(keyName(inner));
+    if (inner.type !== type || !callNames(inner).has(name)) continue;
+    sites.push(keyName(inner) ?? inner.id?.name);
   }
-  return members.sort((a, b) => a.localeCompare(b));
+  return sites.sort((a, b) => a.localeCompare(b)).join('\n');
 }
+
+const sortedNames = (names) => [...names].sort((a, b) => a.localeCompare(b)).join('\n');
 
 /** Whether a `??` or `||` falls back from a call of `callee` to a `new constructorName(…)`. */
 function fallsBackFrom(node, [callee, constructorName]) {
@@ -411,8 +416,8 @@ function claimsOverCode(code) {
     assigns: ([name, value]) => assignedLiterals(code, name).includes(value),
     property: ([key, value]) => propertyValues(code, key).includes(value),
     key: (name) => propertyKeys(code).has(name),
-    callers: ([name, members]) =>
-      membersCalling(code, name).join('\n') === [...members].sort((a, b) => a.localeCompare(b)).join('\n'),
+    callers: ([name, members]) => sitesCalling(code, name) === sortedNames(members),
+    fnCallers: ([name, fns]) => sitesCalling(code, name, 'FunctionDeclaration') === sortedNames(fns),
     fallsBack: (pair) => fallsBackFrom(code, pair),
   };
 }
@@ -569,6 +574,11 @@ const CONTRACT_CLAIMS = Object.freeze({
     ask: 'callers',
     holds: true,
     says: ([f, members]) => `calls ${f}() from exactly ${members.join(', ')}`,
+  },
+  fnCallers: {
+    ask: 'fnCallers',
+    holds: true,
+    says: ([f, fns]) => `calls ${f}() from exactly the functions [${fns.join(', ')}]`,
   },
   fallsBackNo: {
     ask: 'fallsBack',

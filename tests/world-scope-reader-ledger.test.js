@@ -72,12 +72,14 @@ const SCAN_TOTALS = Object.freeze({
   // for two per-arm selectors (`pairs` 127 -> 128, and the component-loop collision group 5 -> 4,
   // so `collisionSites` 43 -> 42); `matches` and `lines` are conserved, because nothing was added.
   // #1923 moved five normalizer reads into `normalize/system.js` (`files` 21 -> 22); the rest hold.
+  // It then moved eight item-source lines into `manager/itemSources.js` (+1 file);
+  // pairs/collisions re-derived.
   matches: 168,
   lines: 153,
-  files: 22,
-  pairs: 128,
-  collisionGroups: 17,
-  collisionSites: 42,
+  files: 23,
+  pairs: 133,
+  collisionGroups: 15,
+  collisionSites: 35,
 });
 
 /**
@@ -154,13 +156,13 @@ const LEDGER = Object.freeze([
   ['src/systems/CraftingSystemManager.js', "system.tools = tools.filter((entry) => String(entry?.id) !== String(toolId));", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "? updates.essenceDefinitions", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', ": current.essenceDefinitions,", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const components = Array.isArray(system.components) ? system.components : [];", 3, 'pre-persist+writer'],
+  ['src/systems/CraftingSystemManager.js', "const components = Array.isArray(system.components) ? system.components : [];", 2, 'pre-persist+writer'],
   ['src/systems/CraftingSystemManager.js', "const componentCount = Array.isArray(system.components)", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "? system.components.length", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "const essenceCount = Array.isArray(system.essenceDefinitions)", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "? system.essenceDefinitions.length", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "system.components.push(item);", 2, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "advanceDefinitionRevision(system.components);", 5, 'writer'],
+  ['src/systems/CraftingSystemManager.js', "system.components.push(item);", 1, 'writer'],
+  ['src/systems/CraftingSystemManager.js', "advanceDefinitionRevision(system.components);", 2, 'writer'],
   ['src/systems/CraftingSystemManager.js', "(system.components || []).find((item) => {", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "for (const component of system.components || []) {", 4, 'writer'],
   // #1699: the stamping and repair clusters moved to `SourceIdentityService.js`, and the three
@@ -170,9 +172,15 @@ const LEDGER = Object.freeze([
   ['src/systems/SourceIdentityService.js', "entriesOf: (system) => system.tools || [],", 1, 'restamp'],
   ['src/systems/SourceIdentityService.js', "definitions: system.components || [],", 1, 'restamp'],
   ['src/systems/SourceIdentityService.js', "definitions: (system.tools || []).filter(", 1, 'restamp'],
-  ['src/systems/CraftingSystemManager.js', "const idx = system.components.findIndex((i) => i.id === itemId);", 2, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const existing = system.components[idx];", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "system.components[idx] = updatedItem;", 2, 'writer'],
+  ['src/systems/CraftingSystemManager.js', "const idx = system.components.findIndex((i) => i.id === itemId);", 1, 'writer'],
+  ['src/systems/CraftingSystemManager.js', "system.components[idx] = updatedItem;", 1, 'writer'],
+  // #1923: the item-source cluster's writer reads, moved to `manager/itemSources.js`.
+  ['src/systems/manager/itemSources.js', "advanceDefinitionRevision(system.components);", 3, 'writer'],
+  ['src/systems/manager/itemSources.js', "system.components.push(item);", 1, 'writer'],
+  ['src/systems/manager/itemSources.js', "const idx = system.components.findIndex((i) => i.id === itemId);", 1, 'writer'],
+  ['src/systems/manager/itemSources.js', "const existing = system.components[idx];", 1, 'writer'],
+  ['src/systems/manager/itemSources.js', "system.components[idx] = updatedItem;", 1, 'writer'],
+  ['src/systems/manager/itemSources.js', "const components = Array.isArray(system.components) ? system.components : [];", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "{ ...system.components[idx], ...updates, id: itemId },", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "if (!this._sameSourceReferenceSet(system.components[idx], updatedItem)) {", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "return system.components[idx];", 1, 'writer'],

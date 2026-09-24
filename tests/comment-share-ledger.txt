@@ -18,6 +18,7 @@ src/migration	15
 src/models	9
 src/models/match	15
 src/systems	16
+src/systems/manager	18
 src/systems/normalize	23
 src/ui	20
 src/ui/model	14

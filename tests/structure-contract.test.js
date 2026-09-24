@@ -102,3 +102,19 @@ test('the census claim is an exact member set, and the fallback claim finds a de
   assert.equal(CONTRACT_CLAIMS.callers.ask, 'callers');
   assert.equal(CONTRACT_CLAIMS.fallsBackNo.holds, false);
 });
+
+const MODULE_CENSUS = [
+  'export async function add(io, system) { const { ids } = io.basis(system); return ids; }',
+  'export function replace(io, system) { return io.basis(system)?.ids ?? new Set(); }',
+  'export function bag(manager) { return { basis: (s) => manager._basis(s) }; }',
+  CENSUS,
+].join('\n');
+
+test('the module census claim is an exact function set, blind to class members', () => {
+  const subject = claimsOverCode(parseModule(MODULE_CENSUS).ast);
+  assert.equal(subject.fnCallers(['basis', ['replace', 'add']]), true, 'order-free');
+  assert.equal(subject.fnCallers(['basis', ['add']]), false, 'an unnamed site fails');
+  assert.equal(subject.fnCallers(['basis', ['add', 'replace', 'bag']]), false, 'a thunk is not one');
+  assert.equal(subject.callers(['basis', ['update', 'create']]), true, 'members stay the other kind');
+  assert.equal(CONTRACT_CLAIMS.fnCallers.ask, 'fnCallers');
+});
