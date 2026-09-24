@@ -3,7 +3,7 @@
  * is a COUNTING guard rather than a pinned list
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
@@ -14,6 +14,17 @@ const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
 
 const systemManagerSource = read('src/systems/CraftingSystemManager.js');
 const recipeManagerSource = read('src/systems/RecipeManager.js');
+
+/** The `manager/` cluster modules (issue 1923), read once by path; `SAVING_MODULES` persist through
+ * `io.saveSystems(`, the manager's `save()`, and each must contribute at least one site. */
+const MANAGER_MODULE_DIR = 'src/systems/manager';
+const SAVING_MODULES = Object.freeze([`${MANAGER_MODULE_DIR}/itemSources.js`]);
+const managerModules = new Map(
+  readdirSync(resolve(repoRoot, MANAGER_MODULE_DIR))
+    .filter((name) => name.endsWith('.js'))
+    .map((name) => `${MANAGER_MODULE_DIR}/${name}`)
+    .map((path) => [path, read(path)])
+);
 
 /** Source lines with `//` comments and JSDoc lines removed, so prose cannot satisfy a match. */
 function codeLines(source) {
@@ -45,7 +56,12 @@ function methodBodies(source) {
 }
 
 describe('CraftingSystemManager attributes every persistence site', () => {
-  const saveSites = codeLines(systemManagerSource).filter((line) => /this\.save\(/.test(line));
+  const moduleSaveSites = (path) =>
+    codeLines(managerModules.get(path) ?? '').filter((line) => /\bsaveSystems\(/.test(line));
+  const saveSites = [
+    ...codeLines(systemManagerSource).filter((line) => /this\.save\(/.test(line)),
+    ...SAVING_MODULES.flatMap(moduleSaveSites),
+  ];
 
   it('found the persistence sites at all', () => {
     // The premise. Without it, a scan that silently matched nothing would make every
@@ -55,6 +71,13 @@ describe('CraftingSystemManager attributes every persistence site', () => {
       saveSites.length >= 24,
       `expected the whole persistence chokepoint to be scanned, found ${saveSites.length} sites`
     );
+  });
+
+  it('reads every saving module, and each contributes a site', () => {
+    for (const path of SAVING_MODULES) {
+      assert.ok(managerModules.has(path), `${path} is missing`);
+      assert.ok(moduleSaveSites(path).length >= 1, `${path} has no \`saveSystems(\` site`);
+    }
   });
 
   it('names domains at EVERY one of them', () => {
@@ -69,7 +92,10 @@ describe('CraftingSystemManager attributes every persistence site', () => {
   it('names only real domains in its hoisted attributions', () => {
     // The hoisted `*_FACTS` constants are derived through `domainsForSystemFields`, so a typo in a
     // FIELD name falls to the every-domain fail-safe rather than to an unknown domain.
-    const quoted = systemManagerSource.match(/domains: \[[^\]]*]/g) ?? [];
+    assert.ok(managerModules.has(`${MANAGER_MODULE_DIR}/collaborators.js`), 'every module is read');
+    const quoted = [systemManagerSource, ...managerModules.values()].flatMap(
+      (source) => source.match(/domains: \[[^\]]*]/g) ?? []
+    );
     for (const literal of quoted) {
       for (const name of literal.match(/'([^']+)'/g) ?? []) {
         assert.ok(

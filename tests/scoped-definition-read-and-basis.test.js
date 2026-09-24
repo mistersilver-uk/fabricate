@@ -574,15 +574,13 @@ describe('the resolved-union memo', () => {
 // Criterion 8 — the census
 
 const MANAGER = 'src/systems/CraftingSystemManager.js';
+const ITEM_SOURCES = 'src/systems/manager/itemSources.js';
 
-/** The five prune sites that BYPASS `_normalizeSystem`, each deriving its own basis. */
-const BYPASS_SITES = [
-  'addItemFromUuid',
-  'applyBulkEditToComponents',
-  'createItem',
-  'replaceItemSource',
-  'updateItem',
-];
+/** The five prune sites that BYPASS `_normalizeSystem`, each deriving its own basis, by home. */
+const BYPASS_SITES = {
+  [MANAGER]: ['applyBulkEditToComponents', 'createItem', 'updateItem'],
+  [ITEM_SOURCES]: ['addItemFromUuid', 'replaceItemSource'],
+};
 
 describe('the _scopeBasis call sites', () => {
   // A seventh site added later fails here until it is named — which is the point: five of these
@@ -590,14 +588,19 @@ describe('the _scopeBasis call sites', () => {
   // untrue assumption once, at issue 1308. And the whole mechanism is one `new Set()` away from a
   // no-op that reads as a guard.
   defineStructureContract('are exactly the six named prune sites, none defaulting the basis', MANAGER, {
-    callers: [['_scopeBasis', ['_normalizeSystem', ...BYPASS_SITES]]],
+    callers: [['_scopeBasis', ['_normalizeSystem', ...BYPASS_SITES[MANAGER]]]],
     fallsBackNo: [['_scopeBasis', 'Set']],
   });
-  for (const member of BYPASS_SITES) {
-    defineStructureContract(`${member} takes its basis from _scopeBasis alone`, { file: MANAGER, member }, {
-      calls: ['_scopeBasis'],
-      readsNo: ['system.essenceDefinitions'],
-    });
+  // The item-source sites moved into a cluster module (issue 1923), which reaches the same
+  // `_scopeBasis` through its `io.scopeBasis` thunk.
+  for (const [file, sites] of Object.entries(BYPASS_SITES)) {
+    const [scope, basis] = file === MANAGER ? ['member', '_scopeBasis'] : ['fn', 'scopeBasis'];
+    for (const site of sites) {
+      defineStructureContract(`${site} takes its basis from ${basis} alone`, { file, [scope]: site }, {
+        calls: [basis],
+        readsNo: ['system.essenceDefinitions'],
+      });
+    }
   }
   // Named as a prune site by the delta, and it IS one — it loops `addItemFromUuid` per item.
   defineStructureContract(
