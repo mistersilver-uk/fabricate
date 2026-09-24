@@ -42,10 +42,15 @@ function recipeFake(calls, recipes) {
   };
 }
 
-function cascadeManager(calls = [], { resolutionMode = 'standard' } = {}) {
-  const recipes = [
-    { id: 'r1', name: 'Alpha', craftingSystemId: 'sysB', results: [{ componentId: 'c1' }] },
-  ];
+const CASCADE_RECIPES = [
+  { id: 'r1', name: 'Alpha', craftingSystemId: 'sysB', results: [{ componentId: 'c1' }] },
+];
+
+/** `system` overrides the fixture's own fields, and `recipes` replaces its one recipe. */
+function cascadeManager(
+  calls = [],
+  { resolutionMode = 'standard', recipes = CASCADE_RECIPES, system = {} } = {}
+) {
   const manager = new CraftingSystemManager(recipeFake(calls, recipes));
   manager.save = async () => void calls.push('save');
   manager._notifySystemsChanged = () => void calls.push('_notifySystemsChanged');
@@ -62,9 +67,53 @@ function cascadeManager(calls = [], { resolutionMode = 'standard' } = {}) {
         { id: 'c2', name: 'Ash', category: 'general', tags: [] },
       ],
       recipeItemDefinitions: [{ id: 'book-1', name: 'Book', recipeIds: ['r1'] }],
+      ...system,
     })
   );
   return manager;
+}
+
+/**
+ * `Ore` carries `fire` and `earth`, and the one recipe needs only `fire`, so either essence delete
+ * rewrites and disables it. The override seam records the definitions it saw, then replaces two
+ * members the rest of the call must still reach.
+ */
+function essenceDeleteManager(calls) {
+  const needsFire = {
+    ingredientGroups: [{ options: [{ match: { type: 'essence', essenceId: 'fire' }, quantity: 1 }] }],
+  };
+  const kiln = {
+    id: 'r2',
+    craftingSystemId: 'sysB',
+    toJSON: () => ({ id: 'r2', enabled: true, ingredientSets: [needsFire], resultGroups: [{}] }),
+  };
+  const manager = cascadeManager(calls, {
+    recipes: [kiln],
+    system: {
+      essenceDefinitions: [
+        { id: 'fire', name: 'Fire' },
+        { id: 'earth', name: 'Earth' },
+      ],
+      items: [{ id: 'c1', name: 'Ore', category: 'general', tags: [], essences: { fire: 2, earth: 1 } }],
+    },
+  });
+  const readComponents = manager.getComponentsForSystem.bind(manager);
+  manager.getComponentsForSystem = (systemId) => {
+    calls.push('getComponentsForSystem');
+    return readComponents(systemId);
+  };
+  const strip = manager._stripEssenceFromSets.bind(manager);
+  const overrideInheritedEssences = async (systemId, componentIds) => {
+    const defined = manager.getSystem(systemId).essenceDefinitions.map((def) => def.id);
+    calls.push(`override:${componentIds} while defined:${defined}`);
+    manager._stripEssenceFromSets = (sets, essenceId) => {
+      calls.push(`_stripEssenceFromSets:${essenceId}`);
+      return strip(sets, essenceId);
+    };
+    stubMembers(manager, calls, ['_reconcileAlchemySignaturesAfterDeletion']);
+    return componentIds;
+  };
+  return { manager, overrideInheritedEssences };
 }
 
 /** Replace each named member with a recorder that answers `result` without running it. */
@@ -91,6 +140,12 @@ test('non-GM: each delete rejects with the GM-permission message naming its own 
   await assert.rejects(manager.deleteComponents('sysB', ['c1']), {
     message: 'GM permissions required: delete components',
   });
+  await assert.rejects(manager.deleteEssence('sysB', 'fire'), {
+    message: 'GM permissions required: delete essence',
+  });
+  await assert.rejects(manager.deleteEssences('sysB', ['fire']), {
+    message: 'GM permissions required: delete essences',
+  });
   assert.deepEqual(calls, [], 'a refused delete writes nothing');
   assert.ok(manager.getSystem('sysB'), 'and the system survives');
 });
@@ -105,6 +160,12 @@ test('GM: each unknown-system refusal carries its exact text', async () => {
     message: 'Crafting system not found: nope',
   });
   await assert.rejects(manager.deleteComponents('nope', ['c1']), {
+    message: 'Crafting system not found: nope',
+  });
+  await assert.rejects(manager.deleteEssence('nope', 'fire'), {
+    message: 'Crafting system not found: nope',
+  });
+  await assert.rejects(manager.deleteEssences('nope', ['fire']), {
     message: 'Crafting system not found: nope',
   });
   assert.deepEqual(calls, [], 'a refused delete writes nothing');
@@ -274,4 +335,54 @@ test('_deleteRecipeSet prunes membership and persists through the manager at cal
     '_notifySystemsChanged',
     'notifyRecipesChanged',
   ]);
+});
+
+test('deleteEssence overrides before it strips, then rewrites, saves once and reconciles once', async () => {
+  globalThis.game.user.isGM = true;
+  const calls = [];
+  const { manager, overrideInheritedEssences } = essenceDeleteManager(calls);
+  const notes = recordNotifications();
+
+  assert.equal(await manager.deleteEssence('sysB', 'fire', { overrideInheritedEssences }), true);
+  assert.deepEqual(calls, [
+    'getComponentsForSystem',
+    'override:c1 while defined:fire,earth',
+    '_stripEssenceFromSets:fire',
+    'updateRecipe:r2',
+    'save',
+    '_notifySystemsChanged',
+    '_reconcileAlchemySignaturesAfterDeletion',
+  ]);
+  assert.deepEqual(manager.getSystem('sysB').components[0].essences, { earth: 1 });
+  assert.deepEqual(notes, ['info: Removed essence "Fire" and updated 1 recipe(s).']);
+});
+
+test('deleteEssences overrides the set in one cohort, then writes recipes and the system once', async () => {
+  globalThis.game.user.isGM = true;
+  const calls = [];
+  const { manager, overrideInheritedEssences } = essenceDeleteManager(calls);
+  const notes = recordNotifications();
+
+  const result = await manager.deleteEssences('sysB', ['fire', 'earth'], {
+    overrideInheritedEssences,
+  });
+  assert.deepEqual(result, {
+    deleted: 2,
+    essenceIds: ['fire', 'earth'],
+    recipesUpdated: 1,
+    recipesDisabled: 1,
+  });
+  assert.deepEqual(calls, [
+    'getComponentsForSystem',
+    'override:c1 while defined:fire,earth',
+    '_stripEssenceFromSets:fire',
+    '_stripEssenceFromSets:earth',
+    'updateRecipe:r2',
+    'recipes.save',
+    'save',
+    '_notifySystemsChanged',
+    '_reconcileAlchemySignaturesAfterDeletion',
+  ]);
+  assert.deepEqual(manager.getSystem('sysB').components[0].essences, {});
+  assert.deepEqual(notes, ['info: Removed 2 essence(s) and updated 1 recipe(s).']);
 });
