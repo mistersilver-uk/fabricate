@@ -23,11 +23,7 @@ import { findMatchingComponent } from '../utils/essenceResolver.js';
 import { localizeGathering } from './gatheringRuntime.js';
 
 export const craftingFacade = {
-  /**
-   * Lazily build and cache the `CraftingListingBuilder` projecting the backend into redaction-safe
-   * listing models, so GM and player viewers resolve through one code path. It imports no Foundry
-   * globals — `localize` and `nowWorldTime` are injected here.
-   */
+  /** One redaction-safe projection for GM and player viewers; Foundry globals are injected here. */
   _getCraftingListingBuilder() {
     if (this._craftingListingBuilder) return this._craftingListingBuilder;
     this._craftingListingBuilder = new CraftingListingBuilder({
@@ -35,8 +31,7 @@ export const craftingFacade = {
       recipeVisibility: this.recipeVisibilityService,
       resolutionModeService: this.resolutionModeService,
       craftingSystemManager: this.craftingSystemManager,
-      // Read ONLY for `findActiveRunForRecipe`, so the projection can name the step a run is parked
-      // on (issue 917). Safe to capture: `this.craftingRunManager` is never reassigned.
+      // Read only to name the step a run is parked on (issue 917); the field is never reassigned.
       craftingRunManager: this.craftingRunManager,
       localize: (key, data) =>
         data === undefined
@@ -45,19 +40,14 @@ export const craftingFacade = {
       nowWorldTime: () => game.time?.worldTime ?? 0,
       resolveCheckFormula: (formula, actor, craftingModifier) =>
         resolveCheckFormulaDisplay(formula, actor, craftingModifier),
-      // How a held document resolves to a managed component (issue 1075): the SAME full resolver
-      // `InventoryListingBuilder` matches owned stacks with, so the crafting row's "looks makeable"
-      // and the inventory tab's owned count cannot disagree. Injected, so its graph stays out of
-      // the harness.
+      // The resolver `InventoryListingBuilder` uses, so "looks makeable" and the owned count
+      // cannot disagree (issue 1075).
       resolveComponentForItem: findMatchingComponent,
     });
     return this._craftingListingBuilder;
   },
 
-  /**
-   * Resolve a stored crafting actor preference; null for a stale id. DEFENCE IN DEPTH: a non-GM
-   * viewer's actor must pass the gathering attempt path's ownership predicate.
-   */
+  /** Null for a stale id or, for a non-GM, an actor failing the gathering ownership predicate. */
   _resolveCraftingActor(actorId) {
     const actor = actorId ? (game.actors?.get?.(actorId) ?? null) : null;
     if (!actor) return null;
@@ -65,10 +55,7 @@ export const craftingFacade = {
     return isGatheringActorSelectableByUser(actor, game.user) ? actor : null;
   },
 
-  /**
-   * Resolve the effective crafting actor and component-source actors against the persisted defaults;
-   * a truthy `rememberedActorId` overrides and stale ids resolve to nothing.
-   */
+  /** A truthy `rememberedActorId` overrides the persisted default; stale ids resolve to nothing. */
   _resolveCraftingSources({ rememberedActorId = null, componentSourceActorIds = null } = {}) {
     const actorId = rememberedActorId || this.getSelectedCraftingActorId() || null;
     const craftingActor = this._resolveCraftingActor(actorId);
@@ -81,10 +68,7 @@ export const craftingFacade = {
     return { craftingActor, componentSourceActors };
   },
 
-  /**
-   * Build the player-facing Crafting listing. The current Foundry user is ALWAYS the viewer, and the
-   * visibility service honours the GM bypass.
-   */
+  /** The current user is always the viewer; the visibility service honours the GM bypass. */
   listCraftingForActor(options = {}) {
     this._requireReady();
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources(options);
@@ -96,11 +80,8 @@ export const craftingFacade = {
   },
 
   /**
-   * DETAIL PHASE — the exact rich model for ONE recipe (issue 1075), companion to
-   * `listCraftingForActor`'s cheap summary rows, so craftability, check resolution and stages are
-   * computed for what is on screen. `recipeId` is NOT trusted: the actor and sources are re-resolved
-   * through `_resolveCraftingSources` and visibility is re-evaluated, so an id the viewer may not
-   * see answers `null`.
+   * The rich model for one recipe beside `listCraftingForActor`'s summary rows (issue 1075).
+   * `recipeId` is untrusted: sources and visibility are re-evaluated; a hidden id answers `null`.
    */
   hydrateCraftingRecipe({ recipeId = null, actorId = null, componentSourceActorIds = null } = {}) {
     this._requireReady();
@@ -117,10 +98,7 @@ export const craftingFacade = {
     });
   },
 
-  /**
-   * Lazily build and cache the `InventoryListingBuilder`; `recipeVisibility` is injected so a non-GM
-   * viewer's used-by list never names a teaser recipe.
-   */
+  /** `recipeVisibility` keeps a teaser recipe out of a non-GM viewer's used-by list. */
   _getInventoryListingBuilder() {
     if (this._inventoryListingBuilder) return this._inventoryListingBuilder;
     this._inventoryListingBuilder = new InventoryListingBuilder({
@@ -132,8 +110,7 @@ export const craftingFacade = {
           ? (game.i18n?.localize?.(key) ?? key)
           : (game.i18n?.format?.(key, data) ?? key),
       nowWorldTime: () => game.time?.worldTime ?? 0,
-      // Gathering tasks live in the `gatheringConfig` setting keyed by system id, not on the system
-      // object, so they are surfaced here for the "produced by" gathering index.
+      // Tasks live in the `gatheringConfig` setting, not on the system, so they are passed in.
       getGatheringTasksForSystem: (systemId) => {
         const config = getSetting(SETTING_KEYS.GATHERING_CONFIG);
         const tasks = config?.systems?.[systemId]?.tasks;
@@ -143,10 +120,7 @@ export const craftingFacade = {
     return this._inventoryListingBuilder;
   },
 
-  /**
-   * Build the player-facing Inventory listing, reusing the crafting selection so the two tabs agree
-   * on what the player owns. The current Foundry user is always the viewer.
-   */
+  /** Reuses the crafting selection so both tabs agree on what is owned; the user is the viewer. */
   listInventoryForActor(options = {}) {
     this._requireReady();
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources(options);
@@ -157,10 +131,7 @@ export const craftingFacade = {
     });
   },
 
-  /**
-   * Learn one recipe from an owned book against the scope the listing was computed for, delegated to
-   * the visibility service, which enforces the per-document learn budget for capped systems.
-   */
+  /** The visibility service enforces the per-document learn budget for capped systems. */
   async learnRecipeFromInventory({
     actorId = null,
     recipeId = null,
@@ -183,14 +154,9 @@ export const craftingFacade = {
   },
 
   /**
-   * Craft a recipe for the current selection, delegating to {@link Fabricate#craft} but taking actor
-   * IDS rather than documents, and resolving the crafting actor and component sources so the attempt
-   * uses the inventory scope the listing was computed for. New starts use version 1 and preserve
-   * ready, fully supplied one-call execution; waiting or unresolved choices leave the run in the
-   * Journal without editable-material spending, and a stale `ingredientEssenceAllocation` blocks
-   * versioned execution until repaired. Versioned required checks use the authority's
-   * prepare/prompt/resolve exchange whatever `interactive` says, and cancelling the prompt leaves
-   * the stage unexecuted rather than the run absent.
+   * {@link Fabricate#craft} by actor ids, against the listing's inventory scope. A stale
+   * `ingredientEssenceAllocation` blocks versioned execution until repaired. Versioned required
+   * checks prompt whatever `interactive` says; a cancelled prompt leaves the stage unexecuted.
    */
   async craftRecipe({
     actorId = null,
@@ -210,24 +176,20 @@ export const craftingFacade = {
       return { success: false, results: null, message: 'No crafting actor selected' };
     }
     const sources = componentSourceActors.length > 0 ? componentSourceActors : [craftingActor];
-    // `interactive` opts into the confirm-roll dialog and chat post; false for automation.
     return await this.craft(craftingActor, recipeId, {
       componentSourceActors: sources,
       lifecycleVersion: 1,
       ingredientSetId,
-      // Per-group player option overrides (issue 552); null keeps default resolution.
+      // Null keeps default resolution (issue 552) and the allocator's suggestion (issue 917).
       ingredientOptionOverrides,
-      // Scoped essence-block funding (issue 917); null keeps the allocator's suggestion.
       ingredientEssenceAllocation,
       interactive,
     });
   },
 
   /**
-   * Salvage one owned component for the current selection (issue 675). TAKES AN `actorId`, NEVER AN
-   * `actorUuid`: `CraftingEngine.salvage` performs NO ownership check, so `_resolveCraftingActor` is
-   * the ONLY gate here, and a uuid would reach `fromUuid()` and THROW rather than answering the
-   * `{ success: false, message }` a store expects. `craftRecipe` parity is the contract.
+   * Takes an `actorId`, never a uuid (issue 675): `CraftingEngine.salvage` checks no ownership, so
+   * `_resolveCraftingActor` is the only gate, and a uuid would reach `fromUuid()` and throw.
    */
   async salvageComponent({ actorId = null, systemId, componentId, interactive = false } = {}) {
     this._requireReady();
@@ -241,8 +203,8 @@ export const craftingFacade = {
   },
 
   /**
-   * Re-evaluate ONE ingredient set's craftability with in-session per-group overrides (issue 552),
-   * through the SAME `evaluateCraftability` seam the engine consumes. Synchronous, for a `$derived`.
+   * One ingredient set's craftability under in-session overrides (issue 552), through the engine's
+   * `evaluateCraftability` seam. Synchronous, for a `$derived`.
    */
   evaluateSelectedSet({
     recipeId = null,
@@ -267,9 +229,7 @@ export const craftingFacade = {
           ? [craftingActor]
           : [];
     if (sources.length === 0) return null;
-    // Resolve through the EXECUTION STEPS, not the `recipe.ingredientSets` that is EMPTY for every
-    // explicit multi-step recipe; `resolveStepIngredientSet` also enforces the two rules that make
-    // this safe.
+    // Via the steps: `recipe.ingredientSets` is empty for an explicit multi-step recipe.
     const resolved = resolveStepIngredientSet({
       steps: this.resolutionModeService?.getExecutionSteps?.(recipe) ?? [],
       stepId,
@@ -277,8 +237,7 @@ export const craftingFacade = {
       setId,
     });
     if (!resolved) return null;
-    // Narrow to the one selected set through the SHARED step view the engine crafts against, so the
-    // step's tool union applies and the IngredientSet instance methods survive.
+    // The engine's step view, so the step's tool union applies and IngredientSet methods survive.
     const singleSetRecipe = {
       ...buildStepRecipeView(recipe, resolved.step),
       ingredientSets: [resolved.set],
@@ -292,7 +251,6 @@ export const craftingFacade = {
     );
   },
 
-  /** Lazily cache the `AlchemyListingBuilder`: the leak-safe, Foundry-global-free workbench view. */
   _getAlchemyListingBuilder() {
     if (this._alchemyListingBuilder) return this._alchemyListingBuilder;
     this._alchemyListingBuilder = new AlchemyListingBuilder({
@@ -303,18 +261,13 @@ export const craftingFacade = {
         data === undefined
           ? (game.i18n?.localize?.(key) ?? key)
           : (game.i18n?.format?.(key, data) ?? key),
-      // The per-pass inventory snapshot's component resolver (issue 1228): the workbench reads no
-      // tallies itself, but its snapshot must be the same complete value every other pass builds.
+      // Unread by the workbench, but its snapshot must match every other pass's (issue 1228).
       resolveComponentForItem: findMatchingComponent,
     });
     return this._alchemyListingBuilder;
   },
 
-  /**
-   * Build the leak-safe player Alchemy workbench listing for `craftingSystemId`. The current user is
-   * always the viewer and the actor goes through crafting's owner gate, so a non-owner viewer's
-   * actor resolves to null and the builder answers a denied, empty listing.
-   */
+  /** Through crafting's owner gate, so a non-owner viewer gets a denied, empty listing. */
   listAlchemyForActor({
     actorId = null,
     craftingSystemId = null,
@@ -334,10 +287,8 @@ export const craftingFacade = {
   },
 
   /**
-   * Submit a workbench of components as an alchemy brew attempt. Owner-scoped like `craftRecipe`,
-   * then delegated to the AUTHORITATIVE `CraftingEngine#craftAlchemy`, which matches every enabled
-   * recipe known and undiscovered and otherwise fizzles with no check and no roll. `interactive`
-   * prompts on a MATCHED brew only.
+   * Owner-scoped like `craftRecipe`; `CraftingEngine#craftAlchemy` matches every enabled recipe,
+   * known or not, and otherwise fizzles with no roll. `interactive` prompts on a matched brew only.
    */
   async submitAlchemyAttempt({
     actorId = null,
@@ -383,17 +334,13 @@ export const craftingFacade = {
     });
   },
 
-  /** Persist the selected alchemy system. */
   setSelectedAlchemySystemId: (id) => setSetting(SETTING_KEYS.LAST_ALCHEMY_SYSTEM, id ?? ''),
 
-  /** Persist the remembered crafting-actor selection. */
   setSelectedCraftingActorId: (id) => setSetting(SETTING_KEYS.LAST_CRAFTING_ACTOR, id ?? ''),
 
-  /** Persist the component-source actor ids. */
   setCraftingComponentSourceIds: (ids) =>
     setSetting(SETTING_KEYS.LAST_COMPONENT_SOURCES, Array.isArray(ids) ? ids : []),
 
-  /** Toggle a recipe's favourite state and persist the updated id list. */
   toggleFavouriteRecipe(recipeId) {
     const current = this.getFavouriteRecipeIds();
     if (!recipeId) return current;
@@ -404,11 +351,7 @@ export const craftingFacade = {
     return next;
   },
 
-  /**
-   * Persist the player's preferred result order for one namespaced key. ASYNC AND MUST BE AWAITED:
-   * under `user` scope `set` is a replicated write that can REJECT, unlike the client-scoped
-   * fire-and-forget in `toggleFavouriteRecipe`.
-   */
+  /** Must be awaited: a user-scoped `set` is a replicated write that can reject. */
   async setProgressiveResultOrder(key, orderedIds) {
     const current = this.getProgressiveResultOrder();
     if (!key) return current;
@@ -417,17 +360,13 @@ export const craftingFacade = {
     return next;
   },
 
-  /**
-   * Persist the "hide unavailable environments" preference, client-scoped and view-only: it changes
-   * no saved data, no engine listing and no GM configuration.
-   */
+  /** Client-scoped and view-only: no saved data, engine listing or GM configuration changes. */
   setHideUnavailableEnvironments: (value) =>
     setSetting(SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE, value === true),
 
   /**
-   * Advance a crafting run's current step — the single player-triggerable advance boundary. `craft()`
-   * writes directly to the source actors, so a non-owner gets a "needs owner" message rather than a
-   * throw. THE RECIPE COMES FROM THE RESOLVED RUN, NEVER THE CALLER (issue 966).
+   * The one player-triggerable advance boundary. A non-owner gets a "needs owner" message, not a
+   * throw. The recipe comes from the resolved run, never the caller (issue 966).
    */
   async advanceCraftingRun({ actorId, runId, interactive = false } = {}) {
     this._requireReady();
@@ -440,8 +379,7 @@ export const craftingFacade = {
         message: localizeGathering('FABRICATE.App.Journal.Actions.NeedsOwner'),
       };
     }
-    // A run that vanished between render and click has no recipe to resolve. Report it rather than
-    // falling through to `craft()`, which would treat the missing run as a fresh craft.
+    // A run gone since render must not fall through to `craft()` as a fresh craft.
     if (!run?.recipeId) {
       return { success: false, message: localizeGathering('FABRICATE.App.Journal.Actions.NoRun') };
     }
@@ -452,10 +390,7 @@ export const craftingFacade = {
     });
   },
 
-  /**
-   * Cancel a player's in-progress craft (issue 848), reusing `advanceCraftingRun`'s ownership guard:
-   * `cancelCraft` restores items to the source actors, so a non-owner is blocked gracefully.
-   */
+  /** `advanceCraftingRun`'s ownership guard (issue 848): the refund writes to the source actors. */
   async cancelCraftingRun({ actorId, runId } = {}) {
     this._requireReady();
     const actor = game.actors?.get(actorId);
@@ -477,8 +412,7 @@ export const craftingFacade = {
       if (result.refunded) {
         key = 'FABRICATE.App.Journal.Actions.CancelledRefunded';
       } else if (result.partialRefund) {
-        // A partial reversal must not claim a full return: some inputs came back and others,
-        // or the currency refund, could not be restored.
+        // Some inputs, or the currency refund, could not be restored.
         key = 'FABRICATE.App.Journal.Actions.CancelledPartial';
       }
       return { ...result, message: localizeGathering(key) };
@@ -487,22 +421,17 @@ export const craftingFacade = {
   },
 
   /**
-   * Craft a recipe for a resolved Actor DOCUMENT — never an id or uuid string; {@link
-   * Fabricate#craftRecipe} is the player-facing actor-ID facade. One-call execution is preserved
-   * when the stage is ready and all choices are supplied; new starts use version 1 through active-GM
-   * authority, waiting stages and unresolved choices stay in the Journal without editable-material
-   * spending, and resuming an existing unversioned run keeps its legacy contract.
-   * Required versioned checks use the authority's player prompt and GM evaluation; a SECRET check
-   * uses a generic prompt and GM private posting with no player roll-data handoff, and Foundry's
-   * whisper presentation is not a server confidentiality guarantee.
+   * Craft for an Actor document, never an id; {@link Fabricate#craftRecipe} takes ids. A ready,
+   * fully supplied stage runs in one call; new starts use version 1 through active-GM authority,
+   * and waiting or unresolved stages stay in the Journal without spending editable materials.
+   * Resuming an unversioned run keeps its legacy contract. A secret check uses a generic prompt and
+   * GM private posting with no player roll-data handoff; Foundry's whisper is not confidential.
    */
   async craft(actor, recipe, options = {}) {
     if (!this.ready) {
       throw new Error('Fabricate not initialized');
     }
 
-    // The id is captured BEFORE the lookup, so the not-found message names it: reading the
-    // resolved value after the lookup always reported "Recipe undefined not found".
     let resolvedRecipe = recipe;
     if (typeof recipe === 'string') {
       resolvedRecipe = this.recipeManager.getRecipe(recipe);
@@ -530,10 +459,7 @@ export const craftingFacade = {
     });
   },
 
-  /**
-   * Delete a recipe by id through `CraftingSystemManager.deleteRecipes` (issue 1132), so this public
-   * API and the GM studio cannot disagree about what deleting a recipe reaches.
-   */
+  /** Through `deleteRecipes` (issue 1132), so this API and the GM studio reach the same things. */
   async deleteRecipe(recipeId) {
     if (!this.ready) {
       throw new Error('Fabricate not initialized');

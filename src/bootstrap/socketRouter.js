@@ -37,25 +37,20 @@ import { MacroExecutor } from '../utils/MacroExecutor.js';
 
 import { getGatheringEngine } from './gatheringRuntime.js';
 
-// Per-sender throttle for inbound gathering node depletions, held at module scope so the window
-// survives across socket messages — a per-message limiter would never refuse anything. Only the
-// active GM ever consults it.
+// Per-sender budgets at module scope, so a window survives across messages; only the active GM
+// consults them. Separate budgets, so bursts of one relay cannot starve another (issues 901, 1286).
 const gatheringDepletionRateLimiter = createDepletionRateLimiter();
-// A separate budget for the blind-start relay (issue 901), so a burst of gathers and a burst of
-// starts cannot starve one another through a shared allowance.
 const gatheringBlindStartRateLimiter = createBlindStartRateLimiter();
-// Third budget, for the complication relay (issue 1286). Charged per MESSAGE, and one resolution —
-// a whole bulk salvage included — emits exactly one.
+// Charged per message; one resolution, a whole bulk salvage included, emits exactly one.
 const complicationDeliveryRateLimiter = createComplicationRateLimiter();
-// Suppresses a complication re-delivered to THIS context. Module scope for the reason the limiters
-// are: a per-message set would remember nothing. It cannot cover an elected GM with the world open
-// in two tabs, which is a stated, accepted residual rather than an oversight.
+// Suppresses a re-delivery to this context. An elected GM with the world open in two tabs is two
+// contexts, an accepted residual.
 const complicationDeliveryDedupe = createComplicationDeliveryDedupe();
 
 /**
- * The ACTIVE-GM edge for a relayed BLIND gathering start (issue 901). THE GM RE-RUNS THE WHOLE
- * ATTEMPT WITH THE REQUESTING USER AS THE VIEWER, so every gate is re-evaluated against the player
- * who asked and `_isOpaqueBlindTask` stays TRUE. `senderId` is the attested socket sender.
+ * The active-GM edge for a relayed blind start (issue 901): the GM re-runs the whole attempt with
+ * the attested sender as the viewer, so every gate is re-evaluated against the player who asked and
+ * `_isOpaqueBlindTask` stays true.
  */
 export async function applyGatheringBlindStart({
   senderId,
@@ -71,11 +66,10 @@ export async function applyGatheringBlindStart({
   try {
     startActor = typeof resolve === 'function' ? resolve(String(actorUuid)) : null;
   } catch {
-    // An unresolvable uuid refuses the relayed start rather than throwing into the socket handler.
+    // An unresolvable uuid refuses the relayed start.
   }
   if (!startActor) return null;
-  // `interactive: false`: the situational-modifier dialog belongs to the player's client, never the
-  // GM's, and a timed blind run does not roll at start anyway.
+  // The modifier dialog belongs to the player; a timed blind run rolls nothing at start.
   return getGatheringEngine()?.startAttempt({
     viewer: requester,
     actor: startActor,
@@ -86,7 +80,6 @@ export async function applyGatheringBlindStart({
   });
 }
 
-/** Resolve an addressed actor synchronously, or `null` when it names nothing reachable. */
 function resolveComplicationActor(actorUuid) {
   const resolve = globalThis.fromUuidSync;
   if (typeof resolve !== 'function' || !actorUuid) return null;
@@ -97,15 +90,12 @@ function resolveComplicationActor(actorUuid) {
   }
 }
 
-/** The corpus the GM-side re-read resolves against (issue 1286): THIS client's own components. */
+/** The GM-side re-read resolves against this client's own components (issue 1286). */
 function complicationComponentsFor(craftingSystemId) {
   return fabricate.craftingSystemManager?.getComponentsForSystem?.(craftingSystemId) ?? [];
 }
 
-/**
- * The token and speaker the GM side resolves for an addressed actor, NEVER read from the payload.
- * Guarded: a throwing `getSpeaker` would reject out of the fire-and-forget apply.
- */
+/** Never read from the payload; guarded, since a throw would reject the fire-and-forget apply. */
 function resolveComplicationSpeaker(actor) {
   try {
     const token = actor?.token ?? actor?.getActiveTokens?.(false, true)?.[0] ?? null;
@@ -117,9 +107,8 @@ function resolveComplicationSpeaker(actor) {
 }
 
 /**
- * Run one complication's authored macro on this elected-GM client and REPORT what happened, never
- * throwing; `recipes-and-steps/spec.md` § Complication Macros owns the `script` call-site gate, the
- * double uuid resolve and why the return is a REPORT rather than the macro's own value.
+ * Run one authored macro on the elected GM and report the outcome, never throwing;
+ * `recipes-and-steps/spec.md` § Complication Macros.
  */
 async function runComplicationMacro({
   craftingSystemId,
@@ -168,10 +157,7 @@ async function runComplicationMacro({
   }
 }
 
-/**
- * Everything the elected GM DOES for one re-read complication: a `gmOnly` effect roll, then the
- * macro. Independent, so each carries its own guard, and the macro is unordered.
- */
+/** A `gmOnly` effect roll, then the macro; independent, so each carries its own guard. */
 async function runComplicationDelivery({
   craftingSystemId,
   component,
@@ -199,10 +185,8 @@ async function runComplicationDelivery({
 }
 
 /**
- * Whether the ADDRESSED crafting system narrates to chat at all (issue 1286). NEITHER THE MACRO NOR
- * THE EFFECT ROLL IS GATED BY THIS, and it SELECTS ROWS rather than vetoing the card —
- * `recipes-and-steps/spec.md` § Complication Macros owns both rules. Read from THIS client's copy,
- * defaulted CLOSED.
+ * Gates neither the macro nor the effect roll, and selects rows rather than vetoing the card
+ * (issue 1286). Read from this client's copy, defaulting closed.
  */
 function complicationChatOutputEnabled(craftingSystemId) {
   return (
@@ -210,23 +194,17 @@ function complicationChatOutputEnabled(craftingSystemId) {
   );
 }
 
-/**
- * Whether one delivered row's macro reports a CONFIGURATION FAULT rather than an outcome: `skipped`
- * is an unresolvable `macroUuid` and `failed` a body that threw; `none` and `ran` are outcomes.
- */
+/** A configuration fault: `skipped` (unresolvable uuid) or `failed` (the body threw). */
 function hasComplicationMacroFault(row) {
   const status = row?.report?.macro?.status;
   return status === 'skipped' || status === 'failed';
 }
 
 /**
- * The GM-only chat card for one delivered resolution — the OUTPUT half of a `gmOnly` complication
- * (issue 1286); `recipes-and-steps/spec.md` § Complication Macros owns the row set and the
- * `chatOutput` rule. FOUR STEPS, IN AN ORDER THAT IS LOAD-BEARING: the `chatOutput` gate first and
- * over the ROW SET, so a gated-off system with nothing faulted returns before any projection;
- * SPEAKER before the visibility pass, which `applyBulkChatVisibility` states as a caller contract;
- * VISIBILITY before `create`, through an EXPLICIT `gmroll`; and `create` INSIDE the same guard, so
- * a card that could not be made GM-only is never posted.
+ * The GM-only card for one delivered resolution (issue 1286). The order is load-bearing: the
+ * `chatOutput` gate over the row set first; speaker before visibility, a caller contract of
+ * `applyBulkChatVisibility`; an explicit `gmroll` before `create`; and `create` inside the same
+ * guard, so a card that could not be made GM-only is never posted.
  */
 async function postGmComplicationCard({
   craftingSystemId,
@@ -236,14 +214,12 @@ async function postGmComplicationCard({
   applied = [],
 }) {
   try {
-    // Over `applied` rather than the projected entries, so the suppressed case returns early.
     const delivered = Array.isArray(applied) ? applied : [];
     const reported = complicationChatOutputEnabled(craftingSystemId)
       ? delivered
       : delivered.filter((row) => hasComplicationMacroFault(row));
     if (reported.length === 0) return null;
-    // `gmComplicationCardEntries` — the only projection that may carry an authored description or a
-    // severity to a GM surface — augmented with what THIS client did. A suite can drive it directly.
+    // The only projection that may carry an authored description or severity to a GM surface.
     const entries = gmComplicationCardEntries(reported);
     const content = buildGmComplicationCardContent(
       { entries, actorName: actor?.name ?? '', reporterName: senderUser?.name ?? '' },
@@ -261,9 +237,8 @@ async function postGmComplicationCard({
 }
 
 /**
- * The ELECTED-GM edge for a relayed complication delivery (issue 1286); `recipes-and-steps/spec.md`
- * § Complication Macros owns the re-read, the attested `senderId` and the per-complication
- * isolation. The Foundry EDGE only — the pure half lives in `complicationSocket.js`.
+ * The elected-GM edge for a relayed complication delivery (issue 1286); the pure half is
+ * `complicationSocket.js`, the rules `recipes-and-steps/spec.md` § Complication Macros.
  */
 export async function applyComplicationDelivery({
   senderId,
@@ -275,8 +250,8 @@ export async function applyComplicationDelivery({
   const senderUser = game.users?.get?.(senderId) ?? null;
   if (!senderUser) return null;
   const actor = resolveComplicationActor(actorUuid);
-  // Failing CLOSED is right, but VISIBLY: `fromUuidSync` answers a compendium uuid with an index
-  // entry carrying no `testUserPermission`, so such a delivery would be refused with no trace.
+  // Fail closed, visibly: `fromUuidSync` answers a compendium uuid with an index entry that has no
+  // `testUserPermission`.
   if (!actor || typeof actor.testUserPermission !== 'function') {
     console.warn(
       'Fabricate | Refused a complication delivery: the addressed actor could not be resolved to a permission-testable document',
@@ -287,9 +262,8 @@ export async function applyComplicationDelivery({
     );
     return null;
   }
-  // Ask the ATTESTED SENDER's own permission directly: `actor.isOwner` resolves against the AMBIENT
-  // `game.user`, which on the elected GM's client owns every actor. THE RULE (issue 1288) IS THAT NO
-  // OWNERSHIP PREDICATE ON A GM-SIDE APPLY PATH MAY READ `isOwner`.
+  // No GM-side apply path may read `isOwner` (issue 1288): it tests the ambient `game.user`, who
+  // owns every actor on the GM's client. Ask the attested sender's permission instead.
   if (actor.testUserPermission(senderUser, 'OWNER') !== true) {
     console.warn(
       'Fabricate | Refused a complication delivery: the sender does not own the addressed actor',
@@ -343,8 +317,7 @@ function eventScenePromptText(key, fallback, data = null) {
   return out && out !== key ? out : fallback;
 }
 
-// GM-side prompt choosing which active players to pull to a dropped event's linked scene. Lives
-// here rather than in the engine because it is Foundry glue.
+// The GM-side prompt choosing which active players to pull to a dropped event's linked scene.
 export async function showEventScenePrompt({ sceneUuid, eventName } = {}) {
   const scene = typeof fromUuid === 'function' ? await fromUuid(sceneUuid) : null;
   if (!scene) {
@@ -408,9 +381,10 @@ export async function showEventScenePrompt({ sceneUuid, eventName } = {}) {
 }
 
 /**
- * Install the one `module.fabricate` listener. The server-attested `senderId` is the second
- * callback argument of a custom module socket broadcast, and every privileged leg below
- * authenticates against it rather than a payload `userId`, which is spoofable (issue 593).
+ * The one `module.fabricate` listener. `senderId`, the second callback argument, is set by the
+ * server from the authenticated session (`dist/server/sockets.mjs` `handleCustomSocket`); every
+ * privileged leg authenticates against it, never a spoofable payload `userId` (issue 593). The
+ * `try`-guarded legs share the channel with, and so must never block, the Interactable payload.
  */
 export function installSocketRouter(io) {
   const { fabricate } = io;
@@ -423,11 +397,6 @@ export function installSocketRouter(io) {
         (error) => console.error('Fabricate | Journal run socket command failed', error)
       );
     }
-    // `senderId` is Foundry's server-attested sender user id — the trusted 2nd callback arg of a
-    // custom module socket broadcast, set from the authenticated session in
-    // `dist/server/sockets.mjs handleCustomSocket` — which the interactable handler authenticates
-    // privileged edges against (issue 593); payload `userId` fields are spoofable. Guarded because
-    // this router shares the `module.fabricate` channel with the Interactable round-trip below.
     try {
       routeEventSceneSocketMessage(payload, {
         currentUserId: () => game.user?.id,
@@ -436,69 +405,61 @@ export function installSocketRouter(io) {
         viewSceneForSelf: (uuid) => viewScene(uuid),
       });
     } catch {
-      // Defensive: never block the Interactable payload below.
+      // Never block the Interactable payload below.
     }
-    // The same channel carries the environment node depletion a player emits: only the active GM may
-    // write `gatheringEnvironments`, so the decrement is applied here from its own stored state.
+    // Only the active GM may write `gatheringEnvironments`, so it applies a player's decrement.
     try {
       routeGatheringNodeDepleteMessage(payload, {
         isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
         senderId,
-        // Bounds the residual denial-of-resource surface: the applier re-checks the node economy
-        // but not whether the sender could reach that task, so throttle to human gathering speed.
+        // The applier re-checks the node economy but not the sender's reach to the task, so
+        // throttle to human gathering speed.
         allowSender: gatheringDepletionRateLimiter,
         applyDeplete: (args) => {
-          // The apply is async and nothing awaits a socket handler, so a failed world-setting write
-          // must be caught here or it lands as an unhandled rejection on the GM's client.
+          // Nothing awaits a socket handler, so each async apply catches its own rejection.
           Promise.resolve(
             fabricate.gatheringRichStateService?.applyEnvironmentNodeDepletion(args)
           ).catch((error) => console.warn('Fabricate | Gathering node depletion failed', error));
         },
       });
     } catch {
-      // Defensive: never block the Interactable payload below.
+      // Never block the Interactable payload below.
     }
-    // The same channel carries a player's BLIND gathering start (issue 901): only the active GM may
-    // write `gatheringBlindRuns`, and only a client the player does not control may draw the task.
+    // Only the active GM may write `gatheringBlindRuns`, and only a client the player does not
+    // control may draw the task (issue 901).
     try {
       routeGatheringBlindStartMessage(payload, {
         isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
         senderId,
         allowSender: gatheringBlindStartRateLimiter,
         applyStart: (args) => {
-          // Nothing awaits a socket handler, so a rejected start must be caught here.
           Promise.resolve(applyGatheringBlindStart(args)).catch((error) =>
             console.warn('Fabricate | Blind gathering start failed', error)
           );
         },
       });
     } catch {
-      // Defensive: never block the Interactable payload below.
+      // Never block the Interactable payload below.
     }
-    // The same channel carries a relayed COMPLICATION delivery (issue 1286): the GM-only card and
-    // macro run from that GM's OWN record. Addressing only — the wire names no macro or content.
+    // Addressing only (issue 1286): the wire names no macro or content, which the GM re-reads.
     try {
       routeComplicationDeliveryMessage(payload, {
         isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
         senderId,
-        // Applied LAST of the refusal gates, so a malformed or unauthenticated message never
-        // consumes a sender's budget. Charged per MESSAGE: one resolution emits exactly one.
+        // The last refusal gate, so a malformed or unauthenticated message spends no budget.
         allowSender: complicationDeliveryRateLimiter,
-        // An elected GM holding two sockets in ONE context receives the message twice; two tabs are
-        // two contexts and remain a stated, accepted residual.
+        // Two sockets in one context would receive the message twice.
         isFreshDelivery: complicationDeliveryDedupe,
         applyComplications: (args) => {
-          // Nothing awaits a socket handler, so a rejected apply must be caught here.
           Promise.resolve(applyComplicationDelivery(args)).catch((error) =>
             console.warn('Fabricate | Complication delivery failed', error)
           );
         },
       });
     } catch {
-      // Defensive: never block the Interactable payload below.
+      // Never block the Interactable payload below.
     }
-    // The same channel carries the Interactable node-update and region-first activation round-trip:
-    // only the active GM writes and validates, and only the targeted user opens a granted session.
+    // Only the active GM writes and validates, and only the targeted user opens a granted session.
     handleInteractableSocketMessage(payload, {
       senderId,
       isSenderGM: (id) => game.users?.get(id)?.isGM === true,

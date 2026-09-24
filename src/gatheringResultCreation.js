@@ -1,9 +1,7 @@
 /**
- * The gathering award seam, split out of `main.js` so it is runtime-importable under `node --test`:
- * it resolves a task's authored result rows to award sources, then stacks or creates owned Items.
- * THE DURABLE-IDENTITY STACK GUARD IS THE LOAD-BEARING PART (issue 556) — a fresh award is handed
- * the awarding system's component set and id, so it is never folded into an owned item resolving to
- * a DIFFERENT component through a transitive `_stats.duplicateSource`.
+ * The gathering award seam: result rows to award sources, then stacked or created Items. The
+ * load-bearing part is the stack guard (issue 556), which never folds an award into an item
+ * resolving to a different component through a transitive `_stats.duplicateSource`.
  */
 
 import { stampItemDataRoleIdentity } from './config/flags.js';
@@ -24,8 +22,6 @@ export function flattenGatheringResults(resultGroups = []) {
   return resultGroups.flatMap((group) => (Array.isArray(group?.results) ? group.results : []));
 }
 
-// The awarding system's component set: the stack guard must be handed this and `system.id`, or a
-// fresh award can fold wrongly (issue 556).
 export function resolveGatheringSystemComponents(system, craftingSystemManager) {
   const own = resolvedComponentsFor(system);
   if (own.length > 0) return own;
@@ -33,10 +29,8 @@ export function resolveGatheringSystemComponents(system, craftingSystemManager) 
 }
 
 /**
- * Resolve a result row to what will be awarded, as `{ source, componentId }`. `componentId` is
- * non-null ONLY when the award resolved through a MANAGED COMPONENT — the identity stamp (issue 780)
- * keys off that fact, not off what the row authored, a row being able to carry both. An unresolvable
- * `itemUuid` falls back to the component lookup, which otherwise silently dropped the award.
+ * `componentId` is non-null only when the award resolved through a managed component, which the
+ * identity stamp keys off (issue 780). An unresolvable `itemUuid` falls back to the component.
  */
 export function resolveGatheringResultAward(result, system, craftingSystemManager) {
   if (result?.itemUuid) {
@@ -64,7 +58,6 @@ export function resolveGatheringResultSource(result, system, craftingSystemManag
   return resolveGatheringResultAward(result, system, craftingSystemManager).source;
 }
 
-/** Human-readable identity for a result row that could not be resolved to an award. */
 export function describeUnresolvedResult(result) {
   return (
     stringOrNull(result?.itemUuid) ||
@@ -108,9 +101,7 @@ export function normalizeFoundryCollection(collection) {
   return [];
 }
 
-/** `componentId` is carried so a ref built BEFORE creation still has an identity: a planned award
- *  resolving to a bare component has no `uuid` yet, and a uuid-only identity emptied the chat card
- *  and run journal for a gather that did award items. */
+/** Carries `componentId`, since a planned award has no `uuid` yet. */
 export function gatheringRunItemRef(actor, item, quantity = null, componentId = null) {
   const ref = {
     actorUuid: actor?.uuid ?? null,
@@ -128,10 +119,10 @@ export function gatheringRunItemRef(actor, item, quantity = null, componentId = 
   return ref;
 }
 
-/** What `plan()` rolled, held for the `create()` that awards it, so the journalled plan and the
- *  awarded stack are one roll rather than two (issue 1645). Keyed on the row's own id where it has
- *  one, because `create()` may be handed an equal CLONE of the planned task and identity alone would
- *  re-roll; a plan-less award resolves in `create()` instead. */
+/**
+ * What `plan()` rolled, so plan and award are one roll (issue 1645). Keyed on the row id, since
+ * `create()` may get an equal clone of the task.
+ */
 function plannedAmounts() {
   const byId = new Map();
   const byRow = new WeakMap();
@@ -154,8 +145,7 @@ export function createGatheringResultCreator(craftingSystemManager) {
   const resolveAmount = (result, actor) =>
     resolveRolledAmount(result, actor, { Roll: diceEngine() });
   return {
-    // Unresolved rows are DIAGNOSTICS, never a shortened list: the engine turns them into a blocked
-    // start BEFORE the node and stamina are committed, so a broken row costs nothing.
+    // Diagnostics, never a shortened list: the engine blocks the start before any commit.
     async plan({ actor, system, resultGroups = [] } = {}) {
       const { awards, unresolved } = resolveAllResults(resultGroups, system, craftingSystemManager);
       if (unresolved.length > 0) {
@@ -182,8 +172,7 @@ export function createGatheringResultCreator(craftingSystemManager) {
 
     async create({ actor, system, resultGroups = [] } = {}) {
       const { awards, unresolved } = resolveAllResults(resultGroups, system, craftingSystemManager);
-      // `plan` already blocked this attempt, so reaching here means the two disagreed. Throw
-      // rather than create a partial award: a half-granted gather is worse than a loud failure.
+      // `plan` should have blocked this; throw rather than half-grant.
       if (unresolved.length > 0) {
         const error = new Error(
           `Fabricate | Refusing to award a gathering result with unresolved sources: ${unresolved.join(', ')}`
@@ -219,9 +208,8 @@ export function createGatheringResultCreator(craftingSystemManager) {
           globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
         }
 
-        // Stamp the awarded component's durable per-system identity (issue 780) on the CREATED item.
-        // NEVER `source.id`, a Foundry Item id in the `registeredItemUuid` case, and the gate is the
-        // RESOLVER's `componentId` rather than a raw `result.componentId`. Create-only.
+        // Create-only (issue 780), from the resolver's `componentId`; never `source.id`, which can
+        // be an Item id.
         if (componentId) {
           stampItemDataRoleIdentity(itemData, system?.id, 'componentId', componentId);
         }

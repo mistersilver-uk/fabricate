@@ -1,17 +1,12 @@
 /**
- * `0.6.0` — convert every recipe, step, ingredient-set and salvage catalyst into a deduped
- * per-system library Tool, replacing the inline `catalysts` arrays with `toolIds`. Pure, idempotent
- * and by-reference; spec § Catalyst → Tool Migration owns the mapping. Catalysts carried no
- * `requirement` gate, so every resulting Tool has `null`. THE DEDUPE KEY IS THE NORMALIZED TOOL
- * JSON: semantically different catalysts on one componentId are NOT merged.
+ * `0.6.0`: every catalyst becomes a deduped library Tool referenced by `toolIds`; spec § Catalyst
+ * → Tool Migration. The dedupe key is the normalized Tool JSON, so different catalysts on one
+ * componentId stay separate, and every Tool's `requirement` is `null`.
  */
 
 import { forEachSystem } from './migrationHelpers.js';
 
-/**
- * Normalize a raw catalyst into the canonical Tool shape used as the dedupe key and the library Tool
- * body. Null when the catalyst has no componentId.
- */
+/** The dedupe key and Tool body; null without a componentId. */
 function catalystToToolShape(catalyst) {
   if (!catalyst || typeof catalyst !== 'object') return null;
   const componentId = catalyst.componentId || catalyst.systemItemId || null;
@@ -20,8 +15,7 @@ function catalystToToolShape(catalyst) {
   const degradesOnUse = catalyst.degradesOnUse === true;
 
   if (!degradesOnUse) {
-    // Presence-only: required but never consumed. `breakageChance: 0` makes `Tool.applyUsage` a
-    // no-op, so NO item-usage flag is ever written.
+    // Presence-only: `breakageChance: 0` makes `Tool.applyUsage` write no usage flag.
     return {
       componentId,
       requirement: null,
@@ -52,14 +46,10 @@ function toolDedupeKey(toolShape) {
   });
 }
 
-/**
- * The dedupe key for an EXISTING library tool, so it can be reused when it is the equivalent of a
- * migrated catalyst. A tool with extra gating or another breakage shape is left alone.
- */
+/** An existing tool is reused only with no gating and a catalyst's breakage shape. */
 function existingToolDedupeKey(tool) {
   if (!tool || typeof tool !== 'object') return null;
   if (!tool.componentId) return null;
-  // Only reuse tools with no requirement gate (catalysts had none).
   if (tool.requirement) return null;
 
   const breakage = tool.breakage;
@@ -81,7 +71,6 @@ function existingToolDedupeKey(tool) {
         : null;
     normalizedBreakage = { mode: 'limitedUses', maxUses };
   } else {
-    // Not a shape any catalyst maps to — never reuse.
     return null;
   }
 
@@ -99,10 +88,7 @@ function existingToolDedupeKey(tool) {
   });
 }
 
-/**
- * A deterministic, collision-resistant id from the system id and dedupe key, so re-running produces
- * identical ids. FNV-1a 32-bit rendered as 8 hex chars, prefixed for readability.
- */
+/** Deterministic, so a re-run mints identical ids: FNV-1a 32-bit as 8 hex chars. */
 function generateToolId(systemId, dedupeKey) {
   const input = `${systemId}\0${dedupeKey}`;
   let hash = 0x81_1c_9d_c5;
@@ -114,10 +100,7 @@ function generateToolId(systemId, dedupeKey) {
   return `tool-cat-${hash.toString(16).padStart(8, '0')}`;
 }
 
-/**
- * Per-system dedupe helper: resolve a catalyst to a library Tool id, reusing an equivalent existing
- * tool or adding a new one keyed by dedupe key. `system.tools` is ensured.
- */
+/** Reuses an equivalent tool or adds one; ensures `system.tools`. */
 function makeSystemToolRegistry(system) {
   if (!Array.isArray(system.tools)) {
     system.tools = [];
@@ -125,7 +108,6 @@ function makeSystemToolRegistry(system) {
   const tools = system.tools;
   const keyToId = new Map();
 
-  // Seed the dedupe map with existing equivalent library tools so migrated catalysts reuse them.
   for (const tool of tools) {
     const key = existingToolDedupeKey(tool);
     if (key && tool.id && !keyToId.has(key)) {
@@ -157,10 +139,7 @@ function makeSystemToolRegistry(system) {
   };
 }
 
-/**
- * Convert a `catalysts` array on `container` into `toolIds`, answering how many were migrated. A
- * container with no catalyst array is left untouched.
- */
+/** Answers the count; a container with no catalyst array is untouched. */
 function convertCatalystArray(container, registry, counter) {
   if (!container || typeof container !== 'object') return;
   if (!Array.isArray(container.catalysts)) return;
@@ -183,16 +162,12 @@ function convertCatalystArray(container, registry, counter) {
   delete container.catalysts;
 }
 
-/**
- * Migrate every catalyst into deduped per-system library Tools and `toolIds`. Pure and idempotent.
- * A recipe whose crafting system is missing from `systems` is skipped, not thrown.
- */
+/** A recipe whose system is missing is skipped, not thrown. */
 export function migrateCatalystsToTools(recipes, systems) {
   const safeRecipes = Array.isArray(recipes) ? recipes : [];
   const safeSystems = Array.isArray(systems) ? systems : [];
   const counter = { count: 0 };
 
-  // One registry per system; built lazily and shared across all recipes targeting it.
   const systemById = new Map();
   const registryById = new Map();
   forEachSystem(safeSystems, (system) => {
@@ -214,7 +189,6 @@ export function migrateCatalystsToTools(recipes, systems) {
     const systemId = recipe.craftingSystemId;
     const registry = systemId ? registryFor(systemId) : null;
     if (!registry) {
-      // Missing crafting system — skip, leave the recipe's catalyst data untouched.
       if (systemId && Array.isArray(recipe.catalysts) && recipe.catalysts.length > 0) {
         console.warn(
           `Fabricate | migrateCatalystsToTools: recipe "${recipe.id ?? '?'}" references missing ` +

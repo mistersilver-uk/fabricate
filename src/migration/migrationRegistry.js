@@ -28,8 +28,7 @@ const CURRENT_MIGRATIONS = [
     label:
       'Strip the retired system-level progressive allowPlayerReorder from the crafting, ' +
       'salvage and gathering checks (the reorder permission now lives on the recipe and on salvage)',
-    // The last release before the flag was retired: a world downgraded to it still finds its own
-    // schema, since this only removes a key that release ignored.
+    // Lossless: it removes only a key that release ignored.
     downgradeTo: '1.17.0',
     migrate: (data) => migrateRetireProgressiveAllowPlayerReorder(data.systems),
   },
@@ -39,8 +38,7 @@ const CURRENT_MIGRATIONS = [
       'Default-on the recipe time requirement for upgraded worlds: delete a persisted ' +
       'requirements.time.enabled === false (the pre-toggle normalizer coercion of an absent ' +
       'flag), so the new default-on reader keeps existing timed recipes running',
-    // The last release before the toggle: the pre-714 normalizer re-coerces the deleted flag back
-    // to `false` there, so the downgrade is lossless.
+    // Lossless: the pre-714 normalizer re-coerces the deleted flag to `false`.
     downgradeTo: '1.18.0',
     migrate: (data) => migrateDefaultOnTimeRequirements(data.systems),
   },
@@ -50,11 +48,8 @@ const CURRENT_MIGRATIONS = [
       'Cap the modifier picks of systems already on the playerPicks combination rule at ' +
       'craftingCheck.maxModifierPicks = 1, the single pick that rule always meant, so the ' +
       'new generalized cap does not silently widen them to unlimited',
-    // The last release before the cap existed: it drops the unknown `maxModifierPicks` key through
-    // `_normalizeCheckModifierConfig`'s allowlist, and its `playerPicks` already means "pick one"
-    // — exactly what the dropped cap encoded — so the downgrade is lossless.
+    // Lossless: the allowlist drops `maxModifierPicks`, and `playerPicks` there means "pick one".
     downgradeTo: '1.19.0',
-    // Returns `{ recipes, systems }` with `recipes` unchanged, so the recipe-level no-op is explicit.
     migrate: (data) => migrateMaxModifierPicks(data),
   },
   {
@@ -63,19 +58,15 @@ const CURRENT_MIGRATIONS = [
       'Retire the check-modifier roll-formula placeholder: strip it from every stored ' +
       'crafting, salvage and gathering check formula, because the resolved modifier ' +
       'scalar is now appended automatically as a flavoured term',
-    // DATA-lossless but BEHAVIOUR-lossy, so deliberately NOT described as landing on that release's
-    // own schema. A world downgraded to 1.20.0 finds its formulas and catalogue intact, but that
-    // build resolves check modifiers ONLY through the placeholder it now lacks, so they stop
-    // contributing to any roll until a GM retypes it into each formula by hand.
+    // Data-lossless but behaviour-lossy: 1.20.0 resolves modifiers only through the stripped
+    // placeholder. Reports through the transient `_retiredCraftingModCounts`.
     downgradeTo: '1.20.0',
-    // Reports per-system counts through the transient `_retiredCraftingModCounts` field.
     migrate: (data) => migrateRetireCraftingModToken(data),
   },
   {
     version: '1.22.0',
-    // THE LOSSY-DOWNGRADE FACT IS IN THE LABEL, NOT IN A COMMENT. The label is the only string a GM
-    // ever reads about this migration — `migrationRecoveryPrompt` renders it beside the
-    // Keep/Downgrade buttons — and that is precisely the choice the warning is about.
+    // A lossy downgrade is stated in the label, the only text `migrationRecoveryPrompt` shows a
+    // GM beside the Keep and Downgrade buttons.
     label:
       'Lift the check-modifier catalogue out of craftingCheck up to the system, so ' +
       'salvage and gathering can select over the same one, and rewrite the byRecipe ' +
@@ -88,16 +79,13 @@ const CURRENT_MIGRATIONS = [
       'on the first read and every check modifier stops contributing to every roll until ' +
       'you re-author it. Your formulas and combination rules are unaffected',
     downgradeTo: '1.21.0',
-    // MACHINE-READABLE, so the label clause above is a RULE rather than one entry's prose: a
-    // migration marked here must name the loss in its own `label`, and
-    // `tests/migration-runner.test.js` enforces that over the whole registry. `1.21.0` is
-    // deliberately NOT marked — DATA-lossless and BEHAVIOUR-lossy is a different fact.
+    // A marked entry must name the loss in its label, which `tests/migration-runner.test.js`
+    // enforces registry-wide. `1.21.0` is not marked: behaviour-lossy is a different fact.
     downgradeLosesData: true,
     migrate: (data) => migrateSystemCheckModifierCatalogue(data),
   },
   {
     version: '1.23.0',
-    // THE LOSSY-DOWNGRADE FACT IS IN THE LABEL, for the reason `1.22.0` states.
     label:
       'Merge the two modifier libraries a crafting system authored — the check-modifier ' +
       'catalogue and the gathering character-modifier library — into one system.modifiers, ' +
@@ -112,14 +100,12 @@ const CURRENT_MIGRATIONS = [
       'contributing to every roll AND every gathering drop row, event and stamina cost ' +
       'loses the modifier it references, until you re-author both libraries',
     downgradeTo: '1.22.0',
-    // MACHINE-READABLE, per the rule `1.22.0` established.
     downgradeLosesData: true,
-    // Reports per-system id-collision counts through the transient `_unifiedModifierCollisions`.
+    // Reports through the transient `_unifiedModifierCollisions`.
     migrate: (data) => migrateUnifyModifierLibraries(data),
   },
   {
     version: '1.24.0',
-    // THE LOSSY-DOWNGRADE FACT IS IN THE LABEL, per the rule 1.22.0 established.
     label:
       'Give the routed check its own DC source, so a routed relative check can compute its ' +
       'base DC from a macro exactly as a simple check can. NO DATA IS REWRITTEN: the ' +
@@ -130,18 +116,14 @@ const CURRENT_MIGRATIONS = [
       'that build DELETES both — a routed check set to Dynamic silently reverts to its ' +
       'static DC and loses the macro link, which you must re-author',
     downgradeTo: '1.23.0',
-    // MACHINE-READABLE, per the rule 1.22.0 established.
     downgradeLosesData: true,
-    // A DELIBERATE NO-OP, in 1.20.0's recipe-level shape: absence already reads as `static`, and
-    // writing the default onto every stored routed slot would touch every system to change nothing.
-    // What this entry buys is the boundary the recovery prompt warns at.
+    // A deliberate no-op: absence already reads as `static`; the entry marks the boundary the
+    // recovery prompt warns at.
     migrate: (data) => data,
   },
   {
     version: '1.25.0',
-    // NO LOSSY-DOWNGRADE CLAUSE, and that is the fact worth stating: this downgrade IS clean. The
-    // rule 1.22.0 to 1.24.0 established is about naming a REAL loss, not about every entry claiming
-    // one.
+    // No lossy-downgrade clause: this downgrade is clean.
     label:
       'Seed the new per-activity failure-result policy to "never" on every crafting, ' +
       'salvage and gathering check that already exists, so NO EXISTING WORLD CHANGES ' +
@@ -155,7 +137,6 @@ const CURRENT_MIGRATIONS = [
       'does not emit this key, drops it on the first save, and has no failure-result ' +
       'capability for it to govern',
     downgradeTo: '1.24.0',
-    // Reports nothing, so it adds no key to the runner's three return literals below.
     migrate: (data) => migrateSeedFailureResultPolicy(data),
   },
   {
@@ -274,14 +255,11 @@ const CURRENT_MIGRATIONS = [
       'them intact, but 1.29.0 re-mints a concrete "tool specific" breakage authority onto every ' +
       'system, which pins a system out of a world authority that a later release lets you author',
     downgradeTo: '1.29.0',
-    // DELIBERATELY NOT MARKED `downgradeLosesData`, and CHECKED rather than copied (issue 1363):
-    // both candidate losses fail the registry's test, and the `toolSpecific` re-minting is
-    // DATA-lossless and BEHAVIOUR-relevant — `1.21.0`'s fact — so it is a label caveat rather than a
-    // data-loss claim. `tests/world-scope-migration-runner.test.js` holds both arms executable.
+    // Unmarked after checking (issue 1363): the `toolSpecific` re-minting is data-lossless, so it
+    // is a label caveat; `tests/world-scope-migration-runner.test.js` holds both arms.
     downgradeLosesData: false,
-    // Reports entities created, groups merged, every rename, refusals, the references that ALREADY
-    // resolve to nothing (reported, never pruned — requirement 18) and the world-default sections a
-    // constraint declined, through the transient `_worldScopeEntityReport` field.
+    // Reports through the transient `_worldScopeEntityReport`; dangling references are reported,
+    // never pruned (requirement 18).
     migrate: (data) => migrateWorldScopeEntities(data),
   },
   {
@@ -297,9 +275,7 @@ const CURRENT_MIGRATIONS = [
       'prerequisites and bonus from the crafting system exactly as before and ignores the ' +
       'overrides this pass wrote, which survive untouched for a re-upgrade',
     downgradeTo: '1.30.0',
-    // DATA-lossless in both directions: the pass only ADDS membership-record keys, and 1.30.0's
-    // `TOOL_SECTIONS` does not name them, so `normalizeMembership` drops them on read there and the
-    // crafting system's own values keep deciding.
+    // Lossless: the added membership keys are outside 1.30.0's `TOOL_SECTIONS`, so it ignores them.
     downgradeLosesData: false,
     migrate: (data) => migrateToolRequirementSections(data),
   },
@@ -319,10 +295,8 @@ const CURRENT_MIGRATIONS = [
       'reaching the systems that inherit them, and the world values themselves are dropped from ' +
       'the setting on the first world-scope save there',
     downgradeTo: '1.31.0',
-    // The elected map is a COPY and its loss costs nothing, but a world map a GM EDITS after this
-    // pass is authored data 1.31.0's `COMPONENT_SECTIONS` does not name: `normalizeWorldDefaults`
-    // drops the key on read, the next `save()` drops it from the setting, and the inheriting systems
-    // still hold the pre-edit values. That is data loss, and the label says so beside the button.
+    // A world map a GM edits afterwards is outside 1.31.0's `COMPONENT_SECTIONS`, so the next
+    // save drops it: data loss.
     downgradeLosesData: true,
     migrate: (data) => migrateComponentEssenceSections(data),
   },
@@ -347,10 +321,8 @@ const CURRENT_MIGRATIONS = [
       'of no modifiers exactly as this release does, so nothing changes in that direction ' +
       'either',
     downgradeTo: '1.32.0',
-    // Nothing is removed in either direction: the pass only ADDS ids to a mark and an empty pick to
-    // a record that had none. `1.32.0` reads the mark as a plain default rather than a bound, so a
-    // subject with its own picks rolls them there exactly as before, and one carrying the authored
-    // `[]` resolves to no eligible modifier — what it resolved to under the mark it used to inherit.
+    // Only adds ids to a mark and an empty pick; `1.32.0` reads the mark as a default, not a
+    // bound, so every subject rolls as before.
     downgradeLosesData: false,
     migrate: (data) => migrateSubjectModifierMarks(data),
   },
@@ -382,14 +354,11 @@ const CURRENT_MIGRATIONS = [
       'untouched for a re-upgrade, so going back costs you nothing further — it simply does not ' +
       'undo the merge',
     downgradeTo: '1.33.0',
-    // Deliberately not marked `downgradeLosesData` (issue 1654, requirement 15): the loss happens at
-    // migration time, not on the downgrade. The label still carries the irreversibility caveat.
+    // Unmarked (issue 1654, requirement 15): the loss is at migration time, not on downgrade.
     downgradeLosesData: false,
-    // Reports four legs through the transient `_worldEssenceMergeReport` field: groups merged,
-    // groups refused with reasons, world essences whose members disagreed, and ones no system holds.
+    // Reports merged, refused, declined and orphaned through `_worldEssenceMergeReport`.
     migrate: (data) => mergeEquivalentWorldEssences(data),
   },
-  // Future migrations added here in version order
 ];
 
 /** Every registered migration in version order; the runner is not told the registry is split. */

@@ -1,10 +1,7 @@
 import { sceneRegionUuidsContainingToken } from './canvas/regionHitTest.js';
 import { arrayOrEmpty as normalizeList } from './utils/scalars.js';
 
-/**
- * The selectable gathering actor adapter GatheringEngine uses; the engine passes an explicit viewer,
- * direct callers falling back to the current user.
- */
+/** The engine passes an explicit viewer; direct callers fall back to the current user. */
 export function createGatheringSelectableActorsGetter({
   getActors,
   getCurrentUser,
@@ -28,9 +25,8 @@ export function getTokenSceneUuid(token) {
 }
 
 /**
- * The scene-link gate: an attemptability gate rather than a listing filter, so a failure returns a
- * blocked result the player app can localize. It restricts EVERY user including GMs, additively
- * with the region and stamina gates.
+ * An attemptability gate, not a listing filter, so a failure is a localizable block. It binds every
+ * user, GMs included, alongside the region and stamina gates.
  */
 export function createGatheringSceneAccess({ getCurrentScene } = {}) {
   return {
@@ -38,8 +34,7 @@ export function createGatheringSceneAccess({ getCurrentScene } = {}) {
       const sceneUuid = environment?.sceneUuid;
       if (!sceneUuid) return { allowed: true };
 
-      // The REQUESTING viewer's scene (issue 1912): a player's start is evaluated on the active GM's
-      // client, whose own canvas says nothing about where the player is.
+      // The requesting viewer's scene (issue 1912): the active GM evaluates a player's start.
       const currentScene = getCurrentScene?.(viewer) ?? null;
       if (!currentScene || currentScene.uuid !== sceneUuid) {
         return { allowed: false, code: 'SCENE_TOKEN_BLOCKED', messageKey: 'FABRICATE.Gathering.Blocked.SceneMissing' };
@@ -58,10 +53,8 @@ export function createGatheringSceneAccess({ getCurrentScene } = {}) {
 }
 
 /**
- * The scene a gathering VIEWER is looking at, for the scene gate above. A remote viewer's scene is
- * `User#viewedScene`, which Foundry keeps current on every client through the user-activity socket;
- * the local user, a viewer that has broadcast no scene, and one naming a scene that is gone all fall
- * back to this client's current scene, the pre-1912 answer.
+ * A remote viewer's `User#viewedScene`, which Foundry keeps current on every client through the
+ * user-activity socket. The local user, or a viewer with no or a deleted scene, gets this client's.
  */
 export function resolveViewerScene({ viewer, currentUser, scenes, currentScene } = {}) {
   const fallback = () => currentScene?.() ?? null;
@@ -114,10 +107,8 @@ export function senseTravelMarkerRegions({ actor, hitTest = sceneRegionUuidsCont
 }
 
 /**
- * Evaluate a gathering formula through Foundry's Roll API, deliberately system-generic: dnd5e and
- * pf2e detail comes from the actor's roll data. Rolls are non-interactive. `kind` names the callsite
- * (`check`, `gate`, `stamina`, `attemptLimit`, `characterModifier`), and the extra per-row keys reach
- * a macro only where the Roll engine reads `actor.getRollData()`.
+ * System-generic: system detail comes from the actor's roll data, and rolls are non-interactive.
+ * `kind` names the callsite; the extra per-row keys reach only a macro reading `getRollData()`.
  */
 export async function evaluateGatheringExpression(payload = {}) {
   const expression = payload?.expression;
@@ -137,7 +128,7 @@ export async function evaluateGatheringExpression(payload = {}) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
-/** Replace any caller-supplied viewer with the current Foundry user, so GM visibility cannot be spoofed. */
+/** The current user replaces any caller viewer, so GM visibility cannot be spoofed. */
 export function withCurrentGatheringViewer(options = {}, getCurrentUser = () => globalThis.game?.user) {
   return {
     ...options,
@@ -145,15 +136,11 @@ export function withCurrentGatheringViewer(options = {}, getCurrentUser = () => 
   };
 }
 
-/** Delegate to a module-internal gathering runtime method as the current user. */
 export function callGatheringRuntimeWithCurrentViewer(runtime, methodName, options = {}, getCurrentUser = () => globalThis.game?.user) {
   return runtime?.[methodName]?.(withCurrentGatheringViewer(options, getCurrentUser));
 }
 
-/**
- * Run independent world-time processors so one failure cannot stop the rest; the promises are
- * returned for tests and a fire-and-forget hook caller may ignore them.
- */
+/** One failure cannot stop the rest; the promises are returned for tests. */
 export function processWorldTimeCallbacksSafely(processors = [], { onError = defaultWorldTimeProcessorError } = {}) {
   return normalizeList(processors).map(({ label = 'Unknown', callback } = {}) => {
     try {

@@ -2,14 +2,12 @@
  * The remaining-quantity ledger an ingredient set resolves against: how it is seeded, the candidate
  * item plans drawn from it, and the shared node budget those enumerations charge.
  */
-// `itemStackQuantity.js` takes the configured path by push and never touches `game`, `ui`, `Hooks`
-// or `CONFIG`, so this import keeps the ingredient model Foundry-free (`data-models`).
+// Foundry-free: the configured path is pushed into `itemStackQuantity.js` (`data-models`).
 import { readStackQuantity } from '../systems/itemStackQuantity.js';
 
 /** Node/subset budget for the item-level backtracking assignment search (issue 663). */
 export const INGREDIENT_SEARCH_NODE_CAP = 200_000;
 
-/** The ledger key for one held stack. */
 export function itemKeyOf(item) {
   return item.uuid || item.id;
 }
@@ -18,14 +16,13 @@ export function itemKeyOf(item) {
 export function seedRemaining(availableItems) {
   const remaining = new Map();
   for (const item of availableItems) {
-    // The routing site for the configured stack-quantity path (issue 1024): the whole consumption
-    // plan is computed from what this ledger holds.
+    // The configured stack-quantity path enters here, and the whole plan follows (issue 1024).
     remaining.set(itemKeyOf(item), readStackQuantity(item));
   }
   return remaining;
 }
 
-/** Charge one node against the shared safeguard budget, reporting whether the bound was reached. */
+/** Charge one node; reports whether the budget is spent. */
 export function chargeNode(budget) {
   if (++budget.nodes > INGREDIENT_SEARCH_NODE_CAP) {
     budget.capHit = true;
@@ -34,10 +31,7 @@ export function chargeNode(budget) {
   return false;
 }
 
-/**
- * Append a chosen option's plan entries to the running plan and deduct them from the ledger. A
- * supplied journal records each write in order, which is what makes the deduction undoable.
- */
+/** Deduct the plan from the ledger; a supplied journal makes it undoable. */
 export function commitItemPlan(candidatePlan, plan, remaining, journal = null) {
   for (const entry of candidatePlan) {
     plan.push(entry);
@@ -48,10 +42,7 @@ export function commitItemPlan(candidatePlan, plan, remaining, journal = null) {
   }
 }
 
-/**
- * Revert `remaining` to the state it held when the caller took `mark`, by replaying the shared undo
- * journal backwards to that mark and truncating it.
- */
+/** Replay the journal backwards to `mark`, then truncate it. */
 export function undoLedger(remaining, journal, mark) {
   for (let index = journal.length - 2; index >= mark; index -= 2) {
     remaining.set(journal[index], journal[index + 1]);
@@ -59,7 +50,6 @@ export function undoLedger(remaining, journal, mark) {
   journal.length = mark;
 }
 
-/** A canonical dedup key for a candidate item plan. */
 export function planSignature(plan) {
   return plan.map((entry) => `${itemKeyOf(entry.item)}x${entry.quantity}`).join('|');
 }
@@ -74,10 +64,7 @@ export function candidateStacksForOption(option, restrictItemId, scan) {
   return pool.filter((item) => itemKeyOf(item) === restrictItemId);
 }
 
-/**
- * The matching stacks with a positive remaining count, in `availableItems` order. Availability is
- * snapshotted, so a later ledger write cannot move the domain an in-flight enumeration walks.
- */
+/** Snapshotted, so a later ledger write cannot move an in-flight enumeration's domain. */
 export function candidateStacksWithAvailability(option, restrictItemId, scan) {
   const out = [];
   for (const item of candidateStacksForOption(option, restrictItemId, scan)) {
@@ -89,8 +76,7 @@ export function candidateStacksWithAvailability(option, restrictItemId, scan) {
 
 /** The greedy front-loaded item plan for one option against `scan.remaining`. */
 export function buildItemPlanForOption(option, restrictItemId, scan) {
-  // A currency option is never item-satisfiable: short-circuit so the resolver never item-matches
-  // it (currency is chosen by the affordability probe in the fallback pass, not here).
+  // Currency is never item-satisfiable; the fallback pass's affordability probe chooses it.
   if (option?.match?.type === 'currency') {
     return { ok: false, plan: [], have: 0 };
   }
@@ -125,10 +111,7 @@ export function* enumerateUnitPlans(option, matchingItems, need, budget) {
   yield* enumerateUnitPlansFrom(option, matchingItems, 0, need, [], budget);
 }
 
-/**
- * Assign `remainingNeed` units across `matchingItems[index..]`, taking the most from the earliest
- * stack first so the first complete plan is the front-loaded greedy pick.
- */
+/** Most from the earliest stack first, so the first complete plan is the greedy pick. */
 function* enumerateUnitPlansFrom(option, matchingItems, index, remainingNeed, entries, budget) {
   if (chargeNode(budget)) return;
   if (remainingNeed === 0) {
