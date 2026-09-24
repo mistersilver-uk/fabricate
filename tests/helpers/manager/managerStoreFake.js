@@ -1631,6 +1631,8 @@ function createStore(calls = [], options = {}) {
         return Promise.reject(new Error('update gathering task failed'));
       }
       if (options.updateGatheringLibraryTaskResult === false) return false;
+      // A store that answers nothing, which the task and event saves read differently.
+      if (options.updateGatheringLibraryTaskResolvesNothing) return Promise.resolve(undefined);
       viewState.update((state) => {
         const systemConfig = state.gatheringConfig?.systems?.[systemId];
         if (!systemConfig) return state;
@@ -1674,6 +1676,7 @@ function createStore(calls = [], options = {}) {
         return Promise.reject(new Error('update gathering event failed'));
       }
       if (options.updateGatheringLibraryEventResult === false) return false;
+      if (options.updateGatheringLibraryEventResolvesNothing) return Promise.resolve(undefined);
       viewState.update((state) => {
         const systemConfig = state.gatheringConfig?.systems?.[systemId];
         if (!systemConfig) return state;

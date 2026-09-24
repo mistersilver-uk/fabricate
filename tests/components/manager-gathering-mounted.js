@@ -2521,6 +2521,71 @@ export function registerGatheringCases() {
     );
   });
 
+  // The drop half of the same search: its suggestions exclude what the selected drop already
+  // references, and a pick lands on that drop by its real id.
+  it('suggests and persists a character modifier typed into the selected drop search', async () => {
+    const calls = [];
+    await openDirtyGatheringTaskEditor(calls, {
+      modifiers: [
+        { id: 'mod-herbalism', label: 'Herbalism Training', expression: '@skills.nat.total' },
+        { id: 'mod-herb-lore', label: 'Herb Lore', expression: '@skills.med.total' },
+      ],
+    });
+    target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]').click();
+    await settleSaveAttempt();
+
+    const search = target.querySelector('[data-gathering-drop-character-modifier-search]');
+    assert.ok(Boolean(search), 'the drop inspector renders the character-modifier search');
+    setInputValue(search.querySelector('input'), 'herb');
+    await settleSaveAttempt();
+    const suggested = () =>
+      [...target.querySelectorAll('[data-gathering-drop-character-modifier-suggestion]')].map(
+        (node) => node.getAttribute('data-gathering-drop-character-modifier-suggestion')
+      );
+    assert.deepEqual(suggested(), ['mod-herbalism', 'mod-herb-lore'], 'both library entries match');
+
+    target
+      .querySelector('[data-gathering-drop-character-modifier-suggestion="mod-herbalism"]')
+      .click();
+    await settleSaveAttempt();
+    assert.equal(
+      target.querySelector('[data-gathering-drop-character-modifier-search] input').value,
+      '',
+      'a pick clears the search term'
+    );
+    setInputValue(
+      target.querySelector('[data-gathering-drop-character-modifier-search] input'),
+      'herb'
+    );
+    await settleSaveAttempt();
+    assert.deepEqual(suggested(), ['mod-herb-lore'], 'the attached entry is no longer suggested');
+
+    await clickHeaderSave();
+    const saved = calls.findLast((call) => call[0] === 'updateGatheringLibraryTask');
+    const row = saved[3].dropRows.find((entry) => entry.id === 'drop-nightshade');
+    assert.deepEqual(
+      row.characterModifiers.map((ref) => [ref.modifierId, ref.operator, ref.expressionOverride]),
+      [['mod-herbalism', '+', '']],
+      'the pick persists on the selected drop as one fresh reference'
+    );
+  });
+
+  // The two saves read a store that answers nothing in opposite ways: a task save needs a truthy
+  // answer, an event save fails only on a literal `false`.
+  it('fails a gathering-task save the store answers with nothing', async () => {
+    await openDirtyGatheringTaskEditor([], { updateGatheringLibraryTaskResolvesNothing: true });
+    await clickHeaderSave();
+    assertSaveErrorRendered('[data-gathering-task-save-error]');
+    assert.equal(headerSaveButton(target).disabled, false, 'the draft is still dirty');
+  });
+
+  it('rebaselines a gathering-event save the store answers with nothing', async () => {
+    await openDirtyGatheringEventEditor([], { updateGatheringLibraryEventResolvesNothing: true });
+    await clickHeaderSave();
+    assertSaveErrorAbsent('[data-gathering-event-save-error]', 'the save counts as landed');
+    assert.equal(headerSaveButton(target).disabled, true, 'the draft is clean against its baseline');
+  });
+
   it('surfaces a gathering-event save that rejects, and clears it on the next success', async () => {
     const calls = [];
     const storeOptions = { updateGatheringLibraryEventReject: true };
