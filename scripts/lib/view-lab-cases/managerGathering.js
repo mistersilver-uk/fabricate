@@ -162,7 +162,10 @@ export const CASES = Object.freeze([
         '[data-gathering-task-node-interval-unit]',
       ].map((target) => ({ container: '[data-gathering-task-nodes]', target })),
       kinds: ['manager', 'environments', 'responsive'],
-      sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/],
+      sourceMatches: [
+        GATHERING_ROUTE_MODEL_PATTERN,
+        /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+      ],
     })
   ),
   // The gathering studio's first open-panel frame (issue 1510), and the only way to photograph a
@@ -231,6 +234,7 @@ export const CASES = Object.freeze([
     expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
       ...ANCHORED_POPOVER_SOURCES,
     ],
@@ -296,6 +300,8 @@ export const CASES = Object.freeze([
         ),
         kinds: ['manager', 'environments', 'responsive'],
         sourceMatches: [
+          // One dirty-draft frame per editor stands for the route model (issue 1721).
+          ...(suffix === 'normal' && !tools ? [GATHERING_ROUTE_MODEL_PATTERN] : []),
           /^src\/ui\/svelte\/apps\/manager\/Gathering(TaskEditView|EventEditView)\.svelte$/,
         ],
       });

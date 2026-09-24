@@ -128,6 +128,7 @@
     gatheringModifierValueClass,
     gatheringTaskDropRows,
     gatheringTaskImage,
+    gatheringVocabularyValues,
     signedToOperatorValue,
     sortedDangerTags,
     truncateDescription,
@@ -4869,8 +4870,7 @@
   }
 
   function gatheringVocabularyOptions(kind) {
-    const vocabulary = gathering.selectedGatheringSystemConfig.vocabularies?.[kind] || {};
-    return Array.isArray(vocabulary.values) ? vocabulary.values : [];
+    return gatheringVocabularyValues(gathering.selectedGatheringSystemConfig, kind);
   }
 
   function gatheringConditionModifierRows(row, kind) {
