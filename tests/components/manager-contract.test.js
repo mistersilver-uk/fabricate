@@ -1495,7 +1495,7 @@ describe('CraftingSystemManager source contract', () => {
   });
 
   // `duplicate` is not in this set (issue 1372), and the armed bulk delete is a deliberate
-  // deviation from the `AGENTS.md` dialog carve-out.
+  // deviation from the foundry-and-architecture.md dialog carve-out.
   defineStructureContract('extracts the inspector and its bulk panel', ESSENCE_STUDIO, {
     imports: [
       '../../../components/IconPicker.svelte',
