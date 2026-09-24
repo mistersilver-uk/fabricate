@@ -30,6 +30,7 @@ import {
 let Component;
 let mounted;
 let target;
+let mountedStore;
 
 // The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
@@ -41,7 +42,9 @@ const { mountManager } = createManagerMounts({
     mounted = nextMounted;
     target = nextTarget;
   },
-  adoptStore: () => {},
+  adoptStore: (store) => {
+    mountedStore = store;
+  },
 });
 
 /** Register this route’s cases in `manager-mounted.test.js`’s one describe. */
@@ -1488,7 +1491,10 @@ export function registerComponentsCases() {
       const calls = [];
       mountManager([], {}, {
         onDropItem: (data) => calls.push(['onDropItem', data]),
-        collectImportFolderGroups: async () => plan,
+        collectImportFolderGroups: async (data) => {
+          calls.push(['collect', data]);
+          return plan;
+        },
         commitImportFolderMapping: async (systemId, decisions) =>
           calls.push(['commit', systemId, decisions]),
       });
@@ -1520,10 +1526,40 @@ export function registerComponentsCases() {
     it('neither imports nor opens the modal for a drop the collector already handled', async () => {
       const calls = await dropFolder({ handled: true });
       assert.ok(!mappingDialog(), 'a handled drop opens nothing');
-      assert.deepEqual(calls, [], 'and never falls through to onDropItem');
+      assert.deepEqual(
+        calls,
+        [['collect', { type: 'Folder', uuid: 'Folder.f1' }]],
+        'and never falls through to onDropItem'
+      );
     });
 
-    it('closes the modal without a service call when the GM commits no folder', async () => {
+    it('closes the mapping modal on Cancel without committing', async () => {
+      const calls = await dropFolder({ groups: GROUPS });
+      assert.ok(Boolean(mappingDialog()), 'the grouped drop opens the mapping modal');
+
+      document.querySelector('[data-import-mapping-cancel]').click();
+      await settle();
+
+      assert.ok(!mappingDialog(), 'Cancel closes the modal');
+      assert.equal(serviceCalls(calls, 'commit').length, 0, 'and nothing reaches the service');
+    });
+
+    it('opens the import report from the header Import button and closes it', async () => {
+      mountManager();
+      mountedStore.importSystem = async () => ({
+        handledCount: 0,
+        groups: [{ kind: 'sourceItem', kindLabel: 'Component source items', count: 0, rows: [] }],
+      });
+      target.querySelector('[data-manager-import-system]').click();
+      await settle();
+      assert.ok(Boolean(document.querySelector('[data-import-report]')), 'Import opens the report');
+
+      document.querySelector('[data-import-report-close]').click();
+      await settle();
+      assert.ok(!document.querySelector('[data-import-report]'), 'and its Close dismisses it');
+    });
+
+    it('refuses an empty import in the modal, and the shell drops one that gets past it', async () => {
       const calls = await dropFolder({ groups: GROUPS });
       document.querySelector('[data-import-mapping-skip]').click();
       flushSync();

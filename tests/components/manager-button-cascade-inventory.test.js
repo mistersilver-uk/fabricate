@@ -25,13 +25,8 @@ const CONVERTED_BATCHES = Object.freeze([
   Object.freeze({
     task: 5,
     files: Object.freeze([
-      // 39 sites — 30 `<button>` and 9 `<a href>` — less 2 that issue 1707 phase 2 moved into
-      // `environment/GatheringTaskInspector.svelte` (the drop Duplicate/Delete pair) and 2 its
-      // phase 3 moved into `environment/GatheringInspectorRail.svelte` (the empty-library setup
-      // card's docs links), both below. Issue 1720 split the root's remaining 35 across the
-      // page header's three action units, 29 of them leaving, and issue 1721 moved 2 more into
-      // `SystemBrowserInspector.svelte` (the first-run card's docs links). The sum over the seven
-      // rows is 39.
+      // The root's 39 task-5 sites (30 `<button>`, 9 `<a href>`), split across the files they
+      // moved into (issues 1707, 1720, 1721); the sum over the seven rows is 39.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
         sites: 4,
@@ -1114,10 +1109,8 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
     47,
-    // 41 -> 42 (issue 1707 phase 2), -> 43 (phase 3): the root's task-5 sites split across the two
-    // files they moved into. -> 46 (issue 1720), across the page header's three action units.
-    // -> 47 (issue 1721), the systems inspector. The 123-site total above is unchanged, because
-    // nothing converted.
+    // One per file the root's task-5 sites moved into (issues 1707, 1720, 1721); the 123-site
+    // total above is unchanged, because nothing converted.
     'across 47 components'
   );
 

@@ -714,6 +714,20 @@ describe('CraftingSystemManager source contract', () => {
     readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
   });
 
+  // Its cards are direct flex children of the shell's `aside.manager-inspector`.
+  it('leaves the systems library inspector unwrapped and unstyled', () => {
+    const inspector = componentAstOf(SYSTEM_BROWSER_INSPECTOR);
+    const topLevel = inspector.fragment.nodes.filter(
+      (node) => node.type !== 'Comment' && !(node.type === 'Text' && !node.data.trim())
+    );
+    assert.deepEqual(
+      topLevel.map((node) => node.type),
+      ['IfBlock'],
+      'the top level is the branch chain alone, with no wrapper element'
+    );
+    assert.ok(!inspector.css, 'and it carries no <style>');
+  });
+
   defineStructureContract(
     'uses manager localization keys rather than hard-coded copy',
     [MANAGER_ROOT, MANAGER_SYSTEM_NAV, HEADER_MODEL],
