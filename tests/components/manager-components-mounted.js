@@ -1474,4 +1474,68 @@ export function registerComponentsCases() {
       });
     }
   });
+
+  // The folder-aware drop through the shell's import flow model (issue 1721).
+  describe('folder-aware component drop', () => {
+    const GROUPS = [
+      { folderId: 'f1', folderName: 'Reagent', itemCount: 2, itemUuids: ['Item.a', 'Item.b'] },
+    ];
+    const mappingDialog = () => document.querySelector('[data-import-mapping]');
+    const serviceCalls = (calls, name) => calls.filter(([called]) => called === name);
+
+    /** Mount on Component Rules with a collector answering `plan`, then drop one folder. */
+    async function dropFolder(plan) {
+      const calls = [];
+      mountManager([], {}, {
+        onDropItem: (data) => calls.push(['onDropItem', data]),
+        collectImportFolderGroups: async () => plan,
+        commitImportFolderMapping: async (systemId, decisions) =>
+          calls.push(['commit', systemId, decisions]),
+      });
+      navButton('Component Rules').click();
+      await settle();
+      const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+      Object.defineProperty(dropEvent, 'dataTransfer', {
+        value: { getData: () => JSON.stringify({ type: 'Folder', uuid: 'Folder.f1' }) },
+      });
+      target.querySelector('.manager-component-drop-zone').dispatchEvent(dropEvent);
+      await settle();
+      return calls;
+    }
+
+    it('opens the mapping modal for a grouped drop and commits against the selected system', async () => {
+      const calls = await dropFolder({ groups: GROUPS });
+      assert.ok(Boolean(mappingDialog()), 'the grouped drop opens the mapping modal');
+      assert.equal(serviceCalls(calls, 'onDropItem').length, 0, 'and imports nothing yet');
+
+      document.querySelector('[data-import-mapping-commit]').click();
+      await settle();
+
+      assert.ok(!mappingDialog(), 'the commit closes the modal');
+      const [commit] = serviceCalls(calls, 'commit');
+      assert.equal(commit?.[1], 'alchemy', 'against the system selected when the GM commits');
+      assert.deepEqual(commit?.[2].map((decision) => decision.folderId), ['f1']);
+    });
+
+    it('neither imports nor opens the modal for a drop the collector already handled', async () => {
+      const calls = await dropFolder({ handled: true });
+      assert.ok(!mappingDialog(), 'a handled drop opens nothing');
+      assert.deepEqual(calls, [], 'and never falls through to onDropItem');
+    });
+
+    it('closes the modal without a service call when the GM commits no folder', async () => {
+      const calls = await dropFolder({ groups: GROUPS });
+      document.querySelector('[data-import-mapping-skip]').click();
+      flushSync();
+      const commit = document.querySelector('[data-import-mapping-commit]');
+      assert.equal(commit.disabled, true, 'the modal itself refuses an empty import');
+      // Lifted so the shell's own guard is what answers the empty set.
+      commit.disabled = false;
+      commit.click();
+      await settle();
+
+      assert.ok(!mappingDialog(), 'the modal closes');
+      assert.equal(serviceCalls(calls, 'commit').length, 0, 'and nothing reaches the service');
+    });
+  });
 }

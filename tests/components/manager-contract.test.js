@@ -175,6 +175,8 @@ const RECIPE_BROWSER_INSPECTOR =
 const RESOLUTION_MODE_OPTIONS = 'src/ui/svelte/apps/manager/resolutionModeOptions.js';
 const ROUTE_EXIT_GUARDS = 'src/ui/svelte/apps/manager/routeExitGuards.js';
 const SYSTEMS_BROWSER = 'src/ui/svelte/apps/manager/SystemsBrowserView.svelte';
+// The systems library inspector, extracted out of the root (issue 1721).
+const SYSTEM_BROWSER_INSPECTOR = 'src/ui/svelte/apps/manager/SystemBrowserInspector.svelte';
 const SYSTEM_EDIT = 'src/ui/svelte/apps/manager/SystemEditView.svelte';
 const TAGS_CATEGORIES = 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte';
 // The system screen's presentation model (issue 1915), the world screen's twin.
@@ -708,6 +710,10 @@ describe('CraftingSystemManager source contract', () => {
     readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
   });
 
+  defineStructureContract('keeps the systems library inspector free of Foundry globals', SYSTEM_BROWSER_INSPECTOR, {
+    readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
+  });
+
   defineStructureContract(
     'uses manager localization keys rather than hard-coded copy',
     [MANAGER_ROOT, MANAGER_SYSTEM_NAV, HEADER_MODEL],
@@ -842,6 +848,7 @@ describe('CraftingSystemManager source contract', () => {
   it('keeps changed manager and environment static localization fallbacks aligned with en.json', () => {
     const contractFiles = [
       MANAGER_ROOT,
+      SYSTEM_BROWSER_INSPECTOR,
       ENVIRONMENT_EDIT,
       ENVIRONMENTS_BROWSER,
       KNOWLEDGE_VIEW,
@@ -1249,12 +1256,19 @@ describe('CraftingSystemManager source contract', () => {
     // The URLs in full: a substring claim on the essences page is satisfied by the
     // effect-transfer URL one card away, which leaves a moved link green.
     spellsExactly: [
-      'FABRICATE.Admin.Manager.EmptySetup.Title',
       'FABRICATE.Admin.Manager.Component.EmptySetup.Title',
       'FABRICATE.Admin.Manager.Essence.EmptySetup.Title',
       'https://mistersilver-uk.github.io/fabricate/help/quickstart',
       'https://mistersilver-uk.github.io/fabricate/components/',
       'https://mistersilver-uk.github.io/fabricate/essences',
+    ],
+  });
+
+  // The first-run card moved with the systems inspector chain (issue 1721).
+  defineStructureContract('routes the empty system library to its first step', SYSTEM_BROWSER_INSPECTOR, {
+    spellsExactly: [
+      'FABRICATE.Admin.Manager.EmptySetup.Title',
+      'https://mistersilver-uk.github.io/fabricate/help/quickstart',
     ],
   });
 
@@ -1675,14 +1689,14 @@ describe('CraftingSystemManager source contract', () => {
       'store.updateGatheringVocabularyValue',
       'store.deleteGatheringVocabularyValue',
     ],
-    names: ['updateSelectedGatheringRules', 'selectedGatheringConditionShortcuts'],
+    names: ['updateSelectedGatheringRules'],
+  });
+
+  // The per-system condition shortcut card moved with the systems inspector chain (issue 1721).
+  defineStructureContract('draws the global condition shortcuts', SYSTEM_BROWSER_INSPECTOR, {
+    names: ['selectedGatheringConditionShortcuts'],
     calls: ['buildSelectedGatheringConditionShortcuts'],
-    // `data-gathering-inspector-rules` is the rules leaf's own hook now (issue 1707 phase 2) and
-    // `manager-environments-mounted.js` pins it through the DOM.
-    writes: [
-      'data-systems-gathering-conditions',
-      'data-systems-gathering-condition',
-    ],
+    writes: ['data-systems-gathering-conditions', 'data-systems-gathering-condition'],
   });
 
   // The rules card moved into `environment/GatheringRulesInspector.svelte` (issue 1707 phase 2):
@@ -1715,7 +1729,7 @@ describe('CraftingSystemManager source contract', () => {
   // whole point of a per-system shortcut card.
   defineStructureContract(
     'persists a condition shortcut against the selected system',
-    { file: MANAGER_ROOT, fn: 'updateSelectedGatheringCondition' },
+    { file: SYSTEM_BROWSER_INSPECTOR, fn: 'updateSelectedGatheringCondition' },
     {
       reads: ['store.updateGatheringConditions'],
       keys: ['systemId'],

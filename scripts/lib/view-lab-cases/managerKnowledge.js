@@ -294,6 +294,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ImportReportModal\.svelte$/,
       // The prompt, run and report sequence this frame drives (issue 1674).
       /^src\/ui\/managerServices\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/importFlowModel\.svelte\.js$/,
     ],
   }),
   managerCase({
@@ -310,6 +311,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/ImportFolderMappingModal\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/importFlowModel\.svelte\.js$/,
     ],
   }),
   managerCase({

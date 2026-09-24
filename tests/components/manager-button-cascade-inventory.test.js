@@ -29,10 +29,12 @@ const CONVERTED_BATCHES = Object.freeze([
       // `environment/GatheringTaskInspector.svelte` (the drop Duplicate/Delete pair) and 2 its
       // phase 3 moved into `environment/GatheringInspectorRail.svelte` (the empty-library setup
       // card's docs links), both below. Issue 1720 split the root's remaining 35 across the
-      // page header's three action units, 29 of them leaving. The sum over the six rows is 39.
+      // page header's three action units, 29 of them leaving, and issue 1721 moved 2 more into
+      // `SystemBrowserInspector.svelte` (the first-run card's docs links). The sum over the seven
+      // rows is 39.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-        sites: 6,
+        sites: 4,
       }),
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte',
@@ -45,6 +47,10 @@ const CONVERTED_BATCHES = Object.freeze([
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte',
         sites: 12,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/SystemBrowserInspector.svelte',
+        sites: 2,
       }),
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/environment/GatheringInspectorRail.svelte',
@@ -769,7 +775,13 @@ const REVIEWED = [
       {
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
         container: 'manager-setup-links',
-        buttons: 6,
+        buttons: 4,
+      },
+      // Two more left with the first-run card issue 1721 moved into the systems inspector.
+      {
+        file: 'src/ui/svelte/apps/manager/SystemBrowserInspector.svelte',
+        container: 'manager-setup-links',
+        buttons: 2,
       },
       // Two of the root's eight left with the empty-library setup card issue 1707 phase 3 moved
       // into the inspector rail; the sum over the two rows is unchanged.
@@ -1101,11 +1113,12 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
-    46,
+    47,
     // 41 -> 42 (issue 1707 phase 2), -> 43 (phase 3): the root's task-5 sites split across the two
     // files they moved into. -> 46 (issue 1720), across the page header's three action units.
-    // The 123-site total above is unchanged, because nothing converted.
-    'across 46 components'
+    // -> 47 (issue 1721), the systems inspector. The 123-site total above is unchanged, because
+    // nothing converted.
+    'across 47 components'
   );
 
   // …and the ledger is not allowed to be fiction. A converted file must actually render the
