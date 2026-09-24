@@ -1,5 +1,4 @@
 /** `DOMAIN.md` glossary entries, their notes under `docs/domain/`, and the gate over both. */
-import { isTableRow, splitRow } from './markdownTables.js';
 import { endsSentence } from './markdownWraps.js';
 
 /** Each glossary section of `DOMAIN.md` and the notes file its entries link to. */
@@ -45,22 +44,12 @@ const POINTER_HEADINGS = [
   'Current Realm Resolution (Phase 1 shipped)',
 ];
 
-const TABLE_OPEN = [
-  '<!-- markdownlint-disable markdownlint-sentences-per-line -->',
-  '',
-  '| Term | Definition | Canonical Mapping | Spec Reference |',
-  '| --- | --- | --- | --- |',
-];
-const TABLE_CLOSE = ['', '<!-- markdownlint-enable markdownlint-sentences-per-line -->'];
 const MAPPING = 'Canonical mapping:';
 const SPEC = 'Spec reference:';
 const LINK_LINE = /^\[Notes\]\((docs\/domain\/[\w-]+\.md)#([^)\s]+)\)$/u;
 const DOMAIN_LINK = /\]\((docs\/domain\/[\w-]+\.md)(?:#([^)\s]*))?\)/gu;
 const FENCE = /^ {0,3}(`{3,}|~{3,})/u;
 const ATX = /^ {0,3}(#{1,6})[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*$/u;
-/** A line opening a block construct, which a line lifted out of a table cell must never do. */
-const BLOCK_START =
-  /^(?: {4}|\t|[-+*](?:\s|$)|#{1,6}(?:\s|$)|>|\d{1,9}[.)](?:\s|$)|\||`{3}|~{3}|[=-]+\s*$|<|\[[^\]]*\]:|(?:[*_]\s*){3,}$)/u;
 /** Terminal punctuation and any closing marks after it; `:` and `;` never end a split sentence. */
 const TERMINAL = /[.!?][*_)\]"'”’]*$/u;
 /** The opening of the next sentence: a capital, or bold, emphasis or code before one. */
@@ -192,7 +181,6 @@ export function sentenceLines(text) {
   return breaks.slice(1).flatMap((end, at) => ruleLines(text.slice(breaks[at] + 1, end)));
 }
 
-const unescapePipes = (cell) => cell.replaceAll(String.raw`\|`, '|');
 const escapePipes = (cell) => cell.replaceAll('|', String.raw`\|`);
 
 /** The `[start, end)` line range of the body under heading `text`, or null when absent. */
@@ -205,41 +193,8 @@ function sectionRange(markdown, text, level) {
   return { start: all[at].index + 1, end };
 }
 
-/** The body rows of the table under `### <section>`, as raw lines. */
-function tableRows(markdown, section) {
-  const range = sectionRange(markdown, section, 3);
-  if (!range) return null;
-  const lines = markdown.split('\n').slice(range.start, range.end);
-  return lines.filter((line) => isTableRow(line)).slice(2);
-}
-
 /** The 1-based positions `1..count`. */
 const leading = (count) => Array.from({ length: count }, (_, at) => at + 1);
-
-/** Whether `order` is a non-empty ascending list of 1-based indices into `total` sentences. */
-const ascendingWithin = (order, total) =>
-  order.length > 0 &&
-  order.every(
-    (index, at) => Number.isInteger(index) && index > (order[at - 1] ?? 0) && index <= total
-  );
-
-/** One table row split into its entry and notes parts, with `\|` unescaped. */
-function splitTableRow(row, sentences = 1) {
-  const [term, definition, mapping, spec] = splitRow(row).map(unescapePipes);
-  const heading = term.replace(/^\*\*(.*)\*\*$/u, '$1');
-  const lines = sentenceLines(definition);
-  const shown = Array.isArray(sentences) ? sentences : leading(sentences);
-  if (Array.isArray(sentences) && !ascendingWithin(sentences, lines.length)) {
-    throw new Error(`"${heading}" names no ascending indices of its ${lines.length} sentences`);
-  }
-  return {
-    heading,
-    definition: lines.filter((_, at) => shown.includes(at + 1)),
-    rest: lines.filter((_, at) => !shown.includes(at + 1)),
-    mapping: sentenceLines(`${MAPPING} ${mapping}`.trimEnd()),
-    spec: sentenceLines(`${SPEC} ${spec}`.trimEnd()),
-  };
-}
 
 /** A paragraph's cell text with its label stripped. */
 const cellOf = (lines, label) => lines.join(' ').slice(label.length).replace(/^ /u, '');
@@ -261,17 +216,6 @@ function rebuildRow(entry, notes, order) {
     cellOf(notes.spec, SPEC),
   ].map(escapePipes);
   return `| ${cells.join(' | ')} |`;
-}
-
-/** The notes file text for `title` and its sections, in the one canonical layout. */
-function serializeNotes(title, sections) {
-  const blocks = sections.map(({ heading, rest, mapping, spec }) =>
-    [`## ${heading}`, rest.join('\n'), mapping.join('\n'), spec.join('\n')]
-      .filter(Boolean)
-      .join('\n\n')
-  );
-  const text = [`# ${title}`, ...blocks].join('\n\n');
-  return `${text}\n`;
 }
 
 /** A notes file's `##` sections, and its non-blank lines before the first as `{ index, line }`. */
@@ -478,186 +422,4 @@ export function glossaryProblems({
     ...linkProblems(domain, readNote),
     ...pointerProblems(domain, pointerHeadings),
   ];
-}
-
-/**
- * `domain` with the table under `### <section>` turned into entries, plus that section's notes;
- * `overrides` maps a term to its `DEFINITION_SENTENCES` value.
- */
-export function convertSection(domain, section, overrides = {}) {
-  const file = SECTION_FILES[section];
-  const rows = file ? tableRows(domain, section) : null;
-  if (!rows || rows.length === 0) throw new Error(`no glossary table under "${section}"`);
-  const terms = rows.map((row) => splitTableRow(row).heading);
-  const unknown = Object.keys(overrides).filter((term) => !terms.includes(term));
-  if (unknown.length > 0) throw new Error(`overrides name no row under "${section}": ${unknown}`);
-  const split = rows.map((row, at) => splitTableRow(row, overrides[terms[at]] ?? 1));
-  const anchors = dedupedSlugs([section, ...terms]).slice(1);
-  const entries = split.map(({ heading, definition }, at) =>
-    [`#### ${heading}`, '', ...definition, '', `[Notes](${file}#${anchors[at]})`].join('\n')
-  );
-  const lines = domain.split('\n');
-  const start = lines.indexOf(TABLE_OPEN[0], sectionRange(domain, section, 3).start);
-  const end = lines.indexOf(TABLE_CLOSE[1], start);
-  const converted = lines.toSpliced(start, end - start + 1, entries.join('\n\n')).join('\n');
-  return { domain: converted, file, notes: serializeNotes(section, split) };
-}
-
-/** The 1-based number of the first line where two texts differ. */
-const firstDifference = (actual, expected) =>
-  firstMismatch(actual.split('\n'), expected.split('\n')) + 1;
-
-/** Each pointer's replacement block, and the notes lines each block consumes by file. */
-function pointerBlocks(domain, notes) {
-  const swaps = new Map();
-  const used = new Map();
-  const problems = [];
-  for (const { index, links } of pointers(domain)) {
-    const [, file, anchor] = links[0];
-    const text = notes[file];
-    const all = text ? headings(text) : [];
-    const target = text && all[headingSlugs(text).indexOf(anchor)];
-    if (!target) {
-      problems.push(`the pointer on line ${index + 1} resolves to no moved block`);
-      continue;
-    }
-    const lines = text.split('\n');
-    const next = all.find((h) => h.index > target.index && h.level <= target.level);
-    const end = next ? next.index : lines.length;
-    const block = lines.slice(target.index + 1, end);
-    while (block[0] === '') block.shift();
-    while (block.at(-1) === '') block.pop();
-    swaps.set(index, block);
-    const marks = used.get(file) ?? new Set();
-    for (let line = target.index; line < end; line += 1) marks.add(line);
-    used.set(file, marks);
-  }
-  return { swaps, used, problems };
-}
-
-/** Why a moved-block file carries a line no pointer consumed, other than its title. */
-function unconsumedLines(path, text, marks) {
-  return text
-    .split('\n')
-    .map((line, at) => ({ line, at }))
-    .filter(({ line, at }) => line !== '' && !(at === 0 && line.startsWith('# ')) && !marks.has(at))
-    .map(({ at }) => `${path} line ${at + 1} is left over`);
-}
-
-/** Why each `docs/domain/` file is not wholly consumed by the reconstruction or unchanged. */
-function leftoverProblems({ notes, baseNotes, groups, used }) {
-  return Object.entries(notes).flatMap(([path, text]) => {
-    const group = groups.find(({ file }) => file === path);
-    if (group) {
-      const canonical = serializeNotes(group.section, group.sections);
-      if (text === canonical) return [];
-      return [`${path} line ${firstDifference(text, canonical)} is left over`];
-    }
-    if (used.has(path)) return unconsumedLines(path, text, used.get(path));
-    return text === baseNotes[path] ? [] : [`${path} changed but no reconstruction consumes it`];
-  });
-}
-
-/** Every line lifted out of a table cell that opens a block construct. */
-function blockStartProblems(groups) {
-  const lifted = groups.flatMap(({ entries, sections }) => [
-    ...entries.flatMap(({ definition }) => definition),
-    ...sections.flatMap(({ rest, mapping, spec }) => [
-      ...rest,
-      ...mapping.slice(1),
-      ...spec.slice(1),
-    ]),
-  ]);
-  return lifted
-    .filter((line) => BLOCK_START.test(line))
-    .map((line) => `a line lifted from a cell opens a block: ${line.slice(0, 60)}`);
-}
-
-/** The whole-document reconstruction of the base from the converted `domain` and its notes. */
-function reconstruct({ domain, groups, swaps, reversePairs }) {
-  const replaced = new Map(swaps);
-  for (const { entries, rows } of groups) {
-    if (entries.length === 0) continue;
-    replaced.set(entries[0].line, [...TABLE_OPEN, ...rows, ...TABLE_CLOSE]);
-    for (let line = entries[0].line + 1; line <= entries.at(-1).lastLine; line += 1) {
-      replaced.set(line, []);
-    }
-  }
-  let text = domain
-    .split('\n')
-    .flatMap((line, index) => replaced.get(index) ?? [line])
-    .join('\n');
-  const problems = [];
-  for (const { current, base } of reversePairs) {
-    const found = count(text, current);
-    if (found === 1) text = text.replace(current, () => base);
-    else problems.push(`a reverse pair matches ${found} times: ${current.slice(0, 60)}`);
-  }
-  return { text, problems };
-}
-
-/** One converted section's entries, notes sections, rebuilt rows and base rows, with its problems. */
-function sectionProof({ base, domain, notes, section, overrides }) {
-  const file = SECTION_FILES[section];
-  const baseRows = tableRows(base, section) ?? [];
-  const entries = parseEntries(domain).filter((entry) => entry.section === section);
-  const { sections } = parseNotes(notes[file] ?? '');
-  const problems = [
-    [entries.length, 'entries'],
-    [entries.filter(({ link }) => link).length, 'link lines'],
-    [sections.length, 'notes sections'],
-  ]
-    .filter(([found]) => found !== baseRows.length)
-    .map(([found, what]) => `${found} ${what} for ${baseRows.length} base rows of "${section}"`);
-  const rows = entries.map((entry, at) =>
-    sections[at]?.heading === entry.heading
-      ? rebuildRow(entry, sections[at], overrides[section]?.[entry.heading])
-      : ''
-  );
-  problems.push(...entries.flatMap(({ problem }) => (problem ? [problem] : [])));
-  return { section, file, entries, sections, rows, baseRows, problems };
-}
-
-/**
- * Proves `domain` and `notes` rebuild `base` byte for byte, from the working files alone, counting
- * the rows of `section` and rebuilding every section already converted. `notes` and `baseNotes`
- * map `docs/domain/*.md` paths to text; each `reversePairs` entry swaps a `current` string, which
- * must occur once, back to its `base` text. `overrides` is shaped as `DEFINITION_SENTENCES`.
- */
-export function verifyConversion({
-  base,
-  domain,
-  notes,
-  baseNotes = {},
-  section,
-  reversePairs,
-  overrides = {},
-}) {
-  const file = SECTION_FILES[section];
-  const baseRows = file ? tableRows(base, section) : null;
-  if (!baseRows || baseRows.length === 0 || !sectionRange(domain, section, 3)) {
-    const problems = [`"${section}" is no glossary section with base rows`];
-    return { problems, rows: 0, rebuilt: 0 };
-  }
-  const groups = Object.keys(SECTION_FILES)
-    .map((own) => sectionProof({ base, domain, notes, section: own, overrides }))
-    .filter((group) => group.section === section || group.entries.length > 0);
-  const { swaps, used, problems: unresolved } = pointerBlocks(domain, notes);
-  const rebuilt = reconstruct({ domain, groups, swaps, reversePairs: reversePairs ?? [] });
-  const problems = groups.flatMap((group) => group.problems);
-  if (rebuilt.text !== base) {
-    const line = firstDifference(rebuilt.text, base);
-    problems.push(`the reconstruction differs from the base at line ${line}`);
-  }
-  problems.push(
-    ...unresolved,
-    ...rebuilt.problems,
-    ...leftoverProblems({ notes, baseNotes, groups, used }),
-    ...blockStartProblems(groups)
-  );
-  const named = groups.find((group) => group.section === section);
-  const reversed = (row) =>
-    (reversePairs ?? []).reduce((text, pair) => text.replace(pair.current, () => pair.base), row);
-  const matching = named.rows.filter((row, at) => reversed(row) === named.baseRows[at]).length;
-  return { problems, rows: baseRows.length, rebuilt: matching };
 }
