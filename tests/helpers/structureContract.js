@@ -11,6 +11,7 @@ import {
   calledName,
   declaredConstant as declaredConstantOf,
   identifierNames,
+  importedModules,
   importsModule as importsModuleOf,
   importsModuleLazily,
   literalStrings,
@@ -320,18 +321,19 @@ function comparedLiterals(node, name) {
   return [...values];
 }
 
-/** The named imports of one specifier kept under their own name, so no local copy can take it. */
-function importedNames(node, specifier) {
-  const names = new Set();
-  for (const inner of walkNodes(node)) {
-    if (inner.type !== 'ImportDeclaration' || inner.source?.value !== specifier) continue;
-    for (const entry of inner.specifiers) {
-      const imported = entry.type === 'ImportSpecifier' && keyName({ key: entry.imported });
-      if (imported && imported === entry.local?.name) names.add(imported);
-    }
-  }
-  return names;
-}
+/** Whether `specifier`'s `name` is imported under its own name, so no local copy can take it. */
+const importsNameUnaliased = (node, [specifier, name]) =>
+  importedModules(node, (declaration) => declaration).some(
+    (declaration) =>
+      declaration.type === 'ImportDeclaration' &&
+      declaration.source.value === specifier &&
+      declaration.specifiers.some(
+        (entry) =>
+          entry.type === 'ImportSpecifier' &&
+          keyName({ key: entry.imported }) === name &&
+          entry.local?.name === name
+      )
+  );
 
 /** The `(key, fallback)` pair a `return text(key, fallback);` states, or `[]` for any other. */
 function returnedTextArguments(node) {
@@ -401,7 +403,7 @@ function claimsOverCode(code) {
   return {
     imports: (specifier) => importsModuleOf(code, specifier),
     importsLazily: (specifier) => importsModuleLazily(code, specifier),
-    importsName: ([specifier, name]) => importedNames(code, specifier).has(name),
+    importsName: (pair) => importsNameUnaliased(code, pair),
     declares: (name) => declaredConstantOf(code, name),
     names: (name) => referencesIdentifierOf(code, name),
     spells: (text) => literalStrings(code).some((literal) => literal.includes(text)),
@@ -612,6 +614,7 @@ const CONTRACT_CLAIMS = Object.freeze({
     says: ([f, c]) => `never falls back from ${f}() to a new ${c}`,
   },
   contains: { ask: 'contains', holds: true, says: (v) => `holds \`${v}\`, shape for shape` },
+  // Matches one exact spelling, so a respelling evades it: always pair it with a positive leg.
   containsNo: { ask: 'contains', holds: false, says: (v) => `holds no \`${v}\`` },
   takes: { ask: 'takes', holds: true, says: (v) => `takes exactly (${v})` },
   importSpecifiers: {

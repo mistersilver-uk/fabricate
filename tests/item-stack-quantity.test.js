@@ -8,8 +8,8 @@ import { join } from 'node:path';
 import { handlerOf, recordNoticeOutput } from './helpers/bootContractProbes.js';
 import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
 import { calledName, walkNodes } from './helpers/moduleAst.js';
-import { componentAstOf, moduleAstOf } from './helpers/parsedSource.js';
-import { readScannedDirectory, repoRoot } from './helpers/sourceScan.js';
+import { moduleAstOf, sourceAstEntriesUnder } from './helpers/parsedSource.js';
+import { repoRoot } from './helpers/sourceScan.js';
 import { defineStructureContract } from './helpers/structureContract.js';
 import { keyName, shapeCount } from './helpers/structureShapes.js';
 import { applyItemStackQuantityPathSetting } from '../src/bootstrap/hooks.js';
@@ -402,25 +402,8 @@ const SITE_MAPPING = [
 /** The accessor module itself, which DEFINES these names and must not be counted. */
 const ACCESSOR_MODULE = 'src/systems/itemStackQuantity.js';
 
-/** Every `src/` module and component as `[repo-relative path, AST]`, read through the AST seam. */
-const srcSyntaxTrees = (() => {
-  let trees;
-  const walk = (dir) => {
-    for (const entry of readScannedDirectory(join(repoRoot, dir), { isRoot: dir === 'src' })) {
-      const path = `${dir}/${entry.name}`;
-      if (entry.isDirectory()) walk(path);
-      else if (path.endsWith('.svelte')) trees.push([path, componentAstOf(path)]);
-      else if (/\.m?js$/.test(path)) trees.push([path, moduleAstOf(path).ast]);
-    }
-  };
-  return () => {
-    if (!trees) {
-      trees = [];
-      walk('src');
-    }
-    return trees.filter(([path]) => path !== ACCESSOR_MODULE);
-  };
-})();
+const srcSyntaxTrees = () =>
+  sourceAstEntriesUnder('src').filter(([path]) => path !== ACCESSOR_MODULE);
 
 /**
  * Count the calls of each accessor per file across the whole `src` tree; a comment is no call.
@@ -1184,6 +1167,8 @@ describe('the hooks edge configures the stored path, then probes it', () => {
     const { path, warned } = applyInWorld({ stored: 'system.qtd', items: heldAt('system.qtd') });
     assert.equal(path, 'system.qtd');
     assert.deepEqual(warned, [], 'the probe read the path just configured');
+    const unread = applyInWorld({ stored: null, items: heldAt('system.quantity') });
+    assert.deepEqual([unread.path, unread.warned], ['system.quantity', []]);
   });
 
   it('configures on every client, and notifies only a GM that asked', () => {

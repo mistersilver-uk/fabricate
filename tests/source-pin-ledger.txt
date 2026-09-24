@@ -105,7 +105,6 @@ tests/components/threshold-band-strip-mounted.test.js	8
 tests/components/tool-rules-list-parity.test.js	2
 tests/components/world-currency-tab.test.js	1
 tests/confirm-button-shape-source-contract.test.js	1
-tests/crafting-definition-repository.test.js	1
 tests/crafting-nav.test.js	7
 tests/file-size-ledger.test.js	1
 tests/foundry-manager-rail-hooks.test.js	1
