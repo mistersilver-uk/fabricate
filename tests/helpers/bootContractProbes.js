@@ -210,6 +210,38 @@ export function probeCraftCommand(facade) {
   }
 }
 
+/** One addressed complication, as a delivery payload carries it. */
+const PROBE_COMPLICATION = Object.freeze({
+  componentId: 'c',
+  complicationId: 'k',
+  resultId: 'r',
+  activity: 'salvage',
+  bucket: 'stageMissed',
+});
+
+/** What the composed complication writer emits from a player client, and what it mints. */
+export function probeComplicationWriter(facade) {
+  const game = globalThis.game;
+  const activeGm = game.user;
+  const emitted = [];
+  const restores = [
+    spyOn(globalThis.foundry.utils, 'randomID', () => 'minted-probe'),
+    spyOn(game.socket, 'emit', (...args) => emitted.push(args)),
+  ];
+  game.user = game.users.get('user-lab-player');
+  try {
+    facade.complicationDeliveryWriter.deliver({
+      craftingSystemId: 'probe-system',
+      actorUuid: 'Actor.probe',
+      complications: [PROBE_COMPLICATION],
+    });
+  } finally {
+    game.user = activeGm;
+    for (const restore of restores) restore();
+  }
+  return { channel: emitted[0]?.[0] ?? null, resolutionId: emitted[0]?.[1]?.resolutionId ?? null };
+}
+
 /** The inbound depletion and complication routes on the one `module.fabricate` listener. */
 export function probeSocketRoutes(facade, listener) {
   const sender = 'user-lab-player';
@@ -234,15 +266,7 @@ export function probeSocketRoutes(facade, listener) {
         craftingSystemId: 'probe-system',
         actorUuid: 'Actor.probe-missing',
         resolutionId,
-        complications: [
-          {
-            componentId: 'c',
-            complicationId: 'k',
-            resultId: 'r',
-            activity: 'salvage',
-            bucket: 'stageMissed',
-          },
-        ],
+        complications: [PROBE_COMPLICATION],
       },
       sender
     );

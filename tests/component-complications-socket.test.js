@@ -4,10 +4,7 @@
  * determined player can already READ a `gmOnly` complication.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import {
   COMPLICATION_DELIVER,
@@ -24,10 +21,9 @@ import {
   routeComplicationDeliveryMessage,
   validateComplicationDeliveryPayload,
 } from '../src/systems/complicationSocket.js';
-import { FABRICATE_ENTRY_SOURCE } from './helpers/bootstrapEntrySource.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainSource = FABRICATE_ENTRY_SOURCE;
+import { Fabricate } from '../src/bootstrap/Fabricate.js';
+import { applyComplicationDelivery } from '../src/bootstrap/socketRouter.js';
+import { defineStructureContract } from './helpers/structureContract.js';
 
 function entry(overrides = {}) {
   return {
@@ -49,39 +45,6 @@ function message(overrides = {}) {
     complications: [entry()],
     ...overrides,
   };
-}
-
-/**
- * The body of a top-level function in the module entry, from its signature to the first column-zero
- * `}`.
- */
-function mainFunctionBody(name) {
-  const start = mainSource.indexOf(`function ${name}(`);
-  assert.ok(start !== -1, `the module entry should declare ${name}`);
-  const end = mainSource.indexOf('\n}\n', start);
-  assert.ok(end > start, `${name} should be a top-level function`);
-  return mainSource.slice(start, end);
-}
-
-/** Source with its comments removed, so an absence assertion reads the CODE. */
-function withoutComments(source) {
-  return source.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/\/\/[^\n]*/g, '');
-}
-
-/** Every function the GM-side apply path is composed from IN `main.js`, comments stripped. */
-function complicationApplySource() {
-  return withoutComments(
-    [
-      'applyComplicationDelivery',
-      'complicationComponentsFor',
-      'resolveComplicationSpeaker',
-      'runComplicationDelivery',
-      'runComplicationMacro',
-      'postGmComplicationCard',
-    ]
-      .map((name) => mainFunctionBody(name))
-      .join('\n')
-  );
 }
 
 /** One authored component, as the elected GM's own `craftingSystems` record holds it. */
@@ -530,39 +493,6 @@ test('the de-duplication key is the resolution, the stage occurrence and the com
   );
 });
 
-// Composition guard. The routing above is pure and unit-testable; the actor re-authorization is
-// not, because it needs a Foundry `Actor`.
-
-test('the complication route is registered on the shared channel in its own guard', () => {
-  assert.ok(
-    mainSource.includes('routeComplicationDeliveryMessage(payload, {'),
-    'the complication action should be routed from the single module.fabricate handler'
-  );
-  assert.ok(
-    mainSource.includes('allowSender: complicationDeliveryRateLimiter'),
-    'the inbound route should be rate limited per sender'
-  );
-  assert.ok(
-    mainSource.includes('isFreshDelivery: complicationDeliveryDedupe'),
-    'the inbound route should de-duplicate within this context'
-  );
-  assert.ok(
-    mainSource.includes('const complicationDeliveryRateLimiter = createComplicationRateLimiter()'),
-    'the limiter must be held at module scope: a per-message limiter refuses nothing'
-  );
-
-  const route = mainSource.indexOf('routeComplicationDeliveryMessage(payload, {');
-  const guard = mainSource.lastIndexOf('try {', route);
-  const rescue = mainSource.indexOf('} catch {', route);
-  assert.ok(guard !== -1 && guard < route, 'the route should sit inside its own try block');
-  assert.ok(rescue > route, 'a throw on one payload must not starve the others on this channel');
-  assert.equal(
-    mainSource.slice(guard, route).includes('routeGathering'),
-    false,
-    'the complication route needs its OWN try/catch, not a share of another route'
-  );
-});
-
 test('1286: an addressed complication that does not exist is DROPPED, never defaulted', () => {
   const components = [authoredComponent()];
 
@@ -771,300 +701,208 @@ test('1286: the macro scope is built from the AUTHORED record, never from the wi
   assert.equal(context.bucket, 'stageMissed', 'the client CLAIM is passed as reported');
 });
 
-test('the elected GM re-reads the authored complication from its own world setting', () => {
-  const apply = complicationApplySource();
-  assert.ok(
-    mainFunctionBody('applyComplicationDelivery').includes(
-      'components: complicationComponentsFor(craftingSystemId)'
-    ),
-    'every addressed complication is resolved against THIS client corpus before anything runs'
-  );
-  assert.ok(
-    mainFunctionBody('complicationComponentsFor').includes(
-      'fabricate.craftingSystemManager?.getComponentsForSystem?.(craftingSystemId)'
-    ),
-    'the macro, the name and the visibility come from this client own copy of craftingSystems'
-  );
-  assert.ok(
-    mainFunctionBody('runComplicationMacro').includes('isRunnableComplicationMacro(macro)'),
-    'the script gate is a call-site check, and the call site is where the macro runs'
-  );
-  for (const forged of [
-    'payload.macroUuid',
-    'entry.macroUuid',
-    'entry.visibility',
-    'entry.severity',
-    'entry.speaker',
-  ]) {
-    assert.equal(
-      apply.includes(forged),
-      false,
-      `the apply path must not read ${forged}: a payload carries no executable authority`
-    );
+// The elected-GM apply path, driven through `applyComplicationDelivery` itself (issue 1933). The
+// route onto the shared channel, its budget and its de-duplication are read from a real boot's
+// `socketRoutes` in `tests/fixtures/fabricateBootContract.golden.json`.
+
+const SENDER = { id: 'user-player', name: 'Player' };
+
+/** A script macro that records its run in the world's own log. */
+const SCRIPT_MACRO = { type: 'script', command: "globalThis.__complicationLog.push(['macro'])" };
+
+/**
+ * An elected-GM client holding one authored `gmOnly` complication whose macro is `Macro.authored`,
+ * the addressed actor, and recording `fromUuid`, `ChatMessage` and warning edges into one log.
+ */
+function gmApplyWorld({
+  senderOwns = true,
+  chatOutput = true,
+  macro = SCRIPT_MACRO,
+  permissionTestable = true,
+} = {}) {
+  const log = [];
+  const actor = {
+    id: 'actor-a',
+    uuid: 'Actor.a',
+    name: 'Iron Golem',
+    // The ambient GM owns every actor, which is exactly why this must never authorize.
+    isOwner: true,
+  };
+  if (permissionTestable) {
+    actor.testUserPermission = (user, level) => {
+      log.push(['permission', user?.id, level]);
+      return senderOwns && user === SENDER && level === 'OWNER';
+    };
   }
-});
+  globalThis.__complicationLog = log;
+  globalThis.game = {
+    user: { id: 'user-gm', name: 'GM', isGM: true },
+    users: { get: (id) => (id === SENDER.id ? SENDER : null) },
+    i18n: { localize: (key) => key },
+  };
+  globalThis.fromUuidSync = (uuid) => (uuid === actor.uuid ? actor : null);
+  globalThis.fromUuid = async (uuid) => {
+    log.push(['fromUuid', uuid]);
+    return uuid === 'Macro.authored' ? macro : null;
+  };
+  globalThis.ChatMessage = {
+    getSpeaker: ({ actor: speaking }) => ({ actor: speaking?.id, alias: speaking?.name }),
+    applyRollMode: (chatData, mode) => log.push(['visibility', mode, chatData.speaker?.alias]),
+    create: async (...args) => log.push(['create', args.length, args[0]]),
+  };
+  const authored = authoredComponent({
+    complications: [
+      {
+        id: 'complication-1',
+        name: 'Shrapnel',
+        severity: 'major',
+        visibility: 'gmOnly',
+        macroUuid: 'Macro.authored',
+      },
+    ],
+  });
+  globalThis.fabricate = {
+    craftingSystemManager: {
+      getComponentsForSystem: (id) => (id === 'system-1' ? [authored] : []),
+      getSystem: (id) => ({ id, features: { chatOutput } }),
+    },
+  };
+  return { log, actor };
+}
 
-test('1286: a gmOnly complication produces a GM-only card, or it produces nothing at all', () => {
-  const apply = mainFunctionBody('applyComplicationDelivery');
-  assert.ok(
-    apply.includes('await postGmComplicationCard({'),
-    'gmOnly is the AUTHORED DEFAULT, so a delivery that ran only macros is a silent no-op ' +
-      'for the common case and for every macro-less complication'
-  );
+/** Deliver one message from the attested sender, capturing what the apply path warns. */
+async function deliverAsSender(overrides = {}) {
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (text) => warnings.push(String(text));
+  try {
+    const applied = await applyComplicationDelivery({ ...message(overrides), senderId: SENDER.id });
+    return { applied, warnings };
+  } finally {
+    console.warn = originalWarn;
+  }
+}
 
-  // The ARGUMENTS are the pin, not the call.
-  const cardCall = /await postGmComplicationCard\(\{([^}]*)\}\)/.exec(withoutComments(apply));
-  assert.ok(cardCall, 'the GM card is called with a single options object');
+const steps = (log) => log.map(([step]) => step);
+
+test('the elected GM re-reads the authored complication from its own world setting', async () => {
+  const { log } = gmApplyWorld();
+  await deliverAsSender({
+    macroUuid: 'Macro.forged',
+    complications: [
+      entry({
+        macroUuid: 'Macro.forged',
+        visibility: 'visible',
+        severity: 'minor',
+        speaker: { alias: 'Forged' },
+      }),
+    ],
+  });
+
   assert.deepEqual(
-    cardCall[1]
-      .split(',')
-      .map((argument) => argument.trim())
-      .filter(Boolean)
-      .sort((left, right) => left.localeCompare(right)),
-    ['actor', 'applied', 'craftingSystemId', 'senderUser', 'speaker'],
-    'every argument the card needs is passed to it'
+    log.filter(([step]) => step === 'fromUuid'),
+    [
+      ['fromUuid', 'Macro.authored'],
+      ['fromUuid', 'Macro.authored'],
+    ],
+    'the macro comes from THIS client copy of the record — resolved by the gate and the runner — never the wire'
   );
-
-  const card = withoutComments(mainFunctionBody('postGmComplicationCard'));
-  assert.ok(
-    card.includes('gmComplicationCardEntries(reported)'),
-    'the row model is the pure projection in complicationRuntime.js, not a hand-rolled map ' +
-      'here: main.js cannot be imported under node --test, so an inline map could only be ' +
-      'pinned by text and a text pin cannot tell applied[index] from applied[0]'
-  );
-  assert.ok(
-    card.includes("applyBulkChatVisibility(chatData, 'gmroll')"),
-    'the legacy rollMode CREATE option is roll-gated and this card carries no rolls, so ' +
-      'create alone would post a GM-only card PUBLICLY'
-  );
-  assert.equal(
-    /core.,\s*.rollMode./.test(card),
-    false,
-    'core.rollMode is scope: client, so on the GM client the fallback is the GM own selector'
-  );
-  // `const chatData`, NOT `speaker`.
-  assert.ok(
-    card.indexOf('const chatData') < card.indexOf('applyBulkChatVisibility'),
-    'applyBulkChatVisibility requires speaker to be on chatData before it is called, so the ' +
-      'data has to be assembled first'
-  );
-  assert.ok(
-    /const chatData = \{[^}]*\bspeaker\b/.test(card),
-    'and the speaker has to actually be one of the fields it is assembled from'
-  );
-  assert.ok(
-    card.indexOf('applyBulkChatVisibility') < card.indexOf('ChatMessage.create'),
-    'an unmapped token must throw BEFORE the message exists: a GM-only card that cannot be ' +
-      'made GM-only must not be posted at all'
-  );
-  const guard = card.indexOf('try {');
-  assert.ok(
-    guard !== -1 && guard < card.indexOf('ChatMessage.create'),
-    'the whole body is contained: the acting client has already returned and the award is committed'
-  );
-
-  // recipes-and-steps/spec.md § "The `script` gate is a call-site check" requires a uuid that does
-  // not resolve to a script macro to be "skipped and REPORTED on the GM-facing output".
-  assert.ok(
-    withoutComments(mainFunctionBody('runComplicationMacro')).includes(
-      "return { status: 'skipped', macroUuid }"
-    ),
-    'the broken link is reported as skipped rather than as "no macro authored"'
-  );
-  // The status reaching the ROW is asserted where the row is built — `gmComplicationCardEntries` in
-  // `complicationRuntime.js`, driven with two rows whose macro outcomes differ
-  // (`component-complications-fire.test.js`).
+  const [, , card] = log.find(([step]) => step === 'create');
+  assert.equal(card.speaker.alias, 'Iron Golem', 'the speaker is resolved GM-side');
+  assert.ok(card.content.includes('Shrapnel'), 'the card names the AUTHORED complication');
 });
 
-test('1286: the GM card consults the system OWN chatOutput toggle, and the macro does not', () => {
-  const card = withoutComments(mainFunctionBody('postGmComplicationCard'));
-  assert.ok(
-    card.includes('complicationChatOutputEnabled(craftingSystemId)'),
-    'features.chatOutput is a per-system GM toggle and the narration this card carries is ' +
-      'exactly what every sibling poster (CraftingEngine, GatheringEngine, ' +
-      'BulkSalvageService) suppresses with it'
+test('1286: a gmOnly complication posts ONE GM-only card: speaker, then gmroll, then create', async () => {
+  const { log } = gmApplyWorld();
+  await deliverAsSender();
+
+  assert.deepEqual(steps(log), [
+    'permission',
+    'fromUuid',
+    'fromUuid',
+    'macro',
+    'visibility',
+    'create',
+  ]);
+  const [, mode, speakerAlias] = log.find(([step]) => step === 'visibility');
+  assert.equal(
+    mode,
+    'gmroll',
+    'the legacy create option is roll-gated, so visibility is applied first'
   );
-  assert.ok(
-    card.indexOf('complicationChatOutputEnabled') < card.indexOf('gmComplicationCardEntries'),
-    'the gate is the first thing the card does, so a system that narrates nothing costs ' +
-      'this client no projection and no localization either'
+  assert.equal(speakerAlias, 'Iron Golem', 'the speaker is on chatData before visibility runs');
+  const [, argumentCount, card] = log.find(([step]) => step === 'create');
+  assert.equal(argumentCount, 1, 'visibility rides on the data, never as a create option');
+  assert.equal(card.author, 'user-gm');
+});
+
+test('1286: chatOutput selects the card rows, and never gates the macro', async () => {
+  const quiet = gmApplyWorld({ chatOutput: false });
+  await deliverAsSender();
+  assert.deepEqual(
+    steps(quiet.log),
+    ['permission', 'fromUuid', 'fromUuid', 'macro'],
+    'the macro ran, no card'
   );
 
-  const gate = withoutComments(mainFunctionBody('complicationChatOutputEnabled'));
-  assert.ok(
-    gate.includes('fabricate.craftingSystemManager?.getSystem?.(craftingSystemId)'),
-    'read from THIS client own copy of the world setting, like every other GM-side re-read'
-  );
-  assert.ok(
-    gate.includes('?.features?.chatOutput === true'),
-    'and defaulted CLOSED: an addressing naming no system on this client has nothing to narrate'
-  );
-
-  // The MACRO is not chat and must not be gated by a chat toggle: a GM who turned Fabricate
-  // narration off has not asked for authored world effects to stop happening.
-  for (const runner of ['runComplicationMacro', 'runComplicationDelivery']) {
+  for (const [status, macro] of [
+    ['skipped', { type: 'chat', command: 'not a script' }],
+    ['failed', { type: 'script', command: "throw new Error('authored bug')" }],
+  ]) {
+    const faulted = gmApplyWorld({ chatOutput: false, macro });
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+      await deliverAsSender();
+    } finally {
+      console.error = originalError;
+    }
     assert.equal(
-      withoutComments(mainFunctionBody(runner)).includes('chatOutput'),
-      false,
-      `${runner} must not consult a chat toggle`
+      steps(faulted.log).at(-1),
+      'create',
+      `a ${status} macro is reported to the GM regardless`
     );
   }
-  assert.ok(
-    mainFunctionBody('applyComplicationDelivery').indexOf('applyAuthoredComplications') <
-      mainFunctionBody('applyComplicationDelivery').indexOf('postGmComplicationCard'),
-    'and the gate cannot reach the macro anyway: the delivery has already run when the card ' +
-      'is asked for'
-  );
 });
 
-test('1286: a broken macro link is reported even when the system narrates nothing', () => {
-  // `recipes-and-steps/spec.md` § "The `script` gate is a call-site check" is UNCONDITIONAL: a uuid
-  // that does not resolve to a script macro "is skipped and reported on the GM-facing output".
-  const card = withoutComments(mainFunctionBody('postGmComplicationCard')).replaceAll(/\s+/g, ' ');
+test('a GM-side apply refuses a sender who owns nothing, whatever the running user owns', async () => {
+  const { log } = gmApplyWorld({ senderOwns: false });
+  const { applied, warnings } = await deliverAsSender();
 
-  // Direction one — gate OFF with a faulted row: the card is still built, from the fault rows. The
-  // backreference is load-bearing.
-  assert.ok(
-    /const reported = complicationChatOutputEnabled\(craftingSystemId\) \? (\w+) : \1\.filter\(\(row\) => hasComplicationMacroFault\(row\)\);/.test(
-      card
-    ),
-    'the toggle selects the ROWS the card is built from and must not veto the card, or a ' +
-      'configuration error the GM alone can fix is reported nowhere but one client console'
+  assert.equal(applied, null);
+  assert.deepEqual(
+    log,
+    [['permission', SENDER.id, 'OWNER']],
+    'asked of the attested sender, then nothing ran'
   );
-
-  // Direction two — gate OFF with nothing faulted: still suppressed, and established without
-  // paying for the projection, which is the whole reason the gate is consulted first.
-  assert.ok(
-    card.includes('if (reported.length === 0) return null;'),
-    'a GM who switched narration off and has nothing broken is whispered nothing at all'
-  );
-  assert.ok(
-    card.indexOf('if (reported.length === 0) return null;') <
-      card.indexOf('gmComplicationCardEntries'),
-    'and that costs no projection and no localization to establish'
-  );
-
-  // What the fault-only card carries: the faulted rows, not the narration the GM switched off.
-  assert.equal(
-    /gmComplicationCardEntries\(applied\)|gmComplicationCardEntries\(delivered\)/.test(card),
-    false,
-    'projecting the full delivery would rebuild the whole narration card for a run whose ' +
-      'only reportable fact was a broken link'
-  );
-
-  const fault = withoutComments(mainFunctionBody('hasComplicationMacroFault')).replaceAll(
-    /\s+/g,
-    ' '
-  );
-  assert.ok(
-    fault.includes('const status = row?.report?.macro?.status;'),
-    'the fault is read from what THIS client did with the macro, never from the payload'
-  );
-  for (const status of ['skipped', 'failed'])
-    assert.ok(
-      fault.includes(`status === '${status}'`),
-      `a macro reported as ${status} is the GM's own authorship to repair: a uuid that did ` +
-        'not resolve and a body that threw are both invisible to everyone else'
-    );
-  assert.equal(
-    /'ran'|'none'/.test(fault),
-    false,
-    'an outcome is not a fault — a macro that ran, or was never authored, forces no card'
-  );
+  assert.ok(warnings.some((text) => text.includes('the sender does not own the addressed actor')));
 });
 
-test('a GM-side apply refuses a sender who owns nothing, whatever the running user owns', () => {
-  const body = mainFunctionBody('applyComplicationDelivery');
+test('1286: a delivery dropped because the actor is not permission-testable is REPORTED', async () => {
+  const { log } = gmApplyWorld({ permissionTestable: false });
+  const { applied, warnings } = await deliverAsSender();
 
-  assert.ok(
-    body.includes('const senderUser = game.users?.get?.(senderId) ?? null;'),
-    'the subject of the permission test is the server-attested sender'
-  );
-  assert.ok(
-    body.includes("if (actor.testUserPermission(senderUser, 'OWNER') !== true) {"),
-    'the actor is re-authorized against the attested sender directly'
-  );
+  assert.equal(applied, null);
+  assert.deepEqual(log, [], 'nothing runs against an actor whose permissions cannot be asked');
+  assert.ok(warnings.some((text) => text.includes('permission-testable document')));
+});
 
-  // `actor.isOwner` resolves against the AMBIENT `game.user` and is therefore true for every actor
-  // on the GM client that evaluates it, so an `isOwner`-first predicate passes for a sender who
-  // owns nothing (issue 1288).
-  for (const inert of ['isGatheringActorSelectableByUser', '.isOwner', 'game.user?.isGM']) {
-    assert.equal(
-      complicationApplySource().includes(inert),
-      false,
-      `${inert} is inert on a GM-side apply path and must not authorize this delivery`
-    );
+test('1286: bulk salvage relays through the writer it reads at call time', () => {
+  const delivered = [];
+  const facade = new Fabricate();
+  const service = facade._getBulkSalvageService();
+  facade.complicationDeliveryWriter = { deliver: (request) => delivered.push(request) };
+
+  service.deliverComplications({ resolutionId: 'bulk' });
+
+  assert.deepEqual(delivered, [{ resolutionId: 'bulk' }]);
+});
+
+// No insecure randomness anywhere on the socket edge; the writer's mint is a boot probe.
+defineStructureContract(
+  'the socket edge mints nothing with Math.random',
+  'src/bootstrap/socketRouter.js',
+  {
+    readsNo: ['Math.random'],
   }
-
-  const code = withoutComments(body);
-  assert.ok(
-    code.indexOf('testUserPermission') < code.indexOf('applyAuthoredComplications'),
-    'the refusal must precede execution, or an unauthorized sender still runs a macro'
-  );
-  assert.ok(
-    code.indexOf('testUserPermission') < code.indexOf('postGmComplicationCard'),
-    'and it must precede the GM card, or an unauthorized sender still authors GM chat'
-  );
-});
-
-test('1286: a delivery dropped because the actor is not permission-testable is REPORTED', () => {
-  // Failing closed is right — nothing may run against an actor whose permissions cannot be asked —
-  // but the drop has to leave a trace on the one client that can diagnose it.
-  const code = withoutComments(mainFunctionBody('applyComplicationDelivery'));
-  const guard = code.indexOf("typeof actor.testUserPermission !== 'function'");
-  assert.notEqual(guard, -1, 'the guard itself must survive: this fix does not open it up');
-  const reported = code.indexOf('console.warn', guard);
-  assert.ok(
-    reported !== -1 && reported < code.indexOf("testUserPermission(senderUser, 'OWNER')"),
-    'the drop is reported inside the guard it fails, before the OWNER check it never reaches'
-  );
-  assert.equal(
-    (code.match(/console\.warn/g) || []).length,
-    2,
-    'both silent refusals — the unresolvable actor and the sender who owns nothing — report'
-  );
-});
-
-test('the delivery writer is composed with the Foundry edges and a non-Math.random mint', () => {
-  assert.ok(
-    mainSource.includes('fabricate.complicationDeliveryWriter = createComplicationDeliveryWriter({'),
-    'the acting-client writer should be composed during bootstrap'
-  );
-  assert.ok(
-    mainSource.includes('mintResolutionId: () => globalThis.foundry?.utils?.randomID?.()'),
-    'the resolution id is minted with foundry.utils.randomID, never Math.random (S2245)'
-  );
-  assert.equal(
-    /Math\.random\(\)/.test(mainFunctionBody('applyComplicationDelivery')),
-    false,
-    'no insecure randomness on the complication path'
-  );
-});
-
-test('1286: the delivery writer is INJECTED into both engines that fire complications', () => {
-  // Each engine also falls back to `game.fabricate.complicationDeliveryWriter`, so delivery
-  // works either way — but a seam only the ambient fallback ever satisfies is not a seam: it
-  // cannot be substituted by a suite that builds its own engine, and the wiring is invisible
-  // at the bootstrap site. Both engines are asserted, because only one of them is obvious.
-  assert.ok(
-    mainSource.includes(
-      'fabricate.craftingEngine?.installComplicationDelivery({\n    writer: fabricate.complicationDeliveryWriter,\n  })'
-    ),
-    'the crafting engine (immediate craft, timed craft FINISH and salvage) takes the writer'
-  );
-  assert.ok(
-    mainSource.includes(
-      'getGatheringEngine()?.installComplicationDelivery({\n    writer: fabricate.complicationDeliveryWriter,\n  })'
-    ),
-    'and so does the gathering engine'
-  );
-});
-
-test('1286: bulk salvage relays through the writer rather than emitting per row', () => {
-  assert.ok(
-    mainSource.includes(
-      'deliverComplications: (message) => this.complicationDeliveryWriter?.deliver(message)'
-    ),
-    'the batched relay seam is wired, or BulkSalvageService silently relays nothing'
-  );
-});
+);

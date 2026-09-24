@@ -1946,5 +1946,9 @@
     "complicationDuplicateDropped": true,
     "complicationsApplied": 99,
     "complicationRateLimitRefusals": 2
+  },
+  "complicationWriter": {
+    "channel": "module.fabricate",
+    "resolutionId": "minted-probe"
   }
 }
