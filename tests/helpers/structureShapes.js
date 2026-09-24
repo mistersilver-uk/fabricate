@@ -5,8 +5,14 @@
  */
 import { isDeepStrictEqual } from 'node:util';
 
-import { calledName, literalStrings, parseModule, walkNodes } from './moduleAst.js';
-import { declaredProps, spelledLiterals } from './svelteStructureContract.js';
+import {
+  calledName,
+  importedModules,
+  lazilyImportedModules,
+  parseModule,
+  walkNodes,
+} from './moduleAst.js';
+import { declaredProps } from './svelteStructureContract.js';
 
 const IGNORED_KEYS = new Set([
   'start',
@@ -128,19 +134,19 @@ function dynamicSpecifier(source) {
   return COMPUTED_IMPORT;
 }
 
-/** Every specifier a subtree imports in any form, a namespace import spelled `* as <specifier>`. */
-function importSpecifiers(node) {
-  const found = [];
-  for (const inner of walkNodes(node)) {
-    if (inner.type === 'ImportExpression') found.push(dynamicSpecifier(inner.source));
-    if (!inner.type?.endsWith('Declaration') || typeof inner.source?.value !== 'string') continue;
-    const whole =
-      (inner.specifiers ?? []).some(({ type }) => type === 'ImportNamespaceSpecifier') ||
-      (inner.type === 'ExportAllDeclaration' && inner.exported);
-    found.push(whole ? `* as ${inner.source.value}` : inner.source.value);
-  }
-  return found;
+/** A static specifier, a namespace import or `export * as` spelled `* as <specifier>`. */
+function staticSpecifier(declaration) {
+  const whole =
+    (declaration.specifiers ?? []).some(({ type }) => type === 'ImportNamespaceSpecifier') ||
+    (declaration.type === 'ExportAllDeclaration' && declaration.exported);
+  return whole ? `* as ${declaration.source.value}` : declaration.source.value;
 }
+
+/** Every specifier a subtree imports in any form. */
+const importSpecifiers = (node) => [
+  ...importedModules(node, staticSpecifier),
+  ...lazilyImportedModules(node, dynamicSpecifier),
+];
 
 /** The specifiers naming `needle`, case-insensitively; an unreadable `import()` always counts. */
 export function importFamily(node, needle) {
@@ -179,18 +185,6 @@ export function propertyReadTally(node, property) {
     tally.set(label, (tally.get(label) ?? 0) + 1);
   }
   return [...tally].sort(([left], [right]) => byLocale(left, right));
-}
-
-/** Every literal a subtree tests the named binding against with `===`. */
-export function comparedLiterals(node, name) {
-  const values = new Set();
-  for (const inner of walkNodes(node)) {
-    if (inner.type !== 'BinaryExpression' || inner.operator !== '===') continue;
-    const sides = [inner.left, inner.right];
-    if (!sides.some((side) => side?.type === 'Identifier' && side.name === name)) continue;
-    for (const side of sides) if (side?.type === 'Literal') values.add(side.value);
-  }
-  return [...values];
 }
 
 /** An attribute as a call site spells it: `bind:` for a binding, `...x` for a spread. */
@@ -283,21 +277,4 @@ export function unreadProps(component) {
     nodes.filter((node) => node.type === 'Identifier' && !spelled.has(node)).map(({ name }) => name)
   );
   return [...declaredProps(component).declared].filter((prop) => !read.has(prop));
-}
-
-const commentTexts = (ast) => (ast?.comments ?? []).map(({ value }) => value);
-
-/** Every string a module spells, its comments included. */
-export function moduleMentions(ast) {
-  return [...literalStrings(ast), ...commentTexts(ast)];
-}
-
-/** Every string a component spells: literals, markup text, HTML comments and script comments. */
-export function componentMentions(component, scopeAst) {
-  const markup = [...walkNodes(component.fragment)].filter(({ type }) => type === 'Comment');
-  return [
-    ...spelledLiterals(component),
-    ...markup.map(({ data }) => data),
-    ...commentTexts(scopeAst),
-  ];
 }

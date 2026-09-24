@@ -8,13 +8,8 @@ import { test } from 'node:test';
 
 import { parseModule } from './helpers/moduleAst.js';
 import { moduleAstOf } from './helpers/parsedSource.js';
-import { parseComponent, parseComponentScope } from './helpers/svelteStructureContract.js';
-import {
-  componentMentions,
-  moduleMentions,
-  suppliesProps,
-  unreadProps,
-} from './helpers/structureShapes.js';
+import { parseComponent } from './helpers/svelteStructureContract.js';
+import { suppliesProps, unreadProps } from './helpers/structureShapes.js';
 import {
   CONTRACT_CLAIMS,
   claimsAcross,
@@ -256,21 +251,4 @@ test('the prop claims resolve a spread, hold an exemption live, and skip the dec
   assert.equal(suppliesProps(site, parseComponent('<p></p>'), row), false, 'nothing declared');
   assert.deepEqual(unreadProps(screen), ['extra'], 'nor is a declaration, a member or a key');
   assert.equal(CONTRACT_CLAIMS.propsUnread.ask, 'propsUnread');
-});
-
-test('the mention claim reads literals, markup text and both kinds of comment', () => {
-  const source = [
-    '<script>',
-    '  // script note',
-    "  const a = 'literal note';",
-    '</script>',
-    '<!-- markup note -->',
-    '<p>text note</p>',
-  ].join('\n');
-  const texts = componentMentions(parseComponent(source), parseComponentScope(source).ast);
-  for (const note of [' script note', 'literal note', ' markup note ', 'text note']) {
-    assert.ok(texts.includes(note), note);
-  }
-  assert.deepEqual(moduleMentions(parseModule("// a\nconst b = 'c';").ast), ['c', ' a']);
-  assert.equal(CONTRACT_CLAIMS.mentionsNo.holds, false);
 });

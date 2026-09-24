@@ -49,13 +49,10 @@ import {
 import {
   attributeIs,
   attributeLabel,
-  comparedLiterals,
-  componentMentions,
   importFamily,
   keyName,
   locatedNodes,
   locatorLabel,
-  moduleMentions,
   namedCodeAst,
   propertyReadTally,
   renderedNodes,
@@ -310,16 +307,16 @@ function templateSuffixes(component, name) {
   return suffixes;
 }
 
-/** The literal a subtree compares the named binding against — what a route branch tests. */
-function comparedLiteral(node, name) {
+/** Every literal a subtree tests the named binding `===` against — what a route branch tests. */
+function comparedLiterals(node, name) {
+  const values = new Set();
   for (const inner of walkNodes(node)) {
-    if (inner.type !== 'BinaryExpression') continue;
+    if (inner.type !== 'BinaryExpression' || inner.operator !== '===') continue;
     const sides = [inner.left, inner.right];
     if (!sides.some((side) => side?.type === 'Identifier' && side.name === name)) continue;
-    const literal = sides.find((side) => side?.type === 'Literal');
-    if (literal) return literal.value;
+    for (const side of sides) if (side?.type === 'Literal') values.add(side.value);
   }
-  return undefined;
+  return [...values];
 }
 
 /** The `(key, fallback)` pair a `return text(key, fallback);` states, or `[]` for any other. */
@@ -384,14 +381,6 @@ function declaredConstantValue(file, name) {
   const parsed = file.endsWith('.svelte') ? componentAstOf(file) : moduleAstOf(file).ast;
   return namedCodeAst(file.endsWith('.svelte') ? [parsed.instance, parsed.module] : parsed, name);
 }
-
-/** Whether a whole file spells `text` anywhere, comments included. */
-const mentionsIn = (file) => (text) => {
-  const texts = file.endsWith('.svelte')
-    ? componentMentions(componentAstOf(file), componentScopeOf(file).ast)
-    : moduleMentions(moduleAstOf(file).ast);
-  return texts.some((entry) => entry.includes(text));
-};
 
 /** The claims any plain code subtree answers: a module, a class member, or one function body. */
 function claimsOverCode(code) {
@@ -502,11 +491,7 @@ function structureOf(target) {
     const component = componentAstOf(file);
     if (!binding && !record) {
       const scope = componentScopeOf(file);
-      return {
-        ...claimsForComponent(component),
-        global: (name) => readsGlobal(scope, name),
-        mentions: mentionsIn(file),
-      };
+      return { ...claimsForComponent(component), global: (name) => readsGlobal(scope, name) };
     }
     let scoped = binding
       ? namedCodeAst([component.instance, component.module], binding)
@@ -515,9 +500,6 @@ function structureOf(target) {
     return claimsOverCode(narrow(scoped));
   }
   const { ast } = moduleAstOf(file);
-  if (!member && !binding && !record && !property) {
-    return { ...claimsOverCode(ast), mentions: mentionsIn(file) };
-  }
   let code = member ? classMemberAst(ast, member) : ast;
   if (binding) code = namedCodeAst(code, binding);
   if (record) code = recordAst(code, record);
@@ -649,12 +631,6 @@ const CONTRACT_CLAIMS = Object.freeze({
     holds: true,
     says: (names) => `reads every declared prop but [${names.join(', ')}]`,
   },
-  mentions: { ask: 'mentions', holds: true, says: (v) => `mentions "${v}", comments included` },
-  mentionsNo: {
-    ask: 'mentions',
-    holds: false,
-    says: (v) => `mentions "${v}" nowhere, comments included`,
-  },
   passesProps: { ask: 'prop', holds: true, says: ([c, p]) => `passes ${p} to every <${c}>` },
   passesValues: {
     ask: 'passesValue',
@@ -711,7 +687,7 @@ export {
   claimsOverCode,
   classMemberAst,
   classRenderedExpressions,
-  comparedLiteral,
+  comparedLiterals,
   constantLiteral,
   declaredConstantValue,
   defineStructureContract,

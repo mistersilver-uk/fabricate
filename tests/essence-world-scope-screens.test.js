@@ -170,6 +170,22 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
         attribute: 'onOpenWorldDefinition',
         is: "(id) => openWorldScopedEntry('world-essence-entry', id)",
       },
+      {
+        at: 'EssenceBrowserInspector',
+        attribute: 'onOpenSystemRules',
+        is: '(entityId, systemId) => openSystemEssenceRules(entityId, systemId)',
+      },
+    ],
+  });
+
+  defineStructureContract('the world essence pages reach the shell handlers they name', ROOT, {
+    gives: [
+      {
+        at: 'WorldEssenceCataloguePage',
+        attribute: 'onOpenSystemRules',
+        is: '(entityId, systemId) => openSystemEssenceRules(entityId, systemId)',
+      },
+      { at: 'WorldEssenceEntryPage', attribute: 'onDirtyChange', is: 'handleWorldEssenceEntryDirty' },
     ],
   });
 
@@ -198,7 +214,10 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
       ['saveAttribute', 'data-world-tool-save'],
     ],
     // A button never disabled cannot say whether the last edit landed.
-    gives: [{ ...ESSENCE_PAIR, attribute: 'saveDisabled', is: '!worldEssenceEntryDirty' }],
+    gives: [
+      { ...ESSENCE_PAIR, attribute: 'saveDisabled', is: '!worldEssenceEntryDirty' },
+      { ...ESSENCE_PAIR, attribute: 'saving', is: 'worldEssenceEntrySaving' },
+    ],
   });
 
   it('SEAM 3 puts the editor in the route-exit chain, so the rail and the breadcrumb prompt too', () => {
@@ -247,7 +266,7 @@ describe('the world essence entry editor keeps the live-preview note', () => {
   defineStructureContract('the entry renders the preview, never the retired switch', ENTRY_PAGE, {
     renders: ['EssenceBehaviorPreview'],
     writesNo: ['showLiveNote'],
-    mentionsNo: ['showLiveNote'],
+    spellsNo: ['showLiveNote'],
   });
   defineStructureContract(
     'and the preview offers no such prop, while still rendering the note',

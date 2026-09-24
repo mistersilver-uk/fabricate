@@ -131,15 +131,13 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
         'const recipeCache = new Map();',
         // The world library is read ONCE per publish and bound to a name.
         'const worldRecipes = _allRecipes();',
-        '({ component: _worldComponentUsage(recipeCache), essence: ' +
-          '_worldEssenceUsage(worldRecipes), tool: _worldToolUsage(recipeCache) })',
+        // The whole projection input: `recipes` takes that binding rather than reading again.
+        'return _buildWorldScopeState({ stores: _worldScopeStores(), systems: _allSystems(), ' +
+          'recipes: worldRecipes, essenceMergeMap: _worldEssenceMergeMap(), usage: { ' +
+          'component: _worldComponentUsage(recipeCache), essence: ' +
+          '_worldEssenceUsage(worldRecipes), tool: _worldToolUsage(recipeCache) } });',
       ],
     }
-  );
-  defineStructureContract(
-    'and the projection input takes that binding rather than calling the reader again',
-    { file: ADMIN_STORE, fn: 'buildWorldScopeState', property: 'recipes' },
-    { contains: ['worldRecipes'] }
   );
 
   // A seam may carry a value into an existing route and may not mint one. The page-header model
@@ -188,11 +186,17 @@ describe('the world component entry’s gateway-owned wires are pinned', () => {
   );
   // The wrong list draws `[data-scoped-entry-essences-empty]` on the card the section exists for.
   defineStructureContract(
-    'hands the entry the WORLD essence roster, which fills the M31 card',
+    'hands both pages the WORLD essence roster, and the catalogue opens the entry route',
     ROOT,
     {
       gives: [
         { at: 'WorldComponentEntryPage', attribute: 'worldEssences', is: 'worldEssenceOptions' },
+        { at: 'WorldComponentCataloguePage', attribute: 'worldEssences', is: 'worldEssenceOptions' },
+        {
+          at: 'WorldComponentCataloguePage',
+          attribute: 'onOpenEntry',
+          is: "(entityId) => openWorldScopedEntry('world-component-entry', entityId)",
+        },
       ],
     }
   );
@@ -204,8 +208,8 @@ describe('the `Add from catalogue` header action opens a picker and navigates no
   const DEAD_TOKEN = `world-component-${'catalogue'}`;
 
   for (const file of [ROOT, CRAFTING_ACTIONS]) {
-    defineStructureContract(`${file} names the dead token nowhere, comments included`, file, {
-      mentionsNo: [DEAD_TOKEN],
+    defineStructureContract(`${file} spells the dead token nowhere`, file, {
+      spellsNo: [DEAD_TOKEN],
     });
   }
   // NON-VACUITY: the token IS a live capture-case id, so the scan above is about the gateway.
@@ -226,7 +230,6 @@ describe('the `Add from catalogue` header action opens a picker and navigates no
         // UX F-A (r9): `proto:1046` draws `+ Add from catalogue` at the published 38px rung.
         { ...ADD_BUTTON, attribute: 'size', is: '38' },
       ],
-      mentionsNo: ['ManagerButton` has NO size prop yet'],
     }
   );
 
@@ -239,7 +242,6 @@ describe('the `Add from catalogue` header action opens a picker and navigates no
         'function openComponentAddFromCatalogue() { componentAddFromCatalogueOpen = true; }',
         "$effect(() => { if (currentView !== 'components') componentAddFromCatalogueOpen = false; })",
       ],
-      mentionsNo: ['dismisses on an outside click, and every nav control is outside it'],
     }
   );
 
@@ -404,8 +406,9 @@ describe('no new scoped file trips either naming gate', () => {
     }
   });
 
-  // The route→page map matches those attribute NAMES literally against every file in this
-  // directory, COMMENTS INCLUDED, so a child mentioning one claims a route a page owns.
+  // A child carrying one claims a route a page owns. The route→page map in
+  // `manager-scoped-prop-contract.test.js` reads the raw text, so a COMMENT spelling one fails
+  // there, as a route owned twice or an eighth route.
   const HOOKS = ['data-scoped-page', 'data-scoped-placeholder'];
   for (const child of [
     'ComponentCatalogueBulkPanel.svelte',
@@ -417,7 +420,7 @@ describe('no new scoped file trips either naming gate', () => {
       `${SCOPED}/${child}`,
       {
         writesNo: HOOKS,
-        mentionsNo: HOOKS,
+        spellsNo: HOOKS,
       }
     );
   }

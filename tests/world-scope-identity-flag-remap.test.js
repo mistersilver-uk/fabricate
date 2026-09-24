@@ -839,7 +839,14 @@ test(
         fabricate: { fabricate: { essences: { 'fire-a': 1, 'fire-b': 2 } } },
       });
       const actor = makeMergeDocument({
-        fabricate: { fabricate: { craftingRuns: craftingRunFlag() } },
+        fabricate: {
+          fabricate: { craftingRuns: craftingRunFlag() },
+          gatheringRuns: {
+            active: {
+              'g-1': { craftingSystemId: 'sys-a', resolvedEssences: { 'fire-a': 1, 'fire-b': 2 } },
+            },
+          },
+        },
       });
       actor.items = [item];
       const writes = [];
@@ -889,9 +896,14 @@ test(
           .resolvedEssences,
         { 'fire-b': 3 }
       );
+      // The bare container is replaced at ITS depth, never re-nested under the inner namespace.
+      assert.deepEqual(actor.flags.fabricate.gatheringRuns.active['g-1'].resolvedEssences, {
+        'fire-b': 3,
+      });
+      assert.equal(actor.flags.fabricate.fabricate.gatheringRuns, undefined);
       // Every write a single `{path: value}` update: no `setFlag`, and no `{recursive: false}`,
       // which would replace the whole `flags` field and every other module's flags with it.
-      assert.deepEqual(writes, [1, 1], 'one forced replacement per document, nothing else');
+      assert.deepEqual(writes, [1, 1, 1], 'one forced replacement per container, nothing else');
     });
   }
 );

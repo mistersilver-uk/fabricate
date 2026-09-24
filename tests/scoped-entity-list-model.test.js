@@ -457,7 +457,7 @@ describe('nothing shipped is restated', () => {
     'src/ui/model/scopedEntityListModel.js',
     {
       namesNo: ['pageCount'],
-      mentionsNo: ['pageCount'],
+      spellsNo: ['pageCount'],
     }
   );
   defineStructureContract('which is where the name lives', 'src/ui/model/browserPagination.js', {

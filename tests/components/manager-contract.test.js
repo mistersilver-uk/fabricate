@@ -51,7 +51,7 @@ import {
   claimsOverCode,
   classMemberAst,
   classRenderedExpressions,
-  comparedLiteral,
+  comparedLiterals,
   constantLiteral,
   declaredConstantValue,
   defineStructureContract,
@@ -2826,7 +2826,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     const viewTitle = namedCodeAst(moduleAstOf(HEADER_MODEL).ast, 'viewTitle');
     for (const node of walkNodes(viewTitle)) {
       if (node.type !== 'IfStatement') continue;
-      const view = comparedLiteral(node.test, 'currentView');
+      const [view] = comparedLiterals(node.test, 'currentView');
       const [key, fallback] = returnedTextArguments(node.consequent);
       if (String(view).startsWith('world-') && key !== undefined) titles.set(view, { key, fallback });
     }
