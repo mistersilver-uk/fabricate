@@ -33,47 +33,26 @@ const HISTORY_LIMIT = 50;
  */
 export class CraftingRunManager extends RunContainerManagerBase {
   /**
-   * @param {object} [deps]
-   * @param {() => boolean} [deps.isPrimaryGM] Primary-GM gate for the timed
-   *   world-time resume path (issue 656). `processWorldTime` runs off the synced
-   *   `updateWorldTime` hook and flips a matured `waitingTime` step to `inProgress`,
-   *   then persists via `_persist` → `actor.setFlag(...)` — a broadcast document write
-   *   on every connected client (duplicate racing writes + player permission-denied
-   *   noise). The default `() => true` keeps unit fixtures (which build no `activeGM`)
-   *   resuming; because it fails OPEN, the real `game.users.activeGM?.id ===
-   *   game.user?.id` check is WIRED at construction in `main.js` (load-bearing).
+   * `isPrimaryGM` gates the timed world-time resume (issue 656): `processWorldTime` runs on every
+   * client off `updateWorldTime` and persists through `actor.setFlag`, a broadcast write. The
+   * default `() => true` fails OPEN for fixtures, so `src/bootstrap/composeServices.js` wires the
+   * real `activeGM` check (load-bearing).
    */
   constructor({ isPrimaryGM = () => true } = {}) {
     super({ flagKey: 'craftingRuns' });
     this._isPrimaryGM = typeof isPrimaryGM === 'function' ? isPrimaryGM : () => true;
   }
 
-  /**
-   * Public accessor for the number of seconds a step's `timeRequirement`
-   * resolves to. The crafting engine uses this to decide whether a step is
-   * genuinely time-gated (> 0 seconds) BEFORE arming a gate, so it can consume
-   * components at START rather than at FINISH.
-   * @param {object|null} timeRequirement
-   * @returns {number} seconds (0 for an empty / instant requirement)
-   */
+  /** A step's `timeRequirement` in seconds (0 when instant), so the engine can consume at START. */
   durationToSeconds(timeRequirement = null) {
     return this._durationToSeconds(timeRequirement);
   }
 
   /**
-   * Snapshot a step's authored ingredient requirements (component id + quantity)
-   * at run creation (issue 738). Persisting the requirements — rather than resolving
-   * them live from the recipe at Journal-projection time — keeps a history entry's
-   * requirements intact after the recipe is later edited or deleted (a deleted recipe
-   * otherwise redacts the whole run). Only component-backed ingredients are captured
-   * (tag / essence requirements carry no component id); the primary (first) ingredient
-   * set is used, mirroring how the crafting UI surfaces a step's requirements. Names
-   * and images are resolved at projection time from the still-live crafting system's
-   * components, so only the stable ids are stored here.
-   *
-   * @param {object} step An execution step (`recipe.getExecutionSteps()` entry).
-   * @returns {Array<{componentId: string, quantity: number}>}
-   * @private
+   * A step's authored component requirements `{ componentId, quantity }` from its first ingredient
+   * set, snapshotted at run creation (issue 738) so a history entry survives a later edit or
+   * deletion of the recipe; tag and essence requirements carry no component id. Names and images
+   * resolve at projection time.
    */
   _buildStepRequirements(step) {
     const sets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
@@ -99,14 +78,10 @@ export class CraftingRunManager extends RunContainerManagerBase {
       updatedAt: this._nowWorldTime(),
       completedAt: undefined,
       timeGate: undefined,
-      // preparedConsumption: the START-phase snapshot for a time-gated step whose
-      // components (and currency) are consumed when the gate is ARMED. Populated
-      // by markStepPrepared; read by the engine at FINISH so the resume can
-      // transfer essences and build results/chat/history without re-reading the
-      // (now-deleted) source items. Undefined for non-timed / instant steps.
-      // Its `currencySpends` holds the SETTLED deductions only (issue 902), because the
-      // cancel reversal refunds exactly what it finds there, and its `essenceEnabled`
-      // holds the START-phase behaviour-gate snapshot (issue 1036).
+      // The START-phase snapshot of a time-gated step, whose components and currency are consumed
+      // when its gate arms; `markStepPrepared` writes it and the engine reads it at FINISH, the
+      // source items being gone. `currencySpends` holds only SETTLED deductions (issue 902), the
+      // cancel reversal's refund input; `essenceEnabled` is the behaviour-gate snapshot (1036).
       preparedConsumption: undefined,
       selectedIngredientSetId: undefined,
       lastCheckResult: undefined,
@@ -202,39 +177,15 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   /**
-   * Persist the START-phase consumption snapshot for a time-gated step.
-   *
-   * A step whose time requirement resolves to > 0 seconds consumes its
-   * components (and currency) when its gate is ARMED, then resumes at maturity to
-   * run the crafting check and create results. This stores what was consumed so
-   * the resume can transfer essences and build the result / chat / history entry
-   * without re-reading the source items (which are already deleted).
-   *
-   * `currencySpends` records what the deduction ACTUALLY SETTLED, never what was intended
-   * (issue 902). It is the sole input to the cancel reversal's refund, so a spend that did
-   * not settle must not appear here — otherwise cancelling hands back currency the actor
-   * never paid. An empty array is the correct record for a step whose currency deduction
-   * settled nothing, and the reversal's own `length > 0` guard then skips the refund.
-   *
-   * `essenceEnabled` is the START-phase behaviour-gate snapshot (issue 1036): a COMPLETE
-   * `{ [essenceId]: boolean }` map over every key in `resolvedEssences`, so a mid-run
-   * enable/disable cannot change the outcome of a craft whose inputs are already
-   * consumed. It is `{}` — not absent — when nothing contributed, and the engine reads an
-   * ABSENT map (a run armed before this change) as all-enabled.
-   *
-   * **{@link buildPreparedConsumption} is a whitelist REBUILD.** It emits exactly the keys
-   * it names and silently drops anything else the call site passes, so a new snapshot field
-   * must be added THERE as well as at the call site or the finish path falls back to live
-   * values and the defect ships green.
-   *
-   * @param {Actor} actor
-   * @param {object} run
-   * @param {number} stepIndex
-   * @param {{ selectedIngredientSetId?: string|null,
-   *   currencySpends?: Array<{unit: string, amount: number}>,
-   *   resolvedEssences?: object, essenceEnabled?: Record<string, boolean>,
-   *   consumedSummary?: Array }} prepared
-   * @returns {Promise<object|null>} the updated run, or null if the step index is invalid
+   * Persist the START-phase consumption snapshot of a time-gated step, which consumed its
+   * components and currency when its gate armed and resumes at maturity without the deleted
+   * source items. `currencySpends` records only what ACTUALLY SETTLED (issue 902), since the cancel
+   * reversal refunds exactly that; `[]` records a deduction that settled nothing. `essenceEnabled`
+   * (issue 1036) is a COMPLETE `{ [essenceId]: boolean }` map over `resolvedEssences`, `{}` when
+   * nothing contributed, so a mid-run toggle cannot change a consumed craft; the engine reads an
+   * ABSENT map as all-enabled. `buildPreparedConsumption` is a whitelist REBUILD: a new snapshot
+   * field must be added there too, or the finish path silently falls back to live values. Answers
+   * the run, or `null` for an invalid step index.
    */
   async markStepPrepared(actor, run, stepIndex, prepared = {}) {
     this._assertRunMutation(run);
@@ -248,21 +199,10 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   /**
-   * Arm the single summed time gate for a COLLAPSED multi-step chain (issue 710).
-   *
-   * When a system's multi-step feature is off, a recipe that still carries authored
-   * steps runs as one atomic action; instead of arming a gate per step, the engine
-   * sums every step's duration and arms ONE gate here, stored on step 0 (with
-   * `currentStepIndex` pinned to 0) so the generic `processWorldTime` resume path —
-   * which reads `run.steps[run.currentStepIndex].timeGate` — matures it exactly like
-   * any other timed run. Nothing is consumed at arm: the chain consumes each step's
-   * ingredients when it executes at maturity. Re-arming an already-armed gate is a
-   * no-op on the gate itself (idempotent), it only re-marks the waiting status.
-   *
-   * @param {Actor} actor
-   * @param {object} run
-   * @param {number} seconds Total summed duration in seconds (> 0).
-   * @returns {Promise<object>} the updated run
+   * Arm the ONE summed gate of a COLLAPSED multi-step chain (issue 710) on step 0, with
+   * `currentStepIndex` pinned to 0, so `processWorldTime` matures it like any timed run. Nothing is
+   * consumed at arm: each step consumes when the chain executes at maturity. Re-arming is
+   * idempotent on the gate and only re-marks the waiting status.
    */
   async armCollapsedChainGate(actor, run, seconds) {
     this._assertRunMutation(run);
@@ -397,9 +337,8 @@ export class CraftingRunManager extends RunContainerManagerBase {
     incrementRunRevision(run);
 
     delete container.active[run.id];
-    // Never archive a run that already has a history entry: a duplicate id would
-    // crash the Journal's keyed each. This can happen if a run lingered in `active`
-    // (a legacy zombie) after a twin was already recorded in history.
+    // A duplicate history id would crash the Journal's keyed each, so a run lingering in `active`
+    // after its twin was recorded is never archived again.
     const alreadyArchived =
       Array.isArray(container.history) && container.history.some((entry) => entry?.id === run.id);
     if (alreadyArchived) {
@@ -423,14 +362,8 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   /**
-   * Discard an active run WITHOUT recording it in history — for a run that was
-   * created but never legitimately started (e.g. a craft rejected before its check
-   * ran, such as insufficient components). Unlike {@link cancelRun}, which archives
-   * to history as `cancelled`, this leaves no trace: the attempt never began.
-   *
-   * @param {Actor} actor
-   * @param {string} runId
-   * @returns {Promise<object|null>} the discarded run, or null if not active
+   * Discard an active run WITHOUT a history entry, for a run that never legitimately started (such
+   * as a craft rejected before its check); `cancelRun` archives instead. `null` when not active.
    */
   async discardRun(actor, runId) {
     const container = this._getContainer(actor);
@@ -443,17 +376,10 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   /**
-   * Discard a run whose start left NO EVIDENCE: no applied effect and no retained receipt. Such a
-   * start changed nothing, so its journal records an uncertainty that does not exist — and the
-   * `recoveryRequired` that records it refuses every control the run has, cancel included, so a
-   * run left in that state can never be cleared by the player (issue 1648, F1).
-   *
-   * Separate from {@link discardRun}, which refuses a run under reconciliation, because the
-   * evidence test is exactly what makes this one safe.
-   *
-   * @param {Actor} actor
-   * @param {string} runId
-   * @returns {Promise<object|null>} the discarded run, or `null` when it is absent or HAS evidence.
+   * Discard a run whose start left NO EVIDENCE (no applied effect, no retained receipt): its
+   * `recoveryRequired` would refuse every control, cancel included, so the player could never
+   * clear it (issue 1648, F1). Separate from `discardRun`, which refuses a run under
+   * reconciliation. `null` when absent or when it HAS evidence.
    */
   async discardUnappliedRun(actor, runId) {
     const container = this._getContainer(actor);
@@ -472,20 +398,10 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   /**
-   * Record a no-signature alchemy fizzle as a failed, recipe-less run-history
-   * entry. A fizzle matches NO enabled recipe, so the entry carries
-   * `recipeId: null` and `isFizzle: true` and never enters the `active`
-   * container — it is archived straight to history. Recording is UNCONDITIONAL:
-   * the `alchemy.showAttemptHistoryToPlayers` flag governs player VISIBILITY at
-   * the Journal projection (see {@link RunJournalBuilder}), never whether the
-   * attempt is recorded. The entry holds no recipe or signature data, so it can
-   * never leak an undiscovered recipe.
-   *
-   * @param {Actor} actor
-   * @param {object} [details]
-   * @param {string|null} [details.craftingSystemId]
-   * @param {string|null} [details.userId]
-   * @returns {Promise<object>} the recorded fizzle history entry
+   * Record a no-signature alchemy fizzle straight into history as a failed, recipe-less entry
+   * (`recipeId: null`, `isFizzle: true`). Recording is UNCONDITIONAL:
+   * `alchemy.showAttemptHistoryToPlayers` governs only its Journal visibility. It holds no recipe
+   * or signature data, so it can never leak an undiscovered recipe.
    */
   async recordFizzle(actor, { craftingSystemId = null, userId = null, ...evidence } = {}) {
     const container = this._getContainer(actor);
@@ -575,10 +491,9 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   async processWorldTime(worldTime = this._nowWorldTime()) {
-    // Timed resume only (issue 656): driven from the synced updateWorldTime hook, and
-    // flipping waitingTime→inProgress triggers _persist → actor.setFlag, a broadcast
-    // document write. Gate to the primary GM so exactly one client performs the write
-    // and players don't emit swallowed permission-denied errors per actor per tick.
+    // Timed resume only (issue 656): flipping `waitingTime` to `inProgress` persists through a
+    // broadcast `actor.setFlag`, so only the primary GM writes, and players emit no swallowed
+    // permission errors per actor per tick.
     if (this._isPrimaryGM() !== true) return;
     for (const actor of game.actors || []) {
       const container = this._getContainer(actor);
@@ -688,17 +603,10 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   /**
-   * Commit a versioned stage START in ONE write: lock the selection, record what the
-   * stage actually consumed, and arm its time gate (D-026/D-028). After this the
-   * persisted plan is authoritative and the stage's inputs are already spent.
-   *
-   * @param {Actor} actor
-   * @param {object} run
-   * @param {number} stepIndex
-   * @param {{selection?: object, prepared?: object, requiredSeconds?: number}} started
-   *   `selection` as {@link setStepSelectionPlan}, `prepared` as {@link markStepPrepared}.
-   * @param {{expectedRevision?: number, executionOperationId?: string}} [options]
-   * @returns {Promise<object|null>} The updated run, or null for an invalid step index.
+   * Commit a versioned stage START in ONE write (D-026/D-028): lock the selection (as
+   * `setStepSelectionPlan`), record what the stage consumed (as `markStepPrepared`) and arm its
+   * time gate. The persisted plan is then authoritative and the inputs are spent. `null` for an
+   * invalid step index.
    */
   async markStepStarted(actor, run, stepIndex, started = {}, options = {}) {
     this._assertRunMutation(run, options);
@@ -882,22 +790,10 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   /**
-   * Walk the runs this client may write and drop the ones a caller's predicates reject.
-   *
-   * The shared body of the two prunes below, which differ only in what they consider
-   * droppable. Kept as one walk because the walk itself carries three easily-lost
-   * properties — the writable-actor scoping, the "persist only when dirty" rule, and the
-   * separate active/history treatment — and a second hand-written copy is where those
-   * diverge.
-   *
-   * Scoped to the actors THIS client may write (issue 970). `cleanupInvalidRuns` runs on
-   * every client at `initialize()`, and a player owns only their own characters, so an
-   * un-filtered walk made a single stale entry on someone else's character reject the whole
-   * startup sequence.
-   *
-   * @param {object} predicates
-   * @param {(run: object) => boolean} predicates.dropActiveRun
-   * @param {(run: object) => boolean} predicates.keepHistoryEntry
+   * The shared walk of the two prunes below: drop what `dropActiveRun` rejects and keep the history
+   * `keepHistoryEntry` accepts, persisting only a dirty container. Scoped to the actors THIS client
+   * may write (issue 970): `cleanupInvalidRuns` runs on every client at `initialize()`, and one
+   * stale entry on another player's character would otherwise reject the whole startup.
    */
   async _pruneRunsAcrossWritableActors({ dropActiveRun, keepHistoryEntry }) {
     for (const actor of selectWritableActors(game.actors)) {
@@ -948,19 +844,10 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   /**
-   * The SUBJECT-TARGETED prune: drop active runs and history entries naming one of the
-   * recipes the caller has just deleted (issue 1226).
-   *
-   * The recipe-shaped sibling of {@link removeRunsForSystem}, and the fallback the
-   * mutation-time gate runs in `cleanupInvalidRuns`'s place when the corpus cannot be
-   * attested complete. It needs no Valid Id Basis: the ids are positively known to be gone
-   * because the caller removed them, and a corpus missing records cannot make a deleted id
-   * valid again. A record that was never read is simply not named here and survives, which
-   * is the whole difference from the sweep above.
-   *
-   * A recipe-less fizzle names nothing and is therefore never matched.
-   *
-   * @param {Iterable<string>} recipeIds
+   * The SUBJECT-TARGETED prune (issue 1226): drop runs and history naming a recipe the caller just
+   * deleted, the mutation-time gate's fallback for `cleanupInvalidRuns`. The ids are positively
+   * gone, so no Valid Id Basis is needed, and a record never read is never named. A recipe-less
+   * fizzle names nothing, so it is never matched.
    */
   async removeRunsForRecipes(recipeIds) {
     const targets = new Set(
@@ -975,22 +862,11 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   /**
-   * Prune legacy phantom active runs: an unversioned run whose recipe is single-step
-   * AND whose only step has no time requirement can never legitimately persist as
-   * active (it only ever rejects, fails, or succeeds atomically), so any such run
-   * left in the active container is a phantom stranded by an old pre-validation
-   * early-return. Multi-step recipes (persist between "Trigger Next Step") and
-   * single-step time-gated recipes (persist a waiting run) are excluded.
-   * Current-version runs can legitimately await manual completion without a time
-   * requirement, including after authored timing is removed, and are never pruned here.
-   *
-   * Unknown recipes are left alone here — {@link cleanupInvalidRuns} owns those.
-   *
-   * Scoped to the actors THIS client may write, for the reason given on
-   * {@link cleanupInvalidRuns} (issue 970).
-   *
-   * @param {(recipeId: string) => (object|null)} resolveRecipe
-   * @returns {Promise<number>} the number of phantom runs pruned
+   * Prune legacy phantom active runs: an unversioned run of a single-step recipe whose one step has
+   * no time requirement can never legitimately stay active, so it was stranded by an old early
+   * return. Multi-step and time-gated recipes, and current-version runs (which may await manual
+   * completion), are never pruned; an unknown recipe is left to `cleanupInvalidRuns`. Scoped to the
+   * actors this client may write (issue 970). Answers the number pruned.
    */
   async pruneInstantaneousActiveRuns(resolveRecipe) {
     if (typeof resolveRecipe !== 'function') return 0;
@@ -1022,12 +898,9 @@ export class CraftingRunManager extends RunContainerManagerBase {
 }
 
 /**
- * Rebuild `preparedConsumption` from a caller snapshot. A WHITELIST: a new field must be
- * added here as well as at the call site, or the resume falls back to live values.
- * `consumedSnapshots` carries the versioned rehydration detail the reconstruction reads;
- * `consumedSummary` stays the cancel reversal's restore input.
- * @param {object} prepared
- * @returns {object}
+ * Rebuild `preparedConsumption` from a caller snapshot. A WHITELIST: a new field must be added
+ * here as well as at the call site, or the resume falls back to live values. `consumedSnapshots`
+ * carries the versioned rehydration detail; `consumedSummary` stays the cancel reversal's input.
  */
 function buildPreparedConsumption(prepared = {}) {
   const value = {
@@ -1053,10 +926,8 @@ function buildPreparedConsumption(prepared = {}) {
 }
 
 /**
- * Apply an authored selection to a step, refusing a plan whose authored snapshot does not
- * match the route it names. Shared by the pre-start edit and the stage-start lock.
- * @param {object} step
- * @param {object} selection
+ * Apply an authored selection to a step, refusing a plan whose authored snapshot does not match
+ * the route it names; shared by the pre-start edit and the stage-start lock.
  */
 function applyStepSelection(step, selection) {
   // Authority callers supply authored evidence. Validate and clone both values
@@ -1090,11 +961,9 @@ function buildSelectionPlan(selection) {
 }
 
 /**
- * Allowlist optional historical stage evidence before it enters an actor flag or
- * an execution receipt. Callers own initiating-viewer disclosure; absent evidence
- * stays absent, and captured empty arrays remain an explicit zero.
- * @param {object} input
- * @returns {object}
+ * Allowlist optional historical stage evidence before it enters an actor flag or an execution
+ * receipt. Callers own initiating-viewer disclosure; absent evidence stays absent, and a captured
+ * empty array stays an explicit zero.
  */
 export function craftingStepHistoryEvidence(input = {}) {
   const source = input ?? {};
