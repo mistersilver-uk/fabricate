@@ -500,7 +500,7 @@ function countBy(items) {
   return counts;
 }
 
-/** `succeeded` when all did, `failed` when none did, else `mixed` (`partial` names an award mode). */
+/** `succeeded` if all did, `failed` if none did, else `mixed` (`partial` names an award mode). */
 function rollUpStatus(items) {
   const succeeded = items.filter((item) => item.outcome === 'succeeded').length;
   if (succeeded === items.length) return 'succeeded';

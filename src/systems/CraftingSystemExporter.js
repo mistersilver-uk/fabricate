@@ -29,26 +29,9 @@ import {
 const SYSTEM_ID_PLACEHOLDER = '__SYSTEM_ID__';
 
 /**
- * Build an export payload for a crafting system, its recipes, and its gathering
- * authoring model (environments + the per-system `gatheringConfig` slice).
- *
- * The envelope carries an explicit integer `schemaVersion` (distinct from
- * `fabricateVersion`) and a `runtimeStateIncluded: false` marker; runtime/world
- * state (per-environment `nodeRuntime`, current-condition selection) is stripped
- * by {@link assembleGatheringAuthoringBundle}.
- *
- * @param {object} system - Normalized system object from CraftingSystemManager
- * @param {object[]} recipes - Recipe objects (plain JSON via recipe.toJSON())
- * @param {string} fabricateVersion - Current module version string
- * @param {object[]} [gatheringEnvironments=[]] - FULL global environment array (all systems)
- * @param {object} [gatheringConfig={}] - FULL `gatheringConfig` setting object
- * @param {object} [currencyConfig={}] - FULL `currencyConfig` world setting
- * @param {object} [travelConfig={}] - FULL `travelConfig` world setting
- * @param {object} [characterLibraries={}] - FULL `characterLibraries` world setting
- * @param {object} [componentScope={}] - FULL `componentScope` world setting
- * @param {object} [essenceScope={}] - FULL `essenceScope` world setting
- * @param {object} [toolScope={}] - FULL `toolScope` world setting
- * @returns {object} Export envelope ready for JSON.stringify
+ * The export envelope for a crafting system: its recipes, its gathering authoring model and the
+ * world slices (currency, travel, character libraries and the three membership-filtered world-scope
+ * entity slices), with an integer `schemaVersion` and `runtimeStateIncluded: false`.
  */
 export function buildExportPayload(
   system,
@@ -56,23 +39,11 @@ export function buildExportPayload(
   fabricateVersion,
   gatheringEnvironments = [],
   gatheringConfig = {},
-  // The world currency configuration (issue 1278). Defaulted so every existing call site keeps
-  // working; an export produced without it simply carries an empty ladder.
+  // The world slices default empty so older call sites keep working; an export without one carries
+  // an empty slice, leaving every reference into it unresolvable in the destination.
   currencyConfig = {},
-  // The world travel configuration (issue 1282): the realm library plus its two scalars.
-  // Defaulted for the same reason, with the same consequence — an export produced without it
-  // carries an empty library, and every realm-gated environment in it lands unresolvable.
   travelConfig = {},
-  // The world character libraries (issue 1308): the character-prerequisite library and the
-  // modifier library. Defaulted for the same reason as the two above, with the same consequence —
-  // an export produced without it carries empty libraries, so every learning gate, tool
-  // requirement and check modifier in the bundle lands unresolvable.
   characterLibraries = {},
-  // The three WORLD-SCOPE ENTITY settings (issue 1364): the world entity roster, the world
-  // defaults and the per-(entity, system) membership records. Defaulted for the reason the three
-  // slices above are, but with a DIFFERENT consequence, because unlike them these are FILTERED BY
-  // MEMBERSHIP to the exported system: an export produced without them carries three empty slices,
-  // so the destination's world corpus learns nothing about the system it just imported.
   componentScope = {},
   essenceScope = {},
   toolScope = {}
@@ -83,8 +54,7 @@ export function buildExportPayload(
 
   const systemId = system.id;
 
-  // Deep-clone system, strip transitional aliases, and strip the Checks Studio's
-  // progressive PREVIEW SANDBOX, which is authoring scratch rather than authoring data.
+  // Strip the transitional aliases and the Checks Studio's progressive preview sandbox (scratch).
   const exportSystem = stripPreviewSandbox(stripTransitionalAliases(structuredClone(system)));
 
   // Replace craftingSystemId with placeholder so imports can rebind
@@ -118,12 +88,7 @@ export function buildExportPayload(
   };
 }
 
-/**
- * Validate import data before passing to CompendiumImporter.
- *
- * @param {*} data - Parsed JSON to validate
- * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
- */
+/** Validate import data before `CompendiumImporter`, upcasting a legacy payload first. */
 export function validateImportData(rawData) {
   const errors = [];
   const warnings = [];
@@ -133,12 +98,8 @@ export function validateImportData(rawData) {
     return { valid: false, errors, warnings };
   }
 
-  // Upcast any legacy (schema 1) payload to the current schema before validating
-  // the v2 shape, so an older `{ fabricateVersion, system, recipes }` export still
-  // validates.
   const data = migrateExportPayload(rawData);
 
-  // Envelope checks
   if (!data.fabricateVersion) {
     warnings.push('Missing fabricateVersion — file may not be a Fabricate export');
   }
@@ -162,15 +123,9 @@ export function validateImportData(rawData) {
     errors.push('"travelConfig" field must be an object');
   }
 
-  // The three WORLD-SCOPE ENTITY slices (issue 1364), checked against the RAW payload rather
-  // than the migrated one — and that is not a stylistic choice. The 5→6 upcast REPLACES a slice
-  // it cannot read with a freshly derived one, so by the time we look at `data` a malformed slice
-  // has already become a well-formed one and this check would never fire. A dropped slice is an
-  // import that quietly creates no memberships. That was indistinguishable from success until the
-  // read repointing of issue 1370 made the union visible to every non-UI reader; it is now
-  // observable, but only once a world default or a membership override is authored, because
-  // while `## CraftingSystem` requirement 36 holds the in-system record decides every key it
-  // carries. So the check stays where it is rather than being demoted to a runtime symptom.
+  // The world-scope slices (issue 1364) are checked against the RAW payload: the 5 to 6 upcast
+  // replaces an unreadable slice with a derived one, so a malformed slice would pass unseen and
+  // quietly create no memberships.
   for (const key of Object.values(WORLD_SCOPE_SLICE_KEYS)) {
     const slice = rawData[key];
     if (slice === undefined) continue;
@@ -181,34 +136,27 @@ export function validateImportData(rawData) {
     for (const subKey of ['entities', 'defaults', 'membership']) {
       const value = slice[subKey];
       if (value === undefined) continue;
-      // EITHER SHAPE IS VALID. `## Scoped Entity Definitions` requirement 13 makes the map and the
-      // array both normative for `defaults` and `membership`, and `entities` is an array on both
-      // sides; a scalar is the only thing that cannot be one.
+      // Either shape is valid (Scoped Entity Definitions requirement 13); a scalar is neither.
       if (typeof value !== 'object' || value === null) {
         errors.push(`"${key}.${subKey}" field must be an object or an array`);
       }
     }
   }
 
-  // System checks
   if (!data.system || typeof data.system !== 'object') {
     errors.push('Missing required "system" field');
   } else if (!data.system.name || typeof data.system.name !== 'string') {
     errors.push('System is missing a "name" field');
   }
 
-  // Realms ride the ENVELOPE since issue 1282, not the system. A malformed legacy value is
-  // checked against the RAW payload rather than the migrated one, because the upcast has
-  // already hoisted (and, for a non-array, discarded) `system.gatheringRealms` by the time we
-  // look at `data`. Accept the legacy `gatheringRegions` key on read (pre-1.1.0-migration
-  // exports) so an old export still validates under the canonical name.
+  // Legacy system realms (and the pre-1.1.0 `gatheringRegions` key) are checked RAW, since the
+  // upcast hoists and discards them; realms ride the envelope since issue 1282.
   const legacySystemRealms = rawData.system?.gatheringRealms ?? rawData.system?.gatheringRegions;
   if (legacySystemRealms !== undefined && !Array.isArray(legacySystemRealms)) {
     errors.push('System "gatheringRealms" field must be an array');
   }
 
-  // Each realm should carry a name (warning, not a hard error, so a hand-trimmed export still
-  // imports).
+  // A nameless realm only warns, so a hand-trimmed export still imports.
   const realms = data.travelConfig?.realms;
   if (realms !== undefined && !Array.isArray(realms)) {
     errors.push('"travelConfig.realms" field must be an array');
@@ -220,7 +168,6 @@ export function validateImportData(rawData) {
     }
   }
 
-  // Recipes checks
   if (data.recipes !== undefined && !Array.isArray(data.recipes)) {
     errors.push('"recipes" field must be an array');
   } else if (Array.isArray(data.recipes)) {
@@ -240,24 +187,13 @@ export function validateImportData(rawData) {
 }
 
 /**
- * Prepare validated import data for CompendiumImporter.importFromPackData().
- *
- * @param {object} data - Validated export payload
- * @param {'keep'|'copy'} mode
- *   - 'keep': retain original IDs (for overwrite or skip scenarios)
- *   - 'copy': bind an incoming entity to the destination's existing world entity where their
- *     source references match, and mint a fresh id only where they do not
- * @param {object} [options]
- * @param {{components?: object[], essences?: object[], tools?: object[]}} [options.worldEntityIndex]
- *   The DESTINATION world's entity roster, read from the three world-scope entity stores. REQUIRED
- *   under copy mode and never defaulted: falling back to minting a fresh id for every entity is
- *   precisely the duplication epic 1357 exists to end, and a silent default is the defect class
- *   this repository has already documented against itself. In keep mode it is optional and is used
- *   only to REPORT an id collision, which keep mode must not repair.
- * @returns {object} Pack data shaped for CompendiumImporter
+ * Shape validated import data for `CompendiumImporter.importFromPackData()`. `keep` retains ids;
+ * `copy` binds each incoming entity to the destination world entity its source references match
+ * and mints only otherwise. `options.worldEntityIndex` is the destination roster, REQUIRED in copy
+ * mode and never defaulted, since minting everything is the duplication epic 1357 ends; keep mode
+ * uses it only to report id collisions.
  */
 export function prepareForImport(rawData, mode = 'keep', options = null) {
-  // Upcast legacy payloads so downstream import always sees the v2 fields.
   const data = migrateExportPayload(rawData);
 
   const system = structuredClone(data.system);
@@ -270,46 +206,26 @@ export function prepareForImport(rawData, mode = 'keep', options = null) {
       ? structuredClone(data.gatheringConfig)
       : { system: {}, shared: {} };
 
-  // The WORLD currency ladder (issue 1278). It rides the envelope rather than the system, so
-  // unlike every other slice above there is nothing on `system` to fall back on: drop it here
-  // and `CompendiumImporter._persistCurrencyConfig` receives `undefined` and returns
-  // immediately, which lands every imported currency cost in the destination world as an
-  // unresolvable unit id. Deliberately NOT rebound under `copy` mode: unit ids are world scope,
-  // shared by every crafting system, and the merge already lets the destination win a collision.
+  // The world slices ride the envelope, with no `system` fallback: dropped here, the matching
+  // `CompendiumImporter._persist*` returns early and strands every reference into it. None is
+  // rebound in copy mode, since their ids are world scope and the merge lets the destination win.
   const currencyConfig =
     data.currencyConfig && typeof data.currencyConfig === 'object'
       ? structuredClone(data.currencyConfig)
       : {};
 
-  // The WORLD realm library (issue 1282), carried for exactly the reason the ladder above is:
-  // it rides the envelope rather than the system, so there is nothing on `system` to fall back
-  // on. Drop it here and `CompendiumImporter._persistTravelConfig` receives `undefined` and
-  // returns immediately, landing every realm-gated environment in the destination world citing
-  // realm ids that name nothing. Deliberately NOT rebound under `copy` mode: realm ids are
-  // world scope, shared by every crafting system that opts in, and the merge already lets the
-  // destination win a collision — rebinding would fork the world's own geography per copy.
   const travelConfig =
     data.travelConfig && typeof data.travelConfig === 'object'
       ? structuredClone(data.travelConfig)
       : {};
 
-  // The WORLD character libraries (issue 1308), carried for exactly the reason the two slices
-  // above are: they ride the envelope rather than the system, so there is nothing on `system` to
-  // fall back on. Drop them here and `CompendiumImporter._persistCharacterLibraries` receives
-  // `undefined` and returns immediately, landing every learning gate, tool requirement and check
-  // modifier in the destination world citing entry ids that name nothing. Deliberately NOT
-  // rebound under `copy` mode, for the reason realm and unit ids are not: these ids are world
-  // scope, shared by every crafting system, and the merge already lets the destination win a
-  // collision — rebinding would fork the world's own rules per copy.
   const characterLibraries =
     data.characterLibraries && typeof data.characterLibraries === 'object'
       ? structuredClone(data.characterLibraries)
       : {};
 
-  // The three WORLD-SCOPE ENTITY slices (issue 1364). Unlike the three world slices above, these
-  // are always present after the upcast — it DERIVES them from the bundle's own system rather
-  // than defaulting them empty — so there is no "dropped here" failure mode to guard. They are
-  // cloned because the copy-mode rewrite below edits them in place.
+  // Always present after the upcast, which derives them; cloned because the copy rewrite edits
+  // them in place.
   const scopeSlices = {};
   for (const entityType of WORLD_SCOPE_ENTITY_TYPES) {
     const key = WORLD_SCOPE_SLICE_KEYS[entityType];
@@ -320,19 +236,15 @@ export function prepareForImport(rawData, mode = 'keep', options = null) {
   }
 
   const upcastReport = data[WORLD_SCOPE_UPCAST_REPORT_KEY];
-  // Every `(system, entityType)` pair the shared transform REFUSED. A refused pair yields an
-  // EMPTY slice, so carrying the refusal is what stops a refusal presenting as a system that
-  // simply has no world members.
+  // Each refused `(system, entityType)` pair, carried so a refusal's empty slice does not read as a
+  // system without world members.
   const worldScopeRefusals = Array.isArray(upcastReport?.refusals)
     ? structuredClone(upcastReport.refusals)
     : [];
   const worldScopeReferences = [];
   if (upcastReport?.droppedToolBreakage) {
-    // KIND 4, and it is a separate kind because the authority is NOT a world default: it is the
-    // FOURTH sub-key of `toolScope`, world scope rather than entity scope. It is the one entry
-    // with no record owner, and every entry must carry an owner, so it takes the shipped `unknown`
-    // owner type — which already reads "Record" — naming the SETTING rather than inventing a
-    // scope-level owner type for one entry.
+    // A separate kind: the authority is `toolScope`'s fourth, world-scope sub-key rather than a
+    // default, so it takes the `unknown` owner type and names the setting.
     worldScopeReferences.push({
       kind: REFERENCE_KINDS.WORLD_TOOL_BREAKAGE_DROPPED,
       ownerType: 'unknown',
@@ -343,10 +255,8 @@ export function prepareForImport(rawData, mode = 'keep', options = null) {
     });
   }
 
-  // Kind 5: a `1.34.0` upcast refusal changes no slice, so it is indistinguishable from a bundle
-  // with nothing to merge unless it is carried here — `import-export` requires it reported rather
-  // than silent. The owner is the refused group's survivor, the id a GM can find in the Essence
-  // Catalogue; the losers ride the reference value.
+  // A `1.34.0` refusal changes no slice, so it is reported here, owned by the refused group's
+  // survivor (the id a GM can find); the losers ride the reference value.
   for (const refusal of Array.isArray(upcastReport?.essenceMergeRefusals)
     ? upcastReport.essenceMergeRefusals
     : []) {
@@ -354,8 +264,7 @@ export function prepareForImport(rawData, mode = 'keep', options = null) {
       kind: REFERENCE_KINDS.WORLD_ESSENCE_MERGE_REFUSED,
       ownerType: 'essence',
       ownerId: String(refusal?.survivorId ?? ''),
-      // `name`, not `survivorName`: the refusal spreads `displayNameOf(group[0].record)`, which
-      // emits a bare `name` key and OMITS it entirely when the record has none.
+      // `name`, not `survivorName`: `displayNameOf` emits a bare `name`, omitted when it has none.
       ownerName: String(refusal?.name ?? refusal?.survivorId ?? ''),
       referenceValue: `${(Array.isArray(refusal?.loserIds) ? refusal.loserIds : []).join(', ')} (${refusal?.reason ?? 'unknown'})`,
       disposition: 'reported',
@@ -375,10 +284,8 @@ export function prepareForImport(rawData, mode = 'keep', options = null) {
     worldScopeReferences,
   };
 
-  // ORDERING IS LOAD-BEARING. `migrateExportPayload` has already DERIVED the three slices above,
-  // keyed to the bundle's OWN ids, so the copy-mode map below rewrites them along with every other
-  // reference. Deriving after rebinding would strand every membership and defaults record at a
-  // pre-rebind id.
+  // ORDERING: the upcast already derived the slices under the bundle's own ids, so the copy map
+  // below rewrites them too; deriving after rebinding would strand them at pre-rebind ids.
   const worldEntityIndex = options?.worldEntityIndex ?? null;
   worldScopeReferences.push(...reportWorldEntityCollisions(prepared, worldEntityIndex, mode));
 
@@ -394,37 +301,19 @@ export function prepareForImport(rawData, mode = 'keep', options = null) {
     // Append "(Copy)" to the name so the user can distinguish it
     system.name = `${system.name || 'Crafting System'} (Copy)`;
 
-    // Regenerate recipe ids with an old→new map and atomically remap each
-    // recipe-book membership array (recipeItemDefinitions[].recipeIds) to the
-    // regenerated id, so a copy's books resolve to the copy's recipes instead of
-    // dangling at the pre-import ids (issue #701). Done eagerly here rather than
-    // leaving id minting to the downstream Recipe constructor so Phase 5 reference
-    // resolution sees the regenerated ids.
+    // Eagerly, so reference resolution sees the regenerated recipe ids (issue 701).
     rebindCopyRecipeIds(prepared);
 
-    // Regenerate record-CONTAINER ids (realm ids, environment record ids) and
-    // rewire their internal cross-references, while PRESERVING task / event /
-    // characterModifier ids so environment→library linkages survive (D3). The
-    // craftingSystemId + gatheringConfig system-key are rebound by the importer
-    // once createSystem has generated the fresh system id.
     rebindCopyContainerIds(prepared);
 
-    // Bind every incoming component to the destination's existing world entity where their
-    // source references say they are the same Item, mint where they do not, and atomically remap
-    // every within-payload component reference — including the ones inside the three world-scope
-    // slices (issue 1364, retracting issue 570's mint-everything rule).
+    // Match-or-mint over components, rewriting the world-scope slices too (issue 1364).
     rebindCopyComponentIds(prepared, { worldEntityIndex, report: worldScopeReferences });
   }
 
   return prepared;
 }
 
-/**
- * Generate a filename for the export.
- *
- * @param {string} systemName - Human-readable system name
- * @returns {string} Filename like "fabricate-example-system-2026-03-12.json"
- */
+/** `fabricate-<slug>-<yyyy-mm-dd>.json`. */
 export function makeExportFilename(systemName) {
   const slug = (systemName || 'system')
     .toLowerCase()
@@ -434,14 +323,7 @@ export function makeExportFilename(systemName) {
   return `fabricate-${slug}-${date}.json`;
 }
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Remove transitional/alias fields from a system object to produce a clean export.
- * The canonical fields are kept; aliases added by _normalizeSystem are stripped.
- */
+/** Strip the aliases `_normalizeSystem` adds, keeping the canonical fields. */
 function stripTransitionalAliases(system) {
   // 'items' and 'managedItems' are aliases for 'components'
   delete system.items;
@@ -455,8 +337,7 @@ function stripTransitionalAliases(system) {
   delete system.enableEssences;
   delete system.enableCategories;
   delete system.enableMultiStepRecipes;
-  // enableTiers/tiers: no longer emitted by _normalizeSystem, but may be present
-  // in data exported/stored by older versions — strip defensively
+  // No longer emitted by `_normalizeSystem`, but older stored data may carry them.
   delete system.enableTiers;
   delete system.tiers;
   delete system.advancedOptionsEnabled;
@@ -475,21 +356,9 @@ function stripTransitionalAliases(system) {
 const PROGRESSIVE_CHECK_KEYS = ['craftingCheck', 'salvageCraftingCheck', 'gatheringCraftingCheck'];
 
 /**
- * Remove the Checks Studio's progressive PREVIEW SANDBOX from an export.
- *
- * `progressive.preview.difficulties` is the ordered list a GM types into the odds histogram
- * to see what a check would award. It is an experiment on one authoring screen, not a
- * property of the system: no runtime path reads it and no readiness rule validates it. A
- * value shipped inside a distributed system reads to the recipient as configuration they are
- * expected to understand, which is exactly the misreading this strip prevents — and it is
- * the same call the `runtimeStateIncluded: false` boundary already makes about every other
- * piece of non-authoring state.
- *
- * ABSENCE-PRESERVING in the other direction too: it deletes the key rather than emptying it,
- * so an import cannot tell an exported experiment from one that was never run.
- *
- * @param {object} system The cloned export system.
- * @returns {object} The same object, sandbox removed.
+ * Delete the Checks Studio's progressive PREVIEW SANDBOX, an authoring-screen experiment no
+ * runtime reads that a recipient would misread as configuration. Deleted rather than emptied, so
+ * an import cannot tell an exported experiment from one never run.
  */
 function stripPreviewSandbox(system) {
   for (const key of PROGRESSIVE_CHECK_KEYS) {
