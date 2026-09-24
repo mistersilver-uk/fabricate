@@ -1,7 +1,7 @@
 /**
  * The tool-source transaction in `manager/toolSources.js` (issue 1923): each writer's GM gate and
- * error text, and the manager members it reaches through `io`, which a later call must see
- * replaced, so the bag is never cached.
+ * error text, and the manager members it reaches through `io`; a later call must see replaced
+ * members, so the bag is never cached.
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -15,13 +15,6 @@ globalThis.game = { user: { isGM: false }, system: { id: 'dnd5e' }, actors: [], 
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
 
 const { CraftingSystemManager } = await import('../../src/systems/CraftingSystemManager.js');
-
-/** `assert.rejects` with a validator, so a swapped or generic error text fails the assertion. */
-const rejectsExactly = (promise, message) =>
-  assert.rejects(promise, (error) => {
-    assert.equal(error.message, message);
-    return true;
-  });
 
 function toolManager() {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
@@ -42,15 +35,17 @@ test('non-GM: each tool writer rejects with the GM-permission message naming its
   globalThis.game.user.isGM = false;
   const manager = toolManager();
 
-  await rejectsExactly(
+  await assert.rejects(
     manager.upsertTool('sysT', { label: 'Saw' }),
-    'GM permissions required: add tool from uuid'
+    { message: 'GM permissions required: add tool from uuid' }
   );
-  await rejectsExactly(
+  await assert.rejects(
     manager.addToolFromUuid('sysT', 'Item.saw'),
-    'GM permissions required: add tool from uuid'
+    { message: 'GM permissions required: add tool from uuid' }
   );
-  await rejectsExactly(manager.deleteTool('sysT', 'tool-1'), 'GM permissions required: delete tool');
+  await assert.rejects(manager.deleteTool('sysT', 'tool-1'), {
+    message: 'GM permissions required: delete tool',
+  });
 });
 
 test('GM: each refusal carries its exact text', async () => {
@@ -58,15 +53,22 @@ test('GM: each refusal carries its exact text', async () => {
   registry.set('Actor.a', { uuid: 'Actor.a', documentName: 'Actor' });
   const manager = toolManager();
 
-  await rejectsExactly(manager.upsertTool('nope', {}), 'Crafting system not found: nope');
-  await rejectsExactly(manager.deleteTool('nope', 'tool-1'), 'Crafting system not found: nope');
-  await rejectsExactly(
+  await assert.rejects(manager.upsertTool('nope', {}), {
+    message: 'Crafting system not found: nope',
+  });
+  await assert.rejects(manager.deleteTool('nope', 'tool-1'), {
+    message: 'Crafting system not found: nope',
+  });
+  await assert.rejects(
     manager.addToolFromUuid('sysT', 'Actor.a'),
-    'Cannot register Tool source "Actor.a": resolved document is not an Item'
+    { message: 'Cannot register Tool source "Actor.a": resolved document is not an Item' }
   );
-  await rejectsExactly(
+  await assert.rejects(
     manager.upsertTool('sysT', { label: 'Unlinked' }),
-    'Cannot save Tool: a tool requires either a componentId or its own source references'
+    {
+      message:
+        'Cannot save Tool: a tool requires either a componentId or its own source references',
+    }
   );
 
   const source = hammer('Item.rollback');
@@ -78,9 +80,9 @@ test('GM: each refusal carries its exact text', async () => {
   manager.save = async ({ put }) => {
     if (put.tools.length === 0) throw new Error('compensation failed');
   };
-  await rejectsExactly(
+  await assert.rejects(
     manager.addToolFromUuid('sysT', source.uuid),
-    'Tool transaction failed and rollback was incomplete'
+    { message: 'Tool transaction failed and rollback was incomplete' }
   );
 });
 

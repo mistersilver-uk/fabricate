@@ -46,14 +46,6 @@ test('a non-GM item edit changes nothing, and a later GM edit sees replaced memb
   assert.deepEqual([early, later], [{ save: 0, notify: 0 }, { save: 1, notify: 1 }]);
 });
 
-/** `assert.rejects` with a validator, so a swapped or generic error text fails the assertion
- * instead of a loose regex quietly matching it. */
-const rejectsExactly = (promise, message) =>
-  assert.rejects(promise, (error) => {
-    assert.equal(error.message, message);
-    return true;
-  });
-
 const gatedSystem = (manager) =>
   manager._normalizeSystem({
     id: 'sys-gate',
@@ -66,17 +58,17 @@ test('non-GM: each writer rejects with the GM-permission message naming its own 
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   manager.systems.set('sys-gate', gatedSystem(manager));
 
-  await rejectsExactly(
+  await assert.rejects(
     manager.addRecipeItemFromUuid('sys-gate', 'Item.recipe-1'),
-    'GM permissions required: add recipe item from uuid'
+    { message: 'GM permissions required: add recipe item from uuid' }
   );
-  await rejectsExactly(
+  await assert.rejects(
     manager.addItemFromUuid('sys-gate', 'Item.comp-2'),
-    'GM permissions required: add component from uuid'
+    { message: 'GM permissions required: add component from uuid' }
   );
-  await rejectsExactly(
+  await assert.rejects(
     manager.replaceItemSource('sys-gate', 'comp-1', 'Item.comp-3'),
-    'GM permissions required: replace component source'
+    { message: 'GM permissions required: replace component source' }
   );
 });
 
@@ -86,17 +78,17 @@ test('GM: a resolved non-Item document is refused with each writer’s own messa
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   manager.systems.set('sys-gate', gatedSystem(manager));
 
-  await rejectsExactly(
+  await assert.rejects(
     manager.addRecipeItemFromUuid('sys-gate', 'Actor.a'),
-    'Cannot add non-Item document (Actor) as a recipe item'
+    { message: 'Cannot add non-Item document (Actor) as a recipe item' }
   );
-  await rejectsExactly(
+  await assert.rejects(
     manager.addItemFromUuid('sys-gate', 'Actor.a'),
-    'Cannot add non-Item document (Actor) as a crafting component'
+    { message: 'Cannot add non-Item document (Actor) as a crafting component' }
   );
-  await rejectsExactly(
+  await assert.rejects(
     manager.replaceItemSource('sys-gate', 'comp-1', 'Actor.a'),
-    'Cannot use non-Item document (Actor) as a component source'
+    { message: 'Cannot use non-Item document (Actor) as a component source' }
   );
 });
 
