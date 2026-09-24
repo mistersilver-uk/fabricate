@@ -200,8 +200,9 @@ export async function cleanupSystemScopedState(io, systemId, { removedRecipeIds 
  * The shared body of every cascading recipe delete (issue 1132). It writes `recipes`, then
  * `craftingSystems`, then actor flags: a failed book write leaves dangling ids the next delete
  * repairs, where books first could drop surviving recipes, and a revoked `SETTINGS_MODIFY` mutates
- * no actor. The membership prune never seeds the basis marker (issue 1011) and is restored if its
- * save fails; both change hooks fire, gated per axis. `system` is the live record, not a snapshot.
+ * no actor. The membership prune never sets, reads or seeds the basis marker (issue 1011) and is
+ * restored if its save fails; both change hooks fire, gated per axis. `system` is the live record,
+ * not a snapshot: `updateSystem`'s mode change calls this and saves the same record afterwards.
  */
 export async function deleteRecipeSet(io, system, recipeIds, options = {}) {
   const requested = normalizeSelectionIds(recipeIds);
@@ -332,8 +333,9 @@ export async function deleteComponents(io, systemId, componentIds) {
 /**
  * The shared body of `deleteItem` and `deleteComponents`: remove the components, repair references
  * and persist once, without a GM gate, notification or alchemy reconcile. The recipe rewrites run
- * before the save, safe only because the activation blocker is not a persistence check. A surviving
- * component's salvage result naming a deleted component is deliberately left dangling.
+ * before the save, safe only because the activation blocker is `_validateRecipeForActivation`, not
+ * `_validateRecipeForPersistence`. A surviving component's salvage result naming a deleted
+ * component is left dangling, since the bulk panel's impact statement claims no salvage coverage.
  */
 export async function deleteComponentSet(io, systemId, componentIds) {
   const system = io.getSystem(systemId);
