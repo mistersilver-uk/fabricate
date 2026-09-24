@@ -5,7 +5,6 @@ import {
   isGatheringActorSelectableByUser,
 } from '../config/preferencesCleanup.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
-import { normalizeSelectionIds } from '../utils/bulkSelectionModel.js';
 import { normalizeCustomComponentCategories } from '../utils/componentCategories.js';
 import {
   advanceDefinitionRevision,
@@ -15,30 +14,14 @@ import {
 } from '../utils/definitionIndex.js';
 import { normalizeFailureResultPolicy } from '../utils/failureResultPolicy.js';
 import { plainTextDescription, descriptionTextCandidate } from '../utils/plainTextDescription.js';
-import {
-  normalizeCustomRecipeCategories,
-  normalizeRecipeCategory,
-} from '../utils/recipeCategories.js';
-import {
-  recipeLostItsShape,
-  recipeReferencesAnyComponent,
-  recipeReferencesComponent,
-  stripComponentsFromRecipeJson,
-} from '../utils/recipeComponentReferences.js';
-import {
-  buildLearnedRecipeActorIndex,
-  planRecipeItemMembershipPrune,
-  selectLearnerActorIds,
-} from '../utils/recipeDeleteImpact.js';
-import { recipeReferencesEssence } from '../utils/recipeEssenceReferences.js';
+import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
+import { recipeReferencesComponent } from '../utils/recipeComponentReferences.js';
 import {
   recipeItemDefinitionsContaining,
   resolveLegacyMembershipDefinition,
 } from '../utils/recipeItemMembership.js';
-import { resolveRecipeCheckTierOptions } from '../utils/routedOutcomeKeywords.js';
 import { getItemMatchUuids } from '../utils/sourceUuid.js';
 
-import { resolveActiveCraftingCheckFormula } from './checkModifierResolver.js';
 import {
   craftingDataChange,
   domainsForRecord,
@@ -47,11 +30,30 @@ import {
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
 import { ALL_INVALIDATION_DOMAINS, domainsForSystemFields } from './invalidationDomains.js';
 import {
+  applyBulkEditToComponents,
+  applyBulkEditToEssences,
+  applyBulkEditToRecipes,
+  bulkEditsCollaborators,
+} from './manager/bulkEdits.js';
+import {
   COMPONENT_FACTS,
-  ESSENCE_FACTS,
   ITEM_METADATA_FACTS,
   RECIPE_ITEM_FACTS,
 } from './manager/collaborators.js';
+import {
+  cleanupSystemScopedState,
+  deleteCascadesCollaborators,
+  deleteComponents,
+  deleteComponentSet,
+  deleteEssence,
+  deleteEssences,
+  deleteItem,
+  deleteRecipeSet,
+  deleteSystem,
+  reconcileAlchemySignaturesAfterDeletion,
+  stripComponentsFromRecipes,
+  stripEssenceFromSets,
+} from './manager/deleteCascades.js';
 import {
   addItemFromUuid,
   addRecipeItemFromUuid,
@@ -122,9 +124,6 @@ import {
   normalizeToolPrerequisites,
   normalizeToolRequirement,
 } from './normalize/tools.js';
-import { RecipeActivationError } from './RecipeActivationError.js';
-import { RecipePersistenceError } from './RecipePersistenceError.js';
-import { resolvedComponentEssencesById } from './resolvedComponentEssences.js';
 import { RevisionBookkeeping } from './revisionBookkeeping.js';
 import { corpusDelta, patchCorpusInPlace, REVISION_SCOPES } from './revisionTokens.js';
 import { resolveScopedEntityRead } from './scopedEntityReads.js';
@@ -972,7 +971,7 @@ export class CraftingSystemManager {
   /**
    * Coerce a membership id list to the persisted shape: trimmed, non-empty, deduped strings, as
    * every `recipeIds` writer produces, since membership readers match by exact equality. Not
-   * named `…IdList`, to stay distinct from the imported `normalizeSelectionIds`.
+   * named `…IdList`, to stay distinct from `normalizeSelectionIds`.
    */
   _normalizeMembershipRecipeIds(recipeIds) {
     return [
@@ -1297,149 +1296,14 @@ export class CraftingSystemManager {
     );
   }
 
-  /**
-   * Delete a crafting system and its recipes (GM only). A failed recipe delete is logged and the
-   * rest continue, and the system is still removed and saved, so no half-deleted system persists.
-   * Emits one aggregated notification, or a warning with the undeleted count.
-   */
   async deleteSystem(systemId) {
-    this._assertGM('delete crafting system');
-    const system = this.systems.get(systemId);
-    if (!system) {
-      throw new Error(`Crafting system not found: ${systemId}`);
-    }
-
-    const affected = this.recipeManager.getRecipes({ craftingSystemId: systemId });
-    const failedRecipeIds = [];
-    // Ids actually removed, which the mutation-time Valid Id Basis gate prunes when the corpus
-    // cannot be attested complete (issue 1226); a failed delete's recipe still exists.
-    const deletedRecipeIds = [];
-    for (const recipe of affected) {
-      try {
-        await this.recipeManager.deleteRecipe(recipe.id, { notify: false, cleanupFlags: false });
-        deletedRecipeIds.push(recipe.id);
-      } catch (error) {
-        failedRecipeIds.push(recipe.id);
-        console.error(
-          'Fabricate | failed to delete recipe while deleting crafting system; remove its orphaned data manually',
-          recipe.id,
-          error
-        );
-      }
-    }
-
-    this.systems.delete(systemId);
-    await this.save({ delete: systemId, domains: ALL_INVALIDATION_DOMAINS });
-
-    await this._cleanupSystemScopedState(systemId, { removedRecipeIds: deletedRecipeIds });
-
-    this._notifySystemsChanged();
-
-    const componentCount = Array.isArray(system.components)
-      ? system.components.length
-      : Array.isArray(system.items)
-        ? system.items.length
-        : 0;
-    const essenceCount = Array.isArray(system.essenceDefinitions)
-      ? system.essenceDefinitions.length
-      : 0;
-    const recipeItemCount = Array.isArray(system.recipeItemDefinitions)
-      ? system.recipeItemDefinitions.length
-      : 0;
-    const relatedCount = affected.length + componentCount + essenceCount + recipeItemCount;
-    const entityLabel = relatedCount === 1 ? 'entity' : 'entities';
-    const summary = `Deleted crafting system "${system.name || systemId}" and ${relatedCount} related ${entityLabel}.`;
-    if (failedRecipeIds.length > 0) {
-      const recipeLabel = failedRecipeIds.length === 1 ? 'recipe' : 'recipes';
-      ui?.notifications?.warn?.(
-        `${summary} ${failedRecipeIds.length} ${recipeLabel} could not be auto-deleted and may need manual removal (see the console for ids).`
-      );
-    } else {
-      ui?.notifications?.info?.(summary);
-    }
+    return deleteSystem(deleteCascadesCollaborators(this), systemId);
   }
 
-  /** Cascade cleanup across every store keyed by `systemId`, skipping unavailable services.
-   * Learned-recipe flags are cleaned once after recipes and the system are gone. Only the
-   * learned-recipe and preference sweeps are corpus-derived and gated on a Valid Id Basis (issue
-   * 1226); the rest name the deleted system. */
   async _cleanupSystemScopedState(systemId, { removedRecipeIds = [] } = {}) {
-    const environmentStore = this._getGatheringEnvironmentStore();
-    if (environmentStore?.cleanupByCraftingSystem) {
-      try {
-        await environmentStore.cleanupByCraftingSystem(systemId);
-      } catch (error) {
-        console.error('Fabricate | environment cleanup failed for system', systemId, error);
-      }
-    }
-
-    const gatheringRunManager = this._getGatheringRunManager();
-    if (gatheringRunManager?.removeRunsForSystem) {
-      try {
-        await gatheringRunManager.removeRunsForSystem(systemId);
-      } catch (error) {
-        console.error('Fabricate | gathering-run cleanup failed for system', systemId, error);
-      }
-    }
-
-    const salvageRunManager = this._getSalvageRunManager();
-    if (salvageRunManager?.removeRunsForSystem) {
-      try {
-        await salvageRunManager.removeRunsForSystem(systemId, {
-          cancelActive: false,
-          removeHistory: true,
-        });
-      } catch (error) {
-        console.error('Fabricate | salvage-run cleanup failed for system', systemId, error);
-      }
-    }
-
-    const craftingRunManager = this._getCraftingRunManager();
-    if (craftingRunManager?.removeRunsForSystem) {
-      try {
-        await craftingRunManager.removeRunsForSystem(systemId);
-      } catch (error) {
-        console.error('Fabricate | crafting-run cleanup failed for system', systemId, error);
-      }
-    }
-
-    const richStateService = this._getGatheringRichStateService();
-    if (richStateService?.removeSystem) {
-      try {
-        await richStateService.removeSystem(systemId);
-      } catch (error) {
-        console.error('Fabricate | gathering-config cleanup failed for system', systemId, error);
-      }
-    }
-
-    const visibilityService = this._getRecipeVisibilityService();
-    if (visibilityService?.cleanupLearnedRecipes) {
-      try {
-        const removed = [...(removedRecipeIds || [])]
-          .map((id) => String(id ?? '').trim())
-          .filter(Boolean);
-        const validRecipeIds = new Set(this.recipeManager.getRecipes({}).map((r) => r.id));
-        await runGatedMutationCleanup({
-          passes: [
-            {
-              label: 'orphaned learned recipes',
-              sweep: () => visibilityService.cleanupLearnedRecipes(validRecipeIds),
-              targeted:
-                removed.length > 0 ? () => visibilityService.forgetDeletedRecipes?.(removed) : null,
-            },
-          ],
-          subject: 'a crafting-system deletion',
-        });
-      } catch (error) {
-        console.error('Fabricate | learned-recipe cleanup failed for system', systemId, error);
-      }
-    }
-
-    try {
-      await this._cleanupCraftingPreferences({ subject: 'a crafting-system deletion' });
-    } catch (error) {
-      console.error('Fabricate | preference cleanup failed for system', systemId, error);
-    }
+    return cleanupSystemScopedState(deleteCascadesCollaborators(this), systemId, {
+      removedRecipeIds,
+    });
   }
 
   /** Announce a crafting-system change: the published legacy hook, then the scoped signal with
@@ -1703,348 +1567,18 @@ export class CraftingSystemManager {
     return system.components[idx];
   }
 
-  /** Lowercase, trim and drop empty tags, preserving order; de-duplication is the caller's job. */
-  _normalizeBulkTagList(tags) {
-    if (!Array.isArray(tags)) return [];
-    return tags
-      .map((tag) =>
-        String(tag || '')
-          .trim()
-          .toLowerCase()
-      )
-      .filter(Boolean);
-  }
-
-  /**
-   * Apply a bulk edit (category, tag additions and removals, essences, progressive DC) to a set of
-   * components in one `save()`, for folder-aware import (issue 771) and bulk edit (issue 772).
-   *
-   * Axes follow `Component` semantics: `category` overwrites; `addTags` unions case-insensitively,
-   * stored lowercase; `removeTags` applies after `addTags`; `essences` replaces the map when
-   * present; `difficulty` is cleared by `0`/`null`/`''`. `essences` and `difficulty` test
-   * presence, not truthiness. Changed components re-normalize under the system's essence and
-   * salvage context, so Simple mode runs the retain-one clamp (issue 764).
-   *
-   * @returns {Promise<{updated: number, componentIds: string[]}>} the cohort the edit was applied
-   *   to, not a diff, as in {@link CraftingSystemManager#applyBulkEditToEssences}.
-   */
   async applyBulkEditToComponents(systemId, componentIds, edit = {}, options = {}) {
-    this._assertGM('apply a bulk edit to components');
-    const system = this.getSystem(systemId);
-    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-
-    const targetIds = new Set(Array.from(componentIds || [], String));
-    if (targetIds.size === 0) return { updated: 0, componentIds: [] };
-
-    const bulkEdit = edit && typeof edit === 'object' ? edit : {};
-    const rawCategory = typeof bulkEdit.category === 'string' ? bulkEdit.category.trim() : '';
-    const hasCategory = rawCategory !== '';
-    const addTags = this._normalizeBulkTagList(bulkEdit.addTags);
-    const removeTags = new Set(this._normalizeBulkTagList(bulkEdit.removeTags));
-    const hasEssences = Object.hasOwn(bulkEdit, 'essences');
-    const hasDifficulty = Object.hasOwn(bulkEdit, 'difficulty');
-    const staged =
-      hasCategory || addTags.length > 0 || removeTags.size > 0 || hasEssences || hasDifficulty;
-    if (!staged) return { updated: 0, componentIds: [] };
-
-    // A `_normalizeSystem` bypass site (issue 1359): same basis, `Set|null`; see `_scopeBasis`.
-    const { essenceIds: validEssenceIds } = this._scopeBasis(system);
-    const salvageContext = this._salvageNormalizationContext(system);
-    const changedIds = [];
-    for (let idx = 0; idx < system.components.length; idx += 1) {
-      const component = system.components[idx];
-      if (!targetIds.has(String(component.id))) continue;
-
-      const currentTags = Array.isArray(component.tags) ? component.tags : [];
-      let nextTags = currentTags;
-      if (addTags.length > 0) {
-        const seen = new Set(currentTags.map((tag) => String(tag).toLowerCase()));
-        nextTags = [...currentTags];
-        for (const tag of addTags) {
-          if (seen.has(tag)) continue;
-          seen.add(tag);
-          nextTags.push(tag);
-        }
-      }
-      // AFTER the union, so a tag in both lists loses.
-      if (removeTags.size > 0) {
-        nextTags = nextTags.filter((tag) => !removeTags.has(String(tag).toLowerCase()));
-      }
-
-      system.components[idx] = this._normalizeComponent(
-        {
-          ...component,
-          category: hasCategory ? rawCategory : component.category,
-          tags: nextTags,
-          essences: hasEssences ? bulkEdit.essences : component.essences,
-          difficulty: hasDifficulty ? bulkEdit.difficulty : component.difficulty,
-          id: component.id,
-        },
-        { validEssenceIds, ...salvageContext }
-      );
-      changedIds.push(String(component.id));
-    }
-    if (changedIds.length > 0) advanceDefinitionRevision(system.components);
-
-    if (changedIds.length > 0 && options.persist !== false)
-      await this.save({ put: system, domains: COMPONENT_FACTS });
-    return { updated: changedIds.length, componentIds: changedIds };
+    return applyBulkEditToComponents(
+      bulkEditsCollaborators(this),
+      systemId,
+      componentIds,
+      edit,
+      options
+    );
   }
 
-  /**
-   * Apply a bulk edit (category, status, lock, check tier, book membership) to a set of recipes in
-   * one `recipes` write and one `craftingSystems` write (issue 1010). Lives here because the book
-   * axis writes `recipeItemDefinitions[].recipeIds`; recipe fields go through `updateRecipe`.
-   *
-   * `edit` carries `toBulkRecipeEdit`'s six keys only when staged; `enabled: false`,
-   * `locked: false` and `checkTierId: null` are real, so presence is tested with `Object.hasOwn`.
-   *
-   * Books are written first, because the membership-basis marker makes later membership reads
-   * well-defined; each setting's save is skipped when its half changed nothing. The activation
-   * gate runs per recipe in batch order inside `updateRecipe`, so a second alchemy candidate sees
-   * the first enabled; {@link RecipeManager#canActivateRecipe} is only a lower bound. It maintains
-   * the marker itself, since it bypasses `updateRecipeItemDefinition`.
-   */
   async applyBulkEditToRecipes(systemId, recipeIds, edit = {}) {
-    this._assertGM('apply a bulk edit to recipes');
-    const system = this.getSystem(systemId);
-    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-
-    const result = {
-      updated: 0,
-      recipeIds: [],
-      blockedEnables: 0,
-      blockedRecipeIds: [],
-      rejected: 0,
-      rejectedRecipeIds: [],
-      booksUpdated: 0,
-      bookIds: [],
-      bookAdditions: 0,
-      bookRemovals: 0,
-    };
-
-    // Resolves, and rejects, the staged check tier before anything is mutated.
-    const axes = this._resolveBulkRecipeAxes(system, edit);
-    if (!axes.staged) return result;
-
-    const targetIds = new Set(normalizeSelectionIds(recipeIds));
-    if (targetIds.size === 0) return result;
-
-    const cohort = (this.recipeManager?.getRecipes?.({ craftingSystemId: systemId }) ?? []).filter(
-      (recipe) => targetIds.has(String(recipe?.id ?? ''))
-    );
-
-    const books = this._applyBulkRecipeBookMembership(system, cohort, axes);
-    result.bookIds = books.bookIds;
-    result.booksUpdated = books.bookIds.length;
-    result.bookAdditions = books.additions;
-    result.bookRemovals = books.removals;
-    if (books.changed) {
-      system.membershipResolvesByRecipeIds = true;
-      await this.save({ put: system, domains: RECIPE_ITEM_FACTS });
-    }
-
-    const outcome = await this._applyBulkRecipePatches(cohort, axes);
-    result.recipeIds = outcome.recipeIds;
-    result.updated = outcome.recipeIds.length;
-    result.blockedRecipeIds = outcome.blockedRecipeIds;
-    result.blockedEnables = outcome.blockedRecipeIds.length;
-    result.rejectedRecipeIds = outcome.rejectedRecipeIds;
-    result.rejected = outcome.rejectedRecipeIds.length;
-
-    if (result.updated > 0) await this.recipeManager.save();
-
-    // At most one of each change hook. On the writing client `reload()` returns `false` and the
-    // socket bridge re-emits nothing, so a book change needs its own signal for the GM's windows.
-    if (books.changed) this._notifySystemsChanged();
-    if (result.updated > 0) {
-      this.recipeManager.notifyRecipesChanged?.({
-        action: 'bulkEdit',
-        recipeIds: result.recipeIds,
-      });
-    }
-
-    return result;
-  }
-
-  /**
-   * Read the six-key `edit` into an axis descriptor by presence, resolving the check tier against
-   * this system's tiers. The tier throws here, before any mutation: a bulk write is stricter than
-   * the single-recipe editor, which tolerates a dangling `checkTierId`.
-   */
-  _resolveBulkRecipeAxes(system, edit) {
-    const bulkEdit = edit && typeof edit === 'object' ? edit : {};
-    const axes = {
-      hasCategory: Object.hasOwn(bulkEdit, 'category'),
-      category: bulkEdit.category,
-      hasEnabled: Object.hasOwn(bulkEdit, 'enabled'),
-      enabled: bulkEdit.enabled === true,
-      hasLocked: Object.hasOwn(bulkEdit, 'locked'),
-      locked: bulkEdit.locked === true,
-      hasCheckTier: Object.hasOwn(bulkEdit, 'checkTierId'),
-      checkTierId: null,
-      // A staged book set is a selection, so it takes `normalizeSelectionIds`.
-      addBookIds: new Set(normalizeSelectionIds(bulkEdit.addBookIds)),
-      removeBookIds: new Set(normalizeSelectionIds(bulkEdit.removeBookIds)),
-    };
-    axes.staged =
-      axes.hasCategory ||
-      axes.hasEnabled ||
-      axes.hasLocked ||
-      axes.hasCheckTier ||
-      Object.hasOwn(bulkEdit, 'addBookIds') ||
-      Object.hasOwn(bulkEdit, 'removeBookIds');
-    if (axes.hasCheckTier)
-      axes.checkTierId = this._resolveBulkCheckTierId(system, bulkEdit.checkTierId);
-    return axes;
-  }
-
-  /**
-   * Resolve a staged check-tier id against the tiers this system's crafting check authors, or
-   * throw. `null`/empty means Default DC; anything else must be an option from
-   * `resolveRecipeCheckTierOptions` over the active check slot, which the editor dropdown and the
-   * bulk panel also read. The slot comes from the resolver itself (issue 1096); a `null` slot
-   * accepts only Default DC.
-   */
-  _resolveBulkCheckTierId(system, rawTierId) {
-    const tierId = typeof rawTierId === 'string' ? rawTierId.trim() : '';
-    if (!tierId) return null;
-
-    const options = resolveRecipeCheckTierOptions(
-      system?.craftingCheck,
-      resolveActiveCraftingCheckFormula(system).slot
-    );
-    const known = options.some((tier) => String(tier?.id ?? '') === tierId);
-    if (!known) {
-      throw new Error(`Check tier not authored by crafting system ${system?.id}: ${tierId}`);
-    }
-    return tierId;
-  }
-
-  /**
-   * Apply the book axis per definition: `addBookIds` and `removeBookIds` are disjoint, so each
-   * touched definition takes one operation and is written once (a definition named by both loses
-   * to remove). Edge counts are taken against the seeded arrays and exclude the seed's own
-   * writes; `changed` is true when any definition was mutated, seed included.
-   */
-  _applyBulkRecipeBookMembership(system, cohort, axes) {
-    const bookIds = [];
-    let additions = 0;
-    let removals = 0;
-    const touched = axes.addBookIds.size > 0 || axes.removeBookIds.size > 0;
-    const selectedIds = cohort.map((recipe) => String(recipe?.id ?? '')).filter(Boolean);
-    if (!touched || selectedIds.length === 0) {
-      return { changed: false, bookIds, additions, removals };
-    }
-
-    // Seed before any array is replaced, while the legacy resolution is live, or the marker set
-    // below would orphan every other book's scalar-only members.
-    const seeded = this._seedMembershipFromLegacyScalars(system);
-    const selected = new Set(selectedIds);
-
-    for (const definition of system.recipeItemDefinitions || []) {
-      const definitionId = String(definition?.id ?? '');
-      const remove = axes.removeBookIds.has(definitionId);
-      const add = !remove && axes.addBookIds.has(definitionId);
-      if (!add && !remove) continue;
-
-      const current = this._normalizeMembershipRecipeIds(definition.recipeIds);
-      const next = remove
-        ? current.filter((id) => !selected.has(id))
-        : this._normalizeMembershipRecipeIds([...current, ...selectedIds]);
-      if (next.length === current.length && next.every((id, index) => id === current[index])) {
-        continue;
-      }
-
-      definition.recipeIds = next;
-      bookIds.push(definitionId);
-      // One operation per definition, so the delta is the edge count.
-      if (remove) removals += current.length - next.length;
-      else additions += next.length - current.length;
-    }
-    // Membership rewritten in place on elements (issue 1076).
-    if (bookIds.length > 0) advanceDefinitionRevision(system.recipeItemDefinitions);
-
-    return { changed: seeded || bookIds.length > 0, bookIds, additions, removals };
-  }
-
-  /**
-   * The per-recipe half of the batch. Its atomicity is microtask-only: `updateRecipe` with
-   * `persist: false` does no real I/O, but anything awaiting real I/O here would let `reload()`
-   * replace the recipes map between iterations and discard staged edits, with no compare-and-set
-   * to catch it.
-   */
-  async _applyBulkRecipePatches(cohort, axes) {
-    const recipeIds = [];
-    const blockedRecipeIds = [];
-    const rejectedRecipeIds = [];
-
-    for (const recipe of cohort) {
-      const updates = this._buildBulkRecipePatch(recipe, axes);
-      if (Object.keys(updates).length === 0) continue;
-
-      const recipeId = String(recipe.id);
-      const outcome = await this._writeBulkRecipePatch(recipeId, updates);
-      if (outcome.updated) recipeIds.push(recipeId);
-      if (outcome.blocked) blockedRecipeIds.push(recipeId);
-      if (outcome.rejected) rejectedRecipeIds.push(recipeId);
-    }
-
-    return { recipeIds, blockedRecipeIds, rejectedRecipeIds };
-  }
-
-  /**
-   * The minimal patch for one recipe: only staged fields that differ, so an agreeing recipe gets
-   * no `updateRecipe` call. The category is normalized first, as `Recipe` does, or `'General'`
-   * would differ from a stored `'general'`.
-   */
-  _buildBulkRecipePatch(recipe, axes) {
-    const updates = {};
-    if (axes.hasCategory) {
-      const category = normalizeRecipeCategory(axes.category);
-      if (category !== recipe.category) updates.category = category;
-    }
-    if (axes.hasEnabled && (recipe.enabled === true) !== axes.enabled) {
-      updates.enabled = axes.enabled;
-    }
-    if (axes.hasLocked && (recipe.locked === true) !== axes.locked) {
-      updates.locked = axes.locked;
-    }
-    if (axes.hasCheckTier && (recipe.checkTierId ?? null) !== axes.checkTierId) {
-      updates.checkTierId = axes.checkTierId;
-    }
-    return updates;
-  }
-
-  /**
-   * Write one recipe's minimal patch. A `RecipeActivationError` (refused enable) records the id and
-   * retries without `enabled`, which is clean because `updateRecipe` throws before
-   * `this.recipes.set`. A `RecipePersistenceError` (unsaveable even under `allowIncomplete`) is
-   * logged and the batch continues, since the books save has already committed.
-   */
-  async _writeBulkRecipePatch(recipeId, updates) {
-    // `persist: false` mutates memory per recipe for one trailing `save()`; `allowIncomplete` keeps
-    // an authoring shell editable.
-    const options = { persist: false, notify: false, emitChange: false, allowIncomplete: true };
-    try {
-      await this.recipeManager.updateRecipe(recipeId, updates, options);
-      return { updated: true, blocked: false, rejected: false };
-    } catch (error) {
-      if (error instanceof RecipePersistenceError) {
-        console.warn(
-          `Fabricate | bulk recipe edit could not save recipe ${recipeId}: ${error.message}`
-        );
-        return { updated: false, blocked: false, rejected: true };
-      }
-      if (!(error instanceof RecipeActivationError)) throw error;
-
-      delete updates.enabled;
-      if (Object.keys(updates).length === 0) {
-        return { updated: false, blocked: true, rejected: false };
-      }
-      await this.recipeManager.updateRecipe(recipeId, updates, options);
-      return { updated: true, blocked: true, rejected: false };
-    }
+    return applyBulkEditToRecipes(bulkEditsCollaborators(this), systemId, recipeIds, edit);
   }
 
   /**
@@ -2065,539 +1599,44 @@ export class CraftingSystemManager {
     return await this._deleteRecipeSet(this.getSystem(systemId), recipeIds, options);
   }
 
-  /**
-   * The shared body of every cascading recipe delete.
-   *
-   * Write order is `recipes`, then `craftingSystems`, then actor flags: a failed book write after
-   * the recipe write leaves dangling book ids, repaired by the next delete, whereas books first
-   * could lose membership of surviving recipes. (`applyBulkEditToRecipes` orders them the other
-   * way because its book write sets the basis marker.) Settings go before actors so a caller
-   * whose `SETTINGS_MODIFY` is revoked mutates no actor flags.
-   *
-   * The `craftingSystems` half takes a restore point, since the prune mutates live `recipeIds`
-   * before saving. It writes the arrays directly via
-   * {@link CraftingSystemManager#_normalizeMembershipRecipeIds} and never sets, reads or seeds
-   * the membership-basis marker (issue 1011): seeding would turn legacy membership into authored
-   * membership. Both change hooks fire, gated per axis, for the reason in `applyBulkEditToRecipes`.
-   *
-   * @param {object|null} system The live normalized system, never a snapshot: the mode-change
-   *   caller runs inside `updateSystem`, which saves again afterwards.
-   */
   async _deleteRecipeSet(system, recipeIds, options = {}) {
-    const requested = normalizeSelectionIds(recipeIds);
-    const recipes = requested
-      .map((recipeId) => this.recipeManager?.getRecipe?.(recipeId))
-      .filter(Boolean);
-    if (recipes.length === 0) {
-      return {
-        deleted: 0,
-        recipeIds: [],
-        recipeItemsAffected: 0,
-        recipeItemsRewritten: 0,
-        learnersAffected: 0,
-      };
-    }
-    const doomedIds = recipes.map((recipe) => String(recipe.id));
-
-    // Counted before the flag pass clears these entries, through the cascade's actor selector.
-    const learnerIds = selectLearnerActorIds(
-      buildLearnedRecipeActorIndex(globalThis.game?.actors),
-      doomedIds
-    );
-
-    // Planned before the recipes leave the map: legacy membership resolves through the recipe.
-    const plan = planRecipeItemMembershipPrune(
-      system?.recipeItemDefinitions,
-      recipes,
-      system?.membershipResolvesByRecipeIds === true
-    );
-
-    const outcome = await this.recipeManager.deleteRecipes(doomedIds, {
-      notify: options.notify,
-      emitChange: false,
-      cleanupFlags: false,
-    });
-
-    // Skipped when this half changed nothing, which is always on a legacy-basis system (see
-    // `planRecipeItemMembershipPrune`).
-    const membershipRestore = plan.prunes.map((entry) => [
-      entry.definition,
-      entry.definition.recipeIds,
-    ]);
-    for (const entry of plan.prunes) {
-      entry.definition.recipeIds = this._normalizeMembershipRecipeIds(entry.recipeIds);
-    }
-    const recipeItemsRewritten = plan.prunes.length;
-    if (recipeItemsRewritten > 0) {
-      try {
-        await this.save({ put: system, domains: RECIPE_ITEM_FACTS });
-      } catch (error) {
-        // Restore the live definitions before rethrowing, so this client never shows a prune the
-        // world did not receive.
-        for (const [definition, recipeIds] of membershipRestore) definition.recipeIds = recipeIds;
-        throw error;
-      }
-    }
-
-    // One clean-up per set, which is two actor walks: `CraftingRunManager.cleanupInvalidRuns` and
-    // `RecipeVisibilityService.cleanupLearnedRecipes`.
-    await this.recipeManager.cleanupOrphanedRecipeFlags?.({ removedRecipeIds: outcome.recipeIds });
-
-    if (recipeItemsRewritten > 0 && options.notifySystems !== false) this._notifySystemsChanged();
-    if (options.emitChange !== false) {
-      // The singular `{recipeId}` payload widened to the id set; the singular key is also emitted
-      // for a one-id set, so the payload shape matches `RecipeManager.deleteRecipe`'s.
-      const details = { action: 'delete', recipeIds: outcome.recipeIds };
-      if (outcome.recipeIds.length === 1) details.recipeId = outcome.recipeIds[0];
-      this.recipeManager.notifyRecipesChanged?.(details);
-    }
-
-    return {
-      deleted: outcome.deleted,
-      recipeIds: outcome.recipeIds,
-      // Both numbers: `plan.affectedIds` is what the confirmation card promised the GM.
-      recipeItemsAffected: plan.affectedIds.length,
-      recipeItemsRewritten,
-      learnersAffected: learnerIds.length,
-    };
+    return deleteRecipeSet(deleteCascadesCollaborators(this), system, recipeIds, options);
   }
 
   async deleteItem(systemId, itemId) {
-    this._assertGM('delete component');
-    const outcome = await this._deleteComponentSet(systemId, [itemId]);
-    if (outcome.deleted === 0) return false;
-
-    if (outcome.recipesUpdated > 0) {
-      ui?.notifications?.info?.(
-        `Removed "${outcome.removedNames[0] || 'component'}" and updated ${outcome.recipesUpdated} recipe(s).`
-      );
-    }
-
-    await this._reconcileAlchemySignaturesAfterDeletion(outcome.system);
-
-    return true;
+    return deleteItem(deleteCascadesCollaborators(this), systemId, itemId);
   }
 
-  /**
-   * Delete a set of components in one `craftingSystems` write and one `recipes` write (issue 1129).
-   * Looping {@link CraftingSystemManager#deleteItem} would write both settings per component, each
-   * write diffed and hooked on every client, and double-count a recipe referencing two deleted
-   * components; the union rewrite instead runs once per recipe. Both settings are replaced, so no
-   * `-=` key is needed. In-use components are warned about, not refused; `recipesDisabled` counts
-   * recipes this call took from enabled to disabled.
-   */
   async deleteComponents(systemId, componentIds) {
-    this._assertGM('delete components');
-    const outcome = await this._deleteComponentSet(systemId, componentIds);
-    if (outcome.deleted === 0) {
-      return { deleted: 0, componentIds: [], recipesUpdated: 0, recipesDisabled: 0 };
-    }
-
-    this._notifySystemsChanged();
-
-    if (outcome.recipesUpdated > 0) {
-      ui?.notifications?.info?.(
-        `Removed ${outcome.deleted} component(s) and updated ${outcome.recipesUpdated} recipe(s).`
-      );
-    }
-
-    await this._reconcileAlchemySignaturesAfterDeletion(outcome.system);
-
-    return {
-      deleted: outcome.deleted,
-      componentIds: outcome.componentIds,
-      recipesUpdated: outcome.recipesUpdated,
-      recipesDisabled: outcome.recipesDisabled,
-    };
+    return deleteComponents(deleteCascadesCollaborators(this), systemId, componentIds);
   }
 
-  /**
-   * The shared body of {@link CraftingSystemManager#deleteItem} and
-   * {@link CraftingSystemManager#deleteComponents}: remove the components, repair references and
-   * persist once. It does not assert GM, notify or reconcile alchemy signatures.
-   *
-   * The recipe rewrites run before `save()`, which is safe only because the activation blocker
-   * lives in `_validateRecipeForActivation`, not `_validateRecipeForPersistence`. A surviving
-   * component's `salvage.resultGroups[].results` naming a deleted component is deliberately left
-   * dangling; the bulk panel's impact statement claims no salvage coverage.
-   */
   async _deleteComponentSet(systemId, componentIds) {
-    const system = this.getSystem(systemId);
-    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-
-    const components = Array.isArray(system.components) ? system.components : [];
-    const requested = new Set(normalizeSelectionIds(componentIds));
-    const removed = components.filter((component) => requested.has(String(component?.id ?? '')));
-    if (removed.length === 0) {
-      return {
-        deleted: 0,
-        componentIds: [],
-        removedNames: [],
-        recipesUpdated: 0,
-        recipesDisabled: 0,
-        system,
-      };
-    }
-
-    const removedIds = removed.map((component) => String(component.id));
-    const removedIdSet = new Set(removedIds);
-    system.components = components.filter(
-      (component) => !removedIdSet.has(String(component?.id ?? ''))
-    );
-
-    // Clear essence source-item links that pointed to any deleted component.
-    const essenceDefinitions = (system.essenceDefinitions || []).map((def) => ({
-      ...def,
-      originItemUuid: removedIdSet.has(def.originItemUuid) ? null : def.originItemUuid,
-      associatedSystemItemId: removedIdSet.has(def.associatedSystemItemId)
-        ? null
-        : def.associatedSystemItemId,
-    }));
-    system.essenceDefinitions = essenceDefinitions;
-    system.essences = essenceDefinitions.map((def) => def.id);
-
-    const { recipesUpdated, recipesDisabled } = await this._stripComponentsFromRecipes(
-      systemId,
-      removedIdSet
-    );
-
-    // Clean up salvage runs referencing each deleted component.
-    for (const componentId of removedIds) {
-      await this._cleanupSalvageRunsForComponent(componentId, systemId);
-    }
-
-    await this.save({ put: system, domains: ESSENCE_FACTS });
-
-    return {
-      deleted: removedIds.length,
-      componentIds: removedIds,
-      removedNames: removed.map((component) => String(component?.name ?? '')),
-      recipesUpdated,
-      recipesDisabled,
-      system,
-    };
+    return deleteComponentSet(deleteCascadesCollaborators(this), systemId, componentIds);
   }
 
-  /**
-   * Strip the deleted components from referencing recipes in one `recipes` write, each recipe
-   * rewritten once. The rewrite and the "no longer craftable" decision live in
-   * `src/utils/recipeComponentReferences.js`, which the bulk panel's impact statement counts
-   * through too.
-   */
   async _stripComponentsFromRecipes(systemId, removedIdSet) {
-    const recipes = this.recipeManager
-      .getRecipes({})
-      .filter(
-        (recipe) =>
-          recipe.craftingSystemId === systemId && recipeReferencesAnyComponent(recipe, removedIdSet)
-      );
-
-    let recipesDisabled = 0;
-    for (const recipe of recipes) {
-      const { json } = stripComponentsFromRecipeJson(recipe, removedIdSet);
-      if (recipeLostItsShape(json)) {
-        if (json.enabled !== false) recipesDisabled += 1;
-        json.enabled = false;
-      }
-
-      await this.recipeManager.updateRecipe(recipe.id, json, {
-        persist: false,
-        notify: false,
-        emitChange: false,
-        allowIncomplete: true,
-      });
-    }
-
-    if (recipes.length > 0) {
-      await this.recipeManager.save();
-      // One change signal for the batch, restoring what `emitChange: false` suppressed:
-      // `settingChangeBridge` re-emits only when `reload()` returns truthy, which it does not on
-      // the writing client. The component-side attribution travels with it (issue 1078).
-      this.recipeManager.notifyRecipesChanged({
-        action: 'update',
-        domains: ESSENCE_FACTS,
-        systemIds: [systemId],
-      });
-    }
-    return { recipesUpdated: recipes.length, recipesDisabled };
+    return stripComponentsFromRecipes(deleteCascadesCollaborators(this), systemId, removedIdSet);
   }
 
-  /** After a deletion in an alchemy system, disable every recipe now in a signature conflict and
-   * notify the GM of their names; no-op otherwise. */
   async _reconcileAlchemySignaturesAfterDeletion(system) {
-    if (system?.resolutionMode !== 'alchemy') return;
-    const disabled = await this.recipeManager.disableSignatureConflicts(system.id);
-    if (disabled.length > 0) {
-      const names = disabled.map((d) => d.name).join(', ');
-      ui?.notifications?.info?.(
-        `Disabled ${disabled.length} recipe(s) with conflicting signatures: ${names}`
-      );
-    }
+    return reconcileAlchemySignaturesAfterDeletion(deleteCascadesCollaborators(this), system);
   }
 
-  /**
-   * Make the essence delete an override before it strips (issue 1371). Since the `1.32.0` election
-   * a component's `essences` are a world section a system inherits unless it overrides, so
-   * stripping the in-system row alone changes nothing resolved. A system-scope essence write is an
-   * override, so each affected inheriting pair is flipped first, seeded from the map it resolved
-   * (read before the flip, or other essences would be lost); the world map and other systems are
-   * untouched. `componentEssenceOverride` decides which pairs are shadowed. No seam means no flip;
-   * a refused flag write is logged and returned as `unreachable`, never thrown.
-   */
-  async _overrideInheritedEssencesBeforeStrip(system, essenceIds, overrideInheritedEssences) {
-    if (typeof overrideInheritedEssences !== 'function') {
-      return { overridden: [], unreachable: [] };
-    }
-    const deleted = new Set(essenceIds.map(String));
-    const resolved = resolvedComponentEssencesById(this, system.id);
-    if (!resolved) return { overridden: [], unreachable: [] };
-
-    // One pass holding each affected row beside its resolved map;
-    // `tests/world-scope-reader-ledger.test.js` counts every raw `system.components` read.
-    const affected = new Map();
-    for (const component of system.components || []) {
-      const id = String(component?.id ?? '');
-      const map = resolved.get(id);
-      if (!map || typeof map !== 'object') continue;
-      if (Object.keys(map).every((essenceId) => !deleted.has(essenceId))) continue;
-      affected.set(id, { component, map });
-    }
-    if (affected.size === 0) return { overridden: [], unreachable: [] };
-
-    const writable = new Set(await overrideInheritedEssences(system.id, [...affected.keys()]));
-    const overridden = [];
-    for (const [id, { component, map }] of affected) {
-      if (!writable.has(id)) continue;
-      component.essences = { ...map };
-      overridden.push(id);
-    }
-    const unreachable = [...affected.keys()].filter((id) => !writable.has(id));
-    if (unreachable.length > 0) {
-      console.error(
-        'Fabricate | component essence override refused, so the essence delete cannot reach',
-        unreachable,
-        'in system',
-        system.id
-      );
-    }
-    return { overridden, unreachable };
-  }
-
-  /**
-   * Delete an essence definition and strip it from referencing ingredient sets, re-saving only
-   * those recipes, emitting one summary and disabling recipes left without sets or results.
-   * `overrideInheritedEssences` is caller-supplied because the flag it writes is a world-scope
-   * setting this manager cannot write; see {@link _overrideInheritedEssencesBeforeStrip}.
-   */
   async deleteEssence(systemId, essenceId, { overrideInheritedEssences } = {}) {
-    this._assertGM('delete essence');
-    const system = this.getSystem(systemId);
-    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-
-    const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
-    const removed = definitions.find((def) => def.id === essenceId);
-    if (!removed) return false;
-
-    // Before the definitions move: the seam reads what the pair resolves.
-    await this._overrideInheritedEssencesBeforeStrip(
-      system,
-      [essenceId],
-      overrideInheritedEssences
-    );
-
-    system.essenceDefinitions = definitions.filter((def) => def.id !== essenceId);
-    system.essences = system.essenceDefinitions.map((def) => def.id);
-
-    // Strip the essence from components still carrying it, so references do not dangle.
-    for (const component of system.components || []) {
-      if (component.essences && essenceId in component.essences) {
-        delete component.essences[essenceId];
-      }
-    }
-
-    // Strip the essence from recipe ingredient sets, touching only referencing recipes.
-    const recipes = this.recipeManager
-      .getRecipes({})
-      .filter(
-        (r) => r.craftingSystemId === systemId && this._recipeReferencesEssence(r, essenceId)
-      );
-    let updatedRecipeCount = 0;
-    for (const recipe of recipes) {
-      const updated = recipe.toJSON();
-      updated.ingredientSets = this._stripEssenceFromSets(updated.ingredientSets, essenceId);
-      updated.steps = (updated.steps || []).map((step) => ({
-        ...step,
-        ingredientSets: this._stripEssenceFromSets(step.ingredientSets, essenceId),
-      }));
-
-      if (this._recipeLostItsShape(updated)) updated.enabled = false;
-
-      await this.recipeManager.updateRecipe(recipe.id, updated, {
-        notify: false,
-        allowIncomplete: true,
-      });
-      updatedRecipeCount += 1;
-    }
-
-    await this.save({ put: system, domains: ESSENCE_FACTS });
-    this._notifySystemsChanged();
-
-    if (updatedRecipeCount > 0) {
-      ui?.notifications?.info?.(
-        `Removed essence "${removed.name ?? 'essence'}" and updated ${updatedRecipeCount} recipe(s).`
-      );
-    }
-
-    await this._reconcileAlchemySignaturesAfterDeletion(system);
-
-    return true;
-  }
-
-  /**
-   * Apply a bulk edit (icon, colour, enabled) to a set of essence definitions in one
-   * `craftingSystems` write (issue 1036), through {@link CraftingSystemManager#updateSystem} so
-   * the alchemy guard runs: a status flip collapsing two recipes onto one signature throws
-   * (`destructive-changes-and-migrations/spec.md` Alchemy Uniqueness Revalidation, clauses 3 and
-   * 5). Every axis is presence-gated with `Object.hasOwn`, since `enabled: false` and
-   * `colorToken: null` are real edits; an empty `edit` writes nothing.
-   *
-   * @returns {Promise<{updated: number, essenceIds: string[]}>} the cohort the edit was applied to.
-   * @throws {Error} when the system does not resolve, or the result would carry a collision.
-   */
-  async applyBulkEditToEssences(systemId, essenceIds, edit = {}) {
-    this._assertGM('apply a bulk edit to essences');
-    const system = this.getSystem(systemId);
-    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-
-    const targetIds = new Set(normalizeSelectionIds(essenceIds));
-    if (targetIds.size === 0) return { updated: 0, essenceIds: [] };
-
-    const bulkEdit = edit && typeof edit === 'object' ? edit : {};
-    const hasIcon = Object.hasOwn(bulkEdit, 'icon') && String(bulkEdit.icon || '').trim() !== '';
-    const hasColorToken = Object.hasOwn(bulkEdit, 'colorToken');
-    const hasEnabled = Object.hasOwn(bulkEdit, 'enabled');
-    if (!hasIcon && !hasColorToken && !hasEnabled) return { updated: 0, essenceIds: [] };
-
-    const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
-    const changedIds = [];
-    const next = definitions.map((definition) => {
-      if (!targetIds.has(String(definition?.id ?? ''))) return definition;
-      changedIds.push(String(definition.id));
-      return {
-        ...definition,
-        icon: hasIcon ? String(bulkEdit.icon).trim() : definition.icon,
-        colorToken: hasColorToken ? bulkEdit.colorToken : definition.colorToken,
-        enabled: hasEnabled ? bulkEdit.enabled === true : definition.enabled !== false,
-      };
+    return deleteEssence(deleteCascadesCollaborators(this), systemId, essenceId, {
+      overrideInheritedEssences,
     });
-    if (changedIds.length === 0) return { updated: 0, essenceIds: [] };
-
-    await this.updateSystem(systemId, { essenceDefinitions: next });
-    return { updated: changedIds.length, essenceIds: changedIds };
   }
 
-  /**
-   * Delete essence definitions in one `craftingSystems` and one `recipes` write (issue 1036).
-   * Looping {@link CraftingSystemManager#deleteEssence} would write `recipes` per recipe, each
-   * write a `reload()`, serialization diff and `Hooks.callAll` on every connected client, and
-   * twice for a recipe naming two deleted essences. Both settings are replaced, so no `-=` key.
-   * Recipe rewrites precede `save()`, safe only as the disabled-essence blocker gates activation.
-   * In-use essences are warned, not refused; `recipesDisabled` counts recipes newly disabled.
-   */
+  async applyBulkEditToEssences(systemId, essenceIds, edit = {}) {
+    return applyBulkEditToEssences(bulkEditsCollaborators(this), systemId, essenceIds, edit);
+  }
+
   async deleteEssences(systemId, essenceIds, { overrideInheritedEssences } = {}) {
-    this._assertGM('delete essences');
-    const system = this.getSystem(systemId);
-    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-
-    const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
-    const requested = new Set(normalizeSelectionIds(essenceIds));
-    const removed = definitions.filter((def) => requested.has(String(def?.id ?? '')));
-    if (removed.length === 0) {
-      return { deleted: 0, essenceIds: [], recipesUpdated: 0, recipesDisabled: 0 };
-    }
-
-    const removedIds = removed.map((def) => String(def.id));
-    const removedIdSet = new Set(removedIds);
-
-    // One cohort for the whole set, before the definitions move, so a component carrying two
-    // deleted essences is flipped once.
-    await this._overrideInheritedEssencesBeforeStrip(system, removedIds, overrideInheritedEssences);
-
-    system.essenceDefinitions = definitions.filter(
-      (def) => !removedIdSet.has(String(def?.id ?? ''))
-    );
-    system.essences = system.essenceDefinitions.map((def) => def.id);
-
-    // Strip every deleted essence from components still carrying it.
-    for (const component of system.components || []) {
-      if (!component.essences) continue;
-      for (const essenceId of removedIds) {
-        if (essenceId in component.essences) delete component.essences[essenceId];
-      }
-    }
-
-    const { recipesUpdated, recipesDisabled } = await this._stripEssencesFromRecipes(
-      systemId,
-      removedIds
-    );
-
-    await this.save({ put: system, domains: ESSENCE_FACTS });
-    this._notifySystemsChanged();
-
-    if (recipesUpdated > 0) {
-      ui?.notifications?.info?.(
-        `Removed ${removedIds.length} essence(s) and updated ${recipesUpdated} recipe(s).`
-      );
-    }
-
-    await this._reconcileAlchemySignaturesAfterDeletion(system);
-
-    return { deleted: removedIds.length, essenceIds: removedIds, recipesUpdated, recipesDisabled };
-  }
-
-  /** Strip the deleted essences from referencing recipes in one `recipes` write, each recipe
-   * rewritten once; the trailing `save()` is the only persist. */
-  async _stripEssencesFromRecipes(systemId, removedIds) {
-    const recipes = this.recipeManager
-      .getRecipes({})
-      .filter(
-        (recipe) =>
-          recipe.craftingSystemId === systemId &&
-          removedIds.some((essenceId) => recipeReferencesEssence(recipe, essenceId))
-      );
-
-    let recipesDisabled = 0;
-    for (const recipe of recipes) {
-      const updated = recipe.toJSON();
-      for (const essenceId of removedIds) {
-        updated.ingredientSets = this._stripEssenceFromSets(updated.ingredientSets, essenceId);
-        updated.steps = (updated.steps || []).map((step) => ({
-          ...step,
-          ingredientSets: this._stripEssenceFromSets(step.ingredientSets, essenceId),
-        }));
-      }
-      if (this._recipeLostItsShape(updated)) {
-        if (updated.enabled !== false) recipesDisabled += 1;
-        updated.enabled = false;
-      }
-
-      await this.recipeManager.updateRecipe(recipe.id, updated, {
-        persist: false,
-        notify: false,
-        emitChange: false,
-        allowIncomplete: true,
-      });
-    }
-
-    if (recipes.length > 0) await this.recipeManager.save();
-    return { recipesUpdated: recipes.length, recipesDisabled };
-  }
-
-  /** Whether a rewritten recipe lost all ingredient sets or results and must be disabled; shared
-   * by both essence deletes. Callers pass `recipe.toJSON()`, whose results live in `resultGroups`
-   * alone (issue 1087). */
-  _recipeLostItsShape(updated) {
-    return recipeLostItsShape(updated);
+    return deleteEssences(deleteCascadesCollaborators(this), systemId, essenceIds, {
+      overrideInheritedEssences,
+    });
   }
 
   /** Whether a recipe references the component in any ingredient set or result, via the shared
@@ -2606,50 +1645,8 @@ export class CraftingSystemManager {
     return recipeReferencesComponent(recipe, itemId);
   }
 
-  /**
-   * Strip an essence from ingredient sets: remove the legacy per-set map key and any essence option
-   * from each group, drop groups left with no options, then sets left with nothing.
-   *
-   * `ingredients` is resolved, never spread through (issue 1036): pre-1135 payloads carry a stale
-   * flat mirror beside the groups, which would let a set whose only requirement was the deleted
-   * essence survive and fail persistence mid-cascade, and let `IngredientSet` resurrect the
-   * option. A group-authored set drops the mirror (issue 1135); a legacy flat-shape set keeps it,
-   * filtered, as its only ingredient data. `essences: {}` retires on the same reasoning.
-   */
   _stripEssenceFromSets(sets, essenceId) {
-    const isDeletedEssence = (ref) =>
-      ref?.match?.type === 'essence' && ref.match.essenceId === essenceId;
-    return (sets || [])
-      .map((set) => {
-        const essences = { ...set.essences };
-        delete essences[essenceId];
-        const ingredientGroups = (set.ingredientGroups || [])
-          .map((group) => ({
-            ...group,
-            options: (group.options || []).filter((option) => !isDeletedEssence(option)),
-          }))
-          .filter((group) => (group.options?.length || 0) > 0);
-        const next = { ...set, essences, ingredientGroups };
-        if (Object.keys(essences).length === 0) delete next.essences;
-        const surviving =
-          (set.ingredientGroups?.length || 0) > 0
-            ? []
-            : (set.ingredients || []).filter((ingredient) => !isDeletedEssence(ingredient));
-        if (surviving.length > 0) next.ingredients = surviving;
-        else delete next.ingredients;
-        return next;
-      })
-      .filter(
-        (set) =>
-          (set.ingredientGroups?.length || set.ingredients?.length || 0) > 0 ||
-          Object.keys(set.essences || {}).length > 0
-      );
-  }
-
-  /** Whether a recipe references the essence in any ingredient set, via the shared leaf
-   * {@link recipeReferencesEssence} (issue 1036) the admin store's `recipeUsageCount` reads. */
-  _recipeReferencesEssence(recipe, essenceId) {
-    return recipeReferencesEssence(recipe, essenceId);
+    return stripEssenceFromSets(sets, essenceId);
   }
 
   /** The ResolutionModeService from `game.fabricate`, or null. */

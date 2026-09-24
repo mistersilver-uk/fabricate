@@ -575,6 +575,7 @@ describe('the resolved-union memo', () => {
 
 const MANAGER = 'src/systems/CraftingSystemManager.js';
 const ITEM_SOURCES = 'src/systems/manager/itemSources.js';
+const BULK_EDITS = 'src/systems/manager/bulkEdits.js';
 // Every `manager/` cluster module (issue 1923), so a site moved into one the census has not named
 // yet still fails it.
 const MANAGER_MODULES = readdirSync(new URL('../src/systems/manager/', import.meta.url))
@@ -583,8 +584,9 @@ const MANAGER_MODULES = readdirSync(new URL('../src/systems/manager/', import.me
 
 /** The five prune sites that BYPASS `_normalizeSystem`, each deriving its own basis, by home. */
 const BYPASS_SITES = {
-  [MANAGER]: ['applyBulkEditToComponents', 'createItem', 'updateItem'],
+  [MANAGER]: ['createItem', 'updateItem'],
   [ITEM_SOURCES]: ['addItemFromUuid', 'replaceItemSource'],
+  [BULK_EDITS]: ['applyBulkEditToComponents'],
 };
 
 describe('the _scopeBasis call sites', () => {

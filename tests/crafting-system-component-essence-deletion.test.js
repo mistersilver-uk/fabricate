@@ -481,7 +481,7 @@ test('deletion in a non-alchemy system does not run the signature reconcile', as
 
 // A recipe manager whose recipe carries the essence via a first-class ingredient OPTION (`match: {
 // type: 'essence', ... }`) inside a group, NOT the legacy per-set essences map — deleteEssence must
-// strip the option and _recipeReferencesEssence must detect it via the option shape.
+// strip the option and recipeReferencesEssence must detect it via the option shape.
 function makeEssenceOptionRecipeManager() {
   const updateCalls = [];
   const recipes = [
