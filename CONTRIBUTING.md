@@ -159,7 +159,8 @@ An absent or `unknown` provenance counts as an unidentified build and never sati
 Re-run it from the SAME commit.
 A target already written from this build is recognised by its provenance and skipped, and only the unwritten targets are completed — the resume path in the **Publish completeness** requirement.
 For a push-triggered stable release, re-dispatch `release.yml` via `workflow_dispatch` with `--ref` set to the branch that produced the tag and the already-minted `tag` supplied; for any channel, `release-s3.yml` can be dispatched directly with the same `tag` and `channel`.
-A `release-s3.yml` dispatch publishes the tag's bytes under the dispatch ref's deployment configuration, because the workflow captures `release.s3.config.json` from the ref it runs on before checking the tag out; dispatch from the ref carrying the tester configuration you intend to publish under, and expect a named refusal when the tag's `scripts/release-s3.js` predates `--config` (issue #1872).
+A `release-s3.yml` dispatch publishes the tag's bytes with the dispatch ref's publisher and deployment configuration, because the workflow builds the tag in a worktree beside its own checkout rather than moving that checkout to the tag; dispatch from the ref carrying the tester configuration you intend to publish under (issues #1872 and #1988).
+Republishing a version after a tester group is added writes only the added group's target: the targets already carrying that version from the same build are recognised by their provenance and skipped.
 
 Do NOT reach for `--overwrite` to get past a failed publish.
 `--overwrite` replaces the bytes of a version a target already advertises, and a version's published artefacts are immutable — clients already on it never re-fetch, and any CDN holding the immutable zip pins the old bytes — so overwriting splits one version string across two different builds.
@@ -169,7 +170,7 @@ The routine remedy for a failed publish is the resume above, not an override —
 #### Provenance metadata and `--source-sha`
 
 Every versioned zip is uploaded with its provenance triple as S3 metadata, and the guard reads it back on the next publish.
-`release-s3.js` takes the commit explicitly via `--source-sha`, because `release-s3.yml` checks out the release tag before invoking the script, which leaves `GITHUB_SHA` naming the ref that triggered the run rather than the built commit — the workflow passes `--source-sha "$(git rev-parse HEAD)"`.
+`release-s3.js` takes the commit explicitly via `--source-sha`, because `release-s3.yml` builds the release tag in its own worktree while `GITHUB_SHA` names the ref that triggered the run rather than the built commit — the workflow passes the worktree's `HEAD` as `--source-sha` and the worktree itself as `--source-root`, and the script refuses a sha that worktree does not hold.
 A build profile defaults to `community`, and every target of one publish must share it, so a mixed-profile publish fails before writing anything (keyed to issue 345) — see the **One build per publish** requirement.
 
 #### Backfilling provenance onto older zips

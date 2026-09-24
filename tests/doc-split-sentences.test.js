@@ -124,8 +124,10 @@ const DECOUNTED_COUNT = 4;
 
 /**
  * Historical policy sentences deliberately replaced, with both sides and the current destination
- * pinned so an ordinary lost instruction cannot hide in the exception (issue #1984).
+ * pinned so an ordinary lost instruction cannot hide in the exception (issues #1984, #1988).
  */
+const APPROVING_ISSUES = new Set(['#1984', '#1988']);
+
 const SUPERSEDED_POLICY = [
   {
     issue: '#1984',
@@ -213,17 +215,44 @@ const SUPERSEDED_POLICY = [
       'If the PR is still draft and reviewable, mark it ready, then wait for every required GitHub Actions and external check associated with that exact remote head.',
     survivesIn: '.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md',
   },
-];
-
-/** Pinned exactly: every entry excuses one historical sentence. */
-const SUPERSEDED_POLICY_COUNT = 11;
-
-/**
- * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue
- * #1761).
- */
-const RENAMED = [
+  // Issue #1988: a channel's tester groups each name their own secret, and CI builds a tag in its
+  // own worktree with the workflow ref's publisher instead of checking the tag out.
   {
+    issue: '#1988',
+    before:
+      '`--channel early-access` and `--channel public` are the private-patron and public targets; each private channel derives its tester URLs from its own path secret, and a channel that declares tester groups with no secret set refuses to publish.',
+    after:
+      '`--channel early-access` and `--channel public` are the private-patron and public targets; each tester group derives its tester URLs from its own path secret, and a channel with any declared group whose secret is unset refuses to publish before building.',
+    survivesIn: 'AGENTS.md',
+  },
+  {
+    issue: '#1988',
+    before:
+      'Every versioned zip carries `(fabricate-version, fabricate-source-sha, fabricate-build-profile)` metadata — pass `--source-sha` explicitly, since `GITHUB_SHA` is stale after a `git checkout <tag>`; manifest writes are conditional (`IfMatch`) and every write is read back.',
+    after:
+      'Every versioned zip carries `(fabricate-version, fabricate-source-sha, fabricate-build-profile)` metadata — pass `--source-sha` explicitly, since `GITHUB_SHA` names the workflow ref rather than the tag being built; manifest writes are conditional (`IfMatch`) and every write is read back.',
+    survivesIn: 'AGENTS.md',
+  },
+  {
+    issue: '#1988',
+    before:
+      '`release-s3.js` takes the commit explicitly via `--source-sha`, because `release-s3.yml` checks out the release tag before invoking the script, which leaves `GITHUB_SHA` naming the ref that triggered the run rather than the built commit — the workflow passes `--source-sha "$(git rev-parse HEAD)"`.',
+    after:
+      "`release-s3.js` takes the commit explicitly via `--source-sha`, because `release-s3.yml` builds the release tag in its own worktree while `GITHUB_SHA` names the ref that triggered the run rather than the built commit — the workflow passes the worktree's `HEAD` as `--source-sha` and the worktree itself as `--source-root`, and the script refuses a sha that worktree does not hold.",
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#1988',
+    before:
+      "The reusable publisher takes a release tag, derives its version, checks out that tagged commit, builds, and publishes to the requested channel's S3 targets from `release.s3.config.json`'s `channels` map (`beta` → the closed-tester group; `early-access` → the patron group; `public` → no tester group; a hotfix line is not declared, so its only target is its sources target).",
+    after:
+      "The reusable publisher takes a release tag, derives its version, builds that tagged commit, and publishes to the requested channel's S3 targets from `release.s3.config.json`'s `channels` map (`beta` → the closed-tester group; `early-access` → the two patron groups; `public` → no tester group; a hotfix line is not declared, so its only target is its sources target).",
+    survivesIn: '.github/workflows/README.md',
+  },
+  {
+    issue: '#1988',
+    // Frozen before issue #1761 renamed the early-access secret; the rename entry it held retired
+    // with this rewrite.
     before:
       'The tester feed lives at an unguessable path: `testers/<group>/<segment>/<moduleId>/…`, ' +
       'where `<segment>` comes from a per-channel repository **secret** (`S3_TESTER_PATH_SECRET` ' +
@@ -231,11 +260,30 @@ const RENAMED = [
       'here — never paste the value) — never the committed config.',
     after:
       'The tester feed lives at an unguessable path: `testers/<group>/<segment>/<moduleId>/…`, ' +
-      'where `<segment>` comes from a per-channel repository **secret** (`S3_TESTER_PATH_SECRET` ' +
-      'for beta, a separate `S3_GUILD_ARTISAN_PATH_SECRET` for early access, referred to abstractly ' +
-      'here — never paste the value) — never the committed config.',
-    identifiers: [['S3_GUILD_ARTISAN_PATH_SECRET', 'S3_EARLY_ACCESS_PATH_SECRET']],
+      'where `<segment>` comes from a per-group repository **secret** (`S3_TESTER_PATH_SECRET` for ' +
+      'beta, and `S3_APPRENTICE_PATH_SECRET` and `S3_GUILD_ARTISAN_PATH_SECRET` for the two ' +
+      'early-access groups, referred to abstractly here — never paste the value) — never the ' +
+      'committed config.',
+    survivesIn: '.github/workflows/README.md',
   },
+  {
+    issue: '#1988',
+    before:
+      'Generate each once and set it before publishing; the publish **refuses to run** when a channel declares tester groups but its secret is unset, so the feed can never fall back to a guessable URL.',
+    after:
+      'Generate each once and set it before publishing; the publish **refuses to run**, before building, when any tester group a channel declares has its secret unset, so the feed can never fall back to a guessable URL.',
+    survivesIn: '.github/workflows/README.md',
+  },
+];
+
+/** Pinned exactly: every entry excuses one historical sentence. */
+const SUPERSEDED_POLICY_COUNT = 17;
+
+/**
+ * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue
+ * #1761).
+ */
+const RENAMED = [
   {
     before:
       "Cite code by symbol name and file path only — for example `_playerListingFields` in `src/systems/GatheringListingBuilder.js`, locatable with `grep -n` — never by line number; `npm run validate:agents` rejects `file.js:NNN`-style citations because they rot silently as code moves.",
@@ -432,7 +480,7 @@ const RENAMED = [
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 27;
+const RENAMED_COUNT = 26;
 
 /** Every sentence of the post-split set, as one multiset. */
 function survivingSentences() {
@@ -522,7 +570,7 @@ test('every superseded policy mapping names its frozen source and current replac
     )
   );
   for (const { issue, before, after, survivesIn } of SUPERSEDED_POLICY) {
-    assert.equal(issue, '#1984', 'every superseded policy entry must name its approving issue');
+    assert.ok(APPROVING_ISSUES.has(issue), `superseded policy entry names ${issue}, not an approving issue`);
     assert.ok((frozen.get(before) ?? 0) > 0, `superseded sentence is absent from the frozen corpus:\n  ${before}`);
     assert.ok(DESTINATIONS.includes(survivesIn), `${survivesIn} is not in DESTINATIONS`);
     const current = sentencesOf(readFileSync(path.join(REPOSITORY_ROOT, survivesIn), 'utf8'));
