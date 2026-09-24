@@ -260,7 +260,7 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     if (choice.rollMode) effectiveRollMode = choice.rollMode;
   }
 
-  // `allowInteractive: false`: never surface a manual roll-fulfilment dialog mid-craft.
+  // `allowInteractive: false`: no manual-fulfilment dialog mid-craft, as in V13 `Roll.simulate`.
   const roll = await new globalThis.Roll(effectiveFormula, rollData).evaluate({
     allowInteractive: false,
   });
