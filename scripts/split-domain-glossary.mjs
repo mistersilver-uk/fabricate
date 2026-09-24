@@ -71,7 +71,7 @@ function verify(section) {
     baseNotes: readBaseNotes(base),
     section,
     reversePairs: REVERSE_PAIRS,
-    overrides: DEFINITION_SENTENCES[section] ?? {},
+    overrides: DEFINITION_SENTENCES,
   });
   const dirty = git('status', '--porcelain', '--', 'DOMAIN.md', 'docs/domain').trim() !== '';
   console.log(`base ${base}`);
@@ -80,7 +80,7 @@ function verify(section) {
   );
   console.log(`rows: ${rebuilt}/${rows} rebuilt`);
   for (const problem of problems) console.error(`FAIL ${problem}`);
-  return problems.length === 0 && rows > 0 ? 0 : 1;
+  return problems.length === 0 && rows > 0 && rebuilt === rows ? 0 : 1;
 }
 
 function convert(section) {

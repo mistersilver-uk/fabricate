@@ -19,6 +19,7 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RECORDS = 'docs/domain/records.md';
 const HISTORY = 'docs/domain/history.md';
 const SECTION = 'Aggregates and Records';
+const TERMS = 'Acquisition, Knowledge, and Resolution Terms';
 
 /** Minimum entries per notes file, so a gate over an emptied glossary cannot pass. */
 const FLOORS = { [RECORDS]: 50 };
@@ -174,7 +175,11 @@ describe('the conversion', () => {
     const files = notesOf(picked.notes);
     const proof = (extra) =>
       verifyConversion({ base: BASE, domain: picked.domain, notes: files, section: SECTION, ...extra });
-    assert.deepEqual(proof({ overrides }), { problems: [], rows: 2, rebuilt: 2 });
+    assert.deepEqual(proof({ overrides: { [SECTION]: overrides } }), {
+      problems: [],
+      rows: 2,
+      rebuilt: 2,
+    });
     assertReports(proof({}).problems, 'differs from the base');
     const reader = { domain: picked.domain, readNote: readerOf(files), overrides };
     assert.equal(termRowText('Alpha Record', reader), ALPHA_ROW);
@@ -243,6 +248,13 @@ describe('the conversion proof', () => {
     assertReports(verify({ reversePairs: [pair] }).problems, 'matches 0 times');
   });
 
+  it('counts a row whose notes carry a reversed edit as rebuilt', () => {
+    const retargeted = edit(notes, 'A second note line.', 'A retargeted note line.');
+    const pair = { current: 'A retargeted note line.', base: 'A second note line.' };
+    const result = verify({ notes: notesOf(retargeted), reversePairs: [pair] });
+    assert.deepEqual(result, { problems: [], rows: 2, rebuilt: 2 });
+  });
+
   const history = '# History\n\n## Remaining Drift to Track\n\nDrift line one.\nDrift line two.\n';
   const pointed = () =>
     edit(
@@ -252,6 +264,19 @@ describe('the conversion proof', () => {
     );
   const withHistory = (text) =>
     verify({ domain: pointed(), notes: { ...notesOf(notes), [HISTORY]: text } });
+
+  it('rebuilds every converted section while proving a later one', () => {
+    const gamma = '| **Gamma** | The third term. It follows. | `Gamma` | spec/g.md |';
+    const both = edit(BASE, 'Kept prose.', table([gamma]));
+    const records = convertSection(both, SECTION);
+    const terms = convertSection(records.domain, TERMS);
+    const files = { [RECORDS]: records.notes, [terms.file]: terms.notes };
+    const proof = (extra) =>
+      verifyConversion({ base: both, domain: terms.domain, notes: files, section: TERMS, ...extra });
+    assert.deepEqual(proof(), { problems: [], rows: 1, rebuilt: 1 });
+    const edited = { ...files, [RECORDS]: edit(records.notes, 'second note', 'secOnd note') };
+    assertReports(proof({ notes: edited }).problems, 'differs from the base');
+  });
 
   it('swaps a pointer back for its moved block', () => {
     assert.deepEqual(withHistory(history).problems, []);

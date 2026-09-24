@@ -519,10 +519,11 @@ function unconsumedLines(path, text, marks) {
 }
 
 /** Why each `docs/domain/` file is not wholly consumed by the reconstruction or unchanged. */
-function leftoverProblems({ notes, baseNotes, file, section, sections, used }) {
+function leftoverProblems({ notes, baseNotes, groups, used }) {
   return Object.entries(notes).flatMap(([path, text]) => {
-    if (path === file) {
-      const canonical = serializeNotes(section, sections);
+    const group = groups.find(({ file }) => file === path);
+    if (group) {
+      const canonical = serializeNotes(group.section, group.sections);
       if (text === canonical) return [];
       return [`${path} line ${firstDifference(text, canonical)} is left over`];
     }
@@ -532,24 +533,25 @@ function leftoverProblems({ notes, baseNotes, file, section, sections, used }) {
 }
 
 /** Every line lifted out of a table cell that opens a block construct. */
-function blockStartProblems(entries, sections) {
-  const lifted = [
+function blockStartProblems(groups) {
+  const lifted = groups.flatMap(({ entries, sections }) => [
     ...entries.flatMap(({ definition }) => definition),
     ...sections.flatMap(({ rest, mapping, spec }) => [
       ...rest,
       ...mapping.slice(1),
       ...spec.slice(1),
     ]),
-  ];
+  ]);
   return lifted
     .filter((line) => BLOCK_START.test(line))
     .map((line) => `a line lifted from a cell opens a block: ${line.slice(0, 60)}`);
 }
 
 /** The whole-document reconstruction of the base from the converted `domain` and its notes. */
-function reconstruct({ domain, entries, rows, swaps, reversePairs }) {
+function reconstruct({ domain, groups, swaps, reversePairs }) {
   const replaced = new Map(swaps);
-  if (entries.length > 0) {
+  for (const { entries, rows } of groups) {
+    if (entries.length === 0) continue;
     replaced.set(entries[0].line, [...TABLE_OPEN, ...rows, ...TABLE_CLOSE]);
     for (let line = entries[0].line + 1; line <= entries.at(-1).lastLine; line += 1) {
       replaced.set(line, []);
@@ -568,11 +570,33 @@ function reconstruct({ domain, entries, rows, swaps, reversePairs }) {
   return { text, problems };
 }
 
+/** One converted section's entries, notes sections, rebuilt rows and base rows, with its problems. */
+function sectionProof({ base, domain, notes, section, overrides }) {
+  const file = SECTION_FILES[section];
+  const baseRows = tableRows(base, section) ?? [];
+  const entries = parseEntries(domain).filter((entry) => entry.section === section);
+  const { sections } = parseNotes(notes[file] ?? '');
+  const problems = [
+    [entries.length, 'entries'],
+    [entries.filter(({ link }) => link).length, 'link lines'],
+    [sections.length, 'notes sections'],
+  ]
+    .filter(([found]) => found !== baseRows.length)
+    .map(([found, what]) => `${found} ${what} for ${baseRows.length} base rows of "${section}"`);
+  const rows = entries.map((entry, at) =>
+    sections[at]?.heading === entry.heading
+      ? rebuildRow(entry, sections[at], overrides[section]?.[entry.heading])
+      : ''
+  );
+  problems.push(...entries.flatMap(({ problem }) => (problem ? [problem] : [])));
+  return { section, file, entries, sections, rows, baseRows, problems };
+}
+
 /**
- * Proves `domain` and `notes` rebuild `base` byte for byte, from the working files alone.
- * `notes` and `baseNotes` map `docs/domain/*.md` paths to text; each `reversePairs` entry swaps a
- * `current` string, which must occur once, back to its `base` text. `overrides` is as for
- * `convertSection`.
+ * Proves `domain` and `notes` rebuild `base` byte for byte, from the working files alone, counting
+ * the rows of `section` and rebuilding every section already converted. `notes` and `baseNotes`
+ * map `docs/domain/*.md` paths to text; each `reversePairs` entry swaps a `current` string, which
+ * must occur once, back to its `base` text. `overrides` is shaped as `DEFINITION_SENTENCES`.
  */
 export function verifyConversion({
   base,
@@ -589,34 +613,25 @@ export function verifyConversion({
     const problems = [`"${section}" is no glossary section with base rows`];
     return { problems, rows: 0, rebuilt: 0 };
   }
-  const entries = parseEntries(domain).filter((entry) => entry.section === section);
-  const { sections } = parseNotes(notes[file] ?? '');
-  const size = baseRows.length;
-  const problems = [
-    [entries.length, 'entries'],
-    [entries.filter(({ link }) => link).length, 'link lines'],
-    [sections.length, 'notes sections'],
-  ]
-    .filter(([found]) => found !== size)
-    .map(([found, what]) => `${found} ${what} for ${size} base rows`);
-  const rows = entries.map((entry, at) =>
-    sections[at]?.heading === entry.heading
-      ? rebuildRow(entry, sections[at], overrides[entry.heading])
-      : ''
-  );
+  const groups = Object.keys(SECTION_FILES)
+    .map((own) => sectionProof({ base, domain, notes, section: own, overrides }))
+    .filter((group) => group.section === section || group.entries.length > 0);
   const { swaps, used, problems: unresolved } = pointerBlocks(domain, notes);
-  const rebuilt = reconstruct({ domain, entries, rows, swaps, reversePairs: reversePairs ?? [] });
+  const rebuilt = reconstruct({ domain, groups, swaps, reversePairs: reversePairs ?? [] });
+  const problems = groups.flatMap((group) => group.problems);
   if (rebuilt.text !== base) {
     const line = firstDifference(rebuilt.text, base);
     problems.push(`the reconstruction differs from the base at line ${line}`);
   }
   problems.push(
-    ...entries.flatMap(({ problem }) => (problem ? [problem] : [])),
     ...unresolved,
     ...rebuilt.problems,
-    ...leftoverProblems({ notes, baseNotes, file, section, sections, used }),
-    ...blockStartProblems(entries, sections)
+    ...leftoverProblems({ notes, baseNotes, groups, used }),
+    ...blockStartProblems(groups)
   );
-  const matching = rows.filter((row, at) => row === baseRows[at]).length;
-  return { problems, rows: size, rebuilt: matching };
+  const named = groups.find((group) => group.section === section);
+  const reversed = (row) =>
+    (reversePairs ?? []).reduce((text, pair) => text.replace(pair.current, () => pair.base), row);
+  const matching = named.rows.filter((row, at) => reversed(row) === named.baseRows[at]).length;
+  return { problems, rows: baseRows.length, rebuilt: matching };
 }
