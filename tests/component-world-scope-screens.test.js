@@ -74,8 +74,6 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
         // `ChanceSlider.svelte` left this list in issue 1707 phase 2: the drop-rate slider that
         // imported it moved into `environment/GatheringTaskInspector.svelte`, so the gateway no
         // longer imports it directly.
-        // DRAGGED IN BY ISSUE 1506's FILE MOVE, and it is neither a screen nor a new dependency.
-        '../../components/Chip.svelte',
         // Moved by issue 1710's file move, and it is neither a screen nor a new dependency.
         '../../components/EmptyState.svelte',
         // `Kicker.svelte` and `Medallion.svelte` left this list in issue 1720 with the page
