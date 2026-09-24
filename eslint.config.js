@@ -98,8 +98,9 @@ const svelteRuneGlobals = {
 };
 
 /**
- * The DOMAIN LAYER's roots (issue 1677) — `AGENTS.md`'s own list of where domain and runtime logic
- * lives, minus `src/integrations/`, which is on that list and is an edge by definition.
+ * The DOMAIN LAYER's roots (issue 1677) — the Architecture Pointers list in
+ * `.agents/docs/foundry-and-architecture.md` of where domain and runtime logic lives, minus
+ * `src/integrations/`, which is on that list and is an edge by definition.
  *
  * Exported because `tests/foundry-global-reads-ratchet.test.js` counts this rule's reports over
  * these roots, and a second spelling of the roots or the names would be a second, drifting answer.
