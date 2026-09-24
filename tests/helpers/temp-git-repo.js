@@ -8,6 +8,11 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
+import { resolveExecutable } from '../../scripts/lib/resolveExecutable.js';
+
+// Resolved once to an absolute path, so no later `PATH` entry can substitute another binary.
+const GIT = resolveExecutable('git');
+
 const ISOLATED_CONFIG = [
   ['user.name', 'fabricate-test'],
   ['user.email', 'test@example.invalid'],
@@ -29,10 +34,11 @@ export function envWithoutGitLocation(base = process.env) {
  *   helper returning the new commit's sha, and a cleanup.
  */
 export function createTempGitRepo(prefix = 'fab-git-') {
+  if (!GIT) throw new Error('git is not on an absolute PATH entry');
   const dir = mkdtempSync(path.join(tmpdir(), prefix));
   const env = envWithoutGitLocation();
   const git = (...args) =>
-    execFileSync('git', [...ISOLATED_CONFIG, '-C', dir, ...args], { encoding: 'utf8', env }).trim();
+    execFileSync(GIT, [...ISOLATED_CONFIG, '-C', dir, ...args], { encoding: 'utf8', env }).trim();
   git('init', '-q');
   const commit = (message) => {
     git('commit', '-q', '--allow-empty', '-m', message);
