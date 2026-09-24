@@ -406,9 +406,9 @@ describe('no new scoped file trips either naming gate', () => {
     }
   });
 
-  // A child carrying one claims a route a page owns. The route→page map in
-  // `manager-scoped-prop-contract.test.js` reads the raw text, so a COMMENT spelling one fails
-  // there, as a route owned twice or an eighth route.
+  // A child carrying one claims a route a page owns. These rows see code and markup, not comments;
+  // a comment has no behaviour. The route→page map in `manager-scoped-prop-contract.test.js` also
+  // reads `data-scoped-page` from raw text, so that hook is caught even in a comment there.
   const HOOKS = ['data-scoped-page', 'data-scoped-placeholder'];
   for (const child of [
     'ComponentCatalogueBulkPanel.svelte',
