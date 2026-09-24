@@ -1,9 +1,7 @@
 /** The canonical recipe and component summary projections (issue 1091, under #1070). */
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import {
   DEFAULT_CRAFTING_IMAGE,
@@ -11,6 +9,7 @@ import {
 } from '../src/ui/svelte/util/craftingImageDefaults.js';
 
 import { countCalls, createOperationCounters } from './helpers/scale/scaleCounters.js';
+import { defineStructureContract } from './helpers/structureContract.js';
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -402,62 +401,28 @@ describe('summary purity — zero exact-evaluation calls', () => {
     assert.equal(counters.get('evaluateCraftability'), 0);
   });
 
-  it('holds no collaborator it could call either function on', () => {
-    // The structural half of the invariant.
-    const source = readFileSync(
-      fileURLToPath(new URL('../src/ui/presenters/summaryProjection.js', import.meta.url)),
-      'utf8'
-    );
-
-    // Comments are stripped FIRST. The exhaustiveness count below keys on the `import`
-    // keyword, and this is a module whose own documentation discusses its imports — a doc
-    // comment merely containing the word would otherwise fail the test with a message
-    // pointing at an import statement that does not exist. (`[^:]` spares `://` in a URL.)
-    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
-
-    // The stripper is regex-based, so a stray `/*` inside a string literal or a line comment could
-    // open a phantom block running to the next real `*/` and swallow the code between.
-    const anchoredImports = (text) => (text.match(/^[ \t]*import\b/gm) ?? []).length;
-    assert.equal(
-      anchoredImports(code),
-      anchoredImports(source),
-      'comment stripping must not swallow an import statement'
-    );
-
-    // Matches the multi-line form Prettier produces past the print width, and either quote style.
-    const withClause = [
-      ...code.matchAll(/\b(?:import|export)\b[\s\S]*?\bfrom\s*(['"])([^'"]+)\1/g),
-    ].map((match) => match[2]);
-    // Side-effect imports (`import './x.js';`) carry no `from` clause at all.
-    const sideEffect = [...code.matchAll(/\bimport\s*(['"])([^'"]+)\1/g)].map((match) => match[2]);
-    const specifiers = [...new Set([...withClause, ...sideEffect])].sort((left, right) =>
-      left.localeCompare(right)
-    );
-
-    assert.deepEqual(
-      specifiers,
-      [
-        '../../systems/inventorySnapshot.js',
-        '../../systems/stepRecipeView.js',
-        '../../utils/componentCategories.js',
-        '../../utils/recipeCategories.js',
-        '../svelte/util/craftingImageDefaults.js',
-        './craftingBrowseStatus.js',
+  // The structural half of the invariant: only pure projection leaves, no manager, engine,
+  // builder or visibility service. The exact set holds static, re-exported, side-effect and
+  // `import()` specifiers alike, so adding one here is a deliberate act.
+  defineStructureContract(
+    'holds no collaborator it could call either function on',
+    'src/ui/presenters/summaryProjection.js',
+    {
+      importSpecifiers: [
+        [
+          '',
+          [
+            '../../systems/inventorySnapshot.js',
+            '../../systems/stepRecipeView.js',
+            '../../utils/componentCategories.js',
+            '../../utils/recipeCategories.js',
+            '../svelte/util/craftingImageDefaults.js',
+            './craftingBrowseStatus.js',
+          ],
+        ],
       ],
-      'summaryProjection may hold only pure projection leaves — no manager, engine, ' +
-        'builder or visibility service. Adding an import or re-export here is a ' +
-        'deliberate act.'
-    );
-
-    // The scan must also be exhaustive: every `import` keyword in the code has to have
-    // been captured above, or a form neither pattern understands could slip past both.
-    assert.equal(
-      (code.match(/\bimport\b/g) ?? []).length,
-      withClause.length,
-      'every import statement must be visible to the scan'
-    );
-    assert.doesNotMatch(code, /\bimport\s*\(/, 'no dynamic import may smuggle one in');
-  });
+    }
+  );
 });
 
 describe('the cheap-availability rule, defined once', () => {

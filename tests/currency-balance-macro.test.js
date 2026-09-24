@@ -3,7 +3,6 @@
  */
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import {
@@ -19,9 +18,11 @@ import {
   validateCurrencyProfile,
 } from '../src/systems/currencyProfile.js';
 
+import { walkNodes } from './helpers/moduleAst.js';
+import { componentAstOf, moduleAstOf } from './helpers/parsedSource.js';
 import { POOLED_LADDER, POOLED_MACROS } from './helpers/pooled-currency-fixtures.js';
-
-const source = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+import { defineStructureContract, propertyValues } from './helpers/structureContract.js';
+import { keyName } from './helpers/structureShapes.js';
 
 /** A spender whose `balance` macro resolves to a runnable script returning `answer`. */
 function balanceSpender(answer, options = {}) {
@@ -194,40 +195,40 @@ describe('the balance key needs no migration', () => {
 
 describe('the surfaces that do not follow the vocabulary automatically', () => {
   const PROJECTIONS = [
-    '../src/ui/svelte/stores/adminCurrencySection.js',
-    '../src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-    '../src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte',
+    'src/ui/svelte/stores/adminCurrencySection.js',
+    'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+    'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte',
   ];
+  const astOf = (path) => (path.endsWith('.svelte') ? componentAstOf(path) : moduleAstOf(path).ast);
+  const byName = (left, right) => left.localeCompare(right);
+  const isEmptySlot = (entry) =>
+    CURRENCY_MACRO_KEYS.includes(keyName(entry)) &&
+    entry.value?.type === 'Literal' &&
+    entry.value.value === '';
 
-  it('declares every macro slot in every hardcoded empty projection', async () => {
+  it('declares every macro slot in every hardcoded empty projection', () => {
     // These literals are only reached in the UNLOADED state, which is why a missing key is
     // invisible: everything else in the app reads the normalized config, where the slot is always
     // present.
     for (const path of PROJECTIONS) {
-      const text = source(path);
-      const counts = CURRENCY_MACRO_KEYS.map((key) => [
-        key,
-        text.split(`${key}: ''`).length - 1,
-      ]);
-      const expected = counts[0][1];
-      assert.ok(expected > 0, `${path} should carry at least one empty macro projection`);
-      for (const [key, count] of counts) {
-        assert.equal(
-          count,
-          expected,
-          `${path} declares ${expected} empty projections but names "${key}" in ${count} of them`
+      const projections = [...walkNodes(astOf(path))].filter(
+        (node) => node.type === 'ObjectExpression' && node.properties.some(isEmptySlot)
+      );
+      assert.ok(projections.length > 0, `${path} should carry at least one empty macro projection`);
+      for (const projection of projections) {
+        assert.deepEqual(
+          projection.properties.filter(isEmptySlot).map(keyName).sort(byName),
+          [...CURRENCY_MACRO_KEYS].sort(byName),
+          `${path} has an empty projection that does not name every slot`
         );
       }
     }
   });
 
-  it('offers an editor field for every macro slot', async () => {
-    const text = source('../src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte');
-    const fields = [...text.matchAll(/key: '([A-Za-z]+)',/g)].map((match) => match[1]);
-
+  it('offers an editor field for every macro slot', () => {
     assert.deepEqual(
-      fields.sort(),
-      [...CURRENCY_MACRO_KEYS].sort(),
+      propertyValues(astOf(PROJECTIONS[2]), 'key').sort(byName),
+      [...CURRENCY_MACRO_KEYS].sort(byName),
       'a slot with no field is a macro a GM has no way to author'
     );
   });
@@ -244,25 +245,18 @@ const POOLED_CURRENCY_TOKENS = Object.freeze([
 ]);
 
 describe('the pooled outcome tokens', () => {
-  it('are answered through the contract, with no second vocabulary beside it', () => {
-    // The forward reference is retired: the contract declares all three beside the pooled members
-    // that answer them (issue 1342).
-    const text = source('../src/systems/currencyAffordance.js');
-    for (const token of POOLED_CURRENCY_TOKENS) {
-      assert.equal(
-        COMPANION_OUTCOMES[token],
-        token,
-        `the contract declares "${token}", and a token is its own key`
-      );
-      assert.ok(
-        text.includes(`COMPANION_OUTCOMES.${token}`),
-        `the pooled currency pair must answer "${token}" through the contract`
-      );
-    }
-    assert.equal(
-      text.includes('POOLED_CURRENCY_OUTCOMES = '),
-      false,
-      'a local pooled-outcome block is two vocabularies for one fact'
-    );
+  it('are declared by the contract, and a token is its own key', () => {
+    for (const token of POOLED_CURRENCY_TOKENS) assert.equal(COMPANION_OUTCOMES[token], token);
   });
+
+  // The forward reference is retired: the contract declares all three beside the pooled members
+  // that answer them (issue 1342); a local pooled-outcome block is two vocabularies for one fact.
+  defineStructureContract(
+    'the pooled currency pair answers them through the contract, with no second vocabulary',
+    'src/systems/currencyAffordance.js',
+    {
+      reads: POOLED_CURRENCY_TOKENS.map((token) => `COMPANION_OUTCOMES.${token}`),
+      namesNo: ['POOLED_CURRENCY_OUTCOMES'],
+    }
+  );
 });

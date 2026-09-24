@@ -37,6 +37,7 @@ import {
   installFacadeGame,
   makeFacadeActor,
 } from './helpers/fabricateFacadeHarness.js';
+import { defineStructureContract } from './helpers/structureContract.js';
 
 /** The configured path, spelled as a LITERAL everywhere below. */
 const QUANTITY_PATH = 'system.count.value';
@@ -344,38 +345,27 @@ describe('AC-7 — the published carve-out is unreachable, so a stable member ca
   });
 });
 
-describe('AC-8 — the import list is a PROPERTY, not a spelling', () => {
-  const SOURCE = readFileSync(
-    new URL('../src/systems/companionComponentAward.js', import.meta.url),
-    'utf8'
-  );
-  const CODE = SOURCE.replaceAll(/\/\*[\s\S]*?\*\//g, '')
-    .replaceAll(/\/\/.*$/gm, '')
-    .replaceAll(/'(?:[^'\\]|\\.)*'/g, "''")
-    .replaceAll(/"(?:[^"\\]|\\.)*"/g, '""')
-    .replaceAll(/`(?:[^`\\]|\\.)*`/g, '``');
-
-  it('imports from EXACTLY four modules, and reads no Foundry global', () => {
-    const specifiers = [...CODE.matchAll(/^import[\s\S]*?from\s+''/gm)].length;
-    const sources = [...SOURCE.matchAll(/^import[\s\S]*?from\s+'([^']+)'/gm)].map(
-      ([, source]) => source
-    );
-    assert.equal(specifiers, sources.length, 'every import was located');
-    assert.deepEqual(
-      [...sources].sort(),
+// AC-8 — the import list is a PROPERTY, not a spelling. Admitting `./CraftingEngine.js` would let
+// the module reach a live engine past the very seam every stacking assertion here depends on. The
+// exact set holds static, re-exported and `import()` specifiers alike.
+defineStructureContract(
+  'AC-8 — imports from EXACTLY four modules, and reads no Foundry global',
+  'src/systems/companionComponentAward.js',
+  {
+    importSpecifiers: [
       [
-        '../config/flags.js',
-        './companionContract.js',
-        './componentStacking.js',
-        './itemStackQuantity.js',
+        '',
+        [
+          '../config/flags.js',
+          './companionContract.js',
+          './componentStacking.js',
+          './itemStackQuantity.js',
+        ],
       ],
-      'admitting `./CraftingEngine.js` would let the module reach a live engine past the very ' +
-        'seam every stacking assertion here depends on'
-    );
-    assert.equal(/globalThis/.test(CODE), false, 'no globalThis');
-    assert.equal(/\bgame\b/.test(CODE), false, 'and no bare `game`');
-  });
-});
+    ],
+    namesNo: ['globalThis', 'game'],
+  }
+);
 
 // ---------------------------------------------------------------------------
 // AC-9 (D0) — a stable member neither throws nor lies, at five sites
@@ -1130,7 +1120,9 @@ describe('AC-27 — placement records echo the caller and are DEEPLY frozen', ()
   });
 });
 
-// AC-30 — the contract's prose cannot silently contradict its own table
+// AC-30 — the contract's prose cannot silently contradict its own table. A deliberate prose pin
+// (issue 1933 retains it): the member counts are code and tested, but whether the comments restate
+// them truthfully has no code equivalent.
 
 describe('AC-30 — the member-count prose is checked, in two halves', () => {
   const CONTRACT_SOURCE = readFileSync(

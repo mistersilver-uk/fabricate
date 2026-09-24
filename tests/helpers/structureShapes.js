@@ -82,6 +82,12 @@ export function hasShape(node, source) {
   return subject?.type === probe.type && isDeepStrictEqual(shapeOf(subject), probe);
 }
 
+/** Whether a function node declares exactly these parameters, defaults and patterns included. */
+export function takesParameters(node, parameters) {
+  const probe = probeShape(`function probe(${parameters}) {}`);
+  return Array.isArray(node?.params) && isDeepStrictEqual(shapeOf(node.params), probe.params);
+}
+
 /** How many nodes of a subtree have exactly the probe's shape. */
 export function shapeCount(root, source) {
   let count = 0;
