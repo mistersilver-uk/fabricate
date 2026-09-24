@@ -8,6 +8,23 @@ const SECTION_FILES = {
   'Acquisition, Knowledge, and Resolution Terms': 'docs/domain/terms.md',
 };
 
+/**
+ * The Definition sentences an entry shows where the first alone misstates or part-states its term:
+ * a leading count, or ascending 1-based indices. Rebuilding a row reads the indices back.
+ */
+export const DEFINITION_SENTENCES = {
+  'Aggregates and Records': {
+    'Phantom-Run `resolved`': 2,
+    'Inventory Card / System Participation': 2,
+    'Result Order Asymmetry': 3,
+    'Manager Navigation Surface / Provider Seam': 2,
+    'Rail Marker Family': 2,
+    'World Defaults': 2,
+    'System Membership Record': 3,
+    'World Identity Snapshot': 2,
+  },
+};
+
 /** The headings whose moved body is replaced by a one-line pointer into `docs/domain/`. */
 const POINTER_HEADINGS = [
   'Remaining Drift to Track',
@@ -183,14 +200,29 @@ function tableRows(markdown, section) {
   return lines.filter((line) => isTableRow(line)).slice(2);
 }
 
+/** The 1-based positions `1..count`. */
+const leading = (count) => Array.from({ length: count }, (_, at) => at + 1);
+
+/** Whether `order` is a non-empty ascending list of 1-based indices into `total` sentences. */
+const ascendingWithin = (order, total) =>
+  order.length > 0 &&
+  order.every(
+    (index, at) => Number.isInteger(index) && index > (order[at - 1] ?? 0) && index <= total
+  );
+
 /** One table row split into its entry and notes parts, with `\|` unescaped. */
 function splitTableRow(row, sentences = 1) {
   const [term, definition, mapping, spec] = splitRow(row).map(unescapePipes);
+  const heading = term.replace(/^\*\*(.*)\*\*$/u, '$1');
   const lines = sentenceLines(definition);
+  const shown = Array.isArray(sentences) ? sentences : leading(sentences);
+  if (Array.isArray(sentences) && !ascendingWithin(sentences, lines.length)) {
+    throw new Error(`"${heading}" names no ascending indices of its ${lines.length} sentences`);
+  }
   return {
-    heading: term.replace(/^\*\*(.*)\*\*$/u, '$1'),
-    definition: lines.slice(0, sentences),
-    rest: lines.slice(sentences),
+    heading,
+    definition: lines.filter((_, at) => shown.includes(at + 1)),
+    rest: lines.filter((_, at) => !shown.includes(at + 1)),
     mapping: sentenceLines(`${MAPPING} ${mapping}`.trimEnd()),
     spec: sentenceLines(`${SPEC} ${spec}`.trimEnd()),
   };
@@ -199,11 +231,19 @@ function splitTableRow(row, sentences = 1) {
 /** A paragraph's cell text with its label stripped. */
 const cellOf = (lines, label) => lines.join(' ').slice(label.length).replace(/^ /u, '');
 
-/** The table row an entry and its notes section rebuild to, `|` re-escaped. */
-function rebuildRow(entry, notes) {
+/**
+ * The table row an entry and its notes section rebuild to, `|` re-escaped: the entry's sentences
+ * sit at the `order` indices when it names them, and lead the notes' otherwise.
+ */
+function rebuildRow(entry, notes, order) {
+  const shown = Array.isArray(order) ? order : leading(entry.definition.length);
+  const [picked, rest] = [[...entry.definition], [...notes.rest]];
+  const definition = Array.from({ length: picked.length + rest.length }, (_, at) =>
+    shown.includes(at + 1) ? picked.shift() : rest.shift()
+  );
   const cells = [
     `**${entry.heading}**`,
-    [...entry.definition, ...notes.rest].join(' '),
+    definition.join(' '),
     cellOf(notes.mapping, MAPPING),
     cellOf(notes.spec, SPEC),
   ].map(escapePipes);
@@ -220,22 +260,25 @@ function serializeNotes(title, sections) {
   return `${[`# ${title}`, ...blocks].join('\n\n')}\n`;
 }
 
-/** A notes file's `##` sections; lines outside the layout are dropped, not guessed at. */
+/** A notes file's `##` sections, and its non-blank lines before the first as `{ index, line }`. */
 function parseNotes(text) {
+  const preamble = [];
   const sections = [];
   let paragraph = 'rest';
-  for (const line of text.split('\n')) {
+  for (const [index, line] of text.split('\n').entries()) {
     const heading = /^## (.+)$/u.exec(line);
     if (heading) {
       sections.push({ heading: heading[1], rest: [], mapping: [], spec: [] });
       paragraph = 'rest';
-    } else if (line !== '' && sections.length > 0) {
+    } else if (line !== '' && sections.length === 0) {
+      preamble.push({ index, line });
+    } else if (line !== '') {
       if (line.startsWith(MAPPING)) paragraph = 'mapping';
       if (line.startsWith(SPEC)) paragraph = 'spec';
       sections.at(-1)[paragraph].push(line);
     }
   }
-  return sections;
+  return { preamble, sections };
 }
 
 /** One `####` entry's parts, with a `problem` naming how its shape is wrong, if it is. */
@@ -273,12 +316,16 @@ function parseEntries(domain) {
   });
 }
 
-/** The rebuilt table row for glossary `term`, or null when it has no entry and notes section. */
-export function termRowText(term, { domain, readNote }) {
+/**
+ * The rebuilt table row for glossary `term`, or null when it has no entry and notes section.
+ * `overrides` defaults to the `DEFINITION_SENTENCES` of the entry's section.
+ */
+export function termRowText(term, { domain, readNote, overrides }) {
   const entry = parseEntries(domain).find((candidate) => candidate.heading === term);
   const notes = entry?.link && readNote(entry.link.file);
-  const section = notes && parseNotes(notes).find(({ heading }) => heading === term);
-  return section ? rebuildRow(entry, section) : null;
+  const section = notes && parseNotes(notes).sections.find(({ heading }) => heading === term);
+  if (!section) return null;
+  return rebuildRow(entry, section, (overrides ?? DEFINITION_SENTENCES[entry.section])?.[term]);
 }
 
 /** Code spans removed, so markup inside them is not counted as markup. */
@@ -288,7 +335,7 @@ const count = (text, token) => text.split(token).length - 1;
 /** Why a definition is not 1–3 complete sentences with balanced inline markup, if it is not. */
 function definitionProblems({ heading, definition }) {
   const problems = [];
-  if (definition.length < 1 || definition.length > 3) problems.push('is not 1–3 lines');
+  if (definition.length === 0 || definition.length > 3) problems.push('is not 1–3 lines');
   if (definition.some((line) => !endsSentence(line))) {
     problems.push('has a line ending mid-sentence');
   }
@@ -311,10 +358,13 @@ function pairingProblems(section, entries, readNote) {
   const file = SECTION_FILES[section];
   const text = readNote(file);
   if (text === null) return [`${file} is missing`];
-  const notes = parseNotes(text).map(({ heading }) => heading);
+  const { preamble, sections } = parseNotes(text);
+  const notes = sections.map(({ heading }) => heading);
   const terms = entries.map(({ heading }) => heading);
   const anchors = dedupedSlugs([section, ...terms]).slice(1);
-  const problems = [];
+  const problems = preamble
+    .filter(({ index, line }) => index !== 0 || line !== `# ${section}`)
+    .map(({ index }) => `${file} line ${index + 1} sits outside any section`);
   const at = firstMismatch(notes, terms);
   if (at !== -1) {
     problems.push(`${file} section ${at + 1} is "${notes[at]}" where the entry is "${terms[at]}"`);
@@ -348,9 +398,7 @@ function pointers(domain) {
     if (!range) return [];
     return lines
       .map((line, index) => ({ heading, index, links: [...line.matchAll(DOMAIN_LINK)] }))
-      .filter(
-        ({ index, links }) => index >= range.start && index < range.end && links.length > 0
-      );
+      .filter(({ index, links }) => index >= range.start && index < range.end && links.length > 0);
   });
 }
 
@@ -403,7 +451,10 @@ export function glossaryProblems({ domain, readNote, floors = {}, pointerHeading
   ];
 }
 
-/** `domain` with the table under `### <section>` turned into entries, plus that section's notes. */
+/**
+ * `domain` with the table under `### <section>` turned into entries, plus that section's notes;
+ * `overrides` maps a term to its `DEFINITION_SENTENCES` value.
+ */
 export function convertSection(domain, section, overrides = {}) {
   const file = SECTION_FILES[section];
   const rows = file ? tableRows(domain, section) : null;
@@ -517,9 +568,18 @@ function reconstruct({ domain, entries, rows, swaps, reversePairs }) {
 /**
  * Proves `domain` and `notes` rebuild `base` byte for byte, from the working files alone.
  * `notes` and `baseNotes` map `docs/domain/*.md` paths to text; each `reversePairs` entry swaps a
- * `current` string, which must occur once, back to its `base` text.
+ * `current` string, which must occur once, back to its `base` text. `overrides` is as for
+ * `convertSection`.
  */
-export function verifyConversion({ base, domain, notes, baseNotes = {}, section, reversePairs }) {
+export function verifyConversion({
+  base,
+  domain,
+  notes,
+  baseNotes = {},
+  section,
+  reversePairs,
+  overrides = {},
+}) {
   const file = SECTION_FILES[section];
   const baseRows = file ? tableRows(base, section) : null;
   if (!baseRows || baseRows.length === 0 || !sectionRange(domain, section, 3)) {
@@ -527,7 +587,7 @@ export function verifyConversion({ base, domain, notes, baseNotes = {}, section,
     return { problems, rows: 0, rebuilt: 0 };
   }
   const entries = parseEntries(domain).filter((entry) => entry.section === section);
-  const sections = parseNotes(notes[file] ?? '');
+  const { sections } = parseNotes(notes[file] ?? '');
   const size = baseRows.length;
   const problems = [
     [entries.length, 'entries'],
@@ -537,7 +597,9 @@ export function verifyConversion({ base, domain, notes, baseNotes = {}, section,
     .filter(([found]) => found !== size)
     .map(([found, what]) => `${found} ${what} for ${size} base rows`);
   const rows = entries.map((entry, at) =>
-    sections[at]?.heading === entry.heading ? rebuildRow(entry, sections[at]) : ''
+    sections[at]?.heading === entry.heading
+      ? rebuildRow(entry, sections[at], overrides[entry.heading])
+      : ''
   );
   const { swaps, used, problems: unresolved } = pointerBlocks(domain, notes);
   const rebuilt = reconstruct({ domain, entries, rows, swaps, reversePairs: reversePairs ?? [] });
@@ -546,6 +608,7 @@ export function verifyConversion({ base, domain, notes, baseNotes = {}, section,
     problems.push(`the reconstruction differs from the base at line ${line}`);
   }
   problems.push(
+    ...entries.flatMap(({ problem }) => (problem ? [problem] : [])),
     ...unresolved,
     ...rebuilt.problems,
     ...leftoverProblems({ notes, baseNotes, file, section, sections, used }),

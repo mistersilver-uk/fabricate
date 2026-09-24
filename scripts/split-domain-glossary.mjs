@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
  * One-shot converter from a `DOMAIN.md` glossary table to per-term entries and notes.
- * `--section "<heading>"` converts one table in place; adding `--verify <base-dir>` instead proves,
- * from the working files alone, that they rebuild `<base-dir>/DOMAIN.md` byte for byte.
+ * `--section "<heading>"` converts one table in place; adding `--verify` instead proves, from the
+ * working files alone, that they rebuild `DOMAIN.md` byte for byte as it stood at
+ * `git merge-base HEAD origin/main`.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -10,23 +11,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import { convertSection, verifyConversion } from './lib/domainGlossary.js';
+import { convertSection, DEFINITION_SENTENCES, verifyConversion } from './lib/domainGlossary.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-
-/** Leading-sentence counts for terms whose first sentence alone misstates or part-states them. */
-const DEFINITION_SENTENCES = {
-  'Aggregates and Records': {
-    'Phantom-Run `resolved`': 2,
-    'Inventory Card / System Participation': 2,
-    'Result Order Asymmetry': 3,
-    'Manager Navigation Surface / Provider Seam': 2,
-    'Rail Marker Family': 2,
-    'World Defaults': 2,
-    'System Membership Record': 3,
-    'World Identity Snapshot': 2,
-  },
-};
 
 const SCOPE_SENTENCE =
   'The notes under `docs/domain/` that each entry below links to are part of this document.';
@@ -44,9 +31,11 @@ const REVERSE_PAIRS = [
   { current: '`DOMAIN.md` (**Projection Tier**)', base: '`DOMAIN.md:161` (**Projection Tier**)' },
 ];
 
-/** Every `docs/domain/*.md` under `root`, keyed by its repository-relative path. */
-function readNotes(root) {
-  const directory = path.join(root, 'docs', 'domain');
+const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' });
+
+/** Every working-tree `docs/domain/*.md`, keyed by its repository-relative path. */
+function readNotes() {
+  const directory = path.join(ROOT, 'docs', 'domain');
   if (!existsSync(directory)) return {};
   return Object.fromEntries(
     readdirSync(directory)
@@ -55,18 +44,32 @@ function readNotes(root) {
   );
 }
 
-function verify(section, baseDirectory) {
+/** Every `docs/domain/*.md` at commit `base`, keyed by its repository-relative path. */
+function readBaseNotes(base) {
+  return Object.fromEntries(
+    git('ls-tree', '--name-only', base, 'docs/domain/')
+      .split('\n')
+      .filter((file) => file.endsWith('.md'))
+      .map((file) => [file, git('show', `${base}:${file}`)])
+  );
+}
+
+function verify(section) {
+  const base = git('merge-base', 'HEAD', 'origin/main').trim();
   const { problems, rows, rebuilt } = verifyConversion({
-    base: readFileSync(path.join(baseDirectory, 'DOMAIN.md'), 'utf8'),
+    base: git('show', `${base}:DOMAIN.md`),
     domain: readFileSync(path.join(ROOT, 'DOMAIN.md'), 'utf8'),
-    notes: readNotes(ROOT),
-    baseNotes: readNotes(baseDirectory),
+    notes: readNotes(),
+    baseNotes: readBaseNotes(base),
     section,
     reversePairs: REVERSE_PAIRS,
+    overrides: DEFINITION_SENTENCES[section] ?? {},
   });
-  const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
-  const dirty = git('status', '--porcelain', '--', 'DOMAIN.md', 'docs/domain') !== '';
-  console.log(`verified ${git('rev-parse', 'HEAD')}${dirty ? ' plus uncommitted changes' : ''}`);
+  const dirty = git('status', '--porcelain', '--', 'DOMAIN.md', 'docs/domain').trim() !== '';
+  console.log(`base ${base}`);
+  console.log(
+    `verified ${git('rev-parse', 'HEAD').trim()}${dirty ? ' plus uncommitted changes' : ''}`
+  );
   console.log(`rows: ${rebuilt}/${rows} rebuilt`);
   for (const problem of problems) console.error(`FAIL ${problem}`);
   return problems.length === 0 && rows > 0 ? 0 : 1;
@@ -86,10 +89,10 @@ function convert(section) {
 }
 
 const { values } = parseArgs({
-  options: { section: { type: 'string' }, verify: { type: 'string' } },
+  options: { section: { type: 'string' }, verify: { type: 'boolean' } },
 });
 if (!values.section) {
-  console.error('usage: split-domain-glossary.mjs --section "<heading>" [--verify <base-dir>]');
+  console.error('usage: split-domain-glossary.mjs --section "<heading>" [--verify]');
   process.exit(2);
 }
-process.exit(values.verify ? verify(values.section, values.verify) : convert(values.section));
+process.exit(values.verify ? verify(values.section) : convert(values.section));

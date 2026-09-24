@@ -11,6 +11,7 @@ import {
   headingSlugs,
   sentenceLines,
   slugify,
+  termRowText,
   verifyConversion,
 } from '../scripts/lib/domainGlossary.js';
 
@@ -46,18 +47,59 @@ const table = (rows) =>
     '<!-- markdownlint-enable markdownlint-sentences-per-line -->',
   ].join('\n');
 
-const document = (rows) =>
-  `# Domain\n\n## Ubiquitous Language\n\n### ${SECTION}\n\n${table(rows)}\n\n` +
+const scaffold = (glossary) =>
+  `# Domain\n\n## Ubiquitous Language\n\n### ${SECTION}\n\n${glossary}\n\n` +
   '### Acquisition, Knowledge, and Resolution Terms\n\nKept prose.\n\n' +
   '## Remaining Drift to Track\n\nDrift line one.\nDrift line two.\n\n## Open Questions\n\nNone.\n';
 
+const document = (rows) => scaffold(table(rows));
+
+const ALPHA_ROW =
+  '| **Alpha Record** | The first record. It keeps `a \\| b` apart. A second note line. | `Alpha` | spec/a.md |';
 const BASE = document([
-  '| **Alpha Record** | The first record. It keeps `a \\| b` apart. A second note line. | `Alpha` | spec/a.md |',
+  ALPHA_ROW,
   '| **Beta** | The second record. **Bold opener** follows. | `Beta`. Mapped twice. | spec/b.md |',
 ]);
 
-const converted = convertSection(BASE, SECTION);
-const { domain, notes } = converted;
+/** What converting `BASE` writes, spelled out so the gate fixtures outlive the converter. */
+const domain = scaffold(
+  [
+    '#### Alpha Record',
+    '',
+    'The first record.',
+    '',
+    '[Notes](docs/domain/records.md#alpha-record)',
+    '',
+    '#### Beta',
+    '',
+    'The second record.',
+    '',
+    '[Notes](docs/domain/records.md#beta)',
+  ].join('\n')
+);
+const notes = [
+  `# ${SECTION}`,
+  '',
+  '## Alpha Record',
+  '',
+  'It keeps `a | b` apart.',
+  'A second note line.',
+  '',
+  'Canonical mapping: `Alpha`',
+  '',
+  'Spec reference: spec/a.md',
+  '',
+  '## Beta',
+  '',
+  '**Bold opener** follows.',
+  '',
+  'Canonical mapping: `Beta`.',
+  'Mapped twice.',
+  '',
+  'Spec reference: spec/b.md',
+  '',
+].join('\n');
+
 const notesOf = (text) => ({ [RECORDS]: text });
 const readerOf = (files) => (file) => files[file] ?? null;
 const gate = (text, files = notesOf(notes), options = {}) =>
@@ -113,12 +155,8 @@ describe('sentence splitting', () => {
 });
 
 describe('the conversion', () => {
-  it('writes entries and notes the gate accepts', () => {
-    assert.match(
-      domain,
-      /^#### Alpha Record\n\nThe first record\.\n\n\[Notes\]\(docs\/domain\/records\.md#alpha-record\)$/mu
-    );
-    assert.match(notes, /^It keeps `a \| b` apart\.\nA second note line\.$/mu);
+  it('writes exactly the entries and notes the gate fixtures use', () => {
+    assert.deepEqual(convertSection(BASE, SECTION), { domain, file: RECORDS, notes });
     assert.deepEqual(gate(domain), []);
   });
 
@@ -127,16 +165,37 @@ describe('the conversion', () => {
     assert.match(two.domain, /^The second record\.\n\*\*Bold opener\*\* follows\.$/mu);
     assert.throws(() => convertSection(BASE, SECTION, { Gamma: 2 }), /Gamma/u);
   });
+
+  it('takes ascending sentence indices, which rebuild the base row only when named', () => {
+    const overrides = { 'Alpha Record': [1, 3] };
+    const picked = convertSection(BASE, SECTION, overrides);
+    assert.match(picked.domain, /^The first record\.\nA second note line\.\n\n\[Notes\]/mu);
+    assert.match(picked.notes, /^## Alpha Record\n\nIt keeps `a \| b` apart\.\n\nCanonical/mu);
+    const files = notesOf(picked.notes);
+    const proof = (extra) =>
+      verifyConversion({ base: BASE, domain: picked.domain, notes: files, section: SECTION, ...extra });
+    assert.deepEqual(proof({ overrides }), { problems: [], rows: 2, rebuilt: 2 });
+    assertReports(proof({}).problems, 'differs from the base');
+    const reader = { domain: picked.domain, readNote: readerOf(files), overrides };
+    assert.equal(termRowText('Alpha Record', reader), ALPHA_ROW);
+  });
+
+  it('throws on indices that are not ascending sentences of their row', () => {
+    assert.throws(() => convertSection(BASE, SECTION, { Beta: [2, 1] }), /Beta/u);
+    assert.throws(() => convertSection(BASE, SECTION, { Beta: [3] }), /Beta/u);
+  });
 });
 
 describe('the gate fails in every direction it claims', () => {
   const definition = (to) => gate(edit(domain, 'The second record.\n', to));
-  const betaNotes = /## Beta[\s\S]*$/u.exec(notes)[0];
+  const betaNotes = () => /## Beta[\s\S]*$/u.exec(notes)[0];
   const cases = [
     ['an entry with no notes section', 'where the entry is "Beta"', () =>
-      gate(domain, notesOf(edit(notes, betaNotes, '')))],
+      gate(domain, notesOf(edit(notes, betaNotes(), '')))],
     ['a notes section with no entry', 'is "Gamma" where', () =>
       gate(domain, notesOf(`${notes}\n## Gamma\n\nCanonical mapping: g\n\nSpec reference: s\n`))],
+    ['a notes line before the first section', 'line 3 sits outside any section', () =>
+      gate(domain, notesOf(edit(notes, `# ${SECTION}\n\n`, `# ${SECTION}\n\nA stray line.\n\n`)))],
     ['a missing notes file', 'is missing', () => gate(domain, {})],
     ['a link line into another file', 'link line of "Beta" must be', () =>
       gate(edit(domain, 'records.md#beta', 'terms.md#beta'))],
@@ -185,12 +244,14 @@ describe('the conversion proof', () => {
   });
 
   const history = '# History\n\n## Remaining Drift to Track\n\nDrift line one.\nDrift line two.\n';
-  const pointed = edit(
-    domain,
-    'Drift line one.\nDrift line two.',
-    'Moved to [history](docs/domain/history.md#remaining-drift-to-track).'
-  );
-  const withHistory = (text) => verify({ domain: pointed, notes: { ...notesOf(notes), [HISTORY]: text } });
+  const pointed = () =>
+    edit(
+      domain,
+      'Drift line one.\nDrift line two.',
+      'Moved to [history](docs/domain/history.md#remaining-drift-to-track).'
+    );
+  const withHistory = (text) =>
+    verify({ domain: pointed(), notes: { ...notesOf(notes), [HISTORY]: text } });
 
   it('swaps a pointer back for its moved block', () => {
     assert.deepEqual(withHistory(history).problems, []);
@@ -201,6 +262,8 @@ describe('the conversion proof', () => {
       verify({ notes: notesOf(edit(notes, 'second note', 'secOnd note')) })],
     ['a dropped entry', '1 entries for 2 base rows', () =>
       verify({ domain: edit(domain, /\n\n#### Beta[^#]*#beta\)/u.exec(domain)[0], '') })],
+    ['a stray line after an entry', 'not heading, definition, link line', () =>
+      verify({ domain: edit(domain, '#alpha-record)', '#alpha-record)\nStray.') })],
     ['a zero-row section', 'no glossary section with base rows', () =>
       verify({ base: document([]) })],
     ['a section that names no heading', 'no glossary section with base rows', () =>
