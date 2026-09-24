@@ -64,8 +64,7 @@ function buildGatheringNamespace(fabricate) {
     clearPartyRealmOverride: (options) => fabricate.clearGatheringPartyRealmOverride(options),
     revealRealmForActor: (options) => fabricate.revealGatheringRealmForActor(options),
     hideRealmForActor: (options) => fabricate.hideGatheringRealmForActor(options),
-    // DEPRECATED region-named aliases: forward to the realm method and warn once, so existing
-    // macros keep working.
+    // Deprecated region aliases forward to the realm method and warn once.
     getRegionStore: () => {
       deprecate('gathering.getRegionStore', 'gathering.getRealmStore');
       return fabricate.getGatheringRealmStore();
@@ -116,7 +115,7 @@ function buildApiClasses(io) {
     SalvageRunManager,
     GatheringEnvironmentStore,
     GatheringRealmStore,
-    // DEPRECATED alias for backwards compatibility — the same class.
+    // Deprecated alias, the same class.
     GatheringRegionStore: GatheringRealmStore,
     GatheringPartyStore,
     CurrencyConfigStore,
@@ -130,9 +129,8 @@ function buildApiClasses(io) {
     ItemPilesIntegration,
     CompendiumImporter,
     CraftingSystemExporter,
-    // Public hook names module authors may subscribe to.
     HOOKS: FABRICATE_HOOKS,
-    // The named, versioned contract for outbound BEHAVIOURAL consumption (issue 1289).
+    // The named, versioned contract for behavioural consumption (issue 1289).
     companion: COMPANION_CONTRACT,
   };
   Object.defineProperty(api, 'COMPANION', {
@@ -160,22 +158,16 @@ function buildExportSystem(fabricate) {
     if (!system) throw new Error(`System "${systemId}" not found`);
     const recipes = recipeManager.getRecipes({ craftingSystemId: systemId }).map((r) => r.toJSON());
     const version = game.modules?.get('fabricate')?.version || '0.0.0';
-    // Gathering authoring rides along, mirroring `adminStore.exportSystem`: the FULL environment
-    // array and the whole `gatheringConfig`, which the exporter slices. Passing three args dropped
-    // both and made the public-API export lossy against the import path (issue 642).
+    // Like `adminStore.exportSystem`, the full environments and `gatheringConfig`, which the
+    // exporter slices; without them the export is lossy against the import (issue 642).
     const gatheringEnvironments = fabricate.gatheringEnvironmentStore?.list?.() ?? [];
     const gatheringConfig = getSetting(SETTING_KEYS.GATHERING_CONFIG) || {};
-    // The world currency ladder rides along too (issue 1278). It is WORLD scope, so there is
-    // nothing on the system to fall back on: omit it and every cost lands as an unresolvable unit.
+    // The world slices (issues 1278, 1282, 1308, 1364): the system holds no copy, so an omitted
+    // slice lands its costs, realms, gates or modifiers unresolvable, and an omitted scope slice
+    // exports an empty roster, defaults and membership.
     const currencyConfig = fabricate.currencyConfigStore?.get?.() ?? {};
-    // The world realm library rides along too (issue 1282), same reason: realms are WORLD scope,
-    // so omitting this lands every realm-gated environment citing realm ids that name nothing.
     const travelConfig = fabricate.gatheringRealmStore?.get?.() ?? {};
-    // And the world character libraries (issue 1308), same reason, same consequence: omit them and
-    // every learning gate, tool requirement and check modifier in the payload lands unresolvable.
     const characterLibraries = fabricate.characterLibrariesStore?.get?.() ?? {};
-    // And the three WORLD-SCOPE ENTITY settings (issue 1364), sharper because these slices are
-    // membership-filtered: omitting them exports an empty roster, defaults and membership.
     const componentScope = fabricate.getComponentScopeStore?.()?.get?.() ?? {};
     const essenceScope = fabricate.getEssenceScopeStore?.()?.get?.() ?? {};
     const toolScope = fabricate.getToolScopeStore?.()?.get?.() ?? {};
@@ -203,8 +195,7 @@ function buildImportSystem(fabricate) {
     const validation = CraftingSystemExporter.validateImportData(data);
     if (!validation.valid) throw new Error(`Invalid import data: ${validation.errors.join('; ')}`);
     const mode = options.copyMode ? 'copy' : 'keep';
-    // The DESTINATION world's entity roster (issue 1364). Copy mode REQUIRES it: without it every
-    // incoming component mints a fresh id, creating a second record for every item this world holds.
+    // Copy mode requires it, or every incoming component mints a duplicate record (issue 1364).
     const worldEntityIndex = buildWorldEntityIndex(fabricate);
     const packData = CraftingSystemExporter.prepareForImport(data, mode, { worldEntityIndex });
     return fabricate.compendiumImporter.importFromPackData(packData, {
@@ -213,20 +204,18 @@ function buildImportSystem(fabricate) {
   };
 }
 
-// Bind the public API onto the live `game.fabricate` global. A pure assignment, idempotent and
-// safe from both `init` and `ready`, the latter backstopping a manager stalled on "still loading".
+// Idempotent, so safe from both `init` and `ready`; the latter backstops a manager stalled on
+// "still loading".
 export function bindFabricateGlobal(fabricate, io) {
   game.fabricate = fabricate;
-  // Expose the manager singleton so the region behaviour event handlers can resolve
-  // `game.fabricate.interactableManager` to dispatch onRegionEnter and onRegionExit.
+  // The region behaviour handlers dispatch onRegionEnter and onRegionExit through it.
   game.fabricate.interactableManager = InteractableManager.instance;
   game.fabricate.gathering = buildGatheringNamespace(fabricate);
 
-  // Classes exposed for advanced users.
   game.fabricate.api = buildApiClasses(io);
   managerExtensions.bindPublicApi(game.fabricate.api);
-  // Both registries are page-session singletons imported at module scope, so the init and ready
-  // replays re-publish the SAME registry: a companion registered during its own `init` survives.
+  // Page-session singletons, so the `ready` replay re-publishes the registry a companion
+  // registered into during its own `init`.
   playerExtensions.bindPublicApi(game.fabricate.api);
 
   game.fabricate.importFromPack = (packData, options) =>
@@ -237,16 +226,14 @@ export function bindFabricateGlobal(fabricate, io) {
 
   game.fabricate.importSystemFromFile = buildImportSystem(fabricate);
 
-  // GM "prepare for uninstall" cleanup (issue 535): `fabricate.interactable` is a module-defined
-  // RegionBehavior sub-type Foundry does NOT remove on disable, so it errors on every scene load.
-  // This strips ONLY what Fabricate owns, never a parent Region, a foreign behaviour or a Token.
+  // Foundry keeps a module's RegionBehavior sub-type on disable, so it errors on every scene
+  // load (issue 535). This strips only what Fabricate owns, never a Region, behaviour or Token.
   game.fabricate.cleanupInteractables = () => runInteractableWorldCleanup();
 }
 
 /**
- * The DESTINATION world's entity roster (issue 1364), which a copy-mode import matches incoming
- * SOURCE REFERENCES against rather than minting a duplicate. An absent store answers an empty list,
- * so everything mints — correct for an unmigrated world.
+ * The destination roster a copy-mode import matches source references against (issue 1364). An
+ * absent store answers empty, so everything mints, which is correct for an unmigrated world.
  */
 function buildWorldEntityIndex(fabricate) {
   return {
@@ -317,10 +304,7 @@ async function runInteractableWorldCleanup() {
   return applied;
 }
 
-/**
- * The macro-facing public surface, assigned to `globalThis.fabricate` by the module entry. A
- * factory because the deferred manager opener and its failure reporter stay in `src/main.js`.
- */
+/** `globalThis.fabricate`; a factory because the manager opener stays in `src/main.js`. */
 export function buildMacroApi(io) {
   return {
     createSimpleRecipe: async (name, ingredients, result) => {
@@ -347,15 +331,13 @@ export function buildMacroApi(io) {
     },
 
     openRecipeManager: () => {
-      // RETHROWING (issue 1565): a public API member must keep returning a promise that rejects with
-      // the original error, so a macro author's `await` sees the failure while the user gets a notice.
+      // Rethrows (issue 1565), so a macro's `await` sees the original error beside the notice.
       return openDeferredAppRethrowing(
         io.showCraftingSystemManagerApp,
         io.reportManagerLoadFailure
       );
     },
 
-    /** List crafting systems. */
     listCraftingSystems: () => {
       return game.fabricate.getCraftingSystemManager().getSystems();
     },

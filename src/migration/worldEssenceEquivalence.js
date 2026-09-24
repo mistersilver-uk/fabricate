@@ -1,7 +1,7 @@
 /**
- * The equivalence decision core of the `1.34.0` world-essence merge (issue 1654). Spec § Equivalent
- * World Essence Merge owns every rule below, the canonicalised `(name, macro, effectSource)` triple
- * and the three refusal invariants included. Total, non-throwing and PURE.
+ * The decision core of the `1.34.0` world-essence merge (issue 1654); spec § Equivalent World
+ * Essence Merge owns every rule, the canonical triple and three refusal invariants included. Total,
+ * non-throwing and pure.
  */
 
 import { resolveEssence } from '../systems/essenceScope.js';
@@ -16,16 +16,14 @@ import {
 
 import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
-/** The `craftingSystem` array essences are stored under, read from the one list that names it. */
 const ESSENCE_DEFINITIONS_FIELD = ENTITY_TYPE_FIELDS.essences;
 
-/** The entity-type leg every map this module emits is written under. */
 const ESSENCES = 'essences';
 
 /** The fallback stem `mintEssenceId` uses for an empty or wholly non-alphanumeric name. */
 const FALLBACK_SLUG_STEM = 'essence';
 
-/** Every refusal reason, so a caller matches a shared token rather than its own string literal. */
+/** Shared tokens, so a caller never matches its own string literal. */
 export const ESSENCE_MERGE_REFUSAL_REASONS = Object.freeze({
   unresolvedEffectSourceComponent: 'unresolvedEffectSourceComponent',
   nonDisjointMap: 'nonDisjointMap',
@@ -33,7 +31,6 @@ export const ESSENCE_MERGE_REFUSAL_REASONS = Object.freeze({
   membershipKeyCollision: 'membershipKeyCollision',
 });
 
-/** Every reason this pass can decline a world essence's candidacy. */
 export const ESSENCE_DECLINE_REASONS = Object.freeze({
   sectionDisagreement: 'sectionDisagreement',
   uncanonicalisableKey: 'uncanonicalisableKey',
@@ -50,12 +47,7 @@ function trimmedString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-// --- The canonicalisers ----------------------------------------------------
-
-/**
- * The case-folded comparison key for an essence name, or `UNCANONICALISABLE`. `toLowerCase`, never
- * the locale-sensitive fold, and an EMPTY name is uncanonicalisable rather than a key of its own.
- */
+/** `toLowerCase`, never the locale fold; an empty name is `UNCANONICALISABLE`, not a key. */
 function canonicalEssenceName(value) {
   if (value !== null && value !== undefined && typeof value !== 'string') return UNCANONICALISABLE;
   const name = String(value ?? '')
@@ -71,7 +63,7 @@ function canonicalEssenceMacro(value) {
   return value.trim() || null;
 }
 
-/** The canonical `effectSource` section, in FIXED KEY ORDER, trimmed-or-`null` (requirement 2). */
+/** In fixed key order, each trimmed or `null` (requirement 2). */
 function canonicalEssenceEffectSource(value) {
   if (value === null || value === undefined) return blankEffectSource();
   if (!isPlainObject(value)) return UNCANONICALISABLE;
@@ -95,7 +87,7 @@ function blankEffectSource() {
   return block;
 }
 
-/** The equivalence key, serialised as an ARRAY so it never depends on property enumeration order. */
+/** An array, so it never depends on property enumeration order. */
 function equivalenceKey(name, macro, effectSource) {
   return JSON.stringify([
     name,
@@ -104,10 +96,7 @@ function equivalenceKey(name, macro, effectSource) {
   ]);
 }
 
-/**
- * The id stem the world catalogue would mint for a name: only the STEM of `mintEssenceId`, which
- * lives in a UI leaf a startup migration must not import, and a test keeps the two equal.
- */
+/** `mintEssenceId`'s stem, copied from a UI leaf a migration must not import; a test pins them. */
 export function essenceSlugStem(name) {
   return (
     String(name ?? '')
@@ -129,12 +118,7 @@ function slugRank(id, stem) {
   return 2;
 }
 
-// --- Reading the inputs ----------------------------------------------------
-
-/**
- * The corpus facts election and the refusal invariants need. A duplicate system id keeps the first
- * system's age and accumulates BOTH systems' rows, or a collision would be hidden, not refused.
- */
+/** A duplicate system id keeps the first age and both rows, so a collision is refused. */
 function readSystemsCorpus(systems) {
   const order = new Map();
   const rowsBySystem = new Map();
@@ -160,9 +144,9 @@ function readSystemsCorpus(systems) {
 }
 
 /**
- * The essence scope payload, accepting both sub-key shapes, de-duplicated as the shipped normalizers
- * do, with every key DERIVED from the record. A membership record is LIVE only when its entity is on
- * the roster and its system in the corpus, or a dead essence would pass the zero-member point.
+ * Both sub-key shapes, de-duplicated like the normalizers, keys derived from each record. A record
+ * is live only with its entity on the roster and its system in the corpus, or a dead essence would
+ * pass the zero-member point.
  */
 function readEssenceScope(essenceScope, systemOrder) {
   const source = isPlainObject(essenceScope) ? essenceScope : {};
@@ -198,8 +182,7 @@ function readEssenceScope(essenceScope, systemOrder) {
     if (!membershipsByEntity.has(entityId)) membershipsByEntity.set(entityId, []);
     membershipsByEntity.get(entityId).push(entry);
   }
-  // Sorted by system age, so every downstream list is ordered by a corpus fact rather than by
-  // payload insertion.
+  // By system age, so downstream order is a corpus fact, not payload insertion.
   for (const records of membershipsByEntity.values()) {
     records.sort(
       (left, right) =>
@@ -229,9 +212,6 @@ function readComponentScope(componentScope) {
   return { ids, memberships };
 }
 
-// --- Candidacy, and the zero point -----------------------------------------
-
-/** The resolved, canonicalised `(macro, effectSource)` pair one membership record answers. */
 function canonicalSectionsOf(worldDefault, membership) {
   const resolved = resolveEssence(worldDefault, membership);
   return {
@@ -250,13 +230,12 @@ function sectionsEqual(left, right) {
   );
 }
 
-/** A report fragment's display name: the STORED name, never the fold, and absence-preserving. */
+/** The stored name, never the fold, and absence-preserving. */
 function displayNameOf(record) {
   const name = record?.name;
   return name === undefined ? {} : { name };
 }
 
-/** Split the world roster into merge candidates, declined essences and orphans. */
 function classifyCandidates(scope, corpus) {
   const candidates = [];
   const declined = [];
@@ -327,12 +306,7 @@ function classifyCandidates(scope, corpus) {
   return { candidates, declined, orphaned };
 }
 
-// --- Survivor election -----------------------------------------------------
-
-/**
- * The election order of requirement 5: corpus position re-derived from the LIVE corpus, with
- * `essenceScope.entities` array position the final tie-break only.
- */
+/** Requirement 5: live corpus position; `essenceScope.entities` order only breaks ties. */
 function byElectionOrder(left, right) {
   if (left.slugRank !== right.slugRank) return left.slugRank - right.slugRank;
   const leftPosition = left.corpusPosition;
@@ -348,10 +322,7 @@ function byElectionOrder(left, right) {
   return left.arrayIndex - right.arrayIndex;
 }
 
-/**
- * Partition the candidates, survivor first by construction, keying on canonicalised CONTENT so only
- * the final tie-break ever sees array order.
- */
+/** Survivor first; keyed on canonical content, so only the last tie-break sees array order. */
 function partitionCandidates(candidates) {
   const ordered = [...candidates].sort(byElectionOrder);
   const groups = new Map();
@@ -362,12 +333,9 @@ function partitionCandidates(candidates) {
   return [...groups.values()].filter((group) => group.length > 1);
 }
 
-// --- The map and its three refusal invariants ------------------------------
-
 /**
- * Every system one candidate is PRESENT in, in corpus age order. Presence, not reachability: the row
- * leg stays because `unionScopedDefinitions` passes a row with no membership record through. NOT
- * widened to a system merely carrying the loser's id as an `essences` map key.
+ * Presence, not reachability, in corpus age order: `unionScopedDefinitions` passes a row with no
+ * membership record through. A loser's id as an `essences` map key is not presence.
  */
 function presenceSystemsOf(candidate, corpus) {
   const present = new Set(candidate.memberSystemIds);
@@ -375,7 +343,6 @@ function presenceSystemsOf(candidate, corpus) {
   return [...present].sort((left, right) => corpus.order.get(left) - corpus.order.get(right));
 }
 
-/** The per-system merge map one set of accepted groups produces. */
 function buildMergeMap(groups, corpus) {
   const mergeMap = {};
   for (const group of groups) {
@@ -414,22 +381,17 @@ function unresolvedEffectSourceSystems(group, worldComponents, corpus) {
 }
 
 /**
- * Whether a component reference is addressable at world scope from one system: on the world roster
- * AND held by this system's membership. The second half is the one `1.30.0` does not make, and a
- * pair it REFUSED wrote no record, so that system's essences still carry raw system-local ids.
+ * On the world roster and held by this system's membership. `1.30.0` skips the second half, but a
+ * pair it refused wrote no record, so that system's essences still carry system-local ids.
  */
 function namesWorldComponentIn(reference, systemId, worldComponents) {
   if (!isWorldAddressable(reference, worldComponents.ids)) return false;
-  // `isWorldAddressable` passes a document UUID unconditionally, so anything past it and off the
-  // roster is globally addressable and carries no system scope.
+  // A document UUID passes unconditionally and carries no system scope.
   if (!worldComponents.ids.has(reference)) return true;
   return worldComponents.memberships.has(membershipKey(reference, systemId));
 }
 
-/**
- * Requirement 6's disjointness invariant, which cannot answer anything today: groups partition the
- * world roster. Kept because that argument rests on the partition, which a re-election would break.
- */
+/** Requirement 6's disjointness: vacuous while groups partition the roster, which may change. */
 function findNonDisjointGroups(mergeMap, groups) {
   const findings = new Map();
   for (const [systemId, legs] of Object.entries(mergeMap)) {
@@ -452,9 +414,8 @@ function findNonDisjointGroups(mergeMap, groups) {
 }
 
 /**
- * Requirement 6's output-uniqueness invariant, over `systems[].essenceDefinitions` exactly as
- * `1.30.0`'s `findRefusals` reads it. Ids are uniquified and NAMES are not, so one system can hold
- * two equivalent same-name essences and merging them collides.
+ * Requirement 6's output uniqueness, read as `1.30.0`'s `findRefusals` reads it. Names are not
+ * uniquified, so one system can hold two equivalent same-name essences whose merge collides.
  */
 function findOutputCollisionGroups(mergeMap, groups, corpus) {
   const findings = new Map();
@@ -483,10 +444,7 @@ function findOutputCollisionGroups(mergeMap, groups, corpus) {
   }));
 }
 
-/**
- * Requirement 6's third invariant, a POST-condition over the rebuilt keys and the only one of the
- * three that can see a world essence holding a record for a system with no in-system row.
- */
+/** A post-condition, the only invariant that sees a record for a system with no in-system row. */
 function findMembershipCollisionGroups(groups, corpus) {
   const findings = [];
   for (const group of groups) {
@@ -511,7 +469,7 @@ function findMembershipCollisionGroups(groups, corpus) {
   return findings;
 }
 
-/** Every refusal one candidate map exhibits, in a fixed reason order so the report is stable. */
+/** In a fixed reason order, so the report is stable. */
 function findGroupRefusals(mergeMap, groups, corpus) {
   return [
     ...findNonDisjointGroups(mergeMap, groups),
@@ -520,9 +478,7 @@ function findGroupRefusals(mergeMap, groups, corpus) {
   ];
 }
 
-// --- The public entry point ------------------------------------------------
-
-/** Decide equivalence, survivors, per-system re-keys and tombstones. It mutates NOTHING. */
+/** Equivalence, survivors, per-system re-keys and tombstones; mutates nothing. */
 export function buildWorldEssenceEquivalence({ systems, essenceScope, componentScope } = {}) {
   const corpus = readSystemsCorpus(systems);
   const scope = readEssenceScope(essenceScope, corpus.order);
@@ -546,8 +502,7 @@ export function buildWorldEssenceEquivalence({ systems, essenceScope, componentS
     });
   };
 
-  // The false-merge trap first, because it is a candidacy gate rather than a map invariant: a group
-  // it removes never contributes a map entry for the other three to read.
+  // The false-merge trap first: a candidacy gate, so its removals never reach the map.
   for (const group of allGroups) {
     const offending = unresolvedEffectSourceSystems(group, worldComponents, corpus);
     if (offending.length > 0) {
@@ -559,9 +514,8 @@ export function buildWorldEssenceEquivalence({ systems, essenceScope, componentS
     }
   }
 
-  // A literal bound, because a migration that spins is indistinguishable from a hung world. No fixed
-  // point is needed: every refusal is attributable to exactly one group, so removing one cannot
-  // create a new refusal, and the second iteration is the assertion that says so.
+  // A literal bound, since a spinning migration looks like a hung world. Each refusal belongs to
+  // one group, so removal creates none, and the second iteration asserts it.
   const bound = allGroups.length + 1;
   let accepted = allGroups.filter((group) => !refused.has(group));
   let mergeMap = buildMergeMap(accepted, corpus);
@@ -585,8 +539,7 @@ export function buildWorldEssenceEquivalence({ systems, essenceScope, componentS
     }
     mergedGroups.push({
       survivorId: survivor.id,
-      // The survivor's display name: what the merged essence will still be called, so the name a GM
-      // can act on. Every loser's own name is preserved in `retired`.
+      // The survivor's name, the one a GM can act on; each loser's is kept in `retired`.
       ...displayNameOf(survivor.record),
       loserIds: losers.map((loser) => loser.id),
       systemIds: [...systemIds].sort(
@@ -594,12 +547,10 @@ export function buildWorldEssenceEquivalence({ systems, essenceScope, componentS
       ),
     });
     for (const loser of losers) {
-      // `identityOf` is absence-preserving, which is right for a tombstone: a field the retired
-      // entity never carried is not one a restore should mint.
+      // Absence-preserving, so a restore never mints a field the retired entity lacked.
       retired[loser.id] = {
         ...identityOf(loser.record, ESSENCES),
-        // What absorbed it, recorded here because this is the last moment the pairing exists
-        // anywhere: the per-system legs are cleared by the one-shot pass that consumes them.
+        // The last record of the pairing: the one-shot pass clears the per-system legs.
         survivorId: survivor.id,
         systems: presenceSystemsOf(loser, corpus),
       };

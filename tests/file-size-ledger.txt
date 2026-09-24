@@ -1,9 +1,9 @@
 src/canvas/interactableResolution.js::buildRegionSpawnRequest	120
-src/migration/MigrationRunner.js::run	240
+src/migration/MigrationRunner.js::run	230
 src/migration/mergeEquivalentWorldEssences.js::mergeEquivalentWorldEssences	130
 src/migration/migrateUnifyGatheringRegions.js::migrateUnifyGatheringRegions	130
-src/migration/migrateWorldScopeEntities.js::migrateWorldScopeEntities	260
-src/models/Recipe.js::_validate	120
+src/migration/migrateWorldScopeEntities.js::migrateWorldScopeEntities	250
+src/models/Recipe.js::_validate	110
 src/systems/CompendiumImporter.js	1300
 src/systems/CompendiumImporter.js::_remapComponentUuids	140
 src/systems/CompendiumImporter.js::importFromPackData	260
@@ -193,4 +193,4 @@ src/ui/svelte/stores/worldScopeActions.js::createWorldScopeEntityActions	500
 src/ui/svelte/stores/worldScopeActions.js::createWorldVocabularyActions	140
 src/ui/svelte/stores/worldScopeProjection.js	1000
 src/ui/svelte/util/shoppingListAggregator.js::aggregateShoppingList	180
-src/utils/rollExpressionAverage.js::createReader	200
+src/utils/rollExpressionAverage.js::createReader	190

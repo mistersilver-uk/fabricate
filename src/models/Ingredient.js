@@ -1,7 +1,4 @@
-/**
- * Represents an ingredient required for crafting
- * Supports both simple (exact item) and advanced (tag-based) matching
- */
+/** One ingredient option, matched by component, tags, currency or essence. */
 import { getFabricateFlag } from '../config/flags.js';
 
 import { getMatchHandler, normalizeMatch } from './match/matchTypes.js';
@@ -12,10 +9,7 @@ import {
   omitReconstructibleDefaults,
 } from './reconstructibleDefaults.js';
 
-/**
- * Serialized ingredient-OPTION fields the `Ingredient` constructor rebuilds to EXACTLY this value
- * when the key is absent, so emitting them is pure payload weight (issue 1135).
- */
+/** Fields the constructor rebuilds exactly from absence (issue 1135). */
 export const INGREDIENT_OMITTED_WHEN_DEFAULT = {
   componentId: isNull,
   itemUuid: isNull,
@@ -30,7 +24,6 @@ export class Ingredient {
     this.quantity = data.quantity || 1;
     this.match = this._normalizeMatch(data);
 
-    // componentId: resolved from match object or bare data field
     this.componentId = this.match?.type === 'component' ? this.match.componentId || null : null;
 
     // Legacy transitional alias
@@ -41,7 +34,6 @@ export class Ingredient {
 
     this.alternatives = data.alternatives || []; // Array of Ingredient objects
 
-    // Effect extraction settings
     this.extractEffects = data.extractEffects === undefined ? false : data.extractEffects;
     this.effectFilter = data.effectFilter || null; // Regex or array of effect names to extract
   }
@@ -50,9 +42,7 @@ export class Ingredient {
     return normalizeMatch(data);
   }
 
-  /** Check if a given item matches this ingredient requirement */
   matches(item) {
-    // Exact match by UUID
     if (this.itemUuid && item.uuid === this.itemUuid) return true;
 
     if (this.match?.type === 'tags') {
@@ -68,18 +58,13 @@ export class Ingredient {
       return matched;
     }
 
-    // Check alternatives
     return this.alternatives.some((alt) => alt.matches(item));
   }
 
-  /** Validate that this ingredient has all required data */
-  /** Validate that this ingredient has all required data. */
   validate({ requireComplete = true } = {}) {
     const errors = [];
 
-    // Completeness is computed INDEPENDENTLY of the per-type validation: the shared "must include a
-    // match rule" error and the per-type tag/currency errors STACK for an incomplete tags/currency
-    // match (an empty-tags option yields BOTH messages).
+    // Independent of per-type validation, so an empty-tags option reports both errors.
     const handler = getMatchHandler(this.match);
     const isComplete = handler.isComplete(this.match);
 
@@ -89,13 +74,11 @@ export class Ingredient {
 
     errors.push(...handler.validate(this.match, { requireComplete }));
 
-    // A currency option carries its amount on the match, not the option quantity, so quantity stays
-    // the default 1 and never needs validating for currency.
+    // Currency carries its amount on the match, so its quantity is never validated.
     if (typeof this.quantity !== 'number' || this.quantity <= 0) {
       errors.push('Ingredient quantity must be a positive number');
     }
 
-    // Validate alternatives
     for (const alt of this.alternatives) {
       const altValidation = alt.validate({ requireComplete });
       if (!altValidation.valid) {
@@ -109,7 +92,6 @@ export class Ingredient {
     };
   }
 
-  /** Get a simple description of this ingredient */
   getDescription() {
     const quantity = this.quantity;
     if (this.match?.type === 'component' && this.match.componentId) {
@@ -125,9 +107,7 @@ export class Ingredient {
     ) {
       return getMatchHandler(this.match).describe(this.match, { quantity });
     }
-    // A currency alternative ("100 gp") describes its cost as an insufficient-currency requirement
-    // so it surfaces sensibly in the engine's missing-items list and the craftability display when
-    // it is the unaffordable representative of a group.
+    // Read by the missing-items list when currency is a group's unaffordable representative.
     if (this.match?.type === 'currency' && getMatchHandler(this.match).isComplete(this.match)) {
       const spend = getMatchHandler(this.match).getCurrencySpend(this.match);
       return `Insufficient currency. Requires ${spend.amount} ${spend.unit}.`;
@@ -142,10 +122,7 @@ export class Ingredient {
     return 'Unknown ingredient';
   }
 
-  /**
-   * Serialize this option, omitting every reconstructible default and the write-retired
-   * `systemItemId` alias (issue 1135).
-   */
+  /** Omits reconstructible defaults and the write-retired `systemItemId` alias (issue 1135). */
   toJSON() {
     return omitReconstructibleDefaults(
       {

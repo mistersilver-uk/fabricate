@@ -12,10 +12,8 @@ import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 
 export const bulkFacade = {
   /**
-   * Lazily build and cache the `BulkSalvageService` behind `salvageComponents` (issue 859), every
-   * collaborator injected so it reaches no Foundry global. CACHING IS SOUND BECAUSE EVERY
-   * COLLABORATOR IS READ OFF `this` AT CALL TIME: `this.craftingEngine` is `null` until
-   * `initialize()`, so a captured field value could hold `null` forever.
+   * Cached (issue 859), which is sound only because every collaborator is read off `this` at call
+   * time: `this.craftingEngine` is `null` until `initialize()`, so a captured value stays null.
    */
   _getBulkSalvageService() {
     if (this._bulkSalvageService) return this._bulkSalvageService;
@@ -25,50 +23,40 @@ export const bulkFacade = {
       getCraftingSystem: (systemId) => this.craftingSystemManager.getSystem(systemId),
       promptRollDecision: promptBulkCheckRoll,
       postChatMessage: (message) => this._postBulkSalvageChatMessage(message),
-      // The BATCHED complication relay (issue 1286), read off `this` at call time. One message per
-      // addressed (system, actor) PAIR rather than per ROW, both halves being GM-side authorization
-      // inputs and the rate limit being sized against the pair count.
+      // One message per (system, actor) pair, not per row (issue 1286): both are GM-side
+      // authorization inputs, and the rate limit is sized to the pair count.
       deliverComplications: (message) => this.complicationDeliveryWriter?.deliver(message),
-      // The executing user's stored progressive stage order, through the SAME edge
-      // `ResolutionModeService` and `CraftingEngine` are given (issue 1286). Only the pre-run
-      // forecast consumes it; left unwired it quietly reads the AUTHORED order instead.
+      // The pre-run forecast reads it; unwired, it quietly falls back to the authored order.
       getPlayerResultOrder: (entry) => this._readPlayerResultOrder(entry),
-      // Key-only, matching every card module's `localize` contract; the aggregate card substitutes
-      // its own counts.
+      // Key-only, like every card module's `localize`; the card substitutes its own counts.
       localize: (key) => game.i18n?.localize?.(key) ?? key,
     });
     return this._bulkSalvageService;
   },
 
-  /** Lazily build and cache the `BulkDestroyService` behind `destroyComponents` (issue 859). */
   _getBulkDestroyService() {
     if (this._bulkDestroyService) return this._bulkDestroyService;
     this._bulkDestroyService = new BulkDestroyService({
       getCraftingSystem: (systemId) => this.craftingSystemManager.getSystem(systemId),
-      // Destroy MUST resolve documents through the identical matcher salvage uses, case-SENSITIVE
-      // name fallback included, or it would delete what the player was shown as a different
-      // component. Read off `this.craftingEngine` at CALL time, this service being cached.
+      // Salvage's matcher, case-sensitive name fallback included, or destroy deletes something
+      // other than what the player was shown.
       findComponentItems: (actor, component, system) =>
         this.craftingEngine.findComponentItems(actor, component, system),
-      // Must RETURN the deleted documents: `unitsDeleted` comes from what came back, never from what
-      // was asked for, a `preDeleteItem` hook being able to veto individual ids silently.
+      // Must return the deleted documents: a `preDeleteItem` hook can silently veto single ids.
       deleteItems: (actor, itemIds) => actor.deleteEmbeddedDocuments('Item', itemIds),
     });
     return this._bulkDestroyService;
   },
 
   /**
-   * Post the ONE aggregated bulk-salvage chat card. THE ORDER OF THE THREE STEPS IS LOAD-BEARING:
-   * SPEAKER first, `applyMode`'s `ic` branch reading `chatData.speaker.actor` unguarded; VISIBILITY
-   * before `create`, the legacy `rollMode` option being honoured only for a message carrying rolls;
-   * and `create` LAST, with `author`, the V14 schema having no `user` field. THE SPEAKER IS BUILT,
-   * NEVER INFERRED — `getSpeaker()` with no actor falls through to the CONTROLLED TOKENS. NEVER read
-   * `core.messageMode`: `assertSetting` throws on V13 and `??` does not catch a throw.
+   * The one aggregated card. Order is load-bearing: speaker first, since `applyMode`'s `ic` branch
+   * reads `chatData.speaker.actor` unguarded; visibility before `create`, since the legacy
+   * `rollMode` option is honoured only with rolls; `create` last, with `author`, as the V14 schema
+   * has no `user`. The speaker is built, since `getSpeaker()` without an actor falls through to the
+   * controlled tokens. Never read `core.messageMode`: `assertSetting` throws on V13.
    */
   async _postBulkSalvageChatMessage({ content, rollMode, actorUuid, actorNames = [] }) {
-    // `globalThis.` rather than the bare global: optional chaining does not rescue an UNDECLARED
-    // identifier, so a bare `fromUuidSync?.()` throws under a harness that has not installed it,
-    // and this poster must never cost a completed run its report.
+    // `globalThis.`: optional chaining does not rescue an undeclared identifier.
     const actor = actorUuid ? (globalThis.fromUuidSync?.(actorUuid) ?? null) : null;
     const alias = actorNames.filter(Boolean).join(', ') || game.user?.name || '';
     const speaker = actor
@@ -81,9 +69,8 @@ export const bulkFacade = {
   },
 
   /**
-   * Gate a bulk target list, resolving ONE actor per row from `target.actorId ?? actorId` and NOTHING
-   * ELSE. No persisted-selection tail, unlike `_resolveCraftingSources`: a bulk run may span actors,
-   * so that fallback would silently RETARGET an unresolved row. Order is preserved.
+   * One actor per row from `target.actorId ?? actorId` only. No persisted-selection fallback, which
+   * would silently retarget an unresolved row of a multi-actor run. Order is preserved.
    */
   _gateBulkTargets(targets, actorId) {
     return (targets || []).filter(Boolean).map((target) => ({
@@ -92,10 +79,7 @@ export const bulkFacade = {
     }));
   },
 
-  /**
-   * Weave a service's result rows back into the caller's ORIGINAL target order, substituting a
-   * refusal row where the gate resolved no actor, or "the third one failed" is unreadable.
-   */
+  /** Back into the caller's target order, a refusal row where the gate resolved no actor. */
   _mergeBulkRows(gated, ranItems, buildRefusedRow) {
     const rows = [];
     let next = 0;
@@ -110,10 +94,7 @@ export const bulkFacade = {
     return rows;
   },
 
-  /**
-   * The identity fields every refusal row carries, resolved from the crafting system so it still
-   * READS as the thing the player selected rather than as a blank line.
-   */
+  /** Resolved from the system, so a refusal row still reads as what the player selected. */
   _buildNotPermittedRow(target) {
     const system = this.craftingSystemManager?.getSystem?.(target?.systemId) ?? null;
     const component = findById(
@@ -127,20 +108,17 @@ export const bulkFacade = {
       componentId: target?.componentId ?? null,
       name: component?.name || '',
       img: component?.img || '',
-      // The facade's own outcome, never folded into `skipped`: "you may not act on this actor" and
-      // "this row was not runnable" are different answers and the panel chips them differently.
+      // Never folded into `skipped`: the panel chips the two answers differently.
       outcome: 'notPermitted',
       skipReason: null,
     };
   },
 
   /**
-   * Salvage MANY owned components in one gesture (issue 859). IT TAKES AN `actorId` PER TARGET,
-   * NEVER AN `actorUuid`, AT ANY NESTING LEVEL: neither the engine nor `BulkSalvageService` performs
-   * an ownership check, so the per-target `_resolveCraftingActor` is the ONLY gate, and it resolves
-   * through `game.actors`, excluding compendium-backed and unlinked token actors. An unresolvable
-   * actor becomes a `notPermitted` ROW rather than a throw. `interactive` defaults TRUE here, unlike
-   * `salvageComponent`. STATED LIMIT: `onProgress`'s `total` counts the rows the SERVICE was given.
+   * Takes an `actorId` per target, never a uuid (issue 859): neither the engine nor the service
+   * checks ownership, so `_resolveCraftingActor` via `game.actors` is the only gate, excluding
+   * compendium and unlinked token actors. An unresolvable actor is a `notPermitted` row. Unlike
+   * `salvageComponent`, `interactive` defaults true. `onProgress`'s `total` counts runnable rows.
    */
   async salvageComponents({
     actorId = null,
@@ -163,8 +141,7 @@ export const bulkFacade = {
       interactive,
       onProgress,
     });
-    // A dismissed prompt returns before the first engine call, so nothing ran and there is no
-    // per-row story to tell — pass the zero-mutation shape through rather than reporting refusals.
+    // A dismissed prompt ran nothing, so its zero-mutation shape passes through as is.
     if (result.cancelled) return result;
 
     const items = this._mergeBulkRows(gated, result.items, (target) => ({
@@ -189,10 +166,9 @@ export const bulkFacade = {
   },
 
   /**
-   * Permanently destroy MANY owned components in one gesture (issue 859), under `salvageComponents`'
-   * gate, merge and `onProgress` limit. DELETES WHOLE STACKS, deliberately NOT gated on
-   * `features.salvage` or `salvage.enabled`: a player can already delete their own Items, so this is
-   * ergonomics and not capability. No chat card. The caller owns the confirmation.
+   * Deletes whole stacks under `salvageComponents`' gate and merge (issue 859). Not gated on
+   * `features.salvage` or `salvage.enabled`: a player can already delete their own Items. No chat
+   * card; the caller owns the confirmation.
    */
   async destroyComponents({ actorId = null, targets = [], onProgress = null } = {}) {
     this._requireReady();
@@ -201,8 +177,7 @@ export const bulkFacade = {
 
     const result = await this._getBulkDestroyService().run({
       targets: runnable.map(({ target, actor }) => ({
-        // The RESOLVED document, not an id: the service's matcher and delete both need the actor
-        // itself, and re-resolving there would be a second gate to keep honest.
+        // The resolved document, so the service never re-resolves behind a second gate.
         actor,
         actorId: actor.id,
         actorName: actor.name,

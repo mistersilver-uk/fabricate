@@ -1,7 +1,7 @@
 /**
- * `1.30.0` — THE WORLD-SCOPE ENTITY MIGRATION (issue 1363). PURE, NON-MUTATING AND IDEMPOTENT: it
- * answers the ORIGINAL object for any key it did not change. Spec § World-Scope Entity Migration
- * owns every rule, the load-bearing rewrite-before-payload order included.
+ * `1.30.0`, the world-scope entity migration (issue 1363). Pure, non-mutating and idempotent: an
+ * unchanged key answers its original object. `destructive-changes-and-migrations/spec.md`
+ * § World-Scope Entity Migration owns every rule, the rewrite-before-payload order included.
  */
 
 import { electWorldDefault } from '../systems/worldScopeDefaults.js';
@@ -33,8 +33,8 @@ export const SCOPE_PAYLOAD_KEYS = Object.freeze({
 });
 
 /**
- * The `inherit` map each entity type is created with — every section OVERRIDDEN. Component
- * `essences` is absent: its switch is decided by EQUALITY in step 3b, through `1.32.0`'s own rule.
+ * Every section overridden. Component `essences` is absent: step 3b decides its switch by
+ * equality, through `1.32.0`'s own rule.
  */
 const OVERRIDING_INHERIT = Object.freeze({
   components: Object.freeze({ category: false }),
@@ -57,10 +57,7 @@ function membershipKeyOf(entityId, systemId) {
   return `${entityId}|${systemId}`;
 }
 
-/**
- * Normalize a persisted re-key map, dropping anything that cannot be one. TOTAL: a hand-edited or
- * absent value answers `{}`.
- */
+/** Total: a hand-edited or absent value answers `{}`. */
 export function normalizeRekeyMap(raw) {
   if (!isPlainObject(raw)) return {};
   const normalized = {};
@@ -81,7 +78,6 @@ export function normalizeRekeyMap(raw) {
   return normalized;
 }
 
-/** Whether a normalized re-key map carries any pair at all. */
 function mapHasEntries(map) {
   return Object.keys(map).length > 0;
 }
@@ -97,9 +93,8 @@ function projectIdentity(record, entityType) {
 }
 
 /**
- * Apply a merged identity onto one in-system record, IN PLACE. ABSENCE IS PART OF THE UNIT: a field
- * the world entity does not carry is DELETED, the donor winning every identity field AS A UNIT. The
- * three SOURCE-LINK fields are the exception to the donor rule, not to this one.
+ * In place, absence included: a field the world entity lacks is deleted, the donor winning every
+ * identity field as a unit. The three source-link fields are the exception to the donor rule only.
  */
 function applyIdentity(record, identity, entityType) {
   let changed = false;
@@ -121,10 +116,7 @@ function applyIdentity(record, identity, entityType) {
   return changed;
 }
 
-/**
- * One system's `prerequisites` override, in `Tool`'s own shape. An unauthored input answers the
- * canonical EMPTY gate rather than absence — see {@link buildMembershipRecord} for why.
- */
+/** In `Tool`'s shape; unauthored is the canonical empty gate ({@link buildMembershipRecord}). */
 export function toolPrerequisitesOverride(raw) {
   const source = isPlainObject(raw) ? raw : {};
   const ids = arrayOf(source.ids)
@@ -144,10 +136,7 @@ export function toolBonusOverride(raw) {
   return { enabled: source.enabled === true && expression !== '', expression };
 }
 
-/**
- * The membership record one in-system definition produces — every section OVERRIDDEN, each value
- * copied verbatim from that system's own definition.
- */
+/** Every section overridden, each copied verbatim from the system's own definition. */
 export function buildMembershipRecord(record, entityType, entityId, systemId) {
   const membership = {
     entityId,
@@ -155,20 +144,17 @@ export function buildMembershipRecord(record, entityType, entityId, systemId) {
     inherit: { ...OVERRIDING_INHERIT[entityType] },
   };
   if (entityType === 'components') {
-    // `category` verbatim, because this is an OVERRIDE and `general` is a legitimate token here —
-    // the prohibition binds the WORLD default. THE WRITE IS ABSENCE-PRESERVING AND MUST BE: an empty
-    // override is NOT EXPRESSIBLE, since `''` coerces to absence and an ABSENT section under
-    // `inherit: false` FALLS BACK to the world value. The world default is DECLINED instead.
+    // `general` is legitimate in an override; the prohibition binds the world default. The write
+    // must preserve absence: `''` coerces to absence, which under `inherit: false` falls back to
+    // the world value, so the world default is declined instead.
     if (trimmedString(record.category)) membership.category = record.category.trim();
     const tags = arrayOf(record.tags).filter((tag) => trimmedString(tag));
     if (tags.length > 0) membership.tags = tags.map((tag) => tag.trim());
     return membership;
   }
   if (entityType === 'essences') {
-    // BOTH SECTIONS ARE WRITTEN UNCONDITIONALLY, which is what makes them safe: an ABSENT section
-    // under `inherit: false` falls back to the world value, so an absence-preserving write would
-    // hand a system that authored nothing the DONOR's effect source or property macro. Both can
-    // express emptiness — `{}` and `null` are real overriding values — so neither needs a decline.
+    // Written unconditionally: an absent section under `inherit: false` would inherit the donor's
+    // value, and `{}` and `null` are real overriding empties, so neither needs a decline.
     const effectSource = {};
     for (const field of ESSENCE_EFFECT_SOURCE_FIELDS) {
       if (record[field] !== undefined) effectSource[field] = record[field];
@@ -178,19 +164,15 @@ export function buildMembershipRecord(record, entityType, entityId, systemId) {
     membership.enabled = record.enabled !== false;
     return membership;
   }
-  // ABSENCE-PRESERVING, AND NECESSARILY SO: neither section can express an empty override. `{}` IS
-  // an override, but the read union spreads the resolved value LAST, so `breakage: {}` would
-  // overwrite the surviving in-system block with a shape every reader mis-reads.
+  // Absence-preserving, necessarily: the read union spreads the resolved value last, so
+  // `breakage: {}` would overwrite the in-system block with a shape every reader mis-reads.
   if (record.breakage !== undefined) membership.breakage = cloneJson(record.breakage);
   if (record.onBreak !== undefined) membership.onBreak = cloneJson(record.onBreak);
-  // WRITTEN UNCONDITIONALLY, on the `effectSource` rule rather than the `breakage` one, because an
-  // empty override here is a real value every reader treats as "none". AN ABSENT KEY IS FILLED WITH
-  // THAT CANONICAL EMPTY, because `Tool` mints both on construction and a raw record already
-  // resolves to exactly these values.
+  // Written unconditionally, like `effectSource`: an empty override reads as "none". An absent
+  // key gets the canonical empty, which `Tool` mints on construction anyway.
   membership.prerequisites = toolPrerequisitesOverride(record.prerequisites);
   membership.bonus = toolBonusOverride(record.bonus);
-  // NOT A RESOLVER SECTION: `resolveTool` answers `repairRequirements` from the membership record
-  // ALONE and never reads the world defaults, so an unauthored one needs no decline.
+  // Not a resolver section: `resolveTool` reads it from the membership record alone.
   if (Array.isArray(record.repairRequirements)) {
     membership.repairRequirements = cloneJson(record.repairRequirements);
   }
@@ -198,10 +180,7 @@ export function buildMembershipRecord(record, entityType, entityId, systemId) {
   return membership;
 }
 
-/**
- * The persisted scope payload for one entity type, normalized and fully cloned. Exported so the
- * `1.34.0` merge reads one through the same reader this pass writes one through.
- */
+/** Normalized and cloned; exported so the `1.34.0` merge reads through the same reader. */
 export function readScopePayload(existing) {
   const source = isPlainObject(existing) ? existing : {};
   const { entities, defaults, membership, ...extras } = source;
@@ -209,26 +188,18 @@ export function readScopePayload(existing) {
     entities: cloneJson(arrayOf(entities).filter((entry) => isPlainObject(entry))),
     defaults: cloneJson(isPlainObject(defaults) ? defaults : {}),
     membership: cloneJson(isPlainObject(membership) ? membership : {}),
-    // EVERY OTHER AUTHORED KEY IS PRESERVED, and that is not defensive style: the tool scope carries
-    // a FOURTH sibling, the WORLD tool-breakage authority, which `ScopedDefinitionStore`
-    // round-trips. Narrowing to the three sub-keys would DESTROY it on any world this pass lifts,
-    // and the registry label rests `downgradeLosesData: false` on those settings surviving untouched.
+    // Every other key survives: the tool scope carries a fourth sibling, the world tool-breakage
+    // authority, and `downgradeLosesData: false` rests on it surviving untouched.
     ...cloneJson(extras),
   };
 }
 
-/**
- * A component id plausibly a definition id rather than a document UUID: anything dotted is excluded,
- * `randomID()` output never containing a dot.
- */
+/** A definition id, not a document UUID: `randomID()` output never contains a dot. */
 function looksLikeDefinitionId(value) {
   return typeof value === 'string' && value.trim().length > 0 && !value.includes('.');
 }
 
-/**
- * Collect every component and tool reference one system reaches, THROUGH THE SHARED WALK, so it
- * cannot report a site the rewrite does not visit, or the reverse.
- */
+/** Through the rewrite's own walk, so the two can never disagree about a site. */
 function collectSystemReferences(system, recipes, gatheringSlice) {
   const componentIds = new Set();
   const toolIds = new Set();
@@ -241,8 +212,7 @@ function collectSystemReferences(system, recipes, gatheringSlice) {
     return value;
   };
   const remappers = { remapComponent, remapTool };
-  // A CLONE, because the collectors are driven through the MUTATING walk: the writes are no-ops,
-  // but a walk is still a walk and must not be pointed at the payload the caller will persist.
+  // A clone: the walk mutates, and must never touch the payload the caller persists.
   const probe = cloneJson({ system, recipes, gatheringSlice });
   rewriteSystemReferences(probe.system, remappers);
   for (const recipe of arrayOf(probe.recipes)) rewriteRecipeReferences(recipe, remappers);
@@ -250,10 +220,7 @@ function collectSystemReferences(system, recipes, gatheringSlice) {
   return { componentIds, toolIds };
 }
 
-/**
- * The references that resolve to NOTHING, reported so a GM can review them. A REPORT, NOT A
- * PREDICTED DELETION: they become prunable only at the CONSUMER SWEEP, so this release deletes none.
- */
+/** Dangling references, for GM review. None is deleted here; only the consumer sweep prunes. */
 function computeFlaggedForReview(systems, recipes, gatheringConfig, worldRoster) {
   const flagged = [];
   forEachSystem(systems, (system) => {
@@ -288,10 +255,7 @@ function computeFlaggedForReview(systems, recipes, gatheringConfig, worldRoster)
   return flagged;
 }
 
-/**
- * Run the whole `1.30.0` transform, answering the keys it changed plus the transient
- * `_worldScopeEntityReport`. Every unchanged key answers its ORIGINAL object.
- */
+/** The changed keys plus the transient `_worldScopeEntityReport`. */
 export function migrateWorldScopeEntities(data) {
   if (!isPlainObject(data)) return data;
   const originalSystems = arrayOf(data.systems);
@@ -304,9 +268,8 @@ export function migrateWorldScopeEntities(data) {
 
   const persistedMap = normalizeRekeyMap(data.worldScopeRekeyMap);
   const reusingPersistedMap = mapHasEntries(persistedMap);
-  // The grouping is derived on EVERY pass: it supplies the roster, the memberships and the report.
-  // Only its MAP is discarded on a re-run — a torn run may already have re-keyed `craftingSystems`,
-  // from which the derived map would be empty while `gatheringConfig` still holds the old ids.
+  // Derived every pass, but a re-run discards its map: a torn run may have re-keyed
+  // `craftingSystems` already while `gatheringConfig` still holds the old ids.
   const grouping = buildWorldScopeGrouping(systems);
   const rekeyMap = reusingPersistedMap ? persistedMap : grouping.rekeyMap;
 
@@ -315,9 +278,8 @@ export function migrateWorldScopeEntities(data) {
     payloads[entityType] = readScopePayload(data[SCOPE_PAYLOAD_KEYS[entityType]]);
   }
 
-  // 1. THE REWRITE HALF — unconditional, driven by the map alone.
-  // How many membership records the FOURTH-target walk had to repair. ZERO on a correctly ordered
-  // pass; anything else means a payload was built BEFORE the rewrite ran.
+  // 1. The rewrite, unconditional and driven by the map alone. The repair count is zero on a
+  // correctly ordered pass; anything else means a payload was built before the rewrite.
   let payloadRewriteRepairs = 0;
   const recipesBySystem = new Map();
   for (const recipe of recipes) {
@@ -336,7 +298,7 @@ export function migrateWorldScopeEntities(data) {
       remapComponent: keyedRemapper(perSystem.components),
       remapTool: keyedRemapper(perSystem.tools),
     };
-    // The DEFINITION ids themselves, then every reference to them.
+    // The definition ids, then every reference to them.
     for (const entityType of REKEYABLE_ENTITY_TYPES) {
       const leg = perSystem[entityType] ?? {};
       for (const record of arrayOf(system[ENTITY_TYPE_FIELDS[entityType]])) {
@@ -351,9 +313,8 @@ export function migrateWorldScopeEntities(data) {
     if (isPlainObject(gatheringConfig.systems)) {
       rewriteGatheringSliceReferences(gatheringConfig.systems[systemId], remappers);
     }
-    // The scope payloads as a FOURTH target — the belt-and-braces arm, which finds NOTHING on a
-    // correctly ordered pass. IT IS COUNTED, and that is not telemetry: the arm is UNCONDITIONAL, so
-    // it would silently REPAIR a pre-rewrite payload, invisibly to every assertion about CONTENT.
+    // The scope payloads as a fourth target. Counted because it repairs silently, invisible to
+    // any assertion about content.
     for (const entityType of ENTITY_TYPES) {
       for (const record of Object.values(payloads[entityType].membership)) {
         if (record?.systemId !== systemId) continue;
@@ -364,17 +325,16 @@ export function migrateWorldScopeEntities(data) {
     }
   });
 
-  // 2. THE IN-SYSTEM IDENTITY WRITE-BACK — also unconditional. See the module note.
+  // 2. The in-system identity write-back, also unconditional.
   const identityByNewId = {};
   for (const entityType of ENTITY_TYPES) {
     const lookup = new Map();
-    // On a re-run the source is the PERSISTED SCOPE PAYLOAD, keyed by the mapped NEW id.
+    // On a re-run: the persisted payload, keyed by the new id.
     for (const entity of payloads[entityType].entities) {
       const id = trimmedString(entity?.id);
       if (id) lookup.set(id, projectIdentity(entity, entityType));
     }
-    // A fresh pass, or a tear before the scope legs landed, has no persisted payload; the grouping
-    // is then the only source and is correct, because `craftingSystems` still carries the old ids.
+    // Otherwise the grouping, correct because `craftingSystems` still carries the old ids.
     for (const entity of grouping.entities[entityType]) {
       if (!lookup.has(entity.id)) lookup.set(entity.id, entity.identity);
     }
@@ -396,7 +356,7 @@ export function migrateWorldScopeEntities(data) {
     }
   });
 
-  // 3. THE LIFT/CLAIM HALF — gated PER `(entityId, systemId)` on the corpus.
+  // 3. The lift and claim, gated per `(entityId, systemId)` on the corpus.
   const createdEntities = { components: 0, essences: 0, tools: 0 };
   const systemsById = new Map(
     systems.filter((system) => trimmedString(system?.id)).map((system) => [system.id, system])
@@ -417,8 +377,8 @@ export function migrateWorldScopeEntities(data) {
       }
       for (const member of liveMembers) {
         const key = membershipKeyOf(entity.id, member.systemId);
-        // THE GUARD, corpus-derived and per pair. Never `migrationVersion`, and never a disjunction
-        // across the three keys: any GM edit seeds a key, and migrations run on the active GM alone.
+        // Never `migrationVersion` and never a disjunction across the three keys: any GM edit
+        // seeds a key, and migrations run on the active GM alone.
         if (payload.membership[key]) continue;
         const system = systemsById.get(member.systemId);
         const record = arrayOf(system?.[ENTITY_TYPE_FIELDS[entityType]]).find(
@@ -436,9 +396,8 @@ export function migrateWorldScopeEntities(data) {
     }
   }
 
-  // 3b. THE DONOR-ELECTED WORLD DEFAULTS, AFTER THE MEMBERSHIP LOOP, which is load-bearing: the
-  // `repairRequirements` constraint reads the records written above. The corpus differential is
-  // unchanged by two mechanisms (requirement 6's stated exception).
+  // 3b. The donor-elected world defaults, after the loop whose records the `repairRequirements`
+  // constraint reads (requirement 6's stated exception).
   const worldComponentIds = new Set(payloads.components.entities.map((entity) => entity.id));
   const isMemberOf = (componentId, systemId) =>
     Boolean(payloads.components.membership[membershipKeyOf(componentId, systemId)]);
@@ -447,8 +406,7 @@ export function migrateWorldScopeEntities(data) {
   for (const entityType of ENTITY_TYPES) {
     const payload = payloads[entityType];
     for (const entity of grouping.entities[entityType]) {
-      // The per-pair LIFT guard governs this too: an entity whose defaults a previous pass already
-      // wrote is not re-elected, so a re-run cannot overwrite a GM's later edit.
+      // Under the lift guard, so a re-run cannot overwrite a GM's later edit.
       if (payload.defaults[entity.id]) continue;
       const liveMembers = entity.members.filter(
         (member) => !isRefusedPair(grouping.refusals, member.systemId, entityType)
@@ -465,8 +423,8 @@ export function migrateWorldScopeEntities(data) {
         entityType,
         entityId: entity.id,
         donorRecord,
-        // EVERY live member's record, because a section only one of them authored must NOT become a
-        // world default: the members that authored none would fall back to it.
+        // Every live member's: a section one member authored must not become a world default
+        // the others would fall back to.
         memberRecords,
         worldComponentIds,
         isMemberOf,
@@ -476,10 +434,8 @@ export function migrateWorldScopeEntities(data) {
       for (const section of refusedSections) {
         refusedDefaultSections.push({ entityType, entityId: entity.id, section });
       }
-      // THE `essences` SWITCH IS DECIDED BY EQUALITY, not written off: each live member is marked
-      // inheriting where its own map equals the elected one and overriding where it does not. That
-      // is the `1.32.0` rule applied here, so a world reaching both passes in one run and one that
-      // ran `1.30.0` long ago converge on the same corpus (issue 1371).
+      // `essences` inherits where a member's map equals the elected one, the `1.32.0` rule, so
+      // one run of both passes and an old `1.30.0` run converge on one corpus (issue 1371).
       if (entityType === 'components') {
         for (const member of liveMembers) {
           markComponentEssenceInheritance(
@@ -492,7 +448,7 @@ export function migrateWorldScopeEntities(data) {
     }
   }
 
-  // 4. THE REPORT.
+  // 4. The report.
   const worldRoster = {
     components: new Set(payloads.components.entities.map((entity) => entity.id)),
     essences: new Set(payloads.essences.entities.map((entity) => entity.id)),
@@ -506,17 +462,15 @@ export function migrateWorldScopeEntities(data) {
     overriddenRecords,
     refusals: grouping.refusals,
     flaggedForReview: computeFlaggedForReview(systems, recipes, gatheringConfig, worldRoster),
-    // ZERO on a correctly ordered pass. See the fourth-target walk above.
     payloadRewriteRepairs,
-    // The world-default sections a CONSTRAINT declined, distinct from ones the donor never authored.
-    // A DIAGNOSTIC, not a GM-facing fact: see the module note.
+    // Sections a constraint declined, not ones the donor never authored; a diagnostic, never shown
+    // to the GM.
     refusedDefaultSections,
   };
 
-  // 5. RETURN THE ORIGINAL OBJECT FOR ANY KEY THIS PASS DID NOT CHANGE. The comparison is against
-  // the NORMALIZED read of the original, so a world with nothing to lift leaves its three scope
-  // settings and the map untouched rather than seeding them: seeding an empty `entities` would make
-  // `_scopeEntityBasis` report a KNOWN, EMPTY basis, which is a licence to prune.
+  // 5. Unchanged keys answer the original, compared against the normalized read, so a world with
+  // nothing to lift is not seeded: an empty `entities` makes `_scopeEntityBasis` report a known,
+  // empty basis, which is a licence to prune.
   const unchanged = (next, original) =>
     JSON.stringify(next) === JSON.stringify(original) ? original : next;
 
