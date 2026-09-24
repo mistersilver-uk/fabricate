@@ -58,6 +58,7 @@ import {
   renderedNodes,
   sameSorted,
   shapeCount,
+  takesParameters,
   suppliesProps,
   templateNodes,
   unreadProps,
@@ -319,6 +320,19 @@ function comparedLiterals(node, name) {
   return [...values];
 }
 
+/** The named imports of one specifier kept under their own name, so no local copy can take it. */
+function importedNames(node, specifier) {
+  const names = new Set();
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'ImportDeclaration' || inner.source?.value !== specifier) continue;
+    for (const entry of inner.specifiers) {
+      const imported = entry.type === 'ImportSpecifier' && keyName({ key: entry.imported });
+      if (imported && imported === entry.local?.name) names.add(imported);
+    }
+  }
+  return names;
+}
+
 /** The `(key, fallback)` pair a `return text(key, fallback);` states, or `[]` for any other. */
 function returnedTextArguments(node) {
   const call = node?.type === 'ReturnStatement' ? node.argument : undefined;
@@ -387,6 +401,7 @@ function claimsOverCode(code) {
   return {
     imports: (specifier) => importsModuleOf(code, specifier),
     importsLazily: (specifier) => importsModuleLazily(code, specifier),
+    importsName: ([specifier, name]) => importedNames(code, specifier).has(name),
     declares: (name) => declaredConstantOf(code, name),
     names: (name) => referencesIdentifierOf(code, name),
     spells: (text) => literalStrings(code).some((literal) => literal.includes(text)),
@@ -408,6 +423,7 @@ function claimsOverCode(code) {
     fnCallers: ([name, fns]) => sitesCalling(code, name, 'FunctionDeclaration') === sortedNames(fns),
     fallsBack: (pair) => fallsBackFrom(code, pair),
     contains: (source) => shapeCount(code, source) > 0,
+    takes: (parameters) => takesParameters(code, parameters),
     importSpecifiers: ([needle, list]) => sameSorted(importFamily(code, needle), list),
     propertyReads: ([name, tally]) => isDeepStrictEqual(propertyReadTally(code, name), tally),
     comparedLiterals: ([name, values]) => sameSorted(comparedLiterals(code, name), values),
@@ -529,6 +545,11 @@ const CONTRACT_CLAIMS = Object.freeze({
   imports: { ask: 'imports', holds: true, says: (v) => `imports ${v}` },
   importsNo: { ask: 'imports', holds: false, says: (v) => `no longer imports ${v}` },
   importsLazily: { ask: 'importsLazily', holds: true, says: (v) => `imports ${v} lazily` },
+  importsName: {
+    ask: 'importsName',
+    holds: true,
+    says: ([s, n]) => `binds ${n} from ${s}, unaliased`,
+  },
   declares: { ask: 'declares', holds: true, says: (v) => `declares const ${v}` },
   names: { ask: 'names', holds: true, says: (v) => `names ${v}` },
   namesNo: { ask: 'names', holds: false, says: (v) => `no longer names ${v}` },
@@ -591,6 +612,8 @@ const CONTRACT_CLAIMS = Object.freeze({
     says: ([f, c]) => `never falls back from ${f}() to a new ${c}`,
   },
   contains: { ask: 'contains', holds: true, says: (v) => `holds \`${v}\`, shape for shape` },
+  containsNo: { ask: 'contains', holds: false, says: (v) => `holds no \`${v}\`` },
+  takes: { ask: 'takes', holds: true, says: (v) => `takes exactly (${v})` },
   importSpecifiers: {
     ask: 'importSpecifiers',
     holds: true,
