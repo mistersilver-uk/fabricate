@@ -1,21 +1,11 @@
 /**
- * Stateless Tool prerequisite and check-bonus composition.
- *
- * Callers supply actors, shared prerequisite definitions, and evaluators explicitly.
- * This keeps actor binding visible and prevents presence, gates, and bonuses from
- * being satisfied by different actors during a multi-actor attempt.
+ * Stateless Tool prerequisite and check-bonus composition. Callers supply actors, prerequisite
+ * definitions and evaluators explicitly, so presence, gates and bonuses cannot be satisfied by
+ * different actors in a multi-actor attempt.
  */
 
-/**
- * Whether Ingredient Set Tool references are active for this system/set pair.
- * Inactive references remain serialized so switching modes or restoring a set
- * name is lossless, but every read-side consumer uses this predicate before
- * treating those ids as requirements.
- *
- * @param {object|null} system
- * @param {object|null} ingredientSet
- * @returns {boolean}
- */
+/** Whether an ingredient set's Tool references are active. Inactive ids stay serialized, so a
+ *  mode switch or a restored set name is lossless; every reader checks this before using them. */
 export function ingredientSetToolsAreActive(system, ingredientSet) {
   return (
     system?.resolutionMode === 'routedByIngredients' &&
@@ -183,38 +173,17 @@ export function appendToolBonusTerms(formula, terms) {
 }
 
 /**
- * The check-modifier term's flavour label: a FIXED ASCII literal, deliberately NOT
- * localized (issue 1094).
- *
- * This is a correctness constraint, not an i18n oversight. The label lands inside a
- * roll formula, and `parsePlainDiceGroups` (`src/utils/craftingCheckExpression.js`)
- * splits on flavour brackets and whitespace, so a localized label containing a
- * `\d*d\d+` token would be tokenized as a phantom crit-eligible die group — and that
- * same tokenizer backs `hasPlainD20` and `applyD20Advantage`, so the damage would
- * reach the advantage transform as well as the crit classifier.
+ * The check-modifier flavour label: a fixed ASCII literal, never localized (issue 1094), because
+ * `parsePlainDiceGroups` would tokenize a `\d*d\d+` in a localized label as a phantom
+ * crit-eligible die group, and that tokenizer also feeds `hasPlainD20` and `applyD20Advantage`.
  */
 export const CHECK_MODIFIER_TERM_LABEL = 'Modifiers';
 
 /**
- * Whether a value can be emitted as a dice-grammar `Constant`.
- *
- * `appendToolBonusTerms` stringifies through `Math.abs(value)` with no numeric
- * formatting, and the grammar's `Constant = _ [0-9]+ ("." [0-9]+)?` has NO exponent
- * production. A scalar that stringifies to exponent notation — `1e-7`, `1e+21` —
- * would emit `+ 1e-7[Modifiers]`, which parses as `StringTerm("1e")` minus
- * `NumericTerm(7[Modifiers])` and THROWS at evaluate because `allowStrings` defaults
- * false. A non-finite value is refused for the same reason (`Infinity` / `NaN` are
- * not `Constant`s either).
- *
- * The term is SKIPPED rather than clamped or rounded: a check modifier is the GM's
- * arithmetic, and silently substituting a different number would be worse than
- * contributing nothing.
- *
- * EXPORTED for `checkModifierResolver.resolveModifierBounds` (issue 1095), which asks the
- * same question of an authored `min`/`max`: a bound the grammar cannot express clamps the
- * SUM into a value this function then refuses, dropping the whole term and with it every
- * other modifier's contribution. Asking one function keeps the clamp and the emit from
- * disagreeing about which numbers are expressible.
+ * Whether a value can be emitted as a dice-grammar `Constant`, which has no exponent production:
+ * `1e-7` would emit `+ 1e-7[Modifiers]` and throw at evaluate, and a non-finite value is no
+ * `Constant` either. Such a term is skipped, never rounded. `resolveModifierBounds` asks the same
+ * question of an authored bound (issue 1095), so the clamp and the emit agree.
  */
 export function isDecimalSafeTermValue(value) {
   const numeric = Number(value);
@@ -223,23 +192,10 @@ export function isDecimalSafeTermValue(value) {
 }
 
 /**
- * Append a resolved check-modifier scalar to a roll formula as ONE flavoured term
- * (`1d20 + 3[Modifiers]`, `1d20 - 2[Modifiers]`), the way tool bonuses append (issue
- * 1094, retiring the roll-formula placeholder they used to need).
- *
- * It DELEGATES to {@link appendToolBonusTerms} rather than re-implementing the emit,
- * so the sign split (`Constant` is unsigned, so `+ -3[Modifiers]` would not parse but
- * `- 3[Modifiers]` does), the `[label]` bracketing, `sanitizeTermLabel`'s control-
- * character and bracket stripping, and the zero-skip stay ONE implementation. A
- * second appender would drift.
- *
- * Ordering, unchanged by this function: tool bonuses append first, then this term,
- * then the advantage transform, then the situational bonus.
- *
- * @param {string} formula
- * @param {{ value?: unknown, label?: string }} [term]
- * @returns {string} The formula with the term appended, or the trimmed formula
- *   unchanged when the value is zero, non-finite, or not decimal-safe.
+ * Append a resolved check-modifier scalar as one flavoured term (`1d20 - 2[Modifiers]`, issue
+ * 1094) through `appendToolBonusTerms`, so the sign split, label sanitizing and zero-skip stay one
+ * implementation. Order: tool bonuses, then this term, then the advantage transform, then the
+ * situational bonus. A zero, non-finite or not decimal-safe value leaves the formula unchanged.
  */
 export function appendCheckModifierTerm(
   formula,
@@ -250,34 +206,11 @@ export function appendCheckModifierTerm(
 }
 
 /**
- * Append the ROLLING check modifiers to a formula, one flavoured term each
- * (`1d20 + 2[Modifiers] + (1d4)[Modifiers]`), after {@link appendCheckModifierTerm} has
- * appended the flat sum (issue 1118).
- *
- * ONE TERM PER ENTRY, where the flat modifiers collapse into one. A flat modifier's
- * contribution is a number, so summing several of them loses nothing; a rolling one's is a
- * distribution, and folding two of them into a single term would hide which entry each die
- * came from on the chat card and in `roll.dice`. The split also contains a fault: a fragment
- * this function refuses drops that entry alone, where a refused member of a summed term
- * would take every other modifier with it.
- *
- * The fragments arrive ALREADY PARENTHESISED and already clamped by
- * `checkModifierResolver.resolveCheckModifierContribution`, which is what makes appending
- * safe: an authored expression may carry its own flavour (`1d4[fire]`), and
- * `1d4[fire][Modifiers]` is a SYNTAX ERROR on 14.365 while `(1d4[fire])[Modifiers]` parses
- * and rolls. This function therefore emits the fragment verbatim rather than re-wrapping or
- * re-labelling it.
- *
- * The label is the same fixed ASCII literal the flat term carries — see
- * {@link CHECK_MODIFIER_TERM_LABEL} — so a GM-authored modifier NAME can never be tokenized
- * as a phantom die group by `parsePlainDiceGroups`. The dice in these terms are real dice
- * the GM authored; that is exactly why a fake one from a label would be indistinguishable.
- *
- * @param {string} formula
- * @param {string[]} fragments Clamped, parenthesised roll fragments in eligible order.
- * @param {string} [label]
- * @returns {string} The formula with one term appended per fragment, or the trimmed formula
- *   unchanged when there are none.
+ * Append each rolling check modifier as its own `[Modifiers]` term after the flat sum (issue
+ * 1118), so each die stays attributable and a refused fragment drops only its own entry. The
+ * fragments arrive parenthesised and clamped by `resolveCheckModifierContribution` and are
+ * emitted verbatim, because `1d4[fire][Modifiers]` is a syntax error on 14.365 where
+ * `(1d4[fire])[Modifiers]` rolls.
  */
 export function appendCheckModifierRollTerms(
   formula,
