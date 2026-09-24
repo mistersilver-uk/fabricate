@@ -75,6 +75,7 @@ The reserved component category present in every crafting system.
 #### Component
 
 A curated library entry in a crafting system that references a Foundry Item via `originItemUuid` and may carry a **Component Category**, tags, essences, difficulty, fallback item IDs, and optional salvage configuration.
+**TWO of those are WORLD-SCOPED SECTIONS rather than the system's own answer** — the category since `1.30.0` and the essence quantities since `1.32.0` (issue 1371, maintainer ruling M31): each is authored once on the world record and resolved by every system that has rules for the component unless that system OVERRIDES it, in which case the in-system value below is what resolves.
 
 [Notes](docs/domain/records.md#component)
 
@@ -203,6 +204,7 @@ The **GM-authored** policy deciding whether a player may reorder a progressive r
 #### Player Result Order
 
 The **per-user runtime preference** naming the order a player wants a progressive recipe's stages spent in.
+Stored as **result ids** (not indices, so it survives GM edits) under namespaced keys (`recipe:<recipeId>` / `salvage:<systemId>:<componentId>` — namespaced because recipe and component ids are drawn from different id spaces and can collide; both `recipe:` and `salvage:` keys are written as of issue 675, whose salvage panel is the first writer of the latter) in the `PROGRESSIVE_RESULT_ORDER` setting, which is **`scope: 'user'`** — per user **within a world**, not per account globally, and a replicated document write rather than localStorage.
 
 [Notes](docs/domain/records.md#player-result-order)
 

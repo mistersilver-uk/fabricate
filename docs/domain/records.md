@@ -60,7 +60,6 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/ui-entity-edi
 
 ## Component
 
-**TWO of those are WORLD-SCOPED SECTIONS rather than the system's own answer** — the category since `1.30.0` and the essence quantities since `1.32.0` (issue 1371, maintainer ruling M31): each is authored once on the world record and resolved by every system that has rules for the component unless that system OVERRIDES it, in which case the in-system value below is what resolves.
 Salvage, complications and difficulty stay the system's alone, because two systems SHOULD disagree about them and none of them has a world referent to disagree about.
 Recipes, Tools, salvage definitions, and gathering results reference components by Fabricate component identity, not by raw Foundry Item identity.
 A component's `componentId` was historically both a within-system identity and the cross-system reference target Tools pointed at; issue 561 gave Tools their own identity, relieving `componentId` of the reference role.
@@ -276,7 +275,6 @@ Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-mod
 
 ## Player Result Order
 
-Stored as **result ids** (not indices, so it survives GM edits) under namespaced keys (`recipe:<recipeId>` / `salvage:<systemId>:<componentId>` — namespaced because recipe and component ids are drawn from different id spaces and can collide; both `recipe:` and `salvage:` keys are written as of issue 675, whose salvage panel is the first writer of the latter) in the `PROGRESSIVE_RESULT_ORDER` setting, which is **`scope: 'user'`** — per user **within a world**, not per account globally, and a replicated document write rather than localStorage.
 It is a **standing preference** applying to every craft of that recipe until changed, NOT a per-attempt gesture.
 It is **never exported**: both halves ride on state `import-export` §Authoring-versus-runtime boundary already excludes (a salvage run's captured order is "active timed runs"; the settings map is user-scoped runtime state), so the split between this and **Result Order Permission** lands exactly on the spec's existing authoring/runtime boundary with no new rule invented.
 Reconciliation against the authored list is one shared pure rule: never drops a result, tail-appends the unranked in authored order (so an unranked stage can never displace a ranked one), never reorders an id-less result, and first-match-wins on duplicate ids.

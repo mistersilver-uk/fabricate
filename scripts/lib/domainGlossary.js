@@ -14,8 +14,10 @@ const SECTION_FILES = {
  */
 export const DEFINITION_SENTENCES = {
   'Aggregates and Records': {
+    Component: 2,
     'Phantom-Run `resolved`': 2,
     'Inventory Card / System Participation': 2,
+    'Player Result Order': 2,
     'Result Order Asymmetry': 3,
     'Manager Navigation Surface / Provider Seam': 2,
     'Rail Marker Family': 2,
