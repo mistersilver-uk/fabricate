@@ -8,7 +8,9 @@
  * message carries every complication for one addressed `(system, actor)` pair, because both are
  * authorization inputs. This is the pure half (routing, validation, throttle, de-duplication and
  * the GM-side apply loop) with the Foundry edges injected, so tests drive the addressing-only
- * contract with real inputs.
+ * contract with real inputs. `main.js` registers the handler and injects the thin Foundry edges
+ * this module never calls directly: `game.socket.emit`, `game.users.activeGM` (elected-GM
+ * lookup), `fromUuid`, `MacroExecutor.run`, `ChatMessage.create`.
  */
 
 import { COMPLICATION_ACTIVITIES } from '../utils/componentComplications.js';
@@ -231,7 +233,8 @@ export function isRunnableComplicationMacro(macro) {
  * The macro scope, built from the GM-side re-read. `MacroExecutor` binds only `context`, `args`
  * and `scope`, so any other name resolves on the executing GM client (its character, canvas,
  * selection and `isGM === true`); the actor, token and speaker are therefore passed explicitly.
- * `bucket`, `resultId` and `effectRollTotal` are the acting client's claim, never acted on.
+ * A macro therefore cannot prompt the acting player. `bucket`, `resultId` and `effectRollTotal`
+ * are the acting client's claim, never acted on.
  */
 export function buildComplicationMacroContext({
   craftingSystemId,

@@ -329,7 +329,7 @@ export function complicationReasons(complication, bucket) {
 /**
  * The GM card's row model: each applied row projected on its own (never zipped back by index),
  * plus `reasons`, the acting client's `claimed` bucket and total kept apart so the card labels
- * them as reported, and the macro report. Kept out of the socket router so tests can drive rows
+ * them as reported, and the macro report. Kept out of `main.js` so tests can drive rows
  * that disagree.
  */
 export function gmComplicationCardEntries(applied) {
@@ -422,7 +422,8 @@ function gmComplicationFaultFacts(entry, loc) {
 }
 
 /** One labelled section, omitted when empty. `attention` carries its own class because
- *  `tests/crafting-chat-card.test.js` requires each complication rule to end on one. */
+ *  `tests/crafting-chat-card.test.js` requires each complication rule branch to end on a
+ *  complication-only class. */
 function gmComplicationSection(section, headingKey, facts, loc) {
   if (facts.length === 0) return '';
   const fault = section === 'attention' ? ` ${GM_CARD_BLOCK}__complication-fault` : '';
@@ -435,10 +436,10 @@ function gmComplicationSection(section, headingKey, facts, loc) {
 }
 
 /**
- * One GM card row as a vertical stack inside the single `__label`, which the `--gm` modifier
- * turns into a column (flex siblings of it collapsed to a few characters wide), so the player row
- * stays byte-identical. Order: identity, authored prose, why it fired, what happens, then any
- * repair only the GM can make.
+ * One GM card row, stacked inside the single `__label`, since flex siblings of it would shrink
+ * to a few characters wide. The `--gm` modifier makes the label a column and no player card
+ * emits it, so the player row is unchanged. Order: identity, authored prose, why it fired, what
+ * happens, then any repair only the GM can make.
  */
 function renderGmComplication(entry, loc) {
   const head = `<span class="${GM_CARD_BLOCK}__complication-name">${esc(entry?.name)}</span>${gmComplicationSeverity(entry, loc)}`;

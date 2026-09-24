@@ -5,7 +5,8 @@
  * that object holds is the game system's choice: dnd5e spreads `system` onto it, so
  * `skills.arc.value` resolves, while pf2e returns `{ actor }` alone, so a pf2e path is rooted at
  * `actor.` and resolves only against live `getRollData()` output, never a clone or the
- * `actor.system` fallback. An unknown path never throws: it reads `0` or `false`, with a warning.
+ * `actor.system` fallback. An unknown path never throws: it reads `0` or `false`, a warning
+ * except under `exists`.
  */
 
 /** Ordered operator metadata: `symbol` is what the preview and dropdown render, and a

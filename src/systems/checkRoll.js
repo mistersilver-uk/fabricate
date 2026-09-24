@@ -613,9 +613,9 @@ export async function evaluateSituationalBonus(bonus, actor = null) {
 }
 
 /**
- * A pass/fail check: the total against `dc` (meet or exceed), honouring forced outcomes. A
- * dismissed interactive prompt returns `cancelled: true` so the caller aborts with zero
- * mutation; with no dice engine it passes rather than block.
+ * A pass/fail check: the total against `dc`, met or (`thresholdMode: 'exceed'`) strictly
+ * exceeded, honouring forced outcomes. A dismissed prompt returns `cancelled: true` so the
+ * caller aborts with zero mutation; with no dice engine it passes rather than block.
  */
 export async function runFormulaPassFail({
   formula: rawFormula,

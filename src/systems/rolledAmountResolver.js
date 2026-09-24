@@ -24,7 +24,7 @@ export async function resolveRolledAmount(
   return { amount: Math.max(0, Math.floor(total)), rolled: { formula, total }, roll };
 }
 
-/** An award's report of a rolled result, plus the integer awarded (`0` if empty); never persisted. */
+/** A rolled result's award report plus the integer awarded (`0` if empty); never persisted. */
 export const rolledAwardRecord = (result, rolled, quantity) => ({
   resultId: result?.id ?? null,
   componentId: result?.componentId ?? result?.systemItemId ?? null,
