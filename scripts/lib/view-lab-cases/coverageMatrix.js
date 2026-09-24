@@ -117,6 +117,7 @@ export const CASES = Object.freeze([
       // `ItemDropZone` is deliberately not claimed here (issue 1509): it is a broad signal, so it was never read.
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
       /^src\/ui\/model\/macroReference\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
     ],
   }),
   managerCase({
@@ -143,6 +144,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckRecipeTiers\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
     ],
   }),
   managerCase({
@@ -170,6 +172,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckRecipeTiers\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
     ],
   }),
   managerCase({
@@ -193,7 +196,10 @@ export const CASES = Object.freeze([
     // The route alone is not enough: a click that no-oped leaves the right screen showing the wrong state.
     expectSelector: '[data-trigger="rw-trig-step-up"] [data-trigger-tier-step]',
     kinds: ['manager', 'checks'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+    ],
   }),
   managerCase({
     id: 'manager-checks-crafting-trigger-break-tools',
@@ -216,7 +222,10 @@ export const CASES = Object.freeze([
     // The subject itself, not the route: both the authority click and the disclosure click have to have landed.
     expectSelector: '[data-trigger="rw-trig-step-up"] [data-trigger-break]',
     kinds: ['manager', 'checks'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+    ],
   }),
   // All four cases select an actor first, and that is not decoration.
   managerCase({
@@ -242,6 +251,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkPreview\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOutcomePreview\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
     ],
   }),
   managerCase({
@@ -263,6 +273,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
     ],
   }),
   managerCase({
@@ -286,6 +297,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
     ],
   }),
   managerCase({
@@ -309,6 +321,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
     ],
   }),
   managerCase({
@@ -329,7 +342,10 @@ export const CASES = Object.freeze([
     expectSelector: '.fabricate-manager [data-simple-band-strip] [data-band-strip-handle]',
     kinds: ['manager', 'checks'],
     // The strip's simple mode, one of the two frames `BROAD_SIGNAL_CASE_OVERRIDES` names for it (issue 1378).
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+    ],
   }),
   managerCase({
     id: 'manager-checks-crafting-outcomes-empty',
@@ -351,7 +367,10 @@ export const CASES = Object.freeze([
     // The fix as a selector: the add control has to be a sibling of the empty sentence, outside the list's `{#if}`.
     expectSelector: '.fabricate-manager [data-outcomes-empty] ~ [data-add-outcome-tier]',
     kinds: ['manager', 'checks'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CraftingCheckEditor\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CraftingCheckEditor\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+    ],
   }),
   managerCase({
     id: 'manager-checks-crafting-alchemy-off',
@@ -367,7 +386,10 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager [data-checks-panel="crafting"][data-checks-off] [data-checks-turn-on]',
     kinds: ['manager', 'checks'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+    ],
   }),
   managerCase({
     id: 'manager-checks-crafting-alchemy-behaviour',
@@ -387,7 +409,10 @@ export const CASES = Object.freeze([
     // The card, which is the subject and exists in no other state — not one of its toggles.
     expectSelector: '.fabricate-manager [data-alchemy-behaviour]',
     kinds: ['manager', 'checks'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+    ],
   }),
   // Player recipe detail, one per resolution mode.
   playerCase({

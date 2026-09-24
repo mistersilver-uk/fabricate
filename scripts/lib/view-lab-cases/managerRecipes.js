@@ -23,6 +23,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
       /^src\/ui\/model\/(?:recipe|entity)BrowserModel\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
     ],
   }),
   managerCase({
