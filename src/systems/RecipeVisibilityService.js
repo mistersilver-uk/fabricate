@@ -48,9 +48,8 @@ const MANAGE_KNOWLEDGE_MESSAGES = {
   useExpended: 'FABRICATE.Knowledge.Manage.UseExpended',
 };
 
-// The three outcomes of `_applyRecipeItemUse`. A bare boolean cannot distinguish
-// "this book is uncapped, so there was nothing to spend" from "this copy is already
-// spent", and the GM path has to report those differently.
+// The three outcomes of `_applyRecipeItemUse`: "uncapped, nothing to spend" and "already
+// spent" must stay distinguishable because the GM path reports them differently.
 const APPLY_USE_OUTCOME = Object.freeze({
   applied: 'applied',
   uncapped: 'uncapped',
@@ -60,74 +59,34 @@ const APPLY_USE_OUTCOME = Object.freeze({
 const VISIBILITY_MODES = ['global', 'restricted', 'item', 'knowledge'];
 
 /**
- * The VISIBILITY-phase counters (issue 1228).
- *
- * `candidateItemOffers` is the number of held documents the per-recipe recipe-item matcher was
- * OFFERED across a pass — summed over every `_collectCandidateItems` call that reached the
- * walk. It exists because the existing scale guard could not see the defect this issue fixes,
- * and could not have seen the one #1077 fixed either: `tests/scale-regression-guards.test.js`
- * measures the SUMMARY phase's `actorItemsScanned`, which is an inventory-READ count.
- *
- * The distinction is the whole point, and it is not a nuance:
- *
- * - Without a snapshot the per-recipe walk re-enumerates `actor.items`, so an item-read
- *   counter moves and an offer counter moves with it.
- * - With a snapshot built from the WRONG collaborator set, `recipeItemCandidates` falls back
- *   to `heldItems()` — which reads each actor's inventory exactly ONCE and memoises it — so
- *   the item-read counter stays perfectly flat while the matcher is handed every held document
- *   once per recipe. That is the silent reinstatement `passInventorySnapshot`'s header
- *   describes, and only this counter can see it.
- *
- * `candidateWalks` is its companion: a pass that answered fewer recipes (a corpus filter that
- * silently dropped rows) would lower the offer count without any optimisation, and only the
- * walk count distinguishes those.
- *
- * Module-level and process-global, matching `SignatureValidator`'s signature counters and
- * `definitionIndex`'s identity counters: the visibility service is constructed in several
- * places a probe cannot reach, so a per-instance wrapper would see only the instances the
- * probe itself built.
+ * Visibility-phase counters (issue 1228). `candidateItemOffers` counts held documents offered to
+ * the per-recipe recipe-item matcher, which an inventory-read counter cannot see once a snapshot
+ * falls back to the memoised `heldItems()`; `candidateWalks` tells a smaller corpus from a real
+ * saving. Process-global, like `SignatureValidator`'s counters, because the service is built in
+ * places a probe cannot reach.
  */
 const _counters = {
   candidateItemOffers: 0,
   candidateWalks: 0,
 };
 
-/**
- * A snapshot of the visibility counters.
- *
- * @returns {{candidateItemOffers: number, candidateWalks: number}}
- */
+/** A snapshot of the visibility counters. */
 export function readVisibilityCounters() {
   return { ..._counters };
 }
 
-/**
- * Zero the visibility counters. Call before a measured region; they are process-global and
- * monotonic otherwise.
- *
- * @returns {void}
- */
+/** Zero the process-global, monotonic visibility counters before a measured region. */
 export function resetVisibilityCounters() {
   _counters.candidateItemOffers = 0;
   _counters.candidateWalks = 0;
 }
 
-/**
- * Visibility, knowledge access, and learn-state service.
- */
+/** Visibility, knowledge access, and learn-state service. */
 export class RecipeVisibilityService {
   /**
-   * @param {object} recipeManager
-   * @param {object} craftingSystemManager
-   * @param {object} [partyLearnPool]
    * @param {((item: object, components: object[], systemId: string) => (object|null))|null}
-   *   [resolveComponentForItem] How a held document resolves to a managed component, for the
-   *   per-pass inventory snapshot this service builds (issue 1228). The service itself never
-   *   calls it: it is a SNAPSHOT collaborator, and it is supplied here so the snapshot this
-   *   service hands down is the same complete value `CraftingListingBuilder` builds rather
-   *   than a half of one that would answer `available: false` for every recipe if a later
-   *   consumer in the same pass read its tallies. Injected rather than imported for the same
-   *   reason `CraftingListingBuilder` injects it — see `passInventorySnapshot`'s header.
+   *   [resolveComponentForItem] Never called here: it completes the per-pass inventory snapshot
+   *   this service hands down, so it matches `CraftingListingBuilder`'s (issue 1228).
    */
   constructor(
     recipeManager,
@@ -152,18 +111,13 @@ export class RecipeVisibilityService {
     return this.craftingSystemManager?.getSystem(recipe.craftingSystemId) || null;
   }
 
-  // Resolve the flat system-level visibility mode (issue 511, PR-B). Prefers the new
-  // `system.visibilityMode` enum; when absent (legacy world, or a raw fixture) it
-  // derives one from the old `recipeVisibility.listMode` + `knowledge.mode`:
-  //   global → global · player → restricted · knowledge+item → item ·
-  //   knowledge+(learned|itemOrLearned) → knowledge · teaser → teaser (handled
-  //   separately) · missing/unknown → global (the legacy default).
+  // The flat system visibility mode (issue 511). A legacy system without `visibilityMode`
+  // derives one from `recipeVisibility.listMode` + `knowledge.mode`: global → global, player →
+  // restricted, knowledge+item → item, knowledge+(learned|itemOrLearned) → knowledge, teaser →
+  // teaser, anything else → global.
   _getVisibilityMode(system) {
-    // Legacy teaser is not representable in the flat enum and keeps its own
-    // teaserConfig-driven runtime, so a system still flagged `listMode: 'teaser'`
-    // resolves to teaser regardless of the (possibly-defaulted) `visibilityMode`.
-    // (The migration maps teaser → global for the authoring enum but preserves
-    // teaserConfig — teaser retirement is a flagged product decision.)
+    // Legacy teaser has no flat-enum value and keeps its own teaserConfig runtime, so
+    // `listMode: 'teaser'` wins over a possibly-defaulted `visibilityMode`.
     if (system?.recipeVisibility?.listMode === 'teaser') return 'teaser';
 
     const mode = system?.visibilityMode;
@@ -178,18 +132,16 @@ export class RecipeVisibilityService {
     return 'global';
   }
 
-  // Whether the system carries an authored flat `visibilityMode`. When it does, the
-  // item/knowledge modes drive the knowledge sub-mode (item → 'item', knowledge →
-  // 'itemOrLearned'); when it does not, the legacy `knowledge.mode` is honored as-is
-  // so migrated 'learned' systems keep their learned-only semantics.
+  // Whether the system authored a flat `visibilityMode`. If so, item → 'item' and knowledge →
+  // 'itemOrLearned' drive the knowledge sub-mode; if not, legacy `knowledge.mode` is honoured
+  // as-is so migrated 'learned' systems stay learned-only.
   _usesFlatVisibilityMode(system) {
     return VISIBILITY_MODES.includes(system?.visibilityMode);
   }
 
-  // Whether a viewer may see a `restricted`-mode recipe. GM always; otherwise the
-  // per-recipe `access` grant governs (a player id, or a character the viewer
-  // controls). When `access` is absent (legacy recipe) fall back to the old
-  // `visibility.restricted` / `allowedUserIds` player-list gate.
+  // Whether a viewer may see a `restricted` recipe: GM always, else the per-recipe `access`
+  // grant (a player id, or a character the viewer controls). A recipe without `access` falls
+  // back to the legacy `visibility.restricted` / `allowedUserIds` list.
   _isRecipeVisibleByAccessGrant(recipe, viewer) {
     if (viewer?.isGM) return true;
 
@@ -220,24 +172,12 @@ export class RecipeVisibilityService {
   }
 
   /**
-   * The book/scroll definitions a recipe belongs to, RETAINED per recipe so the array is
-   * stable across calls (issue 1077).
-   *
-   * Stability is not cosmetic here. `definitionIndex` keys its retained index on the
-   * candidate ARRAY OBJECT, and `recipeItemDefinitionsContaining` deliberately returns a
-   * FRESH array every time (it must — an index-backed `byRecipeId` hands back the shared
-   * bucket, which a caller must not be able to mutate). Handing that throwaway straight to
-   * the index meant the index was rebuilt once per (recipe x held item) pair: 122,501 index
-   * builds for one 5,000-recipe visibility pass on the committed `knowledge-corpus` profile.
-   * #1076's index was correct and simply never got the chance to hit. Memoising the RESULT
-   * here is what makes the array stable without giving the rule a second implementation.
-   *
-   * Validity follows `RecipeManager._recipeCohorts`' rule exactly — the source array's
-   * IDENTITY, its LENGTH, and `definitionIndex`'s own revision counter. That third clause is
-   * the one that matters: `CraftingSystemManager` rewrites indexed FIELDS of live definition
-   * elements (the `recipeIds` membership writers), which the first two clauses cannot see,
-   * and `tests/recipe-book-membership-basis.test.js` is what catches a memo that ignores it.
-   * @private
+   * The member-book definitions of a recipe, retained so the array is stable across calls
+   * (issue 1077): `definitionIndex` keys on the candidate array object, and
+   * `recipeItemDefinitionsContaining` returns a fresh array each time. Validity is the source
+   * array's identity and length plus `definitionIndex`'s revision, which catches
+   * `CraftingSystemManager` rewriting `recipeIds` in place
+   * (`tests/recipe-book-membership-basis.test.js`).
    */
   _memoRecipeItemDefinitions(system, recipe, compute) {
     const definitions = system.recipeItemDefinitions || [];
@@ -265,23 +205,11 @@ export class RecipeVisibilityService {
     return computed;
   }
 
-  // The book/scroll definitions a recipe belongs to (issue 511 many-to-many). Returns a
-  // SET — a recipe may live in several books, each with its own caps.
-  //
-  // The rule is `utils/recipeItemMembership.js` (issue 1155), the ONE implementation every
-  // membership reader asks: canonical `recipeIds[]`, falling back to the recipe's legacy
-  // reverse ref only while the system's `membershipResolvesByRecipeIds` marker is unset.
-  // This is the most player-facing caller — per-book learn caps and character
-  // prerequisites are enforced off it — which is precisely why it must not carry its own
-  // copy of the rule, and why the basis is READ from the system rather than re-derived
-  // from the arrays (issue 1011): the retired inference flipped in both directions, so
-  // emptying the last array resurrected phantom memberships for every player at once.
-  //
-  // `indexedMembershipLookups` keeps the `recipeIds[]` leg on the retained
-  // `recipeId -> definitions` index (issue 1076), because this runs on EVERY access check
-  // and a linear scan of the system's definitions here was a measurable per-check cost.
-  // The memo (issue 1077) retains the RESULT so the array handed on is stable; see
-  // `_memoRecipeItemDefinitions` for why that identity matters to the index.
+  // The member-book definitions of a recipe (issue 511 many-to-many); a recipe may live in
+  // several books, each with its own caps. The rule is `utils/recipeItemMembership.js`
+  // (issue 1155), and the basis is read from the system's `membershipResolvesByRecipeIds`
+  // marker, never re-derived from the arrays (issue 1011). The `recipeIds[]` leg uses the
+  // retained index (issue 1076); the memo keeps the result stable for it (issue 1077).
   _getRecipeItemDefinitions(recipe) {
     const system = this._getCraftingSystem(recipe);
     if (!system) return [];
@@ -328,30 +256,23 @@ export class RecipeVisibilityService {
     );
   }
 
-  // Member book definitions plus a synthetic entry for a recipe's legacy
-  // `linkedRecipeItemUuid`, so an un-migrated recipe that carries only the old
-  // single reverse ref (no authored definition) still resolves by its source
-  // pointer. The synthetic entry has no `id`, so it can only match the source-uuid
-  // tiers of the shared matcher, never the durable identity tier.
+  // Member book definitions plus a synthetic id-less entry for a legacy `linkedRecipeItemUuid`,
+  // so an un-migrated recipe still resolves by source pointer. Having no `id`, the entry
+  // matches only the source-uuid tiers, never the durable identity tier.
   _recipeItemMatchDefinitions(recipe) {
     const defs = this._getRecipeItemDefinitions(recipe);
     const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
     if (!legacyUuid) return defs;
     if (defs.some((def) => String(def?.originItemUuid || '').trim() === legacyUuid)) return defs;
-    // Retained beside the member list for the same reason it is: this array is handed
-    // straight to `matchRecipeItemDefinition`, which indexes it by object identity, so
-    // rebuilding it per matched item rebuilt the index per matched item (issue 1077).
+    // Retained like the member list: `matchRecipeItemDefinition` indexes this array by
+    // identity, so rebuilding it per item rebuilt the index per item (issue 1077).
     const system = this._getCraftingSystem(recipe);
     if (!system) return [...defs, { id: null, originItemUuid: legacyUuid }];
     return this._memoLegacyMatchDefinitions(system, recipe, defs, legacyUuid);
   }
 
-  /**
-   * The retained `[...memberBooks, syntheticLegacyEntry]` array for one legacy recipe.
-   * Shares {@link _memoRecipeItemDefinitions}' validity rule; keyed separately because the
-   * synthetic entry makes it a different array from the member list.
-   * @private
-   */
+  // The retained `[...memberBooks, syntheticLegacyEntry]` array for one legacy recipe; it
+  // shares `_memoRecipeItemDefinitions`' validity rule under its own key.
   _memoLegacyMatchDefinitions(system, recipe, defs, legacyUuid) {
     const definitions = system.recipeItemDefinitions || [];
     const revision = readDefinitionRevision(definitions);
@@ -380,11 +301,9 @@ export class RecipeVisibilityService {
     return matchDefinitions;
   }
 
-  // Resolve which member book an item IS, AND by which tier, through the one shared,
-  // system-scoped matcher (durable per-system `roles` leaf → legacy scalar → own uuid →
-  // compendium source → duplicate source). The recipe's `craftingSystemId` scopes the
-  // durable-identity tier (issue 567). An id-less legacy synthetic entry still matches only
-  // the source-uuid tiers regardless of systemId, so legacy/alchemy links keep resolving.
+  // Which member book an item is, and by which tier, via the shared system-scoped matcher
+  // (roles leaf → legacy scalar → own uuid → compendium source → duplicate source). The
+  // id-less legacy synthetic entry matches only the source-uuid tiers (issue 567).
   _matchRecipeItemForRecipe(recipe, item) {
     return matchRecipeItemDefinition(
       item,
@@ -403,11 +322,9 @@ export class RecipeVisibilityService {
     );
   }
 
-  // The member book definition that a specific owned item IS, so the learn/use paths
-  // read caps from the book actually being read. A SUPPLIED item that matches no
-  // member definition resolves to null (uncapped) — only an ABSENT item falls back
-  // to the recipe's first member book (issue 555, R6b). `craftingSystemId` scopes the
-  // durable-identity tier (issue 567).
+  // The member book definition a specific owned item is, so learn/use read that book's caps.
+  // A supplied item matching no member resolves to null (uncapped); only an absent item falls
+  // back to the first member book (issue 555).
   _matchDefinitionForItem(recipe, item) {
     const defs = this._getRecipeItemDefinitions(recipe);
     if (!item) return defs[0] || null;
@@ -424,10 +341,8 @@ export class RecipeVisibilityService {
     );
   }
 
-  // Both accessors key on the SHARED constant rather than a bare literal, because the
-  // learned map now has a writer outside this class: the companion contract's GM knowledge
-  // grant reaches the same flag through injected seams (issue 1289, D3). Two spellings of
-  // one persisted key is a typo away from a second flag that reads back empty forever.
+  // Both accessors key on the shared `LEARNED_RECIPES_FLAG_KEY`: the companion knowledge grant
+  // writes the same flag (issue 1289), so a second spelling would read back empty.
   _getLearnedMap(actor) {
     const learned = getFabricateFlag(actor, LEARNED_RECIPES_FLAG_KEY, {});
     return learned && typeof learned === 'object' ? learned : {};
@@ -446,9 +361,8 @@ export class RecipeVisibilityService {
     return await setFabricateFlag(actor, 'discoveryProgress', discovery);
   }
 
-  // Resolve a recipe by id — prefers the manager's `getRecipe` (constant-time) and
-  // falls back to scanning `getRecipes()`. Returns null for an orphan id whose recipe
-  // no longer exists (so per-system scoping and budget-freeing can skip it).
+  // A recipe by id via `getRecipe`, else a `getRecipes()` scan; null for an orphan id, so
+  // per-system scoping and budget-freeing can skip it.
   _getRecipeById(id) {
     if (typeof this.recipeManager?.getRecipe === 'function') {
       return this.recipeManager.getRecipe(id) || null;
@@ -457,12 +371,9 @@ export class RecipeVisibilityService {
     return all.find((recipe) => String(recipe?.id) === String(id)) || null;
   }
 
-  // The persisted use count of one recipe item copy, coerced exactly as the craft
-  // path always coerced it. The trailing `|| 0` is load-bearing: a corrupt truthy
-  // non-numeric `timesUsed` (`"abc"`) makes `Number(...)` NaN, and the craft path's
-  // historical outer `Number(selected.timesUsed || 0) + 1` over this already-coerced
-  // value produced `1`, not NaN. Dropping it would write `null` and force `exhausted`
-  // false, so no `whenSpent` disposal branch could ever run for such a copy.
+  // The persisted use count of one copy. The trailing `|| 0` is load-bearing: a truthy
+  // non-numeric `timesUsed` would otherwise yield NaN, write null and leave `exhausted` false,
+  // so no `whenSpent` disposal could run.
   _getRecipeItemUsage(item) {
     const usage = getFabricateFlag(item, 'recipeItemUsage', {});
     return Number(usage?.timesUsed || 0) || 0;
@@ -474,10 +385,8 @@ export class RecipeVisibilityService {
     });
   }
 
-  // Mark a spent item-charge document 'inert' (issue 511, PR-B `whenSpent: 'inert'`):
-  // keep the item but record its exhaustion so it stops granting craftability. The
-  // usage count is written alongside the flag so `_filterNonExhausted` still excludes
-  // it via `timesUsed >= maxUses`.
+  // Mark a spent copy inert (`whenSpent: 'inert'`, issue 511): the item stays but stops
+  // granting; `timesUsed` is written too so `_filterNonExhausted` excludes it.
   async _markRecipeItemInert(item, timesUsed) {
     await setFabricateFlag(item, 'recipeItemUsage', {
       timesUsed: Math.max(0, Math.floor(timesUsed)),
@@ -485,9 +394,8 @@ export class RecipeVisibilityService {
     });
   }
 
-  // The learning-limit SCOPE for a recipe's linked recipe item: 'perInstance' (the
-  // cap applies to each physical copy of the item) or 'total' (one shared world pool
-  // across every copy of the source item).
+  // The learn-cap scope of a recipe's book: 'perInstance' (each physical copy) or 'total' (one
+  // shared world pool across every copy of the source item).
   _getRecipeItemLearnScope(recipe, definition = this._getRecipeItemDefinition(recipe)) {
     return this._getRecipeItemCaps(recipe, definition).learn.learnScope || 'perInstance';
   }
@@ -499,10 +407,8 @@ export class RecipeVisibilityService {
     return Array.isArray(ids) ? ids : [];
   }
 
-  // True when a Required-Knowledge id still resolves to an existing recipe in the
-  // world. A dangling id (its recipe was deleted) is treated as removed so the gate
-  // fails OPEN, mirroring the character-prerequisite gate (issue 544). Resolves via
-  // `getRecipe` when the manager exposes it, else scans `getRecipes()`.
+  // Whether a Required-Knowledge id still names a recipe; a dangling id is treated as removed,
+  // so the gate fails open like the character-prerequisite gate (issue 544).
   _recipeExists(id) {
     if (typeof this.recipeManager?.getRecipe === 'function') {
       return this.recipeManager.getRecipe(id) != null;
@@ -511,11 +417,9 @@ export class RecipeVisibilityService {
     return all.some((candidate) => String(candidate?.id) === String(id));
   }
 
-  // A reader satisfies a recipe's Required Knowledge when Limited learning is OFF (the
-  // gate is not enforced then — issue 544), or when the actor has already learned
-  // EVERY still-existing required recipe. An empty requirement is always met, and a
-  // prerequisite id whose recipe was deleted is skipped (fail-open) rather than
-  // permanently bricking the book.
+  // Required Knowledge is met when Limited learning is off (issue 544) or the actor has learned
+  // every still-existing required recipe. An empty requirement is met; a deleted prerequisite
+  // is skipped (fail-open).
   _isPrerequisiteMet(recipe, actor, definition = this._getRecipeItemDefinition(recipe)) {
     if (this._getRecipeItemCaps(recipe, definition).learn.limitLearning !== true) return true;
     const ids = this._getRecipeItemPrerequisiteIds(recipe, definition);
@@ -524,10 +428,8 @@ export class RecipeVisibilityService {
     return ids.filter((id) => this._recipeExists(id)).every((id) => !!learned?.[id]);
   }
 
-  // The character-prerequisite ids a reader must ALL pass to learn a recipe from
-  // this book (issue 544) — references into `system.characterPrerequisites`. Read
-  // straight off the definition's caps (the runtime `_getRecipeItemCaps` reader
-  // rebuilds only the legacy cap fields and does not surface this list).
+  // The character-prerequisite ids a reader must all pass to learn from this book (issue 544),
+  // read off the definition's caps because `_getRecipeItemCaps` does not surface them.
   _getRecipeItemCharacterPrerequisiteIds(
     recipe,
     definition = this._getRecipeItemDefinition(recipe)
@@ -536,11 +438,9 @@ export class RecipeVisibilityService {
     return Array.isArray(ids) ? ids : [];
   }
 
-  // Evaluate the recipe's character-prerequisite learning gate against the acting
-  // actor's prepared roll data (AND semantics). A prerequisite id that no longer
-  // resolves to a system definition is skipped (fail-open — a deleted definition
-  // removes its gate). `rollData` is resolved once here when omitted; pass it in
-  // to avoid rebuilding it per recipe in a bulk loop.
+  // The character-prerequisite learning gate against the actor's roll data (AND semantics). An
+  // id with no system definition is skipped (fail-open). Pass `rollData` in a bulk loop so it
+  // is resolved once.
   _meetsCharacterPrerequisites(
     recipe,
     actor,
@@ -580,12 +480,9 @@ export class RecipeVisibilityService {
     return `${system?.id || 'unknown'}::${itemKey}`;
   }
 
-  // Per item-DOCUMENT-instance learn count for the recipe-item learn cap (issue
-  // 511). Mirrors `recipeItemUsage.timesUsed` (`_getRecipeItemUsage` /
-  // `_setRecipeItemUsage`): the count lives on the physical item document, so a
-  // stacked qty>1 document shares one count, the budget accumulates across every
-  // actor that holds the document, and it is not reset on transfer/ownership
-  // change (the flag travels with the item data).
+  // The per-document learn count for the learn cap (issue 511), like `recipeItemUsage.timesUsed`:
+  // it lives on the item document, so a stacked copy shares one count, it accumulates across
+  // holders, and it survives transfer because the flag travels with the item.
   _getRecipeItemLearnCount(item) {
     const learning = getFabricateFlag(item, 'recipeItemLearning', {});
     return Number(learning?.learnedCount || 0);
@@ -621,69 +518,38 @@ export class RecipeVisibilityService {
   }
 
   /**
-   * Whether ANY reveal path on this system reads `learnedRecipes` — i.e. whether a learned
-   * entry written for a character can become visible to them (issue 1289, D4).
-   *
-   * A SIBLING of {@link _isLearnModeEnabled}, never a superset and never built on it. That
-   * method gates the LEARN path — "may a reader learn this from a book here" — while this one
-   * gates OBSERVABILITY — "can an entry someone wrote ever be seen". They are not one function
-   * because they disagree in BOTH directions:
-   *
-   * - A system carrying flat `visibilityMode: 'knowledge'` with a residual
-   *   `recipeVisibility.knowledge.mode: 'item'` IS observable — `evaluateRecipeAccess`'s
-   *   non-alchemy `item`/`knowledge` arm forces the `itemOrLearned` sub-mode when a flat enum
-   *   is authored, so `hasLearned` grants — while `_isLearnModeEnabled` reads that residual
-   *   `'item'` raw and returns `false`. This is not a hand-edited world: `migrateVisibilityModeEnum`
-   *   deliberately leaves the legacy block in place, and `setVisibilityMode` writes only
-   *   `{ visibilityMode }`, so clicking "Knowledge" on the radio lands exactly there.
-   * - Alchemy with `item` or `restricted` and `learnOnCraft` off is NOT observable, yet a
-   *   blanket "learn mode OR alchemy" widening would have reported a SUCCESSFUL grant onto an
-   *   entry no player can ever see — the exact defect this predicate exists to prevent.
-   *
-   * Derived from `evaluateRecipeAccess`'s reveal switch ARM BY ARM, so the two must be changed
-   * together. `_isLearnModeEnabled` is deliberately untouched by this addition: its comment
-   * enumerates the three learn paths whose gate must not drift, and observability is not one
-   * of them.
-   *
-   * @param {object|null|undefined} system the recipe's crafting system
-   * @returns {boolean}
+   * Whether any reveal path on this system reads `learnedRecipes`, i.e. whether a learned entry
+   * written for a character can become visible to them (issue 1289). A sibling of
+   * `_isLearnModeEnabled`, never built on it: flat `knowledge` over a residual `item` sub-mode
+   * (as `migrateVisibilityModeEnum` leaves it) is observable but not learnable, and alchemy
+   * `item`/`restricted` without `learnOnCraft` is not observable, so "learn mode or alchemy"
+   * would over-report. Mirrors `evaluateRecipeAccess`'s reveal switch arm by arm; change both.
    */
   isLearnedKnowledgeObservable(system) {
     if (system?.resolutionMode === 'alchemy') {
       // The brew-discovery union reveals a learned entry under EVERY mode.
       if (system?.alchemy?.learnOnCraft === true) return true;
-      // Otherwise only the switch's `default:` arm reads the learned map; the
-      // `restricted` and `item` arms never do. Legacy `teaser` falls to `default:` too,
-      // and the agreement is structural rather than lucky: both this test and that arm
-      // are "everything that is not `restricted` or `item`".
+      // Otherwise only the switch's `default:` arm reads the learned map; `restricted` and
+      // `item` never do, and legacy `teaser` falls to `default:` too.
       const mode = this._getVisibilityMode(system);
       return mode !== 'restricted' && mode !== 'item';
     }
-    // Non-alchemy: the `item` arm forces `knowledgeMode: 'item'`, and the `restricted`,
-    // `global` and `teaser` arms never reach `evaluateKnowledgeAccess` at all, so
-    // `knowledge` is the only resolved mode under which `hasLearned` can grant. That is
-    // exact for legacy systems too, with no `_usesFlatVisibilityMode` branch: a legacy
-    // `listMode: 'knowledge'` resolves to `'knowledge'` only for the `learned` /
-    // `itemOrLearned` sub-modes, both of which honour `hasLearned`, while a legacy `item`
-    // sub-mode resolves to the `'item'` mode instead.
+    // Non-alchemy: `item` forces `knowledgeMode: 'item'` and `restricted`/`global`/`teaser`
+    // never reach `evaluateKnowledgeAccess`, so only `knowledge` lets `hasLearned` grant. Legacy
+    // systems agree: `listMode: 'knowledge'` resolves to it only for the learned sub-modes.
     return this._getVisibilityMode(system) === 'knowledge';
   }
 
-  // Per-recipe-item use/learn caps (issue 511). Caps live on the recipe's linked
-  // recipe item definition (`definition.caps`) rather than one system-wide config,
-  // so two books in the same system can differ. Resolves via the recipe's
-  // `recipeItemId`; a recipe with no resolvable definition FAILS CLOSED to uncapped
-  // (the same permissive default `_getKnowledgeConfig` fell back to, and consistent
-  // with the invalid-cap → unlimited convention). `mode` and `dragDropEnabled` stay
-  // system-wide and are read from `_getKnowledgeConfig`, never from here.
+  // Per-recipe-item use/learn caps (issue 511), read from the recipe's book definition
+  // (`definition.caps`) so two books in one system can differ. No resolvable definition means
+  // uncapped. `mode` and `dragDropEnabled` stay system-wide in `_getKnowledgeConfig`.
   _getRecipeItemCaps(recipe, definition = this._getRecipeItemDefinition(recipe)) {
     const caps = definition?.caps;
     const item = caps?.item || {};
     const learn = caps?.learn || {};
 
-    // whenSpent (new) — prefer the authored enum; otherwise derive from the legacy
-    // `destroyWhenExhausted` boolean (true → 'destroyed', absent/false → 'inert')
-    // so an un-migrated raw cap keeps its old runtime behaviour (no delete).
+    // Prefer the authored `whenSpent`; otherwise derive it from legacy `destroyWhenExhausted`
+    // (true → 'destroyed', else 'inert') so an un-migrated cap never deletes.
     const whenSpent =
       item.whenSpent === 'destroyed' || item.whenSpent === 'inert'
         ? item.whenSpent
@@ -707,9 +573,8 @@ export class RecipeVisibilityService {
         : 'perInstance';
     const learningMode =
       learnScope === 'total' ? 'party' : Number(learnsAllowed) > 1 ? 'ntimes' : 'once';
-    // `prerequisiteIds` (issue 544) — recipes the reader must already know (AND).
-    // Prefer the array; fold the legacy single `prerequisite` string for un-migrated
-    // caps. Trim/String/dedupe to a clean id array.
+    // `prerequisiteIds` (issue 544), AND semantics: prefer the array, else fold the legacy
+    // single `prerequisite` string; trimmed, stringified and de-duplicated.
     const rawPrerequisiteIds = Array.isArray(learn.prerequisiteIds)
       ? learn.prerequisiteIds
       : learn.prerequisite
@@ -728,9 +593,8 @@ export class RecipeVisibilityService {
       },
       learn: {
         consumeOnLearn: learn.consumeOnLearn !== false,
-        // Legacy cap fields kept in sync with the new ones so the existing learn-cap
-        // helpers (`_getLearnCapForRecipe`, `_isRecipeItemLearnCapped`) transparently
-        // honor a book authored with only the new `limitLearning`/`learnsAllowed`.
+        // Legacy cap fields mirror the new ones so `_getLearnCapForRecipe` and
+        // `_isRecipeItemLearnCapped` honour a book authored only with the new fields.
         limitRecipes: limitLearning,
         maxRecipes: learnsAllowed,
         destroyWhenSpent: learn.destroyWhenSpent === true,
@@ -743,45 +607,26 @@ export class RecipeVisibilityService {
     };
   }
 
-  // Resolve caps from a recipe item DEFINITION alone (issue 785). The GM Knowledge
-  // surface names an owned copy and the definition it matched, never a recipe, and
-  // `_getRecipeItemCaps` reads `recipe` only to default its `definition` parameter —
-  // so supplying the definition makes the recipe argument inert. Routing through
-  // `_getRecipeItemCaps` (never a raw `definition.caps` read) is what keeps the legacy
-  // `destroyWhenExhausted` / `limitRecipes` / `learningMode` derivations applied. A
-  // missing definition resolves to uncapped, matching the fail-open convention.
+  // Caps from a book definition alone (issue 785), for the GM Knowledge surface, which names
+  // no recipe. Routes through `_getRecipeItemCaps` so the legacy-field derivations still
+  // apply; a missing definition resolves to uncapped.
   _capsForDefinition(definition) {
     return this._getRecipeItemCaps(null, definition || null);
   }
 
   /**
-   * The owned documents that ARE one of `recipe`'s member books, in the deterministic
-   * (actor, item) order the learn/use paths select on.
+   * The owned documents that are one of `recipe`'s member books, in the deterministic
+   * (actor, item) order the learn/use paths select on. `snapshot` (built from these actors) is
+   * a read optimisation only (issue 1077): its per-system book candidates are a superset every
+   * matcher can accept, and the per-recipe matcher still decides every entry, so both paths
+   * return the identical array.
    *
-   * `snapshot` is an optional read optimisation and never a semantic one (issue 1077). Given
-   * one, this walks the snapshot's per-system book candidates — a SUPERSET of what any single
-   * recipe's matcher can accept, proven sound in `inventorySnapshot`'s header — instead of
-   * re-enumerating every source actor's whole inventory. The per-recipe matcher below is
-   * unchanged and still decides every entry, so the two paths return the identical array;
-   * only the number of items the matcher is offered differs. Without a snapshot the walk is
-   * exactly what it always was, which is what every direct caller (`learnRecipe`,
-   * `guardCraftStart`, the GM knowledge surfaces) still gets.
-   *
-   * @param {object} recipe
-   * @param {object|null} craftingActor
-   * @param {object[]} [componentSourceActors]
-   * @param {object|null} [snapshot] A snapshot built from THESE actors, or null.
    * @returns {Array<{actor: object, item: object, actorOrder: number, itemOrder: number,
    *   timesUsed: number}>}
-   * @private
    */
   _collectCandidateItems(recipe, craftingActor, componentSourceActors = [], snapshot = null) {
-    // A recipe belonging to no book — no `recipeIds` membership, no legacy `recipeItemId`
-    // and no `linkedRecipeItemUuid` — has an EMPTY match-definition set, and
-    // `matchRecipeItemDefinition` returns nothing for an empty set, so the walk below can
-    // only ever return `[]`. Answering that without touching inventory removes a full
-    // per-recipe inventory scan from every recipe of a system that does not gate on books
-    // at all, which is the common configuration (issue 1077).
+    // A recipe in no book has an empty match-definition set, so the walk could only return
+    // `[]`; answer without scanning inventory, the common configuration (issue 1077).
     if (!this._hasRecipeItemReference(recipe)) return [];
 
     const offered = this._candidateItemEntries(
@@ -790,9 +635,8 @@ export class RecipeVisibilityService {
       snapshot,
       recipe
     );
-    // Counted HERE rather than inside `_candidateItemEntries`, because the number that matters
-    // is how many documents the per-recipe matcher below is handed — not how many the snapshot
-    // holds. See `_counters` for why an inventory-read counter cannot see this.
+    // Counted here, not in `_candidateItemEntries`: what matters is how many documents the
+    // matcher is handed, not how many the snapshot holds (see `_counters`).
     _counters.candidateWalks += 1;
     _counters.candidateItemOffers += offered.length;
 
@@ -804,11 +648,8 @@ export class RecipeVisibilityService {
     return matched;
   }
 
-  /**
-   * The `{actor, item, actorOrder, itemOrder}` records the candidate walk considers — the
-   * snapshot's prefiltered set when one is supplied, otherwise every held document.
-   * @private
-   */
+  // The `{actor, item, actorOrder, itemOrder}` records the walk considers: the snapshot's
+  // prefiltered set when supplied, otherwise every held document.
   _candidateItemEntries(craftingActor, componentSourceActors, snapshot, recipe) {
     if (snapshot) {
       const system = this._getCraftingSystem(recipe);
@@ -833,13 +674,9 @@ export class RecipeVisibilityService {
     return entries;
   }
 
-  // Drop candidate items that have reached their OWN book's use cap (issue 511
-  // per-book caps). Because membership is many-to-many, a recipe can live in several
-  // books with differing `limitUses`/`maxUses`, so each candidate is judged against
-  // the caps of the specific book it IS (`_matchDefinitionForItem`) — never one
-  // representative book's caps applied to every match. An item whose book does not
-  // limit uses, or whose `maxUses` is invalid/non-positive, is always kept
-  // (unlimited), preserving the fail-open convention.
+  // Drop candidates that reached their own book's use cap (issue 511): with many-to-many
+  // membership each is judged against the book it is (`_matchDefinitionForItem`). A book that
+  // does not limit uses, or has an invalid `maxUses`, keeps the item (fail-open).
   _filterNonExhausted(recipe, matches) {
     return matches.filter((entry) => {
       const cfg = this._getRecipeItemCaps(
@@ -865,18 +702,11 @@ export class RecipeVisibilityService {
   }
 
   /**
-   * Evaluate whether a viewer has knowledge access to a recipe.
-   *
-   * GM bypass: a GM is always granted access (`reason: 'gm'`). The returned
-   * `hasLearned: true` / `hasMatchedItem: true` flags signal "access is always
-   * granted for a GM" — they do NOT represent the GM actor's actual learned
-   * state or item ownership, and `matchedItems` is intentionally left empty
-   * because no real items are collected on this path. Callers that need the
-   * actual set of owned, matching recipe items (e.g. `learnRecipe` selecting an
-   * item to consume, or `applyRecipeItemUseOnCraft` deciding whether to track a
-   * use) must NOT read `matchedItems` from this result for a GM; they must
-   * collect candidate items directly via `_collectCandidateItems` /
-   * `_filterNonExhausted` so they react to what the actor really owns.
+   * Whether a viewer has knowledge access to a recipe. A GM is always granted (`reason: 'gm'`);
+   * its `hasLearned`/`hasMatchedItem: true` describe that bypass, not real state, and
+   * `matchedItems` stays empty. Callers needing the actor's real matching items (`learnRecipe`,
+   * `applyRecipeItemUseOnCraft`) collect them via `_collectCandidateItems` /
+   * `_filterNonExhausted` instead.
    */
   evaluateKnowledgeAccess({
     recipe,
@@ -895,9 +725,8 @@ export class RecipeVisibilityService {
         hasLearned: true,
         hasMatchedItem: true,
         matchedItems: [],
-        // A GM collects no real items on this path, so it owns no evidence about
-        // exhaustion either. `null` (never `0`) keeps that distinguishable from a
-        // genuine "owns nothing" — see `isKnowledgeItemExhausted`.
+        // A GM collects no items, so it has no exhaustion evidence: `null`, never `0`, keeps
+        // that distinct from "owns nothing" (see `isKnowledgeItemExhausted`).
         candidateItemCount: null,
       };
     }
@@ -928,43 +757,23 @@ export class RecipeVisibilityService {
       hasLearned,
       hasMatchedItem,
       matchedItems,
-      // How many matching copies were owned BEFORE per-book cap filtering. Carried so a
-      // caller that already has this result can answer "is this recipe's book knowledge
-      // exhausted?" without collecting the candidate set a second time (issue 1077): the
-      // answer is `candidateItemCount > 0 && matchedItems.length === 0`, which is exactly
-      // what `isKnowledgeItemExhausted` computes from its own rescan.
+      // Owned copies before per-book filtering, so a caller can answer "exhausted?" as
+      // `candidateItemCount > 0 && matchedItems.length === 0` without rescanning (issue 1077).
       candidateItemCount: allMatches.length,
     };
   }
 
   /**
-   * Whether a recipe's item-based knowledge is exhausted for a viewer: the actor
-   * (or a component-source actor) DOES own at least one matching recipe item, but
-   * every such item has reached its OWN book's `maxUses` cap (per-book, issue 511).
-   * Returns `false` when no matching item is owned at all (that is an
-   * "unknown"/teaser state, not "exhausted"), or when at least one non-exhausted
-   * item remains — including an item whose book does not limit uses. Read-only;
-   * composes the same candidate-collection + per-book non-exhausted filter the
-   * learn/use paths rely on, so the player listing's "exhausted" status agrees with
-   * what the engine would refuse to consume.
+   * Whether a recipe's item knowledge is exhausted for a viewer: at least one matching copy is
+   * owned and every one has reached its own book's `maxUses` (issue 511). Owning none is an
+   * unknown/teaser state, not exhausted. It uses the learn/use paths' candidate filter, so the
+   * listing's "exhausted" agrees with what the engine refuses to consume.
    *
-   * @param {object} args
-   * @param {object} args.recipe
-   * @param {object|null} args.craftingActor
-   * @param {object[]} [args.componentSourceActors]
-   * @param {object|null} [args.knowledge] A result of {@link evaluateKnowledgeAccess} for
-   *   this same recipe and actor set. When it carries evidence (`candidateItemCount`), the
-   *   answer is read from it and NO inventory is rescanned — the visibility pass already
-   *   collected exactly this candidate set and filtered it by the same per-book caps
-   *   (issue 1077). A caller with nothing to offer omits it and gets the original rescan.
-   * @param {object|null} [args.snapshot] The caller's per-pass inventory snapshot, for the
-   *   RESCAN branch (issue 1228). The evidence branch above needs nothing, but the rescan is
-   *   reached far more often than "a caller with nothing to offer" suggests: a `global`- or
-   *   `restricted`-visibility system leaves `access.knowledge` null, so every recipe of one
-   *   that ALSO carries recipe-item definitions or a legacy `linkedRecipeItemUuid` — the
-   *   guaranteed state of any world migrated off `item` mode — lands here. Unthreaded that is
-   *   one whole inventory enumeration per visible row on the main player screen.
-   * @returns {boolean}
+   * @param {object|null} [args.knowledge] An {@link evaluateKnowledgeAccess} result for this
+   *   recipe and actor set; when it carries `candidateItemCount` the answer is read from it with
+   *   no rescan (issue 1077).
+   * @param {object|null} [args.snapshot] The per-pass inventory snapshot for the rescan branch
+   *   (issue 1228), which `global`/`restricted` systems with book definitions reach per row.
    */
   isKnowledgeItemExhausted({
     recipe,
@@ -1018,12 +827,10 @@ export class RecipeVisibilityService {
   }
 
   _evaluateTeaserAccess({ recipe, viewer, craftingActor, system }) {
-    // GM sees everything fully
     if (viewer?.isGM) {
       return { visible: true, craftable: true, reason: 'ok' };
     }
 
-    // Recipe opts out of teaser mode — fully visible
     if (recipe?.teaser?.enabled === false) {
       return { visible: true, craftable: true, reason: 'ok' };
     }
@@ -1073,13 +880,11 @@ export class RecipeVisibilityService {
         manuallySet: false,
       };
 
-      // Idempotent — skip if already discovered this fragment
       if (entry.fragments.includes(fragmentId)) continue;
 
       const newFragments = [...entry.fragments, fragmentId];
       const newProgress = entry.progress; // manual progress unchanged
 
-      // Compute total including all fragment contributions
       let totalFragmentProgress = 0;
       for (const frag of fragments) {
         if (!frag.recipeIds?.includes(recipeId)) continue;
@@ -1089,7 +894,6 @@ export class RecipeVisibilityService {
       }
       const effectiveProgress = Math.min(100, newProgress + totalFragmentProgress);
 
-      // Check if this discovery causes auto-transition
       let discoveredAt = entry.discoveredAt;
       if (!discoveredAt) {
         const recipe = this.recipeManager.getRecipe?.(recipeId);
@@ -1136,36 +940,21 @@ export class RecipeVisibilityService {
   }
 
   /**
-   * Evaluate visibility + craftability for a single recipe.
+   * Visibility and craftability for one recipe.
    *
-   * Non-alchemy modes GATE: `visible` follows the resolved `visibilityMode`
-   * (`global` / `restricted` / `item` / `knowledge` / `teaser`), and `craftable`
-   * additionally requires knowledge/unlocked/access to pass — `reason` is one of
-   * `ok` / `visibility` / `knowledge` / `locked` / `teaser` / `teaser-discovered` /
-   * `missing-system`.
+   * Non-alchemy modes gate: `visible` follows the resolved `visibilityMode`, and `craftable`
+   * also needs knowledge, unlock and access; `reason` is `ok`, `visibility`, `knowledge`,
+   * `locked`, `teaser`, `teaser-discovered` or `missing-system`.
    *
-   * Alchemy mode is REVEAL-not-gate: `visibilityMode` selects only which source
-   * REVEALS a recipe in the player's Known list, and brewing is NEVER gated by
-   * visibility, so a non-GM alchemy recipe is ALWAYS `craftable: true` (a matched
-   * ingredient signature is the sole brew gate). Reveal governs only `visible`, per
-   * mode for a non-GM: `global` reveals brew-discovered (`learnedRecipes`) recipes;
-   * `item` reveals a linked book/scroll held on the crafting actor or a component
-   * source (computed synchronously from live `actor.items`, so a dropped book
-   * un-reveals on the next build with no flag write); `knowledge` reveals a recipe
-   * learned via the Inventory learn path; `restricted` (surfaced as "Manual" for
-   * alchemy) reveals via the per-recipe access grant. Discovery-by-brew reveal is
-   * unioned across ALL modes, and `learnOnCraft` governs ONLY whether a matched
-   * brew writes that union — never whether anything is revealed. The alchemy reason
-   * taxonomy is `gm`, `alchemy-revealed`, and `alchemy-unrevealed`.
+   * Alchemy reveals rather than gates: a non-GM alchemy recipe is always `craftable` (a matched
+   * signature is the only brew gate), and the mode picks what reveals it: `global` brew
+   * discovery, `item` a held book (live `actor.items`, so dropping it un-reveals), `knowledge`
+   * the Inventory learn path, `restricted` ("Manual") the access grant. Brew discovery reveals
+   * under every mode; `learnOnCraft` only decides whether a brew writes it. Reasons are `gm`,
+   * `alchemy-revealed` and `alchemy-unrevealed`.
    *
-   * @param {object} params
-   * @param {object} params.recipe
-   * @param {object} params.viewer - The viewing user (`isGM` short-circuits to full access).
-   * @param {object} [params.craftingActor]
-   * @param {object[]} [params.componentSourceActors]
    * @param {object|null} [params.snapshot] An {@link buildInventorySnapshot} result built from
-   *   THESE actors. A pure read optimisation for the knowledge branches — see
-   *   `_collectCandidateItems`. Omit it and the evaluation is byte-for-byte what it was.
+   *   these actors; a pure read optimisation (see `_collectCandidateItems`).
    * @returns {{ visible: boolean, craftable: boolean, reason: string, knowledge?: object }}
    */
   evaluateRecipeAccess({
@@ -1180,13 +969,8 @@ export class RecipeVisibilityService {
       return { visible: false, craftable: false, reason: 'missing-system' };
     }
 
-    // Alchemy mode: REVEAL-not-gate. `visibilityMode` selects which source(s)
-    // REVEAL a recipe in the player's Known list, but brewing is NEVER gated by
-    // visibility — a matched ingredient signature is the sole brew gate. So a
-    // non-GM alchemy recipe is ALWAYS `craftable: true`; reveal governs only
-    // `visible`. This synchronous branch reads live `actor.items` (no fromUuid /
-    // async), recomputed per build, so a dropped book un-reveals on the next build
-    // with no flag write.
+    // Alchemy reveals rather than gates (see the docblock): always craftable for a non-GM, with
+    // reveal recomputed synchronously from live `actor.items` on each build.
     if (system?.resolutionMode === 'alchemy') {
       if (viewer?.isGM) {
         return { visible: true, craftable: true, reason: 'gm', knowledge: null };
@@ -1195,9 +979,8 @@ export class RecipeVisibilityService {
       const mode = this._getVisibilityMode(system);
       const learnedMap = this._getLearnedMap(craftingActor);
 
-      // Discovery-by-brew reveal is unioned across ALL modes: a matched-signature
-      // brew writes `learnedRecipes` only when `learnOnCraft` is on, and any such
-      // learned recipe is revealed regardless of the mode's own reveal source.
+      // Brew discovery reveals under every mode; a matched brew writes `learnedRecipes` only
+      // when `learnOnCraft` is on.
       const brewDiscovered = alchemyCfg.learnOnCraft === true && Boolean(learnedMap?.[recipe.id]);
 
       let knowledge = null;
@@ -1226,10 +1009,8 @@ export class RecipeVisibilityService {
           break;
         }
         default: {
-          // `global` and `knowledge` both reveal from the SAME `learnedRecipes`
-          // read (one code path, not two) — they differ only in how it is populated
-          // (global: brew-discovery; knowledge: the Inventory learn path). Existing
-          // worlds seeded `knowledge` therefore keep their learned-only semantics.
+          // `global` and `knowledge` reveal from the same `learnedRecipes` read and differ
+          // only in its writer (brew discovery vs the Inventory learn path).
           revealedByMode = Boolean(learnedMap?.[recipe.id]);
         }
       }
@@ -1263,10 +1044,8 @@ export class RecipeVisibilityService {
         }
         case 'item':
         case 'knowledge': {
-          // `item` → item-only knowledge access; `knowledge` → item-or-learned.
-          // Only force the sub-mode when the flat `visibilityMode` is authored;
-          // legacy systems keep their own `knowledge.mode` (so 'learned' stays
-          // learned-only).
+          // `item` forces item-only access and `knowledge` item-or-learned, but only for an
+          // authored flat mode; legacy systems keep `knowledge.mode` ('learned' stays learned).
           const knowledgeMode = this._usesFlatVisibilityMode(system)
             ? mode === 'item'
               ? 'item'
@@ -1312,24 +1091,11 @@ export class RecipeVisibilityService {
 
   /**
    * The corpus-wide visibility pass: every enabled recipe a viewer may see, with its access.
+   * One inventory snapshot is built per pass and threaded down (issue 1077), so the per-recipe
+   * cost follows the books held rather than the whole inventory. It is a per-pass value, never
+   * a cache, so it cannot go stale.
    *
-   * The knowledge branches of this pass used to re-enumerate every source actor's whole
-   * inventory PER RECIPE, so opening a crafting app against 5,000 book-gated recipes and a
-   * four-actor party performed 20,000 `actor.items` reads and 120,000 recipe-item match
-   * attempts (issue 1077). One snapshot is built here instead — one read of each actor, one
-   * book-candidate resolution per held document per system — and threaded down, which makes
-   * the per-recipe term proportional to the books actually held rather than to the whole
-   * inventory.
-   *
-   * The snapshot is a per-pass VALUE and is discarded when this returns; it is never a cache
-   * and cannot go stale. See `inventorySnapshot`'s header for why the item half is not
-   * keyed on #1076's revision tokens.
-   *
-   * @param {object} params
-   * @param {object} params.viewer
    * @param {string} [params.craftingSystemId] Restrict to one system.
-   * @param {object|null} [params.craftingActor]
-   * @param {object[]} [params.componentSourceActors]
    * @returns {Array<{recipe: object, access: object}>}
    */
   getVisibleRecipes({ viewer, craftingSystemId, craftingActor, componentSourceActors = [] }) {
@@ -1354,20 +1120,8 @@ export class RecipeVisibilityService {
       .filter((entry) => entry.access.visible);
   }
 
-  /**
-   * The per-pass inventory snapshot a corpus-wide walk shares.
-   *
-   * Delegates to the shared {@link buildPassInventorySnapshot}, which owns the legacy
-   * `linkedRecipeItemUuid` collection and the recipe-item matcher so no call site can build a
-   * snapshot missing either (issue 1228). This used to assemble both itself, which is how the
-   * two production snapshots came to inject disjoint collaborator sets.
-   *
-   * @param {object[]} recipes
-   * @param {object|null} craftingActor
-   * @param {object[]} componentSourceActors
-   * @returns {object}
-   * @private
-   */
+  // The per-pass inventory snapshot, via the shared `buildPassInventorySnapshot`, which owns
+  // the legacy-uuid collection and the matcher so no caller builds a partial one (issue 1228).
   _passSnapshot(recipes, craftingActor, componentSourceActors) {
     return buildPassInventorySnapshot({
       craftingActor,
@@ -1377,10 +1131,9 @@ export class RecipeVisibilityService {
     });
   }
 
-  // The System-Validity Gate's two facts for one system (spec §System-Validity
-  // Gate), evaluated once per call. Reads the system's recipes/components through the
-  // injected recipe manager. Fails open (empty) when the system id is missing so a
-  // broken collaborator never blocks a craft outright. Callers own the GM bypass.
+  // The System-Validity Gate's two facts for one system (spec §System-Validity Gate). Fails
+  // open (empty) when the system id is missing, so a broken collaborator never blocks a
+  // craft. Callers own the GM bypass.
   _computeSystemVisibility(system) {
     if (!system?.id) return { blocksSystem: false, hiddenEntityIds: new Set() };
     const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system.id }) || [];
@@ -1391,13 +1144,10 @@ export class RecipeVisibilityService {
   }
 
   guardCraftStart({ viewer, recipe, craftingActor, componentSourceActors = [] }) {
-    // System-Validity Gate (spec §Crafting Guard Algorithm step 0): reject a non-GM
-    // craft up front when the system's validation report blocks the whole system, or
-    // when the targeted recipe entity is marked `blocks: 'visibility'`. This is an
-    // INDEPENDENT layer from listing filtering — a non-GM must not bypass visibility
-    // by targeting a recipe id directly via API/macro. `computeSystemVisibility` is
-    // evaluated once here (not per step). GMs bypass so they can still reach a broken
-    // system to diagnose it (mirrors `GatheringEngine._isSystemBlockedForGathering`).
+    // System-Validity Gate (spec §Crafting Guard Algorithm step 0): reject a non-GM craft when
+    // the system is blocked or the recipe is `blocks: 'visibility'`, independently of listing,
+    // so an API or macro call cannot bypass it. GMs bypass to diagnose a broken system, as in
+    // `GatheringEngine._isSystemBlockedForGathering`.
     if (viewer?.isGM !== true) {
       const system = this._getCraftingSystem(recipe);
       if (system) {
@@ -1417,9 +1167,8 @@ export class RecipeVisibilityService {
     const system = this._getCraftingSystem(recipe);
     if (!system) return { success: false, message: LEARN_RECIPE_MESSAGES.systemNotFound };
 
-    // Preconditions gate: the authored flat mode wins, so a flat `item`/`global`/
-    // `restricted` system rejects the learn even though it carries the residual
-    // `knowledge.mode` default (spec §Learning Recipes → Preconditions).
+    // Preconditions gate (spec §Learning Recipes → Preconditions): an authored flat mode wins
+    // over the residual `knowledge.mode` default.
     if (!this._isLearnModeEnabled(system)) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.learningDisabled };
     }
@@ -1436,12 +1185,9 @@ export class RecipeVisibilityService {
       return { success: false, message: LEARN_RECIPE_MESSAGES.prerequisiteNotMet };
     }
 
-    // Learning consumes/anchors a real owned recipe item, so we must evaluate
-    // the actor's actual inventory directly rather than trusting
-    // `evaluateKnowledgeAccess().matchedItems` — that array is empty on the GM
-    // bypass path, which would make a GM who genuinely owns a matching item fail
-    // with `noMatchingItem`. Collecting candidates here means a GM (or player)
-    // who owns a match can learn, while one who owns none still cannot.
+    // Collect the actor's real candidates rather than trusting `matchedItems`, which is empty
+    // on the GM bypass: a GM who owns a matching item can learn, and one who owns none still
+    // cannot.
     const allMatches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
     // Candidate exhaustion is judged per candidate's OWN book (per-book caps, issue 511).
     const matchedItems = this._filterNonExhausted(recipe, allMatches);
@@ -1450,9 +1196,8 @@ export class RecipeVisibilityService {
       return { success: false, message: LEARN_RECIPE_MESSAGES.noMatchingItem };
     }
 
-    // Resolve the SELECTED book once — the character-prerequisite gate (issue 544) and
-    // the `consumeOnLearn` deletion below both anchor on the book the actor actually
-    // owns, not the recipe's first-member book.
+    // Resolve the selected book once: the character-prerequisite gate (issue 544) and the
+    // `consumeOnLearn` deletion anchor on the owned book, not the first member book.
     const selectedDefinition = this._matchDefinitionForItem(recipe, selected.item);
     const characterGate = this._meetsCharacterPrerequisites(
       recipe,
@@ -1487,12 +1232,9 @@ export class RecipeVisibilityService {
     };
   }
 
-  // Whether a recipe's crafting system has an EFFECTIVE learn cap (issue 511):
-  // `limitRecipes === true` AND a finite positive `maxRecipes`. A system that
-  // toggled `limitRecipes` on but carries an invalid/missing `maxRecipes` is
-  // NOT treated as capped — it fails closed to the uncapped/unlimited learn path
-  // (mirroring how `_filterNonExhausted` treats an invalid `maxUses` as
-  // unlimited) rather than bricking its linked recipes with a zero budget.
+  // Whether the recipe's book has an effective learn cap (issue 511): `limitRecipes` and a
+  // finite positive `maxRecipes`. An invalid `maxRecipes` is treated as uncapped, like an
+  // invalid `maxUses` in `_filterNonExhausted`, rather than as a zero budget.
   _isRecipeItemLearnCapped(recipe, definition = this._getRecipeItemDefinition(recipe)) {
     return Number.isFinite(this._getLearnCapForRecipe(recipe, definition));
   }
@@ -1505,20 +1247,16 @@ export class RecipeVisibilityService {
     return Number.isFinite(max) && max > 0 ? max : undefined;
   }
 
-  // FN1 (issue 511) — capped-system recipes surface the item-sheet picker path
-  // ('manual') REGARDLESS of `dragDropEnabled`, and are NEVER auto-learned on
-  // drop ('auto'). Uncapped recipes keep the original split: auto-learn when
-  // `dragDropEnabled === true`, else the manual sheet path. This lets one dropped
-  // book auto-learn its uncapped-system recipes while routing only the
-  // capped-system ones to the picker (DN2).
+  // Capped recipes always take the item-sheet picker ('manual') and are never auto-learned on
+  // drop ('auto'); uncapped ones auto-learn when `dragDropEnabled === true`, else take the
+  // picker (issue 511), so one dropped book can auto-learn some recipes and route the rest.
   _isRecipeEligibleForOwnedItemLearning(recipe, mode = 'auto') {
     if (!recipe || recipe.enabled === false) return false;
 
     const system = this._getCraftingSystem(recipe);
     if (!system) return false;
-    // Learning only applies to the knowledge visibility mode (item-only and the
-    // non-knowledge modes never learn). Shared with the service learn entry points via
-    // `_isLearnModeEnabled` so the flat-enum/legacy resolution cannot drift.
+    // Only the knowledge mode learns; shared with the learn entry points via
+    // `_isLearnModeEnabled` so flat/legacy resolution cannot drift.
     if (!this._isLearnModeEnabled(system)) return false;
 
     const knowledge = this._getKnowledgeConfig(system);
@@ -1544,21 +1282,11 @@ export class RecipeVisibilityService {
       if (!this._hasRecipeItemReference(recipe)) return false;
       const { definition, tier } = this._matchRecipeItemForRecipe(recipe, ownedItem);
       if (!definition) return false;
-      // R5 (issue 555): the bulk on-drop auto-learn path (`mode: 'auto'`, the createItem
-      // hook) must not silently grant a recipe whose owned item matches its definition
-      // ONLY via tier 4 — the un-migrated `_stats.duplicateSource` fallback, which is
-      // exactly the duplicated-book ambiguity. A silent bulk knowledge grant is not
-      // cheap or reversible, so it demands a higher-confidence match. Explicit learn,
-      // the item-sheet picker (`mode: 'manual'`), and every display path still honour
-      // tier 4. Paired with the mandatory primary-GM auto-stamp (R3), which flags every
-      // registered book so real books resolve at tier 1 and keep auto-learning.
-      //
-      // The refusal is limited to REGISTERED definitions (`definition.id`). A recipe
-      // linked only by the legacy `linkedRecipeItemUuid` — an un-migrated book, or a
-      // standalone alchemy formula item — resolves through the synthetic entry built by
-      // `_recipeItemMatchDefinitions`, which has `id: null` and therefore no source to
-      // stamp. Tier 4 is the only signal such an item can ever produce, so refusing it
-      // would disable its on-drop learning permanently rather than until R3 runs.
+      // The bulk on-drop path (`mode: 'auto'`) refuses a registered definition matched only
+      // by tier 4 (`_stats.duplicateSource`), the duplicated-book ambiguity, because a silent
+      // bulk grant is not reversible (issue 555). Explicit learn, the picker and display paths
+      // still honour tier 4. An id-less legacy synthetic entry can only ever match at tier 4,
+      // so it is exempt, or its on-drop learning would be disabled for good.
       if (mode === 'auto' && tier === 'duplicate' && definition.id) return false;
       return true;
     });
@@ -1626,14 +1354,11 @@ export class RecipeVisibilityService {
       return this._buildOwnedItemLearningResult({ actor, ownedItem, mode, silent: true });
     }
 
-    // Capped-system recipes are learned one-at-a-time through the item-sheet
-    // picker (getLearnableRecipesFromItem / learnOneRecipeFromItem), never in the
-    // bulk drop/manual path, so they are suppressed here per matched recipe
-    // (DN2). Uncapped matched recipes in the same drop still learn in bulk.
+    // Capped recipes learn one at a time through the item-sheet picker, never in bulk, so
+    // they are suppressed here per recipe; uncapped recipes in the same drop still learn.
     const matchedRecipes = this._getOwnedItemLearningCandidates({ ownedItem, mode }).filter(
-      // Resolve the cap against the SPECIFIC owned book (R6a, issue 555), not the
-      // recipe's first member book — a recipe can live in several books with different
-      // caps, and the un-resolved default previously read the wrong book's cap.
+      // Resolve the cap against this owned book (issue 555), not the recipe's first member
+      // book: a recipe can live in several books with different caps.
       (recipe) =>
         !this._isRecipeItemLearnCapped(recipe, this._matchDefinitionForItem(recipe, ownedItem))
     );
@@ -1648,23 +1373,18 @@ export class RecipeVisibilityService {
         alreadyLearnedRecipes.push(recipe);
         continue;
       }
-      // A reader who fails the recipe's Required-Knowledge or character-prerequisite
-      // gate cannot bulk-learn it from a dropped book — silently skipped, mirroring
-      // how the drop path already suppresses capped recipes.
+      // A reader failing Required Knowledge or a character prerequisite is skipped silently,
+      // as capped recipes are.
       const definition = this._matchDefinitionForItem(recipe, ownedItem);
       if (!this._isPrerequisiteMet(recipe, actor, definition)) continue;
       if (!this._meetsCharacterPrerequisites(recipe, actor, definition, rollData).met) continue;
       learnableRecipes.push(recipe);
     }
 
-    // `consumeOnLearn` is read per recipe item from the SPECIFIC owned book's caps
-    // (issue 511 per-recipe-item caps; spec §Multi-Recipe Matching any-of semantics),
-    // NOT the legacy system-wide `knowledge.learn.consumeOnLearn` — that field is
-    // rebuilt away by the normalizer and stripped by the 1.11.0 migration, so it never
-    // fires at runtime. An unresolved definition fails closed to consume (the
-    // `_getRecipeItemCaps` default). `consumeOnLearn` is ignored for capped books
-    // (superseded by `destroyWhenSpent`), but capped recipes are already excluded above,
-    // so this only ever sees uncapped recipes (UN4).
+    // `consumeOnLearn` comes from this owned book's caps (issue 511), never the legacy
+    // system-wide `knowledge.learn.consumeOnLearn`, which the normalizer rebuilds away and the
+    // 1.11.0 migration strips. An unresolved definition consumes. Capped books ignore it, but
+    // they are already excluded above.
     const consumedItem = learnableRecipes.some(
       (recipe) =>
         this._getRecipeItemCaps(recipe, this._matchDefinitionForItem(recipe, ownedItem)).learn
@@ -1753,16 +1473,10 @@ export class RecipeVisibilityService {
   }
 
   /**
-   * Read-only view of the capped recipes a player can still learn from one owned
-   * recipe item (issue 511). Returns the item's linked, capped-system recipes the
-   * actor has not yet learned, plus the item-document's remaining learn budget
-   * (`remainingBudget = maxRecipes − count`). The recipe list is empty and
-   * `remainingBudget` is `0` once the budget is spent. Only capped-system recipes
-   * participate — uncapped recipes learn in bulk via `learnRecipesFromOwnedItem`.
+   * The capped recipes an actor can still learn from one owned book (issue 511), with its
+   * remaining learn budget (`maxRecipes − count`, 0 once spent). Uncapped recipes learn in
+   * bulk via `learnRecipesFromOwnedItem` instead.
    *
-   * @param {object} args
-   * @param {object} args.ownedItem
-   * @param {object|null} [args.actor]
    * @returns {{recipes: object[], remainingBudget: number, maxRecipes: number|undefined, count: number}}
    */
   getLearnableRecipesFromItem({
@@ -1773,9 +1487,8 @@ export class RecipeVisibilityService {
     if (!ownedItem || !actor) return empty;
     if (!this._isActorOwnedItem(ownedItem, actor)) return empty;
 
-    // Caps are read from THIS owned book (the one being read) per recipe — a recipe may
-    // live in several books, and several systems can share one physical item, so each
-    // recipe's cap resolves against the book that IS this item (many-to-many).
+    // Caps resolve per recipe against the book this item is: a recipe may live in several
+    // books, and several systems can share one physical item.
     const cappedCandidates = this._getOwnedItemLearningCandidates({
       ownedItem,
       mode: 'manual',
@@ -1792,9 +1505,8 @@ export class RecipeVisibilityService {
       )
       .filter((value) => Number.isFinite(value));
     const maxRecipes = caps.length > 0 ? Math.max(...caps) : undefined;
-    // The spent count is scope-aware: `perInstance` reads the per-copy document
-    // count; `total` reads the shared world pool (which the per-copy count never
-    // reflects), so the reader sees the real remaining budget for either scope.
+    // Scope-aware spent count: `perInstance` reads the copy's count and `total` the shared
+    // world pool, which the per-copy count never reflects.
     const primary = cappedCandidates[0];
     const primaryDefinition = this._matchDefinitionForItem(primary, ownedItem);
     const count =
@@ -1804,9 +1516,8 @@ export class RecipeVisibilityService {
     const remainingBudget = Number.isFinite(maxRecipes) ? Math.max(0, maxRecipes - count) : 0;
 
     const learnedMap = this._getLearnedMap(actor);
-    // Exclude recipes the reader cannot learn (Required-Knowledge + character-
-    // prerequisite gates) — the picker must not offer a recipe that
-    // learnOneRecipeFromItem would then refuse (issue 544).
+    // Exclude recipes failing Required Knowledge or a character prerequisite, which
+    // `learnOneRecipeFromItem` would refuse (issue 544).
     const rollData = actor?.getRollData?.() ?? {};
     const unlearned = cappedCandidates.filter((recipe) => {
       if (learnedMap?.[recipe.id]) return false;
@@ -1824,17 +1535,11 @@ export class RecipeVisibilityService {
   }
 
   /**
-   * Learn exactly one capped recipe from an owned recipe item (issue 511),
-   * enforcing the per-document learn budget. Validates the link, that the recipe
-   * is not already learned, and that `remainingBudget > 0`; writes one
-   * `learnedRecipes` entry, increments the item-document learn count, and deletes
-   * the item when the count reaches `maxRecipes` iff `destroyWhenSpent`. For
-   * capped books `consumeOnLearn` is ignored.
+   * Learn one capped recipe from an owned book (issue 511) within its per-document budget:
+   * writes one `learnedRecipes` entry, increments the document's learn count, and deletes the
+   * book when the count reaches `maxRecipes` iff `destroyWhenSpent`. `consumeOnLearn` is
+   * ignored for capped books.
    *
-   * @param {object} args
-   * @param {object} args.recipe
-   * @param {object} args.ownedItem
-   * @param {object|null} [args.actor]
    * @returns {Promise<{success: boolean, message: string, messageData?: object, destroyed?: boolean, remainingBudget?: number}>}
    */
   async learnOneRecipeFromItem({
@@ -1878,9 +1583,8 @@ export class RecipeVisibilityService {
 
     const maxRecipes = this._getLearnCapForRecipe(recipe, definition);
 
-    // `total` scope draws from ONE shared world pool (across every copy of the source
-    // item) instead of the per-copy document count, so every actor spends the same
-    // budget.
+    // `total` scope draws on one shared world pool across every copy of the source item
+    // instead of the per-copy count.
     if (this._getRecipeItemLearnScope(recipe, definition) === 'total') {
       return this._learnOnePartyRecipe({
         recipe,
@@ -1927,10 +1631,9 @@ export class RecipeVisibilityService {
     };
   }
 
-  // Learn one recipe from a `party`-mode book against the SHARED world pool. The
-  // shared slot is reserved via the GM-authoritative pool BEFORE the learn is
-  // recorded, so a non-GM (or otherwise failed) increment fails closed — the actor
-  // does not learn and the shared budget is not forked.
+  // Learn one recipe from a `party`-mode book against the shared world pool. The slot is
+  // reserved through the GM-authoritative pool before the learn is recorded, so a failed
+  // increment fails closed: no learn, and the shared budget is not forked.
   async _learnOnePartyRecipe({
     recipe,
     ownedItem,
@@ -1946,12 +1649,9 @@ export class RecipeVisibilityService {
       return { success: false, message: LEARN_RECIPE_MESSAGES.learnBudgetSpent };
     }
 
-    // A `total`-scope budget lives in a WORLD setting, so only a GM can reserve a
-    // slot. Report that as its own reason: the increment failing because this client
-    // is a player is NOT the budget being spent, and reporting "no learning uses
-    // left" told players their shared budget was gone while it sat untouched — a
-    // silent, permanent block on every `total`-scope book. `writable` is optional so
-    // injected test doubles (and any store that cannot refuse) behave as before.
+    // A `total` budget lives in a world setting, so only a GM can reserve a slot; a player's
+    // refused increment gets its own reason, not "no uses left" for an untouched budget.
+    // `writable` is optional so stores that cannot refuse behave as before.
     if (
       typeof this._partyLearnPool.writable === 'function' &&
       this._partyLearnPool.writable() !== true
@@ -1994,20 +1694,13 @@ export class RecipeVisibilityService {
   }
 
   /**
-   * Learn exactly one recipe from a book the crafting actor (or a component-source
-   * actor) owns, for the player Inventory learn affordance (issue 511). Resolves
-   * the owned book document deterministically, then:
-   *  - a capped system enforces the per-document learn budget and destroy-when-spent
-   *    (delegates to {@link learnOneRecipeFromItem});
-   *  - an uncapped system (or a cap toggled on with an invalid `maxRecipes`, which
-   *    fails closed to uncapped) writes one `learnedRecipes` entry and NEVER
-   *    consumes the book — `consumeOnLearn` is ignored here so learning one recipe
-   *    from a multi-recipe book does not strand its remaining recipes.
+   * Learn one recipe from a book the crafting actor or a component-source actor owns, for the
+   * Inventory learn affordance (issue 511). A capped book delegates to
+   * {@link learnOneRecipeFromItem}; an uncapped one (including an invalid `maxRecipes`) writes
+   * one `learnedRecipes` entry and never consumes the book, so a multi-recipe book is not
+   * stranded.
    *
-   * @param {object} args
-   * @param {object} args.recipe
    * @param {object|null} args.craftingActor Where the learned recipe is recorded.
-   * @param {object[]} [args.componentSourceActors] Additional inventory sources.
    * @returns {Promise<{success: boolean, message: string, messageData?: object, destroyed?: boolean, remainingBudget?: number}>}
    */
   async learnRecipeFromOwnedBook({ recipe, craftingActor, componentSourceActors = [] }) {
@@ -2041,15 +1734,12 @@ export class RecipeVisibilityService {
     const selected = this._selectDeterministic(matches);
     if (!selected) return { success: false, message: LEARN_RECIPE_MESSAGES.noMatchingItem };
 
-    // An EFFECTIVE cap (enabled + finite positive max) on the SELECTED book routes
-    // through the budget-enforcing capped path; an invalid cap falls through to
-    // uncapped.
+    // An effective cap on the selected book takes the budget-enforcing capped path; an
+    // invalid cap falls through to uncapped.
     const selectedDefinition = this._matchDefinitionForItem(recipe, selected.item);
 
-    // The character-prerequisite gate is per-book, so evaluate it against the book
-    // the actor actually owns (issue 544) — a recipe can belong to several books
-    // with different prerequisites. (The capped branch re-checks inside
-    // learnOneRecipeFromItem against the same selected book.)
+    // The character-prerequisite gate is per book, so check the owned one (issue 544); the
+    // capped branch re-checks the same book inside `learnOneRecipeFromItem`.
     const characterGate = this._meetsCharacterPrerequisites(
       recipe,
       craftingActor,
@@ -2099,17 +1789,14 @@ export class RecipeVisibilityService {
     if (!['item', 'itemOrLearned'].includes(mode)) return;
 
     const matches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
-    // Filter and select against each candidate's OWN book caps (per-book use caps,
-    // issue 511) — a first member book that does not limit uses must NOT short-circuit
-    // tracking when a second member book does. The old first-book `limitUses` early
-    // return skipped tracking in exactly that case.
+    // Filter and select per candidate's own book caps (issue 511): a first member book that
+    // does not limit uses must not skip tracking when another member book does.
     const nonExhausted = this._filterNonExhausted(recipe, matches);
     const selected = this._selectDeterministic(nonExhausted);
     if (!selected) return;
 
-    // Anchor caps to the SPECIFIC book the selected item is (per-book use caps): a
-    // recipe in two item-mode books with differing maxUses/whenSpent must exhaust and
-    // spend the actually-consumed item by ITS book's rules, not the first book's.
+    // Anchor caps to the selected item's own book, so it exhausts and is spent by its book's
+    // `maxUses`/`whenSpent`, not the first book's.
     const selectedCaps = this._getRecipeItemCaps(
       recipe,
       this._matchDefinitionForItem(recipe, selected.item)
@@ -2118,49 +1805,34 @@ export class RecipeVisibilityService {
   }
 
   /**
-   * Spend one use of one recipe item copy (issue 785). This is the SINGLE decision
-   * point for the increment, the exhaustion test and the `whenSpent` disposal, shared
-   * by the recipe-driven craft path (`applyRecipeItemUseOnCraft`) and the GM-driven
-   * Knowledge surface (`expendRecipeItemUse`) so the two can never diverge.
+   * Spend one use of one recipe item copy (issue 785): the single decision point for the
+   * increment, the exhaustion test and the `whenSpent` disposal, shared by
+   * `applyRecipeItemUseOnCraft` and the GM's `expendRecipeItemUse`.
    *
-   * An uncapped book performs NO write at all — not a zero-delta write.
+   * An uncapped book and an already-spent copy perform no write. The spent guard is the exact
+   * complement of `_filterNonExhausted`, so the craft path is unchanged, and it stops a stale
+   * GM row from deleting a copy under `whenSpent: 'destroyed'`. The count is re-read from the
+   * document rather than a caller's snapshot, so no `await` between collection and write can
+   * make it stale.
    *
-   * An ALREADY-SPENT copy performs no write either. The guard is the exact
-   * complement of `_filterNonExhausted`, which is what makes it behaviour-preserving
-   * on the craft path: that path only ever reaches here with a candidate that
-   * predicate already kept. The GM path has no such pre-filter, so without the guard
-   * a stale row (an asynchronous re-projection, a second GM window, a macro spending
-   * the last charge) would let a disabled-looking button drive one more increment —
-   * and, under `whenSpent: 'destroyed'`, silently delete the copy while reporting
-   * success.
-   *
-   * The current count is re-read from the document here rather than taken from a
-   * caller-supplied candidate snapshot. On the craft path the two are equal (nothing
-   * awaits between candidate collection and this write), so the re-read is strictly
-   * safer: it closes a staleness window that would open the moment an `await` is
-   * inserted between the two, and it keeps the GM path free of any snapshot at all.
-   *
-   * @param {object} item the owned recipe item copy to spend a use of
    * @param {object} itemCaps the resolved `caps.item` block from `_getRecipeItemCaps`
-   * @returns {Promise<'applied'|'uncapped'|'spent'>} which of the three outcomes ran
+   * @returns {Promise<'applied'|'uncapped'|'spent'>}
    */
   async _applyRecipeItemUse(item, itemCaps) {
     if (!item || itemCaps?.limitUses !== true) return APPLY_USE_OUTCOME.uncapped;
 
     const timesUsed = this._getRecipeItemUsage(item);
     const maxUses = Number(itemCaps.maxUses);
-    // A non-finite or non-positive `maxUses` is UNLIMITED (fail-open) — the same
-    // reading `_filterNonExhausted` applies, so the two can never disagree about
-    // whether a copy still has charges.
+    // A non-finite or non-positive `maxUses` is unlimited (fail-open), as in
+    // `_filterNonExhausted`, so the two agree on whether a copy has charges.
     const capped = Number.isFinite(maxUses) && maxUses > 0;
     if (capped && timesUsed >= maxUses) return APPLY_USE_OUTCOME.spent;
 
     const nextUses = timesUsed + 1;
     const exhausted = capped && nextUses >= maxUses;
 
-    // On exhaustion: 'destroyed' deletes the item; 'inert' keeps it but records the
-    // exhaustion (it is already excluded by `_filterNonExhausted` once
-    // `timesUsed >= maxUses`, so no further gating is needed).
+    // On exhaustion 'destroyed' deletes the copy and 'inert' records it; `_filterNonExhausted`
+    // already excludes it once `timesUsed >= maxUses`.
     if (exhausted && itemCaps.whenSpent === 'inert') {
       await this._markRecipeItemInert(item, nextUses);
       return APPLY_USE_OUTCOME.applied;
@@ -2173,10 +1845,8 @@ export class RecipeVisibilityService {
     return APPLY_USE_OUTCOME.applied;
   }
 
-  // Resolve one owned copy by DOCUMENT ID — never a uuid. Prefers the real
-  // `EmbeddedCollection#get` and falls back to scanning a plain array so a lightweight
-  // `{ items: [...] }` actor still resolves. Returns null rather than throwing when
-  // the actor, the collection, or the copy is gone.
+  // One owned copy by document id, never a uuid, via `EmbeddedCollection#get` or a
+  // plain-array scan; null when the actor, collection or copy is gone.
   _getActorOwnedItemById(actor, itemId) {
     if (!actor || !itemId) return null;
     const fromCollection = actor.items?.get?.(String(itemId));
@@ -2185,23 +1855,11 @@ export class RecipeVisibilityService {
   }
 
   /**
-   * Spend one use of a GM-nominated owned recipe item copy (issue 785 — the Knowledge
-   * surface's Expend action).
+   * Spend one use of a GM-nominated owned copy (issue 785, the Knowledge surface's Expend). No
+   * visibility or knowledge gate applies, and GM authorization belongs at the manager service
+   * seam. A vanished copy yields a result, never a throw; a spent or uncapped copy writes
+   * nothing and returns a failure.
    *
-   * No visibility-mode and no knowledge-mode gate applies: the GM named the copy, and
-   * gating here would contradict `_applyRecipeItemUse` being the single decision point.
-   * GM authorization itself belongs at the manager service seam — engines never gate.
-   *
-   * The copy is addressed by document id because the surface hands back the id it
-   * rendered; a copy that has vanished between render and click yields a result shape,
-   * never a throw past a caller that expects one.
-   *
-   * An already-spent copy, or a copy from an uncapped book, performs NO write at
-   * all — `_applyRecipeItemUse` short-circuits on both outcomes — and this returns a
-   * failure result rather than a silent success.
-   *
-   * @param {object} actor the owning actor
-   * @param {string} itemId the owned copy's document id
    * @param {object} definition the recipe item definition the copy matched
    * @returns {Promise<{ success: boolean, message: string, messageData?: object }>}
    */
@@ -2246,64 +1904,39 @@ export class RecipeVisibilityService {
   }
 
   /**
-   * Forget every learned-recipe entry a caller's predicate rejects, across the actors this
-   * client may write.
-   *
-   * The shared body of the two prunes below. Scoped to the actors THIS client may write
-   * (issue 970): `cleanupLearnedRecipes` runs on every client at `initialize()` and mutates
-   * actor flags directly (there is no GM relay), so an un-filtered walk had a player
-   * attempting `Actor#update` on every other character in the world.
-   *
-   * Ids come from the ENTRY-BOUNDARY reader, never from `Object.keys` (issue 1143).
-   * `Document#update` nests a dotted recipe id into a subtree, so the top level of the
-   * persisted map holds the id's FIRST SEGMENT (`imported`) rather than an id. That segment
-   * names no valid recipe, so it read as stale, and the deletion of `imported` below removed
-   * the whole subtree — every sibling entry whose recipe still existed with it. See
-   * `recipeKeyedFlagEntries.js` for why the walk stops at the entry and why `flattenObject`
-   * is the wrong inverse.
-   *
-   * @param {(recipeId: string) => boolean} isStale
+   * Forget every learned entry `isStale` rejects, on the actors this client may write
+   * (issue 970): `cleanupLearnedRecipes` runs on every client with no GM relay. Ids come from
+   * the entry-boundary reader, never `Object.keys` (issue 1143): `Document#update` nests a
+   * dotted id, so a top-level key is only its first segment, and deleting it removes every
+   * sibling. See `recipeKeyedFlagEntries.js`.
    */
   async _forgetLearnedRecipesWhere(isStale) {
     for (const actor of selectWritableActors(game.actors)) {
       const learned = this._getLearnedMap(actor);
-      const staleIds = [...readLearnedRecipeEntries(learned).keys()].filter(isStale);
+      const staleIds = [...readLearnedRecipeEntries(learned).keys()].filter((id) => isStale(id));
       if (staleIds.length === 0) continue;
-      // Route through the shared deletion primitive so pruned keys are actually
-      // removed with explicit forced deletions (the prior filtered-map `_setLearnedMap`
-      // rebuild MERGED, so stale keys were never deleted and resurrected on reload).
-      // `freeLearnBudget: false` — recipe deletion is content management, not an
-      // in-fiction un-learn, so it must not refund any consumed learn budget.
+      // The shared deletion primitive uses forced deletions, since a map rebuilt through
+      // `setFlag` merges and never deletes. `freeLearnBudget: false`: recipe deletion is
+      // content management, not an in-fiction un-learn.
       await this.forgetLearnedRecipes(actor, staleIds, { freeLearnBudget: false });
     }
   }
 
   /**
-   * The CORPUS-DERIVED prune: drop learned-recipe entries naming a recipe that is not in
-   * the live corpus.
-   *
-   * It infers a deletion from an ABSENCE, so it is only safe against a known-complete
-   * **Valid Id Basis** (`data-models/spec.md` § Valid Id Basis) — a half-read corpus makes
-   * it forget recipes every actor legitimately knows, and finishing the read afterwards
-   * restores none of it. Both of its callers gate it: `startupPassComposition.js` at boot
-   * and `mutationCleanupComposition.js` after a GM's delete.
+   * The corpus-derived prune: drop learned entries naming a recipe absent from the corpus. It
+   * infers deletion from absence, so it is only safe against a complete **Valid Id Basis**
+   * (`data-models/spec.md` § Valid Id Basis); `startupPassComposition.js` and
+   * `mutationCleanupComposition.js` gate it.
    */
   async cleanupLearnedRecipes(validRecipeIds = new Set()) {
     await this._forgetLearnedRecipesWhere((id) => !validRecipeIds.has(id));
   }
 
   /**
-   * The SUBJECT-TARGETED prune: drop learned-recipe entries naming one of the recipes the
-   * caller has just deleted (issue 1226).
-   *
-   * The fallback the mutation-time gate runs in {@link cleanupLearnedRecipes}'s place when
-   * the corpus cannot be attested complete. It needs no Valid Id Basis: the ids are
-   * positively known to be gone because the caller removed them, and a corpus missing
-   * records cannot make a deleted id valid again. An entry naming a recipe that was simply
-   * never read is not named here and survives, which is the whole difference from the
-   * sweep above.
-   *
-   * @param {Iterable<string>} recipeIds
+   * The subject-targeted prune (issue 1226): drop learned entries naming recipes the caller
+   * just deleted. The mutation-time fallback for {@link cleanupLearnedRecipes} when the corpus
+   * cannot be attested complete; it needs no Valid Id Basis, and an entry for a never-read
+   * recipe survives.
    */
   async forgetDeletedRecipes(recipeIds) {
     const targets = new Set(
@@ -2314,46 +1947,25 @@ export class RecipeVisibilityService {
   }
 
   /**
-   * The shared crafting-knowledge deletion primitive (issue 773) — the single path
-   * behind erase-one / reset-one-system / reset-all-systems. Removes each supplied
-   * recipe id from the actor's learned-knowledge store with explicit, reload-safe
-   * forced deletions under the full doubly-nested path
-   * `flags.fabricate.fabricate.learnedRecipes` (and, when `clearDiscovery`,
-   * `flags.fabricate.fabricate.discoveryProgress`), each built by `forcedDeletionEntry` and
-   * batched into ONE `Actor#update`. It NEVER prunes by rebuilding a filtered map through
-   * `setFlag` as the sole write — that merge never removes keys and the entry resurrects on
-   * reload (see the recipe-visibility spec's Knowledge Reset / Erase).
+   * The shared crafting-knowledge deletion primitive (issue 773) behind erase-one and the
+   * reset grains. Removes each id from `flags.fabricate.fabricate.learnedRecipes` (and
+   * `discoveryProgress` when `clearDiscovery`) with forced deletions built by
+   * `forcedDeletionEntry`, batched into one `Actor#update`. Never a rebuilt map through
+   * `setFlag` alone: that merge keeps keys, so the entry resurrects on reload.
    *
-   * Both stores are read through the ENTRY-BOUNDARY reader in
-   * `recipeKeyedFlagEntries.js` (issue 1143), never by indexing the raw map: a dotted
-   * recipe id is persisted as a SUBTREE, so `hasOwnProperty(map, 'a.b')` is false and
-   * `map['a.b']` is undefined against the shape actually on the document.
+   * Both stores are read through the entry-boundary reader (issue 1143), since a dotted id is
+   * persisted as a subtree. An id a batched deletion cannot remove exactly (an unsafe segment,
+   * another entry nested inside it, or `__proto__`/`constructor`/`prototype`) routes the store
+   * to a delete-then-write fallback: two sequential awaited operations, never one update, which
+   * `mergeObject` may apply delete-after-insert and wipe the map.
    *
-   * An id routes to a two-step delete-then-write fallback whenever a batched per-id
-   * deletion cannot remove exactly that id's entry — because the id is not a safe
-   * segment, OR because another entry nests inside it (`a` and `a.b` share one node, so
-   * deleting `a` removes both), OR because it is `__proto__`, `constructor` or
-   * `prototype`, which `forcedDeletionEntry` refuses. The fallback drops the parent key
-   * (`learnedRecipes`) and
-   * re-writes the retained map, rebuilt from the entry view rather than by filtering the
-   * raw top level — two SEQUENTIAL awaited operations, never a same-update mix (which
-   * `mergeObject` may process delete-after-insert and wipe the whole map).
+   * `freeLearnBudget` (default true, so a reset actor can re-learn) frees one slot per cleared
+   * entry against a still-held source copy at its current `learnScope`. Orphans (no
+   * `sourceItemUuid`, an unheld source, an unresolvable recipe) free nothing, since a `total`
+   * pool key cannot be rebuilt once the recipe is gone.
    *
-   * When `freeLearnBudget` (default true — reset/erase are respec/amnesia, so the
-   * actor must be able to re-learn), each cleared entry frees one consumed learn slot
-   * against a STILL-HELD source copy at its CURRENT `learnScope`: `perInstance`
-   * decrements the held item's `recipeItemLearning.learnedCount`; `total` decrements
-   * the GM-authoritative party-pool key. Orphan entries (no `sourceItemUuid`, an
-   * unheld source, or an unresolvable recipe) free NOTHING — a `total` pool key is
-   * unreconstructable once the recipe/definition is gone, so it is deliberately left
-   * as-is rather than risk a wrong-key decrement.
-   *
-   * @param {object} actor The actor document whose learned knowledge is mutated.
-   * @param {string[]} recipeIds Recipe ids to forget.
-   * @param {object} [options]
-   * @param {boolean} [options.freeLearnBudget=true] Free the consumed learn budget.
-   * @param {boolean} [options.clearDiscovery=false] Also clear each id's
-   *   `discoveryProgress` entry (the reset grains pass true; erase-one defaults off).
+   * @param {boolean} [options.clearDiscovery=false] Also clear each id's `discoveryProgress`
+   *   entry (the reset grains pass true).
    * @returns {Promise<{ success: boolean, count: number }>}
    */
   async forgetLearnedRecipes(
@@ -2367,9 +1979,8 @@ export class RecipeVisibilityService {
 
     const requested = [...new Set((recipeIds || []).map(String))];
 
-    // One plan per recipe-id-keyed store. Both are cleared by the same two mechanisms,
-    // and describing them uniformly is what keeps the learned and discovery halves from
-    // being two hand-maintained copies of one algorithm.
+    // One plan per recipe-id-keyed store, so the learned and discovery halves share one
+    // algorithm rather than two copies.
     const plans = [this._planLearnedClear(actor, requested)];
     if (clearDiscovery) plans.push(this._planDiscoveryClear(actor, requested));
 
@@ -2384,9 +1995,8 @@ export class RecipeVisibilityService {
       ? learnedPlan.ids.map((id) => ({ recipeId: id, entry: learnedPlan.entries.get(id) }))
       : [];
 
-    // Common (generated-id) case: batch every in-place deletion, across both
-    // stores, into ONE update. A store holding an id that cannot be deleted in place
-    // contributes nothing here and takes the two-step fallback below instead.
+    // Batch every in-place deletion, across both stores, into one update; a store holding an
+    // id that cannot be deleted in place takes the fallback below instead.
     const updates = Object.assign({}, ...plans.map((plan) => this._inPlaceDeletions(plan)));
     if (Object.keys(updates).length > 0) {
       await actor.update(updates);
@@ -2412,17 +2022,10 @@ export class RecipeVisibilityService {
   }
 
   /**
-   * Describe how one recipe-id-keyed store must be cleared (issue 1143).
-   *
-   * `entries` is the ENTRY-BOUNDARY view, not the raw map: a dotted recipe id is nested
-   * by `Document#update`, so `hasOwnProperty(map, 'a.b')` is false and `map['a.b']` is
-   * undefined against the shape actually on the document.
-   *
-   * `needsRebuild` is true when ANY requested id cannot be removed by a batched per-id
-   * deletion without destroying something else — see {@link isDirectlyDeletableId}. It is
-   * all-or-nothing per store because the fallback rewrites the whole map anyway.
-   *
-   * @private
+   * How one recipe-id-keyed store must be cleared (issue 1143). `entries` is the entry-boundary
+   * view, not the raw map. `needsRebuild` is true when any requested id cannot be removed by a
+   * batched per-id deletion without destroying something else ({@link isDirectlyDeletableId});
+   * it is per store because the fallback rewrites the whole map.
    */
   _planStoreClear(flagKey, entries, requested, write) {
     const ids = requested.filter((id) => entries.has(id));
@@ -2455,10 +2058,9 @@ export class RecipeVisibilityService {
     );
   }
 
-  // The in-place deletion entries for one plan, or nothing when that store has to be
-  // rebuilt instead. Returned as a payload fragment so every store's deletions merge
-  // into ONE `Actor#update`. An id the helper will not address reroutes the store.
-  // Rerouting sets needsRebuild here, so this must run before the two-step loop reads it.
+  // One plan's in-place deletion entries, or nothing when the store must be rebuilt; merged
+  // so every store deletes in one `Actor#update`. An id the helper refuses sets
+  // `needsRebuild`, so this must run before the two-step loop reads it.
   _inPlaceDeletions(plan) {
     if (plan.needsRebuild) return {};
     const parentPath = `${this._nestedFlagPath}.${plan.flagKey}`;
@@ -2471,20 +2073,12 @@ export class RecipeVisibilityService {
   }
 
   /**
-   * The two-step delete-then-write fallback: drop the parent key FIRST, then re-write
-   * the retained map so the merge lands on an absent key and is reload-safe. These are
-   * two SEQUENTIAL awaited operations, never one update — `mergeObject` may process the
-   * deletion after the insertion and wipe the whole map.
-   *
-   * The retained map is rebuilt from the ENTRY VIEW, not by filtering `Object.entries`
-   * of the raw store (issue 1143). That comparison puts nested first segments on one
-   * side and recipe ids on the other, matches nothing, and writes the entry just deleted
-   * straight back — so fixing detection alone would have fixed nothing. A retained
-   * dotted id re-splits on this write exactly as the original learn write did, which is
-   * the documented fidelity limit; the invariant preserved is that no SURVIVING entry is
-   * destroyed.
-   *
-   * @private
+   * The delete-then-write fallback: drop the parent key first, then re-write the retained map
+   * so the merge lands on an absent key. Two sequential awaited operations, never one update,
+   * which `mergeObject` may apply delete-after-insert. The retained map is rebuilt from the
+   * entry view, not the raw top level (issue 1143), or the just-deleted entry is written back.
+   * A retained dotted id re-splits on this write, the documented fidelity limit; no surviving
+   * entry is destroyed.
    */
   async _rebuildStoreWithoutIds(actor, plan) {
     const [path, deletion] = forcedDeletionEntry(this._nestedFlagPath, plan.flagKey);
@@ -2494,11 +2088,9 @@ export class RecipeVisibilityService {
     await plan.write(actor, retained);
   }
 
-  // Free one consumed learn slot for a cleared learned entry, against the CURRENT
-  // learn scope of a STILL-HELD source copy. No-ops (frees nothing) for an auto-learn
-  // entry (no `sourceItemUuid`), a source book the actor no longer carries, or an
-  // orphan recipe id that no longer resolves — in particular a `total` pool key is
-  // unreconstructable once the recipe/definition is gone, so no pool math runs.
+  // Free one learn slot for a cleared entry against the current scope of a still-held source
+  // copy. Frees nothing for an auto-learn entry (no `sourceItemUuid`), an unheld book, or an
+  // orphan recipe id, whose `total` pool key cannot be rebuilt.
   async _freeLearnBudgetForEntry(actor, recipeId, entry) {
     const sourceItemUuid = entry?.sourceItemUuid;
     if (!sourceItemUuid) return;
@@ -2516,16 +2108,10 @@ export class RecipeVisibilityService {
   }
 
   /**
-   * Reset one crafting system's learned knowledge for one actor (issue 773). Clears
-   * every learned entry whose recipe belongs to `systemId` (resolved via
-   * `getRecipe(id).craftingSystemId`) plus their scoped `discoveryProgress`. Orphan
-   * learned keys whose recipe no longer resolves are LEFT IN PLACE — they cannot be
-   * attributed to a system.
+   * Reset one system's learned knowledge for one actor (issue 773): every learned entry whose
+   * recipe belongs to `systemId`, plus its `discoveryProgress`. Orphan keys whose recipe no
+   * longer resolves stay, since they cannot be attributed to a system.
    *
-   * @param {object} actor
-   * @param {string} systemId
-   * @param {object} [options]
-   * @param {boolean} [options.freeLearnBudget=true]
    * @returns {Promise<{ success: boolean, count: number }>}
    */
   async forgetSystemLearnedRecipes(actor, systemId, { freeLearnBudget = true } = {}) {
@@ -2533,8 +2119,7 @@ export class RecipeVisibilityService {
       return { success: false, count: 0 };
     }
     // Entry-boundary ids, not `Object.keys` (issue 1143): a dotted id's first segment
-    // resolves to no recipe, so it could never be attributed to a system and the reset
-    // silently skipped it.
+    // resolves to no recipe, so the reset would skip it.
     const ids = [...readLearnedRecipeEntries(this._getLearnedMap(actor)).keys()].filter(
       (id) => this._getRecipeById(id)?.craftingSystemId === systemId
     );
@@ -2542,21 +2127,17 @@ export class RecipeVisibilityService {
   }
 
   /**
-   * Reset ALL learned knowledge for one actor across every crafting system (issue
-   * 773) — every learned key INCLUDING orphans, plus every `discoveryProgress` entry.
+   * Reset all learned knowledge for one actor across every system (issue 773): every learned
+   * key including orphans, plus every `discoveryProgress` entry.
    *
-   * @param {object} actor
-   * @param {object} [options]
-   * @param {boolean} [options.freeLearnBudget=true]
    * @returns {Promise<{ success: boolean, count: number }>}
    */
   async forgetAllLearnedRecipes(actor, { freeLearnBudget = true } = {}) {
     if (!actor || typeof actor.update !== 'function') {
       return { success: false, count: 0 };
     }
-    // Entry-boundary ids for BOTH stores (issue 1143). `Object.keys` yielded a dotted
-    // id's first segment, which `forgetLearnedRecipes` then found genuinely present and
-    // deleted as a whole subtree, taking every sibling with it.
+    // Entry-boundary ids for both stores (issue 1143): `Object.keys` yields a dotted id's
+    // first segment, whose deletion takes every sibling with it.
     const ids = [
       ...new Set([
         ...readLearnedRecipeEntries(this._getLearnedMap(actor)).keys(),

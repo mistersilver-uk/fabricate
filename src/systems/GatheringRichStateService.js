@@ -105,37 +105,25 @@ const REVEAL_POLICIES = new Set(['never', 'onSuccess', 'onAttempt']);
 const REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
 const GATHERING_EVENT_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
 const CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
-// System-wide drop-modifier application mode. This is a single global system
-// setting (`dropModifierMode`) and cannot be overridden per modifier. Covers
-// character modifiers AND condition modifiers (weather/time-of-day/biome).
+// The single system-wide `dropModifierMode`, never overridden per modifier; it covers character
+// and condition (weather, time-of-day, biome) modifiers.
 const DROP_MODIFIER_MODES = new Set(['additive', 'multiplicative']);
 
-/**
- * Resolve the effective additive/multiplicative drop-modifier mode from the
- * system-level setting alone, falling back to `'additive'` for any unknown
- * value. There is no per-reference/per-entry override.
- *
- * @param {string} [systemMode] The system-level `dropModifierMode`.
- * @returns {'additive'|'multiplicative'}
- */
+/** The drop-modifier mode from the system setting alone, `'additive'` for any unknown value. */
 function resolveDropModifierMode(systemMode) {
   return DROP_MODIFIER_MODES.has(systemMode) ? systemMode : 'additive';
 }
-// Legacy system-level limitation mode values, retained only for the read-time
-// compat mapping in normalizeGatheringEconomy (legacy `mode` ⇒ stamina/nodes
-// flags). The canonical state is the two independent booleans, not this enum.
+// Legacy limitation-mode values, kept only for `normalizeGatheringEconomy`'s read-time mapping
+// onto the two canonical booleans.
 const ECONOMY_MODES = new Set(['none', 'stamina', 'nodes']);
 // Legacy system-level economy setting. Task resolution is selected independently.
 const GATHERING_RESOLUTION_MODES = new Set(['d100', 'progressive', 'routed']);
 const GATHERING_TASK_RESOLUTION_MODES = new Set(['straight', 'd100', 'progressive', 'routed']);
 // Stamina regeneration over world time.
 const STAMINA_REGEN_POLICIES = new Set(['none', 'overTime']);
-// Legacy stamina-regen policy mapped onto the unified `overTime` term. The 1.2.0
-// migration rewrites this in persisted data, but normalizeGatheringEconomy applies
-// the same mapping at read time so a world whose stamina data was never migrated
-// keeps regenerating instead of silently coercing to `none` (which disables regen).
-// NOTE: distinct from the pre-0.4.0 node-respawn `elapsedTime` legacy value — a
-// different enum at a different path (see gatheringNodeConfig.js).
+// Legacy stamina-regen policy mapped to `overTime`. The 1.2.0 migration rewrites stored data, but
+// the read-time mapping keeps an unmigrated world regenerating instead of coercing to `none`.
+// Distinct from the node-respawn `elapsedTime` value (see gatheringNodeConfig.js).
 const LEGACY_STAMINA_REGEN_POLICY_MAP = Object.freeze({ elapsedTime: 'overTime' });
 const STAMINA_REGEN_UNITS = new Set(['minutes', 'hours', 'days', 'weeks']);
 const SECONDS_PER_UNIT = Object.freeze({ minutes: 60, hours: 3600, days: 86_400, weeks: 604_800 });
@@ -161,31 +149,16 @@ const BLOCKED_REASON_KEYS = Object.freeze({
 });
 
 /**
- * Owns rich-gathering runtime support: global conditions, reusable library
- * composition, system d100 rules, node counts, actor-scoped stamina, attempt
- * counters, and blind task reveal evidence. The service is intentionally small
- * and side-effect explicit so GatheringEngine can keep history-before-effects
- * ordering.
+ * Rich-gathering runtime support: global conditions, library composition, d100 rules, node
+ * counts, actor stamina, attempt counters and blind reveal evidence, kept side-effect explicit so
+ * GatheringEngine can keep history-before-effects ordering.
  */
 export class GatheringRichStateService {
   /**
-   * Construct the service with injected runtime seams. `evaluateExpression`
-   * was added by the gathering character modifiers feature so d100 resolution
-   * can evaluate character modifier expressions against the acting actor
-   * without coupling the service to Foundry globals.
-   *
-   * @param {object} options
-   * @param {object} [options.environmentStore] Gathering environment store.
-   * @param {Function} [options.getSetting] Read accessor for gathering config.
-   * @param {Function} [options.setSetting] Write accessor for gathering config.
-   * @param {string} [options.settingKey] Config setting key.
-   * @param {Function} [options.nowWorldTime] Current world-time getter.
-   * @param {Function} [options.getUserId] Current Foundry user id getter.
    * @param {Function} [options.rollD100] D100 roller (test seam).
-   * @param {object} [options.hooks] Foundry Hooks bridge.
-   * @param {Function} [options.evaluateExpression] Async expression evaluator
-   *   (signature matches `evaluateGatheringExpression`); used to resolve
-   *   character modifier expressions to numeric contributions.
+   * @param {Function} [options.evaluateExpression] Async evaluator with the
+   *   `evaluateGatheringExpression` signature, resolving character modifier expressions against
+   *   the acting actor without Foundry globals.
    */
   constructor({
     environmentStore = null,
@@ -198,21 +171,15 @@ export class GatheringRichStateService {
     hooks = globalThis.Hooks ?? null,
     evaluateExpression = null,
     secondsPerUnit = null,
-    // Interactable-scoped node seams (issue 302). These resolve + write the node
-    // pool carried by a scene interactable's `fabricate.interactable` behaviour,
-    // injected so the rich-state service never reaches for `game.scenes`. When
-    // absent (the default), every node path falls back to the environment scope.
+    // Interactable-scoped node seams (issue 302) resolving and writing a scene interactable's
+    // pool without `game.scenes`; absent, every node path uses the environment scope.
     resolveRegionBehavior = null,
     writeInteractableBehavior = null,
-    // GM-routed ENVIRONMENT node depletion seam. The environment pool is persisted
-    // in the `gatheringEnvironments` WORLD setting, which Foundry lets only a GM
-    // update, so a player's gather decrement is emitted to the active GM instead of
-    // written directly (see `gatheringNodeSocket.js`). When absent (the default) the
-    // write is applied in place, which is what tests and a GM client do anyway.
+    // GM-routed environment node depletion: the pool lives in the `gatheringEnvironments` world
+    // setting only a GM may update, so a player's decrement goes to the active GM
+    // (`gatheringNodeSocket.js`). Absent, the write applies in place, as on a GM client.
     depleteEnvironmentNode = null,
-    // Extracted collaborators (issue 376). Default-constructed below from the
-    // parent's already-assigned seams so `makeRichState()` and main.js keep
-    // working unchanged. Injectable for focused tests.
+    // Extracted collaborators (issue 376), default-constructed from this service's seams.
     staminaService = null,
     nodeService = null,
   } = {}) {
@@ -225,10 +192,8 @@ export class GatheringRichStateService {
     this.rollD100 = rollD100;
     this.hooks = hooks;
     this.evaluateExpression = evaluateExpression;
-    // Seam: seconds in one regen/respawn unit. The default reproduces the
-    // hardcoded Earth-calendar table; main.js injects a calendar-aware provider
-    // so `days`/`weeks` track the active Foundry world calendar (minutes/hours
-    // are universal and always 60/3600).
+    // Seconds per regen/respawn unit. The default is the Earth-calendar table; main.js injects a
+    // calendar-aware provider so `days`/`weeks` follow the world calendar.
     this.secondsPerUnit =
       typeof secondsPerUnit === 'function'
         ? secondsPerUnit
@@ -238,13 +203,9 @@ export class GatheringRichStateService {
     this.writeInteractableBehavior =
       typeof writeInteractableBehavior === 'function' ? writeInteractableBehavior : null;
 
-    // Stamina + node subsystems were extracted (issue 376). They are wired from
-    // the parent's OWN seams so there is a single economy/config/now/hook read
-    // path (no drift, no duplicated normalize logic): the stamina service reads
-    // the economy through `_systemEconomy`, the node service the config through
-    // `_config`, and both fire hooks / resolve world-time through the parent's
-    // `_callHook`/`_historyEvent`/`_now`. The parent retains its public economy
-    // booleans and the d100/listing core, delegating stamina/node methods here.
+    // Stamina and node services (issue 376) are wired from this service's own seams, so there is
+    // one economy, config, clock and hook path: stamina reads `_systemEconomy`, nodes `_config`,
+    // and both use `_callHook`/`_historyEvent`/`_now`.
     this.staminaService =
       staminaService ??
       new GatheringStaminaService({
@@ -269,8 +230,8 @@ export class GatheringRichStateService {
         writeInteractableBehavior: this.writeInteractableBehavior,
         depleteEnvironmentNode:
           typeof depleteEnvironmentNode === 'function' ? depleteEnvironmentNode : null,
-        // The economy gate lives on the parent, so the active-GM applier re-checks
-        // the toggle here instead of trusting the requesting client's check.
+        // The economy gate lives here, so the active-GM applier re-checks it rather than trusting
+        // the requesting client.
         nodesEnabled: (systemId) => this.nodesEnabled(systemId),
       });
   }
@@ -378,24 +339,16 @@ export class GatheringRichStateService {
       environment?.eventOrder
     ).map((event) => applyEventDropRateAdjustment(normalizeEvent(event), environment));
 
-    // Modifiers are WORLD-owned since issue 1308 (they were system-owned from issue 1117): the
-    // ONE authored library lives in the `characterLibraries` world setting, and it serves the
-    // check modifiers on all three activities AND these d100 drop/event/stamina references. The
-    // gathering config's `characterModifiers` copy is no longer the source (the 1.23.0 migration
-    // merges it up and retires the key), and no read-alias is kept for it — a silent fallback
-    // would make the relocation unobservable.
+    // Modifiers are world-owned (issue 1308): one library in the `characterLibraries` setting
+    // serves check modifiers and these d100 references. The gathering config's old
+    // `characterModifiers` copy is retired by the 1.23.0 migration, with no read alias.
     const libraryCharacterModifiers = new Map();
     for (const entry of normalizeList(this._worldModifierLibrary(system))) {
       if (entry?.id) libraryCharacterModifiers.set(String(entry.id), cloneJson(entry));
     }
 
-    // Tools are now system-owned: source the library from the crafting system
-    // (`system.tools`, populated by CraftingSystemManager._normalizeSystem) — the
-    // single canonical source the recipe gate, salvage, and the canvas browser all
-    // read. The `system` argument is the normalized crafting system; fall back to a
-    // live lookup via the global registry when a caller did not pass one. The
-    // gathering-config `tools` copy is no longer the source (a reconciliation
-    // migration moves any UI-authored tools onto the system).
+    // Tools are system-owned: read `system.tools` (normalized by `_normalizeSystem`), falling back
+    // to a registry lookup when no system was passed; the gathering-config `tools` copy is retired.
     const toolSource = Array.isArray(system?.tools)
       ? resolvedToolsFor(system)
       : resolvedToolsFor(
@@ -443,25 +396,13 @@ export class GatheringRichStateService {
   }
 
   /**
-   * Resolve a d100 gathering attempt against the supplied task/environment.
+   * Resolve a d100 gathering attempt. Returns `{ status: 'misconfigured', diagnostics }` when a
+   * reference or override cannot resolve, so the caller stops before touching nodes, stamina or
+   * attempt limits.
    *
-   * Now async because character modifier references invoke the injected
-   * expression evaluator, which returns a promise. Returns
-   * `{ status: 'misconfigured', diagnostics }` when any
-   * reference or override cannot resolve so the caller short-circuits before
-   * touching nodes, stamina, or attempt-limit state.
-   *
-   * @param {object} options
-   * @param {object} options.task Task being resolved.
-   * @param {object} options.environment Composed environment.
-   * @param {object} [options.actor] Acting Foundry actor.
-   * @param {object} [options.viewer] Active viewer payload.
-   * @param {object} [options.system] Crafting system.
-   * @param {number} [options.gatheringModifier] Fallback gathering modifier value.
-   * @param {number} [options.eventModifier] Fallback event modifier value.
-   * @returns {Promise<object>} Resolution payload (status, roll, itemRows, items,
-   *   events, eventPolicy, characterModifierSnapshot, [diagnostics]). `itemRows`
-   *   retains every evaluated row; `items` remains the reward-selected subset.
+   * @returns {Promise<object>} Resolution payload (status, roll, itemRows, items, events,
+   *   eventPolicy, characterModifierSnapshot, [diagnostics]); `itemRows` keeps every evaluated row
+   *   and `items` the reward-selected subset.
    */
   async resolveD100Attempt({
     task,
@@ -471,13 +412,9 @@ export class GatheringRichStateService {
     system = null,
     gatheringModifier = 0,
     eventModifier = 0,
-    // Interactive DSN animation (opt-in). `animate` pre-rolls a single `Nd100`
-    // Foundry Roll so Dice So Nice animates every percentile throw at once, then
-    // draws the per-row/event faces from it (falling back to `this.rollD100()` if
-    // the pool runs dry). `extraModifier` is a flat situational bonus added to
-    // every throw. `rollMode`/`speaker`/`flavor` decorate the DSN chat post. All
-    // default to the pre-existing silent behaviour (`animate` false → each throw
-    // uses `this.rollD100()` unchanged, and nothing is posted to chat).
+    // Opt-in Dice So Nice: `animate` pre-rolls one `Nd100` Roll and draws each row/event face
+    // from it (falling back to `this.rollD100()`); `extraModifier` is a flat bonus on every throw;
+    // `rollMode`/`speaker`/`flavor` decorate the post. Off, throws are silent.
     animate = false,
     extraModifier = 0,
     rollMode,
@@ -487,9 +424,7 @@ export class GatheringRichStateService {
     const flatBonus = Number.isFinite(extraModifier) ? extraModifier : 0;
     const taskModifier = numericModifier(task?.gatheringModifier, gatheringModifier);
 
-    // Resolve rules up front so the system-default character-modifier mode is
-    // available while resolving each reference (the loops below predate the
-    // later `rules` use at selection time, which now reuses this value).
+    // Rules resolve first, so the system-default modifier mode is available to each reference.
     const rules = resolveRulesForAttempt(task, environment);
     const dropModifierMode = rules.dropModifierMode;
 
@@ -544,9 +479,8 @@ export class GatheringRichStateService {
       extraModifier: flatBonus,
     });
 
-    // Surface the attempt's single d100 to chat so Dice So Nice animates it, and so the
-    // number the player reads is the number the rows were actually tested against.
-    // Interactive/animate-only; a chat failure is logged and swallowed, never thrown.
+    // Post the attempt's d100 so Dice So Nice animates it and the shown number is the one tested;
+    // animate-only, and a chat failure is logged, never thrown.
     if (itemRoll.attemptRollMessage) {
       try {
         // `rollMode` is deprecated on V14; the shim picks key and vocabulary together.
@@ -659,12 +593,8 @@ export class GatheringRichStateService {
   }
 
   /**
-   * Resolve the environment's independent event throws for any gathering yield mode.
-   * Item/check resolution remains owned by the engine or the d100 path; this seam owns only
-   * event matching, character-modifier evidence, selection, and failure-with-event policy.
-   *
-   * @param {object} options
-   * @returns {Promise<object>} Event resolution payload.
+   * Resolve the environment's independent event throws for any yield mode: event matching,
+   * character-modifier evidence, selection and failure-with-event policy only.
    */
   async resolveEnvironmentalEvents({
     task,
@@ -797,23 +727,11 @@ export class GatheringRichStateService {
   }
 
   /**
-   * Build a no-dice preview of each drop row's chance for the player "What you
-   * might find" inspector. Mirrors the per-row math in `resolveD100Attempt`
-   * (condition + character modifiers) WITHOUT rolling, returning the base and
-   * modifier-adjusted chance plus a recoverable breakdown (weather, time-of-day,
-   * biome, and per-ability character contributions) so the UI can explain how
-   * each contributor moves the chance.
+   * A no-dice preview of each drop row's chance for the "What you might find" inspector, using
+   * `resolveD100Attempt`'s per-row math without rolling: base and adjusted chance plus a weather,
+   * time-of-day, biome and per-ability breakdown. Unresolvable character modifiers are omitted,
+   * with no diagnostics shown to players.
    *
-   * Async because character-ability modifiers resolve game-system expressions
-   * against the actor. Unresolvable character modifiers are omitted from the
-   * preview (no diagnostics surfaced to players).
-   *
-   * @param {object} options
-   * @param {object} options.environment Composed environment (conditions/biomes/rules).
-   * @param {object} options.task Composed/normalized task with `dropRows`.
-   * @param {object} [options.actor] Selected actor for character modifiers.
-   * @param {object} [options.viewer] Active viewer payload.
-   * @param {object} [options.system] Crafting system.
    * @returns {Promise<{drops: object[], awardMode: string, awardLimit: number, eventPolicy: string}>}
    */
   async previewDropBreakdown({
@@ -875,11 +793,8 @@ export class GatheringRichStateService {
         }
       }
       const base = clampDropRate(row.dropRate);
-      // Authoritative final chance comes from the shared mixer over ALL drop
-      // modifiers (condition + character), so additive-then-multiplicative mixing
-      // matches resolveD100Attempt/rollDropRow exactly. The per-kind display
-      // payload below is purely for the breakdown UI and MUST NOT re-derive the
-      // final number.
+      // The final chance comes from the shared mixer over all drop modifiers, matching
+      // `resolveD100Attempt`; the per-kind payload below is display-only and never re-derives it.
       const conditionEntries = matchingConditionModifierEntries(
         row.conditionModifiers,
         conditions,
@@ -933,8 +848,7 @@ export class GatheringRichStateService {
         },
       });
     }
-    // Aggregate "at least one find" chance from the modifier-adjusted per-drop
-    // chances (NOT the base rates), so the success bar matches the drop rows.
+    // "At least one find" from the adjusted per-drop chances, so the bar matches the rows.
     const missAll = drops.reduce(
       (product, drop) => product * (1 - Math.max(0, Math.min(1, Number(drop.finalChance) || 0))),
       1
@@ -943,16 +857,10 @@ export class GatheringRichStateService {
   }
 
   /**
-   * The condition-adjusted "at least one find" success chance for a task — the
-   * eager (sync, no-actor) counterpart to previewDropBreakdown's aggregate. It
-   * applies the current weather/time-of-day/biome modifiers to each drop's base
-   * rate so the listing's success bar reflects conditions (character-ability
-   * modifiers are layered on later by the lazy inspector breakdown). Returns
-   * `null` for non-d100 tasks or when there are no enabled drop rows.
+   * The condition-adjusted "at least one find" chance for a task, the synchronous no-actor
+   * counterpart to `previewDropBreakdown`; character modifiers are layered on by the inspector.
    *
-   * @param {object} task Composed/normalized task.
-   * @param {object} environment Composed environment (conditions/biomes/rules).
-   * @returns {number|null} A 0–1 fraction, or `null` when not applicable.
+   * @returns {number|null} A 0–1 fraction, or `null` for non-d100 tasks or no enabled rows.
    */
   taskSuccessChance(task, environment) {
     if (task?.resolutionMode !== 'd100') return null;
@@ -967,8 +875,7 @@ export class GatheringRichStateService {
     const dropModifierMode = rules.dropModifierMode;
     const missAll = rows.reduce((product, row) => {
       const base = clampDropRate(row.dropRate);
-      // Same additive-then-multiplicative mixing as resolveD100Attempt so the
-      // listing's success bar honors multiplicative condition modifiers too.
+      // The same mixing as `resolveD100Attempt`, so multiplicative condition modifiers count.
       const { finalRate } = applyDropModifierContributions(
         base,
         matchingConditionModifierEntries(
@@ -985,26 +892,11 @@ export class GatheringRichStateService {
   }
 
   /**
-   * Resolve a single character modifier reference against the actor.
+   * Resolve one character modifier reference against the actor: override-first inheritance,
+   * misconfiguration detection (missing entry, `min > max`, non-finite result), evaluation,
+   * min/max clamp, then the operator. The evidence feeds the per-row snapshot.
    *
-   * Applies override-first inheritance (expression),
-   * detects misconfiguration (missing entry, `min > max`, non-finite
-   * resolution), invokes the injected evaluator, clamps by min/max, then
-   * applies operator. The returned evidence is suitable for the per-row
-   * snapshot.
-   *
-   * @param {object} payload Resolution payload.
-   * @param {object} payload.reference Row-scoped reference shape.
-   * @param {object|null} payload.libraryEntry Matching library modifier.
-   * @param {object} payload.actor Acting actor.
-   * @param {object} [payload.environment]
-   * @param {object} [payload.task]
-   * @param {object|null} [payload.row]
-   * @param {object|null} [payload.event]
-   * @param {object} [payload.viewer]
-   * @param {object} [payload.system]
-   * @param {string} [payload.dropModifierMode] Global system drop-modifier mode
-   *   applied to every reference (no per-reference override).
+   * @param {string} [payload.dropModifierMode] The system mode, applied to every reference.
    * @returns {Promise<{ok: boolean, contribution: number, contributionEntry?: object, evidence: object, diagnostic?: object}>}
    */
   async _resolveCharacterModifierContribution({
@@ -1024,9 +916,8 @@ export class GatheringRichStateService {
     const operator = CHARACTER_MODIFIER_OPERATORS.has(reference?.operator)
       ? reference.operator
       : '+';
-    // The application mode is the single global system mode — there is no
-    // per-reference override. The value is clamped and operator-signed
-    // identically for both modes — only aggregation differs.
+    // The single system mode; clamping and operator signing are identical in both modes, only
+    // aggregation differs.
     const effectiveMode = resolveDropModifierMode(dropModifierMode);
     const min = numberOrNullStrict(reference?.min);
     const max = numberOrNullStrict(reference?.max);
@@ -1124,9 +1015,8 @@ export class GatheringRichStateService {
       bounds: { min, max },
     };
 
-    // Structured entry carries everything aggregation needs to apply this
-    // contribution either additively (signed delta) or multiplicatively
-    // (factor `1 ± value/100`) without re-deriving the mode.
+    // Carries what aggregation needs to apply this additively (signed delta) or multiplicatively
+    // (factor `1 ± value/100`).
     const contributionEntry = {
       mode: effectiveMode,
       operator,
@@ -1137,16 +1027,8 @@ export class GatheringRichStateService {
     return { ok: true, contribution, contributionEntry, evidence };
   }
 
-  /**
-   * Resolve a character modifier's raw numeric value via the injected
-   * expression evaluator. Returns `null` when no evaluator is wired or the
-   * resolution throws — the caller maps that to a non-finite diagnostic.
-   * Extracted from {@link _resolveCharacterModifierContribution} to keep that
-   * method's branching shallow.
-   *
-   * @param {object} payload
-   * @returns {Promise<*>} The raw resolved value, or `null`.
-   */
+  /** A character modifier's raw value from the injected evaluator, or `null` when none is wired or
+   * it throws; the caller maps that to a non-finite diagnostic. */
   async _resolveModifierRawValue({
     expression,
     modifier,
@@ -1197,15 +1079,12 @@ export class GatheringRichStateService {
             enabled: true,
             available: Number(displayNode.current || 0) > 0,
             depleted: Number(displayNode.current || 0) <= 0,
-            // Derived player-safe boolean: a depleted `nonRegenerating` pool is
-            // exhausted for good. We surface only this flag, never the full
-            // respawn block, to the player payload.
+            // Player-safe: a depleted `nonRegenerating` pool is exhausted for good; only this
+            // flag reaches players, never the respawn block.
             permanentlyExhausted:
               Number(displayNode.current || 0) <= 0 &&
               displayNode.respawn?.policy === 'nonRegenerating',
-            // Player-safe policy flag: drives count-bearing scarcity copy ("N of M
-            // remaining — will not replenish") before exhaustion. Just the policy,
-            // no extra counts leaked beyond the existing current/max.
+            // Player-safe policy flag for "will not replenish" copy; no counts beyond current/max.
             nonRegenerating: displayNode.respawn?.policy === 'nonRegenerating',
             current: showNodeCounts ? Number(displayNode.current || 0) : null,
             max: showNodeCounts ? Number(displayNode.max || 0) : null,
@@ -1235,9 +1114,7 @@ export class GatheringRichStateService {
     };
   }
 
-  // Stamina public surface — delegated to GatheringStaminaService (issue 376).
-  // Engine + main.js call these on the parent; the behaviour and persisted
-  // shapes are unchanged.
+  // Stamina surface, delegated to GatheringStaminaService (issue 376).
 
   getActorStamina(actor, systemId = null) {
     return this.staminaService.getActorStamina(actor, systemId);
@@ -1262,53 +1139,30 @@ export class GatheringRichStateService {
   }
 
   /**
-   * Apply a routed ENVIRONMENT node depletion as the active GM. main.js wires this
-   * as the socket handler's apply body, so a player's gather decrement lands as a
-   * legitimate GM-authored world-setting write instead of failing with "lacks
-   * permission to update Setting". Delegated to GatheringNodeService.
+   * Apply a routed environment node depletion as the active GM, the socket handler's apply body,
+   * so a player's decrement lands as a GM-authored world-setting write.
    *
-   * @param {{ environmentId: string, taskId: string }} payload
    * @returns {Promise<object|null>} The updated environment, or null on no-op.
    */
   async applyEnvironmentNodeDepletion(payload = {}) {
     return this.nodeService.applyEnvironmentNodeDepletion(payload);
   }
 
-  /**
-   * Regenerate one actor's stamina as world time passes. Delegated to
-   * GatheringStaminaService (issue 376); GatheringEngine calls this on the
-   * parent.
-   *
-   * @param {object} payload
-   * @returns {Promise<object|null>} The updated stamina entry, or null on no-op.
-   */
+  /** Regenerate one actor's stamina over world time (GatheringStaminaService, issue 376). */
   async regenerateActorStamina(payload = {}) {
     return this.staminaService.regenerateActorStamina(payload);
   }
 
-  /**
-   * Respawn finite resource nodes for one environment as world time passes.
-   * The parent owns the `nodes.enabled` gate (the canonical economy read path
-   * lives here); the per-node respawn arithmetic is delegated to
-   * GatheringNodeService (issue 376). GatheringEngine calls this on the parent.
-   *
-   * @param {object} payload
-   * @returns {Promise<object|null>} The updated environment, or null on no-op.
-   */
+  /** Respawn one environment's finite nodes over world time. The `nodes.enabled` gate stays here;
+   * the arithmetic is GatheringNodeService's (issue 376). */
   async respawnNodes({ environment, worldTime } = {}) {
     if (!environment) return null;
     if (!this.nodesEnabled(environment.craftingSystemId)) return null;
     return this.nodeService.respawnNodes({ environment, worldTime });
   }
 
-  /**
-   * Respawn one interactable-scoped node pool as world time passes (issue 302).
-   * Delegated to GatheringNodeService (issue 376); GatheringEngine calls this on
-   * the parent.
-   *
-   * @param {object} payload
-   * @returns {Promise<{ changed: boolean, node: object }>}
-   */
+  /** Respawn one interactable-scoped node pool over world time (issues 302, 376).
+   * @returns {Promise<{ changed: boolean, node: object }>} */
   async respawnInteractableNode(payload = {}) {
     return this.nodeService.respawnInteractableNode(payload);
   }
@@ -1352,39 +1206,18 @@ export class GatheringRichStateService {
     return true;
   }
 
-  /**
-   * Count the distinct task ids an actor has revealed for one environment at a
-   * given reveal scope. Delegates to
-   * {@link GatheringRichStateService#listRevealedTaskIds} and returns its
-   * length, so the count and the list share one read path and never drift. The
-   * `party` scope has no dedicated key today and therefore collapses onto the
-   * `actor:` key, matching the writer. Returns `0` on missing/inaccessible
-   * state and never throws.
-   *
-   * @param {object} args
-   * @param {object} args.actor Foundry actor holding the reveal flag state.
-   * @param {string} args.environmentId Environment whose reveals are counted.
-   * @param {string} [args.scope='actor'] Reveal scope (`actor`/`user`/`party`/`global`).
-   * @returns {number} Count of distinct revealed task ids.
-   */
+  /** How many distinct task ids an actor revealed for an environment at a scope: the length of
+   * {@link GatheringRichStateService#listRevealedTaskIds}. `0` on missing state; never throws. */
   countRevealedTasks({ actor, environmentId, scope = 'actor' } = {}) {
     return this.listRevealedTaskIds({ actor, environmentId, scope }).length;
   }
 
   /**
-   * List the distinct task ids the actor has revealed for an environment at the
-   * given reveal scope. Shares the read path and `revealKey` prefix matching
-   * with {@link GatheringRichStateService#countRevealedTasks} (which delegates
-   * here) so the list and the count never drift from the `revealTask` writer.
+   * The distinct task ids an actor revealed for an environment at a reveal scope, matching the
+   * `revealKey` prefix the `revealTask` writer uses. `party` collapses onto the `actor:` key, as
+   * the writer does.
    *
-   * `party` collapses onto the `actor:` key (there is no party branch in
-   * `revealKey`), matching how reveals are written.
-   *
-   * @param {object} args
-   * @param {object} args.actor Foundry actor holding the reveal flag state.
-   * @param {string} args.environmentId Environment whose reveals are listed.
-   * @param {string} [args.scope='actor'] Reveal scope (`actor`/`user`/`party`/`global`).
-   * @returns {string[]} Distinct revealed task ids; `[]` on missing/inaccessible state.
+   * @returns {string[]} Distinct revealed task ids; `[]` on missing or inaccessible state.
    */
   listRevealedTaskIds({ actor, environmentId, scope = 'actor' } = {}) {
     const envId = stringOrFallback(environmentId, '');
@@ -1396,8 +1229,7 @@ export class GatheringRichStateService {
       return [];
     }
     if (!reveals || typeof reveals !== 'object') return [];
-    // Build the scope-specific prefix once via revealKey (with a sentinel task
-    // id) so the matching format always mirrors the writer's key format.
+    // Build the prefix through `revealKey` with a sentinel task id, so it mirrors the writer.
     const sentinel = '\0';
     const sampleKey = revealKey({
       environmentId: envId,
@@ -1410,9 +1242,8 @@ export class GatheringRichStateService {
     const taskIds = new Set();
     for (const [key, record] of Object.entries(reveals)) {
       if (!key.startsWith(prefix)) continue;
-      // The RECORD's own `taskId` first, the key tail only as a fallback: the key is
-      // sanitised segment-by-segment (see `revealKeySegment`), so a task id carrying a dot
-      // survives in the record but not in the key it was filed under.
+      // The record's own `taskId` first: keys are sanitised per segment (`revealKeySegment`), so a
+      // dotted task id survives only in the record.
       const taskId = stringOrFallback(record?.taskId, '') || key.slice(prefix.length);
       if (taskId) taskIds.add(taskId);
     }
@@ -1420,14 +1251,9 @@ export class GatheringRichStateService {
   }
 
   /**
-   * Resolve biome ids into display metadata so player chips render identically
-   * to the GM editor. The per-system biome vocabulary wins, then the global
-   * vocabulary, then {@link DEFAULT_BIOME_METADATA}. Reuses the shared
-   * vocabulary-option normalizer so labels, icons, color tokens, and custom
-   * colors match the manager surface.
+   * Biome ids as display metadata matching the GM editor: the system vocabulary, then the global
+   * one, then {@link DEFAULT_BIOME_METADATA}, via the shared vocabulary-option normalizer.
    *
-   * @param {Array<string>|string} biomeIds Biome ids to resolve.
-   * @param {string} systemId Crafting system id for per-system vocabulary.
    * @returns {Array<{id: string, label: string, icon: string, colorToken: string, customColor: string}>}
    */
   resolveBiomeTags(biomeIds, systemId) {
@@ -1464,8 +1290,7 @@ export class GatheringRichStateService {
     const source = this.nodeService._resolveNodeSource({ environment, task, interactableRef });
     const gateNode = source.read();
     if (nodesEnabled && gateNode && Number(gateNode.current || 0) <= 0) {
-      // A `nonRegenerating` pool at 0 is permanently exhausted (it never
-      // regrows and cannot be restocked), so surface a distinct reason.
+      // A `nonRegenerating` pool at 0 never regrows or restocks, so it gets its own reason.
       const exhausted = gateNode.respawn?.policy === 'nonRegenerating';
       blockedReasons.push(
         this._blockedReason(exhausted ? 'NODE_EXHAUSTED' : 'NODE_DEPLETED', { taskId: task.id })
@@ -1493,13 +1318,9 @@ export class GatheringRichStateService {
   }
 
   /**
-   * @param {object} args
-   * @param {'immediate'|'waitingStart'|'timedMaturity'} [args.phase='immediate'] Which
-   *   commit this is. A TIMED run commits twice — once when the wait starts and once
-   *   when it matures — and `shouldDepleteNode` is true at both for `onStart` timing,
-   *   which consumed two units per run. `phase` disambiguates: `onStart` consumes at
-   *   `waitingStart`, `onSuccess` at `timedMaturity`, and an `immediate` attempt (the
-   *   single-commit case) keeps consuming exactly as before.
+   * @param {'immediate'|'waitingStart'|'timedMaturity'} [args.phase='immediate'] Which commit this
+   *   is. A timed run commits at start and at maturity, so `onStart` depletes at `waitingStart`
+   *   and `onSuccess` at `timedMaturity`; an `immediate` attempt commits once.
    */
   async commitAcceptedAttempt({
     actor,
@@ -1535,13 +1356,9 @@ export class GatheringRichStateService {
       shouldDepleteNode({ nodes: depletionSource }, outcome) &&
       depletionPhaseMatches(depletionSource, phase)
     ) {
-      // Persist the full node object (config + respawn timers) with one consumed,
-      // so the resolved pool (env `nodeRuntime[taskId]` OR the interactable's own
-      // scoped `node`) is seeded and decremented in a single write. `deplete` — not
-      // `write` — because the ENVIRONMENT pool lives in a world setting only a GM may
-      // update, so a player's decrement is routed to the active GM (which recomputes
-      // it from its own stored state); `remaining` below is this client's optimistic
-      // view of that write, exactly as it was before the routing existed.
+      // Persist the whole node with one unit consumed, seeding and decrementing the resolved pool
+      // in one write. `deplete`, not `write`: the environment pool is a GM-only world setting, so
+      // a player's decrement is routed to the GM, and `remaining` is this client's optimistic view.
       const node = depleteNodeOnce(depletionSource, {
         worldTime: Number(this.nowWorldTime?.() ?? 0),
       });
@@ -1551,13 +1368,9 @@ export class GatheringRichStateService {
         consumed: 1,
         remaining: node.current,
         scope: source.kind,
-        // False when the write was relayed: `remaining` is then this client's local
-        // computation, not the count the GM wrote, and can be wrong (repeat gathers
-        // before the setting replicates all read the same stale `current`; a matured
-        // timed run reads a start-time snapshot; the GM may no-op the write entirely).
-        // Consumers that publish a durable number must suppress it — see the chat card
-        // in `GatheringEngine#_postGatheringChatMessage`. `redactRichEvidence` still
-        // reads `remaining` so blind-run `available` reporting is unchanged.
+        // False when relayed: `remaining` is then a possibly wrong local guess, so consumers
+        // publishing a durable number (`GatheringEngine#_postGatheringChatMessage`) must suppress
+        // it. `redactRichEvidence` still reads `remaining` for blind `available` reporting.
         authoritative: source.routed !== true,
       };
     }
@@ -1617,24 +1430,12 @@ export class GatheringRichStateService {
         : [],
       gatheringModifier: normalized.gatheringModifier,
       resultGroups: cloneJson(normalized.resultGroups),
-      // THE TASK'S OWN CHECK-MODIFIER PICK (issue 1095) MUST SURVIVE COMPOSITION.
-      // `normalizeLibraryTask` above and `_normalizeGatheringTask` (adminStore) are the two
-      // mirrored LIBRARY normalizers, but this literal is a THIRD whitelist rebuild and it
-      // is the one the ENGINE sees: `composeEnvironment` → `_findStartTask` →
-      // `_resolveStartContext` hands this object to `buildCheckModifierContext(system,
-      // 'gathering', task)`, which reads `task.checkModifierIds`. Omitting the key here made
-      // `readSubjectModifierIds` find nothing, so every composed task INHERITED the default
-      // set and `bySubject` could never work on gathering at all — with both library
-      // normalizers correct and the pick intact on disk.
-      //
-      // Same absence-preserving attach as the two normalizers, for the same reason: an
-      // authored EMPTY array is a real pick of zero and must not collapse back to inherit.
+      // The task's own check-modifier pick (issue 1095) must survive this third whitelist rebuild,
+      // the one the engine reads via `buildCheckModifierContext`; without it `bySubject` never
+      // works on gathering. An authored empty array is a real pick and must not inherit.
       ...authoredCheckModifierIds(normalized.checkModifierIds),
-      // THE FAILURE OUTCOME MUST REACH THE ENGINE, not merely disk (issue 1098, CF8).
-      // `GatheringEngine._applyFailureFeedback` reads `task.failureOutcome ?? null` off
-      // THIS object, so emitting it from the two library normalizers alone would leave the
-      // field correct on disk and dead at roll time — the exact third-mirror failure
-      // `checkModifierIds` above records.
+      // The failure outcome must reach the engine (issue 1098): `_applyFailureFeedback` reads
+      // `task.failureOutcome` off this object.
       ...authoredFailureOutcome(normalized.failureOutcome),
       // Per-task routed-check DC override (issue 904).
       dcOverride: normalized.dcOverride,
@@ -1643,13 +1444,11 @@ export class GatheringRichStateService {
     };
     if (normalized.timeRequirement)
       runtimeTask.timeRequirement = cloneJson(normalized.timeRequirement);
-    // Resource nodes are per-environment: use this environment's stored runtime
-    // pool if present, else seed a fresh full pool from the library config. The
-    // seed is read-only here; it persists on first depletion.
+    // Nodes are per environment: use the stored runtime pool, else a read-only full seed from the
+    // library config that persists on first depletion.
     if (normalized.nodes) {
       const stored = environment?.nodeRuntime?.[normalized.id];
-      // Library config is authoritative; the per-environment entry contributes
-      // only runtime state (count + respawn anchor). A fresh pool starts full.
+      // Library config is authoritative; the stored entry adds only count and respawn anchor.
       runtimeTask.nodes = stored
         ? this.nodeService._mergeNodeConfigState(cloneJson(normalized.nodes), stored)
         : { ...cloneJson(normalized.nodes), current: Number(normalized.nodes.max || 0) };
@@ -1657,14 +1456,8 @@ export class GatheringRichStateService {
     return runtimeTask;
   }
 
-  /**
-   * Remove all per-system gathering library state for `systemId` from the
-   * persisted gathering config. Operates on the raw setting (no normalization)
-   * so unrelated systems are left untouched.
-   *
-   * @param {string} systemId
-   * @returns {Promise<boolean>} true when an entry was removed
-   */
+  /** Remove `systemId`'s gathering library state from the raw config, leaving other systems
+   * untouched. Resolves true when an entry was removed. */
   async removeSystem(systemId) {
     if (!systemId) return false;
     if (typeof this.getSetting !== 'function' || typeof this.setSetting !== 'function')
@@ -1690,14 +1483,8 @@ export class GatheringRichStateService {
     return this.setSetting(this.settingKey, cloneJson(config));
   }
 
-  /**
-   * Persist a crafting system's gathering economy block (the two independent
-   * limitation flags — stamina + resource nodes — plus stamina regen) into the
-   * raw config, merging beside the system's other library state.
-   *
-   * @param {{systemId: string, economy: object}} payload
-   * @returns {Promise<object|null>} The normalized economy block, or null.
-   */
+  /** Persist a system's economy block (stamina and node flags plus stamina regen) into the raw
+   * config beside its other library state; resolves the normalized block, or null. */
   async setSystemEconomy({ systemId, economy } = {}) {
     if (!systemId || typeof this.setSetting !== 'function') return null;
     const target = String(systemId);
@@ -1714,74 +1501,36 @@ export class GatheringRichStateService {
     return normalized;
   }
 
-  /**
-   * The normalized economy block for a crafting system (two limitation flags +
-   * stamina regen). Always returns a fully-defaulted block so callers never
-   * branch on absence.
-   *
-   * @param {string} systemId Crafting system id.
-   * @returns {{stamina: {enabled: boolean, regen: object}, nodes: {enabled: boolean}}}
-   */
+  /** A system's fully defaulted economy block, so callers never branch on absence.
+   * @returns {{stamina: {enabled: boolean, regen: object}, nodes: {enabled: boolean}}} */
   _systemEconomy(systemId) {
     const economy = this._config().systems?.[String(systemId || '')]?.economy;
-    // Normalize on read so persisted-but-not-yet-migrated worlds (legacy `mode`)
-    // resolve to the two flags via the read-time compat mapping.
+    // Normalized on read, so a legacy `mode` maps onto the two flags.
     return economy ? normalizeGatheringEconomy(economy) : normalizeGatheringEconomy(null);
   }
 
-  /**
-   * Whether the per-actor stamina limitation is enabled for a crafting system.
-   *
-   * @param {string} systemId Crafting system id.
-   * @returns {boolean}
-   */
+  /** Whether the per-actor stamina limitation is enabled for a system. */
   staminaEnabled(systemId) {
     return this._systemEconomy(systemId).stamina?.enabled === true;
   }
 
-  /**
-   * Whether the finite resource-node limitation is enabled for a crafting
-   * system.
-   *
-   * @param {string} systemId Crafting system id.
-   * @returns {boolean}
-   */
+  /** Whether the finite resource-node limitation is enabled for a system. */
   nodesEnabled(systemId) {
     return this._systemEconomy(systemId).nodes?.enabled === true;
   }
 
-  /**
-   * Whether the weather condition dimension is enabled for a crafting system.
-   * Drives both gathering match gating (via the per-system condition settings)
-   * and the player header bar's weather chip visibility.
-   *
-   * @param {string} systemId Crafting system id.
-   * @returns {boolean}
-   */
+  /** Whether the weather dimension is enabled for a system: match gating and the header chip. */
   weatherEnabled(systemId) {
     return resolveSystemConditionSettings(this._config(), systemId)?.weather?.enabled !== false;
   }
 
-  /**
-   * Whether the time-of-day condition dimension is enabled for a crafting system.
-   *
-   * @param {string} systemId Crafting system id.
-   * @returns {boolean}
-   */
+  /** Whether the time-of-day dimension is enabled for a system. */
   timeOfDayEnabled(systemId) {
     return resolveSystemConditionSettings(this._config(), systemId)?.timeOfDay?.enabled !== false;
   }
 
-  /**
-   * Thin derived back-compat accessor for a system's limitation "mode". The two
-   * independent flags are the canonical state; this collapses them to a single
-   * string for any external/API consumer. Returns `'both'` when both flags are
-   * on (a value the old enum never had), `'stamina'` / `'nodes'` when only one
-   * is, and `'none'` when neither is. No internal caller relies on it.
-   *
-   * @param {string} systemId Crafting system id.
-   * @returns {'both'|'stamina'|'nodes'|'none'}
-   */
+  /** A derived back-compat limitation "mode" for external consumers: `'both'`, `'stamina'`,
+   * `'nodes'` or `'none'`. The two flags are canonical; no internal caller uses this. */
   economyMode(systemId) {
     const stamina = this.staminaEnabled(systemId);
     const nodes = this.nodesEnabled(systemId);
@@ -1791,27 +1540,16 @@ export class GatheringRichStateService {
     return 'none';
   }
 
-  /**
-   * Public accessor for a system's normalized economy block.
-   *
-   * @param {string} systemId Crafting system id.
-   * @returns {{stamina: {enabled: boolean, regen: object}, nodes: {enabled: boolean}}}
-   */
+  /** A system's normalized economy block. */
   systemEconomy(systemId) {
     return cloneJson(this._systemEconomy(systemId));
   }
 
   /**
-   * Resolve the character-modifier library for an attempt: prefer the per-environment map
-   * populated at composition time, falling back to the WORLD library (needed for stamina regen,
-   * which has no environment context).
+   * The modifier library for an attempt: the per-environment map from composition, else the world
+   * library (stamina regen has no environment). No system id since issue 1318, as the library is
+   * world scope.
    *
-   * Takes no system id since issue 1318. It carried one while the library belonged to a crafting
-   * system and a caller without the system in hand had to look it up; at world scope there is
-   * nothing system-specific left to resolve, and a retained-but-discarded parameter reads as
-   * though there still were.
-   *
-   * @param {object} payload
    * @returns {Map<string, object>}
    */
   _modifierLibrary({ environment = null, system = null } = {}) {
@@ -1825,38 +1563,14 @@ export class GatheringRichStateService {
     return new Map(entries.map((entry) => [String(entry.id), entry]));
   }
 
-  /**
-   * The ONE authored modifier library for a crafting system (issue 1117).
-   *
-   * Prefers the normalized system the caller already holds and falls back to a live
-   * registry lookup by id, the identical two-step the tool library uses in
-   * {@link composeEnvironment} — a caller that has the system must not pay for a global
-   * lookup, and one that only has an id (stamina regen has no environment and no system)
-   * must still resolve.
-   *
-   * @param {object|null} system The normalized crafting system, when the caller has it.
-   * @param {string} systemId Its id, used for the registry fallback.
-   * @returns {Array<object>} The library entries, possibly empty.
-   */
+  /** The one authored modifier library (issues 1117, 1308), now world scope. */
   _worldModifierLibrary(system) {
-    // Issue 1308: ONE read of the world library, replacing the registry round-trip this used to
-    // fall back on. That fallback existed only because the library lived on the crafting system,
-    // so a caller without the system in hand had to go and fetch it; the library is world scope
-    // now, so there is nothing system-specific left to look up — which is why this takes no
-    // system id (issue 1318 dropped the one it had been carrying and discarding).
+    // One read of the world library; nothing system-specific remains to look up (issue 1318).
     return resolveModifierLibrary(system);
   }
 
-  /**
-   * Resolve a task's stamina cost for one actor: the base `task.staminaCost`
-   * adjusted by the task's `staminaCostModifiers` (resolved against the
-   * per-environment character modifier library, the same path drop chances
-   * use). Floored at 0 so a strong character can make a task free. Used by both
-   * the start gate and the spend so they always agree.
-   *
-   * @param {object} payload
-   * @returns {Promise<number>} Non-negative integer stamina cost.
-   */
+  /** A task's stamina cost for one actor: `task.staminaCost` adjusted by `staminaCostModifiers`
+   * through the drop-chance path, floored at 0. The start gate and the spend both use it. */
   async _effectiveStaminaCost({ actor, system, environment, task, viewer = null } = {}) {
     const base = Number(task?.staminaCost || 0);
     if (base <= 0) return 0;
@@ -1876,8 +1590,7 @@ export class GatheringRichStateService {
         event: null,
         viewer,
         system,
-        // Stamina-cost adjustments stay additive regardless of the system drop
-        // mode: a force-additive resolution sums signed deltas onto the base.
+        // Stamina adjustments stay additive regardless of the system drop mode.
         dropModifierMode: 'additive',
       });
       if (resolved.ok) total += Number(resolved.evidence.contribution || 0);
@@ -1885,16 +1598,8 @@ export class GatheringRichStateService {
     return Math.max(0, Math.round(total));
   }
 
-  /**
-   * The effective per-actor stamina cost to surface in a player listing, or
-   * `null` when there is nothing to refine (the system does not have stamina
-   * enabled, or the task has no base cost). The synchronous listing build shows the base
-   * cost; callers use this to replace it with the modifier-adjusted value for
-   * the viewing character.
-   *
-   * @param {object} payload
-   * @returns {Promise<number|null>}
-   */
+  /** The modifier-adjusted stamina cost to show the viewing character in a listing, or `null`
+   * when stamina is off or the task has no base cost. */
   async listingStaminaCost({ actor, system = null, environment, task, viewer = null } = {}) {
     if (!this.staminaEnabled(environment?.craftingSystemId)) return null;
     if (!(Number(task?.staminaCost || 0) > 0)) return null;
@@ -1933,18 +1638,11 @@ export class GatheringRichStateService {
 }
 
 /**
- * Whether THIS commit is the one that consumes the node, for a run that commits more
- * than once. A timed run calls `commitAcceptedAttempt` twice — at `waitingStart` and
- * again at `timedMaturity` — and `shouldDepleteNode` answers true at both for
- * `onStart` timing, so an `onStart` timed task used to consume two units per run.
+ * Whether this commit consumes the node for a multi-commit run. A timed run commits at
+ * `waitingStart` and `timedMaturity`, and `shouldDepleteNode` is true at both for `onStart`, so
+ * `onStart` consumes at start and `onSuccess` at resolution; an `immediate` attempt always does.
  *
- * `onStart` consumes when the attempt starts; `onSuccess` consumes when the outcome
- * resolves. An `immediate` attempt has exactly one commit and always consumes there,
- * which is why it is not gated (that is the single-commit path both timings share).
- *
- * @param {object} node The resolved node (carries `depletionTiming`).
  * @param {'immediate'|'waitingStart'|'timedMaturity'} phase
- * @returns {boolean}
  */
 function depletionPhaseMatches(node, phase) {
   if (phase !== 'waitingStart' && phase !== 'timedMaturity') return true;
@@ -1959,30 +1657,19 @@ function shouldDepleteNode(task, outcome) {
 }
 
 /**
- * Normalize a per-system gathering economy block. Two independent boolean
- * flags select the limitation models: `stamina.enabled` (per-actor stamina
- * pools) and `nodes.enabled` (finite resource nodes). Both can be on at once
- * (the anti-dogpiling combination); neither on means no limit. Stamina regen is
- * system-level: `amount` is a single expression (a plain number or a formula
- * with character references) evaluated per actor and applied once per `unit` of
- * elapsed world time when `policy === 'overTime'`.
+ * Normalize a system's gathering economy. `stamina.enabled` (actor pools) and `nodes.enabled`
+ * (finite nodes) are independent and may both be on. Stamina regen applies the `amount`
+ * expression per actor once per elapsed `unit` of world time under `policy: 'overTime'`.
  *
- * Read-time legacy compat: when neither new flag KEY is present but a legacy
- * `mode` string is, it is mapped to the flags (`stamina` ⇒ stamina.enabled,
- * `nodes` ⇒ nodes.enabled, else both false). Present flags always win over a
- * stale `mode`, so a stale `mode` can never resurrect a disabled limitation.
+ * A legacy `mode` maps to the flags only when neither flag key is present, so a stale `mode` never
+ * resurrects a disabled limitation. `resolutionMode` (default `d100`, the only honoured value) is
+ * GM config and never reaches the player listing.
  *
- * `resolutionMode` is the system-level gathering resolution (default `d100`, the
- * only currently honored value). It is GM config and is NOT part of the player
- * gathering listing payload.
- *
- * @param {object} raw Raw economy block.
  * @returns {{resolutionMode: string, stamina: {enabled: boolean, regen: object}, nodes: {enabled: boolean}}}
  */
 function normalizeGatheringEconomy(raw = {}) {
   const regen = raw?.stamina?.regen || {};
-  // "New flags present" means the KEY exists (not merely truthy). Only when
-  // neither key exists do we fall back to mapping a legacy `mode`.
+  // A flag counts as present when its key exists, not when it is truthy.
   const hasStaminaFlag =
     raw?.stamina != null && Object.prototype.hasOwnProperty.call(raw.stamina, 'enabled');
   const hasNodesFlag =
@@ -1996,8 +1683,8 @@ function normalizeGatheringEconomy(raw = {}) {
       : 'd100',
     stamina: {
       enabled: staminaEnabled,
-      // Expression templates (number or formula, e.g. "40" or "4 * @abilities.con.mod"),
-      // rolled once per character at seed time. `start` blank ⇒ start full at max.
+      // Expressions ("40", "4 * @abilities.con.mod") rolled once per character at seed time;
+      // a blank `start` starts full.
       max: stringOrFallback(raw?.stamina?.max, ''),
       start: stringOrFallback(raw?.stamina?.start, ''),
       regen: {
@@ -2005,8 +1692,7 @@ function normalizeGatheringEconomy(raw = {}) {
           ? regen.policy
           : (LEGACY_STAMINA_REGEN_POLICY_MAP[regen.policy] ?? 'none'),
         unit: STAMINA_REGEN_UNITS.has(regen.unit) ? regen.unit : 'hours',
-        // A single expression: a plain number ("1") or a formula with character
-        // references ("1 + @abilities.con.mod"), evaluated per actor in-game.
+        // One expression, a number or a formula with character references, evaluated per actor.
         amount: stringOrFallback(regen.amount, ''),
         lastRoll:
           regen.lastRoll && typeof regen.lastRoll === 'object' ? cloneJson(regen.lastRoll) : null,
@@ -2049,9 +1735,7 @@ function normalizeGatheringConfig(raw = {}) {
       tasks: normalizeList(config?.tasks).map(normalizeLibraryTask),
       tools: normalizeList(config?.tools).map(normalizeLibraryTool).filter(Boolean),
       events: normalizeList(config?.events).map(normalizeEvent),
-      // `characterModifiers` is DELIBERATELY not emitted (issue 1117): the modifier
-      // library moved onto the crafting system as `system.modifiers`. This is an allowlist
-      // rebuild, so not emitting the key is what retires it from every world that saves.
+      // `characterModifiers` is not emitted (issue 1117): this allowlist rebuild retires it.
       economy: normalizeGatheringEconomy(config?.economy),
     };
   }
@@ -2119,13 +1803,9 @@ function normalizeSystemVocabularies(raw = {}, fallbackVocabularies = {}) {
 }
 
 /**
- * Carry a validated global condition onto every system that offers it.
- *
- * Runtime composition gates on `systems[id].conditions[kind].current`, not the global
- * current, so without this the public setter is a no-op for any world the manager has
- * saved. A system whose own `values` exclude the id keeps its current: storing a value
- * outside `values` is only snapped back to `values[0]` on the next read. `enabled`
- * governs runtime gating, not storage, so a disabled dimension is updated too.
+ * Carry a validated global condition onto every system offering it, because composition gates
+ * on `systems[id].conditions[kind].current`. A system whose `values` exclude the id keeps its
+ * current, and a disabled dimension is updated too, since `enabled` governs gating, not storage.
  */
 function withSystemCurrentCondition(systems, kind, current) {
   const next = {};
@@ -2166,28 +1846,15 @@ function normalizeLibraryTask(task = {}) {
       ? task.toolIds.map((id) => String(id ?? '').trim()).filter(Boolean)
       : [],
     nodes: normalizeNodeConfig(task.nodes),
-    // This task's own check-modifier pick (issue 1095) — the GATHERING analogue of
-    // `Recipe.craftingModifier.modifierIds`, consulted only under the `bySubject`
-    // combination rule. Attached ONLY when authored: an authored EMPTY array is a real
-    // pick of zero, distinct from an absent one which inherits
-    // `gatheringCraftingCheck.defaultModifierIds`.
-    //
-    // THIS NORMALIZER IS ONE OF A MIRRORED PAIR. `_normalizeGatheringTask` in
-    // src/ui/svelte/stores/adminStore.js is the other, and BOTH are whitelist rebuilds, so
-    // a key emitted here and not there is dropped the moment a task is saved through the
-    // manager draft path — and vice versa. The shared `authoredCheckModifierIds` attach is
-    // what keeps the two from drifting on the subtle half (authoredness is decided by
-    // `Array.isArray` at entry, never by the filtered length).
+    // The task's check-modifier pick (issue 1095), used under `bySubject`, attached only when
+    // authored: an empty array is a pick of zero, absence inherits `defaultModifierIds`. This
+    // mirrors `_normalizeGatheringTask` in adminStore.js; both are whitelist rebuilds, so a key
+    // missing from either is dropped on save.
     ...authoredCheckModifierIds(task.checkModifierIds),
-    // The task's text/macro failure feedback (issue 1098, CF8). Emitted by NO gathering-task
-    // rebuild before that issue, so a GM-authored value was dropped on the next save — and
-    // `_libraryTaskToRuntimeTask` above must emit it too, or it never reaches the engine.
+    // Failure feedback (issue 1098), which `_libraryTaskToRuntimeTask` must emit too.
     ...authoredFailureOutcome(task.failureOutcome),
-    // Per-task routed-check DC override (issue 904): replaces the routed check's
-    // own dc at gather time when set. Guard null/''/undefined explicitly before
-    // `Number()` so re-normalizing a null stays null (Number(null) is 0, which
-    // would otherwise mint a spurious 0 override the GM never set). Mirrors
-    // `_normalizeGatheringTask` in src/ui/svelte/stores/adminStore.js exactly.
+    // Per-task routed DC override (issue 904). Null and '' stay null, since `Number(null)` is 0,
+    // mirroring `_normalizeGatheringTask` in adminStore.js.
     dcOverride: (() => {
       const raw = task.dcOverride;
       if ([null, undefined, ''].includes(raw)) return null;
@@ -2353,22 +2020,12 @@ function applyEventDropRateAdjustment(event, environment) {
   return applyDropRateAdjustment(event, adjustment);
 }
 
-/**
- * Normalize drop-row character modifier references.
- *
- * @param {Array} refs Raw reference list.
- * @returns {Array<object>} Normalized references.
- */
+/** Normalize drop-row character modifier references. */
 export function normalizeDropCharacterModifiers(refs) {
   return normalizeCharacterModifierReferenceList(refs);
 }
 
-/**
- * Normalize event-row character modifier references.
- *
- * @param {Array} refs Raw reference list.
- * @returns {Array<object>} Normalized references.
- */
+/** Normalize event-row character modifier references. */
 export function normalizeEventCharacterModifiers(refs) {
   return normalizeCharacterModifierReferenceList(refs);
 }
@@ -2417,24 +2074,11 @@ function numericModifier(provider = null, fallback = 0) {
 }
 
 /**
- * Aggregate resolved drop-modifier contributions (character AND condition
- * modifiers: weather/time-of-day/biome) onto a base drop rate.
+ * Aggregate resolved drop-modifier contributions (character and condition) onto a base rate:
+ * sum the additive deltas first, multiply by the product of the multiplicative factors
+ * (`1 ± value/100`, floored at 0), then clamp to [0, 100] and round once. Additive-only input
+ * gives the plain sum. A plain-number entry is an additive delta.
  *
- * Deterministic mixing order: sum every entry's additive percentage-point delta
- * onto `baseRate` FIRST, then multiply by the PRODUCT of all multiplicative
- * factors, then clamp to [0, 100] and `Math.round` exactly once. A
- * multiplicative factor is `1 - value/100` for `-` and `1 + value/100` for `+`,
- * floored at 0 so an over-100 `-` reduction never flips the rate negative.
- * Additive-only inputs leave `multiplicativeFactor === 1`, so the rounding is an
- * identity and the result is byte-identical to the pre-feature flat sum
- * (`base + conditionAdditive + charAdditive`).
- *
- * Entries are structured payloads `{ mode, operator, value, contribution }`; a
- * legacy plain-number entry is treated as an additive delta for safety.
- *
- * @param {number} baseRate Row/event base drop rate (already a percentage).
- * @param {Array<object|number>} entries Resolved contribution entries (character
- *   + condition), each carrying its own resolved `mode`.
  * @returns {{finalRate: number, additiveTotal: number, multiplicativeFactor: number}}
  */
 function applyDropModifierContributions(baseRate, entries) {
@@ -2462,16 +2106,8 @@ function applyDropModifierContributions(baseRate, entries) {
   return { finalRate, additiveTotal, multiplicativeFactor };
 }
 
-/**
- * Build a structured aggregation entry for a single condition modifier. The
- * global system `dropModifierMode` selects additive vs multiplicative for every
- * modifier; the shape matches the character `contributionEntry` so both feed the
- * same {@link applyDropModifierContributions} mixer.
- *
- * @param {object} modifier Normalized condition modifier (`operator`/`value`).
- * @param {string} dropModifierMode System-level drop-modifier mode.
- * @returns {{mode:'additive'|'multiplicative',operator:string,value:number,contribution:number}}
- */
+/** One condition modifier as an aggregation entry under the system `dropModifierMode`, shaped like
+ * the character `contributionEntry` for {@link applyDropModifierContributions}. */
 function conditionEntry(modifier, dropModifierMode) {
   const value = Number(modifier.value) || 0;
   return {
@@ -2483,18 +2119,8 @@ function conditionEntry(modifier, dropModifierMode) {
 }
 
 /**
- * Resolve the active condition modifiers (weather + time-of-day + biome) into a
- * flat list of structured aggregation entries, each carrying its own resolved
- * additive/multiplicative mode. Weather/time-of-day match by `conditionId`
- * against the current condition; biome entries are collapsed per-mode by
- * {@link matchingBiomeModifierEntries}.
- *
- * @param {object} modifiers Row/event `conditionModifiers` ({timeOfDay,weather,biome}).
- * @param {object} conditions Current environment conditions.
- * @param {Array<string>} biomes Active biome tags.
- * @param {string} biomeAggregation Biome aggregation policy.
- * @param {string} dropModifierMode System default mode.
- * @returns {Array<object>} Structured entries.
+ * The active condition modifiers as aggregation entries: weather and time-of-day match by
+ * `conditionId`, and biomes collapse per mode via {@link matchingBiomeModifierEntries}.
  */
 function matchingConditionModifierEntries(
   modifiers = {},
@@ -2537,14 +2163,11 @@ function rollDropRow({
     biomeAggregation,
     dropModifierMode
   );
-  // Evidence parity: `conditionModifier` reports the signed ADDITIVE condition
-  // delta only (the field's historical meaning), so additive-only configs keep
-  // emitting exactly the same number as before the multiplicative split.
+  // `conditionModifier` keeps its meaning, the signed additive condition delta only.
   const conditionModifier = conditionEntries
     .filter((entry) => entry.mode !== 'multiplicative')
     .reduce((sum, entry) => sum + (Number(entry.contribution) || 0), 0);
-  // Character-only additive total / multiplicative product, kept as their own
-  // evidence fields so existing assertions about character contributions hold.
+  // Character-only additive total and multiplicative product, kept as their own evidence fields.
   const charList = Array.isArray(characterModifierContributions)
     ? characterModifierContributions
     : [];
@@ -2605,11 +2228,8 @@ function normalizeDropConditionModifierList(values = []) {
     .filter(Boolean);
 }
 
-// Display split for a single condition kind ('weather'|'timeOfDay') under the
-// current conditions — used by previewDropBreakdown so the player UI can show
-// the additive percentage-point delta and the multiplicative factor (product of
-// the matching `1 ± value/100` factors, `1` when none) separately. The
-// authoritative final chance is computed elsewhere from the structured entries.
+// Display split for one condition kind: the additive delta and the multiplicative factor (`1`
+// when none), for `previewDropBreakdown`; the final chance is computed from the entries.
 function conditionKindDisplay(
   modifiers = {},
   kind,
@@ -2633,10 +2253,7 @@ function conditionKindDisplay(
   return { value, factor };
 }
 
-// Display split for biome modifiers: the additive delta (signed, per
-// aggregation) and the single multiplicative factor derived from the aggregated
-// signed percent. Mirrors matchingBiomeModifierEntries so the breakdown matches
-// the rolled result.
+// Display split for biome modifiers, mirroring `matchingBiomeModifierEntries`.
 function biomeKindDisplay(
   biomeModifiers = [],
   biomes = [],
@@ -2662,22 +2279,11 @@ function biomeKindDisplay(
 }
 
 /**
- * Collapse the active biome modifiers into at most two structured aggregation
- * entries — one additive, one multiplicative — selected by the global system
- * `dropModifierMode` (every biome modifier shares that mode).
+ * The active biome modifiers as at most two entries, one additive and one multiplicative, under
+ * the system `dropModifierMode`. Each subset aggregates by {@link aggregateBiomeModifierValues}
+ * over signed values; the multiplicative subset aggregates in signed-percent space, not as a
+ * product of factors, and becomes one `± value` entry.
  *
- * The additive and multiplicative subsets are aggregated INDEPENDENTLY by the
- * existing {@link aggregateBiomeModifierValues} over their signed values. The
- * additive subset preserves today's exact behavior for every aggregation. The
- * multiplicative subset is aggregated in SIGNED-PERCENT space (not as a product
- * of factors) so cumulative/strongestOfEach/dominant stay consistent with the
- * additive intuition and yield one deterministic biome factor; that single
- * signed percent is then turned into one `± value` multiplicative entry.
- *
- * @param {Array} biomeModifiers Normalized biome condition-modifier list.
- * @param {Array<string>} biomes Active biome tags.
- * @param {string} aggregation Biome aggregation policy.
- * @param {string} dropModifierMode System default mode.
  * @returns {Array<object>} Zero, one, or two structured entries.
  */
 function matchingBiomeModifierEntries(
@@ -2769,11 +2375,8 @@ function normalizeGatheringRules(rules = {}) {
     eventVisibility: GATHERING_EVENT_VISIBILITIES.has(rules?.eventVisibility)
       ? rules.eventVisibility
       : DEFAULT_GATHERING_RULES.eventVisibility,
-    // `dropModifierMode` is the generalized system default (character + condition
-    // modifiers). Read the new key first, then fall back to the legacy
-    // `characterModifierMode` (issue 324 was never released, so this is a
-    // read-time compat shim, not a migration), then the default. Never emit the
-    // legacy key.
+    // Read `dropModifierMode`, then the unreleased legacy `characterModifierMode` (a read-time
+    // shim, issue 324), then the default; the legacy key is never emitted.
     dropModifierMode: DROP_MODIFIER_MODES.has(rules?.dropModifierMode)
       ? rules.dropModifierMode
       : DROP_MODIFIER_MODES.has(rules?.characterModifierMode)
@@ -2813,13 +2416,9 @@ function selectDrops(drops, mode, limit = 1) {
 
 function seedVocabulary(raw, defaults, normalizeId = normalizeTag) {
   const values = Array.isArray(raw) ? raw : raw ? [raw] : [];
-  // The manager persists these lists as option records while the service reads ids,
-  // and stringifying a record yielded `[object object]`, which was then saved back as
-  // the whole vocabulary. So unwrap records to their id, and discard that
-  // stringification under the SAME normalizer the dimension uses -- the manager
-  // kebab-cases condition ids, so the poison reaches this list as `object-object`
-  // there and as `[object object]` in the lower-cased tag dimensions. A list that is
-  // nothing but poison is left empty and re-seeds the documented defaults.
+  // The manager persists option records while this reads ids, so records unwrap to their id, and
+  // a stringified record (`[object object]`, or `object-object` once kebab-cased) is discarded;
+  // an all-poison list re-seeds the defaults.
   const sentinel = normalizeId(OBJECT_STRINGIFICATION);
   const ids = values
     .map((value) =>
@@ -2860,9 +2459,7 @@ function normalizeVocabularyOption(kind, value) {
   if (!id) return null;
   const rawLabel = isRecord ? String(value.label ?? '').trim() : '';
   const defaultBiome = kind === 'biomes' ? DEFAULT_BIOME_METADATA[id] : null;
-  // Bare strings get a generated capitalised label; using the raw string as
-  // the label would render an unwanted lowercase chip. Records keep their
-  // explicit label when present.
+  // A bare string gets a capitalised generated label; a record keeps its own.
   const label = isRecord
     ? rawLabel || defaultBiome?.label || vocabularyLabelFromId(id)
     : defaultBiome?.label || vocabularyLabelFromId(id);
@@ -2990,14 +2587,9 @@ function plainObjectOrNull(value) {
 }
 
 /**
- * Reduce one segment of a reveal key to a form Foundry cannot take apart.
- *
- * Reveal state is persisted through `setFlag`, and Foundry `expandObject`s flag data on
- * the way in — EVERY dotted key, at every depth, becomes nested objects. An actor uuid is
- * `Actor.<id>`, so `actor:Actor.<id>:<env>:<task>` was stored as
- * `reveals["actor:Actor"]["<id>:<env>:<task>"]`: a shape no reader looking for the flat key
- * can match. Blind reveals were therefore WRITE-ONLY — `revealTask` succeeded, the hook
- * fired, and `discoveredTasks` stayed empty under every reveal policy.
+ * Reduce one reveal-key segment to a form Foundry cannot take apart. Reveals persist through
+ * `setFlag`, which `expandObject`s every dotted key, so `actor:Actor.<id>:…` nested under
+ * `reveals["actor:Actor"]` and no reader could find it.
  */
 function revealKeySegment(value) {
   return String(value ?? '').replaceAll('.', '_');
@@ -3011,10 +2603,7 @@ function revealKey({ environmentId, taskId, scope, actor, userId }) {
   return `actor:${revealKeySegment(actor?.uuid || actor?.id || 'unknown')}:${env}:${task}`;
 }
 
-/**
- * Stable-sort records by an explicit order of ids. Records absent from the
- * order array keep their original (library) order after the listed ones.
- */
+/** Stable-sort records by an ordered id list; unlisted records keep library order after them. */
 function sortRecordsByOrder(records, order) {
   const list = normalizeList(records);
   const orderIndex = new Map(normalizeList(order).map((id, index) => [String(id), index]));
