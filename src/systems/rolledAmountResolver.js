@@ -1,13 +1,11 @@
 /**
- * The ONE seam that turns a result's authored amount into the integer awarded (issue 1645).
- *
- * No `quantityFormula` (or whitespace) awards `quantity` and rolls nothing. Otherwise the
- * expression is rolled ONCE per result per award against the crafting character, floored, and
- * clamped at zero: a zero is an EMPTY AWARD, so no item is created and the award still states it.
- * `rolled` is `{ formula, total }` and nothing more, because run records persist it, and `total` is
- * the roll's own total rather than the clamped amount. The live `roll` comes back for the chat
- * message and is never persisted. `Roll` is injected and absent THROWS: silently awarding the
- * authored fallback where dice are unavailable is a wrong number, not a degraded one.
+ * The one seam turning a result's authored amount into the integer awarded (issue 1645).
+ * No `quantityFormula` (or whitespace) awards `quantity` and rolls nothing; otherwise the formula
+ * is rolled once per result per award against the crafting character, floored and clamped at
+ * zero, and a zero is an empty award: no item is created and the award still states it. `rolled`
+ * is `{ formula, total }` only because run records persist it, and `total` is the roll's own
+ * total, not the clamped amount; the live `roll` is for the chat message and never persisted.
+ * An absent `Roll` throws: awarding the authored fallback without dice is a wrong number.
  */
 export async function resolveRolledAmount(
   { quantity, quantityFormula } = {},
@@ -26,8 +24,7 @@ export async function resolveRolledAmount(
   return { amount: Math.max(0, Math.floor(total)), rolled: { formula, total }, roll };
 }
 
-/** What an award reports about a rolled result: the roll as it fell, plus the integer awarded,
- *  which is `0` for an empty award. Carried beside the created items; never persisted. */
+/** An award's report of a rolled result, plus the integer awarded (`0` if empty); never persisted. */
 export const rolledAwardRecord = (result, rolled, quantity) => ({
   resultId: result?.id ?? null,
   componentId: result?.componentId ?? result?.systemItemId ?? null,

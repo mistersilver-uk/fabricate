@@ -1,42 +1,15 @@
 /**
- * Character prerequisites — reusable, system-scoped pass/fail conditions the GM
- * authors on the System Settings page and attaches to gate actions (this PR:
- * learning a recipe). A prerequisite is a dotted `path` into the acting actor's
- * prepared roll data, a comparison `op`, and (for non-valueless operators) a
- * `value` comparand.
- *
- * This module is intentionally Foundry-free so it can be unit-tested in
- * isolation. At runtime the caller passes `actor.getRollData()` as `rollData`.
- *
- * WHAT IS ON THAT OBJECT IS THE GAME SYSTEM'S CHOICE, and the two systems
- * Fabricate ships presets for do not agree. `dnd5e` spreads `system` onto its
- * roll data, so a bare `skills.arc.value` resolves. `pf2e` does not: its
- * `getRollData()` returns `{ actor: this }` alone, so every `pf2e` path must be
- * rooted at `actor.` (`actor.skills.crafting.rank`). This docstring previously
- * asserted that Foundry resolves shortcut keys for both, which is what produced
- * three shipped `pf2e` presets that could never be satisfied.
- *
- * A mistyped or unknown path never throws — it degrades to `0` (numeric
- * operators) or `false` (boolean/existence operators) and logs a single console
- * warning. That is deliberate, but it is also why a wrong path is invisible:
- * prefer pinning a new preset's shape in a test over trusting it by eye.
- *
- * ONE CONSEQUENCE FOR CALLERS. A `pf2e` path reaches PREPARED state through the
- * `actor` reference the roll data carries, so it resolves only against a live
- * document. Every call site spells `actor?.getRollData?.() ?? actor?.system ?? {}`;
- * that fallback yields an object with no `actor` key, under which every `pf2e` path
- * reads 0 again — silently, per the rule above. Pass `getRollData()` output, never a
- * cloned or serialized projection of it.
+ * Character prerequisites (DOMAIN.md "Character Prerequisite"): world-scoped pass/fail
+ * conditions, each a dotted `path` into the acting actor's roll data, a comparison `op` and, for
+ * a non-valueless operator, a `value`. Foundry-free; callers pass `actor.getRollData()`. What
+ * that object holds is the game system's choice: dnd5e spreads `system` onto it, so
+ * `skills.arc.value` resolves, while pf2e returns `{ actor }` alone, so a pf2e path is rooted at
+ * `actor.` and resolves only against live `getRollData()` output, never a clone or the
+ * `actor.system` fallback. An unknown path never throws: it reads `0` or `false`, with a warning.
  */
 
-/**
- * Ordered operator metadata. `symbol` is what the collapsed-header preview and
- * the operator dropdown render (a math glyph for numeric operators, a phrase
- * for the valueless ones); `valueless` operators hide the value field in the
- * editor and omit the comparand from the preview.
- *
- * @type {ReadonlyArray<{id: string, symbol: string, label: string, valueless: boolean, kind: 'number'|'boolean'|'existence'}>}
- */
+/** Ordered operator metadata: `symbol` is what the preview and dropdown render, and a
+ *  `valueless` operator hides the value field and omits the comparand from the preview. */
 export const PREREQUISITE_OPERATORS = Object.freeze(
   [
     { id: 'eq', symbol: '=', label: 'equals', valueless: false, kind: 'number' },
@@ -59,19 +32,10 @@ export const DEFAULT_PREREQUISITE_OPERATOR = 'gte';
 /** Default Font Awesome glyph for a prerequisite with no explicit icon. */
 export const DEFAULT_PREREQUISITE_ICON = 'fa-solid fa-user-shield';
 
-/**
- * @param {string} op Operator id.
- * @returns {boolean} `true` when the operator takes no comparand (`isTrue`,
- *   `isFalse`, `exists`) and the editor must hide the value field.
- */
 export function isValuelessOperator(op) {
   return OPERATOR_BY_ID.get(op)?.valueless === true;
 }
 
-/**
- * @param {string} op Operator id.
- * @returns {object|null} The frozen operator metadata, or `null` when unknown.
- */
 export function operatorMeta(op) {
   return OPERATOR_BY_ID.get(op) || null;
 }
@@ -86,15 +50,7 @@ function cleanPath(path) {
     .replace(/^@+/, '');
 }
 
-/**
- * Safely read a dotted path out of prepared roll data. Mirrors the traversal
- * semantics of `foundry.utils.getProperty` but never throws and has no Foundry
- * dependency. A leading `@` (the UI affordance) is tolerated and stripped.
- *
- * @param {object} rollData Prepared actor roll data (`actor.getRollData()`).
- * @param {string} path Dotted path, with or without a leading `@`.
- * @returns {*} The resolved value, or `undefined` when any segment is missing.
- */
+/** A never-throwing `getProperty`: a leading `@` is stripped; a missing segment is `undefined`. */
 export function resolveRollDataPath(rollData, path) {
   const clean = cleanPath(path);
   if (!clean || rollData == null) return;
@@ -128,24 +84,9 @@ function coerceBoolean(value) {
 }
 
 /**
- * Compare two numbers with one of the SIX NUMERIC operator ids in
- * {@link PREREQUISITE_OPERATORS} (`eq`, `neq`, `gt`, `gte`, `lt`, `lte` — the
- * entries whose `valueless` is `false`).
- *
- * Numeric-only by design: the three valueless ids (`isTrue`, `isFalse`,
- * `exists`) have no numeric reading and return `false` here, as does any
- * unknown id. A caller offering a numeric comparison to a GM must therefore
- * filter the vocabulary with {@link isValuelessOperator} rather than hand-list
- * six ids, and must not route a valueless operator here expecting a pass.
- *
- * Exported so every consumer of a "compare a number against a comparand"
- * gate reads ONE operator table instead of restating the switch.
- *
- * @param {number} actual The resolved left-hand number.
- * @param {string} op Operator id.
- * @param {number} expected The comparand.
- * @returns {boolean} `true` when the comparison holds; `false` for the three
- *   valueless ids and for any unknown id.
+ * Compare with one of the six numeric operator ids; a valueless or unknown id answers `false`,
+ * so a caller offering a numeric comparison filters with `isValuelessOperator`. Every
+ * number-against-comparand gate reads this one table.
  */
 export function compareNumbersByOperatorId(actual, op, expected) {
   switch (op) {
@@ -179,15 +120,7 @@ function defaultWarn(path) {
   );
 }
 
-/**
- * Evaluate a single prerequisite against prepared roll data.
- *
- * @param {object} rollData Prepared actor roll data (`actor.getRollData()`).
- * @param {{path?: string, op?: string, value?: *}} prereq The prerequisite.
- * @param {{warn?: (path: string) => void}} [options] Injectable warning sink
- *   (defaults to `console.warn`); pass a spy in tests.
- * @returns {boolean} `true` when the condition passes.
- */
+/** `warn` (default `console.warn`) hears an unresolved path, except under `exists`. */
 export function evaluatePrerequisite(rollData, prereq, { warn = defaultWarn } = {}) {
   const op = resolveOperatorId(prereq?.op);
   const path = cleanPath(prereq?.path);
@@ -214,16 +147,7 @@ export function evaluatePrerequisite(rollData, prereq, { warn = defaultWarn } = 
   }
 }
 
-/**
- * Evaluate a list of prerequisites with AND semantics.
- *
- * @param {object} rollData Prepared actor roll data.
- * @param {Array<object>} prereqs The prerequisites to check (all must pass).
- * @param {{warn?: (path: string) => void}} [options] Injectable warning sink.
- * @returns {{passed: boolean, failures: Array<{id: string|null, name: string, preview: string}>}}
- *   `passed` is `true` only when every prerequisite passes; `failures` lists the
- *   ones that did not, with a human-readable preview for messaging.
- */
+/** AND semantics; `failures` lists each failing entry with a preview for messaging. */
 export function evaluatePrerequisites(rollData, prereqs, options = {}) {
   const list = Array.isArray(prereqs) ? prereqs.filter(Boolean) : [];
   const failures = [];
@@ -239,13 +163,7 @@ export function evaluatePrerequisites(rollData, prereqs, options = {}) {
   return { passed: failures.length === 0, failures };
 }
 
-/**
- * Render the collapsed-header / message preview string, e.g.
- * `@skills.arc.value ≥ 1` or (valueless) `@flags.attuned is true`.
- *
- * @param {{path?: string, op?: string, value?: *}} prereq The prerequisite.
- * @returns {string} The `@path op value` preview.
- */
+/** The `@path op value` preview, e.g. `@skills.arc.value ≥ 1` or `@flags.attuned is true`. */
 export function prerequisitePreview(prereq) {
   const op = resolveOperatorId(prereq?.op);
   const meta = OPERATOR_BY_ID.get(op);
@@ -256,16 +174,8 @@ export function prerequisitePreview(prereq) {
   return `${at} ${meta.symbol} ${value}`.trim();
 }
 
-/**
- * Normalize one raw prerequisite into the canonical stored shape. Shared by the
- * crafting-system normalizer and the admin store so both agree on defaults.
- * Valueless operators force `value` to `null`; an empty-string value becomes
- * `null`.
- *
- * @param {*} entry Raw prerequisite.
- * @param {() => string} [randomID] Id generator used only when the entry has no id.
- * @returns {object|null} Canonical prerequisite, or `null` when no id can be assigned.
- */
+/** The canonical stored shape, shared so every normalizer agrees on defaults: a valueless operator
+ *  or an empty string stores `value: null`, and an entry that cannot be given an id is `null`. */
 export function normalizeCharacterPrerequisite(entry, randomID = () => '') {
   const source = entry && typeof entry === 'object' ? entry : {};
   const id = String(source.id || '').trim() || String(randomID() || '').trim();
@@ -283,13 +193,7 @@ export function normalizeCharacterPrerequisite(entry, randomID = () => '') {
   return { id, name, icon, path, op, value };
 }
 
-/**
- * Normalize a list of raw prerequisites, dropping any that cannot be assigned an id.
- *
- * @param {*} entries Raw prerequisite list.
- * @param {() => string} [randomID] Id generator.
- * @returns {Array<object>} Canonical prerequisites.
- */
+/** Drops any entry that cannot be assigned an id. */
 export function normalizeCharacterPrerequisiteList(entries, randomID = () => '') {
   if (!Array.isArray(entries)) return [];
   return entries.map((entry) => normalizeCharacterPrerequisite(entry, randomID)).filter(Boolean);
