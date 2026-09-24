@@ -13,6 +13,7 @@ import {
   missingSentences,
   multiset,
   sentencesOf,
+  structuralLinesOf,
   withoutCounts,
   withoutLinkTargets,
 } from '../scripts/lib/docSentences.js';
@@ -45,6 +46,16 @@ const DESTINATIONS = [
   // Issue #1936: the workflow procedure moved out of AGENTS.md.
   '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
 ];
+
+/**
+ * AGENTS.md as it stood at issue #1936's merge-base, checked alone and with no exceptions. Each
+ * floor sits just under the fixture's count of sentences or of table rows and fenced lines.
+ */
+const PRE_1936 = {
+  fixture: `${FIXTURES}/AGENTS.pre-1936.md`,
+  sentenceFloor: 515,
+  structureFloor: 84,
+};
 
 /**
  * Sentences deliberately dropped, each naming the location that still carries them. Empty, because
@@ -483,16 +494,19 @@ const RENAMED = [
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
 const RENAMED_COUNT = 26;
 
-/** Every sentence of the post-split set, as one multiset. */
-function survivingSentences() {
+/** Everything `extract` yields from the post-split set, as one multiset. */
+function survivingLines(extract) {
   const all = [];
   for (const destination of DESTINATIONS) {
     const absolute = path.join(REPOSITORY_ROOT, destination);
     assert.ok(existsSync(absolute), `DESTINATIONS names ${destination}, which is not in the checkout`);
-    all.push(...sentencesOf(readFileSync(absolute, 'utf8')));
+    all.push(...extract(readFileSync(absolute, 'utf8')));
   }
   return multiset(all);
 }
+
+/** Every sentence of the post-split set, as one multiset. */
+const survivingSentences = () => survivingLines(sentencesOf);
 
 test('the frozen fixtures are the documents they claim to be', () => {
   // A checker fed an empty or unreadable OLD passes trivially, which is the commonest way a
@@ -534,6 +548,27 @@ test('every sentence of the pre-split documents still exists somewhere', () => {
       'the number is generated now, DECOUNTED and DECOUNTED_COUNT; if only a renamed identifier ' +
       'changed, RENAMED and RENAMED_COUNT.'
   );
+});
+
+test('every sentence, table row and fenced line of the pre-#1936 AGENTS.md still exists', () => {
+  const text = readFileSync(path.join(REPOSITORY_ROOT, PRE_1936.fixture), 'utf8');
+  const corpora = [
+    ['sentences', sentencesOf, PRE_1936.sentenceFloor],
+    ['table rows and fenced lines', structuralLinesOf, PRE_1936.structureFloor],
+  ];
+  for (const [kind, extract, floor] of corpora) {
+    const before = extract(text);
+    assert.ok(
+      before.length >= floor,
+      `${PRE_1936.fixture} yields ${before.length} ${kind}, under its floor of ${floor}`
+    );
+    const lost = missingSentences(multiset(before), survivingLines(extract));
+    assert.deepEqual(
+      lost.map(({ sentence, before: was, after: now }) => `(${was} -> ${now}) ${sentence}`),
+      [],
+      `these ${kind} predate issue #1936 in AGENTS.md and are in no DESTINATIONS file`
+    );
+  }
 });
 
 test('every deduplication claim names a place that really carries the sentence', () => {
@@ -771,4 +806,8 @@ test('normalisation forgives formatting and nothing else', () => {
   // Structure carries no rule and is dropped, so a table reflow or a fence move is not a loss.
   assert.deepEqual(sentencesOf('| a | b |\n| --- | --- |\n---\n<!-- x -->\n[ref]: https://e.com\n'), []);
   assert.deepEqual(sentencesOf('```js\nconst a = 1;\n```\n'), []);
+  assert.deepEqual(
+    structuralLinesOf('| a |  b |\n|:---|---:|\n```text\n  x\n```\nprose.\n'),
+    ['a | b', 'x']
+  );
 });

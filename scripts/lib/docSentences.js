@@ -31,6 +31,33 @@ export function sentencesOf(markdown) {
 }
 
 /**
+ * The table rows and fenced-block lines `sentencesOf` drops as structure, in order: a row is its
+ * trimmed cells re-joined, a separator row is dropped, and a fenced line is trimmed.
+ */
+export function structuralLinesOf(markdown) {
+  const lines = [];
+  let inFence = false;
+  for (const line of String(markdown).split('\n')) {
+    if (/^\s*(?:```|~~~)/u.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    const trimmed = line.trim();
+    if (inFence) {
+      if (trimmed.length > 0) lines.push(trimmed);
+      continue;
+    }
+    if (!trimmed.startsWith('|')) continue;
+    const cells = trimmed
+      .replace(/^\||\|$/gu, '')
+      .split('|')
+      .map((cell) => cell.trim());
+    if (!cells.every((cell) => /^:?-+:?$/u.test(cell))) lines.push(cells.join(' | '));
+  }
+  return lines;
+}
+
+/**
  * A sentence with every Markdown link TARGET removed, its text kept.
  *
  * A move can force a link to be retargeted — an in-file `(#anchor)` becomes `(path/to.md#anchor)`
