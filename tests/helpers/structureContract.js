@@ -225,7 +225,7 @@ function membersCalling(node, name) {
     if (inner.type !== 'MethodDefinition' || !callNames(inner.value).has(name)) continue;
     members.push(keyName(inner));
   }
-  return members.sort();
+  return members.sort((a, b) => a.localeCompare(b));
 }
 
 /** Whether a `??` or `||` falls back from a call of `callee` to a `new constructorName(…)`. */
@@ -412,7 +412,7 @@ function claimsOverCode(code) {
     property: ([key, value]) => propertyValues(code, key).includes(value),
     key: (name) => propertyKeys(code).has(name),
     callers: ([name, members]) =>
-      membersCalling(code, name).join('\n') === [...members].sort().join('\n'),
+      membersCalling(code, name).join('\n') === [...members].sort((a, b) => a.localeCompare(b)).join('\n'),
     fallsBack: (pair) => fallsBackFrom(code, pair),
   };
 }
