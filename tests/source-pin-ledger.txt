@@ -118,8 +118,6 @@ tests/essence-world-scope-screens.test.js	33
 tests/export-system-gathering-bundle.test.js	7
 tests/file-size-ledger.test.js	1
 tests/foundry-manager-rail-hooks.test.js	1
-tests/foundry-perf-profile.test.js	1
-tests/gathering-bootstrap-api.test.js	6
 tests/gathering-harvesting-boundary.test.js	3
 tests/gathering-image-defaults.test.js	8
 tests/helpers/bootstrapEntrySource.js	1
