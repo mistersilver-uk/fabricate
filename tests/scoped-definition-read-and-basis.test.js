@@ -3,7 +3,7 @@
  * (issue 1359, part of epic 1357).
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import { resolve } from 'node:path';
@@ -575,6 +575,11 @@ describe('the resolved-union memo', () => {
 
 const MANAGER = 'src/systems/CraftingSystemManager.js';
 const ITEM_SOURCES = 'src/systems/manager/itemSources.js';
+// Every `manager/` cluster module (issue 1923), so a site moved into one the census has not named
+// yet still fails it.
+const MANAGER_MODULES = readdirSync(new URL('../src/systems/manager/', import.meta.url))
+  .filter((name) => name.endsWith('.js'))
+  .map((name) => `src/systems/manager/${name}`);
 
 /** The five prune sites that BYPASS `_normalizeSystem`, each deriving its own basis, by home. */
 const BYPASS_SITES = {
@@ -591,8 +596,13 @@ describe('the _scopeBasis call sites', () => {
     callers: [['_scopeBasis', ['_normalizeSystem', ...BYPASS_SITES[MANAGER]]]],
     fallsBackNo: [['_scopeBasis', 'Set']],
   });
-  // The item-source sites moved into a cluster module (issue 1923), which reaches the same
-  // `_scopeBasis` through its `io.scopeBasis` thunk.
+  // A cluster module reaches the same `_scopeBasis` through its `io.scopeBasis` thunk.
+  for (const file of MANAGER_MODULES) {
+    defineStructureContract(`${file} derives the basis only at its named sites, undefaulted`, file, {
+      fnCallers: [['scopeBasis', BYPASS_SITES[file] ?? []]],
+      fallsBackNo: [['scopeBasis', 'Set']],
+    });
+  }
   for (const [file, sites] of Object.entries(BYPASS_SITES)) {
     const [scope, basis] = file === MANAGER ? ['member', '_scopeBasis'] : ['fn', 'scopeBasis'];
     for (const site of sites) {
