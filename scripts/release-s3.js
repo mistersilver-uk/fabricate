@@ -1,12 +1,13 @@
 /** S3 release pipeline for the Fabricate Foundry module. */
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { readFile, writeFile, rm, mkdir } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { argv, env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { assertPublishSafety, fetchPublishState } from './lib/publishGuard.js';
 import { assertArchiveChunkCompleteness } from './lib/releaseZipChunks.js';
+import { resolveExecutable } from './lib/resolveExecutable.js';
 import { zipDirectory } from './lib/zip.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -26,18 +27,28 @@ const DEFAULT_TESTER_SECRET_ENV = 'S3_TESTER_PATH_SECRET';
 // or full install URLs — those leak the cohort secret path into job logs.
 const isCI = (envMap) => envMap.GITHUB_ACTIONS === 'true' || envMap.CI === 'true';
 
-// The live secret segment, captured for the top-level error handler so an AWS error that echoes a
+// Every live secret segment, captured for the top-level error handler so an AWS error that echoes a
 // key (e.g. "NoSuchKey: testers/<group>/<segment>/…") is redacted before it reaches CI logs.
-let activeTesterSegment = '';
+let activeTesterSegments = [];
 
 /**
- * Belt-and-suspenders: replace the secret tester segment with `***` anywhere it might appear in a
- * string we print.
+ * Belt-and-suspenders: replace every secret tester segment with `***` anywhere it might appear in a
+ * string we print. Longest first, so a segment containing another is never half-redacted.
  */
-export function redactSegment(str, segment) {
-  const s = String(str ?? '');
-  if (!segment) return s;
-  return s.split(segment).join('***');
+export function redactSegment(str, segmentOrSegments) {
+  const segments = [segmentOrSegments]
+    .flat()
+    .filter((segment) => typeof segment === 'string' && segment !== '')
+    .sort((a, b) => b.length - a.length);
+  let s = String(str ?? '');
+  for (const segment of segments) s = s.split(segment).join('***');
+  return s;
+}
+
+/** The CLI's fatal-error text: in CI every live segment is redacted from it. */
+export function renderFatalError(error, envMap = env) {
+  const rendered = String(error?.stack || error);
+  return isCI(envMap) ? redactSegment(rendered, activeTesterSegments) : rendered;
 }
 
 /**
@@ -73,11 +84,36 @@ export function getFlag(args, flag) {
 
 /**
  * @typedef {object} ChannelConfig
- * @property {string} channel              - the channel this resolves
- * @property {string[]} testerGroups       - the cohorts served by this channel (possibly none)
- * @property {string|null} testerSecretEnv - env var holding this channel's tester path secret
+ * @property {string} channel        - the channel this resolves
+ * @property {string[]} testerGroups - the cohorts served by this channel (possibly none)
+ * @property {Array<{group: string, testerSecretEnv: string|null}>} testers - each cohort with the
+ *   env var holding its OWN tester path secret
  * @property {'declared'|'default'|'undeclared'} source - where the answer came from
  */
+
+/**
+ * Read a `testerGroups` declaration: an object keyed by group (each naming its own secret), or the
+ * legacy array whose groups all inherit the channel's `testerSecretEnv`.
+ */
+function readTesterGroups(testerGroups, channelSecretEnv, channel) {
+  if (testerGroups === undefined) return { testerGroups: [], testers: [] };
+  let testers;
+  if (Array.isArray(testerGroups)) {
+    testers = testerGroups.map((group) => ({ group, testerSecretEnv: channelSecretEnv }));
+  } else if (testerGroups !== null && typeof testerGroups === 'object') {
+    testers = Object.entries(testerGroups).map(([group, entry]) => ({
+      group,
+      testerSecretEnv: entry?.testerSecretEnv ?? null,
+    }));
+  } else {
+    throw new TypeError(
+      `resolveChannelConfig: channel "${channel}" declares "testerGroups" as ` +
+        `${JSON.stringify(testerGroups)}; expected an array of group names or an object keyed by ` +
+        'group, each naming its own "testerSecretEnv".'
+    );
+  }
+  return { testerGroups: testers.map(({ group }) => group), testers };
+}
 
 /** Resolve one channel's publish configuration. */
 export function resolveChannelConfig(config, channel) {
@@ -92,24 +128,43 @@ export function resolveChannelConfig(config, channel) {
       : null;
 
   if (declared) {
-    return {
-      channel,
-      testerGroups: [...(declared.testerGroups ?? [])],
-      testerSecretEnv: declared.testerSecretEnv ?? null,
-      source: 'declared',
-    };
+    const groups = readTesterGroups(
+      declared.testerGroups,
+      declared.testerSecretEnv ?? null,
+      channel
+    );
+    return { channel, ...groups, source: 'declared' };
   }
 
   if (channel === config?.channel) {
-    return {
-      channel,
-      testerGroups: [...(config.testerGroups ?? [])],
-      testerSecretEnv: DEFAULT_TESTER_SECRET_ENV,
-      source: 'default',
-    };
+    const groups = readTesterGroups(config.testerGroups, DEFAULT_TESTER_SECRET_ENV, channel);
+    return { channel, ...groups, source: 'default' };
   }
 
-  return { channel, testerGroups: [], testerSecretEnv: null, source: 'undeclared' };
+  return { channel, testerGroups: [], testers: [], source: 'undeclared' };
+}
+
+/**
+ * Resolve each tester group's live segment from its own secret. A group whose secret is unnamed,
+ * unset, or blank lands in `missing`; the segment is otherwise used exactly as before (slashes
+ * trimmed), so a republish derives the same keys.
+ *
+ * @returns {{testers: Array<{group: string, secretEnv: string, segment: string}>,
+ *   missing: Array<{group: string, secretEnv: string|null}>}} The resolved and missing groups.
+ */
+export function resolveTesterSegments(channelConfig, envMap) {
+  const testers = [];
+  const missing = [];
+  for (const { group, testerSecretEnv } of channelConfig.testers) {
+    const secretEnv =
+      typeof testerSecretEnv === 'string' && testerSecretEnv.trim() !== ''
+        ? testerSecretEnv.trim()
+        : null;
+    const segment = secretEnv ? trimSlashes(envMap?.[secretEnv] ?? '') : '';
+    if (segment.trim() === '') missing.push({ group, secretEnv });
+    else testers.push({ group, secretEnv, segment });
+  }
+  return { testers, missing };
 }
 
 /**
@@ -124,17 +179,43 @@ export function resolveChannelConfig(config, channel) {
  * @property {string} downloadUrl  - public URL of this target's own versioned zip
  */
 
+/**
+ * The `{group, segment}` pairs a layout addresses: `testers` (each group with its own segment), or
+ * the legacy `testerGroups` sharing one `testerSegment`. Never both.
+ */
+function layoutTesters(opts) {
+  if (!Object.hasOwn(opts, 'testers')) {
+    const segment = trimSlashes(opts.testerSegment ?? '');
+    return (opts.testerGroups ?? []).map((group) => ({ group, segment }));
+  }
+  if (Object.hasOwn(opts, 'testerGroups') || Object.hasOwn(opts, 'testerSegment')) {
+    throw new TypeError(
+      'deriveS3Layout: pass either `testers` or the legacy `testerGroups`/`testerSegment`, not both.'
+    );
+  }
+  return opts.testers.map(({ group, segment }) => {
+    const trimmed = trimSlashes(segment);
+    if (trimmed.trim() === '') {
+      throw new TypeError(
+        `deriveS3Layout: tester group "${group}" has a blank segment, which would address a ` +
+          'guessable path.'
+      );
+    }
+    return { group, segment: trimmed };
+  });
+}
+
 /** Derive the per-target S3 layout for a module release. */
-export function deriveS3Layout({
-  moduleId,
-  channel,
-  version,
-  baseUrl,
-  testerGroups = [],
-  testerSegment = '',
-  buildProfile = 'community',
-  testerBuildProfile,
-}) {
+export function deriveS3Layout(opts) {
+  const {
+    moduleId,
+    channel,
+    version,
+    baseUrl,
+    buildProfile = 'community',
+    testerBuildProfile,
+  } = opts;
+  const testers = layoutTesters(opts);
   const base = stripTrailingSlashes(baseUrl);
   const zipName = `${moduleId}-${version}.zip`;
 
@@ -167,8 +248,7 @@ export function deriveS3Layout({
 
   // The secret segment sits between the (public) group and the module id so the
   // tester feed URL can't be guessed from the group name alone.
-  const segment = trimSlashes(testerSegment);
-  const testerTargets = testerGroups.map((group) => {
+  const testerTargets = testers.map(({ group, segment }) => {
     const prefix = segment
       ? `testers/${group}/${segment}/${moduleId}`
       : `testers/${group}/${moduleId}`;
@@ -343,18 +423,21 @@ export function buildCopyObjectParams(
   };
 }
 
-/** Build dist/ at the requested version and hand back the built manifest. */
-async function defaultBuild({ version }) {
+/**
+ * Build `dist/` at the requested version inside `sourceRoot` — the tree whose bytes ship, which in
+ * CI is the release tag's own worktree — and hand back the built manifest.
+ */
+async function defaultBuild({ version, sourceRoot = ROOT }) {
   try {
     execSync(`node scripts/release.js --dist-version "${version}" --no-zip`, {
-      cwd: ROOT,
+      cwd: sourceRoot,
       stdio: 'inherit',
     });
   } catch {
     fail('build failed');
   }
 
-  const distDir = join(ROOT, 'dist');
+  const distDir = join(sourceRoot, 'dist');
   const manifestPath = join(distDir, 'module.json');
   try {
     return { distDir, manifest: JSON.parse(await readFile(manifestPath, 'utf8')) };
@@ -378,7 +461,10 @@ async function defaultBuild({ version }) {
  *   archive-completeness gate (issue 1565). Injectable for the same reason `zip` is: the harnesses
  *   inject a `zip` that writes the 9-byte string `zip-bytes`, and a zip reader throws on that, so
  *   every test that is not ABOUT this gate stubs it out and one test per harness arms it for real.
- * @property {(opts: {version: string}) => Promise<{distDir: string, manifest: object}>} [build]
+ * @property {(opts: {version: string, sourceRoot: string}) =>
+ *   Promise<{distDir: string, manifest: object}>} [build]
+ * @property {(sourceRoot: string) => string|null} [resolveTreeSha] The commit checked out at a
+ *   source root, which `--source-sha` must equal.
  * @property {(distDir: string, zipPath: string) => void} [zip]
  * @property {(opts: {bucket: string, region?: string}) => Promise<S3Port>} [createS3Client]
  * @property {string} [stagingDir] Where per-target zips are staged.
@@ -387,7 +473,7 @@ async function defaultBuild({ version }) {
 
 /**
  * Resolve everything a publish needs from the config + env — including the channel's OWN tester
- * groups and secret — and derive the target layout.
+ * groups, each with its own secret — and derive the target layout.
  */
 function resolvePublishPlan({ config, channel, version, env: envMap, buildProfile = 'community' }) {
   const moduleId = config?.moduleId;
@@ -398,14 +484,17 @@ function resolvePublishPlan({ config, channel, version, env: envMap, buildProfil
   const baseUrl = stripTrailingSlashes(envMap.RELEASE_BASE_URL || config.baseUrl || '');
   const channelConfig = resolveChannelConfig(config, channel);
 
-  const secretEnv = channelConfig.testerSecretEnv;
-  const testerSegment = trimSlashes(secretEnv ? envMap[secretEnv] || '' : '');
-  if (channelConfig.testerGroups.length > 0 && !testerSegment) {
-    const cause = secretEnv ? `${secretEnv} is unset` : 'declares no "testerSecretEnv"';
+  const { testers, missing } = resolveTesterSegments(channelConfig, envMap);
+  if (missing.length > 0) {
+    const causes = missing.map(({ group, secretEnv }) =>
+      secretEnv
+        ? `${secretEnv} is unset (tester group "${group}")`
+        : `tester group "${group}" declares no "testerSecretEnv"`
+    );
     fail(
-      `channel "${channel}" declares ${channelConfig.testerGroups.length} tester group(s) but ` +
-        `${cause} — refusing to publish to a guessable path. Set that channel's OWN secret (a ` +
-        'GitHub Actions secret in CI; an env var locally) before publishing.'
+      `channel "${channel}" declares ${channelConfig.testers.length} tester group(s) but ` +
+        `${causes.join('; ')} — refusing to publish to a guessable path. Set each group's OWN ` +
+        'secret (a GitHub Actions secret in CI; an env var locally) before publishing.'
     );
   }
 
@@ -419,13 +508,13 @@ function resolvePublishPlan({ config, channel, version, env: envMap, buildProfil
     channel,
     version,
     baseUrl: baseUrl || 'https://example.invalid',
-    testerGroups: channelConfig.testerGroups,
-    testerSegment,
+    testers,
     buildProfile,
     testerBuildProfile,
   });
 
-  return { moduleId, bucket, baseUrl, channelConfig, testerSegment, layout };
+  const testerSegments = testers.map(({ segment }) => segment);
+  return { moduleId, bucket, baseUrl, channelConfig, testerSegments, layout };
 }
 
 /**
@@ -450,7 +539,7 @@ export async function runCheckHeads({ config, version, channel, deps = {} }) {
   if (!version) fail('--version <ver> is required');
 
   const plan = resolvePublishPlan({ config, channel, version, env: envMap });
-  activeTesterSegment = plan.testerSegment;
+  activeTesterSegments = plan.testerSegments;
   requireBucketAndBaseUrl(plan);
 
   const createClient = deps.createS3Client ?? createDefaultS3Client;
@@ -491,7 +580,7 @@ export async function main({ argv: argvInput = argv, env: envInput = env, deps =
 
   if (!version) fail('--version <ver> is required');
 
-  // Resolve the channel's own targets (its tester groups + secret come from the CHANNEL).
+  // Resolve the channel's own targets; every group's secret is resolved before anything is built.
   const plan = resolvePublishPlan({
     config,
     channel,
@@ -500,18 +589,19 @@ export async function main({ argv: argvInput = argv, env: envInput = env, deps =
     buildProfile: options.buildProfile,
   });
   // Assigned BEFORE anything can throw with an S3 key in it, so the CLI's catch-all can redact it.
-  activeTesterSegment = plan.testerSegment;
+  activeTesterSegments = plan.testerSegments;
   if (!dryRun) requireBucketAndBaseUrl(plan);
 
   // The issue-345 tripwire runs BEFORE the build and BEFORE any write: a publish whose targets do
   // not all share one build profile fails here with nothing built and nothing uploaded.
   const buildProfile = assertUniformBuildProfile(plan.layout.targets);
+  const sourceRoot = resolveSourceRoot({ options, ci, deps });
   printPlan({ plan, channel, version, dryRun, ci, log });
 
   // Build dist/ at the requested version, then validate what came out.
   log('release-s3: building...');
   const build = deps.build ?? defaultBuild;
-  const { distDir, manifest: built } = await build({ version });
+  const { distDir, manifest: built } = await build({ version, sourceRoot });
   assertBuiltManifest(built, { moduleId: plan.moduleId, version });
 
   const staged = await stageTargets({ plan, built, distDir, deps, ci, log });
@@ -533,23 +623,73 @@ export async function main({ argv: argvInput = argv, env: envInput = env, deps =
         log,
       });
 
-  printSummary({ layout: plan.layout, dryRun, segment: plan.testerSegment, ci, log });
+  printSummary({ layout: plan.layout, dryRun, ci, log });
   return { layout: plan.layout, staged, safety, put, dryRun };
+}
+
+/** The commit checked out at `sourceRoot`, or `null` when git cannot say. */
+function defaultResolveTreeSha(sourceRoot) {
+  const git = resolveExecutable('git');
+  if (!git) return null;
+  try {
+    const sha = execFileSync(git, ['-C', sourceRoot, 'rev-parse', 'HEAD'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return sha.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The tree whose bytes are built. In CI it is always the release tag's own checkout, apart from
+ * this publisher's, because the publisher runs from the workflow ref (issue 1988); `--source-sha`
+ * must name the commit that tree actually holds.
+ */
+function resolveSourceRoot({ options, ci, deps }) {
+  if (ci && (!options.sourceRoot || !options.sourceSha)) {
+    fail(
+      'a CI build needs both --source-root <dir> (the release tag checked out apart from this ' +
+        'publisher) and --source-sha <sha> (the commit that tree holds): the publisher runs from ' +
+        'the workflow ref and takes only the built bytes from the tag.'
+    );
+  }
+  const sourceRoot = resolve(options.sourceRoot ?? ROOT);
+  if (options.sourceSha) {
+    const treeSha = (deps.resolveTreeSha ?? defaultResolveTreeSha)(sourceRoot);
+    if (treeSha !== options.sourceSha) {
+      fail(
+        `--source-sha ${options.sourceSha} is not the commit checked out at ${sourceRoot} ` +
+          `(${treeSha ?? 'unreadable'}) — refusing to stamp one commit's provenance onto another's bytes.`
+      );
+    }
+  }
+  return sourceRoot;
+}
+
+/** A flag's value, refusing a flag that is present with no value (distinct from an absent flag). */
+function requiredFlagValue(args, flag) {
+  const value = getFlag(args, flag);
+  if (args.includes(flag) && !value?.trim()) fail(`${flag} was given without a value`);
+  return value;
 }
 
 /**
  * @param {string[]} args The argv slice.
  * @returns {{version: string|null, channelOverride: string|null, configPath: string,
- *   sourceSha: string|null, buildProfile: string, dryRun: boolean, overwrite: boolean,
- *   checkHeads: boolean, allowDowngrade: boolean, backfillProvenance: boolean}} The options.
+ *   sourceSha: string|null, sourceRoot: string|null, buildProfile: string, dryRun: boolean,
+ *   overwrite: boolean, checkHeads: boolean, allowDowngrade: boolean,
+ *   backfillProvenance: boolean}} The options.
  */
 function parseArgs(args) {
   return {
     version: getFlag(args, '--version'),
     channelOverride: getFlag(args, '--channel'),
     configPath: getFlag(args, '--config') || join(ROOT, 'release.s3.config.json'),
-    // The source commit stamped into every zip's provenance.
-    sourceSha: getFlag(args, '--source-sha'),
+    // The source commit stamped into every zip's provenance, and the tree that commit is built in.
+    sourceSha: requiredFlagValue(args, '--source-sha'),
+    sourceRoot: requiredFlagValue(args, '--source-root'),
     buildProfile: getFlag(args, '--build-profile') || 'community',
     dryRun: args.includes('--dry-run'),
     overwrite: args.includes('--overwrite'),
@@ -878,7 +1018,7 @@ export async function runBackfill({
     env: envResolved,
     buildProfile: options.buildProfile,
   });
-  activeTesterSegment = plan.testerSegment;
+  activeTesterSegments = plan.testerSegments;
   requireBucketAndBaseUrl(plan);
 
   const createClient = deps.createS3Client ?? createDefaultS3Client;
@@ -954,25 +1094,23 @@ function printHeadReport(report, log) {
 }
 
 /**
- * @param {{layout: object, dryRun: boolean, segment: string, ci: boolean,
- *   log: (...args: unknown[]) => void}} opts The layout, mode, live secret, CI flag and logger.
+ * @param {{layout: object, dryRun: boolean, ci: boolean, log: (...args: unknown[]) => void}} opts
+ *   The layout, mode, CI flag and logger.
  * @returns {void}
  */
-function printSummary({ layout, dryRun, segment, ci, log }) {
+function printSummary({ layout, dryRun, ci, log }) {
   // CI: the install URLs ARE the cohort secret — never print them to job logs.
   if (ci) {
     const verb = dryRun ? 'would publish' : 'published';
     log(
       `\nrelease-s3: ${verb} channel + ${layout.testerTargets.length} tester feed(s) ` +
         `(v${layout.version}). Install URLs withheld from CI logs — run a local ` +
-        `\`--dry-run\` with the channel's tester secret set to retrieve them.`
+        `\`--dry-run\` with every tester group's secret set to retrieve them.`
     );
     return;
   }
   // Local/dry-run: print the real install URLs so the maintainer can distribute
-  // them privately (local stdout is not a public artifact). `segment` is the live
-  // secret here by design — do not redact.
-  void segment;
+  // them privately (local stdout is not a public artifact) — do not redact.
   const header = dryRun
     ? 'DRY-RUN — install URLs that would be published:'
     : 'Published install URLs:';
@@ -993,10 +1131,9 @@ if (isMainModule) {
   try {
     await main();
   } catch (error) {
-    // In CI, redact the secret segment from any error text (AWS errors can echo
+    // In CI, redact every secret segment from any error text (AWS errors can echo
     // the object key) before it lands in the job log.
-    const rendered = String(error?.stack || error);
-    console.error(isCI(env) ? redactSegment(rendered, activeTesterSegment) : rendered);
+    console.error(renderFatalError(error, env));
     exit(1);
   }
 }

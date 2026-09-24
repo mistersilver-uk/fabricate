@@ -6,12 +6,15 @@
   "testerGroups": ["closed-beta-2026"],
   "channels": {
     "beta": {
-      "testerGroups": ["closed-beta-2026"],
-      "testerSecretEnv": "S3_TESTER_PATH_SECRET"
+      "testerGroups": {
+        "closed-beta-2026": { "testerSecretEnv": "S3_TESTER_PATH_SECRET" }
+      }
     },
     "early-access": {
-      "testerGroups": ["guild-artisan-2026"],
-      "testerSecretEnv": "S3_GUILD_ARTISAN_PATH_SECRET"
+      "testerGroups": {
+        "apprentice-crafter-2026": { "testerSecretEnv": "S3_APPRENTICE_PATH_SECRET" },
+        "guild-artisan-2026": { "testerSecretEnv": "S3_GUILD_ARTISAN_PATH_SECRET" }
+      }
     },
     "public": {
       "testerGroups": []
