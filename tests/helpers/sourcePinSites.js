@@ -26,6 +26,9 @@ const FUNCTION_TYPES = Object.freeze([
 
 const NO_EXPORTS = () => undefined;
 
+/** The binding an anonymous `export default` stands for, which the AST does not name. */
+const DEFAULT_EXPORT = Object.freeze({ type: 'Identifier', name: '*default*' });
+
 /**
  * Subtree queries, memoised on the node: a module is re-analysed on every pass of the cross-module
  * fixpoint, and re-walking each subtree per pass doubled the gate's run time.
@@ -56,8 +59,18 @@ const spellsSrcPath = memoised((node) =>
   literalStrings(node).some((text) => text.includes('src/') || SRC_ROOTS.includes(text))
 );
 
+/** `calledName`, plus a string-keyed member such as `fs['readFileSync']`. */
+function readerCallName(node) {
+  const { callee } = node;
+  const keyed = callee?.type === 'MemberExpression' && callee.computed ? callee.property : {};
+  return calledName(node) ?? (typeof keyed.value === 'string' ? keyed.value : undefined);
+}
+
 const isReader = (node, readers) =>
-  node?.type === 'CallExpression' && readers.has(calledName(node));
+  node?.type === 'CallExpression' && readers.has(readerCallName(node));
+
+/** The name an import or export specifier spells, whether as an identifier or a string. */
+const specifierName = (node) => node?.name ?? node?.value;
 
 /** The name a function is bound to, whether declared or assigned to a `const`. */
 function boundFunctionName(node, assignedNames) {
@@ -68,11 +81,44 @@ function boundFunctionName(node, assignedNames) {
 function functionAssignments(nodes) {
   const assigned = new Map();
   for (const node of nodes) {
+    if (
+      node.type === 'ExportDefaultDeclaration' &&
+      FUNCTION_TYPES.includes(node.declaration.type)
+    ) {
+      assigned.set(node.declaration, DEFAULT_EXPORT.name);
+    }
     if (node.type !== 'VariableDeclarator' || node.id?.type !== 'Identifier') continue;
     if (node.init && FUNCTION_TYPES.includes(node.init.type)) assigned.set(node.init, node.id.name);
   }
   return assigned;
 }
+
+/** Local names destructured from a base reader, as `const { readFileSync: rd } = fs`. */
+function destructuredReaders(nodes) {
+  const names = [];
+  for (const node of nodes) {
+    if (node.type !== 'VariableDeclarator' || node.id?.type !== 'ObjectPattern') continue;
+    for (const { key, value } of node.id.properties) {
+      if (BASE_READERS.includes(specifierName(key)) && value?.type === 'Identifier') {
+        names.push(value.name);
+      }
+    }
+  }
+  return names;
+}
+
+/** A function's own return values, not those of the functions nested in it. */
+const functionReturns = memoised((fn) => {
+  if (fn.body?.type !== 'BlockStatement') return [fn.body];
+  const returns = [];
+  // Seeding `seen` with a nested function's body stops the walk descending into its returns.
+  const seen = new Set();
+  for (const inner of walkNodes(fn.body, seen)) {
+    if (FUNCTION_TYPES.includes(inner.type)) seen.add(inner.body);
+    else if (inner.type === 'ReturnStatement' && inner.argument) returns.push(inner.argument);
+  }
+  return returns;
+});
 
 /** Every name bound as a function parameter anywhere in the module. */
 function parameterNames(functions) {
@@ -105,10 +151,11 @@ const moduleIndex = memoised((ast) => {
   const functions = nodes.filter((node) => FUNCTION_TYPES.includes(node.type));
   const assigned = functionAssignments(nodes);
   const named = functions
-    .map((fn) => ({ name: boundFunctionName(fn, assigned), calls: callsIn(fn.body) }))
+    .map((fn) => ({ name: boundFunctionName(fn, assigned), fn, calls: callsIn(fn.body) }))
     .filter(({ name }) => name !== undefined);
   return {
     named,
+    aliases: destructuredReaders(nodes),
     parameters: parameterNames(functions),
     calls: nodes.filter((node) => node.type === 'CallExpression'),
     declarators: nodes.filter(
@@ -121,8 +168,8 @@ const moduleIndex = memoised((ast) => {
  * Names this module can read a file through: the base readers, the imported ones, and any local
  * function whose body calls one, resolved to a fixpoint so a wrapper around a wrapper still counts.
  */
-function readerNames({ named }, imported) {
-  const names = new Set([...BASE_READERS, ...imported]);
+function readerNames({ named, aliases }, imported) {
+  const names = new Set([...BASE_READERS, ...aliases, ...imported]);
   let grew = true;
   while (grew) {
     grew = false;
@@ -135,13 +182,29 @@ function readerNames({ named }, imported) {
   return names;
 }
 
-/** The name an import or export specifier spells, whether as an identifier or a string. */
-const specifierName = (node) => node?.name ?? node?.value;
+/**
+ * Names whose call returns what a reader returned, so the path a caller hands one is a read: the
+ * readers themselves, and a function returning one's call directly, as `readRootSource` does.
+ */
+function textReaderNames({ named, aliases }, imported) {
+  const names = new Set([...BASE_READERS, ...aliases, ...imported]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const { name, fn } of named) {
+      if (names.has(name) || !functionReturns(fn).some((value) => isReader(value, names))) continue;
+      names.add(name);
+      grew = true;
+    }
+  }
+  return names;
+}
 
 function seedKinds(seeds, kinds, key, name) {
   if (kinds?.has('path')) seeds.paths.add(key);
   if (kinds?.has('source')) seeds.sources.add(key);
   if (kinds?.has('reader')) seeds.wrappers.add(name);
+  if (kinds?.has('text')) seeds.readers.add(name);
 }
 
 /** `ns.TEXT` is keyed on the member node, since the namespace binding itself is not text. */
@@ -160,7 +223,8 @@ function seedNamespaceMembers(nodes, identifierKey, namespaces, seeds) {
 /**
  * What this module imports from a `tests/` export, keyed by (resolved module, imported name): paths
  * and sources by the local binding, and readers by the name a call site spells. An imported wrapper
- * marks the module as reading files but is not a pin read, since most compile or mount a component.
+ * marks the module as reading files but is not a pin read, since most compile or mount a component;
+ * one returning the text it read is.
  */
 function importSeeds(ast, identifierKey, exportsOf) {
   const seeds = {
@@ -218,43 +282,30 @@ function classifyDeclaration(declaration, context) {
   return { path, source };
 }
 
-/** Top-level function declarations the module exports, inline or through `export { name }`. */
-function exportedFunctions(ast) {
-  const listed = new Set();
-  const declared = [];
-  for (const node of ast.body) {
-    const fn = node.type === 'FunctionDeclaration' ? node : node.declaration;
-    if (fn?.type === 'FunctionDeclaration') declared.push([fn, fn !== node]);
-    if (node.type === 'ExportNamedDeclaration' && !node.source) {
-      for (const { local } of node.specifiers) listed.add(specifierName(local));
-    }
-  }
-  return declared
-    .filter(([fn, inline]) => fn.id && (inline || listed.has(fn.id.name)))
-    .map(([fn]) => fn);
+/** An anonymous default export, as declarations of the binding its importers name. */
+function defaultExportDeclarations(ast) {
+  const declaration = ast.body.find(
+    (node) => node.type === 'ExportDefaultDeclaration'
+  )?.declaration;
+  if (!declaration || declaration.id || declaration.type === 'Identifier') return [];
+  if (declaration.type !== 'FunctionDeclaration')
+    return [{ id: DEFAULT_EXPORT, init: declaration }];
+  return functionReturns(declaration).map((init) => ({ id: DEFAULT_EXPORT, init }));
 }
 
 /**
- * An exported function's own return values, as declarations of its binding, so a caller of a
+ * Every declared function's return values, as declarations of its binding, so a caller of a
  * function returning text holds a source. `const` functions are classified by their declarator.
  */
-const exportedFunctionReturns = memoised((ast) => {
-  const returns = [];
-  for (const fn of exportedFunctions(ast)) {
-    // Seeding `seen` with a nested function's body stops the walk descending into its returns.
-    const seen = new Set();
-    for (const inner of walkNodes(fn.body, seen)) {
-      if (FUNCTION_TYPES.includes(inner.type)) seen.add(inner.body);
-      else if (inner.type === 'ReturnStatement' && inner.argument) {
-        returns.push({ id: fn.id, init: inner.argument });
-      }
-    }
-  }
-  return returns;
-});
+const functionReturnDeclarations = memoised((ast) => [
+  ...nodesIn(ast)
+    .filter((node) => node.type === 'FunctionDeclaration' && node.id)
+    .flatMap((fn) => functionReturns(fn).map((init) => ({ id: fn.id, init }))),
+  ...defaultExportDeclarations(ast),
+]);
 
 function resolveBindings(ast, { declarators }, { readers, keyFor, seeds }) {
-  const declarations = [...declarators, ...exportedFunctionReturns(ast)];
+  const declarations = [...declarators, ...functionReturnDeclarations(ast)];
   const paths = new Set(seeds.paths);
   const sources = new Set(seeds.sources);
   const context = { readers, paths, sources, keyFor };
@@ -313,7 +364,11 @@ function isPinSite(node, context) {
   // `assert.match(source, /x/)` and `/x/.test(source)` take the text as an argument, not a receiver.
   if ((called === 'match' && receiver?.name === 'assert') || called === 'test') {
     const [subject] = node.arguments;
-    return subject !== undefined && sources.has(keyFor(subject));
+    return (
+      subject !== undefined &&
+      (sources.has(keyFor(subject)) ||
+        (subject.type === 'CallExpression' && sources.has(keyFor(subject.callee))))
+    );
   }
   if (called !== 'includes' || receiver === undefined) return false;
   // A resolved source binding is pin enough whatever the needle: a pin whose argument is a loop
@@ -327,6 +382,7 @@ function isPinSite(node, context) {
 /** The local binding or re-exported kinds behind each name one export statement makes public. */
 function* exportedBindings(node, exportsOf) {
   if (node.type === 'ExportAllDeclaration') {
+    // A known limit: `export * as ns from` is not followed.
     if (node.exported) return;
     for (const [name, kinds] of exportsOf(node.source.value) ?? []) {
       if (name !== 'default') yield { name, kinds };
@@ -334,8 +390,11 @@ function* exportedBindings(node, exportsOf) {
     return;
   }
   if (node.type === 'ExportDefaultDeclaration') {
-    const local = node.declaration.type === 'Identifier' ? node.declaration : node.declaration.id;
-    if (local) yield { name: 'default', local };
+    const { declaration } = node;
+    yield {
+      name: 'default',
+      local: declaration.type === 'Identifier' ? declaration : (declaration.id ?? DEFAULT_EXPORT),
+    };
     return;
   }
   const { declaration, specifiers = [], source } = node;
@@ -354,8 +413,8 @@ function* exportedBindings(node, exportsOf) {
   }
 }
 
-/** This module's exports that importers must treat as a path, a source, or a reader. */
-function exportTable(ast, { paths, sources, wrappers, keyFor }, exportsOf) {
+/** This module's exports that importers must treat as a path, a source, a reader, or text. */
+function exportTable(ast, { paths, sources, wrappers, texts, keyFor }, exportsOf) {
   const table = new Map();
   for (const node of ast.body) {
     if (!node.type.startsWith('Export')) continue;
@@ -366,6 +425,7 @@ function exportTable(ast, { paths, sources, wrappers, keyFor }, exportsOf) {
         if (paths.has(key)) found.add('path');
         if (sources.has(key)) found.add('source');
         if (wrappers.has(local.name)) found.add('reader');
+        if (texts.has(local.name)) found.add('text');
       }
       if (found.size > 0) table.set(name, found);
     }
@@ -403,8 +463,14 @@ function analyseModule(ast, { file = '', scopeManager, exportsOf = NO_EXPORTS } 
     readsFiles ||= isReader(node, direct);
     if (isPinSite(node, context)) sites += 1;
   }
-  const wrappers = hasExports(ast) ? readerNames(index, direct) : direct;
-  return { sites, readsFiles, exports: exportTable(ast, { ...context, wrappers }, exportsOf) };
+  if (!hasExports(ast)) return { sites, readsFiles, exports: new Map() };
+  const wrappers = readerNames(index, direct);
+  const texts = textReaderNames(index, seeds.readers);
+  return {
+    sites,
+    readsFiles,
+    exports: exportTable(ast, { ...context, wrappers, texts }, exportsOf),
+  };
 }
 
 /** @returns {number} The pin sites in one module, with nothing imported resolved. */

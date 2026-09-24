@@ -265,6 +265,31 @@ const PROBES = Object.freeze([
     ],
   },
   {
+    name: 'a regex test and an assert.match on a call returning source are pins',
+    file: 'tests/x.test.js',
+    sites: 3,
+    source: [
+      "import { readFileSync } from 'node:fs';",
+      "import assert from 'node:assert/strict';",
+      "const read = () => readFileSync('src/a.svelte', 'utf8');",
+      'export const one = /premium/i.test(read());',
+      'assert.match(read(), /export/);',
+    ],
+  },
+  {
+    name: 'a function returning source is followed whether exported, private or nested',
+    file: 'tests/x.test.js',
+    sites: 4,
+    source: [
+      "import { readFileSync } from 'node:fs';",
+      "function rootSource() { return readFileSync('src/a.svelte', 'utf8'); }",
+      'export function pins() {',
+      "  function nested() { return readFileSync('src/b.js', 'utf8'); }",
+      "  return rootSource().includes('x') && nested().includes('y');",
+      '}',
+    ],
+  },
+  {
     name: 'an includes on text that never came from src/ is not a pin',
     file: 'tests/x.test.js',
     sites: 0,
@@ -429,16 +454,69 @@ const CORPUS_PROBES = Object.freeze([
     modules: {
       'tests/helpers/compile.js': [
         "import { readFileSync } from 'node:fs';",
-        'export function compile(path) {',
-        "  return readFileSync(path, 'utf8');",
+        "import { compile } from 'svelte/compiler';",
+        'export function compileFile(path) {',
+        "  return compile(readFileSync(path, 'utf8'));",
         '}',
       ],
       'tests/x.test.js': [
-        "import { compile } from './helpers/compile.js';",
-        "export const mounted = compile('src/ui/Root.svelte');",
+        "import { compileFile } from './helpers/compile.js';",
+        "export const mounted = compileFile('src/ui/Root.svelte');",
       ],
     },
     sites: 0,
+  },
+  {
+    name: 'an imported wrapper returning the text it read is a read of the path it is handed',
+    modules: {
+      'tests/helpers/read.js': [
+        "import { readFileSync } from 'node:fs';",
+        'export function readRoot(path) {',
+        "  return readFileSync(path, 'utf8');",
+        '}',
+        "export const readListed = (full) => readFileSync(full, 'utf8');",
+      ],
+      'tests/x.test.js': [
+        "import { readListed, readRoot } from './helpers/read.js';",
+        "const source = readRoot('src/ui/Root.svelte');",
+        "export const lang = readRoot('lang/en.json');",
+        "export const ok = source.includes('<div') && readListed('src/a.js').includes('x');",
+      ],
+    },
+    sites: 3,
+  },
+  {
+    name: 'a default export of text is text, named or anonymous',
+    modules: {
+      'tests/helpers/named.js': [
+        "import { readFileSync } from 'node:fs';",
+        "const TEXT = readFileSync('src/a.js', 'utf8');",
+        'export default TEXT;',
+      ],
+      'tests/helpers/value.js': [
+        "import { readFileSync } from 'node:fs';",
+        "export default readFileSync('src/b.js', 'utf8');",
+      ],
+      'tests/helpers/declared.js': [
+        "import { readFileSync } from 'node:fs';",
+        'export default function () {',
+        "  return readFileSync('src/c.js', 'utf8');",
+        '}',
+      ],
+      'tests/helpers/arrow.js': [
+        "import { readFileSync } from 'node:fs';",
+        "export default () => readFileSync('src/d.js', 'utf8');",
+      ],
+      'tests/x.test.js': [
+        "import named from './helpers/named.js';",
+        "import value from './helpers/value.js';",
+        "import declared from './helpers/declared.js';",
+        "import arrow from './helpers/arrow.js';",
+        "export const pins = named.includes('a') && value.includes('b');",
+        "export const called = declared().includes('c') && arrow().includes('d');",
+      ],
+    },
+    sites: 4,
   },
 ]);
 
@@ -474,7 +552,7 @@ test('the legacy-scan helpers only fall', () => {
   );
 });
 
-test('a helper reading files raw, aliased or via a wrapper chain is flagged until listed', () => {
+test('a helper reading files raw, aliased, keyed or via a wrapper chain is flagged until listed', () => {
   const { fileReaders } = countCorpusPinSites(
     parseCorpus({
       'tests/helpers/scan.js': [
@@ -484,6 +562,15 @@ test('a helper reading files raw, aliased or via a wrapper chain is flagged unti
       'tests/helpers/raw.js': [
         "import { readFileSync as read } from 'node:fs';",
         "export const text = read('src/a.js', 'utf8');",
+      ],
+      'tests/helpers/keyed.js': [
+        "import fs from 'node:fs';",
+        "export const text = fs['readFileSync']('a.txt', 'utf8');",
+      ],
+      'tests/helpers/destructured.js': [
+        "import fs from 'node:fs';",
+        'const { readFileSync: rd } = fs;',
+        "export const text = rd('a.txt', 'utf8');",
       ],
       'tests/helpers/wrapped.js': [
         "import { readListed } from './scan.js';",
@@ -502,7 +589,13 @@ test('a helper reading files raw, aliased or via a wrapper chain is flagged unti
   );
   const listed = { 'tests/helpers/scan.js': 'corpus', 'tests/helpers/pure.js': 'scan' };
   assert.deepEqual(scanHelperFindings(fileReaders, listed), {
-    unlisted: ['tests/helpers/raw.js', 'tests/helpers/twoHop.js', 'tests/helpers/wrapped.js'],
+    unlisted: [
+      'tests/helpers/destructured.js',
+      'tests/helpers/keyed.js',
+      'tests/helpers/raw.js',
+      'tests/helpers/twoHop.js',
+      'tests/helpers/wrapped.js',
+    ],
     stale: ['tests/helpers/pure.js'],
     unknownKind: ['tests/helpers/pure.js'],
   });
