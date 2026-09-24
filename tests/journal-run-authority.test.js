@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import {
@@ -10,6 +9,7 @@ import {
   createJournalRunAuthority,
 } from '../src/systems/journalRunAuthority.js';
 import { JOURNAL_RUN_COMMAND_TIMEOUT_MS } from '../src/systems/journalRunCommands.js';
+import { defineStructureContract } from './helpers/structureContract.js';
 
 /**
  * Models the V13.351/V14.365 server rules the arbitration rests on: `keepId` is what preserves a
@@ -599,15 +599,23 @@ describe('journal run authority ledger', () => {
     assert.ok(calls >= 4, 'boot, claims, and the token use secure random values');
   });
 
-  it('fails closed when Web Crypto is unavailable and has no Math.random fallback', async () => {
+  it('fails closed when Web Crypto is unavailable and has no Math.random fallback', async (t) => {
+    const insecure = [];
+    t.mock.method(Math, 'random', () => insecure.push('Math.random') && 0.5);
     const authority = foundryAuthorityFixture({});
     assert.deepEqual(await authority.setup(), {
       success: false,
       reason: 'secure-random-unavailable',
     });
-    const source = readFileSync(new URL('../src/systems/journalRunAuthority.js', import.meta.url), 'utf8');
-    assert.doesNotMatch(source, /Math\.random/);
+    assert.deepEqual(insecure, [], 'no insecure draw stands in for the missing Web Crypto');
   });
+
+  // Every draw in the module, not only setup's: ids come from Web Crypto and nowhere else.
+  defineStructureContract(
+    'draws its randomness from Web Crypto alone',
+    'src/systems/journalRunAuthority.js',
+    { reads: ['webCrypto.randomUUID', 'webCrypto.getRandomValues'], readsNo: ['Math.random'] }
+  );
 
   it('provisions one private ledger for the active GM and keeps setup an idempotent ensure', async () => {
     const world = sharedAuthorityWorld();

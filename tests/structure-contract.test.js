@@ -154,6 +154,18 @@ test('the shape claim matches an expression or statement shape for shape, and no
   );
   assert.throws(() => subject.contains('if ('), /not one JavaScript expression or statement/);
   assert.equal(CONTRACT_CLAIMS.contains.ask, 'contains');
+  assert.equal(CONTRACT_CLAIMS.containsNo.ask, 'contains');
+  assert.equal(CONTRACT_CLAIMS.containsNo.holds, false, 'the negative asks the same predicate');
+});
+
+test('the parameter claim compares a function signature, defaults and patterns included', () => {
+  const { ast } = parseModule('async function save(id, updates, { baseline } = {}) {}');
+  const save = claimsOverCode(namedCodeAst(ast, 'save'));
+  assert.equal(save.takes('id, updates, { baseline } = {}'), true, 'reflowed spacing is the same');
+  assert.equal(save.takes('id, updates, { baseline }'), false, 'a dropped default is another');
+  assert.equal(save.takes('id, updates'), false, 'and so is a dropped parameter');
+  assert.equal(claimsOverCode(ast).takes(''), false, 'a module is no function');
+  assert.equal(CONTRACT_CLAIMS.takes.ask, 'takes');
 });
 
 test('the import claim reads every spelling, lists a namespace, and fails closed on import(x)', () => {
@@ -181,6 +193,22 @@ test('the import claim reads every spelling, lists a namespace, and fails closed
     computed.importSpecifiers(['scope', ['import(<computed>)', 'import(<computed>)']]),
     true
   );
+});
+
+test('the named-import claim holds a binding kept under its own name, from one specifier', () => {
+  const source = [
+    "import { gate as local, kept } from './contract.js';",
+    "import { gate } from './leaf.js';",
+    'const other = () => {};',
+  ].join('\n');
+  const subject = claimsOverCode(parseModule(source).ast);
+  assert.equal(subject.importsName(['./contract.js', 'kept']), true);
+  assert.equal(subject.importsName(['./contract.js', 'gate']), false, 'an alias frees the name');
+  assert.equal(subject.importsName(['./contract.js', 'local']), false, 'nor is it the alias');
+  assert.equal(subject.importsName(['./leaf.js', 'gate']), true, 'another specifier is its own');
+  assert.equal(subject.importsName(['./leaf.js', 'kept']), false);
+  assert.equal(subject.importsName(['./contract.js', 'other']), false, 'nor is a declaration');
+  assert.equal(CONTRACT_CLAIMS.importsName.ask, 'importsName');
 });
 
 test('the read tally names every root and spelling, and a destructure is left to the key claim', () => {

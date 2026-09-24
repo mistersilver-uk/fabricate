@@ -74,12 +74,15 @@ const SCAN_TOTALS = Object.freeze({
   // #1923 moved five normalizer reads into `normalize/system.js` (`files` 21 -> 22); the rest hold.
   // It then moved eight item-source lines into `manager/itemSources.js` (+1 file);
   // pairs/collisions re-derived. Ten tool-source lines moved to `manager/toolSources.js` (+1 file).
+  // Five bulk-edit lines moved to `manager/bulkEdits.js` (+1 file).
+  // Eight delete-cascade lines moved to `manager/deleteCascades.js` (+1 file), then nine
+  // essence-delete lines followed them there.
   matches: 168,
   lines: 153,
-  files: 24,
-  pairs: 133,
-  collisionGroups: 15,
-  collisionSites: 35,
+  files: 26,
+  pairs: 136,
+  collisionGroups: 14,
+  collisionSites: 31,
 });
 
 /**
@@ -157,15 +160,18 @@ const LEDGER = Object.freeze([
   ['src/systems/manager/toolSources.js', "system.tools = tools.filter((entry) => String(entry?.id) !== String(toolId));", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "? updates.essenceDefinitions", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', ": current.essenceDefinitions,", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const components = Array.isArray(system.components) ? system.components : [];", 2, 'pre-persist+writer'],
-  ['src/systems/CraftingSystemManager.js', "const componentCount = Array.isArray(system.components)", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "? system.components.length", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const essenceCount = Array.isArray(system.essenceDefinitions)", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "? system.essenceDefinitions.length", 1, 'writer'],
+  ['src/systems/CraftingSystemManager.js', "const components = Array.isArray(system.components) ? system.components : [];", 1, 'pre-persist'],
+  // #1923: the system delete's writer reads, moved to `manager/deleteCascades.js`.
+  ['src/systems/manager/deleteCascades.js', "const componentCount = Array.isArray(system.components)", 1, 'writer'],
+  ['src/systems/manager/deleteCascades.js', "? system.components.length", 1, 'writer'],
+  ['src/systems/manager/deleteCascades.js', "const essenceCount = Array.isArray(system.essenceDefinitions)", 1, 'writer'],
+  ['src/systems/manager/deleteCascades.js', "? system.essenceDefinitions.length", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "system.components.push(item);", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "advanceDefinitionRevision(system.components);", 2, 'writer'],
   ['src/systems/CraftingSystemManager.js', "(system.components || []).find((item) => {", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "for (const component of system.components || []) {", 4, 'writer'],
+  ['src/systems/CraftingSystemManager.js', "for (const component of system.components || []) {", 1, 'writer'],
+  // #1923: the essence deletes' component loops, moved to `manager/deleteCascades.js`.
+  ['src/systems/manager/deleteCascades.js', "for (const component of system.components || []) {", 3, 'writer'],
   // #1699: the stamping and repair clusters moved to `SourceIdentityService.js`, and the three
   // auto-stamps collapsed onto one parameterised body whose per-arm `entriesOf` selectors replace
   // the two retired loop headers.
@@ -185,17 +191,24 @@ const LEDGER = Object.freeze([
   ['src/systems/CraftingSystemManager.js', "{ ...system.components[idx], ...updates, id: itemId },", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "if (!this._sameSourceReferenceSet(system.components[idx], updatedItem)) {", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "return system.components[idx];", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "for (let idx = 0; idx < system.components.length; idx += 1) {", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const component = system.components[idx];", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "system.components[idx] = this._normalizeComponent(", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "if (changedIds.length > 0) advanceDefinitionRevision(system.components);", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "system.components = components.filter(", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const essenceDefinitions = (system.essenceDefinitions || []).map((def) => ({", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "system.essenceDefinitions = essenceDefinitions;", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];", 3, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "system.essenceDefinitions = definitions.filter((def) => def.id !== essenceId);", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "system.essences = system.essenceDefinitions.map((def) => def.id);", 2, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "system.essenceDefinitions = definitions.filter(", 1, 'writer'],
+  // #1923: the component bulk edit's writer reads, moved to `manager/bulkEdits.js`.
+  ['src/systems/manager/bulkEdits.js', "for (let idx = 0; idx < system.components.length; idx += 1) {", 1, 'writer'],
+  ['src/systems/manager/bulkEdits.js', "const component = system.components[idx];", 1, 'writer'],
+  ['src/systems/manager/bulkEdits.js', "system.components[idx] = io.normalizeComponent(", 1, 'writer'],
+  ['src/systems/manager/bulkEdits.js', "if (changedIds.length > 0) advanceDefinitionRevision(system.components);", 1, 'writer'],
+  // #1923: the component-set delete's writer reads, moved to `manager/deleteCascades.js`.
+  ['src/systems/manager/deleteCascades.js', "const components = Array.isArray(system.components) ? system.components : [];", 1, 'writer'],
+  ['src/systems/manager/deleteCascades.js', "system.components = components.filter(", 1, 'writer'],
+  ['src/systems/manager/deleteCascades.js', "const essenceDefinitions = (system.essenceDefinitions || []).map((def) => ({", 1, 'writer'],
+  ['src/systems/manager/deleteCascades.js', "system.essenceDefinitions = essenceDefinitions;", 1, 'writer'],
+  // #1923: the essence deletes' writer reads, moved to `manager/deleteCascades.js`; the last
+  // collapsed onto one line at the module's shallower indent.
+  ['src/systems/manager/deleteCascades.js', "const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];", 2, 'writer'],
+  // #1923: the essence bulk edit's third copy of the line above, moved to `manager/bulkEdits.js`.
+  ['src/systems/manager/bulkEdits.js', "const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];", 1, 'writer'],
+  ['src/systems/manager/deleteCascades.js', "system.essenceDefinitions = definitions.filter((def) => def.id !== essenceId);", 1, 'writer'],
+  ['src/systems/manager/deleteCascades.js', "system.essences = system.essenceDefinitions.map((def) => def.id);", 2, 'writer'],
+  ['src/systems/manager/deleteCascades.js', "system.essenceDefinitions = definitions.filter((def) => !removedIdSet.has(String(def?.id ?? '')));", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "const items = Array.isArray(system.components) ? system.components : [];", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "const rawItems = Array.isArray(inputSystem?.components)", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "? inputSystem.components", 1, 'writer'],

@@ -11,6 +11,7 @@ import {
   calledName,
   declaredConstant as declaredConstantOf,
   identifierNames,
+  importedModules,
   importsModule as importsModuleOf,
   importsModuleLazily,
   literalStrings,
@@ -58,6 +59,7 @@ import {
   renderedNodes,
   sameSorted,
   shapeCount,
+  takesParameters,
   suppliesProps,
   templateNodes,
   unreadProps,
@@ -319,6 +321,20 @@ function comparedLiterals(node, name) {
   return [...values];
 }
 
+/** Whether `specifier`'s `name` is imported under its own name, so no local copy can take it. */
+const importsNameUnaliased = (node, [specifier, name]) =>
+  importedModules(node, (declaration) => declaration).some(
+    (declaration) =>
+      declaration.type === 'ImportDeclaration' &&
+      declaration.source.value === specifier &&
+      declaration.specifiers.some(
+        (entry) =>
+          entry.type === 'ImportSpecifier' &&
+          keyName({ key: entry.imported }) === name &&
+          entry.local?.name === name
+      )
+  );
+
 /** The `(key, fallback)` pair a `return text(key, fallback);` states, or `[]` for any other. */
 function returnedTextArguments(node) {
   const call = node?.type === 'ReturnStatement' ? node.argument : undefined;
@@ -387,6 +403,7 @@ function claimsOverCode(code) {
   return {
     imports: (specifier) => importsModuleOf(code, specifier),
     importsLazily: (specifier) => importsModuleLazily(code, specifier),
+    importsName: (pair) => importsNameUnaliased(code, pair),
     declares: (name) => declaredConstantOf(code, name),
     names: (name) => referencesIdentifierOf(code, name),
     spells: (text) => literalStrings(code).some((literal) => literal.includes(text)),
@@ -408,6 +425,7 @@ function claimsOverCode(code) {
     fnCallers: ([name, fns]) => sitesCalling(code, name, 'FunctionDeclaration') === sortedNames(fns),
     fallsBack: (pair) => fallsBackFrom(code, pair),
     contains: (source) => shapeCount(code, source) > 0,
+    takes: (parameters) => takesParameters(code, parameters),
     importSpecifiers: ([needle, list]) => sameSorted(importFamily(code, needle), list),
     propertyReads: ([name, tally]) => isDeepStrictEqual(propertyReadTally(code, name), tally),
     comparedLiterals: ([name, values]) => sameSorted(comparedLiterals(code, name), values),
@@ -529,6 +547,11 @@ const CONTRACT_CLAIMS = Object.freeze({
   imports: { ask: 'imports', holds: true, says: (v) => `imports ${v}` },
   importsNo: { ask: 'imports', holds: false, says: (v) => `no longer imports ${v}` },
   importsLazily: { ask: 'importsLazily', holds: true, says: (v) => `imports ${v} lazily` },
+  importsName: {
+    ask: 'importsName',
+    holds: true,
+    says: ([s, n]) => `binds ${n} from ${s}, unaliased`,
+  },
   declares: { ask: 'declares', holds: true, says: (v) => `declares const ${v}` },
   names: { ask: 'names', holds: true, says: (v) => `names ${v}` },
   namesNo: { ask: 'names', holds: false, says: (v) => `no longer names ${v}` },
@@ -591,6 +614,9 @@ const CONTRACT_CLAIMS = Object.freeze({
     says: ([f, c]) => `never falls back from ${f}() to a new ${c}`,
   },
   contains: { ask: 'contains', holds: true, says: (v) => `holds \`${v}\`, shape for shape` },
+  // Matches one exact spelling, so a respelling evades it: always pair it with a positive leg.
+  containsNo: { ask: 'contains', holds: false, says: (v) => `holds no \`${v}\`` },
+  takes: { ask: 'takes', holds: true, says: (v) => `takes exactly (${v})` },
   importSpecifiers: {
     ask: 'importSpecifiers',
     holds: true,

@@ -1,8 +1,6 @@
 /** The Standalone Check Roll (issue 1293) — `src/systems/companionCheckRoll.js`. */
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
 import { runFormulaPassFail, runFormulaProgressive } from '../src/systems/checkRoll.js';
@@ -19,6 +17,7 @@ import {
   assertMessageDataCovers,
   assertMessageIsFromTable,
 } from './helpers/companionContractOutcomes.js';
+import { defineStructureContract } from './helpers/structureContract.js';
 
 // Stubs
 
@@ -559,65 +558,38 @@ describe('AC-14 (bulk half) — resolveBulkCheckDecision never throws, whatever 
 
 // AC-9 — the module rolls nothing, proved three ways
 
-const MODULE_PATH = resolve(import.meta.dirname, '../src/systems/companionCheckRoll.js');
-const MODULE_SOURCE = readFileSync(MODULE_PATH, 'utf8');
-
-/**
- * The module's text with comments and string literals removed. Every ABSENCE assertion below reads
- * this rather than the raw file, so the module header is free to EXPLAIN what the module does not
- * do without satisfying its own prohibition.
- */
-const MODULE_CODE = MODULE_SOURCE.replaceAll(/\/\*[\s\S]*?\*\//g, '')
-  .replaceAll(/\/\/.*$/gm, '')
-  .replaceAll(/'(?:[^'\\]|\\.)*'/g, "''")
-  .replaceAll(/"(?:[^"\\]|\\.)*"/g, '""')
-  .replaceAll(/`(?:[^`\\]|\\.)*`/g, '``');
+const MODULE = 'src/systems/companionCheckRoll.js';
 
 describe('AC-9 — the module rolls nothing and reaches nothing it was not given', () => {
-  it('imports from EXACTLY two modules, so it cannot bypass its own seams', () => {
-    const specifiers = [...MODULE_CODE.matchAll(/^import[\s\S]*?from\s+''/gm)].length;
-    const sources = [...MODULE_SOURCE.matchAll(/^import[\s\S]*?from\s+'([^']+)'/gm)].map(
-      ([, source]) => source
-    );
-    assert.equal(specifiers, sources.length, 'every import was located');
-    assert.deepEqual(
-      [...sources].sort(),
-      ['../utils/craftingCheckExpression.js', './companionContract.js'],
-      'an import list is a PROPERTY; a variable-name grep is only a spelling. Admitting ' +
-        'checkRoll.js or rollPrompt.js here would let the module bypass the very seams every ' +
-        'dismissal assertion depends on'
-    );
-  });
+  // An import list is a PROPERTY; a variable-name grep is only a spelling. Admitting checkRoll.js
+  // or rollPrompt.js here would let the module bypass the very seams every dismissal assertion
+  // depends on. The exact set holds static, re-exported and `import()` specifiers alike.
+  defineStructureContract(
+    'imports from EXACTLY two modules, so it cannot bypass its own seams',
+    MODULE,
+    { importSpecifiers: [['', ['../utils/craftingCheckExpression.js', './companionContract.js']]] }
+  );
 
-  it('takes the CALL-SITE rule from the contract, and defines no second copy', () => {
-    // The rule "exists once" is canonical, and four members now gate on it (issue 1301, D13).
-    // This module used to own the only copy; lifting it into the Foundry-free leaf that
-    // already owns `COMPANION_CALL_SITES` is what keeps the count at one. A local re-derivation
-    // here would be invisible to every behavioural case in this file — both copies would agree
-    // on the fixtures at hand, and drift only later.
-    assert.match(
-      MODULE_SOURCE,
-      /import \{[\s\S]*?gateCompanionCallSite[\s\S]*?\} from '\.\/companionContract\.js';/,
-      'the gate arrives from the contract module'
-    );
-    assert.equal(
-      /function\s+gateCompanion\w*CallSite/.test(MODULE_CODE),
-      false,
-      'and this module declares no call-site gate of its own'
-    );
-    assert.equal(
-      MODULE_CODE.includes('COMPANION_CALL_SITES'),
-      false,
-      'nor re-derives the rule from the call-site vocabulary directly'
-    );
+  // The rule "exists once" is canonical, and four members gate on it (issue 1301, D13). A local
+  // re-derivation would be invisible to every behavioural case here: both copies would agree on
+  // the fixtures at hand, and drift only later.
+  defineStructureContract('takes the CALL-SITE rule from the contract', MODULE, {
+    importsName: [['./companionContract.js', 'gateCompanionCallSite']],
+    namesNo: ['COMPANION_CALL_SITES'],
+    spellsNo: ['gmAction', 'broadcast'],
   });
+  for (const member of ['rollActorCheck', 'resolveBulkCheckDecision']) {
+    defineStructureContract(
+      `${member} gates on that imported rule before anything else`,
+      { file: MODULE, fn: member },
+      { contains: ['const refusal = gateCompanionCallSite(request, seams);'] }
+    );
+  }
 
-  it('contains no globalThis.Roll reference at all, in code', () => {
-    // No `typeof` carve-out: with `hasDiceEngine` as a seam there is no longer a legitimate
-    // site for one.
-    assert.equal(MODULE_CODE.includes('globalThis'), false, 'the leaf reads no global');
-    assert.equal(/\bRoll\b/.test(MODULE_CODE.replaceAll(/Roll(Actor|Decision)/g, '')), false);
-    assert.ok(MODULE_SOURCE.includes('globalThis.Roll'), 'and the header still explains why');
+  // No `typeof` carve-out: with `hasDiceEngine` as a seam there is no legitimate site for one.
+  defineStructureContract('contains no globalThis.Roll reference at all, in code', MODULE, {
+    namesNo: ['globalThis', 'Roll'],
+    names: ['hasDiceEngine'],
   });
 
   it('constructs exactly one Roll per rollActorCheck and none per resolveBulkCheckDecision', async () => {

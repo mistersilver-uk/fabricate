@@ -21,6 +21,7 @@ const MANAGER_MODULE_DIR = 'src/systems/manager';
 const SAVING_MODULES = Object.freeze([
   `${MANAGER_MODULE_DIR}/itemSources.js`,
   `${MANAGER_MODULE_DIR}/toolSources.js`,
+  `${MANAGER_MODULE_DIR}/deleteCascades.js`,
 ]);
 const managerModules = new Map(
   readdirSync(resolve(repoRoot, MANAGER_MODULE_DIR))

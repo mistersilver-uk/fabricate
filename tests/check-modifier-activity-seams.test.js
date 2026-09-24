@@ -3,8 +3,9 @@
  * crafting. Every assertion here reads the ROLLED FORMULA STRING a real runner produced.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
+
+import { defineStructureContract } from './helpers/structureContract.js';
 
 globalThis.foundry = { utils: { randomID: () => Math.random().toString(36).slice(2) } };
 globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
@@ -331,23 +332,22 @@ test('a task’s pick survives COMPOSITION and reaches the rolled formula', asyn
 
 // ── gathering d100 is PROVEN untouched, capably ───────────────────────────────
 
-test('the d100 branch consults NO check-modifier context, and the proof can fail', () => {
-  // `d100` rolls a fixed percentage against each drop's chance and authors no formula, so the
-  // check-modifier catalogue is inert under it with cause `noCheck`.
-  const source = readFileSync('src/systems/GatheringEngine.js', 'utf8');
-  const slice = (from, to) => source.slice(source.indexOf(from), source.indexOf(to));
-  const d100Path = slice('async _resolveD100Outcome', 'async _resolveProgressiveOutcome');
-  const routedPath = slice('async _resolveRoutedFormulaOutcome', '\n  _resolveGatheringRoutedDc(');
-  assert.ok(
-    routedPath.includes('buildCheckModifierContext'),
-    'the ROUTED path must consult the context, or this scan proves nothing about d100'
-  );
-  assert.ok(
-    !d100Path.includes('buildCheckModifierContext'),
-    'the d100 path must not consult it: its arithmetic is percentage-point / multiplicative ' +
-      'character modifiers, a different concept with different semantics'
-  );
-});
+// `d100` rolls a fixed percentage against each drop's chance and authors no formula, so the
+// check-modifier catalogue is inert under it with cause `noCheck`. Its arithmetic is
+// percentage-point / multiplicative character modifiers, a different concept.
+const GATHERING_ENGINE = 'src/systems/GatheringEngine.js';
+
+defineStructureContract(
+  'the ROUTED branch consults the gathering check-modifier context',
+  { file: GATHERING_ENGINE, member: '_resolveRoutedFormulaOutcome' },
+  { contains: ["const craftingModifier = buildCheckModifierContext(system, 'gathering', task);"] }
+);
+
+defineStructureContract(
+  'the d100 branch consults NO check-modifier context',
+  { file: GATHERING_ENGINE, member: '_resolveD100Outcome' },
+  { callsNo: ['buildCheckModifierContext'] }
+);
 
 // ── eval == display, across the arity change (C3) ─────────────────────────────
 
@@ -380,15 +380,11 @@ test('the LISTED formula and the ROLLED formula resolve the same scalar, under e
   }
 });
 
-test('the listing builder calls the context builder with an ACTIVITY, not at arity 2', () => {
-  // A source pin, because the arity error is invisible from a return value: an arity-2 call
-  // resolves `activity` to `undefined`, `ACTIVITY_CHECK_KEYS.get(undefined)` misses, and the
-  // context silently reads NO selection at all — every rule collapses to `addAll` over an empty
-  // set, which is a scalar of 0 and an appended term of nothing.
-  const source = readFileSync('src/ui/presenters/CraftingListingBuilder.js', 'utf8');
-  assert.match(
-    source,
-    /buildCheckModifierContext\(\s*system,\s*'crafting',\s*recipe\s*\)/,
-    'the display path names its activity explicitly'
-  );
-});
+// The arity error is invisible from a return value: an arity-2 call resolves `activity` to
+// `undefined`, `ACTIVITY_CHECK_KEYS.get(undefined)` misses, and the context silently reads NO
+// selection at all — every rule collapses to `addAll` over an empty set.
+defineStructureContract(
+  'the listing builder calls the context builder with an ACTIVITY, not at arity 2',
+  'src/ui/presenters/CraftingListingBuilder.js',
+  { contains: ["buildCheckModifierContext(system, 'crafting', recipe)"] }
+);
