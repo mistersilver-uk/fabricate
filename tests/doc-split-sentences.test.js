@@ -45,6 +45,8 @@ const DESTINATIONS = [
   '.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md',
   // Issue #1936: the workflow procedure moved out of AGENTS.md.
   '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  // Issue #1936: the generic JS-structure rules moved into the skill that owns them.
+  '.agents/skills/javascript-structural-design/SKILL.md',
 ];
 
 /**

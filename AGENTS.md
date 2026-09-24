@@ -92,23 +92,12 @@ If capture is genuinely impossible, only a maintainer may apply the `screenshots
 ## Code Conventions
 
 - The runtime codebase is JavaScript, but typed surfaces must stay explicit; avoid `any` without justification where types are used.
-- Keep modules and objects small and cohesive; if a unit naturally does X and Y, split it.
-- Keep constructors and factories boring; avoid hidden I/O, service lookup, and object graph assembly inside them.
-- Inject specific collaborators instead of passing context or container grab bags and digging through them later.
-- Prefer behavior-first APIs over getter or setter-heavy data bags.
-- Isolate global mutable state and runtime lookups at thin edges that are easy to test.
+- The module- and object-shape rules are in [JavaScript Adaptation](.agents/skills/javascript-structural-design/SKILL.md#javascript-adaptation); where each kind of code lives, the normalizer chokepoint, the confirm carve-outs, and the i18n and source-pin rules are in [Architecture Pointers](.agents/docs/foundry-and-architecture.md#architecture-pointers).
 - Svelte is the only UI templating system.
 Do not add or reintroduce Handlebars templates.
-- UI shells live in `src/ui/*.js` and `src/ui/*.svelte.js`.
-- `src/ui/model/` holds the Foundry-free view models the UI owns — pure filtering, sorting, pagination, selection and validation logic with no Foundry global and no importer outside `src/ui/`.
 - `src/ui/presenters/` holds the modules that render a chat card or build a read-side row model for a UI surface.
 Unlike `src/ui/model/`, these may have importers outside `src/ui/` — the crafting, gathering and bulk-salvage engines, and `src/main.js`, which drives four of them behind the `game.fabricate` facade.
 Several own a canonical disclosure rule (teaser redaction, blind-run secrecy, summary audience), so a change here can be a requirement change rather than a cosmetic one.
-- Svelte UI components live in `src/ui/svelte/apps/` and `src/ui/svelte/components/`.
-- Svelte stores live in `src/ui/svelte/stores/`.
-- Domain and runtime logic lives under `src/models/`, `src/systems/`, `src/utils/`, `src/integrations/`, `src/config/`, and related `src/` modules.
-- Tests live under `tests/`.
-- Styles live in `styles/`, primarily `styles/fabricate.css`.
 - `styles/fabricate.css` is loaded **globally** into the Foundry document (via `module.json`'s `styles` field; in dev also through the `src/main.js` import), so it shares the page with every other module and system sheet.
 Every selector in this file MUST be namespaced under a `.fabricate*` root class (e.g. `.fabricate-app`, `.fabricate`, `.fabricate-manager`) — the only exception is `:root` for custom-property definitions.
 A bare generic selector like `.badge` or `.btn-icon` will bleed into other sheets (it previously broke the D&D 5e Armor Class badge). `tests/styles-namespacing.test.js` enforces this under `npm test` and fails on any unscoped selector.
@@ -117,32 +106,10 @@ Note this is independent of the Svelte `<style>` blocks in `src/ui/svelte/`, whi
 Use a theme token (`var(--fab-…)`); when a util can't resolve a colour, return `''` and let CSS supply a themed default.
 A region/document's *own* runtime colour is fine inline via `style=` (it isn't a source literal).
 - **A UI control's constraint is never an invariant — the invariant belongs at the normalizer.**
-A disabled or absent control only refuses to *enter* a forbidden state through one surface.
-It cannot stop a record *becoming* forbidden by a removal path, and it is not on the path of the writers that have no UI at all — import (`CraftingSystemExporter.prepareForImport`), copy-mode, and migration.
-Enforce the rule where every writer passes instead: `_normalizeSystem` / `_normalizeComponent` / `_normalizeSalvage` in `src/systems/CraftingSystemManager.js` are that single chokepoint.
-Issue 676 is the worked example, and the claim "constraining the control makes the forbidden state unreachable by construction" was false in **both** directions: the sanctioned flow's exact reverse (enable at one result group, delete that group, save) persisted the forbidden state anyway, and then disabled the control that would have undone it.
-Keep the control constraint as UX, and **test the requirement** (normalizer input → output), never the control's `disabled` attribute — a control-shaped test reads green through every gap the control cannot close.
 - Localized strings belong in `lang/`; UI code should use the Foundry bridge/localization helpers instead of hard-coded copy.
 - Manager confirmation prompts (discard unsaved, destructive actions) MUST go through `services.confirmDialog` → `foundry.applications.api.DialogV2.confirm`.
 Never use `globalThis.confirm()`, not even as a fallback.
 See [Manager confirm-discard guard](.agents/docs/foundry-and-architecture.md#manager-confirm-discard-guard).
-  - **Carve-out: high-frequency destructive ROW actions.** A per-row destructive action a GM performs repeatedly down a list (deleting one owned copy, erasing one learned recipe) uses the inline two-step arm — `src/ui/svelte/components/ArmedDangerButton.svelte` — instead of a modal: the first click arms the control, the second executes.
-A modal per row is the wrong ergonomics at that frequency, and the arm still requires a deliberate second act.
-`confirmDialog` is RETAINED for the heavyweight cases: deleting a stacked (`quantity > 1`) document, and a reset action.
-The armed token MUST be keyed on the target document id, never a row index, because a projection can re-publish asynchronously between the two clicks.
-This carve-out does NOT retrofit `VocabularyPanel`'s expanding below-row confirm strip, which is a different idiom by design — it carries a reference-count consequence sentence no two-word button label can hold.
-  - **Carve-out: a bulk action that states its own impact.** A bulk destructive action ALSO uses the inline two-step arm, in place of `confirmDialog`, when the panel states the impact of the pending action — what it affects and how much — in view BEFORE the control is armed.
-The stated impact is what a modal would otherwise exist to warn about, so the modal adds no safety once the panel already says it, and the arm still requires the same deliberate second act a row action does.
-A bulk action that does NOT state its impact in-panel still goes through `confirmDialog`; this does not relax the rule for a bulk action that stays silent about its consequences until the modal names them.
-The essence library's bulk delete (`EssenceBulkEditPanel.svelte`) is the worked example: it states how many essences, carrying components, and rewritten recipes are affected, then arms the same `ArmedDangerButton`, on an explicit maintainer decision (issue 1036).
-The Component Studio's bulk delete (`ComponentBulkEditPanel.svelte`) is the second (issue 1129) and shows the carve-out generalizing rather than staying a one-off: it states how many components, rewritten recipes, and newly disabled recipes are affected, then arms.
-Its impact is computed in the store and passed in as a prop rather than derived from the selected rows, because one of its numbers — how many recipes the delete leaves uncraftable — depends on the whole selection against real recipe bodies and cannot be answered per row.
-- When a Svelte component is shared between task and event (or similar `kind`-driven) contexts, split shared i18n keys into kind-specific siblings (`…Task` / `…Event`) and select with a ternary on `kind`.
-Reserve combined "tasks and events" / "task or event" wording for surfaces that genuinely mix kinds (overview hints, mixed validation issues, error messages).
-- Generic "record" / "records" wording in user-facing strings under `FABRICATE.Admin.Manager.EnvironmentEditor.*` is a known anti-pattern; environments don't have catalysts, they have tasks, events, and required tools.
-Use accurate domain terms when adding new strings.
-- Test files under `tests/components/` pin code shapes with `inspectorSource.includes(...)` / `listSource.includes(...)` string assertions.
-When renaming variables, refactoring markup, or removing i18n keys, grep these assertions and update them in lockstep — they fail at test time, not compile time.
 - **Comments state contracts, not history.**
 A comment survives only if it states an invariant, a non-obvious ordering or concurrency rule, a persisted-shape or public-API contract, or the test or spec line that pins one — in one to three lines.
 - Rejected alternatives, review rounds, and what the code used to do live in the issue and the pull request.
@@ -276,7 +243,6 @@ Plan-review, implementation-review, and docs-loop reviewers return their verdict
 - Change `module.json` id or module name.
 - Add npm dependencies without a plan entry that explains why they are needed.
 - Add a component under `src/ui/svelte/components/` without adding its specimen to `openspec/specs/design-system/library.html` and its row to `scripts/lib/designSystemPrimitives.json` in the same change.
-`tests/design-system-coverage.test.js` enforces this: it fails when a file in that directory carries no manifest row, and when the library and the manifest describe different vocabularies.
 Equally, do not hand-roll markup for a control the primitive set already owns, and do not introduce a second component that owns half a meaning an existing primitive owns — extend that primitive instead.
 - Patch dead UI / config / code branches as a workaround.
 When a control has nothing useful to configure or a code path has no remaining purpose, propose wholesale removal first.
