@@ -2570,6 +2570,175 @@ export function registerGatheringCases() {
     );
   });
 
+  const HERBALISM = Object.freeze({
+    id: 'mod-herbalism',
+    label: 'Herbalism Training',
+    icon: 'fa-solid fa-leaf',
+    expression: '@skills.nat.total',
+  });
+  const HERB_LORE = Object.freeze({ id: 'mod-herb-lore', label: 'Herb Lore' });
+
+  /** The drop or the event editor, its record carrying one reference and no condition modifier. */
+  async function openModifierSubject(subject, calls) {
+    const ref = { id: 'ref-1', modifierId: HERBALISM.id, operator: '-', min: null, max: null };
+    const bare = { biome: [], timeOfDay: [], weather: [] };
+    mountManager(calls, {
+      modifiers: [HERBALISM, HERB_LORE],
+      taskDropRows: [
+        { id: 'drop-herb', componentId: 'c3', quantity: 1, dropRate: 50, enabled: true },
+        { id: 'drop-root', componentId: 'c3', quantity: 1, dropRate: 50, enabled: true },
+      ].map((row) => ({ ...row, conditionModifiers: bare, characterModifiers: [ref] })),
+      gatheringLibraryEvents: gatheringEventLibraryFixtures.map((event) => ({
+        ...event,
+        conditionModifiers: bare,
+        characterModifiers: [ref],
+      })),
+    });
+    navButton('Gathering').click();
+    await settleSaveAttempt();
+    gatheringSubitem(subject === 'drop' ? 'Tasks' : 'Events').click();
+    await settleSaveAttempt();
+    const [kind, id, name] =
+      subject === 'drop'
+        ? ['task', 'task-herbs', 'Gather Moon Herbs']
+        : ['event', 'event-thorns', 'Thorn Snare'];
+    target.querySelector(`[data-gathering-${kind}-id="${id}"] [aria-label="Edit ${name}"]`).click();
+    await settleSaveAttempt();
+    if (subject === 'drop') {
+      target.querySelector('[data-gathering-task-drop-id="drop-herb"]').click();
+      await settleSaveAttempt();
+    }
+  }
+
+  async function saveSubject(subject, calls) {
+    await clickHeaderSave();
+    const saved = calls.findLast((call) =>
+      ['updateGatheringLibraryTask', 'updateGatheringLibraryEvent'].includes(call[0])
+    );
+    return subject === 'drop' ? saved[3].dropRows[0] : saved[3];
+  }
+
+  // Each subject's condition cards through the root: the picker it reconciled, a picked option, a
+  // typed and a stepped value, and a delete, all landing on that record.
+  for (const subject of ['drop', 'event']) {
+    it(`edits the ${subject}'s condition modifiers through the shell's picker and writers`, async () => {
+      const calls = [];
+      await openModifierSubject(subject, calls);
+      const card = () =>
+        target.querySelector(`[data-gathering-${subject}-condition-modifiers="timeOfDay"]`);
+      const picker = () =>
+        card().querySelector(`[data-gathering-${subject}-condition-modifier-picker="timeOfDay"]`);
+      const rows = () => [...card().querySelectorAll(`[data-gathering-${subject}-modifier-id]`)];
+
+      picker().querySelector('button').click();
+      await settleSaveAttempt();
+      assert.deepEqual(
+        rows().map((row) => row.textContent.includes('First Light')),
+        [true],
+        'the add control attaches the option the picker reconciled to'
+      );
+
+      const select = picker().querySelector('select');
+      select.value = 'night';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      await settleSaveAttempt();
+      picker().querySelector('button').click();
+      await settleSaveAttempt();
+      const night = rows().find((row) => row.textContent.includes('Deep Night'));
+      assert.ok(Boolean(night), 'a picked option is the one the add control attaches');
+
+      setInputValue(night.querySelector('input'), '5');
+      await settleSaveAttempt();
+      rows()
+        .find((row) => row.textContent.includes('Deep Night'))
+        .querySelector('input')
+        .dispatchEvent(new globalThis.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+      await settleSaveAttempt();
+      rows()
+        .find((row) => row.textContent.includes('First Light'))
+        .querySelector('.manager-character-modifier-row-reference-delete')
+        .click();
+      await settleSaveAttempt();
+
+      const saved = await saveSubject(subject, calls);
+      assert.deepEqual(
+        saved.conditionModifiers.timeOfDay.map((row) => [row.conditionId, row.operator, row.value]),
+        [['night', '+', 6]],
+        'the typed and stepped value survives on the one modifier left'
+      );
+    });
+
+    it(`edits the ${subject}'s Modifier Library reference through the shell's writers`, async () => {
+      const calls = [];
+      await openModifierSubject(subject, calls);
+      const ref = () =>
+        target.querySelector(`[data-gathering-${subject}-character-modifier-ref="ref-1"]`);
+      assert.ok(Boolean(ref().querySelector('i.fa-leaf')), 'the row draws its library icon');
+      assert.ok(!ref().querySelector('.manager-character-modifier-stale-warning'), 'not stale');
+      assert.ok(
+        ref().querySelector('.manager-character-modifier-operator-select.is-negative'),
+        'the operator reads negative'
+      );
+
+      ref().querySelector('.manager-character-modifier-override-row button').click();
+      await settleSaveAttempt();
+      assert.equal(
+        ref().querySelector('.manager-character-modifier-override-row button')
+          .getAttribute('aria-pressed'),
+        'true',
+        'the override is on'
+      );
+      const operator = ref().querySelector('.manager-character-modifier-operator-select select');
+      operator.value = '+';
+      operator.dispatchEvent(new Event('change', { bubbles: true }));
+      await settleSaveAttempt();
+      assert.ok(ref().querySelector('.manager-character-modifier-operator-select.is-positive'));
+
+      const saved = await saveSubject(subject, calls);
+      assert.deepEqual(
+        saved.characterModifiers.map((entry) => [entry.operator, entry.expressionOverride]),
+        [['+', HERBALISM.expression]],
+        'the override seeds the library expression and the operator flips'
+      );
+
+      ref().querySelector('.manager-character-modifier-row-reference-delete').click();
+      await settleSaveAttempt();
+      assert.deepEqual((await saveSubject(subject, calls)).characterModifiers, []);
+    });
+  }
+
+  // The term is shared by both subjects, so each clears it when its own record changes, and the
+  // suggestion list opens upwards when the search sits low in its clipping box.
+  it('clears the character-modifier search per record and opens it upwards near the bottom', async () => {
+    await openModifierSubject('drop', []);
+    const search = () => target.querySelector('[data-gathering-drop-character-modifier-search]');
+    search().getBoundingClientRect = () => ({ top: 700, bottom: 730, left: 0, right: 200 });
+    setInputValue(search().querySelector('input'), 'herb');
+    await settleSaveAttempt();
+    assert.ok(
+      target.querySelector('[data-gathering-drop-character-modifier-suggestions].is-above'),
+      'the list opens upwards with 38px below and 700px above'
+    );
+
+    target.querySelector('[data-gathering-task-drop-id="drop-root"]').click();
+    await settleSaveAttempt();
+    assert.equal(search().querySelector('input').value, '', 'another drop starts a new search');
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    await openModifierSubject('event', []);
+    const eventInput = () =>
+      target.querySelector('[data-gathering-event-character-modifier-search] input');
+    setInputValue(eventInput(), 'herb');
+    await settleSaveAttempt();
+    target.querySelector('[data-gathering-event-back]').click();
+    await settleSaveAttempt();
+    target.querySelector('[data-gathering-event-id="event-thorns"] [aria-label="Edit Thorn Snare"]').click();
+    await settleSaveAttempt();
+    assert.equal(eventInput().value, '', 'reopening the event starts a new search');
+  });
+
   // The two saves read a store that answers nothing in opposite ways: a task save needs a truthy
   // answer, an event save fails only on a literal `false`.
   it('fails a gathering-task save the store answers with nothing', async () => {
