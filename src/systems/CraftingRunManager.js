@@ -81,7 +81,8 @@ export class CraftingRunManager extends RunContainerManagerBase {
       // The START-phase snapshot of a time-gated step, whose components and currency are consumed
       // when its gate arms; `markStepPrepared` writes it and the engine reads it at FINISH, the
       // source items being gone. `currencySpends` holds only SETTLED deductions (issue 902), the
-      // cancel reversal's refund input; `essenceEnabled` is the behaviour-gate snapshot (1036).
+      // cancel reversal's refund input; `essenceEnabled` is the behaviour-gate snapshot
+      // (issue 1036).
       preparedConsumption: undefined,
       selectedIngredientSetId: undefined,
       lastCheckResult: undefined,

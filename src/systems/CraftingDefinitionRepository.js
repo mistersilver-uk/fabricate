@@ -44,8 +44,8 @@ export class CraftingDefinitionRepository {
 
   /**
    * Optional and synchronous, since the managers' `reload()` runs from `updateSetting`: the corpus
-   * a replication event delivered, or `null` without one (a pack write on 14.365 reaches only
-   * clients that loaded the document, issue 1088).
+   * a replication event delivered, or `null` from a backend with no synchronous snapshot (a pack
+   * write on 14.365 reaches only clients that loaded the document, issue 1088).
    */
   readReplicatedSnapshot() {
     return null;

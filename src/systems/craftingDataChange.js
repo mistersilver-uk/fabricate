@@ -3,9 +3,11 @@
  * `Hooks.callAll`, absent from `FABRICATE_HOOKS`, so promoting it owes a three-segment name, a
  * `schemaVersion`, a `src/config/hooks.js` entry and a DOMAIN.md row. It is a real hook for core's
  * snapshot iteration and per-listener `Hooks.onError` isolation (13.351 and 14.365 alike), and
- * because tests swap `globalThis.Hooks`. The payload is `{ source: 'recipes' | 'systems', scopes }`
- * with one `{ systemId, domains }` scope per record-owner; an empty `scopes` routes broadly
- * (`data-models/spec.md` § Invalidation Domains).
+ * because tests swap `globalThis.Hooks`. It is additive: the module-namespaced legacy change
+ * hooks (`fabricate.recipesChanged`, `fabricate.craftingSystemsChanged` and their siblings) keep
+ * their payloads unchanged and remain the third-party surface. The payload is
+ * `{ source: 'recipes' | 'systems', scopes }` with one `{ systemId, domains }` scope per
+ * record-owner; an empty `scopes` routes broadly (`data-models/spec.md` § Invalidation Domains).
  */
 
 import { ALL_INVALIDATION_DOMAINS } from './invalidationDomains.js';
@@ -55,9 +57,8 @@ export function domainsForRecord(change, recordId) {
 }
 
 /**
- * Domains attributed between a mutation and its announcement: `save()` records and the notifier
- * drains, since several paths save without announcing. An unannounced save's domains ride the next
- * announcement, over-broad at worst and never stale.
+ * Domains attributed from a mutation to its announcement: `save()` records and the notifier drains.
+ * An unannounced save's domains ride the next announcement, over-broad at worst and never stale.
  */
 export class PendingChangeDomains {
   constructor() {

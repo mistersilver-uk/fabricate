@@ -4,6 +4,7 @@
  * ids come from the entries' marker fields, never the top level, `flattenObject` or known-id
  * matching. Repair is best-effort and entries are scalar-only; `recipe-visibility/spec.md`
  * § Reading a recipe-id-keyed flag map owns the rules, both builds' routes and the lost shapes.
+ * Verified by execution on 13.351 (`DataModel#updateSource`) and 14.365 (`ObjectField#_cleanType`).
  */
 
 import { isSafeFlagKeySegment } from '../config/flags.js';

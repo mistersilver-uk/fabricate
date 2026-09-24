@@ -39,8 +39,9 @@ export function buildExportPayload(
   fabricateVersion,
   gatheringEnvironments = [],
   gatheringConfig = {},
-  // The world slices default empty so older call sites keep working; an export without one carries
-  // an empty slice, leaving every reference into it unresolvable in the destination.
+  // The world slices default empty so older call sites keep working. Without currency, travel or
+  // the character libraries every reference into that slice is unresolvable in the destination;
+  // without the three scope slices the destination's world corpus learns nothing of this system.
   currencyConfig = {},
   travelConfig = {},
   characterLibraries = {},
@@ -206,9 +207,10 @@ export function prepareForImport(rawData, mode = 'keep', options = null) {
       ? structuredClone(data.gatheringConfig)
       : { system: {}, shared: {} };
 
-  // The world slices ride the envelope, with no `system` fallback: dropped here, the matching
-  // `CompendiumImporter._persist*` returns early and strands every reference into it. None is
-  // rebound in copy mode, since their ids are world scope and the merge lets the destination win.
+  // These three world slices ride the envelope, with no `system` fallback: dropped here, the
+  // matching `CompendiumImporter._persist*` returns early and strands every reference into it.
+  // None is rebound in copy mode, since their ids are world scope and the merge lets the
+  // destination win.
   const currencyConfig =
     data.currencyConfig && typeof data.currencyConfig === 'object'
       ? structuredClone(data.currencyConfig)
