@@ -3,6 +3,7 @@
  */
 
 import {
+  CHECKS_ROUTE_MODEL_PATTERN,
   CRAFTING_ROUTED_CHECK,
   CRAFTING_ROUTED_INGREDIENTS,
   CRAFTING_SHARED,
@@ -117,7 +118,7 @@ export const CASES = Object.freeze([
       // `ItemDropZone` is deliberately not claimed here (issue 1509): it is a broad signal, so it was never read.
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
       /^src\/ui\/model\/macroReference\.js$/,
-      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -144,7 +145,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckRecipeTiers\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -172,7 +173,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckRecipeTiers\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -198,7 +199,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -224,7 +225,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   // All four cases select an actor first, and that is not decoration.
@@ -251,7 +252,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkPreview\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOutcomePreview\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -273,7 +274,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -297,7 +298,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -321,7 +322,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -344,7 +345,7 @@ export const CASES = Object.freeze([
     // The strip's simple mode, one of the two frames `BROAD_SIGNAL_CASE_OVERRIDES` names for it (issue 1378).
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -369,7 +370,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/CraftingCheckEditor\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -388,7 +389,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -411,7 +412,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   // Player recipe detail, one per resolution mode.
