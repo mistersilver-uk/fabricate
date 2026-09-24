@@ -29,6 +29,7 @@ import {
 let Component;
 let mounted;
 let target;
+let mountedStore;
 
 // The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
@@ -49,7 +50,9 @@ const { mountManager } = createManagerMounts({
     mounted = nextMounted;
     target = nextTarget;
   },
-  adoptStore: () => {},
+  adoptStore: (store) => {
+    mountedStore = store;
+  },
 });
 
 /** Register this route’s cases in `manager-mounted.test.js`’s one describe. */
@@ -204,8 +207,10 @@ export function registerGatheringCases() {
   // A system switch reopens the gathering workspace on its first tab, so the next system's
   // library is not entered on the tab and task the GM picked in the last one.
   it('reopens the gathering workspace on its environments tab when the selected system switches', async () => {
-    mountManager([], {
+    const calls = [];
+    mountManager(calls, {
       smithingFeatures: { gathering: true, itemTags: true, recipeCategories: true, salvage: true },
+      modifiers: [{ id: 'mod-herbalism', label: 'Herbalism Lore' }],
     });
     const settle = async () => {
       for (let index = 0; index < 8; index += 1) await Promise.resolve();
@@ -241,6 +246,45 @@ export function registerGatheringCases() {
     gatheringSubitem('Tasks').click();
     await settle();
     assert.equal(selectedTaskId(), 'task-herbs', 'and the returning library selects its first task');
+
+    // The draft and modifier handlers read the system and the library when they are called.
+    mountedStore.viewState.update((state) => {
+      const { alchemy } = state.gatheringConfig.systems;
+      const forge = { ...alchemy.tasks[0], id: 'task-forge', name: 'Stoke the Forge' };
+      const smithing = { ...alchemy, tasks: [forge] };
+      const systems = { ...state.gatheringConfig.systems, smithing };
+      return { ...state, gatheringConfig: { ...state.gatheringConfig, systems } };
+    });
+    await switchSystem('smithing');
+    gatheringSubitem('Tasks').click();
+    await settle();
+    target
+      .querySelector('[data-gathering-task-id="task-forge"] [aria-label="Edit Stoke the Forge"]')
+      .click();
+    await settle();
+    setInputValue(target.querySelector('[data-gathering-task-field="name"]'), 'Bank the Forge');
+    await settle();
+    headerSaveButton(target).click();
+    await settle();
+    const saved = calls.findLast((call) => call[0] === 'updateGatheringLibraryTask');
+    assert.deepEqual(saved.slice(1, 3), ['smithing', 'task-forge'], 'saved on the new system');
+
+    target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]').click();
+    await settle();
+    const search = target.querySelector('[data-gathering-drop-character-modifier-search] input');
+    setInputValue(search, 'lore');
+    await settle();
+    const suggested = () =>
+      [...target.querySelectorAll('[data-gathering-drop-character-modifier-suggestion]')].map(
+        (node) => node.getAttribute('data-gathering-drop-character-modifier-suggestion')
+      );
+    assert.deepEqual(suggested(), ['mod-herbalism']);
+    mountedStore.viewState.update((state) => ({
+      ...state,
+      worldModifiers: [{ id: 'mod-anvil', label: 'Anvil Lore' }],
+    }));
+    await settle();
+    assert.deepEqual(suggested(), ['mod-anvil'], 'the drop search reads the library as it stands');
   });
 
   // The shell's writes to the gathering route model's selections, drafts and flags, one record
@@ -2519,6 +2563,252 @@ export function registerGatheringCases() {
       ['mod-herbalism'],
       'the picked reference persists on this event, so the pick reached its own record'
     );
+  });
+
+  // The drop half of the same search: its suggestions exclude what the selected drop already
+  // references, and a pick lands on that drop by its real id.
+  it('suggests and persists a character modifier typed into the selected drop search', async () => {
+    const calls = [];
+    await openDirtyGatheringTaskEditor(calls, {
+      modifiers: [
+        { id: 'mod-herbalism', label: 'Herbalism Training', expression: '@skills.nat.total' },
+        { id: 'mod-herb-lore', label: 'Herb Lore', expression: '@skills.med.total' },
+      ],
+    });
+    target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]').click();
+    await settleSaveAttempt();
+
+    const search = target.querySelector('[data-gathering-drop-character-modifier-search]');
+    assert.ok(Boolean(search), 'the drop inspector renders the character-modifier search');
+    setInputValue(search.querySelector('input'), 'herb');
+    await settleSaveAttempt();
+    const suggested = () =>
+      [...target.querySelectorAll('[data-gathering-drop-character-modifier-suggestion]')].map(
+        (node) => node.getAttribute('data-gathering-drop-character-modifier-suggestion')
+      );
+    assert.deepEqual(suggested(), ['mod-herbalism', 'mod-herb-lore'], 'both library entries match');
+
+    target
+      .querySelector('[data-gathering-drop-character-modifier-suggestion="mod-herbalism"]')
+      .click();
+    await settleSaveAttempt();
+    assert.equal(
+      target.querySelector('[data-gathering-drop-character-modifier-search] input').value,
+      '',
+      'a pick clears the search term'
+    );
+    setInputValue(
+      target.querySelector('[data-gathering-drop-character-modifier-search] input'),
+      'herb'
+    );
+    await settleSaveAttempt();
+    assert.deepEqual(suggested(), ['mod-herb-lore'], 'the attached entry is no longer suggested');
+
+    await clickHeaderSave();
+    const saved = calls.findLast((call) => call[0] === 'updateGatheringLibraryTask');
+    const row = saved[3].dropRows.find((entry) => entry.id === 'drop-nightshade');
+    assert.deepEqual(
+      row.characterModifiers.map((ref) => [ref.modifierId, ref.operator, ref.expressionOverride]),
+      [['mod-herbalism', '+', '']],
+      'the pick persists on the selected drop as one fresh reference'
+    );
+  });
+
+  const HERBALISM = Object.freeze({
+    id: 'mod-herbalism',
+    label: 'Herbalism Training',
+    icon: 'fa-solid fa-leaf',
+    expression: '@skills.nat.total',
+  });
+  const HERB_LORE = Object.freeze({ id: 'mod-herb-lore', label: 'Herb Lore' });
+
+  /** The drop or the event editor, its record carrying one reference and no condition modifier. */
+  async function openModifierSubject(subject, calls) {
+    const ref = { id: 'ref-1', modifierId: HERBALISM.id, operator: '-', min: null, max: null };
+    const bare = { biome: [], timeOfDay: [], weather: [] };
+    mountManager(calls, {
+      modifiers: [HERBALISM, HERB_LORE],
+      taskDropRows: [
+        { id: 'drop-herb', componentId: 'c3', quantity: 1, dropRate: 50, enabled: true },
+        { id: 'drop-root', componentId: 'c3', quantity: 1, dropRate: 50, enabled: true },
+      ].map((row) => ({ ...row, conditionModifiers: bare, characterModifiers: [ref] })),
+      gatheringLibraryEvents: gatheringEventLibraryFixtures.map((event) => ({
+        ...event,
+        conditionModifiers: bare,
+        characterModifiers: [ref],
+      })),
+    });
+    navButton('Gathering').click();
+    await settleSaveAttempt();
+    gatheringSubitem(subject === 'drop' ? 'Tasks' : 'Events').click();
+    await settleSaveAttempt();
+    const [kind, id, name] =
+      subject === 'drop'
+        ? ['task', 'task-herbs', 'Gather Moon Herbs']
+        : ['event', 'event-thorns', 'Thorn Snare'];
+    target.querySelector(`[data-gathering-${kind}-id="${id}"] [aria-label="Edit ${name}"]`).click();
+    await settleSaveAttempt();
+    if (subject === 'drop') {
+      target.querySelector('[data-gathering-task-drop-id="drop-herb"]').click();
+      await settleSaveAttempt();
+    }
+  }
+
+  async function saveSubject(subject, calls) {
+    await clickHeaderSave();
+    const saved = calls.findLast((call) =>
+      ['updateGatheringLibraryTask', 'updateGatheringLibraryEvent'].includes(call[0])
+    );
+    return subject === 'drop' ? saved[3].dropRows[0] : saved[3];
+  }
+
+  // Each subject's condition cards through the root: the picker it reconciled, a picked option, a
+  // typed and a stepped value, and a delete, all landing on that record.
+  for (const subject of ['drop', 'event']) {
+    it(`edits the ${subject}'s condition modifiers through the shell's picker and writers`, async () => {
+      const calls = [];
+      await openModifierSubject(subject, calls);
+      const card = () =>
+        target.querySelector(`[data-gathering-${subject}-condition-modifiers="timeOfDay"]`);
+      const picker = () =>
+        card().querySelector(`[data-gathering-${subject}-condition-modifier-picker="timeOfDay"]`);
+      const rows = () => [...card().querySelectorAll(`[data-gathering-${subject}-modifier-id]`)];
+
+      picker().querySelector('button').click();
+      await settleSaveAttempt();
+      assert.deepEqual(
+        rows().map((row) => row.textContent.includes('First Light')),
+        [true],
+        'the add control attaches the option the picker reconciled to'
+      );
+
+      const select = picker().querySelector('select');
+      select.value = 'night';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      await settleSaveAttempt();
+      picker().querySelector('button').click();
+      await settleSaveAttempt();
+      const night = rows().find((row) => row.textContent.includes('Deep Night'));
+      assert.ok(Boolean(night), 'a picked option is the one the add control attaches');
+
+      setInputValue(night.querySelector('input'), '5');
+      await settleSaveAttempt();
+      rows()
+        .find((row) => row.textContent.includes('Deep Night'))
+        .querySelector('input')
+        .dispatchEvent(new globalThis.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+      await settleSaveAttempt();
+      rows()
+        .find((row) => row.textContent.includes('First Light'))
+        .querySelector('.manager-character-modifier-row-reference-delete')
+        .click();
+      await settleSaveAttempt();
+
+      const saved = await saveSubject(subject, calls);
+      assert.deepEqual(
+        saved.conditionModifiers.timeOfDay.map((row) => [row.conditionId, row.operator, row.value]),
+        [['night', '+', 6]],
+        'the typed and stepped value survives on the one modifier left'
+      );
+    });
+
+    it(`edits the ${subject}'s Modifier Library reference through the shell's writers`, async () => {
+      const calls = [];
+      await openModifierSubject(subject, calls);
+      const ref = () =>
+        target.querySelector(`[data-gathering-${subject}-character-modifier-ref="ref-1"]`);
+      assert.ok(Boolean(ref().querySelector('i.fa-leaf')), 'the row draws its library icon');
+      assert.ok(!ref().querySelector('.manager-character-modifier-stale-warning'), 'not stale');
+      assert.ok(
+        ref().querySelector('.manager-character-modifier-operator-select.is-negative'),
+        'the operator reads negative'
+      );
+
+      ref().querySelector('.manager-character-modifier-override-row button').click();
+      await settleSaveAttempt();
+      assert.equal(
+        ref().querySelector('.manager-character-modifier-override-row button')
+          .getAttribute('aria-pressed'),
+        'true',
+        'the override is on'
+      );
+      const operator = ref().querySelector('.manager-character-modifier-operator-select select');
+      operator.value = '+';
+      operator.dispatchEvent(new Event('change', { bubbles: true }));
+      await settleSaveAttempt();
+      assert.ok(ref().querySelector('.manager-character-modifier-operator-select.is-positive'));
+
+      const saved = await saveSubject(subject, calls);
+      assert.deepEqual(
+        saved.characterModifiers.map((entry) => [entry.operator, entry.expressionOverride]),
+        [['+', HERBALISM.expression]],
+        'the override seeds the library expression and the operator flips'
+      );
+
+      ref().querySelector('.manager-character-modifier-row-reference-delete').click();
+      await settleSaveAttempt();
+      assert.deepEqual((await saveSubject(subject, calls)).characterModifiers, []);
+    });
+  }
+
+  // The term is shared by both subjects, so each clears it when its own record changes, and the
+  // suggestion list opens upwards when the search sits low in its clipping box.
+  it('clears the character-modifier search per record and opens it upwards near the bottom', async () => {
+    await openModifierSubject('drop', []);
+    const search = () => target.querySelector('[data-gathering-drop-character-modifier-search]');
+    const clip = search().parentElement;
+    clip.style.overflowY = 'auto';
+    clip.getBoundingClientRect = () => ({ top: 100, bottom: 500, left: 0, right: 400 });
+    const opensUpWith = async (spaceBelow) => {
+      setInputValue(search().querySelector('input'), '');
+      await settleSaveAttempt();
+      const bottom = 500 - spaceBelow;
+      search().getBoundingClientRect = () => ({ top: bottom - 30, bottom, left: 0, right: 200 });
+      setInputValue(search().querySelector('input'), 'herb');
+      await settleSaveAttempt();
+      return Boolean(
+        target.querySelector('[data-gathering-drop-character-modifier-suggestions].is-above')
+      );
+    };
+    assert.deepEqual(
+      [await opensUpWith(159), await opensUpWith(160)],
+      [true, false],
+      'the list opens upwards only with under 160px below its clipping box'
+    );
+
+    target.querySelector('[data-gathering-task-drop-id="drop-root"]').click();
+    await settleSaveAttempt();
+    assert.equal(search().querySelector('input').value, '', 'another drop starts a new search');
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    await openModifierSubject('event', []);
+    const eventInput = () =>
+      target.querySelector('[data-gathering-event-character-modifier-search] input');
+    setInputValue(eventInput(), 'herb');
+    await settleSaveAttempt();
+    target.querySelector('[data-gathering-event-back]').click();
+    await settleSaveAttempt();
+    target.querySelector('[data-gathering-event-id="event-thorns"] [aria-label="Edit Thorn Snare"]').click();
+    await settleSaveAttempt();
+    assert.equal(eventInput().value, '', 'reopening the event starts a new search');
+  });
+
+  // The two saves read a store that answers nothing in opposite ways: a task save needs a truthy
+  // answer, an event save fails only on a literal `false`.
+  it('fails a gathering-task save the store answers with nothing', async () => {
+    await openDirtyGatheringTaskEditor([], { updateGatheringLibraryTaskResolvesNothing: true });
+    await clickHeaderSave();
+    assertSaveErrorRendered('[data-gathering-task-save-error]');
+    assert.equal(headerSaveButton(target).disabled, false, 'the draft is still dirty');
+  });
+
+  it('rebaselines a gathering-event save the store answers with nothing', async () => {
+    await openDirtyGatheringEventEditor([], { updateGatheringLibraryEventResolvesNothing: true });
+    await clickHeaderSave();
+    assertSaveErrorAbsent('[data-gathering-event-save-error]', 'the save counts as landed');
+    assert.equal(headerSaveButton(target).disabled, true, 'the draft is clean against its baseline');
   });
 
   it('surfaces a gathering-event save that rejects, and clears it on the next success', async () => {

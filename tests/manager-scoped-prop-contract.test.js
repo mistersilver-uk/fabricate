@@ -145,6 +145,10 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // Added by issue 1721: the gathering workspace's read side and its pure presenters are their own
   // units, which took `gatheringImageDefaults.js` and `gatheringComposition.js` with them.
   './gatheringDisplay.js',
+  // Added by issue 1721: the gathering workspace's write side, and the modifiers a drop or an event
+  // carries, are their own units.
+  './gatheringDraftHandlers.svelte.js',
+  './gatheringModifierHandlers.svelte.js',
   './gatheringRouteModel.svelte.js',
   // Added by issue 1720: the page header's six answers are their own unit, and the root no longer
   // resolves the eyebrow, title, lede or action-group name itself.

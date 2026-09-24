@@ -146,6 +146,17 @@ const CHECKS_ROUTE_MODEL = 'src/ui/svelte/apps/manager/checks/checksRouteModel.s
 // The gathering workspace's read side and its pure presenters.
 const GATHERING_ROUTE_MODEL = 'src/ui/svelte/apps/manager/gatheringRouteModel.svelte.js';
 const GATHERING_DISPLAY = 'src/ui/svelte/apps/manager/gatheringDisplay.js';
+// Its write side: the library and draft actions, and the modifiers a drop or event carries.
+const GATHERING_DRAFT_HANDLERS = 'src/ui/svelte/apps/manager/gatheringDraftHandlers.svelte.js';
+const GATHERING_MODIFIER_HANDLERS =
+  'src/ui/svelte/apps/manager/gatheringModifierHandlers.svelte.js';
+const GATHERING_UNITS = [
+  MANAGER_ROOT,
+  GATHERING_ROUTE_MODEL,
+  GATHERING_DISPLAY,
+  GATHERING_DRAFT_HANDLERS,
+  GATHERING_MODIFIER_HANDLERS,
+];
 const MANAGER_SYSTEM_NAV = 'src/ui/svelte/apps/manager/ManagerSystemNav.svelte';
 const MANAGER_WORLD_NAV = 'src/ui/svelte/apps/manager/ManagerWorldNav.svelte';
 const MANAGER_WORLD_DOWNTIME_NAV_GROUP =
@@ -742,8 +753,19 @@ describe('CraftingSystemManager source contract', () => {
       'gathering.reselectTask',
       'gathering.reselectEvent',
       'gathering.reselectDrop',
+      'modifiers.resetSearchOnDrop',
+      'modifiers.resetSearchOnEvent',
+      'modifiers.syncSearchDirection',
+      'modifiers.reconcileDropPickers',
+      'modifiers.reconcileEventPickers',
     ],
   });
+  for (const file of [GATHERING_DRAFT_HANDLERS, GATHERING_MODIFIER_HANDLERS]) {
+    defineStructureContract(`leaves ${file} effect-free`, file, {
+      callsNo: ['$effect'],
+      readsNo: ['$effect.pre', '$effect.root'],
+    });
+  }
 
   // Its cards are direct flex children of the shell's `aside.manager-inspector`.
   it('leaves the systems library inspector unwrapped and unstyled', () => {
@@ -900,6 +922,8 @@ describe('CraftingSystemManager source contract', () => {
       ARMED_DANGER_BUTTON,
       GATHERING_ROUTE_MODEL,
       GATHERING_DISPLAY,
+      GATHERING_DRAFT_HANDLERS,
+      GATHERING_MODIFIER_HANDLERS,
       ...componentPathsIn('src/ui/svelte/apps/manager/environment'),
       ...componentPathsIn('src/ui/svelte/apps/manager/knowledge'),
     ];
@@ -1737,6 +1761,8 @@ describe('CraftingSystemManager source contract', () => {
       'store.updateGatheringVocabularyValue',
       'store.deleteGatheringVocabularyValue',
     ],
+  });
+  defineStructureContract('updates the selected system’s gathering rules', GATHERING_DRAFT_HANDLERS, {
     names: ['updateSelectedGatheringRules'],
   });
 
@@ -1846,27 +1872,10 @@ describe('CraftingSystemManager source contract', () => {
   // What the library, its inspector and the focused editor draw and do — rows, drop rules,
   // component browser, sliders, paging, availability, Required Tools, toolbar delete — is driven
   // by `tests/components/manager-gathering-mounted.js`. What stays is the wiring behind them.
-  // The drop inspector moved into `environment/GatheringTaskInspector.svelte` (issue 1707 phase
-  // 2) and the rail that selects it into `environment/GatheringInspectorRail.svelte` (phase 3), so
-  // the root renders the editor and the rail.
+  // The root renders the editor and the rail; the handlers it hands them live in the gathering units.
   defineStructureContract('wires the gathering task library and its inspector', MANAGER_ROOT, {
     renders: ['GatheringTaskEditView', 'GatheringInspectorRail'],
-    names: [
-      'selectGatheringTask',
-      'createGatheringTask',
-      'editGatheringTask',
-      'duplicateGatheringTask',
-      'deleteGatheringTask',
-      'toggleGatheringTaskEnabled',
-      'addGatheringDropModifier',
-      'updateGatheringDropModifier',
-      'onGatheringDropCountKeydown',
-      'deleteGatheringTaskDraft',
-      'selectedGatheringSystemTools',
-      'addToolReferenceToSelectedTask',
-      'removeToolReferenceFromSelectedTask',
-    ],
-    reads: ['store.duplicateGatheringLibraryTask'],
+    names: ['selectedGatheringSystemTools'],
     declares: ['itemCards'],
     passesProps: [
       ['EnvironmentsBrowserView', 'onSelectGatheringTask'],
@@ -1878,8 +1887,25 @@ describe('CraftingSystemManager source contract', () => {
       ['GatheringTaskEditView', 'itemCards'],
       ['GatheringTaskEditView', 'resolutionMode'],
     ],
+  });
+  defineStructureContract('handles the gathering task library and its drops', GATHERING_UNITS, {
+    names: [
+      'selectGatheringTask',
+      'createGatheringTask',
+      'editGatheringTask',
+      'duplicateGatheringTask',
+      'deleteGatheringTask',
+      'toggleGatheringTaskEnabled',
+      'addGatheringDropModifier',
+      'updateGatheringDropModifier',
+      'onGatheringDropCountKeydown',
+      'deleteGatheringTaskDraft',
+      'addToolReferenceToSelectedTask',
+      'removeToolReferenceFromSelectedTask',
+    ],
+    reads: ['store.duplicateGatheringLibraryTask'],
     // Issue 883: the inspector's slider is `ChanceSlider`. The track/fill structure and the
-    // input/blur/keydown trio it hand-rolled must be gone from the root, not merely unused — a
+    // input/blur/keydown trio it hand-rolled must be gone from every unit, not merely unused — a
     // surviving copy is what the next divergence gets written against.
     spellsNo: ['manager-drop-rate-control', 'manager-drop-rate-track', 'manager-drop-rate-fill'],
     namesNo: ['onGatheringDropRateInput', 'onGatheringDropRateBlur', 'onGatheringDropRateKeydown'],
@@ -1891,7 +1917,7 @@ describe('CraftingSystemManager source contract', () => {
   // drop inspector renders no component selector.
   defineStructureContract(
     'selects the task and tiers its drop rates for the inspector',
-    [MANAGER_ROOT, GATHERING_ROUTE_MODEL, GATHERING_DISPLAY],
+    GATHERING_UNITS,
     {
       names: ['selectedGatheringTaskId', 'gatheringDropRateTierClass', 'gatheringDropRateTierColor'],
       readsNo: ['selectedGatheringDrop.componentId', 'gathering.selectedGatheringDrop.componentId'],

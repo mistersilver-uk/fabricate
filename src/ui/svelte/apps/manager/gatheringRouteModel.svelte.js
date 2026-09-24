@@ -72,7 +72,7 @@ const gatheringNavItems = [
 ];
 
 /** The shell's names for one library record's selection, draft and editor state. */
-const TASK_FIELDS = Object.freeze({
+export const TASK_FIELDS = Object.freeze({
   selectedId: 'selectedGatheringTaskId',
   draft: 'gatheringTaskDraft',
   baseline: 'gatheringTaskDraftBaseline',
@@ -84,7 +84,7 @@ const TASK_FIELDS = Object.freeze({
   validation: 'gatheringTaskValidation',
 });
 
-const EVENT_FIELDS = Object.freeze({
+export const EVENT_FIELDS = Object.freeze({
   selectedId: 'selectedGatheringEventId',
   draft: 'gatheringEventDraft',
   baseline: 'gatheringEventDraftBaseline',
@@ -117,7 +117,7 @@ function validateGatheringEventDraft(draft, text) {
 }
 
 /** Copy each part's accessors onto one object; a spread would read every getter once instead. */
-function mergeAccessors(...parts) {
+export function mergeAccessors(...parts) {
   const model = {};
   for (const part of parts) {
     Object.defineProperties(model, Object.getOwnPropertyDescriptors(part));
