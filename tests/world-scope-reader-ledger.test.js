@@ -74,12 +74,14 @@ const SCAN_TOTALS = Object.freeze({
   // #1923 moved five normalizer reads into `normalize/system.js` (`files` 21 -> 22); the rest hold.
   // It then moved eight item-source lines into `manager/itemSources.js` (+1 file);
   // pairs/collisions re-derived. Ten tool-source lines moved to `manager/toolSources.js` (+1 file).
+  // Five bulk-edit lines moved to `manager/bulkEdits.js` (+1 file); one was the third copy of a
+  // manager line, so that group keeps two sites (`collisionSites` -1) and its move adds a pair.
   matches: 168,
   lines: 153,
-  files: 24,
-  pairs: 133,
+  files: 25,
+  pairs: 134,
   collisionGroups: 15,
-  collisionSites: 35,
+  collisionSites: 34,
 });
 
 /**
@@ -185,14 +187,17 @@ const LEDGER = Object.freeze([
   ['src/systems/CraftingSystemManager.js', "{ ...system.components[idx], ...updates, id: itemId },", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "if (!this._sameSourceReferenceSet(system.components[idx], updatedItem)) {", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "return system.components[idx];", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "for (let idx = 0; idx < system.components.length; idx += 1) {", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const component = system.components[idx];", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "system.components[idx] = this._normalizeComponent(", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "if (changedIds.length > 0) advanceDefinitionRevision(system.components);", 1, 'writer'],
+  // #1923: the component bulk edit's writer reads, moved to `manager/bulkEdits.js`.
+  ['src/systems/manager/bulkEdits.js', "for (let idx = 0; idx < system.components.length; idx += 1) {", 1, 'writer'],
+  ['src/systems/manager/bulkEdits.js', "const component = system.components[idx];", 1, 'writer'],
+  ['src/systems/manager/bulkEdits.js', "system.components[idx] = io.normalizeComponent(", 1, 'writer'],
+  ['src/systems/manager/bulkEdits.js', "if (changedIds.length > 0) advanceDefinitionRevision(system.components);", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "system.components = components.filter(", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "const essenceDefinitions = (system.essenceDefinitions || []).map((def) => ({", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "system.essenceDefinitions = essenceDefinitions;", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];", 3, 'writer'],
+  ['src/systems/CraftingSystemManager.js', "const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];", 2, 'writer'],
+  // #1923: the essence bulk edit's third copy of the line above, moved to `manager/bulkEdits.js`.
+  ['src/systems/manager/bulkEdits.js', "const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "system.essenceDefinitions = definitions.filter((def) => def.id !== essenceId);", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "system.essences = system.essenceDefinitions.map((def) => def.id);", 2, 'writer'],
   ['src/systems/CraftingSystemManager.js', "system.essenceDefinitions = definitions.filter(", 1, 'writer'],
