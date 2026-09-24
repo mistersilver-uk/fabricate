@@ -48,7 +48,7 @@ src/systems/checkRoll.js::evaluateCheckRoll	160
 src/systems/checkRoll.js::evaluatePreparedRunCheck	130
 src/systems/checkRoll.js::runFormulaRouted	110
 src/systems/companionContract.js	950
-src/systems/componentEssenceOverride.js::createComponentEssenceOverride	240
+src/systems/componentEssenceOverride.js::createComponentEssenceOverride	140
 src/systems/currencyAffordance.js	1350
 src/systems/gatheringLocation.js::evaluateLocationAvailability	110
 src/systems/importReferenceResolver.js::collectBrokenInternalReferences	160
@@ -61,7 +61,6 @@ src/systems/journalRunAuthority.js::createJournalRunAuthority>run>queue	140
 src/systems/journalRunCommands.js	1100
 src/systems/journalRunCommands.js::createJournalRunCommandService	430
 src/systems/journalRunCommands.js::createJournalRunCommandService>executeOperation	190
-src/systems/scopedDefinitionStore.js	950
 src/systems/systemValidation.js::collectSystemBlockers	170
 src/toolBreakageRuntime.js::createToolBreakageRuntime	210
 src/ui/InteractableConfigApp.svelte.js::_buildServices	410

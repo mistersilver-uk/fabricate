@@ -140,6 +140,11 @@ A thrown error propagates to the caller (no Foundry notification-swallow), which
 - `CraftingSystemManager` uses `getSystems()` and `getItems(systemId)`.
 - V13 `CalendarData#timeToComponents().day` is the day-*of-year* (0-based, and it resets every year), NOT a cumulative campaign day.
 Compose an absolute/monotonic day from `year` + `day` (plus a days-per-year seam) before showing it — see `daysPerYearFromCalendar` (`src/systems/foundryCalendar.js`) and `worldTimeLabel` (`src/ui/svelte/util/worldTimeLabel.js`).
+- **`src/systems/foundryCalendar.js` derives interval lengths from the world calendar, `game.time.calendar`, an instance of `CONFIG.time.worldCalendarClass` (core default `foundry.data.CalendarData`, the same schema on V13.351 and V14.365), through these fields.**
+A day is `days.hoursPerDay * days.minutesPerHour * days.secondsPerMinute`, else the measured difference `componentsToTime({ day: 1 }) - componentsToTime({ day: 0 })`, else the Earth day of 86,400 seconds.
+A week is the weekday count `days.values.length` times the day length, else seven days, and the Earth week of 604,800 seconds when there is no calendar at all.
+A year is `days.daysPerYear`, else the sum of `months.values[].days`, else unresolved, so the caller falls back to a within-year day.
+Fabricate fixes minutes and hours at 60 and 3,600 seconds and never reads them from the calendar, although `CalendarData` makes `days.secondsPerMinute` and `days.minutesPerHour` configurable, so under a custom calendar only Fabricate's day and week lengths follow it.
 - A run's persisted `componentSourceActorUuids` are UUIDs (not ids) — resolve them with `fromUuid`/`fromUuidSync`, never `game.actors.get`.
 See `resolveAdvanceSources` (`src/systems/advanceCraftingSources.js`).
 - **The player-path ownership gate lives in the `src/bootstrap/craftingFacade.js` facade, not in `CraftingEngine`.** `CraftingEngine.craft` / `salvage` contain **no ownership check at all** — they resolve the actor uuid they are handed and mutate that actor's Items directly.

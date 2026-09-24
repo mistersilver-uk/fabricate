@@ -4,10 +4,8 @@ import { cloneJson, normalizeIdList } from '../utils/scalars.js';
 const REALM_MEMBERSHIP_KEYS = Object.freeze(['includedRealmIds', 'excludedRealmIds']);
 
 /**
- * Drop from `environment` every realm id that `baseline` already carried and the world library
- * no longer has; an id `baseline` did not carry is left for validation to reject.
- *
- * @returns {string[]} the dropped ids
+ * Drop, and answer, every realm id `baseline` already carried that the world library lacks; an id
+ * `baseline` did not carry is left for validation to reject.
  */
 function pruneRealmMembership(environment, baseline, knownRealmIds) {
   const dropped = new Set();
@@ -59,11 +57,8 @@ export function createRealmMembership({
   findPersisted = () => null,
 } = {}) {
   /**
-   * The world realm library as a lookup, or null when it cannot be read at all. Both the
-   * rejection of an unknown realm id and the prune of a stale one are keyed to this same
-   * answer, so a library that is missing neither rejects nor destroys anything.
-   *
-   * @returns {Set<string>|null}
+   * The world realm ids, or `null` when unreadable, in which case neither the rejection nor the
+   * prune keyed to this answer acts.
    */
   function knownRealmIds() {
     const worldRealms = travelStore?.list?.();
@@ -72,12 +67,8 @@ export function createRealmMembership({
   }
 
   /**
-   * Prune the records that ALREADY carried a departed realm id, so one deleted realm cannot make
-   * every environment in the world unsaveable.
-   *
-   * @param {object[]} environments normalized records, pruned in place
-   * @param {{ baselineById?: Map<string, object>|null, notify?: boolean }} [options]
-   * @returns {object[]} the same records
+   * Prune, in place, records that already carried a departed realm id, so one deleted realm cannot
+   * make every environment unsaveable; answers the same records.
    */
   function prune(environments, { baselineById = null, notify = true } = {}) {
     const known = knownRealmIds();
@@ -110,7 +101,7 @@ export function createRealmMembership({
       const [pruned] = prune([cloneJson(environment)], { baselineById, notify: false });
       return pruned;
     },
-    /** @returns {string[]} one error per realm id the world library does not have. */
+    /** One error per realm id the world library does not have. */
     unknownRealmErrors(environment, label) {
       const known = knownRealmIds();
       return known ? unknownRealmErrors(environment, label, known) : [];
