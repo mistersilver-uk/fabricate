@@ -1,5 +1,7 @@
 /** Promotion-time release guards for `.github/workflows/promote-to-public.yml` (issue #716). */
 
+import { resolveChannelConfig } from '../release-s3.js';
+
 import { foundryIsNewerVersion } from './semver.js';
 
 const HOTFIX_SPEC_REF = 'Release and Distribution §Hotfix isolation';
@@ -76,20 +78,29 @@ export function assertHotfixMinimumNotRaised({
   };
 }
 
-/** The tester identity a config declares for one channel: the group names and the secret's name. */
+/**
+ * The tester identity a config declares for one channel, read by the publisher's own resolver so
+ * either config shape compares equal: a set of `group via secretEnv` pairs. A declaration the
+ * resolver cannot read yields `unreadable`, which never agrees with anything.
+ */
 function testerIdentity(config, channel) {
-  const declared = config?.channels?.[channel] ?? {};
-  const groups = Array.isArray(declared.testerGroups) ? declared.testerGroups.map(String) : [];
-  const secretEnv =
-    typeof declared.testerSecretEnv === 'string' && declared.testerSecretEnv.trim() !== ''
-      ? declared.testerSecretEnv.trim()
-      : '(none)';
-  return { groups, secretEnv };
+  try {
+    const pairs = resolveChannelConfig(config ?? {}, channel).testers.map(
+      ({ group, testerSecretEnv }) => {
+        const secretEnv = typeof testerSecretEnv === 'string' ? testerSecretEnv.trim() : '';
+        return `${String(group)} via ${secretEnv || '(none)'}`;
+      }
+    );
+    return { pairs: [...new Set(pairs)].sort((a, b) => (a < b ? -1 : Number(a > b))) };
+  } catch (error) {
+    return { pairs: [], unreadable: error.message };
+  }
 }
 
 /** One side of the comparison, in a form safe to log: no segment value, only names. */
-function describeIdentity({ groups, secretEnv }) {
-  return `tester group(s) [${groups.join(', ') || 'none'}] via ${secretEnv}`;
+function describeIdentity({ pairs, unreadable }) {
+  if (unreadable) return `an unreadable tester declaration (${unreadable})`;
+  return `tester group(s) [${pairs.join(', ') || 'none'}]`;
 }
 
 /**
@@ -111,14 +122,14 @@ export function evaluateTesterConfigDrift({
     `this ref declares ${describeIdentity(dispatch)}, while ${publisherRef} — the ref that ` +
     `publishes ${channel} — declares ${describeIdentity(publisher)}`;
 
-  // Group names compared as sets: declaration order carries no meaning, a rename does.
-  const dispatchGroups = new Set(dispatch.groups);
-  const publisherGroups = new Set(publisher.groups);
-  const sameGroups =
-    dispatchGroups.size === publisherGroups.size &&
-    [...dispatchGroups].every((group) => publisherGroups.has(group));
+  // Pairs compared as sets: declaration order and config shape carry no meaning, a rename does.
+  const agree =
+    !dispatch.unreadable &&
+    !publisher.unreadable &&
+    dispatch.pairs.length === publisher.pairs.length &&
+    dispatch.pairs.every((pair, index) => pair === publisher.pairs[index]);
 
-  if (sameGroups && dispatch.secretEnv === publisher.secretEnv) {
+  if (agree) {
     return {
       drifted: false,
       summary: `${channel} tester identity agrees across refs: ${sides}.`,

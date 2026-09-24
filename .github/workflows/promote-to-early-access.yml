@@ -22,6 +22,10 @@ name: "Promote to Early Access"
 #
 # Refuses: a non-beta tag, a nonexistent tag, a non-ancestor commit, and a tag the beta head does
 # not advertise.
+#
+# The verification runs the workflow ref's scripts, not `release`'s (issue #1988): the workflow text
+# comes from the dispatch ref, and scripts it imports from an older `release` could lack an export it
+# names. Only the merge step moves the tree onto `release`.
 
 on:
   workflow_dispatch:
@@ -39,10 +43,9 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - name: Checkout release
+      - name: Checkout the workflow ref
         uses: actions/checkout@v6
         with:
-          ref: release
           fetch-depth: 0
           # The push below authenticates as the bypass App, never as github-actions[bot]. checkout
           # stores its own credential as an http.extraheader, and an Authorization header BEATS the
@@ -66,7 +69,7 @@ jobs:
         env:
           BETA_TAG: ${{ inputs.beta_tag }}
         run: |
-          git fetch origin main --tags --force
+          git fetch origin main release --tags --force
           if ! git tag -l "$BETA_TAG" | grep -q .; then
             echo "::error::Tag '$BETA_TAG' does not exist."
             exit 1
@@ -106,23 +109,24 @@ jobs:
           node --input-type=module <<'NODE'
           import { readFile } from 'node:fs/promises';
           import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
-          import { deriveS3Layout, resolveChannelConfig } from './scripts/release-s3.js';
+          import {
+            deriveS3Layout,
+            describeMissingTesterSecrets,
+            resolveChannelConfig,
+            resolveTesterSegments,
+          } from './scripts/release-s3.js';
 
           const expected = process.env.EXPECTED_VERSION;
           const config = JSON.parse(await readFile('release.s3.config.json', 'utf8'));
           const bucket = process.env.S3_RELEASE_BUCKET || config.bucket;
           const baseUrl = process.env.RELEASE_BASE_URL || config.baseUrl;
 
-          // Resolve the beta channel's OWN tester groups + secret, then derive every target (the
-          // channel manifest AND each tester manifest) — the same enumeration the publish and the
-          // public promotion use, so a partial publish cannot slip through a channel-only check.
-          const channelConfig = resolveChannelConfig(config, 'beta');
-          const secretEnv = channelConfig.testerSecretEnv;
-          const testerSegment = (secretEnv ? process.env[secretEnv] || '' : '').replace(/^\/+|\/+$/g, '');
-          if (channelConfig.testerGroups.length > 0 && !testerSegment) {
-            throw new Error(
-              `beta declares ${channelConfig.testerGroups.length} tester group(s) but ${secretEnv} is unset — cannot verify the tester head.`
-            );
+          // Resolve the beta channel's tester groups, each from its own secret, then derive every
+          // target (the channel manifest and each tester manifest) — the same enumeration the publish
+          // and the public promotion use, so a partial publish cannot slip through a channel-only check.
+          const { testers, missing } = resolveTesterSegments(resolveChannelConfig(config, 'beta'), process.env);
+          if (missing.length > 0) {
+            throw new Error(`beta cannot verify its tester heads: ${describeMissingTesterSecrets(missing)}.`);
           }
 
           const { targets } = deriveS3Layout({
@@ -130,8 +134,7 @@ jobs:
             channel: 'beta',
             version: expected,
             baseUrl,
-            testerGroups: channelConfig.testerGroups,
-            testerSegment,
+            testers,
           });
 
           const s3 = new S3Client({ region: process.env.AWS_REGION });

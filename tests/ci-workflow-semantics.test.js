@@ -15,12 +15,14 @@ import {
   evaluate,
   key,
   nestedEntries,
+  parseActionSteps,
   parseJobs,
   scalars,
   section,
   unwrap,
   value,
 } from './helpers/workflow-source.js';
+import { createTempGitRepo, envWithoutGitLocation } from './helpers/temp-git-repo.js';
 // The gate's bound defaults are READ, not restated (issue 1133).
 import {
   GRACE_MS,
@@ -294,26 +296,22 @@ function shippedConfig() {
   const config = JSON.parse(
     readFileSync(path.join(REPOSITORY_ROOT, 'release.s3.config.json'), 'utf8')
   );
-  /** The secret a channel's own feed derives its path from, or null when it has no tester group. */
-  const secretFor = (channel) => {
-    const { testerGroups, testerSecretEnv } = resolveChannelConfig(config, channel);
-    if (testerGroups.length === 0) return null;
-    // Asserted, not filtered: a `''` or absent name would drop out of `declared` and mute both
-    // bindings below for the one channel that needs them.
-    assert.ok(
-      typeof testerSecretEnv === 'string' && testerSecretEnv.trim() !== '',
-      `channel "${channel}" declares tester groups with no testerSecretEnv, so its feed has no ` +
-        'segment to derive a path from'
-    );
-    return testerSecretEnv;
-  };
+  /** The secrets a channel's tester feeds derive their paths from: one per tester group. */
+  const secretsFor = (channel) =>
+    resolveChannelConfig(config, channel).testers.map(({ group, testerSecretEnv }) => {
+      // Asserted, not filtered: a `''` or absent name would drop out of `declared` and mute both
+      // bindings below for the one group that needs them.
+      assert.ok(
+        typeof testerSecretEnv === 'string' && testerSecretEnv.trim() !== '',
+        `tester group "${group}" on channel "${channel}" declares no testerSecretEnv, so its feed ` +
+          'has no segment to derive a path from'
+      );
+      return testerSecretEnv;
+    });
 
   const names = [...new Set([...Object.keys(config.channels ?? {}), config.channel].filter(Boolean))];
-  const declared = [];
-  for (const secret of names.map(secretFor)) {
-    if (secret && !declared.includes(secret)) declared.push(secret);
-  }
-  return { declared, secretFor };
+  const declared = [...new Set(names.flatMap(secretsFor))];
+  return { declared, secretsFor };
 }
 
 /** Every workflow file, as `{ file, source }`. */
@@ -355,7 +353,7 @@ const referencesReleaseS3 = (run) => /scripts\/release-s3\.js/.test(String(run ?
 
 test('no workflow forwards a tester-path secret the release config does not declare', () => {
   const { declared } = shippedConfig();
-  assert.ok(declared.length >= 2, 'the config declares fewer secrets than the channels that need one');
+  assert.ok(declared.length >= 3, 'the config declares fewer secrets than the tester groups that need one');
 
   const strays = [];
   for (const { file, source } of workflowSources()) {
@@ -376,7 +374,7 @@ test('no workflow forwards a tester-path secret the release config does not decl
 });
 
 test('every declared tester-path secret reaches release-s3.js through every workflow that runs it', () => {
-  const { declared, secretFor } = shippedConfig();
+  const { declared, secretsFor } = shippedConfig();
   const publishers = [];
   const callers = [];
   let declaredByReusable = null;
@@ -437,7 +435,7 @@ test('every declared tester-path secret reaches release-s3.js through every work
   for (const { file, step, channels, unresolved } of publishers) {
     const needed = unresolved
       ? declared
-      : [...new Set(channels.map(secretFor).filter(Boolean))];
+      : [...new Set(channels.flatMap(secretsFor))];
     for (const secret of needed) {
       bindings += 1;
       assert.ok(
@@ -449,7 +447,7 @@ test('every declared tester-path secret reaches release-s3.js through every work
     }
   }
   // Non-vacuity: a reader that found no channel at all would excuse every step above.
-  assert.ok(bindings >= 6, `only ${bindings} publisher/secret bindings were asserted`);
+  assert.ok(bindings >= 10, `only ${bindings} publisher/secret bindings were asserted`);
 });
 
 // The mint gate and the deployment-configuration source (issues 1864, 1872).
@@ -621,81 +619,235 @@ test("the classifier's shell body mints only a tag absent from the pre-run snaps
   }
 });
 
-/** The capture of the deployment configuration from the ref the workflow is running at. */
-const CAPTURES_CONFIG = /git show "\$GITHUB_SHA":release\.s3\.config\.json/;
-/** A checkout that moves the tree to a release tag, as distinct from `git checkout -B <branch>`. */
-const CHECKS_OUT_A_TAG = /git checkout ["']?v?\$\{?[A-Z_]+/;
-/** An invocation of the publisher, as distinct from a dry-run plan that echoes its command line. */
-const INVOKES_RELEASE_S3 = /^\s*node scripts\/release-s3\.js/m;
+/**
+ * An invocation of the publisher — `node [./]scripts/release-s3.js` or one of its `npm run
+ * release:s3` scripts — as distinct from a dry-run plan that echoes its command line.
+ */
+const INVOKES_RELEASE_S3 = /^\s*(?:node\s+(?:\.\/)?scripts\/release-s3\.js|npm\s+run\s+release:s3\b)/m;
+/** The composite that checks a release tag out beside the workflow ref's own checkout. */
+const RELEASE_SOURCE_ACTION = './.github/actions/release-source';
+const RELEASE_SOURCE_ACTION_FILE = path.join(REPOSITORY_ROOT, '.github', 'actions', 'release-source', 'action.yml');
+/** The tag each publishing workflow hands release-source: the tag it was called with, or its version's. */
+const RELEASE_SOURCE_TAG = {
+  'release-s3.yml': '${{ inputs.tag }}',
+  'promote-to-public.yml': 'v${{ inputs.version }}',
+};
+/** A shell step that moves the checked-out tree to another commit. */
+const MOVES_THE_TREE = /\bgit\s+(?:checkout|switch)\b/;
 
-test('every job that publishes from a checked-out tag takes its configuration from the workflow ref', () => {
-  // Tester-group identity is deployment configuration, so it must come from the ref the workflow
-  // runs at — never from the tag, whose tree predates any rotation (issue 1872).
+/** `{ id, output }` of a `${{ steps.<id>.outputs.<output> }}` expression, or null for anything else. */
+function stepOutputReference(expression) {
+  const reference = /^\$\{\{\s*steps\.([\w-]+)\.outputs\.(\w+)\s*\}\}$/.exec(expression ?? '');
+  return reference ? { id: reference[1], output: reference[2] } : null;
+}
+
+/**
+ * The step a publisher flag's value comes from: `--flag "$VAR"`, `VAR` bound in the step's env: to
+ * `${{ steps.<id>.outputs.<output> }}`. Null when any link of that chain is missing.
+ */
+function flagSource(step, flag) {
+  const variable = new RegExp(`${flag}\\s+"\\$([A-Z_]+)"`).exec(step.run)?.[1];
+  return stepOutputReference(step.env[variable]);
+}
+
+test('the publisher-invocation matcher sees every spelling of a release-s3 run, and no echoed plan', () => {
+  for (const run of [
+    'node scripts/release-s3.js --version "$VERSION"',
+    'node ./scripts/release-s3.js --version "$VERSION"',
+    'npm run release:s3 -- --version "$VERSION"',
+    'npm run release:s3:dry-run -- --version "$VERSION"',
+  ]) {
+    assert.match(run, INVOKES_RELEASE_S3);
+  }
+  assert.doesNotMatch('echo "Would publish (node scripts/release-s3.js --version 1.0.0)"', INVOKES_RELEASE_S3);
+});
+
+test('every job that builds a tag runs the workflow ref publisher over a release-source tree', () => {
+  // The tag supplies the built bytes; the publisher tooling runs from the workflow ref (issue 1988).
+  // A tag's own publisher cannot read a configuration shape introduced after it, so no job may move
+  // its tree to the tag and run the publisher it finds there.
   const visited = [];
 
   for (const { file, source } of workflowSources()) {
     for (const [name, job] of Object.entries(parseJobs(source))) {
       const steps = job.steps ?? [];
-      const checkoutIndex = steps.findIndex((step) => CHECKS_OUT_A_TAG.test(step.run));
-      const publishIndex = steps.findIndex(
-        (step) => referencesReleaseS3(step.run) && INVOKES_RELEASE_S3.test(step.run)
-      );
-      if (checkoutIndex === -1 || publishIndex === -1) continue;
+      const builds = steps
+        .map((step, index) => ({ step, index }))
+        .filter(({ step }) => INVOKES_RELEASE_S3.test(step.run) && !step.run.includes('--backfill-provenance'));
+      if (builds.length === 0) continue;
 
       const label = `${file} job "${name}"`;
       visited.push(label);
 
-      assert.match(
-        steps[publishIndex].run,
-        /--config "\$RUNNER_TEMP\/release\.s3\.config\.json"/,
-        `${label} publishes from a checked-out tag without passing the captured --config, so it ` +
-          "reads the TAG's release.s3.config.json and a rotated tester group can never be populated"
-      );
+      for (const { step, index } of builds) {
+        for (const [flag, output] of [['--source-root', 'path'], ['--source-sha', 'sha']]) {
+          const origin = flagSource(step, flag);
+          assert.ok(origin, `${label} step "${step.name}" does not pass ${flag} from a step output`);
+          assert.equal(origin.output, output, `${label} passes ${flag} from outputs.${origin.output}`);
+          const sourceIndex = steps.findIndex((candidate) => candidate.id === origin.id);
+          assert.ok(
+            sourceIndex !== -1 && sourceIndex < index,
+            `${label} takes ${flag} from step "${origin.id}", which does not run before the publish`
+          );
+          assert.equal(
+            steps[sourceIndex].uses,
+            RELEASE_SOURCE_ACTION,
+            `${label} takes ${flag} from a step that is not ${RELEASE_SOURCE_ACTION}`
+          );
+          // The tree built is the tag this workflow publishes, not whatever release-source is handed.
+          assert.equal(
+            steps[sourceIndex].with.tag,
+            RELEASE_SOURCE_TAG[file],
+            `${label} hands release-source the tag ${steps[sourceIndex].with.tag}`
+          );
+        }
+      }
 
-      // release-s3.js's parseArgs ignores an unknown flag, so a tag predating --config would publish
-      // under its own configuration while the job believed it had passed the ref's.
-      assert.ok(
-        steps
-          .slice(checkoutIndex, publishIndex + 1)
-          .map((step) => step.run)
-          .join('\n')
-          .includes(`grep -q -- "'--config'"`),
-        `${label} never checks that the checked-out tag's release-s3.js accepts --config, so a tag ` +
-          'that predates the flag publishes under its own configuration and the job reads as correct'
-      );
-
-      const captureIndex = steps.findIndex((step) => CAPTURES_CONFIG.test(step.run));
-      assert.notEqual(captureIndex, -1, `${label} never captures the config from $GITHUB_SHA`);
-
-      // The capture must precede the checkout, which is what makes the file unreadable. Where the
-      // two share one step, the ordering is by line within that step's `run:` body; where the
-      // checkout is its own step, it is by step.
-      if (captureIndex === checkoutIndex) {
-        const lines = steps[captureIndex].run.split('\n');
+      for (const step of steps) {
+        assert.ok(!MOVES_THE_TREE.test(step.run), `${label} step "${step.name}" moves its tree to another commit`);
         assert.ok(
-          lines.findIndex((line) => CAPTURES_CONFIG.test(line)) <
-            lines.findIndex((line) => CHECKS_OUT_A_TAG.test(line)),
-          `${label} captures the config AFTER checking out the tag, in the same run: body`
-        );
-      } else {
-        assert.ok(
-          captureIndex < checkoutIndex,
-          `${label} captures the config in a step that runs after the tag checkout`
+          !(step.uses.startsWith('actions/checkout') && step.with.ref),
+          `${label} checks out ref ${step.with.ref} instead of the workflow ref`
         );
       }
     }
   }
 
-  // The preflights above grep a literal out of the publisher's source, so that literal is a
-  // hand-maintained mirror: pin it here rather than let a rename make every preflight refuse.
-  assert.match(
-    readFileSync(path.join(REPOSITORY_ROOT, 'scripts', 'release-s3.js'), 'utf8'),
-    /'--config'/,
-    'the tag preflights grep for "\'--config\'" in scripts/release-s3.js; that literal has moved'
-  );
-
   // Non-vacuity: the walk must reach both shapes — the dedicated publisher and the promotion's
-  // single-body re-stage — or one of them could lose its capture unobserved.
+  // re-stage — or one of them could run a tag's publisher unobserved.
   assert.ok(visited.includes('release-s3.yml job "release-s3"'), `release-s3.yml was not visited (saw ${visited.join('; ') || 'nothing'})`);
   assert.ok(visited.includes('promote-to-public.yml job "publish"'), `the public re-stage was not visited (saw ${visited.join('; ') || 'nothing'})`);
+});
+
+test('the release-source action builds the tag in its own worktree with its full toolchain', () => {
+  const source = readFileSync(RELEASE_SOURCE_ACTION_FILE, 'utf8');
+  const steps = parseActionSteps(source);
+  const outputs = Object.fromEntries(
+    ['path', 'sha'].map((name) => [
+      name,
+      scalars(nestedEntries(section(entries(source), 'outputs'), name)).value,
+    ])
+  );
+
+  const worktree = steps.find((step) => /\bgit worktree add --detach\b/.test(step.run));
+  assert.ok(worktree, 'the tag is not checked out with `git worktree add --detach`');
+  assert.equal(worktree.env.TAG, '${{ inputs.tag }}', 'the tag must reach the shell through env:');
+
+  // The worktree is created at the tag it was given, and both outputs name that same worktree.
+  const target = /git worktree add --detach "\$(\w+)" "\$TAG"/.exec(worktree.run)?.[1];
+  assert.ok(target, 'the worktree is not created from "$TAG"');
+  assert.match(worktree.run, new RegExp(`echo "path=\\$${target}" >> "\\$GITHUB_OUTPUT"`), 'path is not the worktree');
+  assert.match(worktree.run, new RegExp(`sha=\\$\\(git -C "\\$${target}" rev-parse HEAD\\)`), 'sha is not the worktree HEAD');
+
+  // Each output is written by the step it names, so a renamed id cannot leave it empty.
+  for (const [name, expression] of Object.entries(outputs)) {
+    const reference = stepOutputReference(expression);
+    assert.ok(reference?.output === name, `output ${name} is ${expression}`);
+    const writer = steps.find((step) => step.id === reference.id);
+    assert.ok(writer, `output ${name} names step "${reference.id}", which does not exist`);
+    assert.match(writer.run, new RegExp(`echo "${name}=[^\\n]*>> "\\$GITHUB_OUTPUT"`), `step "${writer.id}" never writes ${name}`);
+  }
+  assert.equal(outputs.path, '${{ steps.' + worktree.id + '.outputs.path }}');
+
+  // The tag's build needs its dev dependencies (Vite), installed in the worktree, not the checkout.
+  const install = steps.find((step) => /\bnpm ci\b/.test(step.run));
+  assert.ok(install, 'the tag tree gets no dependency install');
+  assert.equal(install['working-directory'], '${{ steps.' + worktree.id + '.outputs.path }}');
+  assert.match(install.run, /npm ci --ignore-scripts/);
+  assert.doesNotMatch(install.run, /--omit=dev|--production|NODE_ENV=production/);
+  assert.ok(!('NODE_ENV' in install.env), 'NODE_ENV in the install env would drop dev dependencies');
+
+  // SonarCloud S7630: a `${{ }}` inside `run:` is substituted before the shell parses the line.
+  for (const step of steps) {
+    assert.ok(!/\$\{\{/.test(step.run), `step "${step.name}" interpolates an expression into run:`);
+  }
+});
+
+/** The `name=value` lines a step appended to `$GITHUB_OUTPUT`. */
+function readStepOutputs(outputFile) {
+  const lines = readFileSync(outputFile, 'utf8').split('\n').filter(Boolean);
+  return Object.fromEntries(lines.map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
+}
+
+test("release-source's worktree step checks out the tag it is given, not the caller's HEAD", () => {
+  // Only the worktree step runs, in bash as the runner runs it: the install step's `npm ci` would
+  // need a registry, and the test above pins it to this step's `path` output.
+  const step = parseActionSteps(readFileSync(RELEASE_SOURCE_ACTION_FILE, 'utf8')).find((one) => one.id === 'worktree');
+  const repo = createTempGitRepo('release-source-repo-');
+  const runnerTemp = mkdtempSync(path.join(tmpdir(), 'release-source-runner-'));
+  try {
+    const tagged = repo.commit('the release');
+    repo.git('tag', '-a', 'v9.9.9', '-m', 'an annotated tag, whose object is not the commit');
+    const head = repo.commit('after the release');
+    assert.notEqual(repo.git('rev-parse', 'v9.9.9'), tagged, 'the fixture tag is not annotated');
+
+    const outputFile = path.join(runnerTemp, 'github-output');
+    writeFileSync(outputFile, '');
+    const result = spawnSync('bash', ['-e'], {
+      input: step.run,
+      cwd: repo.dir,
+      env: { ...envWithoutGitLocation(), RUNNER_TEMP: runnerTemp, GITHUB_OUTPUT: outputFile, TAG: 'v9.9.9' },
+      encoding: 'utf8',
+      timeout: 60000,
+    });
+    assert.equal(result.status, 0, `the worktree step failed: ${result.stderr}`);
+
+    const outputs = readStepOutputs(outputFile);
+    assert.equal(path.resolve(outputs.path), path.join(runnerTemp, 'release-source'));
+    const checkedOut = repo.git('-C', outputs.path, 'rev-parse', 'HEAD');
+    assert.equal(checkedOut, repo.git('rev-parse', 'v9.9.9^{commit}'), 'the worktree does not hold the tag');
+    assert.notEqual(checkedOut, head, "the worktree holds the caller's HEAD");
+    assert.equal(outputs.sha, tagged, 'sha is not the commit the tag names');
+  } finally {
+    repo.dispose();
+    rmSync(runnerTemp, { recursive: true, force: true });
+  }
+});
+
+/** A step that runs one of this repository's scripts, by path or by import. */
+const RUNS_REPOSITORY_SCRIPTS = /\bnode\s+(?:\.\/)?scripts\/|\bfrom\s+'\.\/scripts\//;
+/** A step that runs node at all: a script by path, or an inline `--input-type` program. */
+const RUNS_NODE = /\bnode\s+(?:--|(?:\.\/)?scripts\/)/;
+
+test('promote-to-early-access runs its scripts from the workflow ref and moves to release only to merge', () => {
+  // The workflow text comes from the dispatch ref and names exports an older `release` could lack
+  // (issue 1988), so the job checks out the workflow ref and only the merge step leaves it.
+  const source = readFileSync(path.join(WORKFLOWS, 'promote-to-early-access.yml'), 'utf8');
+  const { steps } = parseJobs(source).promote;
+
+  const checkouts = steps.filter((step) => step.uses.startsWith('actions/checkout'));
+  assert.equal(checkouts.length, 1, 'the promote job should check out exactly once');
+  assert.ok(!checkouts[0].with.ref, `the promote job checks out ${checkouts[0].with.ref} instead of the workflow ref`);
+
+  const lastNode = steps.findLastIndex((step) => RUNS_NODE.test(step.run));
+  assert.ok(lastNode !== -1, 'the promote job runs no node step');
+  for (const step of steps.slice(0, lastNode + 1)) {
+    assert.ok(!MOVES_THE_TREE.test(step.run), `step "${step.name}" moves the tree before the last node step`);
+  }
+
+  const merge = steps.findIndex((step) => /\bgit checkout -B release\b/.test(step.run));
+  assert.ok(merge !== -1, 'no step moves to release to merge');
+  const readers = steps.flatMap((step, index) => (RUNS_REPOSITORY_SCRIPTS.test(step.run) ? [index] : []));
+  assert.ok(readers.length >= 2, `only ${readers.length} step(s) run the repository's scripts`);
+  for (const index of readers) {
+    assert.ok(index < merge, `step "${steps[index].name}" runs the repository's scripts after the move to release`);
+  }
+});
+
+test('every inline tester-segment resolution words its refusal through describeMissingTesterSecrets', () => {
+  let resolutions = 0;
+  for (const { file, source } of workflowSources()) {
+    for (const [name, job] of Object.entries(parseJobs(source))) {
+      for (const step of job.steps ?? []) {
+        if (!/\bresolveTesterSegments\(/.test(step.run)) continue;
+        resolutions += 1;
+        assert.match(
+          step.run,
+          /\bdescribeMissingTesterSecrets\(missing\)/,
+          `${file} job "${name}" step "${step.name}" words its own missing-secret refusal`
+        );
+      }
+    }
+  }
+  assert.ok(resolutions >= 2, `only ${resolutions} inline tester-segment resolution(s) were found`);
 });

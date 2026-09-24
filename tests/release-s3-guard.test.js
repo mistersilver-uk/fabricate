@@ -13,8 +13,15 @@ const { ARCHIVE_CHUNK_GATE_LABEL, assertArchiveChunkCompleteness } = await impor
 );
 // The comparator the guard's remedy is measured against — the same one that decides the refusal.
 const { foundryIsNewerVersion } = await import('../scripts/lib/semver.js');
-const { main, resolveChannelConfig, runCheckHeads, deriveS3Layout, s3StatusFromError } =
-  await import('../scripts/release-s3.js');
+const {
+  describeMissingTesterSecrets,
+  main,
+  resolveChannelConfig,
+  resolveTesterSegments,
+  runCheckHeads,
+  deriveS3Layout,
+  s3StatusFromError,
+} = await import('../scripts/release-s3.js');
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -27,39 +34,142 @@ const CONFIG = {
   channel: 'beta',
   testerGroups: ['closed-beta-2026'],
   channels: {
-    beta: { testerGroups: ['closed-beta-2026'], testerSecretEnv: 'S3_TESTER_PATH_SECRET' },
+    beta: { testerGroups: { 'closed-beta-2026': { testerSecretEnv: 'S3_TESTER_PATH_SECRET' } } },
     'early-access': {
-      testerGroups: ['guild-artisan-2026'],
-      testerSecretEnv: 'S3_GUILD_ARTISAN_PATH_SECRET',
+      testerGroups: {
+        'apprentice-crafter-2026': { testerSecretEnv: 'S3_APPRENTICE_PATH_SECRET' },
+        'guild-artisan-2026': { testerSecretEnv: 'S3_GUILD_ARTISAN_PATH_SECRET' },
+      },
     },
     public: { testerGroups: [] },
   },
 };
+
+const EARLY_ACCESS_TESTERS = [
+  { group: 'apprentice-crafter-2026', testerSecretEnv: 'S3_APPRENTICE_PATH_SECRET' },
+  { group: 'guild-artisan-2026', testerSecretEnv: 'S3_GUILD_ARTISAN_PATH_SECRET' },
+];
 
 const BETA_CHANNEL_MANIFEST = 'modules/fabricate/beta/latest/module.json';
 const BETA_TESTER_MANIFEST = 'testers/closed-beta-2026/seg/fabricate/module.json';
 
 // 1.3 — resolveChannelConfig: a channel's cohorts and secret belong to THAT channel
 
-test('resolveChannelConfig gives early-access its OWN cohort and secret, never the closed beta', () => {
+test('resolveChannelConfig gives early-access its own cohorts, each with its own secret', () => {
   const resolved = resolveChannelConfig(CONFIG, 'early-access');
-  assert.deepEqual(resolved.testerGroups, ['guild-artisan-2026']);
+  assert.deepEqual(resolved.testerGroups, ['apprentice-crafter-2026', 'guild-artisan-2026']);
   assert.ok(!resolved.testerGroups.includes('closed-beta-2026'));
-  assert.equal(resolved.testerSecretEnv, 'S3_GUILD_ARTISAN_PATH_SECRET');
+  assert.deepEqual(resolved.testers, EARLY_ACCESS_TESTERS);
   assert.equal(resolved.source, 'declared');
+  // The channel-level secret is gone from the answer, so a caller still reading it fails closed.
+  assert.ok(!Object.hasOwn(resolved, 'testerSecretEnv'));
 });
 
 test('resolveChannelConfig gives public no tester group at all', () => {
   const resolved = resolveChannelConfig(CONFIG, 'public');
   assert.deepEqual(resolved.testerGroups, []);
-  assert.equal(resolved.testerSecretEnv, null);
+  assert.deepEqual(resolved.testers, []);
 });
 
 test('resolveChannelConfig inherits NOTHING for an undeclared channel (a hotfix line)', () => {
   const resolved = resolveChannelConfig(CONFIG, '1.4.x');
   assert.equal(resolved.source, 'undeclared');
   assert.deepEqual(resolved.testerGroups, []);
-  assert.equal(resolved.testerSecretEnv, null);
+  assert.deepEqual(resolved.testers, []);
+});
+
+test('resolveChannelConfig still reads the legacy array: every group inherits the channel secret', () => {
+  const legacy = {
+    channels: {
+      'early-access': { testerGroups: ['a-2026', 'b-2026'], testerSecretEnv: 'S3_SHARED_PATH_SECRET' },
+    },
+  };
+  assert.deepEqual(resolveChannelConfig(legacy, 'early-access').testers, [
+    { group: 'a-2026', testerSecretEnv: 'S3_SHARED_PATH_SECRET' },
+    { group: 'b-2026', testerSecretEnv: 'S3_SHARED_PATH_SECRET' },
+  ]);
+});
+
+test('resolveChannelConfig gives an object entry no channel-level fallback secret', () => {
+  const config = {
+    channels: {
+      beta: { testerSecretEnv: 'S3_TESTER_PATH_SECRET', testerGroups: { 'closed-beta-2026': {} } },
+    },
+  };
+  assert.deepEqual(resolveChannelConfig(config, 'beta').testers, [
+    { group: 'closed-beta-2026', testerSecretEnv: null },
+  ]);
+});
+
+test('resolveChannelConfig reads an absent testerGroups as none, and refuses any other shape', () => {
+  assert.deepEqual(resolveChannelConfig({ channels: { beta: {} } }, 'beta').testers, []);
+  for (const testerGroups of [null, 'closed-beta-2026', 7, true]) {
+    assert.throws(
+      () => resolveChannelConfig({ channels: { beta: { testerGroups } } }, 'beta'),
+      (error) => error instanceof TypeError && /channel "beta"/.test(error.message),
+      `channels.beta.testerGroups = ${JSON.stringify(testerGroups)} must refuse`
+    );
+    assert.throws(
+      () => resolveChannelConfig({ channel: 'beta', testerGroups }, 'beta'),
+      TypeError,
+      `a scalar testerGroups of ${JSON.stringify(testerGroups)} must refuse`
+    );
+  }
+});
+
+// resolveTesterSegments: one segment per group, every missing secret named
+
+test('resolveTesterSegments resolves each group from its own secret', () => {
+  const resolved = resolveTesterSegments(resolveChannelConfig(CONFIG, 'early-access'), {
+    S3_APPRENTICE_PATH_SECRET: '/ap-seg/',
+    S3_GUILD_ARTISAN_PATH_SECRET: 'ga-seg',
+  });
+  assert.deepEqual(resolved, {
+    testers: [
+      { group: 'apprentice-crafter-2026', secretEnv: 'S3_APPRENTICE_PATH_SECRET', segment: 'ap-seg' },
+      { group: 'guild-artisan-2026', secretEnv: 'S3_GUILD_ARTISAN_PATH_SECRET', segment: 'ga-seg' },
+    ],
+    missing: [],
+  });
+});
+
+test('resolveTesterSegments reports an unset, blank or unnamed secret as missing', () => {
+  const config = {
+    channels: {
+      'early-access': {
+        testerGroups: {
+          'unset-2026': { testerSecretEnv: 'S3_UNSET_PATH_SECRET' },
+          'blank-2026': { testerSecretEnv: 'S3_BLANK_PATH_SECRET' },
+          'slashes-2026': { testerSecretEnv: 'S3_SLASHES_PATH_SECRET' },
+          'unnamed-2026': {},
+          'empty-name-2026': { testerSecretEnv: '   ' },
+        },
+      },
+    },
+  };
+  const { testers, missing } = resolveTesterSegments(resolveChannelConfig(config, 'early-access'), {
+    S3_BLANK_PATH_SECRET: '   ',
+    S3_SLASHES_PATH_SECRET: '///',
+  });
+  assert.deepEqual(testers, []);
+  assert.deepEqual(missing, [
+    { group: 'unset-2026', secretEnv: 'S3_UNSET_PATH_SECRET' },
+    { group: 'blank-2026', secretEnv: 'S3_BLANK_PATH_SECRET' },
+    { group: 'slashes-2026', secretEnv: 'S3_SLASHES_PATH_SECRET' },
+    { group: 'unnamed-2026', secretEnv: null },
+    { group: 'empty-name-2026', secretEnv: null },
+  ]);
+});
+
+test('describeMissingTesterSecrets names each unset variable with its group, or the unnamed group', () => {
+  assert.equal(
+    describeMissingTesterSecrets([
+      { group: 'unset-2026', secretEnv: 'S3_UNSET_PATH_SECRET' },
+      { group: 'unnamed-2026', secretEnv: null },
+    ]),
+    'S3_UNSET_PATH_SECRET is unset (tester group "unset-2026"); ' +
+      'tester group "unnamed-2026" declares no "testerSecretEnv"'
+  );
 });
 
 test('resolveChannelConfig prefers a declared channels entry over the scalar default', () => {
@@ -75,8 +185,9 @@ test('resolveChannelConfig falls back to the scalar default when no channels map
   const legacy = { moduleId: 'fabricate', channel: 'beta', testerGroups: ['closed-beta-2026'] };
   const resolved = resolveChannelConfig(legacy, 'beta');
   assert.equal(resolved.source, 'default');
-  assert.deepEqual(resolved.testerGroups, ['closed-beta-2026']);
-  assert.equal(resolved.testerSecretEnv, 'S3_TESTER_PATH_SECRET');
+  assert.deepEqual(resolved.testers, [
+    { group: 'closed-beta-2026', testerSecretEnv: 'S3_TESTER_PATH_SECRET' },
+  ]);
   // …and only for the channel it names.
   assert.equal(resolveChannelConfig(legacy, 'early-access').source, 'undeclared');
 });
@@ -407,10 +518,13 @@ async function makeHarness({
   const calls = { build: 0, zip: 0 };
   // Patched by runWithBuild, so a test can hand main() a manifest the build should have refused.
   let manifestPatch = {};
+  // The stub build's tree holds whichever commit the run names, so `--source-sha` always matches.
+  let treeSha = null;
 
   const deps = {
     log: () => {},
     stagingDir: join(dir, 'staging'),
+    resolveTreeSha: () => treeSha,
     build: async ({ version }) => {
       calls.build += 1;
       return {
@@ -444,12 +558,15 @@ async function makeHarness({
     }),
   };
 
-  const run = (...flags) =>
-    main({
+  const run = (...flags) => {
+    const at = flags.indexOf('--source-sha');
+    treeSha = at === -1 ? null : flags[at + 1];
+    return main({
       argv: ['node', 'release-s3.js', '--config', configPath, ...flags],
       env: { S3_TESTER_PATH_SECRET: 'seg' },
       deps,
     });
+  };
 
   /** Run with the built manifest patched — e.g. a field the build left empty. */
   const runWithBuild = (patch, ...flags) => {
@@ -457,7 +574,7 @@ async function makeHarness({
     return run(...flags);
   };
 
-  return { run, runWithBuild, puts, gets, calls, configPath };
+  return { run, runWithBuild, puts, gets, calls, configPath, deps };
 }
 
 // Issue 1565, in the file that owns the "ZERO PutObject" invariant.
@@ -609,59 +726,66 @@ test('main() --check-heads fails when the guard would refuse', async () => {
   );
 });
 
-test('main() refuses to publish a channel whose tester secret is unset', async () => {
+test('main() refuses before building when any tester group of the channel has no secret set', async () => {
   const harness = await makeHarness();
-  await assert.rejects(
+  const publishEarlyAccess = (env) =>
     main({
-      argv: [
-        'node',
-        'release-s3.js',
-        '--config',
-        harness.configPath,
-        '--version',
-        '1.4.0',
-        '--channel',
-        'early-access',
-      ],
-      // The BETA secret is set; early-access's own secret is not. It must refuse rather than reuse
-      // the beta path.
-      env: { S3_TESTER_PATH_SECRET: 'seg' },
-      deps: { log: () => {} },
-    }),
-    /S3_GUILD_ARTISAN_PATH_SECRET is unset/
+      argv: ['node', 'release-s3.js', '--config', harness.configPath, '--version', '1.4.0', '--channel', 'early-access'],
+      env,
+      deps: harness.deps,
+    });
+
+  // The beta secret is set; neither early-access secret is. It must refuse rather than reuse the
+  // beta path, naming every unset variable and the group it serves.
+  await assert.rejects(publishEarlyAccess({ S3_TESTER_PATH_SECRET: 'seg' }), (error) => {
+    assert.match(error.message, /S3_APPRENTICE_PATH_SECRET is unset \(tester group "apprentice-crafter-2026"\)/);
+    assert.match(error.message, /S3_GUILD_ARTISAN_PATH_SECRET is unset \(tester group "guild-artisan-2026"\)/);
+    return true;
+  });
+  // One group's secret set is not enough: the other group would otherwise go unserved.
+  await assert.rejects(
+    publishEarlyAccess({ S3_GUILD_ARTISAN_PATH_SECRET: 'ga-seg' }),
+    (error) =>
+      /S3_APPRENTICE_PATH_SECRET is unset/.test(error.message) &&
+      !error.message.includes('S3_GUILD_ARTISAN_PATH_SECRET')
   );
+  assert.equal(harness.calls.build, 0, 'the refusal must precede the build');
   assert.deepEqual(harness.puts, []);
 });
 
 test('main() refuses a channel that declares tester groups but no testerSecretEnv', async () => {
-  // The other arm of the same refusal — a plausible mistake when adding a second cohort.
-  const dir = await mkdtemp(join(tmpdir(), 'fabricate-release-s3-'));
-  const configPath = join(dir, 'release.s3.config.json');
-  await writeFile(
-    configPath,
-    JSON.stringify({
-      ...CONFIG,
-      channels: { ...CONFIG.channels, 'early-access': { testerGroups: ['patrons-2027'] } },
-    })
-  );
+  // The other arm of the same refusal — a plausible mistake when adding a second cohort — in both
+  // shapes: an object entry naming no secret, and the legacy array with no channel-level secret.
+  const shapes = {
+    object: {
+      'guild-artisan-2026': { testerSecretEnv: 'S3_GUILD_ARTISAN_PATH_SECRET' },
+      'patrons-2027': {},
+    },
+    legacy: ['patrons-2027'],
+  };
+  for (const [shape, testerGroups] of Object.entries(shapes)) {
+    const dir = await mkdtemp(join(tmpdir(), 'fabricate-release-s3-'));
+    const configPath = join(dir, 'release.s3.config.json');
+    const channels = { ...CONFIG.channels, 'early-access': { testerGroups } };
+    await writeFile(configPath, JSON.stringify({ ...CONFIG, channels }));
+    let builds = 0;
 
-  await assert.rejects(
-    main({
-      argv: [
-        'node',
-        'release-s3.js',
-        '--config',
-        configPath,
-        '--version',
-        '1.5.0',
-        '--channel',
-        'early-access',
-      ],
-      env: { S3_TESTER_PATH_SECRET: 'seg', S3_GUILD_ARTISAN_PATH_SECRET: 'ea-seg' },
-      deps: { log: () => {} },
-    }),
-    /declares no "testerSecretEnv"/
-  );
+    await assert.rejects(
+      main({
+        argv: ['node', 'release-s3.js', '--config', configPath, '--version', '1.5.0', '--channel', 'early-access'],
+        env: { S3_TESTER_PATH_SECRET: 'seg', S3_GUILD_ARTISAN_PATH_SECRET: 'ea-seg' },
+        deps: {
+          log: () => {},
+          build: () => {
+            builds += 1;
+          },
+        },
+      }),
+      /tester group "patrons-2027" declares no "testerSecretEnv"/,
+      `the ${shape} shape`
+    );
+    assert.equal(builds, 0, `the ${shape} shape built before refusing`);
+  }
 });
 
 test('runCheckHeads reads every private target of the channel it is asked about', async () => {
@@ -671,7 +795,7 @@ test('runCheckHeads reads every private target of the channel it is asked about'
     version: '1.5.0',
     channel: 'early-access',
     deps: {
-      env: { S3_GUILD_ARTISAN_PATH_SECRET: 'ea-seg' },
+      env: { S3_APPRENTICE_PATH_SECRET: 'ap-seg', S3_GUILD_ARTISAN_PATH_SECRET: 'ea-seg' },
       createS3Client: async () => ({
         getObject: async (key) => {
           gets.push(key);
@@ -683,45 +807,153 @@ test('runCheckHeads reads every private target of the channel it is asked about'
 
   assert.deepEqual(gets, [
     'modules/fabricate/early-access/latest/module.json',
+    'testers/apprentice-crafter-2026/ap-seg/fabricate/module.json',
     'testers/guild-artisan-2026/ea-seg/fabricate/module.json',
   ]);
   assert.equal(report.safety.ok, true);
 });
 
+// Issue 1988 — republishing an already-published version after a tester group is added
+
+const EA_CHANNEL_MANIFEST = 'modules/fabricate/early-access/latest/module.json';
+const zipKeyOf = (prefix, version) => `${prefix}/versions/${version}/fabricate-${version}.zip`;
+const APPRENTICE_PREFIX = 'testers/apprentice-crafter-2026/ap-seg/fabricate';
+
+/** The early-access declaration v1.11.0 was first published under: guild-artisan alone. */
+const ONE_GROUP_CONFIG = {
+  ...CONFIG,
+  channels: {
+    ...CONFIG.channels,
+    'early-access': {
+      testerGroups: ['guild-artisan-2026'],
+      testerSecretEnv: 'S3_GUILD_ARTISAN_PATH_SECRET',
+    },
+  },
+};
+
+/** An S3 double that remembers every write, zip provenance included, across runs. */
+function rememberingBucket() {
+  const objects = new Map();
+  const puts = [];
+  return {
+    puts,
+    createS3Client: async () => ({
+      headObject: async (key) => {
+        const object = objects.get(key);
+        return object ? { etag: `etag-${key}`, size: 1, metadata: object.metadata } : null;
+      },
+      getObject: async (key) => {
+        const object = objects.get(key);
+        return object
+          ? { status: 200, body: object.body, etag: `etag-${key}` }
+          : { status: 404, body: null };
+      },
+      putObject: async ({ key, body, metadata }) => {
+        objects.set(key, { body: typeof body === 'string' ? body : null, metadata: metadata ?? {} });
+        puts.push(key);
+      },
+    }),
+  };
+}
+
+test('adding a tester group and republishing the same build writes only the added group', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'fabricate-release-s3-republish-'));
+  const distDir = join(dir, 'dist');
+  await mkdir(distDir, { recursive: true });
+  const bucket = rememberingBucket();
+  const env = { S3_APPRENTICE_PATH_SECRET: 'ap-seg', S3_GUILD_ARTISAN_PATH_SECRET: 'ga-seg' };
+
+  let runs = 0;
+  const publish = async (config, sourceSha, log = () => {}) => {
+    runs += 1;
+    const configPath = join(dir, `config-${runs}.json`);
+    await writeFile(configPath, JSON.stringify(config));
+    return main({
+      argv: ['node', 'release-s3.js', '--config', configPath, '--version', '1.11.0', '--channel', 'early-access', '--source-sha', sourceSha],
+      env,
+      deps: {
+        log,
+        stagingDir: join(dir, 'staging'),
+        resolveTreeSha: () => sourceSha,
+        build: async ({ version }) => ({
+          distDir,
+          manifest: { id: 'fabricate', title: 'Fabricate', version, compatibility: { minimum: '13' } },
+        }),
+        zip: (_from, to) => writeFileSync(to, 'zip-bytes'),
+        assertArchiveChunks: () => {},
+        createS3Client: bucket.createS3Client,
+      },
+    });
+  };
+
+  // v1.11.0 as it went out: the channel and the one guild-artisan tester target.
+  await publish(ONE_GROUP_CONFIG, 'S');
+  assert.equal(bucket.puts.length, 4, 'the first publish writes two zips and two manifests');
+  bucket.puts.length = 0;
+
+  const result = await publish(CONFIG, 'S');
+
+  assert.deepEqual(
+    Object.fromEntries(result.safety.decisions.map(({ label, decision }) => [label, decision])),
+    {
+      'channel-early-access': 'allow-resume',
+      'tester-apprentice-crafter-2026': 'allow-no-head',
+      'tester-guild-artisan-2026': 'allow-resume',
+    }
+  );
+  assert.deepEqual(bucket.puts, [zipKeyOf(APPRENTICE_PREFIX, '1.11.0'), `${APPRENTICE_PREFIX}/module.json`]);
+  assert.ok(!bucket.puts.includes(EA_CHANNEL_MANIFEST));
+
+  // The same version from a different build is a content swap on the targets that already carry it.
+  bucket.puts.length = 0;
+  await assert.rejects(publish(CONFIG, 'T'), /already-published immutable artefact/);
+  assert.deepEqual(bucket.puts, [], 'a provenance refusal must write nothing, not even the new group');
+});
+
 // 1.2 — the shipped release.s3.config.json
 
-test('the shipped config declares the three channels, each with its own cohort and secret', async () => {
-  const shipped = JSON.parse(await readFile(join(ROOT, 'release.s3.config.json'), 'utf8'));
+const readShipped = async () =>
+  JSON.parse(await readFile(join(ROOT, 'release.s3.config.json'), 'utf8'));
+
+test('the shipped config declares the three channels, each group with its own secret', async () => {
+  const shipped = await readShipped();
 
   assert.deepEqual(resolveChannelConfig(shipped, 'beta'), {
     channel: 'beta',
     testerGroups: ['closed-beta-2026'],
-    testerSecretEnv: 'S3_TESTER_PATH_SECRET',
+    testers: [{ group: 'closed-beta-2026', testerSecretEnv: 'S3_TESTER_PATH_SECRET' }],
     source: 'declared',
   });
   assert.deepEqual(resolveChannelConfig(shipped, 'early-access'), {
     channel: 'early-access',
-    testerGroups: ['guild-artisan-2026'],
-    testerSecretEnv: 'S3_GUILD_ARTISAN_PATH_SECRET',
+    testerGroups: ['apprentice-crafter-2026', 'guild-artisan-2026'],
+    testers: EARLY_ACCESS_TESTERS,
     source: 'declared',
   });
-  assert.deepEqual(resolveChannelConfig(shipped, 'public').testerGroups, []);
+  // An empty array, not `{}`: a publisher predating per-group secrets spreads it without crashing.
+  assert.deepEqual(shipped.channels.public.testerGroups, []);
 
   // The scalar defaults stay, and stay in agreement with the map.
   assert.equal(shipped.channel, 'beta');
   assert.deepEqual(shipped.testerGroups, ['closed-beta-2026']);
 });
 
+/** Every tester group the shipped config resolves, across every channel it names. */
+function shippedTesters(shipped) {
+  const channels = [...new Set([...Object.keys(shipped.channels), shipped.channel])];
+  return channels.flatMap((channel) =>
+    resolveChannelConfig(shipped, channel).testers.map((tester) => ({ channel, ...tester }))
+  );
+}
+
 test('the shipped config names no superseded tester group and no superseded secret', async () => {
   // Every OTHER assertion in this file runs against the synthetic local CONFIG, so all of them stay
   // green if the shipped file is never touched.
-  const shipped = JSON.parse(await readFile(join(ROOT, 'release.s3.config.json'), 'utf8'));
-  const channels = Object.values(shipped.channels);
-
-  const groups = [...(shipped.testerGroups ?? []), ...channels.flatMap((c) => c.testerGroups ?? [])];
-  const secrets = channels.map((c) => c.testerSecretEnv).filter(Boolean);
+  const testers = shippedTesters(await readShipped());
+  const groups = testers.map(({ group }) => group);
+  const secrets = testers.map(({ testerSecretEnv }) => testerSecretEnv).filter(Boolean);
   // Non-vacuity: a config that declared no group and no secret would satisfy every sweep below.
-  assert.ok(groups.length > 0 && secrets.length > 0, 'the shipped config declares no tester feed');
+  assert.ok(groups.length >= 3 && secrets.length >= 3, 'the shipped config declares too few tester feeds');
 
   assert.ok(
     !groups.includes('patrons-2026'),
@@ -738,45 +970,51 @@ test('the shipped config names no superseded tester group and no superseded secr
   }
 });
 
-test('every channel in the shipped config declares at most ONE tester group', async () => {
-  // release-s3.js resolves ONE segment per channel and applies it to every group in the array, so a
-  // second entry would silently share the first's segment.
-  const shipped = JSON.parse(await readFile(join(ROOT, 'release.s3.config.json'), 'utf8'));
+test('every shipped tester group names its own secret, distinct from its channel siblings', async () => {
+  // A channel's groups sharing one secret would share one segment, collapsing two cohorts onto
+  // one prefix; release-s3.js resolves a segment per group precisely so they need not.
+  const shipped = await readShipped();
 
-  let withGroups = 0;
-  for (const [channel, config] of Object.entries(shipped.channels)) {
-    const declared = config.testerGroups ?? [];
+  const byChannel = new Map();
+  for (const { channel, group, testerSecretEnv } of shippedTesters(shipped)) {
     assert.ok(
-      declared.length <= 1,
-      `channel "${channel}" declares ${declared.length} tester groups (${declared.join(', ')}); ` +
-        'they would share one segment, so give each its own channel or accept the shared prefix here'
+      typeof testerSecretEnv === 'string' && testerSecretEnv.trim() !== '',
+      `tester group "${group}" on channel "${channel}" names no secret`
     );
-    if (declared.length === 1) {
-      withGroups += 1;
-      assert.ok(config.testerSecretEnv, `channel "${channel}" declares a group but no secret`);
-    }
+    const siblings = byChannel.get(channel) ?? new Map();
+    const sharer = [...siblings].find(([other, secret]) => other !== group && secret === testerSecretEnv);
+    assert.ok(!sharer, `"${group}" and "${sharer?.[0]}" on "${channel}" share ${testerSecretEnv}`);
+    siblings.set(group, testerSecretEnv);
+    byChannel.set(channel, siblings);
   }
-  assert.equal(withGroups, 2, 'beta and early-access are the two channels with a tester cohort');
+  assert.deepEqual(
+    resolveChannelConfig(shipped, 'early-access').testerGroups.toSorted(),
+    ['apprentice-crafter-2026', 'guild-artisan-2026'],
+    'early-access serves exactly the two early-access Patreon cohorts'
+  );
 });
 
-test('early-access derives its tester feed from the guild-artisan group, never the old one', async () => {
-  const shipped = JSON.parse(await readFile(join(ROOT, 'release.s3.config.json'), 'utf8'));
-  const resolved = resolveChannelConfig(shipped, 'early-access');
+test('early-access derives a tester feed for both cohorts, each at its own segment', async () => {
+  const shipped = await readShipped();
+  const { testers } = resolveTesterSegments(resolveChannelConfig(shipped, 'early-access'), {
+    S3_APPRENTICE_PATH_SECRET: 'ap-seg',
+    S3_GUILD_ARTISAN_PATH_SECRET: 'ga-seg',
+  });
 
   const layout = deriveS3Layout({
     moduleId: shipped.moduleId,
     channel: 'early-access',
     version: '1.4.0',
     baseUrl: shipped.baseUrl,
-    testerGroups: resolved.testerGroups,
-    testerSegment: 'ea-seg',
+    testers,
   });
 
   assert.deepEqual(
     layout.targets.map((t) => t.manifestKey),
     [
       'modules/fabricate/early-access/latest/module.json',
-      'testers/guild-artisan-2026/ea-seg/fabricate/module.json',
+      'testers/apprentice-crafter-2026/ap-seg/fabricate/module.json',
+      'testers/guild-artisan-2026/ga-seg/fabricate/module.json',
     ]
   );
   assert.ok(
@@ -786,7 +1024,7 @@ test('early-access derives its tester feed from the guild-artisan group, never t
 });
 
 test('a hotfix channel is undeclared, so its ONLY target is its own sources feed', async () => {
-  const shipped = JSON.parse(await readFile(join(ROOT, 'release.s3.config.json'), 'utf8'));
+  const shipped = await readShipped();
   const resolved = resolveChannelConfig(shipped, '1.4.x');
 
   assert.equal(resolved.source, 'undeclared');

@@ -23,7 +23,7 @@ const FABRICATE = 'mistersilver-uk/fabricate';
 const PREMIUM = 'mistersilver-uk/fabricate-premium';
 const BASE_URL = 'https://cdn.example/base';
 
-/** This repository's schema: one `testerSecretEnv` per channel, against an array of groups. */
+/** The legacy array schema: one `testerSecretEnv` per channel, shared by every group. */
 const FABRICATE_CONFIG = {
   moduleId: 'fabricate',
   baseUrl: BASE_URL,
@@ -37,7 +37,7 @@ const FABRICATE_CONFIG = {
   },
 };
 
-/** The premium repository's schema: one `testerSecretEnv` per group. The asymmetry is deliberate. */
+/** The premium repository's schema: one `testerSecretEnv` per group, as this one's now is. */
 const PREMIUM_CONFIG = {
   channels: {
     beta: {
@@ -95,6 +95,8 @@ function countingSegments() {
   };
 }
 
+const groupNamesOf = (secret) => secret?.groups.map(({ name }) => name);
+
 const collectLog = () => {
   const lines = [];
   return { lines, log: (line) => lines.push(String(line)) };
@@ -137,16 +139,37 @@ test('the plan covers exactly the tester feeds the shipped config resolves to', 
   const channels = [...new Set([...Object.keys(shipped.channels), shipped.channel])];
   const feeds = (list) => list.map(({ group, secretEnv }) => `${group}=${secretEnv}`).sort();
 
-  const published = channels.flatMap((channel) => {
-    const { testerGroups, testerSecretEnv } = resolveChannelConfig(shipped, channel);
-    return testerGroups.map((group) => ({ group, secretEnv: testerSecretEnv }));
-  });
+  const published = channels.flatMap((channel) =>
+    resolveChannelConfig(shipped, channel).testers.map(({ group, testerSecretEnv }) => ({
+      group,
+      secretEnv: testerSecretEnv,
+    }))
+  );
   const planned = planRotation({ fabricateConfig: shipped, premiumConfig: null }).secrets.flatMap(
     (secret) => secret.groups.map(({ name }) => ({ group: name, secretEnv: secret.name }))
   );
 
-  assert.ok(published.length >= 2, 'the shipped config resolves fewer tester feeds than it declares');
+  assert.ok(published.length >= 3, 'the shipped config resolves fewer tester feeds than it declares');
   assert.deepEqual(feeds(planned), feeds(published));
+});
+
+test('the shipped config rotates every early-access secret in both repositories', () => {
+  // Both Patreon cohorts receive this module and the premium modules, so each group's secret is
+  // one prefix shared by the two repositories and must be written to both in one rotation.
+  const shipped = JSON.parse(
+    readFileSync(path.join(REPOSITORY_ROOT, 'release.s3.config.json'), 'utf8')
+  );
+  const { secrets } = planRotation({ fabricateConfig: shipped, premiumConfig: PREMIUM_CONFIG });
+  const bySecret = Object.fromEntries(secrets.map((secret) => [secret.name, secret]));
+
+  for (const [name, group] of [
+    ['S3_APPRENTICE_PATH_SECRET', 'apprentice-crafter-2026'],
+    ['S3_GUILD_ARTISAN_PATH_SECRET', 'guild-artisan-2026'],
+  ]) {
+    assert.deepEqual(bySecret[name]?.repositories, [FABRICATE, PREMIUM], `${name} repositories`);
+    assert.deepEqual(groupNamesOf(bySecret[name]), [group], `${name} serves ${group} alone`);
+    assert.ok(bySecret[name].groups[0].modules.includes('fabricate'), `${group} is fed this module`);
+  }
 });
 
 test('the plan warns that a shared secret collapses whatever prefixes the repositories hold now', () => {

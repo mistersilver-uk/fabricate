@@ -408,3 +408,71 @@ test('the shipped release.s3.config.json declares an early-access identity the g
   assert.match(drift.summary, /patrons-2026/);
   assert.match(drift.summary, /S3_GUILD_ARTISAN_PATH_SECRET/);
 });
+
+// Issue 1988: per-group secrets. `release` keeps the legacy array until a promotion carries the new
+// shape there, so the same declaration in either shape must read as agreement, not drift.
+
+const PER_GROUP = {
+  moduleId: 'fabricate',
+  channels: {
+    'early-access': {
+      testerGroups: {
+        'apprentice-crafter-2026': { testerSecretEnv: 'S3_APPRENTICE_PATH_SECRET' },
+        'guild-artisan-2026': { testerSecretEnv: 'S3_GUILD_ARTISAN_PATH_SECRET' },
+      },
+    },
+  },
+};
+
+test('the same group/secret pairs in the legacy and the per-group shape are not drift', () => {
+  const drift = evaluateTesterConfigDrift({
+    channel: 'early-access',
+    dispatchConfig: {
+      moduleId: 'fabricate',
+      channels: {
+        'early-access': {
+          testerGroups: { 'guild-artisan-2026': { testerSecretEnv: 'S3_GUILD_ARTISAN_PATH_SECRET' } },
+        },
+      },
+    },
+    publisherConfig: configWith(ROTATED),
+  });
+  assert.equal(drift.drifted, false, drift.summary);
+});
+
+test('a group added on one ref is drift, and the summary names every pair on both sides', () => {
+  const drift = evaluateTesterConfigDrift({
+    channel: 'early-access',
+    dispatchConfig: PER_GROUP,
+    publisherConfig: configWith(ROTATED),
+  });
+  assert.equal(drift.drifted, true);
+  assert.match(drift.summary, /apprentice-crafter-2026 via S3_APPRENTICE_PATH_SECRET/);
+  assert.match(drift.summary, /guild-artisan-2026 via S3_GUILD_ARTISAN_PATH_SECRET\].*origin\/release/);
+});
+
+test('two groups swapping their secrets is drift, though the names and secrets are unchanged', () => {
+  const swapped = structuredClone(PER_GROUP);
+  const groups = swapped.channels['early-access'].testerGroups;
+  groups['apprentice-crafter-2026'].testerSecretEnv = 'S3_GUILD_ARTISAN_PATH_SECRET';
+  groups['guild-artisan-2026'].testerSecretEnv = 'S3_APPRENTICE_PATH_SECRET';
+  const drift = evaluateTesterConfigDrift({
+    channel: 'early-access',
+    dispatchConfig: PER_GROUP,
+    publisherConfig: swapped,
+  });
+  assert.equal(drift.drifted, true);
+});
+
+test('a declaration the resolver cannot read is drift, never agreement', () => {
+  const unreadable = { channels: { 'early-access': { testerGroups: 'guild-artisan-2026' } } };
+  for (const [dispatchConfig, publisherConfig] of [
+    [PER_GROUP, unreadable],
+    [unreadable, PER_GROUP],
+    [unreadable, unreadable],
+  ]) {
+    const drift = evaluateTesterConfigDrift({ channel: 'early-access', dispatchConfig, publisherConfig });
+    assert.equal(drift.drifted, true);
+    assert.match(drift.summary, /unreadable tester declaration/);
+  }
+});
