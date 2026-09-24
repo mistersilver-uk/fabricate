@@ -75,12 +75,13 @@ const SCAN_TOTALS = Object.freeze({
   // It then moved eight item-source lines into `manager/itemSources.js` (+1 file);
   // pairs/collisions re-derived. Ten tool-source lines moved to `manager/toolSources.js` (+1 file).
   // Five bulk-edit lines moved to `manager/bulkEdits.js` (+1 file).
+  // Eight delete-cascade lines moved to `manager/deleteCascades.js` (+1 file).
   matches: 168,
   lines: 153,
-  files: 25,
-  pairs: 134,
-  collisionGroups: 15,
-  collisionSites: 34,
+  files: 26,
+  pairs: 135,
+  collisionGroups: 14,
+  collisionSites: 32,
 });
 
 /**
@@ -158,11 +159,12 @@ const LEDGER = Object.freeze([
   ['src/systems/manager/toolSources.js', "system.tools = tools.filter((entry) => String(entry?.id) !== String(toolId));", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "? updates.essenceDefinitions", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', ": current.essenceDefinitions,", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const components = Array.isArray(system.components) ? system.components : [];", 2, 'pre-persist+writer'],
-  ['src/systems/CraftingSystemManager.js', "const componentCount = Array.isArray(system.components)", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "? system.components.length", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const essenceCount = Array.isArray(system.essenceDefinitions)", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "? system.essenceDefinitions.length", 1, 'writer'],
+  ['src/systems/CraftingSystemManager.js', "const components = Array.isArray(system.components) ? system.components : [];", 1, 'pre-persist'],
+  // #1923: the system delete's writer reads, moved to `manager/deleteCascades.js`.
+  ['src/systems/manager/deleteCascades.js', "const componentCount = Array.isArray(system.components)", 1, 'writer'],
+  ['src/systems/manager/deleteCascades.js', "? system.components.length", 1, 'writer'],
+  ['src/systems/manager/deleteCascades.js', "const essenceCount = Array.isArray(system.essenceDefinitions)", 1, 'writer'],
+  ['src/systems/manager/deleteCascades.js', "? system.essenceDefinitions.length", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "system.components.push(item);", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "advanceDefinitionRevision(system.components);", 2, 'writer'],
   ['src/systems/CraftingSystemManager.js', "(system.components || []).find((item) => {", 1, 'writer'],
@@ -191,9 +193,11 @@ const LEDGER = Object.freeze([
   ['src/systems/manager/bulkEdits.js', "const component = system.components[idx];", 1, 'writer'],
   ['src/systems/manager/bulkEdits.js', "system.components[idx] = io.normalizeComponent(", 1, 'writer'],
   ['src/systems/manager/bulkEdits.js', "if (changedIds.length > 0) advanceDefinitionRevision(system.components);", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "system.components = components.filter(", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const essenceDefinitions = (system.essenceDefinitions || []).map((def) => ({", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "system.essenceDefinitions = essenceDefinitions;", 1, 'writer'],
+  // #1923: the component-set delete's writer reads, moved to `manager/deleteCascades.js`.
+  ['src/systems/manager/deleteCascades.js', "const components = Array.isArray(system.components) ? system.components : [];", 1, 'writer'],
+  ['src/systems/manager/deleteCascades.js', "system.components = components.filter(", 1, 'writer'],
+  ['src/systems/manager/deleteCascades.js', "const essenceDefinitions = (system.essenceDefinitions || []).map((def) => ({", 1, 'writer'],
+  ['src/systems/manager/deleteCascades.js', "system.essenceDefinitions = essenceDefinitions;", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];", 2, 'writer'],
   // #1923: the essence bulk edit's third copy of the line above, moved to `manager/bulkEdits.js`.
   ['src/systems/manager/bulkEdits.js', "const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];", 1, 'writer'],

@@ -23,7 +23,7 @@ src/systems/CraftingEngine.js::executeVersionedStage	190
 src/systems/CraftingLifecycleExecutor.js::execute	120
 src/systems/CraftingRunManager.js	1150
 src/systems/CraftingSystemExporter.js::prepareForImport	130
-src/systems/CraftingSystemManager.js	2600
+src/systems/CraftingSystemManager.js	2200
 src/systems/CraftingSystemManager.js::updateSystem	120
 src/systems/GatheringEngine.js	5800
 src/systems/GatheringEngine.js::_postGatheringChatMessage	120

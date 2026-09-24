@@ -4,7 +4,7 @@ src/systems/CoinSpenders.js	2
 src/systems/CompendiumImporter.js	2
 src/systems/CraftingEngine.js	64
 src/systems/CraftingRunManager.js	9
-src/systems/CraftingSystemManager.js	24
+src/systems/CraftingSystemManager.js	19
 src/systems/FragmentDiscoveryHook.js	3
 src/systems/RecipeManager.js	19
 src/systems/RecipeVisibilityService.js	1
