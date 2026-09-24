@@ -43,6 +43,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
       // `SystemsBrowserView` alone (issue 1515).
       /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -84,6 +85,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -101,6 +103,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -158,6 +161,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/,
     ],
   }),
   managerCase({

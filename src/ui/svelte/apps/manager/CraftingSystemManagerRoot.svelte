@@ -2,7 +2,6 @@
 <script>
   import { onDestroy, untrack } from 'svelte';
   import GatheringInspectorRail from './environment/GatheringInspectorRail.svelte';
-  import Chip from '../../components/Chip.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import {
     DEFAULT_GATHERING_ENVIRONMENT_IMG,
@@ -108,6 +107,7 @@
   import ComponentAddFromCatalogueDialog from './scoped/ComponentAddFromCatalogueDialog.svelte';
   import ImportFolderMappingModal from './ImportFolderMappingModal.svelte';
   import ImportReportModal from './ImportReportModal.svelte';
+  import { createImportFlowModel } from './importFlowModel.svelte.js';
   import ManagerNavRail from './ManagerNavRail.svelte';
   import ManagerPageHeader from './ManagerPageHeader.svelte';
   import {
@@ -134,6 +134,7 @@
   } from '../../../../systems/checkModifierResolver.js';
   import RecipeEditView from './RecipeEditView.svelte';
   import { craftingEffect } from './crafting/craftingVisibility.js';
+  import SystemBrowserInspector from './SystemBrowserInspector.svelte';
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
   import TagsCategoriesView from './TagsCategoriesView.svelte';
@@ -386,13 +387,6 @@
   let recipeItemActiveTab = $state('overview');
   // World-item options fed to the recipe-item editor's Overview link picker.
   let worldItemOptions = $state([]);
-  // Folder-aware import mapping modal (issue 771): opened before a folder / whole-pack
-  // component drop commits, seeded with the per-folder groups the drop resolved to.
-  let importMappingOpen = $state(false);
-  let importMappingFolders = $state([]);
-  // Post-import reference report (issue 877): the store resolves the assembled
-  // `buildImportReportContent` output once a system import completes.
-  let importReportContent = $state(null);
   // `Add from catalogue to {system}` (issue 1371, M9): the system Component Rules list's header
   // action opens an IN-PLACE picker over the world catalogue rather than navigating anywhere.
   let componentAddFromCatalogueOpen = $state(false);
@@ -614,6 +608,12 @@
   const selectedSystem = $derived($viewState.selectedSystem);
   const selectedSystemId = $derived(selectedSystem?.id || '');
   const systemsLoading = $derived($viewState.systemsLoading === true);
+  // The system import report and the folder-aware component drop (issue 1721).
+  const importFlow = createImportFlowModel({
+    store: () => store,
+    services: () => services,
+    selectedSystemId: () => selectedSystemId,
+  });
   const canShowEnvironments = $derived(selectedSystem?.features?.gathering === true);
   const recipeMultiStepEnabled = $derived(selectedSystem?.features?.multiStepRecipes === true);
   // Complex recipes need a resolution mode that allows multiple ingredient/result
@@ -1256,11 +1256,6 @@
     componentCategories: componentCategoryRows.length,
     itemTags: tagRows.length,
   });
-  const selectedCountFacts = $derived(buildSelectedCountFacts(selectedCounts));
-  const enabledFeatureLabels = $derived(featureLabels(selectedSystem));
-  const selectedGatheringConditionShortcuts = $derived(
-    buildSelectedGatheringConditionShortcuts(selectedSystem, $viewState.gatheringConfig)
-  );
   // The ONE authored modifier library (issue 1117).
   const selectedSystemModifiers = $derived(
     Array.isArray($viewState.worldModifiers) ? $viewState.worldModifiers : []
@@ -3411,11 +3406,6 @@
     store.updateGatheringRules?.(selectedSystemId, updates);
   }
 
-  function updateSelectedGatheringCondition(kind, value) {
-    if (!selectedSystemId || !kind) return;
-    store.updateGatheringConditions?.({ [kind]: value, systemId: selectedSystemId });
-  }
-
   function formatCount(keySingular, fallbackSingular, keyPlural, fallbackPlural, count) {
     const key = count === 1 ? keySingular : keyPlural;
     const fallback = count === 1 ? fallbackSingular : fallbackPlural;
@@ -3491,113 +3481,6 @@
       titlebarOutcomeTierCount
     );
     return `${mode} · ${tiers}`;
-  }
-
-  function featureLabels(system) {
-    if (!system?.features) return [];
-    const featureMap = [
-      ['gathering', 'FABRICATE.Admin.Manager.Feature.Gathering', 'Gathering'],
-      ['essences', 'FABRICATE.Admin.Manager.Feature.Essences', 'Essences'],
-      [
-        'multiStepRecipes',
-        'FABRICATE.Admin.Manager.Feature.MultiStepRecipes',
-        'Multi-step recipes',
-      ],
-      ['craftingChecks', 'FABRICATE.Admin.Manager.Feature.CraftingChecks', 'Crafting checks'],
-      ['outcomeRouting', 'FABRICATE.Admin.Manager.Feature.OutcomeRouting', 'Outcome routing'],
-      ['effectTransfer', 'FABRICATE.Admin.Manager.Feature.EffectTransfer', 'Effect transfer'],
-      ['propertyMacros', 'FABRICATE.Admin.Manager.Feature.PropertyMacros', 'Property macros'],
-    ];
-    return featureMap
-      .filter(([key]) => system.features[key] === true)
-      .map(([, key, fallback]) => text(key, fallback));
-  }
-
-  function buildSelectedCountFacts(counts) {
-    const offLabel = text('FABRICATE.Admin.Manager.Off', 'Off');
-    return [
-      {
-        id: 'components',
-        label: text('FABRICATE.Admin.Manager.Column.Components', 'Components'),
-        value: counts.components,
-      },
-      {
-        id: 'recipes',
-        label: text('FABRICATE.Admin.Manager.Column.Recipes', 'Recipes'),
-        value: counts.recipes,
-      },
-      counts.environments == null
-        ? {
-            id: 'environments',
-            label: text('FABRICATE.Admin.Manager.GatheringEnvironments', 'Gathering environments'),
-            value: offLabel,
-            isOff: true,
-          }
-        : {
-            id: 'environments',
-            label: text('FABRICATE.Admin.Manager.GatheringEnvironments', 'Gathering environments'),
-            value: counts.environments,
-          },
-      {
-        id: 'essences',
-        label: text('FABRICATE.Admin.Manager.Nav.Essences', 'Essences'),
-        value: counts.essences,
-      },
-      {
-        id: 'item-tags',
-        label: text('FABRICATE.Admin.Manager.Feature.ItemTags', 'Item tags'),
-        value: counts.itemTags,
-      },
-      {
-        id: 'recipe-categories',
-        label: text('FABRICATE.Admin.Manager.Feature.RecipeCategories', 'Recipe categories'),
-        value: counts.recipeCategories,
-      },
-    ];
-  }
-
-  function buildSelectedGatheringConditionShortcuts(system, gatheringConfig) {
-    if (system?.features?.gathering !== true) return [];
-    const systemConditions = gatheringConfig?.systems?.[system.id]?.conditions || {};
-    return [
-      {
-        kind: 'timeOfDay',
-        icon: 'fas fa-clock',
-        label: text('FABRICATE.Admin.Manager.CurrentTimeOfDay', 'Current time of day'),
-        setting: systemConditions.timeOfDay || {
-          enabled: true,
-          current: gatheringConfig?.conditions?.timeOfDay || 'day',
-          values: gatheringConfig?.vocabularies?.timeOfDay || [],
-        },
-      },
-      {
-        kind: 'weather',
-        icon: 'fas fa-cloud-sun',
-        label: text('FABRICATE.Admin.Manager.CurrentWeather', 'Current weather'),
-        setting: systemConditions.weather || {
-          enabled: true,
-          current: gatheringConfig?.conditions?.weather || 'clear',
-          values: gatheringConfig?.vocabularies?.weather || [],
-        },
-      },
-    ].filter(
-      (condition) =>
-        condition.setting?.enabled !== false && conditionValues(condition.setting).length > 0
-    );
-  }
-
-  function conditionId(option) {
-    if (option && typeof option === 'object') return String(option.id || '').trim();
-    return String(option || '').trim();
-  }
-
-  function conditionLabel(option) {
-    if (option && typeof option === 'object') return String(option.label || option.id || '').trim();
-    return String(option || '').trim();
-  }
-
-  function conditionValues(setting) {
-    return Array.isArray(setting?.values) ? setting.values : [];
   }
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
@@ -4556,12 +4439,6 @@
     });
   }
 
-  // The store resolves the post-import report content (or null when the import was cancelled,
-  // failed, or skipped an existing system).
-  async function importSystem() {
-    importReportContent = (await store.importSystem?.()) ?? null;
-  }
-
   function exportSystem(systemId = selectedSystemId) {
     if (!systemId) return;
     store.exportSystem?.(systemId);
@@ -4585,27 +4462,6 @@
   // Enabling is GATED: an incomplete recipe (or one with a conflicting signature) is refused.
   function toggleRecipeEnabled(recipeId, enabled, options) {
     store.toggleRecipeEnabled?.(recipeId, enabled, options);
-  }
-
-  // A folder / whole-pack drop opens the mapping modal BEFORE importing so the GM can categorize +
-  // tag per folder.
-  async function dropComponent(data) {
-    const plan = (await services?.collectImportFolderGroups?.(data)) || null;
-    if (plan?.groups?.length) {
-      importMappingFolders = plan.groups;
-      importMappingOpen = true;
-      return;
-    }
-    // `handled` means the collector already notified (e.g. a compendium-directory folder groups
-    // packs, not items) and there is nothing to import — do NOT fall through to onDropItem.
-    if (plan?.handled) return;
-    services?.onDropItem?.(data);
-  }
-
-  async function commitImportFolderMapping(decisions) {
-    importMappingOpen = false;
-    if (!Array.isArray(decisions) || decisions.length === 0) return;
-    await services?.commitImportFolderMapping?.(selectedSystemId, decisions);
   }
 
   function editComponent(itemId = selectedComponent?.id) {
@@ -7127,18 +6983,6 @@
     });
   }
 
-  function countLabelParts(label) {
-    const normalized = String(label ?? '')
-      .trim()
-      .replace(/\s+/g, ' ');
-    const firstSpace = normalized.indexOf(' ');
-    if (firstSpace === -1) return { lead: normalized, rest: '' };
-    return {
-      lead: normalized.slice(0, firstSpace),
-      rest: normalized.slice(firstSpace + 1),
-    };
-  }
-
   // The page header's action ladder is a child component now, so every control it presses is a
   // named function here rather than a closure written at the call site.
   const backToWorldEssences = () => setView('world-essences');
@@ -7297,7 +7141,7 @@
     {createParty}
     {createTravelRealm}
     {backToSystemsBrowser}
-    {importSystem}
+    importSystem={importFlow.importSystem}
     {exportSelectedSystem}
     {createSystem}
     {createRecipe}
@@ -8047,7 +7891,7 @@
         dropEnabled={!!selectedSystemId && !!services?.onDropItem}
         onSearchChange={(term) => store.setItemSearch?.(term)}
         onSelectComponent={(id) => selectComponent(id)}
-        onDropComponent={(data) => dropComponent(data)}
+        onDropComponent={(data) => importFlow.dropComponent(data)}
         onEditComponent={(id) => editComponent(id)}
         onOpenWorldEntry={(route, entityId) => openWorldScopedEntry(route, entityId)}
         onSelectionCleared={() => componentBulk.announceCleared()}
@@ -8747,229 +8591,16 @@
             onToggleEnabled={(id, enabled) => store.setRecipeItemEnabled?.(id, enabled)}
             onToggleQuickLimit={(id, limited) => toggleRecipeItemQuickLimit(id, limited)}
           />
-        {:else if selectedSystem}
-          <section class="fabricate-card manager-inspector-card">
-            <div class="manager-inspector-title-row is-hero-large">
-              <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
-                <i class="fas fa-layer-group"></i>
-              </span>
-              <div class="manager-inspector-copy">
-                <p class="manager-kicker">
-                  {text('FABRICATE.Admin.Manager.Column.System', 'System')}
-                </p>
-                <h2 class="manager-inspector-name" title={selectedSystem.name}>
-                  {selectedSystem.name}
-                </h2>
-                <div class="manager-chip-row">
-                  <Chip tone="active">{resolutionModeLabel(selectedSystem.resolutionMode)}</Chip>
-                  <Chip tone={selectedSystem.enabled === false ? 'disabled' : 'active'}>
-                    {selectedSystem.enabled === false
-                      ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled')
-                      : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
-                  </Chip>
-                </div>
-              </div>
-            </div>
-
-            <p class="manager-muted">
-              {selectedSystem.description ||
-                text(
-                  'FABRICATE.Admin.Manager.NoDescriptionAdded',
-                  'No description has been added.'
-                )}
-            </p>
-          </section>
-
-          <section class="fabricate-card manager-inspector-card">
-            <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Counts', 'Counts')}</h3>
-            <div class="manager-fact-grid">
-              {#each selectedCountFacts as fact (fact.id)}
-                {@const labelParts = countLabelParts(fact.label)}
-                <div class="manager-fact" class:is-off={fact.isOff} data-count-id={fact.id}>
-                  {#if fact.isOff}
-                    <span class="manager-fact-line">
-                      <span class="manager-fact-label">{fact.label}</span>
-                      <strong class="is-disabled">{fact.value}</strong>
-                    </span>
-                  {:else}
-                    <!-- prettier-ignore -->
-                    <span class="manager-fact-line">
-                      <!-- `{' '}` is the separator between the leading span and the trailing label: -->
-                      <!-- a literal space is the first token inside the `{#if}` and Svelte trims -->
-                      <!-- block-leading whitespace, so the two would run together. -->
-                      <!-- The fence above preserves the LINE ANCHOR of the directive below, not -->
-                      <!-- the render (issue 923): Prettier splits the line below across three, -->
-                      <!-- which moves the mustache off the line the directive is anchored to, -->
-                      <!-- and the suppression stops applying. The durable guard for this whole -->
-                      <!-- class is `reportUnusedDisableDirectives: 'error'` in eslint.config.js. -->
-                      <!-- eslint-disable-next-line svelte/no-useless-mustaches -->
-                      <span class="manager-fact-leading"><strong>{fact.value}</strong> {labelParts.lead}</span>{#if labelParts.rest}{' '}<span class="manager-fact-label">{labelParts.rest}</span>{/if}
-                    </span>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          </section>
-
-          <section
-            class="fabricate-card manager-inspector-card"
-            aria-label={text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}
-          >
-            <h3 class="manager-card-title">
-              {text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}
-            </h3>
-            {#if enabledFeatureLabels.length > 0}
-              <div class="manager-feature-list">
-                {#each enabledFeatureLabels as feature (feature)}
-                  <Chip tone="active">{feature}</Chip>
-                {/each}
-              </div>
-            {:else}
-              <p class="manager-muted">
-                {text(
-                  'FABRICATE.Admin.Manager.NoOptionalFeatures',
-                  'No optional features enabled.'
-                )}
-              </p>
-            {/if}
-          </section>
-
-          {#if selectedGatheringConditionShortcuts.length > 0}
-            <section
-              class="fabricate-card manager-inspector-card manager-condition-shortcut-card"
-              data-systems-gathering-conditions
-              aria-label={text('FABRICATE.Admin.Manager.GlobalConditions', 'Global conditions')}
-            >
-              <h3 class="manager-card-title">
-                {text('FABRICATE.Admin.Manager.GlobalConditions', 'Global conditions')}
-              </h3>
-              <div class="manager-condition-shortcut-list">
-                {#each selectedGatheringConditionShortcuts as condition (condition.kind)}
-                  <label
-                    class="fabricate-field manager-field manager-condition-shortcut"
-                    data-systems-gathering-condition={condition.kind}
-                  >
-                    <span class="manager-condition-shortcut-label">
-                      <i class={condition.icon} aria-hidden="true"></i>
-                      <span>{condition.label}</span>
-                    </span>
-                    <select
-                      value={condition.setting.current}
-                      onchange={(event) =>
-                        updateSelectedGatheringCondition(condition.kind, event.currentTarget.value)}
-                    >
-                      {#each conditionValues(condition.setting) as option (conditionId(option))}
-                        <option value={conditionId(option)}>{conditionLabel(option)}</option>
-                      {/each}
-                    </select>
-                  </label>
-                {/each}
-              </div>
-            </section>
-          {/if}
-        {:else if systemsLoading}
-          <section
-            class="manager-setup-card"
-            aria-label={text(
-              'FABRICATE.Admin.Manager.LoadingSystems',
-              'Loading crafting systems...'
-            )}
-          >
-            <div class="manager-setup-card-header">
-              <i class="fas fa-spinner" aria-hidden="true"></i>
-              <div>
-                <p class="manager-kicker">
-                  {text('FABRICATE.Admin.Manager.LoadingSystemsKicker', 'Startup')}
-                </p>
-                <h3>
-                  {text('FABRICATE.Admin.Manager.LoadingSystems', 'Loading crafting systems...')}
-                </h3>
-              </div>
-            </div>
-            <p class="manager-muted">
-              {text(
-                'FABRICATE.Admin.Manager.LoadingSystemsHint',
-                'Fabricate is finishing startup before the system library is shown.'
-              )}
-            </p>
-          </section>
-        {:else if ($viewState.systems || []).length === 0}
-          <section
-            class="manager-setup-card"
-            aria-label={text(
-              'FABRICATE.Admin.Manager.EmptySetup.Title',
-              'Set up your first system'
-            )}
-          >
-            <div class="manager-setup-card-header">
-              <i class="fas fa-compass" aria-hidden="true"></i>
-              <div>
-                <p class="manager-kicker">
-                  {text('FABRICATE.Admin.Manager.EmptySetup.Kicker', 'First run')}
-                </p>
-                <h3>
-                  {text('FABRICATE.Admin.Manager.EmptySetup.Title', 'Set up your first system')}
-                </h3>
-              </div>
-            </div>
-            <p class="manager-muted">
-              {text(
-                'FABRICATE.Admin.Manager.EmptySetup.Hint',
-                'Create a crafting system, add item-backed components, then build recipes from those components.'
-              )}
-            </p>
-            <ol class="manager-setup-list">
-              <li>
-                {text(
-                  'FABRICATE.Admin.Manager.EmptySetup.StepSystem',
-                  'Create a system for one crafting discipline or ruleset.'
-                )}
-              </li>
-              <li>
-                {text(
-                  'FABRICATE.Admin.Manager.EmptySetup.StepComponents',
-                  'Import world or compendium items as reusable components.'
-                )}
-              </li>
-              <li>
-                {text(
-                  'FABRICATE.Admin.Manager.EmptySetup.StepRecipes',
-                  'Add recipes that consume components and award results.'
-                )}
-              </li>
-            </ol>
-            <div
-              class="manager-setup-links"
-              aria-label={text('FABRICATE.Admin.Manager.EmptySetup.Resources', 'Resources')}
-            >
-              <ManagerButton
-                tag="a"
-                href="https://mistersilver-uk.github.io/fabricate/help/quickstart"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <i class="fas fa-book-open" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.EmptySetup.Quickstart', 'Quickstart')}</span>
-              </ManagerButton>
-              <ManagerButton
-                tag="a"
-                href="https://mistersilver-uk.github.io/fabricate"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <i class="fas fa-circle-question" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.EmptySetup.Docs', 'Docs')}</span>
-              </ManagerButton>
-            </div>
-          </section>
         {:else}
-          <EmptyState
-            icon="fas fa-arrow-pointer"
-            title={text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
-            hint={text(
-              'FABRICATE.Admin.Manager.InspectorHint',
-              'The inspector shows counts, resolution mode, and enabled features for the selected system.'
-            )}
+          <SystemBrowserInspector
+            {store}
+            {selectedSystem}
+            {selectedSystemId}
+            {selectedCounts}
+            {systemsLoading}
+            systems={$viewState.systems}
+            gatheringConfig={$viewState.gatheringConfig}
+            {resolutionModeLabel}
           />
         {/if}
       </aside>
@@ -8977,19 +8608,19 @@
   </div>
 
   <ImportFolderMappingModal
-    open={importMappingOpen}
-    folders={importMappingFolders}
+    open={importFlow.importMappingOpen}
+    folders={importFlow.importMappingFolders}
     componentCategories={selectedSystem?.componentCategories || []}
     itemTags={selectedSystem?.itemTags || []}
     onAddCategory={addComponentCategory}
-    onCommit={commitImportFolderMapping}
-    onClose={() => (importMappingOpen = false)}
+    onCommit={importFlow.commitImportFolderMapping}
+    onClose={() => (importFlow.importMappingOpen = false)}
   />
 
   <ImportReportModal
-    open={importReportContent !== null}
-    content={importReportContent}
-    onClose={() => (importReportContent = null)}
+    open={importFlow.importReportContent !== null}
+    content={importFlow.importReportContent}
+    onClose={() => (importFlow.importReportContent = null)}
   />
 
   <!--
