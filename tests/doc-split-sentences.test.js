@@ -42,6 +42,8 @@ const DESTINATIONS = [
   '.agents/docs/foundry-and-architecture.md',
   // Issue #1984: the detailed final-delivery procedure moved out of always-loaded guidance.
   '.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md',
+  // Issue #1936: the workflow procedure moved out of AGENTS.md.
+  '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
 ];
 
 /**

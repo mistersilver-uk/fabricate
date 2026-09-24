@@ -24,7 +24,7 @@ export const UNTIERED_ROLE_TIERS = {
   fabricate_pr_explorer: 'small',
 };
 
-/** Paths whose touch forces `large`, mirroring the fenced list in `AGENTS.md`. */
+/** Paths whose touch forces `large`, mirroring the fenced list in `agentic-workflow.md`. */
 export const HIGH_RISK_PATHS = [
   'module.json',
   'package.json',

@@ -17,7 +17,8 @@ Make behavior changes here, not in the bindings.
 - relevant canonical specs under `openspec/specs/`
 - `openspec/specs/design-system/spec.md` when planning any UI-touching change, so the plan names the primitives it reuses and states explicitly which, if any, it extends or adds
 - the **Agent Roles & Bindings** table in `AGENTS.md` to resolve routing tokens to the provider agents that bind to these skills, together with its `Family` table for a model-tiered family
-- the **Model tier routing** section of `AGENTS.md` for the per-spawn selection ladder, its stage thresholds, the model-tier floors, the `HIGH_RISK_PATHS` list, and the `ESCALATE_TIER` protocol
+- the **Model tier routing** section of `AGENTS.md` for the per-spawn selection ladder and its stage thresholds, and the same section of `.agents/skills/fabricate-orchestrator/references/agentic-workflow.md` for the model-tier floors, the `HIGH_RISK_PATHS` list, and the `ESCALATE_TIER` protocol
+- `.agents/skills/fabricate-orchestrator/references/agentic-workflow.md` for the workflow procedure `AGENTS.md` links to: planning, proportionality, isolated worktrees, model-tier routing detail, the iteration loops, the final handoff, stop conditions, and confirming work
 - `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for isolated lane assignment, integration, artifacts, feedback, and cleanup
 - `.agents/skills/fabricate-orchestrator/references/foundry-smoke-lifecycle.md` for interrupted or stale per-worktree Foundry recovery and local/CI lifecycle semantics
 - `.agents/skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, or test seams
@@ -29,7 +30,7 @@ The **workflow driver** is the top-level loop — Codex's depth-0 prompt agent o
 A spawned `fabricate_orchestrator` is a read-only planning helper.
 It inspects the supplied repository and issue context, resolves the roster, and returns a complete draft or replacement `openspec-delta` managed block for the driver to apply.
 It never edits files, commits, pushes, manages worktrees, mutates GitHub state, or spawns another agent.
-Each loop runs one full round by default; the driver applies mechanical findings itself and spawns only disposition-only confirmation rounds at model tier `medium` after that, per `AGENTS.md`'s **Iteration cycles**; the 3-revision cap is the stop condition — at the cap, halt and surface findings to the user.
+Each loop runs one full round by default; the driver applies mechanical findings itself and spawns only disposition-only confirmation rounds at model tier `medium` after that, per the **Iteration cycles** in `.agents/skills/fabricate-orchestrator/references/agentic-workflow.md`; the 3-revision cap is the stop condition — at the cap, halt and surface findings to the user.
 Every spawned role uses the isolated lane lifecycle in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` by default.
 The driver retains exclusive authority over the coordinator checkout, integration, GitHub and remote mutations, authoritative gates, and lane cleanup.
 The numbered state-machine procedure belongs to the driver; a spawned helper performs only its read-only planning analysis and handoff portions from the context in its brief.
@@ -83,7 +84,7 @@ Keep the delta concrete, using the block's sections (`### Proposal`, `### Design
 7. **Plan review loop.** From a clean committed coordinator baseline, the driver may create detached planning and plan-review lanes using the preliminary roster derived from the current affected-file proposal; approval is not a prerequisite for these read-only lanes.
 The driver runs the plan-review agents in parallel against the issue delta.
 Each emits `APPROVED / NEEDS_CHANGES / BLOCKED` to the driver — reviewers do not post verdicts as issue or PR comments.
-The driver applies the mechanical findings to the delta block itself and re-spawns a reviewer only as a disposition-only confirmation round at model tier `medium`, per `AGENTS.md`'s **Iteration cycles**.
+The driver applies the mechanical findings to the delta block itself and re-spawns a reviewer only as a disposition-only confirmation round at model tier `medium`, per the **Iteration cycles** in `.agents/skills/fabricate-orchestrator/references/agentic-workflow.md`.
 Treat any `BLOCKED` verdict as a stop condition.
 Hard cap: 3 plan revisions before escalating.
 8. Update the visible plan with `update_plan` once every plan-review finding is applied or dispositioned.
@@ -92,7 +93,7 @@ For every spawn of a model-tiered family, resolve exactly one model tier first, 
 10. **Implementation review loop.** The driver hands off to the implementer with explicit file ownership; the implementer makes the canonical spec changes under `openspec/specs/` that the delta's `### Spec Deltas` require.
 When the implementer reports done, the driver runs `fabricate_reviewer` plus any post-implementation reviewers from the resolved roster, supplying them the issue delta alongside the diff.
 Reviewers compare the actual `openspec/specs/` diff against the proposed delta and confirm a faithful realization (or flag a justified deviation for reconciliation).
-Loop on `NEEDS_CHANGES` until every finding is applied, dispositioned by a confirmation round, or recorded as a Deviation, per `AGENTS.md`'s **Iteration cycles**.
+Loop on `NEEDS_CHANGES` until every finding is applied, dispositioned by a confirmation round, or recorded as a Deviation, per the **Iteration cycles** in `.agents/skills/fabricate-orchestrator/references/agentic-workflow.md`.
 Hard cap: 3 implementation revisions.
 11. **Documentation iteration loop.** If the change touches behaviour, public API, hooks, settings, or any JSDoc/Jekyll-documented surface, the driver runs the paired `fabricate_domain_expert` + `fabricate_docs_writer` loop:
 

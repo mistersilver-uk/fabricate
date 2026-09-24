@@ -584,20 +584,24 @@ test('12. a description naming all three model tiers is rejected for every model
   assert.deepEqual(untiered, []);
 });
 
-// 13. The AGENTS.md <-> module mirror ------------------------------------ `AGENTS.md` restates
-// HIGH_RISK_PATHS, the SMALL_MAX/MEDIUM_MAX table, the model pins, and the roster.
+// 13. The harness-document <-> module mirror ----------------------------- `AGENTS.md` restates
+// the SMALL_MAX/MEDIUM_MAX table and the roster; the agentic-workflow reference restates
+// HIGH_RISK_PATHS and the model pins.
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
-const AGENTS_MD = readFileSync(join(REPO_ROOT, 'AGENTS.md'), 'utf8');
+const AGENTS_PATH = 'AGENTS.md';
+const WORKFLOW_PATH = '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md';
+const AGENTS_MD = readFileSync(join(REPO_ROOT, AGENTS_PATH), 'utf8');
+const WORKFLOW_MD = readFileSync(join(REPO_ROOT, WORKFLOW_PATH), 'utf8');
 
 const unbacktick = (cell) => cell.replaceAll('`', '').trim();
 const firstInt = (cell) => Number.parseInt(/\d+/.exec(cell)?.[0] ?? '', 10);
 
 /** Read the GitHub-flavoured Markdown table whose header row satisfies `isHeader`. */
-function readMarkdownTable(md, isHeader, label) {
+function readMarkdownTable(doc, md, isHeader, label) {
   const lines = md.split('\n');
   const headerIndex = lines.findIndex((l) => l.trim().startsWith('|') && isHeader(l));
-  assert.ok(headerIndex >= 0, `AGENTS.md is missing the ${label} table`);
+  assert.ok(headerIndex >= 0, `${doc} is missing the ${label} table`);
   const rows = [];
   for (let i = headerIndex + 1; i < lines.length; i += 1) {
     if (!lines[i].trim().startsWith('|')) break;
@@ -609,7 +613,7 @@ function readMarkdownTable(md, isHeader, label) {
         .map((c) => c.trim())
     );
   }
-  assert.ok(rows.length > 0, `AGENTS.md ${label} table has no rows`);
+  assert.ok(rows.length > 0, `${doc} ${label} table has no rows`);
   return rows;
 }
 
@@ -617,14 +621,14 @@ function readMarkdownTable(md, isHeader, label) {
  * The fenced `HIGH_RISK_PATHS` block holds prose then a blank line then the list, so the entries
  * are the LAST blank-line-separated group.
  */
-function fencedHighRiskPaths(md) {
+function fencedHighRiskPaths(doc, md) {
   const marker = md.indexOf('**`HIGH_RISK_PATHS`.**');
-  assert.ok(marker >= 0, 'AGENTS.md is missing the HIGH_RISK_PATHS section');
+  assert.ok(marker >= 0, `${doc} is missing the HIGH_RISK_PATHS section`);
   const fenceStart = md.indexOf('```text', marker);
-  assert.ok(fenceStart >= 0, 'AGENTS.md HIGH_RISK_PATHS section has no fenced block');
+  assert.ok(fenceStart >= 0, `${doc} HIGH_RISK_PATHS section has no fenced block`);
   const bodyStart = md.indexOf('\n', fenceStart) + 1;
   const fenceEnd = md.indexOf('```', bodyStart);
-  assert.ok(fenceEnd > bodyStart, 'AGENTS.md HIGH_RISK_PATHS fence is unterminated');
+  assert.ok(fenceEnd > bodyStart, `${doc} HIGH_RISK_PATHS fence is unterminated`);
   const groups = md.slice(bodyStart, fenceEnd).trim().split(/\n\s*\n/);
   return groups[groups.length - 1]
     .split('\n')
@@ -632,12 +636,13 @@ function fencedHighRiskPaths(md) {
     .filter(Boolean);
 }
 
-test('13. AGENTS.md mirrors HIGH_RISK_PATHS, the thresholds, the pins, and the roster', () => {
+test('13. the harness documents mirror HIGH_RISK_PATHS, the thresholds, the pins, and the roster', () => {
   // (a) The fenced path list, entries AND order.
-  assert.deepEqual(fencedHighRiskPaths(AGENTS_MD), HIGH_RISK_PATHS);
+  assert.deepEqual(fencedHighRiskPaths(WORKFLOW_PATH, WORKFLOW_MD), HIGH_RISK_PATHS);
 
   // (b) SMALL_MAX / MEDIUM_MAX per stage. One AGENTS.md row covers two stage keys.
   const thresholdRows = readMarkdownTable(
+    AGENTS_PATH,
     AGENTS_MD,
     (l) => l.includes('`SMALL_MAX`') && l.includes('`MEDIUM_MAX`'),
     'SMALL_MAX/MEDIUM_MAX'
@@ -657,7 +662,8 @@ test('13. AGENTS.md mirrors HIGH_RISK_PATHS, the thresholds, the pins, and the r
 
   // (c) The provider pin table.
   const pinRows = readMarkdownTable(
-    AGENTS_MD,
+    WORKFLOW_PATH,
+    WORKFLOW_MD,
     (l) => l.includes('Model tier') && l.includes('model_reasoning_effort'),
     'model-tier pin'
   );
