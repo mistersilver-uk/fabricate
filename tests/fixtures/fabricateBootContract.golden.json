@@ -1952,5 +1952,12 @@
   "complicationWriter": {
     "channel": "module.fabricate",
     "resolutionId": "minted-probe"
-  }
+  },
+  "gatheringSceneFollowsRequester": {
+    "remoteViewerOnSceneB": "allowed",
+    "currentUserViewingSceneB": "FABRICATE.Gathering.Blocked.SceneMissing"
+  },
+  "gatheringResultCreatorReadsLiveSystemManager": [
+    "probe"
+  ]
 }

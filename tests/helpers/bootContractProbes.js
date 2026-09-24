@@ -107,8 +107,15 @@ function probeDepletionSeam(facade) {
 /** Ask each wired single-writer gate as the active GM, an assistant GM and a player. */
 export function probeGmGates(facade, runtime) {
   const game = globalThis.game;
+  // The lab GM is `game.users.activeGM`, standing in for the role-4 GAMEMASTER.
   const activeGm = game.user;
-  const assistantGm = { id: 'user-lab-assistant-gm', name: 'Assistant GM', isGM: true };
+  const assistantGm = {
+    id: 'user-lab-assistant-gm',
+    name: 'Assistant GM',
+    isGM: true,
+    role: 3,
+    active: true,
+  };
   const player = game.users.get('user-lab-player');
   const gates = {
     gatheringResumeTimedRuns: () => runtime.getGatheringEngine().resumeTimedRuns(),
@@ -173,7 +180,7 @@ export async function probeWorldTimeDispatch(facade, runtime) {
   ];
   const tick = () => new Promise((settle) => setTimeout(settle, 0));
   try {
-    handlerOf('updateWorldTime')(4242);
+    handlerOf('updateWorldTime')(4242, 1, {}, 'user-lab-gm');
     await tick();
     // Guarded: a crafting processor that throws must not starve the gathering one.
     restores.push(
@@ -184,7 +191,7 @@ export async function probeWorldTimeDispatch(facade, runtime) {
     const { error } = console;
     console.error = () => {};
     try {
-      handlerOf('updateWorldTime')(4343);
+      handlerOf('updateWorldTime')(4343, 1, {}, 'user-lab-gm');
       await tick();
     } finally {
       console.error = error;
@@ -211,7 +218,10 @@ export function probeCraftCommand(facade) {
     spyOn(facade.recipeManager, 'getRecipes', () => [recipe]),
   ];
   try {
-    const answer = handlerOf('chatMessage')(null, '/craft Probe Recipe');
+    const answer = handlerOf('chatMessage')(globalThis.ui?.chat ?? {}, '/craft Probe Recipe', {
+      speaker: {},
+      user: game.user.id,
+    });
     return {
       suppressesChat: answer === false,
       delegatesToFacadeCraft:
@@ -402,17 +412,68 @@ export function probeJournalAuthorityHooks(facade) {
     spyOn(commands, 'refreshJournalRunAuthorityAvailability', () => reached.push('refresh')),
     spyOn(commands, 'bootstrapJournalRunAuthority', () => reached.push('bootstrap')),
   ];
+  const user = globalThis.game.user;
   try {
-    for (const event of JOURNAL_AUTHORITY_EVENTS) handlerOf(event)?.({}, {}, 'user-lab-gm');
+    for (const [event, args] of [
+      ['createJournalEntryPage', [{}, {}, 'user-lab-gm']],
+      ['deleteJournalEntryPage', [{}, {}, 'user-lab-gm']],
+      ['updateUser', [user, { active: true }, {}, 'user-lab-gm']],
+      ['userConnected', [user, true]],
+    ]) {
+      handlerOf(event)?.(...args);
+    }
   } finally {
     for (const restore of restores) restore();
   }
   return reached;
 }
 
-const JOURNAL_AUTHORITY_EVENTS = Object.freeze([
-  'createJournalEntryPage',
-  'deleteJournalEntryPage',
-  'updateUser',
-  'userConnected',
-]);
+/**
+ * The scene gate asked for an environment on scene B while this client views scene A (issue
+ * 1912): a remote requester viewing B is judged on B, and this client's own user on its canvas.
+ */
+export function probeGatheringSceneFollowsRequester(runtime) {
+  const game = globalThis.game;
+  const sceneA = { id: 'probe-scene-a', uuid: 'Scene.probe-scene-a' };
+  const sceneB = { id: 'probe-scene-b', uuid: 'Scene.probe-scene-b' };
+  const actor = { getDependentTokens: () => [{ parent: sceneB }] };
+  const ask = (viewer) => {
+    const answer = runtime.getGatheringEngine().sceneAccess.canAttempt({
+      environment: { sceneUuid: sceneB.uuid },
+      actor,
+      viewer,
+    });
+    return answer.allowed ? 'allowed' : answer.messageKey;
+  };
+  const restores = [
+    spyOn(game, 'scenes', { current: sceneA, get: (id) => (id === sceneB.id ? sceneB : null) }),
+    spyOn(game.user, 'viewedScene', sceneB.id),
+  ];
+  try {
+    return {
+      remoteViewerOnSceneB: ask({ id: 'probe-remote-player', viewedScene: sceneB.id }),
+      currentUserViewingSceneB: ask(game.user),
+    };
+  } finally {
+    for (const restore of restores) restore();
+  }
+}
+
+/** The system ids the engine's result creator asks the LIVE crafting system manager for. */
+export async function probeGatheringResultCreator(facade, runtime) {
+  const asked = [];
+  const manager = facade.craftingSystemManager;
+  const restore = spyOn(manager, 'getSystem', (id) => {
+    asked.push(id);
+    return null;
+  });
+  try {
+    await runtime.getGatheringEngine().resultCreator.plan({
+      system: { id: 'probe' },
+      resultGroups: [{ results: [{ componentId: 'x' }] }],
+    });
+  } finally {
+    restore();
+  }
+  return asked;
+}

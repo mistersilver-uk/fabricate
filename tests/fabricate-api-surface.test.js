@@ -309,12 +309,15 @@ describe('the location API no-ops when realms are disabled for the system', () =
   const REALMS_OFF = { id: 'sys-off', gatheringRealmSettings: { enabled: false } };
   const REALMS_ON = { id: 'sys-on', gatheringRealmSettings: { enabled: true } };
 
-  /** A GM facade over one system, recording every party-store and discovery write. */
+  /** A GM facade over one system, recording every write; the actor has discovered `realm-seen`. */
   function locationFacade() {
     const writes = [];
     const actor = {
       id: 'actor-1',
-      getFlag: () => undefined,
+      getFlag: (scope, key) =>
+        key === 'fabricate.discoveredGatheringRealms'
+          ? { 'realm-seen': { discoveredAt: 1, source: 'manual' } }
+          : undefined,
       setFlag: async (...args) => writes.push(['setFlag', ...args]),
     };
     globalThis.game = { user: { id: 'gm', isGM: true }, actors: { get: () => actor } };
@@ -358,7 +361,7 @@ describe('the location API no-ops when realms are disabled for the system', () =
     [
       'hideGatheringRealmForActor',
       (facade, systemId) =>
-        facade.hideGatheringRealmForActor({ actorId: 'actor-1', systemId, realmId: 'realm-1' }),
+        facade.hideGatheringRealmForActor({ actorId: 'actor-1', systemId, realmId: 'realm-seen' }),
       false,
     ],
   ];
@@ -369,10 +372,7 @@ describe('the location API no-ops when realms are disabled for the system', () =
       assert.deepEqual(off.writes, []);
       const on = locationFacade();
       await call(on.facade, REALMS_ON.id);
-      assert.ok(
-        on.writes.length > 0 || name === 'hideGatheringRealmForActor',
-        `${name} acts when enabled`
-      );
+      assert.ok(on.writes.length > 0, `${name} acts when enabled`);
     });
   }
 
@@ -421,6 +421,13 @@ test('the Journal composition emitter survives socket serialization with its opt
   assert.deepEqual(options, {}, 'an absent options bag is emitted as {}, never undefined');
   assert.deepEqual(await answer, { success: true });
 });
+
+// The GM's reply emits `{ recipients }` behind the authority's claim, which no ledger-free test reaches.
+defineStructureContract(
+  'the composition emitter forwards its options bag',
+  { file: 'src/bootstrap/journalOperations.js', fn: 'createJournalCommandsForFabricate', property: 'emit' },
+  { callsWith: [['emit', 'options']] }
+);
 
 // The start handler runs behind the authority's claim, which no boot reaches without a ledger.
 defineStructureContract(

@@ -759,6 +759,7 @@ function gmApplyWorld({
         visibility: 'gmOnly',
         macroUuid: 'Macro.authored',
       },
+      { id: 'complication-2', name: 'Cinders', severity: 'minor', visibility: 'gmOnly' },
     ],
   });
   globalThis.fabricate = {
@@ -863,6 +864,28 @@ test('1286: chatOutput selects the card rows, and never gates the macro', async 
       `a ${status} macro is reported to the GM regardless`
     );
   }
+});
+
+test('1286: a chatOutput-off card holds ONLY the faulted rows of a delivery', async () => {
+  const BOTH = [entry(), entry({ complicationId: 'complication-2', resultId: 'result-2' })];
+  const FAILING = { type: 'script', command: "throw new Error('authored bug')" };
+  const cardFor = async (chatOutput) => {
+    const { log } = gmApplyWorld({ chatOutput, macro: FAILING });
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+      await deliverAsSender({ complications: BOTH });
+    } finally {
+      console.error = originalError;
+    }
+    return log.find(([step]) => step === 'create')[2].content;
+  };
+
+  const narrated = await cardFor(true);
+  assert.ok(narrated.includes('Cinders'), 'a narrating system reports the macro-less row');
+  const quiet = await cardFor(false);
+  assert.ok(quiet.includes('Shrapnel'), 'the failed macro is reported');
+  assert.ok(!quiet.includes('Cinders'), 'a row whose macro did not fault is not');
 });
 
 test('a GM-side apply refuses a sender who owns nothing, whatever the running user owns', async () => {

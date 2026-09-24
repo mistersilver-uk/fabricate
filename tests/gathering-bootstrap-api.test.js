@@ -140,6 +140,13 @@ defineStructureContract(
   }
 );
 
+// Which user is local decides the fallback, so the resolver is handed THIS client's user.
+defineStructureContract(
+  'the viewer scene resolver is told which user is this client',
+  { file: 'src/bootstrap/composeServices.js', fn: 'buildGatheringEngine', property: 'getCurrentScene' },
+  { reads: ['game.user'], keys: ['currentUser'] }
+);
+
 defineStructureContract(
   'the location service senses travel-marker regions on any scene',
   { file: 'src/bootstrap/composeServices.js', fn: 'buildGatheringStores' },

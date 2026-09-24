@@ -1017,8 +1017,9 @@ describe('criterion 14 — the member table resolves, and says where', () => {
 
 // The production seam bags, read off the REAL facade (issue 1933)
 
+// `ACTIVE_GM` is `game.users.activeGM`, standing in for the role-4 GAMEMASTER.
 const ACTIVE_GM = { id: 'user-gm', isGM: true };
-const ASSISTANT_GM = { id: 'user-assistant', isGM: true };
+const ASSISTANT_GM = { id: 'user-assistant', isGM: true, role: 3, active: true };
 
 /** A real facade over recording collaborators, with `game.users.activeGM` set to `ACTIVE_GM`. */
 function seamFacade() {
