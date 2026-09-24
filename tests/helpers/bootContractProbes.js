@@ -6,7 +6,7 @@
  */
 
 /** The listener `main.js` registered for one hook event, or `null` when it registered none. */
-function handlerOf(event) {
+export function handlerOf(event) {
   const entry = [...globalThis.Hooks.registrations.values()].find((row) => row.event === event);
   return entry?.handler ?? null;
 }
@@ -104,18 +104,65 @@ function probeDepletionSeam(facade) {
   return reached.length === 1 && reached[0].probe === true;
 }
 
+/** A connected role-3 ASSISTANT: `isGM` holds for it in core, and it is never `activeGM` here. */
+export const ASSISTANT_GM = Object.freeze({
+  id: 'user-lab-assistant-gm',
+  name: 'Assistant GM',
+  isGM: true,
+  role: 3,
+  active: true,
+});
+
+/** Run `work` as `user`, awaited, so an async pass meets one user throughout; the lab GM returns. */
+export async function asLabUser(user, work) {
+  const game = globalThis.game;
+  const previous = game.user;
+  game.user = user;
+  try {
+    return await work();
+  } finally {
+    game.user = previous;
+  }
+}
+
+const RECORDED_CONSOLE = Object.freeze(['info', 'debug', 'log', 'warn', 'error']);
+const RECORDED_NOTIFICATIONS = Object.freeze(['info', 'warn', 'error']);
+
+/**
+ * Run `work` with every console level and notification channel recorded rather than printed.
+ *
+ * @returns {Promise<{posted: Array, logged: Array, result: unknown}>} `[level, message, options]`
+ * per notification and `[level, ...args]` per console line.
+ */
+export async function recordNoticeOutput(work) {
+  const posted = [];
+  const logged = [];
+  const originalConsole = Object.fromEntries(
+    RECORDED_CONSOLE.map((level) => [level, console[level]])
+  );
+  const { notifications } = globalThis.ui;
+  for (const level of RECORDED_CONSOLE) {
+    console[level] = (...args) => logged.push([level, ...args]);
+  }
+  const post = (level) => (message, options) => posted.push([level, message, options]);
+  globalThis.ui.notifications = {
+    ...notifications,
+    ...Object.fromEntries(RECORDED_NOTIFICATIONS.map((level) => [level, post(level)])),
+  };
+  try {
+    return { posted, logged, result: await work() };
+  } finally {
+    Object.assign(console, originalConsole);
+    globalThis.ui.notifications = notifications;
+  }
+}
+
 /** Ask each wired single-writer gate as the active GM, an assistant GM and a player. */
 export function probeGmGates(facade, runtime) {
   const game = globalThis.game;
   // The lab GM is `game.users.activeGM`, standing in for the role-4 GAMEMASTER.
   const activeGm = game.user;
-  const assistantGm = {
-    id: 'user-lab-assistant-gm',
-    name: 'Assistant GM',
-    isGM: true,
-    role: 3,
-    active: true,
-  };
+  const assistantGm = ASSISTANT_GM;
   const player = game.users.get('user-lab-player');
   const gates = {
     gatheringResumeTimedRuns: () => runtime.getGatheringEngine().resumeTimedRuns(),
@@ -476,4 +523,66 @@ export async function probeGatheringResultCreator(facade, runtime) {
     restore();
   }
   return asked;
+}
+
+/** The composed importer's fields, each swapped for a recorder AFTER construction. */
+const IMPORTER_SEAM_FIELDS = Object.freeze([
+  'gatheringEnvironmentStore',
+  'gatheringRealmStore',
+  'componentScopeStore',
+  'essenceScopeStore',
+  'toolScopeStore',
+]);
+
+/**
+ * What the shared importer's seams reach, with the arguments they forward, once each facade field
+ * has been replaced, which only a LAZY seam follows; what its setting pair reads and writes; and
+ * which users its GM gate admits.
+ */
+export async function probeImporterSeams(facade) {
+  const game = globalThis.game;
+  const importer = facade.compendiumImporter;
+  const reached = [];
+  const recorder = (field) =>
+    Object.fromEntries(
+      ['list', 'load', 'save', 'get', 'isSeeded'].map((method) => [
+        method,
+        (...args) => reached.push(`${field}.${method} ${JSON.stringify(args)}`) > 0,
+      ])
+    );
+  const settings = [];
+  const restores = [
+    ...IMPORTER_SEAM_FIELDS.map((field) => spyOn(facade, field, recorder(field))),
+    spyOn(game.settings, 'get', (namespace, key) => settings.push(`get ${namespace}.${key}`)),
+    spyOn(game.settings, 'set', (namespace, key, value) =>
+      settings.push(`set ${namespace}.${key} ${JSON.stringify(value)}`)
+    ),
+  ];
+  try {
+    const environments = importer._environmentStore;
+    environments.list();
+    environments.load();
+    environments.save([{ id: 'probe-environment' }]);
+    importer._travelStore.get();
+    importer._travelStore.save({ probe: 'travel' });
+    for (const [kind, seam] of Object.entries(importer._scopeStoreSeams)) {
+      seam.isSeeded('entities');
+      seam.get();
+      seam.save({ probe: kind });
+    }
+    importer._getSetting('gatheringConfig');
+    importer._setSetting('gatheringConfig', { probe: 'gatheringConfig' });
+  } finally {
+    for (const restore of restores) restore();
+  }
+  const admits = (user) => asLabUser(user, () => importer._isGM());
+  return {
+    reached,
+    settings,
+    admits: {
+      activeGm: await admits(game.user),
+      assistantGm: await admits(ASSISTANT_GM),
+      player: await admits(game.users.get('user-lab-player')),
+    },
+  };
 }

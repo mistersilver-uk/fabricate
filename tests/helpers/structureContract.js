@@ -218,6 +218,26 @@ function callsWithLiteral(node, [name, value]) {
   return false;
 }
 
+/** The class members whose own body calls `name`, sorted: the census a prune seam is held to. */
+function membersCalling(node, name) {
+  const members = [];
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'MethodDefinition' || !callNames(inner.value).has(name)) continue;
+    members.push(keyName(inner));
+  }
+  return members.sort((a, b) => a.localeCompare(b));
+}
+
+/** Whether a `??` or `||` falls back from a call of `callee` to a `new constructorName(…)`. */
+function fallsBackFrom(node, [callee, constructorName]) {
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'LogicalExpression' || !['??', '||'].includes(inner.operator)) continue;
+    if (inner.right?.type !== 'NewExpression' || inner.right.callee?.name !== constructorName) continue;
+    if (callNames(inner.left).has(callee)) return true;
+  }
+  return false;
+}
+
 /** Every literal a subtree assigns to one binding, which is what a route transition is. */
 function assignedLiterals(node, name) {
   const values = [];
@@ -391,6 +411,9 @@ function claimsOverCode(code) {
     assigns: ([name, value]) => assignedLiterals(code, name).includes(value),
     property: ([key, value]) => propertyValues(code, key).includes(value),
     key: (name) => propertyKeys(code).has(name),
+    callers: ([name, members]) =>
+      membersCalling(code, name).join('\n') === [...members].sort((a, b) => a.localeCompare(b)).join('\n'),
+    fallsBack: (pair) => fallsBackFrom(code, pair),
   };
 }
 
@@ -542,6 +565,16 @@ const CONTRACT_CLAIMS = Object.freeze({
   keys: { ask: 'key', holds: true, says: (v) => `gives some record a ${v} key` },
   keysNo: { ask: 'key', holds: false, says: (v) => `gives no record a ${v} key` },
   comparesNo: { ask: 'compares', holds: false, says: (v) => `hard-codes no comparison to ${v}` },
+  callers: {
+    ask: 'callers',
+    holds: true,
+    says: ([f, members]) => `calls ${f}() from exactly ${members.join(', ')}`,
+  },
+  fallsBackNo: {
+    ask: 'fallsBack',
+    holds: false,
+    says: ([f, c]) => `never falls back from ${f}() to a new ${c}`,
+  },
   passesProps: { ask: 'prop', holds: true, says: ([c, p]) => `passes ${p} to every <${c}>` },
   passesValues: {
     ask: 'passesValue',
