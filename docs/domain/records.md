@@ -542,6 +542,7 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/overview/spec
 
 ## World Defaults
 
+The migration ELECTS each default from the OLDEST contributing system — the same donor that wins identity — across SEVEN sections: component `category` and `essences` (the latter since `1.32.0`, issue 1371, and the one section whose membership switches are decided by EQUALITY with the elected map rather than written off, so a system already carrying the donor's values is created inheriting them), essence `effectSource` and `macro`, and tool `breakage`, `onBreak` and the seeded `repairRequirements`.
 TWO are excluded for two DIFFERENT reasons: component `tags` because the merge is ADDITIVE with no inherit switch, so a world list is granted to every member system at once whoever the donor is; and the tool-breakage authority because its problem is unknowable PROVENANCE rather than an ambiguous donor.
 FIVE constraints can decline an individual SECTION, and a declined section simply gets none and is reported.
 FOUR are addressability rules — a `general` category, a non-world-addressable `effectSource` or `onBreak` target, and a `repairRequirements` recipe naming a component some group system is not a member of.
@@ -549,7 +550,6 @@ The FIRST, which the migration applies before all of them, is that EVERY LIVE ME
 Without it a member that authored nothing carries an ABSENT section, which under an `inherit: false` switch resolves to the WORLD value — so the donor's category, breakage mode or on-break action would silently become that member's behaviour, and the "nothing resolves through any of it at migration time" claim below would be false.
 `effectSource` and `macro` need no such precondition because they are NEW section names colliding with nothing on the in-system record, so `{}` and `null` are storable overrides and the membership builder writes both UNCONDITIONALLY; `breakage` and `onBreak` are spelled IDENTICALLY to the in-system `Tool` keys and the **Read Union** spreads resolved sections LAST, so an override of `{}` would erase a live in-system block instead.
 Nothing resolves through any of it at migration time, because every membership record is created fully OVERRIDING; a world default matters only for a system added later or an override a GM clears later.
-The second layer of `## Scoped Entity Definitions`: the behaviour every crafting system inherits for one entity until it overrides a SECTION of it.
 Editing one world value changes behaviour in every inheriting system at once, so a world-defaults editor states the **inherit count** before the change lands.
 Every field is ABSENCE-PRESERVING — an unauthored component category in particular must never normalize to the reserved `general` bucket, because that would reset every inheriting system on the first resolve.
 A world default carries NO `enabled` flag; disabling world-wide is N membership edits, never a fourth layer.

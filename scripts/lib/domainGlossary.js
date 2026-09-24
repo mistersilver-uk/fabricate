@@ -19,7 +19,7 @@ export const DEFINITION_SENTENCES = {
     'Result Order Asymmetry': 3,
     'Manager Navigation Surface / Provider Seam': 2,
     'Rail Marker Family': 2,
-    'World Defaults': 2,
+    'World Defaults': [1, 10],
     'System Membership Record': 3,
     'World Identity Snapshot': 2,
   },

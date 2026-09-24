@@ -321,7 +321,7 @@ The world-scoped record holding one entity's IDENTITY — name, description, ico
 #### World Defaults
 
 **PERSISTED AND WRITTEN** as of `1.30.0` (issue 1358 modelled it; issue 1359 persists it at `fabricate.<entity>Scope.defaults` and normalizes it on every load; READ through it as of issue 1370, though nothing RESOLVES through it in practice: the migration writes every membership record fully OVERRIDING, and while `## CraftingSystem` requirement 36 holds the in-system record decides every key it carries, so a world default is reached only for a key that record does not carry).
-The migration ELECTS each default from the OLDEST contributing system — the same donor that wins identity — across SEVEN sections: component `category` and `essences` (the latter since `1.32.0`, issue 1371, and the one section whose membership switches are decided by EQUALITY with the elected map rather than written off, so a system already carrying the donor's values is created inheriting them), essence `effectSource` and `macro`, and tool `breakage`, `onBreak` and the seeded `repairRequirements`.
+The second layer of `## Scoped Entity Definitions`: the behaviour every crafting system inherits for one entity until it overrides a SECTION of it.
 
 [Notes](docs/domain/records.md#world-defaults)
 
