@@ -1,51 +1,49 @@
 /**
  * A facade method that delegates must not NARROW what it forwards (issue 1759). Why it survived a
- * fix is the part worth keeping, because it is the shape of the trap.
+ * fix is the part worth keeping, because it is the shape of the trap. Read through the AST of the
+ * five slices, never their text (issue 1933).
  */
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
 import { test } from 'node:test';
 
-import { INSTALLED_FACADE_MEMBERS } from '../src/bootstrap/Fabricate.js';
-import { FABRICATE_ENTRY_SOURCE } from './helpers/bootstrapEntrySource.js';
+import { Fabricate, INSTALLED_FACADE_MEMBERS } from '../src/bootstrap/Fabricate.js';
+import { calledName, identifierNames, walkNodes } from './helpers/moduleAst.js';
+import { moduleAstOf } from './helpers/parsedSource.js';
 
-/** Normalise line endings before scanning. */
-function normaliseEndings(text) {
-  return text.split(String.fromCharCode(13) + '\n').join('\n');
+/** The slice modules `Fabricate.js` installs, each exporting one object of the same name. */
+const SLICES = ['craftingFacade', 'gatheringFacade', 'companionFacade', 'bulkFacade', 'journalFacade'];
+
+/** Every member each slice declares, as `[name, functionNode]`. */
+function sliceMembers() {
+  return SLICES.flatMap((slice) => {
+    const { ast } = moduleAstOf(`src/bootstrap/${slice}.js`);
+    const exported = [...walkNodes(ast)].find(
+      (node) => node.type === 'VariableDeclarator' && node.id?.name === slice
+    );
+    return exported.init.properties.map((property) => [property.key.name, property.value]);
+  });
 }
 
-const mainSource = normaliseEndings(FABRICATE_ENTRY_SOURCE);
+const paramName = (param) => (param.type === 'AssignmentPattern' ? param.left : param).name;
 
-/** A method declared at class-body indentation, with its parameter list and body. */
-const METHOD = /\n {2}(?:async )?([A-Za-z_][\w$]*)\(([^)]*)\) \{\n((?: {4}[^\n]*\n|\n)*?) {2}\},?\n/g;
-
-/** `this.<service>?.<sameName>(` — the delegation shape the facade uses throughout. */
-const HANDOFF_OWNER = /this\.[A-Za-z_][\w$]*$/;
-
-const parameterNames = (text) =>
-  text
-    .split(',')
-    .map((part) => part.split('=')[0].trim())
-    .filter(Boolean);
+/** A call on `this.<service>`, optional links included — the delegation shape the facade uses. */
+const callsOwnService = (call) => call.callee?.object?.object?.type === 'ThisExpression';
 
 /**
  * Every method that hands off to a same-named method on one of its own services, as `{ method,
- * declared, forwarded }`.
+ * declared, forwarded }`; `forwarded` is every name any argument of that call mentions.
  */
 function delegations() {
   const found = [];
-  for (const [, name, params, body] of mainSource.matchAll(METHOD)) {
-    const handoff = `?.${name}(`;
-    const at = body.indexOf(handoff);
-    if (at === -1 || !HANDOFF_OWNER.test(body.slice(0, at))) continue;
-    const argsFrom = at + handoff.length;
-    const argsTo = body.indexOf(')', argsFrom);
-    if (argsTo === -1) continue;
-    found.push({
-      method: name,
-      declared: parameterNames(params),
-      forwarded: parameterNames(body.slice(argsFrom, argsTo)),
-    });
+  for (const [method, fn] of sliceMembers()) {
+    for (const call of walkNodes(fn.body)) {
+      if (calledName(call) !== method || !callsOwnService(call)) continue;
+      found.push({
+        method,
+        declared: fn.params.map(paramName).filter(Boolean),
+        forwarded: new Set(call.arguments.flatMap((argument) => [...identifierNames(argument)])),
+      });
+    }
   }
   return found;
 }
@@ -59,9 +57,11 @@ test('every slice member really is installed on the prototype', () => {
     INSTALLED_FACADE_MEMBERS.length,
     'two slices declare the same member name, so one silently overwrites the other'
   );
-  for (const name of ['craftRecipe', 'startGatheringAttempt', 'awardComponents', 'salvageComponents', 'listJournalForActor']) {
-    assert.ok(INSTALLED_FACADE_MEMBERS.includes(name), `${name} is installed`);
-  }
+  assert.deepEqual(
+    sliceMembers().map(([name]) => name),
+    INSTALLED_FACADE_MEMBERS,
+    'the corpus below reads exactly the members the class installs, in install order'
+  );
 });
 
 test('the gate finds the facade delegations it exists to police', () => {
@@ -77,10 +77,10 @@ test('the gate finds the facade delegations it exists to police', () => {
 
 test('no delegating facade method drops an argument its caller relies on', () => {
   const narrowed = delegations()
-    .filter((entry) => entry.declared.some((param) => !entry.forwarded.includes(param)))
+    .filter((entry) => entry.declared.some((param) => !entry.forwarded.has(param)))
     .map(
       (entry) =>
-        `${entry.method}(${entry.declared.join(', ')}) forwards only (${entry.forwarded.join(', ')})`
+        `${entry.method}(${entry.declared.join(', ')}) forwards only (${[...entry.forwarded].join(', ')})`
     );
   assert.deepEqual(
     narrowed,
@@ -88,4 +88,18 @@ test('no delegating facade method drops an argument its caller relies on', () =>
     'a facade method that declares a parameter and does not hand it on silently reverts the ' +
       'callee to its own default, which is how the public craft API came to open a roll dialog'
   );
+});
+
+test('executeJournalRunCommand hands its options to the command service', async () => {
+  const received = [];
+  const facade = Object.assign(new Fabricate(), {
+    ready: true,
+    journalRunCommands: { executeJournalRunCommand: async (...args) => received.push(args) },
+  });
+  const command = { type: 'start' };
+  const options = { interactive: false };
+
+  await facade.executeJournalRunCommand(command, options);
+
+  assert.deepEqual(received, [[command, options]]);
 });
