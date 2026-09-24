@@ -1872,10 +1872,7 @@ describe('CraftingSystemManager source contract', () => {
   // What the library, its inspector and the focused editor draw and do — rows, drop rules,
   // component browser, sliders, paging, availability, Required Tools, toolbar delete — is driven
   // by `tests/components/manager-gathering-mounted.js`. What stays is the wiring behind them.
-  // The drop inspector moved into `environment/GatheringTaskInspector.svelte` (issue 1707 phase
-  // 2) and the rail that selects it into `environment/GatheringInspectorRail.svelte` (phase 3), so
-  // the root renders the editor and the rail, and the handlers it hands them live in the gathering
-  // units (issue 1721).
+  // The root renders the editor and the rail; the handlers it hands them live in the gathering units.
   defineStructureContract('wires the gathering task library and its inspector', MANAGER_ROOT, {
     renders: ['GatheringTaskEditView', 'GatheringInspectorRail'],
     names: ['selectedGatheringSystemTools'],

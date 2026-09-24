@@ -29,6 +29,7 @@ import {
 let Component;
 let mounted;
 let target;
+let mountedStore;
 
 // The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
@@ -49,7 +50,9 @@ const { mountManager } = createManagerMounts({
     mounted = nextMounted;
     target = nextTarget;
   },
-  adoptStore: () => {},
+  adoptStore: (store) => {
+    mountedStore = store;
+  },
 });
 
 /** Register this route’s cases in `manager-mounted.test.js`’s one describe. */
@@ -204,8 +207,10 @@ export function registerGatheringCases() {
   // A system switch reopens the gathering workspace on its first tab, so the next system's
   // library is not entered on the tab and task the GM picked in the last one.
   it('reopens the gathering workspace on its environments tab when the selected system switches', async () => {
-    mountManager([], {
+    const calls = [];
+    mountManager(calls, {
       smithingFeatures: { gathering: true, itemTags: true, recipeCategories: true, salvage: true },
+      modifiers: [{ id: 'mod-herbalism', label: 'Herbalism Lore' }],
     });
     const settle = async () => {
       for (let index = 0; index < 8; index += 1) await Promise.resolve();
@@ -241,6 +246,45 @@ export function registerGatheringCases() {
     gatheringSubitem('Tasks').click();
     await settle();
     assert.equal(selectedTaskId(), 'task-herbs', 'and the returning library selects its first task');
+
+    // The draft and modifier handlers read the system and the library when they are called.
+    mountedStore.viewState.update((state) => {
+      const { alchemy } = state.gatheringConfig.systems;
+      const forge = { ...alchemy.tasks[0], id: 'task-forge', name: 'Stoke the Forge' };
+      const smithing = { ...alchemy, tasks: [forge] };
+      const systems = { ...state.gatheringConfig.systems, smithing };
+      return { ...state, gatheringConfig: { ...state.gatheringConfig, systems } };
+    });
+    await switchSystem('smithing');
+    gatheringSubitem('Tasks').click();
+    await settle();
+    target
+      .querySelector('[data-gathering-task-id="task-forge"] [aria-label="Edit Stoke the Forge"]')
+      .click();
+    await settle();
+    setInputValue(target.querySelector('[data-gathering-task-field="name"]'), 'Bank the Forge');
+    await settle();
+    headerSaveButton(target).click();
+    await settle();
+    const saved = calls.findLast((call) => call[0] === 'updateGatheringLibraryTask');
+    assert.deepEqual(saved.slice(1, 3), ['smithing', 'task-forge'], 'saved on the new system');
+
+    target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]').click();
+    await settle();
+    const search = target.querySelector('[data-gathering-drop-character-modifier-search] input');
+    setInputValue(search, 'lore');
+    await settle();
+    const suggested = () =>
+      [...target.querySelectorAll('[data-gathering-drop-character-modifier-suggestion]')].map(
+        (node) => node.getAttribute('data-gathering-drop-character-modifier-suggestion')
+      );
+    assert.deepEqual(suggested(), ['mod-herbalism']);
+    mountedStore.viewState.update((state) => ({
+      ...state,
+      worldModifiers: [{ id: 'mod-anvil', label: 'Anvil Lore' }],
+    }));
+    await settle();
+    assert.deepEqual(suggested(), ['mod-anvil'], 'the drop search reads the library as it stands');
   });
 
   // The shell's writes to the gathering route model's selections, drafts and flags, one record
@@ -2712,12 +2756,24 @@ export function registerGatheringCases() {
   it('clears the character-modifier search per record and opens it upwards near the bottom', async () => {
     await openModifierSubject('drop', []);
     const search = () => target.querySelector('[data-gathering-drop-character-modifier-search]');
-    search().getBoundingClientRect = () => ({ top: 700, bottom: 730, left: 0, right: 200 });
-    setInputValue(search().querySelector('input'), 'herb');
-    await settleSaveAttempt();
-    assert.ok(
-      target.querySelector('[data-gathering-drop-character-modifier-suggestions].is-above'),
-      'the list opens upwards with 38px below and 700px above'
+    const clip = search().parentElement;
+    clip.style.overflowY = 'auto';
+    clip.getBoundingClientRect = () => ({ top: 100, bottom: 500, left: 0, right: 400 });
+    const opensUpWith = async (spaceBelow) => {
+      setInputValue(search().querySelector('input'), '');
+      await settleSaveAttempt();
+      const bottom = 500 - spaceBelow;
+      search().getBoundingClientRect = () => ({ top: bottom - 30, bottom, left: 0, right: 200 });
+      setInputValue(search().querySelector('input'), 'herb');
+      await settleSaveAttempt();
+      return Boolean(
+        target.querySelector('[data-gathering-drop-character-modifier-suggestions].is-above')
+      );
+    };
+    assert.deepEqual(
+      [await opensUpWith(159), await opensUpWith(160)],
+      [true, false],
+      'the list opens upwards only with under 160px below its clipping box'
     );
 
     target.querySelector('[data-gathering-task-drop-id="drop-root"]').click();

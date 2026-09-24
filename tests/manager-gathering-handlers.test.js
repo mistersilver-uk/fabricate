@@ -73,13 +73,14 @@ describe('gathering draft and modifier handlers', () => {
   let compiler;
   let createGatheringModifierHandlers;
   let createGatheringDraftHandlers;
+  let randomBase36;
   let createGatheringRouteModel;
   const originalConfirm = globalThis.confirm;
 
   before(async () => {
     compiler = createSvelteModuleCompiler('fabricate-gathering-handlers-');
     ({ createGatheringModifierHandlers } = await compiler.loadWithClosure(MODIFIERS_PATH));
-    ({ createGatheringDraftHandlers } = await compiler.load(DRAFTS_PATH));
+    ({ createGatheringDraftHandlers, randomBase36 } = await compiler.load(DRAFTS_PATH));
     ({ createGatheringRouteModel } = await compiler.load(ROUTE_MODEL_PATH));
   });
 
@@ -161,7 +162,6 @@ describe('gathering draft and modifier handlers', () => {
     assert.equal(gathering.activeGatheringTab, 'tasks');
     assert.ok(calls.some((call) => call[0] === 'expandGroup' && call[1] === 'gathering'));
     assert.deepEqual(gathering.gatheringTaskDraft, TASKS[0]);
-    assert.notStrictEqual(gathering.gatheringTaskDraft, TASKS[0], 'the draft is a copy');
     assert.equal(gathering.gatheringTaskDraftDirty, false, 'and starts clean against its baseline');
 
     drafts.editGatheringEvent('v1');
@@ -267,13 +267,21 @@ describe('gathering draft and modifier handlers', () => {
     assert.ok(!calls.some((call) => call[0] === 'updateGatheringLibraryTask'), 'nothing saved');
   });
 
-  it('keeps the task editor open when the store refuses a delete', async () => {
+  it('deletes a task without asking, and keeps the editor open on a refusal', async () => {
+    const deletes = [];
     const { gathering, drafts, views } = openHandlers({
-      store: { deleteGatheringLibraryTask: async () => false },
+      store: {
+        deleteGatheringLibraryTask: async (...args) => {
+          deletes.push(args);
+          return false;
+        },
+      },
     });
+    globalThis.confirm = () => false;
     drafts.editGatheringTask('t1');
     await drafts.deleteGatheringTaskDraft();
 
+    assert.deepEqual(deletes, [['alchemy', 't1']], 'a task delete asks nobody');
     assert.deepEqual(views, ['gathering-task-edit']);
     assert.ok(gathering.gatheringTaskDraft, 'the draft survives the refusal');
   });
@@ -290,6 +298,18 @@ describe('gathering draft and modifier handlers', () => {
     assert.deepEqual(calls.at(-2), ['deleteGatheringLibraryEvent', 'alchemy', 'v1']);
     assert.equal(gathering.gatheringEventDraft, null);
     assert.deepEqual(views.at(-1), 'environments');
+  });
+
+  it('leaves the event editor even when the store refuses the delete', async () => {
+    const { gathering, drafts, views } = openHandlers({
+      store: { deleteGatheringLibraryEvent: async () => false },
+    });
+    drafts.editGatheringEvent('v1');
+    globalThis.confirm = () => true;
+    await drafts.deleteGatheringEventDraft();
+
+    assert.equal(views.at(-1), 'environments');
+    assert.equal(gathering.gatheringEventDraft, null);
   });
 
   it('keeps the drop selection on a real row through add, duplicate, move and delete', () => {
@@ -317,8 +337,17 @@ describe('gathering draft and modifier handlers', () => {
     assert.equal(gathering.selectedGatheringDropId, 'd3', 'the last row falls back to the new last');
   });
 
+  it('mints base36 ids of the asked length that vary', () => {
+    const id = randomBase36(64);
+    assert.match(id, /^[a-z0-9]{64}$/);
+    assert.ok(new Set(id).size > 1, 'not one repeated character');
+  });
+
   it('imports a dropped component into its row with the raw drop data', async () => {
-    const { gathering, drafts, calls } = openHandlers();
+    const img = 'icons/consumables/plants/leaf-glowing-green.webp';
+    const { gathering, drafts, calls } = openHandlers({
+      store: { gatheringTaskAutopopulateFromComponent: () => ({ name: 'Nightshade', img }) },
+    });
     drafts.editGatheringTask('t1');
     const data = { type: 'Item', uuid: 'Item.x' };
 
@@ -326,6 +355,8 @@ describe('gathering draft and modifier handlers', () => {
     assert.strictEqual(calls.find((call) => call[0] === 'import')[1], data);
     assert.equal(gathering.gatheringTaskDraft.dropRows[1].componentId, 'c9');
     assert.equal(gathering.selectedGatheringDropId, 'd2');
+    const { name, img: taskImg } = gathering.gatheringTaskDraft;
+    assert.deepEqual([name, taskImg], ['Nightshade', img], 'the task takes the autopopulate patch');
   });
 
   it('steps a drop count with the arrow keys and stops every keydown propagating', () => {

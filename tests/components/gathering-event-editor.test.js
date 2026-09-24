@@ -143,8 +143,7 @@ describe('GatheringEventEditView source contract', () => {
   // The two hook pins this block opened with are asserted in the DOM now — at the event route by
   // `manager-gathering-mounted.js`, at both subjects by `manager-environments-mounted.js` — because
   // issue 1707 computes every hook name from `subject` and no root literal spells them.
-  // The handlers moved into the gathering modifier unit (issue 1721). Application mode is a single
-  // global system setting, so no per-modifier mode reaches the update.
+  // Application mode is a single global system setting, so no per-modifier mode reaches the update.
   defineStructureContract(
     'handles the event modifier inspector (time, weather, character)',
     GATHERING_MODIFIER_HANDLERS,
@@ -175,15 +174,17 @@ describe('GatheringEventEditView source contract', () => {
   );
   defineStructureContract(
     'keeps neither the two-line value body nor the operator-only class helper',
-    [MANAGER_ROOT, GATHERING_ROUTE_MODEL, GATHERING_DISPLAY],
+    [
+      MANAGER_ROOT,
+      GATHERING_ROUTE_MODEL,
+      GATHERING_DISPLAY,
+      GATHERING_DRAFT_HANDLERS,
+      GATHERING_MODIFIER_HANDLERS,
+    ],
     { spellsNo: ['manager-condition-modifier-row-body'], namesNo: ['gatheringDropModifierOperatorClass'] }
   );
 
-  // The `onkeydown` attribute is the shared panel's now, and since issue 1707 phase 2 the drop's
-  // arity normalisation is the task leaf's; since phase 3 the root hands both steppers to the
-  // rail under scope-distinguished names, and since issue 1721 the steppers are the modifier
-  // unit's. The normalised call reaching the real row is asserted by the mounted Arrow-step case
-  // in `manager-gathering-mounted.js`.
+  // The shared panel owns `onkeydown` and the task leaf normalises the drop's arity; the mounted Arrow-step case in `manager-gathering-mounted.js` asserts the normalised call reaching the real row.
   defineStructureContract('steps condition modifier values with Arrow Up/Down', GATHERING_MODIFIER_HANDLERS, {
     names: ['onGatheringDropModifierKeydown', 'onGatheringEventModifierKeydown'],
     spellsExactly: ['ArrowUp', 'ArrowDown'],
