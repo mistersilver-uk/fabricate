@@ -1,7 +1,9 @@
 /**
  * The item-source cluster (issue 1923): the legacy recipe-item reconciler, component and
  * recipe-item registration from an Item uuid, component source replacement and the GM metadata
- * refresh; collaborators arrive in `io`.
+ * refresh; collaborators arrive in `io`. Import de-duplication (`addItemFromUuid`) and
+ * source-metadata propagation (`refreshComponentMetadataForUpdatedItem`) key on the narrower Item
+ * Source Reference Chain, `getItemIdentityReferences`, which excludes `_stats.duplicateSource`.
  */
 import { advanceDefinitionRevision } from '../../utils/definitionIndex.js';
 import {
