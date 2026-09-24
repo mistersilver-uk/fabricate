@@ -10,12 +10,14 @@ import {
   respawnGainModeOptions,
   respawnPolicyOptions
 } from '../../src/ui/svelte/apps/manager/gatheringTaskSelectOptions.js';
+import { defineStructureContract } from '../helpers/structureContract.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const editorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
 const langPath = resolve(repoRoot, 'lang/en.json');
+const GATHERING_ROUTE_MODEL = 'src/ui/svelte/apps/manager/gatheringRouteModel.svelte.js';
 
 const cssPath = resolve(repoRoot, 'styles/fabricate.css');
 
@@ -130,11 +132,18 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     );
   });
 
+  // The system economy's two flags and the default-environment options the parent passes down.
+  defineStructureContract('derives the task editor inputs in the gathering route model', GATHERING_ROUTE_MODEL, {
+    declares: [
+      'selectedGatheringTaskStaminaEnabled',
+      'selectedGatheringTaskNodesEnabled',
+      'selectedSystemEnvironmentOptions',
+    ],
+  });
+
   it('wires the two economy flags from the parent', () => {
-    assert.match(rootSource, /selectedGatheringTaskStaminaEnabled\s*=\s*\$derived/, 'parent derives stamina-enabled from the system economy block');
-    assert.match(rootSource, /selectedGatheringTaskNodesEnabled\s*=\s*\$derived/, 'parent derives nodes-enabled from the system economy block');
-    assert.match(rootSource, /staminaEnabled=\{selectedGatheringTaskStaminaEnabled\}/, 'parent passes staminaEnabled to the task editor');
-    assert.match(rootSource, /nodesEnabled=\{selectedGatheringTaskNodesEnabled\}/, 'parent passes nodesEnabled to the task editor');
+    assert.match(rootSource, /staminaEnabled=\{gathering\.selectedGatheringTaskStaminaEnabled\}/, 'parent passes staminaEnabled to the task editor');
+    assert.match(rootSource, /nodesEnabled=\{gathering\.selectedGatheringTaskNodesEnabled\}/, 'parent passes nodesEnabled to the task editor');
   });
 
   it('authors depletedBehavior with a FilePicker swap-image (swap is the only behavior; no delete, no postfix)', () => {
@@ -227,8 +236,7 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     // pin as source text.
     assert.match(editorSource, /function setDefaultEnvironment/, 'has a default-environment setter');
     // The parent feeds the system environments into the editor.
-    assert.match(rootSource, /selectedSystemEnvironmentOptions\s*=\s*\$derived/, 'parent derives the system environment options');
-    assert.match(rootSource, /environmentOptions=\{selectedSystemEnvironmentOptions\}/, 'parent passes environmentOptions to the task editor');
+    assert.match(rootSource, /environmentOptions=\{gathering\.selectedSystemEnvironmentOptions\}/, 'parent passes environmentOptions to the task editor');
   });
 
   it('adds the depleted-behavior + default-environment + drop-dialog i18n keys', () => {
@@ -267,7 +275,7 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     assert.match(editorSource, /function updateDcOverride/, 'has a DC override setter');
     assert.match(editorSource, /onUpdateTask\(\{ dcOverride: null \}\)/, 'a blank DC clears the override (null = system default)');
     assert.match(editorSource, /dcOverride:\s*Number\.isFinite\(next\)\s*\?\s*Math\.trunc\(next\)\s*:\s*null/, 'a numeric DC is truncated to an integer');
-    assert.match(rootSource, /resolutionMode=\{gatheringTaskResolutionMode\}/, 'parent passes the selected task mode to the task editor');
+    assert.match(rootSource, /resolutionMode=\{gathering\.gatheringTaskResolutionMode\}/, 'parent passes the selected task mode to the task editor');
   });
 
   it('adds the per-task DC override i18n keys', () => {

@@ -143,6 +143,9 @@ const NAV_RAIL_MODEL = 'src/ui/svelte/apps/manager/navRailModel.svelte.js';
 const HEADER_MODEL = 'src/ui/svelte/apps/manager/headerModel.svelte.js';
 // The Checks Studio's drafts and rail group, extracted out of the root (issue 1721).
 const CHECKS_ROUTE_MODEL = 'src/ui/svelte/apps/manager/checks/checksRouteModel.svelte.js';
+// The gathering workspace's read side and its pure presenters.
+const GATHERING_ROUTE_MODEL = 'src/ui/svelte/apps/manager/gatheringRouteModel.svelte.js';
+const GATHERING_DISPLAY = 'src/ui/svelte/apps/manager/gatheringDisplay.js';
 const MANAGER_SYSTEM_NAV = 'src/ui/svelte/apps/manager/ManagerSystemNav.svelte';
 const MANAGER_WORLD_NAV = 'src/ui/svelte/apps/manager/ManagerWorldNav.svelte';
 const MANAGER_WORLD_DOWNTIME_NAV_GROUP =
@@ -726,6 +729,22 @@ describe('CraftingSystemManager source contract', () => {
     reads: ['checks.reseed'],
   });
 
+  // The gathering model owns no effect either: the shell runs its six reconcilers.
+  defineStructureContract('leaves the gathering route model effect-free', GATHERING_ROUTE_MODEL, {
+    callsNo: ['$effect'],
+    readsNo: ['$effect.pre', '$effect.root'],
+  });
+  defineStructureContract('runs the gathering reconcilers from the shell', MANAGER_ROOT, {
+    reads: [
+      'gathering.normalizeTab',
+      'gathering.resetOnSystemSwitch',
+      'gathering.resetTabOffRoute',
+      'gathering.reselectTask',
+      'gathering.reselectEvent',
+      'gathering.reselectDrop',
+    ],
+  });
+
   // Its cards are direct flex children of the shell's `aside.manager-inspector`.
   it('leaves the systems library inspector unwrapped and unstyled', () => {
     const inspector = componentAstOf(SYSTEM_BROWSER_INSPECTOR);
@@ -879,13 +898,16 @@ describe('CraftingSystemManager source contract', () => {
       ENVIRONMENTS_BROWSER,
       KNOWLEDGE_VIEW,
       ARMED_DANGER_BUTTON,
+      GATHERING_ROUTE_MODEL,
+      GATHERING_DISPLAY,
       ...componentPathsIn('src/ui/svelte/apps/manager/environment'),
       ...componentPathsIn('src/ui/svelte/apps/manager/knowledge'),
     ];
     const failures = [];
 
     for (const file of contractFiles) {
-      for (const { key, fallback } of staticTextCalls(componentAstOf(file))) {
+      const ast = file.endsWith('.js') ? moduleAstOf(file).ast : componentAstOf(file);
+      for (const { key, fallback } of staticTextCalls(ast)) {
         if (!isChangedManagerEnvironmentLocalizationKey(key)) continue;
         const value = catalogValue(key);
         if (typeof value !== 'string') {
@@ -1217,15 +1239,15 @@ describe('CraftingSystemManager source contract', () => {
     ],
   });
 
-  // The tab the submenu reads is still the shell's; the placeholder it routes into moved to the
-  // gathering inspector rail with issue 1707, whose own contract claims the write.
-  defineStructureContract("keeps the gathering rail's active tab on the shell", MANAGER_ROOT, {
+  // The tab the submenu reads is the gathering route model's; the placeholder it routes into moved
+  // to the gathering inspector rail with issue 1707, whose own contract claims the write.
+  defineStructureContract("keeps the gathering rail's active tab in the route model", GATHERING_ROUTE_MODEL, {
     names: ['activeGatheringTab'],
   });
 
   defineStructureContract(
     'counts each gathering section for its own rail entry',
-    { file: MANAGER_ROOT, constant: 'gatheringNavCounts' },
+    { file: GATHERING_ROUTE_MODEL, constant: 'gatheringNavCounts' },
     { keys: ['environments', 'tasks', 'encounters', 'total'] }
   );
 
@@ -1233,7 +1255,7 @@ describe('CraftingSystemManager source contract', () => {
   // asked of the whole derivation, a rollup that had dropped one would still answer yes.
   defineStructureContract(
     'and summarises environments, tasks and events in the parent rollup',
-    { file: MANAGER_ROOT, constant: 'gatheringNavCounts', property: 'total' },
+    { file: GATHERING_ROUTE_MODEL, constant: 'gatheringNavCounts', property: 'total' },
     {
       reads: [
         'environmentList.length',
@@ -1245,13 +1267,13 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'derives the reusable event count from the selected gathering config',
-    { file: MANAGER_ROOT, constant: 'gatheringEventDefinitions' },
+    { file: GATHERING_ROUTE_MODEL, constant: 'gatheringEventDefinitions' },
     { reads: ['selectedGatheringSystemConfig.events'] }
   );
 
   defineStructureContract(
     'owns the gathering tab state for inspector coordination',
-    { file: MANAGER_ROOT, constant: 'activeGatheringTab' },
+    { file: GATHERING_ROUTE_MODEL, constant: 'activeGatheringTab' },
     { spellsExactly: ['environments'] }
   );
 
@@ -1830,7 +1852,6 @@ describe('CraftingSystemManager source contract', () => {
   defineStructureContract('wires the gathering task library and its inspector', MANAGER_ROOT, {
     renders: ['GatheringTaskEditView', 'GatheringInspectorRail'],
     names: [
-      'selectedGatheringTaskId',
       'selectGatheringTask',
       'createGatheringTask',
       'editGatheringTask',
@@ -1839,8 +1860,6 @@ describe('CraftingSystemManager source contract', () => {
       'toggleGatheringTaskEnabled',
       'addGatheringDropModifier',
       'updateGatheringDropModifier',
-      'gatheringDropRateTierClass',
-      'gatheringDropRateTierColor',
       'onGatheringDropCountKeydown',
       'deleteGatheringTaskDraft',
       'selectedGatheringSystemTools',
@@ -1864,10 +1883,20 @@ describe('CraftingSystemManager source contract', () => {
     // surviving copy is what the next divergence gets written against.
     spellsNo: ['manager-drop-rate-control', 'manager-drop-rate-track', 'manager-drop-rate-fill'],
     namesNo: ['onGatheringDropRateInput', 'onGatheringDropRateBlur', 'onGatheringDropRateKeydown'],
-    // The selected drop inspector renders no component selector, and no second duplicate action.
-    readsNo: ['selectedGatheringDrop.componentId'],
+    // No second duplicate action.
     callsWithNo: [['duplicateGatheringTask', 'selectedGatheringTask']],
   });
+
+  // The shell and its gathering units select the task and tier its drop rates, and the selected
+  // drop inspector renders no component selector.
+  defineStructureContract(
+    'selects the task and tiers its drop rates for the inspector',
+    [MANAGER_ROOT, GATHERING_ROUTE_MODEL, GATHERING_DISPLAY],
+    {
+      names: ['selectedGatheringTaskId', 'gatheringDropRateTierClass', 'gatheringDropRateTierColor'],
+      readsNo: ['selectedGatheringDrop.componentId', 'gathering.selectedGatheringDrop.componentId'],
+    }
+  );
 
   // The task and drop inspector markup moved into `environment/GatheringTaskInspector.svelte`
   // (issue 1707 phase 2): its hooks and the drop editor's classes are that leaf's own.

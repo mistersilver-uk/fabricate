@@ -35,6 +35,10 @@ export const BULK_DELETE_CARD_PATTERN = /^src\/ui\/svelte\/apps\/manager\/BulkDe
 export const CHECKS_ROUTE_MODEL_PATTERN =
   /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/;
 
+/** The gathering workspace's route model and pure presenters (issue 1721). */
+export const GATHERING_ROUTE_MODEL_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/gathering(?:RouteModel|Display)\./;
+
 /** The trigger set the three `manager-recipes-bulk-edit*` frames share (issue 1010). */
 export const RECIPE_BULK_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/Recipe/,

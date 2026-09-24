@@ -51,9 +51,7 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // ADDED BY ISSUE 1373, and deliberately: the world Tool entry's `Preview as` region resolves its
   // Tool's world-default prerequisites against ONE actor, and the roster it offers is the shared,
   // GM-configurable player-character predicate rather than a second `type === 'character'` test.
-  '../../../../gatheringImageDefaults.js',
   '../../../../systems/characterModifierPrerequisiteCopy.js',
-  '../../../../systems/gatheringComposition.js',
   '../../../../utils/categoryIcons.js',
   '../../../../utils/componentCategories.js',
   '../../../../utils/craftingCheckExpression.js',
@@ -144,6 +142,10 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './essences/EssenceBehaviorPreview.svelte',
   './essences/EssenceBrowserInspector.svelte',
   './essences/EssenceBulkEditPanel.svelte',
+  // Added by issue 1721: the gathering workspace's read side and its pure presenters are their own
+  // units, which took `gatheringImageDefaults.js` and `gatheringComposition.js` with them.
+  './gatheringDisplay.js',
+  './gatheringRouteModel.svelte.js',
   // Added by issue 1720: the page header's six answers are their own unit, and the root no longer
   // resolves the eyebrow, title, lede or action-group name itself.
   './headerModel.svelte.js',

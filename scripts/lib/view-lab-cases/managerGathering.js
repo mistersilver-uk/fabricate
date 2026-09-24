@@ -5,6 +5,7 @@
 import {
   ANCHORED_POPOVER_SOURCES,
   ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+  GATHERING_ROUTE_MODEL_PATTERN,
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
@@ -20,6 +21,7 @@ export const CASES = Object.freeze([
     expectView: 'environments',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
       ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
@@ -36,6 +38,7 @@ export const CASES = Object.freeze([
     position: { width: 1000, height: 700 },
     kinds: ['manager', 'environments', 'responsive'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
       // This case stacks the browse column above the rail, so it is the frame that proves the
@@ -58,6 +61,7 @@ export const CASES = Object.freeze([
     expectSelector: '.fabricate-manager [data-gathering-task-fact="environments"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTasksBrowserView)\.svelte$/,
       // This frame's `expectSelector` is a fact of the task inspector, which issue 1707 phase 2
       // moved out of the root: without this the leaf publishes environment-editor frames instead.
@@ -115,6 +119,7 @@ export const CASES = Object.freeze([
     expectView: 'gathering-task-edit',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
     ],
@@ -315,6 +320,7 @@ export const CASES = Object.freeze([
     expectSelector: '[data-gathering-task-results="straight"] [data-recipe-result-item]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
     ],
@@ -354,6 +360,7 @@ export const CASES = Object.freeze([
       expectScrollable: 'main.manager-gathering-task-edit-view',
       kinds: ['manager', 'environments', 'responsive'],
       sourceMatches: [
+        GATHERING_ROUTE_MODEL_PATTERN,
         /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte$/,
         /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
       ],
@@ -378,6 +385,7 @@ export const CASES = Object.freeze([
     expectSelector: '[data-gathering-routed-tier-status="lab-abundant"][data-match-count="1"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
     ],
@@ -401,6 +409,7 @@ export const CASES = Object.freeze([
     expectSelector: '[data-gathering-routed-tier-status="lab-abundant"][data-match-count="0"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
     ],
@@ -454,6 +463,7 @@ export const CASES = Object.freeze([
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'environments', 'responsive'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
     ],
@@ -474,7 +484,10 @@ export const CASES = Object.freeze([
     ],
     expectView: 'environment-edit',
     kinds: ['manager', 'environments'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+      GATHERING_ROUTE_MODEL_PATTERN,
+    ],
   }),
   ...[
     { suffix: 'normal', width: 1280, height: 820 },
@@ -529,6 +542,7 @@ export const CASES = Object.freeze([
       })),
       kinds: ['manager', 'environments', 'responsive'],
       sourceMatches: [
+        GATHERING_ROUTE_MODEL_PATTERN,
         /^src\/ui\/svelte\/apps\/manager\/environment\/EnvironmentOverviewTab\.svelte$/,
       ],
     });
@@ -587,6 +601,7 @@ export const CASES = Object.freeze([
       ' [data-record-inspector="event"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
     ],
@@ -605,6 +620,7 @@ export const CASES = Object.freeze([
     expectSelector: '.fabricate-manager [data-gathering-event-fact="environments"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
       // The facts this case exists to show are computed and rendered here.
@@ -634,6 +650,7 @@ export const CASES = Object.freeze([
     expectView: 'gathering-event-edit',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
       // This is the only frame that draws the event half of the shared modifier panel, and neither
@@ -669,6 +686,7 @@ export const CASES = Object.freeze([
       '.fabricate-manager .manager-inspector [data-gathering-drop-condition-modifiers="biome"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,

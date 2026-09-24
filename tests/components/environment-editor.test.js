@@ -27,6 +27,7 @@ const MANAGER = 'src/ui/svelte/apps/manager';
 const ENV_DIR = `${MANAGER}/environment`;
 const SHELL = `${MANAGER}/EnvironmentEditView.svelte`;
 const MANAGER_ROOT = `${MANAGER}/CraftingSystemManagerRoot.svelte`;
+const GATHERING_ROUTE_MODEL = `${MANAGER}/gatheringRouteModel.svelte.js`;
 const LIST = `${ENV_DIR}/CompositionList.svelte`;
 const MODE_CONTROL = `${ENV_DIR}/CompositionModeControl.svelte`;
 const INSPECTOR = `${ENV_DIR}/RecordInspector.svelte`;
@@ -436,7 +437,7 @@ describe('environment composition editor structure', () => {
 
   defineStructureContract(
     'threads the system event selection rule into the events composition list',
-    { file: MANAGER_ROOT, constant: 'selectedGatheringRules' },
+    { file: GATHERING_ROUTE_MODEL, constant: 'selectedGatheringRules' },
     { names: ['eventSelectionMode'] }
   );
 

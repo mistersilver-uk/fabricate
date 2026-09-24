@@ -2,7 +2,7 @@
  * System scope: the Checks rail, its modifier panels, and the tags and categories route.
  */
 
-import { ANCHORED_POPOVER_SOURCES } from './caseConstants.js';
+import { ANCHORED_POPOVER_SOURCES, GATHERING_ROUTE_MODEL_PATTERN } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
@@ -16,6 +16,7 @@ export const CASES = Object.freeze([
     expectView: 'checks-gathering',
     kinds: ['manager', 'checks'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
     ],
@@ -244,6 +245,7 @@ export const CASES = Object.freeze([
       ':not(:has([data-failure-consumption]))',
     kinds: ['manager', 'checks'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
     ],
@@ -407,6 +409,7 @@ export const CASES = Object.freeze([
       ':has([data-crafting-modifier-readonly="expression"])',
     kinds: ['manager', 'checks'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
       // The entry row sits outside `checks/` since issue 1373 moved it into a component the Tool Studio also calls.
@@ -473,6 +476,7 @@ export const CASES = Object.freeze([
       '[data-subject-modifier-inherited]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/SubjectModifierPicker\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
     ],

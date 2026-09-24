@@ -100,9 +100,9 @@ export default {
       .locator('.fabricate-manager[data-manager-view="gathering-task-edit"]')
       .first()
       .waitFor({ state: 'visible', timeout: 5000 });
-    // "Selected Drop Rule" only renders when a drop row is selected
-    // (CraftingSystemManagerRoot.svelte:2957 `{#if selectedGatheringDrop}`) and its i18n value
-    // is now "Selected Drop", so it isn't asserted here.
+    // "Selected Drop Rule" only renders when a drop row is selected (the `selectedDrop` branch of
+    // `environment/GatheringTaskInspector.svelte`) and its i18n value is now "Selected Drop", so it
+    // isn't asserted here.
     for (const expected of ['Task Identity', 'Task Availability', 'Drop Rules']) {
       if ((await page.locator('.fabricate-manager').filter({ hasText: expected }).count()) === 0) {
         throw new Error(`Manager gathering task editor is missing "${expected}".`);

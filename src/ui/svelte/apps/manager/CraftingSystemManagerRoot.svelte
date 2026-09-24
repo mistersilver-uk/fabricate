@@ -3,10 +3,6 @@
   import { onDestroy, untrack } from 'svelte';
   import GatheringInspectorRail from './environment/GatheringInspectorRail.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
-  import {
-    DEFAULT_GATHERING_ENVIRONMENT_IMG,
-    DEFAULT_GATHERING_TASK_IMG,
-  } from '../../../../gatheringImageDefaults.js';
   import { isGameMaster, localize, notifyInfo, notifyWarn } from '../../util/foundryBridge.js';
   import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';
@@ -37,7 +33,6 @@
   import { parseDiceGroups } from '../../../../utils/craftingCheckExpression.js';
   import { interpolate } from './checks/checksCopy.js';
   import { summariseCondition } from './checks/checkTriggerSummary.js';
-  import { activeEnvironmentsForRecord } from '../../../../systems/gatheringComposition.js';
   import { buildVocabularyUsage, dedupeVocabularyEntries } from '../../../model/vocabularyUsage.js';
   import { createRecipeBrowserState } from '../../../model/recipeBrowserModel.js';
   import {
@@ -122,6 +117,21 @@
     resolveChecksRedirect,
   } from './checks/checksNav.js';
   import { createChecksRouteModel } from './checks/checksRouteModel.svelte.js';
+  import { createGatheringRouteModel } from './gatheringRouteModel.svelte.js';
+  import {
+    gatheringDropCountValue,
+    gatheringDropRateTierClass,
+    gatheringDropRateTierColor,
+    gatheringDropRateValue,
+    gatheringModifierDisplayValue,
+    gatheringModifierSignedValue,
+    gatheringModifierValueClass,
+    gatheringTaskDropRows,
+    gatheringTaskImage,
+    signedToOperatorValue,
+    sortedDangerTags,
+    truncateDescription,
+  } from './gatheringDisplay.js';
   import RecipeEditView from './RecipeEditView.svelte';
   import { craftingEffect } from './crafting/craftingVisibility.js';
   import SystemBrowserInspector from './SystemBrowserInspector.svelte';
@@ -297,7 +307,6 @@
   let selectedEssenceId = $state('');
   let lastComponentSystemId = $state('');
   let lastEssenceSystemId = $state('');
-  let lastGatheringSystemId = $state('');
   let essenceEditDirty = $state(false);
   let essenceEditSaving = $state(false);
   let essenceEditDraft = $state(null);
@@ -354,7 +363,6 @@
   let essenceBulkDeleting = $state(false);
   // The bulk delete's ARMED latch (the maintainer's binding decision for this action).
   let essenceBulkDeleteArmed = $state(false);
-  let activeGatheringTab = $state('environments');
   // `activeTravelTab` serves World > Parties ALONE now (issue 1282).
   let activeTravelTab = $state('parties');
   // World > Travel's destination: `realms` or `map`. Realms is the landing tab.
@@ -380,21 +388,6 @@
   // `Add from catalogue to {system}` (issue 1371, M9): the system Component Rules list's header
   // action opens an IN-PLACE picker over the world catalogue rather than navigating anywhere.
   let componentAddFromCatalogueOpen = $state(false);
-  let selectedGatheringTaskId = $state('');
-  let selectedGatheringEventId = $state('');
-  let selectedGatheringDropId = $state('');
-  let gatheringTaskDraft = $state(null);
-  let gatheringTaskDraftBaseline = $state(null);
-  let gatheringTaskSaving = $state(false);
-  // User-facing failure text for the gathering-task editor, rendered by the header toolbar
-  // beside Save (issue 919).
-  let gatheringTaskSaveError = $state('');
-  let gatheringEventDraft = $state(null);
-  let gatheringEventDraftBaseline = $state(null);
-  let gatheringEventSaving = $state(false);
-  // User-facing failure text for the gathering-event editor, rendered by the header toolbar
-  // beside Save (issue 919).
-  let gatheringEventSaveError = $state('');
   // `breakage`, because the system Tool rules editor has no Overview tab: identity is world
   // scope's, and `ToolEditorTabs` records why (issue 1373).
   let toolEditorActiveTab = $state('breakage');
@@ -415,9 +408,21 @@
     selectedSystem: () => selectedSystem,
     selectedSystemId: () => selectedSystemId,
     salvageResolutionMode: () => salvageResolutionMode,
-    gatheringResolutionMode: () => gatheringResolutionMode,
+    gatheringResolutionMode: () => gathering.gatheringResolutionMode,
     selectedSystemModifiers: () => selectedSystemModifiers,
     currentView: () => currentView,
+  });
+  // The gathering workspace's tab, selections, drafts and library (issue 1721).
+  const gathering = createGatheringRouteModel({
+    store: () => store,
+    viewState: () => $viewState,
+    view: () => currentView,
+    selectedSystem: () => selectedSystem,
+    selectedSystemId: () => selectedSystemId,
+    canShowEnvironments: () => canShowEnvironments,
+    isGatheringRoute: () => isGatheringRoute,
+    navRail: () => navRail,
+    text,
   });
   const canShowEnvironments = $derived(selectedSystem?.features?.gathering === true);
   const recipeMultiStepEnabled = $derived(selectedSystem?.features?.multiStepRecipes === true);
@@ -842,10 +847,10 @@
   }
 
   async function onAddDropCharacterModifier(rowId, modifierId = null) {
-    if (!editingGatheringTask?.id || !rowId) return;
+    if (!gathering.editingGatheringTask?.id || !rowId) return;
     const id = modifierId ?? selectedSystemModifiers[0]?.id ?? '';
     if (!id) return;
-    const rows = gatheringTaskDropRows(editingGatheringTask);
+    const rows = gatheringTaskDropRows(gathering.editingGatheringTask);
     const row = rows.find((entry) => entry.id === rowId);
     if (!row) return;
     const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
@@ -865,7 +870,9 @@
     const term = characterModifierSearchTerm.trim().toLowerCase();
     if (!term) return [];
     const attached = new Set(
-      (selectedGatheringDrop?.characterModifiers || []).map((ref) => ref.modifierId).filter(Boolean)
+      (gathering.selectedGatheringDrop?.characterModifiers || [])
+        .map((ref) => ref.modifierId)
+        .filter(Boolean)
     );
     return selectedSystemModifiers.filter((entry) => {
       if (attached.has(entry.id)) return false;
@@ -875,7 +882,7 @@
     });
   });
   $effect(() => {
-    if (selectedGatheringDrop?.id) {
+    if (gathering.selectedGatheringDrop?.id) {
       characterModifierSearchTerm = '';
     }
   });
@@ -884,7 +891,9 @@
     const term = characterModifierSearchTerm.trim().toLowerCase();
     if (!term) return [];
     const attached = new Set(
-      (editingGatheringEvent?.characterModifiers || []).map((ref) => ref.modifierId).filter(Boolean)
+      (gathering.editingGatheringEvent?.characterModifiers || [])
+        .map((ref) => ref.modifierId)
+        .filter(Boolean)
     );
     return selectedSystemModifiers.filter((entry) => {
       if (attached.has(entry.id)) return false;
@@ -894,7 +903,7 @@
     });
   });
   $effect(() => {
-    if (editingGatheringEvent?.id) {
+    if (gathering.editingGatheringEvent?.id) {
       characterModifierSearchTerm = '';
     }
   });
@@ -963,15 +972,24 @@
   let gatheringWeatherPickerSelection = $state('');
   let gatheringBiomePickerSelection = $state('');
   $effect(() => {
-    const biomeAvailable = gatheringConditionAvailableOptions(selectedGatheringDrop, 'biome');
+    const biomeAvailable = gatheringConditionAvailableOptions(
+      gathering.selectedGatheringDrop,
+      'biome'
+    );
     if (!biomeAvailable.some((option) => option.id === gatheringBiomePickerSelection)) {
       gatheringBiomePickerSelection = biomeAvailable[0]?.id || '';
     }
-    const timeAvailable = gatheringConditionAvailableOptions(selectedGatheringDrop, 'timeOfDay');
+    const timeAvailable = gatheringConditionAvailableOptions(
+      gathering.selectedGatheringDrop,
+      'timeOfDay'
+    );
     if (!timeAvailable.some((option) => option.id === gatheringTimeOfDayPickerSelection)) {
       gatheringTimeOfDayPickerSelection = timeAvailable[0]?.id || '';
     }
-    const weatherAvailable = gatheringConditionAvailableOptions(selectedGatheringDrop, 'weather');
+    const weatherAvailable = gatheringConditionAvailableOptions(
+      gathering.selectedGatheringDrop,
+      'weather'
+    );
     if (!weatherAvailable.some((option) => option.id === gatheringWeatherPickerSelection)) {
       gatheringWeatherPickerSelection = weatherAvailable[0]?.id || '';
     }
@@ -981,15 +999,24 @@
   let gatheringEventWeatherPickerSelection = $state('');
   let gatheringEventBiomePickerSelection = $state('');
   $effect(() => {
-    const biomeAvailable = gatheringConditionAvailableOptions(editingGatheringEvent, 'biome');
+    const biomeAvailable = gatheringConditionAvailableOptions(
+      gathering.editingGatheringEvent,
+      'biome'
+    );
     if (!biomeAvailable.some((option) => option.id === gatheringEventBiomePickerSelection)) {
       gatheringEventBiomePickerSelection = biomeAvailable[0]?.id || '';
     }
-    const timeAvailable = gatheringConditionAvailableOptions(editingGatheringEvent, 'timeOfDay');
+    const timeAvailable = gatheringConditionAvailableOptions(
+      gathering.editingGatheringEvent,
+      'timeOfDay'
+    );
     if (!timeAvailable.some((option) => option.id === gatheringEventTimeOfDayPickerSelection)) {
       gatheringEventTimeOfDayPickerSelection = timeAvailable[0]?.id || '';
     }
-    const weatherAvailable = gatheringConditionAvailableOptions(editingGatheringEvent, 'weather');
+    const weatherAvailable = gatheringConditionAvailableOptions(
+      gathering.editingGatheringEvent,
+      'weather'
+    );
     if (!weatherAvailable.some((option) => option.id === gatheringEventWeatherPickerSelection)) {
       gatheringEventWeatherPickerSelection = weatherAvailable[0]?.id || '';
     }
@@ -1017,33 +1044,6 @@
     if (kind === 'biome') gatheringBiomePickerSelection = value;
     else if (kind === 'weather') gatheringWeatherPickerSelection = value;
     else gatheringTimeOfDayPickerSelection = value;
-  }
-
-  function gatheringModifierSignedValue(modifier) {
-    return (
-      (modifier?.operator === '-' ? -1 : 1) * Math.abs(Math.trunc(Number(modifier?.value || 0)))
-    );
-  }
-
-  function gatheringModifierValueClass(modifier) {
-    const signed = gatheringModifierSignedValue(modifier);
-    if (signed > 0) return 'is-positive';
-    if (signed < 0) return 'is-negative';
-    return 'is-zero';
-  }
-
-  function gatheringModifierDisplayValue(modifier) {
-    const value = Math.abs(Math.trunc(Number(modifier?.value || 0)));
-    if (modifier?.operator === '-') return value > 0 ? `-${value}` : '-';
-    return value > 0 ? `+${value}` : '0';
-  }
-
-  function signedToOperatorValue(raw) {
-    const text = String(raw ?? '');
-    const negative = text.trim().startsWith('-');
-    const digits = text.replace(/[^0-9]/g, '');
-    const value = digits === '' ? 0 : Math.abs(Math.trunc(Number(digits)));
-    return { operator: negative ? '-' : '+', value };
   }
 
   function onGatheringDropModifierKeydown(rowId, kind, modifier, event) {
@@ -1074,8 +1074,8 @@
   }
 
   async function onUpdateDropCharacterModifier(rowId, refId, patch) {
-    if (!editingGatheringTask?.id || !rowId || !refId) return;
-    const rows = gatheringTaskDropRows(editingGatheringTask);
+    if (!gathering.editingGatheringTask?.id || !rowId || !refId) return;
+    const rows = gatheringTaskDropRows(gathering.editingGatheringTask);
     const row = rows.find((entry) => entry.id === rowId);
     if (!row) return;
     const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
@@ -1084,8 +1084,8 @@
   }
 
   async function onDeleteDropCharacterModifier(rowId, refId) {
-    if (!editingGatheringTask?.id || !rowId || !refId) return;
-    const rows = gatheringTaskDropRows(editingGatheringTask);
+    if (!gathering.editingGatheringTask?.id || !rowId || !refId) return;
+    const rows = gatheringTaskDropRows(gathering.editingGatheringTask);
     const row = rows.find((entry) => entry.id === rowId);
     if (!row) return;
     const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
@@ -1336,100 +1336,6 @@
     void recipeBulk.ids;
     recipeBulkDeleteArmed = false;
   });
-  const environmentList = $derived($viewState.environments || []);
-  const environmentValidationCount = $derived(
-    Array.isArray($viewState.environmentValidationState?.errors)
-      ? $viewState.environmentValidationState.errors.length
-      : 0
-  );
-  const selectedEnvironmentId = $derived(
-    $viewState.selectedEnvironmentId || $viewState.environmentDraft?.id || ''
-  );
-  const environmentDraftForDisplay = $derived($viewState.environmentDraft || null);
-  const shouldUseEnvironmentDraftForDisplay = $derived(
-    Boolean(environmentDraftForDisplay) &&
-      (currentView === 'environment-edit' ||
-        $viewState.environmentDraftDirty === true ||
-        $viewState.environmentDraftIsNew === true ||
-        environmentDraftForDisplay.id === selectedEnvironmentId)
-  );
-  const selectedEnvironment = $derived(
-    shouldUseEnvironmentDraftForDisplay
-      ? environmentDraftForDisplay
-      : environmentList.find((environment) => environment.id === selectedEnvironmentId) ||
-          environmentList.find(
-            (environment) => environment.id === environmentDraftForDisplay?.id
-          ) ||
-          environmentList[0] ||
-          null
-  );
-  const selectedEnvironmentFacts = $derived(environmentFacts(selectedEnvironment));
-  const selectedEnvironmentSceneState = $derived(environmentSceneState(selectedEnvironment));
-  const gatheringNavItems = [
-    {
-      id: 'environments',
-      icon: 'fas fa-seedling',
-      labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Environments',
-      labelFallback: 'Environments',
-    },
-    {
-      id: 'tasks',
-      icon: 'fas fa-list-check',
-      labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Tasks',
-      labelFallback: 'Tasks',
-      titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksTitle',
-      titleFallback: 'Gathering Tasks',
-      hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint',
-      hintFallback: 'Browse gathering tasks before attaching them to environments.',
-    },
-    {
-      id: 'encounters',
-      icon: 'fas fa-masks-theater',
-      labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Encounters',
-      labelFallback: 'Events',
-      titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersTitle',
-      titleFallback: 'Gathering events',
-      hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersHint',
-      hintFallback: 'Browse reusable events before attaching them to environments.',
-    },
-    {
-      id: 'settings',
-      icon: 'fas fa-sliders',
-      labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Settings',
-      labelFallback: 'Settings',
-      titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.SettingsPlaceholderTitle',
-      titleFallback: 'Gathering settings',
-      hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.SettingsPlaceholderHint',
-      hintFallback: 'Set system-level rules for gathering.',
-    },
-  ];
-  // The SELECTED SYSTEM's participation in Travel & Realms (issue 1282).
-  const gatheringRealmsEnabled = $derived($viewState.gatheringRealmSettings?.enabled === true);
-  // A party's current-realm override is per-selected-system, so it needs that system to take part:
-  // the gathering feature AND its Travel & Realms toggle.
-  const partyRealmOverridesAvailable = $derived(
-    canShowEnvironments &&
-      gatheringRealmsEnabled &&
-      $viewState.partyRealmOverridesAvailable === true
-  );
-  const partyRealmOverridesUnavailableHint = $derived(
-    !selectedSystem || selectedSystem?.features?.gathering !== true
-      ? text(
-          'FABRICATE.Admin.Manager.World.PartyOverrideGatheringRequired',
-          'Select a crafting system with Gathering enabled to set a current-realm override.'
-        )
-      : !gatheringRealmsEnabled
-        ? text(
-            'FABRICATE.Admin.Manager.World.PartyOverrideTravelRequired',
-            'Enable Travel & Realms in this system\u2019s settings to set a current-realm override.'
-          )
-        : ''
-  );
-  const displayedGatheringTab = $derived(activeGatheringTab);
-  const visibleGatheringNavItems = gatheringNavItems;
-  const gatheringInspectorTabs = $derived(
-    visibleGatheringNavItems.filter((tab) => tab.id !== 'environments')
-  );
   const isWorldRoute = $derived(currentView === 'world');
   const isWorldDowntimeRoute = $derived(currentView === 'world-downtime');
   // World > Currency (issue 1278).
@@ -2159,19 +2065,7 @@
       currentView === 'gathering-task-edit' ||
       currentView === 'gathering-event-edit'
   );
-  const isActiveGatheringChildRoute = $derived(
-    isGatheringRoute && visibleGatheringNavItems.some((tab) => tab.id === displayedGatheringTab)
-  );
-  const activeGatheringInspectorTab = $derived(
-    gatheringInspectorTabs.find((tab) => tab.id === displayedGatheringTab) || null
-  );
-  // Gathering's tab set is fixed, but a restored token can still name a section that no
-  // longer exists — including the retired `travel` one, which is now the World > Travel route.
-  $effect(() => {
-    if (!visibleGatheringNavItems.some((tab) => tab.id === activeGatheringTab)) {
-      activeGatheringTab = 'environments';
-    }
-  });
+  $effect(() => gathering.normalizeTab());
 
   // Crafting nav group (issue 511, PR-B redesign).
   const craftingVisibilityMode = $derived(selectedSystem?.visibilityMode || 'knowledge');
@@ -2206,7 +2100,7 @@
     groupLocks: () => ({
       crafting: isCraftingRoute,
       checks: isChecksRoute,
-      gathering: isActiveGatheringChildRoute,
+      gathering: gathering.isActiveGatheringChildRoute,
       worldTravel: isWorldTravelRoute,
       worldRules: isWorldRulesRoute,
       worldDowntime: isWorldDowntimeRoute,
@@ -2282,38 +2176,6 @@
         )
       : []
   );
-  const selectedGatheringRules = $derived(
-    $viewState.gatheringConfig?.systems?.[selectedSystemId]?.rules || {
-      rewardSelectionMode: 'highestRankedDrop',
-      rewardLimit: 1,
-      eventSelectionMode: 'allDrops',
-      eventLimit: 1,
-      eventPolicy: 'successWithEvent',
-      toolBreakagePolicy: 'failureOnBreak',
-      biomeModifierAggregation: 'strongestOfEach',
-      eventVisibility: 'encounterChance',
-    }
-  );
-  const selectedGatheringSystemConfig = $derived(
-    $viewState.gatheringConfig?.systems?.[selectedSystemId] || {}
-  );
-  // Two independent limitation flags.
-  const selectedGatheringEconomy = $derived(selectedGatheringSystemConfig.economy || {});
-  // The gathering check editor shown is selected by the gathering economy's
-  // resolution mode (d100 → fixed, not editable; progressive/routed → editable).
-  const gatheringResolutionMode = $derived(selectedGatheringEconomy.resolutionMode || 'd100');
-  const selectedGatheringTaskStaminaEnabled = $derived(
-    selectedGatheringEconomy.stamina != null &&
-      Object.prototype.hasOwnProperty.call(selectedGatheringEconomy.stamina, 'enabled')
-      ? selectedGatheringEconomy.stamina.enabled === true
-      : selectedGatheringEconomy.mode === 'stamina'
-  );
-  const selectedGatheringTaskNodesEnabled = $derived(
-    selectedGatheringEconomy.nodes != null &&
-      Object.prototype.hasOwnProperty.call(selectedGatheringEconomy.nodes, 'enabled')
-      ? selectedGatheringEconomy.nodes.enabled === true
-      : selectedGatheringEconomy.mode === 'nodes'
-  );
   // ─────────────────────────────────────────────────────────────────────────────────────────
   // BREADCRUMB LEAVES: the SUBJECT of an editor, not the act of editing it (issue 1328).
   const crumbSubject = (name, key, fallback) => {
@@ -2322,21 +2184,21 @@
   };
   const environmentCrumb = $derived(
     crumbSubject(
-      environmentDraftForDisplay?.name,
+      gathering.environmentDraftForDisplay?.name,
       'FABRICATE.Admin.Manager.Environment.EditBreadcrumb',
       'Edit environment'
     )
   );
   const gatheringTaskCrumb = $derived(
     crumbSubject(
-      gatheringTaskDraft?.name,
+      gathering.gatheringTaskDraft?.name,
       'FABRICATE.Admin.Manager.Environment.Tasks.EditBreadcrumb',
       'Edit gathering task'
     )
   );
   const gatheringEventCrumb = $derived(
     crumbSubject(
-      gatheringEventDraft?.name,
+      gathering.gatheringEventDraft?.name,
       'FABRICATE.Admin.Manager.Environment.Events.EditBreadcrumb',
       'Edit gathering event'
     )
@@ -2351,33 +2213,6 @@
     )
   );
 
-  // WHICH GATHERING SUB-TAB IS ON SCREEN, in the label the rail gives it.
-  const gatheringTabLabel = $derived.by(() => {
-    const item = gatheringNavItems.find((entry) => entry.id === activeGatheringTab);
-    return item ? text(item.labelKey, item.labelFallback) : '';
-  });
-
-  // THE GATHERING FAMILY'S PER-TAB PAGE COPY, RESOLVED HERE RATHER THAN IN THE VIEW (issue 1515).
-  const activeGatheringNavItem = $derived(
-    gatheringNavItems.find((entry) => entry.id === displayedGatheringTab) || null
-  );
-  const gatheringTabPageTitle = $derived(
-    activeGatheringNavItem?.titleKey
-      ? text(activeGatheringNavItem.titleKey, activeGatheringNavItem.titleFallback)
-      : ''
-  );
-  const gatheringTabPageHint = $derived(
-    activeGatheringNavItem?.hintKey
-      ? text(activeGatheringNavItem.hintKey, activeGatheringNavItem.hintFallback)
-      : ''
-  );
-
-  const gatheringTaskDefinitions = $derived(
-    Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []
-  );
-  const gatheringEventDefinitions = $derived(
-    Array.isArray(selectedGatheringSystemConfig.events) ? selectedGatheringSystemConfig.events : []
-  );
   // Tools are system-owned: read the canonical library from the selected crafting system (surfaced
   // on $viewState.selectedSystem.tools by the store) rather than the gathering-config copy.
   const selectedGatheringSystemTools = $derived(
@@ -2395,19 +2230,6 @@
       );
       return { ...tool, componentName: component?.name || '', componentImg: component?.img || '' };
     })
-  );
-  // Environments of the selected system, as { id, name } rows for the task editor's optional
-  // default-environment select (the on-drop precedence middle tier).
-  const selectedSystemEnvironmentOptions = $derived(
-    environmentList
-      .filter(
-        (environment) =>
-          String(environment?.craftingSystemId || '') === String(selectedSystemId || '')
-      )
-      .map((environment) => ({
-        id: String(environment.id),
-        name: String(environment.name || environment.id),
-      }))
   );
   const travelParties = $derived($viewState.travelParties || []);
 
@@ -2438,7 +2260,7 @@
   const worldRealms = $derived($viewState.worldRealms || []);
   // Rows for the Realms tab's per-realm environment editor.
   const worldTravelEnvironmentOptions = $derived(
-    environmentList.map((environment) => ({
+    gathering.environmentList.map((environment) => ({
       id: environment.id,
       name: environment.name,
       img: environment.img || '',
@@ -2478,25 +2300,6 @@
       selectedMapRegionUuid = mapCurrentSceneRegions[0].sceneRegionUuid;
     }
   });
-  const gatheringNavCounts = $derived({
-    environments: environmentList.length,
-    tasks: gatheringTaskDefinitions.length,
-    encounters: gatheringEventDefinitions.length,
-    total:
-      environmentList.length + gatheringTaskDefinitions.length + gatheringEventDefinitions.length,
-  });
-  const selectedGatheringTask = $derived(
-    gatheringTaskDefinitions.find((task) => task.id === selectedGatheringTaskId) ||
-      gatheringTaskDefinitions[0] ||
-      null
-  );
-  const selectedGatheringEvent = $derived(
-    gatheringEventDefinitions.find((event) => event.id === selectedGatheringEventId) ||
-      gatheringEventDefinitions[0] ||
-      null
-  );
-  const editingGatheringTask = $derived(gatheringTaskDraft || selectedGatheringTask);
-  const gatheringTaskResolutionMode = $derived(editingGatheringTask?.resolutionMode || 'd100');
   function isGatheringResultGroupMode(mode) {
     return ['straight', 'routed'].includes(mode);
   }
@@ -2507,63 +2310,10 @@
     FULL_WIDTH_VIEWS.find((entry) =>
       entry.predicate(currentView, {
         travelTab: activeTravelTab,
-        resultGroupTaskMode: isGatheringResultGroupMode(gatheringTaskResolutionMode),
+        resultGroupTaskMode: isGatheringResultGroupMode(gathering.gatheringTaskResolutionMode),
       })
     ) ?? null
   );
-  const gatheringTaskRoutedOutcomeTiers = $derived.by(() =>
-    routedTierOptionsForPolicy(
-      selectedSystem?.gatheringCraftingCheck?.routed,
-      selectedSystem?.gatheringCraftingCheck?.failureResultPolicy
-    )
-  );
-  const selectedGatheringDrop = $derived(
-    gatheringTaskDropRows(editingGatheringTask).find((row) => row.id === selectedGatheringDropId) ||
-      gatheringTaskDropRows(editingGatheringTask)[0] ||
-      null
-  );
-  const gatheringTaskDraftDirty = $derived(
-    !!(
-      gatheringTaskDraft &&
-      gatheringTaskDraftBaseline &&
-      JSON.stringify(gatheringTaskDraft) !== JSON.stringify(gatheringTaskDraftBaseline)
-    )
-  );
-  const gatheringTaskValidation = $derived(
-    gatheringTaskDraft
-      ? store.validateGatheringLibraryTask?.(gatheringTaskDraft) || { valid: true, errors: [] }
-      : { valid: true, errors: [] }
-  );
-
-  const editingGatheringEvent = $derived(gatheringEventDraft || selectedGatheringEvent);
-  const gatheringEventDraftDirty = $derived(
-    !!(
-      gatheringEventDraft &&
-      gatheringEventDraftBaseline &&
-      JSON.stringify(gatheringEventDraft) !== JSON.stringify(gatheringEventDraftBaseline)
-    )
-  );
-  const gatheringEventValidation = $derived(validateGatheringEventDraft(gatheringEventDraft));
-
-  function validateGatheringEventDraft(draft) {
-    if (!draft) return { valid: true, errors: [] };
-    const errors = [];
-    if (!String(draft?.name || '').trim()) {
-      errors.push(
-        text('FABRICATE.Admin.Manager.Environment.Events.NameRequired', 'Name is required.')
-      );
-    }
-    const rate = Number(draft?.dropRate);
-    if (!Number.isFinite(rate) || rate < 1 || rate > 100) {
-      errors.push(
-        text(
-          'FABRICATE.Admin.Manager.Environment.Events.DropRateInvalid',
-          'Drop rate must be between 1 and 100.'
-        )
-      );
-    }
-    return { valid: errors.length === 0, errors };
-  }
 
   const libraryToolsList = $derived(
     Array.isArray(selectedSystem?.tools) ? selectedSystem.tools : []
@@ -2629,67 +2379,11 @@
     lastEssenceSystemId = selectedSystemId;
   });
 
-  $effect(() => {
-    if (selectedSystemId === lastGatheringSystemId) return;
-    activeGatheringTab = 'environments';
-    selectedGatheringTaskId = '';
-    selectedGatheringEventId = '';
-    gatheringTaskDraft = null;
-    gatheringTaskDraftBaseline = null;
-    gatheringTaskSaving = false;
-    gatheringTaskSaveError = '';
-    gatheringEventDraft = null;
-    gatheringEventDraftBaseline = null;
-    gatheringEventSaving = false;
-    gatheringEventSaveError = '';
-    navRail.setGroupExpanded('gathering', isGatheringRoute);
-    lastGatheringSystemId = selectedSystemId;
-  });
-
-  $effect(() => {
-    if (activeGatheringTab === 'environments') return;
-    if (currentView === 'environments' && canShowEnvironments) return;
-    if (currentView === 'gathering-task-edit' && canShowEnvironments) return;
-    if (currentView === 'gathering-event-edit' && canShowEnvironments) return;
-    activeGatheringTab = 'environments';
-  });
-
-  $effect(() => {
-    if (!canShowEnvironments) {
-      selectedGatheringTaskId = '';
-      selectedGatheringDropId = '';
-      return;
-    }
-    if (
-      selectedGatheringTaskId &&
-      gatheringTaskDefinitions.some((task) => task.id === selectedGatheringTaskId)
-    )
-      return;
-    selectedGatheringTaskId = gatheringTaskDefinitions[0]?.id || '';
-  });
-
-  $effect(() => {
-    if (!canShowEnvironments) {
-      selectedGatheringEventId = '';
-      return;
-    }
-    if (
-      selectedGatheringEventId &&
-      gatheringEventDefinitions.some((event) => event.id === selectedGatheringEventId)
-    )
-      return;
-    selectedGatheringEventId = gatheringEventDefinitions[0]?.id || '';
-  });
-
-  $effect(() => {
-    if (!editingGatheringTask) {
-      selectedGatheringDropId = '';
-      return;
-    }
-    const rows = gatheringTaskDropRows(editingGatheringTask);
-    if (selectedGatheringDropId && rows.some((row) => row.id === selectedGatheringDropId)) return;
-    selectedGatheringDropId = rows[0]?.id || '';
-  });
+  $effect(() => gathering.resetOnSystemSwitch());
+  $effect(() => gathering.resetTabOffRoute());
+  $effect(() => gathering.reselectTask());
+  $effect(() => gathering.reselectEvent());
+  $effect(() => gathering.reselectDrop());
 
   $effect(() => {
     services?.registerEssenceDirtyGuard?.(() =>
@@ -2880,7 +2574,7 @@
     route: {
       checksActiveTab: () => checks.checksActiveTab,
       currentView: () => currentView,
-      displayedGatheringTab: () => displayedGatheringTab,
+      displayedGatheringTab: () => gathering.displayedGatheringTab,
       isChecksRoute: () => isChecksRoute,
       isWorldDowntimeRoute: () => isWorldDowntimeRoute,
       isWorldRulesRoute: () => isWorldRulesRoute,
@@ -2899,8 +2593,8 @@
       enabledPartyCount: () => enabledPartyCount,
       essenceRulesMode: () => essenceRulesMode,
       format: () => format,
-      gatheringTabPageHint: () => gatheringTabPageHint,
-      gatheringTabPageTitle: () => gatheringTabPageTitle,
+      gatheringTabPageHint: () => gathering.gatheringTabPageHint,
+      gatheringTabPageTitle: () => gathering.gatheringTabPageTitle,
       playerCharacterUuids: () => playerCharacterUuids,
       recipeDraft: () => recipeDraft,
       recipeEditSubtitle: () => recipeEditSubtitle,
@@ -2951,7 +2645,7 @@
       return text('FABRICATE.Admin.Manager.Component.Inspector', 'Selected component inspector');
     if (currentView === 'essences' || currentView === 'essence-edit')
       return text('FABRICATE.Admin.Manager.Essence.Inspector', 'Selected essence inspector');
-    if (currentView === 'environments' && displayedGatheringTab === 'tasks')
+    if (currentView === 'environments' && gathering.displayedGatheringTab === 'tasks')
       return text(
         'FABRICATE.Admin.Manager.Environment.Tasks.Inspector',
         'Selected gathering task inspector'
@@ -3107,14 +2801,14 @@
     },
     'gathering-task-edit': {
       active: () => activeView === 'gathering-task-edit',
-      isDirty: () => gatheringTaskDraftDirty,
+      isDirty: () => gathering.gatheringTaskDraftDirty,
       whenClean: (nextView) => finishGatheringTaskExit(true, nextView),
       confirm: () => store.confirmDiscardDirtyGatheringTaskDraft?.(),
       finish: finishGatheringTaskExit,
     },
     'gathering-event-edit': {
       active: () => activeView === 'gathering-event-edit',
-      isDirty: () => gatheringEventDraftDirty,
+      isDirty: () => gathering.gatheringEventDraftDirty,
       whenClean: (nextView) => finishGatheringEventExit(true, nextView),
       confirm: () => store.confirmDiscardDirtyGatheringEventDraft?.(),
       finish: finishGatheringEventExit,
@@ -4481,12 +4175,12 @@
       .replace('{disabled}', disabled);
   }
 
-  function selectEnvironment(environmentId = selectedEnvironment?.id) {
+  function selectEnvironment(environmentId = gathering.selectedEnvironment?.id) {
     if (!environmentId) return;
     store.selectEnvironment?.(environmentId);
   }
 
-  function editEnvironment(environmentId = selectedEnvironment?.id) {
+  function editEnvironment(environmentId = gathering.selectedEnvironment?.id) {
     if (!environmentId || !canShowEnvironments) return;
     afterTruthyResult(store.selectEnvironment?.(environmentId), () => {
       activeView = 'environment-edit';
@@ -4510,18 +4204,18 @@
     store.toggleEnvironmentEnabled?.(environmentId, enabled);
   }
 
-  function duplicateEnvironment(environmentId = selectedEnvironment?.id) {
+  function duplicateEnvironment(environmentId = gathering.selectedEnvironment?.id) {
     if (!environmentId) return;
     store.duplicateEnvironmentDraft?.(environmentId);
   }
 
-  function deleteEnvironment(environmentId = selectedEnvironment?.id) {
+  function deleteEnvironment(environmentId = gathering.selectedEnvironment?.id) {
     if (!environmentId) return;
     store.deleteEnvironmentDraft?.(environmentId);
   }
 
-  function selectGatheringTask(taskId = selectedGatheringTask?.id) {
-    selectedGatheringTaskId = taskId || '';
+  function selectGatheringTask(taskId = gathering.selectedGatheringTask?.id) {
+    gathering.selectedGatheringTaskId = taskId || '';
   }
 
   function createGatheringTask(systemId = selectedSystemId) {
@@ -4529,135 +4223,146 @@
     const created = store.addGatheringLibraryTask?.(systemId);
     if (isPromise(created)) {
       created.then((task) => {
-        if (task?.id) selectedGatheringTaskId = task.id;
+        if (task?.id) gathering.selectedGatheringTaskId = task.id;
       });
       return;
     }
-    if (created?.id) selectedGatheringTaskId = created.id;
+    if (created?.id) gathering.selectedGatheringTaskId = created.id;
   }
 
-  function editGatheringTask(taskId = selectedGatheringTask?.id) {
+  function editGatheringTask(taskId = gathering.selectedGatheringTask?.id) {
     if (!taskId || !canShowEnvironments) return;
-    selectedGatheringTaskId = taskId;
-    const source = gatheringTaskDefinitions.find((task) => task.id === taskId) || null;
+    gathering.selectedGatheringTaskId = taskId;
+    const source = gathering.gatheringTaskDefinitions.find((task) => task.id === taskId) || null;
     const snapshot = source ? JSON.parse(JSON.stringify(source)) : null;
-    gatheringTaskDraft = snapshot;
-    gatheringTaskDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
-    gatheringTaskSaveError = '';
-    activeGatheringTab = 'tasks';
+    gathering.gatheringTaskDraft = snapshot;
+    gathering.gatheringTaskDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
+    gathering.gatheringTaskSaveError = '';
+    gathering.activeGatheringTab = 'tasks';
     navRail.expandGroup('gathering');
     activeView = 'gathering-task-edit';
   }
 
   function clearGatheringTaskDraft() {
-    gatheringTaskDraft = null;
-    gatheringTaskDraftBaseline = null;
-    gatheringTaskSaveError = '';
+    gathering.gatheringTaskDraft = null;
+    gathering.gatheringTaskDraftBaseline = null;
+    gathering.gatheringTaskSaveError = '';
   }
 
   function backToGatheringTaskLibrary() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
-      activeGatheringTab = 'tasks';
+      gathering.activeGatheringTab = 'tasks';
       navRail.expandGroup('gathering');
       activeView = 'environments';
     });
   }
 
   async function saveGatheringTaskDraft() {
-    if (!gatheringTaskDraft || !selectedSystemId || !selectedGatheringTaskId) return false;
-    const { valid, errors } = gatheringTaskValidation;
+    if (!gathering.gatheringTaskDraft || !selectedSystemId || !gathering.selectedGatheringTaskId)
+      return false;
+    const { valid, errors } = gathering.gatheringTaskValidation;
     if (!valid) {
-      gatheringTaskSaveError = errors[0] || '';
+      gathering.gatheringTaskSaveError = errors[0] || '';
       return false;
     }
     const proceed =
       (await store.confirmGatheringLibraryTaskCompositionLoss?.(
         selectedSystemId,
-        selectedGatheringTaskId,
-        gatheringTaskDraft
+        gathering.selectedGatheringTaskId,
+        gathering.gatheringTaskDraft
       )) ?? true;
     if (!proceed) return false; // GM cancelled the match-loss warning — keep editing, no save error
     // Cleared here — once an attempt is actually committed to, and before the awaited store call
     // (mirrors saveRecipeItemDraft).
-    gatheringTaskSaveError = '';
-    gatheringTaskSaving = true;
+    gathering.gatheringTaskSaveError = '';
+    gathering.gatheringTaskSaving = true;
     try {
       const ok = await store.updateGatheringLibraryTask?.(
         selectedSystemId,
-        selectedGatheringTaskId,
-        gatheringTaskDraft
+        gathering.selectedGatheringTaskId,
+        gathering.gatheringTaskDraft
       );
       if (ok) {
-        gatheringTaskDraftBaseline = JSON.parse(JSON.stringify(gatheringTaskDraft));
-        gatheringTaskSaveError = '';
+        gathering.gatheringTaskDraftBaseline = JSON.parse(
+          JSON.stringify(gathering.gatheringTaskDraft)
+        );
+        gathering.gatheringTaskSaveError = '';
         return true;
       }
-      gatheringTaskSaveError = text(
+      gathering.gatheringTaskSaveError = text(
         'FABRICATE.Admin.Manager.Environment.Tasks.SaveFailed',
         'Save failed. Try again.'
       );
       return false;
     } catch (error) {
       console.error('Failed to save gathering task draft', error);
-      gatheringTaskSaveError = text(
+      gathering.gatheringTaskSaveError = text(
         'FABRICATE.Admin.Manager.Environment.Tasks.SaveFailed',
         'Save failed. Try again.'
       );
       return false;
     } finally {
-      gatheringTaskSaving = false;
+      gathering.gatheringTaskSaving = false;
     }
   }
 
   async function deleteGatheringTaskDraft() {
-    if (!selectedSystemId || !selectedGatheringTaskId) return;
-    const deletedTaskId = selectedGatheringTaskId;
+    if (!selectedSystemId || !gathering.selectedGatheringTaskId) return;
+    const deletedTaskId = gathering.selectedGatheringTaskId;
     const result = await store.deleteGatheringLibraryTask?.(selectedSystemId, deletedTaskId);
     if (result === false) return;
-    if (selectedGatheringTaskId === deletedTaskId) selectedGatheringTaskId = '';
-    gatheringTaskDraft = null;
-    gatheringTaskDraftBaseline = null;
-    gatheringTaskSaveError = '';
-    activeGatheringTab = 'tasks';
+    if (gathering.selectedGatheringTaskId === deletedTaskId) gathering.selectedGatheringTaskId = '';
+    gathering.gatheringTaskDraft = null;
+    gathering.gatheringTaskDraftBaseline = null;
+    gathering.gatheringTaskSaveError = '';
+    gathering.activeGatheringTab = 'tasks';
     navRail.expandGroup('gathering');
     activeView = 'environments';
   }
 
-  function duplicateGatheringTask(systemId = selectedSystemId, taskId = selectedGatheringTask?.id) {
+  function duplicateGatheringTask(
+    systemId = selectedSystemId,
+    taskId = gathering.selectedGatheringTask?.id
+  ) {
     if (!systemId || !taskId) return;
     const duplicated = store.duplicateGatheringLibraryTask?.(systemId, taskId);
     if (isPromise(duplicated)) {
       duplicated.then((task) => {
-        if (task?.id) selectedGatheringTaskId = task.id;
+        if (task?.id) gathering.selectedGatheringTaskId = task.id;
       });
       return;
     }
-    if (duplicated?.id) selectedGatheringTaskId = duplicated.id;
+    if (duplicated?.id) gathering.selectedGatheringTaskId = duplicated.id;
   }
 
-  function deleteGatheringTask(systemId = selectedSystemId, taskId = selectedGatheringTask?.id) {
+  function deleteGatheringTask(
+    systemId = selectedSystemId,
+    taskId = gathering.selectedGatheringTask?.id
+  ) {
     if (!systemId || !taskId) return;
     const deleted = store.deleteGatheringLibraryTask?.(systemId, taskId);
     if (isPromise(deleted)) {
       deleted.then((value) => {
-        if (value !== false && selectedGatheringTaskId === taskId) selectedGatheringTaskId = '';
+        if (value !== false && gathering.selectedGatheringTaskId === taskId)
+          gathering.selectedGatheringTaskId = '';
       });
       return;
     }
-    if (deleted !== false && selectedGatheringTaskId === taskId) selectedGatheringTaskId = '';
+    if (deleted !== false && gathering.selectedGatheringTaskId === taskId)
+      gathering.selectedGatheringTaskId = '';
   }
 
   function toggleGatheringTaskEnabled(
     systemId = selectedSystemId,
-    taskId = selectedGatheringTask?.id,
+    taskId = gathering.selectedGatheringTask?.id,
     enabled = true
   ) {
     if (!systemId || !taskId) return;
     store.updateGatheringLibraryTask?.(systemId, taskId, { enabled });
   }
 
-  function selectGatheringEvent(eventId = selectedGatheringEvent?.id) {
-    selectedGatheringEventId = eventId || '';
+  function selectGatheringEvent(eventId = gathering.selectedGatheringEvent?.id) {
+    gathering.selectedGatheringEventId = eventId || '';
   }
 
   function createGatheringEvent(systemId = selectedSystemId) {
@@ -4665,71 +4370,75 @@
     const created = store.addGatheringLibraryEvent?.(systemId);
     if (isPromise(created)) {
       created.then((event) => {
-        if (event?.id) selectedGatheringEventId = event.id;
+        if (event?.id) gathering.selectedGatheringEventId = event.id;
       });
       return;
     }
-    if (created?.id) selectedGatheringEventId = created.id;
+    if (created?.id) gathering.selectedGatheringEventId = created.id;
   }
 
-  function editGatheringEvent(eventId = selectedGatheringEvent?.id) {
+  function editGatheringEvent(eventId = gathering.selectedGatheringEvent?.id) {
     if (!eventId || !canShowEnvironments) return;
-    selectedGatheringEventId = eventId;
-    const source = gatheringEventDefinitions.find((event) => event.id === eventId) || null;
+    gathering.selectedGatheringEventId = eventId;
+    const source =
+      gathering.gatheringEventDefinitions.find((event) => event.id === eventId) || null;
     const snapshot = source ? JSON.parse(JSON.stringify(source)) : null;
-    gatheringEventDraft = snapshot;
-    gatheringEventDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
-    gatheringEventSaveError = '';
-    activeGatheringTab = 'encounters';
+    gathering.gatheringEventDraft = snapshot;
+    gathering.gatheringEventDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
+    gathering.gatheringEventSaveError = '';
+    gathering.activeGatheringTab = 'encounters';
     navRail.expandGroup('gathering');
     activeView = 'gathering-event-edit';
   }
 
   function clearGatheringEventDraft() {
-    gatheringEventDraft = null;
-    gatheringEventDraftBaseline = null;
-    gatheringEventSaveError = '';
-    gatheringEventSaving = false;
+    gathering.gatheringEventDraft = null;
+    gathering.gatheringEventDraftBaseline = null;
+    gathering.gatheringEventSaveError = '';
+    gathering.gatheringEventSaving = false;
   }
 
   function backToGatheringEventLibrary() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
-      activeGatheringTab = 'encounters';
+      gathering.activeGatheringTab = 'encounters';
       navRail.expandGroup('gathering');
       activeView = 'environments';
     });
   }
 
   async function saveGatheringEventDraft() {
-    if (!gatheringEventDraft || !selectedSystemId || !selectedGatheringEventId) return false;
-    const { valid, errors } = gatheringEventValidation;
+    if (!gathering.gatheringEventDraft || !selectedSystemId || !gathering.selectedGatheringEventId)
+      return false;
+    const { valid, errors } = gathering.gatheringEventValidation;
     if (!valid) {
-      gatheringEventSaveError = errors[0] || '';
+      gathering.gatheringEventSaveError = errors[0] || '';
       return false;
     }
     const proceed =
       (await store.confirmGatheringLibraryEventCompositionLoss?.(
         selectedSystemId,
-        selectedGatheringEventId,
-        gatheringEventDraft
+        gathering.selectedGatheringEventId,
+        gathering.gatheringEventDraft
       )) ?? true;
     if (!proceed) return false; // GM cancelled the match-loss warning — keep editing, no save error
     // Cleared at the same point, and for the same reason, as in saveGatheringTaskDraft: an
     // unchanged error string is not a DOM mutation.
-    gatheringEventSaveError = '';
-    gatheringEventSaving = true;
+    gathering.gatheringEventSaveError = '';
+    gathering.gatheringEventSaving = true;
     try {
       const ok = await store.updateGatheringLibraryEvent?.(
         selectedSystemId,
-        selectedGatheringEventId,
-        gatheringEventDraft
+        gathering.selectedGatheringEventId,
+        gathering.gatheringEventDraft
       );
       if (ok !== false) {
-        gatheringEventDraftBaseline = JSON.parse(JSON.stringify(gatheringEventDraft));
-        gatheringEventSaveError = '';
+        gathering.gatheringEventDraftBaseline = JSON.parse(
+          JSON.stringify(gathering.gatheringEventDraft)
+        );
+        gathering.gatheringEventSaveError = '';
         return true;
       }
-      gatheringEventSaveError = text(
+      gathering.gatheringEventSaveError = text(
         'FABRICATE.Admin.Manager.Environment.Events.SaveFailed',
         'Save failed. Try again.'
       );
@@ -4738,63 +4447,68 @@
       // Until issue 919 this `try` had no `catch` at all, so a rejected store call escaped
       // as an unhandled rejection and the GM saw nothing. Mirrors saveGatheringTaskDraft.
       console.error('Failed to save gathering event draft', error);
-      gatheringEventSaveError = text(
+      gathering.gatheringEventSaveError = text(
         'FABRICATE.Admin.Manager.Environment.Events.SaveFailed',
         'Save failed. Try again.'
       );
       return false;
     } finally {
-      gatheringEventSaving = false;
+      gathering.gatheringEventSaving = false;
     }
   }
 
   async function deleteGatheringEventDraft() {
-    if (!selectedGatheringEventId || !selectedSystemId) return;
+    if (!gathering.selectedGatheringEventId || !selectedSystemId) return;
     const message = text(
       'FABRICATE.Admin.Manager.Environment.Events.DeleteConfirm',
       'Delete this event? This cannot be undone.'
     );
     const confirmed = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : true;
     if (confirmed === false) return;
-    const deletedId = selectedGatheringEventId;
+    const deletedId = gathering.selectedGatheringEventId;
     await store.deleteGatheringLibraryEvent?.(selectedSystemId, deletedId);
-    if (selectedGatheringEventId === deletedId) selectedGatheringEventId = '';
+    if (gathering.selectedGatheringEventId === deletedId) gathering.selectedGatheringEventId = '';
     clearGatheringEventDraft();
-    activeGatheringTab = 'encounters';
+    gathering.activeGatheringTab = 'encounters';
     navRail.expandGroup('gathering');
     activeView = 'environments';
   }
 
   function duplicateGatheringEvent(
     systemId = selectedSystemId,
-    eventId = selectedGatheringEvent?.id
+    eventId = gathering.selectedGatheringEvent?.id
   ) {
     if (!systemId || !eventId) return;
     const duplicated = store.duplicateGatheringLibraryEvent?.(systemId, eventId);
     if (isPromise(duplicated)) {
       duplicated.then((event) => {
-        if (event?.id) selectedGatheringEventId = event.id;
+        if (event?.id) gathering.selectedGatheringEventId = event.id;
       });
       return;
     }
-    if (duplicated?.id) selectedGatheringEventId = duplicated.id;
+    if (duplicated?.id) gathering.selectedGatheringEventId = duplicated.id;
   }
 
-  function deleteGatheringEvent(systemId = selectedSystemId, eventId = selectedGatheringEvent?.id) {
+  function deleteGatheringEvent(
+    systemId = selectedSystemId,
+    eventId = gathering.selectedGatheringEvent?.id
+  ) {
     if (!systemId || !eventId) return;
     const deleted = store.deleteGatheringLibraryEvent?.(systemId, eventId);
     if (isPromise(deleted)) {
       deleted.then((value) => {
-        if (value !== false && selectedGatheringEventId === eventId) selectedGatheringEventId = '';
+        if (value !== false && gathering.selectedGatheringEventId === eventId)
+          gathering.selectedGatheringEventId = '';
       });
       return;
     }
-    if (deleted !== false && selectedGatheringEventId === eventId) selectedGatheringEventId = '';
+    if (deleted !== false && gathering.selectedGatheringEventId === eventId)
+      gathering.selectedGatheringEventId = '';
   }
 
   function toggleGatheringEventEnabled(
     systemId = selectedSystemId,
-    eventId = selectedGatheringEvent?.id,
+    eventId = gathering.selectedGatheringEvent?.id,
     enabled = true
   ) {
     if (!systemId || !eventId) return;
@@ -4802,40 +4516,44 @@
   }
 
   function updateSelectedGatheringEvent(updates = {}) {
-    if (gatheringEventDraft) {
-      gatheringEventDraft = { ...gatheringEventDraft, ...updates };
+    if (gathering.gatheringEventDraft) {
+      gathering.gatheringEventDraft = { ...gathering.gatheringEventDraft, ...updates };
       return true;
     }
-    if (!selectedSystemId || !selectedGatheringEvent?.id) return false;
+    if (!selectedSystemId || !gathering.selectedGatheringEvent?.id) return false;
     return store.updateGatheringLibraryEvent?.(
       selectedSystemId,
-      selectedGatheringEvent.id,
+      gathering.selectedGatheringEvent.id,
       updates
     );
   }
 
   function updateSelectedGatheringTask(updates = {}) {
-    if (gatheringTaskDraft) {
-      gatheringTaskDraft = { ...gatheringTaskDraft, ...updates };
+    if (gathering.gatheringTaskDraft) {
+      gathering.gatheringTaskDraft = { ...gathering.gatheringTaskDraft, ...updates };
       return true;
     }
-    if (!selectedSystemId || !selectedGatheringTask?.id) return false;
-    return store.updateGatheringLibraryTask?.(selectedSystemId, selectedGatheringTask.id, updates);
+    if (!selectedSystemId || !gathering.selectedGatheringTask?.id) return false;
+    return store.updateGatheringLibraryTask?.(
+      selectedSystemId,
+      gathering.selectedGatheringTask.id,
+      updates
+    );
   }
 
   function addToolReferenceToSelectedTask(toolId) {
-    if (!editingGatheringTask || !toolId) return;
-    const existing = Array.isArray(editingGatheringTask.toolIds)
-      ? editingGatheringTask.toolIds
+    if (!gathering.editingGatheringTask || !toolId) return;
+    const existing = Array.isArray(gathering.editingGatheringTask.toolIds)
+      ? gathering.editingGatheringTask.toolIds
       : [];
     if (existing.includes(toolId)) return;
     updateSelectedGatheringTask({ toolIds: [...existing, toolId] });
   }
 
   function removeToolReferenceFromSelectedTask(toolId) {
-    if (!editingGatheringTask || !toolId) return;
-    const existing = Array.isArray(editingGatheringTask.toolIds)
-      ? editingGatheringTask.toolIds
+    if (!gathering.editingGatheringTask || !toolId) return;
+    const existing = Array.isArray(gathering.editingGatheringTask.toolIds)
+      ? gathering.editingGatheringTask.toolIds
       : [];
     updateSelectedGatheringTask({ toolIds: existing.filter((id) => id !== toolId) });
   }
@@ -4845,7 +4563,7 @@
   }
 
   function addGatheringTaskDrop() {
-    if (!editingGatheringTask) return;
+    if (!gathering.editingGatheringTask) return;
     const row = {
       id: gatheringDropRowId(),
       name: '',
@@ -4856,50 +4574,50 @@
       conditionModifiers: { biome: [], timeOfDay: [], weather: [] },
       enabled: false,
     };
-    selectedGatheringDropId = row.id;
+    gathering.selectedGatheringDropId = row.id;
     updateSelectedGatheringTask({
-      dropRows: [...gatheringTaskDropRows(editingGatheringTask), row],
+      dropRows: [...gatheringTaskDropRows(gathering.editingGatheringTask), row],
     });
   }
 
   function updateGatheringTaskDrop(rowId, updates = {}) {
-    if (!editingGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(editingGatheringTask).map((row) =>
+    if (!gathering.editingGatheringTask || !rowId) return;
+    const rows = gatheringTaskDropRows(gathering.editingGatheringTask).map((row) =>
       row.id === rowId ? { ...row, ...updates } : row
     );
     const patch =
       store.gatheringTaskAutopopulateFromComponent?.(
         selectedSystemId,
-        editingGatheringTask,
+        gathering.editingGatheringTask,
         rows
       ) || {};
     updateSelectedGatheringTask({ dropRows: rows, ...patch });
   }
 
-  function duplicateGatheringTaskDrop(rowId = selectedGatheringDrop?.id) {
-    if (!editingGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(editingGatheringTask);
+  function duplicateGatheringTaskDrop(rowId = gathering.selectedGatheringDrop?.id) {
+    if (!gathering.editingGatheringTask || !rowId) return;
+    const rows = gatheringTaskDropRows(gathering.editingGatheringTask);
     const index = rows.findIndex((row) => row.id === rowId);
     if (index < 0) return;
     const duplicate = { ...JSON.parse(JSON.stringify(rows[index])), id: gatheringDropRowId() };
-    selectedGatheringDropId = duplicate.id;
+    gathering.selectedGatheringDropId = duplicate.id;
     updateSelectedGatheringTask({
       dropRows: [...rows.slice(0, index + 1), duplicate, ...rows.slice(index + 1)],
     });
   }
 
-  function deleteGatheringTaskDrop(rowId = selectedGatheringDrop?.id) {
-    if (!editingGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(editingGatheringTask);
+  function deleteGatheringTaskDrop(rowId = gathering.selectedGatheringDrop?.id) {
+    if (!gathering.editingGatheringTask || !rowId) return;
+    const rows = gatheringTaskDropRows(gathering.editingGatheringTask);
     const index = rows.findIndex((row) => row.id === rowId);
     const nextRows = rows.filter((row) => row.id !== rowId);
-    selectedGatheringDropId = nextRows[Math.min(index, nextRows.length - 1)]?.id || '';
+    gathering.selectedGatheringDropId = nextRows[Math.min(index, nextRows.length - 1)]?.id || '';
     updateSelectedGatheringTask({ dropRows: nextRows });
   }
 
   function moveGatheringTaskDrop(rowId, direction) {
-    if (!editingGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(editingGatheringTask);
+    if (!gathering.editingGatheringTask || !rowId) return;
+    const rows = gatheringTaskDropRows(gathering.editingGatheringTask);
     const index = rows.findIndex((row) => row.id === rowId);
     if (index < 0) return;
     const target = direction === 'up' ? index - 1 : index + 1;
@@ -4914,7 +4632,7 @@
     const item = await services?.importSingleManagedItemFromDrop?.(data);
     if (!item?.id) return false;
     updateGatheringTaskDrop(rowId, { componentId: item.id, itemUuid: '', name: '', enabled: true });
-    selectedGatheringDropId = rowId;
+    gathering.selectedGatheringDropId = rowId;
     return true;
   }
 
@@ -5146,12 +4864,12 @@
   }
 
   function gatheringConditionOptions(kind) {
-    const setting = selectedGatheringSystemConfig.conditions?.[kind] || {};
+    const setting = gathering.selectedGatheringSystemConfig.conditions?.[kind] || {};
     return Array.isArray(setting.values) ? setting.values : [];
   }
 
   function gatheringVocabularyOptions(kind) {
-    const vocabulary = selectedGatheringSystemConfig.vocabularies?.[kind] || {};
+    const vocabulary = gathering.selectedGatheringSystemConfig.vocabularies?.[kind] || {};
     return Array.isArray(vocabulary.values) ? vocabulary.values : [];
   }
 
@@ -5179,8 +4897,10 @@
   }
 
   function updateGatheringDropModifier(rowId, kind, modifierId, updates = {}) {
-    if (!editingGatheringTask || !rowId || !kind || !modifierId) return;
-    const row = gatheringTaskDropRows(editingGatheringTask).find((entry) => entry.id === rowId);
+    if (!gathering.editingGatheringTask || !rowId || !kind || !modifierId) return;
+    const row = gatheringTaskDropRows(gathering.editingGatheringTask).find(
+      (entry) => entry.id === rowId
+    );
     if (!row) return;
     const conditionModifiers = gatheringConditionModifierGroups(row);
     conditionModifiers[kind] = conditionModifiers[kind].map((modifier) =>
@@ -5190,8 +4910,10 @@
   }
 
   function addGatheringDropModifier(rowId, kind, conditionId) {
-    if (!editingGatheringTask || !rowId || !kind || !conditionId) return;
-    const row = gatheringTaskDropRows(editingGatheringTask).find((entry) => entry.id === rowId);
+    if (!gathering.editingGatheringTask || !rowId || !kind || !conditionId) return;
+    const row = gatheringTaskDropRows(gathering.editingGatheringTask).find(
+      (entry) => entry.id === rowId
+    );
     if (!row) return;
     const conditionModifiers = gatheringConditionModifierGroups(row);
     if (conditionModifiers[kind].some((modifier) => modifier.conditionId === conditionId)) return;
@@ -5203,8 +4925,10 @@
   }
 
   function deleteGatheringDropModifier(rowId, kind, modifierId) {
-    if (!editingGatheringTask || !rowId || !kind || !modifierId) return;
-    const row = gatheringTaskDropRows(editingGatheringTask).find((entry) => entry.id === rowId);
+    if (!gathering.editingGatheringTask || !rowId || !kind || !modifierId) return;
+    const row = gatheringTaskDropRows(gathering.editingGatheringTask).find(
+      (entry) => entry.id === rowId
+    );
     if (!row) return;
     const conditionModifiers = gatheringConditionModifierGroups(row);
     conditionModifiers[kind] = conditionModifiers[kind].filter(
@@ -5214,8 +4938,8 @@
   }
 
   function addGatheringEventConditionModifier(kind, conditionId) {
-    if (!editingGatheringEvent?.id || !kind || !conditionId) return;
-    const conditionModifiers = gatheringConditionModifierGroups(editingGatheringEvent);
+    if (!gathering.editingGatheringEvent?.id || !kind || !conditionId) return;
+    const conditionModifiers = gatheringConditionModifierGroups(gathering.editingGatheringEvent);
     if (conditionModifiers[kind].some((modifier) => modifier.conditionId === conditionId)) return;
     conditionModifiers[kind] = [
       ...conditionModifiers[kind],
@@ -5225,8 +4949,8 @@
   }
 
   function updateGatheringEventConditionModifier(kind, modifierId, updates = {}) {
-    if (!editingGatheringEvent?.id || !kind || !modifierId) return;
-    const conditionModifiers = gatheringConditionModifierGroups(editingGatheringEvent);
+    if (!gathering.editingGatheringEvent?.id || !kind || !modifierId) return;
+    const conditionModifiers = gatheringConditionModifierGroups(gathering.editingGatheringEvent);
     conditionModifiers[kind] = conditionModifiers[kind].map((modifier) =>
       modifier.id === modifierId ? { ...modifier, ...updates } : modifier
     );
@@ -5234,8 +4958,8 @@
   }
 
   function deleteGatheringEventConditionModifier(kind, modifierId) {
-    if (!editingGatheringEvent?.id || !kind || !modifierId) return;
-    const conditionModifiers = gatheringConditionModifierGroups(editingGatheringEvent);
+    if (!gathering.editingGatheringEvent?.id || !kind || !modifierId) return;
+    const conditionModifiers = gatheringConditionModifierGroups(gathering.editingGatheringEvent);
     conditionModifiers[kind] = conditionModifiers[kind].filter(
       (modifier) => modifier.id !== modifierId
     );
@@ -5243,9 +4967,9 @@
   }
 
   function pickCharacterModifierForEvent(modifierId) {
-    if (!editingGatheringEvent?.id || !modifierId) return;
-    const refs = Array.isArray(editingGatheringEvent.characterModifiers)
-      ? editingGatheringEvent.characterModifiers
+    if (!gathering.editingGatheringEvent?.id || !modifierId) return;
+    const refs = Array.isArray(gathering.editingGatheringEvent.characterModifiers)
+      ? gathering.editingGatheringEvent.characterModifiers
       : [];
     if (refs.some((ref) => ref.modifierId === modifierId)) return;
     characterModifierSearchTerm = '';
@@ -5261,18 +4985,18 @@
   }
 
   function onUpdateEventCharacterModifier(refId, patch) {
-    if (!editingGatheringEvent?.id || !refId) return;
-    const refs = Array.isArray(editingGatheringEvent.characterModifiers)
-      ? editingGatheringEvent.characterModifiers
+    if (!gathering.editingGatheringEvent?.id || !refId) return;
+    const refs = Array.isArray(gathering.editingGatheringEvent.characterModifiers)
+      ? gathering.editingGatheringEvent.characterModifiers
       : [];
     const next = refs.map((ref) => (ref.id === refId ? { ...ref, ...patch } : ref));
     updateSelectedGatheringEvent({ characterModifiers: next });
   }
 
   function onDeleteEventCharacterModifier(refId) {
-    if (!editingGatheringEvent?.id || !refId) return;
-    const refs = Array.isArray(editingGatheringEvent.characterModifiers)
-      ? editingGatheringEvent.characterModifiers
+    if (!gathering.editingGatheringEvent?.id || !refId) return;
+    const refs = Array.isArray(gathering.editingGatheringEvent.characterModifiers)
+      ? gathering.editingGatheringEvent.characterModifiers
       : [];
     updateSelectedGatheringEvent({ characterModifiers: refs.filter((ref) => ref.id !== refId) });
   }
@@ -5283,7 +5007,9 @@
   }
 
   function selectGatheringTab(tabId) {
-    activeGatheringTab = visibleGatheringNavItems.some((tab) => tab.id === tabId)
+    gathering.activeGatheringTab = gathering.visibleGatheringNavItems.some(
+      (tab) => tab.id === tabId
+    )
       ? tabId
       : 'environments';
     navRail.expandGroup('gathering');
@@ -5419,11 +5145,11 @@
 
   function openGatheringSection(tabId = 'environments') {
     if (!canShowEnvironments) return;
-    const nextTab = visibleGatheringNavItems.some((tab) => tab.id === tabId)
+    const nextTab = gathering.visibleGatheringNavItems.some((tab) => tab.id === tabId)
       ? tabId
       : 'environments';
     afterTruthyResult(confirmRouteExit('environments'), () => {
-      activeGatheringTab = nextTab;
+      gathering.activeGatheringTab = nextTab;
       navRail.expandGroup('gathering');
       activeView = 'environments';
     });
@@ -5498,7 +5224,7 @@
   }
 
   function activateGatheringParent() {
-    if (isActiveGatheringChildRoute) {
+    if (gathering.isActiveGatheringChildRoute) {
       navRail.expandGroup('gathering');
       return;
     }
@@ -5707,247 +5433,6 @@
     services?.onCopySourceUuid?.(uuid);
   }
 
-  const INSPECTOR_DESCRIPTION_LIMIT = 160;
-
-  function truncateDescription(description) {
-    if (typeof description !== 'string') return '';
-    const trimmed = description.trim();
-    if (trimmed.length <= INSPECTOR_DESCRIPTION_LIMIT) return trimmed;
-    return `${trimmed.slice(0, INSPECTOR_DESCRIPTION_LIMIT).trimEnd()}…`;
-  }
-
-  function environmentName(environment) {
-    const explicitName = typeof environment?.name === 'string' ? environment.name.trim() : '';
-    if (explicitName) return explicitName;
-    return text('FABRICATE.Admin.Environments.NewDraftTitle', 'New Gathering Environment');
-  }
-
-  function environmentSceneImage(environment) {
-    const linkedScene = linkedSceneForEnvironment(environment);
-    return linkedScene?.img || linkedScene?.thumbnail || linkedScene?.thumb || '';
-  }
-
-  function environmentImage(environment) {
-    // A linked scene's thumbnail takes the place of the environment's own image; the stored
-    // `img` is kept as a fallback for when the scene is unlinked.
-    const sceneImage = environmentSceneImage(environment);
-    if (sceneImage) return sceneImage;
-    return String(environment?.img || '').trim() || DEFAULT_GATHERING_ENVIRONMENT_IMG;
-  }
-
-  function hasEnvironmentImage(environment) {
-    return Boolean(environmentSceneImage(environment) || String(environment?.img || '').trim());
-  }
-
-  function linkedSceneForEnvironment(environment) {
-    const sceneUuid = environment?.sceneUuid || '';
-    if (!sceneUuid) return null;
-    return (selectedSystem?.sceneOptions || []).find((scene) => scene.uuid === sceneUuid) || null;
-  }
-
-  function environmentSelectionModeLabel(environment) {
-    return environment?.selectionMode === 'blind'
-      ? text('FABRICATE.Admin.Environments.SelectionBlind', 'Blind')
-      : text('FABRICATE.Admin.Environments.SelectionTargeted', 'Targeted');
-  }
-
-  function environmentStatusLabel(environment) {
-    return environment?.enabled === false
-      ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled')
-      : text('FABRICATE.Admin.Manager.StatusActive', 'Active');
-  }
-
-  function environmentSceneState(environment) {
-    if (!environment?.sceneUuid) {
-      return {
-        id: 'none',
-        label: text('FABRICATE.Admin.Manager.Environment.SceneNone', 'No scene'),
-        tone: 'disabled',
-      };
-    }
-    const scene = linkedSceneForEnvironment(environment);
-    if (!scene) {
-      return {
-        id: 'missing',
-        label: text('FABRICATE.Admin.Manager.Environment.SceneMissing', 'Scene unresolved'),
-        tone: 'warning',
-      };
-    }
-    return {
-      id: 'linked',
-      label: text('FABRICATE.Admin.Manager.Environment.SceneLinked', 'Linked scene'),
-      name: scene.name || environment.sceneUuid,
-      tone: 'active',
-    };
-  }
-
-  /** One of the three environment inspector counts, as the store computed it. */
-  function environmentStoredCount(environment, key) {
-    const stored = $viewState.environmentTaskCounts?.[String(environment?.id || '')]?.[key];
-    return Number.isFinite(stored) ? stored : 0;
-  }
-
-  function environmentComposedTaskCount(environment) {
-    return environmentStoredCount(environment, 'availableTaskCount');
-  }
-
-  function environmentComposedEventCount(environment) {
-    return environmentStoredCount(environment, 'availableEventCount');
-  }
-
-  function environmentRequiredToolCount(environment) {
-    return environmentStoredCount(environment, 'requiredToolCount');
-  }
-
-  function gatheringTaskName(task) {
-    return String(
-      task?.name ||
-        text('FABRICATE.Admin.Manager.Environment.Tasks.UnnamedTask', 'Unnamed gathering task')
-    ).trim();
-  }
-
-  function gatheringTaskImage(task) {
-    return task?.img || DEFAULT_GATHERING_TASK_IMG;
-  }
-
-  function gatheringTaskDropRows(task) {
-    return Array.isArray(task?.dropRows) ? task.dropRows : [];
-  }
-
-  function gatheringManagedItemLabel(componentId) {
-    const item = (selectedSystem?.managedItemOptions || []).find(
-      (option) => String(option.id || '') === String(componentId || '')
-    );
-    return item?.name || componentId || '';
-  }
-
-  function gatheringManagedItemImage(componentId) {
-    const item = (selectedSystem?.managedItemOptions || []).find(
-      (option) => String(option.id || '') === String(componentId || '')
-    );
-    return item?.img || 'icons/svg/item-bag.svg';
-  }
-
-  function gatheringDropName(row) {
-    return (
-      row?.name ||
-      gatheringManagedItemLabel(row?.componentId) ||
-      row?.itemUuid ||
-      text('FABRICATE.Admin.Manager.Environment.Tasks.UnresolvedDrop', 'Unresolved drop')
-    );
-  }
-
-  function gatheringDropImage(row) {
-    return row?.img || gatheringManagedItemImage(row?.componentId) || 'icons/svg/item-bag.svg';
-  }
-
-  function gatheringOptionLabel(kind, id) {
-    const options = selectedGatheringSystemConfig.vocabularies?.biomes?.values;
-    const option = (Array.isArray(options) ? options : []).find(
-      (value) => String(value?.id || value) === String(id || '')
-    );
-    return String(option?.label || option?.id || id || '').trim();
-  }
-
-  function gatheringConditionLabel(kind, id) {
-    if (kind === 'biome') return gatheringOptionLabel('biome', id) || String(id || '');
-    const setting = selectedGatheringSystemConfig.conditions?.[kind] || {};
-    const option = (Array.isArray(setting.values) ? setting.values : []).find(
-      (value) => String(value?.id || value) === String(id || '')
-    );
-    return String(option?.label || option?.id || id || '').trim();
-  }
-
-  function gatheringModifierKindIcon(kind, conditionId = '') {
-    if (kind === 'weather') return 'fas fa-cloud-sun';
-    if (kind === 'timeOfDay') return 'fas fa-clock';
-    const option = gatheringVocabularyOptions('biomes').find(
-      (value) => String(value?.id || value) === String(conditionId || '')
-    );
-    return String(option?.icon || '').trim() || 'fas fa-mountain-sun';
-  }
-
-  function gatheringModifierCardTitle(kind, scope = 'task') {
-    if (kind === 'biome') {
-      return scope === 'event'
-        ? text('FABRICATE.Admin.Manager.Environment.Events.BiomeModifiers', 'Biome modifiers')
-        : text('FABRICATE.Admin.Manager.Environment.Tasks.BiomeModifiers', 'Biome modifiers');
-    }
-    if (kind === 'weather')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.Tasks.WeatherModifiers',
-        'Weather modifiers'
-      );
-    return text('FABRICATE.Admin.Manager.Environment.Tasks.TimeModifiers', 'Time modifiers');
-  }
-
-  function gatheringModifierCardHint(kind, scope = 'task') {
-    if (scope === 'event') {
-      if (kind === 'biome')
-        return text(
-          'FABRICATE.Admin.Manager.Environment.Events.BiomeModifiersHint',
-          "Adjust this event's chance based on the gathering environment's biomes."
-        );
-      if (kind === 'weather')
-        return text(
-          'FABRICATE.Admin.Manager.Environment.Events.WeatherModifiersHint',
-          "Adjust this event's chance based on the active weather condition."
-        );
-      return text(
-        'FABRICATE.Admin.Manager.Environment.Events.TimeModifiersHint',
-        "Adjust this event's chance based on the active time of day."
-      );
-    }
-    if (kind === 'biome')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.Tasks.BiomeModifiersHint',
-        "Adjust this drop's chance based on the gathering environment's biomes."
-      );
-    if (kind === 'weather')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.Tasks.WeatherModifiersHint',
-        "Adjust this drop's chance based on the active weather condition."
-      );
-    return text(
-      'FABRICATE.Admin.Manager.Environment.Tasks.TimeModifiersHint',
-      "Adjust this drop's chance based on the active time of day."
-    );
-  }
-
-  function gatheringDropRateValue(row) {
-    const number = Math.trunc(Number(row?.dropRate ?? 1));
-    if (!Number.isFinite(number)) return 1;
-    return Math.min(100, Math.max(0, number));
-  }
-
-  function gatheringDropCountValue(row) {
-    const number = Math.trunc(Number(row?.quantity ?? 1));
-    if (!Number.isFinite(number)) return 1;
-    return Math.min(999, Math.max(1, number));
-  }
-
-  function gatheringDropRateTierClass(value) {
-    const rate = gatheringDropRateValue({ dropRate: value });
-    if (rate === 0) return 'is-none';
-    if (rate >= 100) return 'is-guaranteed';
-    if (rate >= 70) return 'is-common';
-    if (rate >= 35) return 'is-uncommon';
-    if (rate >= 15) return 'is-rare';
-    if (rate >= 5) return 'is-very-rare';
-    return 'is-legendary';
-  }
-
-  function gatheringDropRateTierColor(value) {
-    const rate = gatheringDropRateValue({ dropRate: value });
-    if (rate === 0) return 'var(--fab-drop-rate-none)';
-    if (rate >= 100) return 'var(--fab-drop-rate-guaranteed)';
-    if (rate >= 70) return 'var(--fab-drop-rate-common)';
-    if (rate >= 35) return 'var(--fab-drop-rate-uncommon)';
-    if (rate >= 15) return 'var(--fab-drop-rate-rare)';
-    if (rate >= 5) return 'var(--fab-drop-rate-very-rare)';
-    return 'var(--fab-drop-rate-legendary)';
-  }
-
   // The drop-rate input/blur/keydown trio that used to live here is gone with the hand-rolled
   // slider it drove (issue 883).
   function onGatheringDropCountInput(rowId, event) {
@@ -5990,144 +5475,6 @@
     });
     event.currentTarget.value = String(quantity);
     updateGatheringTaskDrop(row.id, { quantity });
-  }
-
-  function gatheringTaskAvailability(task) {
-    const timeValues = Array.isArray(task?.timeOfDay) ? task.timeOfDay : [];
-    const weatherValues = Array.isArray(task?.weather) ? task.weather : [];
-    const times =
-      timeValues.length > 0
-        ? timeValues
-            .map((id) => gatheringConditionLabel('timeOfDay', id))
-            .filter(Boolean)
-            .join(', ')
-        : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyTime', 'Any time');
-    const weather =
-      weatherValues.length > 0
-        ? weatherValues
-            .map((id) => gatheringConditionLabel('weather', id))
-            .filter(Boolean)
-            .join(', ')
-        : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyWeather', 'Any weather');
-    return `${times}, ${weather}`;
-  }
-
-  const DANGER_LEVEL_ORDER = ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'];
-
-  function sortedDangerTags(tags) {
-    if (!Array.isArray(tags)) return [];
-    return [...tags].sort((a, b) => {
-      const ai = DANGER_LEVEL_ORDER.indexOf(a);
-      const bi = DANGER_LEVEL_ORDER.indexOf(b);
-      const aRank = ai === -1 ? DANGER_LEVEL_ORDER.length : ai;
-      const bRank = bi === -1 ? DANGER_LEVEL_ORDER.length : bi;
-      if (aRank !== bRank) return aRank - bRank;
-      return String(a).localeCompare(String(b));
-    });
-  }
-
-  function gatheringTaskReferencingEnvironments(task) {
-    if (!task?.id) return [];
-    const taskId = String(task.id);
-    return environmentList.filter((environment) => {
-      if (String(environment?.craftingSystemId || '') !== String(selectedSystemId || ''))
-        return false;
-      const enabledIds = Array.isArray(environment?.enabledTaskIds)
-        ? environment.enabledTaskIds.map(String)
-        : [];
-      return enabledIds.includes(taskId);
-    });
-  }
-
-  function gatheringEventReferencingEnvironments(event) {
-    if (!event?.id) return [];
-    const eventId = String(event.id);
-    return environmentList.filter((environment) => {
-      if (String(environment?.craftingSystemId || '') !== String(selectedSystemId || ''))
-        return false;
-      const enabledIds = Array.isArray(environment?.enabledEventIds)
-        ? environment.enabledEventIds.map(String)
-        : [];
-      return enabledIds.includes(eventId);
-    });
-  }
-
-  /** The environments a library gathering record is active in right now. */
-  function activeEnvironmentsForGatheringRecord(record, kind, scopedEnvironments) {
-    return activeEnvironmentsForRecord(record, scopedEnvironments, kind, {
-      conditionSettings: selectedGatheringSystemConfig.conditions,
-    });
-  }
-
-  // The `task.enabled === false` early return this used to open with is gone rather than kept as a
-  // second gate.
-  function activeGatheringTaskEnvironmentCount(task) {
-    return activeEnvironmentsForGatheringRecord(
-      task,
-      'task',
-      environmentList.filter(
-        (environment) =>
-          environment?.enabled !== false &&
-          String(environment?.craftingSystemId || selectedSystemId) ===
-            String(selectedSystemId || '')
-      )
-    ).length;
-  }
-
-  // Site 10's fact. Extracted from an inline IIFE in the markup so it sits beside the task fact
-  // it now shares a definition with, and so the two are read together when either changes.
-  function activeGatheringEventEnvironmentCount(event) {
-    return activeEnvironmentsForGatheringRecord(
-      event,
-      'event',
-      environmentList.filter(
-        (environment) =>
-          environment?.enabled !== false &&
-          String(environment?.craftingSystemId || '') === String(selectedSystemId || '')
-      )
-    ).length;
-  }
-
-  function environmentFacts(environment) {
-    if (!environment) return [];
-    return [
-      {
-        id: 'tasks',
-        label: text('FABRICATE.Admin.Environments.Tasks', 'Tasks'),
-        value: environmentComposedTaskCount(environment),
-      },
-      {
-        id: 'events',
-        label: text('FABRICATE.Admin.Environments.Events', 'Events'),
-        value: environmentComposedEventCount(environment),
-      },
-      {
-        id: 'required-tools',
-        label: text('FABRICATE.Admin.Environments.RequiredTools', 'Required tools'),
-        value: environmentRequiredToolCount(environment),
-      },
-      {
-        id: 'mode',
-        label: text('FABRICATE.Admin.Environments.SelectionMode', 'Selection mode'),
-        value: environmentSelectionModeLabel(environment),
-      },
-    ];
-  }
-
-  function environmentDirtyFor(environment) {
-    return (
-      environment?.id &&
-      $viewState.environmentDraft?.id === environment.id &&
-      $viewState.environmentDraftDirty === true
-    );
-  }
-
-  function environmentInvalidFor(environment) {
-    return (
-      environment?.id &&
-      $viewState.environmentDraft?.id === environment.id &&
-      environmentValidationCount > 0
-    );
   }
 
   // `componentSourceState` lived here to tone the inline components inspector's source chip.
@@ -6397,7 +5744,7 @@
     {worldToolEntryRecord}
     {worldToolEntryName}
     {worldToolEntrySubtitle}
-    {environmentDraftForDisplay}
+    environmentDraftForDisplay={gathering.environmentDraftForDisplay}
     {isWorldRoute}
     {isWorldDowntimeRoute}
     {isWorldRulesRoute}
@@ -6415,8 +5762,8 @@
     {downtimeTabCrumbNavigable}
     {downtimeLeafCrumb}
     {downtimeChromeChannel}
-    {activeGatheringTab}
-    {gatheringTabLabel}
+    activeGatheringTab={gathering.activeGatheringTab}
+    gatheringTabLabel={gathering.gatheringTabLabel}
     {recipeItemCrumb}
     {environmentCrumb}
     {gatheringTaskCrumb}
@@ -6486,7 +5833,7 @@
     {essenceEditSaveLabel}
     {canSaveEssenceEdit}
     {cancelEssenceEdit}
-    {displayedGatheringTab}
+    displayedGatheringTab={gathering.displayedGatheringTab}
     {canShowEnvironments}
     {createGatheringTaskForSystem}
     {createGatheringEventForSystem}
@@ -6496,18 +5843,18 @@
     environmentSaving={$viewState.environmentSaving}
     {deleteEnvironmentDraft}
     {saveEnvironmentEdit}
-    {gatheringTaskDraftDirty}
-    {gatheringTaskSaving}
-    {gatheringTaskValidation}
-    {gatheringTaskSaveError}
-    {selectedGatheringTaskId}
+    gatheringTaskDraftDirty={gathering.gatheringTaskDraftDirty}
+    gatheringTaskSaving={gathering.gatheringTaskSaving}
+    gatheringTaskValidation={gathering.gatheringTaskValidation}
+    gatheringTaskSaveError={gathering.gatheringTaskSaveError}
+    selectedGatheringTaskId={gathering.selectedGatheringTaskId}
     {deleteGatheringTaskDraft}
     {saveGatheringTaskDraft}
-    {gatheringEventDraftDirty}
-    {gatheringEventSaving}
-    {gatheringEventValidation}
-    {gatheringEventSaveError}
-    {selectedGatheringEventId}
+    gatheringEventDraftDirty={gathering.gatheringEventDraftDirty}
+    gatheringEventSaving={gathering.gatheringEventSaving}
+    gatheringEventValidation={gathering.gatheringEventValidation}
+    gatheringEventSaveError={gathering.gatheringEventSaveError}
+    selectedGatheringEventId={gathering.selectedGatheringEventId}
     {deleteGatheringEventDraft}
     {saveGatheringEventDraft}
   />
@@ -6540,9 +5887,9 @@
       {canShowEnvironments}
       {isGatheringRoute}
       {activateGatheringParent}
-      {gatheringNavCounts}
-      {visibleGatheringNavItems}
-      {displayedGatheringTab}
+      gatheringNavCounts={gathering.gatheringNavCounts}
+      visibleGatheringNavItems={gathering.visibleGatheringNavItems}
+      displayedGatheringTab={gathering.displayedGatheringTab}
       {openGatheringSection}
       {experimentalFeaturesEnabled}
       {worldScopedCounts}
@@ -6783,22 +6130,22 @@
       </main>
     {:else if currentView === 'environments' || currentView === 'world'}
       <EnvironmentsBrowserView
-        environments={environmentList}
+        environments={gathering.environmentList}
         environmentsLoading={$viewState.environmentsLoading}
         environmentsError={$viewState.environmentsError}
-        environmentDraft={environmentDraftForDisplay}
+        environmentDraft={gathering.environmentDraftForDisplay}
         environmentDraftDirty={$viewState.environmentDraftDirty}
-        {environmentValidationCount}
-        {selectedEnvironmentId}
+        environmentValidationCount={gathering.environmentValidationCount}
+        selectedEnvironmentId={gathering.selectedEnvironmentId}
         {selectedSystemId}
         gatheringConfig={$viewState.gatheringConfig}
         sceneOptions={selectedSystem?.sceneOptions || []}
         environmentTaskCounts={$viewState.environmentTaskCounts || {}}
-        {shouldUseEnvironmentDraftForDisplay}
-        activeGatheringTab={isWorldRoute ? 'travel' : displayedGatheringTab}
+        shouldUseEnvironmentDraftForDisplay={gathering.shouldUseEnvironmentDraftForDisplay}
+        activeGatheringTab={isWorldRoute ? 'travel' : gathering.displayedGatheringTab}
         activeTravelTab={isWorldRoute ? 'parties' : activeTravelTab}
-        selectedTaskId={selectedGatheringTask?.id || selectedGatheringTaskId}
-        selectedEventId={selectedGatheringEvent?.id || selectedGatheringEventId}
+        selectedTaskId={gathering.selectedGatheringTask?.id || gathering.selectedGatheringTaskId}
+        selectedEventId={gathering.selectedGatheringEvent?.id || gathering.selectedGatheringEventId}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
         {services}
         onSelectGatheringTab={selectGatheringTab}
@@ -6835,8 +6182,8 @@
         travelFieldErrors={$viewState.travelFieldErrors || {}}
         travelActorOptions={$viewState.actorOptions || []}
         {worldRealms}
-        {partyRealmOverridesAvailable}
-        {partyRealmOverridesUnavailableHint}
+        partyRealmOverridesAvailable={gathering.partyRealmOverridesAvailable}
+        partyRealmOverridesUnavailableHint={gathering.partyRealmOverridesUnavailableHint}
         onCreateParty={() => store.createParty?.()}
         onRenameParty={(id, name) => store.renameParty?.(id, name)}
         onSetPartyEnabled={(id, enabled) => store.setPartyEnabled?.(id, enabled)}
@@ -6865,11 +6212,11 @@
           <EnvironmentEditView
             environmentDraft={$viewState.environmentDraft}
             composition={$viewState.environmentComposition}
-            eventSelectionMode={selectedGatheringRules.eventSelectionMode}
+            eventSelectionMode={gathering.selectedGatheringRules.eventSelectionMode}
             isNew={$viewState.environmentDraftIsNew}
-            linkedSceneImage={environmentSceneImage($viewState.environmentDraft)}
+            linkedSceneImage={gathering.environmentSceneImage($viewState.environmentDraft)}
             realmRecords={worldRealms}
-            realmsEnabled={gatheringRealmsEnabled}
+            realmsEnabled={gathering.gatheringRealmsEnabled}
             biomeOptions={gatheringVocabularyOptions('biomes')}
             dangerOptions={gatheringVocabularyOptions('danger')}
             onPickImagePath={services?.pickImagePath}
@@ -6936,7 +6283,7 @@
             salvageCheckSimple={checks.salvageSimpleDraft}
             salvageCheckRouted={checks.salvageRoutedDraft}
             salvageCheckProgressive={checks.salvageProgressiveDraft}
-            {gatheringResolutionMode}
+            gatheringResolutionMode={gathering.gatheringResolutionMode}
             gatheringCheckProgressive={checks.gatheringProgressiveDraft}
             gatheringCheckRouted={checks.gatheringRoutedDraft}
             breakageAuthority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
@@ -6981,19 +6328,19 @@
       </main>
     {:else if currentView === 'gathering-task-edit' && selectedSystem}
       <GatheringTaskEditView
-        task={editingGatheringTask}
-        staminaEnabled={selectedGatheringTaskStaminaEnabled}
-        nodesEnabled={selectedGatheringTaskNodesEnabled}
-        resolutionMode={gatheringTaskResolutionMode}
-        routedOutcomeTiers={gatheringTaskRoutedOutcomeTiers}
-        resultValidationErrors={gatheringTaskValidation.resultErrors || []}
+        task={gathering.editingGatheringTask}
+        staminaEnabled={gathering.selectedGatheringTaskStaminaEnabled}
+        nodesEnabled={gathering.selectedGatheringTaskNodesEnabled}
+        resolutionMode={gathering.gatheringTaskResolutionMode}
+        routedOutcomeTiers={gathering.gatheringTaskRoutedOutcomeTiers}
+        resultValidationErrors={gathering.gatheringTaskValidation.resultErrors || []}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
         weatherOptions={gatheringConditionOptions('weather')}
         timeOfDayOptions={gatheringConditionOptions('timeOfDay')}
         biomeOptions={gatheringVocabularyOptions('biomes')}
-        selectedDropId={selectedGatheringDrop?.id || selectedGatheringDropId}
-        rewardRules={selectedGatheringRules}
+        selectedDropId={gathering.selectedGatheringDrop?.id || gathering.selectedGatheringDropId}
+        rewardRules={gathering.selectedGatheringRules}
         characterModifierLibrary={selectedSystemModifiers}
         checkModifierOptions={selectedSystemModifiers}
         gatheringModifierPolicy={selectedSystem?.gatheringCraftingCheck?.defaultModifierPolicy ||
@@ -7002,11 +6349,11 @@
         gatheringModifierDefaultIds={selectedSystem?.gatheringCraftingCheck?.defaultModifierIds ||
           []}
         libraryTools={selectedGatheringSystemTools}
-        environmentOptions={selectedSystemEnvironmentOptions}
+        environmentOptions={gathering.selectedSystemEnvironmentOptions}
         onPickImagePath={services?.pickImagePath}
         onUpdateTask={updateSelectedGatheringTask}
         onSelectDrop={(rowId) => {
-          selectedGatheringDropId = rowId;
+          gathering.selectedGatheringDropId = rowId;
         }}
         onAddDrop={addGatheringTaskDrop}
         onUpdateDrop={updateGatheringTaskDrop}
@@ -7020,7 +6367,7 @@
       />
     {:else if currentView === 'gathering-event-edit' && selectedSystem}
       <GatheringEventEditView
-        event={editingGatheringEvent}
+        event={gathering.editingGatheringEvent}
         weatherOptions={gatheringConditionOptions('weather')}
         timeOfDayOptions={gatheringConditionOptions('timeOfDay')}
         biomeOptions={gatheringVocabularyOptions('biomes')}
@@ -7427,42 +6774,42 @@
         {#if currentView === 'world' || currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit' || isWorldTravelRoute}
           <GatheringInspectorRail
             {currentView}
-            {displayedGatheringTab}
+            displayedGatheringTab={gathering.displayedGatheringTab}
             {isWorldTravelRoute}
-            {activeGatheringInspectorTab}
-            {selectedGatheringTask}
-            {editingGatheringTask}
-            {selectedGatheringDrop}
-            {activeGatheringTaskEnvironmentCount}
-            {gatheringTaskAvailability}
+            activeGatheringInspectorTab={gathering.activeGatheringInspectorTab}
+            selectedGatheringTask={gathering.selectedGatheringTask}
+            editingGatheringTask={gathering.editingGatheringTask}
+            selectedGatheringDrop={gathering.selectedGatheringDrop}
+            activeGatheringTaskEnvironmentCount={gathering.activeGatheringTaskEnvironmentCount}
+            gatheringTaskAvailability={gathering.gatheringTaskAvailability}
             {gatheringTaskDropRows}
             {gatheringTaskImage}
-            {gatheringTaskName}
-            {gatheringTaskReferencingEnvironments}
+            gatheringTaskName={gathering.gatheringTaskName}
+            gatheringTaskReferencingEnvironments={gathering.gatheringTaskReferencingEnvironments}
             {gatheringDropCountValue}
-            {gatheringDropImage}
-            {gatheringDropName}
+            gatheringDropImage={gathering.gatheringDropImage}
+            gatheringDropName={gathering.gatheringDropName}
             {gatheringDropRateTierClass}
             {gatheringDropRateTierColor}
             {gatheringDropRateValue}
             {gatheringDropModifierPickerSelection}
             {characterModifierSearchSuggestions}
-            {selectedGatheringEvent}
-            {editingGatheringEvent}
-            {activeGatheringEventEnvironmentCount}
-            {gatheringEventReferencingEnvironments}
+            selectedGatheringEvent={gathering.selectedGatheringEvent}
+            editingGatheringEvent={gathering.editingGatheringEvent}
+            activeGatheringEventEnvironmentCount={gathering.activeGatheringEventEnvironmentCount}
+            gatheringEventReferencingEnvironments={gathering.gatheringEventReferencingEnvironments}
             {gatheringEventModifierPickerSelection}
             {eventCharacterModifierSearchSuggestions}
             {sortedDangerTags}
             {selectedSystemModifiers}
             {characterModifierSearchOpenUp}
             {gatheringConditionAvailableOptions}
-            {gatheringConditionLabel}
+            gatheringConditionLabel={gathering.gatheringConditionLabel}
             {gatheringConditionModifierRows}
-            {gatheringModifierCardHint}
-            {gatheringModifierCardTitle}
+            gatheringModifierCardHint={gathering.gatheringModifierCardHint}
+            gatheringModifierCardTitle={gathering.gatheringModifierCardTitle}
             {gatheringModifierDisplayValue}
-            {gatheringModifierKindIcon}
+            gatheringModifierKindIcon={gathering.gatheringModifierKindIcon}
             {gatheringModifierValueClass}
             {signedToOperatorValue}
             {rowCharacterModifiers}
@@ -7471,23 +6818,23 @@
             {characterModifierLabelForRef}
             {characterModifierLibraryEntry}
             {characterModifierOperatorClass}
-            {selectedGatheringRules}
+            selectedGatheringRules={gathering.selectedGatheringRules}
             {worldTravelTab}
             {selectedTravelRealm}
             {selectedMapRegion}
             {worldRealms}
-            {selectedEnvironment}
-            {selectedEnvironmentFacts}
-            {selectedEnvironmentSceneState}
-            {environmentList}
-            {environmentValidationCount}
-            {environmentDirtyFor}
-            {environmentInvalidFor}
-            {environmentImage}
-            {environmentName}
-            {environmentSelectionModeLabel}
-            {environmentStatusLabel}
-            {hasEnvironmentImage}
+            selectedEnvironment={gathering.selectedEnvironment}
+            selectedEnvironmentFacts={gathering.selectedEnvironmentFacts}
+            selectedEnvironmentSceneState={gathering.selectedEnvironmentSceneState}
+            environmentList={gathering.environmentList}
+            environmentValidationCount={gathering.environmentValidationCount}
+            environmentDirtyFor={gathering.environmentDirtyFor}
+            environmentInvalidFor={gathering.environmentInvalidFor}
+            environmentImage={gathering.environmentImage}
+            environmentName={gathering.environmentName}
+            environmentSelectionModeLabel={gathering.environmentSelectionModeLabel}
+            environmentStatusLabel={gathering.environmentStatusLabel}
+            hasEnvironmentImage={gathering.hasEnvironmentImage}
             {truncateDescription}
             travelSaving={$viewState.travelSaving === true}
             environmentSaveError={$viewState.environmentSaveError}

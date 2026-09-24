@@ -5,6 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ROUTE_EXIT_GUARDS } from '../../src/ui/svelte/apps/manager/routeExitGuards.js';
+import { defineStructureContract } from '../helpers/structureContract.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -12,6 +13,9 @@ const editorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringEventE
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
 const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
 const langPath = resolve(repoRoot, 'lang/en.json');
+const MANAGER_ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
+const GATHERING_ROUTE_MODEL = 'src/ui/svelte/apps/manager/gatheringRouteModel.svelte.js';
+const GATHERING_DISPLAY = 'src/ui/svelte/apps/manager/gatheringDisplay.js';
 
 const chanceSliderPath = resolve(repoRoot, 'src/ui/svelte/components/ChanceSlider.svelte');
 
@@ -151,22 +155,19 @@ describe('GatheringEventEditView source contract', () => {
     );
   });
 
-  it('renders condition modifiers as a single signed number input that colors its box by value', () => {
-    // The operator Positive/Negative <select> is gone; value is typed signed.
-    assert.ok(rootSource.includes('function gatheringModifierValueClass'), 'root should expose a signed value-class helper');
-    assert.ok(rootSource.includes('function signedToOperatorValue'), 'root should split a signed input back into { operator, value }');
-    // The coloured box and the signed-input wrapper are asserted in the DOM by
-    // `manager-environments-mounted.js`; the root no longer writes either.
-    assert.equal(rootSource.includes('manager-condition-modifier-row-body'), false, 'the old two-line value body should be removed');
-    assert.equal(rootSource.includes('gatheringDropModifierOperatorClass'), false, 'the operator-only class helper should be removed');
-  });
-
-  it('formats condition modifier values as signed percentages', () => {
-    // The formatter stays in the root; the input that renders its return, its `inputmode` and its
-    // `%` adornment moved into the shared panel and are asserted in the DOM by
-    // `manager-environments-mounted.js`.
-    assert.ok(rootSource.includes('function gatheringModifierDisplayValue'), 'root should expose a signed display formatter');
-  });
+  // The operator Positive/Negative <select> is gone; value is typed signed. The coloured box, the
+  // signed-input wrapper, its `inputmode` and its `%` adornment are asserted in the DOM by
+  // `manager-environments-mounted.js`.
+  defineStructureContract(
+    'classes, formats and splits a signed condition modifier value',
+    GATHERING_DISPLAY,
+    { exports: ['gatheringModifierValueClass', 'gatheringModifierDisplayValue', 'signedToOperatorValue'] }
+  );
+  defineStructureContract(
+    'keeps neither the two-line value body nor the operator-only class helper',
+    [MANAGER_ROOT, GATHERING_ROUTE_MODEL, GATHERING_DISPLAY],
+    { spellsNo: ['manager-condition-modifier-row-body'], namesNo: ['gatheringDropModifierOperatorClass'] }
+  );
 
   it('supports Arrow Up/Down stepping on condition modifier values', () => {
     assert.ok(rootSource.includes('function onGatheringDropModifierKeydown'), 'root should expose a drop modifier keydown stepper');
@@ -198,18 +199,24 @@ describe('GatheringEventEditView source contract', () => {
     assert.ok(editorSource.includes('viewScene(linkedSceneUuid)'), 'clicking the scene name should navigate the GM to the scene');
   });
 
+  // The draft, its baseline and what they derive are driven by `tests/manager-gathering-route-model.test.js`.
+  defineStructureContract('stages the event draft in the gathering route model', GATHERING_ROUTE_MODEL, {
+    spellsExactly: [
+      'gatheringEventDraft',
+      'gatheringEventDraftBaseline',
+      'editingGatheringEvent',
+      'gatheringEventDraftDirty',
+      'gatheringEventValidation',
+    ],
+  });
+
   it('stages event edits in a draft with Save + Dirty toolbar parity with tasks', () => {
-    assert.ok(rootSource.includes('let gatheringEventDraft = $state(null)'), 'root should declare an event draft state');
-    assert.ok(rootSource.includes('let gatheringEventDraftBaseline = $state(null)'), 'root should declare an event draft baseline');
-    assert.ok(rootSource.includes('const editingGatheringEvent = $derived'), 'root should expose an editingGatheringEvent derived');
-    assert.ok(rootSource.includes('const gatheringEventDraftDirty = $derived'), 'root should expose an event dirty derived');
-    assert.ok(rootSource.includes('const gatheringEventValidation = $derived'), 'root should expose an event validation derived');
     assert.ok(rootSource.includes('function saveGatheringEventDraft'), 'root should expose saveGatheringEventDraft');
     assert.ok(rootSource.includes('function deleteGatheringEventDraft'), 'root should expose deleteGatheringEventDraft');
     assert.ok(ROUTE_EXIT_GUARDS.some((guard) => guard.view === 'gathering-event-edit'), 'route-exit chain should include event confirm');
     assert.ok(gatheringActionsSource.includes('FABRICATE.Admin.Manager.Environment.Events.Save'), 'toolbar Save button uses the event Save lang key');
     assert.ok(gatheringActionsSource.includes('FABRICATE.Admin.Manager.Environment.Events.Dirty'), 'toolbar Dirty chip uses the event Dirty lang key');
-    assert.ok(rootSource.includes('event={editingGatheringEvent}'), 'editor mount should bind the draft event');
+    assert.ok(rootSource.includes('event={gathering.editingGatheringEvent}'), 'editor mount should bind the draft event');
   });
 
   it('mounts at the gathering-event-edit route and exposes a back-to-library affordance', () => {
