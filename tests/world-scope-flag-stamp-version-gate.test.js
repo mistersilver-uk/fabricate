@@ -1,13 +1,14 @@
-/** THE ONE-SHOT VERSION ADVANCES THAT CONSUME A MIGRATION'S OUTPUT (issue 1363). */
+/**
+ * THE ONE-SHOT VERSION ADVANCES THAT CONSUME A MIGRATION'S OUTPUT (issue 1363), driven through the
+ * real module entry: the stamps and the `1.30.0` remap are its exports, and the `1.34.0` essence
+ * remap is reachable only through the `ready` startup sequence.
+ */
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import test from 'node:test';
-import { fileURLToPath } from 'node:url';
-import { entrySources } from './helpers/bootstrapEntrySource.js';
+import test, { describe, it } from 'node:test';
 
-
+import { Fabricate } from '../src/bootstrap/Fabricate.js';
+import { installIdentityRepairs } from '../src/bootstrap/migrations.js';
 import {
   COMPONENT_FLAG_STAMP_TARGET,
   SETTING_KEYS,
@@ -22,235 +23,305 @@ import {
   WORLD_ESSENCE_MERGE_RETIRED_LEG,
   WORLD_ESSENCE_MERGE_SYSTEMS_LEG,
 } from '../src/systems/remapWorldScopeIdentityFlags.js';
+import { ASSISTANT_GM, asLabUser } from './helpers/bootContractProbes.js';
+import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const MAIN = [entrySources['src/main.js'], entrySources['src/bootstrap/Fabricate.js']].join('\n');
+const LAB_BOOT = { timeout: 300000 };
+const write = (key, value) => globalThis.game.settings.set('fabricate', key, value);
+const read = (key) => globalThis.game.settings.get('fabricate', key);
 
-/** The body of one named `async function` in `src/main.js`. */
-function bodyOf(name) {
-  const start = MAIN.indexOf(`async function ${name}()`);
-  assert.ok(start > 0, `${name} must exist in src/main.js`);
-  const end = MAIN.indexOf('\n}\n', start);
-  assert.ok(end > start, `${name} must be a complete function`);
-  return MAIN.slice(start, end);
+/** An actor whose bare run-container read throws: one `skippedErrors` in either remap pass. */
+const brokenActor = () => ({
+  id: 'probe-broken',
+  items: [],
+  getFlag: (scope, key) => {
+    if (key === 'gatheringRuns') throw new Error('probe: the document refused the read');
+    return null;
+  },
+});
+
+/** Replace what the remap passes walk, keeping the lab collection's other members; `walked` counts. */
+function walkOnly(actors) {
+  const game = globalThis.game;
+  const original = game.actors;
+  const walked = { count: 0 };
+  game.actors = Object.assign(Object.create(original), {
+    *[Symbol.iterator]() {
+      walked.count += 1;
+      yield* actors;
+    },
+  });
+  return { walked, restore: () => (game.actors = original) };
 }
 
-/** The body of one named `async` METHOD on the `Fabricate` facade. */
-function methodBodyOf(name) {
-  const start = MAIN.indexOf(`  async ${name}() {`);
-  assert.ok(start > 0, `${name} must exist as a Fabricate method in src/main.js`);
-  const end = MAIN.indexOf(
-    `
+/** Run `work` with `console.warn` recorded rather than printed. */
+async function recordingWarnings(work) {
+  const { warn } = console;
+  const warnings = [];
+  console.warn = (message) => warnings.push(String(message));
+  try {
+    await work();
+  } finally {
+    console.warn = warn;
   }
-`,
-    start
-  );
-  assert.ok(end > start, `${name} must be a complete method`);
-  return MAIN.slice(start, end);
+  return warnings;
 }
 
 test('the two stamp targets are BUMPED, which is what makes the repair happen at all', () => {
-  // Without the bump the stamps never re-run and every source leaf stays stale. This is the
-  // premise the whole file rests on, so it is asserted rather than assumed.
   assert.equal(COMPONENT_FLAG_STAMP_TARGET, 2);
   assert.equal(TOOL_FLAG_STAMP_TARGET, 2);
   assert.equal(WORLD_SCOPE_IDENTITY_FLAG_TARGET, 1);
 });
 
-for (const [pass, versionKey] of [
-  ['runComponentFlagAutoStamp', 'COMPONENT_FLAG_STAMP_VERSION'],
-  ['runToolFlagAutoStamp', 'TOOL_FLAG_STAMP_VERSION'],
-]) {
-  test(`${pass} WITHHOLDS its version advance while the 1.30.0 migration has not completed`, () => {
-    // DELETING THE GUARD MUST FLIP THIS TO FAIL.
-    const body = bodyOf(pass);
-    const guardIndex = body.indexOf('if (!mayClearWorldScopeRekeyMap(');
-    const advanceIndex = body.indexOf(`SETTING_KEYS.${versionKey}, `);
-    assert.ok(
-      guardIndex > 0,
-      `${pass} must gate its version advance on the producing migration having COMPLETED`
-    );
-    assert.ok(advanceIndex > guardIndex, `${pass} must advance its version AFTER that gate`);
-    assert.match(
-      body.slice(guardIndex, advanceIndex),
-      /return;/,
-      'the gate must RETURN rather than branch past the advance'
-    );
-    // The gate must sit AFTER the work, so a torn boot still repairs what it can and only the
-    // one-shot BOOKKEEPING is withheld.
-    const workIndex = body.indexOf('autoStamp');
-    assert.ok(workIndex > 0 && workIndex < guardIndex, `${pass} still does its work first`);
-  });
-}
-
-test('the gate is the SAME predicate the remap uses, so the three passes cannot drift', () => {
-  // One spelling, in the pure module, on `compareSemver`. A second hand-rolled `>=` on what is a
-  // STRING setting is the defect this whole gate exists to avoid.
-  const callSites = MAIN.match(/mayClearWorldScopeRekeyMap\(/g) ?? [];
-  assert.equal(callSites.length, 3, 'exactly three: both stamps and the remap');
+test('the clear gates are semver compares, never lexicographic', () => {
   assert.equal(mayClearWorldScopeRekeyMap('1.29.0'), false);
   assert.equal(mayClearWorldScopeRekeyMap('1.4.0'), false, 'and never a lexicographic compare');
   assert.equal(mayClearWorldScopeRekeyMap('1.30.0'), true);
-});
-
-test('a world with NOTHING to re-key still advances the remap version, so it stops re-checking', () => {
-  const body = bodyOf('runWorldScopeIdentityFlagRemap');
-  const pendingIndex = body.indexOf('hasPendingWorldScopeRekey(');
-  const advanceIndex = body.indexOf('SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION,');
-  assert.ok(pendingIndex > 0, 'the RUN gate is the corpus-derived pending-map predicate');
-  assert.ok(advanceIndex > pendingIndex);
-  assert.doesNotMatch(
-    body.slice(pendingIndex, body.indexOf('mayClearWorldScopeRekeyMap(')),
-    /\breturn;/,
-    'an empty map must NOT return early: the pass would then re-check on every boot forever'
-  );
-});
-
-// The PUBLIC recovery action, and the second withhold that makes it reachable
-
-test('the recovery action is ACTIVE-GM ONLY, matching the boot pass', () => {
-  // NOT A PERMISSION CHECK BUT A SINGLE-WRITER RULE, and it has to be here rather than inherited:
-  // the method calls `applyWorldScopeIdentityFlagRemap` DIRECTLY, which carries no gate of its own,
-  // so it bypasses the one inside `runWorldScopeIdentityFlagRemap`.
-  const body = methodBodyOf('remapWorldScopeIdentityFlags');
-  const gateIndex = body.indexOf('game.users?.activeGM?.id !== game.user?.id');
-  const applyIndex = body.indexOf('applyWorldScopeIdentityFlagRemap(');
-  assert.ok(gateIndex > 0, 'the public method must carry the active-GM gate itself');
-  assert.ok(applyIndex > gateIndex, 'and it must gate BEFORE it does any work');
-  assert.match(body.slice(gateIndex, applyIndex), /return null;/, 'a refused call answers null');
-  // The boot pass keeps its own copy of the same gate, so neither inherits from the other.
-  assert.match(
-    bodyOf('runWorldScopeIdentityFlagRemap'),
-    /game\.users\?\.activeGM\?\.id !== game\.user\?\.id/
-  );
-});
-
-test('the docblock does not claim a recovery the gating makes unreachable', () => {
-  // The method is reachable exactly when the map is still PENDING, and the boot pass clears it
-  // on any clean, non-torn boot. So the states it names must be states that WITHHOLD the clear.
-  const source = MAIN.slice(0, MAIN.indexOf('  async remapWorldScopeIdentityFlags() {'));
-  const docblock = source.slice(source.lastIndexOf('/**'));
-  assert.match(docblock, /TORN MIGRATION/, 'state 1 withholds the clear');
-  assert.match(docblock, /PARTIAL REMAP/, 'state 2 must be one that ALSO withholds the clear');
-  assert.match(docblock, /ACTIVE-GM ONLY/, 'and the gate is stated');
-  assert.doesNotMatch(
-    docblock,
-    /GM-gated by the pass itself/,
-    'the claim that was false: this method bypasses the pass that carries that gate'
-  );
-});
-
-test('a PARTIAL remap withholds the clear AND the version advance', () => {
-  // Without this, a transient rejection writing one actor leaves it naming retired ids, destroys
-  // the decision record, and un-withholds the startup prune that then deletes its runs.
-  assert.equal(remapCompletedCleanly({ skippedErrors: 0 }), true);
-  assert.equal(remapCompletedCleanly({ skippedErrors: 1 }), false);
-  assert.equal(remapCompletedCleanly({ skippedErrors: 3, lockedSkips: 0 }), false);
-  // A LOCKED skip is a STANDING condition a re-run cannot improve, so it must NOT withhold —
-  // withholding on it would retain the map forever.
-  assert.equal(remapCompletedCleanly({ skippedErrors: 0, lockedSkips: 9 }), true);
-  assert.equal(remapCompletedCleanly(null), true, 'a pass that did not run withholds nothing');
-  assert.equal(remapCompletedCleanly(undefined), true);
-
-  const body = bodyOf('runWorldScopeIdentityFlagRemap');
-  const withholdIndex = body.indexOf('if (!remapCompletedCleanly(summary))');
-  const clearIndex = body.indexOf('SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, {}');
-  const versionIndex = body.indexOf('SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION,');
-  assert.ok(withholdIndex > 0, 'the second withhold is wired');
-  assert.ok(clearIndex > withholdIndex, 'the clear sits after it');
-  assert.ok(versionIndex > withholdIndex, 'and so does the version advance');
-  assert.match(body.slice(withholdIndex, clearIndex), /return;/);
-});
-
-// The `1.34.0` essence-merge one-shot (issue 1654). A second decision record with a second Number
-// version, so a world that has consumed one may still owe the other.
-
-test('the essence one-shot has its OWN target, and its clear gate is never a lexicographic compare', () => {
   assert.equal(WORLD_ESSENCE_MERGE_FLAG_TARGET, 1);
   assert.equal(mayClearWorldEssenceMergeMap('1.33.0'), false);
-  assert.equal(
-    mayClearWorldEssenceMergeMap('1.4.0'),
-    false,
-    "a bare JS `>=` on this STRING setting answers TRUE here, and 1.4.0's population is the most " +
-      'tear-prone there is'
-  );
+  assert.equal(mayClearWorldEssenceMergeMap('1.4.0'), false, "1.4.0's population tears most");
   assert.equal(mayClearWorldEssenceMergeMap('1.34.0'), true);
   assert.equal(mayClearWorldEssenceMergeMap('1.35.0'), true);
   assert.equal(mayClearWorldEssenceMergeMap(undefined), false, 'an unstamped world has not run it');
-  // One spelling, one call site: the essence clear is the only thing that consults it.
-  assert.equal((MAIN.match(/mayClearWorldEssenceMergeMap\(/g) ?? []).length, 1);
 });
 
-test('the essence clear and its version advance are BOTH inside the same gate', () => {
-  const body = bodyOf('runWorldEssenceMergeFlagRemap');
-  const pendingIndex = body.indexOf('hasPendingWorldEssenceMerge(');
-  const gateIndex = body.indexOf('if (!mayClearWorldEssenceMergeMap(');
-  const withholdIndex = body.indexOf('if (!remapCompletedCleanly(summary))');
-  const clearIndex = body.indexOf('SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, {');
-  const versionIndex = body.indexOf('SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION,');
-  assert.ok(pendingIndex > 0, 'the RUN gate is the pending-map predicate');
-  assert.ok(gateIndex > pendingIndex, 'the CLEAR gate is a separate, later question');
-  assert.ok(withholdIndex > gateIndex, 'and the second withhold is later still');
-  assert.ok(clearIndex > withholdIndex, 'the clear sits after both');
-  assert.ok(versionIndex > withholdIndex, 'and so does the version advance');
-  assert.match(body.slice(gateIndex, clearIndex), /return;/);
-  assert.doesNotMatch(
-    body.slice(pendingIndex, gateIndex),
-    /\breturn;/,
-    'a world with nothing to remap must NOT return early: it would re-check on every boot forever'
+test('a PARTIAL remap is the only summary that withholds', () => {
+  assert.equal(remapCompletedCleanly({ skippedErrors: 0 }), true);
+  assert.equal(remapCompletedCleanly({ skippedErrors: 1 }), false);
+  assert.equal(remapCompletedCleanly({ skippedErrors: 3, lockedSkips: 0 }), false);
+  // A LOCKED skip is a standing condition a re-run cannot improve, so it must NOT withhold.
+  assert.equal(remapCompletedCleanly({ skippedErrors: 0, lockedSkips: 9 }), true);
+  assert.equal(remapCompletedCleanly(null), true, 'a pass that did not run withholds nothing');
+  assert.equal(remapCompletedCleanly(undefined), true);
+});
+
+test('the two one-shots keep separate settings', () => {
+  assert.notEqual(
+    SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION,
+    SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION
   );
-});
-
-test('the CLEAR empties the `systems` leg and WRITES THE TOMBSTONE BACK', () => {
-  // The setting is a two-leg container: `mintEssenceId` resolves a new id against the live roster
-  // alone, so a clear that wrote `{}` hands a retired id back and a reference this pass left behind
-  // starts contributing the wrong essence — on a world that has finished migrating.
-  const body = bodyOf('runWorldEssenceMergeFlagRemap');
-  const clearIndex = body.indexOf('SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, {');
-  assert.ok(clearIndex > 0, 'the premise: the clear is there');
-  const clear = body.slice(clearIndex, clearIndex + 160);
-  assert.match(clear, /systems: \{\},/, 'the TRANSIENT leg is emptied');
-  assert.match(clear, /retired: stored\.retired \?\? \{\},/, 'and the tombstone is written BACK');
-  assert.doesNotMatch(
-    clear.slice(0, 60),
-    /WORLD_ESSENCE_MERGE_MAP, \{\}\)/,
-    'never a bare `{}`: that destroys the tombstone silently'
-  );
-  assert.match(body, /const stored = getSetting\(SETTING_KEYS\.WORLD_ESSENCE_MERGE_MAP\)/);
-  // A guarded mirror: `src/main.js` spells the two leg names as literals because a computed key
-  // would make the clear unreadable, so the literals are pinned against the constants the pure
-  // reader uses. A rename on one side alone fails here rather than at the next boot.
-  assert.equal(WORLD_ESSENCE_MERGE_SYSTEMS_LEG, 'systems');
-  assert.equal(WORLD_ESSENCE_MERGE_RETIRED_LEG, 'retired');
-  assert.ok(clear.includes(`${WORLD_ESSENCE_MERGE_SYSTEMS_LEG}: {},`));
-  assert.ok(clear.includes(`${WORLD_ESSENCE_MERGE_RETIRED_LEG}: stored.${WORLD_ESSENCE_MERGE_RETIRED_LEG}`));
-});
-
-test('the essence recovery action is ACTIVE-GM ONLY and SAYS SO when it declines', () => {
-  // A silent `return null` on a player client leaves a GM's "run it from the console"
-  // instruction looking like it had worked.
-  const body = methodBodyOf('remapWorldEssenceIdentityFlags');
-  const gateIndex = body.indexOf('game.users?.activeGM?.id !== game.user?.id');
-  const applyIndex = body.indexOf('applyWorldEssenceMergeFlagRemap(');
-  assert.ok(gateIndex > 0, 'the public method must carry the active-GM gate itself');
-  assert.ok(applyIndex > gateIndex, 'and it must gate BEFORE it does any work');
-  const declined = body.slice(gateIndex, applyIndex);
-  assert.match(declined, /console\.warn\(/, 'the decline is REPORTED, never silent');
-  assert.match(declined, /ACTIVE GM alone/);
-  assert.match(declined, /return null;/);
-  // The boot pass keeps its own copy of the same gate, so neither inherits from the other.
-  assert.match(
-    bodyOf('runWorldEssenceMergeFlagRemap'),
-    /game\.users\?\.activeGM\?\.id !== game\.user\?\.id/
-  );
-});
-
-test('the two one-shots are INDEPENDENT: separate settings, separate targets, separate gates', () => {
-  // A re-bump of the `1.30.0` stamp instead would gate the essence repair off on every world that
-  // had already consumed the re-key map, which is every world that has upgraded once.
-  assert.notEqual(SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION, SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION);
   assert.notEqual(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, SETTING_KEYS.WORLD_SCOPE_REKEY_MAP);
-  const body = bodyOf('runWorldEssenceMergeFlagRemap');
-  assert.doesNotMatch(body, /WORLD_SCOPE_REKEY_MAP|WORLD_SCOPE_IDENTITY_FLAG/);
-  assert.doesNotMatch(bodyOf('runWorldScopeIdentityFlagRemap'), /WORLD_ESSENCE_MERGE/);
+});
+
+test(
+  'each 1.30.0 consumer does its work but withholds its advance until 1.30.0 completed',
+  LAB_BOOT,
+  async () => {
+    await withFabricateLifecycleReplay(async ({ loadModule }) => {
+      const main = await loadModule('/src/main.js');
+      const worked = [];
+      for (const method of ['autoStampComponentSources', 'autoStampToolSources']) {
+        main.default.craftingSystemManager[method] = async () => worked.push(method);
+      }
+      const passes = [
+        ['runComponentFlagAutoStamp', 'COMPONENT_FLAG_STAMP_VERSION', COMPONENT_FLAG_STAMP_TARGET],
+        ['runToolFlagAutoStamp', 'TOOL_FLAG_STAMP_VERSION', TOOL_FLAG_STAMP_TARGET],
+        [
+          'runWorldScopeIdentityFlagRemap',
+          'WORLD_SCOPE_IDENTITY_FLAG_VERSION',
+          WORLD_SCOPE_IDENTITY_FLAG_TARGET,
+        ],
+      ];
+      // One predicate for all three: `1.4.0` is the value a bare string `>=` would admit.
+      for (const migrationVersion of ['1.4.0', '1.29.0', '1.30.0']) {
+        await write(SETTING_KEYS.MIGRATION_VERSION, migrationVersion);
+        await write(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, {});
+        for (const [pass, versionKey, target] of passes) {
+          await write(SETTING_KEYS[versionKey], 0);
+          worked.length = 0;
+          await recordingWarnings(() => main[pass]());
+          const advanced = migrationVersion === '1.30.0';
+          assert.equal(
+            read(SETTING_KEYS[versionKey]),
+            advanced ? target : 0,
+            `${pass} @ ${migrationVersion}`
+          );
+          if (pass !== 'runWorldScopeIdentityFlagRemap') {
+            assert.equal(worked.length, 1, `${pass} still does its work first, withheld or not`);
+          }
+        }
+      }
+    });
+  }
+);
+
+test(
+  'the 1.30.0 remap advances an empty map, withholds a partial one, and gates on the active GM',
+  LAB_BOOT,
+  async () => {
+    await withFabricateLifecycleReplay(async ({ loadModule }) => {
+      const { runWorldScopeIdentityFlagRemap } = await loadModule('/src/main.js');
+      const player = globalThis.game.users.get('user-lab-player');
+      const arrange = async (rekeyMap) => {
+        await write(SETTING_KEYS.MIGRATION_VERSION, '1.30.0');
+        await write(SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION, 0);
+        await write(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, rekeyMap);
+      };
+      const pending = { 'sys-a': { components: { old: 'new' } } };
+
+      // Nothing to re-key: no walk, and the advance still lands so the pass stops re-checking.
+      await arrange({});
+      const idle = walkOnly([brokenActor()]);
+      await runWorldScopeIdentityFlagRemap();
+      idle.restore();
+      assert.equal(idle.walked.count, 0, 'an empty map remaps nothing');
+      assert.equal(read(SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION), 1);
+
+      // A partial pass keeps its decision record and its version.
+      await arrange(pending);
+      const partial = walkOnly([brokenActor()]);
+      const warnings = await recordingWarnings(() => runWorldScopeIdentityFlagRemap());
+      partial.restore();
+      assert.equal(partial.walked.count, 1, 'the pending map is walked');
+      assert.deepEqual(read(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP), pending, 'the map is retained');
+      assert.equal(read(SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION), 0, 'and the version too');
+      assert.ok(warnings.some((line) => line.includes('RETAINED: 1 document(s)')));
+
+      // The boot pass carries its own single-writer gate.
+      for (const user of [ASSISTANT_GM, player]) {
+        await arrange({});
+        await asLabUser(user, () => runWorldScopeIdentityFlagRemap());
+        assert.equal(read(SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION), 0, `${user.id} refused`);
+      }
+      await runWorldScopeIdentityFlagRemap();
+      assert.equal(
+        read(SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION),
+        1,
+        'the active GM admitted'
+      );
+    });
+  }
+);
+
+test('the 1.34.0 essence one-shot, through the ready sequence', LAB_BOOT, async () => {
+  await withFabricateLifecycleReplay(async ({ ready, loadModule }) => {
+    const { default: facade } = await loadModule('/src/main.js');
+    // The migration pass would advance `migrationVersion` before the one-shot reads it.
+    facade._runMigrations = async () => {};
+    const player = globalThis.game.users.get('user-lab-player');
+    const retired = { loser: { name: 'Loser' } };
+    const pending = () => ({
+      [WORLD_ESSENCE_MERGE_SYSTEMS_LEG]: { 'sys-a': { essences: { loser: 'survivor' } } },
+      [WORLD_ESSENCE_MERGE_RETIRED_LEG]: retired,
+    });
+    const boot = async ({
+      migrationVersion = '1.34.0',
+      mergeMap = pending(),
+      user,
+      actors,
+    } = {}) => {
+      await write(SETTING_KEYS.MIGRATION_VERSION, migrationVersion);
+      await write(SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION, 0);
+      await write(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, mergeMap);
+      // The 1.30.0 one-shot is spent, and its map is still pending: the essence pass must not care.
+      await write(SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION, WORLD_SCOPE_IDENTITY_FLAG_TARGET);
+      await write(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, { 'sys-a': { components: { a: 'b' } } });
+      const walk = actors ? walkOnly(actors) : null;
+      const warnings = await recordingWarnings(() => (user ? asLabUser(user, ready) : ready()));
+      walk?.restore();
+      return {
+        warnings,
+        mergeMap: read(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP),
+        version: read(SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION),
+      };
+    };
+
+    for (const migrationVersion of ['1.33.0', '1.4.0']) {
+      const torn = await boot({ migrationVersion });
+      assert.deepEqual(torn.mergeMap, pending(), `a torn ${migrationVersion} retains the map`);
+      assert.equal(torn.version, 0, 'and withholds the advance');
+      assert.ok(torn.warnings.some((line) => line.includes('1.34.0 migration has not completed')));
+    }
+
+    const partial = await boot({ actors: [brokenActor()] });
+    assert.deepEqual(partial.mergeMap, pending(), 'a partial remap retains the map');
+    assert.equal(partial.version, 0);
+
+    const cleared = await boot();
+    assert.deepEqual(
+      cleared.mergeMap[WORLD_ESSENCE_MERGE_SYSTEMS_LEG],
+      {},
+      'the transient leg empties'
+    );
+    assert.deepEqual(
+      cleared.mergeMap[WORLD_ESSENCE_MERGE_RETIRED_LEG],
+      retired,
+      'the tombstone stays'
+    );
+    assert.equal(cleared.version, WORLD_ESSENCE_MERGE_FLAG_TARGET);
+    assert.deepEqual(
+      read(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP),
+      { 'sys-a': { components: { a: 'b' } } },
+      'the essence one-shot never touches the 1.30.0 decision record'
+    );
+
+    const empty = await boot({ mergeMap: {} });
+    assert.equal(empty.version, WORLD_ESSENCE_MERGE_FLAG_TARGET, 'nothing to remap still advances');
+
+    for (const user of [ASSISTANT_GM, player]) {
+      const refused = await boot({ user });
+      assert.deepEqual(refused.mergeMap, pending(), `${user.id} leaves the map alone`);
+      assert.equal(refused.version, 0);
+    }
+  });
+});
+
+describe('the public recovery actions run on the active GM alone', () => {
+  const GM = { id: 'gm', isGM: true, role: 4, active: true };
+  const PLAYER = { id: 'player', isGM: false, role: 1, active: true };
+  const ACTIONS = [
+    ['remapWorldScopeIdentityFlags', 'applyWorldScopeIdentityFlagRemap', 'WORLD_SCOPE_REKEY_MAP'],
+    [
+      'remapWorldEssenceIdentityFlags',
+      'applyWorldEssenceMergeFlagRemap',
+      'WORLD_ESSENCE_MERGE_MAP',
+    ],
+  ];
+  const PENDING = {
+    WORLD_SCOPE_REKEY_MAP: { 'sys-a': { components: { a: 'b' } } },
+    WORLD_ESSENCE_MERGE_MAP: { systems: { 'sys-a': { essences: { a: 'b' } } } },
+  };
+
+  function arrange(user, mapKey, map) {
+    const repairs = [];
+    installIdentityRepairs({
+      applyWorldScopeIdentityFlagRemap: (value) => repairs.push(['scope', value]) && 'repaired',
+      applyWorldEssenceMergeFlagRemap: (value) => repairs.push(['essence', value]) && 'repaired',
+    });
+    const values = new Map([[SETTING_KEYS[mapKey], map]]);
+    globalThis.game = {
+      user,
+      users: { activeGM: GM },
+      settings: { get: (_, key) => values.get(key) },
+    };
+    return repairs;
+  }
+
+  for (const [method, , mapKey] of ACTIONS) {
+    it(`${method} refuses an assistant GM and a player, and SAYS SO`, async () => {
+      for (const user of [{ ...ASSISTANT_GM }, PLAYER]) {
+        const repairs = arrange(user, mapKey, PENDING[mapKey]);
+        const warnings = await recordingWarnings(async () => {
+          assert.equal(await new Fabricate()[method](), null);
+        });
+        assert.deepEqual(repairs, [], 'a refused call does no work');
+        assert.ok(
+          warnings.some((line) => line.includes('ACTIVE GM alone')),
+          'never silently'
+        );
+      }
+    });
+
+    it(`${method} repairs a PENDING map on the active GM and is inert on a cleared one`, async () => {
+      const repairs = arrange(GM, mapKey, PENDING[mapKey]);
+      assert.equal(await new Fabricate()[method](), 'repaired');
+      assert.deepEqual(
+        repairs.map(([, value]) => value),
+        [PENDING[mapKey]]
+      );
+      const idle = arrange(GM, mapKey, {});
+      assert.equal(await new Fabricate()[method](), null, 'a consumed map has nothing to recover');
+      assert.deepEqual(idle, []);
+    });
+  }
 });

@@ -11,7 +11,13 @@ import { fileURLToPath } from 'node:url';
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
 import { RETIRED_PLACEMENT_CORPUS } from './helpers/retiredPlaceholderOracle.js';
 import { migrateExportPayload } from '../src/migration/migrateExportPayload.js';
-import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
+import {
+  ACTIVE_GM,
+  ASSISTANT,
+  detailLine,
+  dispatchMigrationSummary,
+  PLAYER,
+} from './helpers/migrationPassDriver.js';
 
 import {
   applyRetireCraftingModToken,
@@ -548,49 +554,32 @@ test('runner: a malformed transient report is coerced rather than passed to a no
   });
 });
 
-// the GM notice in src/main.js. `src/main.js` cannot be imported by a unit test (module-level
-// Foundry side effects and a `.css` asset import), so this repo's established pattern for covering
-// it is a source-text guard.
+// The GM notice's DISPATCH, driven through the real startup pass in `src/bootstrap/migrations.js`.
 
-const MAIN_SOURCE = entryModuleSource('src/bootstrap/migrations.js');
-
-test('main.js reads the counts off the runner SUMMARY, not off the data payload', () => {
-  assert.ok(
-    /summary\?\.retiredCraftingModCounts/.test(MAIN_SOURCE),
-    'the notice reads the summary key the runner returns'
-  );
-  assert.equal(
-    MAIN_SOURCE.includes('_retiredCraftingModCounts'),
-    false,
-    'and never the transient field, which the runner deletes before main.js ever sees it'
-  );
+test('the startup pass posts the SUMMARY counts on the channel the composed severity selects', async () => {
+  const label = '1.21.0 retired check-modifier placeholder';
+  for (const [counts, channel, options] of [
+    [[{ system: 'A', untouched: 1 }], 'warn', { permanent: true }],
+    [[{ system: 'A', inert: 1, subtractive: 2 }], 'info', undefined],
+  ]) {
+    const notice = buildRetiredCraftingModNotice(counts, () => undefined);
+    const { posted, logged } = await dispatchMigrationSummary({ retiredCraftingModCounts: counts });
+    assert.deepEqual(posted, [[channel, notice.message, options]], notice.severity);
+    assert.deepEqual(logged, [detailLine(label, notice.detail)], 'and the detail reaches the console');
+  }
 });
 
-test('main.js fires the notice GM-only and only when a count is non-zero', () => {
-  const block = MAIN_SOURCE.slice(MAIN_SOURCE.indexOf('const retiredCraftingModCounts'));
-  const guard = block.slice(0, block.indexOf('{'));
-  assert.ok(/retiredCraftingModCounts\.length > 0/.test(guard), 'gated on a non-empty report');
-  assert.ok(/game\.user\?\.isGM/.test(guard), 'and on the user being a GM');
-});
-
-// SEVERITY IS LOAD-BEARING, and this was found the hard way.
-test('main.js dispatches the composed severity to the right notification channel', () => {
-  const block = MAIN_SOURCE.slice(MAIN_SOURCE.indexOf('const retiredCraftingModCounts'));
-  const dispatch = block.slice(0, block.indexOf('\n  }'));
-  assert.ok(
-    /if \(notice\.severity === 'warn'\)\s*ui\.notifications\?\.warn\?\.\(notice\.message, \{ permanent: true \}\);/.test(
-      dispatch
-    ),
-    'a check that will not roll until rewritten must not scroll away unread'
-  );
-  assert.ok(
-    /else ui\.notifications\?\.info\?\.\(notice\.message\);/.test(dispatch),
-    'every other finding is informational, so it cannot fail a View Lab capture'
-  );
-  assert.ok(
-    /buildRetiredCraftingModNotice\(/.test(dispatch),
-    'and it composes nothing itself — see the executable notice tests below'
-  );
+test('the startup pass says nothing for a clean world, a transient field, or a non-active GM', async () => {
+  const counts = [{ system: 'A', untouched: 1 }];
+  assert.equal((await dispatchMigrationSummary({ retiredCraftingModCounts: counts })).posted.length, 1);
+  for (const [summary, user, why] of [
+    [{ retiredCraftingModCounts: [] }, ACTIVE_GM, 'an empty report is a clean world'],
+    [{ _retiredCraftingModCounts: counts }, ACTIVE_GM, 'the runner deletes the transient field'],
+    [{ retiredCraftingModCounts: counts }, ASSISTANT, 'an assistant GM is not the active GM'],
+    [{ retiredCraftingModCounts: counts }, PLAYER, 'a player is never told'],
+  ]) {
+    assert.deepEqual((await dispatchMigrationSummary(summary, user)).posted, [], why);
+  }
 });
 
 // the notice COMPOSITION, executed. THE ARITHMETIC IS THE POINT OF THIS NOTICE, and while it lived

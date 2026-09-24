@@ -11,7 +11,14 @@ import {
   MigrationRunner,
 } from '../src/migration/MigrationRunner.js';
 import { buildWorldEssenceMergeRemapNotice } from '../src/systems/remapWorldScopeIdentityFlags.js';
-import { entrySources } from './helpers/bootstrapEntrySource.js';
+import { asLabUser } from './helpers/bootContractProbes.js';
+import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
+import {
+  ASSISTANT,
+  detailLine,
+  dispatchMigrationSummary,
+  PLAYER,
+} from './helpers/migrationPassDriver.js';
 
 import {
   buildWorldEssenceMergeNotice,
@@ -21,7 +28,6 @@ import {
 } from '../src/systems/worldScopeEntityNotice.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const MAIN = [entrySources['src/bootstrap/migrations.js'], entrySources['src/main.js']].join('\n');
 const LANG = JSON.parse(readFileSync(resolve(HERE, '..', 'lang', 'en.json'), 'utf8'));
 const EMPTY = Object.freeze({ message: '', detail: '' });
 
@@ -311,60 +317,6 @@ test('each clause of the essence remap notice appears independently of the other
   assert.doesNotMatch(failedOnly, /merged essence set|refused the update/);
 });
 
-// The two DISPATCH legs in src/main.js
-
-test('src/main.js dispatches BOTH notices, each on the right channel', () => {
-  // An omitted dispatch fails SILENT — the consumer is guarded and the notice simply never
-  // appears — which is why its PRESENCE is asserted rather than inferred.
-  const composeIndex = MAIN.indexOf('buildWorldScopeEntityNotice(worldScopeEntityReport');
-  assert.ok(composeIndex > 0, 'the migration notice is composed from the transient report');
-  // ANCHORED TO THIS BLOCK, and the anchoring is the whole point.
-  const worldScopeBlock = MAIN.slice(composeIndex, composeIndex + 700);
-  assert.match(
-    worldScopeBlock,
-    /notice\.severity === 'warn'/,
-    'the severity the composer derived must actually select the channel'
-  );
-  assert.match(
-    worldScopeBlock,
-    /ui\.notifications\?\.warn\?\.\(notice\.message, \{ permanent: true \}\)/,
-    'a warning notice is PERMANENT, because the GM has to act on a rename or a prune'
-  );
-  assert.match(worldScopeBlock, /ui\.notifications\?\.info\?\.\(notice\.message\)/);
-  assert.match(
-    worldScopeBlock,
-    /logMigrationNoticeDetail\('1\.30\.0 world-scope entities', notice\.detail\)/,
-    'the names the toast only counts must reach the console'
-  );
-  assert.match(
-    MAIN,
-    /const notice = buildWorldScopeIdentityRemapNotice\(summary,/,
-    'the remap notice is composed from the pass summary'
-  );
-  assert.match(
-    MAIN,
-    /if \(notice\.message && game\.user\?\.isGM\) \{\s*logMigrationNoticeDetail\('1\.30\.0 world-scope identity flag remap', notice\.detail\);\s*ui\.notifications\?\.warn\?\.\(notice\.message, \{ permanent: true \}\);/,
-    'and posted, GM-only and permanent, with its detail logged'
-  );
-});
-
-test('every localization key the two notices reference exists in lang/en.json', () => {
-  const source = readFileSync(
-    resolve(HERE, '..', 'src', 'systems', 'worldScopeEntityNotice.js'),
-    'utf8'
-  );
-  const keys = [...source.matchAll(/'(FABRICATE\.Migration\.WorldScopeEntities\.[A-Za-z]+)'/g)].map(
-    (match) => match[1]
-  );
-  assert.ok(
-    keys.length >= 8,
-    `the premise: the module really does reference keys (${keys.length})`
-  );
-  for (const key of new Set(keys)) {
-    assert.equal(typeof localizeLang(key), 'string', `${key} must exist in lang/en.json`);
-  }
-});
-
 // The `1.34.0` equivalent-essence merge notice (issue 1654). `adminStore.addEssence` mints an
 // essence id with `crypto.randomUUID()`, so these assertions hold the toast to readable names: no
 // id enumeration, and no `oldId → newId` arrow of the kind the `Renames` clause prints.
@@ -552,72 +504,6 @@ test('the shipped report shape — a `name` on every entry — needs no fallback
   );
 });
 
-test('src/main.js dispatches the merge notice from the migration-summary handler', () => {
-  // An omitted dispatch fails silently: the consumer is guarded on a report that is `null` unless
-  // the migration ran, so its presence is asserted rather than inferred.
-  const composeIndex = MAIN.indexOf('buildWorldEssenceMergeNotice(worldEssenceMergeReport');
-  assert.ok(composeIndex > 0, 'the notice is composed from the transient report');
-  assert.match(MAIN, /const worldEssenceMergeReport = summary\?\.\w+ \?\? null;/);
-  const block = MAIN.slice(composeIndex, composeIndex + 700);
-  assert.match(
-    block,
-    /ui\.notifications\?\.warn\?\.\(essenceNotice\.message, \{ permanent: true \}\)/,
-    'ALWAYS permanent and ALWAYS a warning: an irreversible merge, an un-retried refusal and an ' +
-      'unsettled disagreement are all things the GM must see'
-  );
-  assert.doesNotMatch(block, /notifications\?\.info\?\.\(essenceNotice/);
-  assert.match(
-    block,
-    /logMigrationNoticeDetail\('1\.34\.0 equivalent essence merge', essenceNotice\.detail\)/,
-    'the detail goes through the one helper whose `info` write survives the release build'
-  );
-  assert.doesNotMatch(
-    block,
-    /console\.(info|debug|log)\(/,
-    'a bare `console.info(...)` statement is deleted from dist/main.js by the minifier'
-  );
-  // The GM gate is the same one every sibling notice in this handler carries.
-  assert.match(MAIN.slice(composeIndex - 200, composeIndex), /game\.user\?\.isGM/);
-});
-
-test('the summary key main.js reads for the merge report is a key the runner actually emits', async () => {
-  // A source-text pin cannot close this gap (issue 1654): `main.js` shipped reading the underscore
-  // field while `MigrationRunner.run()` emits `worldEssenceMergeReport`, so the grep matched while
-  // the notice was dead code. The claim here is that the identifier read exists on the object read.
-  const read = MAIN.match(/const worldEssenceMergeReport = summary\?\.(\w+) \?\? null;/);
-  assert.ok(read, 'main.js reads the merge report off the migration summary');
-
-  const store = new Map([['migrationVersion', getHighestRegisteredMigrationVersion()]]);
-  const summary = await new MigrationRunner({
-    getSetting: (key) => store.get(key),
-    setSetting: async (key, value) => store.set(key, value),
-  }).run();
-
-  assert.ok(
-    Object.hasOwn(summary, read[1]),
-    `main.js reads summary.${read[1]}, which MigrationRunner.run() does not emit — the notice ` +
-      `would be dead code. Emitted keys: ${Object.keys(summary).join(', ')}`
-  );
-});
-
-test('src/main.js composes and posts the essence remap notice from the pass summary', () => {
-  // An omitted dispatch fails silently: the notice would never appear and every assertion above
-  // it would stay green.
-  const composeIndex = MAIN.indexOf('buildWorldEssenceMergeRemapNotice(summary,');
-  assert.ok(composeIndex > 0, 'the essence remap notice is composed from the pass summary');
-  const block = MAIN.slice(composeIndex, composeIndex + 400);
-  assert.match(
-    block,
-    /if \(notice\.message && game\.user\?\.isGM\) \{\s*logMigrationNoticeDetail\('1\.34\.0 essence flag remap', notice\.detail\);\s*ui\.notifications\?\.warn\?\.\(notice\.message, \{ permanent: true \}\);/,
-    'GM-only and PERMANENT, exactly as the 1.30.0 sibling posts its own'
-  );
-  assert.doesNotMatch(
-    MAIN,
-    /MIRRORS `runWorldScopeIdentityFlagRemap` DELIBERATELY AND COMPLETELY/,
-    'the mirror is partial and the docblock must not overstate it'
-  );
-});
-
 test('the 1.34.0 and 1.30.0 remap fallbacks and their lang/en.json strings compose the SAME notices', () => {
   // Existence is not agreement: the key-exists guards stayed green while an inline English fallback
   // kept a sentence `lang/en.json` had already been corrected away from.
@@ -646,42 +532,6 @@ test('the 1.34.0 and 1.30.0 remap fallbacks and their lang/en.json strings compo
     buildWorldScopeIdentityRemapNotice(remapSummary, noLocalizer),
     buildWorldScopeIdentityRemapNotice(remapSummary, localizeLang)
   );
-});
-
-test('every WorldEssenceMerge key the REMAP notice references exists in lang/en.json', () => {
-  const source = readFileSync(
-    resolve(HERE, '..', 'src', 'systems', 'remapWorldScopeIdentityFlags.js'),
-    'utf8'
-  );
-  const keys = [...source.matchAll(/'(FABRICATE\.Migration\.WorldEssenceMerge\.[A-Za-z]+)'/g)].map(
-    (match) => match[1]
-  );
-  assert.equal(
-    keys.length,
-    5,
-    `the premise: the module really does reference keys (${keys.length})`
-  );
-  for (const key of new Set(keys)) {
-    assert.equal(typeof localizeLang(key), 'string', `${key} must exist in lang/en.json`);
-  }
-});
-
-test('every WorldEssenceMerge localization key the notice references exists in lang/en.json', () => {
-  const source = readFileSync(
-    resolve(HERE, '..', 'src', 'systems', 'worldScopeEntityNotice.js'),
-    'utf8'
-  );
-  const keys = [...source.matchAll(/'(FABRICATE\.Migration\.WorldEssenceMerge\.[A-Za-z]+)'/g)].map(
-    (match) => match[1]
-  );
-  assert.equal(
-    keys.length,
-    8,
-    `the premise: the module really does reference keys (${keys.length})`
-  );
-  for (const key of new Set(keys)) {
-    assert.equal(typeof localizeLang(key), 'string', `${key} must exist in lang/en.json`);
-  }
 });
 
 test('the shipped English strings carry the same substitutions the fallbacks do', () => {
@@ -720,4 +570,151 @@ test('the shipped English strings carry the same substitutions the fallbacks do'
     /own essence row keeps the name, icon and description it was authored with/,
     'the notice must scope the identity loss to the WORLD record'
   );
+});
+
+// Every key a notice REQUESTS, recorded as the four builders compose over reports that reach each
+// clause, so a key the module spells but never asks for is not counted.
+
+test('every localization key the four notices request exists in lang/en.json', () => {
+  const requested = new Set();
+  const recording = (key) => {
+    requested.add(key);
+    return undefined;
+  };
+  const overflowing = Array.from({ length: 7 }, (unused, index) => ({
+    survivorId: `s-${index}`,
+    loserIds: [`l-${index}`],
+    name: `Essence ${index}`,
+    reason: 'outputIdCollision',
+    sections: ['macro'],
+  }));
+  const incomplete = {
+    unsafeSystemIdSkips: ['a.b'],
+    unsafeEssenceIdSkips: ['a.b'],
+    refusedGroups: 1,
+    lockedSkips: 2,
+    skippedErrors: 3,
+  };
+  buildWorldScopeEntityNotice(fullReport(), recording);
+  buildWorldEssenceMergeNotice(mergeReport(), recording);
+  buildWorldEssenceMergeNotice(
+    { mergedGroups: overflowing, refusals: overflowing, declined: overflowing },
+    recording
+  );
+  buildWorldScopeIdentityRemapNotice(incomplete, recording);
+  buildWorldEssenceMergeRemapNotice(incomplete, recording);
+
+  const within = (namespace) => [...requested].filter((key) => key.startsWith(namespace));
+  assert.ok(within('FABRICATE.Migration.WorldScopeEntities.').length >= 15, 'the premise');
+  assert.ok(within('FABRICATE.Migration.WorldEssenceMerge.').length >= 13, 'the premise');
+  for (const key of requested) {
+    assert.equal(typeof localizeLang(key), 'string', `${key} must exist in lang/en.json`);
+  }
+});
+
+// The startup pass that DISPATCHES the migration notices. An omitted dispatch fails SILENT — each
+// consumer is guarded on a report that is `null` unless its migration ran — so it is driven.
+
+test('the 1.30.0 world-scope notice takes the channel its composed severity selects', async () => {
+  for (const [report, channel, options] of [
+    [fullReport(), 'warn', { permanent: true }],
+    [createdOnly(), 'info', undefined],
+  ]) {
+    const notice = buildWorldScopeEntityNotice(report, noLocalizer);
+    const { posted, logged } = await dispatchMigrationSummary({ worldScopeEntityReport: report });
+    assert.deepEqual(posted, [[channel, notice.message, options]], `a ${notice.severity} notice`);
+    const detail = notice.detail ? [detailLine('1.30.0 world-scope entities', notice.detail)] : [];
+    assert.deepEqual(logged, detail, 'the names the toast only counts reach the console');
+  }
+});
+
+test('the 1.34.0 merge notice is ALWAYS a permanent warning, off a key the runner emits', async () => {
+  const notice = buildWorldEssenceMergeNotice(mergeReport(), noLocalizer);
+  const { posted, logged } = await dispatchMigrationSummary({
+    worldEssenceMergeReport: mergeReport(),
+  });
+  assert.deepEqual(posted, [['warn', notice.message, { permanent: true }]]);
+  assert.deepEqual(
+    logged,
+    [detailLine('1.34.0 equivalent essence merge', notice.detail)],
+    'one info line through the helper the release build keeps, and no bare console statement'
+  );
+
+  // The key the pass reads is one the real runner emits: `main.js` once read an underscored field
+  // `MigrationRunner.run()` never produced, and the notice was dead code (issue 1654).
+  const store = new Map([['migrationVersion', getHighestRegisteredMigrationVersion()]]);
+  const summary = await new MigrationRunner({
+    getSetting: (key) => store.get(key),
+    setSetting: async (key, value) => store.set(key, value),
+  }).run();
+  assert.ok(Object.hasOwn(summary, 'worldEssenceMergeReport'), Object.keys(summary).join(', '));
+});
+
+test('the migration notices reach the active GM alone', async () => {
+  const summary = { worldScopeEntityReport: fullReport(), worldEssenceMergeReport: mergeReport() };
+  assert.equal((await dispatchMigrationSummary(summary)).posted.length, 2, 'the premise');
+  for (const user of [ASSISTANT, PLAYER]) {
+    const { posted, logged } = await dispatchMigrationSummary(summary, user);
+    assert.deepEqual([posted, logged], [[], []], `${user.id} is told nothing`);
+  }
+});
+
+// The two remap repairs `src/main.js` declares, reached through the module entry's own install.
+
+test('both remap repairs post their notice to a GM, permanent, with the detail logged', { timeout: 300000 }, async () => {
+  await withFabricateLifecycleReplay(async ({ loadModule }) => {
+    const migrations = await loadModule('/src/bootstrap/migrations.js');
+    const game = globalThis.game;
+    const labLocalize = (key, data) => (data ? game.i18n.format(key, data) : game.i18n.localize(key));
+    const player = game.users.get('user-lab-player');
+    // A bare run-container read that throws is one document the identity remap cannot update.
+    const broken = {
+      id: 'probe-broken',
+      items: [],
+      getFlag: (scope, key) => {
+        if (key === 'gatheringRuns') throw new Error('probe: the document refused the read');
+        return null;
+      },
+    };
+    const actors = game.actors;
+    game.actors = [broken];
+    const repairs = [
+      [
+        'applyWorldScopeIdentityFlagRemap',
+        { 'sys-a': { components: { a: 'b' } } },
+        '1.30.0 world-scope identity flag remap',
+        buildWorldScopeIdentityRemapNotice,
+      ],
+      [
+        'applyWorldEssenceMergeFlagRemap',
+        { systems: { 'sys-a': { essences: { 'fire.dotted': 'fire' } } } },
+        '1.34.0 essence flag remap',
+        buildWorldEssenceMergeRemapNotice,
+      ],
+    ];
+    const { info, debug } = console;
+    const { warn } = globalThis.ui.notifications;
+    try {
+      for (const [repair, map, label, compose] of repairs) {
+        const run = async (user) => {
+          const seen = { posted: [], logged: [] };
+          globalThis.ui.notifications.warn = (message, options) => seen.posted.push([message, options]);
+          console.info = (...args) => seen.logged.push(['info', ...args]);
+          console.debug = () => {};
+          seen.summary = await asLabUser(user, () => migrations[repair](map));
+          return seen;
+        };
+        const posted = await run(game.user);
+        const notice = compose(posted.summary, labLocalize);
+        assert.ok(notice.message, `the premise: ${repair} reports something the GM must act on`);
+        assert.deepEqual(posted.posted, [[notice.message, { permanent: true }]]);
+        assert.deepEqual(posted.logged, [detailLine(label, notice.detail)]);
+        assert.deepEqual((await run(player)).posted, [], `${repair} tells a player nothing`);
+      }
+    } finally {
+      game.actors = actors;
+      globalThis.ui.notifications.warn = warn;
+      Object.assign(console, { info, debug });
+    }
+  });
 });

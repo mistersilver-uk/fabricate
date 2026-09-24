@@ -6,7 +6,7 @@
  */
 
 /** The listener `main.js` registered for one hook event, or `null` when it registered none. */
-function handlerOf(event) {
+export function handlerOf(event) {
   const entry = [...globalThis.Hooks.registrations.values()].find((row) => row.event === event);
   return entry?.handler ?? null;
 }
@@ -104,18 +104,33 @@ function probeDepletionSeam(facade) {
   return reached.length === 1 && reached[0].probe === true;
 }
 
+/** A connected role-3 ASSISTANT: `isGM` holds for it in core, and it is never `activeGM` here. */
+export const ASSISTANT_GM = Object.freeze({
+  id: 'user-lab-assistant-gm',
+  name: 'Assistant GM',
+  isGM: true,
+  role: 3,
+  active: true,
+});
+
+/** Run `work` as `user`, awaited, so an async pass meets one user throughout; the lab GM returns. */
+export async function asLabUser(user, work) {
+  const game = globalThis.game;
+  const previous = game.user;
+  game.user = user;
+  try {
+    return await work();
+  } finally {
+    game.user = previous;
+  }
+}
+
 /** Ask each wired single-writer gate as the active GM, an assistant GM and a player. */
 export function probeGmGates(facade, runtime) {
   const game = globalThis.game;
   // The lab GM is `game.users.activeGM`, standing in for the role-4 GAMEMASTER.
   const activeGm = game.user;
-  const assistantGm = {
-    id: 'user-lab-assistant-gm',
-    name: 'Assistant GM',
-    isGM: true,
-    role: 3,
-    active: true,
-  };
+  const assistantGm = ASSISTANT_GM;
   const player = game.users.get('user-lab-player');
   const gates = {
     gatheringResumeTimedRuns: () => runtime.getGatheringEngine().resumeTimedRuns(),
