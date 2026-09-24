@@ -1,9 +1,8 @@
 // The entity-AGNOSTIC half of Scoped Entity Definitions (issue 1358, part of epic 1357).
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
+
+import { defineStructureContract } from './helpers/structureContract.js';
 
 const {
   MEMBERSHIP_KEY_SEPARATOR,
@@ -493,130 +492,26 @@ test('defineScope answers a frozen descriptor over a DEFENSIVE copy of the secti
   }, TypeError, 'the frozen descriptor refuses a structural flip');
 });
 
-// The dependency boundary (criterion 9). PARSED, never substring-searched.
+// The dependency boundary (criterion 9): the scope modules configure the primitive, never the
+// reverse. ESLint's `no-restricted-imports` sees no `import()` in any form, so these rows are the
+// dynamic backstop: the claim reads static imports, re-exports and `import()` in every spelling,
+// and lists an unreadable `import()` specifier rather than skipping it (tests/structure-contract).
+const SCOPE_MODULES = ['componentScope', 'essenceScope', 'toolScope'];
 
-const SYSTEMS_DIR = fileURLToPath(new URL('../src/systems/', import.meta.url));
-const PRIMITIVE_PATH = path.join(SYSTEMS_DIR, 'scopedDefinitions.js');
-const SCOPE_MODULES = ['componentScope.js', 'essenceScope.js', 'toolScope.js'];
+defineStructureContract(
+  'scopedDefinitions.js imports none of the three scope modules, in any spelling',
+  'src/systems/scopedDefinitions.js',
+  { importSpecifiers: SCOPE_MODULES.map((name) => [name, []]) }
+);
 
-function stripComments(source) {
-  return source.replace(/\/\*[\S\s]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
-}
-
-/**
- * Every module specifier the file really imports: `import ... from`, bare `import '…'`, re-export
- * `export ... from`, and dynamic `import('…')` in BOTH its quoted and its template-literal
- * spellings.
- */
-function extractImportSpecifiers(source) {
-  const code = stripComments(source);
-  const specifiers = [];
-  const patterns = [
-    /\b(?:import|export)\b[^'"();]*?\bfrom\s*['"]([^'"]+)['"]/g,
-    /\bimport\s+['"]([^'"]+)['"]/g,
-    /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
-    /\bimport\s*\(\s*`([^`$]+)`\s*\)/g,
-  ];
-  for (const pattern of patterns) {
-    for (const match of code.matchAll(pattern)) specifiers.push(match[1]);
-  }
-  return specifiers;
-}
-
-/**
- * Every `import(` in the file opens with a readable string literal.
- *
- * Without this the boundary guard is only as strong as the extractor: a computed or concatenated
- * dynamic specifier reads as ZERO specifiers, and "no forbidden import found" is then vacuously
- * true. ESLint cannot cover this half at all — `no-restricted-imports` does not analyse dynamic
- * imports in any form — so the whole dynamic boundary rests here.
- */
-function assertEveryDynamicImportIsReadable(code, where) {
-  const openings = [...code.matchAll(/\bimport\s*\(/g)];
-  for (const opening of openings) {
-    const tail = code.slice(opening.index + opening[0].length);
-    assert.match(
-      tail,
-      /^\s*(?:['"][^'"]*['"]|`[^`$]*`)\s*\)/,
-      `${where}: every dynamic import must name a literal specifier this guard can read`
-    );
-  }
-}
-
-/**
- * Both spellings a relative specifier may take: Node's ESM resolver demands the extension, but the
- * bundler and the editor do not, so `'./componentScope'` is a real thing a future edit can write.
- */
-function candidateTargets(fromFile, specifier) {
-  const resolved = path.resolve(path.dirname(fromFile), specifier);
-  return [resolved, `${resolved}.js`];
-}
-
-test('the specifier extractor is not vacuous: it finds the imports the scope modules really have', async () => {
-  for (const name of SCOPE_MODULES) {
-    const source = await readFile(path.join(SYSTEMS_DIR, name), 'utf8');
-    const specifiers = extractImportSpecifiers(source);
-    assert.ok(
-      specifiers.includes('./scopedDefinitions.js'),
-      `${name} imports the primitive, and the extractor sees it`
-    );
-  }
-});
-
-test('the extractor reads every spelling a reverse edge could take', () => {
-  // Four spellings, and none of them is hypothetical: ESLint's `no-restricted-imports` sees only
-  // the first two (and only when the pattern list carries the extensionless form as well), and it
-  // does not analyse `import()` in ANY form. So the extractor has to read all four itself.
-  const sample = [
-    "import { x } from './componentScope.js';",
-    "export { y } from './essenceScope';",
-    "const a = await import('./toolScope');",
-    'const b = await import(`./componentScope.js`);',
-  ].join('\n');
-  assert.deepStrictEqual(extractImportSpecifiers(sample), [
-    './componentScope.js',
-    './essenceScope',
-    './toolScope',
-    './componentScope.js',
-  ]);
-});
-
-test('the dynamic-import readability guard rejects a specifier it cannot read', () => {
-  assert.throws(
-    () => assertEveryDynamicImportIsReadable('const m = await import(NAME);', 'sample'),
-    'a computed specifier fails the guard rather than reading as zero imports'
+for (const name of SCOPE_MODULES) {
+  defineStructureContract(
+    `${name}.js imports the primitive, and the claim sees it`,
+    `src/systems/${name}.js`,
+    {
+      importSpecifiers: [
+        ['scopedDefinition', ['./scopedDefinitions.js', './scopedDefinitionStore.js']],
+      ],
+    }
   );
-  assert.throws(
-    () => assertEveryDynamicImportIsReadable('await import(`./${name}.js`);', 'sample'),
-    'and so does an interpolated template literal'
-  );
-  assertEveryDynamicImportIsReadable("await import('./ok.js');", 'sample');
-  assertEveryDynamicImportIsReadable('await import(`./ok.js`);', 'sample');
-});
-
-test('scopedDefinitions.js imports none of the three scope modules, in any spelling', async () => {
-  const source = await readFile(PRIMITIVE_PATH, 'utf8');
-  const code = stripComments(source);
-  assertEveryDynamicImportIsReadable(code, 'scopedDefinitions.js');
-  const forbidden = new Set(SCOPE_MODULES.map((name) => path.join(SYSTEMS_DIR, name)));
-  const violations = extractImportSpecifiers(source)
-    .filter((specifier) => specifier.startsWith('.'))
-    .flatMap((specifier) => candidateTargets(PRIMITIVE_PATH, specifier))
-    .filter((target) => forbidden.has(target));
-  assert.deepStrictEqual(
-    violations,
-    [],
-    'the dependency runs one way: the scope modules configure the primitive, never the reverse'
-  );
-});
-
-test('the boundary guard is not vacuous: an extensionless reverse edge is caught', () => {
-  // Proving the guard CAN fail, on the exact spelling that slipped past the r1 extractor.
-  const forbidden = new Set(SCOPE_MODULES.map((name) => path.join(SYSTEMS_DIR, name)));
-  for (const specifier of ['./componentScope', './toolScope.js', './essenceScope']) {
-    const caught = candidateTargets(PRIMITIVE_PATH, specifier).filter((target) =>
-      forbidden.has(target)
-    );
-    assert.equal(caught.length, 1, `${specifier} resolves onto a forbidden module`);
-  }
-});
+}

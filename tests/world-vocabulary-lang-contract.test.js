@@ -11,24 +11,28 @@ import {
   panelKey,
   WORLD_VOCABULARY_PANELS,
 } from '../src/ui/svelte/apps/manager/scoped/worldVocabularyStudio.js';
+import { calledName, walkNodes } from './helpers/moduleAst.js';
+import { componentAstOf, moduleAstOf } from './helpers/parsedSource.js';
 
 const repoRoot = resolve(import.meta.dirname, '..');
 const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
 const LANG = JSON.parse(read('lang/en.json'));
 
-/** The per-panel field names the two consumers actually ask for. */
+/** The per-panel field names the two consumers actually ask for, read off their parsed calls. */
 function requestedFields() {
   const fields = new Set();
-  const sources = [
-    read('src/ui/svelte/apps/manager/scoped/WorldVocabularyPage.svelte'),
-    read('src/ui/svelte/apps/manager/scoped/worldVocabularyStudio.js'),
+  const trees = [
+    componentAstOf('src/ui/svelte/apps/manager/scoped/WorldVocabularyPage.svelte'),
+    moduleAstOf('src/ui/svelte/apps/manager/scoped/worldVocabularyStudio.js').ast,
   ];
-  for (const source of sources) {
-    for (const [, field] of source.matchAll(/panel(?:Text|Key)\(panel, '(\w+)'/g)) {
-      fields.add(field);
+  for (const tree of trees) {
+    for (const node of walkNodes(tree)) {
+      if (!['panelText', 'panelKey'].includes(calledName(node))) continue;
+      const [panel, field] = node.arguments;
+      if (panel?.name === 'panel' && typeof field?.value === 'string') fields.add(field.value);
     }
   }
-  return [...fields].sort();
+  return [...fields].sort((left, right) => left.localeCompare(right));
 }
 
 /** The ONE field pair that is legitimately per-kind rather than universal. */

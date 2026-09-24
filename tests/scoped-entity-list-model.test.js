@@ -5,8 +5,6 @@
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 import { WORLD_IDENTITY_FIELDS } from '../src/systems/worldScopeEntityGrouping.js';
 // BY PATH, and the path matters.
@@ -15,17 +13,10 @@ import {
   projectWorldScopeEntity,
   WORLD_SCOPE_DESCRIPTORS,
 } from '../src/ui/svelte/stores/worldScopeProjection.js';
-import { paginateRows } from '../src/ui/model/browserPagination.js';
 // ALL THREE SHIPPED SORTS, run rather than restated.
 import { sortComponents } from '../src/ui/model/componentBrowserModel.js';
 import { sortEssences } from '../src/ui/model/essenceBrowserModel.js';
 import { sortRecipes } from '../src/ui/model/recipeBrowserModel.js';
-import {
-  describeBulkSelection,
-  pruneBulkSelection,
-  setBulkSelection,
-  toggleBulkSelection,
-} from '../src/utils/bulkSelectionModel.js';
 import {
   createScopedEntityListModel,
   defaultScopedSearchText,
@@ -34,8 +25,9 @@ import {
   SYSTEM_MEMBERSHIP_FILTERS,
   WORLD_MEMBERSHIP_FILTERS,
 } from '../src/ui/model/scopedEntityListModel.js';
+import * as listModel from '../src/ui/model/scopedEntityListModel.js';
+import { defineStructureContract } from './helpers/structureContract.js';
 
-const repoRoot = resolve(import.meta.dirname, '..');
 const ENTITY_TYPES = ['component', 'essence', 'tool'];
 
 /** The plural keys the derivation bridges to, restated here so the bridge itself is measured. */
@@ -78,33 +70,12 @@ describe('the two identity shape facts are derived, and the bridge is pinned', (
     }
   });
 
-  it('reads the bridge OUT OF THE PRODUCTION MODULE, and every key it names is non-empty', () => {
-    // THE PIN ABOVE USES THIS FILE'S OWN COPY of the bridge, so it cannot see production drop its
-    // own.
-    const source = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/stores/worldScopeProjection.js'),
-      'utf8'
-    );
-    const block = /const IDENTITY_FIELD_KEY = Object\.freeze\(\{([^}]*)\}\)/.exec(source)?.[1];
-    assert.ok(
-      block,
-      'the projection declares no `IDENTITY_FIELD_KEY` bridge, so the derivation is indexing ' +
-        'the plural identity lists with a singular descriptor key and answers false everywhere'
-    );
-    const pairs = [...block.matchAll(/(\w+):\s*'([^']+)'/g)].map((match) => [match[1], match[2]]);
-    assert.deepEqual(
-      pairs.map(([singular]) => singular).sort(),
-      [...ENTITY_TYPES].sort(),
-      'the bridge must name every singular descriptor key'
-    );
-    for (const [singular, plural] of pairs) {
-      const fields = WORLD_IDENTITY_FIELDS[plural];
-      assert.ok(
-        Array.isArray(fields) && fields.length > 0,
-        `the bridge maps ${singular} to ${plural}, which names no identity field list`
-      );
-    }
-  });
+  // The pins above use this file's OWN COPY of the bridge, so this row reads production's.
+  defineStructureContract(
+    'reads the bridge OUT OF THE PRODUCTION MODULE, one plural key per singular type',
+    { file: 'src/ui/svelte/stores/worldScopeProjection.js', constant: 'IDENTITY_FIELD_KEY' },
+    { contains: [`Object.freeze({ component: 'components', essence: 'essences', tool: 'tools' })`] }
+  );
 
   it('answers sourceLinked TRUE for exactly the component and the tool', () => {
     const linked = ENTITY_TYPES.filter((type) => projectionOf(type).sourceLinked === true);
@@ -441,45 +412,29 @@ describe('the two memos, counted', () => {
 });
 
 describe('nothing shipped is restated', () => {
-  const source = readFileSync(resolve(repoRoot, 'src/ui/model/scopedEntityListModel.js'), 'utf8');
-  const framePath = 'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte';
-  const frame = readFileSync(resolve(repoRoot, framePath), 'utf8');
-
-  it('imports the shipped selection reducer and page arithmetic INTO THE FRAME', () => {
-    // Asserted on the frame rather than on the model because the model must not own either: the
-    // composition is what reaches for them.
-    for (const name of [
-      'toggleBulkSelection',
-      'setBulkSelection',
-      'describeBulkSelection',
-      'pruneBulkSelection',
-    ]) {
-      assert.equal(
-        frame.includes(name),
-        true,
-        `${framePath} must compose ${name} from src/utils/bulkSelectionModel.js`
-      );
+  // Asserted on the frame rather than on the model because the model must not own either: the
+  // composition is what reaches for them.
+  defineStructureContract(
+    'the FRAME composes the shipped selection reducer and page arithmetic',
+    'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+    {
+      imports: [
+        '../../../../../utils/bulkSelectionModel.js',
+        '../../../../model/browserPagination.js',
+      ],
+      calls: [
+        'toggleBulkSelection',
+        'setBulkSelection',
+        'describeBulkSelection',
+        'pruneBulkSelection',
+        'paginateRows',
+      ],
     }
-    assert.match(frame, /from '\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/utils\/bulkSelectionModel\.js'/);
-    assert.match(frame, /import \{ paginateRows \} from '[^']*browserPagination\.js'/);
-    // The bindings resolve to the real exports, so the string match above is about the module the
-    // repository actually ships rather than about a same-named local.
-    for (const fn of [
-      toggleBulkSelection,
-      setBulkSelection,
-      describeBulkSelection,
-      pruneBulkSelection,
-      paginateRows,
-    ]) {
-      assert.equal(typeof fn, 'function');
-    }
-  });
+  );
 
-  it('exports no selection reducer and no page arithmetic of its own', () => {
-    const exported = [...source.matchAll(/^export (?:const|function) (\w+)/gm)].map(
-      (match) => match[1]
-    );
-    assert.ok(exported.length > 0, 'the export scrape found nothing, so this assertion is vacuous');
+  it('the model exports no selection reducer and no page arithmetic of its own', () => {
+    const exported = Object.keys(listModel);
+    assert.ok(exported.includes('createScopedEntityListModel'), 'the namespace is the real model');
     for (const banned of [
       'toggleBulkSelection',
       'setBulkSelection',
@@ -495,6 +450,17 @@ describe('nothing shipped is restated', () => {
           'lives in exists to prevent'
       );
     }
-    assert.equal(source.includes('pageCount'), false, 'page arithmetic belongs to paginateRows');
+  });
+
+  defineStructureContract(
+    'page arithmetic belongs to paginateRows',
+    'src/ui/model/scopedEntityListModel.js',
+    {
+      namesNo: ['pageCount'],
+      mentionsNo: ['pageCount'],
+    }
+  );
+  defineStructureContract('which is where the name lives', 'src/ui/model/browserPagination.js', {
+    names: ['pageCount'],
   });
 });
