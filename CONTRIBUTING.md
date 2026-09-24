@@ -55,6 +55,7 @@ Its glob enumerates a fixed set of test directories (see the `test` script in `p
 A test placed in a directory the glob does not list is NOT gated, even though it passes when run directly with `node --test <file>`.
 When adding a test in a new directory, add that directory to the `test` script and confirm the total count rises under `npm test`.
 A mounted-component test that references a `.svelte` (or imported module) missing from its harness allowlist does not fail — it hangs and is reported as `# cancelled`, so after adding/rendering a component confirm `# cancelled 0`, not just `# fail 0` (see the implementer skill).
+The unit-test bar is `# cancelled 0` as well as `# fail 0`: a parallel run under machine load (a concurrent `npm ci` in another worktree, for instance) produces cancellations that read like failures, so on any cancellation re-run with `--test-concurrency=1` and account for the delta before diagnosing a real break.
 
 ## How releases work
 
@@ -519,6 +520,8 @@ To reword a non-tip commit non-interactively (interactive rebase is unavailable)
 - Merge commits are linted too.
 A `merge:` prefix fails `commitlint` (`merge` is not an allowed type); `commitlint`'s default ignore only skips the standard capitalized `Merge branch …` / `Merge pull request …` messages.
 For a `--no-ff` integration merge, title it `chore: merge <x> into <y>` (or keep the default `Merge branch …` message). `git commit --amend -m "chore: …"` preserves both parents if a merge message needs fixing; re-run `npx commitlint --from=main --to=HEAD`, then `git push --force-with-lease`.
+- GitHub issue, PR, and comment bodies are written as normal prose with no manual line wrapping — one line per paragraph, and let GitHub soft-wrap.
+Do not hard-wrap at a fixed column, and do not apply the one-sentence-per-line rule here (GitHub renders single newlines as spaces, but unwrapped source is cleaner to read and edit).
 
 ## Linting & formatting
 
@@ -589,6 +592,8 @@ Run this before finalising any change that touches Markdown.
 
 - `npm run lint:md:files -- <paths>` is the focused local and lane check and passes only the explicit paths to `markdownlint-cli2 --no-globs`, so configured repository globs cannot pull unrelated Markdown into the run.
 `npm run lint:md` remains the unchanged authoritative whole-repository gate in local development and CI; CI does not substitute the focused command for it.
+- Do not reflow existing documents wholesale just to apply these rules.
+Apply them to new content and to any section you are already editing.
 That is the steady-state rule, and it sits on top of the one-time reflow of the harness documents that issue #1661 sanctioned and `scripts/lib/markdownWraps.js` performed; a further wholesale reflow needs its own sanction.
 
 ### CSS linting (Stylelint)

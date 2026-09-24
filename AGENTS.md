@@ -80,7 +80,6 @@ The model pins, the keyed inputs, row intersection, the `HIGH_RISK_PATHS` list, 
 ## Build & Test
 
 - `npm test` — required validation gate for implementation changes.
-The unit-test bar is `# cancelled 0` as well as `# fail 0`: a parallel run under machine load (a concurrent `npm ci` in another worktree, for instance) produces cancellations that read like failures, so on any cancellation re-run with `--test-concurrency=1` and account for the delta before diagnosing a real break.
 - `npm run build` — required build gate for implementation changes.
 - `npm run lint` + `npm run lint:svelte` + `npm run lint:svelte:warnings` + `npm run lint:css` + `npm run format:check` + `npm run lint:md` — required ESLint + Svelte ESLint + Svelte compiler-warning sweep + Stylelint + Prettier + markdownlint gate (the `lint` CI job).
 - `npm run lint:md` (markdownlint, config in `.markdownlint-cli2.jsonc`) gates every authored Markdown file and enforces **one sentence per line** — run it before finalising any change that touches Markdown.
@@ -154,11 +153,7 @@ This keeps diffs sentence-scoped and review-friendly.
 Headings and list items stay one per line as usual, and a multi-sentence list item still puts each sentence on its own line.
 A multi-sentence table cell cannot break across lines, so keep its sentences in the one cell and wrap that table in the markdownlint disable region described in the Build & Test section.
 Prettier does not format Markdown (its glob is `src/**/*.js` plus `eslint.config.js` only), so nothing re-wraps these files — author them this way by hand.
-- GitHub issue, PR, and comment bodies are written as normal prose with no manual line wrapping — one line per paragraph, and let GitHub soft-wrap.
-Do not hard-wrap at a fixed column, and do not apply the one-sentence-per-line rule here (GitHub renders single newlines as spaces, but unwrapped source is cleaner to read and edit).
-- Do not reflow existing documents wholesale just to apply these rules.
-Apply them to new content and to any section you are already editing.
-- How the steady-state rule sits on the one-time reflow is in [Markdown linting (markdownlint)](CONTRIBUTING.md#markdown-linting-markdownlint).
+- How GitHub issue, PR, and comment bodies are wrapped is in [Commit conventions](CONTRIBUTING.md#commit-conventions), and when an existing document is reflowed is in [Markdown linting (markdownlint)](CONTRIBUTING.md#markdown-linting-markdownlint).
 
 ## Git Conventions
 
