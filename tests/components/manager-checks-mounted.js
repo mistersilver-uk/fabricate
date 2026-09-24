@@ -26,6 +26,8 @@ let ProgressiveCraftingCheckEditorComponent;
 let ChecksViewComponent;
 let mounted;
 let target;
+// The store `mountManager` built, so a case can make one save refuse after mounting.
+let checksStore;
 
 // The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
@@ -37,7 +39,9 @@ const { mountManager, mountWorldRulesDestination, openRecipeEditor } = createMan
     mounted = nextMounted;
     target = nextTarget;
   },
-  adoptStore: () => {},
+  adoptStore: (store) => {
+    checksStore = store;
+  },
 });
 
 /** Register this route’s cases in `manager-mounted.test.js`’s one describe. */
@@ -3840,6 +3844,137 @@ export function registerChecksCases() {
     assert.equal(written[1].rollFormula, '1d20 + 7');
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'components');
   });
+
+  /** The routed gathering economy the per-slot save cases below share. */
+  const routedGatheringOptions = {
+    gatheringResolutionMode: 'routed',
+    gatheringCraftingCheck: {
+      enabled: true,
+      routed: {
+        rollFormula: '2d6',
+        type: 'relative',
+        relativeOutcomes: [{ id: 'g1', name: 'Rich Vein', success: true, dc: 5 }],
+        fixedOutcomes: [],
+      },
+    },
+  };
+
+  async function toggleActive(activity) {
+    target.querySelector(`[data-checks-active="${activity}"] [data-checks-active-toggle]`).click();
+    await tick();
+    flushSync();
+  }
+
+  // A moved Active switch dirties its activity, so each slot save must still read its OWN flag.
+  for (const row of [
+    {
+      activity: 'crafting',
+      options: {
+        alchemyResolutionMode: 'simple',
+        craftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
+      },
+      active: 'saveCraftingCheckActive',
+      slot: 'saveCraftingCheckSimple',
+    },
+    {
+      activity: 'gathering',
+      options: routedGatheringOptions,
+      active: 'saveGatheringCheckActive',
+      slot: 'saveGatheringCheckRouted',
+    },
+  ]) {
+    it(`applies a staged ${row.activity} Active switch without rewriting its untouched slot`, async () => {
+      const calls = [];
+      await mountChecks(calls, row.options);
+      await openChecksActivity(row.activity);
+      await toggleActive(row.activity);
+
+      target.querySelector('[data-checks-save]').click();
+      await settleRouteExit();
+      assert.deepEqual(
+        calls.filter((call) => call[0] === row.active),
+        [[row.active, false]],
+        'Save applies the staged switch'
+      );
+      assert.deepEqual(
+        calls.filter((call) => call[0] === row.slot),
+        [],
+        'and the slot draft nobody touched is not written'
+      );
+    });
+  }
+
+  // A store save resolving `false` answers false, so the guard keeps the GM here, and it leaves
+  // the baseline where it was, so the activity still reads unsaved.
+  for (const row of [
+    {
+      activity: 'crafting',
+      options: { alchemyResolutionMode: 'simple', craftingCheck: { enabled: false } },
+      save: 'saveCraftingCheckActive',
+      edit: () => toggleActive('crafting'),
+    },
+    {
+      activity: 'crafting',
+      options: {
+        alchemyResolutionMode: 'alchemy',
+        alchemyConfig: { checkMode: 'simple', learnOnCraft: true, consumeOnFail: true },
+        craftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
+      },
+      save: 'setAlchemyCheckMode',
+      edit: () => toggleActive('crafting'),
+    },
+    {
+      activity: 'salvage',
+      options: {
+        salvageResolutionMode: 'progressive',
+        salvageCraftingCheck: { enabled: true, progressive: { awardMode: 'equal' } },
+      },
+      save: 'saveSalvageCheckProgressive',
+      edit: async () => {
+        await openChecksSection('outcomes');
+        target.querySelector('[data-award-mode-option="exceed"] input').click();
+        await tick();
+        flushSync();
+      },
+    },
+    {
+      activity: 'gathering',
+      options: routedGatheringOptions,
+      save: 'saveGatheringCheckRouted',
+      edit: async () => {
+        setInputValue(target.querySelector('[data-check-roll-formula]'), '2d6 + 1');
+        await tick();
+        flushSync();
+      },
+    },
+  ]) {
+    it(`keeps a refused ${row.save} unsaved and the GM on checks-${row.activity}`, async () => {
+      const calls = [];
+      await mountChecks(calls, { ...row.options, confirmDiscardChecksResult: 'save' });
+      checksStore[row.save] = (value) => {
+        calls.push([row.save, value]);
+        return false;
+      };
+      await openChecksActivity(row.activity);
+      await row.edit();
+
+      navButton('Component Rules').click();
+      await settleRouteExit();
+      assert.ok(
+        calls.some((call) => call[0] === row.save),
+        'the save is attempted'
+      );
+      assert.equal(
+        target.querySelector('.fabricate-manager').dataset.managerView,
+        `checks-${row.activity}`,
+        'a refused save keeps the GM on the studio'
+      );
+      assert.ok(
+        target.querySelector(`[data-checks-nav-dirty="${row.activity}"]`),
+        'and the activity is still marked unsaved, because the baseline was not moved'
+      );
+    });
+  }
 
   it('gives every outcome band its OWN colour, and keys the strip from the tier rows', async () => {
     // Deriving the fill from the `success` flag alone painted Standard and Masterwork
