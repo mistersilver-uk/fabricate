@@ -486,7 +486,7 @@ function structureOf(target) {
     typeof target === 'string' ? { file: target } : target;
   const binding = fn ?? constant;
   // A property path narrows one key at a time: `['world-essence-entry', 'confirm']`.
-  const narrow = (scope) => [property ?? []].flat().reduce(propertyAst, scope);
+  const narrow = (scope) => [property ?? []].flat().reduce((node, name) => propertyAst(node, name), scope);
   if (file.endsWith('.svelte')) {
     const component = componentAstOf(file);
     if (!binding && !record) {
