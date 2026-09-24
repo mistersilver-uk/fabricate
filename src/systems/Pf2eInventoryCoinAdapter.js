@@ -1,34 +1,12 @@
 /**
- * Foundry-touching coin adapter for spending pf2e currency through the inventory API.
- *
- * This is the pf2e entry behind the generic {@link ActorInventoryCoinSpender}: the
- * spender resolves a per-system adapter by `game.system.id` and delegates `readCoins`
- * and `spend` to it. The adapter isolates the unavoidable system-specific bit (pf2e's
- * inventory API) so the spender, the engine, and the pure currency-profile helpers stay
- * Foundry-free and unit-testable.
- *
- * Modern Pathfinder 2e does NOT store coins at a flat `system.currency.*` data path;
- * coins are inventory treasure Items aggregated on `actor.inventory.coins` (a
- * `CoinsPF2e`) and mutated through `actor.inventory.removeCoins(...)`. The flat
- * `actorPath` + `actor.update()` model used by the `actorProperty` strategy therefore
- * cannot spend pf2e coins.
- *
- * `actor.inventory.removeCoins(coins, { byValue = true })` makes its own change (it
- * breaks higher denominations), validates sufficiency, never lets a balance go negative,
- * and resolves to `false` when funds are insufficient. So Fabricate must NOT run its own
- * change-making on this path: pass a single denomination count and let `removeCoins`
- * handle the breakdown. The `false` return is the authoritative insufficient-funds signal.
+ * The pf2e coin adapter behind `ActorInventoryCoinSpender`, which resolves it by `game.system.id`.
+ * pf2e keeps coins as treasure Items aggregated on `actor.inventory.coins`, not at a flat
+ * `system.currency.*` path, so `actorProperty` cannot spend them. `removeCoins(coins,
+ * { byValue = true })` makes its own change, never goes negative and resolves `false` when funds
+ * are short: pass one denomination count, run no change-making, and treat `false` as authoritative.
  */
 export class Pf2eInventoryCoinAdapter {
-  /**
-   * Read the actor's coin aggregate.
-   *
-   * Fails loudly (returns `null`) when the actor has no pf2e inventory — a non-pf2e
-   * actor on the actorInventory spend strategy is a misconfiguration, not a silent no-op.
-   *
-   * @param {object} actor
-   * @returns {{ copperValue: number, pp: number, gp: number, sp: number, cp: number } | null}
-   */
+  /** The coin aggregate, or `null` for an actor with no pf2e inventory (a misconfiguration). */
   readCoins(actor) {
     const coins = actor?.inventory?.coins;
     if (!coins) return null;
@@ -41,15 +19,7 @@ export class Pf2eInventoryCoinAdapter {
     };
   }
 
-  /**
-   * Spend a single denomination's worth of coins through the pf2e inventory API,
-   * letting `removeCoins` make its own change across denominations.
-   *
-   * @param {object} actor
-   * @param {{ unit: object, amount: number }} requirement - `unit` carries the resolved
-   *   currency-profile unit (with `denomination`); `amount` is the count of that unit.
-   * @returns {Promise<{ valid: boolean, message?: string }>}
-   */
+  /** Spend one denomination's count; `removeCoins` makes its own change. */
   async spend(actor, { unit, amount } = {}) {
     const denomination = String(unit?.denomination || unit?.id || '').trim();
     if (!denomination) {
@@ -68,15 +38,8 @@ export class Pf2eInventoryCoinAdapter {
   }
 
   /**
-   * Refund a single denomination's worth of coins through the pf2e inventory API — the
-   * inverse of {@link spend}. `actor.inventory.addCoins({ [denomination]: count })` adds
-   * the coins back (returns void, no change-making, never fails on sufficiency). Maps the
-   * requirement shape exactly as `spend` does so a refund gives back the same denomination
-   * that was spent. Used by the player-cancel reversal (issue 848).
-   *
-   * @param {object} actor
-   * @param {{ unit: object, amount: number }} requirement
-   * @returns {Promise<{ valid: boolean, message?: string }>}
+   * Refund one denomination's count, the inverse of `spend` (issue 848); pf2e's `addCoins` returns
+   * void, makes no change and never fails on sufficiency.
    */
   async addCoins(actor, { unit, amount } = {}) {
     const denomination = String(unit?.denomination || unit?.id || '').trim();

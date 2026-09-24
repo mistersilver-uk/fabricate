@@ -10,63 +10,20 @@ import {
 } from './currencyProfile.js';
 
 /**
- * Coin spenders share one behavior-first interface so {@link CraftingEngine} can resolve
- * a spender by `spendStrategy` and drive it uniformly:
- *
- *   readCoins(actor, profileContext) -> { valid, copperValue?, message? }
- *   spend(actor, requirement, profileContext) -> Promise<{ valid, message? }>
- *
- * `profileContext` carries the already-validated currency profile and the resolved unit:
- *   { profile, unit, units }
- *
- * `check` reports affordability for the up-front gate; `spend` performs the deduction and is the
- * authoritative insufficient-funds signal. The pure spend math and validation stay in
- * `currencyProfile.js`; the spenders own the actor I/O. `readCoins` is the shared affordability
- * primitive that `check` wraps on the actor-property/inventory spenders, and since issue 1342 the
- * macro spender answers it too, through the GM's optional `balance` macro.
- *
- * ## `readCoins` is SYNCHRONOUS on two spenders and ASYNCHRONOUS on the third
- *
- * {@link MacroCoinSpender#readCoins} must run a macro, so it returns a Promise where the other two
- * return a value. Every caller that may see a macro spender therefore has to `await` it, and the
- * two shipped callers that CANNOT await — {@link checkAffordabilityViaReadCoins} and
- * {@link buildAffordCurrencyProbe} — are unaffected only because neither is ever reached with a
- * macro spender: the probe short-circuits the `macro` strategy above its `readCoins` call, and
- * `MacroCoinSpender.check` does not go through the shared helper at all. A future caller that
- * reads coins synchronously must keep one of those two properties, because `Promise.valid` is
- * `undefined` rather than `false` and would read as a successful zero-balance answer.
- *
- * ## The two markers on a refusal, and what each one claims (issue 1301)
- *
- * A refusal is `{ valid: false, message }` and may carry either or both of:
- *
- * - **`thrown: true`** — the mechanism DELIVERED NO ANSWER. Named for the outcome class rather
- *   than for a stack unwinding, which is why it is also set where this module refuses BEFORE
- *   delegating to a mechanism that would have thrown. `currencyAffordance.js` reads it to
- *   answer `checkUnavailable`, so what it must keep meaning is "do not report this actor as
- *   poor".
- * - **`wroteNothing: true`** — NOTHING WAS WRITTEN, and this module can prove it, because the
- *   refusal was taken before the write or the write's own return said Foundry accepted no
- *   change. The world-scoped currency credit reads it to answer `creditNotConfigured`.
- *
- * Both are ADDITIVE for every existing caller: the craft paths read only `valid` and `message`,
- * so a broken macro still aborts a craft exactly as it did. The ONE exception is declared where
- * it is made — see {@link ActorPropertyCoinSpender#refund}, which now reports a discarded
- * `actor.update` as a failure and moves the player-cancel refund's shipped answer.
+ * Coin spenders share one interface, resolved by `spendStrategy`: `readCoins(actor,
+ * { profile, unit, units })` -> `{ valid, copperValue?, message? }`, `check` for the up-front gate,
+ * and `spend`/`refund` -> `Promise<{ valid, message? }>`, `spend` being the authoritative
+ * insufficient-funds signal. Spend math lives in `currencyProfile.js`; spenders own actor I/O.
+ * `MacroCoinSpender#readCoins` is asynchronous where the other two are synchronous (issue 1342):
+ * a caller that cannot await must never see a macro spender, since `Promise.valid` is `undefined`
+ * and would read as a zero balance. `checkAffordabilityViaReadCoins` and `buildAffordCurrencyProbe`
+ * are safe only because neither is reached with one.
+ * A refusal `{ valid: false, message }` may carry `thrown: true` (the mechanism delivered no
+ * answer; read as `checkUnavailable`, never as poor) and `wroteNothing: true` (provably nothing
+ * written; read as `creditNotConfigured`) (issue 1301). Both are additive for the craft paths.
  */
 
-/**
- * Shared affordability check for the actor-property and actor-inventory spenders: read the
- * actor's coins, then compare the available base value against the requirement (amount × the
- * unit's base value). Returns `{ valid: true }` when affordable, otherwise `{ valid: false,
- * message }`. Reuses {@link formatCurrencyRequirement} for the shortfall message.
- *
- * @param {object} spender - a spender exposing `readCoins(actor, ctx)`.
- * @param {object} actor
- * @param {{ unit: object, amount: number }} requirement
- * @param {{ profile: object, unit: object, units: object[] }} ctx
- * @returns {{ valid: boolean, message?: string }}
- */
+/** The shared read-then-compare affordability check for the property and inventory spenders. */
 function checkAffordabilityViaReadCoins(spender, actor, requirement, ctx = {}) {
   const { profile, unit, units } = ctx;
   const coins = spender.readCoins(actor, { profile, unit, units: units || profile?.units || [] });
@@ -90,21 +47,9 @@ function checkAffordabilityViaReadCoins(spender, actor, requirement, ctx = {}) {
 }
 
 /**
- * Build the SYNCHRONOUS affordability probe handed to ingredient-set resolution.
- *
- * The selection resolver is synchronous and calls `affordCurrency(match) -> boolean` to decide
- * whether a currency option may satisfy a group. It must answer without awaiting, so this probe
- * does a synchronous coin READ (not the async spend) for the property/inventory strategies, and
- * is optimistic for the `macro` strategy (the authoritative `canAfford` macro is async and runs
- * in the engine gate later — see {@link CraftingEngine}). It returns `false` for a null actor, an
- * invalid profile, an unknown unit, or insufficient held value.
- *
- * @param {object} args
- * @param {object|null} args.actor - the crafting actor; `null` short-circuits to never-affordable.
- * @param {object} args.profile - a validated currency profile ({@link validateCurrencyProfile}).
- * @param {string} args.spendStrategy
- * @param {object} args.spender - resolved coin spender (exposes `readCoins`).
- * @returns {(match: { unit?: string, amount?: number }) => boolean}
+ * The synchronous `affordCurrency(match) -> boolean` probe selection calls: a synchronous coin
+ * read, optimistic for `macro` (its async `canAfford` gate runs later), `false` for a null actor,
+ * unknown unit or shortfall.
  */
 export function buildAffordCurrencyProbe({ actor, profile, spendStrategy, spender } = {}) {
   return (match) => {
@@ -115,9 +60,7 @@ export function buildAffordCurrencyProbe({ actor, profile, spendStrategy, spende
       (entry) => entry.id === String(match?.unit || '').trim()
     );
     if (!unit) return false;
-    // Macro spending can only be checked by running the (async) canAfford macro, which the
-    // synchronous probe cannot do. Stay optimistic here; the engine's async gate is authoritative
-    // and aborts loudly on a real shortfall (never granting a free craft).
+    // Optimistic: the engine's async `canAfford` gate is authoritative and aborts on a shortfall.
     if (spendStrategy === 'macro') return true;
     if (typeof spender?.readCoins !== 'function') return false;
     const coins = spender.readCoins(actor, { profile, unit, units: profile.units });
@@ -128,14 +71,8 @@ export function buildAffordCurrencyProbe({ actor, profile, spendStrategy, spende
 }
 
 /**
- * Resolve a requirement's unit ID from either shape the spender interface is driven with.
- *
- * Every caller in `currencyAffordance.js` hands a spender `{ unit: <the resolved unit OBJECT> }`,
- * while {@link formatCurrencyRequirement} expects `{ unit: <the unit ID> }` and falls back to
- * rendering whatever it was given. Handing it the object therefore rendered a GM-facing message as
- * `Could not spend currency (1 [object Object]).`, which is why this resolution is not optional
- * politeness: the world-scoped affordability answer publishes that message to a companion as its
- * `messageData.detail` (issue 1289).
+ * A requirement's unit id from either shape; `formatCurrencyRequirement` given the unit object
+ * rendered "[object Object]" into a message a companion receives (issue 1289).
  */
 function requirementUnitId(requirement) {
   const unit = requirement?.unit;
@@ -143,15 +80,8 @@ function requirementUnitId(requirement) {
 }
 
 /**
- * Interpret a currency macro's return value into a uniform `{ valid, message? }` result. Reuses
- * the original currency-macro contract: a bare `true`, or an object with a truthy `success` or
- * `canAfford`, means the gate/deduction passed; `false`, `null`, a thrown error, or an object
- * with a falsy `success`/`canAfford` means it failed, surfacing the macro's `message` (or the
- * provided fallback) to the player. Pure — no Foundry access — so it is unit-testable in isolation.
- *
- * @param {any} result - the macro's raw return value.
- * @param {{ fallbackMessage?: string }} [options]
- * @returns {{ valid: boolean, message?: string }}
+ * A currency macro's return as `{ valid, message? }`: `true`, or an object with a truthy `success`
+ * or `canAfford`, passes; anything else fails with the macro's `message` or the fallback.
  */
 export function interpretMacroSpendResult(result, { fallbackMessage } = {}) {
   const fallback = fallbackMessage || 'Currency macro reported failure.';
@@ -165,33 +95,9 @@ export function interpretMacroSpendResult(result, { fallbackMessage } = {}) {
 }
 
 /**
- * Interpret a `balance` macro's return value into the `readCoins` shape (issue 1342).
- *
- * **It is a separate interpreter from {@link interpretMacroSpendResult}, and it has to be.** That
- * one answers `{ valid, message }` for a macro asked to DO something, and a bare number falls
- * through its object test to `{ valid: false }` — so a `balance` macro that correctly returned
- * `250` would be read as a refusal. The two questions have different answer spaces and cannot
- * share a reader.
- *
- * **The rule is null-versus-zero, and it runs one way only.** A finite number — INCLUDING `0` —
- * means the macro answered and the actor provably holds that much. Anything else means the
- * question was not answered, and answers `{ valid: false }`, which every caller turns into a
- * `null` "cannot see". Mapping an unanswered question to `0` is the exact lie this rule exists to
- * prevent: a broken macro would report every actor as penniless, and a pooled gate built on that
- * would refuse a well-funded party — or, worse at the other member, report a party as unable to
- * pay for something it can plainly afford.
- *
- * A non-finite number (`NaN`, `Infinity`) is NOT a count and is refused with everything else. So
- * is a numeric STRING: `currencyAffordance.js`'s request-side amount rule accepts `'5'` because a
- * companion legitimately holds an authored activity field as text, but a macro is code the GM
- * wrote for this contract and `Number('')` is `0` — coercing here would turn an empty return into
- * a provable zero.
- *
- * Pure — no Foundry access — so it is unit-testable in isolation.
- *
- * @param {any} result - the macro's raw return value.
- * @param {{ fallbackMessage?: string }} [options]
- * @returns {{ valid: boolean, copperValue?: number, message?: string }}
+ * A `balance` macro's return as `readCoins` (issue 1342); separate, since a bare number is a
+ * refusal to `interpretMacroSpendResult`. Only a finite number, `0` included, is an answer;
+ * anything else, a numeric string too, is `{ valid: false }` ("cannot see"), never a zero.
  */
 export function interpretMacroBalanceResult(result, { fallbackMessage } = {}) {
   if (typeof result === 'number' && Number.isFinite(result)) {
@@ -205,19 +111,8 @@ export function interpretMacroBalanceResult(result, { fallbackMessage } = {}) {
   };
 }
 
-/**
- * Generic actor-property spender (the default, dnd5e and general behavior).
- *
- * Reads balances from each unit's `actorPath`, computes the spend (with change-making
- * across configured sub-units) via {@link buildCurrencySpendUpdates}, and applies a single
- * batched `actor.update(...)`.
- */
+/** The default `actorProperty` spender: balances by `actorPath`, one batched `actor.update`. */
 export class ActorPropertyCoinSpender {
-  /**
-   * @param {object} actor
-   * @param {{ profile: object, unit: object }} profileContext
-   * @returns {{ valid: boolean, copperValue?: number, message?: string }}
-   */
   readCoins(actor, { profile, unit } = {}) {
     const balances = readCurrencyBalances(actor, profile?.units || []);
     if (!balances.valid) return { valid: false, message: balances.message };
@@ -226,24 +121,10 @@ export class ActorPropertyCoinSpender {
     return { valid: true, copperValue };
   }
 
-  /**
-   * Affordability gate. Wraps {@link readCoins} + base-value comparison.
-   * @param {object} actor
-   * @param {{ unit: object, amount: number }} requirement
-   * @param {{ profile: object, unit: object, units: object[] }} ctx
-   * @returns {{ valid: boolean, message?: string }}
-   */
   check(actor, requirement, ctx = {}) {
     return checkAffordabilityViaReadCoins(this, actor, requirement, ctx);
   }
 
-  /**
-   * @param {object} actor
-   * @param {{ unit: object, amount: number }} requirement - `unit` is the resolved
-   *   currency-profile unit; `buildCurrencySpendUpdates` resolves balances by `unit.id`.
-   * @param {{ profile: object }} profileContext
-   * @returns {Promise<{ valid: boolean, message?: string }>}
-   */
   async spend(actor, { unit, amount } = {}, { profile } = {}) {
     const spend = buildCurrencySpendUpdates(
       actor,
@@ -258,37 +139,11 @@ export class ActorPropertyCoinSpender {
   }
 
   /**
-   * Refund a previously spent requirement (issue 848) — adds `amount` of the unit's own
-   * denomination back to the actor's balance via a single batched `actor.update(...)`.
-   *
-   * **The write is judged by its own return, and that is a DECLARED BEHAVIOUR CHANGE**
-   * (issue 1301). `Document#update` resolves `undefined` when the whole diff is empty, which is
-   * exactly what a GM-authored `actorPath` that is not in the actor's data model produces:
-   * `SchemaField` prunes the unknown key and the empty diff is skipped, with no error, no hook
-   * and no notification. This method answered `{ valid: true }` regardless, so a discarded
-   * write reported a successful refund.
-   *
-   * It now answers `{ valid: false, wroteNothing: true }` there, and that answer is READ: it
-   * flows through `applySpenderToGroup` and `refundCurrencySpends` to
-   * `CraftingEngine._refundCraftCurrency`, whose `console.error` now fires, and on to
-   * `cancelCraft` — so a player cancelling a craft in a mis-typed `actorProperty` world moves
-   * from `refunded: true` to `refunded: false, partialRefund: true`. That is the correct
-   * report: a discarded write is not a refund.
-   *
-   * The test sits INSIDE the existing zero-updates guard deliberately.
-   * `buildCurrencyRefundUpdates` legitimately answers `{ valid: true, updates: {} }` for a
-   * non-positive amount, and outside the guard that no-op would become a reported failure.
-   *
-   * The pre-write refusal above it is marked `wroteNothing` too, and that one is provably
-   * correct rather than merely judged: it RETURNS before `actor.update` is reached. Its
-   * producer is a unit whose `actorPath` resolves a value that is present but non-numeric,
-   * which `readCurrencyBalances` refuses — on the DEFAULT spend strategy, where an unmarked
-   * refusal would otherwise read as a domain answer.
-   *
-   * @param {object} actor
-   * @param {{ unit: object, amount: number }} requirement
-   * @param {{ profile: object }} profileContext
-   * @returns {Promise<{ valid: boolean, wroteNothing?: boolean, message?: string }>}
+   * Refund by adding the unit's own denomination back in one `actor.update` (issue 848). The
+   * write is judged by its return (issue 1301): `Document#update` resolves `undefined` for an empty
+   * diff, which an off-schema `actorPath` produces, so that answers `wroteNothing` and a cancel
+   * reports `partialRefund`. The test sits inside the zero-updates guard, as a non-positive amount
+   * legitimately writes nothing.
    */
   async refund(actor, { unit, amount } = {}, { profile } = {}) {
     const refund = buildCurrencyRefundUpdates(
@@ -312,24 +167,11 @@ export class ActorPropertyCoinSpender {
 }
 
 /**
- * Generic actor-inventory spender. Delegates the system-specific coin I/O to a per-system
- * coin adapter resolved by `game.system.id`. The pf2e adapter is the sole intended entry
- * (see {@link Pf2eInventoryCoinAdapter}); this is deliberately a small internal map, not a
- * third-party plugin registry.
- *
- * A coin adapter implements:
- *   readCoins(actor) -> { copperValue, ... } | null
- *   spend(actor, { unit, amount }) -> Promise<{ valid, message? }>
- *
- * When no adapter is registered for the current system the spender fails loudly with a
- * clear message — never a silent no-op.
+ * The `actorInventory` spender, delegating coin I/O to a per-system adapter by `game.system.id`
+ * (pf2e is the sole entry; an internal map, not a plugin registry). An adapter implements
+ * `readCoins(actor)` and `spend(actor, { unit, amount })`; no adapter fails loudly.
  */
 export class ActorInventoryCoinSpender {
-  /**
-   * @param {object} [options]
-   * @param {Map<string, object>} [options.adapters] - systemId -> coin adapter.
-   * @param {() => string} [options.getSystemId] - resolves the active Foundry system id.
-   */
   constructor({ adapters = new Map(), getSystemId } = {}) {
     this._adapters = adapters instanceof Map ? adapters : new Map(adapters);
     this._getSystemId =
@@ -344,18 +186,8 @@ export class ActorInventoryCoinSpender {
   }
 
   /**
-   * Why this spender cannot spend at all in the ACTIVE GAME SYSTEM, or `null` when it can.
-   *
-   * Actor-independent by construction: {@link _resolveAdapter} reads the system id and takes no
-   * actor, so this answers "is this world able to spend coins" and never "does this actor's sheet
-   * carry the field". The per-actor sentence stays in {@link readCoins}, where the actor is known.
-   * Conflating the two would tell a GM whose world is misconfigured to go and look at a character
-   * sheet.
-   *
-   * Reuses `_resolveAdapter`, whose system-id resolver already guards the Foundry global, so this
-   * adds no new lifecycle exposure. Called from `resolveCurrencyContext` on the craftability path.
-   *
-   * @returns {string|null}
+   * Why this world cannot spend, or `null`: actor-independent, so a misconfigured world is never
+   * sent to a character sheet; the per-actor sentence stays in `readCoins`.
    */
   describeUnavailable() {
     const { systemId, adapter } = this._resolveAdapter();
@@ -363,11 +195,6 @@ export class ActorInventoryCoinSpender {
     return `No currency inventory adapter is registered for system "${systemId || 'unknown'}".`;
   }
 
-  /**
-   * @param {object} actor
-   * @param {{ unit: object }} profileContext
-   * @returns {{ valid: boolean, copperValue?: number, message?: string }}
-   */
   readCoins(actor, { unit } = {}) {
     const { systemId, adapter } = this._resolveAdapter();
     if (!adapter) {
@@ -386,23 +213,10 @@ export class ActorInventoryCoinSpender {
     return { valid: true, copperValue: Number(coins.copperValue) || 0 };
   }
 
-  /**
-   * Affordability gate. Wraps {@link readCoins} + base-value comparison.
-   * @param {object} actor
-   * @param {{ unit: object, amount: number }} requirement
-   * @param {{ profile: object, unit: object, units: object[] }} ctx
-   * @returns {{ valid: boolean, message?: string }}
-   */
   check(actor, requirement, ctx = {}) {
     return checkAffordabilityViaReadCoins(this, actor, requirement, ctx);
   }
 
-  /**
-   * @param {object} actor
-   * @param {{ unit: object, amount: number }} requirement
-   * @param {{ profile: object }} profileContext
-   * @returns {Promise<{ valid: boolean, message?: string }>}
-   */
   async spend(actor, requirement, { profile } = {}) {
     const { systemId, adapter } = this._resolveAdapter();
     if (!adapter?.spend) {
@@ -422,15 +236,7 @@ export class ActorInventoryCoinSpender {
     }
   }
 
-  /**
-   * Refund a previously spent requirement (issue 848). Delegates to the per-system coin adapter's
-   * `refund` (falling back to an `addCoins` capability when present). When the adapter offers no
-   * refund capability the refund fails loudly with a clear message rather than silently losing coins.
-   * @param {object} actor
-   * @param {{ unit: object, amount: number }} requirement
-   * @param {{ profile: object }} profileContext
-   * @returns {Promise<{ valid: boolean, message?: string }>}
-   */
+  /** Refund through the adapter's `refund` or `addCoins` (issue 848); none fails loudly. */
   async refund(actor, requirement, { profile } = {}) {
     const { systemId, adapter } = this._resolveAdapter();
     const refund = adapter?.refund ?? adapter?.addCoins;
@@ -444,9 +250,7 @@ export class ActorInventoryCoinSpender {
       return (await refund.call(adapter, actor, requirement)) ?? { valid: true };
     } catch (error) {
       console.error('Fabricate | Failed to refund inventory currency', error);
-      // `thrown` and NOT `wroteNothing`: a system adapter that threw part-way may already have
-      // created a treasure item, so nothing here can prove the zero. Symmetric with
-      // `MacroCoinSpender`'s shipped marker (issue 1301).
+      // `thrown`, not `wroteNothing`: a throwing adapter may already have created treasure.
       return {
         valid: false,
         thrown: true,
@@ -457,41 +261,16 @@ export class ActorInventoryCoinSpender {
 }
 
 /**
- * Macro-backed actor-inventory spender. Under the `actorInventory` strategy's `macro` mode the
- * GM supplies their own currency macros: `canAfford` gates the craft, `decrement` spends,
- * `increment` refunds, and `balance` REPORTS holdings without acting on them. The `increment`
- * macro is invoked by {@link refund} on the player-cancel reversal (issue 848) — the refund flow
- * it was always reserved for. Every ACTING macro path builds the agreed context (supplied by the
- * engine via `ctx.macroContext`) and passes the macro's return value through the shared, pure
- * {@link interpretMacroSpendResult}, so a `false`/`null`/throw aborts loudly rather than silently
- * granting a free craft or dropping a refund.
- *
- * `balance` (issue 1342) is the one key that ASKS rather than acts, so {@link readCoins} reads it
- * through {@link interpretMacroBalanceResult} instead — a number is an answer there, and
- * `interpretMacroSpendResult` would read `250` as a refusal. It shares every other mechanic
- * (resolution, the four refusal shapes, the throw guard) through {@link _invokeMacro}.
- *
- * The context carries a `caller` discriminator (`'craft'` or `'award'`) and, on an award call,
- * `recipe: null` and `craftingSystem: null` — see `CURRENCY_SPEND_CALLERS` in
- * `currencyAffordance.js`, which builds it.
+ * The `macro` spender: `canAfford` gates, `decrement` spends, `increment` refunds a player-cancel
+ * (issue 848) and `balance` reports holdings (issue 1342). Acting macros go through
+ * `interpretMacroSpendResult`, so a `false`, `null` or throw aborts loudly; `balance` goes through
+ * `interpretMacroBalanceResult`. The context's `caller` is built by `CURRENCY_SPEND_CALLERS`.
  */
 export class MacroCoinSpender {
   /**
-   * The macro slots are copied by ITERATING {@link CURRENCY_MACRO_KEYS}, not by naming them
-   * (issue 1342). The three keys used to be hardcoded here, which meant a GM could author a
-   * fourth macro in an editor that persisted it, a normalizer that emitted it and a config the
-   * spender then silently dropped on the floor — the failure mode being a configured macro that
-   * simply never runs, with nothing anywhere reporting why. Iterating the declared list makes the
-   * constructor follow the vocabulary instead of shadowing it, so the next key needs no edit here.
-   *
-   * @param {object} [options]
-   * @param {{ canAfford?: string, increment?: string, decrement?: string, balance?: string }}
-   *   [options.macros]
-   * @param {(uuid: string, context: object) => Promise<any>} [options.runMacro]
-   * @param {(uuid: string) => Promise<object|null>} [options.resolveMacro] resolves a macro
-   *   document for the gate below; defaults to a guarded `fromUuid`, in the shape
-   *   {@link ActorInventoryCoinSpender} already uses for `game.system.id`, so the class stays
-   *   drivable without a Foundry global.
+   * Slots are copied by iterating `CURRENCY_MACRO_KEYS` (issue 1342), so a new key is never
+   * silently dropped. `resolveMacro` defaults to a guarded `fromUuid`, so no Foundry global is
+   * needed.
    */
   constructor({ macros = {}, runMacro = MacroExecutor.run, resolveMacro } = {}) {
     this._macros = {};
@@ -513,37 +292,11 @@ export class MacroCoinSpender {
   }
 
   /**
-   * Why this macro cannot be run, or `null` when it can.
-   *
-   * The RESOLVE-THEN-GATE half of the idiom `MacroExecutor.js:4-18` records: the `type ===
-   * 'script'` check is a CALL-SITE check and must not be centralised in the executor, because
-   * centralising it would turn a `chat`-type essence property macro from a silent warn into a
-   * per-essence-per-result error notification. This is the call site.
-   *
-   * Four spellings of "the macro never ran", answered identically, because from the GM's side
-   * deleting a macro and switching its type to `chat` are the same action. The MARKERS differ
-   * by one field, and the split is chosen so that no shipped answer moves:
-   *
-   * - a uuid resolving to nothing, and a document with no string `command`, THROW today inside
-   *   `MacroExecutor.run`, so both keep `thrown: true` and `checkAffordability` keeps answering
-   *   `checkUnavailable` for them;
-   * - a BLANK or whitespace-only command compiles today and returns `undefined`, which
-   *   `interpretMacroSpendResult` turns into an unmarked refusal and `checkAffordability`
-   *   answers `notAffordable`. It is therefore `wroteNothing`-only: marking it `thrown` would
-   *   move a published member's shipped answer as a side effect of a marker placement, which
-   *   belongs to its own change;
-   * - a non-`script` type carries `thrown: true`, because a chat macro's text is chat text: it
-   *   is compiled as JavaScript at `MacroExecutor.js:90` and throws for any body that is not
-   *   also valid JS, so `checkUnavailable` IS its shipped answer in every non-pathological
-   *   case, and answering `notAffordable` instead would report a well-funded actor as poor.
-   *   The residual is a chat macro whose text happens to be valid JS returning falsy, which
-   *   moves from `notAffordable` to `checkUnavailable`.
-   *
-   * Every one of the four carries `wroteNothing: true`, which is what the world-scoped credit
-   * reads to answer `creditNotConfigured` — the same answer for all four, which is the point.
-   *
-   * @param {object|null} macro
-   * @returns {{ reason: string, thrown: boolean }|null}
+   * Why a macro cannot run, or `null`: the resolve-then-gate call-site check `MacroExecutor.js`
+   * records (a chat macro is gated here, never in the executor). All four answer `wroteNothing`
+   * (`creditNotConfigured`); a missing uuid, a non-string command and a non-`script` type also
+   * answer `thrown` (`checkUnavailable`), while a blank command does not, since it already
+   * answered `notAffordable` and marking it would move a published answer.
    */
   static _macroRefusal(macro) {
     if (!macro) return { reason: 'could not be found', thrown: true };
@@ -556,20 +309,8 @@ export class MacroCoinSpender {
   }
 
   /**
-   * Run one configured macro and normalize its answer.
-   *
-   * The catch branch marks its result `thrown: true` (issue 1289). The field is ADDITIVE and every
-   * existing caller is unaffected: the craft paths read only `valid` and `message`, so a broken
-   * macro still aborts the craft exactly as it did.
-   *
-   * It exists because without it a THROWN macro and a GENUINE SHORTFALL were the same value. Both
-   * returned `{ valid: false, message }`, so nothing downstream could tell "this macro is broken"
-   * from "this actor is poor" — a silent false negative. That cost nothing on the craft path, where
-   * either answer correctly refuses the craft, but the world-scoped affordability answer REPORTS
-   * its result to a companion and a GM, and reporting a well-funded actor as unable to pay because
-   * a craft-shaped macro dereferenced a null `recipe` is a lie. `interpretMacroSpendResult` is
-   * deliberately untouched: a `false`/`null` return already aborts loudly, and only the throw path
-   * was silent.
+   * Run an acting macro key. A throw is marked `thrown: true` (issue 1289), so the world-scoped
+   * answer never reports a broken macro as a poor actor; the craft paths read only `valid`.
    */
   async _runMacroKey(key, actor, requirement, ctx) {
     const fallbackMessage = `Could not spend currency (${formatCurrencyRequirement({ unit: requirementUnitId(requirement), amount: requirement?.amount }, ctx?.profile?.units || [])}).`;
@@ -580,24 +321,14 @@ export class MacroCoinSpender {
   }
 
   /**
-   * The resolve-then-gate-then-run mechanics, shared by every macro key.
-   *
-   * Extracted (issue 1342) so `balance` reuses the four refusal shapes and their markers rather
-   * than growing a second copy of them. Only the INTERPRETATION differs between keys, so only the
-   * interpretation is injected — see {@link interpretMacroBalanceResult} for why a holdings answer
-   * cannot share {@link interpretMacroSpendResult}.
-   *
-   * Every refusal here answers `{ valid: false }` and NEVER a value, which is what keeps the
-   * null-versus-zero rule true for the balance read: the four "the macro never ran" shapes and the
-   * "no macro configured" shape all reach a caller as "cannot see", never as "holds nothing".
+   * Resolve, gate and run one macro key; only interpretation differs by key. Every refusal is
+   * `{ valid: false }`, never a value, so a balance read that never ran is "cannot see".
    */
   async _invokeMacro(key, ctx, { fallbackMessage, interpret }) {
     const macroUuid = this._macros[key];
     if (!macroUuid) {
-      // `wroteNothing` and NOT `thrown`, so a `macro` world with no `canAfford` configured
-      // answers `checkAffordability` exactly what it answers today. That answer is itself a
-      // misconfiguration reported as a domain answer, and it is now DETECTABLE because this
-      // marker exists — but widening the reader is a different change's decision.
+      // `wroteNothing`, not `thrown`: a world with no `canAfford` keeps its shipped
+      // `checkAffordability` answer.
       return {
         valid: false,
         wroteNothing: true,
@@ -617,35 +348,17 @@ export class MacroCoinSpender {
     try {
       return interpret(await this._runMacro(macroUuid, context));
     } catch (error) {
-      // `thrown` and deliberately NOT `wroteNothing`: a macro that threw part-way may already
-      // have moved coins, so nothing here can prove the zero. The world-scoped credit tests
-      // `wroteNothing` before `thrown`, so adding it here would silently reclassify a broken
-      // `increment` macro from `creditUnavailable` to the retry-safe `creditNotConfigured`.
+      // `thrown`, not `wroteNothing`: a macro that threw part-way may have moved coins, and the
+      // credit tests `wroteNothing` first, so it would read as retry-safe.
       console.error(`Fabricate | Currency ${key} macro failed (${macroUuid}):`, error);
       return { valid: false, thrown: true, message: fallbackMessage };
     }
   }
 
   /**
-   * Read the actor's holdings through the GM-supplied `balance` macro (issue 1342) — the macro
-   * strategy's answer to the same question {@link ActorPropertyCoinSpender#readCoins} answers, so
-   * a pooled holdings read composes across all three strategies rather than excluding one.
-   *
-   * **ASYNCHRONOUS, where the other two spenders' `readCoins` is synchronous.** See this module's
-   * header for which callers that constrains and why the shipped ones are safe.
-   *
-   * **`copperValue` is in the requirement unit's TERMINAL BASE UNIT**, exactly as it is on the
-   * other two spenders: the whole ladder branch's value, expressed in the branch's smallest coin.
-   * The macro is told which unit was asked about through `ctx.macroContext.requirement.unit` and
-   * is given the ladder in `ctx.macroContext.units`; the `cost` it receives carries a ZERO
-   * amount, because a balance read proposes no cost.
-   *
-   * **A refusal never becomes a zero.** Every failure path answers `{ valid: false, message }`,
-   * and callers publish `null`.
-   *
-   * @param {object|null} actor
-   * @param {{ profile?: object, unit?: object, macroContext?: object }} [ctx]
-   * @returns {Promise<{ valid: boolean, copperValue?: number, message?: string }>}
+   * Holdings through the `balance` macro (issue 1342), asynchronously (see the module header).
+   * `copperValue` is in the terminal base unit, as on the other spenders; the macro gets the unit
+   * in `macroContext.requirement.unit` and a zero-amount `cost`. A refusal never becomes a zero.
    */
   async readCoins(actor, ctx = {}) {
     const fallbackMessage = `Could not read a currency balance for ${actor?.name || 'actor'}: the "balance" currency macro did not return a number.`;
@@ -655,27 +368,15 @@ export class MacroCoinSpender {
     });
   }
 
-  /**
-   * Affordability gate — runs the `canAfford` macro.
-   * @returns {Promise<{ valid: boolean, message?: string }>}
-   */
   async check(actor, requirement, ctx = {}) {
     return this._runMacroKey('canAfford', actor, requirement, ctx);
   }
 
-  /**
-   * Deduction — runs the `decrement` macro.
-   * @returns {Promise<{ valid: boolean, message?: string }>}
-   */
   async spend(actor, requirement, ctx = {}) {
     return this._runMacroKey('decrement', actor, requirement, ctx);
   }
 
-  /**
-   * Refund (issue 848) — runs the GM-supplied `increment` macro. This is the refund flow the
-   * `increment` macro was always reserved for; a missing macro fails loudly via {@link _runMacroKey}.
-   * @returns {Promise<{ valid: boolean, message?: string }>}
-   */
+  /** Runs `increment`; a missing macro fails loudly (issue 848). */
   async refund(actor, requirement, ctx = {}) {
     return this._runMacroKey('increment', actor, requirement, ctx);
   }

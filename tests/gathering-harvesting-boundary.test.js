@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { SETTING_KEYS } from '../src/config/settings.js';
+import { termRowText } from '../scripts/lib/domainGlossary.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');
@@ -71,7 +72,12 @@ test('canonical docs keep harvesting modeled through recipes or component salvag
   assert.match(spec, /This spec does not introduce:\s*\n\s*- a standalone harvesting subsystem/);
   assert.match(spec, /A recipe whose ingredient is the harvested component\./);
   assert.match(spec, /A salvage definition on the harvested component\./);
-  assert.match(domain, /\*\*Harvesting\*\*[\s\S]*recipe or a component salvage definition/);
+  const harvesting = termRowText('Harvesting', {
+    domain,
+    readNote: file => (existsSync(resolve(repoRoot, file)) ? readFileSync(resolve(repoRoot, file), 'utf8') : null)
+  });
+  assert.ok(Boolean(harvesting), 'the Harvesting row is still in the glossary');
+  assert.match(harvesting, /^\| \*\*Harvesting\*\* \|[\s\S]*recipe or a component salvage definition/);
 
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   assert.equal(manager._normalizeFeatures({}).salvage, true);
