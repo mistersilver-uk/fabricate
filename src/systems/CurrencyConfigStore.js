@@ -9,26 +9,12 @@ import { normalizeWorldCurrencyConfig } from './currencyProfile.js';
 import { SettingsBackedStore } from './SettingsBackedStore.js';
 
 /**
- * Persists the world currency configuration to the `currencyConfig` world setting.
- *
- * Currency is world scope because a world runs exactly ONE Foundry game system, so there is
- * exactly one way actors store coins. The coin ladder, the spend strategy, the selected provider
- * and the GM macro set therefore describe the WORLD. What stays per crafting system is only
- * `requirements.currency.enabled` — whether that system participates — which this store knows
- * nothing about.
- *
- * **Persistence is not gated on profile validity, and that is deliberate.** A GM authors a ladder
- * incrementally: the moment they add the first of two units, or clear an actor path to retype it,
- * the profile is transiently invalid. Rejecting those writes would make the editor unusable. So
- * this store normalizes on write and always saves, exactly as the per-system editor did before the
- * move, and validity is resolved where it actually matters — at craft time, in
- * `resolveCurrencyContext`, which surfaces a clear error and refuses to spend.
- *
- * It is a persistence shell and nothing more: read, normalize, write. The ladder EDITS — adding a
- * unit, refusing a cyclic sub-unit, reordering, seeding presets, adopting a provider's canonical
- * denominations — live in `adminStore`, composed from the same shared helpers
- * (`canAddCurrencySubUnit`, `reorderListByIndex`) that the modifier and prerequisite lists use.
- * Mirroring them here as store methods would be a second implementation of one set of rules.
+ * Persists the world currency configuration to the `currencyConfig` world setting; a world runs
+ * one game system, so the ladder, strategy, provider and macros are world scope, and only
+ * `requirements.currency.enabled` stays per crafting system.
+ * Persistence is not gated on profile validity: a ladder is transiently invalid mid-edit, so it
+ * normalizes and always saves, and `resolveCurrencyContext` refuses to spend at craft time.
+ * A persistence shell only; ladder edits live in `adminStore` on the shared helpers.
  */
 export class CurrencyConfigStore extends SettingsBackedStore {
   constructor({
