@@ -85,7 +85,8 @@ export async function buildRecipeItemSourceSnapshot(
   // Resolve the same union of source refs a component records (live document uuid +
   // canonical compendium uuid + broken-source fallbacks), so a recipe item claims the
   // full breadth for matching (issue 555). Clone-gated identity is applied inside
-  // `_resolveImportedSourceData`, so a duplicated source keys on its own uuid.
+  // `resolveImportedSourceData` (`manager/itemSources.js`), so a duplicated source keys on its
+  // own uuid.
   const sourceData = await io.resolveImportedComponentSourceData(itemUuid, source);
   const fallbackName = fallbackDefinition?.name || itemUuid?.split('.')?.pop() || 'Recipe Item';
   const fallbackImg = fallbackDefinition?.img || 'icons/svg/item-bag.svg';
