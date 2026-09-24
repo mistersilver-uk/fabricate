@@ -337,48 +337,6 @@ const SYSTEMS_FILE_COMMENT_FLOOR = 10;
 /** Below this the `src/systems` scan is truncated rather than clean; it holds ~150 files. */
 const SYSTEMS_SCAN_FLOOR = 100;
 
-/**
- * Files still over the cap, pending their sweep. Rows are only ever deleted: a trim that clears a
- * file deletes its row, and a change that pushes a file over trims that file instead.
- */
-const SYSTEMS_CAP_PENDING = Object.freeze([
-  'src/systems/GatheringBlindRunStore.js',
-  'src/systems/GatheringHookPublisher.js',
-  'src/systems/GatheringLocationService.js',
-  'src/systems/GatheringNodeService.js',
-  'src/systems/SourceIdentityService.js',
-  'src/systems/WorldVocabularyStore.js',
-  'src/systems/componentEssenceOverride.js',
-  'src/systems/componentScope.js',
-  'src/systems/componentStacking.js',
-  'src/systems/environmentRealmMembership.js',
-  'src/systems/essenceScope.js',
-  'src/systems/eventSceneCoordinator.js',
-  'src/systems/foundryCalendar.js',
-  'src/systems/gatheringBlindRunSocket.js',
-  'src/systems/gatheringComposition.js',
-  'src/systems/gatheringEngineInternals.js',
-  'src/systems/gatheringNodeConfig.js',
-  'src/systems/gatheringNodeSocket.js',
-  'src/systems/gatheringRealmDiscovery.js',
-  'src/systems/gatheringRealms.js',
-  'src/systems/gatheringRichStateInternals.js',
-  'src/systems/nodeRespawnMath.js',
-  'src/systems/normalize/components.js',
-  'src/systems/resolvedComponentEssences.js',
-  'src/systems/scopedDefinitionStore.js',
-  'src/systems/scopedDefinitions.js',
-  'src/systems/scopedEntityReads.js',
-  'src/systems/toolBreakageAuthority.js',
-  'src/systems/toolScope.js',
-  'src/systems/worldIdentityDrift.js',
-  'src/systems/worldScopeImportMerge.js',
-  'src/systems/worldScopeRekeyPending.js',
-  'src/systems/worldScopeStores.js',
-  'src/systems/worldVocabulary.js',
-  'src/systems/writableActors.js',
-]);
-
 /** The one predicate both the scan and the boundary test call. */
 function overSystemsCap({ commentLines, totalLines: total }) {
   return (
@@ -414,37 +372,12 @@ test('the src/systems scan reaches every file, including src/systems/normalize/'
   );
 });
 
-test('no src/systems file outside SYSTEMS_CAP_PENDING is over the comment-share cap', () => {
-  const pending = new Set(SYSTEMS_CAP_PENDING);
-  const over = scanSystemsFiles().filter(overSystemsCap);
-  const unexpected = over.filter(({ file }) => !pending.has(file));
+test('no src/systems file is over the comment-share cap', () => {
   assert.deepStrictEqual(
-    unexpected.map(describeCounts),
+    scanSystemsFiles().filter(overSystemsCap).map(describeCounts),
     [],
     `over ${SYSTEMS_FILE_SHARE_CAP}% comment share with more than ${SYSTEMS_FILE_COMMENT_FLOOR} ` +
-      'comment lines: trim the file under the comment policy (issue 1657). Every file over ' +
-      `the cap:\n${over.map(({ file }) => `  '${file}',`).join('\n')}`
-  );
-});
-
-test('every SYSTEMS_CAP_PENDING row names a file that still exists and is still over', () => {
-  const scanned = new Map(scanSystemsFiles().map((entry) => [entry.file, entry]));
-  const stale = [];
-  for (const file of SYSTEMS_CAP_PENDING) {
-    const entry = scanned.get(file);
-    if (!entry) stale.push(`${file} (missing)`);
-    else if (!overSystemsCap(entry)) stale.push(describeCounts(entry));
-  }
-  assert.deepStrictEqual(stale, [], 'stale SYSTEMS_CAP_PENDING rows: delete each one');
-});
-
-test('SYSTEMS_CAP_PENDING is frozen, unique and code-point sorted', () => {
-  assert.ok(Object.isFrozen(SYSTEMS_CAP_PENDING), 'SYSTEMS_CAP_PENDING is frozen');
-  assert.equal(new Set(SYSTEMS_CAP_PENDING).size, SYSTEMS_CAP_PENDING.length, 'rows are unique');
-  assert.deepStrictEqual(
-    SYSTEMS_CAP_PENDING,
-    [...SYSTEMS_CAP_PENDING].sort(byCodePoint),
-    'rows are code-point sorted'
+      'comment lines: trim the file under the comment policy (issue 1657)'
   );
 });
 
