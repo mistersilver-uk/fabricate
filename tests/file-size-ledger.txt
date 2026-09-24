@@ -115,7 +115,7 @@ src/ui/svelte/apps/manager/BooksScrollsView.svelte	800
 src/ui/svelte/apps/manager/BulkStagingInset.svelte	600
 src/ui/svelte/apps/manager/ComponentEditView.svelte	2600
 src/ui/svelte/apps/manager/ComponentsBrowserView.svelte	900
-src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte	9150
+src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte	8400
 src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte	1550
 src/ui/svelte/apps/manager/EssenceBrowserView.svelte	700
 src/ui/svelte/apps/manager/EssenceEditView.svelte	850

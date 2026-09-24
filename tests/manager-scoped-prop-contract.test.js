@@ -53,9 +53,7 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // GM-configurable player-character predicate rather than a second `type === 'character'` test.
   '../../../../gatheringImageDefaults.js',
   '../../../../systems/characterModifierPrerequisiteCopy.js',
-  '../../../../systems/checkModifierResolver.js',
   '../../../../systems/gatheringComposition.js',
-  '../../../../systems/progressiveCheckSandbox.js',
   '../../../../utils/categoryIcons.js',
   '../../../../utils/componentCategories.js',
   '../../../../utils/craftingCheckExpression.js',
@@ -128,7 +126,9 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './checks/checkTriggerSummary.js',
   './checks/checksCopy.js',
   './checks/checksNav.js',
-  './checks/checksReadiness.js',
+  // Added by issue 1721: the Checks Studio's drafts and rail group are their own unit, which took
+  // `checkModifierResolver.js`, `progressiveCheckSandbox.js` and `checksReadiness.js` with them.
+  './checks/checksRouteModel.svelte.js',
   './components/ComponentBrowserInspector.svelte',
   './components/ComponentBulkEditPanel.svelte',
   './crafting/craftingNav.js',
