@@ -6,33 +6,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {
-  FabricateFacadeUnderTest,
-  mainMethodSource,
-} from './helpers/fabricateFacadeHarness.js';
+import { FabricateFacadeUnderTest } from './helpers/fabricateFacadeHarness.js';
 
-// --- Faithful reproduction of Fabricate#resetActorKnowledge ------------------
+/** The REAL facade, pre-`ready`: the reset has no readiness gate, so it answers before `ready`. */
 class ResetKnowledgeFacade extends FabricateFacadeUnderTest {
   constructor(recipeVisibilityService) {
     super({ recipeVisibilityService });
-  }
-
-  async resetActorKnowledge({ actorId = null, systemId = null, freeLearnBudget = true } = {}) {
-    const gate = this._requireGmActor(actorId, {
-      gmOnlyKey: 'FABRICATE.Knowledge.Reset.GMOnly',
-      noActorKey: 'FABRICATE.Knowledge.Reset.NoActor',
-    });
-    if (gate.outcome) return { success: false, message: gate.message };
-    const actor = gate.actor;
-    const service = this.recipeVisibilityService;
-    const result = systemId
-      ? await service.forgetSystemLearnedRecipes(actor, systemId, { freeLearnBudget })
-      : await service.forgetAllLearnedRecipes(actor, { freeLearnBudget });
-    return {
-      success: result.success === true,
-      message: 'FABRICATE.Knowledge.Reset.Success',
-      messageData: { actor: actor.name, count: result.count || 0, systemId },
-    };
   }
 }
 
@@ -91,6 +70,7 @@ test('773 facade: a systemId delegates to the per-system reset and reports the c
   assert.equal(service.calls[0].method, 'forgetSystemLearnedRecipes');
   assert.equal(service.calls[0].actor, actor);
   assert.equal(service.calls[0].systemId, 'system-1');
+  assert.deepEqual(service.calls[0].options, { freeLearnBudget: true });
   assert.deepEqual(result, {
     success: true,
     message: 'FABRICATE.Knowledge.Reset.Success',
@@ -104,76 +84,10 @@ test('773 facade: no systemId delegates to the all-systems reset', async () => {
   const service = makeSpyService();
   const facade = new ResetKnowledgeFacade(service);
 
-  const result = await facade.resetActorKnowledge({ actorId: 'actor-1' });
+  const result = await facade.resetActorKnowledge({ actorId: 'actor-1', freeLearnBudget: false });
 
   assert.equal(service.calls[0].method, 'forgetAllLearnedRecipes');
+  assert.deepEqual(service.calls[0].options, { freeLearnBudget: false });
   assert.equal(result.messageData.count, 5);
   assert.equal(result.messageData.systemId, null);
-});
-
-// SOURCE-CONTRACT guard — pin the real src/main.js method.
-
-const RESET =
-  'async resetActorKnowledge({ actorId = null, systemId = null, freeLearnBudget = true } = {}) {';
-const PREAMBLE = '_requireGmActor(actorId, { gmOnlyKey, noActorKey }) {';
-
-test('SOURCE CONTRACT: resetActorKnowledge delegates its gate and delegates by scope', () => {
-  // BOUNDED to this method alone. The previous form sliced `MAIN_SOURCE` from the method's first
-  // character to the END OF THE FILE, which is harmless for a "must contain" claim and silently
-  // vacuous for a "must NOT contain" one — every helper the rest of the class legitimately uses is
-  // inside an unbounded slice.
-  const body = mainMethodSource(RESET);
-
-  assert.ok(
-    body.includes('const gate = this._requireGmActor(actorId, {') &&
-      body.includes("gmOnlyKey: 'FABRICATE.Knowledge.Reset.GMOnly'") &&
-      body.includes("noActorKey: 'FABRICATE.Knowledge.Reset.NoActor'"),
-    'the gate is delegated to the shared preamble, with THIS member\'s own refusal strings'
-  );
-  assert.ok(
-    body.includes('if (gate.outcome) return { success: false, message: gate.message };'),
-    'a refused gate returns the { success, message } facade convention, never a throw'
-  );
-  for (const inlined of ['game.user?.isGM', 'game.actors?.get?.(']) {
-    assert.equal(
-      body.includes(inlined),
-      false,
-      `\`${inlined}\` is still inlined here; the point of the preamble is that this rule ` +
-        'exists once, and a re-inlined copy is how the keys drift apart again'
-    );
-  }
-  assert.ok(
-    body.includes('service.forgetSystemLearnedRecipes(actor, systemId, { freeLearnBudget })') &&
-      body.includes('service.forgetAllLearnedRecipes(actor, { freeLearnBudget })'),
-    'delegates to the per-system or all-systems reset by scope'
-  );
-  assert.ok(
-    body.includes("message: 'FABRICATE.Knowledge.Reset.Success'"),
-    'a success returns the Success outcome with { success, message } (never throws)'
-  );
-});
-
-test('SOURCE CONTRACT: both gates resolve INSIDE _requireGmActor, in that order', () => {
-  // The refactor is only behaviour-preserving if the gates it removed from the method above
-  // still exist somewhere, in the same order, and neither the four behavioural cases nor the
-  // absence assertions above can see that: the cases would pass against a preamble that
-  // dropped a gate for a GM fixture, and an absence assertion is satisfied BY a deletion.
-  const preamble = mainMethodSource(PREAMBLE);
-
-  const gmAt = preamble.indexOf('if (game.user?.isGM !== true) {');
-  const actorAt = preamble.indexOf('const actor = this._resolveCraftingActor(actorId);');
-  assert.ok(gmAt >= 0, 'the GM gate is the preamble\'s first test');
-  assert.ok(actorAt >= 0, 'the actor is resolved through the ownership-gated resolver');
-  assert.ok(gmAt < actorAt, 'GM before actor: a non-GM must never reach an actor resolution');
-  assert.ok(
-    preamble.includes('outcome: COMPANION_OUTCOMES.gmOnly, message: gmOnlyKey') &&
-      preamble.includes('outcome: COMPANION_OUTCOMES.noActor, message: noActorKey'),
-    'each refusal answers with the CALLER\'s key, which is why the keys are parameters'
-  );
-  assert.equal(
-    preamble.includes('this.ready') || preamble.includes('_requireReady'),
-    false,
-    'readiness is tested per member AFTER this preamble: `_requireReady()` throws, and a ' +
-      'ready-first preamble would make a pre-`ready` non-GM call throw where it returns gmOnly'
-  );
 });

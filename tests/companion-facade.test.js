@@ -30,9 +30,12 @@ import {
   POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS,
   POOLED_HOLDINGS_READ_MESSAGE_KEYS,
 } from '../src/systems/companionContract.js';
-import { buildInteractiveRollOptions } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
-import { FABRICATE_ENTRY_SOURCE } from './helpers/bootstrapEntrySource.js';
-
+import { companionFacade } from '../src/bootstrap/companionFacade.js';
+import {
+  buildInteractiveRollOptions,
+  promptBulkCheckRoll,
+  promptCheckRoll,
+} from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 
 import {
   assertContractResult,
@@ -47,10 +50,7 @@ import {
 } from './helpers/currency-spend-fixtures.js';
 import {
   FabricateFacadeUnderTest,
-  HARNESS_SOURCE,
-  MAIN_SOURCE,
   installFacadeGame,
-  mainMethodSource,
   makeFacadeActor,
 } from './helpers/fabricateFacadeHarness.js';
 
@@ -331,19 +331,19 @@ describe('criterion 6 — the gate order is GM -> actor -> readiness, not a set'
     });
   }
 
-  it('resolves the actor through the OWNERSHIP-gated resolver, not a bare collection read', () => {
-    // "Un-actable-as" is unreachable through either member today, because the GM gate runs first
-    // and `_resolveCraftingActor` bypasses its predicate for a GM.
-    const preamble = mainMethodSource('_requireGmActor(actorId, { gmOnlyKey, noActorKey }) {');
-    assert.ok(
-      preamble.includes('this._resolveCraftingActor(actorId)'),
-      'the preamble resolves through the ownership-gated resolver'
-    );
-    assert.equal(
-      preamble.replace(/^\s*\/\/.*$/gm, '').includes('game.actors'),
-      false,
-      'and never reads the actor collection directly, which would drop that predicate'
-    );
+  it('resolves the actor through the OWNERSHIP-gated resolver, not a bare collection read', async () => {
+    // A GM with the actor in `game.actors`: only a preamble that asks `_resolveCraftingActor` can
+    // answer noActor here, because a bare collection read would find it.
+    const actor = makeGrantTargetActor('actor-1');
+    const { facade } = standUpFacade({ actors: [actor] });
+    const asked = [];
+    facade._resolveCraftingActor = (actorId) => {
+      asked.push(actorId);
+      return null;
+    };
+    const result = await facade.grantRecipeKnowledge({ actorId: 'actor-1', recipeId: RECIPE.id });
+    assert.equal(result.outcome, COMPANION_OUTCOMES.noActor);
+    assert.deepEqual(asked, ['actor-1']);
   });
 });
 
@@ -1015,656 +1015,245 @@ describe('criterion 14 — the member table resolves, and says where', () => {
   });
 });
 
-// SOURCE CONTRACT — the harness copies, pinned against src/main.js both ways
+// The production seam bags, read off the REAL facade (issue 1933)
 
-const PREAMBLE = '_requireGmActor(actorId, { gmOnlyKey, noActorKey }) {';
-const GRANT =
-  'async grantRecipeKnowledge({ actorId = null, recipeId = null, grantedBy = null } = {}) {';
-const AFFORD = 'async checkAffordability({ actorId = null, unitId = null, amount = null } = {}) {';
-const ROLL = 'async rollActorCheck({';
-const BULK = 'async resolveBulkCheckDecision({ callSite = null, formulas = null } = {}) {';
-const AWARD =
-  'async awardComponents({ actorId = null, systemId = null, awards = null, callSite = null } = {}) {';
-const CREDIT =
-  'async creditCurrency({ actorId = null, unitId = null, amount = null, callSite = null } = {}) {';
-/** The pooled members' own signatures, and the SET-valued preamble they sit on (issue 1342). */
-const PLURAL_PREAMBLE = '_requireGmActors(actorUuids) {';
-const READ_POOLED = 'async readPooledHoldings({ actorUuids = null, costs = null } = {}) {';
-const CONSUME_POOLED =
-  'async consumePooledHoldings({ actorUuids = null, callSite = null, costs = null } = {}) {';
+// `ACTIVE_GM` is `game.users.activeGM`, standing in for the role-4 GAMEMASTER.
+const ACTIVE_GM = { id: 'user-gm', isGM: true };
+const ASSISTANT_GM = { id: 'user-assistant', isGM: true, role: 3, active: true };
 
-/** Every claim below is asserted over BOTH texts (issue 1202). */
-function bothTexts(signature) {
-  return [
-    ['production', mainMethodSource(signature)],
-    ['the harness mirror', mainMethodSource(signature, HARNESS_SOURCE)],
-  ];
+/** A real facade over recording collaborators, with `game.users.activeGM` set to `ACTIVE_GM`. */
+function seamFacade() {
+  const { setCurrentUser, game } = installFacadeGame({ user: ACTIVE_GM });
+  game.users = { activeGM: ACTIVE_GM };
+  game.i18n = { localize: (key) => (key === 'KNOWN' ? 'Known text' : key) };
+  const component = { id: 'comp-1', name: 'Iron Ore' };
+  const system = { id: 'sys-1', components: [component] };
+  const calls = [];
+  const record =
+    (name, value) =>
+    (...args) => {
+      calls.push([name, ...args]);
+      return value;
+    };
+  const facade = new FabricateFacadeUnderTest({
+    craftingSystemManager: {
+      getSystem: record('getSystem', system),
+      getSystems: record('getSystems', [system]),
+    },
+    craftingEngine: { findComponentItems: record('findComponentItems', ['held']) },
+    currencyConfigStore: { get: record('currencyConfig', { units: [] }) },
+    actorPropertyCoinSpender: { kind: 'property' },
+    actorInventoryCoinSpender: { kind: 'inventory' },
+  });
+  globalThis.fromUuid = record('fromUuid', { uuid: 'Item.source' });
+  return { facade, calls, component, system, setCurrentUser };
 }
 
-/** The same text with whole-line `//` comments removed. */
-function codeOnly(body) {
-  return body
-    .split('\n')
-    .filter((line) => !line.trim().startsWith('//'))
-    .join('\n');
-}
+const WORLD_CURRENCY_SEAMS = [
+  'getCurrencyConfig',
+  'actorPropertyCoinSpender',
+  'actorInventoryCoinSpender',
+];
 
-describe('the harness copies are faithful to src/main.js', () => {
-  it('reproduces the shared preamble, both gates and both parameterised refusals', () => {
-    for (const [label, body] of bothTexts(PREAMBLE)) {
-      assert.ok(body.length > 150, `non-vacuity: ${label} sliced to ${body.length} characters`);
-      const gmAt = body.indexOf('if (game.user?.isGM !== true) {');
-      const actorAt = body.indexOf('const actor = this._resolveCraftingActor(actorId);');
-      assert.ok(gmAt >= 0, `${label} lost the GM gate`);
-      assert.ok(actorAt >= 0, `${label} lost the ownership-gated actor resolution`);
-      assert.ok(gmAt < actorAt, `${label} tests the actor before the GM`);
-      assert.ok(
-        body.includes('outcome: COMPANION_OUTCOMES.gmOnly, message: gmOnlyKey') &&
-          body.includes('outcome: COMPANION_OUTCOMES.noActor, message: noActorKey'),
-        `${label} stopped answering with the CALLER's own refusal strings`
-      );
-    }
-  });
-
-  it('reproduces one guard per member, ordered preamble-then-readiness', () => {
-    // `rollActorCheck` joins this loop and `resolveBulkCheckDecision` does NOT: the two gate
-    // DIFFERENTLY, deliberately, and a uniform shape asserted over both is unsatisfiable
-    // together with the criterion that pins the bulk member's missing actor gate.
-    for (const signature of [GRANT, AFFORD, ROLL, AWARD, CREDIT]) {
-      for (const [label, body] of bothTexts(signature)) {
-        // The trailing `{` the first two members carry is deliberately NOT pinned here.
-        assert.ok(
-          body.includes('const gate = this._requireGmActor(actorId,'),
-          `${label} ${signature} no longer delegates its gate to the shared preamble`
-        );
-        assert.ok(
-          body.includes('if (gate.outcome || this.ready !== true) {'),
-          `${label} ${signature} lost the single guard that keeps the preamble ahead of readiness`
-        );
-        assert.equal(
-          codeOnly(body).includes('_requireReady()'),
-          false,
-          `${label} ${signature} must REFUSE notReady, never throw it — a stable member may not throw`
-        );
-      }
-    }
-  });
-
-  it('keeps each member on its own refusal strings, at both call sites', () => {
-    for (const [label, body] of bothTexts(GRANT)) {
-      assert.ok(
-        body.includes('gmOnlyKey: KNOWLEDGE_GRANT_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly]'),
-        `${label}: a failed grant must not report itself in the words of a failed reset`
-      );
-    }
-    for (const [label, body] of bothTexts(AFFORD)) {
-      assert.ok(
-        body.includes('gmOnlyKey: AFFORDABILITY_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly]'),
-        `${label}: the currency check answers in the currency vocabulary`
-      );
-    }
-    // `rollActorCheck`'s pair is HOISTED to module scope on both sides, so the claim is
-    // pinned where it is stated rather than inside the delegator body.
-    for (const [label, source] of [
-      ['production', MAIN_SOURCE],
-      ['the harness mirror', HARNESS_SOURCE],
-    ]) {
-      assert.ok(
-        source.includes('gmOnlyKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly]') &&
-          source.includes('noActorKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]'),
-        `${label}: a refused check roll must not report itself in the grant's words`
-      );
-    }
-  });
-
-  it('AC-5 — rollActorCheck reuses the preamble and passes the RESOLVED actor through', () => {
-    for (const [label, body] of bothTexts(ROLL)) {
-      assert.ok(body.length > 150, `non-vacuity: ${label} sliced to ${body.length} characters`);
-      assert.ok(
-        body.includes('this._requireGmActor(actorId, ROLL_ACTOR_CHECK_GATE_KEYS)'),
-        `${label} stopped delegating its gate to the shared preamble, with its OWN hoisted keys`
-      );
-      assert.ok(
-        body.includes('actor: gate.actor'),
-        `${label} must pass the RESOLVED actor into the leaf: a second resolver would be the ` +
-          'THIRD copy the preamble’s own comment warns the author of'
-      );
-      assert.ok(
-        body.includes('this._companionCheckSeams()'),
-        `${label} obtains its seams from the one hoisted bag, never a restated literal`
-      );
-      // The refusal is built by THIS member's own builder, and the gate outcome wins over
-      // readiness.
-      assert.ok(
-        body.includes('return checkRollResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);'),
-        `${label} must answer its OWN refusal shape, with the gate outcome ahead of readiness`
-      );
-    }
-  });
-
-  it('AC-5 — resolveBulkCheckDecision gates GM INLINE, with no actor gate at all', () => {
-    for (const [label, body] of bothTexts(BULK)) {
-      assert.ok(body.length > 100, `non-vacuity: ${label} sliced to ${body.length} characters`);
-      assert.ok(
-        body.includes('user?.isGM === true ? null : COMPANION_OUTCOMES.gmOnly'),
-        `${label} lost the inline GM gate`
-      );
-      assert.ok(
-        body.includes('if (gmOnly || this.ready !== true) {'),
-        `${label} lost the readiness half, which keeps the GM refusal ahead of readiness`
-      );
-      // `_requireGmActor(undefined, …)` ALWAYS answers `noActor`, because
-      // `_resolveCraftingActor(null)` returns null — so reusing the preamble here would make
-      // a member that reads no actor answer an actor refusal on every single call.
-      assert.equal(
-        codeOnly(body).includes('_requireGmActor'),
-        false,
-        `${label} must not reach the actor-targeted preamble`
-      );
-      assert.equal(
-        codeOnly(body).includes('actorId'),
-        false,
-        `${label} must not read an actorId it does not declare`
-      );
-      assert.ok(body.includes('this._companionCheckSeams()'), `${label} lost the hoisted seams`);
-      assert.ok(
-        body.includes('return bulkCheckDecisionResult(gmOnly ?? COMPANION_OUTCOMES.notReady);'),
-        `${label} must answer its OWN refusal shape, with the GM refusal ahead of readiness`
-      );
-    }
-  });
-
-  /** The eight seams the ONE bag binds, each to the collaborator production actually ships. */
-  const SEAM_BINDINGS = [
+/** Each production bag and the exact seams it binds; a dropped seam leaves its leaf on undefined. */
+const SEAM_BAGS = [
+  ['_worldCurrencySeams', WORLD_CURRENCY_SEAMS],
+  [
+    '_companionCheckSeams',
     [
       'isElectedExecutor',
-      'isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id',
-      'every connected GM client executes a broadcast call, rolling N different totals into ' +
-        'N companion instances — the exact harm the single-executor rule exists to prevent',
-    ],
-    [
       'hasDiceEngine',
-      "hasDiceEngine: () => typeof globalThis.Roll === 'function'",
-      'engineUnavailable becomes unreachable, and a client with no dice engine dispatches ' +
-        'to a runner that cannot roll',
-    ],
-    [
       'localize',
-      "resolved !== '' && resolved !== key ? resolved : fallback",
-      'a chat flavour reading `FABRICATE.Check.Roll.DefaultLabel check (DC 15)`, because ' +
-        'the bridge answers the KEY for a missing string exactly as Foundry does',
-    ],
-    ['prompt', 'prompt: promptCheckRoll', 'the BULK dialog opens for a single roll'],
-    ['promptBulk', 'promptBulk: promptBulkCheckRoll', 'the single-roll dialog opens for a batch'],
-    [
+      'prompt',
+      'promptBulk',
       'runPassFail',
-      'runPassFail: runFormulaPassFail',
-      'a graded check dispatches the PROGRESSIVE runner: the dc is ignored and the member ' +
-        'answers `rolled` rather than checkPassed/checkFailed, at every DC, forever',
-    ],
-    [
       'runProgressive',
-      'runProgressive: runFormulaProgressive',
-      'an ungraded roll is graded against an undefined dc',
-    ],
-    [
       'buildRollOptions',
-      'buildRollOptions: buildInteractiveRollOptions',
-      'the roll options are composed by something other than the one builder that derives ' +
-        'the speaker from the resolved actor',
     ],
-  ];
+  ],
+  [
+    '_componentAwardSeams',
+    [
+      'resolveSystem',
+      'resolveComponent',
+      'findComponentItems',
+      'resolveSourceItem',
+      'isElectedExecutor',
+    ],
+  ],
+  [
+    '_pooledHoldingsSeams',
+    [...WORLD_CURRENCY_SEAMS, 'listSystems', 'craftingSystemManager', 'findComponentItems'],
+  ],
+  [
+    '_pooledConsumptionSeams',
+    [
+      ...WORLD_CURRENCY_SEAMS,
+      'isElectedExecutor',
+      'resolveSystem',
+      'resolveComponent',
+      'findComponentItems',
+    ],
+  ],
+];
 
-  it('AC-5 — the ONE seam bag binds every seam to the collaborator production ships', () => {
-    // PRODUCTION ONLY, and that asymmetry is the whole reason this assertion exists rather than an
-    // oversight. What the existing pins prove is that a bag is CALLED
-    // (`this._companionCheckSeams()` appears in both delegator bodies).
-    const bag = mainMethodSource('_companionCheckSeams() {');
-    const keys = [...bag.matchAll(/^ {6}(\w+):/gm)].map(([, key]) => key);
-    assert.deepEqual(
-      keys,
-      SEAM_BINDINGS.map(([key]) => key),
-      'the bag binds exactly these eight seams — a dropped one leaves the leaf reading undefined'
+/** Swap `globalThis.Roll` for one call, so `hasDiceEngine` is asked both ways. */
+function withRoll(value, ask) {
+  const previous = globalThis.Roll;
+  globalThis.Roll = value;
+  try {
+    return ask();
+  } finally {
+    globalThis.Roll = previous;
+  }
+}
+
+const heldItems = ({ bag, calls }) =>
+  bag.findComponentItems('a', 'c', 's')[0] === 'held' &&
+  calls.at(-1).join(',') === 'findComponentItems,a,c,s';
+const resolvesSystem = ({ bag, system }) => bag.resolveSystem('sys-1') === system;
+const resolvesComponent = ({ bag, system, component }) =>
+  bag.resolveComponent(system, 'comp-1') === component &&
+  bag.resolveComponent(system, 'nope') === null;
+const readsWorldLadder = ({ bag }) => Array.isArray(bag.getCurrencyConfig()?.units);
+
+/** `[bag, seam, probe]`: what each binding must reach, asked of the bag production builds. */
+const SEAM_PROBES = [
+  ['_companionCheckSeams', 'prompt', ({ bag }) => bag.prompt === promptCheckRoll],
+  ['_companionCheckSeams', 'promptBulk', ({ bag }) => bag.promptBulk === promptBulkCheckRoll],
+  ['_companionCheckSeams', 'runPassFail', ({ bag }) => bag.runPassFail === runFormulaPassFail],
+  [
+    '_companionCheckSeams',
+    'runProgressive',
+    ({ bag }) => bag.runProgressive === runFormulaProgressive,
+  ],
+  [
+    '_companionCheckSeams',
+    'buildRollOptions',
+    ({ bag }) => bag.buildRollOptions === buildInteractiveRollOptions,
+  ],
+  [
+    '_companionCheckSeams',
+    'hasDiceEngine',
+    ({ bag }) =>
+      withRoll(function Roll() {}, bag.hasDiceEngine) === true &&
+      withRoll(undefined, bag.hasDiceEngine) === false,
+  ],
+  [
+    '_companionCheckSeams',
+    'localize',
+    ({ bag }) =>
+      bag.localize('KNOWN', 'fallback') === 'Known text' &&
+      bag.localize('MISSING', 'fallback') === 'fallback',
+  ],
+  ['_worldCurrencySeams', 'getCurrencyConfig', readsWorldLadder],
+  [
+    '_worldCurrencySeams',
+    'actorPropertyCoinSpender',
+    ({ bag }) => bag.actorPropertyCoinSpender?.kind === 'property',
+  ],
+  [
+    '_worldCurrencySeams',
+    'actorInventoryCoinSpender',
+    ({ bag }) => bag.actorInventoryCoinSpender?.kind === 'inventory',
+  ],
+  ['_pooledHoldingsSeams', 'getCurrencyConfig', readsWorldLadder],
+  ['_pooledHoldingsSeams', 'listSystems', ({ bag, system }) => bag.listSystems()[0] === system],
+  [
+    '_pooledHoldingsSeams',
+    'craftingSystemManager',
+    ({ bag, facade }) => bag.craftingSystemManager === facade.craftingSystemManager,
+  ],
+  ['_pooledHoldingsSeams', 'findComponentItems', heldItems],
+  ['_pooledConsumptionSeams', 'getCurrencyConfig', readsWorldLadder],
+  ['_pooledConsumptionSeams', 'resolveSystem', resolvesSystem],
+  ['_pooledConsumptionSeams', 'resolveComponent', resolvesComponent],
+  ['_pooledConsumptionSeams', 'findComponentItems', heldItems],
+  ['_componentAwardSeams', 'resolveSystem', resolvesSystem],
+  ['_componentAwardSeams', 'resolveComponent', resolvesComponent],
+  ['_componentAwardSeams', 'findComponentItems', heldItems],
+  [
+    '_componentAwardSeams',
+    'resolveSourceItem',
+    ({ bag, calls }) =>
+      bag.resolveSourceItem('Item.source')?.uuid === 'Item.source' &&
+      calls.at(-1)[0] === 'fromUuid',
+  ],
+];
+
+/** Every bag carrying an election, which must elect the ACTIVE GM and nobody else. */
+const ELECTED_BAGS = ['_companionCheckSeams', '_componentAwardSeams', '_pooledConsumptionSeams'];
+
+describe('the production facade binds every seam bag to the collaborator it ships', () => {
+  for (const [member, keys] of SEAM_BAGS) {
+    it(`${member} binds exactly ${keys.length} seams`, () => {
+      const { facade } = seamFacade();
+      assert.deepEqual(Object.keys(facade[member]()), keys);
+    });
+  }
+
+  for (const [member, seam, probe] of SEAM_PROBES) {
+    it(`${member}.${seam} reaches the collaborator production wires`, () => {
+      const fixture = seamFacade();
+      assert.equal(probe({ ...fixture, bag: fixture.facade[member]() }), true);
+    });
+  }
+
+  for (const member of ELECTED_BAGS) {
+    it(`${member}.isElectedExecutor elects the active GM only`, () => {
+      const { facade, setCurrentUser } = seamFacade();
+      const bag = facade[member]();
+      const answers = [ACTIVE_GM, ASSISTANT_GM, PLAYER].map((user) => {
+        setCurrentUser(user);
+        return bag.isElectedExecutor();
+      });
+      assert.deepEqual(answers, [true, false, false]);
+    });
+  }
+});
+
+/** The two delegators the singular criterion-6 table does not walk, with their OWN tables. */
+const AWARD_AND_CREDIT = [
+  [
+    'awardComponents',
+    COMPONENT_AWARD_MESSAGE_KEYS,
+    (facade) =>
+      facade.awardComponents({ actorId: 'actor-1', systemId: 'sys-1', awards: [], callSite: 'x' }),
+  ],
+  [
+    'creditCurrency',
+    CURRENCY_CREDIT_MESSAGE_KEYS,
+    (facade) =>
+      facade.creditCurrency({ actorId: 'actor-1', unitId: 'gp', amount: 1, callSite: 'x' }),
+  ],
+];
+
+describe('each actor-targeted delegator refuses in its OWN words, GM -> actor -> readiness', () => {
+  for (const [name, keys, call] of AWARD_AND_CREDIT) {
+    it(`${name} answers gmOnly, noActor and notReady from its own table, never throwing`, async () => {
+      const actor = makeGrantTargetActor('actor-1');
+      const ask = async (options) =>
+        (await call(standUpFacade({ ready: false, ...options }).facade)).message;
+      assert.equal(await ask({ user: PLAYER, actors: [actor] }), keys[COMPANION_OUTCOMES.gmOnly]);
+      assert.equal(await ask({ actors: [] }), keys[COMPANION_OUTCOMES.noActor]);
+      assert.equal(await ask({ actors: [actor] }), keys[COMPANION_OUTCOMES.notReady]);
+    });
+  }
+
+  it('sites the two pooled delegators apart, with the award member between them', () => {
+    const order = Object.keys(companionFacade);
+    const read = order.indexOf('readPooledHoldings');
+    assert.ok(read >= 0 && read < order.indexOf('awardComponents'));
+    assert.ok(order.indexOf('awardComponents') < order.indexOf('consumePooledHoldings'));
+  });
+
+  it('publishes no grant symbol on the api, gathering or macro surface of a real boot', () => {
+    const golden = JSON.parse(
+      readFileSync(resolve(import.meta.dirname, 'fixtures/fabricateBootContract.golden.json'), 'utf8')
     );
-    // Non-vacuity, in the shape ROLL_ACTOR_CHECK_GATE_KEYS' own pins already use: a slice that
-    // silently shrank to nothing would satisfy `deepEqual([], [])` above only if the expected
-    // list were empty too, but the substring checks below would pass over a short string.
-    assert.ok(bag.length > 400, `non-vacuity: the seam bag sliced to ${bag.length} characters`);
-    // Whitespace-normalized, and each binding matched with its TRAILING SEPARATOR left off, so the
-    // claims survive a reformat of `src/main.js`.
-    const squashed = bag.replaceAll(/\s+/g, ' ');
-    for (const [key, binding, harm] of SEAM_BINDINGS) {
-      const whole = new RegExp(`${binding.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w$])`);
-      assert.match(
-        squashed,
-        whole,
-        `${key} is no longer bound as \`${binding}\`, so in production ${harm}`
-      );
+    for (const set of ['apiKeys', 'macroApiKeys', 'gatheringKeys']) {
+      assert.ok(golden[set].length > 0, `${set} is populated`);
+      assert.equal(golden[set].includes('grantRecipeKnowledge'), false, `${set} names no grant`);
     }
-  });
-
-  it('AC-29 — each new delegator keeps its OWN refusal strings, where hoisting put them', () => {
-    // `bothTexts` returns a METHOD-BODY slice, and D12 hoisted these pairs out of that slice — so
-    // the body-level assertion above proves delegation to the shared preamble and can say nothing
-    // about WHICH strings each member delegates with.
-    const PAIRS = [
-      [AWARD, 'awardComponents', 'AWARD_COMPONENTS_GATE_KEYS', 'COMPONENT_AWARD_MESSAGE_KEYS', COMPONENT_AWARD_MESSAGE_KEYS],
-      [CREDIT, 'creditCurrency', 'CREDIT_CURRENCY_GATE_KEYS', 'CURRENCY_CREDIT_MESSAGE_KEYS', CURRENCY_CREDIT_MESSAGE_KEYS],
-    ];
-    for (const [label, source] of [
-      ['production', MAIN_SOURCE],
-      ['the harness mirror', HARNESS_SOURCE],
-    ]) {
-      for (const [, member, constant, table, keys] of PAIRS) {
-        assert.ok(
-          source.includes(`gmOnlyKey: ${table}[COMPANION_OUTCOMES.gmOnly]`) &&
-            source.includes(`noActorKey: ${table}[COMPANION_OUTCOMES.noActor]`),
-          `${label}: ${member}'s hoisted pair must read ${table}, never another member's`
-        );
-        // And the table it names really is that member's own, so the pin cannot be satisfied
-        // by a constant that merely SPELLS the right name.
-        assert.ok(
-          keys[COMPANION_OUTCOMES.gmOnly].startsWith('FABRICATE.'),
-          `${member}'s table resolves a real key`
-        );
-        assert.ok(
-          constant.startsWith(member === 'awardComponents' ? 'AWARD_' : 'CREDIT_'),
-          `${member}'s constant is named for the member it belongs to`
-        );
-      }
-    }
-    // The half the two assertions above CANNOT make, and the reason the hole was worth closing.
-    for (const [signature, member, constant] of PAIRS) {
-      for (const [label, body] of bothTexts(signature)) {
-        assert.ok(
-          body.includes(`this._requireGmActor(actorId, ${constant})`),
-          `${label}: ${member} must gate with ${constant}, never another member's pair`
-        );
-      }
-    }
-  });
-
-  it('AC-29 — `_worldCurrencySeams()` binds the same seams in both texts', () => {
-    // The bag D12 mitigation 1 hoisted, and the one `checkAffordability` was RETARGETED onto, so a
-    // mirror that omits a binding takes the whole currency surface with it.
-    const BINDINGS = [
-      ['getCurrencyConfig', 'getCurrencyConfig: () => this.currencyConfigStore?.get?.() ?? null'],
-      ['actorPropertyCoinSpender', 'actorPropertyCoinSpender: this.actorPropertyCoinSpender'],
-      ['actorInventoryCoinSpender', 'actorInventoryCoinSpender: this.actorInventoryCoinSpender'],
-    ];
-    for (const [label, source] of [
-      ['production', MAIN_SOURCE],
-      ['the harness mirror', HARNESS_SOURCE],
-    ]) {
-      const bag = mainMethodSource('_worldCurrencySeams() {', source);
-      assert.ok(bag.length > 150, `non-vacuity: ${label} sliced to ${bag.length} characters`);
-      assert.deepEqual(
-        [...bag.matchAll(/^ {6}(\w+):/gm)].map(([, key]) => key),
-        BINDINGS.map(([key]) => key),
-        `${label} binds exactly these three seams`
-      );
-      const squashed = bag.replaceAll(/\s+/g, ' ');
-      for (const [key, binding] of BINDINGS) {
-        assert.ok(squashed.includes(binding), `${label}: ${key} is no longer bound as authored`);
-      }
-      // `isElectedExecutor` is absent on BOTH sides by design: the check gates on no call site,
-      // and a seam present in the bag but read by only one of its two consumers is how a gate
-      // ends up assumed rather than declared. `creditCurrency` adds its own.
-      assert.equal(
-        squashed.includes('isElectedExecutor'),
-        false,
-        `${label}: the shared bag carries no election`
-      );
-    }
-  });
-
-  it('binds every seam `awardComponents` injects, to the collaborator production ships', () => {
-    // PRODUCTION-SIDE ONLY, and that asymmetry is the reason this pin is needed rather than an
-    // excuse for not having one: the mirror INJECTS this bag — production reaches `fromUuid`, the
-    // live crafting-system manager and the real engine, none of which exist under `node --test` —
-    // so every facade-level case for this member runs against a bag the suite supplied, and nothing
-    // else looks at the one production builds.
-    const AWARD_SEAM_BINDINGS = [
-      [
-        'resolveSystem',
-        'resolveSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null',
-        'the leaf calls undefined and a `stable` member throws on its first real call',
-      ],
-      [
-        'resolveComponent',
-        'resolveComponent: (system, componentId) => findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId) ?? null',
-        'every entry answers componentNotFound, so no award ever lands',
-      ],
-      [
-        'findComponentItems',
-        'findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? []',
-        'the award stops resolving its stack targets through the published resolver',
-      ],
-      [
-        'resolveSourceItem',
-        'resolveSourceItem: (uuid) => fromUuid(uuid)',
-        'every award falls back to a synthesised payload, or fails inside its own try',
-      ],
-      [
-        'isElectedExecutor',
-        'isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id',
-        'a broadcast award is unelectable and the duplicate-write gate is gone',
-      ],
-    ];
-
-    const bag = mainMethodSource('_componentAwardSeams() {');
-    assert.ok(bag.length > 250, `non-vacuity: the seam bag sliced to ${bag.length} characters`);
-    assert.deepEqual(
-      [...bag.matchAll(/^ {6}(\w+):/gm)].map(([, key]) => key),
-      AWARD_SEAM_BINDINGS.map(([key]) => key),
-      'the bag binds exactly these five seams — the sixth the leaf declares, `createOrStack`, ' +
-        'is deliberately absent so the create primitive keeps ONE spelling'
-    );
-    const squashed = bag.replaceAll(/\s+/g, ' ');
-    for (const [key, binding, harm] of AWARD_SEAM_BINDINGS) {
-      assert.ok(
-        squashed.includes(binding),
-        `${key} is no longer bound as authored, so in production ${harm}`
-      );
-    }
-  });
-
-  it('AC-5 — neither new delegator throws readiness, spreads a request, or reads game.actors', () => {
-    for (const signature of [ROLL, BULK]) {
-      for (const [label, body] of bothTexts(signature)) {
-        const code = codeOnly(body);
-        assert.equal(
-          code.includes('_requireReady()'),
-          false,
-          `${label} ${signature} must REFUSE notReady, never throw it`
-        );
-        // The structurally identical hole the shipped contract already had to close: a `{
-        // ...request, actor }` forward passes every MODULE-level criterion while letting a
-        // companion inject an `actor` that overrides the resolved one, a `prompt` that bypasses the
-        // dialog, or a `speaker` impersonating another actor in chat.
-        assert.equal(
-          code.includes('...'),
-          false,
-          `${label} ${signature} spreads something into the leaf; it must name every key`
-        );
-        assert.equal(
-          code.includes('game.actors'),
-          false,
-          `${label} ${signature} reads the actor collection directly, dropping the ownership predicate`
-        );
-      }
-    }
-  });
-
-  it('AC-31 — reproduces the SET-valued preamble, its GM half and the delegated split', () => {
-    for (const [label, body] of bothTexts(PLURAL_PREAMBLE)) {
-      assert.ok(body.length > 250, `non-vacuity: ${label} sliced to ${body.length} characters`);
-      const gmAt = body.indexOf('if (game.user?.isGM !== true) {');
-      const gateAt = body.indexOf('return gatePooledActorUuids(actorUuids, {');
-      assert.ok(gmAt >= 0, `${label} lost the GM gate the singular preamble states in the same words`);
-      assert.ok(gateAt >= 0, `${label} stopped delegating the address rule to the ONE place it exists`);
-      assert.ok(gmAt < gateAt, `${label} reads addresses before it has established a GM`);
-      // It threads NO refusal string. Both pooled delegators discard `gate.message` and answer
-      // through their own result builder, which derives the member's words from its own table by
-      // outcome — so a key here could only restate that string in a second place.
-      assert.equal(
-        codeOnly(body).includes('Key'),
-        false,
-        `${label} threads a refusal string through a preamble whose \`message\` nobody reads`
-      );
-      // Addressed by UUID, never by id.
-      assert.ok(
-        body.includes('globalThis.fromUuidSync?.(uuid) ?? null'),
-        `${label} no longer resolves its actors by ADDRESS`
-      );
-      assert.equal(
-        codeOnly(body).includes('game.actors'),
-        false,
-        `${label} reads the actor collection, which cannot address a token actor at all`
-      );
-      // `fromUuidSync` answers whatever the address names. Without this test an Item address
-      // would be scanned for components and, on the consume, written to.
-      assert.ok(
-        body.includes("if (addressed?.documentName !== 'Actor') return null;"),
-        `${label} accepts an address that resolves to a document which is not an actor`
-      );
-      // And the pack test beside it. `fromUuidSync` answers a pack address as `collection.get(id)
-      // ?? index.get(id)`, so the SAME uuid is refused as an index entry before anything loads the
-      // pack and admitted as a real Actor afterwards.
-      assert.ok(
-        body.includes('addressed.inCompendium === true ? null : addressed'),
-        `${label} admits a compendium actor, whose embedded documents a consume would delete`
-      );
-      assert.equal(
-        codeOnly(body).includes('_requireReady()'),
-        false,
-        `${label} must REFUSE notReady, never throw it — a stable member may not throw`
-      );
-    }
-  });
-
-  /**
-   * Each pooled member with the two things only IT may name: its own answer builder and its own
-   * leaf.
-   */
-  const POOLED_DELEGATORS = [
-    [READ_POOLED, 'pooledHoldingsReadResult', 'readPooledHoldingsAcrossActors'],
-    [CONSUME_POOLED, 'pooledHoldingsConsumeResult', 'consumePooledHoldingsFromActors'],
-  ];
-
-  it('AC-31 — reproduces one guard per POOLED member, ordered preamble-then-readiness', () => {
-    for (const [signature, builder, leaf] of POOLED_DELEGATORS) {
-      for (const [label, body] of bothTexts(signature)) {
-        assert.ok(body.length > 200, `non-vacuity: ${label} sliced to ${body.length} characters`);
-        assert.ok(
-          body.includes('const gate = this._requireGmActors(actorUuids);'),
-          `${label} ${signature} must delegate to the SET-valued preamble`
-        );
-        assert.ok(
-          body.includes(`return ${builder}(`),
-          `${label} ${signature} must answer its OWN refusal shape; the other pooled member's ` +
-            'builder answers in the other member’s words AND its other key set'
-        );
-        assert.ok(
-          body.includes(`await ${leaf}(`),
-          `${label} ${signature} no longer delegates to its own leaf`
-        );
-        assert.ok(
-          body.includes('if (gate.outcome || this.ready !== true) {'),
-          `${label} ${signature} lost the single guard that keeps the preamble ahead of readiness`
-        );
-        // The bound rides on the refusal.
-        assert.ok(
-          body.includes('gate.messageData'),
-          `${label} ${signature} drops the gate's own interpolation data from its refusal`
-        );
-        // The RESOLVED documents, as the leaf's FIRST argument — which is what makes a
-        // caller-supplied `actors` in the request structurally unable to reach a seam.
-        assert.match(
-          body,
-          new RegExp(String.raw`${leaf}\(\s*gate\.actors\s*,`),
-          `${label} ${signature} must pass the RESOLVED actor documents as the leaf's FIRST argument`
-        );
-        const code = codeOnly(body);
-        assert.equal(
-          code.includes('_requireReady()'),
-          false,
-          `${label} ${signature} must REFUSE notReady, never throw it`
-        );
-        assert.equal(
-          code.includes('...'),
-          false,
-          `${label} ${signature} spreads something into the leaf; it must name every key`
-        );
-        assert.equal(
-          code.includes('game.actors'),
-          false,
-          `${label} ${signature} reads the actor collection directly, which cannot address a token`
-        );
-      }
-    }
-  });
-
-  it('AC-31 — each pooled member answers in its OWN words WITHOUT a threaded refusal string', () => {
-    // The inverse of the pin this replaces.
-    for (const [label, source] of [
-      ['production', MAIN_SOURCE],
-      ['the harness mirror', HARNESS_SOURCE],
-    ]) {
-      for (const removed of ['READ_POOLED_HOLDINGS_GATE_KEYS', 'CONSUME_POOLED_HOLDINGS_GATE_KEYS']) {
-        assert.equal(
-          source.includes(removed),
-          false,
-          `${label}: ${removed} is back — a second home for a string the builder already derives`
-        );
-      }
-      assert.equal(
-        source.includes('invalidActorUuidsKey'),
-        false,
-        `${label}: a refusal string is threaded through the set-valued preamble again`
-      );
-    }
-    // And the behavioural half, on the two outcomes only the SET-valued gate can produce: each
-    // member reports them in its own vocabulary, which is what the deleted trio claimed to buy
-    // and never did. `POOLED_MEMBERS[n].keys` is the member's OWN published table.
-    for (const member of POOLED_MEMBERS) {
-      for (const outcome of [COMPANION_OUTCOMES.noActor, COMPANION_OUTCOMES.invalidActorUuids]) {
-        const other = POOLED_MEMBERS.find((candidate) => candidate !== member);
-        assert.notEqual(
-          member.keys[outcome],
-          other.keys[outcome],
-          `${member.name} and ${other.name} must not share a ${outcome} string`
-        );
-        assert.ok(
-          member.keys[outcome].startsWith('FABRICATE.'),
-          `${member.name}'s table resolves a real key for ${outcome}`
-        );
-      }
-    }
-  });
-
-  it('AC-31 — the two pooled delegators are NOT adjacent, in either text', () => {
-    // A MEASURED siting rather than an aesthetic one, and the acceptance criterion this change
-    // carries.
-    for (const [label, source] of [
-      ['production', MAIN_SOURCE],
-      ['the harness mirror', HARNESS_SOURCE],
-    ]) {
-      const readAt = source.indexOf(READ_POOLED);
-      const consumeAt = source.indexOf(CONSUME_POOLED);
-      assert.ok(readAt >= 0, `${label} no longer declares readPooledHoldings as authored`);
-      assert.ok(consumeAt > readAt, `${label} no longer declares consumePooledHoldings after it`);
-      assert.ok(
-        source.slice(readAt, consumeAt).includes(AWARD),
-        `${label} sites the two pooled delegators together, which is what makes their run measure`
-      );
-    }
-  });
-
-  it('AC-31 — binds every seam the two pooled members inject, as production ships them', () => {
-    // PRODUCTION-SIDE ONLY, for the reason the award bag's pin states: the mirror INJECTS both bags
-    // — production reaches the live crafting-system manager, the real engine and `game.users`, none
-    // of which exist under `node --test` — so every facade-level case for these two members runs
-    // against a bag the suite supplied, and nothing else looks at the one production builds.
-    const POOLED_BAGS = [
-      [
-        '_pooledHoldingsSeams() {',
-        ['listSystems', 'craftingSystemManager', 'findComponentItems'],
-        [
-          [
-            'listSystems',
-            'listSystems: () => this.craftingSystemManager?.getSystems?.() ?? []',
-            'no crafting system is offered to resolve a cost name in, so every component and ' +
-              'tool cost answers componentNotFound/toolNotFound forever',
-          ],
-          [
-            'craftingSystemManager',
-            'craftingSystemManager: this.craftingSystemManager',
-            'the tool classifier reads no manager and every tool cost reads `missing`',
-          ],
-          [
-            'findComponentItems',
-            'findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? []',
-            'the read stops counting through the PUBLISHED matcher the consume takes through, ' +
-              'which is exactly the gate that lies',
-          ],
-        ],
-      ],
-      [
-        '_pooledConsumptionSeams() {',
-        ['isElectedExecutor', 'resolveSystem', 'resolveComponent', 'findComponentItems'],
-        [
-          [
-            'isElectedExecutor',
-            'isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id',
-            'a broadcast take is unelectable, so N connected GM clients each delete N times the ' +
-              'components and take N times the coin, with no natural key to absorb the repeat',
-          ],
-          [
-            'resolveSystem',
-            'resolveSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null',
-            'every component row answers systemNotFound and no take ever lands',
-          ],
-          [
-            'resolveComponent',
-            'resolveComponent: (system, componentId) => findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId) ?? null',
-            'every component row answers componentNotFound',
-          ],
-          [
-            'findComponentItems',
-            'findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? []',
-            'the take drains documents some other matcher chose than the one the read counted',
-          ],
-        ],
-      ],
-    ];
-
-    for (const [signature, keys, bindings] of POOLED_BAGS) {
-      const bag = mainMethodSource(signature);
-      assert.ok(bag.length > 250, `non-vacuity: ${signature} sliced to ${bag.length} characters`);
-      assert.deepEqual(
-        [...bag.matchAll(/^ {6}(\w+):/gm)].map(([, key]) => key),
-        keys,
-        `${signature} binds exactly these seams — a dropped one leaves the leaf reading undefined`
-      );
-      // The spread is enumerated by nothing above it, and dropping it is the silent mutation
-      // that matters most: the coin bindings vanish, every currency cost degrades to "cannot
-      // see", and every component and tool case in the suite stays green.
-      assert.ok(
-        bag.includes('...this._worldCurrencySeams(),'),
-        `${signature} stopped spreading the ONE world-currency bag, so its coin axis is unbound`
-      );
-      const squashed = bag.replaceAll(/\s+/g, ' ');
-      for (const [key, binding, harm] of bindings) {
-        assert.ok(
-          squashed.includes(binding),
-          `${key} is no longer bound as authored, so in production ${harm}`
-        );
-      }
-    }
-  });
-
-  it('publishes no grant symbol outside the gated facade', () => {
-    const source = FABRICATE_ENTRY_SOURCE;
-    // `getRecipeVisibilityService()` hands out the live service UNGATED, so an unbounded
-    // self-benefiting write published beside the class constructors — or re-exported from this
-    // module — would be reachable by any player from the console with no gate at all.
-    const exportBlockStart = source.indexOf('export const __test');
-    // GUARDED, because both assertions below are ABSENCE assertions.
-    assert.ok(
-      exportBlockStart >= 0,
-      'src/main.js still declares a test-only export block for this slice to start at'
-    );
-    const exportBlocks = source.slice(exportBlockStart);
-    assert.equal(
-      /grantRecipeKnowledge/.test(exportBlocks),
-      false,
-      'no grant symbol is re-exported from src/main.js'
-    );
-    assert.equal(
-      source.includes('grantRecipeKnowledge,\n'),
-      false,
-      'and none is added to the api class bag as a bare shorthand property'
-    );
   });
 });

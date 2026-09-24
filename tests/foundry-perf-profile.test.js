@@ -423,14 +423,17 @@ test('an unclosed phase is reported rather than silently dropped', () => {
 
 test('the composition root opens and closes every declared startup phase', () => {
   // The mirror that rots silently: a phase declared here but never marked in `initialize()` makes
-  // the profile report `missing` forever while every gate stays green.
-  const source = readFileSync(join(REPOSITORY_ROOT, 'src', 'bootstrap', 'composeServices.js'), 'utf8');
+  // the profile report `missing` forever while every gate stays green. The marks are the ones a
+  // real boot emitted, which `tests/bootstrap/fabricate-boot-contract.test.js` holds the golden to.
+  const golden = JSON.parse(
+    readFileSync(join(REPOSITORY_ROOT, 'tests', 'fixtures', 'fabricateBootContract.golden.json'), 'utf8')
+  );
   for (const phase of STARTUP_PHASE_NAMES) {
-    const constant = Object.entries(STARTUP_PHASES).find(([, value]) => value === phase)[0];
-    const begins = source.split(`_startupMarks.begin(STARTUP_PHASES.${constant})`).length - 1;
-    const ends = source.split(`_startupMarks.end(STARTUP_PHASES.${constant})`).length - 1;
-    assert.equal(begins, 1, `the composition root must begin the ${phase} phase exactly once`);
-    assert.equal(ends, 1, `the composition root must end the ${phase} phase exactly once`);
+    const { start, end } = startupMarkNames(phase);
+    const count = (name) => golden.startupMarks.filter((mark) => mark === name).length;
+    assert.equal(count(start), 1, `the composition root must begin the ${phase} phase exactly once`);
+    assert.equal(count(end), 1, `the composition root must end the ${phase} phase exactly once`);
+    assert.ok(golden.startupMarks.indexOf(start) < golden.startupMarks.indexOf(end));
   }
 });
 

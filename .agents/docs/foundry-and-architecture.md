@@ -429,6 +429,14 @@ The authority ledger MUST stay a world `JournalEntry`, and that is a correctness
 Every player-side read in `createFoundryJournalRunAuthority` in `src/systems/journalRunAuthority.js` relies on that: move the ledger into a compendium, or assume its absence, and each player client resolves `ledger-missing` and refuses every Journal run control permanently.
 The restored-availability announcement is local in the same way — `Hooks.callAll` never crosses the socket, so a remote client re-derives only because the core `deleteJournalEntryPage` hook fires its own refresh, which holds because the collection delete precedes the `callAll`.
 
+### What the boot contract's lab shim cannot show
+
+`tests/bootstrap/fabricate-boot-contract.test.js` boots the real entry inside the View Lab's Foundry shim, `installFoundryShim` in `tests/view-lab/foundry/installFoundryShim.js`, and four of that shim's limits bound what a boot claim can prove.
+The default lab user is both `game.user` and `game.users.activeGM`, so an `isGM`, active-GM or primary-GM gate cannot be told apart on it; `probeGmGates` in `tests/helpers/bootContractProbes.js` asks each wired gate again as an assistant GM and as a player.
+The lab world binds `game.fabricate` before the lifecycle replay and keeps `game.ready` true throughout, so an init-timing claim reads a member only `bindFabricateGlobal` installs rather than the global's identity or `game.ready`.
+The shim's `game.settings.register` keeps only a setting's default and its `set` never calls `onChange`, so a setting's `onChange` is asserted through a recorder on `register`, never through `game.settings.settings`.
+Its `Hooks.call` and `Hooks.callAll` run no listener and its `once` is `on`, so a hook claim asserts the recorded `callAll` name and arguments or calls the registered handler directly, never an effect further down.
+
 ### Manager confirm-discard guard
 
 Every editor in the Crafting System Manager (component, essence, environment, gathering task, gathering event, tools) guards an unsaved draft on route exit.
