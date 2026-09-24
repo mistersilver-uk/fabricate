@@ -1064,10 +1064,9 @@ export function registerChecksCases() {
   it('Checks carries the progressive PREVIEW SANDBOX through the draft and into the save', async () => {
     // The THIRD allowlist rebuild the progressive block passes through (issue 1097). The
     // manager's normalizer and the store's projection are graded in
-    // `tests/progressive-preview-sandbox.test.js`; what only this suite can grade — it is
-    // the only one that mounts `CraftingSystemManagerRoot` — is `cloneProgressiveCheck`,
-    // whose whitelist would otherwise hold the GM's experiment for exactly as long as the
-    // panel stayed open and then write a block without it.
+    // `tests/progressive-preview-sandbox.test.js`; what this suite grades through the mounted
+    // root is `cloneProgressiveCheck`, whose whitelist would otherwise hold the GM's experiment
+    // for exactly as long as the panel stayed open and then write a block without it.
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -3770,31 +3769,6 @@ export function registerChecksCases() {
     );
   });
 
-  it('applies a staged salvage Active switch through Save checks, without rewriting its formula', async () => {
-    const calls = [];
-    await mountChecks(calls, {
-      salvageResolutionMode: 'simple',
-      salvageCraftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
-    });
-    await openChecksActivity('salvage');
-    target.querySelector('[data-checks-active="salvage"] [data-checks-active-toggle]').click();
-    await tick();
-    flushSync();
-
-    target.querySelector('[data-checks-save]').click();
-    await settleRouteExit();
-    assert.deepEqual(
-      calls.filter((call) => call[0] === 'saveSalvageCheckActive'),
-      [['saveSalvageCheckActive', false]],
-      'Save applies the staged switch'
-    );
-    assert.deepEqual(
-      calls.filter((call) => call[0] === 'saveSalvageCheckSimple'),
-      [],
-      'and the per-slot dirty guard keeps it from rewriting an untouched formula block'
-    );
-  });
-
   it('stays on the Checks route when a Save-on-navigate does not land', async () => {
     // The checks row's finisher returned `true` unconditionally after awaiting the save.
     const calls = [];
@@ -3865,7 +3839,7 @@ export function registerChecksCases() {
     flushSync();
   }
 
-  // A moved Active switch dirties its activity, so each slot save must still read its OWN flag.
+  // A moved Active switch dirties its activity, so each slot save must still read its own flag.
   for (const row of [
     {
       activity: 'crafting',
@@ -3875,6 +3849,15 @@ export function registerChecksCases() {
       },
       active: 'saveCraftingCheckActive',
       slot: 'saveCraftingCheckSimple',
+    },
+    {
+      activity: 'salvage',
+      options: {
+        salvageResolutionMode: 'simple',
+        salvageCraftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
+      },
+      active: 'saveSalvageCheckActive',
+      slot: 'saveSalvageCheckSimple',
     },
     {
       activity: 'gathering',

@@ -233,17 +233,64 @@ describe('checksRouteModel', () => {
     );
   });
 
-  it('reports no issues for a switched-off activity', () => {
-    const off = { ...SYSTEM, craftingCheck: { enabled: false, simple: { rollFormula: '' } } };
-    const { model } = openModel({ system: off });
-    const craftingIssues = () => model.checksNavItems.find((item) => item.id === 'crafting');
-
-    assert.equal(craftingIssues().issueCount, 0);
-    model.onToggleCheckActive('crafting', true);
+  it('keeps a lead refusal from skipping its dirty slot, and answers false', async () => {
+    const { model, calls } = openModel({ results: { saveCraftingCheckActive: false } });
+    model.onToggleCheckActive('crafting', false);
+    model.onUpdateCraftingCheckSimple(withFormula(model.checkSimpleDraft, '1d20 + 5'));
     flushSync();
-    assert.ok(craftingIssues().issueCount > 0, 'the same draft switched on is not ready');
-    assert.equal(model.checksNavCount, craftingIssues().issueCount);
+
+    assert.equal(await model.saveChecks(), false);
+    flushSync();
+    assert.ok(calls.some(([name]) => name === 'saveCraftingCheckSimple'), 'the slot still saves');
+    assert.deepEqual(model.checksDirtyActivities, ['crafting'], 'the refused lead stays dirty');
   });
+
+  // Each row is switched off with an unready draft; `other` is a mode whose optionality differs.
+  for (const row of [
+    {
+      activity: 'crafting',
+      patch: { craftingCheck: { enabled: false, simple: { rollFormula: '' } } },
+      optional: true,
+      other: { patch: { resolutionMode: 'routedByCheck' }, optional: false },
+    },
+    {
+      activity: 'salvage',
+      patch: {
+        salvageResolutionMode: 'simple',
+        salvageCraftingCheck: { enabled: false, simple: { rollFormula: '' } },
+      },
+      optional: true,
+      other: { patch: { salvageResolutionMode: 'progressive' }, optional: false },
+    },
+    {
+      activity: 'gathering',
+      patch: { gatheringCraftingCheck: { enabled: false, routed: { rollFormula: '' } } },
+      gatheringMode: 'routed',
+      optional: false,
+      other: { gatheringMode: 'd100', optional: true },
+    },
+  ]) {
+    it(`reports no issues for a switched-off ${row.activity} check`, () => {
+      const { model } = openModel({
+        system: { ...SYSTEM, ...row.patch },
+        gatheringMode: row.gatheringMode,
+      });
+      const issues = () => model.checksNavItems.find((item) => item.id === row.activity);
+
+      assert.equal(model.checkActivation[row.activity].optional, row.optional);
+      assert.equal(issues().issueCount, 0);
+      model.onToggleCheckActive(row.activity, true);
+      flushSync();
+      assert.ok(issues().issueCount > 0, 'the same draft switched on is not ready');
+      assert.equal(model.checksNavCount, issues().issueCount);
+
+      const other = openModel({
+        system: { ...SYSTEM, ...row.other.patch },
+        gatheringMode: row.other.gatheringMode,
+      }).model;
+      assert.equal(other.checkActivation[row.activity].optional, row.other.optional);
+    });
+  }
 
   it('opens the tab the route names, and counts each deep-link request', () => {
     const { model, live } = openModel();
