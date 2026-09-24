@@ -8,6 +8,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { termRowText } from '../scripts/lib/domainGlossary.js';
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
 
@@ -683,8 +685,7 @@ describe('the reachability banner names exactly the entity types still unreachab
 
 describe('DOMAIN.md no longer claims nothing writes the world identity snapshot', () => {
   // AC-25. Without the positive half below, DELETING the whole row would pass.
-  const domain = read('DOMAIN.md');
-  const row = domain.split('\n').find((line) => line.startsWith('| **World Identity Snapshot**'));
+  const row = termRowText('World Identity Snapshot', { domain: read('DOMAIN.md'), readNote: read });
 
   it('the row still exists and still names its detector', () => {
     assert.ok(Boolean(row), 'the World Identity Snapshot row is still in the glossary');
