@@ -44,6 +44,8 @@ export function wiringReferences(facade, runtime) {
       'complicationDeliveryWriter',
       facade.complicationDeliveryWriter
     ),
+    gatheringEngineTookPauseCheck: took('isGamePaused', runtime.isCurrentWorldPaused),
+    gatheringEngineSelectsByOwnership: selectsByOwnership(engine),
     gatheringEngineTookJournalAuthority: engine?.versionedRunAuthority != null,
     gatheringEngineHasToolSeams:
       typeof engine?.toolAvailability?.check === 'function' &&
@@ -69,6 +71,17 @@ export function wiringReferences(facade, runtime) {
       handlerOf('updateUser')
     ),
   };
+}
+
+/** Whether the engine's attempt predicate is the per-user ownership rule, asked of two players. */
+function selectsByOwnership(engine) {
+  const owner = { id: 'probe-owner', isGM: false };
+  const stranger = { id: 'probe-stranger', isGM: false };
+  const actor = { testUserPermission: (user, level) => level === 'OWNER' && user === owner };
+  return (
+    engine?.isActorSelectable?.({ actor, viewer: owner }) === true &&
+    engine.isActorSelectable({ actor, viewer: stranger }) === false
+  );
 }
 
 /** Whether the recipe manager's system resolver answers the live manager's own record. */

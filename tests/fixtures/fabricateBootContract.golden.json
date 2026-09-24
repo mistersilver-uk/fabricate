@@ -1660,6 +1660,8 @@
     "gatheringEngineTookTravelStore": true,
     "gatheringEngineTookBlindRunStore": true,
     "gatheringEngineTookComplicationWriter": true,
+    "gatheringEngineTookPauseCheck": true,
+    "gatheringEngineSelectsByOwnership": true,
     "gatheringEngineTookJournalAuthority": true,
     "gatheringEngineHasToolSeams": true,
     "recipeManagerResolvesLiveSystemManager": true,
