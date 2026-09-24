@@ -14,6 +14,7 @@ const { ARCHIVE_CHUNK_GATE_LABEL, assertArchiveChunkCompleteness } = await impor
 // The comparator the guard's remedy is measured against — the same one that decides the refusal.
 const { foundryIsNewerVersion } = await import('../scripts/lib/semver.js');
 const {
+  describeMissingTesterSecrets,
   main,
   resolveChannelConfig,
   resolveTesterSegments,
@@ -54,7 +55,7 @@ const BETA_TESTER_MANIFEST = 'testers/closed-beta-2026/seg/fabricate/module.json
 
 // 1.3 — resolveChannelConfig: a channel's cohorts and secret belong to THAT channel
 
-test('resolveChannelConfig gives early-access its OWN cohorts, each with its own secret', () => {
+test('resolveChannelConfig gives early-access its own cohorts, each with its own secret', () => {
   const resolved = resolveChannelConfig(CONFIG, 'early-access');
   assert.deepEqual(resolved.testerGroups, ['apprentice-crafter-2026', 'guild-artisan-2026']);
   assert.ok(!resolved.testerGroups.includes('closed-beta-2026'));
@@ -89,7 +90,7 @@ test('resolveChannelConfig still reads the legacy array: every group inherits th
   ]);
 });
 
-test('resolveChannelConfig gives an object entry NO channel-level fallback secret', () => {
+test('resolveChannelConfig gives an object entry no channel-level fallback secret', () => {
   const config = {
     channels: {
       beta: { testerSecretEnv: 'S3_TESTER_PATH_SECRET', testerGroups: { 'closed-beta-2026': {} } },
@@ -118,7 +119,7 @@ test('resolveChannelConfig reads an absent testerGroups as none, and refuses any
 
 // resolveTesterSegments: one segment per group, every missing secret named
 
-test('resolveTesterSegments resolves each group from its OWN secret', () => {
+test('resolveTesterSegments resolves each group from its own secret', () => {
   const resolved = resolveTesterSegments(resolveChannelConfig(CONFIG, 'early-access'), {
     S3_APPRENTICE_PATH_SECRET: '/ap-seg/',
     S3_GUILD_ARTISAN_PATH_SECRET: 'ga-seg',
@@ -158,6 +159,17 @@ test('resolveTesterSegments reports an unset, blank or unnamed secret as missing
     { group: 'unnamed-2026', secretEnv: null },
     { group: 'empty-name-2026', secretEnv: null },
   ]);
+});
+
+test('describeMissingTesterSecrets names each unset variable with its group, or the unnamed group', () => {
+  assert.equal(
+    describeMissingTesterSecrets([
+      { group: 'unset-2026', secretEnv: 'S3_UNSET_PATH_SECRET' },
+      { group: 'unnamed-2026', secretEnv: null },
+    ]),
+    'S3_UNSET_PATH_SECRET is unset (tester group "unset-2026"); ' +
+      'tester group "unnamed-2026" declares no "testerSecretEnv"'
+  );
 });
 
 test('resolveChannelConfig prefers a declared channels entry over the scalar default', () => {
@@ -714,7 +726,7 @@ test('main() --check-heads fails when the guard would refuse', async () => {
   );
 });
 
-test('main() refuses before building when ANY tester group of the channel has no secret set', async () => {
+test('main() refuses before building when any tester group of the channel has no secret set', async () => {
   const harness = await makeHarness();
   const publishEarlyAccess = (env) =>
     main({
@@ -723,7 +735,7 @@ test('main() refuses before building when ANY tester group of the channel has no
       deps: harness.deps,
     });
 
-  // The BETA secret is set; neither early-access secret is. It must refuse rather than reuse the
+  // The beta secret is set; neither early-access secret is. It must refuse rather than reuse the
   // beta path, naming every unset variable and the group it serves.
   await assert.rejects(publishEarlyAccess({ S3_TESTER_PATH_SECRET: 'seg' }), (error) => {
     assert.match(error.message, /S3_APPRENTICE_PATH_SECRET is unset \(tester group "apprentice-crafter-2026"\)/);
@@ -742,33 +754,38 @@ test('main() refuses before building when ANY tester group of the channel has no
 });
 
 test('main() refuses a channel that declares tester groups but no testerSecretEnv', async () => {
-  // The other arm of the same refusal — a plausible mistake when adding a second cohort.
-  const dir = await mkdtemp(join(tmpdir(), 'fabricate-release-s3-'));
-  const configPath = join(dir, 'release.s3.config.json');
-  await writeFile(
-    configPath,
-    JSON.stringify({
-      ...CONFIG,
-      channels: {
-        ...CONFIG.channels,
-        'early-access': {
-          testerGroups: {
-            'guild-artisan-2026': { testerSecretEnv: 'S3_GUILD_ARTISAN_PATH_SECRET' },
-            'patrons-2027': {},
+  // The other arm of the same refusal — a plausible mistake when adding a second cohort — in both
+  // shapes: an object entry naming no secret, and the legacy array with no channel-level secret.
+  const shapes = {
+    object: {
+      'guild-artisan-2026': { testerSecretEnv: 'S3_GUILD_ARTISAN_PATH_SECRET' },
+      'patrons-2027': {},
+    },
+    legacy: ['patrons-2027'],
+  };
+  for (const [shape, testerGroups] of Object.entries(shapes)) {
+    const dir = await mkdtemp(join(tmpdir(), 'fabricate-release-s3-'));
+    const configPath = join(dir, 'release.s3.config.json');
+    const channels = { ...CONFIG.channels, 'early-access': { testerGroups } };
+    await writeFile(configPath, JSON.stringify({ ...CONFIG, channels }));
+    let builds = 0;
+
+    await assert.rejects(
+      main({
+        argv: ['node', 'release-s3.js', '--config', configPath, '--version', '1.5.0', '--channel', 'early-access'],
+        env: { S3_TESTER_PATH_SECRET: 'seg', S3_GUILD_ARTISAN_PATH_SECRET: 'ea-seg' },
+        deps: {
+          log: () => {},
+          build: () => {
+            builds += 1;
           },
         },
-      },
-    })
-  );
-
-  await assert.rejects(
-    main({
-      argv: ['node', 'release-s3.js', '--config', configPath, '--version', '1.5.0', '--channel', 'early-access'],
-      env: { S3_TESTER_PATH_SECRET: 'seg', S3_GUILD_ARTISAN_PATH_SECRET: 'ea-seg' },
-      deps: { log: () => {}, build: () => assert.fail('a refused publish must build nothing') },
-    }),
-    /tester group "patrons-2027" declares no "testerSecretEnv"/
-  );
+      }),
+      /tester group "patrons-2027" declares no "testerSecretEnv"/,
+      `the ${shape} shape`
+    );
+    assert.equal(builds, 0, `the ${shape} shape built before refusing`);
+  }
 });
 
 test('runCheckHeads reads every private target of the channel it is asked about', async () => {
@@ -839,7 +856,7 @@ function rememberingBucket() {
   };
 }
 
-test('adding a tester group and republishing the same build writes ONLY the added group', async () => {
+test('adding a tester group and republishing the same build writes only the added group', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'fabricate-release-s3-republish-'));
   const distDir = join(dir, 'dist');
   await mkdir(distDir, { recursive: true });
@@ -887,7 +904,7 @@ test('adding a tester group and republishing the same build writes ONLY the adde
   assert.deepEqual(bucket.puts, [zipKeyOf(APPRENTICE_PREFIX, '1.11.0'), `${APPRENTICE_PREFIX}/module.json`]);
   assert.ok(!bucket.puts.includes(EA_CHANNEL_MANIFEST));
 
-  // The same version from a DIFFERENT build is a content swap on the targets that already carry it.
+  // The same version from a different build is a content swap on the targets that already carry it.
   bucket.puts.length = 0;
   await assert.rejects(publish(CONFIG, 'T'), /already-published immutable artefact/);
   assert.deepEqual(bucket.puts, [], 'a provenance refusal must write nothing, not even the new group');
@@ -913,7 +930,7 @@ test('the shipped config declares the three channels, each group with its own se
     testers: EARLY_ACCESS_TESTERS,
     source: 'declared',
   });
-  // An empty ARRAY, not `{}`: a publisher predating per-group secrets spreads it without crashing.
+  // An empty array, not `{}`: a publisher predating per-group secrets spreads it without crashing.
   assert.deepEqual(shipped.channels.public.testerGroups, []);
 
   // The scalar defaults stay, and stay in agreement with the map.
@@ -977,7 +994,7 @@ test('every shipped tester group names its own secret, distinct from its channel
   );
 });
 
-test('early-access derives a tester feed for BOTH cohorts, each at its own segment', async () => {
+test('early-access derives a tester feed for both cohorts, each at its own segment', async () => {
   const shipped = await readShipped();
   const { testers } = resolveTesterSegments(resolveChannelConfig(shipped, 'early-access'), {
     S3_APPRENTICE_PATH_SECRET: 'ap-seg',

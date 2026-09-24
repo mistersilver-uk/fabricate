@@ -23,7 +23,7 @@ const FABRICATE = 'mistersilver-uk/fabricate';
 const PREMIUM = 'mistersilver-uk/fabricate-premium';
 const BASE_URL = 'https://cdn.example/base';
 
-/** This repository's LEGACY schema: one `testerSecretEnv` per channel, against an array of groups. */
+/** The legacy array schema: one `testerSecretEnv` per channel, shared by every group. */
 const FABRICATE_CONFIG = {
   moduleId: 'fabricate',
   baseUrl: BASE_URL,
@@ -153,7 +153,7 @@ test('the plan covers exactly the tester feeds the shipped config resolves to', 
   assert.deepEqual(feeds(planned), feeds(published));
 });
 
-test('the shipped config rotates every early-access secret in BOTH repositories', () => {
+test('the shipped config rotates every early-access secret in both repositories', () => {
   // Both Patreon cohorts receive this module and the premium modules, so each group's secret is
   // one prefix shared by the two repositories and must be written to both in one rotation.
   const shipped = JSON.parse(

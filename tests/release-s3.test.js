@@ -5,6 +5,8 @@ import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { createTempGitRepo } from './helpers/temp-git-repo.js';
+
 const {
   deriveS3Layout,
   getFlag,
@@ -17,6 +19,7 @@ const {
   main,
   runBackfill,
   runCheckHeads,
+  runCli,
 } = await import('../scripts/release-s3.js');
 const { assertPublishSafety, fetchPublishState } = await import('../scripts/lib/publishGuard.js');
 const { zipDirectory } = await import('../scripts/lib/zip.js');
@@ -216,7 +219,7 @@ const TWO_GROUPS = {
   baseUrl: 'https://releases.example.io',
 };
 
-test('deriveS3Layout gives each tester group its OWN segment', () => {
+test('deriveS3Layout gives each tester group its own segment', () => {
   const { testerTargets } = deriveS3Layout({
     ...TWO_GROUPS,
     testers: [
@@ -621,12 +624,16 @@ async function makeMain({
     createS3Client: async () => s3,
     resolveSha,
   };
-  const run = (...flags) => {
+  const argvFor = (flags) => {
     const at = flags.indexOf('--source-sha');
     namedSha = at === -1 ? null : flags[at + 1];
-    return main({ argv: ['node', 'release-s3.js', '--config', configPath, ...flags], env, deps });
+    return ['node', 'release-s3.js', '--config', configPath, ...flags];
   };
-  return { run, puts, copies, store, distDir, builds, deps, configPath };
+  const run = (...flags) => main({ argv: argvFor(flags), env, deps });
+  // The command-line entry, with `extraEnv` over the harness env and the process seams captured.
+  const cli = ({ extraEnv, stderr, exit }, ...flags) =>
+    runCli({ argv: argvFor(flags), env: { ...env, ...extraEnv }, deps, stderr, exit });
+  return { run, cli, puts, copies, store, distDir, builds, deps, configPath };
 }
 
 const manifestPut = (puts, key) =>
@@ -842,7 +849,7 @@ test('a zip backfilled with an "unknown" sha is treated by the guard as absent (
 
 // Issue 1988 — the workflow ref's publisher builds the release tag's tree, never the tag's publisher
 
-test('main() hands the build the version AND the resolved --source-root', async () => {
+test('main() hands the build the version and the resolved --source-root', async () => {
   const harness = await makeMain();
   const tagTree = await mkdtemp(join(tmpdir(), 'fab-s3-tag-'));
 
@@ -854,7 +861,7 @@ test('main() hands the build the version AND the resolved --source-root', async 
   assert.equal(harness.builds[1].sourceRoot, join(import.meta.dirname, '..'));
 });
 
-test('the default build runs the source tree\'s own `scripts/release.js` and ships ITS manifest', async () => {
+test('the default build runs the source tree\'s own `scripts/release.js` and ships its manifest', async () => {
   // A stand-in tag tree: its release.js records the argv it was given and writes a marker manifest.
   const tagTree = await mkdtemp(join(tmpdir(), 'fab-s3-tag-'));
   await mkdir(join(tagTree, 'scripts'), { recursive: true });
@@ -915,6 +922,28 @@ test('a --source-sha that is not the source tree\'s commit refuses before buildi
   assert.deepEqual(harness.puts, []);
 });
 
+test('the default tree reader checks --source-sha against the source root\'s own HEAD', async () => {
+  // No injected resolveTreeSha: real git reads a temp repository, never this checkout.
+  const repo = createTempGitRepo('fab-s3-source-');
+  try {
+    const earlier = repo.commit('earlier');
+    const head = repo.commit('head');
+    const harness = await makeMain();
+    delete harness.deps.resolveTreeSha;
+
+    await harness.run('--version', '1.4.0-beta.1', '--dry-run', '--source-root', repo.dir, '--source-sha', head);
+    assert.equal(harness.builds.length, 1, 'the commit the tree holds must pass the check');
+
+    await assert.rejects(
+      harness.run('--version', '1.4.0-beta.1', '--dry-run', '--source-root', repo.dir, '--source-sha', earlier),
+      new RegExp(`--source-sha ${earlier} is not the commit checked out at [\\s\\S]*\\(${head}\\)`)
+    );
+    assert.equal(harness.builds.length, 1, 'a mismatch must refuse before building');
+  } finally {
+    repo.dispose();
+  }
+});
+
 test('a CI build refuses unless both --source-root and --source-sha are given', async () => {
   const tagTree = await mkdtemp(join(tmpdir(), 'fab-s3-tag-'));
   for (const ci of [{ GITHUB_ACTIONS: 'true' }, { CI: 'true' }]) {
@@ -961,29 +990,47 @@ test('renderFatalError leaks no tester segment from a main, check-heads or backf
     };
   };
 
-  // Each mode gets segments of its own, so a mode that failed to record its segments cannot pass
-  // on the ones the previous mode left behind in the module-level list the renderer reads.
+  const failure = (promise) =>
+    promise.then(
+      () => assert.fail('expected the run to fail'),
+      (caught) => caught
+    );
+  // Each mode renders its failure under `ci` and gets segments of its own, so a mode that failed to
+  // record its segments cannot pass on the ones the previous mode left in the renderer's list. The
+  // publish goes through the command-line entry, so the redaction proven is the one the CLI prints.
   const modes = {
-    main: (harness) => harness.run('--channel', 'early-access', '--version', '1.4.0', '--source-sha', 'deadbeef'),
-    'check-heads': (harness, env, failOn) =>
-      runCheckHeads({ config, version: '1.4.0', channel: 'early-access', deps: { env, createS3Client: echoing(failOn) } }),
-    backfill: (harness) => harness.run('--channel', 'early-access', '--backfill-provenance'),
+    main: async ({ harness, ci }) => {
+      const written = [];
+      const exits = [];
+      const sourceRoot = await mkdtemp(join(tmpdir(), 'fab-s3-tag-'));
+      await harness.cli(
+        { extraEnv: ci, stderr: { write: (text) => written.push(text) }, exit: (code) => exits.push(code) },
+        ...['--channel', 'early-access', '--version', '1.4.0', '--source-root', sourceRoot, '--source-sha', 'deadbeef']
+      );
+      assert.deepEqual(exits, [1], 'a failed publish must exit 1');
+      return written.join('');
+    },
+    'check-heads': async ({ env, guild, ci }) =>
+      renderFatalError(
+        await failure(
+          runCheckHeads({ config, version: '1.4.0', channel: 'early-access', deps: { env, createS3Client: echoing(guild) } })
+        ),
+        ci
+      ),
+    backfill: async ({ harness, ci }) =>
+      renderFatalError(await failure(harness.run('--channel', 'early-access', '--backfill-provenance')), ci),
   };
-  for (const [mode, run] of Object.entries(modes)) {
+  for (const [mode, render] of Object.entries(modes)) {
     const [apprentice, guild] = [`ap${mode}secret`, `ga${mode}secret`];
     const env = { S3_APPRENTICE_PATH_SECRET: apprentice, S3_GUILD_ARTISAN_PATH_SECRET: guild };
     const harness = await makeMain({ config, env });
     harness.deps.createS3Client = echoing(guild);
 
-    const error = await run(harness, env, guild).then(
-      () => assert.fail(`expected the ${mode} run to fail`),
-      (caught) => caught
-    );
     // Non-vacuity: the unredacted text really does carry both segments.
-    const raw = renderFatalError(error, {});
+    const raw = await render({ harness, env, guild, ci: {} });
     assert.ok(raw.includes(apprentice) && raw.includes(guild), `nothing to redact in: ${raw}`);
     for (const ci of [{ GITHUB_ACTIONS: 'true' }, { CI: 'true' }]) {
-      const rendered = renderFatalError(error, ci);
+      const rendered = await render({ harness, env, guild, ci });
       assert.ok(!rendered.includes(apprentice) && !rendered.includes(guild), `${mode}: ${rendered}`);
       assert.match(rendered, /\*\*\*/);
     }

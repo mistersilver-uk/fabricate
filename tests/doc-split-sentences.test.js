@@ -251,8 +251,7 @@ const SUPERSEDED_POLICY = [
   },
   {
     issue: '#1988',
-    // Frozen before issue #1761 renamed the early-access secret; the rename entry it held retired
-    // with this rewrite.
+    // The frozen text predates issue #1761.
     before:
       'The tester feed lives at an unguessable path: `testers/<group>/<segment>/<moduleId>/…`, ' +
       'where `<segment>` comes from a per-channel repository **secret** (`S3_TESTER_PATH_SECRET` ' +
