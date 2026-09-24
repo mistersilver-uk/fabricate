@@ -1,22 +1,16 @@
 /**
- * Plain-text NORMALIZATION of an already-resolved description. This module does not, and must not,
- * RESOLVE anything: enrichment happens at write time through the `enrichToHtml` seam, so everything
- * here is synchronous, Foundry-free and safe to call from a store, a service or a builder alike.
- * The issue 800 vocabulary is pinned — RESOLVE (write time), NORMALIZE (here), FLATTEN
- * (deterministic text rewrites). The pipeline is idempotent and touches only `globalThis.document`
- * and `globalThis.game?.i18n`, never a bare Foundry runtime global.
+ * Normalizes an already-resolved description and must never resolve: enrichment happens at write
+ * time (issue 800 pins RESOLVE, NORMALIZE and FLATTEN). Synchronous and idempotent, touching only
+ * `globalThis.document` and `globalThis.game?.i18n`.
  */
 
-// Inline-roll command tokens (`/r`, `/roll`, and the gm/blind/private variants) that lead a `[[…]]`
-// expression; stripped when we fall back to the bare formula.
+// The `/r` and `/roll` families that lead a `[[…]]` expression.
 const ROLL_COMMAND_TOKEN = /^\/(?:gmr|br|pr|r|roll)\b\s*/i;
 
-// Visibility-gated and secret markup that must never reach a stored description or any reader of
-// one.
+// Gated and secret markup that must never reach a stored description or its readers.
 const VISIBILITY_GATED_SELECTOR =
   '[data-visibility="gm"], [data-visibility="none"], [data-visibility="owner"], section.secret:not(.revealed)';
 
-// Separator characters orphaned when a reference is dropped.
 const SEPARATOR_CLASS = ',;·•–—';
 const EDGE_SEPARATOR_CLASS = `${SEPARATOR_CLASS}:：`;
 
@@ -28,7 +22,6 @@ function bareRollFormula(inner) {
   return formula.trim();
 }
 
-/** Flatten inline roll expressions to text. */
 export function flattenRollExpressions(text) {
   if (typeof text !== 'string' || text.length === 0) return '';
   return text.replaceAll(
@@ -54,16 +47,13 @@ function flattenLabelledDirectives(text) {
     );
 }
 
-/** Predicate: does this text carry a directive that is VISIBLY broken to a reader? */
+/** Whether a directive in the text is visibly broken to a reader. */
 export function hasUnresolvedDirectives(text) {
   if (typeof text !== 'string' || text.length === 0) return false;
   return /[@&][A-Za-z]{1,32}\[[^\]]{0,2048}\](?!\{[^}]{1,2048}\})/.test(text);
 }
 
-/**
- * Recursively extract the best textual candidate from a Foundry-style description value ({ value,
- * enriched, html, … } objects, arrays, primitives).
- */
+/** The best textual candidate from `{ value, enriched, html }` objects, arrays or primitives. */
 export function descriptionTextCandidate(value, seen = new Set()) {
   if (value == null) return '';
 
@@ -102,13 +92,9 @@ export function descriptionTextCandidate(value, seen = new Set()) {
   return '';
 }
 
-/**
- * STEP 1 of the post-enrichment DOM pass — the privacy scrub, run FIRST on the pristine tree,
- * unconditionally.
- */
+/** Step 1: the privacy scrub, first and unconditionally, on the pristine tree. */
 function scrubVisibilityGatedContent(root) {
-  // `querySelectorAll` returns a STATIC list in both Foundry and happy-dom, so removing as we
-  // iterate is safe.
+  // `querySelectorAll` is static in Foundry and happy-dom, so removing while iterating is safe.
   for (const element of root.querySelectorAll(VISIBILITY_GATED_SELECTOR)) {
     element.remove();
   }
@@ -123,7 +109,6 @@ const BROKEN_LINK_PLACEHOLDER_KEYS = Object.freeze(['COMMON.Unknown', 'Unknown']
 function brokenLinkPlaceholders() {
   const placeholders = new Set();
 
-  // Preferred: ask core for its own placeholder.
   try {
     const impl =
       globalThis.foundry?.applications?.ux?.TextEditor?.implementation ??
@@ -137,7 +122,6 @@ function brokenLinkPlaceholders() {
     // Fall through to the key list.
   }
 
-  // Fallback: localize both known keys.
   for (const key of BROKEN_LINK_PLACEHOLDER_KEYS) {
     const value = String(globalThis.game?.i18n?.localize?.(key) ?? '').trim();
     if (!value) continue;
@@ -148,13 +132,9 @@ function brokenLinkPlaceholders() {
   return placeholders;
 }
 
-/**
- * STEP 2 of the post-enrichment DOM pass — the broken-reference decision, run on whatever the
- * privacy scrub left behind.
- */
+/** Step 2: the broken-reference decision over what the scrub left. */
 function resolveBrokenAnchors(root) {
-  // Deliberately NOT memoized at module scope: the set would need invalidating on a language
-  // change, and it would leak across tests using different mocked `game.i18n`.
+  // Not memoized: a language change would stale it, and it would leak across mocked tests.
   const placeholders = brokenLinkPlaceholders();
   for (const anchor of root.querySelectorAll('a.broken')) {
     const parent = anchor.parentNode;
@@ -171,10 +151,7 @@ function resolveBrokenAnchors(root) {
   }
 }
 
-/**
- * Strip HTML markup and decode entities, running the privacy scrub and the broken-anchor pass over
- * the parsed tree first.
- */
+/** After the scrub and broken-anchor pass over the parsed tree. */
 function stripHtml(raw) {
   if (globalThis.document?.createElement) {
     const template = globalThis.document.createElement('template');
@@ -199,7 +176,6 @@ function stripHtml(raw) {
     .replaceAll(/&#39;|&apos;/gi, "'");
 }
 
-/** Tidy separators and brackets orphaned by a removed reference. */
 function tidySeparators(text) {
   return text
     .replaceAll(new RegExp(`([${SEPARATOR_CLASS}])(?: ?[${SEPARATOR_CLASS}])+`, 'g'), '$1')
@@ -212,7 +188,6 @@ function tidySeparators(text) {
     .replace(new RegExp(String.raw`[\s${EDGE_SEPARATOR_CLASS}]+$`), '');
 }
 
-/** Produce a display-safe plain-text description from any Foundry-style value. */
 export function plainTextDescription(value) {
   const raw = descriptionTextCandidate(value);
   if (!raw) return '';

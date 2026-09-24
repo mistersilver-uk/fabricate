@@ -10,10 +10,7 @@ import {
   omitReconstructibleDefaults,
 } from './reconstructibleDefaults.js';
 
-/**
- * Serialized ingredient-SET fields the `IngredientSet` constructor rebuilds to EXACTLY this value
- * when the key is absent, so emitting them is pure payload weight (issue 1135).
- */
+/** Fields the constructor rebuilds exactly from absence (issue 1135). */
 export const INGREDIENT_SET_OMITTED_WHEN_DEFAULT = {
   name: isEmptyString,
   essences: isEmptyMap,
@@ -22,19 +19,15 @@ export const INGREDIENT_SET_OMITTED_WHEN_DEFAULT = {
   resultGroupId: isNull,
 };
 
-// Re-exported so callers of the model keep reading the cap from it while the ledger owns the value.
 export { INGREDIENT_SEARCH_NODE_CAP } from './ingredientLedger.js';
 
-/**
- * Represents a set of ingredients that can satisfy a recipe's input requirements. Multiple
- * ingredient sets allow recipes to accept alternative combinations (e.g., "2xA OR 1xB + 1xC")
- */
+/** One alternative combination that satisfies a recipe's inputs. */
 export class IngredientSet {
   constructor(data = {}) {
     this.id = data.id || foundry.utils.randomID();
     this.name = data.name || '';
 
-    // Ingredient groups: all groups required, one option satisfies each group.
+    // Every group is required; one option satisfies each.
     const groups =
       Array.isArray(data.ingredientGroups) && data.ingredientGroups.length > 0
         ? data.ingredientGroups
@@ -43,27 +36,20 @@ export class IngredientSet {
       group instanceof IngredientGroup ? group : IngredientGroup.fromJSON(group)
     );
 
-    // Legacy alias retained for older UI code paths.
     this.ingredients = this.ingredientGroups
       .map((group) => group.options?.[0] || null)
       .filter(Boolean);
 
-    // Required essences (accumulated from ingredients)
     this.essences = data.essences || {}; // { 'light': 2, 'fire': 1 }
 
-    // Shared library tool references applying to this ingredient set.
     this.toolIds = this._normalizeToolIds(data.toolIds);
 
-    // Result IDs to produce when this set is used (for variable recipes)
+    // For variable recipes.
     this.resultMapping = data.resultMapping || [];
 
-    // Mapped mode: direct routing to a specific result group.
     this.resultGroupId = data.resultGroupId || null;
   }
 
-  /**
-   * Normalize an array of library tool id strings: coerce to trimmed, non-empty, deduped strings.
-   */
   _normalizeToolIds(toolIds) {
     if (!Array.isArray(toolIds)) return [];
     const seen = new Set();
@@ -86,7 +72,6 @@ export class IngredientSet {
     }));
   }
 
-  /** Validate that this ingredient set has all required data */
   validate({ requireComplete = true } = {}) {
     const errors = [];
 
@@ -98,7 +83,6 @@ export class IngredientSet {
       errors.push('Ingredient set must have at least one ingredient group or essence requirement');
     }
 
-    // Validate ingredient groups/options.
     for (const [groupIndex, group] of this.ingredientGroups.entries()) {
       const groupValidation = group.validate({ requireComplete });
       if (!groupValidation.valid) {
@@ -110,7 +94,6 @@ export class IngredientSet {
       }
     }
 
-    // Validate essence requirements.
     for (const quantity of Object.values(this.essences)) {
       if (typeof quantity !== 'number' || quantity <= 0) {
         errors.push('An essence requirement must have a positive quantity');
@@ -123,14 +106,12 @@ export class IngredientSet {
     };
   }
 
-  /** Check if this ingredient set can be crafted with the given items */
   canBeCraftedWith(availableItems, { resolveItemEssences } = {}) {
     const selection = this.resolveIngredientSelection(availableItems, null, {
       resolveItemEssences,
     });
     if (!selection.success) return false;
 
-    // Check if all essence requirements are satisfied
     if (Object.keys(this.essences).length > 0) {
       const accumulatedEssences = this._accumulateEssences(availableItems);
 
@@ -145,7 +126,6 @@ export class IngredientSet {
     return true;
   }
 
-  /** Accumulate essences from all available items */
   _accumulateEssences(items) {
     const accumulated = {};
 
@@ -159,16 +139,12 @@ export class IngredientSet {
     return accumulated;
   }
 
-  /** Match ingredients to available items and return consumption plan */
   matchIngredients(availableItems, matcher = null, opts = {}) {
     const selection = this.resolveIngredientSelection(availableItems, matcher, opts);
     return selection.success ? selection.plan : [];
   }
 
-  /**
-   * Resolve which option satisfies each ingredient group, building the item consumption plan and
-   * (when a currency probe is supplied) the currency spends.
-   */
+  /** The option per group, the item plan and, given a currency probe, the spends. */
   resolveIngredientSelection(availableItems, matcher = null, options = {}) {
     return createIngredientSolver({
       ingredientGroups: this.ingredientGroups,
@@ -176,10 +152,7 @@ export class IngredientSet {
     }).resolve(availableItems, matcher, options);
   }
 
-  /**
-   * Serialize this set, omitting every reconstructible default and the write-retired flat
-   * `ingredients` alias (issue 1135).
-   */
+  /** Omits reconstructible defaults and the write-retired `ingredients` alias (issue 1135). */
   toJSON() {
     return omitReconstructibleDefaults(
       {

@@ -1,43 +1,34 @@
 /**
- * Shared essence allocation (issue 917): how units drawn from carrier stacks become the essence
- * amounts delivered to ONE ingredient set's essence block. Funding a block is a joint problem over
- * the whole block, so the arithmetic lives here once and both the consuming model and the
- * suggesting read side use it. Deliberately IMPORT-FREE: the mounted harnesses copy
- * `IngredientSet.js` raw, and a missing transitive import HANGS those suites as `# cancelled`
- * rather than failing. Pure, deterministic, and independent of the `carriers` array's order.
+ * How carrier units become one essence block's delivered amounts (issue 917), shared by the model
+ * and the read side. Pure, deterministic and order-independent. Import-free: the mounted harnesses
+ * copy `IngredientSet.js` raw, where a missing import hangs the suite as `# cancelled`.
  */
 
-/** Coerce a count of item units. */
 function unitsOf(value) {
   const units = Number(value);
   if (!Number.isFinite(units) || units <= 0) return 0;
   return Math.floor(units);
 }
 
-/** Coerce an essence amount. */
 function amountOf(value) {
   const amount = Number(value);
   if (!Number.isFinite(amount) || amount <= 0) return 0;
   return amount;
 }
 
-/** Read one item key out of a `{ itemKey: units }` map. */
 function unitsFor(map, itemKey) {
   if (typeof itemKey !== 'string' || itemKey === '') return 0;
   if (!map || typeof map !== 'object') return 0;
   return unitsOf(map[itemKey]);
 }
 
-/** Entries of an essence map, tolerant of the absent/garbage shapes a stored flag can hold. */
+/** Tolerates the garbage a stored flag can hold. */
 function essenceEntries(essences) {
   if (!essences || typeof essences !== 'object') return [];
   return Object.entries(essences);
 }
 
-/**
- * Add `entries` (scaled by `multiplier`) into an essence-id totals map, dropping unusable ids and
- * non-positive amounts.
- */
+/** Drops unusable ids and non-positive amounts. */
 function accumulate(totals, entries, multiplier = 1) {
   for (const [rawId, rawAmount] of entries) {
     const essenceId = typeof rawId === 'string' ? rawId.trim() : '';
@@ -48,11 +39,7 @@ function accumulate(totals, entries, multiplier = 1) {
   return totals;
 }
 
-/**
- * Normalize the two shapes a caller legitimately holds into `[essenceId, need]` pairs: the
- * `essencePool.requirements` array (`{ essenceId, need }`, where `amount` is accepted as the
- * model-side alias) or a bare `{ [essenceId]: need }` map.
- */
+/** `essencePool.requirements` (`need`, or the model's `amount`) or a need-by-essence-id map. */
 function requirementEntries(requirements) {
   if (!Array.isArray(requirements)) return essenceEntries(requirements);
   return requirements.map((requirement) => [
@@ -61,20 +48,15 @@ function requirementEntries(requirements) {
   ]);
 }
 
-/** Total need per essence id. */
 function totalRequired(requirements) {
   return accumulate(new Map(), requirementEntries(requirements));
 }
 
-/** The carriers, defensively. */
 function carrierList(carriers) {
   return Array.isArray(carriers) ? carriers : [];
 }
 
-/**
- * Sum what an allocation actually delivers: every allocated carrier's `perUnit` map scaled by the
- * units allocated to it.
- */
+/** Each allocated carrier's `perUnit` map times its allocated units. */
 export function deliveredEssences(allocation, carriers) {
   const delivered = new Map();
 
@@ -112,7 +94,6 @@ export function clampAllocation(allocation, availableUnits) {
   return Object.fromEntries(clamped);
 }
 
-/** Build the per-carrier capacity reader for one {@link greedyAllocate} run. */
 function capacityReader(availableUnits) {
   const authoritative = Boolean(availableUnits) && typeof availableUnits === 'object';
   return (carrier) => {
@@ -122,7 +103,6 @@ function capacityReader(availableUnits) {
   };
 }
 
-/** Score one candidate unit of a carrier against the need still outstanding. */
 function scoreCarrier(carrier, remaining, ownedUnits) {
   let score = 0;
   let overshoot = 0;
@@ -138,10 +118,7 @@ function scoreCarrier(carrier, remaining, ownedUnits) {
   return { itemKey: carrier.itemKey, perUnit: carrier.perUnit, ownedUnits, score, overshoot };
 }
 
-/**
- * The tie-break, as a strict "is `candidate` preferred over `incumbent`" predicate: **(score desc,
- * least overshoot, ownedUnits desc, itemKey lexicographic)**.
- */
+/** Score desc, least overshoot, `ownedUnits` desc, then `itemKey` lexicographic. */
 function isBetterPick(candidate, incumbent) {
   if (candidate.score !== incumbent.score) return candidate.score > incumbent.score;
   if (candidate.overshoot !== incumbent.overshoot) return candidate.overshoot < incumbent.overshoot;
@@ -151,10 +128,7 @@ function isBetterPick(candidate, incumbent) {
   return candidate.itemKey < incumbent.itemKey;
 }
 
-/**
- * Pick the single best next unit, or `null` when no carrier with capacity left contributes anything
- * to the outstanding need.
- */
+/** `null` when no carrier with capacity contributes to the outstanding need. */
 function selectCarrier(carriers, remaining, capacityFor, allocation) {
   let best = null;
 
@@ -169,10 +143,7 @@ function selectCarrier(carriers, remaining, capacityFor, allocation) {
   return best;
 }
 
-/**
- * Subtract one unit of a carrier from the outstanding need, forgetting essences that reach zero so
- * the loop's "anything left?" test is just `remaining.size`.
- */
+/** Forgets essences that reach zero, so "anything left?" is `remaining.size`. */
 function drawDown(remaining, perUnit) {
   for (const [rawId, rawAmount] of essenceEntries(perUnit)) {
     const essenceId = typeof rawId === 'string' ? rawId.trim() : '';
@@ -184,10 +155,7 @@ function drawDown(remaining, perUnit) {
   }
 }
 
-/**
- * Suggest an allocation that funds the block: repeatedly take the single best next unit until
- * nothing is outstanding, or until no remaining carrier can contribute.
- */
+/** Take the best next unit until nothing is outstanding or no carrier can contribute. */
 export function greedyAllocate(requirements, carriers, availableUnits) {
   const remaining = totalRequired(requirements);
   const ledger = carrierList(carriers);

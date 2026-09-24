@@ -1,7 +1,6 @@
 /**
- * `1.21.0` — retire the Fabricate-owned check-modifier placeholder from every stored roll formula
- * (issue 1094; spec § Check-Modifier Placeholder Retirement Migration owns every rule below,
- * including why a token it cannot lift out is left untouched and REPORTED).
+ * `1.21.0`: strip the check-modifier placeholder from every stored formula (issue 1094). Spec
+ * § Check-Modifier Placeholder Retirement Migration, including why an unliftable token is reported.
  */
 
 import {
@@ -32,12 +31,12 @@ function formulaKeysFor(slot) {
   return slot === 'routed' ? ['rollFormula', ROUTED_LEGACY_FORMULA_KEY] : ['rollFormula'];
 }
 
-/** A zeroed count bag. Named so the three producers below cannot drift on key spelling. */
+/** Named, so the three producers cannot drift on key spelling. */
 function emptyCounts() {
   return { inert: 0, subtractive: 0, repeated: 0, untouched: 0 };
 }
 
-/** Whether any count in a bag is non-zero — the gate on reporting a system at all. */
+/** The gate on reporting a system at all. */
 export function hasRetiredCraftingModFindings(counts) {
   return (
     Number(counts?.inert) > 0 ||
@@ -48,9 +47,8 @@ export function hasRetiredCraftingModFindings(counts) {
 }
 
 /**
- * Retire the token from ONE field: classify, count, then rewrite, so a counted formula is described
- * by its PRE-strip text. The NULL dice engine keeps the output free of any Foundry global, leaving
- * the STRUCTURAL residue check as the only guard on what this writes (requirement 3).
+ * Count before rewriting, so the count describes the pre-strip text. With no dice engine, the
+ * structural residue check is the only guard on what this writes (requirement 3).
  */
 function retireFormulaField(config, key, counts) {
   const authored = config?.[key];
@@ -68,17 +66,12 @@ function retireFormulaField(config, key, counts) {
   config[key] = plan.formula;
 }
 
-/**
- * Count the ONE formula whose modifiers are about to go live, gated on a non-empty RESOLVED ELIGIBLE
- * SET rather than a non-empty catalogue (requirement 5). Must run BEFORE the strip.
- */
+/** Gated on a non-empty resolved eligible set, not catalogue (requirement 5); before the strip. */
 function countInertActiveCraftingCheck(system) {
   const check = isPlainObject(system?.craftingCheck) ? system.craftingCheck : null;
   if (!check) return 0;
-  // The context is BUILT by the shared builder, never hand-mirrored, and `null` for the subject
-  // because no migration can see a recipe's pick. THE `??` CHAIN MUST COVER ALL THREE LIBRARY
-  // LOCATIONS this world may be at (issues 1095, 1117): the spread is unconditional, so a missing
-  // key would write `modifiers: undefined` over a real one and the failure is a silent count of 0.
+  // The shared builder, subject `null` since no migration sees a pick. The `??` chain must cover
+  // all three library locations (issues 1095, 1117), or `modifiers: undefined` silently counts 0.
   const eligible = resolveEligibleModifierIds(
     buildCheckModifierContext(
       {
@@ -98,10 +91,7 @@ function countInertActiveCraftingCheck(system) {
   return describeRetiredModifierPlaceholder(authored).present ? 0 : 1;
 }
 
-/**
- * Apply the whole `1.21.0` transform to ONE system, mutated in place, shared with
- * `migrateExportPayload.js`. It DELIBERATELY DOES NOT SEED A MISSING CHECK BLOCK (requirement 6).
- */
+/** In place, shared with the export upcast; never seeds a missing check block (requirement 6). */
 export function applyRetireCraftingModToken(system) {
   const counts = emptyCounts();
   if (!isPlainObject(system)) return counts;
@@ -156,16 +146,11 @@ const NOTICE_UNTOUCHED_FALLBACK =
 
 const NOTICE_KEY_PREFIX = 'FABRICATE.Migration.RetireCheckModifierPlaceholder.';
 
-/**
- * Compose the one-time GM notice: totals, affected systems, message and channel. LIFTED OUT OF
- * `src/main.js` deliberately, and SEVERITY IS PER FINDING — `untouched` is the only count that
- * leaves a BROKEN world, so it alone is a PERMANENT warning (requirement 5).
- */
+/** Only `untouched` leaves a broken world, so it alone is a permanent warning (requirement 5). */
 export function buildRetiredCraftingModNotice(reported, format) {
   const entries = Array.isArray(reported) ? reported : [];
 
-  // Belt and braces over the runner's own coercion: a NaN passes the `count <= 0` gate below and
-  // would render "NaN formula(s)" to the GM as this migration's one visible output.
+  // Over the runner's coercion too: a NaN passes `count <= 0` and renders "NaN formula(s)".
   const totals = emptyCounts();
   for (const entry of entries) {
     for (const [countKey] of NOTICE_CLAUSES) {
@@ -200,7 +185,6 @@ export function buildRetiredCraftingModNotice(reported, format) {
   };
 }
 
-/** The GM-facing name of a system, falling back to its id and then to a stable label. */
 function systemLabel(system) {
   const name = typeof system?.name === 'string' ? system.name.trim() : '';
   if (name) return name;
@@ -208,7 +192,6 @@ function systemLabel(system) {
   return id || 'Unnamed system';
 }
 
-/** Runner entry point. */
 export function migrateRetireCraftingModToken(data = {}) {
   const systems = structuredClone(data.systems ?? null);
 
