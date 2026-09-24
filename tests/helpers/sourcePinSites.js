@@ -1,7 +1,10 @@
 /**
- * Count the source-text pin sites in one test module (issue 1658). Proved from inside the `npm
- * test` glob by `tests/source-pin-ratchet.test.js`.
+ * Count the source-text pin sites in one test module (issue 1658), following text a module imports
+ * from another `tests/` module (issue 1933). Proved from inside the `npm test` glob by
+ * `tests/source-pin-ratchet.test.js`.
  */
+import { posix } from 'node:path';
+
 import { calledName, identifierNames, literalStrings, walkNodes } from './moduleAst.js';
 
 /** The reads that bring `src/` text into a test, before local wrappers are added per module. */
@@ -21,8 +24,37 @@ const FUNCTION_TYPES = Object.freeze([
   'ArrowFunctionExpression',
 ]);
 
-const spellsSrcPath = (node) =>
-  literalStrings(node).some((text) => text.includes('src/') || SRC_ROOTS.includes(text));
+const NO_EXPORTS = () => undefined;
+
+/**
+ * Subtree queries, memoised on the node: a module is re-analysed on every pass of the cross-module
+ * fixpoint, and re-walking each subtree per pass doubled the gate's run time.
+ */
+function memoised(query) {
+  const cache = new WeakMap();
+  return (node) => {
+    if (!node || typeof node !== 'object') return query(node);
+    if (!cache.has(node)) cache.set(node, query(node));
+    return cache.get(node);
+  };
+}
+
+const nodesIn = memoised((node) => [...walkNodes(node)]);
+
+const callsIn = memoised((node) =>
+  [...walkNodes(node)].filter((inner) => inner.type === 'CallExpression')
+);
+
+/** Identifiers and members, the nodes a binding can be referenced through. */
+const referencesIn = memoised((node) =>
+  [...walkNodes(node)].filter(
+    (inner) => inner.type === 'Identifier' || inner.type === 'MemberExpression'
+  )
+);
+
+const spellsSrcPath = memoised((node) =>
+  literalStrings(node).some((text) => text.includes('src/') || SRC_ROOTS.includes(text))
+);
 
 const isReader = (node, readers) =>
   node?.type === 'CallExpression' && readers.has(calledName(node));
@@ -33,34 +65,21 @@ function boundFunctionName(node, assignedNames) {
 }
 
 /** Names bound to a function expression, which the AST does not record on the function itself. */
-function functionAssignments(ast) {
+function functionAssignments(nodes) {
   const assigned = new Map();
-  for (const node of walkNodes(ast)) {
+  for (const node of nodes) {
     if (node.type !== 'VariableDeclarator' || node.id?.type !== 'Identifier') continue;
     if (node.init && FUNCTION_TYPES.includes(node.init.type)) assigned.set(node.init, node.id.name);
   }
   return assigned;
 }
 
-const callsAReader = (node, readers) =>
-  [...walkNodes(node)].some((inner) => isReader(inner, readers));
-
-/**
- * Names this module can read a file through: the base readers plus any local function whose body
- * calls one, resolved to a fixpoint so a wrapper around a wrapper still counts.
- */
-function readerNames(ast) {
-  const assigned = functionAssignments(ast);
-  const names = new Set(BASE_READERS);
-  let grew = true;
-  while (grew) {
-    grew = false;
-    for (const node of walkNodes(ast)) {
-      if (!FUNCTION_TYPES.includes(node.type)) continue;
-      const bound = boundFunctionName(node, assigned);
-      if (!bound || names.has(bound) || !callsAReader(node.body, names)) continue;
-      names.add(bound);
-      grew = true;
+/** Every name bound as a function parameter anywhere in the module. */
+function parameterNames(functions) {
+  const names = new Set();
+  for (const node of functions) {
+    for (const parameter of node.params ?? []) {
+      for (const name of identifierNames(parameter)) names.add(name);
     }
   }
   return names;
@@ -80,47 +99,165 @@ function variableIndex(scopeManager) {
   return index;
 }
 
-/** Whether any identifier in a subtree resolves to a key already in `known`. */
-function referencesKnown(node, known, keyFor, seedPaths) {
-  for (const inner of walkNodes(node)) {
-    if (inner.type !== 'Identifier') continue;
-    if (known.has(keyFor(inner))) return true;
-    if (seedPaths.has(inner.name) && known.has(inner.name)) return true;
+/** What a module's analysis needs that does not depend on what it imports, built once per AST. */
+const moduleIndex = memoised((ast) => {
+  const nodes = nodesIn(ast);
+  const functions = nodes.filter((node) => FUNCTION_TYPES.includes(node.type));
+  const assigned = functionAssignments(nodes);
+  const named = functions
+    .map((fn) => ({ name: boundFunctionName(fn, assigned), calls: callsIn(fn.body) }))
+    .filter(({ name }) => name !== undefined);
+  return {
+    named,
+    parameters: parameterNames(functions),
+    calls: nodes.filter((node) => node.type === 'CallExpression'),
+    declarators: nodes.filter(
+      (node) => node.type === 'VariableDeclarator' && node.id?.type === 'Identifier' && node.init
+    ),
+  };
+});
+
+/**
+ * Names this module can read a file through: the base readers, the imported ones, and any local
+ * function whose body calls one, resolved to a fixpoint so a wrapper around a wrapper still counts.
+ */
+function readerNames({ named }, imported) {
+  const names = new Set([...BASE_READERS, ...imported]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const { name, calls } of named) {
+      if (names.has(name) || !calls.some((call) => isReader(call, names))) continue;
+      names.add(name);
+      grew = true;
+    }
   }
-  return false;
+  return names;
+}
+
+/** The name an import or export specifier spells, whether as an identifier or a string. */
+const specifierName = (node) => node?.name ?? node?.value;
+
+function seedKinds(seeds, kinds, key, name) {
+  if (kinds?.has('path')) seeds.paths.add(key);
+  if (kinds?.has('source')) seeds.sources.add(key);
+  if (kinds?.has('reader')) seeds.wrappers.add(name);
+}
+
+/** `ns.TEXT` is keyed on the member node, since the namespace binding itself is not text. */
+function seedNamespaceMembers(nodes, identifierKey, namespaces, seeds) {
+  for (const node of nodes) {
+    if (node.type !== 'MemberExpression' || node.object?.type !== 'Identifier') continue;
+    const table = namespaces.get(identifierKey(node.object));
+    const name = node.computed ? node.property?.value : node.property?.name;
+    if (table === undefined || typeof name !== 'string') continue;
+    const key = `${node.object.name}.${name}`;
+    seeds.members.set(node, key);
+    seedKinds(seeds, table.get(name), key, name);
+  }
+}
+
+/**
+ * What this module imports from a `tests/` export, keyed by (resolved module, imported name): paths
+ * and sources by the local binding, and readers by the name a call site spells. An imported wrapper
+ * marks the module as reading files but is not a pin read, since most compile or mount a component.
+ */
+function importSeeds(ast, identifierKey, exportsOf) {
+  const seeds = {
+    paths: new Set(),
+    sources: new Set(),
+    readers: new Set(),
+    wrappers: new Set(),
+    members: new Map(),
+  };
+  const namespaces = new Map();
+  for (const node of ast.body) {
+    if (node.type !== 'ImportDeclaration') continue;
+    const table = exportsOf(node.source.value);
+    for (const { type, local, imported } of node.specifiers) {
+      if (type === 'ImportNamespaceSpecifier') {
+        if (table !== undefined) namespaces.set(identifierKey(local), table);
+        continue;
+      }
+      const name = type === 'ImportDefaultSpecifier' ? 'default' : specifierName(imported);
+      if (BASE_READERS.includes(name)) seeds.readers.add(local.name);
+      seedKinds(seeds, table?.get(name), identifierKey(local), local.name);
+    }
+  }
+  if (namespaces.size > 0) seedNamespaceMembers(nodesIn(ast), identifierKey, namespaces, seeds);
+  return seeds;
+}
+
+/** Whether any identifier or keyed member in a subtree resolves to a key already in `known`. */
+function referencesKnown(node, known, keyFor) {
+  return referencesIn(node).some((inner) => {
+    const key = keyFor(inner);
+    return key !== undefined && known.has(key);
+  });
 }
 
 /** Whether a read call names a `src/` path directly or through a path binding. */
-const readsSrc = (call, paths, keyFor, seedPaths) =>
+const readsSrc = (call, paths, keyFor) =>
   spellsSrcPath(call) ||
-  call.arguments.some((argument) => referencesKnown(argument, paths, keyFor, seedPaths));
+  call.arguments.some((argument) => referencesKnown(argument, paths, keyFor));
 
 /**
  * Classify one declaration: a PATH binding spells a `src/` path without reading it, and a SOURCE
  * binding holds text a reader returned.
  */
 function classifyDeclaration(declaration, context) {
-  const { readers, paths, sources, keyFor, seedPaths } = context;
-  const reads = [...walkNodes(declaration.init)].filter((node) => isReader(node, readers));
+  const { readers, paths, sources, keyFor } = context;
+  const reads = callsIn(declaration.init).filter((node) => isReader(node, readers));
   // The two are computed independently rather than as an either/or: a binding that spells a path
   // and is later found to derive from a source is both, and collapsing them moves real counts.
   const path = reads.length === 0 && spellsSrcPath(declaration.init);
   const source =
-    reads.some((read) => readsSrc(read, paths, keyFor, seedPaths)) ||
+    reads.some((read) => readsSrc(read, paths, keyFor)) ||
     (reads.length > 0 && spellsSrcPath(declaration.init)) ||
-    referencesKnown(declaration.init, sources, keyFor, seedPaths);
+    referencesKnown(declaration.init, sources, keyFor);
   return { path, source };
 }
 
-function resolveBindings(ast, scopeManager, readers, seedPaths) {
-  const index = variableIndex(scopeManager);
-  const keyFor = (node) => index.get(node) ?? node?.name;
-  const declarations = [...walkNodes(ast)].filter(
-    (node) => node.type === 'VariableDeclarator' && node.id?.type === 'Identifier' && node.init
-  );
-  const paths = new Set(seedPaths);
-  const sources = new Set();
-  const context = { readers, paths, sources, keyFor, seedPaths };
+/** Top-level function declarations the module exports, inline or through `export { name }`. */
+function exportedFunctions(ast) {
+  const listed = new Set();
+  const declared = [];
+  for (const node of ast.body) {
+    const fn = node.type === 'FunctionDeclaration' ? node : node.declaration;
+    if (fn?.type === 'FunctionDeclaration') declared.push([fn, fn !== node]);
+    if (node.type === 'ExportNamedDeclaration' && !node.source) {
+      for (const { local } of node.specifiers) listed.add(specifierName(local));
+    }
+  }
+  return declared
+    .filter(([fn, inline]) => fn.id && (inline || listed.has(fn.id.name)))
+    .map(([fn]) => fn);
+}
+
+/**
+ * An exported function's own return values, as declarations of its binding, so a caller of a
+ * function returning text holds a source. `const` functions are classified by their declarator.
+ */
+const exportedFunctionReturns = memoised((ast) => {
+  const returns = [];
+  for (const fn of exportedFunctions(ast)) {
+    // Seeding `seen` with a nested function's body stops the walk descending into its returns.
+    const seen = new Set();
+    for (const inner of walkNodes(fn.body, seen)) {
+      if (FUNCTION_TYPES.includes(inner.type)) seen.add(inner.body);
+      else if (inner.type === 'ReturnStatement' && inner.argument) {
+        returns.push({ id: fn.id, init: inner.argument });
+      }
+    }
+  }
+  return returns;
+});
+
+function resolveBindings(ast, { declarators }, { readers, keyFor, seeds }) {
+  const declarations = [...declarators, ...exportedFunctionReturns(ast)];
+  const paths = new Set(seeds.paths);
+  const sources = new Set(seeds.sources);
+  const context = { readers, paths, sources, keyFor };
   // Monotone over a finite set of declarations, so this terminates on its own; a fixed pass bound
   // would only turn a long binding chain into a silent under-count.
   let grew = true;
@@ -140,13 +277,22 @@ function resolveBindings(ast, scopeManager, readers, seedPaths) {
       }
     }
   }
-  return { paths, sources, keyFor };
+  return { paths, sources };
 }
 
-/** The identifier a call's receiver is reached through, so `byFile[path]` resolves to `byFile`. */
-function receiverNode(node) {
+/**
+ * The node a call's receiver is reached through: `byFile[path]` resolves to `byFile`, a keyed
+ * `ns.TEXT` to itself, and a call of a source function, `read().includes`, to `read`.
+ */
+function receiverNode(node, { keyFor, sources }) {
   let object = node.callee?.type === 'MemberExpression' ? node.callee.object : undefined;
-  while (object?.type === 'MemberExpression') object = object.object;
+  while (object?.type === 'MemberExpression' || object?.type === 'CallExpression') {
+    if (sources.has(keyFor(object))) return object;
+    if (object.type === 'CallExpression') {
+      return sources.has(keyFor(object.callee)) ? object.callee : undefined;
+    }
+    object = object.object;
+  }
   return object?.type === 'Identifier' ? object : undefined;
 }
 
@@ -158,28 +304,16 @@ const matchesLiteral = (node) => {
   );
 };
 
-/** Every name bound as a function parameter anywhere in the module. */
-function parameterNames(ast) {
-  const names = new Set();
-  for (const node of walkNodes(ast)) {
-    if (!FUNCTION_TYPES.includes(node.type)) continue;
-    for (const parameter of node.params ?? []) {
-      for (const name of identifierNames(parameter)) names.add(name);
-    }
-  }
-  return names;
-}
-
 /** Whether this call asserts the shape of source text, and so is one pin site. */
 function isPinSite(node, context) {
   const { readers, paths, sources, keyFor, parameters } = context;
-  if (isReader(node, readers)) return readsSrc(node, paths, keyFor, new Set());
+  if (isReader(node, readers)) return readsSrc(node, paths, keyFor);
   const called = calledName(node);
-  const receiver = receiverNode(node);
+  const receiver = receiverNode(node, context);
   // `assert.match(source, /x/)` and `/x/.test(source)` take the text as an argument, not a receiver.
   if ((called === 'match' && receiver?.name === 'assert') || called === 'test') {
     const [subject] = node.arguments;
-    return subject?.type === 'Identifier' && sources.has(keyFor(subject));
+    return subject !== undefined && sources.has(keyFor(subject));
   }
   if (called !== 'includes' || receiver === undefined) return false;
   // A resolved source binding is pin enough whatever the needle: a pin whose argument is a loop
@@ -190,23 +324,142 @@ function isPinSite(node, context) {
   return matchesLiteral(node) && parameters.has(receiver.name);
 }
 
+/** The local binding or re-exported kinds behind each name one export statement makes public. */
+function* exportedBindings(node, exportsOf) {
+  if (node.type === 'ExportAllDeclaration') {
+    if (node.exported) return;
+    for (const [name, kinds] of exportsOf(node.source.value) ?? []) {
+      if (name !== 'default') yield { name, kinds };
+    }
+    return;
+  }
+  if (node.type === 'ExportDefaultDeclaration') {
+    const local = node.declaration.type === 'Identifier' ? node.declaration : node.declaration.id;
+    if (local) yield { name: 'default', local };
+    return;
+  }
+  const { declaration, specifiers = [], source } = node;
+  if (declaration?.type === 'VariableDeclaration') {
+    for (const { id } of declaration.declarations) {
+      if (id?.type === 'Identifier') yield { name: id.name, local: id };
+    }
+  } else if (declaration?.id) {
+    yield { name: declaration.id.name, local: declaration.id };
+  }
+  const table = source ? exportsOf(source.value) : undefined;
+  for (const specifier of specifiers) {
+    const name = specifierName(specifier.exported);
+    if (source) yield { name, kinds: table?.get(specifierName(specifier.local)) };
+    else yield { name, local: specifier.local };
+  }
+}
+
+/** This module's exports that importers must treat as a path, a source, or a reader. */
+function exportTable(ast, { paths, sources, wrappers, keyFor }, exportsOf) {
+  const table = new Map();
+  for (const node of ast.body) {
+    if (!node.type.startsWith('Export')) continue;
+    for (const { name, local, kinds } of exportedBindings(node, exportsOf)) {
+      const found = new Set(kinds);
+      if (local !== undefined) {
+        const key = keyFor(local);
+        if (paths.has(key)) found.add('path');
+        if (sources.has(key)) found.add('source');
+        if (wrappers.has(local.name)) found.add('reader');
+      }
+      if (found.size > 0) table.set(name, found);
+    }
+  }
+  return table;
+}
+
+const hasExports = (ast) => ast.body.some((node) => node.type.startsWith('Export'));
+
 /**
+ * One module's pin sites, whether it calls a reader at all, and its export table.
+ *
  * @param {object} ast A module AST from `parseModule`.
- * @param {{file?: string, scopeManager?: object, seedPaths?: Set<string>}} options `file` decides
- *   whether a parameter the module was handed counts as source it is pinning; `seedPaths` names the
- *   `src/` path constants this module imports.
- * @returns {number}
+ * @param {{file?: string, scopeManager?: object, exportsOf?: Function}} options `file` decides
+ *   whether a handed parameter counts as source; `exportsOf(specifier)` is the export table of the
+ *   `tests/` module an import names, or `undefined`.
  */
-export function countPinSites(ast, { file = '', scopeManager, seedPaths = new Set() } = {}) {
-  const readers = readerNames(ast);
-  const { paths, sources, keyFor } = resolveBindings(ast, scopeManager, readers, seedPaths);
+function analyseModule(ast, { file = '', scopeManager, exportsOf = NO_EXPORTS } = {}) {
+  const index = moduleIndex(ast);
+  const variables = variableIndex(scopeManager);
+  const identifierKey = (node) => variables.get(node) ?? node?.name;
+  const seeds = importSeeds(ast, identifierKey, exportsOf);
+  const keyFor = (node) => seeds.members.get(node) ?? identifierKey(node);
+  const readers = readerNames(index, seeds.readers);
+  const { paths, sources } = resolveBindings(ast, index, { readers, keyFor, seeds });
   // Counted everywhere, the parameter shape sweeps up ordinary array membership in behavioural
   // tests: 425 sites across 94 files, against 11 under `tests/helpers/`.
-  const parameters = file.startsWith('tests/helpers/') ? parameterNames(ast) : new Set();
-  const context = { readers, paths, sources, keyFor, seedPaths, parameters };
+  const parameters = file.startsWith('tests/helpers/') ? index.parameters : new Set();
+  const context = { readers, paths, sources, keyFor, parameters };
+  // A local wrapper's body calls one of these, so they alone decide whether the module reads files.
+  const direct = new Set([...readers, ...seeds.wrappers]);
   let sites = 0;
-  for (const node of walkNodes(ast)) {
-    if (node.type === 'CallExpression' && isPinSite(node, context)) sites += 1;
+  let readsFiles = false;
+  for (const node of index.calls) {
+    readsFiles ||= isReader(node, direct);
+    if (isPinSite(node, context)) sites += 1;
   }
-  return sites;
+  const wrappers = hasExports(ast) ? readerNames(index, direct) : direct;
+  return { sites, readsFiles, exports: exportTable(ast, { ...context, wrappers }, exportsOf) };
+}
+
+/** @returns {number} The pin sites in one module, with nothing imported resolved. */
+export function countPinSites(ast, options) {
+  return analyseModule(ast, options).sites;
+}
+
+/** A relative specifier as a corpus key, or `undefined` for a package or a file outside it. */
+function resolveSpecifier(file, specifier, corpus) {
+  if (typeof specifier !== 'string' || !specifier.startsWith('.')) return undefined;
+  const base = posix.normalize(posix.join(posix.dirname(file), specifier));
+  return [base, `${base}.js`, `${base}/index.js`].find((candidate) => corpus.has(candidate));
+}
+
+const sameTable = (left, right) =>
+  left !== undefined &&
+  left.size === right.size &&
+  [...right].every(([name, kinds]) => [...kinds].every((kind) => left.get(name)?.has(kind)));
+
+/**
+ * Every module's pin sites, with imported text followed across modules to a fixpoint.
+ *
+ * @param {Map<string, {ast: object, scopeManager?: object}>} corpus Keyed by repo-relative path.
+ * @returns {{sites: Map<string, number>, fileReaders: Set<string>}} Sites for modules with any,
+ *   and every module that calls a raw reader or an imported reader wrapper.
+ */
+export function countCorpusPinSites(corpus) {
+  const tables = new Map();
+  const results = new Map();
+  const analyse = (file) => {
+    const { ast, scopeManager } = corpus.get(file);
+    const exportsOf = (specifier) => tables.get(resolveSpecifier(file, specifier, corpus));
+    const result = analyseModule(ast, { file, scopeManager, exportsOf });
+    results.set(file, result);
+    return result;
+  };
+  const exporting = [...corpus.keys()].filter((file) => hasExports(corpus.get(file).ast));
+  // Export tables only grow as their imports' tables grow, so this reaches a fixpoint, and the last
+  // pass, which changed nothing, analysed every exporting module against the final tables.
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const file of exporting) {
+      const { exports } = analyse(file);
+      if (sameTable(tables.get(file), exports)) continue;
+      tables.set(file, exports);
+      grew = true;
+    }
+  }
+  for (const file of corpus.keys()) if (!results.has(file)) analyse(file);
+  const sites = new Map();
+  const fileReaders = new Set();
+  for (const [file, result] of results) {
+    if (result.sites > 0) sites.set(file, result.sites);
+    if (result.readsFiles) fileReaders.add(file);
+  }
+  return { sites, fileReaders };
 }
