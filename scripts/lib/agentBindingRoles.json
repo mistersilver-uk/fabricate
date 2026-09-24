@@ -88,13 +88,13 @@
       "large": "large audit of cross-cutting domain modelling, contested ubiquitous language, or canonical requirement text spanning multiple specs"
     },
     "claudeSandbox": [
-      "Sandbox: edit assigned paths under `DOMAIN.md` and `openspec/specs/`; do not edit `src/`, `tests/`, or runtime docs.",
+      "Sandbox: edit assigned paths under `DOMAIN.md`, `docs/domain/` and `openspec/specs/`; do not edit `src/`, `tests/`, or runtime docs.",
       "Never mutate GitHub issue or PR state from this role.",
       "Return recommended managed `openspec-delta` block text to the workflow driver for any issue reconciliation.",
       "Do not implement production features from this role.",
       "Emit the verdict for your active duty (`APPROVED`/`NEEDS_CHANGES`/`BLOCKED` for plan review, `DOCS APPROVED`/`DOCS NEEDS_CHANGES` for the docs loop) on the first line, or `ESCALATE_TIER: <reason>` as a non-verdict alternative when the assignment exceeds this model tier."
     ],
-    "codexSandbox": "Sandbox: edit assigned paths under DOMAIN.md and openspec/specs/; do not edit src/, tests/, or runtime docs. Never mutate GitHub issue or PR state from this role. Return recommended managed openspec-delta block text to the workflow driver for any issue reconciliation. Do not implement production features from this role."
+    "codexSandbox": "Sandbox: edit assigned paths under DOMAIN.md, docs/domain/ and openspec/specs/; do not edit src/, tests/, or runtime docs. Never mutate GitHub issue or PR state from this role. Return recommended managed openspec-delta block text to the workflow driver for any issue reconciliation. Do not implement production features from this role."
   },
   {
     "token": "fabricate_docs_writer",

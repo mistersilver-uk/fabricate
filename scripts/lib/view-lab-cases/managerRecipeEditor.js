@@ -2,7 +2,11 @@
  * System scope: the recipe editor tabs, its crafting-modifier states and the Access route.
  */
 
-import { ACCESS_ROSTER_SEARCH_MISS_TERM, ANCHORED_POPOVER_SOURCES } from './caseConstants.js';
+import {
+  ACCESS_ROSTER_SEARCH_MISS_TERM,
+  ANCHORED_POPOVER_SOURCES,
+  CHECKS_ROUTE_MODEL_PATTERN,
+} from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
@@ -22,6 +26,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   // Every frame below reaches its state by clicking the rule group rather than by authoring a second catalogued system.
@@ -250,6 +255,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({

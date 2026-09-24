@@ -5,6 +5,7 @@
 import {
   ANCHORED_POPOVER_SOURCES,
   BULK_DELETE_CARD_PATTERN,
+  CHECKS_ROUTE_MODEL_PATTERN,
   RECIPE_BULK_EDIT_MATCHES,
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
@@ -154,6 +155,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -206,7 +208,7 @@ export const CASES = Object.freeze([
       '.fabricate-manager [data-bulk-book-state="add"] ~ [data-bulk-book-state="remove"], ' +
       '.fabricate-manager [data-bulk-book-state="remove"] ~ [data-bulk-book-state="add"]',
     kinds: ['manager', 'recipes'],
-    sourceMatches: RECIPE_BULK_EDIT_MATCHES,
+    sourceMatches: [...RECIPE_BULK_EDIT_MATCHES, CHECKS_ROUTE_MODEL_PATTERN],
   }),
   managerCase({
     id: 'manager-recipes-bulk-edit-unstaged',
@@ -318,7 +320,11 @@ export const CASES = Object.freeze([
     ],
     kinds: ['manager', 'recipes'],
     // Spread rather than the shared array: this and the picker frame are the two bulk-edit frames resting on an open panel.
-    sourceMatches: [...RECIPE_BULK_EDIT_MATCHES, ...ANCHORED_POPOVER_SOURCES],
+    sourceMatches: [
+      ...RECIPE_BULK_EDIT_MATCHES,
+      ...ANCHORED_POPOVER_SOURCES,
+      CHECKS_ROUTE_MODEL_PATTERN,
+    ],
   }),
   // Both frames run on herbalism rather than the flagship smithing library, which is why they say anything.
   managerCase({
