@@ -1,131 +1,150 @@
-import test from 'node:test';
+/**
+ * The gathering half of the public API and its bootstrap seams (issue 1933): the facade wrappers
+ * driven on the real class over the module-private engine holder, the bar predicate, the adapters,
+ * and the composition wiring the boot contract cannot identity-check, as structure-contract rows.
+ */
+import test, { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
+import { Fabricate } from '../src/bootstrap/Fabricate.js';
+import {
+  getBarSelectableActors,
+  isSelectableBarActor,
+  setGatheringEngine,
+} from '../src/bootstrap/gatheringRuntime.js';
 import {
   callGatheringRuntimeWithCurrentViewer,
   createGatheringSelectableActorsGetter,
   evaluateGatheringExpression,
   processWorldTimeCallbacksSafely,
-  withCurrentGatheringViewer
+  withCurrentGatheringViewer,
 } from '../src/gatheringBootstrapAdapters.js';
 import { createGatheringToolAvailability } from '../src/gatheringToolRuntime.js';
 import { GatheringGateAndCheckEvaluator } from '../src/systems/GatheringGateAndCheckEvaluator.js';
-import { entrySources } from './helpers/bootstrapEntrySource.js';
+import { makeFacadeActor } from './helpers/fabricateFacadeHarness.js';
+import { defineStructureContract } from './helpers/structureContract.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const toolRuntimePath = resolve(__dirname, '../src/gatheringToolRuntime.js');
-const adaptersPath = resolve(__dirname, '../src/gatheringBootstrapAdapters.js');
-const mainSource = [
-  entrySources['src/main.js'],
-  entrySources['src/bootstrap/composeServices.js'],
-  entrySources['src/bootstrap/gatheringRuntime.js'],
-  entrySources['src/bootstrap/gatheringFacade.js'],
-  entrySources['src/bootstrap/hooks.js'],
-  entrySources['src/bootstrap/Fabricate.js'],
-].join('\n');
-const toolRuntimeSource = readFileSync(toolRuntimePath, 'utf8');
-const adaptersSource = readFileSync(adaptersPath, 'utf8');
+const PLAYER = { id: 'player', isGM: false };
 
-test('Fabricate exposes gathering runtime getters and API methods', () => {
-  for (const expected of [
-    'getGatheringEnvironmentStore()',
-    'getGatheringRunManager()',
-    'getGatheringGateAndCheckEvaluator()',
-    'listGatheringForActor(options = {})',
-    'startGatheringAttempt(options = {})',
-    'getGatheringDropBreakdown(options = {})'
+/** A player-owned actor of one Foundry actor type. */
+const ownedActor = (id, type, owners = [PLAYER.id]) =>
+  Object.assign(makeFacadeActor(id, { ownerUserIds: owners }), { type, img: `${id}.webp` });
+
+/**
+ * The real facade over a recording engine installed in the module-private holder, a player
+ * viewer, the world `actors`, and the persisted remembered-actor and extra-PC-type settings.
+ */
+function gatheringFacade({ remembered = 'remembered', actors = [], extraTypes = [] } = {}) {
+  const calls = [];
+  const record = (method, answer) => (payload) => {
+    calls.push([method, payload]);
+    return answer;
+  };
+  setGatheringEngine({
+    listForActor: record('listForActor', 'listed'),
+    getTaskDropBreakdown: record('getTaskDropBreakdown', 'breakdown'),
+    requestStart: record('requestStart', { success: false, reason: 'probe' }),
+  });
+  const settings = {
+    lastGatheringActor: remembered,
+    additionalPlayerCharacterActorTypes: extraTypes,
+  };
+  globalThis.game = { user: PLAYER, actors, settings: { get: (_namespace, key) => settings[key] } };
+  return { facade: Object.assign(new Fabricate(), { ready: true }), calls };
+}
+
+/** `[options, rememberedActorId the engine must receive]`: a truthy id overrides, null coalesces. */
+const REMEMBERED_CASES = [
+  [{}, 'remembered'],
+  [{ rememberedActorId: null }, 'remembered'],
+  [{ rememberedActorId: '' }, 'remembered'],
+  [{ rememberedActorId: 'explicit' }, 'explicit'],
+];
+
+describe('the public gathering wrappers force the current user and the remembered actor', () => {
+  for (const [wrapper, method] of [
+    ['listGatheringForActor', 'listForActor'],
+    ['getGatheringDropBreakdown', 'getTaskDropBreakdown'],
   ]) {
-    assert.ok(mainSource.includes(expected), `src/main.js should expose ${expected}`);
+    for (const [options, expected] of REMEMBERED_CASES) {
+      it(`${wrapper}(${JSON.stringify(options)}) reaches ${method} for ${expected}`, () => {
+        const { facade, calls } = gatheringFacade();
+        facade[wrapper]({ ...options, viewer: { id: 'spoofed-gm', isGM: true } });
+        const [[called, payload]] = calls;
+        assert.equal(called, method);
+        assert.equal(payload.viewer, PLAYER, 'the current Foundry user, never a supplied viewer');
+        assert.equal(payload.rememberedActorId, expected);
+      });
+    }
   }
 
-  assert.equal(
-    mainSource.includes('  getGatheringEngine() {'),
-    false,
-    'game.fabricate should not expose a raw GatheringEngine accessor: the holder in ' +
-      '`src/bootstrap/gatheringRuntime.js` is a module function, never a facade member'
-  );
-  assert.equal(
-    mainSource.includes('this.gatheringEngine'),
-    false,
-    'the raw GatheringEngine instance should not be exposed as a public Fabricate property'
-  );
+  it('startGatheringAttempt requests a versioned start for the SAME actor the listing used', async () => {
+    const remembered = ownedActor('remembered', 'character');
+    const { facade, calls } = gatheringFacade({
+      actors: [ownedActor('first', 'character'), remembered],
+    });
 
-  assert.match(
-    mainSource,
-    /return callGatheringRuntimeWithCurrentViewer\(\s*getGatheringEngine\(\),\s*'listForActor',\s*withRememberedActor,\s*\(\) => game\.user\s*\);/,
-    'listGatheringForActor should delegate through current-user viewer enforcement (with the remembered-actor default)'
-  );
-  // `requestStart`, not `startAttempt` (issue 901): the public entry must go through the routing
-  // wrapper, which hands a blind timed start to the active GM BEFORE any task is drawn.
-  assert.match(
-    mainSource,
-    /return executePublicGather\(\{[\s\S]*?requestStart: \(\) =>[\s\S]*?callGatheringRuntimeWithCurrentViewer\([\s\S]*?getGatheringEngine\(\),[\s\S]*?'requestStart',[\s\S]*?withRememberedActor,[\s\S]*?\(\) => game\.user/,
-    'startGatheringAttempt should complete a ready attempt through executePublicGather, still '
-      + 'delegating to requestStart under current-user viewer enforcement (with the '
-      + 'remembered-actor default)'
-  );
-  // The three wrappers (list, attempt, drop breakdown) MUST resolve the SAME actor the UI displays.
-  assert.match(
-    mainSource,
-    /_withRememberedActorDefault\(options = \{\}\) \{[\s\S]*?rememberedActorId: options\.rememberedActorId \|\| this\.getSelectedGatheringActorId\(\) \|\| null,/,
-    '_withRememberedActorDefault should coalesce a null/omitted id to the persisted selection (a truthy id overrides)'
-  );
-  for (const wrapper of ['listGatheringForActor', 'startGatheringAttempt', 'getGatheringDropBreakdown']) {
-    assert.match(
-      mainSource,
-      new RegExp(`${wrapper}\\(options = \\{\\}\\) \\{[\\s\\S]*?const withRememberedActor = this\\._withRememberedActorDefault\\(options\\);`),
-      `${wrapper} should default the remembered actor through _withRememberedActorDefault`
+    await facade.startGatheringAttempt({ environmentId: 'env', viewer: { id: 'x', isGM: true } });
+
+    const [[method, payload]] = calls;
+    assert.equal(method, 'requestStart', 'the routing wrapper, never startAttempt');
+    assert.equal(payload.viewer, PLAYER);
+    assert.equal(payload.actor, remembered, 'the remembered actor, not selectableActors[0]');
+    assert.equal(payload.lifecycleVersion, 1);
+  });
+});
+
+describe('the actor-selection bar composes ownership with the CONFIGURED player-character types', () => {
+  it('admits an owned character, and an owned robot only once the GM configures robots', () => {
+    const robot = ownedActor('robot', 'robot');
+    gatheringFacade();
+    assert.equal(
+      isSelectableBarActor({ actor: ownedActor('pc', 'character'), viewer: PLAYER }),
+      true
     );
-  }
-  assert.equal(
-    mainSource.includes('rememberedActorId: this.getSelectedGatheringActorId() || null,'),
-    false,
-    'the buggy `{ rememberedActorId: persisted, ...options }` spread (explicit null clobbers the default) must not return'
-  );
-  assert.match(
-    mainSource,
-    /return callGatheringRuntimeWithCurrentViewer\(\s*getGatheringEngine\(\),\s*'getTaskDropBreakdown',\s*withRememberedActor,\s*\(\) => game\.user\s*\);/,
-    'getGatheringDropBreakdown should delegate through current-user viewer enforcement (with the remembered-actor default)'
-  );
+    assert.equal(
+      isSelectableBarActor({ actor: ownedActor('pc', 'character', []), viewer: PLAYER }),
+      false
+    );
+    assert.equal(isSelectableBarActor({ actor: robot, viewer: PLAYER }), false);
+    gatheringFacade({ extraTypes: ['robot'] });
+    assert.equal(isSelectableBarActor({ actor: robot, viewer: PLAYER }), true);
+  });
+
+  it('lists the bar through that predicate, as redaction-safe { id, uuid, name, img } records', () => {
+    const pc = ownedActor('pc', 'character');
+    const { facade } = gatheringFacade({
+      actors: [pc, ownedActor('npc', 'npc'), ownedActor('theirs', 'character', ['other'])],
+    });
+    assert.deepEqual(getBarSelectableActors({ viewer: PLAYER }), [pc]);
+    assert.deepEqual(facade.listSelectableActors(), [
+      { id: 'pc', uuid: 'Actor.pc', name: 'Actor pc', img: 'pc.webp' },
+    ]);
+  });
 });
 
-test('actor-selection bar wiring filters to player characters and returns redaction-safe records', () => {
-  // ANTI-PIN (issue 1024). The old pin asserted the hardcoded literal `return actor?.type ===
-  // 'character';` — the exact bug.
-  assert.equal(
-    mainSource.includes("actor?.type === 'character'"),
-    false,
-    'main.js must not re-hardcode the dnd5e/pf2e player-character actor type'
-  );
-  assert.equal(
-    mainSource.includes('actor.type === "character"'),
-    false,
-    'nor the double-quoted spelling of it'
-  );
-  assert.ok(
-    mainSource.includes(
-      "import { isPlayerCharacterActor } from '../config/playerCharacterTypes.js';"
-    ),
-    'main.js should import the shared, GM-configurable player-character predicate'
-  );
-  assert.ok(
-    mainSource.includes('return isGatheringActorSelectableByUser(actor, viewer) && isPlayerCharacterActor(actor);'),
-    'isSelectableBarActor should compose ownership authorization AND the player-character concept'
-  );
-  assert.ok(
-    mainSource.includes('isSelectable: (actor, viewer) => isSelectableBarActor({ actor, viewer })'),
-    'getBarSelectableActors should be wired through the shared selectable-actors getter'
-  );
-  // Guard the redacted shape: exactly { id, uuid, name, img }, nothing else.
-  assert.match(
-    mainSource,
-    /getBarSelectableActors\(\{ viewer: game\.user \}\)\.map\(\(actor\) => \(\{\s*id: actor\?\.id \?\? actor\?\.uuid \?\? null,\s*uuid: actor\?\.uuid \?\? null,\s*name: actor\?\.name \?\? '',\s*img: actor\?\.img \?\? null,?\s*\}\)\)/,
-    'listSelectableActors should map to only the redaction-safe { id, uuid, name, img } record shape'
-  );
-});
+// The engine's scene-access, result-creator and failure-feedback seams are factory products the
+// boot can see but not identity-check, so their construction is pinned where it is composed.
+defineStructureContract(
+  'the gathering engine is composed with the requesting viewer scene and its factory seams',
+  { file: 'src/bootstrap/composeServices.js', fn: 'buildGatheringEngine' },
+  {
+    calls: [
+      'createGatheringSceneAccess',
+      'resolveViewerScene',
+      'createGatheringResultCreator',
+      'createGatheringFailureFeedback',
+      'createGatheringToolAvailability',
+      'createGatheringToolBreakage',
+    ],
+  }
+);
+
+defineStructureContract(
+  'the location service senses travel-marker regions on any scene',
+  { file: 'src/bootstrap/composeServices.js', fn: 'buildGatheringStores' },
+  { calls: ['senseTravelMarkerRegions'] }
+);
 
 test('current-user viewer enforcement prevents public API viewer spoofing', () => {
   const currentUser = { id: 'real-user', isGM: false };
@@ -242,90 +261,6 @@ test('expression adapter accepts evaluator payload shape and uses actor roll dat
   }
 });
 
-test('bootstrap constructs gathering collaborators after systems load with explicit seams', () => {
-  assert.ok(
-    mainSource.indexOf('await fabricate.craftingSystemManager.initialize();') <
-      mainSource.indexOf('fabricate.gatheringEnvironmentStore = new GatheringEnvironmentStore'),
-    'environment store should be created after systems initialize'
-  );
-  assert.ok(
-    mainSource.includes('fabricate.gatheringEnvironmentStore.load();'),
-    'environment store should load persisted environments during bootstrap'
-  );
-
-  for (const expected of [
-    'environmentStore: fabricate.gatheringEnvironmentStore',
-    'runManager: fabricate.gatheringRunManager',
-    'evaluator: fabricate.gatheringGateAndCheckEvaluator',
-    'systemManager: fabricate.craftingSystemManager',
-    'getSelectableActors: getGatheringSelectableActors',
-    'isActorSelectable: ({ actor, viewer }) => isGatheringActorSelectableByUser(actor, viewer)',
-    'sceneAccess: createGatheringSceneAccess({',
-    // Issue 1912: both gates key off the requesting viewer / every scene, never this client's canvas.
-    'getCurrentScene: (viewer) =>',
-    'resolveViewerScene({',
-    'currentUser: game.user,',
-    'return senseTravelMarkerRegions({ actor });',
-    'resultCreator: createGatheringResultCreator(fabricate.craftingSystemManager)',
-    'failureFeedback: createGatheringFailureFeedback()',
-    'getRunViewer: getGatheringRunViewer',
-    'localize: localizeGathering'
-  ]) {
-    assert.ok(mainSource.includes(expected), `GatheringEngine should receive ${expected}`);
-  }
-
-  for (const expected of [
-    'removeRunsForSystem: (systemId) =>\n        fabricate.gatheringRunManager.removeRunsForSystem(systemId)',
-    'removeRunsForEnvironment: (environmentId) =>\n        fabricate.gatheringRunManager.removeRunsForEnvironment(environmentId)',
-    'removeRunsForTask: (taskId, options) =>\n        fabricate.gatheringRunManager.removeRunsForTask(taskId, options)'
-  ]) {
-    assert.ok(mainSource.includes(expected), `environment cleanup should wire ${expected}`);
-  }
-});
-
-test('world-time hooks dispatch gathering without coupling failures to existing processors', () => {
-  assert.match(
-    mainSource,
-    /processWorldTimeCallbacksSafely\(\[\s*\{\s*label: 'Crafting',\s*callback: async \(\) => \{\s*await game\.fabricate\?\.getCraftingRunManager\?\.\(\)\?\.processWorldTime\?\.\(worldTime\);\s*await game\.fabricate\?\.getCraftingEngine\?\.\(\)\?\.processVersionedWorldTime\?\.\(\{ worldTime \}\);\s*\}/s,
-    'crafting world-time processing should await legacy runs and the versioned authority path'
-  );
-  assert.match(
-    mainSource,
-    /label: 'Salvage',\s*callback: \(\) => game\.fabricate\?\.getCraftingEngine\?\.\(\)\?\.processPendingSalvageRuns\?\.\(worldTime\)/s,
-    'salvage world-time processing should still run'
-  );
-  assert.match(
-    mainSource,
-    /label: 'Gathering',\s*callback: \(\) => getGatheringEngine\(\)\?\.processWorldTime\?\.\(worldTime\)/s,
-    'gathering world-time processing should run through GatheringEngine.processWorldTime'
-  );
-  assert.match(
-    mainSource,
-    // The ready startup sequence may first re-run the idempotent init backstop
-    // (bindFabricateGlobal) to recover from a missed `init`, then must await
-    // initialize() -> world-time; `fabricate.ready` fires after every registration.
-    /async function runReadyStartupSequence\(io\) \{[\s\S]*?await io\.fabricate\.initialize\(\);\s*await io\.processFabricateWorldTime\(\);[\s\S]*Hooks\.callAll\('fabricate\.ready'\);/s,
-    'ready startup should await world-time processing before fabricate.ready'
-  );
-  assert.match(
-    mainSource,
-    /Hooks\.on\('updateWorldTime', \(worldTime\) => \{\s*void io\.processFabricateWorldTime\(worldTime\);\s*\}\);/s,
-    'updateWorldTime hook should explicitly fire-and-forget the guarded dispatcher'
-  );
-  // Both halves in one pin: `src/bootstrap/gatheringRuntime.js` holds the only binding and the
-  // composition root is its only writer, so no facade member can hand the engine out.
-  assert.match(
-    mainSource,
-    /(?=[\s\S]*let gatheringEngine = null;)(?=[\s\S]*setGatheringEngine\(\s*new GatheringEngine\()/,
-    'GatheringEngine should remain module-private while still receiving timed completion calls'
-  );
-  assert.match(
-    mainSource,
-    /function processFabricateWorldTime\(worldTime = Number\(game\.time\?\.worldTime \|\| 0\)\) \{\s*return Promise\.all\(processWorldTimeCallbacksSafely\(\[[\s\S]*label: 'Crafting'[\s\S]*label: 'Salvage'[\s\S]*label: 'Gathering'/,
-    'startup and update dispatch should return guarded settlement for crafting, salvage, and gathering processors'
-  );
-});
-
 test('world-time processor helper continues after synchronous throws and async rejections', async () => {
   const calls = [];
   const errors = [];
@@ -411,62 +346,6 @@ test('awaited startup settlement delays fabricate.ready until all guarded proces
     { label: 'Salvage', message: 'salvage failed' },
     { label: 'Gathering', message: 'gathering failed' }
   ]);
-});
-
-test('scene access adapter accepts Foundry V13 TokenDocument parent scene shape', () => {
-  assert.match(
-    adaptersSource,
-    /getActorTokensOnScenes\(actor, \[currentScene\]\)\.find[\s\S]*getDependentTokens\(options\)[\s\S]*getActiveTokens\?\.\(false, true\)/,
-    'scene access should read the linked scene\'s token documents through every-scene Actor#getDependentTokens, with a TokenDocument getActiveTokens fallback (issue 1912)'
-  );
-  assert.match(
-    adaptersSource,
-    /token\?\.parent\?\.uuid[\s\S]*token\?\.scene\?\.uuid[\s\S]*token\?\.document\?\.parent\?\.uuid/,
-    'scene access should accept V13 TokenDocument parent UUID and legacy fake/placeable shapes'
-  );
-  // The scene-token gate applies to ALL users (no GM exemption), additive with
-  // the realm/stamina/node gates.
-  assert.doesNotMatch(
-    adaptersSource,
-    /isGM === true\) return \{ allowed: true \}/,
-    'scene access should NOT exempt GM viewers from the scene gate'
-  );
-});
-
-test('GatheringEngine is constructed with tool availability and breakage injectables', () => {
-  assert.match(
-    mainSource,
-    /toolAvailability: createGatheringToolAvailability\(/,
-    'GatheringEngine should be given a toolAvailability factory'
-  );
-  assert.match(
-    mainSource,
-    /toolBreakage: createGatheringToolBreakage\(/,
-    'GatheringEngine should be given a toolBreakage factory'
-  );
-});
-
-test('tool availability injectable matches by componentId and skips broken-flagged items', () => {
-  assert.match(
-    mainSource,
-    /createGatheringToolAvailability/,
-    'main.js should wire createGatheringToolAvailability'
-  );
-  assert.match(
-    mainSource,
-    /function createGatheringToolBreakage\(/,
-    'main.js should declare createGatheringToolBreakage'
-  );
-  assert.match(
-    toolRuntimeSource,
-    /toolBroken/,
-    'tool availability should consider the toolBroken flag'
-  );
-  assert.match(
-    toolRuntimeSource,
-    /evaluateRequirement\?\.\(/,
-    'tool availability should evaluate per-tool requirement'
-  );
 });
 
 test('tool availability injectable blocks when actor lacks a required library tool', async () => {

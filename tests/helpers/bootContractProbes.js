@@ -149,7 +149,7 @@ export function probeSettingBridge(facade) {
 export async function probeWorldTimeDispatch(facade, runtime) {
   const reached = {};
   const record = (name) => (argument) => {
-    reached[name] = argument;
+    reached[name] = [...(reached[name] ?? []), argument];
   };
   const engine = runtime.getGatheringEngine();
   const restores = [
@@ -158,11 +158,26 @@ export async function probeWorldTimeDispatch(facade, runtime) {
     spyOn(facade.craftingEngine, 'processPendingSalvageRuns', record('salvage')),
     spyOn(engine, 'processWorldTime', record('gathering')),
   ];
+  const tick = () => new Promise((settle) => setTimeout(settle, 0));
   try {
     handlerOf('updateWorldTime')(4242);
-    await new Promise((settle) => setTimeout(settle, 0));
+    await tick();
+    // Guarded: a crafting processor that throws must not starve the gathering one.
+    restores.push(
+      spyOn(facade.craftingRunManager, 'processWorldTime', () => {
+        throw new Error('probe: the crafting processor failed');
+      })
+    );
+    const { error } = console;
+    console.error = () => {};
+    try {
+      handlerOf('updateWorldTime')(4343);
+      await tick();
+    } finally {
+      console.error = error;
+    }
   } finally {
-    for (const restore of restores) restore();
+    for (const restore of restores.reverse()) restore();
   }
   return reached;
 }
@@ -272,10 +287,8 @@ export function probeSocketRoutes(facade, listener) {
  * against `fabricate.ready` (which the `callAll` recorder appends).
  */
 export async function installReadyRecorders(loadModule) {
-  const { CraftingRunManager } = await loadModule('/src/systems/CraftingRunManager.js');
   const { performance } = globalThis;
   const { mark } = performance;
-  const { processWorldTime } = CraftingRunManager.prototype;
   const startupMarks = [];
   const readySequence = [];
   const restores = [
@@ -283,15 +296,65 @@ export async function installReadyRecorders(loadModule) {
       if (String(name).startsWith('fabricate:')) startupMarks.push(name);
       return mark.call(this, name, ...rest);
     }),
-    spyOn(CraftingRunManager.prototype, 'processWorldTime', function recordWorldTime(...args) {
-      readySequence.push('craftingRuns.processWorldTime');
-      return processWorldTime.apply(this, args);
-    }),
   ];
+  for (const [path, className, method, label] of READY_MARKERS) {
+    const { prototype } = (await loadModule(path))[className];
+    const original = prototype[method];
+    restores.push(
+      spyOn(prototype, method, function recordReadyStep(...args) {
+        readySequence.push(label);
+        return original.apply(this, args);
+      })
+    );
+  }
   const restore = () => {
     for (const undo of restores.reverse()) undo();
   };
   return { startupMarks, readySequence, restore };
+}
+
+/** The ready-time steps whose relative order is load-bearing, each recorded on its prototype. */
+const READY_MARKERS = Object.freeze([
+  [
+    '/src/systems/CraftingSystemManager.js',
+    'CraftingSystemManager',
+    'initialize',
+    'craftingSystemManager.initialize',
+  ],
+  [
+    '/src/systems/GatheringEnvironmentStore.js',
+    'GatheringEnvironmentStore',
+    'load',
+    'gatheringEnvironmentStore.load',
+  ],
+  [
+    '/src/systems/CraftingRunManager.js',
+    'CraftingRunManager',
+    'processWorldTime',
+    'craftingRuns.processWorldTime',
+  ],
+]);
+
+/** The run-cleanup seams the environment store was handed, each reaching the run manager. */
+export function probeEnvironmentRunCleanup(facade) {
+  const reached = [];
+  const runs = facade.gatheringRunManager;
+  const record =
+    (name) =>
+    (...args) =>
+      reached.push([name, ...args]);
+  const restores = ['removeRunsForSystem', 'removeRunsForEnvironment', 'removeRunsForTask'].map(
+    (name) => spyOn(runs, name, record(name))
+  );
+  try {
+    const cleanup = facade.gatheringEnvironmentStore.runCleanup;
+    cleanup.removeRunsForSystem('system-probe');
+    cleanup.removeRunsForEnvironment('environment-probe');
+    cleanup.removeRunsForTask('task-probe', { probe: true });
+  } finally {
+    for (const restore of restores) restore();
+  }
+  return reached;
 }
 
 /** Which journal-authority seam each boot-registered document and user hook reaches. */

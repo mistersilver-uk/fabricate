@@ -12,6 +12,7 @@ import { test } from 'node:test';
 import {
   installReadyRecorders,
   probeCraftCommand,
+  probeEnvironmentRunCleanup,
   probeGmGates,
   probeJournalAuthorityHooks,
   probeSettingBridge,
@@ -449,6 +450,7 @@ async function measureBootContract({ init, ready, loadModule }) {
     worldTimeDispatch: await probeWorldTimeDispatch(facade, runtime),
     craftCommand: probeCraftCommand(facade),
     journalAuthorityHooks: probeJournalAuthorityHooks(facade),
+    environmentRunCleanup: probeEnvironmentRunCleanup(facade),
     socketRoutes: probeSocketRoutes(facade, socketListener),
   };
 }
@@ -583,6 +585,7 @@ test('the boot contract golden is not vacuous', () => {
   );
   assert.equal(golden.settingBridge.length, 3);
   assert.equal(golden.journalAuthorityHooks.length, 4);
+  assert.equal(golden.environmentRunCleanup.length, 3);
   assert.equal(Object.keys(golden.worldTimeDispatch).length, 4);
   assert.ok(golden.socketRoutes.depletionsApplied > 0 && golden.socketRoutes.complicationsApplied > 0);
   assert.ok(golden.binding.every((row) => typeof row.length === 'number'));
