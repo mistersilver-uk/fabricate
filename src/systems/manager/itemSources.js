@@ -1,8 +1,7 @@
 /**
  * The item-source cluster (issue 1923): the legacy recipe-item reconciler, component and
  * recipe-item registration from an Item uuid, component source replacement and the GM metadata
- * refresh, extracted from `CraftingSystemManager`. Every collaborator arrives in `io`, which the
- * manager's delegate rebuilds per call, so an instance patch is still observed.
+ * refresh; collaborators arrive in `io`.
  */
 import { advanceDefinitionRevision } from '../../utils/definitionIndex.js';
 import {
@@ -14,7 +13,7 @@ import {
 
 import { baseCollaborators, COMPONENT_FACTS, RECIPE_ITEM_FACTS } from './collaborators.js';
 
-/** This cluster's `io` bag: the base thunks plus the manager members the moved bodies reach. */
+/** This cluster's `io` bag: the base thunks plus the manager members these bodies reach. */
 export function itemSourcesCollaborators(manager) {
   return {
     ...baseCollaborators(manager),

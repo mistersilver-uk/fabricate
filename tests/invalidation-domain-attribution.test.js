@@ -60,7 +60,7 @@ describe('CraftingSystemManager attributes every persistence site', () => {
     codeLines(managerModules.get(path) ?? '').filter((line) => /\bsaveSystems\(/.test(line));
   const saveSites = [
     ...codeLines(systemManagerSource).filter((line) => /this\.save\(/.test(line)),
-    ...SAVING_MODULES.flatMap(moduleSaveSites),
+    ...[...managerModules.keys()].flatMap(moduleSaveSites),
   ];
 
   it('found the persistence sites at all', () => {

@@ -72,9 +72,8 @@ const SCAN_TOTALS = Object.freeze({
   // for two per-arm selectors (`pairs` 127 -> 128, and the component-loop collision group 5 -> 4,
   // so `collisionSites` 43 -> 42); `matches` and `lines` are conserved, because nothing was added.
   // #1923 moved five normalizer reads into `normalize/system.js` (`files` 21 -> 22); the rest hold.
-  // It then moved eight item-source lines into `manager/itemSources.js` (`files` 22 -> 23). Five
-  // shared lines now sit in both files (`pairs` 128 -> 133); three collision groups dissolve and
-  // one splits in two (`collisionGroups` 17 -> 15, `collisionSites` 42 -> 35).
+  // It then moved eight item-source lines into `manager/itemSources.js` (+1 file);
+  // pairs/collisions re-derived.
   matches: 168,
   lines: 153,
   files: 23,
