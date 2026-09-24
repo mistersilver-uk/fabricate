@@ -222,6 +222,16 @@ export function parseJobs(source) {
 }
 
 /**
+ * The ordered `runs.steps` of a composite action, built exactly as a workflow job's steps are.
+ *
+ * @param {string} source The `action.yml` file's contents.
+ * @returns {object[]} The steps, in declaration order.
+ */
+export function parseActionSteps(source) {
+  return buildSteps(nestedEntries(section(entries(source), 'runs'), 'steps'), source);
+}
+
+/**
  * Strip a surrounding `${{ ... }}` wrapper from a workflow expression, if present.
  * @param {string} expression The raw `if:` value.
  * @returns {string} The bare expression.

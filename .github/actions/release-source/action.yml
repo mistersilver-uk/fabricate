@@ -1,0 +1,45 @@
+name: "Release source"
+description: >-
+  Check a release tag's tree out into its own worktree and install that tree's dependencies, so the
+  workflow ref's publisher builds the tag's bytes without ever running the tag's own publisher.
+
+# The tag supplies the built bytes; the publisher tooling runs from the workflow ref (issue #1988).
+# A publisher recorded in an older tag cannot read a configuration shape introduced after it, so the
+# caller keeps its own checkout of the workflow ref, and this action puts the tag BESIDE it rather
+# than moving that checkout to the tag.
+#
+# The caller must already have checked out with `fetch-depth: 0` (so the tag resolves locally) and
+# run `./.github/actions/release-setup` (so Node and npm are ready).
+inputs:
+  tag:
+    description: "The release tag whose tree is built (e.g. v1.11.0)."
+    required: true
+
+outputs:
+  path:
+    description: "Absolute path of the tag's worktree; pass it to release-s3.js as --source-root."
+    value: ${{ steps.worktree.outputs.path }}
+  sha:
+    description: "The commit the worktree holds (a commit even for an annotated tag); pass it as --source-sha."
+    value: ${{ steps.worktree.outputs.sha }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check the release tag out into its own worktree
+      id: worktree
+      shell: bash
+      env:
+        TAG: ${{ inputs.tag }}
+      run: |
+        SOURCE="$RUNNER_TEMP/release-source"
+        git worktree add --detach "$SOURCE" "$TAG"
+        echo "path=$SOURCE" >> "$GITHUB_OUTPUT"
+        echo "sha=$(git -C "$SOURCE" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+    - name: Install the release tag's dependencies
+      shell: bash
+      working-directory: ${{ steps.worktree.outputs.path }}
+      # The tag's own build toolchain, dev dependencies included: its `scripts/release.js` runs Vite.
+      # `--ignore-scripts` for the reason release-setup gives (Sonar S6505).
+      run: npm ci --ignore-scripts

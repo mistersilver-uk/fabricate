@@ -167,15 +167,20 @@ jobs:
           PUBLISHER_CONFIG: ${{ runner.temp }}/release.s3.publisher.config.json
           S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
           RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
-          # Both tester secrets: the guard enumerates every private target of beta AND early-access,
-          # and each channel derives its tester manifest key from its OWN secret.
+          # Every tester secret: the guard enumerates every private target of beta AND early-access,
+          # and each tester group derives its manifest key from its OWN secret.
           S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
+          S3_APPRENTICE_PATH_SECRET: ${{ secrets.S3_APPRENTICE_PATH_SECRET }}
           S3_GUILD_ARTISAN_PATH_SECRET: ${{ secrets.S3_GUILD_ARTISAN_PATH_SECRET }}
         run: |
           node --input-type=module <<'NODE'
           import { readFile, appendFile } from 'node:fs/promises';
           import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
-          import { deriveS3Layout, resolveChannelConfig } from './scripts/release-s3.js';
+          import {
+            deriveS3Layout,
+            resolveChannelConfig,
+            resolveTesterSegments,
+          } from './scripts/release-s3.js';
           import {
             evaluateRegistryLeadTarget,
             evaluateTesterConfigDrift,
@@ -233,13 +238,12 @@ jobs:
           // the SAME way release-s3.js publishes them, so a partial publish cannot slip past a
           // channel-only check.
           const targetsFor = (channel) => {
-            const cc = resolveChannelConfig(config, channel);
-            const secretEnv = cc.testerSecretEnv;
-            const seg = (secretEnv ? process.env[secretEnv] || '' : '').replace(/^\/+|\/+$/g, '');
-            if (cc.testerGroups.length > 0 && !seg) {
-              fail(`channel "${channel}" declares ${cc.testerGroups.length} tester group(s) but ${secretEnv} is unset — cannot enumerate its private targets.`);
+            const { testers, missing } = resolveTesterSegments(resolveChannelConfig(config, channel), process.env);
+            if (missing.length > 0) {
+              const unset = missing.map(({ group, secretEnv }) => `${secretEnv ?? '(no testerSecretEnv)'} for ${group}`);
+              fail(`channel "${channel}" cannot enumerate its private targets: ${unset.join(', ')} is unset.`);
             }
-            return deriveS3Layout({ moduleId, channel, version, baseUrl, testerGroups: cc.testerGroups, testerSegment: seg }).targets;
+            return deriveS3Layout({ moduleId, channel, version, baseUrl, testers }).targets;
           };
 
           const channelHeadKey = (channel) =>
@@ -356,8 +360,9 @@ jobs:
 
   # ── JOB 3: PUBLISH ──────────────────────────────────────────────────────────────────────────────
   # ALWAYS runs (no job-level `if:`). RE-STAGES from the built dist via release-s3.js, never an S3
-  # copy. It writes exactly ONE thing: the public sources feed. The write skips at STEP level when the
-  # public head already advertises the version (re-run safety, driven off guard.prev_public). NO
+  # copy: this ref's publisher builds v<version> in a worktree beside it (issue #1988). It writes
+  # exactly ONE thing: the public sources feed. The write skips at STEP level when the public head
+  # already advertises the version (re-run safety, driven off guard.prev_public). NO
   # early-access re-publish, and NOTHING is written to the beta channel — a lagging private head is a
   # hard failure in the guard, never a catch-up here (a stable version on a private channel would
   # discard the prerelease-outranks-GA fail-safe and defect the cohort on the next public version).
@@ -386,7 +391,7 @@ jobs:
           if [ "$PREV_PUBLIC" = "$VERSION" ]; then
             echo "Would SKIP the public write: the public head already advertises v$VERSION (re-run)."
           else
-            echo "Would RE-STAGE v$VERSION from the built dist and publish it to the 'public' channel (node scripts/release-s3.js --version $VERSION --channel public), under the deployment configuration this workflow ref carries."
+            echo "Would RE-STAGE v$VERSION from the built dist and publish it to the 'public' channel (node scripts/release-s3.js --version $VERSION --channel public), building v$VERSION's tree with this workflow ref's publisher and deployment configuration."
           fi
           echo "Nothing is written to the beta or early-access channels."
 
@@ -416,26 +421,28 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: echo "::notice::The public head already advertises v$VERSION (guard reported prev_public == version) — skipping the public write for re-run safety."
 
+      - name: Check the version's tag out beside the publisher
+        id: source
+        if: ${{ !inputs.dry_run && needs.guard.outputs.prev_public != inputs.version }}
+        uses: ./.github/actions/release-source
+        with:
+          tag: v${{ inputs.version }}
+
       - name: Re-stage and publish the version to the public channel
         if: ${{ !inputs.dry_run && needs.guard.outputs.prev_public != inputs.version }}
         env:
           VERSION: ${{ inputs.version }}
           S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
           RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
+          SOURCE_ROOT: ${{ steps.source.outputs.path }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
         run: |
-          # Build from the tested commit, then re-stage per target (release-s3.js), NEVER an S3 copy.
-          # 'public' has no tester group, so this is exactly one target: the public sources feed.
-          #
-          # Bytes from the tag, deployment configuration from the workflow ref (issue 1872). The
-          # checkout below moves the tree to v$VERSION, so the capture has to precede it.
-          git show "$GITHUB_SHA":release.s3.config.json > "$RUNNER_TEMP/release.s3.config.json"
-          git checkout "v$VERSION"
-          grep -q -- "'--config'" scripts/release-s3.js || {
-            echo "::error::scripts/release-s3.js at v$VERSION predates --config, so the deployment configuration captured from the workflow ref would be ignored. Promote a version whose tag carries --config support."
-            exit 1
-          }
+          # Build the tag's tree with this ref's publisher, then re-stage per target (release-s3.js),
+          # NEVER an S3 copy. 'public' has no tester group, so this is exactly one target: the public
+          # sources feed. --source-sha stamps the zip's provenance, so a re-run resumes rather than
+          # reading an unidentified build.
           node scripts/release-s3.js --version "$VERSION" --channel public \
-            --config "$RUNNER_TEMP/release.s3.config.json"
+            --source-root "$SOURCE_ROOT" --source-sha "$SOURCE_SHA"
 
   # ── JOB 4: READBACK → PREFLIGHT → UN-DRAFT → REGISTER ───────────────────────────────────────────
   # The `if:` is VERBATIM from the issue: no `inputs.dry_run` disjunct, so a *skipped* job 2/3 (which

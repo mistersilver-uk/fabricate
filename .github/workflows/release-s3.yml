@@ -1,8 +1,12 @@
 name: "Publish to S3"
 
-# Reusable per-channel publisher. Takes a release TAG, derives its version, checks out that
-# tagged commit, builds, and publishes to the requested channel's S3 targets. Called by beta.yml
-# (channel: beta) and, in later issue #627 chunks, by the early-access/public promotion workflows.
+# Reusable per-channel publisher. Takes a release TAG, derives its version, builds that tagged
+# commit in its own worktree, and publishes to the requested channel's S3 targets. Called by beta.yml
+# (channel: beta) and release.yml (early-access, or a hotfix line's own channel).
+#
+# The tag supplies the built bytes; the publisher tooling (scripts/release-s3.js and the
+# release.s3.config.json it reads) runs from the workflow ref (issue #1988). A publisher recorded in
+# an older tag cannot read a configuration shape introduced after it.
 on:
   workflow_dispatch:
     inputs:
@@ -59,9 +63,12 @@ on:
     secrets:
       # Secrets are NOT inherited by reusable workflows — the caller (beta.yml, and later the
       # early-access/public promotions) must pass these through explicitly. The publish refuses to
-      # run if a channel declares tester groups but its tester-path secret is unset.
+      # run if any tester group a channel declares has its tester-path secret unset.
       S3_TESTER_PATH_SECRET:
         description: "Secret directory segment for the closed-beta tester feed path"
+        required: false
+      S3_APPRENTICE_PATH_SECRET:
+        description: "Secret directory segment for the apprentice-crafter early-access tester feed path"
         required: false
       S3_GUILD_ARTISAN_PATH_SECRET:
         description: "Secret directory segment for the guild-artisan early-access tester feed path"
@@ -77,7 +84,8 @@ permissions:
 jobs:
   release-s3:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Two dependency installs (the publisher's and the tag's) plus the tag's build.
+    timeout-minutes: 20
     # Job-level (NOT workflow-level) so it survives being called as a reusable workflow, and
     # per-channel so a beta publish and a public publish do not serialise needlessly. cancel-in-
     # progress is false: a second push must QUEUE behind an in-flight publish, never cancel it
@@ -119,38 +127,23 @@ jobs:
             exit 1
           fi
 
-      - name: Capture the deployment configuration from the workflow ref
-        # Tester-group identity is deployment configuration, not a property of the released bytes
-        # (issue 1872): it comes from the ref this workflow runs at, never from the tag. The
-        # checkout below moves the tree to the tag, so the capture has to precede it.
-        run: git show "$GITHUB_SHA":release.s3.config.json > "$RUNNER_TEMP/release.s3.config.json"
-
-      - name: Checkout release tag
-        env:
-          RELEASE_TAG: ${{ inputs.tag }}
-        run: git checkout "$RELEASE_TAG"
-
-      - name: The tag's publisher must accept --config
-        # release-s3.js's parseArgs ignores an unknown flag, so a tag predating --config would
-        # silently publish under its own configuration while this workflow believed it had passed
-        # the ref's. Named refusal rather than a silent wrong prefix.
-        run: |
-          grep -q -- "'--config'" scripts/release-s3.js || {
-            echo "::error::scripts/release-s3.js at this tag predates --config, so the deployment configuration captured from the workflow ref would be ignored. Publish a tag that carries --config support, or cut one by cherry-picking it onto that line."
-            exit 1
-          }
-
-      # Shared Node + npm ci + OIDC preamble. npm ci runs AFTER the tag checkout above so it installs
-      # the TAG's dependencies (which is why this workflow keeps its own checkout/tag steps rather
-      # than letting the composite own checkout). OIDC credentials are needed for a real publish AND
-      # for a `--check-heads` read; they are skipped only on a dry-run that is NOT also reading heads
-      # (the script imports no AWS SDK and reaches no bucket when `--dry-run` is set alone).
-      # aws-role/aws-region are forwarded because the composite cannot read vars.* itself.
+      # Shared Node + npm ci + OIDC preamble, installing the WORKFLOW REF's dependencies: the
+      # publisher runs from this checkout, and the tag is built in a worktree beside it (next step).
+      # OIDC credentials are needed for a real publish AND for a `--check-heads` read; they are
+      # skipped only on a dry-run that is NOT also reading heads (the script imports no AWS SDK and
+      # reaches no bucket when `--dry-run` is set alone). aws-role/aws-region are forwarded because
+      # the composite cannot read vars.* itself.
       - uses: ./.github/actions/release-setup
         with:
           enable-oidc: ${{ !inputs.dry_run || inputs.check_heads }}
           aws-role: ${{ vars.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Check the release tag out beside the publisher
+        id: source
+        uses: ./.github/actions/release-source
+        with:
+          tag: ${{ inputs.tag }}
 
       - name: Publish to S3
         env:
@@ -158,25 +151,23 @@ jobs:
           RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
           # Secret directory segments for the private tester feed paths. GitHub masks their values
           # in logs; the script also withholds all S3 keys/URLs in CI and refuses to publish a
-          # channel's tester groups when that channel's tester-path secret is unset.
+          # channel when any tester group it declares has its own tester-path secret unset.
           S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
+          S3_APPRENTICE_PATH_SECRET: ${{ secrets.S3_APPRENTICE_PATH_SECRET }}
           S3_GUILD_ARTISAN_PATH_SECRET: ${{ secrets.S3_GUILD_ARTISAN_PATH_SECRET }}
           CHANNEL: ${{ inputs.channel }}
           VERSION: ${{ steps.version.outputs.version }}
+          # The tag's worktree and the commit it holds. --source-sha must NOT come from GITHUB_SHA,
+          # which names the workflow ref, not the commit whose bytes this zip carries; the provenance
+          # guard keys resume/overwrite on it, and release-s3.js refuses a sha that tree does not hold.
+          SOURCE_ROOT: ${{ steps.source.outputs.path }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
         run: |
-          # --source-sha is the tagged commit ACTUALLY being built, taken from the checked-out tree.
-          # It must NOT come from GITHUB_SHA: the "Checkout release tag" step above did
-          # `git checkout "$tag"`, so GITHUB_SHA still names the ref that triggered the run, not the
-          # commit whose bytes this zip carries. The provenance guard keys resume/overwrite on it.
-          #
-          # The two sources differ deliberately: the bytes come from the tag (this tree), while the
-          # deployment configuration comes from the workflow ref, captured before the checkout.
-          SOURCE_SHA="$(git rev-parse HEAD)"
           node scripts/release-s3.js \
             --version "$VERSION" \
             --channel "$CHANNEL" \
+            --source-root "$SOURCE_ROOT" \
             --source-sha "$SOURCE_SHA" \
-            --config "$RUNNER_TEMP/release.s3.config.json" \
             ${{ inputs.check_heads == true && '--check-heads' || '' }} \
             ${{ inputs.dry_run == true && '--dry-run' || '' }} \
             ${{ inputs.overwrite == true && '--overwrite' || '' }}
