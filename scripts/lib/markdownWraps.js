@@ -93,7 +93,7 @@ function classifyLines(lines) {
 }
 
 /** Whether `body` ends a sentence rather than breaking one. */
-function endsSentence(body) {
+export function endsSentence(body) {
   return SENTENCE_END.test(body) && !ABBREVIATION.test(body);
 }
 
