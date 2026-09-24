@@ -24,6 +24,13 @@ const TERMS = 'Acquisition, Knowledge, and Resolution Terms';
 /** Minimum entries per notes file, so a gate over an emptied glossary cannot pass. */
 const FLOORS = { [RECORDS]: 50 };
 
+/** The headings whose moved body leaves exactly one pointer into `docs/domain/`. */
+const POINTER_HEADINGS = [
+  'Current Realm Resolution (Phase 1 shipped)',
+  'Remaining Drift to Track',
+  'Research Notes',
+];
+
 const readRepoNote = (file) => {
   const absolute = path.join(ROOT, file);
   return existsSync(absolute) ? readFileSync(absolute, 'utf8') : null;
@@ -119,7 +126,8 @@ function assertReports(problems, reason) {
 describe('the real glossary', () => {
   it('meets the entry contract with its notes', () => {
     const real = readFileSync(path.join(ROOT, 'DOMAIN.md'), 'utf8');
-    assert.deepEqual(glossaryProblems({ domain: real, readNote: readRepoNote, floors: FLOORS }), []);
+    const options = { floors: FLOORS, pointerHeadings: POINTER_HEADINGS };
+    assert.deepEqual(glossaryProblems({ domain: real, readNote: readRepoNote, ...options }), []);
   });
 });
 
