@@ -1,7 +1,8 @@
 /**
  * The GM-routed blind gathering start (issue 901), shaped like `gatheringNodeSocket.js`: a player
  * cannot write the `fabricate.gatheringBlindRuns` world setting, so the active GM starts the run.
- * The payload is addressing only (environment, actor, optional interactable), never an outcome.
+ * The payload is addressing only (environment, actor, optional interactable and revealed task id),
+ * never an outcome.
  * The GM re-runs the whole attempt from its own state with the server-attested sender as the
  * viewer, so every gate is re-evaluated and the task drawn GM-side; `isActorSelectable({ actor,
  * viewer: sender })` limits a forged message to what a legitimate start could do. The remaining

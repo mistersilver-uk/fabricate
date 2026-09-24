@@ -4,10 +4,10 @@
  * then the per-`(entity, system)` membership record. Resolution is per section, never per field,
  * and section values are opaque here: never walked or cloned, so a normalized record aliases the
  * caller's section values. It runs once per merged row of every read union (issue 1370), where
- * the in-system record still wins every key it carries. The dependency runs one way: this module
- * must not import the per-entity scope modules, pinned by an ESLint `no-restricted-imports` entry
- * and `tests/scoped-definitions.test.js`. Contract: `data-models/spec.md` § Scoped Entity
- * Definitions requirements 1 to 12.
+ * the in-system record wins every key it carries but an inheriting section (issue 1372). The
+ * dependency runs one way: this module must not import the per-entity scope modules, pinned by an
+ * ESLint `no-restricted-imports` entry and `tests/scoped-definitions.test.js`. Contract:
+ * `data-models/spec.md` § Scoped Entity Definitions requirements 1 to 12.
  */
 
 /** The separator between an entity id and a system id in a membership key. */

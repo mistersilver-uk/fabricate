@@ -216,8 +216,8 @@ export function validateGatheringRealmList(realms) {
 
 /**
  * A system's realm settings, participation only (issue 1282): only a boolean `true` opts in. The
- * world-level `revealMode` and `modifierVisibility` are dropped, never passed through, so a
- * reader still on this record cannot quietly read `manual`.
+ * world-level `revealMode` and `modifierVisibility` are dropped here; read them through
+ * `getRealmRevealMode` and `getRealmModifierVisibility`.
  */
 export function normalizeGatheringRealmSettings(data = {}) {
   return { enabled: data?.enabled === true };

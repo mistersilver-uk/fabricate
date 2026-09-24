@@ -159,8 +159,8 @@ function writeInheritedEffectSource(row, value) {
 
 /**
  * How each section is written onto a merged row, since a section name is not always its shipped
- * field name (an essence's `effectSource` and `macro`). Each key set must equal its scope's section
- * list, which `inheritedSectionWriters` checks; the field names are driven per section by
+ * field name (an essence's `effectSource` and `macro`). Every section a scope declares needs a
+ * writer here, which `inheritedSectionWriters` checks; the field names are driven per section by
  * `tests/world-scope-inherited-section-resolution.test.js`. `repairRequirements` is a seed, not a
  * section.
  */

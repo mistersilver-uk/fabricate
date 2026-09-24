@@ -5,7 +5,6 @@
  * server-side read authorization (`dist/packages/world.mjs` calls `dump()` on every collection
  * without the user), so a player can still read a world setting, but cannot forge one, since
  * `BaseSetting.#canModify` needs `SETTINGS_MODIFY`, whose `requiredRoles` is `[GAMEMASTER]`.
- * Encryption was rejected: a browser-bound per-GM key strands runs.
  *
  * Single writer: `game.settings.set` replaces the value, so every mutation rewrites the whole map,
  * safe only because the active GM alone writes it. Player starts relay through
