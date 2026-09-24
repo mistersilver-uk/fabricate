@@ -22,7 +22,8 @@ const SECTION = 'Aggregates and Records';
 const TERMS = 'Acquisition, Knowledge, and Resolution Terms';
 
 /** Minimum entries per notes file, so a gate over an emptied glossary cannot pass. */
-const FLOORS = { [RECORDS]: 50 };
+const FLOORS = { [RECORDS]: 50, 'docs/domain/terms.md': 130 };
+const TOTAL_FLOOR = 150;
 
 /** The headings whose moved body leaves exactly one pointer into `docs/domain/`. */
 const POINTER_HEADINGS = [
@@ -126,7 +127,7 @@ function assertReports(problems, reason) {
 describe('the real glossary', () => {
   it('meets the entry contract with its notes', () => {
     const real = readFileSync(path.join(ROOT, 'DOMAIN.md'), 'utf8');
-    const options = { floors: FLOORS, pointerHeadings: POINTER_HEADINGS };
+    const options = { floors: FLOORS, totalFloor: TOTAL_FLOOR, pointerHeadings: POINTER_HEADINGS };
     assert.deepEqual(glossaryProblems({ domain: real, readNote: readRepoNote, ...options }), []);
   });
 });
@@ -237,6 +238,8 @@ describe('the gate fails in every direction it claims', () => {
       gate(edit(domain, 'Drift line one.', 'Moved to [notes](docs/domain/records.md#nowhere).'))],
     ['an entry count under its floor', 'under its floor of 3', () =>
       glossaryProblems({ domain, readNote: readerOf(notesOf(notes)), floors: { [RECORDS]: 3 } })],
+    ['a total entry count under its floor', '2 entries in all, under the floor of 3', () =>
+      glossaryProblems({ domain, readNote: readerOf(notesOf(notes)), totalFloor: 3 })],
   ];
   for (const [name, reason, run] of cases) {
     it(name, () => assertReports(run(), reason));

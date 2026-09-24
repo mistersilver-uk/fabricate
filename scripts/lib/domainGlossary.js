@@ -439,8 +439,26 @@ function pointerProblems(domain, required) {
   return problems;
 }
 
+/** Why the entries fall under a per-file floor or under `totalFloor` in all, if they do. */
+function floorProblems(entries, floors, totalFloor) {
+  const problems = Object.entries(floors).flatMap(([file, floor]) => {
+    const linked = entries.filter(({ section }) => SECTION_FILES[section] === file).length;
+    return linked < floor ? [`${file} has ${linked} entries, under its floor of ${floor}`] : [];
+  });
+  if (entries.length < totalFloor) {
+    problems.push(`${entries.length} entries in all, under the floor of ${totalFloor}`);
+  }
+  return problems;
+}
+
 /** Every way `DOMAIN.md` and its notes break the glossary contract; `[]` when they do not. */
-export function glossaryProblems({ domain, readNote, floors = {}, pointerHeadings = [] }) {
+export function glossaryProblems({
+  domain,
+  readNote,
+  floors = {},
+  totalFloor = 0,
+  pointerHeadings = [],
+}) {
   const entries = parseEntries(domain);
   const problems = entries.flatMap((entry) => [
     ...(entry.problem ? [entry.problem] : []),
@@ -454,12 +472,9 @@ export function glossaryProblems({ domain, readNote, floors = {}, pointerHeading
   if (linkLines !== entries.length) {
     problems.push(`${linkLines} link lines for ${entries.length} entries`);
   }
-  for (const [file, floor] of Object.entries(floors)) {
-    const linked = entries.filter(({ section }) => SECTION_FILES[section] === file).length;
-    if (linked < floor) problems.push(`${file} has ${linked} entries, under its floor of ${floor}`);
-  }
   return [
     ...problems,
+    ...floorProblems(entries, floors, totalFloor),
     ...linkProblems(domain, readNote),
     ...pointerProblems(domain, pointerHeadings),
   ];
