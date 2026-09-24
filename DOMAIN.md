@@ -522,7 +522,8 @@ The currency conversion ladder.
 
 #### Currency Spend Strategy
 
-The GM-selectable mechanism (`CurrencyConfig.spendStrategy`, persisted as the WORLD `fabricate.currencyConfig` setting rather than a per-crafting-system field since issue #1278 moved it — `requirements.currency.spendStrategy`/`requirements.currency.macros` are stale names for the persisted home and must not be reintroduced in documentation) for how a currency requirement is read and spent, first-class in both dnd5e and pf2e worlds (no longer derived solely from preset seeding). (These spenders have a LIVE craft consumer: `CraftingEngine._spendCraftCurrency` drives the deduction on every craft path and `_refundCraftCurrency` drives the player-cancel refund; component-level currency spending remains a deferred follow-up.)
+The GM-selectable mechanism (`CurrencyConfig.spendStrategy`, persisted as the WORLD `fabricate.currencyConfig` setting rather than a per-crafting-system field since issue #1278 moved it — `requirements.currency.spendStrategy`/`requirements.currency.macros` are stale names for the persisted home and must not be reintroduced in documentation) for how a currency requirement is read and spent, first-class in both dnd5e and pf2e worlds (no longer derived solely from preset seeding).
+(These spenders have a LIVE craft consumer: `CraftingEngine._spendCraftCurrency` drives the deduction on every craft path and `_refundCraftCurrency` drives the player-cancel refund; component-level currency spending remains a deferred follow-up.)
 
 [Notes](docs/domain/terms.md#currency-spend-strategy)
 
@@ -1149,7 +1150,8 @@ The shared activity-agnostic roll model used by crafting, salvage, AND gathering
 
 #### Standalone Check Roll
 
-The check-roll MECHANICS published to a companion module that owns no crafting system: `@`-placeholder resolution against the actor's roll data, the retired-placeholder shim, the Advantage/Disadvantage rewrite, the situational-bonus input with its `Roll.validate` net, the roll mode and the chat post, and the pass/fail or raw-total answer. **"Standalone" is a claim about the CRAFTING-SYSTEM axis** — the roll stands outside any **Crafting System** — and is **NOT** a claim about the GAME-SYSTEM axis, where Fabricate is agnostic on this path exactly as on every other.
+The check-roll MECHANICS published to a companion module that owns no crafting system: `@`-placeholder resolution against the actor's roll data, the retired-placeholder shim, the Advantage/Disadvantage rewrite, the situational-bonus input with its `Roll.validate` net, the roll mode and the chat post, and the pass/fail or raw-total answer.
+**"Standalone" is a claim about the CRAFTING-SYSTEM axis** — the roll stands outside any **Crafting System** — and is **NOT** a claim about the GAME-SYSTEM axis, where Fabricate is agnostic on this path exactly as on every other.
 
 [Notes](docs/domain/terms.md#standalone-check-roll)
 
