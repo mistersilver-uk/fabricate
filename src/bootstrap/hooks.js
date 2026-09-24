@@ -340,7 +340,7 @@ async function runReadyStartupSequence(io) {
   await io.processFabricateWorldTime();
   await io.runRecipeItemFlagAutoStamp();
   await io.runComponentFlagAutoStamp();
-  // After the component stamp and the init-time `1.15.0` migration whose tool refs it reads.
+  // After the component stamp and `initialize()`'s `1.15.0` migration, whose tool refs it reads.
   await io.runToolFlagAutoStamp();
   // After the source-side stamp, so a fresh drag inherits the flag first (issue 600).
   await io.runOwnedItemComponentIdentityRestamp();

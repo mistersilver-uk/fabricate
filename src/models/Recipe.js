@@ -79,7 +79,7 @@ function serializeResultGroup(group) {
   };
 }
 
-/** A crafting recipe, Simple (one set, one result group) or Complex. */
+/** A crafting recipe; its Recipe mode (`complex`) is an authoring shape, not a resolution mode. */
 export class Recipe {
   constructor(data = {}) {
     this.id = data.id || foundry.utils.randomID();
@@ -112,6 +112,7 @@ export class Recipe {
     this.resultGroups = this._normalizeResultGroups(data);
     this.results = this.resultGroups.flatMap((group) => group.results);
 
+    // Derived from the shape when absent; a reserved `role: 'failure'` group keeps it Simple.
     this.complex = typeof data.complex === 'boolean' ? data.complex : this._deriveComplex(data);
 
     this.toolIds = this._normalizeToolIds(data.toolIds);

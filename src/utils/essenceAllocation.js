@@ -1,7 +1,7 @@
 /**
  * How carrier units become one essence block's delivered amounts (issue 917), shared by the model
  * and the read side. Pure, deterministic and order-independent. Import-free: the mounted harnesses
- * copy `IngredientSet.js` raw, where a missing import hangs the suite as `# cancelled`.
+ * copy `IngredientSet.js` raw, where a missing import cancels the suite rather than failing it.
  */
 
 function unitsOf(value) {

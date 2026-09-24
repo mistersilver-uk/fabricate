@@ -2,7 +2,7 @@
  * The filter behind every "omitted when default" table (issues 1087, 1135): a write-side reduction
  * with no migration and no change in meaning. A key is omittable only where no reader tells
  * absence from the default, audited per field (`data-models/spec.md` Recipe requirement 18).
- * Dependency-free: the mounted harnesses copy it raw, where an uncopied import hangs the suite.
+ * Dependency-free: the mounted harnesses copy it raw, and a missing import cancels the suite.
  */
 
 export const isEmptyArray = (value) => Array.isArray(value) && value.length === 0;

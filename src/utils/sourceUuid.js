@@ -59,7 +59,7 @@ function warnUnsafeSystemIdOnce(systemId) {
  * `roles[systemId]`, or a nullish leaf is no claim.
  */
 function claimedRoleId(item, systemId, roleKey) {
-  // A dotted `systemId` was nested by `expandObject` on write, so it indexes no `roles` key; the
+  // A dotted systemId would be nested by expandObject on write, so it can index no roles key; the
   // resolver degrades to raw refs.
   if (!isSafeFlagKeySegment(systemId)) return null;
   const roles = getFabricateFlag(item, 'roles', null);

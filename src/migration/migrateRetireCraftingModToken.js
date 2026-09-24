@@ -1,6 +1,7 @@
 /**
- * `1.21.0`: strip the check-modifier placeholder from every stored formula (issue 1094). Spec
- * § Check-Modifier Placeholder Retirement Migration, including why an unliftable token is reported.
+ * `1.21.0`: strip the check-modifier placeholder from every stored formula it can lift out of
+ * (issue 1094); spec § Check-Modifier Placeholder Retirement Migration says why the rest stay
+ * untouched and reported.
  */
 
 import {
