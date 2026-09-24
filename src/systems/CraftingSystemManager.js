@@ -1,16 +1,10 @@
 /** Manages crafting systems and their item libraries */
-import {
-  getFabricateFlag,
-  setFabricateFlag,
-  FABRICATE_FLAG_NAMESPACE,
-  isSafeFlagKeySegment,
-} from '../config/flags.js';
+import { getFabricateFlag, setFabricateFlag, isSafeFlagKeySegment } from '../config/flags.js';
 import {
   cleanupStalePreferences,
   isGatheringActorSelectableByUser,
 } from '../config/preferencesCleanup.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
-import { Tool } from '../models/Tool.js';
 import { normalizeSelectionIds } from '../utils/bulkSelectionModel.js';
 import { normalizeCustomComponentCategories } from '../utils/componentCategories.js';
 import {
@@ -57,7 +51,6 @@ import {
   ESSENCE_FACTS,
   ITEM_METADATA_FACTS,
   RECIPE_ITEM_FACTS,
-  TOOL_FACTS,
 } from './manager/collaborators.js';
 import {
   addItemFromUuid,
@@ -68,6 +61,7 @@ import {
   replaceItemSource,
   resolveImportedComponentSourceData,
 } from './manager/itemSources.js';
+import { deleteTool, toolSourcesCollaborators, upsertTool } from './manager/toolSources.js';
 import { migrateRecipeForModeChange } from './migrateRecipeForModeChange.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
 import { normalizeComponent } from './normalize/components.js';
@@ -155,8 +149,6 @@ import {
 } from './sourceIdentitySnapshots.js';
 import { WHOLE_CORPUS_ID_BASIS } from './startupMaintenance.js';
 import { hasPendingWorldScopeRekey } from './worldScopeRekeyPending.js';
-
-const MISSING_SOURCE_FLAG = Symbol('missing-source-flag');
 
 /** Resolve an injected store seam, given as the store or as a lazy getter (the production shape,
  * since `game.fabricate` is unpopulated at construction). A throwing getter answers `null`, an
@@ -882,236 +874,12 @@ export class CraftingSystemManager {
     return this.upsertTool(systemId, {}, { itemUuid });
   }
 
-  async _resolveToolSourceItem(itemUuid) {
-    let source;
-    try {
-      source = await fromUuid(itemUuid);
-    } catch {
-      source = null;
-    }
-    if (!source || source.documentName !== 'Item') {
-      throw new Error(
-        `Cannot register Tool source "${itemUuid}": resolved document is not an Item`
-      );
-    }
-    return source;
-  }
-
-  _findToolForUpsert(tools, data, snapshot, source, flagKey) {
-    const requestedId = typeof data?.id === 'string' ? data.id.trim() : '';
-    if (requestedId) {
-      const byId = tools.find((entry) => String(entry?.id) === requestedId);
-      if (byId) return byId;
-    }
-    const durableId = flagKey ? getFabricateFlag(source, flagKey, null) : null;
-    if (durableId) {
-      const byDurableId = tools.find((entry) => String(entry?.id) === String(durableId));
-      if (byDurableId) return byDurableId;
-    }
-    const refs = new Set([snapshot?.registeredItemUuid, snapshot?.originItemUuid].filter(Boolean));
-    return (
-      tools.find((entry) =>
-        [entry?.registeredItemUuid, entry?.originItemUuid].some((ref) => refs.has(ref))
-      ) || null
-    );
-  }
-
-  _sourceFlagState(source, flagKey) {
-    const provenance = {};
-    for (const key of ['duplicateSource', 'compendiumSource']) {
-      provenance[key] = {
-        present: Object.prototype.hasOwnProperty.call(source?._stats ?? {}, key),
-        value: source?._stats?.[key],
-      };
-    }
-    return {
-      source,
-      flagKey,
-      value: getFabricateFlag(source, flagKey, MISSING_SOURCE_FLAG),
-      provenance,
-    };
-  }
-
-  async _resolveStrictSourceFlagState(registeredItemUuid, flagKey) {
-    if (!registeredItemUuid) return null;
-    const source = await fromUuid(registeredItemUuid);
-    if (!source || source.pack || typeof source.unsetFlag !== 'function') return null;
-    return this._sourceFlagState(source, flagKey);
-  }
-
-  async _restoreSourceFlag({ source, flagKey, value }) {
-    const current = getFabricateFlag(source, flagKey, MISSING_SOURCE_FLAG);
-    if (current === value) return;
-    if (value !== MISSING_SOURCE_FLAG) {
-      await setFabricateFlag(source, flagKey, value);
-      return;
-    }
-    if (current === MISSING_SOURCE_FLAG || typeof source?.unsetFlag !== 'function') return;
-    await source.unsetFlag(FABRICATE_FLAG_NAMESPACE, `fabricate.${flagKey}`);
-  }
-
-  async _restoreSourceProvenance({ source, provenance }) {
-    if (!provenance || typeof source?.update !== 'function') return;
-    const patch = {};
-    for (const [key, previous] of Object.entries(provenance)) {
-      const present = Object.prototype.hasOwnProperty.call(source?._stats ?? {}, key);
-      const current = source?._stats?.[key];
-      if (previous.present) {
-        if (!present || current !== previous.value) patch[`_stats.${key}`] = previous.value;
-      } else if (present) {
-        // A required nullable UUID field: a forced deletion fails validation, `null` clears it.
-        patch[`_stats.${key}`] = null;
-      }
-    }
-    if (Object.keys(patch).length > 0) await source.update(patch);
-  }
-
-  async _rollbackToolTransaction(system, previousTools, sourceFlagStates, cause) {
-    const errors = [cause];
-    system.tools = previousTools;
-    for (let index = sourceFlagStates.length - 1; index >= 0; index -= 1) {
-      const state = sourceFlagStates[index];
-      try {
-        await this._restoreSourceFlag(state);
-      } catch (error) {
-        errors.push(error);
-      }
-      try {
-        await this._restoreSourceProvenance(state);
-      } catch (error) {
-        errors.push(error);
-      }
-    }
-    try {
-      await this.save({ put: system, domains: TOOL_FACTS });
-    } catch (error) {
-      errors.push(error);
-    }
-    if (errors.length > 1) {
-      throw new AggregateError(errors, 'Tool transaction failed and rollback was incomplete');
-    }
-    throw cause;
-  }
-
-  async _applyToolSourceFlagChanges({
-    system,
-    previousTools,
-    source,
-    previousSourceUuid,
-    nextSourceUuid,
-    flagKey,
-    toolId,
-  }) {
-    if (!source || !flagKey) return;
-    const sourceFlagStates = [];
-    try {
-      const nextSourceState = this._sourceFlagState(source, flagKey);
-      const previousSourceState =
-        previousSourceUuid && previousSourceUuid !== nextSourceUuid
-          ? await this._resolveStrictSourceFlagState(previousSourceUuid, flagKey)
-          : null;
-      sourceFlagStates.push(nextSourceState);
-      await this._stampSourceIdentity(source, flagKey, toolId);
-      if (previousSourceState?.value === toolId) {
-        sourceFlagStates.push(previousSourceState);
-        await previousSourceState.source.unsetFlag(
-          FABRICATE_FLAG_NAMESPACE,
-          `fabricate.${flagKey}`
-        );
-      }
-    } catch (error) {
-      await this._rollbackToolTransaction(system, previousTools, sourceFlagStates, error);
-    }
-  }
-
-  /** Persist one normalized Tool, optionally registering or relinking its Item source. Sources
-   * resolve before mutation; a failed write restores the Tool array with no flag writes. */
   async upsertTool(systemId, data = {}, { itemUuid } = {}) {
-    this._assertGM('add tool from uuid');
-    const system = this.getSystem(systemId);
-    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-    const flagKey = this._toolRoleFlagKey(system.id);
-    const hasSourceRequest = typeof itemUuid === 'string' && !!itemUuid.trim();
-    const source = hasSourceRequest ? await this._resolveToolSourceItem(itemUuid.trim()) : null;
-    const snapshot = source ? await this._buildToolSourceSnapshot(itemUuid.trim(), source) : null;
-    const tools = Array.isArray(system.tools) ? system.tools : [];
-    const existing = this._findToolForUpsert(tools, data, snapshot, source, flagKey);
-    // The Valid Id Basis `_normalizeSystem` uses (issue 1308), via the same helper: this site
-    // bypasses `_normalizeSystem`, and a real-but-empty Set here would strip every tool's
-    // prerequisites in a healthy migrated world.
-    const { prerequisiteIds: validPrerequisiteIds } = this._characterLibraryBasis(system);
-    const staged = this._normalizeTool(
-      {
-        ...existing,
-        ...(data && typeof data === 'object' ? data : null),
-        ...snapshot,
-        id: existing?.id || data?.id || foundry.utils.randomID(),
-        ...(source && { componentId: null }),
-      },
-      { validPrerequisiteIds }
-    );
-    const validation = Tool.fromJSON(staged).validate();
-    if (!validation.valid) throw new Error(`Cannot save Tool: ${validation.errors.join('; ')}`);
-
-    const nextTools = existing
-      ? tools.map((entry) => (entry === existing ? staged : entry))
-      : [...tools, staged];
-    const previousTools = system.tools;
-    system.tools = nextTools;
-    try {
-      await this.save({ put: system, domains: TOOL_FACTS });
-    } catch (error) {
-      system.tools = previousTools;
-      throw error;
-    }
-
-    const previousSourceUuid = existing?.registeredItemUuid || existing?.originItemUuid || null;
-    await this._applyToolSourceFlagChanges({
-      system,
-      previousTools,
-      source,
-      previousSourceUuid,
-      nextSourceUuid: staged.registeredItemUuid,
-      flagKey,
-      toolId: staged.id,
-    });
-    return { item: staged, action: existing ? 'updated' : 'added' };
+    return upsertTool(toolSourcesCollaborators(this), systemId, data, { itemUuid });
   }
 
-  /** Remove a Tool and clear only its `roles[systemId].toolId` leaf from the source Item
-   * (issue 561), preserving a sibling `componentId` leaf. GM-gated, saved. */
   async deleteTool(systemId, toolId) {
-    this._assertGM('delete tool');
-    const system = this.getSystem(systemId);
-    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-    const tools = Array.isArray(system.tools) ? system.tools : [];
-    const tool = tools.find((entry) => String(entry?.id) === String(toolId)) || null;
-    if (!tool) return { deleted: false };
-
-    const previousTools = system.tools;
-    system.tools = tools.filter((entry) => String(entry?.id) !== String(toolId));
-    try {
-      await this.save({ put: system, domains: TOOL_FACTS });
-    } catch (error) {
-      system.tools = previousTools;
-      throw error;
-    }
-
-    const flagKey = this._toolRoleFlagKey(system.id);
-    const registeredItemUuid = tool.registeredItemUuid || tool.originItemUuid || null;
-    if (flagKey && registeredItemUuid) {
-      const sourceFlagStates = [];
-      try {
-        const state = await this._resolveStrictSourceFlagState(registeredItemUuid, flagKey);
-        if (state?.value === tool.id) {
-          sourceFlagStates.push(state);
-          await state.source.unsetFlag(FABRICATE_FLAG_NAMESPACE, `fabricate.${flagKey}`);
-        }
-      } catch (error) {
-        await this._rollbackToolTransaction(system, previousTools, sourceFlagStates, error);
-      }
-    }
-    return { deleted: true };
+    return deleteTool(toolSourcesCollaborators(this), systemId, toolId);
   }
 
   async deleteRecipeItemDefinition(systemId, recipeItemId) {
