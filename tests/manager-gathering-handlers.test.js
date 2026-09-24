@@ -368,6 +368,10 @@ describe('gathering draft and modifier handlers', () => {
     modifiers.reconcileDropPickers();
     assert.equal(modifiers.gatheringDropModifierPickerSelection('weather'), 'clear', 'a live pick stays');
     assert.equal(modifiers.gatheringEventModifierPickerSelection('weather'), '', 'the event keeps its own');
+
+    modifiers.addGatheringDropModifier('d1', 'weather', 'clear');
+    modifiers.reconcileDropPickers();
+    assert.equal(modifiers.gatheringDropModifierPickerSelection('weather'), 'rain', 'an attached pick moves on');
   });
 
   it('adds, steps and deletes a condition modifier on the drop it names', () => {
