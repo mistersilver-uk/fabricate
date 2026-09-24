@@ -1,6 +1,7 @@
 /**
  * Bounds the comment-line share per directory (issue 1657) as a ceiling, so a sweep that trims
- * comments costs no ledger edit and only a directory that grows materially does (issue 1914).
+ * comments costs no ledger edit and only a directory that grows materially does (issue 1914),
+ * and caps each `src/systems` file at a 30% comment share (issue 1934).
  */
 import assert from 'node:assert/strict';
 import { readdirSync, statSync } from 'node:fs';
@@ -270,6 +271,9 @@ function findSymlinkedDirectories(root) {
   return found;
 }
 
+/** The one read of the corpus; the per-file `src/systems` cap below filters it too. */
+const readCorpus = () => collectWorkingTreeSources(SCAN_ROOTS, SCAN_EXTENSIONS);
+
 const gate = ceilingLedgerGate({
   test,
   assert,
@@ -277,7 +281,7 @@ const gate = ceilingLedgerGate({
   ledgerPath: LEDGER_PATH,
   updateEnv: 'UPDATE_COMMENT_SHARE_LEDGER',
   tightenEnv: 'TIGHTEN_COMMENT_SHARE_LEDGER',
-  build: () => buildLedger(collectWorkingTreeSources(SCAN_ROOTS, SCAN_EXTENSIONS)),
+  build: () => buildLedger(readCorpus()),
   ceiling: ceilingFor,
   shrink: 'allow',
   floor: SCAN_FLOOR,
@@ -323,4 +327,188 @@ test('none of the four scanned roots contains a symlinked directory', () => {
     [],
     `expected zero symlinked directories under ${SCAN_ROOTS.join(', ')}; found: ${found.join(', ')}`
   );
+});
+
+/** A `src/systems` file is over its cap above this whole-percent comment share (issue 1934). */
+const SYSTEMS_FILE_SHARE_CAP = 30;
+/** A file with this many comment lines or fewer is never over, whatever its share. */
+const SYSTEMS_FILE_COMMENT_FLOOR = 10;
+/** Below this the `src/systems` scan is truncated rather than clean; it holds ~150 files. */
+const SYSTEMS_SCAN_FLOOR = 100;
+
+/**
+ * Files still over the cap, pending their sweep. Rows are only ever deleted: a trim that clears a
+ * file deletes its row, and a change that pushes a file over trims that file instead.
+ */
+const SYSTEMS_CAP_PENDING = Object.freeze([
+  'src/systems/AlchemySignatureReport.js',
+  'src/systems/BulkDestroyService.js',
+  'src/systems/BulkSalvageService.js',
+  'src/systems/CharacterLibrariesStore.js',
+  'src/systems/CoinSpenders.js',
+  'src/systems/CompendiumImporter.js',
+  'src/systems/CraftingDefinitionRepository.js',
+  'src/systems/CraftingSystemExporter.js',
+  'src/systems/CurrencyConfigStore.js',
+  'src/systems/GatheringBlindRunStore.js',
+  'src/systems/GatheringHookPublisher.js',
+  'src/systems/GatheringLocationService.js',
+  'src/systems/GatheringNodeService.js',
+  'src/systems/Pf2eInventoryCoinAdapter.js',
+  'src/systems/RecipeActivationError.js',
+  'src/systems/RecipePersistenceError.js',
+  'src/systems/ResolutionModeService.js',
+  'src/systems/SettingsBackedStore.js',
+  'src/systems/SettingsCraftingDefinitionRepository.js',
+  'src/systems/SignatureValidator.js',
+  'src/systems/SourceIdentityService.js',
+  'src/systems/WorldVocabularyStore.js',
+  'src/systems/advanceCraftingSources.js',
+  'src/systems/authoringExport.js',
+  'src/systems/bulkChatVisibility.js',
+  'src/systems/characterLibraries.js',
+  'src/systems/characterModifierPrerequisiteCopy.js',
+  'src/systems/characterPrerequisites.js',
+  'src/systems/checkModifierResolver.js',
+  'src/systems/checkRoll.js',
+  'src/systems/companionCheckRoll.js',
+  'src/systems/companionComponentAward.js',
+  'src/systems/companionContract.js',
+  'src/systems/companionKnowledgeGrant.js',
+  'src/systems/companionPooledConsumption.js',
+  'src/systems/companionPooledHoldings.js',
+  'src/systems/complicationRuntime.js',
+  'src/systems/complicationSocket.js',
+  'src/systems/componentEssenceOverride.js',
+  'src/systems/componentScope.js',
+  'src/systems/componentStacking.js',
+  'src/systems/craftingDataChange.js',
+  'src/systems/currencyAffordance.js',
+  'src/systems/currencyProfile.js',
+  'src/systems/environmentRealmMembership.js',
+  'src/systems/essenceScope.js',
+  'src/systems/eventSceneCoordinator.js',
+  'src/systems/foundryCalendar.js',
+  'src/systems/gatheringBlindRunSocket.js',
+  'src/systems/gatheringComposition.js',
+  'src/systems/gatheringEngineInternals.js',
+  'src/systems/gatheringNodeConfig.js',
+  'src/systems/gatheringNodeSocket.js',
+  'src/systems/gatheringRealmDiscovery.js',
+  'src/systems/gatheringRealms.js',
+  'src/systems/gatheringRichStateInternals.js',
+  'src/systems/importReferenceResolver.js',
+  'src/systems/invalidationDomains.js',
+  'src/systems/inventorySnapshot.js',
+  'src/systems/itemStackQuantity.js',
+  'src/systems/modifierLibrary.js',
+  'src/systems/mutationCleanupComposition.js',
+  'src/systems/nodeRespawnMath.js',
+  'src/systems/normalize/components.js',
+  'src/systems/passInventorySnapshot.js',
+  'src/systems/pooledAllocation.js',
+  'src/systems/progressiveCheckSandbox.js',
+  'src/systems/recipeItemPartyLearnPool.js',
+  'src/systems/recipeKeyedFlagEntries.js',
+  'src/systems/resolvedComponentEssences.js',
+  'src/systems/revisionBookkeeping.js',
+  'src/systems/revisionTokens.js',
+  'src/systems/rolledAmountResolver.js',
+  'src/systems/runContainerCoherence.js',
+  'src/systems/runFlagInvalidation.js',
+  'src/systems/runJournalOutcomeBands.js',
+  'src/systems/salvageCheckUsability.js',
+  'src/systems/scopedDefinitionStore.js',
+  'src/systems/scopedDefinitions.js',
+  'src/systems/scopedEntityReads.js',
+  'src/systems/startupMaintenance.js',
+  'src/systems/startupPassComposition.js',
+  'src/systems/stepRecipeView.js',
+  'src/systems/systemValidation.js',
+  'src/systems/toolBreakageAuthority.js',
+  'src/systems/toolCheckBonus.js',
+  'src/systems/toolScope.js',
+  'src/systems/worldIdentityDrift.js',
+  'src/systems/worldScopeImportMerge.js',
+  'src/systems/worldScopeRekeyPending.js',
+  'src/systems/worldScopeStores.js',
+  'src/systems/worldVocabulary.js',
+  'src/systems/writableActors.js',
+]);
+
+/** The one predicate both the scan and the boundary test call. */
+function overSystemsCap({ commentLines, totalLines: total }) {
+  return (
+    shareOf({ commentLines, totalLines: total }) > SYSTEMS_FILE_SHARE_CAP &&
+    commentLines > SYSTEMS_FILE_COMMENT_FLOOR
+  );
+}
+
+let systemsScan;
+function scanSystemsFiles() {
+  if (systemsScan) return systemsScan;
+  systemsScan = [];
+  for (const [file, text] of Object.entries(readCorpus())) {
+    if (!file.startsWith('src/systems/')) continue;
+    const commentLines = countCommentLines(text, extensionOf(file));
+    systemsScan.push({ file, commentLines, totalLines: totalLines(text) });
+  }
+  return systemsScan;
+}
+
+const describeCounts = ({ file, commentLines, totalLines: total }) =>
+  `${file} (${commentLines}/${total})`;
+
+test('the src/systems scan reaches every file, including src/systems/normalize/', () => {
+  const files = scanSystemsFiles().map(({ file }) => file);
+  assert.ok(
+    files.length >= SYSTEMS_SCAN_FLOOR,
+    `expected at least ${SYSTEMS_SCAN_FLOOR} src/systems files; scanned ${files.length}`
+  );
+  assert.ok(
+    files.some((file) => file.startsWith('src/systems/normalize/')),
+    'expected the src/systems scan to descend into src/systems/normalize/'
+  );
+});
+
+test('no src/systems file outside SYSTEMS_CAP_PENDING is over the comment-share cap', () => {
+  const pending = new Set(SYSTEMS_CAP_PENDING);
+  const over = scanSystemsFiles().filter(overSystemsCap);
+  const unexpected = over.filter(({ file }) => !pending.has(file));
+  assert.deepStrictEqual(
+    unexpected.map(describeCounts),
+    [],
+    `over ${SYSTEMS_FILE_SHARE_CAP}% comment share with more than ${SYSTEMS_FILE_COMMENT_FLOOR} ` +
+      'comment lines: trim the file under the comment policy (issue 1657). Every file over ' +
+      `the cap:\n${over.map(({ file }) => `  '${file}',`).join('\n')}`
+  );
+});
+
+test('every SYSTEMS_CAP_PENDING row names a file that still exists and is still over', () => {
+  const scanned = new Map(scanSystemsFiles().map((entry) => [entry.file, entry]));
+  const stale = [];
+  for (const file of SYSTEMS_CAP_PENDING) {
+    const entry = scanned.get(file);
+    if (!entry) stale.push(`${file} (missing)`);
+    else if (!overSystemsCap(entry)) stale.push(describeCounts(entry));
+  }
+  assert.deepStrictEqual(stale, [], 'stale SYSTEMS_CAP_PENDING rows: delete each one');
+});
+
+test('SYSTEMS_CAP_PENDING is frozen, unique and code-point sorted', () => {
+  assert.ok(Object.isFrozen(SYSTEMS_CAP_PENDING), 'SYSTEMS_CAP_PENDING is frozen');
+  assert.equal(new Set(SYSTEMS_CAP_PENDING).size, SYSTEMS_CAP_PENDING.length, 'rows are unique');
+  assert.deepStrictEqual(
+    SYSTEMS_CAP_PENDING,
+    [...SYSTEMS_CAP_PENDING].sort(byCodePoint),
+    'rows are code-point sorted'
+  );
+});
+
+test('the cap is exclusive at 30% and exempts ten or fewer comment lines', () => {
+  const over = (commentLines, total) => overSystemsCap({ commentLines, totalLines: total });
+  assert.equal(over(30, 100), false, '30/100 is at the cap');
+  assert.equal(over(31, 100), true, '31/100 is over');
+  assert.equal(over(10, 20), false, '10/20 is at the floor');
+  assert.equal(over(11, 20), true, '11/20 is over');
 });
