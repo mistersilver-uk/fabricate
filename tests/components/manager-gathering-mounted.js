@@ -200,6 +200,48 @@ export function registerGatheringCases() {
     );
   });
 
+  // A system switch reopens the gathering workspace on its first tab, so the next system's
+  // library is not entered on the tab and task the GM picked in the last one.
+  it('reopens the gathering workspace on its environments tab when the selected system switches', async () => {
+    mountManager([], {
+      smithingFeatures: { gathering: true, itemTags: true, recipeCategories: true, salvage: true },
+    });
+    const settle = async () => {
+      for (let index = 0; index < 8; index += 1) await Promise.resolve();
+      await tick();
+      flushSync();
+    };
+    const switchSystem = async (systemId) => {
+      const scope = target.querySelector('[data-manager-scope-select]');
+      scope.value = systemId;
+      scope.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+      await settle();
+      await settle();
+    };
+    const tasksBrowser = () => target.querySelector('[data-gathering-tasks-browser]');
+    const selectedTaskId = () =>
+      target.querySelector('.manager-gathering-task-row.is-selected')?.dataset.gatheringTaskId;
+
+    navButton('Gathering').click();
+    await settle();
+    gatheringSubitem('Tasks').click();
+    await settle();
+    target
+      .querySelector('[data-gathering-task-id="task-cavern"] .manager-gathering-task-identity')
+      .click();
+    await settle();
+    assert.equal(selectedTaskId(), 'task-cavern', 'pre-condition: the GM picked the second task');
+
+    await switchSystem('smithing');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
+    assert.ok(!tasksBrowser(), 'the switch returns the workspace to its environments tab');
+
+    await switchSystem('alchemy');
+    gatheringSubitem('Tasks').click();
+    await settle();
+    assert.equal(selectedTaskId(), 'task-herbs', 'and the returning library selects its first task');
+  });
+
   it('deletes the editing gathering task from the editor toolbar and returns to the task browser', async () => {
     const calls = [];
     target = document.createElement('div');

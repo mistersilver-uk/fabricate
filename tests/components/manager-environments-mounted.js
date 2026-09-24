@@ -123,6 +123,47 @@ export function registerEnvironmentsCases() {
     await settleBetweenTests();
   });
 
+  // Off every gathering route the tab returns to Environments, so a workspace switched back on
+  // opens on its first tab rather than the one the GM left.
+  it('reopens a re-enabled gathering workspace on its environments tab', async () => {
+    const store = createStore([]);
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store, services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    const settle = async () => {
+      await tick();
+      flushSync();
+    };
+    const setGathering = async (enabled) => {
+      store.viewState.update((state) => ({
+        ...state,
+        selectedSystem: {
+          ...state.selectedSystem,
+          features: { ...state.selectedSystem.features, gathering: enabled },
+        },
+      }));
+      await settle();
+    };
+    const view = () => target.querySelector('.fabricate-manager').dataset.managerView;
+    const tasksBrowser = () => target.querySelector('[data-gathering-tasks-browser]');
+
+    navButton('Gathering').click();
+    await settle();
+    gatheringSubitem('Tasks').click();
+    await settle();
+    assert.ok(Boolean(tasksBrowser()), 'pre-condition: the GM is on the Tasks tab');
+
+    await setGathering(false);
+    assert.equal(view(), 'systems', 'with gathering off the route falls back to the library');
+    await setGathering(true);
+    assert.equal(view(), 'environments', 'switched back on, the same route returns');
+    assert.ok(!tasksBrowser(), 'on its environments tab');
+  });
+
   // The rules leaf's own controls (issue 1707 phase 2). Every one of the ten selects and both
   // steppers write through one `onUpdate` prop; before this case nothing anywhere changed one, so
   // dropping the prop rendered the whole column inert and shipped green.
