@@ -1,6 +1,6 @@
 name: "Publish to S3"
 
-# Reusable per-channel publisher. Takes a release TAG, derives its version, builds that tagged
+# Reusable per-channel publisher. Takes a release tag, derives its version, builds that tagged
 # commit in its own worktree, and publishes to the requested channel's S3 targets. Called by beta.yml
 # (channel: beta) and release.yml (early-access, or a hotfix line's own channel).
 #
@@ -127,10 +127,10 @@ jobs:
             exit 1
           fi
 
-      # Shared Node + npm ci + OIDC preamble, installing the WORKFLOW REF's dependencies: the
+      # Shared Node + npm ci + OIDC preamble, installing the workflow ref's dependencies: the
       # publisher runs from this checkout, and the tag is built in a worktree beside it (next step).
-      # OIDC credentials are needed for a real publish AND for a `--check-heads` read; they are
-      # skipped only on a dry-run that is NOT also reading heads (the script imports no AWS SDK and
+      # OIDC credentials are needed for a real publish and for a `--check-heads` read; they are
+      # skipped only on a dry-run that is not also reading heads (the script imports no AWS SDK and
       # reaches no bucket when `--dry-run` is set alone). aws-role/aws-region are forwarded because
       # the composite cannot read vars.* itself.
       - uses: ./.github/actions/release-setup
@@ -157,7 +157,7 @@ jobs:
           S3_GUILD_ARTISAN_PATH_SECRET: ${{ secrets.S3_GUILD_ARTISAN_PATH_SECRET }}
           CHANNEL: ${{ inputs.channel }}
           VERSION: ${{ steps.version.outputs.version }}
-          # The tag's worktree and the commit it holds. --source-sha must NOT come from GITHUB_SHA,
+          # The tag's worktree and the commit it holds. --source-sha never comes from GITHUB_SHA,
           # which names the workflow ref, not the commit whose bytes this zip carries; the provenance
           # guard keys resume/overwrite on it, and release-s3.js refuses a sha that tree does not hold.
           SOURCE_ROOT: ${{ steps.source.outputs.path }}

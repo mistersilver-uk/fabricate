@@ -2,7 +2,7 @@
 import { execFileSync, execSync } from 'node:child_process';
 import { readFile, writeFile, rm, mkdir } from 'node:fs/promises';
 import { join, dirname, resolve } from 'node:path';
-import { argv, env, exit } from 'node:process';
+import { argv, env, exit, stderr } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { assertPublishSafety, fetchPublishState } from './lib/publishGuard.js';
@@ -87,7 +87,7 @@ export function getFlag(args, flag) {
  * @property {string} channel        - the channel this resolves
  * @property {string[]} testerGroups - the cohorts served by this channel (possibly none)
  * @property {Array<{group: string, testerSecretEnv: string|null}>} testers - each cohort with the
- *   env var holding its OWN tester path secret
+ *   env var holding its own tester path secret
  * @property {'declared'|'default'|'undeclared'} source - where the answer came from
  */
 
@@ -165,6 +165,17 @@ export function resolveTesterSegments(channelConfig, envMap) {
     else testers.push({ group, secretEnv, segment });
   }
   return { testers, missing };
+}
+
+/** The one wording for every group `resolveTesterSegments` reports missing, joined by `; `. */
+export function describeMissingTesterSecrets(missing) {
+  return missing
+    .map(({ group, secretEnv }) =>
+      secretEnv
+        ? `${secretEnv} is unset (tester group "${group}")`
+        : `tester group "${group}" declares no "testerSecretEnv"`
+    )
+    .join('; ');
 }
 
 /**
@@ -472,7 +483,7 @@ async function defaultBuild({ version, sourceRoot = ROOT }) {
  */
 
 /**
- * Resolve everything a publish needs from the config + env — including the channel's OWN tester
+ * Resolve everything a publish needs from the config + env — including the channel's own tester
  * groups, each with its own secret — and derive the target layout.
  */
 function resolvePublishPlan({ config, channel, version, env: envMap, buildProfile = 'community' }) {
@@ -486,15 +497,11 @@ function resolvePublishPlan({ config, channel, version, env: envMap, buildProfil
 
   const { testers, missing } = resolveTesterSegments(channelConfig, envMap);
   if (missing.length > 0) {
-    const causes = missing.map(({ group, secretEnv }) =>
-      secretEnv
-        ? `${secretEnv} is unset (tester group "${group}")`
-        : `tester group "${group}" declares no "testerSecretEnv"`
-    );
     fail(
       `channel "${channel}" declares ${channelConfig.testers.length} tester group(s) but ` +
-        `${causes.join('; ')} — refusing to publish to a guessable path. Set each group's OWN ` +
-        'secret (a GitHub Actions secret in CI; an env var locally) before publishing.'
+        `${describeMissingTesterSecrets(missing)} — refusing to publish to a guessable path. ` +
+        "Set each group's own secret (a GitHub Actions secret in CI; an env var locally) before " +
+        'publishing.'
     );
   }
 
@@ -1125,15 +1132,25 @@ function printSummary({ layout, dryRun, ci, log }) {
   }
 }
 
-// Run main only when invoked directly (not when imported by tests).
-const isMainModule = argv[1] && fileURLToPath(import.meta.url) === argv[1];
-if (isMainModule) {
+/**
+ * The command-line entry: run `main`, and on failure write the fatal error — in CI with every secret
+ * segment redacted, since an AWS error can echo an object key — to `stderr` and exit 1.
+ */
+export async function runCli({
+  argv: argvInput = argv,
+  env: envInput = env,
+  deps = {},
+  stderr: errorStream = stderr,
+  exit: exitProcess = exit,
+} = {}) {
   try {
-    await main();
+    return await main({ argv: argvInput, env: envInput, deps });
   } catch (error) {
-    // In CI, redact every secret segment from any error text (AWS errors can echo
-    // the object key) before it lands in the job log.
-    console.error(renderFatalError(error, env));
-    exit(1);
+    errorStream.write(`${renderFatalError(error, envInput)}\n`);
+    return exitProcess(1);
   }
 }
+
+// Run main only when invoked directly (not when imported by tests).
+const isMainModule = argv[1] && fileURLToPath(import.meta.url) === argv[1];
+if (isMainModule) await runCli();

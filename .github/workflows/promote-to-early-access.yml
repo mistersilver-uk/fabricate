@@ -23,7 +23,7 @@ name: "Promote to Early Access"
 # Refuses: a non-beta tag, a nonexistent tag, a non-ancestor commit, and a tag the beta head does
 # not advertise.
 #
-# The verification runs the WORKFLOW REF's scripts, not `release`'s (issue #1988): the workflow text
+# The verification runs the workflow ref's scripts, not `release`'s (issue #1988): the workflow text
 # comes from the dispatch ref, and scripts it imports from an older `release` could lack an export it
 # names. Only the merge step moves the tree onto `release`.
 
@@ -111,6 +111,7 @@ jobs:
           import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
           import {
             deriveS3Layout,
+            describeMissingTesterSecrets,
             resolveChannelConfig,
             resolveTesterSegments,
           } from './scripts/release-s3.js';
@@ -120,13 +121,12 @@ jobs:
           const bucket = process.env.S3_RELEASE_BUCKET || config.bucket;
           const baseUrl = process.env.RELEASE_BASE_URL || config.baseUrl;
 
-          // Resolve the beta channel's OWN tester groups, each from its own secret, then derive every
-          // target (the channel manifest AND each tester manifest) — the same enumeration the publish
+          // Resolve the beta channel's tester groups, each from its own secret, then derive every
+          // target (the channel manifest and each tester manifest) — the same enumeration the publish
           // and the public promotion use, so a partial publish cannot slip through a channel-only check.
           const { testers, missing } = resolveTesterSegments(resolveChannelConfig(config, 'beta'), process.env);
           if (missing.length > 0) {
-            const unset = missing.map(({ group, secretEnv }) => `${secretEnv ?? '(no testerSecretEnv)'} for ${group}`);
-            throw new Error(`beta cannot verify its tester heads: ${unset.join(', ')} is unset.`);
+            throw new Error(`beta cannot verify its tester heads: ${describeMissingTesterSecrets(missing)}.`);
           }
 
           const { targets } = deriveS3Layout({

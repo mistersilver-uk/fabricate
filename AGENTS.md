@@ -493,6 +493,7 @@ Pair with `--dry-run` to print every planned key and URL without writing, and `-
 The tag supplies the built bytes and the publisher runs from the workflow ref: every CI publish checks the tag out beside the workflow ref with `.github/actions/release-source/action.yml` and passes `--source-root <worktree>` and `--source-sha <commit>`, so the ref's publisher and configuration build the tag's tree.
 In CI a build refuses without both flags, and it refuses a `--source-sha` that is not the commit checked out at `--source-root`.
 Run locally with neither, it builds this checkout and reads its own `release.s3.config.json`.
+A local `--source-sha` given without `--source-root` is checked against this checkout's `HEAD`.
 The three-channel model these serve is specified in `openspec/specs/release-and-distribution/spec.md`.
 - `release-s3.js` publishes through a **provenance guard**, not a byte check (the built zip is not byte-reproducible across builds).
 Every versioned zip carries `(fabricate-version, fabricate-source-sha, fabricate-build-profile)` metadata — pass `--source-sha` explicitly, since `GITHUB_SHA` names the workflow ref rather than the tag being built; manifest writes are conditional (`IfMatch`) and every write is read back.

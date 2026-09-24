@@ -167,8 +167,8 @@ jobs:
           PUBLISHER_CONFIG: ${{ runner.temp }}/release.s3.publisher.config.json
           S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
           RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
-          # Every tester secret: the guard enumerates every private target of beta AND early-access,
-          # and each tester group derives its manifest key from its OWN secret.
+          # Every tester secret: the guard enumerates every private target of beta and early-access,
+          # and each tester group derives its manifest key from its own secret.
           S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
           S3_APPRENTICE_PATH_SECRET: ${{ secrets.S3_APPRENTICE_PATH_SECRET }}
           S3_GUILD_ARTISAN_PATH_SECRET: ${{ secrets.S3_GUILD_ARTISAN_PATH_SECRET }}
@@ -178,6 +178,7 @@ jobs:
           import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
           import {
             deriveS3Layout,
+            describeMissingTesterSecrets,
             resolveChannelConfig,
             resolveTesterSegments,
           } from './scripts/release-s3.js';
@@ -240,8 +241,7 @@ jobs:
           const targetsFor = (channel) => {
             const { testers, missing } = resolveTesterSegments(resolveChannelConfig(config, channel), process.env);
             if (missing.length > 0) {
-              const unset = missing.map(({ group, secretEnv }) => `${secretEnv ?? '(no testerSecretEnv)'} for ${group}`);
-              fail(`channel "${channel}" cannot enumerate its private targets: ${unset.join(', ')} is unset.`);
+              fail(`channel "${channel}" cannot enumerate its private targets: ${describeMissingTesterSecrets(missing)}.`);
             }
             return deriveS3Layout({ moduleId, channel, version, baseUrl, testers }).targets;
           };
@@ -361,8 +361,8 @@ jobs:
   # ── JOB 3: PUBLISH ──────────────────────────────────────────────────────────────────────────────
   # ALWAYS runs (no job-level `if:`). RE-STAGES from the built dist via release-s3.js, never an S3
   # copy: this ref's publisher builds v<version> in a worktree beside it (issue #1988). It writes
-  # exactly ONE thing: the public sources feed. The write skips at STEP level when the public head
-  # already advertises the version (re-run safety, driven off guard.prev_public). NO
+  # exactly one thing: the public sources feed. The write skips at step level when the public head
+  # already advertises the version (re-run safety, driven off guard.prev_public). No
   # early-access re-publish, and NOTHING is written to the beta channel — a lagging private head is a
   # hard failure in the guard, never a catch-up here (a stable version on a private channel would
   # discard the prerelease-outranks-GA fail-safe and defect the cohort on the next public version).
@@ -438,7 +438,7 @@ jobs:
           SOURCE_SHA: ${{ steps.source.outputs.sha }}
         run: |
           # Build the tag's tree with this ref's publisher, then re-stage per target (release-s3.js),
-          # NEVER an S3 copy. 'public' has no tester group, so this is exactly one target: the public
+          # never an S3 copy. 'public' has no tester group, so this is exactly one target: the public
           # sources feed. --source-sha stamps the zip's provenance, so a re-run resumes rather than
           # reading an unidentified build.
           node scripts/release-s3.js --version "$VERSION" --channel public \

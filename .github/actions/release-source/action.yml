@@ -3,13 +3,10 @@ description: >-
   Check a release tag's tree out into its own worktree and install that tree's dependencies, so the
   workflow ref's publisher builds the tag's bytes without ever running the tag's own publisher.
 
-# The tag supplies the built bytes; the publisher tooling runs from the workflow ref (issue #1988).
-# A publisher recorded in an older tag cannot read a configuration shape introduced after it, so the
-# caller keeps its own checkout of the workflow ref, and this action puts the tag BESIDE it rather
-# than moving that checkout to the tag.
+# The tag supplies the built bytes; the publisher runs from the workflow ref (issue #1988).
 #
 # The caller must already have checked out with `fetch-depth: 0` (so the tag resolves locally) and
-# run `./.github/actions/release-setup` (so Node and npm are ready).
+# have Node and npm set up.
 inputs:
   tag:
     description: "The release tag whose tree is built (e.g. v1.11.0)."
