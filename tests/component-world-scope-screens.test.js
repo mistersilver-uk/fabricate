@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -685,7 +685,10 @@ describe('the reachability banner names exactly the entity types still unreachab
 
 describe('DOMAIN.md no longer claims nothing writes the world identity snapshot', () => {
   // AC-25. Without the positive half below, DELETING the whole row would pass.
-  const row = termRowText('World Identity Snapshot', { domain: read('DOMAIN.md'), readNote: read });
+  const row = termRowText('World Identity Snapshot', {
+    domain: read('DOMAIN.md'),
+    readNote: (f) => (existsSync(resolve(repoRoot, f)) ? read(f) : null),
+  });
 
   it('the row still exists and still names its detector', () => {
     assert.ok(Boolean(row), 'the World Identity Snapshot row is still in the glossary');

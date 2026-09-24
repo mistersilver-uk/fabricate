@@ -37,7 +37,7 @@ test('DOMAIN.md is the corpus these assertions think it is', () => {
   // an ASCII tree of the world-settings layout, which `isTableRow` excludes because they do not
   // CLOSE with a pipe. A floor above the real corpus fails forever and invites lowering until it
   // passes, at which point it measures nothing, so this is an exact equality.
-  assert.equal(TABLE_ROWS.length, 178,'the DOMAIN.md table corpus changed size');
+  assert.equal(TABLE_ROWS.length, 178, 'the DOMAIN.md table corpus changed size');
   assert.ok(DOMAIN.length > 100_000, 'DOMAIN.md is far smaller than any version of this document');
 });
 
