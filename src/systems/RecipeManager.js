@@ -261,7 +261,6 @@ export class RecipeManager {
   async initialize() {
     if (this.initialized) return;
 
-    // Load recipes through the definition repository (issue 1089)
     for (const recipe of await this._repository.loadAll()) {
       this.recipes.set(recipe.id, recipe);
     }
@@ -697,27 +696,22 @@ export class RecipeManager {
       }
     }
 
-    // Filter by category
     if (filters.category) {
       recipes = recipes.filter((r) => r.category === filters.category);
     }
 
-    // Filter by system
     if (filters.system) {
       recipes = recipes.filter((r) => (r.system || 'all') === 'all' || r.system === filters.system);
     }
 
-    // Filter by enabled status
     if (filters.enabled !== undefined) {
       recipes = recipes.filter((r) => r.enabled === filters.enabled);
     }
 
-    // Filter by tags
     if (filters.tags && filters.tags.length > 0) {
       recipes = recipes.filter((r) => filters.tags.some((tag) => (r.tags || []).includes(tag)));
     }
 
-    // Search by name
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       recipes = recipes.filter(
@@ -822,7 +816,6 @@ export class RecipeManager {
       return emptyResult;
     }
 
-    // Aggregate all items from component source actors once.
     const availableItems = sourceActors.flatMap((actor) => [...actor.items]);
 
     const features = this._getSystemFeatures(recipe);
@@ -883,7 +876,6 @@ export class RecipeManager {
         firstSetSelection = selection;
       }
 
-      // Check essences for this set.
       let essencesMet = true;
       if (features.enableEssences && Object.keys(ingredientSet.essences || {}).length > 0) {
         const accumulatedEssences = this._accumulateEssences(
@@ -1299,7 +1291,6 @@ export class RecipeManager {
       }
     }
 
-    // Check essences
     if (features.enableEssences && Object.keys(ingredientSet.essences || {}).length > 0) {
       const accumulatedEssences = this._accumulateEssences(availableItems, recipe);
 
@@ -1573,12 +1564,11 @@ export class RecipeManager {
     // No `removedRecipeIds`: an import only ADDS or REPLACES, so nothing was orphaned and the
     // gate has nothing to fall back to (issue 1226). The sweep is a pure orphan hunt.
     await this._cleanupFlagsAfterRecipeMutation();
-    // Spec item 3: one aggregated conflict report naming each skipped recipe and its
-    // reason (duplicate-id skips are no longer silent).
+    // One aggregated conflict report naming each skipped recipe and its reason.
     if (conflicts.length > 0) {
       ui.notifications.warn(this._formatImportConflictReport(conflicts));
     }
-    // Spec item 4: the terminal counts notification, kept distinct from the report.
+    // The terminal counts notification, kept distinct from the report.
     ui.notifications.info(`Imported ${imported} recipes (${skipped} skipped)`);
     this._notifyRecipesChanged('import', {
       imported,

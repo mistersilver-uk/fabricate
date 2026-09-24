@@ -68,18 +68,16 @@ function safeRollDecision(value) {
 }
 
 /**
- * Encode native identity for per-user, per-world terminal hiding, without deleting actor history.
- * @param {{actorUuid: string, runType: string, runId: string}} identity
- * @returns {string} JSON tuple key. Alchemy uses its native `crafting` run type.
+ * The JSON tuple key hiding one native run per user and world, never deleting actor history;
+ * alchemy uses its native `crafting` run type.
  */
 export function journalRunDismissalKey({ actorUuid, runType, runId }) {
   return JSON.stringify([String(actorUuid ?? ''), String(runType ?? ''), String(runId ?? '')]);
 }
 
 /**
- * Keep valid identity/timestamp entries, bounded to the 500 most recently hidden runs.
- * @param {object} value User-scoped dismissal map.
- * @returns {object} A new map suitable for the replacing user-setting write.
+ * Keep valid identity/timestamp entries, bounded to the 500 most recently hidden runs, as a new
+ * map for the replacing user-setting write.
  */
 export function normalizeJournalRunDismissals(value) {
   const entries = Object.entries(value && typeof value === 'object' ? value : {})
@@ -108,19 +106,14 @@ function operationUnavailable() {
 }
 
 /**
- * The refusal every Fabricate edge answers when the journal-run command service is absent.
- * It lives HERE so the reason-drift guard can see it: minted at an edge instead, the literal sat
- * outside every source that guard scanned and reached a player unworded.
- * @returns {{success: false, reason: string}}
+ * The refusal every Fabricate edge answers when the journal-run command service is absent, minted
+ * here so the reason-drift guard can see it.
  */
 export function authorityUnavailableRefusal() {
   return failure('authority-unavailable');
 }
 
-/**
- * The same absence in the shape `getJournalRunAuthorityAvailability` answers.
- * @returns {{available: false, reason: string}}
- */
+/** The same absence in the shape `getJournalRunAuthorityAvailability` answers. */
 export function authorityUnavailableAvailability() {
   return { available: false, reason: 'authority-unavailable' };
 }
@@ -165,23 +158,13 @@ function installEngineAuthority(engine, authority) {
 }
 
 /**
- * Preserve one-call execution when the stage is ready and all choices are supplied.
- * New starts select version 1 and use the installed active-GM boundary for start and execution.
- * Waiting stages or incomplete choices return their run for later Journal execution without
- * editable-material spending. Existing unstamped runs retain legacy behavior.
- * @param {object} options
- * @param {object} options.engine Crafting engine with its authority adapter installed.
- * @param {object} options.runManager Native crafting-run lookup.
- * @param {object} options.actor Resolved Actor document, not an actor ID or UUID string.
- * @param {object[]} options.sourceActors Resolved material-source Actor documents.
- * @param {object} options.recipe Resolved Recipe.
- * @param {string|null} [options.ingredientSetId]
- * @param {object} [options.options] Run ID, explicit ingredient/essence choices, and the
- *   `interactive` flag: `true` from the crafting UI opens the roll dialog for a required check,
- *   absent or `false` (the public API's default) settles it on the engine's own defaults.
- * @param {Function} [options.executeCommand] Authoritative command client.
- * @param {Function} [options.resolveUuid] Optional created-result document resolver.
- * @returns {Promise<object>} Start/wait, execution or refusal result, with resolved results when available.
+ * Preserve one-call execution when the stage is ready and all choices are supplied. New starts
+ * select version 1 and use the installed active-GM boundary for start and execution; a waiting
+ * stage or incomplete choices return the run for later Journal execution without spending
+ * editable materials, and existing unstamped runs keep legacy behaviour. `actor` and
+ * `sourceActors` are resolved documents, never ids. `options.interactive` is `true` from the
+ * crafting UI, which opens the roll dialog for a required check, and absent or `false` (the public
+ * API's default) settles it on the engine's own defaults.
  */
 export async function executePublicCraft({
   engine,
@@ -239,11 +222,9 @@ export async function executePublicCraft({
         sourceActorUuids: actorUuidList(sourceActors),
       },
     },
-    // The caller's flag, not a constant (issue 1780). The crafting UI passes `interactive: true`
-    // and expects the roll dialog; a macro omits it and `craftRecipe` defaults it to false, which
-    // is the non-interactive route issue 1683 added so the API never waits on a prompt nobody
-    // answers. Hard-coding `false` here silenced the player app's prompt the moment `main.js`
-    // started forwarding these options.
+    // The caller's flag, never a constant (issue 1780): the crafting UI passes `true` and expects
+    // the roll dialog, while a macro omits it and `craftRecipe` defaults it to the non-interactive
+    // route issue 1683 added, so the API never waits on a prompt nobody answers.
     { interactive: options?.interactive === true }
   );
   if (!Array.isArray(settled?.createdResultUuids) || typeof resolveUuid !== 'function') {
@@ -262,35 +243,14 @@ export async function executePublicCraft({
 }
 
 /**
- * Preserve one-call completion for the public gathering API.
- *
- * The gathering counterpart of {@link executePublicCraft}, and it exists for the same reason.
- * Issue 1648 gave gathering a versioned lifecycle, and `startGatheringAttempt` began selecting it
- * unconditionally. That routes a ready attempt away from the engine's immediate resolution and
- * into a started run awaiting execution -- so every macro and script calling
- * `game.fabricate.startGatheringAttempt()` went on reporting `accepted: true` and silently
- * awarded nothing. Crafting was given this boundary in the same work; gathering was not, and the
- * Foundry smoke's guaranteed-success forage caught it the moment the Phase E hang stopped
- * masking the rest of the run.
- *
- * Keyed on `canExecuteImmediately`, the same field {@link executePublicCraft} uses, because it is
- * the one the journal command layer's result normaliser forwards. The gathering engine's native
- * word is `state: 'ready'` and the normaliser drops it, so keying on that completed nothing at
- * all -- every public caller reads a normalised result. A waiting or timed attempt answers
- * `canExecuteImmediately: false` and is left exactly as it was: those mature at GM-gated world
- * time, and finishing one here would spend the wait the task declares.
- *
- * The start result is kept under the settled one rather than replaced. An attempt that was
- * accepted and then failed to execute is both of those things, and a caller reading `accepted`
- * must not be told the attempt never happened.
- * @param {object} options
- * @param {Function} options.requestStart Bound versioned start, already viewer-scoped.
- * @param {object} options.actor Resolved Actor document, not an id or UUID string.
- * @param {Function} [options.executeCommand] Authoritative command client.
- * @param {boolean} [options.interactive] The caller's flag: `true` from the gathering screen
- *   opens the roll dialog for a required check, `false` (the public API's default) settles it.
- * @returns {Promise<object>} The start result for a waiting or refused attempt, else the start
- *   result with its execution outcome applied over it.
+ * Preserve one-call completion for the public gathering API, as `executePublicCraft` does for
+ * crafting: since issue 1648 `startGatheringAttempt` selects the versioned lifecycle, so without
+ * this a ready public attempt reported `accepted: true` and awarded nothing. Keyed on
+ * `canExecuteImmediately`, the field the command layer's normaliser forwards (it drops the
+ * engine's `state: 'ready'`); a waiting or timed attempt is left as it was, since it matures at
+ * GM-gated world time. The execution outcome is applied OVER the start result, so an accepted
+ * attempt that failed to execute still reads `accepted`. `interactive` is the caller's flag, as
+ * in `executePublicCraft`.
  */
 export async function executePublicGather({
   requestStart,
@@ -317,11 +277,9 @@ export async function executePublicGather({
       actorUuid: actor?.uuid,
       runType: 'gathering',
       runId,
-      // `runRevision`, not `run.runRevision`: the start this reads is already NORMALISED, and
-      // the normaliser lifts the revision to the top level and drops the run document. Reading
-      // the nested one sent `expectedRevision: undefined` and the execute answered
-      // `invalid-command`, which is a refusal the player would have seen as a gather that
-      // started and awarded nothing.
+      // `runRevision`, not `run.runRevision`: the normalised start lifts the revision to the top
+      // level and drops the run document, and an undefined `expectedRevision` is refused as
+      // `invalid-command`.
       expectedRevision: started.runRevision,
       action: 'execute',
       payload: { trigger: 'manual' },
@@ -337,10 +295,6 @@ export async function executePublicGather({
  * Compose both persisted run managers into the authority's exclusive reconstruction boundary.
  * The returned function requires exactly one scope: a nonempty `operationId` or `orphaned: true`.
  * It reconstructs evidence and never performs spending, awards or rollback.
- * @param {object} [options]
- * @param {Function} options.getCraftingRunManager
- * @param {Function} options.getGatheringRunManager
- * @returns {Function} Async scoped reconstruction returning `{success, results?}` or a reason.
  */
 export function createJournalExecutionReconstructor({
   getCraftingRunManager,
@@ -650,11 +604,8 @@ function serializedOperationResult(result, { secret = false, runId = '' } = {}) 
     ...(Object.hasOwn(source, 'canExecuteImmediately') && {
       canExecuteImmediately: source.canExecuteImmediately === true,
     }),
-    // Gathering says WHY it refused in its own vocabulary -- `state` names the condition and
-    // `blockedReasons` carries the coded detail -- where crafting uses `reason` and `message`.
-    // This list was written for crafting's words, so it dropped gathering's on the floor and a
-    // blocked attempt reached its caller as `{success: false, reason: null, message: null}`:
-    // a refusal with nothing in it, which no surface can word and no player can act on
+    // Gathering refuses in its own vocabulary (`state` and the coded `blockedReasons`), where
+    // crafting uses `reason` and `message`; dropping them left a refusal no surface could word
     // (issue 1759).
     ...(Object.hasOwn(source, 'state') && { state: source.state ?? null }),
     ...(Object.hasOwn(source, 'blockedReasons') && {
@@ -1014,14 +965,10 @@ export function createJournalRunCommandService({
   }
 
   /**
-   * Run one Journal command, resolving a required check on the way.
-   *
-   * `interactive` is the CALLER'S. The Journal and the crafting and gathering screens pass
-   * `true`; the public API defaults it to `false` because a macro or a script has no one to
-   * answer a dialog, and `promptCheck` awaits a human with no timeout of its own -- `sendCommand`
-   * has one, the prompt does not. A non-interactive caller therefore settles the check with the
-   * engine's own defaults instead of opening it, which is the same route a player takes after
-   * answering (issue 1683).
+   * Run one Journal command, resolving a required check on the way. `interactive` is the CALLER'S:
+   * the public API defaults it to `false`, because `promptCheck` awaits a human with no timeout of
+   * its own, so a non-interactive caller settles the check on the engine's defaults, the route a
+   * player takes after answering (issue 1683).
    */
   async function executeJournalRunCommand(command, { interactive = true } = {}) {
     const first = await sendCommand(command);

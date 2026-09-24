@@ -1,25 +1,11 @@
 /**
- * Pure classification, rebinding, and resolution of the cross-references carried
- * by a Fabricate import payload. Foundry-free: the only side channel is an
- * INJECTED async `resolveUuid` used for external existence checks (the importer
- * passes a wrapper over `fromUuid`).
- *
- * References fall into two classes:
- *   - INTERNAL — resolvable within the payload (env→task/event id linkage, drop-row
- *     `componentId`, tool `componentId`, recipe `recipeItemId`, essence
- *     `sourceComponentId`). A broken internal reference is a data-integrity
- *     warning: kept verbatim and reported.
- *   - EXTERNAL — world documents that may be absent in the target world
- *     (environment `sceneUuid`, realm `sceneMappings[].sceneUuid` +
- *     `sceneRegionUuid`, drop-row `itemUuid`, macro UUIDs). Preserved verbatim,
- *     resolved via `resolveUuid` if possible, else reported — never nulled out.
- *
- * Each reported/handled reference becomes an entry:
- *   { kind, ownerType, ownerId, ownerName, referenceValue, disposition }
- * where disposition is one of:
- *   - `remapped`  — external ref resolved to a DIFFERENT value (updated in place)
- *   - `retained`  — external ref resolved unchanged (kept verbatim)
- *   - `reported`  — needs GM attention (external absent, or broken internal)
+ * Pure classification, copy-mode rebinding and resolution of an import payload's cross-references
+ * (`openspec/specs/import-export/spec.md` § Reference handling, § Copy-mode identifier rebinding).
+ * Foundry-free: the only side channel is the injected async `resolveUuid` for external existence
+ * checks. A broken INTERNAL reference is kept verbatim and reported; an EXTERNAL one is preserved,
+ * resolved when possible, else reported, never nulled. Each entry is `{ kind, ownerType, ownerId,
+ * ownerName, referenceValue, disposition }`, `disposition` being `remapped` (resolved to a
+ * different value, updated in place), `retained` (resolved unchanged) or `reported`.
  */
 
 import { sourceReferencesOf, toolSourceReferences } from './worldScopeEntityGrouping.js';
@@ -42,23 +28,17 @@ export const REFERENCE_KINDS = Object.freeze({
   EVENT_LINK: 'eventLink',
   COMPONENT_LINK: 'componentLink',
   RECIPE_ITEM: 'recipeItem',
-  // The four world-scope entity kinds (issue 1364, epic 1357). All four carry the shipped
-  // `reported` disposition and reuse the shipped entity-specific owner types, except
-  // `worldToolBreakageDropped`, whose subject is a SETTING rather than a record and which
-  // therefore takes the shipped `unknown` owner type. No new ownerType is introduced: a generic
-  // `worldEntity` would be unsearchable and would lose the entity type in a report grouped by
-  // kind.
+  // The world-scope kinds (issue 1364) reuse the entity owner types; `worldToolBreakageDropped`,
+  // whose subject is a setting, takes `unknown`; a generic `worldEntity` would be unsearchable.
   WORLD_ENTITY_COLLISION: 'worldEntityCollision',
   WORLD_ENTITY_MISSING: 'worldEntityMissing',
   WORLD_DEFAULT_DECLINED: 'worldDefaultDeclined',
   WORLD_TOOL_BREAKAGE_DROPPED: 'worldToolBreakageDropped',
-  // Kind 5: a `1.34.0` essence-merge upcast refusal changes no slice, so without a kind carrying
-  // it the refusal reaches no report. `import-export` requires it reported rather than silent
-  // (issue 1654).
+  // A `1.34.0` essence-merge refusal changes no slice, so only this kind reports it (issue 1654).
   WORLD_ESSENCE_MERGE_REFUSED: 'worldEssenceMergeRefused',
 });
 
-/** The world-scope entity types, and the settings key + in-system array each is carried under. */
+/** The world-scope entity types; the maps below give each one's slice key and system array. */
 export const WORLD_SCOPE_ENTITY_TYPES = Object.freeze(['components', 'essences', 'tools']);
 
 /** The envelope slice key for each world-scope entity type. */
@@ -85,10 +65,8 @@ const WORLD_SCOPE_OWNER_TYPES = Object.freeze({
 const LOCAL_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
 function localId() {
-  // 16-char base36 id; Foundry-free stand-in for foundry.utils.randomID().
-  // Draws from the platform CSPRNG (`crypto.getRandomValues`, available in Node
-  // and the Foundry browser context) rather than a pseudorandom generator, so it
-  // stays pure, unit-testable, and free of insecure-randomness findings.
+  // A Foundry-free 16-char base36 `randomID()` stand-in drawn from the platform CSPRNG, so it
+  // stays pure and free of insecure-randomness findings.
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   let id = '';
@@ -99,22 +77,9 @@ function localId() {
 }
 
 /**
- * The source-reference set one incoming record claims, computed exactly as the `1.30.0` grouping
- * computes it.
- *
- * IT IS THE MIGRATION'S SIX-SPELLING RULE, not the narrower three-field `getItemMatchUuids`, and
- * that is load-bearing rather than tidy. `sourceReferencesOf` reads `originItemUuid`,
- * `registeredItemUuid`, `sourceUuid`, `sourceItemUuid` and then `aliasItemUuids` OR - only in its
- * absence - `fallbackItemIds`. The three extra spellings are the LEGACY ones, which is exactly
- * what a schema 1-5 export carries: a component linked only through `sourceUuid` would be LINKED
- * to the migration and UNLINKED to the import, and would mint a duplicate world entity for an Item
- * the destination already holds. The alias list is an EITHER/OR, so a record carrying both has its
- * `fallbackItemIds` ignored.
- *
- * @param {unknown} record
- * @param {string} entityType
- * @param {object[]} components The OWNING system's component array, for a tool with no own refs.
- * @returns {string[]}
+ * One incoming record's source-reference set, by the `1.30.0` grouping's six-spelling rule (the
+ * legacy spellings are what a schema 1-5 export carries); a tool with no refs of its own derives
+ * through its component.
  */
 function sourceReferenceSet(record, entityType, components) {
   return entityType === 'tools'
@@ -122,14 +87,7 @@ function sourceReferenceSet(record, entityType, components) {
     : sourceReferencesOf(record);
 }
 
-/**
- * The destination's world entity roster for one entity type, in roster order, each paired with its
- * source-reference set.
- *
- * @param {unknown} worldEntityIndex
- * @param {string} entityType
- * @returns {Array<{id: string, refs: Set<string>}>}
- */
+/** The destination's world entities of one type in roster order, each with its source refs. */
 function destinationRoster(worldEntityIndex, entityType) {
   const entities = worldEntityIndex?.[entityType];
   if (!Array.isArray(entities)) return [];
@@ -138,8 +96,7 @@ function destinationRoster(worldEntityIndex, entityType) {
     if (!entity || typeof entity !== 'object') continue;
     const id = typeof entity.id === 'string' ? entity.id.trim() : '';
     if (!id) continue;
-    // A world entity carries its OWN refs; there is no owning system to derive a tool's through,
-    // and the migration's write-back has already folded a derived set onto it.
+    // A world entity carries its own refs; the migration folded any derived tool set onto it.
     roster.push({ id, refs: new Set(sourceReferencesOf(entity)) });
   }
   return roster;
@@ -163,55 +120,18 @@ function reportEntry(kind, ownerType, owner, referenceValue) {
 }
 
 /**
- * Report every incoming entity whose id equals a DESTINATION world entity's id while their source
- * references prove they are different Items (issue 1364, `worldEntityCollision`).
- *
- * IT RESOLVES, TO THE WRONG THING, which is why it is REPORTED rather than repaired. Component and
- * tool ids are not globally unique and copy-import has always preserved them; while ids were per
- * system that was harmless, but once they name WORLD entities an id collision silently binds the
- * imported system's membership record to an unrelated world record. Keep mode must not regenerate
- * anything, so there is no repair available that would not itself be a re-key.
- *
- * IT IS NOT KEEP-MODE-ONLY. It applies in keep mode for all three entity types, and in COPY mode
- * for tools and essences, whose identifiers copy mode preserves verbatim; components in copy mode
- * are protected by match-or-mint and cannot reach this state.
- *
- * THE PREDICATE REQUIRES POSITIVE EVIDENCE: both sets non-empty AND disjoint. An UNLINKED record
- * on either side carries no evidence either way, and reporting it would fire on the commonest
- * operation there is - re-importing a pack the destination already has.
- *
- * **THE ESSENCE ARM IS VACUOUS IN PRACTICE, AND SAYING SO IS THE POINT.** The DESTINATION side is
- * what makes it so: `WORLD_IDENTITY_FIELDS.essences` lifts only `name` / `icon` / `colorToken` /
- * `description` and no source link, so no world essence entity the migration or an export ever
- * produced carries one and `destination.refs.size` is 0 for every one of them. The reason is that
- * identity field list, not any claim that an essence id is stable — `1.34.0` re-keys essence ids
- * (issue 1654) — so the arm stays vacuous on ground the merge does not disturb. The INCOMING side
- * is not empty - an essence definition's own `sourceItemUuid` is a THIRD, unrelated field family
- * that `sourceReferencesOf` happens to read - so it is the destination half alone that
- * short-circuits the positive-evidence guard. The loop still covers all three entity types
- * because the rule is stated over all three and a hand-authored world essence carrying a link
- * would then be covered without an edit; it is written down so no one mistakes the arm for tested
- * behaviour.
- *
- * **IT DELIBERATELY DOES NOT COVER COPY-MODE COMPONENTS, AND THE MANY-TO-ONE CASE IS NOT ITS
- * JOB.** This pass runs BEFORE `rebindCopyComponentIds`, so under copy mode a component's id here
- * is a PRE-REBIND id that is about to be replaced; reporting a collision on it would name an
- * identifier the prepared payload does not contain. The converse hazard - two incoming components
- * binding to ONE destination entity - is reported by the id-claim ladder in
- * {@link rebindCopyComponentIds}, which is the only place that knows which record claimed what.
- *
- * @param {object} prepared
- * @param {unknown} worldEntityIndex
- * @param {'keep'|'copy'} mode
- * @returns {object[]} report entries
+ * Report each incoming entity whose id equals a destination world entity's while both carry source
+ * references and share none (issue 1364, `worldEntityCollision`): it resolves to the wrong thing,
+ * and keep mode may not re-key. Keep mode checks all three types and copy mode tools and essences;
+ * copy-mode components bind by match-or-mint in the later `rebindCopyComponentIds`. The essence
+ * arm is vacuous in practice, since world essences carry no source link (see the spec).
  */
 export function reportWorldEntityCollisions(prepared, worldEntityIndex, mode) {
   const entries = [];
   if (!prepared || typeof prepared !== 'object' || !worldEntityIndex) return entries;
   const components = arrayOf(prepared.system?.components);
   for (const entityType of WORLD_SCOPE_ENTITY_TYPES) {
-    // Components in copy mode bind through match-or-mint, so they never arrive under a colliding
-    // id in the first place.
+    // Copy-mode components bind by match-or-mint, so they never arrive under a colliding id.
     if (mode === 'copy' && entityType === 'components') continue;
     const roster = destinationRoster(worldEntityIndex, entityType);
     if (roster.length === 0) continue;
@@ -238,32 +158,16 @@ export function reportWorldEntityCollisions(prepared, worldEntityIndex, mode) {
 }
 
 /**
- * Copy-mode: regenerate record-CONTAINER ids (environment record ids) while PRESERVING
- * task / event / characterModifier ids so environment→library linkages survive (D3). The
- * `craftingSystemId` and the `gatheringConfig` system key are rebound by the importer once
- * `createSystem` has produced the fresh system id.
- *
- * REALM IDS ARE NO LONGER PART OF WHAT A COPY REBINDS (issue 1282). They were, while realms
- * belonged to the crafting system and a copy of that system therefore needed its own copies of
- * its places. Realms are WORLD scope now: they ride the envelope rather than the system, and
- * `CompendiumImporter._persistTravelConfig` merges them by id with the destination winning a
- * collision. Rebinding them here would defeat that merge outright — every realm in the pack
- * would arrive under an id the world has never seen, so a copy-import would DUPLICATE the
- * world's entire geography instead of recognising it, and the copy's environments would gate on
- * the duplicates while every other system kept gating on the originals.
- *
- * That is also why `includedRealmIds` / `excludedRealmIds` are left exactly as authored: the
- * ids they cite are the world's, and they still name the same places after the copy.
- *
- * @param {{ system: object, recipes: object[], gatheringEnvironments: object[], gatheringConfig: object }} prepared
- * @param {{ generateId?: () => string }} [deps]
- * @returns {object} the same `prepared` reference, mutated
+ * Copy mode: regenerate environment record ids, preserving task, event and characterModifier ids
+ * so library linkages survive; the importer rebinds `craftingSystemId` and the `gatheringConfig`
+ * key once the new system exists. Realms are world scope since issue 1282 and keep their ids, as
+ * do `includedRealmIds`/`excludedRealmIds`, so the destination-wins merge recognises the world's
+ * places instead of duplicating them.
  */
 export function rebindCopyContainerIds(prepared, { generateId = localId } = {}) {
   if (!prepared || typeof prepared !== 'object') return prepared;
   const { gatheringEnvironments } = prepared;
 
-  // --- Environment record ids ---
   const environments = Array.isArray(gatheringEnvironments) ? gatheringEnvironments : [];
   for (const env of environments) {
     if (!env || typeof env !== 'object') continue;
@@ -274,109 +178,18 @@ export function rebindCopyContainerIds(prepared, { generateId = localId } = {}) 
 }
 
 /**
- * Copy-mode: bind every incoming component to the destination's EXISTING world entity where its
- * source references say they are the same Item, MINT a fresh id where they do not, and atomically
- * remap every within-payload reference to an old component id so nothing dangles.
- *
- * ## MATCH-OR-MINT REPLACES MINT-EVERYTHING (issue 1364, epic 1357 decision 5)
- *
- * Copy mode used to regenerate EVERY component id (issue 570), which closed issue 556's
- * copy-import id-collision residual while component ids were per system. Once they name WORLD
- * entities that same rule became the duplication this epic exists to end: re-importing a pack the
- * destination already has created a SECOND world record for every real Item in it. So an incoming
- * component whose source-reference set INTERSECTS an existing destination world entity's binds to
- * that entity's id, and only an unmatched or UNLINKED component mints.
- *
- * The guarantee issue 570 needed still holds, restated accurately: two copies share an id only
- * when each INTERSECTS THE SAME destination world entity - so the two would have resolved to that
- * one world entity had they been grouped in one corpus.
- *
- * It is deliberately NOT stated as "their own sets intersect each other". A destination entity's
- * set may have been WIDENED by the grouping's union, so two incoming records that share no
- * reference at all can each intersect it, and it is the INJECTIVE binding below - not the
- * intersection relation - that keeps them apart.
- *
- * ## THE COLLECTION MATCHED OVER IS `prepared.system.components`, NEVER THE DERIVED SLICE
- *
- * That is easy to get backwards and it is load-bearing. The in-system array keeps its LEGACY
- * spellings, because the payload upcast discards the shared transform's rewritten `systems`;
- * the derived world entity in `componentScope.entities` has already canonicalised those spellings
- * into `aliasItemUuids`. Matching over the slice would make even the narrow three-field matcher
- * find them, and the whole point of using the six-spelling rule would evaporate.
- *
- * ## MULTI-MATCH BINDS DETERMINISTICALLY AND REPORTS
- *
- * The `1.30.0` grouping UNIONS a group's source references onto every in-system record, so an
- * exported record from a migrated world carries its whole SOURCE-WORLD GROUP's uuids. An incoming
- * set can therefore intersect MORE THAN ONE destination world entity. The import does not MERGE
- * them - that would be a destructive change to data the import did not bring - and it does not
- * MINT either, which would recreate the duplicate silently. It binds to the LARGEST intersection,
- * ties broken by roster position (first wins), and reports the ambiguity naming every losing
- * candidate. The tie-break is deterministic for the reason the id-claim ladder's is: a re-run must
- * choose identically.
- *
- * ## AND THE BINDING IS INJECTIVE: ONE DESTINATION ENTITY, AT MOST ONE INCOMING RECORD
- *
- * The converse of multi-match is the one that loses data, and it is not exotic. TWO incoming
- * records can intersect ONE destination entity - directly, when they share a
- * `registeredItemUuid`, and transitively, when the destination entity's own set was WIDENED by
- * the `1.30.0` grouping's union so that `c1{Item.x}` and `c2{Item.y}`, which share nothing with
- * each other, both intersect it. "Intersects a destination entity" is therefore NOT an
- * equivalence relation over the incoming records and cannot partition them.
- *
- * Without a claim ladder both records bind to the same id and the SECOND one vanishes whole:
- * `_normalizeSystem` keeps only the last of a duplicate id in `itemById`, and the read union
- * de-duplicates by entity id, so the component disappears from the UI, from the index and from
- * the engine with no error anywhere. The migration REFUSES the same corpus outright
- * (`outputIdCollision`), so silently collapsing it here would give one release two answers to one
- * question.
- *
- * So {@link bindToDestination} carries the ID-CLAIM LADDER's three rungs, keyed on the
- * DESTINATION id rather than on a group's members: the best intersecting candidate if unclaimed,
- * else the NEXT unclaimed intersecting candidate in the same ranked order, else mint. Every
- * contested destination id is reported naming BOTH owners.
- *
- * **The middle rung is not polish.** Mint-immediately is neither order-stable nor idempotent:
- * destination roster order is the key order of a persisted setting that nothing in this pipeline
- * sorts, and a record that mints because its best candidate was taken adds one world entity per
- * import, forever, because the entity it minted last time is never the one it prefers this time.
- * Taking the next unclaimed candidate binds to that minted entity on the second run instead, so
- * the second and every later import adds nothing.
- *
- * ## ONE ID CLASS, NOT THREE, AND FIVE REWRITE TARGETS
- *
- * Only components ever regenerated. Tools and essences continue to bind by id verbatim, and their
- * source-reference comparison is used only to REPORT a mismatch. The map drives FIVE targets:
- * the system, recipes and gathering slice through the shared walk; every `membership` record;
- * every `defaults` record, through the SAME section-shaped function; those records' own `id` /
- * `entityId`; and the incoming `entities` roster's own `id`, where a MATCHED entity's record is
- * DROPPED rather than re-keyed, because the destination already holds that world entity.
- *
- * Dropping rather than re-keying is deliberate. Re-keying and relying on the merge's
- * destination-wins collision rule is observationally equivalent under a CORRECT merge, and that is
- * exactly why it is not chosen: it would make this function's correctness depend on the merge's
- * collision rule being right.
- *
- * THE TRAVERSAL ITSELF IS NOT HERE. Every reference site lives in the ONE shared walk
- * `src/systems/worldScopeReferenceRewrite.js`, which this function and the `1.30.0` world-scope
- * migration both drive (issue 1363). This function keeps only what is copy-mode-specific.
- *
- * The rewrite is KEY-AWARE: it only rewrites a value that (a) sits at one of the enumerated
- * component-reference sites AND (b) equals an old component id. A value at a non-reference
- * position (a `recipeIds[]` entry, an outcome/salvage-group id, a scene/macro UUID) is never
- * touched even if it coincidentally equals a component id.
- *
- * TOOL IDS ARE NOT RE-KEYED BY COPY MODE, so the shared walk's tool-id sites are driven with an
- * identity remapper and are provably inert here.
- *
- * @param {{ system: object, recipes: object[], gatheringConfig: object }} prepared
- * @param {object} [deps]
- * @param {() => string} [deps.generateId]
- * @param {{components?: object[], essences?: object[], tools?: object[]}} [deps.worldEntityIndex]
- *   The DESTINATION world's entity roster. Required by `prepareForImport` under copy mode; an
- *   empty index here simply means every component mints.
- * @param {object[]} [deps.report] Sink for the ambiguity entries.
- * @returns {object} the same `prepared` reference, mutated
+ * Copy mode: bind each incoming component to the destination world entity its source references
+ * match, else mint, and remap every within-payload reference to an old component id (issue 1364;
+ * `import-export/spec.md` § Copy-mode identifier rebinding owns the rules). Matching runs over
+ * `prepared.system.components`, never the derived slice, whose spellings are already canonical. A
+ * multi-match binds to the largest intersection (first in roster order wins) and reports the
+ * rest; the binding is INJECTIVE through the id-claim ladder in `bindToDestination`. The map
+ * drives five targets: the system, recipes and gathering slice through the shared walk in
+ * `worldScopeReferenceRewrite.js`; `membership` and `defaults` records; their own ids; and the
+ * incoming roster, where a MATCHED entity is dropped rather than re-keyed so correctness never
+ * leans on the merge's collision rule. The rewrite is key-aware, and tool ids are never re-keyed.
+ * `worldEntityIndex` is the destination roster (`prepareForImport` requires it in copy mode; empty
+ * means every component mints) and `report` collects the ambiguity entries.
  */
 export function rebindCopyComponentIds(
   prepared,
@@ -388,15 +201,11 @@ export function rebindCopyComponentIds(
   const components = Array.isArray(system?.components) ? system.components : [];
   const roster = destinationRoster(worldEntityIndex, 'components');
 
-  // --- Old -> new component-id map (built over system.components[].id only) ---
   const idMap = {};
-  /** The incoming ids that BOUND to a destination world entity rather than minting. */
+  // Incoming ids that bound to a destination entity rather than minting.
   const matched = new Set();
-  /**
-   * The ID-CLAIM LADDER's state: destination entity id -> the incoming record that took it.
-   * It is what makes the binding INJECTIVE, and it is a Map rather than a Set because a
-   * contention is only actionable if the report can name BOTH owners.
-   */
+  // The id-claim ladder's state, destination id -> the record that took it: a Map, so a
+  // contention report names both owners.
   const claimed = new Map();
   for (const component of components) {
     if (!component || typeof component !== 'object' || !component.id) continue;
@@ -428,28 +237,16 @@ export function rebindCopyComponentIds(
   for (const recipe of arrayOf(recipes)) rewriteRecipeReferences(recipe, remappers);
   rewriteSystemReferences(system, remappers);
   rewriteGatheringSliceReferences(systemSlice(gatheringConfig), remappers);
-  // TARGETS 2, 3 and 4 - the component references INSIDE the three slices, and the records' own
-  // identifiers.
+  // TARGETS 2, 3 and 4 - the component references inside the three slices, and their own ids.
   rewriteScopeSliceReferences(prepared, remappers, keyedRemapper(idMap));
 
   return prepared;
 }
 
 /**
- * Bind one incoming component to a destination world entity, or answer `null` to mint.
- *
- * THE ID-CLAIM LADDER, keyed on the destination id: the best intersecting candidate if
- * UNCLAIMED, else the next unclaimed candidate in the same ranked order, else mint. `claimed` is
- * threaded across the whole payload's records, which is what makes the binding INJECTIVE - see
- * {@link rebindCopyComponentIds}'s note for what a non-injective binding silently destroys, and
- * why the middle rung rather than an immediate mint is what makes a re-import idempotent.
- *
- * @param {string[]} refs
- * @param {Array<{id: string, refs: Set<string>}>} roster In ROSTER ORDER, which is the tie-break.
- * @param {object} component The incoming record, for the report's owner.
- * @param {object[]|null} report
- * @param {Map<string, object>} claimed Destination id -> the incoming record that took it.
- * @returns {string|null}
+ * The id-claim ladder, keyed on the destination id: the best intersecting candidate if unclaimed,
+ * else the next unclaimed one in rank order (which makes a re-import idempotent), else `null` to
+ * mint. `claimed` spans the whole payload, which makes the binding injective.
  */
 function bindToDestination(refs, roster, component, report, claimed) {
   const candidates = rankedCandidates(refs, roster);
@@ -471,15 +268,8 @@ function bindToDestination(refs, roster, component, report, claimed) {
 }
 
 /**
- * Every destination entity one incoming reference set intersects, best match first.
- *
- * Ranked by intersection size DESCENDING, ties by ROSTER POSITION so first wins. The position is
- * carried explicitly rather than left to `Array#sort`'s stability, because the ranking is the
- * whole of the determinism guarantee and a re-run must choose identically.
- *
- * @param {string[]} refs
- * @param {Array<{id: string, refs: Set<string>}>} roster
- * @returns {Array<{id: string, size: number, position: number}>}
+ * The intersecting destination entities, largest intersection first, ties by an explicit roster
+ * position rather than sort stability, so a re-run chooses identically.
  */
 function rankedCandidates(refs, roster) {
   const candidates = [];
@@ -492,27 +282,8 @@ function rankedCandidates(refs, roster) {
 }
 
 /**
- * Report one record's binding outcome: every CONTESTED destination id, and every candidate the
- * winner merely beat.
- *
- * A contested id is reported against BOTH owners - the record that claimed it and the record that
- * wanted it - because a contention naming only one of them tells a GM that something collided
- * without telling them what with, and the whole point of the entry is that the second record has
- * had to take a different id (or mint one) rather than silently disappear.
- *
- * A BEATEN candidate is reported against this record ALONE, and unconditionally. The two classes
- * are different facts and are deliberately shaped differently: a contention says "another record
- * took this and I had to move", while a beaten candidate says "my references also named this one".
- * The beaten entry names no second owner because there is no second party to the ambiguity - the
- * winner beat it on intersection size, not on who got there first - and it is emitted whether or
- * not some unrelated record has claimed it, because a claim by a third record changes nothing
- * about the fact that THIS record's set intersects it.
- *
- * @param {object[]|null} report
- * @param {object} component The record being bound.
- * @param {Map<string, object>} claimed
- * @param {Array<{id: string}>} contested
- * @param {Array<{id: string}>} beaten
+ * Report a binding: each CONTESTED destination id against BOTH owners (the record that claimed it
+ * and the one that had to move), and each merely BEATEN candidate against this record alone.
  */
 function reportBinding(report, component, claimed, contested, beaten) {
   if (!Array.isArray(report)) return;
@@ -526,27 +297,15 @@ function reportBinding(report, component, claimed, contested, beaten) {
     push(component, candidate.id);
   }
   for (const candidate of beaten) {
-    // UNCONDITIONALLY, and the absent guard is the point. `contested` and `beaten` are disjoint by
-    // construction - one is the prefix above the winner, the other the suffix below it - so a
-    // filter on `claimed` here cannot prevent a double report, it can only SUPPRESS a real
-    // multi-match: a losing candidate some OTHER incoming record happens to have claimed is still
-    // a destination entity THIS record's references named, and dropping it can leave a
-    // two-candidate match reporting nothing at all.
+    // Unconditionally: `contested` and `beaten` are disjoint, so a `claimed` filter could only
+    // suppress a real multi-match that another record happened to claim.
     push(component, candidate.id);
   }
 }
 
 /**
- * TARGET 5 - drop every MATCHED entity's incoming roster record and re-key the rest.
- *
- * Without this a matched entity arrives still carrying its pre-import id and merges into a
- * destination-wins, id-keyed roster as a NEW world entity: a second world record for an Item the
- * destination already has, and every membership record rewritten by target 4 then names a world
- * entity absent from the merged roster.
- *
- * @param {object} prepared
- * @param {ReadonlySet<string>} matched
- * @param {Record<string, string>} idMap
+ * TARGET 5: drop each matched entity's incoming roster record and re-key the rest; a matched one
+ * would otherwise merge in as a second world record for an Item the destination already has.
  */
 function dropMatchedWorldEntities(prepared, matched, idMap) {
   const slice = prepared[WORLD_SCOPE_SLICE_KEYS.components];
@@ -562,22 +321,10 @@ function dropMatchedWorldEntities(prepared, matched, idMap) {
 }
 
 /**
- * TARGETS 2, 3 and 4 - rewrite every component reference inside the three envelope slices, and
- * every `defaults` record's own `id` and `membership` record's own `entityId`.
- *
- * The shipped migration drives `rewriteMembershipReferences` over `membership` ONLY. A `defaults`
- * record has the SAME section shape, so the same function applies unchanged - and it must, because
- * a world default carries component references exactly as a membership record does. Its components
- * branch is a deliberate no-op (`category` holds no component reference) and its tools branch
- * deliberately WITHHOLDS `componentId`, because neither record class carries one.
- *
- * Only the component scope's own identifiers move here: this copy-mode remap re-keys no essence or
- * tool id. The `1.34.0` equivalent-essence merge re-keys essence ids under its own map, in the
- * export upcast that runs before copy mode (issue 1654).
- *
- * @param {object} prepared
- * @param {{remapComponent: Function}} remappers
- * @param {(value: unknown) => unknown} remapId
+ * TARGETS 2 to 4: component references inside the three slices, plus each `defaults` record's
+ * `id` and `membership` record's `entityId`. `defaults` shares the membership section shape, so
+ * the same rewrite applies. Only component ids move; the `1.34.0` essence merge re-keys essences
+ * earlier, in the export upcast (issue 1654).
  */
 function rewriteScopeSliceReferences(prepared, remappers, remapId) {
   for (const entityType of WORLD_SCOPE_ENTITY_TYPES) {
@@ -599,30 +346,15 @@ function rewriteScopeSliceReferences(prepared, remappers, remapId) {
 }
 
 /**
- * Copy-mode: regenerate every recipe id and atomically remap every within-payload
- * recipe-book membership reference (`recipeItemDefinitions[].recipeIds` entries) to
- * the regenerated id (issue #701). Without this, copy-mode strips recipe ids (the
- * downstream `Recipe` constructor mints fresh ones) but the book membership arrays
- * still point at the pre-import ids, so every book in the copy renders empty and a
- * faithful copy import reports every membership entry as a broken `RECIPE_ITEM`
- * reference.
- *
- * The rewrite is KEY-AWARE and class-scoped: only `recipeIds[]` membership
- * positions are rewritten. A membership entry naming a recipe id ABSENT from the
- * payload (genuinely broken in the source) is preserved verbatim so it still
- * resolves-and-reports downstream. Mirrors {@link rebindCopyComponentIds}; the
- * component-id remap still must not touch `recipeIds[]` (the protection is per id
- * class, not absolute).
- *
- * @param {{ system: object, recipes: object[] }} prepared
- * @param {{ generateId?: () => string }} [deps]
- * @returns {object} the same `prepared` reference, mutated
+ * Copy mode: regenerate every recipe id and remap each `recipeItemDefinitions[].recipeIds` entry
+ * to it (issue 701), or every copied book renders empty; an id absent from the payload stays
+ * verbatim and still reports. Only `recipeIds[]` positions move, and the component remap never
+ * touches them.
  */
 export function rebindCopyRecipeIds(prepared, { generateId = localId } = {}) {
   if (!prepared || typeof prepared !== 'object') return prepared;
   const { system, recipes } = prepared;
 
-  // --- Old → new recipe-id map (built over recipes[].id only) ---
   const idMap = new Map();
   for (const recipe of arrayOf(recipes)) {
     if (recipe && typeof recipe === 'object' && recipe.id) {
@@ -649,23 +381,15 @@ export function rebindCopyRecipeIds(prepared, { generateId = localId } = {}) {
 }
 
 /**
- * Resolve and classify every reference in the payload. Returns a deep clone with
- * remapped external values applied, plus the structured `unresolvedReferences[]`
- * collection.
- *
- * @param {{ system?: object, recipes?: object[], gatheringEnvironments?: object[], gatheringConfig?: object, travelConfig?: object }} payload
- * @param {{ resolveUuid?: (uuid: string) => Promise<null | { uuid: string }> }} [deps]
- * @returns {Promise<{ resolved: object, unresolvedReferences: object[] }>}
+ * Classify every reference in a deep clone, applying remapped external values. External checks
+ * need `resolveUuid`; without one everything external stays verbatim and unreported.
  */
 export async function resolveImportReferences(payload, { resolveUuid = null } = {}) {
   const resolved = structuredClone(payload || {});
   const unresolvedReferences = [];
 
-  // Internal (broken-reference) integrity checks are synchronous.
   collectBrokenInternalReferences(resolved, unresolvedReferences);
 
-  // External existence checks require an injected resolver; without one we keep
-  // everything verbatim and skip reporting (the caller decides).
   if (typeof resolveUuid === 'function') {
     const descriptors = collectExternalDescriptors(resolved);
     for (const descriptor of descriptors) {
@@ -703,10 +427,6 @@ function entry(descriptor, disposition) {
   };
 }
 
-/**
- * @param {object} payload
- * @returns {Array<{ kind, ownerType, ownerId, ownerName, referenceValue, set: (v: string) => void }>}
- */
 function collectExternalDescriptors(payload) {
   const descriptors = [];
   const system = payload.system || {};
@@ -727,8 +447,7 @@ function collectExternalDescriptors(payload) {
     }
   }
 
-  // Realm scene mappings (scene + scene-region). Realms ride the ENVELOPE since issue 1282,
-  // so they are read from the world travel config rather than off the system.
+  // Realm scene mappings, read from the envelope's travel config since issue 1282.
   for (const realm of arrayOf(payload.travelConfig?.realms)) {
     for (const mapping of arrayOf(realm?.sceneMappings)) {
       if (mapping?.sceneUuid) {
@@ -781,10 +500,7 @@ function collectExternalDescriptors(payload) {
   collectMacroDescriptors(payload.recipes, 'recipe', descriptors);
   collectMacroDescriptors(slice.tasks, 'task', descriptors);
   collectMacroDescriptors(slice.events, 'event', descriptors);
-  // Essence property macros (issue 1036) live on a DIFFERENTLY NAMED field, so the
-  // collector takes the field name rather than being forked. The import report already
-  // carries the `essence` owner type (it is used for `componentLink`), so no new
-  // owner-type label is needed.
+  // Essence property macros (issue 1036) sit on a differently named field.
   collectMacroDescriptors(system.essenceDefinitions, 'essence', descriptors, 'propertyMacroUuid');
   collectComplicationMacroDescriptors(system.components, descriptors);
 
@@ -792,19 +508,9 @@ function collectExternalDescriptors(payload) {
 }
 
 /**
- * Component complication macros (issue 1286). `collectMacroDescriptors` reads
- * `record[field]` ONE level deep and so cannot reach a nested list; this walk is dedicated
- * rather than a flattened call for a REPORTING reason as much as a structural one. A
- * flattened call would take `ownerId`/`ownerName` from the complication, so the import
- * report would name the complication — which the GM cannot open — instead of the component
- * that carries it. `ownerType: 'component'` already has a localized label, so no new one is
- * needed.
- *
- * Unregistered, the uuid is never remapped and the complication runs the WRONG macro in the
- * importing world.
- *
- * @param {unknown} components
- * @param {object[]} descriptors
+ * Component complication macros (issue 1286), walked separately so the report names the owning
+ * component, which the GM can open, rather than the complication; unregistered, the uuid would
+ * run the wrong macro in the importing world.
  */
 function collectComplicationMacroDescriptors(components, descriptors) {
   for (const component of arrayOf(components)) {
@@ -846,11 +552,7 @@ function collectMacroDescriptors(records, ownerType, descriptors, field = 'macro
   }
 }
 
-/**
- * Report internal references that resolve to nothing within the payload.
- * @param {object} payload
- * @param {object[]} out
- */
+/** Report the internal references that resolve to nothing within the payload. */
 function collectBrokenInternalReferences(payload, out) {
   const system = payload.system || {};
   const componentIds = idSet(system.components);
@@ -890,9 +592,7 @@ function collectBrokenInternalReferences(payload, out) {
     }
   }
 
-  // Tool componentId + onBreak.replacementComponentId, across BOTH the crafting-system
-  // tools (`system.tools`) and the gathering-library tools (`gatheringConfig.system.tools`)
-  // — issue 570 D2 (the collector previously walked only the gathering slice's tools).
+  // Tool component refs across BOTH `system.tools` and the gathering-library tools (issue 570).
   const reportToolComponentRefs = (tool) => {
     if (!tool || typeof tool !== 'object') return;
     if (tool.componentId && !componentIds.has(tool.componentId)) {
@@ -906,14 +606,9 @@ function collectBrokenInternalReferences(payload, out) {
   for (const tool of arrayOf(system.tools)) reportToolComponentRefs(tool);
   for (const tool of arrayOf(slice.tools)) reportToolComponentRefs(tool);
 
-  // Recipe ingredient-option / result / catalyst component refs (issue 570 D2),
-  // including the recursive `alternatives[]` and the flat `ingredients`/`results`
-  // aliases, at both top level and per step.
-  // `ownerType` travels with the owner because these walkers are shared by TWO owner
-  // classes: a recipe's ingredient/result/catalyst refs, and a COMPONENT's salvage
-  // result/catalyst refs. Hard-coding 'recipe' here (as it was before issue 877) made
-  // the report label a salvage row "Recipe: Iron Ore" for a component owner, and left
-  // the `OwnerType.component` label unreachable from this collector.
+  // Recipe ingredient, result and catalyst refs, recursive `alternatives[]` and flat aliases
+  // included, top level and per step (issue 570). `ownerType` travels with the owner because a
+  // COMPONENT's salvage refs share these walkers (issue 877).
   const reportIngredientRef = (ref, owner, ownerType) => {
     if (!ref || typeof ref !== 'object') return;
     const componentId =
@@ -979,8 +674,7 @@ function collectBrokenInternalReferences(payload, out) {
       reportIngredientRef(catalyst, component, 'component');
   }
 
-  // Essence sourceComponentId → components (fall back to the legacy
-  // associatedSystemItemId alias).
+  // Essence `sourceComponentId`, falling back to the legacy `associatedSystemItemId`.
   for (const def of arrayOf(system.essenceDefinitions)) {
     const sourceComponentId = def?.sourceComponentId ?? def?.associatedSystemItemId;
     if (sourceComponentId && !componentIds.has(sourceComponentId)) {
@@ -988,8 +682,7 @@ function collectBrokenInternalReferences(payload, out) {
     }
   }
 
-  // Recipe recipeItemId → recipeItemDefinitions (legacy reverse ref; absent once a
-  // world is migrated to book-side membership).
+  // Legacy reverse `recipeItemId`; absent once a world has book-side membership.
   for (const recipe of arrayOf(payload.recipes)) {
     if (recipe?.recipeItemId && !recipeItemIds.has(recipe.recipeItemId)) {
       push(REFERENCE_KINDS.RECIPE_ITEM, 'recipe', recipe, recipe.recipeItemId);

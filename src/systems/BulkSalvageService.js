@@ -1,44 +1,17 @@
 /**
- * Runs a BULK salvage: one player gesture, N salvage attempts, one aggregated chat
- * card (issue 859).
- *
- * ## Every collaborator is injected, and nothing here reaches a Foundry global
- *
- * `game`, `ui` and `ChatMessage` do not appear in this module. The engine call, the
- * crafting-system lookup, the roll prompt, the chat post and the localization lookup
- * all arrive as seams, so the whole outcome vocabulary — the part of this feature that
- * is engine semantics rather than presentation — is unit-testable against plain
- * objects. That is also why the service lives neither in `src/main.js` (unimportable
- * under `node --test`) nor in the runes store.
- *
- * ## Execution is STRICTLY SEQUENTIAL, and that is a correctness requirement
- *
- * `Promise.all` would be wrong three separate ways, so the `for…of`/`await` below must
- * not be "optimised":
- *
- * 1. Tool breakage at item *k* must be visible at item *k+1*. A batch that broke the
- *    same hammer concurrently would salvage every row against a hammer that was
- *    already gone.
- * 2. Stack depletion is shared. Two rows resolving to the same owned stack must see
- *    each other's consumption.
- * 3. Each salvage run record is a read-modify-write actor `setFlag`. There is no
- *    compare-and-set anywhere in the run store, so concurrent writers lose entries.
- *
- * ## Duplicate targets cannot double-consume
- *
- * Safety comes from that sequencing plus each `salvage()` call's own availability
- * check — which re-derives the owned documents from `actor.items` at call time — NOT
- * from the caller handing over a disjoint set. The defensive dedupe below is retained
- * anyway, because a duplicated row is a UI defect worth reporting rather than
- * silently executing twice.
+ * Runs a bulk salvage (issue 859; DOMAIN.md "Bulk Salvage"): one gesture, N salvage attempts, one
+ * aggregated chat card. Every collaborator is injected and no Foundry global is read, so the
+ * outcome vocabulary is unit-testable. Execution is STRICTLY SEQUENTIAL, never `Promise.all`: tool
+ * breakage at row k must be visible at k+1, rows can share a stack, and each run record is a
+ * read-modify-write `setFlag` with no compare-and-set. That sequencing plus each `salvage()`'s own
+ * availability check stops duplicate targets double-consuming; the dedupe is defensive.
  */
 
 import {
   buildBulkSalvageChatContent,
   sumChatEntriesByName,
 } from '../ui/presenters/BulkSalvageChatCard.js';
-// The PLAYER forecast projection, and the trigger-id read that keeps it honest. Both are
-// import-free leaves, so the "what could go wrong" preview costs this service no closure.
+// The player forecast projection and its trigger-id read, both import-free leaves.
 import { forecastComplications } from '../utils/complicationPlan.js';
 import { hasPlainD20 } from '../utils/craftingCheckExpression.js';
 import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
@@ -50,24 +23,12 @@ import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import { resolvedComponentsFor } from './scopedEntityReads.js';
 
 /**
- * The maximum number of targets one bulk gesture may carry.
- *
- * The bound is enforced at SELECTION time so bulk salvage and bulk destroy inherit one
- * limit — a cap applied only here would let a 40-row selection salvage 25 and destroy
- * all 40, which puts the unbounded behaviour on the destructive path. It is re-checked
- * here as a defensive backstop, which is why {@link BulkSalvageService} takes it as a
- * `maxItems` seam: the `bulkLimit` branch is unreachable through the UI and would
- * otherwise be untestable.
+ * The targets one gesture may carry, enforced at SELECTION so salvage and destroy share one bound;
+ * re-checked here as a backstop, hence the `maxItems` seam that makes `bulkLimit` testable.
  */
 export const BULK_MAX_ITEMS = 25;
 
-/**
- * The reasons a target is refused BEFORE the engine is called. Advisory only — the
- * engine stays authoritative, and a target that passes pre-flight can still fail for a
- * reason only the engine can see (not enough units, tools unavailable, a time gate).
- *
- * @type {Readonly<Record<string, string>>}
- */
+/** Pre-flight refusals, advisory: the engine stays authoritative and can still fail a row. */
 export const BULK_SALVAGE_SKIP_REASONS = Object.freeze({
   unknownSystem: 'unknownSystem',
   featureDisabled: 'featureDisabled',
@@ -78,24 +39,9 @@ export const BULK_SALVAGE_SKIP_REASONS = Object.freeze({
 });
 
 /**
- * Classify what one `salvage()` return means, in the ONE order that is total.
- *
- * The order is load-bearing rather than stylistic, because two of the discriminators
- * travel alongside a `success` value that contradicts them:
- *
- * - the time gate returns `waiting: true` WITH `success: true` (the run started; it
- *   awarded nothing), so `waiting` must be read before `success === true` or every
- *   time-gated row reports as recovered;
- * - a misconfigured check returns `misconfigured: true` WITH `success: false`, so it
- *   must be read before `success === false` or a GM-side config gap reports to the
- *   player as a failed roll that never happened.
- *
- * The table is total GIVEN a salvage run manager. Without one the time gate never
- * arms, so a runless salvage carrying a `timeRequirement` simply never returns
- * `waiting` — stated because the mapping otherwise reads as unconditional.
- *
- * @param {object|null} result A `CraftingEngine#salvage` return.
- * @returns {'cancelled'|'misconfigured'|'waiting'|'succeeded'|'failed'}
+ * What one `salvage()` return means, in the one total order: the time gate returns `waiting` WITH
+ * `success: true` and a misconfigured check `misconfigured` WITH `success: false`, so both are read
+ * before `success`. Total given a salvage run manager; without one the time gate never arms.
  */
 export function classifySalvageOutcome(result) {
   if (result?.cancelled === true) return 'cancelled';
@@ -115,36 +61,11 @@ function firstFinite(...values) {
 }
 
 /**
- * The tools that BROKE during one salvage, as plain `{ name, img }` chat entries.
- *
- * Reads the run record rather than the live breakage evidence, because that evidence
- * never leaves the engine: `salvage()` returns tool information only through
- * `salvageRun.usedTools`. On the RUNLESS path (`salvageRun === null`) there is therefore
- * no tool evidence at all and this correctly yields nothing — a stated limit of the
- * aggregate card, not a silent one.
- *
- * ## What it shares with the per-item card, and what it does NOT
- *
- * It answers the same QUESTION as `CraftingEngine._resolveBrokenToolChatEntries` — which
- * tools broke, as `{ name, img }` — from the same broken-only filter. It is not a mirror
- * of that function and must not be described as one:
- *
- * - it resolves `record.componentId` only, where the engine also resolves `record.toolId`
- *   against `system.tools` (issue 1119) so an item-sourced Tool is named rather than blank;
- * - it does not de-duplicate, where the engine skips a repeated
- *   `toolId || componentId || itemUuid`;
- * - on a DUPLICATED component id the two now disagree. This one is FIRST-wins, because
- *   that is what `findById` reproduces and what every other component lookup in the
- *   codebase does. The engine's `new Map(...)` is last-wins by accident of construction
- *   — it is a whole-array transform run once, correctly out of scope for issue 1202, and
- *   deliberately left alone.
- *
- * ## Why the index (issue 1202)
- *
- * This ran once per bulk ROW and built its own whole-library `Map` before looking at the
- * run record at all, so an N-row run over an M-component library paid `N x M` to answer a
- * question that is almost always "no tools broke". The retained index is built once for
- * the array and only consulted when there IS a broken record.
+ * The tools that broke in one salvage, as `{ name, img }`, read from the run record because
+ * `salvage()` returns tool evidence only there (the runless path has none, a stated limit). It
+ * answers the question `CraftingEngine._resolveBrokenToolChatEntries` answers but is no mirror: it
+ * resolves `componentId` only, does not dedupe, and is first-wins on a duplicated component id.
+ * The index is consulted only when a record broke (issue 1202).
  */
 function brokenToolEntries(salvageRun, system) {
   const broken = (salvageRun?.usedTools || []).filter((record) => record?.broken === true);
@@ -156,13 +77,7 @@ function brokenToolEntries(salvageRun, system) {
   });
 }
 
-/**
- * How many units of the source this call actually broke down.
- *
- * The run record is preferred because it is what was really consumed; the authored
- * `ingredientQuantity` is the fallback for the runless path, where a success is known
- * to have consumed exactly that much.
- */
+/** Units consumed: the run record's, else `ingredientQuantity` on a runless success. */
 function consumedUnits(result, component, outcome) {
   const recorded = salvageRunConsumed(result?.salvageRun);
   if (recorded !== null) return recorded;
@@ -171,21 +86,8 @@ function consumedUnits(result, component, outcome) {
 }
 
 /**
- * Tell an optional listener that one more target has resolved — and NEVER let that
- * listener cost the player the rest of the batch.
- *
- * A bulk run is mid-flight document mutation: sources have been consumed, results
- * created and tools broken by the time the first tick fires. So a throw out of a
- * consumer's callback must not propagate, for the same reason `_runOne` turns a thrown
- * `salvage()` into an `error` row rather than an abort — reporting is strictly less
- * important than the twenty-four rows that have not run yet. Notification is FIRE AND
- * FORGET: the return value is ignored and never awaited, so a listener that returns a
- * promise cannot pace the loop either.
- *
- * @param {Function|null} onProgress The caller's listener, or anything that is not a
- *   function (including the `null` default), which reports nothing at all.
- * @param {number} completed Targets resolved so far, 1-based and monotonic.
- * @param {number} total Targets this run was given.
+ * Report progress fire-and-forget, absorbing a listener's throw: the batch is mid-flight
+ * mutation, so reporting must never cost the rows not yet run.
  */
 function reportBulkProgress(onProgress, completed, total) {
   if (typeof onProgress !== 'function') return;
@@ -207,30 +109,11 @@ function salvageRunConsumed(salvageRun) {
 
 export class BulkSalvageService {
   /**
-   * @param {object} options
-   * @param {Function} options.salvage The engine's `salvage(actorUuid, systemId,
-   *   componentId, options)`, already bound.
-   * @param {Function} options.getCraftingSystem `(systemId) => system|null`.
-   * @param {Function} [options.promptRollDecision] Opens the ONE bulk roll prompt and
-   *   resolves `{ confirmed, bonus, rollMode, advantage }`. Omitted (or absent) means
-   *   no prompt is possible, so every roll uses its base formula.
-   * @param {Function} [options.postChatMessage] Posts the aggregated card. It — not
-   *   this service and not the card builder — owns speaker, visibility and creation.
-   * @param {Function} [options.deliverComplications] The complication delivery writer's
-   *   `deliver({craftingSystemId, actorUuid, complications})`, already bound. Omitted means
-   *   the run still FIRES every row's complications — the firing is the engine's and happens
-   *   whatever this service does — and simply relays none of them, which is the same drop a
-   *   world with no connected GM already takes.
-   * @param {Function} [options.getPlayerResultOrder] `({scope, id}) => string[]|null`, the
-   *   executing user's stored progressive result order — the SAME seam
-   *   `CraftingEngine` captures onto a run record at start, and read with the same
-   *   `salvage:<systemId>:<componentId>` id. Consumed by {@link BulkSalvageService#forecast}
-   *   only; the run path never reads it here, because the order a row is resolved against is
-   *   the one its own run captured. Omitted means the forecast reads the authored order,
-   *   which is what an unwired caller got before.
-   * @param {Function} [options.localize] Key-only localization lookup.
-   * @param {number} [options.maxItems] Defensive selection bound; see
-   *   {@link BULK_MAX_ITEMS}.
+   * `promptRollDecision` opens the ONE bulk roll prompt (absent: base formulas); `postChatMessage`
+   * owns speaker, visibility and creation. Without `deliverComplications` the rows still fire
+   * their complications and relay none, the drop a GM-less world takes. `getPlayerResultOrder` is
+   * the engine's own seam, read with the same `salvage:<systemId>:<componentId>` id, and only the
+   * forecast reads it; a row resolves against the order its run captured.
    */
   constructor({
     salvage,
@@ -254,34 +137,12 @@ export class BulkSalvageService {
   }
 
   /**
-   * Salvage every target in order.
-   *
-   * ## THIS METHOD PERFORMS NO OWNERSHIP CHECK
-   *
-   * It receives a FACADE-DERIVED `actorUuid` per target and hands it straight to
-   * `CraftingEngine#salvage`, which — as its own docblock records — resolves the uuid
-   * through `fromUuid` and mutates that actor's Items with no ownership gate of its
-   * own. The only gate is at the facade, where `salvageComponents` takes an ACTOR ID
-   * per target and resolves it through `_resolveCraftingActor`. **No UI may plumb a
-   * uuid through to `targets[].actorUuid`**; the supported entry point is the facade,
-   * and this service is deliberately not exported onto `game.fabricate`.
-   *
-   * @param {object} params
-   * @param {Array<{actorUuid: string, actorId: string, actorName: string,
-   *   systemId: string, componentId: string}>} params.targets Targets in the order the
-   *   player sees them. Order is preserved end to end, so a report row and a card row
-   *   line up with the queue the player committed.
-   * @param {boolean} [params.interactive=true] When true the run opens ONE roll prompt
-   *   and applies the player's answer to every roll.
-   * @param {Function} [params.onProgress] Called `(completed, total)` after each target
-   *   resolves — see {@link reportBulkProgress}. OPTIONAL by design: every caller that
-   *   wants no progress simply omits it, and a run without one behaves identically.
-   *   Nothing downstream of the callback is awaited, so a listener can neither pace nor
-   *   stall a loop that is mutating documents.
-   * @returns {Promise<{cancelled: boolean, items: object[], counts: object,
-   *   posted: boolean}>} Plain models only — NEVER Item documents. A consumed source's
-   *   document is already deleted by the time this returns, so handing one back would
-   *   hand back a document that no longer exists.
+   * Salvage every target in order. NO OWNERSHIP CHECK: each `actorUuid` goes straight to
+   * `CraftingEngine#salvage`, which mutates that actor's Items ungated, so the facade's
+   * `salvageComponents` (actor ids through `_resolveCraftingActor`) is the only gate, no UI may
+   * plumb a uuid through, and this service is never exported on `game.fabricate`. `interactive`
+   * opens ONE prompt applied to every roll; `onProgress(completed, total)` is optional and never
+   * awaited. Answers plain models only, since a consumed source's document is already deleted.
    */
   async run({ targets = [], interactive = true, onProgress = null } = {}) {
     const entries = this._preflight(targets);
@@ -291,15 +152,11 @@ export class BulkSalvageService {
     if (decision.cancelled)
       return { cancelled: true, items: [], counts: countBy([]), posted: false };
 
-    // Progress is reported over EVERY entry, pre-flight skips included, rather than over
-    // `runnable`. The panel marks the rows the player queued, in this same order, so a
-    // counter that silently omitted the skipped ones would mark the wrong rows done and
-    // would stop short of its own total on any run carrying a skip.
+    // Progress counts every entry, pre-flight skips included, since the panel marks the queued
+    // rows in this order.
     let completed = 0;
     for (const entry of entries) {
-      // SEQUENTIAL BY CONTRACT — see the module docblock. Never `Promise.all`. A
-      // pre-flight-classified row never reaches the engine, but it is still one of the
-      // rows being worked through, so it advances the count like any other.
+      // SEQUENTIAL BY CONTRACT (see the module header); a skipped row still advances the count.
       if (entry.outcome === null) {
         await this._runOne(entry, { interactive, rollDecision: decision.rollDecision });
       }
@@ -308,78 +165,22 @@ export class BulkSalvageService {
     }
 
     const items = entries.map((entry) => entry.item);
-    // BESIDE the aggregate card, not per row: every row's GM requests reach the elected GM
-    // as one message. Before the card, because the relay is ordered "after the award
-    // commits, before the chat card is posted" and the aggregate card is this run's card.
+    // Beside the aggregate card as one relay, and before it: the relay is ordered "after the award
+    // commits, before the chat card is posted", and the aggregate card is this run's card.
     this._deliverComplications(entries);
     const posted = await this._postAggregateCard(entries, decision.rollDecision);
     return { cancelled: false, items, counts: countBy(items), posted };
   }
 
   /**
-   * The PRE-RUN complication forecast for a bulk selection (issue 1286): what could go
-   * wrong, per queued component, before anything is rolled or committed.
-   *
-   * ## It reuses pre-flight rather than filtering the targets itself
-   *
-   * The forecast must describe the run that would actually happen, so it is built over
-   * {@link BulkSalvageService#_preflight}'s classification and contributes only RUNNABLE
-   * rows. That is what makes it respect the selection cap for free: the 26th selected
-   * target is refused by POSITION as `bulkLimit`, so it is absent from the preview exactly
-   * as it will be absent from the run — and so are the duplicate, unknown-system,
-   * feature-disabled, unknown-component and salvage-disabled rows. A second filter here
-   * would be a second cap, and the two would drift.
-   *
-   * ## Progressive only, and in the PLAYER'S order
-   *
-   * Complications fire from an ordered progressive stage list; every other salvage mode
-   * returns null plan inputs from the engine, so a forecast for one would promise a
-   * consequence nothing can deliver. Within a row the stages are read in the player's
-   * stored order through the same `applyPlayerResultOrder` reconciliation the engine
-   * captures onto the run record, honouring `allowPlayerResultReorder: false` the same way
-   * — so the preview lists a row's complications in the order the roll will be spent down.
-   *
-   * ## What "per component" means, and what the count counts
-   *
-   * One group per queued `(systemId, componentId)`, in queue order: two selected rows of
-   * the same component on two actors are one warning, not two. Inside a group there is one
-   * entry per STAGE OCCURRENCE that carries the complication, and NO dedupe across
-   * occurrences: the runtime fires per result entry, so a component staged five times is
-   * five separate awards that can go wrong five separate ways, and an entry list that
-   * collapsed them would under-report what the run can do.
-   *
-   * `count` is the total of those entries, which is therefore a count of the firings this
-   * row could produce. It is still not a prediction across the whole run — each queued row
-   * is its own resolution, so the same complication can fire again on the next row, and the
-   * headline stays a warning rather than arithmetic.
-   *
-   * This is the same rule and the same shape the in-panel bulk block draws from the store's
-   * `attachStageComplications` output (`ui-crafting-app/spec.md` § Player Salvage Surface,
-   * _Bulk complication forecast_). The two projections read different sources for different
-   * callers; they must not read different rules.
-   *
-   * Nothing here is an audience decision of this service's own: the entries come from the
-   * player forecast projection, which is where the `gmOnly` filter lives, and this service
-   * must not grow a second copy of that rule.
-   *
-   * ## It has no caller in this repository, and that is stated rather than implied
-   *
-   * The shipped bulk "What could go wrong" block reads the queued entry the inventory store
-   * publishes, NOT this method — the same `ui-crafting-app/spec.md` bullet says so explicitly.
-   * This is the service-side projection published for a caller holding no store, and no such
-   * caller exists here yet; it is covered by tests and by that spec sentence alone. An earlier
-   * revision of this docblock claimed the surface was unshipped and that this was what it
-   * would read, and both halves were false.
-   *
-   * @param {Array<{actorId: string, actorName: string, systemId: string,
-   *   componentId: string}>} targets the selection, in the order the player sees it.
-   * @returns {{count: number, components: Array<{systemId: string|null,
-   *   componentId: string|null, name: string, img: string,
-   *   complications: Array<{id: string|null, name: string, description: string,
-   *     severity: string, visibility: string, resultId: string|null, componentId: string,
-   *     componentName: string}>}>}} `resultId` names the stage occurrence an entry hangs
-   *   off, so two entries for a component staged twice are distinguishable rather than
-   *   indistinguishable repeats.
+   * The pre-run complication forecast (issue 1286): per queued `(systemId, componentId)`, in queue
+   * order, the player-visible complications a PROGRESSIVE row could fire, one entry per stage
+   * occurrence (`resultId` tells repeats apart) in the player's stored stage order. Built over
+   * `_preflight`, so it honours the selection cap and every skip without a second filter. `count`
+   * totals the entries, a warning rather than a run-wide prediction. The rule matches the store's
+   * (`ui-crafting-app/spec.md` § Player Salvage Surface, _Bulk complication forecast_), and the
+   * audience filter lives in the forecast projection alone. No caller in this repository reads
+   * it: the shipped bulk block reads the inventory store.
    */
   forecast(targets = []) {
     const groups = new Map();
@@ -403,15 +204,8 @@ export class BulkSalvageService {
   }
 
   /**
-   * One runnable row's ordered progressive stage results, or `[]` when the row cannot
-   * produce a stage list at all.
-   *
-   * Mirrors `CraftingEngine._resolveProgressiveSalvageAward`'s ordering half exactly: the
-   * FIRST result group, reordered by the player's stored order unless the GM pinned the
-   * authored one. It stops short of the award loop, which needs a rolled budget this
-   * forecast deliberately does not have.
-   *
-   * @private
+   * One row's ordered progressive stage results: `_resolveProgressiveSalvageAward`'s ordering
+   * half, the first result group in the player's order unless the GM pinned the authored one.
    */
   _forecastStageResults(entry) {
     const salvage = entry.component?.salvage ?? null;
@@ -419,9 +213,8 @@ export class BulkSalvageService {
     const authored = Array.isArray(groups[0]?.results) ? groups[0].results : [];
     if (authored.length === 0) return authored;
     if (salvage?.allowPlayerResultReorder === false) return authored;
-    // The id space is `<systemId>:<componentId>` because component ids are not globally
-    // unique; it must match the store's write key and the engine's capture key exactly, or
-    // the forecast quietly reads the authored order while the run reads the player's.
+    // Keyed `<systemId>:<componentId>`, as component ids are not globally unique; it must match
+    // the store's write key and the engine's capture key.
     const ordered = this.getPlayerResultOrder({
       scope: 'salvage',
       id: `${entry.target?.systemId}:${entry.target?.componentId}`,
@@ -430,18 +223,8 @@ export class BulkSalvageService {
   }
 
   /**
-   * The player-visible complications one runnable row could fire, in stage order, ONE ENTRY
-   * PER STAGE OCCURRENCE.
-   *
-   * There is deliberately no dedupe. The runtime fires per result entry, so a component
-   * staged five times is five awards that can each go wrong on their own, and folding them
-   * to one entry would promise fewer consequences than the run can deliver. The pair key
-   * this method used to hold mirrored a firing rule that no longer exists.
-   *
-   * The component a stage names is the one it PRODUCES, never the component being
-   * salvaged — a complication is authored on the yield.
-   *
-   * @private
+   * One row's player-visible complications, one per stage occurrence with no dedupe, since each
+   * occurrence can go wrong on its own; a stage names the component it PRODUCES.
    */
   _forecastComplicationsFor(entry) {
     const { mode, config, unsupportedMode } = resolveSalvageCheck(entry.system);
@@ -468,24 +251,9 @@ export class BulkSalvageService {
   }
 
   /**
-   * Relay every row's complications to the elected GM as ONE message per addressed
-   * `(craftingSystemId, actorUuid)` pair (issue 1286).
-   *
-   * ## Why the grouping is by that pair and not simply "one message"
-   *
-   * The delivery payload names ONE crafting system and ONE actor, because the elected GM
-   * re-reads the authored complication from that system's record and re-authorizes that
-   * actor against the attested sender. Both are authorization inputs, so they cannot be
-   * per-entry without moving the authorization decision onto the wire. A bulk run may
-   * legitimately span actors (`salvageComponents` takes an `actorId` per target), so the
-   * honest bound is one message per distinct pair — which for the ordinary run, and for
-   * every run the rate limiter was sized against, is exactly one.
-   *
-   * Fire and forget, and guarded: the awards are committed, the run records are written and
-   * the card is about to post, so a relay failure is a lost narrative beat and must never be
-   * able to cost the player a report of what they already received.
-   *
-   * @private
+   * Relay every row's complications to the elected GM, one message per `(craftingSystemId,
+   * actorUuid)` pair, because both are authorization inputs the GM re-reads and cannot ride per
+   * entry. Fire and forget, and guarded: a relay failure must not cost the player the card.
    */
   _deliverComplications(entries) {
     if (typeof this.deliverComplications !== 'function') return;
@@ -508,14 +276,7 @@ export class BulkSalvageService {
     }
   }
 
-  /**
-   * Classify each target WITHOUT calling the engine, preserving input order.
-   *
-   * The selection bound is applied first and by POSITION, because "the 26th selected
-   * item" is refused regardless of whether it would otherwise have been runnable.
-   *
-   * @private
-   */
+  /** Classify each target without the engine, in input order; the cap goes first, by POSITION. */
   _preflight(targets) {
     const seen = new Set();
     return (targets || []).map((target, index) => {
@@ -547,23 +308,9 @@ export class BulkSalvageService {
   }
 
   /**
-   * Open the ONE roll prompt, or establish that there is nothing to prompt about.
-   *
-   * Two structural guarantees live here:
-   *
-   * - **No usable check means no prompt.** Asking a player for a situational bonus for
-   *   a batch in which nothing rolls is a dialog with no consequence.
-   * - **A dismissal returns before the FIRST `salvage()` call.** Zero mutation on
-   *   cancel is achieved structurally, by not having started, rather than by rolling
-   *   anything back — there is nothing in this domain that could be rolled back.
-   *
-   * `allowAdvantage` is computed HERE, from the crafting system's AUTHORED formula,
-   * and is all-or-nothing across the usable-check subjects: offering advantage that
-   * only some rolls could honour would be a lie about half the batch. It is
-   * deliberately not read from the listing projection, which carries no formula at all
-   * — `InventoryListingBuilder._buildSalvage` computes one and discards it.
-   *
-   * @private
+   * Open the ONE roll prompt, or not: no usable check means no prompt, and a dismissal returns
+   * before the first `salvage()`, so a cancel mutates nothing. `allowAdvantage` is all-or-nothing
+   * over the usable checks' AUTHORED formulas, which the listing projection does not carry.
    */
   async _resolveRollDecision(runnable, interactive) {
     const none = { cancelled: false, rollDecision: null };
@@ -585,10 +332,8 @@ export class BulkSalvageService {
     });
     if (!choice || choice.confirmed === false) return { cancelled: true, rollDecision: null };
 
-    // `promptCheckRoll`'s shape MINUS `confirmed`, which is what makes the engine treat
-    // it as a pre-resolved choice rather than as a fresh prompt result. Carrying
-    // `confirmed` through would be read as a cancellation by any future tightening of
-    // the evaluator's early exit.
+    // `promptCheckRoll`'s shape minus `confirmed`, so the engine reads a pre-resolved choice,
+    // never a fresh prompt result a tightened early exit could read as a cancellation.
     return {
       cancelled: false,
       rollDecision: {
@@ -599,13 +344,7 @@ export class BulkSalvageService {
     };
   }
 
-  /**
-   * Salvage one target and record what happened. NEVER throws: a thrown call becomes
-   * an `error` row and the run continues, because one bad row must not cost the player
-   * the other twenty-four.
-   *
-   * @private
-   */
+  /** Salvage one target, never throwing: a throw becomes an `error` row and the run goes on. */
   async _runOne(entry, { interactive, rollDecision }) {
     const { item } = entry;
     try {
@@ -613,14 +352,9 @@ export class BulkSalvageService {
         entry.target.actorUuid,
         entry.target.systemId,
         entry.target.componentId,
-        // `deferComplicationDelivery` is what makes a 25-row run ONE socket message rather
-        // than 25. The row still fires its own complications — each row is its own
-        // resolution — but the GM requests come back on the return for
-        // {@link BulkSalvageService#_deliverComplications} to batch. Batching is what keeps a
-        // run inside the GM-side rate limit: the relay sends one message per addressed
-        // (system, actor) pair, so a fanned-out selection is bounded by the 25-row cap rather
-        // than by the row count. A per-row emit would silently refuse the tail of a long run
-        // on a path the player never sees.
+        // Deferred, so a 25-row run is ONE socket message per (system, actor) pair rather than
+        // 25, inside the GM-side rate limit; each row still fires its own complications and
+        // returns the GM requests for `_deliverComplications` to batch.
         { interactive, rollDecision, suppressChat: true, deferComplicationDelivery: true }
       );
       const outcome = classifySalvageOutcome(result);
@@ -629,11 +363,8 @@ export class BulkSalvageService {
       entry.outcome = outcome;
       item.outcome = outcome;
       item.message = result?.message ?? '';
-      // A progressive check overwrites `value` with the AWARDING value on a forced
-      // crit, so the raw `data.total` is preferred wherever a run record carries it —
-      // the same precedence `rollTotalForCard` applies in `craftCardFields`. The
-      // top-level `value` is the last resort because `salvage()` threads it only on
-      // the SUCCESS return; a rolled failure's total is reachable only through the run.
+      // The raw `data.total` first, since a forced crit overwrites `value` (as `rollTotalForCard`
+      // reads it); the top-level `value` last, since `salvage()` threads it only on success.
       item.rollValue = firstFinite(
         salvageRun?.checkResult?.data?.total,
         salvageRun?.checkResult?.value,
@@ -646,12 +377,8 @@ export class BulkSalvageService {
         quantity: created.quantity,
       }));
       item.tools = brokenToolEntries(salvageRun, entry.system);
-      // The addressing-only GM requests, held on the ENTRY rather than the item: they are
-      // not report rows and must never reach the card model. The player-visible fired
-      // complications go on the ITEM, already redacted by the engine through
-      // `publicComplications`, and gain the component name the aggregate card names them by
-      // — a bulk card lists many components, so an unattributed complication row cannot be
-      // reconciled with the results table above it.
+      // GM requests stay on the ENTRY, never the card model; the engine-redacted player
+      // complications go on the ITEM with the component name the bulk card attributes them by.
       entry.complicationRequests = result?.complicationRequests ?? [];
       item.complications = (result?.complications || []).map((complication) => ({
         ...complication,
@@ -672,21 +399,8 @@ export class BulkSalvageService {
   }
 
   /**
-   * Build and post the ONE aggregated card.
-   *
-   * ## The `chatOutput` gate is PER SYSTEM, and applied here
-   *
-   * A run can span crafting systems, and each system's GM decides independently
-   * whether Fabricate narrates to chat. So a subject appears on the card iff ITS OWN
-   * system has `features.chatOutput === true`, and when no subject qualifies nothing
-   * is posted at all — not an empty card. This is the service's job rather than the
-   * card builder's because only the service holds the crafting systems; the builder is
-   * pure.
-   *
-   * A `skipped` row never reached the engine and so has nothing to tell the table; it
-   * belongs to the in-panel report only.
-   *
-   * @private
+   * Build and post the ONE aggregated card. The `chatOutput` gate is per system: a subject appears
+   * only when its own system narrates, and with none nothing posts. A skipped row stays in-panel.
    */
   async _postAggregateCard(entries, rollDecision) {
     if (typeof this.postChatMessage !== 'function') return false;
@@ -715,12 +429,8 @@ export class BulkSalvageService {
         results: sumChatEntriesByName(subjects.flatMap((item) => item.results)),
         consumed: sumChatEntriesByName(subjects.flatMap((item) => item.consumed)),
         tools: dedupeTools(subjects.flatMap((item) => item.tools)),
-        // Every row's PLAYER-VISIBLE complications, in run order and NOT deduped: they ride
-        // this card because a bulk salvage is not one resolution — each row has its own run
-        // record — so there is no single run to hang them on. Already redacted by the engine
-        // through `publicComplications`, so a `gmOnly` complication cannot be here even when
-        // a GM is the acting user; this service holds no audience filter of its own and must
-        // not grow one, or the disclosure guarantee would live in two places.
+        // Every row's engine-redacted player complications, in run order and undeduped (each row
+        // is its own run); this service holds no audience filter and must not grow one.
         complications: subjects.flatMap((item) => item.complications || []),
       },
       this.localize
@@ -729,15 +439,11 @@ export class BulkSalvageService {
     try {
       await this.postChatMessage({
         content,
-        // The legacy roll-mode token the player chose, or null when nothing prompted.
-        // The POSTER owns the version edge that decides which applier receives it and
-        // in which vocabulary, and owns the fallback to the client's `core.rollMode`
-        // when this is null. Translating here would put that decision in two places.
+        // The legacy token the player chose, or null; the poster owns the version edge and the
+        // `core.rollMode` fallback.
         rollMode: rollDecision?.rollMode ?? null,
-        // A one-actor run speaks AS that actor. A run spanning actors has no single
-        // speaker, so the poster falls back to an explicit alias with the acting user
-        // rather than letting `getSpeaker` infer one from controlled tokens — which
-        // would attribute the card to whatever unrelated NPC a GM had selected.
+        // One actor speaks as itself; several get an explicit alias from the poster, never
+        // `getSpeaker`'s guess from controlled tokens.
         actorUuid: actorUuids.size === 1 ? [...actorUuids][0] : null,
         actorNames,
       });
@@ -794,11 +500,7 @@ function countBy(items) {
   return counts;
 }
 
-/**
- * The card's roll-up: `succeeded` only when every row succeeded, `failed` when none
- * did, `mixed` otherwise. `mixed` rather than `partial`, which already names a
- * progressive award mode.
- */
+/** `succeeded` if all did, `failed` if none did, else `mixed` (`partial` names an award mode). */
 function rollUpStatus(items) {
   const succeeded = items.filter((item) => item.outcome === 'succeeded').length;
   if (succeeded === items.length) return 'succeeded';

@@ -1,6 +1,6 @@
 /**
- * Orchestrates importing crafting systems and recipes from pack JSON data.
- * Handles UUID remapping with deterministic precedence and fallback item ID management.
+ * Imports a crafting system and its recipes from pack JSON, remapping component source UUIDs by
+ * deterministic precedence and merging the world slices (`openspec/specs/import-export/spec.md`).
  */
 import { normalizeWorldCurrencyConfig } from './currencyProfile.js';
 import { validateGatheringDropReferences } from './GatheringDropReferenceValidator.js';
@@ -40,10 +40,7 @@ const SCOPE_OWNER_TYPES = Object.freeze({
 /** How often (in recipes processed) Phase 4 emits an interim progress tick. */
 const RECIPE_PROGRESS_INTERVAL = 10;
 
-/**
- * Sentinel cached against a pack whose `getIndex` rejected, so a broken pack is
- * skipped once per import run rather than retried for every unresolved component.
- */
+/** Cached for a pack whose `getIndex` rejected, skipping it once per run, not per component. */
 const PACK_LOOKUP_SKIP = Symbol('pack-lookup-skip');
 
 /** The records of a payload-supplied report array, or none. */
@@ -61,42 +58,12 @@ function clampProgressFraction(pct) {
 }
 
 /**
- * Build the default V13 progress-notification reporter used when no `reportProgress`
- * seam is injected. `ui.notifications.info(msg, { progress: true, console: false })`
- * returns a handle whose `handle.update({ pct, message })` advances the bar (`pct` on
- * `[0, 1]`); it superseded `SceneNavigation.displayProgressBar`. `console: false`
- * matches the native scene loader and stops every progress tick from writing a
- * `console.info` line.
- *
- * The returned value is a callable reporter that ALSO owns the toast lifecycle: it is
- * the single owner of its notification handle, and it carries an idempotent `dismiss()`
- * terminal seam so an abnormal exit can finalize the still-open toast. The reporter is
- * stateful (it lazily opens ONE toast on first call, updates it thereafter, and tracks
- * `started`/`completed`) and carries the required guards:
- *   1. Undefined-handle / test-stub safety — when `info` is absent or returns a falsy
- *      handle (or a handle without `.update`), it degrades to a no-op rather than
- *      throwing (the test harness stubs `info` as `() => {}`, returning `undefined`).
- *   2. update-before-render safety — a progress toast queued behind the visible-toast
- *      cap may not be rendered when `.update()` is first called, which can throw; the
- *      call is wrapped in try/catch and degrades silently.
- *   3. Completion at `pct: 1` — a progress toast is exempt from the normal lifetime and
- *      only self-dismisses when it reaches `pct: 1`, so callers MUST finish at `pct: 1`;
- *      reaching `pct: 1` sets `completed`, after which `dismiss()` stands down (the toast
- *      already scheduled its own 500ms self-remove, so there is no double-remove race).
- *
- * `dismiss()` guarantees a terminal state on an exit that never reached `pct: 1`
- * (e.g. an import that throws mid-pipeline). It is a no-op when the reporter never
- * started or already completed; otherwise it removes the still-open toast via the
- * handle's own `handle.remove()` — NOT the `ui.notifications.remove(handle)` class
- * method, which throws on an undefined or stubbed handle, whereas `handle.remove()` is
- * reached only past the falsy/`remove`-method guard below. `handle.remove()` is also
- * immediate and queue-safe: it splices the notify queue without touching the DOM,
- * unlike `update({ pct: 1 })`, which would flash the bar to a misleading SUCCESS state
- * and can throw on an un-rendered toast. The removal call mirrors the existing guards:
- * a falsy handle, a missing `remove` method, or a teardown throw all degrade to a
- * no-op.
- *
- * @returns {((update: { pct?: number, message?: string, phase?: string }) => void) & { dismiss: () => void }}
+ * The default progress reporter: one lazily opened `ui.notifications.info(msg, { progress: true,
+ * console: false })` toast, advanced through its handle (the API and its guards are in
+ * `.agents/docs/foundry-and-architecture.md`). A missing or stub handle, and an `update` on a
+ * toast not yet rendered, degrade to a no-op. Callers must finish at `pct: 1`, where the toast
+ * self-dismisses; the idempotent `dismiss()` removes a toast an abnormal exit left open, through
+ * `handle.remove()`, and stands down once `pct: 1` was reached.
  */
 export function createDefaultProgressReporter() {
   let handle = null;
@@ -117,31 +84,26 @@ export function createDefaultProgressReporter() {
       }
     }
 
-    // `clampProgressFraction` returns a literal `1` at/above the cap, so this boundary
-    // has no float-drift risk; reaching it marks the run complete (the toast self-
-    // dismisses at strict `pct === 1`) so a later `dismiss()` stands down.
+    // `clampProgressFraction` returns a literal `1` at the cap, so reaching it marks completion.
     if (fraction === 1) completed = true;
 
     if (!handle || typeof handle.update !== 'function') return;
     try {
       handle.update({ pct: fraction, message });
     } catch {
-      // Toast not yet rendered (queued behind the visible-toast cap): degrade to a
-      // no-op tick rather than throwing out of the import loop.
+      // Not yet rendered (queued behind the visible-toast cap): degrade to a no-op tick.
     }
   }
 
   reportProgress.dismiss = function dismiss() {
-    // No-op when the toast never opened, or already reached pct:1 (where it scheduled
-    // its own self-remove). Idempotent: `completed` is latched before the removal so a
-    // repeat call — or a removal throw — cannot re-enter the removal path.
+    // `completed` latches before the removal, so a repeat call or a removal throw cannot re-enter.
     if (!started || completed) return;
     completed = true;
     if (!handle || typeof handle.remove !== 'function') return;
     try {
       handle.remove();
     } catch {
-      // Teardown on an un-rendered / queued toast can throw: degrade to a no-op.
+      // Teardown on an unrendered toast can throw: degrade to a no-op.
     }
   };
 
@@ -149,10 +111,8 @@ export function createDefaultProgressReporter() {
 }
 
 /**
- * Default external-reference resolver. Wraps the async `fromUuid` (NOT
- * `fromUuidSync`, which only reliably resolves cached world docs). Returns
- * `{ uuid }` when the document exists, else `null` (absent). Throws on a
- * malformed UUID, so the caller wraps in try/catch → treated as absent.
+ * The default external-reference resolver: async `fromUuid` (`fromUuidSync` reliably resolves only
+ * cached world documents), answering `{ uuid }` or `null`; a malformed UUID throws for the caller.
  */
 async function defaultResolveExternalUuid(uuid) {
   if (!uuid) return null;
@@ -161,23 +121,11 @@ async function defaultResolveExternalUuid(uuid) {
 }
 
 /**
- * Upcast a component's pre-`1.16.0` source-reference field names to their
- * renamed post-1.16.0 forms so a legacy-named component resolves, classifies, and
- * persists per spec (`openspec/specs/import-export/spec.md:70`). Tool and
- * recipe-item-definition import paths already accept the legacy names; components
- * were the gap.
- *
- * The rename is DELETE-AND-RENAME, never an additive spread: `_normalizeComponent`
- * prefers any present `aliasItemUuids` array, so leaving `fallbackItemIds` beside a
- * new (or empty) `aliasItemUuids` reproduces exactly the shadowing bug this fixes.
- * New names WIN when both are present (a post-rename export carries the new names).
- * Scoped to component records only — the same field names denote unrelated persisted
- * concepts elsewhere (RegionBehaviour schema field, essence `sourceItemUuid`,
- * actor-flag provenance), so this must not be a codemod on the literal string.
- *
- * @param {object} component
- * @returns {object} the component with legacy source fields renamed (a copy when a
- *   rename happened, otherwise the original reference)
+ * Rename a component's pre-`1.16.0` source-reference fields to their current names
+ * (`import-export/spec.md` § Reference handling), returning a copy when anything moved. A
+ * DELETE-AND-RENAME, never an additive spread, since a leftover `fallbackItemIds` beside
+ * `aliasItemUuids` shadows it; a present new name wins. Components only: the same field names mean
+ * unrelated things elsewhere.
  */
 function upcastComponentSourceFields(component) {
   if (!component || typeof component !== 'object') return component;
@@ -206,31 +154,10 @@ function upcastComponentSourceFields(component) {
 }
 
 /**
- * A thin delegating view of ONE world-scope entity store, resolved on every call (issue 1364).
- *
- * IT LIVES BESIDE THE IMPORTER RATHER THAN AT THE WIRING SITE, because the rule it encodes is
- * this importer's: the world-scope merge FAILS CLOSED, so an absent store is skipped silently and
- * a seam that answered anything optimistic would turn "merged nothing" into "reported success".
- * Keeping the adapter next to `_scopeStore` is what stops the two halves of that contract drifting
- * apart, and it is what lets a test exercise the SHIPPED delegator instead of a copy of it.
- *
- * It exists at all for the reason the importer's `environmentStore` delegator does: the seam is
- * built while the field it names may not be assigned yet, so it closes over a READ rather than
- * over a value. Closing over the FIELD rather than an accessor NAME is also what distinguishes it
- * from the `game.fabricate` accessor mirror it replaced — a rename here is a rename of a property
- * the wiring site reads, not of a string in a hand-maintained table.
- *
- * `isSeeded` answers a strict `true` only when a real store says so, so an unassigned field is
- * indistinguishable from an unmigrated world and the merge is skipped — which also means `save` is
- * unreachable without a real store behind it.
- *
- * The three methods are exactly what the world-scope merge calls. It is a shared factory rather
- * than three inline literals at the wiring site because three near-identical blocks are what the
- * duplication gate counts.
- *
- * @param {() => object|null|undefined} resolve Reads the owning field at call time.
- * @returns {{isSeeded: (subKey: string) => boolean, get: () => object|null,
- *   save: (value: object) => Promise<unknown>|undefined}}
+ * A delegating view of one world-scope entity store, resolved on every call (issue 1364), because
+ * the wiring site builds the seam before the field it reads may be assigned. It lives here since
+ * the merge FAILS CLOSED: `isSeeded` is strictly `true` only when a real store says so, so an
+ * unassigned field reads as an unmigrated world, the merge is skipped and `save` is unreachable.
  */
 export function scopeStoreDelegate(resolve) {
   return {
@@ -242,22 +169,9 @@ export function scopeStoreDelegate(resolve) {
 
 export class CompendiumImporter {
   /**
-   * @param {object} craftingSystemManager
-   * @param {object} recipeManager
-   * @param {object} [seams]
-   * @param {object} [seams.environmentStore] - GatheringEnvironmentStore seam (list/save)
-   * @param {object} [seams.travelStore] - GatheringRealmStore seam (get/save), preferred over the
-   *   raw setting pair for the world travel merge (issue 1858)
-   * @param {(key: string) => *} [seams.getSetting] - World-setting reader (gatheringConfig)
-   * @param {(key: string, value: *) => Promise<*>} [seams.setSetting] - World-setting writer
-   * @param {() => boolean} [seams.isGM] - GM predicate (F3 fail-fast gate)
-   * @param {(uuid: string) => Promise<null | { uuid: string }>} [seams.resolveExternalUuid]
-   * @param {(update: { pct?: number, message?: string, phase?: string }) => void} [seams.reportProgress]
-   *   Live-progress sink called at phase boundaries, every N recipes, and on completion.
-   *   Defaults to the Foundry V13 progress-notification factory so the caller wires nothing.
-   * @param {object} [seams.componentScopeStore] World COMPONENT scope store (issue 1364)
-   * @param {object} [seams.essenceScopeStore] World ESSENCE scope store (issue 1364)
-   * @param {object} [seams.toolScopeStore] World TOOL scope store (issue 1364)
+   * `reportProgress` defaults to a fresh `createDefaultProgressReporter` per run; the three
+   * `*ScopeStore` seams are the world-scope entity stores (issue 1364), and `travelStore` is
+   * preferred over the raw setting pair for the travel merge (issue 1858).
    */
   constructor(craftingSystemManager, recipeManager, seams = {}) {
     this._craftingSystemManager = craftingSystemManager;
@@ -266,8 +180,7 @@ export class CompendiumImporter {
     this._travelStore = seams.travelStore ?? null;
     this._getSetting = seams.getSetting ?? null;
     this._setSetting = seams.setSetting ?? null;
-    // Enforce the GM gate whenever a Foundry `game.user` is present; pure tests
-    // that never install `game.user` are allowed through.
+    // The GM gate applies whenever a Foundry `game.user` is present; pure tests pass through.
     this._isGM =
       seams.isGM ??
       (() => {
@@ -275,12 +188,8 @@ export class CompendiumImporter {
         return g?.user ? g.user.isGM === true : true;
       });
     this._resolveExternalUuid = seams.resolveExternalUuid ?? defaultResolveExternalUuid;
-    // Store the injected seam (or null). The DEFAULT reporter is stateful — it opens
-    // and then drives a single toast — and this importer is a long-lived singleton in
-    // main.js reused across imports, so the default MUST be constructed per RUN (see
-    // importFromPackData) rather than once here; otherwise a second import would try to
-    // update the first run's already-dismissed toast. An injected seam is stateless and
-    // is reused as-is.
+    // The default reporter is stateful and this importer is a long-lived singleton, so the default
+    // is built per RUN in `importFromPackData`, never here; an injected seam is reused as-is.
     this._reportProgress = seams.reportProgress ?? null;
     this._activeProgressReporter = null;
     // The three world-scope entity stores (issue 1364), injected exactly as `environmentStore` is.
@@ -292,52 +201,28 @@ export class CompendiumImporter {
   }
 
   /**
-   * One world-scope entity store, or `null`.
-   *
-   * IT FAILS CLOSED and never constructs one of its own. Synthesizing a store would hand the merge
-   * a fabricated, UNSEEDED destination — and an unseeded destination is exactly the state whose
-   * first write flips a whole world's Valid Id Basis from UNKNOWN to KNOWN. `_persistCharacterLibraries`
-   * returns early on an absent seam for the same reason.
-   *
-   * **IT IS THE INJECTED SEAM ALONE, WITH NO `game.fabricate` FALLBACK, AND THE ABSENCE IS
-   * DELIBERATE.** A lazy accessor lookup keyed on a hand-maintained mirror of `game.fabricate`'s
-   * method names looks like belt-and-braces and is the opposite: because the merge fails closed,
-   * a mirror that drifts — a renamed accessor, a moved store — makes every world-scope import
-   * silently merge NOTHING and still report success, and no test can see the difference between
-   * that and a correct fallback. Both production call sites inject the three stores explicitly and
-   * are pinned by a source contract, which is a guard that can fail.
-   *
-   * @param {'components'|'essences'|'tools'} entityType
-   * @returns {object|null}
-   * @private
+   * One world-scope entity store, or `null`: the injected seam alone, FAILING CLOSED, never a
+   * synthesized store (whose first write would flip the world's Valid Id Basis to KNOWN) and never
+   * a `game.fabricate` fallback, whose drift would make every import silently merge nothing. Both
+   * production call sites inject the stores, pinned by a source contract.
    */
   _scopeStore(entityType) {
     return this._scopeStoreSeams[entityType] ?? null;
   }
 
   /**
-   * Import a crafting system and recipes from pack JSON data.
-   *
-   * @param {object} packData - Pack JSON (must have a `system` field; `recipes` is optional)
-   * @param {object} [options]
-   * @param {boolean} [options.overwriteExisting=false] - Overwrite system/recipes if they exist
-   * @param {boolean} [options.retainFallbackIds=true] - Keep existing aliasItemUuids on re-import
-   * @param {object} [options.additionalFallbackIds={}] - Map of componentId -> string[] extra fallbacks
-   * @param {string[]} [options.targetPackIds=[]] - Limit source+name search to specific pack IDs
-   * @returns {Promise<object>} Structured import summary
-   * @throws Re-throws the original error UNCHANGED (no wrapping, no swallow) when a phase
-   *   after the `pct:0` start emit fails, after invoking the active reporter's terminal
-   *   `dismiss()` so the still-open progress toast is torn down and a failed import never
-   *   orphans the bar on screen until reload.
+   * Import a crafting system and its recipes from pack JSON, answering a structured summary.
+   * `retainFallbackIds` keeps existing `aliasItemUuids`; `additionalFallbackIds` maps component
+   * ids to extra ones; `targetPackIds` limits the source+name search. A phase failing after the
+   * `pct: 0` emit dismisses the progress toast and re-throws the original error unchanged.
    */
   async importFromPackData(packData, options = {}) {
     if (!packData || typeof packData !== 'object' || !packData.system) {
       throw new Error('Invalid pack data: missing required "system" field');
     }
 
-    // F3 — GM gate first: fail fast before ANY world-scope write. A non-GM
-    // `game.settings.set` on world scope is server-rejected in V13, which would
-    // leave a partial system + rejected writes if not gated here.
+    // GM gate first, before ANY world-scope write: the server rejects a non-GM world-setting
+    // write, which would leave a partial system.
     if (!this._isGM()) {
       throw new Error('Only a GM can import a crafting system (world-scope write).');
     }
@@ -357,31 +242,21 @@ export class CompendiumImporter {
       components: { total: 0, remapped: [], retained: [], unresolved: [] },
       recipes: { total: recipesData.length, imported: 0, skipped: 0, pruned: 0, errors: [] },
       collisions: [],
-      // Orphan candidates surfaced under overwrite: recipes belonging to the target
-      // system that are absent from the incoming payload. Each carries a `disposition`
-      // (`pruned` for auto-removed provenance-matched recipes, `reported` for preserved
-      // GM-authored / legacy / foreign-provenance candidates).
+      // Recipes of the target system absent from the payload, under overwrite: `pruned` when
+      // provenance-matched, else `reported`.
       orphans: [],
-      // Structured cross-reference report surfaced to the GM (source items,
-      // scenes, scene-regions, macros, drop-row items, broken internal links).
+      // The cross-reference report surfaced to the GM.
       unresolvedReferences: [],
     };
 
-    // Fresh progress reporter per RUN: the default reporter carries per-toast state,
-    // and this importer instance is reused across imports (main.js singleton), so a new
-    // reporter is built here for each run. An injected seam is reused directly.
+    // A fresh reporter per RUN, since the default carries per-toast state.
     this._activeProgressReporter = this._reportProgress ?? createDefaultProgressReporter();
 
     const systemLabel = summary.system.name || 'crafting system';
     this._emitProgress({ pct: 0, phase: 'start', message: `Importing ${systemLabel}…` });
 
-    // Guarantee a terminal reporter state on EVERY exit path. This try wraps the phase
-    // body AFTER the pct:0 start emit, so its catch targets THIS run's freshly-assigned
-    // `_activeProgressReporter`, never a stale prior-run reporter on the instance field.
-    // A progress toast self-dismisses only at pct:1, so a throw before the pct:1
-    // completion emit would otherwise leave the bar frozen until reload; the catch
-    // dismisses the still-open toast and then RE-THROWS the original error UNCHANGED so
-    // the UI caller still surfaces the real failure (its distinct `Import failed:` toast).
+    // Every exit after the `pct: 0` emit ends the toast: a throw dismisses THIS run's reporter and
+    // re-throws the original error, so the UI still surfaces the real failure.
     try {
       // --- Phase 1: Resolve existing system ---
       const existingSystem = this._findExistingSystem(systemData);
@@ -428,24 +303,13 @@ export class CompendiumImporter {
       const systemInput = { ...systemData, components: remappedComponents };
       await this._validateGatheringConfig(systemInput);
 
-      // ORDER IS LOAD-BEARING (issue 1308): the world character libraries are merged BEFORE the
-      // system is created or updated, unlike the currency and travel slices, which are persisted
-      // last because nothing reads them during normalization.
-      //
-      // These two ARE read during normalization. `_normalizeSystem` derives its Valid Id Basis
-      // from the world libraries, so a system created while the incoming entries are still only
-      // in the payload would have every tool prerequisite reference and every default modifier id
-      // pruned against a basis that cannot yet see them. Merging first is what makes a copy-mode
-      // import of a bundle authored in another world land with its references intact.
+      // ORDER IS LOAD-BEARING (issue 1308): the character libraries merge BEFORE the system is
+      // created or updated, since `_normalizeSystem` derives its Valid Id Basis from them and would
+      // prune every incoming reference; currency and travel persist last, unread by normalization.
       await this._persistCharacterLibraries(packData.characterLibraries);
 
-      // The world-scope entity ROSTERS and DEFAULTS (issue 1364), merged in the same slot and for
-      // the same reason: `_normalizeSystem` derives its Valid Id Basis from the `entities` sub-key
-      // on every normalize, so a system created while the incoming world entities are still only
-      // in the payload would have every essence quantity pruned against a basis that cannot yet
-      // see them. The MEMBERSHIP layer cannot be merged here — the destination's system id does
-      // not exist until `createSystem` runs below — so it lands immediately after, which is why
-      // this merge is split rather than atomic.
+      // The world-scope rosters and defaults merge in the same slot for the same reason (issue
+      // 1364); memberships need the destination system id, so they land after `createSystem`.
       summary.unresolvedReferences.push(...arrayOfRecords(packData.worldScopeReferences));
       await this._persistScopedEntityRosters(packData, summary);
 
@@ -461,32 +325,23 @@ export class CompendiumImporter {
           resolution: 'overwritten',
         });
       } else {
-        // Force the pack's system ID if provided so cross-references remain stable
         system = await this._craftingSystemManager.createSystem(systemInput);
         summary.system.id = system.id;
         summary.system.name = system.name;
         summary.system.created = true;
       }
 
-      // The MEMBERSHIP layer, now that the destination's system id exists. Every incoming record's
-      // `systemId` is rewritten to it, in BOTH modes: copy-mode import removed the payload's id,
-      // and a keep-mode overwrite may have resolved an existing system by NAME under a different
-      // one, so the payload's id is the destination's in neither.
+      // Every membership's `systemId` is rewritten to the destination's in BOTH modes: copy mode
+      // removed the payload's id, and a keep-mode overwrite may have matched a system by NAME.
       await this._persistScopedEntityMemberships(packData, system.id, summary);
 
-      // Provenance key for recipe import stamping (issue 775): the pack's own stable
-      // identity when the payload carries one (keep-mode — preserved across reinstalls of
-      // the same pack, which is what makes provenance-matched pruning correct on the NEXT
-      // reinstall), else the freshly-created system id (copy-mode / id-less payloads,
-      // where the stamp is inert because copy never overwrites an existing system).
+      // Provenance (issue 775): the pack's own id when present, stable across reinstalls, which is
+      // what makes the next reinstall's pruning correct; else the new id (copy mode, inert).
       const packSystemId = systemData.id || system.id;
 
       // --- Phase 4: Import recipes ---
-      // Each recipe mutates the in-memory recipe map only (persist:false); the whole
-      // batch is flushed with ONE `save()` after the loop, collapsing N growing
-      // whole-array `recipes` world writes to a single write. Per-recipe error
-      // isolation is unchanged (the try/catch still runs per recipe), and a caught
-      // failure leaves earlier successes in the map for the final `save()` to persist.
+      // Each recipe mutates the in-memory map only (`persist: false`), flushed by ONE `save()`
+      // after the loop; a failed recipe is isolated and earlier successes still persist.
       const totalRecipes = recipesData.length;
       let processedRecipes = 0;
       for (const recipeData of recipesData) {
@@ -496,9 +351,8 @@ export class CompendiumImporter {
             recipeData.craftingSystemId === '__SYSTEM_ID__'
               ? system.id
               : recipeData.craftingSystemId || system.id,
-          // ALWAYS re-stamp provenance (issue 775), discarding any inbound `importSource`,
-          // so it self-heals across re-export/re-import chains and across a stale/foreign
-          // inbound value. A "stamp only when null" shortcut would be wrong.
+          // ALWAYS re-stamp provenance (issue 775), discarding any inbound `importSource`, so it
+          // self-heals across re-export chains.
           importSource: { systemId: packSystemId, importedAt: Date.now() },
         };
 
@@ -550,10 +404,7 @@ export class CompendiumImporter {
       }
 
       // --- Phase 4b: Prune provenance-matched orphans (overwrite of an existing system) ---
-      // Only ever runs in the `existingSystem && overwriteExisting` path: a copy-mode /
-      // fresh-system import mints a new id and has no persisted recipes to overwrite, so
-      // there is never an orphan to prune. Deletes mutate the in-memory map only
-      // (persist:false), folding into the single post-loop save below.
+      // Only an overwrite can orphan a recipe; the deletes fold into the one save below.
       if (existingSystem && overwriteExisting) {
         this._emitProgress({
           pct: 0.92,
@@ -563,27 +414,14 @@ export class CompendiumImporter {
         await this._pruneOrphanedRecipes(system, recipesData, packSystemId, summary);
       }
 
-      // Single batched persist for the whole recipe phase. Widened from `imported > 0` so
-      // a prune-only reinstall (payload drops recipes but adds none, imported === 0) still
-      // writes; an overwrite that imports and prunes NOTHING still writes nothing.
-      // Optional-chained so a synchronous-storing mock recipe manager (which never needs a
-      // settings flush) is a no-op here; the real RecipeManager always defines `save`, so
-      // production still issues one write.
+      // One batched persist, also after a prune-only reinstall; optional for a mock manager.
       if (summary.recipes.imported > 0 || summary.recipes.pruned > 0) {
         await this._recipeManager.save?.();
       }
 
-      // ONE bulk actor-flag cleanup pass after the prune batch (F1, the deleteSystem
-      // precedent): reconciles invalid-run and learned-recipe flags against the
-      // post-deletion map in O(affected actors), not O(pruned × actors). Independent of
-      // the `recipes` write above, so it runs after the single save.
-      //
-      // The pruned ids are NAMED (issue 1226). This is a destructive door the flag-cleanup
-      // gate covers, and the ids are what it prunes when the corpus cannot be attested
-      // complete — without them a reinstall against a half-converted world would leave
-      // every flag its own prune orphaned. `_pruneOrphanedRecipes` records each one it
-      // actually deleted as a `pruned` orphan, so this is derived from what happened rather
-      // than from what was planned.
+      // ONE bulk flag cleanup after the prune (the `deleteSystem` precedent), naming the ids it
+      // actually pruned (issue 1226): the gate prunes exactly those when the corpus cannot be
+      // attested complete.
       if (summary.recipes.pruned > 0) {
         await this._recipeManager.cleanupOrphanedRecipeFlags?.({
           removedRecipeIds: summary.orphans
@@ -608,36 +446,23 @@ export class CompendiumImporter {
       // Fold the component source-item resolution into the unified reference report.
       this._foldComponentReferences(summary);
 
-      // Completion MUST reach pct:1 — a progress toast is lifetime-exempt and only
-      // self-dismisses at pct:1, so anything less leaves the bar on screen.
+      // Completion MUST reach `pct: 1`, the only point a progress toast self-dismisses.
       this._emitProgress({ pct: 1, phase: 'complete', message: `Imported ${systemLabel}` });
 
       return summary;
     } catch (error) {
-      // Terminal-on-throw: finalize the still-open progress indicator (no-op on the
-      // success/skip paths, which already reached pct:1), then re-throw the ORIGINAL
-      // error unchanged — no wrapping, no swallow.
+      // Terminal on throw: close the still-open toast, then re-throw the original error.
       this._activeProgressReporter?.dismiss?.();
       throw error;
     }
   }
 
-  /**
-   * Emit a single progress update through the injected/defaulted `reportProgress`
-   * seam. Clamps `pct` into `[0, 1]` so the completion contract holds regardless of
-   * caller arithmetic.
-   * @private
-   */
+  /** Emit one progress update, clamping `pct` into `[0, 1]`. */
   _emitProgress({ pct, message, phase } = {}) {
     this._activeProgressReporter?.({ pct: clampProgressFraction(pct), message, phase });
   }
 
-  /**
-   * Emit an interim recipe-phase progress tick every `RECIPE_PROGRESS_INTERVAL`
-   * recipes (and on the final recipe), mapping recipe progress onto the `[0.25, 0.9]`
-   * span reserved for Phase 4.
-   * @private
-   */
+  /** A recipe-phase tick every `RECIPE_PROGRESS_INTERVAL` recipes and the last, on [0.25, 0.9]. */
   _maybeEmitRecipeProgress(processed, total) {
     if (total <= 0) return;
     if (processed % RECIPE_PROGRESS_INTERVAL !== 0 && processed !== total) return;
@@ -650,19 +475,10 @@ export class CompendiumImporter {
   }
 
   /**
-   * Prune provenance-matched orphans after an overwrite import (issue 775). Enumerate
-   * the target system's persisted recipes that are ABSENT from the incoming payload,
-   * partition them by provenance, auto-delete the ones stamped by THIS pack (mutating
-   * the in-memory map only, so the deletions fold into the single post-loop save), and
-   * record every candidate in `summary.orphans` with its disposition:
-   *   - provenance-matched (`importSource.systemId === packSystemId`) → auto-pruned;
-   *   - unprovenanced (`importSource == null`, GM-authored or pre-provenance legacy) → kept + reported;
-   *   - foreign-provenance (`importSource.systemId` set but ≠ packSystemId) → kept + reported.
-   *
-   * The absent-set is derived from ALL payload recipe ids — NOT the successfully
-   * imported ids — so a payload recipe whose overwrite THREW (per-recipe error
-   * isolation) is still "shipped" and is never pruned (data-loss guard).
-   * @private
+   * Prune provenance-matched orphans after an overwrite (issue 775): each persisted recipe of the
+   * system absent from the payload is deleted when stamped by THIS pack, and otherwise kept and
+   * reported (`unprovenanced` or `foreignProvenance`). Absence is judged against EVERY payload id,
+   * so a recipe whose overwrite threw is never pruned.
    */
   async _pruneOrphanedRecipes(system, recipesData, packSystemId, summary) {
     const payloadIds = new Set(
@@ -701,10 +517,8 @@ export class CompendiumImporter {
   }
 
   /**
-   * Import the gathering-authoring bundle for the (possibly freshly-created)
-   * system: rebind container ids, resolve/report references, merge the world realm library,
-   * persist environments via replace-by-system-id (F1), and merge the gatheringConfig slice.
-   * @private
+   * The gathering authoring bundle: rebind environments to the system, resolve and report
+   * references, then merge the realm library, gathering config and environments.
    */
   async _importGatheringAuthoring(packData, system, recipesData, summary) {
     const environments = Array.isArray(packData.gatheringEnvironments)
@@ -715,20 +529,13 @@ export class CompendiumImporter {
         ? structuredClone(packData.gatheringConfig)
         : null;
 
-    // F2 — copy-mode container rebind BEFORE persistence: point every
-    // environment at the (possibly newly generated) system id and rekey the
-    // config slice under it. Task/event/modifier ids are preserved (D3).
+    // Point every environment at the (possibly new) system id; task, event and modifier ids stay.
     for (const env of environments) {
       if (env && typeof env === 'object') env.craftingSystemId = system.id;
     }
 
-    // Resolve + classify references (external existence + broken-internal), then
-    // report them. Realm scene refs live on the already-created system; the
-    // default resolver never rewrites external UUIDs, so they are reported only.
-    // The realm library rides the ENVELOPE since issue 1282, so it is handed to the resolver
-    // alongside the rest: every realm's `sceneMappings[]` carries a scene and scene-region UUID
-    // that the destination world may not have, and dropping it here is what would silently stop
-    // those being reported.
+    // The realm library rides the envelope (issue 1282), handed to the resolver so its scene and
+    // region UUIDs are reported; the default resolver never rewrites an external UUID.
     const travelConfig =
       packData.travelConfig && typeof packData.travelConfig === 'object'
         ? structuredClone(packData.travelConfig)
@@ -751,16 +558,8 @@ export class CompendiumImporter {
       : [];
     const resolvedConfig = resolved.gatheringConfig;
 
-    // The task LIBRARY lands before the environments that reference it. An environment's
-    // enable gate asks whether it composes at least one task, and in automatic mode that
-    // question can only be answered against the library — so persisting environments first
-    // validates them against whatever the destination world already had. That ordering was
-    // latent until issue 1315 closed the gate's mode-blind `enabledTaskIds` guard, which had
-    // been answering "yes" for automatic environments without consulting the library at all.
-    // The realm library lands before them for the same reason: an imported environment gates on
-    // realms by id, and the environment store validates those ids against the world library on
-    // every write, so persisting the environments first rejects the whole import of a
-    // realm-gated system into a world that does not yet have those places (issue 1848).
+    // The realm library and task library land before the environments, which the store validates
+    // against them on every write (issues 1315, 1848).
     await this._persistTravelConfig(resolved.travelConfig);
     await this._persistGatheringConfig(system.id, resolvedConfig);
     await this._persistEnvironments(system.id, resolvedEnvironments);
@@ -768,45 +567,17 @@ export class CompendiumImporter {
   }
 
   /**
-   * Merge the incoming world entity ROSTER and world DEFAULTS into this world's own, per entity
-   * type and per layer, BEFORE the crafting system is created or updated (issue 1364).
-   *
-   * ## THE SEEDING GATE — the safety rule the whole merge rests on
-   *
-   * `ScopedDefinitionStore._persist` sets ALL THREE `seeded` flags and persists all three sub-keys
-   * on any write, so a FIRST write would flip this world's Valid Id Basis from UNKNOWN to KNOWN
-   * for that entity type across every system in the world — including systems the import never
-   * touched. So the merge writes only into a scope the destination has ALREADY seeded, judged with
-   * the PER-SUB-KEY form on `entities` and never the no-argument form, which ORs across sub-keys
-   * and would report seeded on the strength of a sibling.
-   *
-   * An unmigrated destination is therefore NEVER seeded by an import: its three settings stay
-   * absent and the created system behaves exactly as it does under schema 5. Nothing is lost — when
-   * that world later migrates, the `1.30.0` pass derives the world entities for the imported system
-   * from the in-system arrays the import DID land. Because the destination is already seeded
-   * whenever a write happens, this merge only ever WIDENS a KNOWN basis, and widening a basis can
-   * never prune anything that was surviving.
-   *
-   * ## THE MERGE BASE IS `store.get()`, NOT THE THREE SUB-KEYS
-   *
-   * `save(raw)` normalizes the RAW argument and rebuilds its extras from that argument alone, and
-   * `normalizeWorldToolBreakage(undefined)` answers `{}`. So a merge written as
-   * `save({ entities, defaults, membership })` would silently ERASE a world tool-breakage authority
-   * a destination GM authored. The store's own persisted projection carries the extras, so the base
-   * is that, mutated across the three sub-keys and handed back.
-   *
-   * It goes through `store.save()` rather than a direct `_setSetting`, because `save()` normalizes
-   * on write AND publishes the cache in one step by contract, while the hand-rolled pair
-   * `_persistCharacterLibraries` uses has two halves either of which is forgettable.
-   *
-   * @param {object} packData
-   * @param {object} summary
-   * @private
+   * Merge the incoming world entity rosters and defaults BEFORE the system is created (issue
+   * 1364; `import-export/spec.md` § World-scope entity merge on import). It writes only into a
+   * scope the destination already SEEDED, judged per sub-key on `entities`, since a first write
+   * would flip that type's Valid Id Basis to KNOWN world-wide; so it only ever widens a known
+   * basis. The base is `store.get()`, never the three sub-keys, which would erase a world
+   * tool-breakage authority, and the write goes through `store.save()`, which normalizes and
+   * publishes in one step.
    */
   async _persistScopedEntityRosters(packData, summary) {
     const legs = this._readScopeMergeLegs(packData);
-    // The merged COMPONENT roster, or `null` when the component scope will not be written and the
-    // roster the addressability constraints consult is therefore UNDECIDABLE.
+    // The merged component roster, or `null` when that scope will not be written (undecidable).
     const componentLeg = legs.components;
     const worldComponentIds = componentLeg.writable
       ? mergedEntityIds(componentLeg.base, componentLeg.incoming)
@@ -832,8 +603,8 @@ export class CompendiumImporter {
         added += 1;
       }
 
-      // LAYER 2 — the world defaults, by `id`, DESTINATION WINS and is never re-examined. A record
-      // the merge would ADD has every section re-decided against the destination's merged corpus.
+      // LAYER 2 - world defaults, by `id`, DESTINATION WINS; an added record has every section
+      // re-decided against the merged corpus.
       const membershipUnion = mergedMembershipUnion(leg.base, leg.incoming);
       for (const incoming of sliceRecords(leg.incoming, 'defaults')) {
         const id = typeof incoming.id === 'string' ? incoming.id.trim() : '';
@@ -860,35 +631,22 @@ export class CompendiumImporter {
             )
           );
         }
-        // A record left carrying only its `id` is not written at all, applying the election's own
-        // rule; the world ENTITY and every membership record are untouched either way.
+        // A record left carrying only its `id` is not written; entities and memberships stay.
         if (!record) continue;
         merged.defaults[id] = record;
         added += 1;
       }
 
-      // NO RECORD, NO WRITE — evaluated independently for each of the two writes the split
-      // produces, exactly as every sibling world-scope merge does.
+      // No record, no write, for each of the two writes independently.
       if (added === 0) continue;
       await leg.store.save(merged);
     }
   }
 
   /**
-   * Merge the incoming MEMBERSHIP records, AFTER the destination's system id exists (issue 1364).
-   *
-   * THE TWO WRITES ARE NOT ATOMIC, and that is stated rather than hidden. A failure between them
-   * leaves the destination holding world entities with no membership record for the imported
-   * system. That state is INERT: an absent membership record is a REFUSAL and never a prune, and
-   * the basis union is deliberately not membership-filtered. Re-running the import repairs it under
-   * KEEP mode, where the destination-wins merge makes the second run additive. A COPY-mode re-run
-   * does NOT repair it — it mints a second destination system, and the torn one keeps its memberless
-   * world entities until a GM deletes it.
-   *
-   * @param {object} packData
-   * @param {string} systemId The RESOLVED destination system id.
-   * @param {object} summary
-   * @private
+   * Merge the incoming memberships once the destination system id exists (issue 1364). The two
+   * writes are not atomic; the torn state is inert (an absent membership refuses, never prunes)
+   * and a keep-mode re-run repairs it, a copy-mode one does not.
    */
   async _persistScopedEntityMemberships(packData, systemId, summary) {
     if (!systemId) return;
@@ -905,8 +663,7 @@ export class CompendiumImporter {
       for (const incoming of sliceRecords(leg.incoming, 'membership')) {
         const entityId = typeof incoming.entityId === 'string' ? incoming.entityId.trim() : '';
         if (!entityId) continue;
-        // THE `systemId` REWRITE. Without it every record names a phantom system and the created
-        // copy has zero members.
+        // Without the `systemId` rewrite every record names a phantom system.
         const record = { ...structuredClone(incoming), entityId, systemId };
         const key = membershipKey(entityId, systemId);
         if (merged.membership[key]) continue;
@@ -930,15 +687,8 @@ export class CompendiumImporter {
   }
 
   /**
-   * Resolve the three merge legs: the store, the incoming slice, the seeding verdict and a FRESH
-   * copy of the destination's persisted projection.
-   *
-   * Read fresh on each of the two writes, deliberately: the first write publishes a new corpus, and
-   * a base captured before it would silently drop whatever that write added.
-   *
-   * @param {object} packData
-   * @returns {Record<string, {store: object|null, incoming: object|null, writable: boolean, base: object|null}>}
-   * @private
+   * Each entity type's store, incoming slice, seeding verdict and FRESH persisted base, re-read
+   * for each of the two writes so the second never drops what the first added.
    */
   _readScopeMergeLegs(packData) {
     const legs = {};
@@ -957,12 +707,7 @@ export class CompendiumImporter {
     return legs;
   }
 
-  /**
-   * One world-scope report entry. The three record-owned kinds reuse the shipped entity-specific
-   * owner types, so no new `OwnerType` is introduced.
-   *
-   * @private
-   */
+  /** One world-scope report entry, reusing the entity owner types. */
   _scopeReference(kind, entityType, owner, referenceValue) {
     return {
       kind,
@@ -975,29 +720,10 @@ export class CompendiumImporter {
   }
 
   /**
-   * Merge the imported world travel config into this world's own (issue 1282).
-   *
-   * NON-DESTRUCTIVE, and the direction matters for the same reason it does for currency:
-   * realms are WORLD scope, so unlike the per-system gathering slice there is no key under
-   * which an import may simply replace what is there. Overwriting would destroy the geography
-   * the destination GM authored for systems that have nothing to do with this import.
-   *
-   * So realms merge by `id` with the DESTINATION winning a collision — an id already in this
-   * world keeps its own definition, including its `sceneMappings[]`, and only genuinely new
-   * places are appended. Environments (`includedRealmIds` / `excludedRealmIds`), party
-   * overrides and actor discovery flags ALL cite realms by id, so a destination realm replaced
-   * by an incoming one of the same id would silently re-point every one of those references at
-   * a different place. Destination-wins is also what makes an import safe to run twice.
-   *
-   * The scalars (reveal mode, modifier visibility) are seeded ONLY into an unconfigured world.
-   * A world that already has realms has already answered how it discloses its places, and an
-   * imported system does not get to overrule it.
-   *
-   * Persists through the resolved `travelStore` seam when one resolves, otherwise through the
-   * raw setting pair (issue 1858). The store write publishes the merged library to its cache
-   * before the setting write resolves, so the environment writes that follow it read the merged
-   * library directly, with no dependence on a replicated-setting hook.
-   * @private
+   * Merge the incoming travel config NON-DESTRUCTIVELY (issue 1282): realms merge by `id`, the
+   * DESTINATION winning, because environments, party overrides and discovery flags cite realms by
+   * id; the scalars seed only an unconfigured world. It writes through the resolved `travelStore`,
+   * else the raw setting pair (issue 1858).
    */
   async _persistTravelConfig(incoming) {
     if (!incoming || typeof incoming !== 'object') return;
@@ -1033,31 +759,21 @@ export class CompendiumImporter {
     }
 
     if (store) {
-      // The store normalizes on write and publishes its cache BEFORE awaiting the setting, so the
-      // environment writes that follow validate against the merged library without waiting on a
-      // replicated-setting hook — which a hook-free world never fires at all (issue 1858).
+      // The store publishes its cache before awaiting the setting, so the environment writes that
+      // follow validate against the merged library with no replicated-setting hook (issue 1858).
       await store.save(next);
       return;
     }
 
-    // Normalize before writing, for the reason `_persistCurrencyConfig` does: every other
-    // writer of this setting goes through `GatheringRealmStore`, which normalizes on write.
-    // Without this a hand-edited export could persist a shape the readers only repair on read —
-    // and a scene mapping that arrived without an id would be minted a FRESH id on every
-    // `load()`, changing its identity from one reload to the next.
+    // Normalized as `GatheringRealmStore` would, or an id-less scene mapping would be minted a
+    // fresh id on every `load()`.
     await this._setSetting(TRAVEL_CONFIG_KEY, normalizeTravelConfig(next));
   }
 
   /**
-   * The realm store behind the `travelStore` seam, resolved PER CALL, or `null`.
-   *
-   * The decision is made on what the seam RESOLVES TO, never on the seam object: `src/main.js`
-   * wires a lazy delegator that is an object whatever the field behind it holds, so trusting the
-   * seam would route the merge into a `save` that resolves to `undefined` and report a phantom
-   * success instead of falling back to the raw setting write. `get()` answering a configuration
-   * is the liveness probe — the `scopeStoreDelegate` fail-closed rule, applied to a seam that
-   * has somewhere else to go.
-   * @private
+   * The realm store behind the `travelStore` seam, resolved per call, or `null`: the wired seam is
+   * a lazy delegator whose `save` could report a phantom success, so `get()` answering is the
+   * liveness probe before the raw setting fallback is skipped.
    */
   _resolveTravelStore() {
     const store = this._travelStore;
@@ -1066,19 +782,9 @@ export class CompendiumImporter {
   }
 
   /**
-   * Merge the imported world character libraries into this world's own (issue 1308).
-   *
-   * NON-DESTRUCTIVE, and PER LIBRARY. The two lists share one setting key for persistence
-   * economy only — they share no invariant — so they are merged independently. A single
-   * object-level merge would let a destination holding prerequisites but no modifiers win the
-   * whole slice and silently discard every incoming modifier.
-   *
-   * Entries merge by `id` with the DESTINATION winning a collision, exactly as currency units and
-   * realms do: an id already in this world keeps its own definition and only genuinely new
-   * entries are appended. That is what makes an import safe to run twice, and it is what keeps
-   * every book, tool, check and drop row that references an id resolving to the rule its author
-   * meant. Ids are never regenerated.
-   * @private
+   * Merge the incoming character libraries NON-DESTRUCTIVELY and PER LIBRARY (issue 1308): they
+   * share a setting key but no invariant. Entries merge by `id`, the DESTINATION winning, and ids
+   * are never regenerated, so an import is safe to run twice.
    */
   async _persistCharacterLibraries(incoming) {
     if (!this._getSetting || !this._setSetting) return;
@@ -1111,29 +817,15 @@ export class CompendiumImporter {
 
     if (!changed) return;
     await this._setSetting(CHARACTER_LIBRARIES_KEY, next);
-    // Republish through the store so its cache is not left holding the pre-import libraries.
-    // `_setSetting` writes the setting directly, so nothing else would refresh it, and the
-    // crafting system normalizer reads this library on every save.
+    // Republish through the store, whose cache the direct write left stale; the crafting system
+    // normalizer reads this library on every save.
     globalThis.game?.fabricate?.getCharacterLibrariesStore?.()?.load?.();
   }
 
   /**
-   * Merge the imported world currency config into this world's own (issue 1278).
-   *
-   * NON-DESTRUCTIVE, and the direction matters: currency is WORLD scope, so unlike the
-   * per-system gathering slice there is no key under which an import may simply replace what is
-   * there. Overwriting would destroy a ladder the destination GM authored for systems that have
-   * nothing to do with this import.
-   *
-   * So units merge by `id` with the DESTINATION winning a collision — an id already in this world
-   * keeps its own definition, and only genuinely new denominations are appended. That is what
-   * makes an import safe to run twice, and it is also what keeps existing recipe currency costs
-   * resolving to the units their author meant.
-   *
-   * The scalars (spend strategy, provider, macros) are seeded ONLY into an unconfigured world.
-   * A world that already has a ladder has already answered "how do actors here store coins", and
-   * an imported system does not get to overrule it.
-   * @private
+   * Merge the incoming currency config NON-DESTRUCTIVELY (issue 1278): units merge by `id`, the
+   * DESTINATION winning, so existing costs keep their units; the scalars seed only an unconfigured
+   * world.
    */
   async _persistCurrencyConfig(incoming) {
     if (!this._getSetting || !this._setSetting) return;
@@ -1166,21 +858,14 @@ export class CompendiumImporter {
       if (incoming.macros && typeof incoming.macros === 'object') next.macros = incoming.macros;
     }
 
-    // Normalize before writing. Every other writer of this setting goes through
-    // `CurrencyConfigStore`, which normalizes on write; this one does not have the store, so
-    // without this a hand-edited export could persist a shape the readers only repair on read —
-    // and a unit that arrived without an id would be minted a FRESH id on every `load()`,
-    // changing its identity from one reload to the next.
+    // Normalized as `CurrencyConfigStore` would, or an id-less unit would be minted a fresh id on
+    // every `load()`.
     await this._setSetting(CURRENCY_CONFIG_KEY, normalizeWorldCurrencyConfig(next));
   }
 
   /**
-   * F1 — replace-by-system-id persistence. Read the ENTIRE global environment
-   * array, remove the target system's existing environments (delete-then-add so
-   * an overwrite re-import never accumulates stale records), splice in the
-   * imported set, and write the merged whole — so other systems' environments
-   * are never clobbered.
-   * @private
+   * Replace this system's environments in the global array (delete-then-add, so an overwrite
+   * never accumulates stale records), leaving other systems' environments untouched.
    */
   async _persistEnvironments(systemId, importedEnvironments) {
     const store = this._environmentStore;
@@ -1196,8 +881,7 @@ export class CompendiumImporter {
       (env) => env?.craftingSystemId !== systemId
     );
 
-    // Nothing to do when there are neither imported nor pre-existing records for
-    // this system (avoids a redundant global write).
+    // Neither imported nor pre-existing records: skip the redundant global write.
     if (importedEnvironments.length === 0 && others.length === (all?.length ?? 0)) {
       return;
     }
@@ -1206,10 +890,8 @@ export class CompendiumImporter {
   }
 
   /**
-   * Merge the exported `{ system: <slice>, shared: <vocab+conditions> }` config
-   * into the global gatheringConfig setting under the (possibly rebased) system
-   * id, without clobbering other systems or the world's current-condition state.
-   * @private
+   * Merge the exported `{ system, shared }` config under the system id, keeping other systems,
+   * existing vocabularies and the world's current conditions.
    */
   async _persistGatheringConfig(systemId, config) {
     if (!this._getSetting || !this._setSetting || !config || typeof config !== 'object') return;
@@ -1231,12 +913,7 @@ export class CompendiumImporter {
     await this._setSetting(GATHERING_CONFIG_KEY, next);
   }
 
-  /**
-   * Map the component source-item resolution (remapped/retained/unresolved) into
-   * the unified `unresolvedReferences[]` collection so the report surfaces source
-   * items alongside every other reference kind.
-   * @private
-   */
+  /** Fold the component source-item resolution into the unified reference report. */
   _foldComponentReferences(summary) {
     const refs = summary.unresolvedReferences;
     for (const entry of summary.components.remapped) {
@@ -1284,12 +961,9 @@ export class CompendiumImporter {
   }
 
   /**
-   * Remap component originItemUuids using deterministic precedence:
-   *   1. Exact UUID match (fromUuid succeeds) — retain as-is
-   *   2. Source+name match in world packs — remap, old UUID added to aliasItemUuids
-   *   3. Unresolved — keep as-is, mark in summary
-   *
-   * @private
+   * Remap component `originItemUuid`s by precedence: an exact UUID match is retained; a
+   * source+name match in world packs is remapped, the old UUID joining `aliasItemUuids`; anything
+   * else stays as-is and is reported.
    */
   async _remapComponentUuids(
     components,
@@ -1307,22 +981,18 @@ export class CompendiumImporter {
       }
     }
 
-    // Run-scoped name→entry lookup, built at most once per pack and reused across
-    // every component's miss-path search — this removes the per-component linear
-    // pack scan. It MUST stay method-local (never an instance field): a second
-    // import on the same importer instance re-derives it, so a stale index can't
-    // leak across runs.
+    // Run-scoped name lookup per pack, reused across components; method-local, so a later import
+    // re-derives it.
     const packLookupCache = new Map();
 
     const remapped = [];
     for (const rawComponent of components) {
-      // Upcast pre-1.16.0 source-reference field names before the originItemUuid
-      // read below, so a legacy-named component takes the resolution path instead
-      // of the id-less early exit that dropped its alias uuids (issue #700).
+      // Upcast legacy source fields first, so a legacy component takes the resolution path
+      // (issue 700).
       const component = upcastComponentSourceFields(rawComponent);
       const { id: compId, name: compName, originItemUuid } = component;
 
-      // Collect fallback IDs: existing retained IDs + explicit additions + pack-provided fallbacks
+      // Fallbacks: retained existing ids, then the pack's own, then explicit additions.
       const mergedFallbacks = [];
 
       if (retainFallbackIds) {
@@ -1426,11 +1096,7 @@ export class CompendiumImporter {
     return remapped;
   }
 
-  /**
-   * Resolve a UUID via fromUuid. Returns the document, or null if it is
-   * missing or unresolvable.
-   * @private
-   */
+  /** The document behind a UUID, or `null` when missing or unresolvable. */
   async _resolveUuidDocument(uuid) {
     if (!uuid) return null;
     try {
@@ -1441,18 +1107,9 @@ export class CompendiumImporter {
   }
 
   /**
-   * Bring a resolved pack component to parity with the interactive drop path
-   * (CraftingSystemManager.addItemFromUuid), which snapshots a live Item's
-   * img/description onto the component it creates. Pre-built premium systems
-   * leave these off components backed by a foreign pack (e.g. the dnd5e SRD)
-   * because that pack isn't available to the build, so the live item at import
-   * time is the only icon/description source. Without this, such components
-   * fall back to icons/svg/item-bag.svg and show no description in the manager.
-   *
-   * Only fills what the pack JSON omitted, so baked in-module art/copy (set by
-   * the premium build for contentRef components) is preserved.
-   *
-   * @private
+   * Snapshot a resolved source item's img and description onto a component that omitted them, as
+   * the interactive drop path does: a premium system backed by a foreign pack cannot bake them in.
+   * Baked art and copy are kept.
    */
   async _withResolvedSourceMetadata(component, sourceDoc) {
     if (!sourceDoc) return component;
@@ -1466,8 +1123,7 @@ export class CompendiumImporter {
     const storedDescription =
       typeof component.description === 'string' ? component.description.trim() : '';
     if (!storedDescription) {
-      // Async since issue 800: `_extractSourceDescription` now RESOLVES the source
-      // description through Foundry's enricher before normalizing it.
+      // Async since issue 800: the source description is enriched before it is normalized.
       const extract = this._craftingSystemManager?._extractSourceDescription;
       const description =
         typeof extract === 'function'
@@ -1480,18 +1136,8 @@ export class CompendiumImporter {
   }
 
   /**
-   * Search world compendium packs for an item whose source UUID matches and whose
-   * name matches the component name. Returns the target compendium UUID, or null.
-   *
-   * @param {string} registeredItemUuid - The source UUID from the pack data
-   * @param {string} name - Component name (case-insensitive match)
-   * @param {string[]} targetPackIds - Optional filter to specific pack IDs
-   * @param {Map<object, Map<string, object[]> | symbol>} packLookupCache - Run-scoped
-   *   per-pack name→entry lookup (or a SKIP sentinel for a pack whose index failed),
-   *   built once per import and reused across every component so the miss-path is an
-   *   O(1) name lookup instead of a per-component linear scan of every pack index.
-   * @returns {Promise<string|null>}
-   * @private
+   * The compendium UUID of a world-pack Item whose source UUID and (case-insensitive) name match,
+   * or `null`, through the run-scoped per-pack name lookup.
    */
   async _findBySourceAndName(registeredItemUuid, name, targetPackIds, packLookupCache) {
     if (!registeredItemUuid || !name) return null;
@@ -1523,13 +1169,8 @@ export class CompendiumImporter {
   }
 
   /**
-   * Return (building on first request) the run-scoped name→entry lookup for a pack:
-   * a `Map<nameLower, entry[]>` over its index, or {@link PACK_LOOKUP_SKIP} when the
-   * pack's `getIndex` rejects (so a broken pack is skipped once, not retried per
-   * component). `getIndex` already self-caches per pack at the Foundry level; the win
-   * here is eliminating the per-component linear scan, and the cache is method-local
-   * so it re-derives on the next import run.
-   * @private
+   * The run-scoped `nameLower -> entries` lookup for a pack, or `PACK_LOOKUP_SKIP` when its
+   * `getIndex` rejects.
    */
   async _getPackNameLookup(pack, packLookupCache) {
     if (packLookupCache.has(pack)) return packLookupCache.get(pack);
@@ -1557,10 +1198,7 @@ export class CompendiumImporter {
     return lookup;
   }
 
-  /**
-   * Find an existing crafting system by ID then by name.
-   * @private
-   */
+  /** An existing crafting system by id, then by name. */
   _findExistingSystem(systemData) {
     const systems = this._craftingSystemManager.getSystems();
 

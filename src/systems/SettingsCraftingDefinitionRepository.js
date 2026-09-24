@@ -7,71 +7,20 @@ import {
 import { CraftingDefinitionRepository } from './CraftingDefinitionRepository.js';
 
 /**
- * The {@link CraftingDefinitionRepository} adapter over today's storage: one
- * `world`-scoped `game.settings` key holding the entire corpus as a single array.
- *
- * Issue 1089. This adapter exists to change nothing. It is the "before" leg of the
- * persistence decision, and its whole job is to make the managers speak in single
- * records while the bytes that reach `game.settings` stay exactly as they were.
- *
- * ## Why a single-record `put` still writes the whole array
- *
- * `game.settings.set` REPLACES a value; it has no merge and no addressable element.
- * (This is the opposite of `setFlag`, which merges and never deletes a removed key —
- * do not carry an assumption from one to the other.) So there is no such thing as
- * writing one recipe here, and {@link SettingsCraftingDefinitionRepository#put}
- * necessarily serializes and replicates the full corpus. That is not a shortcoming of
- * this adapter; it is precisely the cost #1079 is deciding how to remove, and the
- * value of naming it in one place is that #1080 replaces one method rather than 31
- * call sites.
- *
- * ## Why the corpus is supplied rather than mirrored
- *
- * The adapter is constructed with a `corpus` thunk returning the owning manager's own
- * `Map`, and it does not keep a copy.
- *
- * A mirrored copy was the obvious alternative and it is a trap. The persisted array is
- * `[...map.values()]`, so its ORDER is the manager map's insertion order — and a
- * second map that took its own `set`/`delete` calls could diverge in ordering from the
- * manager's while every record remained individually correct. That would rewrite the
- * whole persisted array on the next save with no test noticing, because the corpus
- * would still contain exactly the right records. Sharing the one map makes that class
- * of bug unrepresentable.
- *
- * It also preserves a property the pre-seam code had by accident and this code has on
- * purpose: `save()` flushed **every** in-memory mutation, including ones made in
- * place by code paths that never called `save()` themselves. Because `put` writes
- * `[...corpus().values()]` rather than one record, those mutations still land. When a
- * document-backed adapter arrives that stops being true — and that is a real
- * behaviour change, correctly owned by #1080, which will need to audit the in-place
- * mutation sites rather than inherit them silently.
- *
- * A document-backed adapter takes no `corpus` thunk at all: it addresses one record
- * and needs nothing else. The parameter's presence here IS the statement of what the
- * settings backend cannot do.
+ * The repository adapter over one `world` setting holding the whole corpus as an array (issue
+ * 1089), changing no persisted byte. `game.settings.set` replaces rather than merges, so even a
+ * single-record `put` writes and replicates the whole corpus. The corpus is the owning manager's
+ * own `Map`, supplied by a thunk and never mirrored: the persisted order is that map's insertion
+ * order, which a second map could silently diverge from, and writing `[...corpus().values()]`
+ * still flushes every in-place mutation as the pre-seam `save()` did. A document-backed adapter
+ * loses that property and must audit the in-place mutation sites (issue 1080).
  */
 export class SettingsCraftingDefinitionRepository extends CraftingDefinitionRepository {
   /**
-   * @param {object} options
-   * @param {string} options.settingKey The `fabricate` setting key holding the corpus.
-   * @param {() => Map<string, object>} options.corpus The owning manager's in-memory
-   *   map of hydrated records, in persisted order.
-   * @param {(record: object) => string} [options.identify] Read a record's id.
-   * @param {(raw: object) => object} [options.hydrate] Turn one persisted record into
-   *   its in-memory form. For recipes this is `Recipe.fromJSON`; for crafting systems
-   *   it is the manager's `_normalizeSystem`, which is a WHITELIST REBUILD — a key it
-   *   does not emit is dropped from storage on the next save, so this must remain the
-   *   manager's own normalizer and never a local approximation of it.
-   * @param {(record: object) => object} [options.serialize] Turn one in-memory record
-   *   into its persisted form.
-   * @param {(record: object) => string|null} [options.scopeOf] Read the owning
-   *   crafting system id of a record.
-   * @param {(record: object) => import('./CraftingDefinitionRepository.js').DefinitionSummary}
-   *   [options.summarize] Project one record to its summary.
-   * @param {(key: string) => any} [options.getSetting] Injected for tests.
-   * @param {(key: string, value: any) => Promise<any>} [options.setSetting] Injected
-   *   for tests. Left as the real accessor in production so a non-GM write is still
-   *   refused by the server exactly as before.
+   * `hydrate` is `Recipe.fromJSON` for recipes and the manager's own `_normalizeSystem` for
+   * crafting systems, a WHITELIST REBUILD that drops any key it does not emit on the next save, so
+   * it must never be a local approximation. `setSetting` stays the real accessor in production, so
+   * the server still refuses a non-GM write.
    */
   constructor({
     settingKey,
@@ -108,30 +57,23 @@ export class SettingsCraftingDefinitionRepository extends CraftingDefinitionRepo
     this._flushPending = false;
   }
 
-  /** @inheritdoc */
   async loadAll() {
     return this.readReplicatedSnapshot();
   }
 
   /**
-   * @inheritdoc
-   *
-   * Supported here, because a `world`-scoped setting IS replicated in full to every
-   * client and `updateSetting` fires synchronously with the new value already in
-   * `game.settings`. #1088 (Q4) confirmed the full-replication half on both 13.351
-   * and 14.365 — which is also why sharding cannot improve cold-load time.
+   * Supported: a `world` setting replicates in full to every client (confirmed on 13.351 and
+   * 14.365, issue 1088), and `updateSetting` fires with the new value already in `game.settings`.
    */
   readReplicatedSnapshot() {
     const stored = this._getSetting(this.settingKey);
     return (Array.isArray(stored) ? stored : []).map((raw) => this._hydrate(raw));
   }
 
-  /** @inheritdoc */
   async get(id) {
     return this._corpus().get(String(id)) ?? null;
   }
 
-  /** @inheritdoc */
   async listSummaries(query = {}) {
     const wantedIds = Array.isArray(query?.ids) ? new Set(query.ids.map(String)) : null;
     const wantedSystem = query?.systemId == null ? null : String(query.systemId);
@@ -144,7 +86,6 @@ export class SettingsCraftingDefinitionRepository extends CraftingDefinitionRepo
     return summaries;
   }
 
-  /** @inheritdoc */
   async put(record) {
     const id = this._identify(record);
     if (id == null) throw new Error(`Cannot persist a crafting definition with no id`);
@@ -152,24 +93,19 @@ export class SettingsCraftingDefinitionRepository extends CraftingDefinitionRepo
     await this._flush();
   }
 
-  /** @inheritdoc */
   async delete(id) {
     this._corpus().delete(String(id));
     await this._flush();
   }
 
   /**
-   * @inheritdoc
-   *
-   * Always immediate, and deliberately not deferred by an enclosing batch: it carries
-   * its own explicit record list, which a later corpus flush would silently replace
-   * with something else. It does not clear a pending flush for the same reason.
+   * Immediate even inside a batch, since a deferred write would become a corpus flush and lose its
+   * explicit record list; a pending flush stays pending.
    */
   async putAll(records) {
     await this._write([...records]);
   }
 
-  /** @inheritdoc */
   async runBatch(work) {
     this._batchDepth += 1;
     try {
@@ -183,12 +119,7 @@ export class SettingsCraftingDefinitionRepository extends CraftingDefinitionRepo
     }
   }
 
-  /**
-   * Make storage current with the in-memory corpus, unless a batch is open — in which
-   * case one flush is issued when the outermost batch closes.
-   *
-   * @private
-   */
+  /** Write the corpus now, or once when the outermost open batch closes. */
   async _flush() {
     if (this._batchDepth > 0) {
       this._flushPending = true;
@@ -197,16 +128,7 @@ export class SettingsCraftingDefinitionRepository extends CraftingDefinitionRepo
     await this._write([...this._corpus().values()]);
   }
 
-  /**
-   * The single point at which this module touches `game.settings`.
-   *
-   * ONE point rather than one per mutation method, so a later mutation method added here
-   * inherits whatever this method does — and so a fixture that observes writes observes all
-   * of them.
-   *
-   * @param {object[]} records
-   * @private
-   */
+  /** The one point this module writes `game.settings`, shared by every write path and fixture. */
   async _write(records) {
     await this._setSetting(
       this.settingKey,
@@ -216,33 +138,19 @@ export class SettingsCraftingDefinitionRepository extends CraftingDefinitionRepo
 }
 
 /**
- * The PERSISTED crafting-system corpus, read RAW (issue 1370).
- *
- * IT LIVES HERE BECAUSE THIS MODULE IS THE ONE PRODUCTION PATH TO THAT SETTING KEY, and
- * `tests/crafting-definition-repository.test.js` enforces that as an architectural boundary
- * rather than a convention. The world identity drift audit needs the corpus BEFORE either manager
- * is constructed — that is the whole point of where it runs, since it is the last moment at which
- * nothing has read the union — so it cannot ask a manager, and reading the key at its call site
- * would put a second reader of these bytes outside the adapter.
- *
- * RAW, and deliberately so: its subject is what is on disk, not what a normalizer would answer.
- * It is a READ ONLY — there is no writing counterpart and there must not be one, because
- * {@link SettingsCraftingDefinitionRepository#put} is the single write path.
- *
- * @param {(key: string) => unknown} [getSetting] Injected by unit fixtures.
- * @returns {Array<object>} the persisted array, or `[]` when the key holds anything else.
+ * The persisted crafting-system array, read RAW (issue 1370), or `[]`. It lives here because this
+ * module is the one production path to the key (`tests/crafting-definition-repository.test.js`
+ * enforces it), and the world identity drift audit reads it before either manager exists. Read
+ * only: `put` is the single write path.
  */
 export function readPersistedCraftingSystems(getSetting = defaultGetSetting) {
   try {
     const raw = getSetting(SETTING_KEYS.CRAFTING_SYSTEMS);
     return Array.isArray(raw) ? raw : [];
   } catch {
-    // GUARDED, on the three scope stores' own precedent, and the reason is the CALLER'S SHAPE
-    // rather than this key's likelihood of throwing. `initialize()` is awaited inside an async
-    // `ready` hook, and Foundry's hook dispatch catches SYNCHRONOUS throws only - so a rejection
-    // here escapes unhandled and silently skips everything sited after it: the world-time pass,
-    // all three flag auto-stamps and the identity remap. A disclosure notice must not be able
-    // to cost a world its startup work.
+    // Guarded: `initialize()` is awaited inside an async `ready` hook, whose dispatch catches only
+    // synchronous throws, so a rejection here would silently skip the world-time pass, the flag
+    // auto-stamps and the identity remap.
     return [];
   }
 }
