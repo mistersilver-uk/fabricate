@@ -369,10 +369,7 @@ async function renderPage(
     // top of it: a modal that never opened, a dialog that was dismissed, an inspector that stayed
     // collapsed.
     if (expectSelector) {
-      const present = await page.evaluate(
-        (selector) => globalThis.document.querySelector(selector) !== null,
-        expectSelector
-      );
+      const present = (await page.locator(expectSelector).count()) > 0;
       if (!present) {
         throw new Error(
           `${label}: expected "${expectSelector}" to be present after its steps, and it is not. ` +
