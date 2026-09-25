@@ -101,7 +101,10 @@ export function resolveCompanionCheckEvaluation(input) {
     const snapshot = validatedSnapshot(input, evaluationSchema);
     if (snapshot === null) return { ok: false };
     const die = snapshot.pool?.die ?? 10;
-    for (const value of [snapshot.pool?.explode?.faces?.value, snapshot.pool?.cancel?.faces?.value]) {
+    for (const value of [
+      snapshot.pool?.explode?.faces?.value,
+      snapshot.pool?.cancel?.faces?.value,
+    ]) {
       if (value !== undefined && value !== null && value > die) return { ok: false };
     }
     return { ok: true, evaluation: normalizeCheckEvaluation(snapshot) };
