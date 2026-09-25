@@ -1518,13 +1518,35 @@ Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/recipe-vi
 
 ## Check
 
-One roll engine (`src/systems/checkRoll.js`) exposes three runners: `runFormulaPassFail` (roll vs a DC met-or-exceeded → `pass`/`fail`), `runFormulaProgressive` (roll total IS the numeric value progressive awarding spends against result difficulties — **no DC**), and `runFormulaRouted` (map the total onto a named **Outcome Tier** whose name routes to a result group).
+One roll engine (`src/systems/checkRoll.js`) exposes three runners: `runFormulaPassFail` (roll vs a DC met or strictly exceeded according to `thresholdMode` → `pass`/`fail`), `runFormulaProgressive` (roll total IS the numeric value progressive awarding spends against result difficulties — **no DC**), and `runFormulaRouted` (map the total onto a named **Outcome Tier** whose name routes to a result group).
 A `label` (`Crafting`/`Salvage`/`Gathering`) only customises failure-message wording; the result shape is identical across activities.
 The persisted system keys are `craftingCheck`, `salvageCraftingCheck`, and `gatheringCraftingCheck` — the `*CraftingCheck` naming is kept **verbatim for back-compat** even though the model is now activity-agnostic, so `gatheringCraftingCheck` is the gathering check, NOT misplaced crafting config.
 
 Canonical mapping: `runFormulaPassFail`/`runFormulaProgressive`/`runFormulaRouted`/`evaluateCheckRoll` in `src/systems/checkRoll.js`; `system.{craftingCheck,salvageCraftingCheck,gatheringCraftingCheck}`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md, openspec/specs/gathering-and-harvesting/spec.md
+
+## Check Evaluation
+
+Every normalized simple, routed and progressive check subobject in crafting, salvage and gathering retains an `evaluation` record, even when its selected product, direction, target or pool settings are inactive.
+The record defaults to `sum/over`, and the current runners and odds classifier execute `sum/over` even when a future count or under choice was authored.
+The private prepared check descriptor clones that authored record beside the prepared formula and DC; it is not the public executed `resolutionSnapshot`.
+
+Canonical mapping: `normalizeCheckEvaluation` in `src/systems/normalize/checkEvaluation.js`; `system.{craftingCheck,salvageCraftingCheck,gatheringCraftingCheck}`; `CraftingEngine.describeVersionedStageCheck`
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
+
+## Executed Check Evidence
+
+An executed formula result records raw `data.total` and the existing `data.dc` alongside the actual product, direction, comparison, target, margin, successes and cancelled-success count.
+In the current `sum/over` execution, successes and cancelled-success count are null; simple checks target their resolved DC, relative routed checks target the roll-matched tier's effective threshold before forcing or stepping, and fixed routed and progressive checks have no single target or margin.
+A non-null margin measures raw total minus target regardless of any forced disposition; an unrolled, cancelled or failed evaluation does not gain executed fields.
+The result's `data.cancelled` is distinct from the top-level `cancelled` flag that aborts a prompt.
+Only a permitted executed versioned crafting check may carry matching `sum/over` metadata into its historical `resolutionSnapshot`.
+
+Canonical mapping: `executedSumEvidence` and the formula runners in `src/systems/checkRoll.js`; `craftingStepHistoryEvidence` in `src/systems/CraftingRunManager.js`; `checkResolutionEvidence` and `historyEvidenceFields` in `src/systems/runHistoryEvidence.js`
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md, openspec/specs/recipes-and-steps/spec.md
 
 ## Standalone Check Roll
 
