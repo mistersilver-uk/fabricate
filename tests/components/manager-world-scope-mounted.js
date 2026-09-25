@@ -1233,6 +1233,8 @@ export function registerWorldScopeCases() {
      * @param {object|null} [options.systemToolBreakage] The selected system's own block.
      * @param {Array<object>|null} [options.worldTools] The world tool corpus. Named entities,
      * @param {Array<object>|null} [options.worldEssences] The world essence corpus. Named
+     * @param {Array<object>} [options.worldEssenceMembership] World essence membership rows.
+     * @param {boolean} [options.enableEssences] Enable and seed the system essence rules route.
      * @param {object|null} [options.craftingCheck] The selected system's crafting check.
      * @param {string} [options.resolutionMode] The selected system's resolution mode.
      * @returns {Promise<object>} the store
@@ -1241,6 +1243,8 @@ export function registerWorldScopeCases() {
       worldToolBreakage,
       systemToolBreakage,
       worldEssences,
+      worldEssenceMembership = [],
+      enableEssences = false,
       worldTools,
       // The world COMPONENT corpus (issue 1371). It defaulted to three generated entities and
       // had no override, so a suite that needed a KNOWN component corpus - an empty one, or one
@@ -1257,7 +1261,9 @@ export function registerWorldScopeCases() {
     } = {}) {
       scopeStores = {
         component: scopeStore(worldComponents ?? worldEntities(3, 'comp')),
-        essence: scopeStore(worldEssences ?? worldEntities(2, 'ess')),
+        essence: scopeStore(worldEssences ?? worldEntities(2, 'ess'), {
+          membership: worldEssenceMembership,
+        }),
         tool: scopeStore(
           worldTools ?? worldEntities(1, 'tool'),
           worldToolBreakage ? { toolBreakage: worldToolBreakage } : {}
@@ -1268,11 +1274,26 @@ export function registerWorldScopeCases() {
       const forge = makeSystem({
         id: 'sys1',
         name: 'Forge',
+        ...(enableEssences
+          ? {
+              features: { essences: true },
+              essenceDefinitions: [{ id: 'ash', name: 'Ash', enabled: true }],
+            }
+          : {}),
         ...(systemToolBreakage ? { toolBreakage: systemToolBreakage } : {}),
         ...(craftingCheck ? { craftingCheck } : {}),
         ...(resolutionMode ? { resolutionMode } : {}),
       });
-      const alchemy = makeSystem({ id: 'sys2', name: 'Alchemy' });
+      const alchemy = makeSystem({
+        id: 'sys2',
+        name: 'Alchemy',
+        ...(enableEssences
+          ? {
+              features: { essences: true },
+              essenceDefinitions: [{ id: 'ash', name: 'Ash', enabled: true }],
+            }
+          : {}),
+      });
       const systems = [forge, alchemy];
       const services = createServices(forge, [], [], {
         getCraftingSystemManager: () => ({
@@ -2610,6 +2631,60 @@ export function registerWorldScopeCases() {
             'a discarded exit writes nothing: the record on disk keeps the name it opened with'
           );
           assert.equal(managerView(), row.catalogue, 'and the GM leaves the editor');
+        });
+      }
+
+      async function leaveDirtyEssenceForSystem(answer) {
+        const prompts = [];
+        const store = await mountWithRealStore({
+          worldEssences: [{ id: 'ash', name: 'Ash' }],
+          worldEssenceMembership: [
+            { entityId: 'ash', systemId: 'sys2', enabled: false, inherit: {} },
+          ],
+          enableEssences: true,
+          choiceDialog: async ({ content }) => {
+            prompts.push(String(content));
+            return answer;
+          },
+        });
+        worldNavItem('essence-catalogue').click();
+        await settleRouteExit();
+        target
+          .querySelector('[data-scoped-list-row="ash"] [data-scoped-list-action="open-entry"]')
+          .click();
+        await settleRouteExit();
+
+        const field = target.querySelector('[data-scoped-entry-name]');
+        field.value = 'Ash the Second';
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        await settleRouteExit();
+        target.querySelector('[data-scoped-entry-system-rules="sys2"]').click();
+        await settleRouteExit();
+        return { prompts, store };
+      }
+
+      it('keeps a dirty world essence in place when cross-system navigation is cancelled', async () => {
+        const { prompts, store } = await leaveDirtyEssenceForSystem('cancel');
+        assert.equal(prompts.length, 1);
+        assert.equal(managerView(), 'world-essence-entry');
+        assert.equal(get(store.viewState).selectedSystem?.id, 'sys1');
+        assert.equal(target.querySelector('[data-scoped-entry-name]')?.value, 'Ash the Second');
+      });
+
+      for (const answer of ['discard', 'save']) {
+        it(`${answer}s a dirty world essence before opening its rules in another system`, async () => {
+          const { prompts, store } = await leaveDirtyEssenceForSystem(answer);
+          assert.equal(prompts.length, 1);
+          assert.equal(managerView(), 'essences');
+          assert.equal(get(store.viewState).selectedSystem?.id, 'sys2');
+          assert.ok(
+            target.querySelector('[data-essence-id="ash"].is-selected'),
+            'the target rules list lost the essence id while the system selection settled'
+          );
+          assert.equal(
+            persistedName(ENTRY_ROWS[0]),
+            answer === 'save' ? 'Ash the Second' : 'Ash'
+          );
         });
       }
     });

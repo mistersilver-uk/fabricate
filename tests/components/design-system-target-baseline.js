@@ -51,8 +51,4 @@ export const TARGET_LIBRARY_NAME_TOTAL = 56;
 export const TARGET_MANIFEST_ROWS = rows('manifestTargetRows');
 
 /** @see TARGET_MANIFEST_ROWS */
-// 46 -> 47 (issue 1707 phase 4): `environment/GatheringModifierEditor.svelte` crossed the two-caller
-// bar, and the row it is owed arrives at `target` because it names no specimen to be faithful to.
-// 47 -> 48 (issue 1915): the two vocabulary shell components arrive at `target` with two callers
-// each, and the VocabularyPanel row they replace leaves — one importer is below the bar.
-export const TARGET_MANIFEST_ROW_TOTAL = 48;
+export const TARGET_MANIFEST_ROW_TOTAL = 49;

@@ -604,7 +604,7 @@ test('a divergent entry names the issue that decided it', () => {
 });
 
 /**
- * The 32 shipped rows the library does not name, re-counted at issue 1392 rather than incremented.
+ * Shipped manifest rows without a named library specimen.
  */
 const UNDOCUMENTED_ROWS = [
   // `components/ActionMenu` is the newest arrival and is the ORDINARY kind of growth: a member of
@@ -639,6 +639,7 @@ const UNDOCUMENTED_ROWS = [
   // The manifest records their new shared membership and why no generic library entry applies.
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
+  'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
   'src/ui/svelte/components/ActionMenu.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',

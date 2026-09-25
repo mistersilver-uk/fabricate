@@ -537,14 +537,8 @@ function indexDefaults(defaults) {
  * the rules editor authors the in-system row; this row only says which of the two the system
  * reads.
  *
- * NO SCREEN CONSUMES IT YET, and the docblock said otherwise until r19-store2. The entry's
- * systems card draws no essence surface, and the rules editor reads `inherited.essences` and the
- * world entry's `defaults.essences` directly. It is published ahead of its consumer — the
- * per-system essence run on `WorldComponentEntrySystemsCard`, which is not this lane's file — and
- * `tests/world-scope-projection.test.js` and `tests/stores/admin-store-component-scope.test.js`
- * pin the fact it states. The system rules LIST answers the same question from the read union
- * instead (`adminComponentRowProjection`'s `_resolvedEssencesBySystemComponent`), because that
- * projection is per SYSTEM and already holds the manager.
+ * `ScopedEntrySystemsCard` receives caller-resolved summaries and does not consume this map.
+ * Projection tests pin it until a per-system presentation reads it directly.
  *
  * @param {object} descriptor
  * @param {{id: string, name: string}} system

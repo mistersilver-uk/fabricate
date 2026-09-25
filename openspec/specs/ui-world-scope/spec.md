@@ -462,8 +462,12 @@ They are stated here rather than left to `## Scoped entity editor patterns` beca
 1. **The World Essence Catalogue renders every world essence with its glyph and its colour, its membership count, and a per-system indicator carrying THREE states** — not a member, a member that is disabled, a member that is enabled.
    `enabled: false` KEEPS the membership record and its overrides, so "absent" and "disabled" are different authored states with different repairs: one is fixed by a toggle and the other by an Add.
    It renders **no source-item badge, column, filter or sort key, and no item image at all**, because a world essence has no source-item link: its lifted identity is exactly `name`, `icon`, `colorToken` and `description`, and its identity is a glyph plus a colour token.
+   Its component, recipe, and system count facts stay aligned as one group with a visible spacing-token gutter before the enabled-state chip.
 2. **The world essence entry editor holds identity plus the two world defaults `effectSource` and `macro`**, each stating how many member systems inherit it and how many override it locally BEFORE the change lands, because that count is the whole reach of the edit and a GM cannot recover it afterwards.
    Only those two fields take a world default; everything else Fabricate carries for an essence — its per-system `enabled` flag above all — stays on the in-system record and takes none.
+   Its `Systems using this essence` card shares the component entry's header action, search, counted `All` / `With rules` / `Without` filter band, shown-over-total count, three-column rows, dashed Add action, rule-navigation action, armed removal action, bounded scroll, and no-match state.
+   `With rules` includes enabled and disabled membership records, while `Without` means no membership record.
+   Each essence row retains `Enabled here`, `Disabled here`, or `Not in this system` metadata, and enablement remains editable on the system's Essence Rules screen reached by the rule-navigation action.
 3. **A world-defaults `effectSource` picker offers ONLY world-addressable referents** — a world component id or a document UUID — and never a system's own component list.
    This is requirement 7 of `## Scoped entity editor patterns` applied to the one field that carries it.
 4. **The System Essence Rules list filters membership with exactly TWO options**, `In this system` and `All world essences`, each carrying its count.

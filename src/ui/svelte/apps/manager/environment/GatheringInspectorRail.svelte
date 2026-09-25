@@ -416,6 +416,7 @@
   </section>
 {:else}
   <EmptyState
+    fill
     icon="fas fa-seedling"
     title={text('FABRICATE.Admin.Manager.Environment.SelectEnvironment', 'Select an environment')}
     hint={text(

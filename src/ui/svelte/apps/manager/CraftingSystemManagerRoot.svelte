@@ -1473,19 +1473,32 @@
     });
   }
 
-  /** Create a world essence from the page header and open its entry editor. */
   /**
-   * Open ONE crafting system's essence rules for a world essence, from the catalogue inspector.
-   *
-   * @param {string} _entityId the essence the row belongs to; see above.
-   * @param {string} systemId the crafting system whose rules to open.
-   * @returns {unknown} whatever `selectSystem` answered, so a refused exit stays refused.
+   * Guard the world draft before changing systems, then seed the same essence into its rules list.
    */
-  function openSystemEssenceRules(_entityId, systemId) {
+  function openSystemEssenceRules(entityId, systemId) {
     if (!systemId) return false;
-    return afterTruthyResult(selectSystem(systemId, 'essences'), () => {
+
+    const land = () => {
+      resetEssenceSelectionFor(systemId, String(entityId ?? ''));
       activeView = 'essences';
-    });
+    };
+    const selectTargetSystem = () => {
+      const selected = store.selectSystem?.(systemId);
+      if (isPromise(selected)) {
+        return selected.then((value) => {
+          if (value !== false) land();
+          return value;
+        });
+      }
+      if (selected !== false) land();
+      return selected;
+    };
+    const confirmed = confirmRouteExit('essences');
+    if (isPromise(confirmed)) {
+      return confirmed.then((value) => (value === false ? false : selectTargetSystem()));
+    }
+    return confirmed === false ? false : selectTargetSystem();
   }
 
   /**
@@ -2120,6 +2133,15 @@
     lastComponentSystemId = systemId;
   }
 
+  /** Seed one system's essence selection before the system-change effect can clear it. */
+  function resetEssenceSelectionFor(systemId, essenceId = '') {
+    selectedEssenceId = essenceId;
+    essenceEditDirty = false;
+    essenceEditSaving = false;
+    essenceEditDraft = null;
+    lastEssenceSystemId = systemId;
+  }
+
   $effect(() => {
     if (selectedSystemId === lastComponentSystemId) return;
     resetComponentSelectionFor(selectedSystemId);
@@ -2127,11 +2149,7 @@
 
   $effect(() => {
     if (selectedSystemId === lastEssenceSystemId) return;
-    selectedEssenceId = '';
-    essenceEditDirty = false;
-    essenceEditSaving = false;
-    essenceEditDraft = null;
-    lastEssenceSystemId = selectedSystemId;
+    resetEssenceSelectionFor(selectedSystemId);
   });
 
   $effect(() => gathering.resetOnSystemSwitch());
@@ -5038,6 +5056,7 @@
         {...essenceScopeProps}
         entityId={worldScopedEntryId}
         onBackToCatalogue={() => setView('world-essences')}
+        onOpenSystemRules={(entityId, systemId) => openSystemEssenceRules(entityId, systemId)}
         onDraftChange={handleWorldEssenceEntryDraft}
         onDirtyChange={handleWorldEssenceEntryDirty}
         onDraftIdentityChange={handleScopedEntryDraftIdentity}
@@ -6079,6 +6098,7 @@
             </section>
           {:else}
             <EmptyState
+              fill
               icon="fas fa-mortar-pestle"
               title={currentView === 'essence-edit'
                 ? text('FABRICATE.Admin.Manager.Essence.CreateInspectorTitle', 'New essence draft')
@@ -6233,6 +6253,7 @@
             </section>
           {:else}
             <EmptyState
+              fill
               icon="fas fa-boxes"
               title={text(
                 'FABRICATE.Admin.Manager.Component.SelectComponent',

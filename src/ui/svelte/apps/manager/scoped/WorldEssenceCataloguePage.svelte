@@ -372,5 +372,6 @@
     display: inline-flex;
     flex: 0 0 auto;
     align-items: center;
+    margin-left: var(--fab-space-2);
   }
 </style>

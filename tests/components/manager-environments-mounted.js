@@ -3488,6 +3488,25 @@ export function registerEnvironmentsCases() {
 
   // The forward crosses TWO boundaries now (leaf -> panel); pin it at the leaf too, not only at
   // the panel the loop above mounts directly (issue 1707 phase 2 review).
+  for (const [label, component] of [
+    ['task', () => GatheringTaskInspectorComponent],
+    ['event', () => GatheringEventInspectorComponent],
+  ]) {
+    it(`fills the ${label} inspector when no row is selected`, () => {
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(component(), { target });
+      flushSync();
+
+      const empty = target.querySelector('.manager-empty');
+      assert.ok(Boolean(empty), `the ${label} inspector rendered no empty state`);
+      assert.ok(
+        empty.classList.contains('is-fill'),
+        `the ${label} inspector empty state does not claim the available rail height`
+      );
+    });
+  }
+
   it('opens the drop panel upwards through GatheringTaskInspector, the leaf that owns it', async () => {
     const shell = modifierEditorShell('drop', []);
     target = document.createElement('div');

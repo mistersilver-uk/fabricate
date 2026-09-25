@@ -2377,6 +2377,7 @@
         },
         "BooksScrolls": {
           "Title": "Books & Scrolls",
+          "SelectTitle": "Select a recipe item",
           "Subtitle": "Review every recipe item in this system with its linked recipes and open one to set its use and learn caps.",
           "Library": "Books & Scrolls",
           "LibraryHint": "Every recipe item in this system — books, scrolls, or any item type — with its linked recipes. Open one to set its use and learn caps.",
@@ -4983,6 +4984,7 @@
             "MapLinksPlaceholder": "Select a region to map it to Scene Regions."
           },
           "MapLinks": {
+            "SelectTitle": "Select a map region",
             "NoScene": "Activate a scene to link its regions.",
             "NoRegions": "The active scene has no regions.",
             "UnnamedRegion": "Unnamed region",
@@ -5034,6 +5036,7 @@
           "DuplicateMember": "This actor already belongs to another enabled party.",
           "DuplicateTravelActor": "This travel actor is already used by another enabled party.",
           "Realms": {
+            "SelectTitle": "Select a realm",
             "Toggle": "Toggle realms list",
             "Empty": "No realms yet.",
             "Filters": "Realm filters",
@@ -6975,6 +6978,8 @@
             "ReuseBlurb": "Copies the effect source and macro into another system’s own rules. One-time shortcut, not a live link.",
             "ReuseAction": "Copy to other systems…",
             "OpenEntry": "Open definition",
+            "OpenSystemRulesAria": "Open this essence in {system}",
+            "AddToSystemAria": "Add {entity} to {system}",
             "OverrideLine": "{overriding} override it locally",
             "RollupDisabled": "Disabled",
             "RollupEnabled": "Enabled",
@@ -6995,7 +7000,6 @@
             "SystemNoRules": "No rules here — it is not in this system.",
             "SystemOverrides": "Overrides {sections} locally.",
             "SystemsBanner": "Per-system rules",
-            "SystemsCount": "{count} of {total} systems have rules",
             "SystemsHead": "Systems using this essence",
             "SystemsSub": "The rules hold what the essence does on craft in that system: its active effect source item and its macro.",
             "TabDefinition": "Definition",

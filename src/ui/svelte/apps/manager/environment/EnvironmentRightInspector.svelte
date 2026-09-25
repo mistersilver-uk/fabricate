@@ -3,7 +3,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import EnvironmentSummaryInspector from './EnvironmentSummaryInspector.svelte';
   import RecordInspector from './RecordInspector.svelte';
-  import InspectorCard from '../../../components/InspectorCard.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
 
   let {
     activeTab = 'overview',
@@ -45,29 +45,29 @@
   {:else if recordEntry}
     <RecordInspector kind={recordKind} {environment} entry={recordEntry} {onUpdateEnvironment} />
   {:else}
-    <InspectorCard data-record-inspector-empty={recordKind}>
-      <p class="manager-kicker">
-        {recordKind === 'event'
-          ? text(
-              'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveEvents',
-              'No active events'
-            )
-          : text(
-              'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveTasks',
-              'No active tasks'
-            )}
-      </p>
-      <p class="manager-muted">
-        {recordKind === 'event'
-          ? text(
-              'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveEventsHint',
-              'Add or include events in this environment so they appear here.'
-            )
-          : text(
-              'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveTasksHint',
-              'Add or include tasks in this environment so they appear here.'
-            )}
-      </p>
-    </InspectorCard>
+    <EmptyState
+      fill
+      icon={recordKind === 'event' ? 'fas fa-bolt' : 'fas fa-list-check'}
+      title={recordKind === 'event'
+        ? text(
+            'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveEvents',
+            'No active events'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveTasks',
+            'No active tasks'
+          )}
+      hint={recordKind === 'event'
+        ? text(
+            'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveEventsHint',
+            'Add or include events in this environment so they appear here.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveTasksHint',
+            'Add or include tasks in this environment so they appear here.'
+          )}
+      dataAttr="data-record-inspector-empty"
+      dataValue={recordKind}
+    />
   {/if}
 </aside>

@@ -136,6 +136,8 @@ describe('the system Tool Rules inspector (issue 1373)', () => {
   it('still renders the no-selection state when there is neither a record nor a world Tool', async () => {
     const target = await harness.mount({ tool: null, unadopted: null, systemName: 'Forge' });
     assert.ok(!target.querySelector('[data-tool-browser-inspector]'));
-    assert.ok(Boolean(target.querySelector('[data-tool-browser-inspector-empty]')));
+    const empty = target.querySelector('[data-tool-browser-inspector-empty]');
+    assert.ok(Boolean(empty));
+    assert.ok(empty.classList.contains('is-fill'));
   });
 });
