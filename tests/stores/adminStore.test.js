@@ -8858,11 +8858,20 @@ describe('adminStore item-card hydration and cohort fetching (issue 1081)', () =
             id: 'remote-carrier',
             name: 'Remote Ember',
             img: 'remote-ember.webp',
-            essences: { fire: 2 },
+            essences: {},
           }),
         ],
       })
     );
+    const systemManager = services.getCraftingSystemManager();
+    services.getCraftingSystemManager = () => ({
+      ...systemManager,
+      getComponentsForSystem: (systemId) => {
+        const components = systemManager.getSystem(systemId)?.components ?? [];
+        if (systemId !== 'sys2') return components;
+        return components.map((component) => ({ ...component, essences: { fire: 2 } }));
+      },
+    });
     const corpus = {
       entities: [{ id: 'fire', name: 'Fire' }],
       defaults: [],
