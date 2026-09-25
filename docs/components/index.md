@@ -407,7 +407,11 @@ A two-way filter above the list controls which components you see:
 - **In this system** shows components this system already has rules for.
 This is the default.
 - **All world components** widens the list to every component the world Component catalogue holds, including ones this system has never adopted.
-The ones this system has no rules for yet are shown as dimmed ghost rows, with a **Not in this system** pill in place of **Salvage**, an em dash where the **Recipes** count would be, and a dashed **Add to system** control in place of **Edit rules**.
+The ones this system has no rules for yet use the same ordinary row styling as world essences that are not in the system.
+Each row shows the world component's identity and description, a **Not in this system** chip with a circle-minus icon, and a primary **Add to this system** control.
+It does not show a bulk checkbox, essence badges, recipe statistics, or other facts that apply only after adoption.
+Select the component identity to keep browsing in **Component Rules**, or choose **Add to this system** to adopt it.
+After the list refreshes, an adopted component shows its ordinary member controls.
 Adopted and not-yet-adopted components share one page together, so a page you turn to can mix both kinds of row.
 
 Each filter option states its own count.

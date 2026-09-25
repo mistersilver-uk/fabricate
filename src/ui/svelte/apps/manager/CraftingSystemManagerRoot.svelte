@@ -5645,7 +5645,6 @@
         onSelectComponent={(id) => selectComponent(id)}
         onDropComponent={(data) => importFlow.dropComponent(data)}
         onEditComponent={(id) => editComponent(id)}
-        onOpenWorldEntry={(route, entityId) => openWorldScopedEntry(route, entityId)}
         onSelectionCleared={() => componentBulk.announceCleared()}
       />
     {:else if currentView === 'recipe-edit' && selectedSystem}

@@ -360,8 +360,11 @@ They are stated here rather than left to `## Scoped entity editor patterns` beca
    So neither a world tag nor a mute changes any system's effective tag list yet.
    **A LANE THAT RESTORES A MUTING CONTROL NEEDS AN M-NUMBERED RULING FIRST**, and until one exists no string may say the entry authors muting — the two that did were deleted with their reader rather than corrected.
 6. **The system-scope Component screens carry the full membership model.**
-   The rules list offers TWO cohort segments — `In this system` and `All world components`, each carrying its own count as the segment's badge — over a cohort that widens to world components this system has no record for, and a non-member row states NO behaviour, because everything a row says about behaviour is a membership fact and inventing one from the world default would claim rules that do not exist there.
-   A non-member row is drawn dimmed, carries a `Not in this system` marker and a dashed `+ Add to system`, and states an em dash where a member row states its recipe count.
+   The rules list offers TWO cohort segments — `In this system` and `All world components`, each carrying its own count as the segment's badge — over a cohort that widens to world components this system has no record for.
+   A non-member row uses the absent Essence Rules row as its canonical presentation: normal contrast and row surface, a circle-minus `Not in this system` chip, a primary `Add to this system` action, and the world identity and description.
+   It shows no checkbox, essence badges, recipe statistic or other system-only fact until adoption.
+   Identity activation stays in Component Rules through the existing selection callback, while member-only automatic selection and inspector resolution keep their existing behavior.
+   Adoption uses the existing membership action, and refresh promotes the row to ordinary member controls.
    **A ROW'S ESSENCE BADGES AND THE INSPECTOR'S ESSENCE RUN STATE THE MAP THIS SYSTEM RESOLVES, NOT THE ROW IT HAS ON DISK** (issue 1371, revision 19).
    Until `essences` became a section the two were the same answer and could not disagree; after the `1.32.0` election they do, and in a one-system world they always do, because the pass marks the donor inheriting by construction.
    A list drawn from the persisted row therefore went on printing the pre-edit numbers the moment a GM edited the world map — which is the edit the whole section exists for — while the same screen's editor, the engine and every other reader answered the new ones.

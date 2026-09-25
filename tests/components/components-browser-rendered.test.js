@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { before, describe, it } from 'node:test';
 
 import { chromium } from 'playwright';
+import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import { createComponentsBrowserViewHarness } from '../helpers/componentScopeMountModules.js';
 import {
@@ -88,7 +89,7 @@ function measureBareButton() {
   return { display: style.display, justifyContent: style.justifyContent, alignItems: style.alignItems };
 }
 
-function page(productMarkup, scopedCss, { chrome = '', control = '' } = {}) {
+function page(productMarkup, scopedCss, { chrome = '', control = '', hostWidth = HOST_WIDTH_PX } = {}) {
   return managerShellPage({
     fabricateCss,
     view: 'components',
@@ -96,9 +97,71 @@ function page(productMarkup, scopedCss, { chrome = '', control = '' } = {}) {
     scopedCss,
     chrome,
     control,
-    hostWidth: HOST_WIDTH_PX,
+    hostWidth,
     hostHeight: HOST_HEIGHT_PX,
   });
+}
+
+function absentScope() {
+  return {
+    entries: [
+      {
+        id: 'world-long',
+        entity: {
+          name: 'Masterwork Morningstar with a Deliberately Long World Name',
+          description:
+            'A long world description that must yield to the adoption control without escaping the row.',
+          img: 'icons/svg/hammer.svg',
+        },
+        systems: [],
+      },
+      {
+        id: 'world-bare',
+        entity: { name: 'Unbound Salt', description: '', img: '' },
+        systems: [],
+      },
+    ],
+  };
+}
+
+function measureAbsentRows() {
+  const probe = document.createElement('span');
+  probe.style.background = 'var(--fab-bg-1)';
+  probe.style.border = '1px solid var(--fab-accent-border)';
+  document.body.append(probe);
+  const bg1 = getComputedStyle(probe).backgroundColor;
+  const accentBorder = getComputedStyle(probe).borderColor;
+  probe.remove();
+
+  const rows = [...document.querySelectorAll('[data-component-member="false"]')].map((row) => {
+    const box = row.getBoundingClientRect();
+    const add = row.querySelector('[data-component-ghost-add]');
+    const addBox = add.getBoundingClientRect();
+    const style = getComputedStyle(row);
+    const target = document.elementFromPoint(
+      addBox.left + addBox.width / 2,
+      addBox.top + addBox.height / 2
+    );
+    return {
+      id: row.dataset.componentId,
+      selected: row.classList.contains('is-selected'),
+      height: box.height,
+      overflow: row.scrollWidth - row.clientWidth,
+      addHeight: addBox.height,
+      addContained: addBox.left >= box.left && addBox.right <= box.right,
+      addHit: target?.closest?.('[data-component-ghost-add]') === add,
+      hasRecipes: Boolean(row.querySelector('[data-component-recipes]')),
+      hasSelection: Boolean(row.querySelector('[data-component-select]')),
+      opacity: style.opacity,
+      backgroundColor: style.backgroundColor,
+      borderColor: style.borderColor,
+    };
+  });
+  return {
+    rows,
+    bg1,
+    accentBorder,
+  };
 }
 
 function card(id, name, description) {
@@ -386,5 +449,81 @@ describe('every row’s medallion sits at the leading edge after the box (issue 
       bare.leadInset > bare.gap + 40,
       `under the control the bare row's medallion still sits ${bare.leadInset}px after the box — the measurement cannot see the shunt`
     );
+  });
+});
+
+describe('absent world components use the Essence Rules row contract (issue 2036)', () => {
+  const rendered = { markup: '', scoped: null };
+  const measurements = new Map();
+
+  before(async () => {
+    rendered.scoped = collectScopedCss({ repoRoot, compiledModules });
+    await harness.setup();
+    try {
+      const target = await harness.mount({
+        itemCards: [],
+        scope: absentScope(),
+        systemId: 'sys-1',
+        selectedSystemId: 'sys-1',
+        selectedComponentId: 'world-long',
+      });
+      target.querySelector('[data-component-membership-option="all"] input').click();
+      flushSync();
+      rendered.markup = target.innerHTML;
+    } finally {
+      harness.teardown();
+    }
+
+    const browser = await chromium.launch();
+    try {
+      for (const width of [HOST_WIDTH_PX, 1024]) {
+        const tab = await browser.newPage({ viewport: { width, height: HOST_HEIGHT_PX } });
+        await tab.setContent(page(rendered.markup, rendered.scoped.css, { hostWidth: width }), {
+          waitUntil: 'load',
+        });
+        const rest = await tab.evaluate(measureAbsentRows);
+        await tab.hover('[data-component-id="world-bare"]');
+        const hover = await tab.evaluate(measureAbsentRows);
+        measurements.set(width, { rest, hover });
+        await tab.close();
+      }
+    } finally {
+      await browser.close();
+    }
+  });
+
+  it('renders actual absent rows at full contrast with member-only facts omitted', () => {
+    assert.ok(rendered.markup.length > 0, 'the view rendered nothing');
+    assert.match(rendered.markup, /data-component-member="false"/);
+    for (const { rest } of measurements.values()) {
+      assert.equal(rest.rows.length, 2);
+      assert.ok(rest.rows.every((row) => row.opacity === '1'), 'absent rows keep normal contrast');
+      assert.ok(rest.rows.every((row) => !row.hasRecipes), 'absent rows omit the recipe fact');
+      assert.ok(rest.rows.every((row) => !row.hasSelection), 'absent rows omit bulk selection');
+    }
+  });
+
+  it('keeps both long and missing content contained at wide and minimum window widths', () => {
+    for (const [width, { rest }] of measurements) {
+      for (const row of rest.rows) {
+        assert.ok(row.height >= 76, `${width}px ${row.id}: row height is ${row.height}px`);
+        assert.ok(row.overflow <= 0.5, `${width}px ${row.id}: row overflows by ${row.overflow}px`);
+        assert.ok(row.addContained, `${width}px ${row.id}: Add escapes the row`);
+        assert.equal(row.addHeight, 34, `${width}px ${row.id}: Add is not the 34px primary rung`);
+        assert.ok(row.addHit, `${width}px ${row.id}: Add is not the pointer target at its centre`);
+      }
+    }
+  });
+
+  it('uses transparent rest, bg-1 hover and bg-1 plus the accent edge when selected', () => {
+    for (const [width, { rest, hover }] of measurements) {
+      const bare = rest.rows.find((row) => row.id === 'world-bare');
+      const hovered = hover.rows.find((row) => row.id === 'world-bare');
+      const selected = rest.rows.find((row) => row.id === 'world-long');
+      assert.equal(bare.backgroundColor, 'rgba(0, 0, 0, 0)', `${width}px: resting fill`);
+      assert.equal(hovered.backgroundColor, rest.bg1, `${width}px: hover fill`);
+      assert.equal(selected.backgroundColor, rest.bg1, `${width}px: selected fill`);
+      assert.equal(selected.borderColor, rest.accentBorder, `${width}px: selected edge`);
+    }
   });
 });
