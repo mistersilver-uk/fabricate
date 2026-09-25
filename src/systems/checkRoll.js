@@ -12,6 +12,7 @@ import {
 } from '../utils/craftingCheckExpression.js';
 
 import { chatModeOption } from './bulkChatVisibility.js';
+import { better, compareToTarget, effectiveMargin, rankBest } from './checkEvaluation.js';
 import {
   makeRollDataExpressionResolver,
   resolveCheckModifierContribution,
@@ -387,6 +388,18 @@ function preparedCheckKind(preparation) {
   return 'simple';
 }
 
+function executedSumEvidence(total, target, comparison) {
+  return {
+    product: 'sum',
+    direction: 'over',
+    comparison,
+    target,
+    margin: target === null ? null : effectiveMargin(total, target, 'over'),
+    successes: null,
+    cancelled: null,
+  };
+}
+
 /**
  * Evaluate and classify the private CraftingEngine check descriptor without accepting a client
  * formula or total. This is the authority-side twin of the three existing formula runners.
@@ -458,6 +471,7 @@ export async function evaluatePreparedRunCheck(
   let outcome = null;
   let value = total;
   if (kind === 'progressive') {
+    Object.assign(data, executedSumEvidence(total, null, null));
     if (forced?.disposition === 'success') value = Number.MAX_SAFE_INTEGER;
     if (forced?.disposition === 'failure') value = 0;
     data.value = value;
@@ -477,7 +491,7 @@ export async function evaluatePreparedRunCheck(
     success = classified.success;
     outcome = classified.matched?.name ?? null;
     data.type = config.type;
-    data.comparison = config.thresholdMode === 'exceed' ? 'exceed' : 'meet';
+    Object.assign(data, executedSumEvidence(total, classified.target, classified.comparison));
     data.outcomeId = classified.matched?.id ?? null;
     data.success = success;
     data.breakTools = classified.breakTools;
@@ -490,11 +504,9 @@ export async function evaluatePreparedRunCheck(
     const comparison = config.thresholdMode === 'exceed' ? 'exceed' : 'meet';
     success = forced
       ? forced.disposition === 'success'
-      : comparison === 'exceed'
-        ? total > Number(data.dc)
-        : total >= Number(data.dc);
+      : compareToTarget(total, Number(data.dc), comparison, 'over');
     outcome = success ? 'pass' : 'fail';
-    data.comparison = comparison;
+    Object.assign(data, executedSumEvidence(total, Number(data.dc), comparison));
   }
   return {
     success,
@@ -687,14 +699,9 @@ export async function runFormulaPassFail({
 
   const forced = resolveForcedOutcome(triggers, { total, diceGroups });
   const comparison = thresholdMode === 'exceed' ? 'exceed' : 'meet';
-  let success;
-  if (forced) {
-    success = forced.disposition === 'success';
-  } else if (comparison === 'exceed') {
-    success = total > dc;
-  } else {
-    success = total >= dc;
-  }
+  const success = forced
+    ? forced.disposition === 'success'
+    : compareToTarget(total, dc, comparison, 'over');
   return {
     success,
     outcome: success ? 'pass' : 'fail',
@@ -705,6 +712,7 @@ export async function runFormulaPassFail({
       resolvedFormula,
       total,
       comparison,
+      ...(formula && executedSumEvidence(total, dc, comparison)),
       diceGroups,
     },
     message: success ? null : `${label} check failed`,
@@ -775,6 +783,7 @@ export async function runFormulaProgressive({
       total,
       value,
       diceGroups,
+      ...(formula && executedSumEvidence(total, null, null)),
     },
   };
 }
@@ -796,42 +805,21 @@ function matchRoutedOutcome({
 }) {
   if (type === 'fixed') {
     const outcomes = Array.isArray(fixedOutcomes) ? fixedOutcomes : [];
-    let best = null;
-    for (const outcome of outcomes) {
-      if (!outcome) continue;
-      const start = Number(outcome.start);
-      const end = Number(outcome.end);
-      if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
-      if (total < start || total > end) continue;
-      if (!best || start > Number(best.start)) best = outcome;
-    }
-    return best;
+    const matching = outcomes.filter((outcome) => {
+      const start = Number(outcome?.start);
+      const end = Number(outcome?.end);
+      return Number.isFinite(start) && Number.isFinite(end) && total >= start && total <= end;
+    });
+    return rankBest(matching, (outcome) => Number(outcome.start), 'over')[0] ?? null;
   }
   const outcomes = Array.isArray(relativeOutcomes) ? relativeOutcomes : [];
-  let best = null;
-  let bestThreshold = null;
-  let lowest = null;
-  let lowestThreshold = null;
-  for (const outcome of outcomes) {
-    if (!outcome) continue;
-    const delta = Number(outcome.dc);
-    if (!Number.isFinite(delta)) continue;
-    const threshold = dc + delta;
-    // Strict `<` keeps the first authored tier among equal-lowest thresholds.
-    if (lowest === null || threshold < lowestThreshold) {
-      lowest = outcome;
-      lowestThreshold = threshold;
-    }
-    const matches = comparison === 'exceed' ? total > threshold : total >= threshold;
-    if (!matches) continue;
-    if (best === null || threshold > bestThreshold) {
-      best = outcome;
-      bestThreshold = threshold;
-    }
-  }
-  // Below every threshold: clamp to the closest (lowest) tier when asked, else null.
-  if (best === null && clampToNearest) return lowest;
-  return best;
+  const valid = outcomes.filter((outcome) => outcome && Number.isFinite(Number(outcome.dc)));
+  const thresholdOf = (outcome) => dc + Number(outcome.dc);
+  const matching = valid.filter((outcome) =>
+    compareToTarget(total, thresholdOf(outcome), comparison, 'over')
+  );
+  if (matching.length > 0) return rankBest(matching, thresholdOf, 'over')[0];
+  return clampToNearest ? (rankBest(valid, thresholdOf, 'under')[0] ?? null) : null;
 }
 
 /** A relative tier ranks by DC delta, a fixed one by range start. */
@@ -847,11 +835,13 @@ function routedRankKey(type) {
 function rankedRoutedOutcomes({ type, relativeOutcomes, fixedOutcomes }) {
   const key = routedRankKey(type);
   const source = type === 'fixed' ? fixedOutcomes : relativeOutcomes;
-  return (Array.isArray(source) ? source : [])
-    .map((outcome, authorIndex) => ({ outcome, authorIndex, rank: Number(outcome?.[key]) }))
-    .filter((entry) => Boolean(entry.outcome) && Number.isFinite(entry.rank))
-    .toSorted((left, right) => left.rank - right.rank || left.authorIndex - right.authorIndex)
-    .map((entry) => entry.outcome);
+  return rankBest(
+    (Array.isArray(source) ? source : []).filter(
+      (outcome) => Boolean(outcome) && Number.isFinite(Number(outcome[key]))
+    ),
+    (outcome) => Number(outcome[key]),
+    'under'
+  );
 }
 
 /** The ranked tiers of one disposition, the only subset a forced outcome or a step moves in. */
@@ -871,11 +861,7 @@ function routeCritOutcome({ type, forcedSuccess, relativeOutcomes, fixedOutcomes
   if (ranked.length === 0) return null;
   // Ascending order: index 0 already IS the lowest-ranked, author-first tier.
   if (!wantSuccess) return ranked[0];
-  // The highest rank sits at the end, but equal-rank tiers must resolve to the FIRST
-  // authored one, so seek the START of the top-rank run rather than reading `at(-1)`.
-  const key = routedRankKey(type);
-  const topRank = Number(ranked.at(-1)[key]);
-  return ranked[ranked.findIndex((outcome) => Number(outcome[key]) === topRank)];
+  return rankBest(ranked, (outcome) => Number(outcome[routedRankKey(type)]), 'over')[0];
 }
 
 /** The `tierStep.mode` values that move; `none` and anything unrecognised is inert. */
@@ -926,7 +912,7 @@ function resolveTierStepTarget(stepping, inPlay) {
     if (typeof tierId !== 'string' || tierId === '') continue;
     const found = inPlay.findIndex((outcome) => outcome.id === tierId);
     if (found === -1) continue;
-    if (index === -1 || found < index) {
+    if (index === -1 || better(found, index, 'under')) {
       index = found;
       trigger = candidate;
     }
@@ -1017,7 +1003,7 @@ function minSuccessTierFailed({ type, minOutcomeId, matched, relativeOutcomes, f
   // A stale/unknown `minOutcomeId` no-ops gracefully, like `checkTierId`.
   if (!Number.isFinite(requiredStart)) return false;
   const matchedStart = Number(matched?.start);
-  return !Number.isFinite(matchedStart) || matchedStart < requiredStart;
+  return !Number.isFinite(matchedStart) || !compareToTarget(matchedStart, requiredStart);
 }
 
 /**
@@ -1041,6 +1027,16 @@ export function classifyCheckTotal({
   minOutcomeId = null,
 }) {
   const forced = resolveForcedOutcome(triggers, { total, diceGroups });
+  const effectiveComparison = comparison === 'exceed' ? 'exceed' : 'meet';
+  const rollMatched = matchRoutedOutcome({
+    type,
+    total,
+    dc,
+    comparison: effectiveComparison,
+    relativeOutcomes,
+    fixedOutcomes,
+    clampToNearest,
+  });
 
   let matched = forced
     ? routeCritOutcome({
@@ -1049,15 +1045,7 @@ export function classifyCheckTotal({
         relativeOutcomes,
         fixedOutcomes,
       })
-    : matchRoutedOutcome({
-        type,
-        total,
-        dc,
-        comparison,
-        relativeOutcomes,
-        fixedOutcomes,
-        clampToNearest,
-      });
+    : rollMatched;
 
   const tierStep = applyTierStepTriggers({
     rolled: matched,
@@ -1086,6 +1074,8 @@ export function classifyCheckTotal({
 
   return {
     matched: effectiveMatched,
+    comparison: effectiveComparison,
+    target: type === 'fixed' || !rollMatched ? null : dc + Number(rollMatched.dc),
     forcedDisposition: forced ? forced.disposition : null,
     success,
     // The final tier's `breakTools` is the only `data.breakTools` source.
@@ -1195,6 +1185,7 @@ export async function runFormulaRouted({
       total,
       type,
       comparison,
+      ...(formula && executedSumEvidence(total, classified.target, classified.comparison)),
       outcomeId: matched?.id ?? null,
       success,
       breakTools: classified.breakTools,
