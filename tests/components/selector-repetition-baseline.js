@@ -5,10 +5,10 @@
  * all, and the chain joined by ` >> ` when a rule is nested. The at-context is part of the key
  * because two rules under different conditions are never the same rule: the same selector inside
  * a `@container` and at the top level is two different pieces of authoring, and merging them is
- * not a thing that can be done. Keyed on the selector ALONE the sheet holds 216 repeated selectors
- * rather than these 107, and both figures are published so a reader can tell which produced a pin.
+ * not a thing that can be done. Keyed on the selector ALONE the sheet holds 215 repeated selectors
+ * rather than these 106, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,080 `(at-context, selector)` keys, of which 2,973 appear exactly
+ * Unfiltered, the sheet holds 3,037 `(at-context, selector)` keys, of which 2,931 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -19,7 +19,7 @@
  * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,572 rules at that head, 107 repeated keys and 219 appearances
+ * printed from. The sheet holds 2,532 rules at that head, 106 repeated keys and 217 appearances
  * between them; five keys appear three times and none appears four or more.
  * ISSUE 1510 PHASE 2 moves both the contextual figures and one repeated row. The component
  * studio conversion is already in main; the checks conversion adds two net rules and one net
@@ -232,6 +232,6 @@ export const SELECTOR_REPETITION_BASELINE = checkedRows(TABLE.rows);
  * The SUM of the counts, not the number of rows.
  * `assertRatchet` asserts exactly that and throws before any comparison if the two disagree, so
  * this is the one figure a reviewer can check against the issue without reading the table. At the
- * measured commit it is 219 across 107 rows.
+ * measured commit it is 217 across 106 rows.
  */
 export const SELECTOR_REPETITION_TOTAL = TABLE.pinnedTotal;

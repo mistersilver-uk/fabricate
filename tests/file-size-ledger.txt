@@ -42,8 +42,8 @@ src/systems/RecipeManager.js::evaluateCraftability	250
 src/systems/RecipeVisibilityService.js	2300
 src/systems/RecipeVisibilityService.js::evaluateRecipeAccess	140
 src/systems/ResolutionModeService.js::validateRecipe	140
-src/systems/checkRoll.js	1250
-src/systems/checkRoll.js::evaluateCheckRoll	160
+src/systems/checkRoll.js	1300
+src/systems/checkRoll.js::evaluateCheckRoll	170
 src/systems/checkRoll.js::evaluatePreparedRunCheck	130
 src/systems/checkRoll.js::runFormulaRouted	110
 src/systems/companionContract.js	950
@@ -95,7 +95,6 @@ src/ui/svelte/apps/alchemy/Workbench.svelte	950
 src/ui/svelte/apps/crafting/RecipeBrowser.svelte	550
 src/ui/svelte/apps/crafting/ShoppingList.svelte	700
 src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte	900
-src/ui/svelte/apps/crafting/rollPrompt.js::promptCheckRoll	140
 src/ui/svelte/apps/gathering/EnvironmentCard.svelte	600
 src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte	550
 src/ui/svelte/apps/gathering/GatheringView.svelte	600
@@ -153,7 +152,7 @@ src/ui/svelte/apps/manager/scoped/ComponentCatalogueBulkPanel.svelte	1050
 src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte	1500
 src/ui/svelte/apps/manager/scoped/WorldComponentCataloguePage.svelte	800
 src/ui/svelte/apps/manager/scoped/WorldComponentEntryPage.svelte	1100
-src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte	1450
+src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte	1300
 src/ui/svelte/apps/manager/scoped/WorldToolCataloguePage.svelte	700
 src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte	1650
 src/ui/svelte/apps/manager/scoped/componentScoped.js	1550
@@ -173,7 +172,7 @@ src/ui/svelte/stores/adminEnvironmentWriteActions.js::createEnvironmentWriteActi
 src/ui/svelte/stores/adminKnowledgeSection.js::createKnowledgeSection	270
 src/ui/svelte/stores/adminRecipeRowProjection.js	950
 src/ui/svelte/stores/adminStore.js	7600
-src/ui/svelte/stores/adminStore.js::createAdminStore	6270
+src/ui/svelte/stores/adminStore.js::createAdminStore	6280
 src/ui/svelte/stores/adminStore.js::createAdminStore>_createTravelSection	600
 src/ui/svelte/stores/adminStore.js::createAdminStore>_createTravelSection>buildState	220
 src/ui/svelte/stores/adminStore.js::createAdminStore>refresh	300
@@ -192,4 +191,4 @@ src/ui/svelte/stores/worldScopeActions.js::createWorldScopeEntityActions	500
 src/ui/svelte/stores/worldScopeActions.js::createWorldVocabularyActions	140
 src/ui/svelte/stores/worldScopeProjection.js	1000
 src/ui/svelte/util/shoppingListAggregator.js::aggregateShoppingList	180
-src/utils/rollExpressionAverage.js::createReader	190
+src/utils/rollExpressionAverage.js::createReader	200

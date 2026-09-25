@@ -1,3 +1,6 @@
+player-crafting-roll-prompt-basic
+player-crafting-roll-prompt-advantage
+player-crafting-roll-prompt-light
 player-gathering-events
 player-gathering-task-ready
 player-gathering-after-success
@@ -17,6 +20,8 @@ player-crafting-routed-by-check
 player-crafting-run-summary
 player-crafting-roll-result
 player-crafting-roll-prompt
+player-crafting-roll-prompt-multipick
+player-crafting-roll-prompt-overflow
 player-crafting-essence-alternative
 player-crafting-alternatives
 player-crafting-essence-legacy

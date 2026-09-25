@@ -1008,6 +1008,11 @@ The player's route to salvage.
   A **fixed** outcome carries an absolute, non-overlapping `[start, end]` segment of the roll range, matches on `start <= total <= end`, and never reads a DC at all — so a **routed + fixed** salvage renders its authored ranges **verbatim** and shows **no DC**.
 - The action is **one-shot for every mode**: it rolls AND commits in a single gesture.
   The roll prompt IS the roll step; there is no separate confirm, no reroll, and no pre-roll dice box.
+  Its body mounts in a sanitized DialogV2 host with an activity header, subject, generic dice formula and inclusive or strict target, actual applied modifier chips or a bounded player choice, situational bonus, roll mode and core-owned footer in that order.
+  Player choices retain authored defaults, radio or checkbox semantics and the authored maximum; the submitted formula uses the selected contributions.
+  Advantage-eligible checks offer Disadvantage, Roll and Advantage in that order, while other checks offer one Roll, preserving the established action identifiers and dismissal result.
+  A bulk prompt lists each subject's display-only need and makes clear that one choice applies across the batch; a no-check subject has no invented fallback DC, and routed fixed or progressive subjects have no single target.
+  A count-only bulk companion call keeps its controls and returns its normal result without inventing subject rows.
   The label names the gesture — with no usable check it is a plain salvage, with one it is a roll.
 - The roll summary is **read-only** and renders only **after** resolution.
   It never renders a hardcoded formula: the formula is system-authored, and the prompt has already displayed the resolved one.

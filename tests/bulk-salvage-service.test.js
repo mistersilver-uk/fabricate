@@ -540,8 +540,8 @@ describe('BulkSalvageService.run: the ONE roll prompt', () => {
     assert.equal(prompts.length, 1, 'one prompt, not one per item');
     assert.equal(prompts[0].count, 2);
     assert.deepEqual(prompts[0].subjects, [
-      { name: 'Iron Ore', img: 'icons/ore.webp' },
-      { name: 'Boar Hide', img: 'icons/hide.webp' },
+      { name: 'Iron Ore', img: 'icons/ore.webp', need: { kind: 'dc', dc: 15 } },
+      { name: 'Boar Hide', img: 'icons/hide.webp', need: { kind: 'dc', dc: 15 } },
     ]);
   });
 

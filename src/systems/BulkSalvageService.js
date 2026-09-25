@@ -11,6 +11,7 @@ import {
   buildBulkSalvageChatContent,
   sumChatEntriesByName,
 } from '../ui/presenters/BulkSalvageChatCard.js';
+import { salvageCheckNeed } from '../ui/presenters/salvageCheckNeed.js';
 // The player forecast projection and its trigger-id read, both import-free leaves.
 import { forecastComplications } from '../utils/complicationPlan.js';
 import { hasPlainD20 } from '../utils/craftingCheckExpression.js';
@@ -328,6 +329,10 @@ export class BulkSalvageService {
       subjects: runnable.map((entry) => ({
         name: entry.item.name,
         img: entry.item.img,
+        need: salvageCheckNeed({
+          ...resolveSalvageCheck(entry.system),
+          component: entry.component,
+        }),
       })),
     });
     if (!choice || choice.confirmed === false) return { cancelled: true, rollDecision: null };

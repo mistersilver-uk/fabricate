@@ -13,6 +13,7 @@ import {
 } from './labInjectedLayoutGuard.js';
 import { LAB_INTERACTABLE_REFS } from './world/labInteractables.js';
 import { buildLabWorld } from './world/labWorld.js';
+import { seedRollPromptFixture } from './rollPromptFixtures.js';
 
 const READY_ATTRIBUTE = 'data-view-lab-ready';
 const ERROR_ATTRIBUTE = 'data-view-lab-error';
@@ -109,6 +110,7 @@ function readParams() {
     // Which crafting system the manager opens on.
     system: params.get('system') ?? null,
     gatheringTaskMode: params.get('gatheringTaskMode') ?? null,
+    rollPromptState: params.get('rollPromptState') ?? null,
     journalCaseState: params.get('journalCaseState') ?? null,
     // TWO things, and the name says only the second: a world seeded with NO crafting systems, and
     // the persisted selection cleared through the real admin store after construction.
@@ -890,6 +892,7 @@ async function boot() {
         gatheringTaskMode: params.gatheringTaskMode,
         journalCaseState: params.journalCaseState,
       });
+  await seedRollPromptFixture(world, params.rollPromptState);
   if (params.longDowntimeLabels) applyLongDowntimeLocalization(world);
   const localize = world ? world.localize : (key) => key;
   configureLabPage({ colorScheme: params.colorScheme });

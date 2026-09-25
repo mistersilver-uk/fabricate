@@ -413,8 +413,12 @@ export const CASES = Object.freeze([
       { selector: '[data-inventory-bulk-salvage]' },
     ],
     // Held to the prompt's own element, never to the tab.
-    expectSelector: '.application.dialog .fabricate-roll-prompt__subjects',
-    // It keeps the shared inventory `sourceMatches` and does not add `apps/crafting/rollPrompt.js`.
+    expectSelector: '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="bulk"] .bulk-row',
+    sourceMatches: [
+      ...BULK_DEFAULTS.sourceMatches,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+    ],
   }),
   playerCase({
     ...BULK_DEFAULTS,

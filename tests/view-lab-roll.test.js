@@ -12,6 +12,7 @@ import { installLabRandom } from './view-lab/foundry/labRandom.js';
 import { installFoundryShim } from './view-lab/foundry/installFoundryShim.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
 import { buildLabActors } from './view-lab/world/labActors.js';
+import { seedRollPromptFixture } from './view-lab/rollPromptFixtures.js';
 import {
   rolledDiceGroups,
   evaluateCheckRoll,
@@ -24,6 +25,36 @@ import {
   resolveActiveCraftingCheckFormula,
   resolveModifierPolicy,
 } from '../src/systems/checkModifierResolver.js';
+import { resolveModifierLibrary } from '../src/systems/characterLibraries.js';
+
+test('roll-prompt View Lab variants project valid checks and long world modifier labels', async () => {
+  const content = buildLabContent();
+  const systems = new Map(content.systems.map((system) => [system.id, {
+    ...system,
+    modifiers: system.modifiers ?? system.craftingCheck?.checkModifiers ?? [],
+  }]));
+  const manager = {
+    getSystem: (id) => systems.get(id),
+    updateSystem: async (id, updates) => systems.set(id, { ...systems.get(id), ...updates }),
+  };
+  const store = {
+    entries: [],
+    isSeeded: () => true,
+    listModifiers() { return this.entries; },
+    async saveModifiers(entries) { this.entries = entries; },
+  };
+  const world = { fabricate: { craftingSystemManager: manager, characterLibrariesStore: store } };
+  await seedRollPromptFixture(world, 'basic');
+  assert.equal(resolveActiveCraftingCheckFormula(manager.getSystem('lab-smithing')).rollFormula, '2d6 + @abilities.int.mod');
+  await seedRollPromptFixture(world, 'advantage');
+  assert.equal(resolveActiveCraftingCheckFormula(manager.getSystem('lab-smithing')).rollFormula, '1d20 + @abilities.int.mod');
+  await seedRollPromptFixture(world, 'pick-one');
+  assert.equal(manager.getSystem('lab-herbalism').craftingCheck.maxModifierPicks, 1);
+  await seedRollPromptFixture(world, 'overflow');
+  const herbalism = manager.getSystem('lab-herbalism');
+  assert.equal(herbalism.craftingCheck.maxModifierPicks, 2);
+  assert.ok(resolveModifierLibrary(herbalism, store).some((entry) => entry.id === 'hb-mod-luck' && entry.label.length > 40));
+});
 
 /** The two statics the shim hands through, reproduced verbatim from `installFoundryShim.js`. */
 const STATICS = {
