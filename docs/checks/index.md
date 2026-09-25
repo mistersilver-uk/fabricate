@@ -316,8 +316,8 @@ The chat card names the modifiers that were picked.
 > That warning does not block saving or enabling the system.
 > The modifier stays eligible and selectable, and it still rolls exactly as written whenever a pick is free for it.
 
-Every interactive check prompt names the activity and, when available, the character and its subject.
+A visible interactive check prompt names the activity and, when available, the character and its subject; a hidden Journal check keeps generic copy and omits protected identity and formula.
 It offers **Situational bonus** and **Roll mode**, plus **Advantage** and **Disadvantage** when the formula supports them.
 It shows a **DC** chip only when the check has one target.
-For a Journal check, the prepared formula and modifier contributions stay fixed while the prompt is open.
-Changing character data or the modifier library after preparation does not change that roll.
+For an entitled visible Journal check, the prepared modifier contributions stay fixed while the prompt is open.
+Changing character data or the modifier library after preparation cannot change those captured modifier terms; other actor-dependent formula terms are resolved when the authority evaluates the roll.
