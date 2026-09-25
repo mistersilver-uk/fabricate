@@ -12,7 +12,10 @@ import {
 } from '../utils/craftingCheckExpression.js';
 
 import { chatModeOption } from './bulkChatVisibility.js';
-import { appendResolvedCheckModifier } from './checkModifierResolver.js';
+import {
+  makeRollDataExpressionResolver,
+  resolveCheckModifierContribution,
+} from './checkModifierResolver.js';
 import {
   appendCheckModifierRollTerms,
   appendCheckModifierTerm,
@@ -36,9 +39,25 @@ export function resolveRolledFormula(
   craftingModifier = null,
   Roll = globalThis.Roll
 ) {
+  return resolveRolledCheck(formula, actor, craftingModifier, Roll).formula;
+}
+
+function resolveRolledCheck(formula, actor, craftingModifier, Roll = globalThis.Roll) {
   const authored = stripRetiredModifierPlaceholder(String(formula ?? ''), Roll);
-  if (authored.trim() === '') return '';
-  return appendResolvedCheckModifier(authored, actor, craftingModifier, Roll);
+  if (authored.trim() === '') return { formula: '', selected: [] };
+  if (!craftingModifier) return { formula: authored, selected: [] };
+  const { scalar, rollTerms, selected } = resolveCheckModifierContribution(
+    craftingModifier,
+    makeRollDataExpressionResolver(actor, Roll),
+    Roll
+  );
+  return {
+    formula: appendCheckModifierRollTerms(
+      appendCheckModifierTerm(authored, { value: scalar }),
+      rollTerms
+    ),
+    selected,
+  };
 }
 
 /**
@@ -166,9 +185,10 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     options?.interactive === true &&
     (typeof options.prompt === 'function' || Boolean(options?.rollDecision));
   // Append before anything reads the formula, so dialog, roll and journal agree (issue 1097).
-  const baseFormula = useDeferredChoice
-    ? authoredFormula
-    : resolveRolledFormula(authoredFormula, actor, options?.craftingModifier);
+  const resolvedCheck = useDeferredChoice
+    ? { formula: authoredFormula, selected: [] }
+    : resolveRolledCheck(authoredFormula, actor, options?.craftingModifier);
+  const baseFormula = resolvedCheck.formula;
   // The `@`-resolved display, recomputed below whenever the formula changes.
   let resolved = resolveCheckFormulaDisplay(baseFormula, actor);
 
@@ -207,6 +227,8 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
         activity: options.activity,
         img: options.img,
         modifierChoice,
+        selectedModifiers: resolvedCheck.selected,
+        thresholdMode: options.thresholdMode,
         // Offered only for a plain-d20 authored check.
         allowAdvantage: hasPlainD20(advantageBase),
       });
@@ -634,7 +656,12 @@ export async function runFormulaPassFail({
   if (formula) {
     let rolled;
     try {
-      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, dc, craftingModifier });
+      rolled = await evaluateCheckRoll(formula, actor, {
+        ...rollOptions,
+        dc,
+        thresholdMode,
+        craftingModifier,
+      });
     } catch (error) {
       console.error(`Fabricate | ${label} check roll failed (${formula})`, error);
       return {
@@ -1101,7 +1128,11 @@ export async function runFormulaRouted({
     try {
       // No `dc` here: `evaluateCheckRoll` uses it for the prompt only, and callers already put
       // the prompt-facing DC on `rollOptions` (none for a fixed check).
-      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, craftingModifier });
+      rolled = await evaluateCheckRoll(formula, actor, {
+        ...rollOptions,
+        thresholdMode,
+        craftingModifier,
+      });
     } catch (error) {
       console.error(`Fabricate | ${label} routed check roll failed (${formula})`, error);
       return {

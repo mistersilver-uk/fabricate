@@ -253,6 +253,45 @@ test('check modifiers: runFormulaPassFail threads the modifier context through t
   delete globalThis.Roll;
 });
 
+test('the runner passes normalized comparison and the formula-selected modifier to the prompt', async () => {
+  stubCraftingModRoll();
+  const actor = { getRollData: () => ({ abilities: { med: { mod: 3 }, alch: { mod: 5 } } }) };
+  for (const thresholdMode of ['meet', 'exceed']) {
+    let shown;
+    await runFormulaPassFail({
+      formula: '1d20', dc: 10, thresholdMode, actor, craftingModifier: MOD_CONTEXT,
+      rollOptions: { interactive: true, prompt: async (options) => {
+        shown = options;
+        return { confirmed: true, advantage: 'normal' };
+      } },
+    });
+    assert.equal(shown.thresholdMode, thresholdMode);
+    assert.deepEqual(shown.selectedModifiers.map((modifier) => modifier.id), ['alch']);
+    assert.equal(shown.selectedModifiers[0].display, '+5');
+    assert.equal(shown.resolvedFormula, '1d20 + 5[Modifiers]');
+  }
+  delete globalThis.Roll;
+});
+
+test('the routed runner passes its comparison and selected modifier to the prompt', async () => {
+  stubCraftingModRoll();
+  const actor = { getRollData: () => ({ abilities: { med: { mod: 3 }, alch: { mod: 5 } } }) };
+  let shown;
+  await runFormulaRouted({
+    formula: '1d20', dc: 10, thresholdMode: 'exceed', type: 'relative',
+    relativeOutcomes: [{ id: 'pass', name: 'Pass', success: true, dcOffset: 0 }],
+    actor, craftingModifier: MOD_CONTEXT,
+    rollOptions: { interactive: true, prompt: async (options) => {
+      shown = options;
+      return { confirmed: true, advantage: 'normal' };
+    } },
+  });
+  assert.equal(shown.thresholdMode, 'exceed');
+  assert.deepEqual(shown.selectedModifiers.map((modifier) => modifier.id), ['alch']);
+  assert.equal(shown.resolvedFormula, '1d20 + 5[Modifiers]');
+  delete globalThis.Roll;
+});
+
 // ── the retirement shim, at the head of the roll path (issue 1094) ───────────
 
 // A token that SURVIVED the 1.21.0 migration — hand-edited, imported, or seeded by a
