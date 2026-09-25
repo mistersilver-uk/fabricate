@@ -156,11 +156,16 @@
 
 <style>
   .fabricate-roll-prompt {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
     color: var(--fab-text);
     background: var(--fab-bg-1);
     font: inherit;
   }
   .prompt-heading {
+    flex: 0 0 auto;
     padding: var(--fab-space-3) calc(var(--fab-space-3) + var(--fab-space-2xs));
     border-bottom: 1px solid var(--fab-border);
     background: var(--fab-bg-2);
@@ -178,7 +183,11 @@
   }
   .prompt-body {
     display: grid;
+    align-content: start;
+    flex: 1 1 auto;
     gap: calc(var(--fab-space-3) + var(--fab-space-2xs));
+    min-height: 0;
+    overflow-y: auto;
     padding: calc(var(--fab-space-3) + var(--fab-space-2xs)) var(--fab-space-4);
   }
   .formula-row {
