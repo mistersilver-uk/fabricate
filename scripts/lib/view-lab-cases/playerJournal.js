@@ -113,14 +113,14 @@ export const CASES = Object.freeze([
     label: 'Player Journal — versioned check roll prompt',
     smokeLabels: [],
     reaches: 'beyond',
-    query: { tab: 'journal', journalCaseState: 'journal-check-prompt' },
+    query: { tab: 'journal', journalCaseState: 'journal-check-prompt', dialog: 'open' },
     steps: [
       { selector: '[data-run-id="lab-v1-journal-check-prompt"]' },
       { selector: '[data-journal-detail] [data-run-action="primary"]' },
     ],
     expectTab: 'journal',
     expectSelector:
-      '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="single"]' +
+      '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="advantage"]' +
       ':has(.prompt-heading p):has(.formula-content code):has(.static-modifiers .modifier-chips)',
     kinds: ['player', 'journal'],
     sourceMatches: [

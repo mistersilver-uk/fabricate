@@ -45,7 +45,7 @@
           <div class="formula-content">
             {#if data.formula}<code>{data.formula}</code>{/if}
             {#if data.dc !== null}
-              <Chip tone="info" density="row" mono>{data.labels.dcValue.replace('{dc}', String(data.dc))} · {data.comparison === 'exceed' ? data.labels.exceed : data.labels.meet}</Chip>
+              <Chip tone="info" density="row" mono icon="fa-solid fa-bullseye">{data.labels.dcValue.replace('{dc}', String(data.dc))} · {data.comparison === 'exceed' ? data.labels.exceed : data.labels.meet}</Chip>
             {/if}
           </div>
         </div>
