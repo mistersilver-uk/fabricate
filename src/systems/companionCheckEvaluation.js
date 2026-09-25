@@ -91,7 +91,10 @@ function validatedSnapshot(record, schema) {
   return snapshot;
 }
 
-/** Validate every supplied field before applying persisted-record defaults. */
+/**
+ * Validate every supplied plain-data field before applying shared defaults.
+ * A valid normalized evaluation still requires an advertised execution mode.
+ */
 export function resolveCompanionCheckEvaluation(input) {
   if (input === undefined) return { ok: true, evaluation: normalizeCheckEvaluation() };
   try {
@@ -107,7 +110,10 @@ export function resolveCompanionCheckEvaluation(input) {
   }
 }
 
-/** The published rows are the executable standalone dispatch contract. */
+/**
+ * Match a normalized evaluation against the published standalone execution rows.
+ * Interactive eligibility belongs to each advertised row.
+ */
 export function supportsCompanionCheckEvaluation(evaluation, interactive = false) {
   return CHECK_EVALUATION_CAPABILITIES.modes.some(
     (mode) =>

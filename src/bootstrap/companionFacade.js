@@ -248,7 +248,10 @@ export const companionFacade = {
     };
   },
 
-  /** One formula for one actor, graded or not (issue 1293); preconditions 1-3 only. */
+  /**
+   * Roll one formula for one actor, graded or ungraded.
+   * Read `evaluation` without invoking an accessor so the leaf retains its gate ordering.
+   */
   async rollActorCheck(request = {}) {
     const {
       actorId = null,
