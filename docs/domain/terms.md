@@ -1529,7 +1529,7 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-mo
 ## Check Evaluation
 
 Each of the eight normalized check subobjects (crafting and salvage simple, routed and progressive; gathering routed and progressive) retains an `evaluation` record, even when its selected product, direction, target or pool settings are inactive.
-The record defaults to `sum/over`, and the current runners and odds classifier execute `sum/over` even when a future count or under choice was authored.
+The record defaults to `sum/over`, and the current activity runners and odds classifier execute `sum/over` even when a future count or under choice was authored.
 Recipe tiers retain nullable `adjustment` and `successes` siblings beside `dc`, and relative outcome tiers retain a nullable `adjustment`; no current runner reads them.
 The private crafting and gathering prepared check descriptors clone that authored record beside the prepared formula and DC; it is not the public executed `resolutionSnapshot`.
 
@@ -1555,8 +1555,11 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-mo
 
 It is therefore NOT a **Check**: a Check is taken on a subject inside a Crafting System and carries that system's **Check Modifier** catalogue, combination rule, tool bonuses, **Check Breakage** triggers, **Tier Stepping** and failure-result policy, none of which a Standalone Check Roll has a system or a subject to derive.
 A companion wanting those routes a real craft or salvage instead.
+Its optional evaluation is strictly validated after the existing authorization and roll-decision gates: malformed records refuse `evaluationInvalid`, and valid modes absent from `game.fabricate.api.companion.features.checkEvaluation` refuse `evaluationUnsupported` before rolling or prompting.
+The version-1 capability descriptor advertises only `sum/over/fixed`, including interactive use; count, under and attribute choices remain valid authored data but have no standalone execution route yet.
+A rolled standalone answer projects **Executed Check Evidence** from the shared runner, while every refusal omits those execution fields.
 
-Canonical mapping: `src/systems/companionCheckRoll.js` (`rollActorCheck`, `resolveBulkCheckDecision`); published as `game.fabricate.rollActorCheck` / `game.fabricate.resolveBulkCheckDecision` on the `companion` contract (issue 1293)
+Canonical mapping: `src/systems/companionCheckRoll.js` (`rollActorCheck`, `resolveBulkCheckDecision`); `src/systems/companionCheckEvaluation.js`; `src/systems/companionContract.js` (`COMPANION_CONTRACT`); published as `game.fabricate.rollActorCheck` / `game.fabricate.resolveBulkCheckDecision` on the `companion` contract (issue 1293)
 
 Spec reference: openspec/specs/companion-api/spec.md, openspec/specs/resolution-modes/spec.md, openspec/specs/ui-crafting-app/spec.md
 
