@@ -4,11 +4,11 @@
  */
 
 import { hasPlainD20, stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
+
 import {
   resolveCompanionCheckEvaluation,
   supportsCompanionCheckEvaluation,
 } from './companionCheckEvaluation.js';
-
 import {
   CHECK_ROLL_DEFAULT_LABEL,
   COMPANION_OUTCOMES,
