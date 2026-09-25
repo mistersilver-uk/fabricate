@@ -268,7 +268,7 @@ export const companionFacade = {
       return checkRollResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
     }
     // The leaf orders call-site and roll-decision gates ahead of a malformed evaluation.
-    let evaluation = null;
+    let evaluation;
     try {
       const descriptor = Object.getOwnPropertyDescriptor(request, 'evaluation');
       evaluation = descriptor && !Object.hasOwn(descriptor, 'value') ? null : descriptor?.value;
