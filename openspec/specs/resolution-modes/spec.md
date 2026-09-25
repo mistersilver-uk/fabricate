@@ -321,6 +321,9 @@ Actual awards and terminal status remain independent evidence: all-miss d100 ite
 The canonical active-check resolver MUST govern both Journal check labels and completion-preference eligibility.
 Alchemy `none` has no check, `simple` reads the simple check slot, and `tiered` reads the routed slot.
 Versioned player checks use an authenticated prepare/resolve exchange: the player chooses permitted roll options, while the active GM evaluates the authoritative check.
+The private prepared descriptor captures the JSON-safe modifier context with actor expression substitutions and the full permitted player choice before the prompt; the public projection carries only the already-applied display entries or deferred choice display, never the private catalogue or evaluation policy.
+The shared resolver supplies both the displayed static contribution and the contribution later appended to the authoritative roll, so a library or actor-data edit after preparation cannot change it.
+Only a simple pass/fail check projects a finite single target and normalized meet-or-exceed comparison to the public Journal prompt; routed and progressive classification inputs stay private.
 Initial secret prompts MUST omit protected subject, artwork, formula, DC and modifier details before transport.
 Secret checks use GM private posting without serialized roll-data handoff; non-secret roll handoff additionally requires a fresh post-commit entitlement check and never rolls a second time.
 Roll delivery and chat posting are separate from run settlement; missing chat delivery MUST NOT authorize replay of spending or awards.

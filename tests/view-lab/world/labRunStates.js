@@ -52,6 +52,7 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'material-shortage': 'lab-v1-material-shortage',
   'ingredient-route': 'lab-v1-ingredient-route',
   'check-route': 'lab-v1-check-route',
+  'journal-check-prompt': 'lab-v1-journal-check-prompt',
   'essence-shared': 'lab-v1-essence-shared',
   paused: 'lab-v1-paused',
   'cancel-confirmation': 'lab-v1-cancel-confirmation',
@@ -576,6 +577,7 @@ function journalCaseFactories(context) {
         })
       ),
     'check-route': () => active(ready('lab-v1-check-route', checkRoute())),
+    'journal-check-prompt': () => active(ready('lab-v1-journal-check-prompt', checkRoute())),
     'essence-shared': () => active(unbegun('lab-v1-essence-shared', essence())),
     paused: () =>
       active(
@@ -1600,6 +1602,7 @@ export function createLabJournalCaseController({
   };
 
   async function execute(command) {
+    if (state === 'journal-check-prompt' && command?.action === 'execute') return undefined;
     const event = { ...cloneFixtureValue(command ?? {}), state };
     events.push(event);
     const located = locateActiveRun(containers, command);

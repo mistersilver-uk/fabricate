@@ -8,6 +8,7 @@ import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
 import { resolvedComponentsFor } from '../src/systems/scopedEntityReads.js';
+import { promptJournalStageCheck } from '../src/bootstrap/journalOperations.js';
 import { createJournalRunAuthority } from '../src/systems/journalRunAuthority.js';
 import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
 
@@ -85,6 +86,31 @@ function commandHarness({
   });
   return { service, emitted, emissionOptions, actor };
 }
+
+it('Journal prompt adapter forwards only named, permitted display fields', async () => {
+  const descriptor = {
+    label: 'Old subject label', subject: 'Steep tea', activity: 'Crafting', actorName: 'Tinker',
+    img: 'icons/tea.webp', formula: '1d20 + 3[Modifiers]',
+    resolvedFormula: '1d20 + 3[Modifiers]', target: 14, comparison: 'exceed',
+    selectedModifiers: [{ label: 'Focus', display: '+3' }],
+    allowAdvantage: true, allowsSituationalModifier: true,
+    modifierChoice: null, privateEvaluation: { rollFormula: 'SECRET' },
+  };
+  let received;
+  await promptJournalStageCheck(descriptor, async (options) => { received = options; });
+  assert.deepEqual(received, {
+    name: 'Steep tea', actorName: 'Tinker', activity: 'Crafting', img: 'icons/tea.webp',
+    formula: '1d20 + 3[Modifiers]', resolvedFormula: '1d20 + 3[Modifiers]',
+    dc: 14, comparison: 'exceed', thresholdMode: 'exceed',
+    selectedModifiers: [{ label: 'Focus', display: '+3' }],
+    allowAdvantage: true, modifierChoice: null,
+  });
+  await promptJournalStageCheck({ ...descriptor, target: null, comparison: null },
+    async (options) => { received = options; });
+  assert.equal(received.dc, null);
+  assert.equal(received.comparison, null);
+  assert.equal(received.thresholdMode, null);
+});
 
 describe('journal run command protocol', () => {
   function loadCraftingOperations() {
@@ -176,9 +202,12 @@ describe('journal run command protocol', () => {
       const canary = 'PROTECTED-RECIPE-CANARY';
       const run = { id: 'run-1', recipeId: 'recipe', lifecycleVersion: 1, runRevision: 3 };
       const publicPrompt = {
-        label: canary, recipeName: canary, formula: '1d20+987', dc: 987,
+        label: canary, recipeName: canary, subject: canary, actorName: canary,
+        activity: 'Crafting', img: canary, formula: '1d20+987', resolvedFormula: '1d20+987',
+        target: 987, comparison: 'exceed', dc: 987,
         mode: 'simple', allowsSituationalModifier: true, allowAdvantage: true,
         modifierChoice: { modifiers: [{ id: canary, label: canary }] },
+        selectedModifiers: [{ label: canary, display: '+987' }],
         allowedModifierIds: [canary], protectedFields: { nested: canary },
       };
       const privateEvaluation = { recipeId: 'recipe', rollFormula: '1d20+987' };
