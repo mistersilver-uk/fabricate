@@ -66,6 +66,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // The outcome simulator and the odds enumerator (issue 1097), plus the engine modules they drive.
   'src/ui/svelte/apps/manager/checks/checkPreview.js',
   'src/ui/svelte/apps/manager/checks/checkOdds.js',
+  'src/systems/checkEvaluation.js',
   'src/systems/checkRoll.js',
   'src/systems/bulkChatVisibility.js',
   'src/utils/progressiveAward.js',
