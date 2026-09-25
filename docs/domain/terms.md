@@ -1540,7 +1540,8 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-mo
 
 An executed formula result records raw `data.total` and the existing `data.dc` alongside the actual product, direction, comparison, target, margin, successes and cancelled-success count.
 In the current `sum/over` execution, successes and cancelled-success count are null; simple checks target their resolved DC, relative routed checks target the roll-matched tier's effective threshold before forcing or stepping, and fixed routed and progressive checks have no single target or margin.
-A non-null margin measures raw total minus target regardless of any forced disposition; an unrolled, cancelled or failed evaluation does not gain executed fields.
+A non-null margin measures raw total minus target regardless of any forced disposition.
+An unrolled, prompt-cancelled, no-engine, empty-formula or errored evaluation does not gain executed fields.
 The result's `data.cancelled` is distinct from the top-level `cancelled` flag that aborts a prompt.
 Only a permitted executed versioned crafting check may carry matching `sum/over` metadata into its historical `resolutionSnapshot`.
 
