@@ -123,7 +123,7 @@
   .prompt-heading p { margin: 3px 0 0; color: var(--fab-text-subtle); font-size: 10.5px; font-weight: 500; }
   .prompt-body { display: grid; gap: 14px; padding: 14px 16px; }
   .formula-row { display: flex; align-items: flex-start; gap: 12px; }
-  .die-glyph { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border: 1px solid var(--fab-border); border-radius: 6px; background: var(--fab-bg-2); color: var(--fab-accent-text); }
+  .die-glyph { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border: 1px solid var(--fab-border-strong); border-radius: 9px; background: var(--fab-bg-2); color: var(--fab-accent-text); font-size: 17px; }
   .formula-content { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; }
   .formula-content code { color: var(--fab-text); font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
   .eyebrow { margin: 0 0 6px; color: var(--fab-text-subtle); font-size: 8.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
@@ -141,6 +141,6 @@
   .modifier-choice i { color: var(--fab-accent-text); }
   .modifier-choice span:last-child { font-weight: 700; }
   .bonus-group, .bonus-field, .mode-field { display: grid; gap: 4px; }
-  .fabricate-roll-prompt :global(.bonus-field input), .fabricate-roll-prompt :global(.mode-field select) { width: 100%; box-sizing: border-box; min-height: 30px; padding: 5px 10px; border: 1px solid var(--fab-border-strong); border-radius: 6px; background: var(--fab-bg-2); color: var(--fab-text); font: inherit; }
+  .fabricate-roll-prompt :global(.bonus-field input), .fabricate-roll-prompt :global(.mode-field select) { width: 100%; box-sizing: border-box; height: 30px; min-height: 30px; padding: 0 10px; border: 1px solid var(--fab-border); border-radius: 7px; background: var(--fab-bg-2); color: var(--fab-text); font: inherit; }
   .fabricate-roll-prompt :global(.bonus-field input::placeholder) { color: var(--fab-text-subtle); }
 </style>

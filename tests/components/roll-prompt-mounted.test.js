@@ -52,6 +52,8 @@ describe('mounted roll prompt', () => {
     const mode = root.querySelector('select[name="rollMode"]');
     assert.ok(bonus);
     assert.ok(mode);
+    assert.equal(mode.value, 'publicroll');
+    assert.equal(mode.selectedOptions[0].textContent, 'Public roll');
     bonus.value = '+2';
     mode.value = 'gmroll';
     assert.equal(bonus.value, '+2');
