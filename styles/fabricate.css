@@ -17451,6 +17451,7 @@
   color-scheme: dark;
   display: flex;
   flex-direction: column;
+  gap: 0;
   overflow: hidden;
   min-height: 0;
   max-height: calc(100vh - 70px);
