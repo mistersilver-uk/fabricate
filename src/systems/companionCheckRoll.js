@@ -96,10 +96,9 @@ async function runStandaloneCheck(
 }
 
 /**
- * Roll one formula for one actor, graded against a finite `dc` or ungraded; never throws.
- * The request key set is closed (`actor, callSite, formula, dc, compare, label, interactive,
- * rollDecision, evaluation`) and no `...request` spread reaches the builder, runner or `rollOptions`, so a
- * caller cannot inject a `prompt` or a `speaker`. `rollDecision` is refused unless `interactive`.
+ * Roll one formula for one actor, graded against a finite `dc` or ungraded, without throwing.
+ * The request is closed and does not spread caller properties into the runner or roll options.
+ * A supplied evaluation is strictly validated after call-site and roll-decision gates, then matched to a published mode.
  */
 export async function rollActorCheck(request, seams) {
   try {

@@ -526,12 +526,9 @@ const ROLLED_OUTCOMES = Object.freeze([
 ]);
 
 /**
- * Build `rollActorCheck`'s answer (issue 1293). Every field is derived from the outcome and the
- * member's internal roll record, never a caller bag: `buildResult` writes `success` before it
- * spreads `extra`. `passed` is `null` when ungraded; `total` is the raw total or `null` for a
- * refusal (a rolled `0` stays `0`); `diceGroups` is `[]` and `resolvedFormula` (the `@`-resolved
- * formula) is `null` on a refusal. Executed evaluation fields come from the runner's own data;
- * refusals omit them.
+ * Build `rollActorCheck`'s answer from the outcome and the runner-owned record, never a caller bag.
+ * `passed` is `null` when ungraded and `total` is `null` for a refusal, while rolled `0` stays `0`.
+ * Refusals use empty dice data and omit executed evaluation fields, which come only from the runner.
  */
 export function checkRollResult(outcome, messageData = null, roll = null) {
   const rolled = ROLLED_OUTCOMES.includes(outcome);
