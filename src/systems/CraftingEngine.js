@@ -426,7 +426,7 @@ export class CraftingEngine {
         slot: activeCheck.slot,
         rollFormula,
         checkConfig: {
-          ...(cloneJsonValue(activeCheck.config) ?? {}),
+          ...cloneJsonValue(activeCheck.config),
           craftingModifier: cloneJsonValue(modifierContext),
           modifierChoice: cloneJsonValue(modifierChoice),
         },

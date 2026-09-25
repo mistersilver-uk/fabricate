@@ -16,7 +16,8 @@ export const CASES = Object.freeze([
   playerCase({
     id: 'player-crafting-roll-prompt-basic',
     label: 'Player app — 2d6 crafting roll prompt',
-    smokeLabels: [], reaches: 'beyond',
+    smokeLabels: [],
+    reaches: 'beyond',
     query: { tab: 'crafting', dialog: 'open', rollPromptState: 'basic' },
     steps: [
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
@@ -28,12 +29,17 @@ export const CASES = Object.freeze([
       ':has(.formula-content code:has-text("2d6 + 3"))' +
       ':has(.formula-content .manager-chip:has-text("DC 15 · meet or beat"))',
     kinds: ['player', 'crafting'],
-    sourceMatches: [CRAFTING_SIMPLE, /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/, /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/],
+    sourceMatches: [
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+    ],
   }),
   playerCase({
     id: 'player-crafting-roll-prompt-advantage',
     label: 'Player app — d20 crafting roll prompt',
-    smokeLabels: [], reaches: 'beyond',
+    smokeLabels: [],
+    reaches: 'beyond',
     query: { tab: 'crafting', dialog: 'open', rollPromptState: 'advantage' },
     steps: [
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
@@ -45,12 +51,17 @@ export const CASES = Object.freeze([
       ':has(.formula-content code:has-text("1d20 + 3"))' +
       ':has(.formula-content .manager-chip:has-text("DC 15 · meet or beat"))',
     kinds: ['player', 'crafting'],
-    sourceMatches: [CRAFTING_SIMPLE, /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/, /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/],
+    sourceMatches: [
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+    ],
   }),
   playerCase({
     id: 'player-crafting-roll-prompt-light',
     label: 'Player app — light frame crafting roll prompt',
-    smokeLabels: [], reaches: 'beyond',
+    smokeLabels: [],
+    reaches: 'beyond',
     query: { tab: 'crafting', dialog: 'open', rollPromptState: 'light', colorScheme: 'light' },
     steps: [
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
@@ -62,7 +73,11 @@ export const CASES = Object.freeze([
       ':has(.formula-content code:has-text("2d6 + 3"))' +
       ':has(.formula-content .manager-chip:has-text("DC 15 · meet or beat"))',
     kinds: ['player', 'crafting'],
-    sourceMatches: [CRAFTING_SIMPLE, /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/, /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/],
+    sourceMatches: [
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+    ],
   }),
   playerCase({
     id: 'player-gathering-events',
@@ -375,7 +390,8 @@ export const CASES = Object.freeze([
   playerCase({
     id: 'player-crafting-roll-prompt-multipick',
     label: 'Player app — multipick crafting roll prompt',
-    smokeLabels: [], reaches: 'beyond',
+    smokeLabels: [],
+    reaches: 'beyond',
     query: { tab: 'crafting', dialog: 'open' },
     steps: [
       { selector: '.crafting-browser-search input', fill: 'Stillroom' },
@@ -390,12 +406,17 @@ export const CASES = Object.freeze([
       ':has(input[type="checkbox"][name="craftingModifier"][aria-label="Medicine +4"])' +
       ':has(input[type="checkbox"][name="craftingModifier"][aria-label="Nature +2"])',
     kinds: ['player', 'crafting'],
-    sourceMatches: [CRAFTING_PROGRESSIVE, /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/, /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/],
+    sourceMatches: [
+      CRAFTING_PROGRESSIVE,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+    ],
   }),
   playerCase({
     id: 'player-crafting-roll-prompt-overflow',
     label: 'Player app — dense crafting roll prompt',
-    smokeLabels: [], reaches: 'beyond',
+    smokeLabels: [],
+    reaches: 'beyond',
     query: { tab: 'crafting', dialog: 'open', rollPromptState: 'overflow' },
     steps: [
       { selector: '.crafting-browser-search input', fill: 'Stillroom' },
@@ -409,7 +430,11 @@ export const CASES = Object.freeze([
       ':not(:has(.formula-content .manager-chip))' +
       ':has(input[type="checkbox"][name="craftingModifier"][aria-label*="Medicine"][aria-label*="+4"])',
     kinds: ['player', 'crafting'],
-    sourceMatches: [CRAFTING_PROGRESSIVE, /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/, /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/],
+    sourceMatches: [
+      CRAFTING_PROGRESSIVE,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+    ],
   }),
   playerCase({
     id: 'player-crafting-essence-alternative',
