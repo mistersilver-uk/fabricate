@@ -28,7 +28,7 @@ The pooled members split the same way: the pooled base-value read, the base-unit
 
 ## The Published Contract
 
-Fabricate publishes exactly one named, versioned contract for outbound behavioural consumption: `game.fabricate.api.companion`, a frozen `{ schemaVersion, members, outcomes, callSites }` descriptor.
+Fabricate publishes exactly one named, versioned contract for outbound behavioural consumption: `game.fabricate.api.companion`, a frozen `{ schemaVersion, members, outcomes, callSites, features }` descriptor.
 This publication rename leaves schema version 1, those four fields and their order, every member row and order, the outcome and call-site vocabularies, signatures, result shapes, and readiness semantics unchanged.
 `game.fabricate.api.COMPANION` remains an enumerable deprecated accessor to that identical descriptor until an explicitly released breaking major version.
 Reading the alias emits at most one warning per client page session, including across the `init`/`ready` rebind, and names both the lowercase replacement and the migration documentation.
@@ -160,8 +160,8 @@ A Standalone Check Roll is `@`-placeholder resolution against the actor's roll d
 
 Two members publish it.
 
-`rollActorCheck` rolls one formula for one actor and answers `{ success, passed, total, diceGroups, resolvedFormula, outcome, message }`.
-Its request key set is **closed**: exactly `{ actorId, callSite, formula, dc, compare, label, interactive, rollDecision }`, and nothing else is read.
+`rollActorCheck` rolls one formula for one actor and answers `{ success, passed, total, diceGroups, resolvedFormula, outcome, message }`, with executed evaluation fields on rolled outcomes.
+Its request key set is **closed**: exactly `{ actorId, callSite, formula, dc, compare, label, interactive, rollDecision, evaluation }`, and nothing else is read.
 No caller-supplied bag is spread into the options builder, the runner, or the nested roll options: a spread would let a companion inject its own prompt and bypass the dialog, or a speaker impersonating another actor in chat, while satisfying every behavioural assertion.
 `img`, `subjects` and `speaker` are deliberately absent from the first version — `speaker` is derived from the resolved actor and is never caller-supplied — because a member MAY gain an optional argument without a version bump but may not lose one.
 There is no bare top-level `rollMode` key: the roll uses the client's own default unless the caller supplies a `rollDecision`, in which case `rollDecision.rollMode` overrides the default exactly as `rollDecision.bonus` and `rollDecision.advantage` do.
@@ -175,11 +175,26 @@ Answering before anything starts is what makes zero mutation on a dismissal stru
 **Derived answer fields are computed from the outcome and from the member's own internal record, never from a caller-supplied bag.**
 `passed` is `true` for `checkPassed`, `false` for `checkFailed`, and `null` for everything else including the ungraded `rolled`, which is not graded and so has no pass.
 `total` is **always the raw roll total** and is `null` for every refusal, `engineUnavailable` and `noFormula` included; a legitimate rolled `0` answers `0` and never `null`.
+An executed answer additionally carries `product`, `direction`, `comparison`, `target`, `margin`, `successes`, and `cancelled`, projected from the shared runner's `data` without changing the raw total or outcome.
+For sum checks, `successes` and `cancelled` are `null`; for an ungraded sum, `comparison`, `target`, and `margin` are `null`.
+The public `cancelled` field counts cancelled successes in future count checks and is distinct from the runner's top-level `cancelled: true` dismissal sentinel, which answers a refusal and has no execution fields.
+Every refusal omits the seven executed fields rather than supplying synthetic values.
 The member never forces an outcome — it passes an empty trigger list explicitly — so the runner's forced-award divergence between the awarding value and the raw total is unreachable, and a later change that admits triggers cannot silently redefine a published field.
 `diceGroups` and `covered` are **lists**, so their absence is `[]`; a `null` would force every caller to guard a length read.
 The scalars are `null` for the opposite reason: their absence is meaningful, and `0` or `false` would be a confident wrong answer.
 
 **Two pre-dispatch gates are required, not one.**
+After authorization, readiness, call-site, election and forwarded roll-decision gates, the member validates an optional `evaluation` before formula, dice-engine, prompt or runner work.
+Absent or `undefined` evaluation receives complete shared defaults; a supplied evaluation must be a plain data record whose nested records contain only the normalizer's declared keys and no accessors.
+Validation checks even inactive fields without coercing types, clamping numbers or replacing invalid enum values, then applies the shared normalizer only to valid partial records.
+Expressions accept strings or finite numbers; the pool die is an integer at least 2, required is an integer from 0 through 20, additional-dice max is an integer from 1 through 20, and face values are `null` or integers from 1 through the effective die.
+The standalone `compare` key remains the sole inclusive versus strict comparison choice: `exceed` is strict and every other legacy value meets the target.
+For schemaVersion 1, `features.checkEvaluation` is recursively frozen and describes executable mode rows with a version, supported target sources, interactive support, and additional-dice availability.
+The initial row supports `{ product: 'sum', direction: 'over', target.source: 'fixed' }` with or without the interactive prompt and reports `additionalDice: false`.
+Malformed evaluation refuses `evaluationInvalid`; a valid combination absent from the capability rows refuses `evaluationUnsupported`, both before any rolling or prompting.
+Count, sum-under and attribute target requests remain unavailable until their respective engine and prompt successors activate them and update the advertised rows with composition tests.
+On count activation, the standalone member ignores `formula`, uses a supplied non-null `dc` as an integer required-count override and otherwise uses `pool.required`; on attribute activation it ignores `dc` and resolves the target against the actor.
+Inactive count-pool data on a sum check is retained after validation, while active additional dice on count remain unavailable until the additional-dice successor.
 First a **post-shim usability test**, defined identically to `resolveActiveCraftingCheckFormula`'s — the retirement shim, then a trim, then an emptiness test — refusing `noFormula`.
 Then a **dice-engine test**, refusing `engineUnavailable`.
 Both are required because the shared evaluator reports "no engine" from **two** sites: a missing dice engine, and a formula the retirement shim empties with the dice engine fully present.
@@ -226,7 +241,7 @@ The shipped internal `caller` discriminator is required of an internal call site
 
 ## The Outcome Vocabulary Added By The Standalone Check Roll
 
-The Standalone Check Roll adds exactly these outcomes: `checkPassed`, `checkFailed`, `rolled`, `rollFailed`, `cancelled`, `engineUnavailable`, `noFormula`, `invalidCallSite`, `notElected`, `invalidRollDecision`, `decided`, and `nothingToDecide`.
+The Standalone Check Roll adds exactly these outcomes: `checkPassed`, `checkFailed`, `rolled`, `rollFailed`, `cancelled`, `engineUnavailable`, `noFormula`, `invalidCallSite`, `notElected`, `invalidRollDecision`, `evaluationInvalid`, `evaluationUnsupported`, `decided`, and `nothingToDecide`.
 Of these, `checkPassed`, `checkFailed`, `rolled`, `decided` and `nothingToDecide` answer `success: true`: a check that **rolled** answered the question whichever way it landed, and the caller reads `outcome` to learn what happened rather than the boolean.
 
 `checkPassed` and `checkFailed` carry their prefix deliberately.

@@ -99,6 +99,8 @@ const EXPECTED_OUTCOMES = Object.freeze([
   'engineUnavailable',
   'noFormula',
   'invalidRollDecision',
+  'evaluationInvalid',
+  'evaluationUnsupported',
   'cancelled',
   'invalidCallSite',
   'notElected',
@@ -273,13 +275,14 @@ function affordabilityAnswer(outcome, affordable, messageData = null) {
   return expected;
 }
 
-test('the descriptor publishes exactly the four contract fields, frozen', () => {
+test('the descriptor publishes versioned evaluation features, frozen', () => {
   assert.ok(Object.isFrozen(COMPANION_CONTRACT), 'the descriptor is frozen');
   assert.deepEqual(Object.keys(COMPANION_CONTRACT), [
     'schemaVersion',
     'members',
     'outcomes',
     'callSites',
+    'features',
   ]);
   assert.equal(COMPANION_CONTRACT.schemaVersion, COMPANION_CONTRACT_SCHEMA_VERSION);
   assert.equal(Number.isInteger(COMPANION_CONTRACT_SCHEMA_VERSION), true);
@@ -292,6 +295,14 @@ test('the descriptor publishes exactly the four contract fields, frozen', () => 
   assert.ok(Object.isFrozen(COMPANION_CONTRACT.members), 'the member table is frozen');
   assert.ok(Object.isFrozen(COMPANION_CONTRACT.outcomes), 'the outcome vocabulary is frozen');
   assert.ok(Object.isFrozen(COMPANION_CONTRACT.callSites), 'the call-site pair is frozen');
+  assert.deepEqual(COMPANION_CONTRACT.features.checkEvaluation, {
+    version: 1,
+    modes: [{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }],
+    additionalDice: false,
+  });
+  assert.ok(Object.isFrozen(COMPANION_CONTRACT.features));
+  assert.ok(Object.isFrozen(COMPANION_CONTRACT.features.checkEvaluation));
+  assert.ok(Object.isFrozen(COMPANION_CONTRACT.features.checkEvaluation.modes[0].targetSources));
 });
 
 test('the member table is exactly the declared set at its declared promise tiers', () => {
@@ -717,7 +728,13 @@ test('every rollActorCheck refusal answers the WHOLE refusal shape', () => {
     assert.deepEqual(result.diceGroups, []);
     assert.equal(result.total, null);
   }
-  for (const outcome of ['noFormula', 'engineUnavailable', 'cancelled']) {
+  for (const outcome of [
+    'noFormula',
+    'engineUnavailable',
+    'cancelled',
+    'evaluationInvalid',
+    'evaluationUnsupported',
+  ]) {
     assertContractResult(
       checkRollResult(outcome, { label: 'Fabricate' }),
       checkRollRefusal(outcome, { label: 'Fabricate' })
@@ -762,6 +779,21 @@ test('a legitimate rolled zero answers 0, and never the null a refusal answers',
   assert.equal(zero.passed, false);
   assert.equal(zero.success, true, 'the check WAS rolled; it simply did not pass');
   assert.equal(zero.diceGroups.length, 1);
+
+  const executed = checkRollResult('checkFailed', { label: 'Fabricate', total: 0, dc: 15 }, {
+    total: 0,
+    product: 'sum',
+    direction: 'over',
+    comparison: 'meet',
+    target: 15,
+    margin: -15,
+    successes: null,
+    cancelled: null,
+  });
+  assert.deepEqual(
+    [executed.product, executed.direction, executed.comparison, executed.target, executed.margin],
+    ['sum', 'over', 'meet', 15, -15]
+  );
 
   const refusal = checkRollResult('engineUnavailable', { label: 'Fabricate' });
   assert.equal(refusal.total, null, 'and the two are distinguishable, which is the whole point');

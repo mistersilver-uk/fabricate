@@ -1678,7 +1678,7 @@ test('executed simple evidence records the raw sum/over comparison under a force
   );
 });
 
-test('standalone companion check keeps its closed request on the current over comparison', async () => {
+test('standalone companion check refuses a future mode before the current over runner', async () => {
   stubRoll(8);
   const result = await rollActorCheck(
     { actor: ACTOR, callSite: 'gmAction', formula: '1d20', dc: 10,
@@ -1693,9 +1693,10 @@ test('standalone companion check keeps its closed request on the current over co
       runProgressive: runFormulaProgressive,
     }
   );
-  assert.equal(result.outcome, 'checkFailed');
-  assert.equal(result.passed, false);
-  assert.equal(result.total, 8);
+  assert.equal(result.outcome, 'evaluationUnsupported');
+  assert.equal(result.success, false);
+  assert.equal(result.total, null);
+  assert.deepEqual(evaluateArgs, [], 'the unsupported mode never reached the dice engine');
 });
 
 test('gathering routed adapter retains a future check record while executing sum/over', async () => {
