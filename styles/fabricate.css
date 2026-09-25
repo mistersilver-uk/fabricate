@@ -17470,7 +17470,7 @@
   display: flex;
   gap: 8px;
   flex: 0 0 auto;
-  padding: 12px 16px;
+  padding: var(--fab-space-3) var(--fab-space-4);
   border-top: 1px solid var(--fab-border);
   background: var(--fab-bg-2);
 }
@@ -17478,15 +17478,16 @@
 .fabricate-roll-prompt-dialog .form-footer button,
 .fabricate-roll-prompt-dialog .dialog-buttons button {
   flex: 1 1 0;
-  min-height: 42px;
+  min-height: 44px;
+  height: 44px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
   border: 1px solid var(--fab-border-strong);
-  border-radius: 6px;
-  background: var(--fab-bg-2);
+  border-radius: 11px;
+  background: var(--fab-bg-1);
   color: var(--fab-text);
   font-size: 12px;
   font-weight: 700;
@@ -17502,6 +17503,7 @@
 
 .fabricate-roll-prompt-dialog .fabricate-roll-prompt__footer-note {
   display: block;
+  color: var(--fab-text-secondary);
   font-size: 9.5px;
   font-weight: 500;
 }

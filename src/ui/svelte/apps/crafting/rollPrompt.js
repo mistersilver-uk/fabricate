@@ -8,6 +8,10 @@ const ROLL_MODES = [
   ['selfroll', 'CHAT.RollSelf', 'Self Roll'],
 ];
 
+function supportedRollMode(value, fallback = 'publicroll') {
+  return ROLL_MODES.some(([mode]) => mode === value) ? value : fallback;
+}
+
 function localize(key, fallback) {
   const value = globalThis.game?.i18n?.localize?.(key);
   return typeof value === 'string' && value && value !== key ? value : fallback;
@@ -72,7 +76,7 @@ function readChoice(button, defaultRollMode, advantage, choicePlan) {
   const result = {
     confirmed: true,
     bonus: bonus || null,
-    rollMode: fields?.rollMode?.value || defaultRollMode || undefined,
+    rollMode: supportedRollMode(fields?.rollMode?.value, defaultRollMode),
     advantage,
   };
   if (choicePlan.options.length > 0) {
@@ -124,7 +128,7 @@ export async function waitForPrompt(
   choicePlan,
   { loadBody = () => import('./RollPrompt.svelte'), mountBody = mount, unmountBody = unmount } = {}
 ) {
-  const defaultRollMode = globalThis.game?.settings?.get?.('core', 'rollMode') ?? '';
+  const defaultRollMode = supportedRollMode(globalThis.game?.settings?.get?.('core', 'rollMode'));
   const labels = copy();
   const rollModes = ROLL_MODES.map(([value, key, fallback]) => ({
     value,
@@ -196,6 +200,7 @@ export function buildSinglePromptData({
   img,
   selectedModifiers,
   thresholdMode,
+  comparison,
 } = {}) {
   const activityLabel = activity || localize('FABRICATE.App.RollPrompt.Roll', 'Roll');
   const title = localize('FABRICATE.App.RollPrompt.CheckTitle', '{activity} check').replace(
@@ -216,7 +221,7 @@ export function buildSinglePromptData({
     img: img || '',
     formula: resolvedFormula || formula || '',
     dc: Number.isFinite(dc) ? dc : null,
-    comparison: thresholdMode === 'exceed' ? 'exceed' : 'meet',
+    comparison: comparison === undefined ? (thresholdMode === 'exceed' ? 'exceed' : 'meet') : comparison,
     selectedModifiers: Array.isArray(selectedModifiers) ? selectedModifiers : [],
   };
 }
@@ -272,7 +277,7 @@ export function buildInteractiveRollOptions(
   const rollOptions = {
     interactive: interactive === true,
     prompt: (rollOptions) => prompt({ ...rollOptions, actorName: actor?.name }),
-    rollMode: globalThis.game?.settings?.get?.('core', 'rollMode') ?? '',
+    rollMode: supportedRollMode(globalThis.game?.settings?.get?.('core', 'rollMode')),
     flavor: `${name ? `${name} — ` : ''}${activity} check${dcLabel}`,
     speaker: globalThis.ChatMessage?.getSpeaker?.({ actor }),
     dc,

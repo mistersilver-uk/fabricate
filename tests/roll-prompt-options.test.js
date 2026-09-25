@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { Window } from 'happy-dom';
 import { buildInteractiveRollOptions, buildSinglePromptData, promptCheckRoll, waitForPrompt } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
-import { checkboxGroupField, stubDialogCapture, stubDialogDismissal } from './helpers/rollPromptDialogStub.js';
+import { checkboxGroupField, stubDialogCapture, stubDialogDismissal, stubI18n } from './helpers/rollPromptDialogStub.js';
 
 const choice = {
   modifiers: [{ id: 'a', label: 'A', display: '+1' }, { id: 'b', label: 'B', display: '+1d4' }],
@@ -30,6 +30,8 @@ describe('roll prompt DialogV2 adapter', () => {
     assert.equal(named.subtitle, 'Brenna · Iron');
     assert.equal(named.comparison, 'exceed');
     assert.equal(buildSinglePromptData({ activity: 'Salvage', actorName: 'Brenna' }).subtitle, 'Brenna');
+    assert.equal(buildSinglePromptData({ thresholdMode: 'exceed', comparison: null }).comparison, null);
+    assert.equal(buildSinglePromptData({ thresholdMode: 'exceed', comparison: 'meet' }).comparison, 'meet');
   });
 
   it('binds the actor name while preserving the runner prompt payload', async () => {
@@ -54,6 +56,21 @@ describe('roll prompt DialogV2 adapter', () => {
     assert.equal(dialog.config.position.width, 500);
     assert.match(dialog.content, /fabricate-roll-prompt-host/);
     assert.ok(!dialog.content.includes('craftingModifier'), 'body is mounted after sanitization');
+  });
+
+  it('uses a supported visible default and submitted mode when the client setting is missing or invalid', async () => {
+    for (const [setting, expected] of [[undefined, 'publicroll'], ['unknown', 'publicroll'], ['gmroll', 'gmroll']]) {
+      const restoreI18n = stubI18n({}, { rollMode: setting });
+      try {
+        assert.equal(buildInteractiveRollOptions({ activity: 'Crafting' }).rollMode, expected);
+        const { result } = await open({ activity: 'Crafting' }, {});
+        assert.equal(result.rollMode, expected);
+        const { result: invalidField } = await open({ activity: 'Crafting' }, { rollMode: { value: 'unknown' } });
+        assert.equal(invalidField.rollMode, expected);
+      } finally {
+        restoreI18n();
+      }
+    }
   });
 
   it('returns the selected capped checkbox values and legacy first id', async () => {
@@ -89,6 +106,7 @@ describe('roll prompt DialogV2 adapter', () => {
 
   it('mounts after render, adds footer notes once, and unmounts once per render and close', async () => {
     const previousDocument = globalThis.document;
+    const restoreI18n = stubI18n({ 'CHAT.RollPublic': 'Everyone' });
     const window = new Window();
     globalThis.document = window.document;
     const root = window.document.createElement('div');
@@ -109,6 +127,8 @@ describe('roll prompt DialogV2 adapter', () => {
         loadBody: async () => ({ default: () => {} }),
         mountBody: (_component, options) => {
           assert.equal(options.target.className, 'fabricate-roll-prompt-host');
+          assert.equal(options.props.data.defaultRollMode, 'publicroll');
+          assert.equal(options.props.data.rollModes[0].label, 'Everyone');
           const handle = { number: mounted.length };
           mounted.push(handle);
           return handle;
@@ -119,6 +139,7 @@ describe('roll prompt DialogV2 adapter', () => {
       assert.equal(mounted.length, 2);
       assert.deepEqual(removed, mounted);
     } finally {
+      restoreI18n();
       if (previousDocument === undefined) delete globalThis.document;
       else globalThis.document = previousDocument;
       await window.happyDOM.abort();
