@@ -55,31 +55,20 @@ export function normalizeJournalRunAuthorityState(value) {
   };
 }
 
-/** Owns prepared secrets and recipient replies for exactly one authority instance. */
-export function createJournalRunPrivatePreparation({ now, currentUser, activeGM, nextRandomId }) {
+function createPreparedTokenStore({
+  now,
+  currentUser,
+  nextRandomId,
+  localInstanceId,
+  dropReply,
+  pruneReplies,
+}) {
   const snapshots = new Map();
-  const replies = new Map();
-  let instanceId = null;
-  const localInstanceId = () => (instanceId ??= nextRandomId());
 
   function prune() {
     for (const [token, snapshot] of snapshots) {
       if (snapshot.expiresAt <= now()) snapshots.delete(token);
     }
-    for (const [requestId, reply] of replies) {
-      if (reply.expiresAt <= now()) replies.delete(requestId);
-    }
-  }
-
-  function belongsHere(request, state) {
-    const token = state.prepareTokens[request?.payload?.prepareToken];
-    const prior = state.requests[request?.requestId];
-    const issuer = token ?? (prior?.response?.checkRequired ? prior : null);
-    return !(
-      issuer?.issuerGMId === activeGM?.()?.id &&
-      issuer?.issuerInstanceId &&
-      issuer.issuerInstanceId !== localInstanceId()
-    );
   }
 
   function issue(state, request, binding, expiresAt) {
@@ -111,6 +100,7 @@ export function createJournalRunPrivatePreparation({ now, currentUser, activeGM,
     const record = state.prepareTokens[token];
     const snapshot = snapshots.get(token);
     prune();
+    pruneReplies();
     if (
       record?.status !== 'active' ||
       record.expiresAt <= now() ||
@@ -122,7 +112,7 @@ export function createJournalRunPrivatePreparation({ now, currentUser, activeGM,
       return null;
     }
     snapshots.delete(token);
-    replies.delete(snapshot.requestId);
+    dropReply(snapshot.requestId);
     record.status = 'consumed';
     record.consumedByRequestId = request.requestId;
     return { ...structuredClone(record), binding: structuredClone(snapshot.binding) };
@@ -140,10 +130,49 @@ export function createJournalRunPrivatePreparation({ now, currentUser, activeGM,
     }
     const snapshot = snapshots.get(token);
     snapshots.delete(token);
-    if (snapshot) replies.delete(snapshot.requestId);
+    if (snapshot) dropReply(snapshot.requestId);
     record.status = 'released';
     record.releasedAt = now();
     return true;
+  }
+
+  return { prune, issue, consume, release };
+}
+
+/** Owns prepared secrets and recipient replies for exactly one authority instance. */
+export function createJournalRunPrivatePreparation({ now, currentUser, activeGM, nextRandomId }) {
+  const replies = new Map();
+  let instanceId = null;
+  const localInstanceId = () => (instanceId ??= nextRandomId());
+  const tokens = createPreparedTokenStore({
+    now,
+    currentUser,
+    nextRandomId,
+    localInstanceId,
+    dropReply: (id) => replies.delete(id),
+    pruneReplies,
+  });
+
+  function pruneReplies() {
+    for (const [requestId, reply] of replies) {
+      if (reply.expiresAt <= now()) replies.delete(requestId);
+    }
+  }
+
+  function prune() {
+    tokens.prune();
+    pruneReplies();
+  }
+
+  function belongsHere(request, state) {
+    const token = state.prepareTokens[request?.payload?.prepareToken];
+    const prior = state.requests[request?.requestId];
+    const issuer = token ?? (prior?.response?.checkRequired ? prior : null);
+    return !(
+      issuer?.issuerGMId === activeGM?.()?.id &&
+      issuer?.issuerInstanceId &&
+      issuer.issuerInstanceId !== localInstanceId()
+    );
   }
 
   function rememberReply(requestId, response, state) {
@@ -158,9 +187,9 @@ export function createJournalRunPrivatePreparation({ now, currentUser, activeGM,
     instanceId: localInstanceId,
     prune,
     belongsHere,
-    issue,
-    consume,
-    release,
+    issue: tokens.issue,
+    consume: tokens.consume,
+    release: tokens.release,
     rememberReply,
     reply: (requestId) => structuredClone(replies.get(requestId)?.response ?? null),
   };
