@@ -714,7 +714,7 @@ This additive `features` field leaves `schemaVersion` at `1`.
 Version `1` advertises only the `sum` product, `over` direction and `fixed` target source.
 That mode supports both interactive and non-interactive rolls.
 It advertises `additionalDice: false`, so additional dice have no standalone execution route.
-The current activity runners still execute `sum` over a fixed target.
+The current activity runners still execute sum/over semantics under their existing simple, routed, and progressive resolution rules.
 Count, under and attribute-target evaluations remain authored data without a standalone route until Fabricate advertises and executes them.
 
 A malformed evaluation returns `evaluationInvalid`.
