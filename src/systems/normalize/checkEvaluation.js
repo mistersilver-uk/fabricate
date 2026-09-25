@@ -1,4 +1,7 @@
-/** The persisted evaluation record keeps inactive choices for later mode switches. */
+/**
+ * Produces the persisted check-evaluation record while retaining inactive mode choices.
+ * Invalid values fall back to the record's stable defaults.
+ */
 export function normalizeCheckEvaluation(input = {}) {
   const source = input && typeof input === 'object' ? input : {};
   const target = source.target && typeof source.target === 'object' ? source.target : {};
@@ -45,12 +48,14 @@ export function normalizeCheckEvaluation(input = {}) {
   };
 }
 
+/** Converts a finite adjustment to a number and represents an absent or invalid value as null. */
 export function normalizeNullableAdjustment(value) {
   if ([null, undefined, ''].includes(value)) return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
 
+/** Converts an authored success count in the supported range to an integer or returns null. */
 export function normalizeNullableSuccesses(value) {
   if ([null, undefined, ''].includes(value)) return null;
   const number = Number(value);
