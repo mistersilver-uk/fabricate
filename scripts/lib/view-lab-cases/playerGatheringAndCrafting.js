@@ -26,7 +26,7 @@ export const CASES = Object.freeze([
       '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="basic"]' +
       ':has(.prompt-heading p:has-text("Bend Horseshoe"))' +
       ':has(.formula-content code:has-text("2d6 + 3"))' +
-      ':has(.formula-content .manager-chip:has-text("DC 12 · meet or beat"))',
+      ':has(.formula-content .manager-chip:has-text("DC 15 · meet or beat"))',
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SIMPLE, /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/, /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/],
   }),
@@ -43,7 +43,7 @@ export const CASES = Object.freeze([
       '.application.dialog:has(button[data-action="advantage"]) .fabricate-roll-prompt[data-roll-prompt-state="advantage"]' +
       ':has(.prompt-heading p:has-text("Bend Horseshoe"))' +
       ':has(.formula-content code:has-text("1d20 + 3"))' +
-      ':has(.formula-content .manager-chip:has-text("DC 12 · meet or beat"))',
+      ':has(.formula-content .manager-chip:has-text("DC 15 · meet or beat"))',
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SIMPLE, /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/, /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/],
   }),
@@ -60,7 +60,7 @@ export const CASES = Object.freeze([
       '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="light"]' +
       ':has(.prompt-heading p:has-text("Bend Horseshoe"))' +
       ':has(.formula-content code:has-text("2d6 + 3"))' +
-      ':has(.formula-content .manager-chip:has-text("DC 12 · meet or beat"))',
+      ':has(.formula-content .manager-chip:has-text("DC 15 · meet or beat"))',
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SIMPLE, /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/, /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/],
   }),
