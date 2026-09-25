@@ -83,6 +83,10 @@ It holds one record per essence.
 Two crafting systems that both use Fire point at that one record, so its name, icon, colour and description are authored once in the catalogue rather than once per system.
 What each system keeps for itself is what the essence does on craft there: its enabled switch, its active effect source, and its macro on craft.
 
+Select an essence in the catalogue, then choose **Open definition**.
+The **Systems using this essence** card lists every crafting system.
+Choose **View system rules** beside a system that uses the essence to open that system’s essence rules, including its **Enabled in _system_** switch.
+
 Fabricate treats two systems as meaning the same essence on three things only.
 The name, the macro on craft, and the active effect source.
 The name is compared without regard to case, so Iron and iron are the same name.
