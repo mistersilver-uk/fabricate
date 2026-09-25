@@ -66,6 +66,10 @@ import {
 import { emptyEnvironmentState as _emptyEnvironmentState } from '../../model/environmentValidation.js';
 import { normalizeNodeConfig } from '../../../systems/gatheringNodeConfig.js';
 import { normalizeGatheringResultGroups } from '../../../systems/gatheringResultGroups.js';
+import {
+  normalizeNullableAdjustment,
+  normalizeNullableSuccesses,
+} from '../../../systems/normalize/checkEvaluation.js';
 import { Result } from '../../../models/Result.js';
 import { Tool } from '../../../models/Tool.js';
 import { classifyModeChange } from '../../../systems/migrateRecipeForModeChange.js';
@@ -735,6 +739,8 @@ function _normalizeGatheringTask(task = {}, randomID = _fallbackRandomID) {
       const n = Number(raw);
       return Number.isFinite(n) ? Math.trunc(n) : null;
     })(),
+    adjustmentOverride: normalizeNullableAdjustment(task.adjustmentOverride),
+    successesOverride: normalizeNullableSuccesses(task.successesOverride),
   };
 }
 

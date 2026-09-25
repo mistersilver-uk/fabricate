@@ -28,6 +28,10 @@ import {
   writeState,
 } from './gatheringRichStateInternals.js';
 import { GatheringStaminaService } from './GatheringStaminaService.js';
+import {
+  normalizeNullableAdjustment,
+  normalizeNullableSuccesses,
+} from './normalize/checkEvaluation.js';
 import { resolvedToolsFor } from './scopedEntityReads.js';
 
 const DEFAULT_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
@@ -1439,6 +1443,8 @@ export class GatheringRichStateService {
       ...authoredFailureOutcome(normalized.failureOutcome),
       // Per-task routed-check DC override (issue 904).
       dcOverride: normalized.dcOverride,
+      adjustmentOverride: normalized.adjustmentOverride,
+      successesOverride: normalized.successesOverride,
       catalysts: [],
       toolIds: Array.isArray(normalized.toolIds) ? [...normalized.toolIds] : [],
     };
@@ -1861,6 +1867,8 @@ function normalizeLibraryTask(task = {}) {
       const n = Number(raw);
       return Number.isFinite(n) ? Math.trunc(n) : null;
     })(),
+    adjustmentOverride: normalizeNullableAdjustment(task.adjustmentOverride),
+    successesOverride: normalizeNullableSuccesses(task.successesOverride),
   };
 }
 

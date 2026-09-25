@@ -14,6 +14,7 @@ globalThis.game = {
 globalThis.ui = { notifications: { warn: () => {}, error: () => {} } };
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
+const { normalizeCheckEvaluation } = await import('../src/systems/normalize/checkEvaluation.js');
 
 // Helper: make a minimal manager
 function makeManager() {
@@ -87,6 +88,7 @@ test('_normalizeCraftingCheck defaults the routed config when absent', () => {
   assert.deepEqual(result.routed, {
     type: 'relative',
     rollFormula: '',
+    evaluation: normalizeCheckEvaluation(),
     dc: 15,
     thresholdMode: 'meet',
     // The routed slot carries its own DC SOURCE (issue 1096), absence-preserving: anything
@@ -99,6 +101,96 @@ test('_normalizeCraftingCheck defaults the routed config when absent', () => {
     fixedOutcomes: [],
     checkBreakage: { triggers: [] },
   });
+});
+
+test('all eight persisted check slots normalize complete defaults', () => {
+  const mgr = makeManager();
+  const slots = [
+    ...['simple', 'progressive', 'routed'].map((key) => mgr._normalizeCraftingCheck({})[key]),
+    ...['simple', 'progressive', 'routed'].map(
+      (key) => mgr._normalizeSalvageCraftingCheck({})[key]
+    ),
+    ...['progressive', 'routed'].map((key) => mgr._normalizeGatheringCraftingCheck({})[key]),
+  ];
+  assert.equal(slots.length, 8);
+  for (const slot of slots) assert.deepEqual(slot.evaluation, normalizeCheckEvaluation());
+});
+
+test('all eight check slots retain inactive evaluation choices through a second normalization', () => {
+  const mgr = makeManager();
+  const authored = {
+    product: 'count',
+    direction: 'under',
+    target: {
+      source: 'attribute',
+      expression: '@skills.repair.value + 2',
+      adjustmentKind: 'multiply',
+      baseAdjustment: 0.5,
+    },
+    pool: {
+      die: 20,
+      base: '@abilities.int.value + 1',
+      threshold: '@skills.repair.value',
+      required: 3,
+      modifierDestination: 'threshold',
+      zeroPoolFails: false,
+      explode: { enabled: true, faces: { kind: 'from', value: 19 }, once: true },
+      cancel: { enabled: true, faces: { kind: 'from', value: 2 } },
+      additionalDice: {
+        enabled: true,
+        source: 'macro',
+        path: 'system.resources.ap.value',
+        readMacroUuid: 'Macro.read',
+        spendMacroUuid: 'Macro.spend',
+        max: 4,
+      },
+    },
+  };
+  for (const [normalize, keys] of [
+    [(input) => mgr._normalizeCraftingCheck(input), ['simple', 'progressive', 'routed']],
+    [(input) => mgr._normalizeSalvageCraftingCheck(input), ['simple', 'progressive', 'routed']],
+    [(input) => mgr._normalizeGatheringCraftingCheck(input), ['progressive', 'routed']],
+  ]) {
+    const input = Object.fromEntries(keys.map((key) => [key, { evaluation: authored }]));
+    const once = normalize(input);
+    const twice = normalize(once);
+    for (const key of keys) {
+      assert.deepEqual(once[key].evaluation, authored, key);
+      assert.deepEqual(twice[key].evaluation, authored, `${key} is idempotent`);
+    }
+  }
+});
+
+test('evaluation clamps bounded integers while preserving finite adjustment values', () => {
+  const normalized = normalizeCheckEvaluation({
+    product: 'unknown',
+    direction: 'unknown',
+    target: { baseAdjustment: 0.2 },
+    pool: { die: 1, required: 99, additionalDice: { max: 40 } },
+  });
+  assert.equal(normalized.product, 'sum');
+  assert.equal(normalized.direction, 'over');
+  assert.equal(normalized.target.baseAdjustment, 0.2);
+  assert.equal(normalized.pool.die, 10);
+  assert.equal(normalized.pool.required, 20);
+  assert.equal(normalized.pool.additionalDice.max, 20);
+});
+
+test('tier and routed outcome difficulty siblings retain inactive values', () => {
+  const mgr = makeManager();
+  const check = mgr._normalizeCraftingCheck({
+    simple: { tiers: [{ id: 't', dc: 12, adjustment: 0.5, successes: 3 }] },
+    routed: {
+      tiers: [{ id: 'r', dc: 13, adjustment: -2, successes: 2 }],
+      relativeOutcomes: [{ id: 'o', dc: 2, adjustment: 0.2 }],
+    },
+  });
+  assert.equal(check.simple.tiers[0].adjustment, 0.5);
+  assert.equal(check.simple.tiers[0].successes, 3);
+  assert.equal(check.routed.tiers[0].adjustment, -2);
+  assert.equal(check.routed.tiers[0].successes, 2);
+  assert.equal(check.routed.relativeOutcomes[0].adjustment, 0.2);
+  assert.deepEqual(mgr._normalizeCraftingCheck(check), check);
 });
 
 // Issue 975 — the legacy routed `natStepping` boolean converts on READ into the pair of
@@ -372,6 +464,7 @@ test('_normalizeCraftingCheck defaults the simple config when absent', () => {
   const result = mgr._normalizeCraftingCheck({});
   assert.deepEqual(result.simple, {
     rollFormula: '',
+    evaluation: normalizeCheckEvaluation(),
     dc: 15,
     thresholdMode: 'meet',
     dcMode: 'static',
@@ -387,6 +480,7 @@ test('_normalizeCraftingCheck defaults the progressive check when absent', () =>
   assert.deepEqual(result.progressive, {
     awardMode: 'equal',
     rollFormula: '',
+    evaluation: normalizeCheckEvaluation(),
     checkBreakage: { triggers: [] },
   });
 });
