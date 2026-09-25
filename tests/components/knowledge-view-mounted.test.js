@@ -32,6 +32,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/craftingImageDefaults.js',
     // The companion contract (issue 1289).
     'src/systems/companionContract.js',
+    'src/systems/companionCheckEvaluation.js',
+    'src/systems/normalize/checkEvaluation.js',
   ],
   // Both lists are inlined here, following the tool-studio-mounted precedent. A `.svelte` the
   // tree renders but the allowlist omits HANGS this file (reported as `# cancelled`) rather
