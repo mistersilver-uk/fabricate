@@ -77,6 +77,7 @@
     "src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte | 1",
     "src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte | 1",
     "src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte | 1",
+    "src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte | 1",
     "src/ui/svelte/components/ActionMenu.svelte | 1",
     "src/ui/svelte/components/ArmedDangerButton.svelte | 1",
     "src/ui/svelte/components/ChanceSlider.svelte | 1",
