@@ -19,7 +19,7 @@ manager-recipe-edit-access-rail
 manager-components-normal
 manager-component-edit-normal
 manager-checks-gathering
-manager-checks-validation
+manager-checks-validation-retired-placeholder
 manager-checks-rail-group
 manager-checks-salvage-on-failure
 manager-tags-categories-normal

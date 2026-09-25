@@ -321,9 +321,9 @@ export const CASES = Object.freeze([
     // Two things at once on the `How they combine` card, which issue 1096's parity round split out of the catalogue card.
     expectSelector:
       '.fabricate-manager' +
-      ':has([data-crafting-modifier-policy-card]' +
-      ':has([data-crafting-modifier-policy-option="bySubject"])' +
-      ':has([data-crafting-modifier-max-picks="unlimited"]))' +
+      ':has([data-crafting-modifier-policy-card])' +
+      ':has([data-crafting-modifier-policy-card] [data-crafting-modifier-policy-option="bySubject"])' +
+      ':has([data-crafting-modifier-policy-card] [data-crafting-modifier-max-picks="unlimited"])' +
       ':has([data-checks-section-callout="modifierAverageUnavailable"])',
     kinds: ['manager', 'checks'],
     sourceMatches: [
