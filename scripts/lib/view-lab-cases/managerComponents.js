@@ -218,7 +218,10 @@ export const CASES = Object.freeze([
       },
     ],
     kinds: ['manager', 'components'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/components\/ComponentRow\.svelte$/,
+    ],
   }),
   managerCase({
     // The `Add from catalogue` picker, open and multi-selected (issue 1371, M9).

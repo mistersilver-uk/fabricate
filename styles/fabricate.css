@@ -19890,11 +19890,23 @@
   background: var(--fab-surface-active);
 }
 
-/* ── C6. THE GHOST ROW ── `proto:5001`: the SAME row on `--fab-surface-soft` at `opacity: .72`. */
+/* An absent component follows the Essence Rules row: full contrast, normal row geometry and no
+   resting fill. */
 .fabricate-manager .manager-components-list .manager-component-row.is-ghost {
+  min-height: 76px;
   border-color: var(--fab-border);
-  background: var(--fab-surface-soft);
-  opacity: 0.72;
+  background: transparent;
+  opacity: 1;
+}
+
+.fabricate-manager .manager-components-list .manager-component-row.is-ghost:hover {
+  border-color: var(--fab-border-strong);
+  background: var(--fab-bg-1);
+}
+
+.fabricate-manager .manager-components-list .manager-component-row.is-ghost.is-selected {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager .manager-components-list .manager-component-row .manager-component-identity {
@@ -19971,7 +19983,8 @@
   text-transform: uppercase;
 }
 
-/* `proto:1090` and `proto:5580`: the row's ONE control, LABELLED. 30 is a live rung, so it does not move; the radius snaps to 7 for a control in the 26-32 band. */
+/* Member rows keep the compact 30px Edit control. The absent row's primary Add uses the primitive's
+   canonical 34px geometry. */
 .fabricate-manager .manager-components-list .manager-component-row .manager-component-row-open {
   flex: 0 0 auto;
   gap: var(--fab-space-chip);

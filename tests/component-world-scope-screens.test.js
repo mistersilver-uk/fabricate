@@ -347,18 +347,16 @@ describe('the catalogue composes the shell and inlines nothing', () => {
 // AC-16. The issue body named `world-component-edit`, which is in no route table: the breadcrumb
 // would lose its middle crumb and the navigation land on nothing.
 describe('the deep link names a route that resolves, and the gateway wires it', () => {
-  for (const file of [BROWSER_VIEW, EDIT_VIEW]) {
-    defineStructureContract(
-      `${file} names the shipped route token`,
-      { file, constant: 'WORLD_ENTRY_ROUTE' },
-      {
-        contains: ["'world-component-entry'"],
-      }
-    );
-    defineStructureContract(`${file} does not name the issue body's token`, file, {
-      spellsNo: ['world-component-edit'],
-    });
-  }
+  defineStructureContract(
+    `${EDIT_VIEW} names the shipped route token`,
+    { file: EDIT_VIEW, constant: 'WORLD_ENTRY_ROUTE' },
+    {
+      contains: ["'world-component-entry'"],
+    }
+  );
+  defineStructureContract(`${EDIT_VIEW} does not name the issue body's token`, EDIT_VIEW, {
+    spellsNo: ['world-component-edit'],
+  });
 
   it('and that token is a route the shell actually enumerates', () => {
     assert.ok(scopedEntryRoute('world-component-entry'), 'the entry route table carries the token');
@@ -368,14 +366,14 @@ describe('the deep link names a route that resolves, and the gateway wires it', 
   // A navigation prop left unwired is silently inert, and the shipped callback beside it defaults
   // to a no-op in the props block.
   defineStructureContract(
-    'the gateway WIRES the exit on both mounts, rather than leaving it defaulted',
+    'the gateway wires the remaining editor exit rather than leaving it defaulted',
     ROOT,
     {
-      gives: ['ComponentsBrowserView', 'ComponentEditView'].map((at) => ({
-        at,
+      gives: [{
+        at: 'ComponentEditView',
         attribute: 'onOpenWorldEntry',
         is: '(route, entityId) => openWorldScopedEntry(route, entityId)',
-      })),
+      }],
     }
   );
 });
