@@ -170,7 +170,7 @@ export const CASES = Object.freeze([
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '[data-check-roll-formula]', fill: '1d20cs>15' },
-      { selector: '[data-check-formula-average-withheld="die-modifiers"]', scroll: true },
+      { selector: '.manager-checks-formula', scroll: true },
     ],
     expectView: 'checks-crafting',
     expectSelector: '.fabricate-manager [data-check-formula-average-withheld="die-modifiers"]',
@@ -314,8 +314,7 @@ export const CASES = Object.freeze([
       { selector: '[data-crafting-modifier-eligibility-input="hb-mod-luck"]' },
       { selector: '[data-crafting-modifier-eligibility-input="hb-mod-luck"]' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '' },
-      // Re-anchored (issue 1095 review).
-      { selector: '[data-crafting-modifier-max-picks]', scroll: true },
+      { selector: '[data-checks-section-callout="modifierAverageUnavailable"]', scroll: true },
     ],
     expectView: 'checks-crafting',
     // Two things at once on the `How they combine` card, which issue 1096's parity round split out of the catalogue card.
