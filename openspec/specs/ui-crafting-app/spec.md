@@ -1013,6 +1013,8 @@ The player's route to salvage.
   Advantage-eligible checks offer Disadvantage, Roll and Advantage in that order, while other checks offer one Roll, preserving the established action identifiers and dismissal result.
   A bulk prompt lists each subject's display-only need and makes clear that one choice applies across the batch; a no-check subject has no invented fallback DC, and routed fixed or progressive subjects have no single target.
   A count-only bulk companion call keeps its controls and returns its normal result without inventing subject rows.
+  DialogV2 retains the frame, close action and footer; the 500px prompt caps to the viewport, scrolls only its body when crowded and keeps the footer available.
+  Count and pool controls belong to their evaluation-mode requirements and do not appear as inactive controls in this summing baseline.
   The label names the gesture — with no usable check it is a plain salvage, with one it is a roll.
 - The roll summary is **read-only** and renders only **after** resolution.
   It never renders a hardcoded formula: the formula is system-authored, and the prompt has already displayed the resolved one.
