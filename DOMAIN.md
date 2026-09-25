@@ -1579,7 +1579,8 @@ Its versioned historical awards come from the applied result-creation receipt, i
 Versioned gathering preserves start-time stamina, node/reservation, blind-store and runtime/economy behavior while adding manual collection and eligible automatic completion.
 Native d100 cleared/missed evidence uses the recorded high-roll threshold; an all-miss item result does not itself make the run failed, and terminal status is never inferred from award count.
 
-**Run Authority Ledger** is the private Foundry JournalEntry that owns request deduplication, one-use prepare tokens and the global embedded-page execution claim.
+**Run Authority Ledger** is the GM-owned world JournalEntry that owns request deduplication, safe one-use prepare-token bindings and the global embedded-page execution claim.
+Its flags replicate to player clients despite restrictive ownership, so prepared check inputs and cached recipient-specific replies remain only in the issuing GM authority instance until an entitled reply is sent.
 Every versioned mutation requires the active GM and exactly one ledger, even for a ready one-call craft.
 Its explicit Journal setup action requires the active GM to confirm that all other GM sessions, including other tabs for the same user, are closed; setup never replaces an existing ledger or resolves duplicates.
 **Claim Reconciliation** records the active GM's manual disposition of a retained claim after inspecting the effects and reconstructing its matching run evidence.
@@ -1598,6 +1599,8 @@ Terminal and recovery guidance distinguish positive awards, confirmed zero and u
 Initial secret-check prompts omit protected identity, image, formula, DC and modifier details, independently of the post-commit entitlement check for any evaluated-roll handoff.
 Secret checks use GM private posting and a sanitized response; a permitted non-secret handoff lets the initiating client post the evaluated roll without rolling again.
 Socket recipient routing protects the reply's audience, while session/request/run/revision correlation prevents another tab from accepting it.
+The visible versioned check prompt displays the prepared formula and modifier contributions; offered player choices remain deferred until submission.
+Only a simple pass/fail check exposes a single target and meet-or-exceed comparison; routed and progressive classification inputs stay in the authority instance.
 
 ### Crafting Lifecycle
 

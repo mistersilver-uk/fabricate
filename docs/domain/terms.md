@@ -904,7 +904,12 @@ Those cases include a non-interactive/API/macro/headless craft, an unauthored fo
 The contribution is always resolved.
 Selected output stays in eligible order, and an unbounded selection includes every eligible entry.
 The prompt's own cap is a UI affordance re-imposed by `evaluateCheckRoll`, never the invariant.
-The pre-roll dialog is the single place shown != evaluated: the deferred slot renders as a trailing `+ (modifier)[Modifiers]` term because the value is unknown until the player picks (and `cleanHTML` forecloses a live-updating preview), while the posted roll, its chat flavor (suffixed with one bullet-joined segment of the chosen labels) and the run journal all carry the appended formula.
+The pre-roll formula shows resolved contributions; a deferred `playerPicks` choice and any entered situational bonus join the posted roll only after submission.
+The posted roll, chat flavor and run journal then carry the chosen contribution and labels.
+DialogV2 sanitizes the initial content, then mounts the Svelte prompt body into a surviving host; the adapter unmounts it before remount and on close.
+For a versioned Journal check, the issuing GM captures the JSON-safe modifier context and permitted choice with the private prepared evaluation before showing the prompt.
+The entitled prompt displays applied entries from that snapshot, or offers the deferred choice; later library or actor-data edits cannot change the prepared contribution.
+The world authority ledger carries only safe token coordination, while the prepared evaluation and cached recipient-specific reply stay in the issuing authority instance and disappear on consume, release or expiry.
 **The `@craftingmod` placeholder is RETIRED** (issue 1094): the `1.21.0` migration strips it from every stored roll formula, and `stripRetiredModifierPlaceholder` removes any survivor at roll time and inside the usability readers, deciding a NON-ADDITIVE placement positionally rather than by `Roll.validate` — which ACCEPTS `max(, 2)` and would roll `-Infinity`.
 **`min` / `max` clamp ONE entry's contribution**, and a bound means the same thing under every rule: the resolved value for a flat expression, and the ROLLED result for a rolling one, the latter expressed IN THE FORMULA as `min(max((1d8), -1), 6)` — one roll, dice still visible on the card, and a maximum of +6 meaning exactly that.
 Verified against the shipped 14.365 dice stack (`CONFIG.Dice.functions` is `{}` so `min`/`max` reach `Math.min`/`Math.max`, `FunctionTerm` evaluates a dice argument rather than stringifying it, and `FunctionTerm#dice` bubbles the inner die into `Roll#dice`), recorded in `tests/helpers/recordedModifierRollShapes.js`.
@@ -1531,7 +1536,8 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-mo
 Each of the eight normalized check subobjects (crafting and salvage simple, routed and progressive; gathering routed and progressive) retains an `evaluation` record, even when its selected product, direction, target or pool settings are inactive.
 The record defaults to `sum/over`, and the current runners and odds classifier execute `sum/over` even when a future count or under choice was authored.
 Recipe tiers retain nullable `adjustment` and `successes` siblings beside `dc`, and relative outcome tiers retain a nullable `adjustment`; no current runner reads them.
-The private crafting and gathering prepared check descriptors clone that authored record beside the prepared formula and DC; it is not the public executed `resolutionSnapshot`.
+The private crafting and gathering prepared check descriptors clone that authored record beside the prepared formula and DC.
+They stay in the issuing authority instance and are neither the public executed `resolutionSnapshot` nor a replicated ledger flag.
 
 Canonical mapping: `normalizeCheckEvaluation`/`normalizeNullableAdjustment`/`normalizeNullableSuccesses` in `src/systems/normalize/checkEvaluation.js`; `system.{craftingCheck,salvageCraftingCheck,gatheringCraftingCheck}`; `CraftingEngine.describeVersionedStageCheck`, `GatheringEngine._versionedCheckDescriptor`
 

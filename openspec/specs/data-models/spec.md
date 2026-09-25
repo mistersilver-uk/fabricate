@@ -4668,7 +4668,7 @@ Archive metadata is either two nulls or a finite `hiddenAt` paired with a nonbla
 The first successful archive writes that pair and advances revision; later archive requests return the stored record unchanged.
 There is no erase or unarchive transition, and archival cannot rewrite identity, plan, decisions, effect evidence or outcome.
 
-The record is stored on one embedded `JournalEntryPage` whose id is the operation id, beneath a resolved private ledger.
+The record is stored on one embedded `JournalEntryPage` whose id is the operation id, beneath the resolved GM-owned authority ledger.
 Acceptance first reads that exact parent and page authoritatively; a valid existing record answers duplicate or conflict without issuing a normal-retry create.
 Only a proven absent page in a present readable ledger permits `createEmbeddedDocuments('JournalEntryPage', ..., { keepId: true })`, preserving embedded-id uniqueness as the race boundary.
 A missing parent, unreadable response, malformed flag, rejected write without conclusive readback, empty or cancelled write result, wrong returned id or unverified acknowledgement fails closed.

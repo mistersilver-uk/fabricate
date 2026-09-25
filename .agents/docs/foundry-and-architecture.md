@@ -426,12 +426,16 @@ Keep the control constraint as UX, and **test the requirement** (normalizer inpu
 
 `journalRunCommands.js` and `journalRunAuthority.js` in `src/systems/` own version-1 arbitration; an absent lifecycle version alone selects legacy behavior.
 `executePublicCraft` preserves ready, fully supplied one-call crafting through the same active-GM boundary, while `CraftingRunManager.pruneInstantaneousActiveRuns` excludes versioned records that may legitimately wait for manual execution.
-The explicit Journal setup action provisions one private ledger only after single-GM-session confirmation; active-GM identity alone cannot distinguish two tabs for the same user.
+The explicit Journal setup action provisions one GM-owned world ledger only after single-GM-session confirmation; active-GM identity alone cannot distinguish two tabs for the same user.
 `reconcileJournalRunAuthority({ claimId, disposition })` records `reconciled` or `abandoned` and releases the matching retained claim only after reconstructing its run evidence; it never retries uncertain effects or promises transactional rollback.
 Initial crafting check descriptors are redacted in `createCraftingJournalOperations` in `src/bootstrap/journalOperations.js` before transport, independently of the post-commit roll-handoff entitlement check.
 
 The authority ledger MUST stay a world `JournalEntry`, and that is a correctness dependency rather than a placement preference.
 `JournalEntry.dump()` takes no user and applies no ownership filter, so the `ownership: {default: 0}` ledger is present in every player's `game.journal` from the connect payload alone.
+Its flags therefore hold only safe request outcomes and prepare-token bindings, status, expiry and issuer identities; the full prepared evaluation and cached recipient-specific prompt or roll handoff stay in the issuing GM authority instance until an entitled reply is sent.
+The issuer instance alone consumes an active token or replays a private preparation reply; another tab of the same GM stays silent, and a lost snapshot or new GM requires fresh preparation without rolling or spending.
+Committed requests may replay only their safe durable outcome without repeating effects or disclosing a roll handoff.
+Boot normalization scrubs legacy private fields from replicated flags under the active-GM claim.
 Every player-side read in `createFoundryJournalRunAuthority` in `src/systems/journalRunAuthority.js` relies on that: move the ledger into a compendium, or assume its absence, and each player client resolves `ledger-missing` and refuses every Journal run control permanently.
 The restored-availability announcement is local in the same way — `Hooks.callAll` never crosses the socket, so a remote client re-derives only because the core `deleteJournalEntryPage` hook fires its own refresh, which holds because the collection delete precedes the `callAll`.
 
