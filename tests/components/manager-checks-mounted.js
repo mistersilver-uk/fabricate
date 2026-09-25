@@ -3050,11 +3050,66 @@ export function registerChecksCases() {
 
   it('root: the Checks card satisfies manager-checks-crafting-modifiers’ own selector (issue 1055)', async () => {
     const selector = labCaseSelector('manager-checks-crafting-modifiers');
-    mountManager([], modifierRuleSystem('playerPicks'));
+    const transformedSystem = modifierRuleSystem('addAll');
+    transformedSystem.modifiers = [
+      { ...MODIFIER_CATALOGUE[0], expression: '1d20cs>15' },
+    ];
+    mountManager([], transformedSystem);
+    checksStore.saveCraftingCheckModifiers = (patch) => {
+      checksStore.viewState.update((state) => ({
+        ...state,
+        selectedSystem: {
+          ...state.selectedSystem,
+          craftingCheck: { ...state.selectedSystem.craftingCheck, ...patch },
+        },
+      }));
+    };
     navButton('Checks').click();
     await tick();
     flushSync();
     await openChecksSection('modifiers');
+    const calloutSelector = '[data-checks-section-callout="modifierAverageUnavailable"]';
+    assert.ok(!target.querySelector(calloutSelector), 'addAll has no transformed-ranking warning');
+
+    const highest = target.querySelector(
+      '[data-crafting-modifier-policy-option="highest"] input'
+    );
+    assert.ok(highest, 'the production highest policy input renders');
+    highest.click();
+    await tick();
+    flushSync();
+    const highestWarning = target.querySelector(calloutSelector);
+    assert.ok(highestWarning, 'highest shows a warning for the eligible transformed modifier');
+    assert.equal(highestWarning.getAttribute('data-callout-tone'), 'info');
+    assert.match(
+      highestWarning.textContent,
+      /Medicine\) changes what its dice total means, so it has no comparable average/
+    );
+
+    const eligibility = target.querySelector('[data-crafting-modifier-eligibility-input="med"]');
+    assert.ok(eligibility, 'the production eligibility control renders');
+    eligibility.click();
+    await tick();
+    flushSync();
+    assert.ok(!target.querySelector(calloutSelector), 'the warning clears when the entry is ineligible');
+    eligibility.click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector(calloutSelector), 'the warning returns when the entry is eligible');
+
+    const playerPicks = target.querySelector(
+      '[data-crafting-modifier-policy-option="playerPicks"] input'
+    );
+    assert.ok(playerPicks, 'the production playerPicks policy input renders');
+    playerPicks.click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector(calloutSelector), 'playerPicks shows the transformed warning');
+    const maxPicksInput = target.querySelector('[data-crafting-modifier-max-picks-input]');
+    assert.ok(maxPicksInput, 'the selecting policy renders its cap input');
+    maxPicksInput.value = '';
+    maxPicksInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
     assert.ok(
       Boolean(target.querySelector(selector)),
       'a selecting rule with no cap must put BOTH the bySubject option and the unlimited cap ' +
