@@ -25,14 +25,18 @@ An essence can also drive automatic [effect transfer](#effect-transfer-via-essen
 ## Open the Essence Studio
 
 Open the Crafting System Manager and select a crafting system.
-Choose the top-level **Essences** entry.
+Choose the top-level **Essence Rules** entry.
+
+When the library opens without a current choice, Fabricate selects the first visible essence that belongs to the system.
 
 Each library row shows the essence's icon, name, colour, an **Effects** pill and a **Macro** pill for the behaviours it carries, a **Disabled** marker when it is turned off, how many components carry it, how many recipes require it, and a per-row enable/disable switch.
 A component that carries this essence only because it inherits the value from the world Component catalogue counts here too, alongside one that authors it directly in this system.
 Choose **List** or **Grid** to change how the library is presented, search or filter by status to narrow it, and select a row to inspect it in the panel on the right.
+The inspector’s system roster uses **Rules** links to open another system.
+Add an essence from that destination system's Essence Rules screen.
 Choose **Edit** to open the essence editor.
 
-Your search, filters, presentation choice, and page position all survive opening the editor and coming back.
+Your search, filters, presentation choice, page position, and selected essence all survive opening the editor and coming back.
 
 {% include screenshot.html case="manager-essences-normal" caption="The essence library in its list presentation, with one essence selected." %}
 
@@ -80,6 +84,7 @@ A brand-new essence is the one exception: it has no shared definition yet, so it
 
 Open the Crafting System Manager and choose **Essence Catalogue** in the World section of the rail.
 It holds one record per essence.
+When the catalogue opens without a current choice, Fabricate selects its first visible essence.
 Two crafting systems that both use Fire point at that one record, so its name, icon, colour and description are authored once in the catalogue rather than once per system.
 What each system keeps for itself is what the essence does on craft there: its enabled switch, its active effect source, and its macro on craft.
 
