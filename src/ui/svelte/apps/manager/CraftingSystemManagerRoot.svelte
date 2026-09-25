@@ -5954,7 +5954,7 @@
               macroName={essenceEditDraft.macroName ||
                 essenceShortValueName(essenceEditDraft.propertyMacroUuid)}
               inherited={inspectedEssenceInherited}
-              sampleComponentName={essenceEditDraft.componentUsageItems?.[0]?.name || ''}
+              previewCarrier={inspectedEssenceWorldEntry?.previewCarrier ?? null}
             />
           {:else if currentView === 'essences' && essenceBulk.count > 0}
             <EssenceBulkEditPanel

@@ -3850,6 +3850,7 @@
             "Label": "Essence behaviour preview",
             "Kicker": "How players see it",
             "InventoryTile": "As an inventory tile",
+            "InventoryTileName": "Inventory tile",
             "OnAComponent": "On a component",
             "Effective": "Effective behaviour",
             "LiveUpdate": "This preview updates live as you edit.",
@@ -3863,8 +3864,7 @@
             "DefaultMacroHint": "Runs on craft in every system that inherits.",
             "TransfersFrom": "From {name}",
             "RunsMacro": "Runs {name}",
-            "RunsMacroHint": "Runs once per craft against the item data, before the item is created.",
-            "SampleComponent": "a carrying component"
+            "RunsMacroHint": "Runs once per craft against the item data, before the item is created."
           },
           "Macro": {
             "Heading": "Macro on craft",

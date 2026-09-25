@@ -693,6 +693,12 @@ function buildEntry(
     // `usage` answers 0, which is what a caller that has not wired it sees.
     componentCount: Number(entityUsage?.componentCount) || 0,
     recipeCount: Number(entityUsage?.recipeCount) || 0,
+    ...(descriptor.entityType === 'essence' && {
+      previewCarrier:
+        entityUsage?.previewCarrier && typeof entityUsage.previewCarrier === 'object'
+          ? { ...entityUsage.previewCarrier }
+          : null,
+    }),
     // WHAT REQUIRES IT, by name and kind, rather than only how many (issue 1373). The world
     // Tool entry's `REQUIRED FOR` region lists each recipe and gathering task; it is the one
     // surface with no system context, so it cannot re-derive the list from a selection. Supplied
@@ -740,7 +746,8 @@ function buildEntry(
  * @param {{entities: boolean, defaults: boolean, membership: boolean}|null} [options.seeded]
  * @param {unknown} [options.systems] The crafting-system roster.
  * @param {Record<string, {componentCount?: number, recipeCount?: number,
- *   recipeCountBySystem?: Record<string, number>}>|null} [options.usage] World-wide reference
+ *   recipeCountBySystem?: Record<string, number>, previewCarrier?: object|null}>|null}
+ *   [options.usage] World-wide reference
  *   counts per entity id, supplied by the caller; see `buildEntry`.
  * @returns {object}
  */

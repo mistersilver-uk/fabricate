@@ -8840,4 +8840,62 @@ describe('adminStore item-card hydration and cohort fetching (issue 1081)', () =
     assert.equal(cohortFetches, 8, 'the counter CAN go up — by exactly one refresh worth');
     assert.equal(libraryFetches, 2, 'and so can the library one, by exactly one');
   });
+
+  it('projects the first positive essence carrier across crafting systems for both editors', async () => {
+    const services = createMockServices();
+    const systems = services._getSystemsMutable();
+    systems[0].essenceDefinitions = [{ id: 'fire', name: 'Fire' }];
+    systems[0].components = [
+      makeItem({ id: 'local-zero', name: 'Local Dust', essences: { fire: 0 } }),
+    ];
+    systems.push(
+      makeSystem({
+        id: 'sys2',
+        name: 'System Two',
+        essenceDefinitions: [{ id: 'fire', name: 'Fire' }],
+        components: [
+          makeItem({
+            id: 'remote-carrier',
+            name: 'Remote Ember',
+            img: 'remote-ember.webp',
+            essences: {},
+          }),
+        ],
+      })
+    );
+    const systemManager = services.getCraftingSystemManager();
+    services.getCraftingSystemManager = () => ({
+      ...systemManager,
+      getComponentsForSystem: (systemId) => {
+        const components = systemManager.getSystem(systemId)?.components ?? [];
+        if (systemId !== 'sys2') return components;
+        return components.map((component) => ({ ...component, essences: { fire: 2 } }));
+      },
+    });
+    const corpus = {
+      entities: [{ id: 'fire', name: 'Fire' }],
+      defaults: [],
+      membership: [],
+    };
+    services.getEssenceScopeStore = () => ({
+      corpus: () => corpus,
+      isSeeded: () => true,
+    });
+
+    const store = createAdminStore(services);
+    await store.selectSystem('sys1');
+    const [entry] = get(store.viewState).worldScope.essence.entries;
+
+    assert.equal(entry.componentCount, 1, 'zero quantities are not carriers');
+    assert.deepEqual(entry.previewCarrier, {
+      id: 'remote-carrier',
+      name: 'Remote Ember',
+      img: 'remote-ember.webp',
+    });
+    assert.deepEqual(
+      get(store.viewState).essenceCards[0]?.componentUsageItems ?? [],
+      [],
+      'the selected-system usage list and delete counts stay selected-system scoped'
+    );
+  });
 });

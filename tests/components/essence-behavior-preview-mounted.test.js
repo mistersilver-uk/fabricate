@@ -41,10 +41,10 @@ before(() => harness.setup());
 after(() => harness.teardown());
 
 describe('EssenceBehaviorPreview — "How players see it" mounts the real player tiles', () => {
-  it('renders the essence tile AND a fake carrying component, plus the rules and live note', async () => {
+  it('renders the essence tile AND its carrying component, plus the rules and live note', async () => {
     const root = await harness.mount({
       essence: makeEssenceRow({ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }),
-      sampleComponentName: 'Ember Ash',
+      previewCarrier: { id: 'ember-ash', name: 'Ember Ash', img: 'ember-ash.webp' },
     });
 
     // The essence's own inventory tile: the REAL card's essence-glyph branch.
@@ -60,13 +60,13 @@ describe('EssenceBehaviorPreview — "How players see it" mounts the real player
       "carrying the essence's name"
     );
 
-    // The fake carrying component: a normal card on a CORE Foundry pack icon, carrying the pip.
+    // The real carrying component pairs its name and artwork while carrying the pip.
     const component = root.querySelector('[data-essence-preview-component]');
     assert.ok(component, 'the carrying-component cell renders');
     const art = component.querySelector('.inventory-card-art img');
     assert.ok(
-      art?.getAttribute('src').includes('icons/containers/bags/pack-engraved-leather-leaf-tan.webp'),
-      'on the core engraved-leather pack icon, NOT the item-bag "no image" sentinel'
+      art?.getAttribute('src').includes('ember-ash.webp'),
+      'on the matching component artwork'
     );
     const pip = component.querySelector('[data-inventory-pip="essence"]');
     assert.ok(pip, 'and it carries the essence as a pip');
@@ -123,6 +123,19 @@ describe('EssenceBehaviorPreview — "How players see it" mounts the real player
     harness.remount();
   });
 
+  it('uses the localized Inventory tile fallback only when no carrier exists', async () => {
+    const root = await harness.mount({
+      essence: makeEssenceRow({ id: 'fire', name: 'Fire' }),
+    });
+    const component = root.querySelector('[data-essence-preview-component]');
+    assert.equal(component.querySelector('.inventory-card-name').textContent.trim(), 'Inventory tile');
+    assert.match(
+      component.querySelector('.inventory-card-art img').getAttribute('src'),
+      /pack-engraved-leather-leaf-tan\.webp$/
+    );
+    harness.remount();
+  });
+
   it('leaves the preview essence tile untinted (accent) when the essence has no colour', async () => {
     const root = await harness.mount({
       essence: makeEssenceRow({ id: 'fire', name: 'Fire' }),
@@ -135,13 +148,13 @@ describe('EssenceBehaviorPreview — "How players see it" mounts the real player
   });
 
   it('tints the "On a component" preview pip to the essence colour when one is chosen', async () => {
-    // Maintainer feedback: the fake carrying-component's essence PIP rendered in the fixed
+    // Maintainer feedback: the carrying component's essence PIP rendered in the fixed
     // `--fab-text` regardless of the essence's own colour. `buildEssencePreviewRow` now
     // shapes `colorToken` onto the pip, and `InventoryItemCard` emits the `--fab-pip-tint`
     // inline var for it — the same mechanism the essence tile above already uses.
     const root = await harness.mount({
       essence: makeEssenceRow({ id: 'fire', name: 'Fire', colorToken: '--fab-tag-mauve' }),
-      sampleComponentName: 'Ember Ash',
+      previewCarrier: { id: 'ember-ash', name: 'Ember Ash', img: 'ember-ash.webp' },
     });
     const pip = root.querySelector(
       '[data-essence-preview-component] [data-inventory-pip="essence"]'
@@ -159,7 +172,7 @@ describe('EssenceBehaviorPreview — "How players see it" mounts the real player
   it('leaves the "On a component" preview pip untinted when the essence has no colour', async () => {
     const root = await harness.mount({
       essence: makeEssenceRow({ id: 'fire', name: 'Fire' }),
-      sampleComponentName: 'Ember Ash',
+      previewCarrier: { id: 'ember-ash', name: 'Ember Ash', img: 'ember-ash.webp' },
     });
     const pip = root.querySelector(
       '[data-essence-preview-component] [data-inventory-pip="essence"]'

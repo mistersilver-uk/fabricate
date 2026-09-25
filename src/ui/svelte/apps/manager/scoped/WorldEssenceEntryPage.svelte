@@ -893,6 +893,7 @@
                 propertyMacrosEnabled={Boolean(defaults?.macro)}
                 sourceName={essenceShortValueName(sectionValueName('effectSource'))}
                 macroName={essenceShortValueName(sectionValueName('macro'))}
+                previewCarrier={entry?.previewCarrier ?? null}
               />
             </section>
           </div>

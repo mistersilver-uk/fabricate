@@ -6715,6 +6715,7 @@
 
 .fabricate-manager .manager-essence-edit-view {
   display: grid;
+  grid-template-rows: max-content;
   align-content: start;
   gap: var(--fab-space-2);
   min-width: 0;

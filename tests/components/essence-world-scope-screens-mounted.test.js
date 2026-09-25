@@ -173,6 +173,16 @@ function essenceScope() {
       ],
     },
     systems: ROSTER,
+    usage: {
+      ash: {
+        componentCount: 1,
+        previewCarrier: {
+          id: 'ash-carrier',
+          name: 'Ashen Thread',
+          img: 'icons/commodities/materials/thread-plain-grey.webp',
+        },
+      },
+    },
   });
 }
 
@@ -437,6 +447,16 @@ describe('the world essence entry editor buffers its edit until Save', () => {
     );
     assert.equal(reported.handle.isDirty(), true);
     assert.equal(reported.dirty.at(-1), true, 'the header button was never told to enable');
+  });
+
+  it('pairs the projected carrier name and artwork in the preview', async () => {
+    const { root } = await mountEntry();
+    const component = root.querySelector('[data-essence-preview-component]');
+    assert.equal(component.querySelector('.inventory-card-name').textContent.trim(), 'Ashen Thread');
+    assert.equal(
+      component.querySelector('.inventory-card-art img').getAttribute('src'),
+      'icons/commodities/materials/thread-plain-grey.webp'
+    );
   });
 
   it('SAVE flushes exactly the difference, and nothing else on the record', async () => {
