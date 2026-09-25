@@ -17498,6 +17498,7 @@
 .fabricate-roll-prompt-dialog .form-footer button[data-action='roll'],
 .fabricate-roll-prompt-dialog .dialog-buttons button[data-action='normal'],
 .fabricate-roll-prompt-dialog .dialog-buttons button[data-action='roll'] {
+  border-color: var(--fab-accent-border);
   background: var(--fab-accent);
   color: var(--fab-on-accent);
 }
