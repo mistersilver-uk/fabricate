@@ -402,7 +402,14 @@ export class CraftingEngine {
     return {
       required: activeCheck.checkUsable || activeCheck.requiresCheck,
       publicPrompt: versionedCheckPrompt({
-        activeCheck, recipe, step, actor, rollFormula, dc, modifierContext, modifierChoice,
+        activeCheck,
+        recipe,
+        step,
+        actor,
+        rollFormula,
+        dc,
+        modifierContext,
+        modifierChoice,
       }),
       privateEvaluation: {
         actorUuid: actor?.uuid ?? null,
@@ -7121,18 +7128,25 @@ function capturePreparedModifierContext(context, actor) {
 }
 
 function versionedCheckPrompt({
-  activeCheck, recipe, step, actor, rollFormula, dc, modifierContext, modifierChoice,
+  activeCheck,
+  recipe,
+  step,
+  actor,
+  rollFormula,
+  dc,
+  modifierContext,
+  modifierChoice,
 }) {
   const selectedModifiers = modifierChoice
     ? []
-    : resolveCheckModifierContribution(
-        modifierContext,
-        makeRollDataExpressionResolver(actor)
-      ).selected.filter((entry) => !entry.blocked).map(publicModifierDisplay);
+    : resolveCheckModifierContribution(modifierContext, makeRollDataExpressionResolver(actor))
+        .selected.filter((entry) => !entry.blocked)
+        .map(publicModifierDisplay);
   const formula = modifierChoice
     ? rollFormula
     : resolveRolledFormula(rollFormula, actor, modifierContext);
   const target = activeCheck.slot === 'simple' && Number.isFinite(dc) ? dc : null;
+  const comparison = activeCheck.config?.thresholdMode === 'exceed' ? 'exceed' : 'meet';
   return {
     label: recipe.name || step.name || 'Crafting',
     activity: 'Crafting',
@@ -7142,7 +7156,7 @@ function versionedCheckPrompt({
     formula,
     resolvedFormula: resolveCheckFormulaDisplay(formula, actor)?.display ?? null,
     target,
-    comparison: target === null ? null : activeCheck.config?.thresholdMode === 'exceed' ? 'exceed' : 'meet',
+    comparison: target === null ? null : comparison,
     selectedModifiers,
     mode: activeCheck.mode,
     allowsSituationalModifier: activeCheck.checkUsable,
