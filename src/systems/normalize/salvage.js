@@ -7,6 +7,8 @@
 import { normalizeQuantityFormula } from '../../models/Result.js';
 import { authoredCheckModifierIds } from '../../utils/checkModifierPicks.js';
 
+import { normalizeNullableAdjustment, normalizeNullableSuccesses } from './checkEvaluation.js';
+
 /** Derive the salvage-normalization context (issue 764) from an owning crafting system.
  * `salvageSimpleCheckHasFormula` reads `salvageCraftingCheck.simple.rollFormula` SPECIFICALLY —
  * the only slot the Simple engine consults — never an OR across the three slots. Tolerant of a
@@ -40,6 +42,8 @@ export function normalizeSalvage(salvage = {}, options = {}) {
       toolIds: [],
       resultGroups: [],
       dcOverride: null,
+      adjustmentOverride: null,
+      successesOverride: null,
       // `checkModifierIds` is deliberately ABSENT from this literal, not `[]`: an empty
       // array is an AUTHORED pick of zero, and a component with no salvage config at all
       // has authored nothing. Seeding one here would silently give every such component a
@@ -98,6 +102,8 @@ export function normalizeSalvage(salvage = {}, options = {}) {
     allowPlayerResultReorder: salvage.allowPlayerResultReorder !== false,
     ingredientQuantity,
     dcOverride,
+    adjustmentOverride: normalizeNullableAdjustment(salvage.adjustmentOverride),
+    successesOverride: normalizeNullableSuccesses(salvage.successesOverride),
     // Preserve migrated salvage tool references so they are not orphaned on the
     // next system save. Coerced to trimmed, non-empty, deduped id strings.
     toolIds: normalizeToolIds(salvage.toolIds),
