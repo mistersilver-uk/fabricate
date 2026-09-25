@@ -427,7 +427,7 @@ export function resolveSelectedCheckModifiers(
   return resolved;
 }
 
-/** Magnitude averages first, then transformed quantities; output remains in eligible order. */
+/** Magnitude averages, then transformed quantities, then blocked entries; output keeps eligible order. */
 function bestRankedModifiers(resolved, limit) {
   if (limit >= resolved.length) return resolved;
   return resolved
@@ -439,6 +439,9 @@ function bestRankedModifiers(resolved, limit) {
 }
 
 function compareRankedModifiers(left, right) {
+  const leftBlocked = left.modifier.blocked === true;
+  const rightBlocked = right.modifier.blocked === true;
+  if (leftBlocked !== rightBlocked) return leftBlocked ? 1 : -1;
   const leftFinite = Number.isFinite(left.modifier.average);
   const rightFinite = Number.isFinite(right.modifier.average);
   if (leftFinite !== rightFinite) return leftFinite ? -1 : 1;

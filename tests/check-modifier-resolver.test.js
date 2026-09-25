@@ -627,6 +627,40 @@ test('ranking treats finite magnitudes as one category ahead of transformed quan
   );
 });
 
+test('ranking leaves blocked modifiers behind finite and transformed contributions', () => {
+  const catalogue = [
+    { id: 'blocked', label: 'Blocked', expression: '' },
+    { id: 'transformed', label: 'Transformed', expression: '1d20cs>15' },
+    { id: 'negative', label: 'Negative', expression: '-4' },
+  ];
+  const resolve = (expression) => expression;
+  const contributionFor = (systemPolicy, maxModifierPicks) =>
+    resolveCheckModifierContribution(
+      {
+        catalogue,
+        systemPolicy,
+        defaultModifierIds: catalogue.map(({ id }) => id),
+        maxModifierPicks,
+      },
+      resolve,
+      PermissiveRoll
+    );
+
+  const highest = contributionFor('highest');
+  assert.equal(highest.selected.length, 1, 'highest keeps its one-entry capacity');
+  assert.equal(highest.scalar, -4, 'the finite contribution remains the highest category');
+  assert.deepEqual(highest.rollTerms, [], 'the one finite contribution emits no roll formula');
+
+  const cappedPicks = contributionFor('playerPicks', 2);
+  assert.equal(cappedPicks.selected.length, 2, 'the cap admits two rollable contributions');
+  assert.equal(cappedPicks.scalar, -4, 'the negative finite contribution survives selection');
+  assert.deepEqual(
+    cappedPicks.rollTerms,
+    ['(1d20cs>15)'],
+    'the transformed contribution fills the remaining capacity before the blocked entry'
+  );
+});
+
 test('all-transformed ranking retains authored order for highest and player picks', () => {
   const catalogue = [
     { id: 'first', label: 'First', expression: '1d20cs>15' },
