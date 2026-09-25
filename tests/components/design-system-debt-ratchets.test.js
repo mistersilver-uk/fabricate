@@ -1,9 +1,4 @@
-/**
- * Six design-system rules the spec states and nothing enforced (issue 1497).
- * 24 bare `:focus` selectors, five viewport breakpoints, 40 wrong font weights, 26 off-token
- * shadows, 99 native `<select>` elements in templates and four more in dialog bodies, and 318
- * off-ladder corner values.
- */
+/** The design-system debt gates compare observed selectors and controls to their committed ceilings. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -1128,7 +1123,6 @@ const RING_ROOTS = Object.freeze(
     '.fabricate-field',
     '.fabricate-icon-button',
     '.fabricate-pagination',
-    '.fabricate-roll-prompt-dialog',
     '.fabricate-search',
     '.fabricate-slider',
     '.fabricate-tabs',
@@ -1533,8 +1527,8 @@ test("the repetition ledger publishes the figures the sheet actually produces", 
 });
 
 test("the module sheet's cross-list selector repetition does not move", () => {
-  // Filtered to count >= 2 on both sides. Unfiltered the sheet holds 3,080 `(at-context, selector)`
-  // keys under this very keying, of which 2,973 appear exactly once; `assertRatchet` compares key
+  // Filtered to count >= 2 on both sides. Unfiltered the sheet holds 3,037 `(at-context, selector)`
+  // keys under this very keying, of which 2,931 appear exactly once; `assertRatchet` compares key
   // by key, so an unfiltered table would report every singleton as new debt the first time anybody
   // added a rule. Filtering both sides keeps a selector FALLING to one appearance visible: it
   // leaves the observed tally, and a baseline row nothing matches is a VANISHED failure.

@@ -788,10 +788,8 @@ export const VIEW_RECIPES = Object.freeze([
   {
     id: 'player-crafting-roll-prompt',
     label: 'Player crafting — interactive check roll prompt',
-    // Issue 855: `rollPrompt.js` renders the whole dialog, so a change to it is only evidenced by
-    // the dialog frame itself.
     smokeLabels: ['player-crafting-roll-prompt'],
-    matches: [/^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\/(?:rollPrompt\.js|RollPrompt\.svelte)$/],
   },
   {
     id: 'player-crafting-essence-legacy',

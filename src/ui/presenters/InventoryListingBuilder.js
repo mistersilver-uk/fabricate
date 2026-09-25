@@ -96,6 +96,8 @@ import { matchRecipeItemDefinition, resolveToolForItem } from '../../utils/sourc
 // item-bag literal (the "treat as no image" sentinel).
 import { GENERIC_ITEM_IMAGE } from '../svelte/util/craftingImageDefaults.js';
 
+import { salvageDisplayDc } from './salvageCheckNeed.js';
+
 // A shared empty set for the GM path, where no entity is visibility-hidden — avoids
 // allocating a throwaway Set per system on every listing build.
 const NO_HIDDEN_ENTITIES = new Set();
@@ -1560,7 +1562,7 @@ export class InventoryListingBuilder {
       // matches on an absolute [start, end] segment of the roll range and `checkRoll`
       // never reads a DC for it (the GM editor hides the field outright); progressive
       // has no DC at all.
-      dc: this._salvageDc({ mode, routedType, config, component }),
+      dc: salvageDisplayDc({ mode, routedType, config, component }),
       // Default TRUE: an absent key reads as permitted; only an explicit false pins the
       // GM's authored order.
       allowPlayerResultReorder: salvage.allowPlayerResultReorder !== false,
@@ -1685,15 +1687,6 @@ export class InventoryListingBuilder {
    * fixed-authored world is shown a routing table the engine will not honour.
    * @private
    */
-  _salvageDc({ mode, routedType, config, component }) {
-    if (mode === 'progressive') return null;
-    if (mode === 'routed' && routedType === 'fixed') return null;
-    const override = component?.salvage?.dcOverride;
-    if (Number.isFinite(override)) return Math.trunc(override);
-    const dc = Number(config?.dc);
-    return Number.isFinite(dc) ? Math.trunc(dc) : 15;
-  }
-
   /**
    * Project a salvage result group's results for display. Mirrors
    * `CraftingEngine._resolveSalvageResultGroups`'s `allGroups.slice(0, 1)` for simple
@@ -1750,7 +1743,7 @@ export class InventoryListingBuilder {
         : Array.isArray(config?.relativeOutcomes)
           ? config.relativeOutcomes
           : [];
-    const baseDc = this._salvageDc({ mode: 'routed', routedType: 'relative', config, component });
+    const baseDc = salvageDisplayDc({ mode: 'routed', routedType: 'relative', config, component });
     const routing = salvage?.outcomeRouting || {};
     const groupById = new Map(
       (Array.isArray(salvage?.resultGroups) ? salvage.resultGroups : [])
