@@ -1,5 +1,5 @@
 /** DialogV2 adapter for the shared single and bulk check prompt body. */
-import { mount, unmount } from 'svelte';
+import { flushSync, mount, unmount } from 'svelte';
 
 const ROLL_MODES = [
   ['publicroll', 'CHAT.RollPublic', 'Public Roll'],
@@ -177,6 +177,8 @@ export async function waitForPrompt(
         if (!host || !Component) throw new Error('Roll prompt mount host unavailable');
         mounted = mountBody(Component, { target: host, props: { data: body } });
         appendFooterSublabels(dialog, labels);
+        flushSync();
+        dialog?.setPosition?.({ height: 'auto', top: null });
       } catch (error) {
         console.error('Fabricate | Roll prompt mount failed:', error);
         void dialog?.close?.();
@@ -221,7 +223,8 @@ export function buildSinglePromptData({
     img: img || '',
     formula: resolvedFormula || formula || '',
     dc: Number.isFinite(dc) ? dc : null,
-    comparison: comparison === undefined ? (thresholdMode === 'exceed' ? 'exceed' : 'meet') : comparison,
+    comparison:
+      comparison === undefined ? (thresholdMode === 'exceed' ? 'exceed' : 'meet') : comparison,
     selectedModifiers: Array.isArray(selectedModifiers) ? selectedModifiers : [],
   };
 }
