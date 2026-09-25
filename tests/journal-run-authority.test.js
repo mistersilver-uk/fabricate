@@ -220,7 +220,7 @@ function sharedAuthorityWorld() {
         await beforeCreate?.();
         const ledger = addLedger(source.state);
         ledger.source = source;
-        log.push(['create', ledger.id]);
+        log.push(['create', structuredClone(source)]);
         return ledger;
       },
       deleteLedger: async (entry) => {
@@ -1488,6 +1488,165 @@ describe('journal run authority ledger', () => {
       })
     );
     assert.deepEqual(wrongSender, { success: false });
+  });
+
+  it('keeps prepared evaluation and recipient replies outside every replicated ledger write', async () => {
+    const world = sharedAuthorityWorld();
+    const authority = world.realm();
+    await authority.setup();
+    const binding = {
+      actorUuid: 'Actor.a', runType: 'crafting', runId: 'run-1', expectedRevision: 2,
+      privateEvaluation: { formula: 'SECRET_FORMULA', catalogue: ['SECRET_CHOICE'] },
+      decisionPolicy: { allowsSituationalModifier: true, allowAdvantage: false },
+    };
+    const request = { requestId: 'private-prepare', senderId: 'player', sessionId: 'one' };
+    const prepare = () => authority.run(request, ({ issuePrepareToken }) => ({
+      success: true, checkRequired: true,
+      prepareToken: issuePrepareToken(binding),
+      promptDescriptor: { formula: 'SECRET_PROMPT' },
+    }));
+    const first = await prepare();
+    assert.deepEqual(await prepare(), first);
+    assert.equal(world.ledger.state.requests[request.requestId].response.promptDescriptor, undefined);
+    assert.equal(world.ledger.state.prepareTokens[first.prepareToken].binding.privateEvaluation, undefined);
+    let consumed;
+    await authority.run(
+      { requestId: 'private-consume', senderId: 'player', sessionId: 'one' },
+      ({ consumePrepareToken }) => {
+        consumed = consumePrepareToken(first.prepareToken, binding);
+        return { success: consumed !== null };
+      }
+    );
+    assert.deepEqual(consumed.binding.privateEvaluation, binding.privateEvaluation);
+    assert.deepEqual(world.ledger.state.prepareTokens[first.prepareToken].binding.decisionPolicy,
+      binding.decisionPolicy);
+    assert.deepEqual(await prepare(), { success: false, reason: 'prepare-token-invalid' });
+    const replicated = world.log.filter(([kind]) => ['create', 'write'].includes(kind));
+    assert.ok(replicated.some(([kind]) => kind === 'create'));
+    for (const [, document] of replicated) {
+      assert.doesNotMatch(JSON.stringify(document), /SECRET_FORMULA|SECRET_CHOICE|SECRET_PROMPT/);
+    }
+  });
+
+  it('scrubs legacy private bindings and caller-only replies during active-GM bootstrap', async () => {
+    const world = sharedAuthorityWorld();
+    world.addLedger({
+      version: 1,
+      requests: {
+        legacy: {
+          kind: 'command', status: 'settled', senderId: 'player', sessionId: 'one',
+          response: { success: true, checkRequired: true, prepareToken: 'old',
+            promptDescriptor: { formula: 'LEGACY_PROMPT' },
+            rollHandoff: { formula: 'LEGACY_HANDOFF' } },
+        },
+      },
+      prepareTokens: {
+        old: { status: 'active', binding: {
+          senderId: 'player', actorUuid: 'Actor.a', runType: 'crafting', runId: 'run-1',
+          expectedRevision: 2, privateEvaluation: { formula: 'LEGACY_FORMULA' },
+        }, expiresAt: 2000 },
+      },
+      reconciliations: [],
+    });
+    const authority = world.realm();
+    assert.equal((await authority.bootstrapRecovery()).success, true);
+    assert.equal(world.ledger.state.prepareTokens.old.status, 'released');
+    assert.equal(world.ledger.state.requests.legacy.response.promptDescriptor, undefined);
+    assert.equal(world.ledger.state.requests.legacy.response.rollHandoff, undefined);
+    assert.deepEqual(
+      await authority.run({ requestId: 'legacy', senderId: 'player', sessionId: 'one' },
+        () => ({ success: true })),
+      { success: false, reason: 'prepare-token-invalid' }
+    );
+    for (const [kind, state] of world.log) {
+      if (kind === 'write') assert.doesNotMatch(JSON.stringify(state), /LEGACY_/);
+    }
+  });
+
+  it('routes an issued token and preparation replay only to its issuing GM tab', async () => {
+    const world = sharedAuthorityWorld();
+    const issuer = world.realm();
+    const otherTab = world.realm();
+    await issuer.setup();
+    const binding = { actorUuid: 'Actor.a', runType: 'crafting', runId: 'run-1', expectedRevision: 2,
+      privateEvaluation: { formula: 'private' } };
+    const prepareRequest = { requestId: 'prepare-tab', senderId: 'player', sessionId: 'one' };
+    const prepared = await issuer.run(prepareRequest, ({ issuePrepareToken }) => ({
+      success: true, checkRequired: true, prepareToken: issuePrepareToken(binding),
+      promptDescriptor: { label: 'visible only to recipient' },
+    }));
+    const tokenRequest = { requestId: 'consume-tab', senderId: 'player', sessionId: 'one',
+      payload: { prepareToken: prepared.prepareToken } };
+    const claims = world.log.filter(([kind]) => kind === 'claim').length;
+    assert.equal(await otherTab.shouldHandleRequest(prepareRequest), false);
+    assert.equal(await otherTab.shouldHandleRequest(tokenRequest), false);
+    assert.equal(world.log.filter(([kind]) => kind === 'claim').length, claims);
+    assert.equal(await issuer.shouldHandleRequest(tokenRequest), true);
+    let calls = 0;
+    await issuer.run(tokenRequest, ({ consumePrepareToken }) => {
+      calls += 1;
+      return { success: consumePrepareToken(prepared.prepareToken, binding) !== null };
+    });
+    assert.equal(calls, 1);
+    assert.equal(await otherTab.shouldHandleRequest(tokenRequest), false);
+  });
+
+  it('rejects cache loss and a newly elected GM without consuming a prepared check', async () => {
+    const world = sharedAuthorityWorld();
+    const issuer = world.realm();
+    await issuer.setup();
+    const binding = { actorUuid: 'Actor.a', runType: 'crafting', runId: 'run-1', expectedRevision: 2,
+      privateEvaluation: { formula: 'private' } };
+    const prepared = await issuer.run(
+      { requestId: 'prepare-lost', senderId: 'player', sessionId: 'one' },
+      ({ issuePrepareToken }) => ({ success: true, prepareToken: issuePrepareToken(binding) })
+    );
+    const replacement = world.realm('gm2', {
+      getCurrentUser: () => ({ id: 'gm2', isGM: true }),
+      getActiveGM: () => ({ id: 'gm2', isGM: true }),
+    });
+    await replacement.bootstrapRecovery();
+    let evaluated = 0;
+    const attempt = await replacement.run(
+      { requestId: 'consume-lost', senderId: 'player', sessionId: 'one',
+        payload: { prepareToken: prepared.prepareToken } },
+      ({ consumePrepareToken }) => {
+        const snapshot = consumePrepareToken(prepared.prepareToken, binding);
+        if (snapshot) evaluated += 1;
+        return { success: snapshot !== null, reason: snapshot ? null : 'prepare-token-invalid' };
+      }
+    );
+    assert.deepEqual(attempt, { success: false, reason: 'prepare-token-invalid' });
+    assert.equal(evaluated, 0);
+    assert.equal(world.ledger.state.prepareTokens[prepared.prepareToken].status, 'active');
+    const fresh = await replacement.run(
+      { requestId: 'prepare-fresh', senderId: 'player', sessionId: 'one' },
+      ({ issuePrepareToken }) => ({ success: true, prepareToken: issuePrepareToken(binding) })
+    );
+    assert.notEqual(fresh.prepareToken, prepared.prepareToken);
+  });
+
+  it('replays a committed outcome after tab loss without handoff or a second effect', async () => {
+    const world = sharedAuthorityWorld();
+    const issuer = world.realm();
+    await issuer.setup();
+    const request = { requestId: 'committed', senderId: 'player', sessionId: 'one' };
+    let effects = 0;
+    const first = await issuer.run(request, () => ({
+      success: true, receipt: ++effects,
+      rollHandoff: { formula: 'PRIVATE_HANDOFF', total: 17 },
+    }));
+    assert.equal(first.rollHandoff.formula, 'PRIVATE_HANDOFF');
+    assert.equal(world.ledger.state.requests.committed.response.rollHandoff, undefined);
+    const reloaded = world.realm();
+    assert.equal(await reloaded.shouldHandleRequest(request), true);
+    assert.equal((await reloaded.bootstrapRecovery()).success, true);
+    assert.deepEqual(await reloaded.run(request, () => ({ success: true, receipt: ++effects })),
+      { success: true, receipt: 1 });
+    assert.equal(effects, 1);
+    for (const [kind, state] of world.log) {
+      if (kind === 'write') assert.doesNotMatch(JSON.stringify(state), /PRIVATE_HANDOFF/);
+    }
   });
 
   /**

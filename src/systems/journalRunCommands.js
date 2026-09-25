@@ -917,6 +917,10 @@ export function createJournalRunCommandService({
     }
     if (payload?.kind !== JOURNAL_RUN_SOCKET_KIND.REQUEST) return null;
     if (!currentRealmIsActiveGm()) return null;
+    if (
+      typeof authority.shouldHandleRequest === 'function' &&
+      !(await authority.shouldHandleRequest(payload))
+    ) return null;
     const response = await handleRequest(payload, senderId);
     // A second tab for the same elected GM has the same attested sender id. A tab that lost
     // either boot recovery or this command's claim must stay silent or it can beat the winning

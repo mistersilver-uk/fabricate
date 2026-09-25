@@ -3176,7 +3176,7 @@ Committed requests return their recorded outcome.
 7. Gathering persists its terminal record with the planned execution journal before effects and updates receipts in that same history record by run ID.
 It does not delay terminal history until effects finish.
 8. Intent, effect plans, receipts and outcomes retain existing secret and blind-run redaction.
-Authority request deduplication and prepare tokens live in the private authority ledger; the run record retains effect evidence.
+Authority request deduplication and safe prepare-token metadata live in the GM-owned authority ledger; the run record retains effect evidence.
 9. Stage browsing is transient UI state and never changes the persisted executable stage index.
 
 ### Authority Ledger and Recovery Boundary
@@ -3186,7 +3186,8 @@ The authority MUST re-resolve the actor, sender ownership, source actors, run re
 The actor UUID identifies the command target; ownership MUST be checked against the attested sender rather than the executing GM's ambient `isOwner`.
 A local queue or revision comparison alone MUST NOT be treated as a cross-browser lock.
 
-The authority requires exactly one private JournalEntry ledger.
+The authority requires exactly one GM-owned JournalEntry ledger.
+Its flags replicate to player clients even when document ownership defaults to none, so they MUST contain no private prepared inputs or recipient-specific prompt or roll handoff data.
 The active GM MUST provision it automatically when the world holds none, during boot recovery and at the start of the command path, and MUST then run boot reconstruction against it.
 A non-GM realm MUST NOT provision a ledger and keeps its active-GM refusal.
 Provisioning MUST use a server-assigned top-level `_id`, never a fixed one: only the embedded duplicate-`_id` check is enforced, so a fixed top-level `_id` silently overwrites the existing ledger and its durable request state.
@@ -3204,7 +3205,11 @@ Because the claim page lives inside the ledger it was created on, a retry that l
 A command MUST NOT run on holding no claim on the ledger it is writing to: a re-acquisition that fails before the handler MUST refuse, and one that fails after it MUST settle as recovery-required.
 Explicit setup remains available as an idempotent ensure that returns the existing ledger rather than refusing it.
 
-The ledger holds durable request outcomes and one-use prepare tokens; an embedded JournalEntryPage with a fixed ID and `keepId` arbitrates the global execution claim.
+The ledger holds safe durable request outcomes and one-use prepare-token bindings, status, expiry and issuing GM and instance identities; an embedded JournalEntryPage with a fixed ID and `keepId` arbitrates the global execution claim.
+The complete prepared evaluation and recipient-specific preparation reply MUST remain in the issuing authority instance and MUST be removed on consume, release or expiry.
+A missing private snapshot after reload or GM handoff MUST refuse the token before evaluation or effects; the caller may prepare again.
+Another tab of the same elected GM MUST stay silent before claim and reply for a token or preparation replay issued by its peer, while committed execution MAY replay its safe durable outcome without another effect or roll handoff.
+Under the active-GM claim, bootstrap MUST scrub legacy persisted private bindings and recipient-specific response fields and invalidate their prepared tokens.
 `keepId` is load-bearing: without it the server discards the fixed ID silently, and the cross-browser lock stops existing rather than failing.
 A claim MUST NOT expire on age alone, because an interrupted operation may already have produced irreversible effects.
 Its standing is judged from the REQUEST it guards, read from the ledger's own durable request state, within a bounded live window derived from the command timeout a caller itself waits before treating a reply as unknown.
@@ -3239,7 +3244,7 @@ An operation that fails by throwing remains uncertain, MUST retain its claim, an
 The recovery rule MUST NOT be widened beyond the provable pre-write case, because releasing a genuinely half-applied effect is worse than the block it removes.
 
 Command replies MUST use transport-level recipient routing as well as attested-GM and recipient/session/request/run/revision correlation.
-The private ledger MUST NOT be copied into actor flags or reply payloads.
+The authority ledger MUST NOT be copied into actor flags or reply payloads.
 Initial prompt redaction MUST use the initiating viewer's current entitlement before returning protected identity, image, formula, DC or modifier information.
 Post-commit evaluated-roll handoff MUST independently recheck entitlement against the current actor, viewer and run; that later check cannot protect an already-disclosed initial prompt.
 Secret checks MUST use generic local prompts, GM private posting and sanitized transition replies without serialized roll data.
