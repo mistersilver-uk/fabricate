@@ -84,12 +84,12 @@ Its reach is bounded by what each mode's model can express: real on crafting `si
 Each of the three activity checks — `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` — still carries its OWN selection over that one library, on the crafting system: a **COMBINATION RULE** (`defaultModifierPolicy`), a default eligible id set (`defaultModifierIds`) and an optional pick cap (`maxModifierPicks`).
 The catalogue is defined once; each activity decides which entries apply and how they combine.
 A check roll formula ALWAYS carries the resulting **check-modifier contribution**; the GM authors no placeholder and cannot forget one, so a catalogue that reaches a rolled check always contributes.
-The rule states BOTH how the eligible entries combine AND **who selects them**, and it has four values: `addAll` (take the activity's own default set; nobody selects), `highest` (the single best rankable entry of that same set; nobody selects), **`bySubject`** (the record being resolved selects, at authoring time), and `playerPicks` (the PLAYER selects, at roll time).
+The rule states BOTH how the eligible entries combine AND **who selects them**, and it has four values: `addAll` (take the activity's own default set; nobody selects), `highest` (the single highest-ranked entry of that same set; nobody selects), **`bySubject`** (the record being resolved selects, at authoring time), and `playerPicks` (the PLAYER selects, at roll time).
 **The two RANKING rules — `highest`, and `playerPicks` on every non-interactive path — classify and order entries deterministically**, so no hidden roll is spent to find a winner.
 Finite magnitude averages rank first by value, including when every value is negative; transformed quantities fill remaining capacity in eligible-set order.
 An expression carrying `cs`, `cf`, `even`, `odd`, `df`, `sf` or `ms` transforms the dice total and therefore has no magnitude average or numeric sentinel.
-Malformed or irreducible entries retain their blocked-entry behaviour.
-The winner is then appended AS DICE, so ranking deterministically never flattens what it selects.
+Malformed or irreducible entries retain their blocked-entry behaviour and rank after transformed entries, so their placeholder average of zero cannot outrank a valid negative magnitude.
+A selected rolling entry is then appended AS DICE, so ranking deterministically never flattens what it selects.
 The average RANKS and never PAYS: it decides which entries apply and nothing about what they contribute.
 It is exact for arithmetic, plain dice and keep/drop dice (order statistics — `2d20kh1` averages 13.825, where its plain sum of 21 would win `highest` against anything), and an explicit approximation for a `min`/`max` around a die (Jensen's inequality), for a pool's non-identically-distributed members, and for magnitude-preserving die modifiers such as `x`, `r` and `min`.
 Selected output always returns in eligible-set order, including a mixed capped selection that uses transformed entries only after every finite magnitude.
