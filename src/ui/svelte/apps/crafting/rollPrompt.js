@@ -204,7 +204,7 @@ export function buildSinglePromptData({
   thresholdMode,
   comparison,
 } = {}) {
-  const activityLabel = activity || localize('FABRICATE.App.RollPrompt.Roll', 'Roll');
+  const activityLabel = activity || localize('FABRICATE.App.RollPrompt.roll', 'Roll');
   const title = localize('FABRICATE.App.RollPrompt.CheckTitle', '{activity} check').replace(
     '{activity}',
     activityLabel

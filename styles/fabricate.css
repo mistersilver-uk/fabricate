@@ -17468,7 +17468,7 @@
 .fabricate-roll-prompt-dialog .form-footer,
 .fabricate-roll-prompt-dialog .dialog-buttons {
   display: flex;
-  gap: 8px;
+  gap: var(--fab-space-2);
   flex: 0 0 auto;
   padding: var(--fab-space-3) var(--fab-space-4);
   border-top: 1px solid var(--fab-border);
@@ -17484,7 +17484,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   border: 1px solid var(--fab-border-strong);
   border-radius: 11px;
   background: var(--fab-bg-1);

@@ -45,7 +45,12 @@
           <div class="formula-content">
             {#if data.formula}<code>{data.formula}</code>{/if}
             {#if data.dc !== null}
-              <Chip tone="info" density="row" mono icon="fa-solid fa-bullseye">{data.labels.dcValue.replace('{dc}', String(data.dc))} · {data.comparison === 'exceed' ? data.labels.exceed : data.labels.meet}</Chip>
+              <Chip tone="info" density="row" mono icon="fa-solid fa-bullseye"
+                >{data.labels.dcValue.replace('{dc}', String(data.dc))} · {data.comparison ===
+                'exceed'
+                  ? data.labels.exceed
+                  : data.labels.meet}</Chip
+              >
             {/if}
           </div>
         </div>
@@ -65,18 +70,44 @@
 
     {#if data.choicePlan.options.length}
       <fieldset class="fabricate-roll-prompt__modifiers">
-        <legend class="eyebrow">{data.labels.modifierChoice}{#if multiPick} · {data.labels.pickUpTo.replace('{count}', String(data.choicePlan.maxPicks))}{/if}</legend>
+        <legend class="eyebrow"
+          >{data.labels.modifierChoice}{#if multiPick}
+            · {data.labels.pickUpTo.replace(
+              '{count}',
+              String(data.choicePlan.maxPicks)
+            )}{/if}</legend
+        >
         <div class="modifier-chips">
           {#each data.choicePlan.options as modifier (modifier.id)}
             {#if multiPick}
-              <label class="modifier-choice" class:is-chosen={selectedIds.includes(modifier.id)} class:is-disabled={!selectedIds.includes(modifier.id) && selectedIds.length >= data.choicePlan.maxPicks}>
-                <SelectionCheckbox wrapper="contents" name="craftingModifier" value={modifier.id} checked={selectedIds.includes(modifier.id)} disabled={!selectedIds.includes(modifier.id) && selectedIds.length >= data.choicePlan.maxPicks} ariaLabel={`${modifierLabel(modifier)} ${modifierValue(modifier)}`} onChange={(checked) => selectCheckbox(modifier.id, checked)} />
+              <label
+                class="modifier-choice"
+                class:is-chosen={selectedIds.includes(modifier.id)}
+                class:is-disabled={!selectedIds.includes(modifier.id) &&
+                  selectedIds.length >= data.choicePlan.maxPicks}
+              >
+                <SelectionCheckbox
+                  wrapper="contents"
+                  name="craftingModifier"
+                  value={modifier.id}
+                  checked={selectedIds.includes(modifier.id)}
+                  disabled={!selectedIds.includes(modifier.id) &&
+                    selectedIds.length >= data.choicePlan.maxPicks}
+                  ariaLabel={`${modifierLabel(modifier)} ${modifierValue(modifier)}`}
+                  onChange={(checked) => selectCheckbox(modifier.id, checked)}
+                />
                 <i class={modifier.icon || 'fa-solid fa-dice-d20'} aria-hidden="true"></i>
                 <span>{modifierLabel(modifier)}</span><span>{modifierValue(modifier)}</span>
               </label>
             {:else}
               <label class="modifier-choice" class:is-chosen={selectedIds.includes(modifier.id)}>
-                <input type="radio" name="craftingModifier" value={modifier.id} checked={selectedIds.includes(modifier.id)} onchange={() => selectedIds = [modifier.id]} />
+                <input
+                  type="radio"
+                  name="craftingModifier"
+                  value={modifier.id}
+                  checked={selectedIds.includes(modifier.id)}
+                  onchange={() => (selectedIds = [modifier.id])}
+                />
                 <i class={modifier.icon || 'fa-solid fa-dice-d20'} aria-hidden="true"></i>
                 <span>{modifierLabel(modifier)}</span><span>{modifierValue(modifier)}</span>
               </label>
@@ -89,7 +120,9 @@
         <p class="eyebrow">{data.labels.modifiers}</p>
         <div class="modifier-chips">
           {#each data.selectedModifiers as modifier, index (index)}
-            <Chip tone="accent" emphasis="outlined" density="row" icon={modifier.icon || 'fa-solid fa-dice-d20'}>{modifierLabel(modifier)} {modifierValue(modifier)}</Chip>
+            <Chip tone="accent" density="row" icon={modifier.icon || 'fa-solid fa-dice-d20'}
+              >{modifierLabel(modifier)} {modifierValue(modifier)}</Chip
+            >
           {/each}
         </div>
         <p class="help">{data.labels.eachAdds}</p>
@@ -99,7 +132,12 @@
     <div class="bonus-group">
       <Field as="label" class="bonus-field">
         <span class="eyebrow">{data.labels.bonus}</span>
-        <input type="text" name="situationalBonus" placeholder={data.labels.bonusPlaceholder} autocomplete="off" />
+        <input
+          type="text"
+          name="situationalBonus"
+          placeholder={data.labels.bonusPlaceholder}
+          autocomplete="off"
+        />
       </Field>
       <p class="help">{data.labels.bonusHelp}</p>
     </div>
@@ -117,31 +155,163 @@
 </div>
 
 <style>
-  .fabricate-roll-prompt { color: var(--fab-text); background: var(--fab-bg-1); font: inherit; }
-  .prompt-heading { padding: 12px 14px; border-bottom: 1px solid var(--fab-border); background: var(--fab-bg-2); }
-  .prompt-heading h2 { margin: 0; font-size: 14px; font-weight: 600; }
-  .prompt-heading p { margin: 3px 0 0; color: var(--fab-text-subtle); font-size: 10.5px; font-weight: 500; }
-  .prompt-body { display: grid; gap: 14px; padding: 14px 16px; }
-  .formula-row { display: flex; align-items: flex-start; gap: 12px; }
-  .die-glyph { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border: 1px solid var(--fab-border-strong); border-radius: 9px; background: var(--fab-bg-2); color: var(--fab-accent-text); font-size: 17px; }
-  .formula-content { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; }
-  .formula-content code { color: var(--fab-text); font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
-  .eyebrow { margin: 0 0 6px; color: var(--fab-text-subtle); font-size: 8.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-  .help { margin: 0; color: var(--fab-text-muted); font-size: 10.5px; font-weight: 400; line-height: 1.4; }
-  .bulk-list { overflow: hidden; border: 1px solid var(--fab-border); border-radius: 6px; }
-  .bulk-list .eyebrow { padding: 8px 10px 2px; }
-  .bulk-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 10px; border-top: 1px solid var(--fab-border); font-size: 12px; }
-  .bulk-row span:last-child { color: var(--fab-text-muted); white-space: nowrap; }
-  .fabricate-roll-prompt__modifiers { min-width: 0; margin: 0; padding: 0; border: 0; }
-  .modifier-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .modifier-choice { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 5px 9px; border: 1px solid var(--fab-border-strong); border-radius: 999px; background: var(--fab-bg-2); color: var(--fab-text); font-size: 11px; cursor: pointer; }
-  .modifier-choice.is-chosen { border-color: var(--fab-accent-border); background: var(--fab-accent-soft); }
-  .modifier-choice:has(input:focus-visible) { outline: 2px solid var(--fab-accent); outline-offset: 2px; }
-  .modifier-choice.is-disabled { opacity: .5; cursor: not-allowed; }
-  .modifier-choice input[type='radio'] { margin: 0; accent-color: var(--fab-accent); }
-  .modifier-choice i { color: var(--fab-accent-text); }
-  .modifier-choice span:last-child { font-weight: 700; }
-  .bonus-group, .bonus-field, .mode-field { display: grid; gap: 4px; }
-  .fabricate-roll-prompt :global(.bonus-field input), .fabricate-roll-prompt :global(.mode-field select) { width: 100%; box-sizing: border-box; height: 30px; min-height: 30px; padding: 0 10px; border: 1px solid var(--fab-border); border-radius: 7px; background: var(--fab-bg-2); color: var(--fab-text); font: inherit; }
-  .fabricate-roll-prompt :global(.bonus-field input::placeholder) { color: var(--fab-text-subtle); }
+  .fabricate-roll-prompt {
+    color: var(--fab-text);
+    background: var(--fab-bg-1);
+    font: inherit;
+  }
+  .prompt-heading {
+    padding: var(--fab-space-3) calc(var(--fab-space-3) + var(--fab-space-2xs));
+    border-bottom: 1px solid var(--fab-border);
+    background: var(--fab-bg-2);
+  }
+  .prompt-heading h2 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .prompt-heading p {
+    margin: calc(var(--fab-space-1) - 1px) 0 0;
+    color: var(--fab-text-subtle);
+    font-size: 10.5px;
+    font-weight: 500;
+  }
+  .prompt-body {
+    display: grid;
+    gap: calc(var(--fab-space-3) + var(--fab-space-2xs));
+    padding: calc(var(--fab-space-3) + var(--fab-space-2xs)) var(--fab-space-4);
+  }
+  .formula-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--fab-space-3);
+  }
+  .die-glyph {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    flex: none;
+    border: 1px solid var(--fab-border-strong);
+    border-radius: 9px;
+    background: var(--fab-bg-2);
+    color: var(--fab-accent-text);
+    font-size: 17px;
+  }
+  .formula-content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: calc(var(--fab-space-1) + 1px);
+    min-width: 0;
+  }
+  .formula-content code {
+    color: var(--fab-text);
+    font-size: 14px;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+  .eyebrow {
+    margin: 0 0 var(--fab-space-chip);
+    color: var(--fab-text-subtle);
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .help {
+    margin: 0;
+    color: var(--fab-text-muted);
+    font-size: 10.5px;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+  .bulk-list {
+    overflow: hidden;
+    border: 1px solid var(--fab-border);
+    border-radius: 6px;
+  }
+  .bulk-list .eyebrow {
+    padding: var(--fab-space-2) calc(var(--fab-space-2) + var(--fab-space-2xs)) var(--fab-space-2xs);
+  }
+  .bulk-row {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--fab-space-3);
+    padding: calc(var(--fab-space-2) - 1px) calc(var(--fab-space-2) + var(--fab-space-2xs));
+    border-top: 1px solid var(--fab-border);
+    font-size: 12px;
+  }
+  .bulk-row span:last-child {
+    color: var(--fab-text-muted);
+    white-space: nowrap;
+  }
+  .fabricate-roll-prompt__modifiers {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .modifier-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fab-space-chip);
+  }
+  .modifier-choice {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--fab-space-1) + 1px);
+    max-width: 100%;
+    padding: calc(var(--fab-space-1) + 1px) calc(var(--fab-space-2) + 1px);
+    border: 1px solid var(--fab-border-strong);
+    border-radius: 999px;
+    background: var(--fab-bg-2);
+    color: var(--fab-text);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .modifier-choice.is-chosen {
+    border-color: var(--fab-accent-border);
+    background: var(--fab-accent-soft);
+  }
+  .modifier-choice:has(input:focus-visible) {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
+  }
+  .modifier-choice.is-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .modifier-choice input[type='radio'] {
+    margin: 0;
+    accent-color: var(--fab-accent);
+  }
+  .modifier-choice i {
+    color: var(--fab-accent-text);
+  }
+  .modifier-choice span:last-child {
+    font-weight: 700;
+  }
+  .bonus-group,
+  .fabricate-roll-prompt :global(.fabricate-field.bonus-field),
+  .fabricate-roll-prompt :global(.fabricate-field.mode-field) {
+    display: grid;
+    gap: var(--fab-space-1);
+  }
+  .fabricate-roll-prompt :global(.bonus-field input),
+  .fabricate-roll-prompt :global(.mode-field select) {
+    width: 100%;
+    box-sizing: border-box;
+    height: 30px;
+    min-height: 30px;
+    padding: 0 calc(var(--fab-space-2) + var(--fab-space-2xs));
+    border: 1px solid var(--fab-border);
+    border-radius: 7px;
+    background: var(--fab-bg-2);
+    color: var(--fab-text);
+    font: inherit;
+  }
+  .fabricate-roll-prompt :global(.bonus-field input::placeholder) {
+    color: var(--fab-text-subtle);
+  }
 </style>

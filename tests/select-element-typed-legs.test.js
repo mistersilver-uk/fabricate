@@ -87,6 +87,15 @@ const RENDERS_SELECT = new Map(
     /<select[\s>]/u.test(template.replaceAll(/<script[\s\S]*?<\/script>/gu, ' ')),
   ])
 );
+/** Marked DialogV2 controls are approved form adapters, not native-select debt rows. */
+const MARKED_DIALOG_SELECTS = Object.freeze([
+  'src/ui/svelte/apps/crafting/RollPrompt.svelte',
+]);
+const MARKED_SELECT_PATTERN = /<!--\s*native select:\s*\S[^>]*-->\s*<select\b/u;
+
+function markedDialogSelects() {
+  return MARKED_DIALOG_SELECTS.filter((file) => MARKED_SELECT_PATTERN.test(SOURCES[file] ?? ''));
+}
 const ACCEPTS_CHILDREN = new Map(
   [...TEMPLATES].map(([file, template]) => [file, /@render\s+children|<slot\b/u.test(template)])
 );
@@ -182,8 +191,8 @@ test('the element-typed leg scan is alive, so the clause below is not quantifyin
   // rather than to a floor a converted file's prose could hold up.
   assert.deepEqual(
     [...RENDERS_SELECT].filter(([, renders]) => renders).map(([file]) => file).sort(),
-    [...new Set(KNOWN_NATIVE_SELECT_ELEMENTS.map((row) => row.key))].sort(),
-    'the templates this scan says render a `<select>` are not the native-select baseline, so a ' +
+    [...new Set([...KNOWN_NATIVE_SELECT_ELEMENTS.map((row) => row.key), ...markedDialogSelects()])].sort(),
+    'the templates this scan says render a `<select>` are neither native-select debt nor a marked DialogV2 adapter, so a ' +
       'leg would be judged against hosts that do not render one, or every leg would report as ' +
       'stranded and the baseline below would be measuring the scan rather than the sheet'
   );

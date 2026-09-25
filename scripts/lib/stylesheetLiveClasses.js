@@ -12,6 +12,8 @@ export const LIVE_CLASS_SOURCE_EXTENSIONS = Object.freeze(['.js', '.mjs', '.svel
 /** Class names Foundry VTT emits into the DOM around, or inside, a Fabricate application. */
 export const FOUNDRY_CORE_CLASSES = Object.freeze([
   'checkbox-label',
+  // DialogV2._renderHTML creates this host in the Foundry frame (V13/V14 dialog.mjs).
+  'dialog-content',
   'dialog-buttons',
   'form-footer',
   'form-group',
