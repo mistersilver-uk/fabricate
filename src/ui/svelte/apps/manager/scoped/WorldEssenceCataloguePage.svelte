@@ -233,6 +233,7 @@
       )}
       countUnit={text('FABRICATE.Admin.Manager.Scoped.Essence.CountUnit', 'essences')}
       membershipFilter={false}
+      autoSelectFirst
       selectAllLabel={text('FABRICATE.Admin.Manager.Scoped.Essence.SelectAllShort', 'All')}
       searchPlaceholder={text(
         'FABRICATE.Admin.Manager.Scoped.Essence.SearchPlaceholder',

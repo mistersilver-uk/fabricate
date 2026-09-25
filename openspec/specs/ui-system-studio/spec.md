@@ -528,6 +528,9 @@ Capabilities:
 - A browser that supports bulk selection states the ticked-row treatment through the one shared rule every such browser joins, so the state looks identical in every studio.
   A studio that writes the ticked class without joining that rule renders a ticked row indistinguishable from an unticked one, which is a defect rather than an omission.
 - The essence library's search, filters, sort, presentation and page position survive a round trip through the essence editor.
+- The essence library initially inspects the first adopted member in the rendered sorted, filtered and paginated list when its selected id is empty or no longer names a current member.
+  A valid adopted-member selection survives sorting, filtering, paging and an editor round trip even while its row is temporarily absent from the rendered page.
+  Empty results select nothing, and rows shown only through `All world essences` are never automatically selected.
 - Manager essence icon editing uses a pop-over icon picker instead of requiring raw icon class entry.
   The editor's icon control is one column: the preview tile fills that column's width and the picker and its reset sit inside the same edge, so no control overhangs the tile it belongs to.
   The tile's glyph is sized for the tile rather than inheriting the shared row-medallion glyph size, which reads as a speck at editor scale.

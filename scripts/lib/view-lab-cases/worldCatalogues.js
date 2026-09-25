@@ -585,7 +585,10 @@ export const CASES = Object.freeze([
     label: 'Manager — World Essence Catalogue, resting inspector',
     reaches: 'beyond',
     smokeLabels: [],
-    steps: [{ selector: '#manager-world-nav-essence-catalogue' }],
+    steps: [
+      { selector: '#manager-world-nav-essence-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'No matching essence' },
+    ],
     expectView: 'world-essences',
     expectSelector: '[data-scoped-list-inspector-state="resting"]',
     expectContained: [
@@ -606,10 +609,9 @@ export const CASES = Object.freeze([
     label: 'Manager — World Essence Catalogue',
     reaches: 'beyond',
     smokeLabels: [],
-    // The second step selects A row, and without it this case photographs the wrong screen.
     steps: [
       { selector: '#manager-world-nav-essence-catalogue' },
-      { selector: '[data-scoped-list-inspect]' },
+      { selector: '[data-scoped-list-inherit-note="effectSource"]', scroll: true },
     ],
     expectView: 'world-essences',
     expectSelector: '[data-scoped-page="world-essences"]',

@@ -5529,7 +5529,7 @@
         {essenceCards}
         showSourceUi={showEssenceSourceUi}
         showPropertyMacroUi={showEssencePropertyMacroUi}
-        selectedEssenceId={selectedEssence?.id || selectedEssenceId}
+        {selectedEssenceId}
         {selectedSystemId}
         onSelectEssence={selectEssence}
         onEditEssence={editEssence}
@@ -6003,7 +6003,6 @@
               systemRows={inspectedEssenceSystemRows}
               memberCount={Number(inspectedEssenceWorldEntry?.membershipCount) || 0}
               rosterSize={allSystems.length}
-              membershipActions={store?.worldScope?.essence ?? null}
               onOpenSystemRules={(entityId, systemId) => openSystemEssenceRules(entityId, systemId)}
               onEdit={(id) => editEssence(id)}
               onOpenWorldDefinition={(id) => openWorldScopedEntry('world-essence-entry', id)}

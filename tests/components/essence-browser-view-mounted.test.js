@@ -541,6 +541,77 @@ describe('EssenceBrowserView membership axis (issue 1716)', () => {
   });
 });
 
+describe('EssenceBrowserView initial member selection (issue 2034)', () => {
+  const AUTHORED_ROWS = [
+    makeEssenceRow({ id: 'zinc', name: 'Zinc' }),
+    makeEssenceRow({ id: 'aether', name: 'Aether' }),
+    makeEssenceRow({ id: 'mist', name: 'Mist' }),
+  ];
+
+  async function mountSelection(extra = {}, rows = AUTHORED_ROWS) {
+    const selected = [];
+    const root = await harness.mount(
+      props(rows, { onSelectEssence: (id) => selected.push(id), ...extra })
+    );
+    await harness.setProps({});
+    return { root, selected };
+  }
+
+  it('selects the first rendered member once for empty and stale ids', async () => {
+    const empty = await mountSelection();
+    assert.equal(
+      empty.root.querySelector('.manager-essence-row')?.dataset.essenceId,
+      'aether',
+      'name sorting puts Aether ahead of the first authored record'
+    );
+    assert.deepEqual(empty.selected, ['aether']);
+
+    const stale = await mountSelection({ selectedEssenceId: 'deleted' });
+    assert.deepEqual(stale.selected, ['aether'], 'a stale non-empty id is replaced once');
+    await harness.setProps({});
+    assert.deepEqual(stale.selected, ['aether'], 'an owner that has not answered is not notified again');
+  });
+
+  it('selects the first member on the current rendered page', async () => {
+    const browserState = {
+      ...createEssenceBrowserState(),
+      pageSize: 1,
+      pageIndex: 1,
+    };
+    const { root, selected } = await mountSelection({ browserState });
+    assert.equal(root.querySelector('.manager-essence-row')?.dataset.essenceId, 'mist');
+    assert.deepEqual(selected, ['mist']);
+  });
+
+  it('preserves a valid member selection while filtering hides it', async () => {
+    const browserState = { ...createEssenceBrowserState(), searchTerm: 'Aether' };
+    const { root, selected } = await mountSelection({
+      browserState,
+      selectedEssenceId: 'zinc',
+    });
+    assert.deepEqual(
+      [...root.querySelectorAll('.manager-essence-row')].map((row) => row.dataset.essenceId),
+      ['aether'],
+      'the chosen member is absent from the rendered rows'
+    );
+    assert.deepEqual(selected, [], 'a valid hidden choice is not replaced');
+  });
+
+  it('waits for an adopted member and never selects an all-world-only row', async () => {
+    const selected = [];
+    const root = await harness.mount(
+      props([], { scope: WORLD_ONLY_SCOPE, onSelectEssence: (id) => selected.push(id) })
+    );
+    root.querySelector('[data-essence-membership-option="all"] input').click();
+    flushSync();
+    assert.equal(root.querySelectorAll('.manager-essence-row').length, 2);
+    assert.deepEqual(selected, [], 'unadopted world rows do not populate the rules inspector');
+
+    await harness.setProps({ essenceCards: [PLAIN_ENABLED] });
+    assert.deepEqual(selected, ['water'], 'late member data selects once when it becomes eligible');
+  });
+});
+
 describe('EssenceBrowserView sort (issue 1510)', () => {
   it('names the converted sort trigger and orders the rows by the key it chooses', async () => {
     // Aether is used by two components and Water by none, so the usage order inverts the name order.

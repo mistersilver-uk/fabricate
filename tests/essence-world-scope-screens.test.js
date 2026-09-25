@@ -151,7 +151,6 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
           'systemRows',
           'memberCount',
           'rosterSize',
-          'membershipActions',
           'onOpenSystemRules',
           'onEdit',
           'onOpenWorldDefinition',
