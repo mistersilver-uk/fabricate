@@ -1951,6 +1951,10 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
   // A check is describable only once every other stage requirement is met, elapsed time
   // included, so the preflight runs against a matured gate.
   game.time.worldTime = 1120;
+  const originalI18n = game.i18n;
+  game.i18n = {
+    localize: (key) => key === 'FABRICATE.App.Nav.Crafting' ? 'Artesanía' : key,
+  };
 
   try {
     const descriptor = await engine.describeVersionedStageCheck({
@@ -1961,7 +1965,7 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
     });
     assert.deepEqual(descriptor.publicPrompt, {
       label: 'Sun Tea',
-      activity: 'Crafting',
+      activity: 'Artesanía',
       subject: 'Sun Tea',
       actorName: 'Tinker',
       img: 'icons/sundries/documents/blueprint-recipe-alchemical.webp',
@@ -2030,6 +2034,7 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
       else globalThis.Roll = originalRoll;
     }
   } finally {
+    game.i18n = originalI18n;
     if (originalChatMessage === undefined) delete globalThis.ChatMessage;
     else globalThis.ChatMessage = originalChatMessage;
   }

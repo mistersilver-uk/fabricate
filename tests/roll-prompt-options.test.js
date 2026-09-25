@@ -113,9 +113,13 @@ describe('roll prompt DialogV2 adapter', () => {
     root.innerHTML = '<div class="fabricate-roll-prompt-host"></div><button data-action="disadvantage"></button><button data-action="advantage"></button>';
     const mounted = [];
     const removed = [];
+    const positions = [];
     try {
       const result = await waitForPrompt({ wait: async (config) => {
-        const dialog = { element: root };
+        const dialog = { element: root, setPosition: (position) => {
+          assert.equal(mounted.length, positions.length + 1);
+          positions.push(position);
+        } };
         config.render(null, dialog);
         config.render(null, dialog);
         assert.equal(root.querySelectorAll('.fabricate-roll-prompt__footer-note').length, 2);
@@ -137,6 +141,7 @@ describe('roll prompt DialogV2 adapter', () => {
       });
       assert.equal(result.confirmed, true);
       assert.equal(mounted.length, 2);
+      assert.deepEqual(positions, [{ height: 'auto', top: null }, { height: 'auto', top: null }]);
       assert.deepEqual(removed, mounted);
     } finally {
       restoreI18n();

@@ -121,7 +121,12 @@ export const CASES = Object.freeze([
     expectTab: 'journal',
     expectSelector:
       '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="advantage"]' +
-      ':has(.prompt-heading p):has(.formula-content code):has(.static-modifiers .modifier-chips)',
+      ':has(.prompt-heading p:has-text("Brenna Karrunsdottir · Inscribe a Runeblade"))' +
+      ':has(.formula-content code:has-text("1d20 + 3 + 6[Modifiers]"))' +
+      ':not(:has(.formula-content .manager-chip))' +
+      ':has(.static-modifiers .manager-chip:has-text("Rune lore +3"))' +
+      ':has(.static-modifiers .manager-chip:has-text("Etching hand +0"))' +
+      ':has(.static-modifiers .manager-chip:has-text("Inscriber’s chisel +3"))',
     kinds: ['player', 'journal'],
     sourceMatches: [
       JOURNAL_SOURCES,

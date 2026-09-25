@@ -7147,9 +7147,12 @@ function versionedCheckPrompt({
     : resolveRolledFormula(rollFormula, actor, modifierContext);
   const target = activeCheck.slot === 'simple' && Number.isFinite(dc) ? dc : null;
   const comparison = activeCheck.config?.thresholdMode === 'exceed' ? 'exceed' : 'meet';
+  const activityKey = 'FABRICATE.App.Nav.Crafting';
+  const localizedActivity = globalThis.game?.i18n?.localize?.(activityKey);
   return {
     label: recipe.name || step.name || 'Crafting',
-    activity: 'Crafting',
+    activity:
+      localizedActivity && localizedActivity !== activityKey ? localizedActivity : 'Crafting',
     subject: recipe.name || step.name || '',
     actorName: actor?.name ?? '',
     img: resolveRecipeImage(recipe),

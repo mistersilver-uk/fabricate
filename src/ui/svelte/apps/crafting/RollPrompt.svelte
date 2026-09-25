@@ -70,7 +70,7 @@
           {#each data.choicePlan.options as modifier (modifier.id)}
             {#if multiPick}
               <label class="modifier-choice" class:is-chosen={selectedIds.includes(modifier.id)} class:is-disabled={!selectedIds.includes(modifier.id) && selectedIds.length >= data.choicePlan.maxPicks}>
-                <SelectionCheckbox wrapper="contents" name="craftingModifier" value={modifier.id} checked={selectedIds.includes(modifier.id)} disabled={!selectedIds.includes(modifier.id) && selectedIds.length >= data.choicePlan.maxPicks} ariaLabel={modifierLabel(modifier)} onChange={(checked) => selectCheckbox(modifier.id, checked)} />
+                <SelectionCheckbox wrapper="contents" name="craftingModifier" value={modifier.id} checked={selectedIds.includes(modifier.id)} disabled={!selectedIds.includes(modifier.id) && selectedIds.length >= data.choicePlan.maxPicks} ariaLabel={`${modifierLabel(modifier)} ${modifierValue(modifier)}`} onChange={(checked) => selectCheckbox(modifier.id, checked)} />
                 <i class={modifier.icon || 'fa-solid fa-dice-d20'} aria-hidden="true"></i>
                 <span>{modifierLabel(modifier)}</span><span>{modifierValue(modifier)}</span>
               </label>
@@ -136,6 +136,7 @@
   .modifier-chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .modifier-choice { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 5px 9px; border: 1px solid var(--fab-border-strong); border-radius: 999px; background: var(--fab-bg-2); color: var(--fab-text); font-size: 11px; cursor: pointer; }
   .modifier-choice.is-chosen { border-color: var(--fab-accent-border); background: var(--fab-accent-soft); }
+  .modifier-choice:has(input:focus-visible) { outline: 2px solid var(--fab-accent); outline-offset: 2px; }
   .modifier-choice.is-disabled { opacity: .5; cursor: not-allowed; }
   .modifier-choice input[type='radio'] { margin: 0; accent-color: var(--fab-accent); }
   .modifier-choice i { color: var(--fab-accent-text); }

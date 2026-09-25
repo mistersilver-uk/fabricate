@@ -22,7 +22,11 @@ export const CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
-    expectSelector: '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="basic"]:has(code)',
+    expectSelector:
+      '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="basic"]' +
+      ':has(.prompt-heading p:has-text("Bend Horseshoe"))' +
+      ':has(.formula-content code:has-text("2d6 + 3"))' +
+      ':has(.formula-content .manager-chip:has-text("DC 12 · meet or beat"))',
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SIMPLE, /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/, /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/],
   }),
@@ -35,7 +39,11 @@ export const CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
-    expectSelector: '.application.dialog:has(button[data-action="advantage"]) .fabricate-roll-prompt[data-roll-prompt-state="advantage"]',
+    expectSelector:
+      '.application.dialog:has(button[data-action="advantage"]) .fabricate-roll-prompt[data-roll-prompt-state="advantage"]' +
+      ':has(.prompt-heading p:has-text("Bend Horseshoe"))' +
+      ':has(.formula-content code:has-text("1d20 + 3"))' +
+      ':has(.formula-content .manager-chip:has-text("DC 12 · meet or beat"))',
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SIMPLE, /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/, /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/],
   }),
@@ -48,7 +56,11 @@ export const CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
-    expectSelector: '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="light"]',
+    expectSelector:
+      '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="light"]' +
+      ':has(.prompt-heading p:has-text("Bend Horseshoe"))' +
+      ':has(.formula-content code:has-text("2d6 + 3"))' +
+      ':has(.formula-content .manager-chip:has-text("DC 12 · meet or beat"))',
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SIMPLE, /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/, /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/],
   }),
@@ -341,7 +353,14 @@ export const CASES = Object.freeze([
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
     // The dialog is a sibling of the window, so the app route alone is satisfied by a prompt that never opened.
-    expectSelector: '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="pick-one"] .fabricate-roll-prompt__modifiers',
+    expectSelector:
+      '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="pick-one"]' +
+      ':has(.prompt-heading p:has-text("Reduce a Stillroom Batch"))' +
+      ':has(.formula-content code:has-text("1d20 + 3"))' +
+      ':not(:has(.formula-content .manager-chip))' +
+      ':has(.modifier-choice span:has-text("Medicine") ~ span:last-child:has-text("+4"))' +
+      ':has(.modifier-choice span:has-text("Nature") ~ span:last-child:has-text("+2"))' +
+      ':has(.modifier-choice span:has-text("Herbalism kit") ~ span:last-child:has-text("+3"))',
     kinds: ['player', 'crafting'],
     sourceMatches: [
       // Narrow rather than `CRAFTING_SHARED`: `rollPrompt.js` builds this dialog end to end and nothing else does.
@@ -363,7 +382,13 @@ export const CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
-    expectSelector: '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="multipick"] input[type="checkbox"][name="craftingModifier"]',
+    expectSelector:
+      '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="multipick"]' +
+      ':has(.prompt-heading p:has-text("Reduce a Stillroom Batch"))' +
+      ':has(.formula-content code:has-text("1d20 + 3"))' +
+      ':not(:has(.formula-content .manager-chip))' +
+      ':has(input[type="checkbox"][name="craftingModifier"][aria-label="Medicine +4"])' +
+      ':has(input[type="checkbox"][name="craftingModifier"][aria-label="Nature +2"])',
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_PROGRESSIVE, /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/, /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/],
   }),
@@ -377,7 +402,12 @@ export const CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
-    expectSelector: '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="overflow"] input[type="checkbox"][name="craftingModifier"]',
+    expectSelector:
+      '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="overflow"]' +
+      ':has(.prompt-heading p:has-text("Reduce a Stillroom Batch"))' +
+      ':has(.formula-content code:has-text("1d20 + 3"))' +
+      ':not(:has(.formula-content .manager-chip))' +
+      ':has(input[type="checkbox"][name="craftingModifier"][aria-label*="Medicine"][aria-label*="+4"])',
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_PROGRESSIVE, /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/, /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/],
   }),

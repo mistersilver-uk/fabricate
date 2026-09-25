@@ -113,7 +113,7 @@ function applyDialogPosition(element, position) {
   let minWidth = parseCssDimension(computed.minWidth, parent.offsetWidth) || 0;
   let maxWidth =
     parseCssDimension(computed.maxWidth, parent.offsetWidth) || Number.POSITIVE_INFINITY;
-  let { width, height } = position;
+  let { width, height, left, top } = position;
   let bounds = element.getBoundingClientRect();
   const { clientWidth, clientHeight } = document.documentElement;
 
@@ -139,8 +139,8 @@ function applyDialogPosition(element, position) {
     width = bounds.width;
   }
 
-  const left = clamp((clientWidth - width) / 2, 0, Math.max(clientWidth - width, 0));
-  const top = clamp((clientHeight - height) / 2, 0, Math.max(clientHeight - height, 0));
+  left = clamp(left ?? (clientWidth - width) / 2, 0, Math.max(clientWidth - width, 0));
+  top = clamp(top ?? (clientHeight - height) / 2, 0, Math.max(clientHeight - height, 0));
   Object.assign(element.style, {
     width: autoWidth ? '' : `${width}px`,
     height: autoHeight ? '' : `${height}px`,
@@ -223,6 +223,15 @@ export function createLabDialogV2({ localize }) {
       return this.#element;
     }
 
+    /** Re-measure after application content changes, retaining the resolved dimensions. */
+    setPosition(position = {}) {
+      Object.assign(this.#chrome.position, position);
+      if (this.#element) {
+        Object.assign(this.#chrome.position, applyDialogPosition(this.#element, this.#chrome.position));
+      }
+      return this.#chrome.position;
+    }
+
     /** The buttons as `_initializeApplicationOptions` keys them: by action. */
     get buttons() {
       return Object.fromEntries(this.#buttons.map((button) => [button.action, button]));
@@ -292,7 +301,7 @@ export function createLabDialogV2({ localize }) {
       if (this.#config.modal) frame.showModal();
       else frame.show();
 
-      applyDialogPosition(frame, this.#chrome.position);
+      Object.assign(this.#chrome.position, applyDialogPosition(frame, this.#chrome.position));
       frame.style.zIndex = String(nextZIndex());
       this.dispatchEvent(new Event('render'));
 
