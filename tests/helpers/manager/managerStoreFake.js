@@ -869,6 +869,21 @@ function createStore(calls = [], options = {}) {
     },
     // THE WORLD SCOPE PROJECTION, seeded from the same tool roster (issue 1373).
     worldScope: {
+      ...(options.worldEssencePreviewCarrier && {
+            essence: {
+              available: false,
+              entries: [
+                {
+                  id: 'earth',
+                  previewCarrier: options.worldEssencePreviewCarrier.earth ?? null,
+                },
+                {
+                  id: 'water',
+                  previewCarrier: options.worldEssencePreviewCarrier.water ?? null,
+                },
+              ],
+            },
+          }),
       tool: {
         entities: (options.gatheringLibraryTools || []).map((tool) => ({ id: tool.id })),
         entries: (options.gatheringLibraryTools || []).map((tool) => ({

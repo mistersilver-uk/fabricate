@@ -3051,9 +3051,17 @@ export function createAdminStore(services) {
       for (const definition of definitions) {
         const id = String(definition?.id ?? '');
         if (!id || usage[id]) continue;
+        const previewCarrier = components.find((component) => _itemUsesEssence(component, id));
         usage[id] = {
           componentCount: _essenceUsageCount(id, components),
           recipeCount: _essenceRecipeUsage(id, recipes).count,
+          previewCarrier: previewCarrier
+            ? {
+                id: previewCarrier.id,
+                name: previewCarrier.name || previewCarrier.id,
+                img: previewCarrier.img || '',
+              }
+            : null,
         };
       }
     }

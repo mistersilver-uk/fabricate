@@ -8,7 +8,7 @@
 
   "HOW IT APPEARS" MOUNTS THE REAL PLAYER TILE, NOT A CHIP: schematic swatch-chips described the
   essence rather than showing it. It mounts the REAL `InventoryItemCard` twice — the essence's own
-  inventory tile, and a fake carrying component — from synthetic rows built by the pure
+  inventory tile, and a carrying component — from synthetic rows built by the pure
   `buildEssencePreviewRow`, the same pattern `RecipeItemEditor` uses so a preview cannot drift. Both
   pass `interactive={false}`, because the card's real button is focusable and no handler is wired
   here, so left interactive it would drop two no-op traps into the editor's tab order.
@@ -33,7 +33,7 @@
     propertyMacrosEnabled = false,
     sourceName = '',
     macroName = '',
-    sampleComponentName = '',
+    previewCarrier = null,
     // WHICH LAYER THIS PANEL DESCRIBES. `'world'` words the two behaviour rows as defaults with
     // an inheritance clause, so a GM editing a record every system resolves against is told so;
     // `'system'` keeps the shipped wording verbatim.
@@ -70,8 +70,7 @@
     )
   );
 
-  // The two synthetic rows the card mounts on the real `InventoryItemCard`; the carrying
-  // component's name is the essence's first real carrier when one exists.
+  // The carrying component's name and art come from the same world-wide carrier object.
   const previewRows = $derived(
     buildEssencePreviewRow(
       {
@@ -81,9 +80,11 @@
         colorToken: essence?.colorToken || null,
       },
       {
-        sampleComponentName:
-          sampleComponentName ||
-          text('FABRICATE.Admin.Manager.Essence.Preview.SampleComponent', 'a carrying component'),
+        previewCarrier,
+        fallbackComponentName: text(
+          'FABRICATE.Admin.Manager.Essence.Preview.InventoryTileName',
+          'Inventory tile'
+        ),
       }
     )
   );
@@ -106,7 +107,7 @@
   </div>
 
   <!-- The REAL player tiles, fed synthetic rows so the preview cannot drift: the essence's own
-         inventory tile, and a fake component carrying the essence as a pip. -->
+         inventory tile, and a component carrying the essence as a pip. -->
   <div class="manager-essence-preview-appears" data-essence-preview-appears>
     <div class="manager-essence-preview-appears-cell" data-essence-preview-tile>
       <span class="manager-muted"

@@ -54,7 +54,15 @@ export function registerEssencesCases() {
     mounted = mount(Component, {
       target,
       props: {
-        store: createStore(calls),
+        store: createStore(calls, {
+          worldEssencePreviewCarrier: {
+            water: {
+              id: 'other-system-water-carrier',
+              name: 'Distinctive Water Carrier',
+              img: 'icons/commodities/materials/powder-blue.webp',
+            },
+          },
+        }),
         services: {
           openCurrentAdmin: () => {},
           onEditComponent: (id) => editedComponents.push(id),
@@ -361,6 +369,17 @@ export function registerEssencesCases() {
     assert.ok(
       target.querySelector('.manager-inspector [data-essence-behavior-preview]'),
       'the editor rail is the live behaviour preview'
+    );
+    const carrierPreview = target.querySelector('[data-essence-preview-component]');
+    assert.equal(
+      carrierPreview.querySelector('.inventory-card-name').textContent.trim(),
+      'Distinctive Water Carrier',
+      'the preview uses the world-wide carrier even though this system reports no usage'
+    );
+    assert.equal(
+      carrierPreview.querySelector('.inventory-card-art img').getAttribute('src'),
+      'icons/commodities/materials/powder-blue.webp',
+      'the carrier name and image come from the same projected object'
     );
     assert.ok(
       target.querySelector('.essence-icon-picker-trigger'),
