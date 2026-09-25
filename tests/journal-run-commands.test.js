@@ -87,6 +87,43 @@ function commandHarness({
   return { service, emitted, emissionOptions, actor };
 }
 
+function replicatedAuthorityFixture() {
+  let ledger = null;
+  let sequence = 0;
+  const readable = [];
+  const gm = { id: 'gm', isGM: true };
+  const authority = createJournalRunAuthority({
+    currentUser: () => gm,
+    activeGM: () => gm,
+    listLedgers: async () => ledger ? [ledger] : [],
+    listLedgerRecords: async () => ledger ? [{ id: ledger.id, createdTime: 1 }] : [],
+    createLedger: async (source) => {
+      readable.push(structuredClone(source));
+      ledger = { id: 'ledger', state: structuredClone(source.state), claim: null };
+      return ledger;
+    },
+    readState: async () => structuredClone(ledger.state),
+    writeState: async (_entry, state) => {
+      readable.push(structuredClone(state));
+      ledger.state = structuredClone(state);
+    },
+    createClaim: async (_entry, source) => {
+      if (ledger.claim) throw new Error('claim-held');
+      ledger.claim = structuredClone(source);
+      return ledger.claim;
+    },
+    readClaim: async () => ledger.claim,
+    deleteClaim: async (_entry, claimId) => {
+      if (ledger.claim?.claimId !== claimId) return false;
+      ledger.claim = null;
+      return true;
+    },
+    reconstructExecutions: async () => ({ success: true }),
+    randomId: () => `private-${++sequence}`,
+  });
+  return { authority, readable };
+}
+
 it('Journal prompt adapter forwards only named, permitted display fields', async () => {
   const descriptor = {
     label: 'Old subject label', subject: 'Steep tea', activity: 'Crafting', actorName: 'Tinker',
@@ -113,6 +150,92 @@ it('Journal prompt adapter forwards only named, permitted display fields', async
 });
 
 describe('journal run command protocol', () => {
+  for (const hidden of [false, true]) {
+    it(`keeps ${hidden ? 'hidden' : 'visible'} prepared check secrets out of player-readable flags`, async () => {
+      const { authority, readable } = replicatedAuthorityFixture();
+      let prompted;
+      let evaluated;
+      let effects = 0;
+      const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+      const { service } = commandHarness({
+        currentUserId: 'gm', authority, run,
+        promptCheck: async (descriptor) => {
+          prompted = descriptor;
+          return { confirmed: true, bonus: 2 };
+        },
+        operations: {
+          crafting: {
+            getRun: () => run,
+            describeCheck: async () => ({
+              required: true,
+              publicPrompt: hidden ? { label: 'Hidden work' } : {
+                label: 'VISIBLE_PROMPT', allowsSituationalModifier: true, allowAdvantage: true,
+              },
+              privateEvaluation: {
+                rollFormula: 'PRIVATE_FORMULA', modifierCatalogue: ['PRIVATE_CHOICE'],
+              },
+            }),
+            evaluateCheck: async ({ privateEvaluation, decision }) => {
+              evaluated = { privateEvaluation, decision };
+              return { engineEvaluated: true, success: true, secret: hidden, data: {},
+                rollHandoff: { serializedRoll: { formula: 'PRIVATE_HANDOFF' } } };
+            },
+            execute: async () => ({ success: true, effects: ++effects }),
+          },
+        },
+      });
+      const response = await service.executeJournalRunCommand({
+        actorUuid: 'Actor.a', runType: 'crafting', runId: run.id,
+        expectedRevision: 3, action: 'execute',
+      });
+      assert.equal(response.success, true);
+      assert.equal(prompted.label, hidden ? 'Hidden work' : 'VISIBLE_PROMPT');
+      assert.equal(evaluated.privateEvaluation.rollFormula, 'PRIVATE_FORMULA');
+      assert.equal(evaluated.decision.allowsSituationalModifier, !hidden);
+      assert.equal(evaluated.decision.allowAdvantage, !hidden);
+      assert.equal(effects, 1);
+      assert.ok(readable.length >= 3, 'creation and state writes are captured');
+      for (const document of readable) {
+        assert.doesNotMatch(JSON.stringify(document),
+          /PRIVATE_FORMULA|PRIVATE_CHOICE|PRIVATE_HANDOFF|VISIBLE_PROMPT/);
+      }
+    });
+  }
+
+  it('keeps a non-issuing same-GM tab silent before claim or reply', async () => {
+    let claims = 0;
+    const { service, emitted } = commandHarness({
+      currentUserId: 'gm',
+      authority: {
+        shouldHandleRequest: async () => false,
+        run: async () => { claims += 1; return { success: true }; },
+      },
+    });
+    const reply = await service.handleSocketMessage({
+      kind: JOURNAL_RUN_SOCKET_KIND.REQUEST,
+      requestId: 'one', sessionId: 'player-tab', actorUuid: 'Actor.a',
+      runType: 'crafting', runId: 'run-1', expectedRevision: 3,
+      action: 'execute', payload: { prepareToken: 'issued-by-other-tab' },
+    }, 'player');
+    assert.equal(reply, null);
+    assert.equal(claims, 0);
+    assert.equal(emitted.length, 0);
+  });
+
+  it('lets an issuer-closed request reach the existing caller timeout', async () => {
+    const caller = commandHarness({ timeoutMs: 5 });
+    const otherTab = commandHarness({
+      currentUserId: 'gm',
+      authority: { shouldHandleRequest: async () => false },
+    });
+    const pending = caller.service.executeJournalRunCommand({
+      actorUuid: 'Actor.a', runType: 'crafting', runId: 'run-1',
+      expectedRevision: 3, action: 'execute', payload: { prepareToken: 'old' },
+    });
+    assert.equal(await otherTab.service.handleSocketMessage(caller.emitted[0], 'player'), null);
+    assert.deepEqual(await pending, { success: false, reason: 'command-timeout' });
+  });
+
   function loadCraftingOperations() {
     const source = readFileSync(new URL('../src/bootstrap/journalOperations.js', import.meta.url), 'utf8');
     const start = source.indexOf('async function resolveJournalSourceActors(');

@@ -3,6 +3,11 @@ import {
   createLedgerRetry,
   retainedClaimIdentity,
 } from './journalRunLedger.js';
+import {
+  createJournalRunPrivatePreparation,
+  normalizeJournalRunAuthorityState,
+  safeJournalRunResponse,
+} from './journalRunPrivatePreparation.js';
 
 const AUTHORITY_VERSION = 1;
 const AUTHORITY_FLAG = 'journalRunAuthorityLedger';
@@ -55,23 +60,7 @@ function emptyState() {
 }
 
 function normalizedState(value) {
-  const source = value && typeof value === 'object' ? value : {};
-  return {
-    version: AUTHORITY_VERSION,
-    requests: source.requests && typeof source.requests === 'object' ? { ...source.requests } : {},
-    prepareTokens:
-      source.prepareTokens && typeof source.prepareTokens === 'object'
-        ? { ...source.prepareTokens }
-        : {},
-    reconciliations: Array.isArray(source.reconciliations) ? [...source.reconciliations] : [],
-  };
-}
-
-function sameBinding(actual, expected) {
-  for (const key of ['senderId', 'actorUuid', 'runType', 'runId', 'expectedRevision']) {
-    if (String(actual?.[key] ?? '') !== String(expected?.[key] ?? '')) return false;
-  }
-  return true;
+  return normalizeJournalRunAuthorityState(value);
 }
 
 function includesExpectedBinding(actual, expected) {
@@ -100,7 +89,7 @@ function activeGmMatches(currentUser, activeGM) {
   );
 }
 
-/** The private ledger's creation source; its top-level `_id` must stay server-assigned. */
+/** The GM-owned ledger's creation source; its top-level `_id` must stay server-assigned. */
 function newLedgerSource() {
   return {
     name: 'Fabricate Run Authority',
@@ -158,7 +147,7 @@ function claimedLedgerWriter({ ledger, claimId, requestId, writeLedgerState, cla
 }
 
 /**
- * Cross-realm exclusion requires exclusive fixed-page creation under exactly one private ledger.
+ * Cross-realm exclusion requires exclusive fixed-page creation under exactly one GM-owned ledger.
  * The elected GM provisions and arbitrates that ledger; settled requests deduplicate, a pre-write
  * refusal releases its claim, and a claim left by an uncertain effect never expires — while one
  * whose guarded request provably finished is reaped once it outlives
@@ -259,6 +248,27 @@ export function createJournalRunAuthority({
     } catch {
       return null;
     }
+  }
+  const privatePreparation = createJournalRunPrivatePreparation({
+    now, currentUser, activeGM, nextRandomId,
+  });
+
+  async function shouldHandleRequest(request) {
+    privatePreparation.prune();
+    let ledgers;
+    try {
+      ledgers = (await listLedgers()) ?? [];
+    } catch {
+      return false;
+    }
+    if (ledgers.length !== 1) return true;
+    let state;
+    try {
+      state = normalizedState(await readState(ledgers[0]));
+    } catch {
+      return false;
+    }
+    return privatePreparation.belongsHere(request, state);
   }
 
   /**
@@ -520,48 +530,19 @@ export function createJournalRunAuthority({
 
   function tokenHelpers({ state, request, persist }) {
     return {
-      issuePrepareToken(binding, { expiresAt } = {}) {
-        const token = nextRandomId();
-        if (!token) throw new Error('Secure random ID API unavailable');
-        state.prepareTokens[token] = {
-          status: 'active',
-          binding: { ...binding, senderId: request.senderId },
-          createdAt: now(),
-          expiresAt: Number.isFinite(Number(expiresAt)) ? Number(expiresAt) : now() + 60_000,
-        };
-        return token;
-      },
-      consumePrepareToken(token, binding) {
-        const record = state.prepareTokens[token];
-        if (
-          record?.status !== 'active' ||
-          record.expiresAt <= now() ||
-          !sameBinding(record.binding, { ...binding, senderId: request.senderId })
-        ) {
-          return null;
-        }
-        record.status = 'consumed';
-        record.consumedByRequestId = request.requestId;
-        return structuredClone(record);
-      },
-      releasePrepareToken(token, binding) {
-        const record = state.prepareTokens[token];
-        if (
-          record?.status !== 'active' ||
-          !sameBinding(record.binding, { ...binding, senderId: request.senderId })
-        ) {
-          return false;
-        }
-        record.status = 'released';
-        record.releasedAt = now();
-        return true;
-      },
+      issuePrepareToken: (binding, { expiresAt } = {}) =>
+        privatePreparation.issue(state, request, binding, expiresAt),
+      consumePrepareToken: (token, binding) =>
+        privatePreparation.consume(state, request, token, binding),
+      releasePrepareToken: (token, binding) =>
+        privatePreparation.release(state, request, token, binding),
       persist,
     };
   }
 
   function run(request, handler) {
     return queue(`command:${request?.requestId ?? 'unknown'}`, async () => {
+      privatePreparation.prune();
       if (!activeGmMatches(currentUser?.(), activeGM?.())) {
         recoveryReady = false;
         await refreshAvailability();
@@ -616,6 +597,9 @@ export function createJournalRunAuthority({
           return unavailable('claim-release-failed');
         }
         publishAvailability({ available: true, reason: null });
+        const privateReply = privatePreparation.reply(request.requestId);
+        if (privateReply) return privateReply;
+        if (prior.response?.checkRequired) return unavailable('prepare-token-invalid');
         return structuredClone(prior.response ?? unavailable('request-not-replayable'));
       }
 
@@ -625,6 +609,8 @@ export function createJournalRunAuthority({
         status: 'processing',
         senderId: request.senderId,
         sessionId: request.sessionId,
+        issuerGMId: currentUser?.()?.id,
+        issuerInstanceId: privatePreparation.instanceId(),
         startedAt: now(),
       };
       const persist = () => writer.persist(state);
@@ -657,7 +643,7 @@ export function createJournalRunAuthority({
       const recoveryRequired = response?.recoveryRequired === true;
       let durableResponse;
       try {
-        durableResponse = structuredClone(response);
+        durableResponse = safeJournalRunResponse(structuredClone(response));
       } catch {
         response = unavailable('response-not-serializable', { recoveryRequired: true });
         durableResponse = structuredClone(response);
@@ -677,6 +663,7 @@ export function createJournalRunAuthority({
         publishAvailability({ available: false, reason: 'recovery-required' });
         return response;
       }
+      privatePreparation.rememberReply(request.requestId, response, state);
       for (const record of createdGrantRecords) {
         if (record.requestId === request.requestId) createdGrantRecords.delete(record);
       }
@@ -754,6 +741,7 @@ export function createJournalRunAuthority({
   return {
     setup,
     run,
+    shouldHandleRequest,
     reconcile,
     consumeExecutionGrant,
     availability: () => ({ ...cachedAvailability }),
