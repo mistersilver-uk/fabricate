@@ -120,7 +120,10 @@ function appendFooterSublabels(dialog, labels) {
   }
 }
 
-/** The host is sanitized by DialogV2 before this callback mounts any interactive body. */
+/**
+ * Mount the interactive check body only after DialogV2 has sanitized its host.
+ * The adapter unmounts before every render and on close, then answers a confirmed choice or dismissal.
+ */
 export async function waitForPrompt(
   DialogV2,
   data,
