@@ -120,7 +120,7 @@
         <p class="eyebrow">{data.labels.modifiers}</p>
         <div class="modifier-chips">
           {#each data.selectedModifiers as modifier, index (index)}
-            <Chip tone="accent" density="row" icon={modifier.icon || 'fa-solid fa-dice-d20'}
+            <Chip tone="accent" density="tag-run" icon={modifier.icon || 'fa-solid fa-dice-d20'}
               >{modifierLabel(modifier)} {modifierValue(modifier)}</Chip
             >
           {/each}
