@@ -215,7 +215,7 @@
     "src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte | border-radius | 8px | 1",
     "src/ui/svelte/apps/manager/scoped/CopyRulesCard.svelte | border-radius | 8px | 2",
     "src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte | border-radius | 8px | 1",
-    "src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte | border-radius | 12px | 4",
+    "src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte | border-radius | 12px | 3",
     "src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte | border-radius | 10px | 2",
     "src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte | border-radius | 12px | 1",
     "src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte | border-radius | 8px | 1",

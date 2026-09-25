@@ -385,6 +385,7 @@
   {/if}
 {:else}
   <EmptyState
+    fill
     icon="fas fa-list-check"
     title={text('FABRICATE.Admin.Manager.Environment.Tasks.SelectTask', 'Select a gathering task')}
     hint={text(

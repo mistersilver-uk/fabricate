@@ -8,7 +8,7 @@
  * not a thing that can be done. Keyed on the selector ALONE the sheet holds 216 repeated selectors
  * rather than these 107, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,078 `(at-context, selector)` keys, of which 2,971 appear exactly
+ * Unfiltered, the sheet holds 3,077 `(at-context, selector)` keys, of which 2,970 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -19,7 +19,7 @@
  * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,570 rules at that head, 107 repeated keys and 219 appearances
+ * printed from. The sheet holds 2,569 rules at that head, 107 repeated keys and 219 appearances
  * between them; five keys appear three times and none appears four or more.
  * ISSUE 1510 PHASE 2 moves both the contextual figures and one repeated row. The component
  * studio conversion is already in main; the checks conversion adds two net rules and one net
@@ -186,10 +186,11 @@
  * (Knowledge and the fourteen) and the two scroll-owner restorations; and one new unnamed 760px
  * container block sizes the three stacked catalogues. Every arrival is a singleton under this
  * file's keying, so the repeated table is untouched, but fifteen of them already head a top-level
- * rule, so keyed alone they become repeated selectors: 2,568 -> 2,570 rules, 3,044 -> 3,078 keys,
- * 2,937 -> 2,971 singletons, 201 -> 216 keyed alone; 107 repeated keys and 219 appearances are
- * unmoved. Re-derived by running `node scripts/stylesheet-selector-census.mjs` and this file's
- * ledger gate, not subtracted.
+ * rule, so keyed alone they become repeated selectors: 201 -> 216 keyed alone, while 107 repeated
+ * keys and 219 appearances are unmoved. Re-derived by running the census and ledger gate.
+ * Issue 2032 removes one dead Tool inspector selector. The rule, key and singleton counts each
+ * fall by one, to 2,569 rules, 3,077 keys and 2,970 singletons. Re-derived by running the same
+ * census command.
  */
 import { readFileSync } from 'node:fs';
 

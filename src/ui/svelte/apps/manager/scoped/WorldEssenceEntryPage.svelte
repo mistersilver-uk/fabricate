@@ -807,10 +807,7 @@
                     'Open this essence in {system}',
                     { system: systemLabel(row) }
                   )}
-                removeLabel={text(
-                  'FABRICATE.Admin.Manager.Scoped.Membership.Remove',
-                  'Remove'
-                )}
+                removeLabel={text('FABRICATE.Admin.Manager.Scoped.Membership.Remove', 'Remove')}
                 removeConsequenceFor={essenceRemoveConsequence}
                 addAria={(row) =>
                   format(

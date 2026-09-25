@@ -628,6 +628,18 @@ describe('the essence entry row states what an essence removal actually does', (
     root.querySelector('[data-scoped-entry-system-rules="sys-b"]').click();
     assert.deepEqual(calls, [['rules', 'ash', 'sys-b']]);
 
+    const remove = root.querySelector(
+      '[data-scoped-entry-system="sys-a"] [data-arm-token="scoped-membership-remove:ash|sys-a"]'
+    );
+    remove.click();
+    await entryHarness.setProps({});
+    root
+      .querySelector(
+        '[data-scoped-entry-system="sys-a"] [data-arm-token="scoped-membership-remove:ash|sys-a"]'
+      )
+      .click();
+    assert.deepEqual(calls.at(-1), ['remove', 'ash', 'sys-a']);
+
     root.querySelector('[data-scoped-entry-system-filter="without"] input').click();
     await entryHarness.setProps({});
     const outsider = root.querySelector('[data-scoped-entry-system="sys-c"]');

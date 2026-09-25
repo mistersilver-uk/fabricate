@@ -472,9 +472,7 @@ export const CASES = Object.freeze([
     expectClick: '[data-arm-token="world-component-delete:sm-coal"]',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntrySystemsCard\.svelte$/,
-    ],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntrySystemsCard\.svelte$/],
   }),
   managerCase({
     // The validation tab on `lab-unbound-salt`, seeded with no source uuid, so its unlinked source blocks.

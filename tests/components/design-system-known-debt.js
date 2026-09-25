@@ -150,7 +150,7 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
 // Issue 1512: the retired stage-row box (8px) and rocker buttons (4px) took four with them.
 // #1510: the Tool library's sort select took its 8px corner with it; the `inline` rung draws 7px.
 // Issue 1973: the Travel Realms pane dropped its retired card chrome's 8px corner.
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 269;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 268;
 
 /** A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`. */
 export const KNOWN_AREA_SCOPED_STYLE_READS = knownDebt('areaScopedStyleReads');
@@ -281,4 +281,5 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // task/event leaves).
 // 48 -> 47 (issue 1707 phase 4): adjudicated. At two callers `notAPrimitive` is closed to it, so it
 // entered the member table as a manager-only composition, the only way a path leaves this register.
+// Issue 2032 adjudicates the newly shared scoped-entry systems card, so the total stays 47.
 export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 47;

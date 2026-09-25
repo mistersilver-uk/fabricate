@@ -224,6 +224,7 @@
   </section>
 {:else if !editing}
   <EmptyState
+    fill
     icon="fas fa-masks-theater"
     title={text(
       'FABRICATE.Admin.Manager.Environment.Events.SelectEvent',

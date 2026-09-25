@@ -177,8 +177,7 @@
           <span class="manager-component-entry-system-name">{row.systemName}</span>
           <span
             class="manager-component-entry-system-mode"
-            data-scoped-entry-system-mode={row.systemId}
-            >{rowMetaFor(row)}</span
+            data-scoped-entry-system-mode={row.systemId}>{rowMetaFor(row)}</span
           >
         </div>
         <span

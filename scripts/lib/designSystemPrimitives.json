@@ -503,6 +503,14 @@
       "evidence": "broad",
       "scope": "shared",
       "why": "Issue 1512 ships the specified `<SortableList>` as the one LIST implementation of `design-system/spec.md`'s requirement \"An ordered row opens in place to its editing body\". FIVE independent importers on landing, which is the widest arrival in this programme: `RecipeStepAccordion`, `environment/CompositionList`, `recipe/RecipeResultGroupCard`, `ComponentEditView`'s progressive salvage stages and `checks/CheckRecipeTiers`. Each of the five hand-rolled the pattern, and the five copies had already drifted into five row geometries, three reorder affordances and two answers to what happens to a collapsed body. The family is rooted at `fabricate-sortable-list` in `styles/fabricate.css` and it portals nothing, so it needs one root; it declares one `mirrored` fixture pair, because `tests/components/manager-layout-tools-fixtures.js` hand-writes the tier row and the fixture census requires the anchor's root to travel with it."
+    },
+    {
+      "path": "src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte",
+      "library": null,
+      "status": "target",
+      "evidence": "targeted",
+      "scope": "manager-only",
+      "why": "The two callers, `WorldComponentEntryPage.svelte` and `WorldEssenceEntryPage.svelte`, share one manager composition for system-membership search, filters, navigation, add and armed removal. `library: null` records that <DataTable> compares sortable fields down columns and <ListRow> can own row geometry, while neither owns card-level relationship queries and commands. Targeted evidence is `world-component-entry-systems` and `world-essence-entry-systems`; the scope is manager-only because this edits GM world catalogue participation."
     }
   ],
   "notAPrimitive": [
