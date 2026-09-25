@@ -1,14 +1,22 @@
-/** Direction-aware check arithmetic shared by resolution and preview callers. */
+/**
+ * Tests a value against a target using the selected inclusive or strict boundary.
+ * Under-direction checks reverse the value ordering without changing the boundary meaning.
+ */
 
 export function compareToTarget(value, target, comparison = 'meet', direction = 'over') {
   if (direction === 'under') return comparison === 'exceed' ? value < target : value <= target;
   return comparison === 'exceed' ? value > target : value >= target;
 }
 
+/** Returns whether the left value ranks ahead of the right value in the given direction. */
 export function better(left, right, direction = 'over') {
   return direction === 'under' ? left < right : left > right;
 }
 
+/**
+ * Returns a new best-first ranking without changing the supplied entries.
+ * Equal values retain their authored order.
+ */
 export function rankBest(entries, valueOf, direction = 'over') {
   return [...entries].sort((left, right) => {
     const a = valueOf(left);
@@ -17,11 +25,15 @@ export function rankBest(entries, valueOf, direction = 'over') {
   });
 }
 
+/** Returns a positive margin when the value is favorable in the given direction. */
 export function effectiveMargin(value, target, direction = 'over') {
   return direction === 'under' ? target - value : value - target;
 }
 
-/** Resolve dice-free arithmetic against roll data without substituting missing paths. */
+/**
+ * Resolves dice-free arithmetic against roll data without substituting missing paths.
+ * An unsuccessful result identifies whether the source was unresolved, dice-based, invalid, or non-finite.
+ */
 export function resolveDeterministicExpression(expression, rollData = {}) {
   if (typeof expression === 'number') {
     return Number.isFinite(expression)
