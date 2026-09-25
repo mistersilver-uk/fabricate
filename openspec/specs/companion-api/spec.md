@@ -29,7 +29,8 @@ The pooled members split the same way: the pooled base-value read, the base-unit
 ## The Published Contract
 
 Fabricate publishes exactly one named, versioned contract for outbound behavioural consumption: `game.fabricate.api.companion`, a frozen `{ schemaVersion, members, outcomes, callSites, features }` descriptor.
-This publication rename leaves schema version 1, those four fields and their order, every member row and order, the outcome and call-site vocabularies, signatures, result shapes, and readiness semantics unchanged.
+The earlier publication rename preserved schema version 1, the original four fields and their order, every member row and order, and readiness semantics.
+The additive `features` field, optional `evaluation` request, execution fields and refusal outcomes described below extend that version without changing the meaning of an existing request or answer field.
 `game.fabricate.api.COMPANION` remains an enumerable deprecated accessor to that identical descriptor until an explicitly released breaking major version.
 Reading the alias emits at most one warning per client page session, including across the `init`/`ready` rebind, and names both the lowercase replacement and the migration documentation.
 Reading the lowercase publication emits no alias warning, and warning machinery never changes or throws instead of the descriptor result.
@@ -193,7 +194,8 @@ For schemaVersion 1, `features.checkEvaluation` is recursively frozen and descri
 The initial row supports `{ product: 'sum', direction: 'over', target.source: 'fixed' }` with or without the interactive prompt and reports `additionalDice: false`.
 Malformed evaluation refuses `evaluationInvalid`; a valid combination absent from the capability rows refuses `evaluationUnsupported`, both before any rolling or prompting.
 Count, sum-under and attribute target requests remain unavailable until their respective engine and prompt successors activate them and update the advertised rows with composition tests.
-On count activation, the standalone member ignores `formula`, uses a supplied non-null `dc` as an integer required-count override and otherwise uses `pool.required`; on attribute activation it ignores `dc` and resolves the target against the actor.
+On count activation, the standalone member ignores `formula`, uses a supplied non-null `dc` as an integer required-count override from 0 through 20 and otherwise uses `pool.required`; an invalid override refuses `evaluationInvalid`.
+On attribute activation it ignores `dc` and resolves the target against the actor.
 Inactive count-pool data on a sum check is retained after validation, while active additional dice on count remain unavailable until the additional-dice successor.
 First a **post-shim usability test**, defined identically to `resolveActiveCraftingCheckFormula`'s — the retirement shim, then a trim, then an emptiness test — refusing `noFormula`.
 Then a **dice-engine test**, refusing `engineUnavailable`.
