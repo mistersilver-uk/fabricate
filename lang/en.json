@@ -6190,6 +6190,7 @@
             "IssueModifierBoundsInverted": "A check modifier this check applies ({names}) has a minimum above its maximum, so it contributes nothing to the roll until you fix the two values.",
             "IssueModifierBoundsUnsafe": "A check modifier this check applies ({names}) has a minimum or maximum too large or too small to appear in a roll formula, so it contributes nothing. Use a whole number a die roll could plausibly reach.",
             "IssueModifierExpressionInvalid": "A check modifier this check applies ({names}) has an expression Fabricate cannot roll, so it contributes nothing. Check it against your game system — a capitalised function name (MAX instead of max), more than 999 dice, or a decimal without a leading zero are all refused by the dice engine.",
+            "IssueModifierAverageUnavailable": "A check modifier this check ranks ({names}) changes what its dice total means, so it has no comparable average. Magnitude modifiers rank first; these entries remain available and roll exactly as written when a place remains.",
             "IssueModifiersInertNoCheck": "This resolution mode rolls no check, so the check modifiers selected here are never applied.",
             "IssueModifiersInertNoModifierSupport": "The d100 roll against each drop’s chance is this mode’s check, and it cannot take check modifiers yet, so the ones selected here are never applied.",
             "IssueModifiersInertNoFormula": "This check has no roll formula yet, so the check modifiers selected here are never applied.",

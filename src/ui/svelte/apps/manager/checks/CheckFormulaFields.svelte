@@ -13,7 +13,10 @@
 -->
 <script>
   import { getModifierExpressionSuggestions } from '../../../../../config/modifierExpressionSuggestions.js';
-  import { reduceRollExpression } from '../../../../../utils/rollExpressionAverage.js';
+  import {
+    classifyRollQuantity,
+    reduceRollExpression,
+  } from '../../../../../utils/rollExpressionAverage.js';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -60,10 +63,24 @@
   const average = $derived.by(() => {
     const source = String(rollFormula || '').trim();
     if (source === '') return null;
-    const { value } = reduceRollExpression(source.replaceAll(/@[\w.[\]-]+/g, '0'));
+    const neutral = source.replaceAll(/@[\w.[\]-]+/g, '0');
+    const quantity = classifyRollQuantity(neutral);
+    if (quantity === 'irreducible') return null;
+    if (quantity === 'transformed') return { quantity };
+    const { value } = reduceRollExpression(neutral);
     if (!Number.isFinite(value)) return null;
-    return Number.isInteger(value) ? String(value) : value.toFixed(1);
+    return {
+      quantity,
+      value: Number.isInteger(value) ? String(value) : value.toFixed(1),
+    };
   });
+
+  const transformedReason = $derived(
+    text(
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonDieModifiers',
+      'This die carries a modifier (keep, reroll, explode, clamp), which changes the spread of results.'
+    )
+  );
 
   const DEFAULT_MODIFIER_ICON = 'fas fa-wand-magic-sparkles';
   const applied = $derived(Array.isArray(appliedModifiers) ? appliedModifiers : []);
@@ -117,17 +134,27 @@
       {placeholder}
       oninput={(event) => onChange({ rollFormula: event.currentTarget.value })}
     />
-    {#if average !== null}
+    {#if average?.quantity === 'magnitude'}
       <span
         class="manager-checks-formula-average"
-        data-check-formula-average={average}
+        data-check-formula-average={average.value}
         title={text(
           'FABRICATE.Admin.Manager.Checks.Crafting.AverageHint',
           'The average of the dice, with every character value taken as zero — no actor is chosen on this screen.'
         )}
       >
         {text('FABRICATE.Admin.Manager.Checks.Crafting.Average', 'avg')}
-        <span>{average}</span>
+        <span>{average.value}</span>
+      </span>
+    {:else if average?.quantity === 'transformed'}
+      <span
+        class="manager-checks-formula-average"
+        data-check-formula-average-withheld="die-modifiers"
+        title={transformedReason}
+      >
+        {text('FABRICATE.Admin.Manager.Checks.Crafting.Average', 'avg')}
+        <span aria-hidden="true">—</span>
+        <span class="visually-hidden">{transformedReason}</span>
       </span>
     {/if}
   </div>

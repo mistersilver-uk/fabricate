@@ -7,7 +7,57 @@ import {
   RECORDED_UNPARSEABLE_EXPRESSIONS,
 } from './helpers/recordedModifierRollShapes.js';
 
-const { reduceRollExpression } = await import('../src/utils/rollExpressionAverage.js');
+const { classifyRollQuantity, reduceRollExpression } = await import(
+  '../src/utils/rollExpressionAverage.js'
+);
+
+test('classifies every transformed die-modifier family through nested expressions', () => {
+  for (const expression of [
+    '1 + (1d20cs>15)',
+    'max(2, 1d20cf<5)',
+    '{1d6, 1d8even}kh1',
+    'floor((1d20odd) / 2)',
+    '(1d20df<5) * 2',
+    'min(1d20sf=1, 4)',
+    'abs(1d20ms>10)',
+  ]) {
+    assert.equal(classifyRollQuantity(expression), 'transformed', expression);
+  }
+});
+
+test('classifies magnitude controls without changing their reduced values', () => {
+  for (const expression of [
+    '1d20 + 5',
+    '2d20kh1',
+    '4d6dl1',
+    '1d20r1',
+    '1d6x',
+    '2d6min2',
+    '2d6max4',
+    'min(max(1d8, -1), 6)',
+  ]) {
+    const before = reduceRollExpression(expression);
+    assert.equal(classifyRollQuantity(expression), 'magnitude', expression);
+    assert.deepEqual(reduceRollExpression(expression), before, `${expression}: reducer output`);
+  }
+});
+
+test('classifies malformed, incomplete and unknown expressions as irreducible', () => {
+  for (const expression of ['', '1d20 +', 'floor(', '1d20cs>', '1d20unknown2']) {
+    assert.equal(classifyRollQuantity(expression), 'irreducible', JSON.stringify(expression));
+  }
+});
+
+test('classification does not alter the reducer values for transformed quantities', () => {
+  for (const [expression, value] of [
+    ['1d20cs>15', 10.5],
+    ['2d6cs>=5', 7],
+    ['1d20df<5', 10.5],
+  ]) {
+    assert.equal(classifyRollQuantity(expression), 'transformed');
+    assert.deepEqual(reduceRollExpression(expression), { value, rollsDice: true });
+  }
+});
 
 // ── the two answers one walk produces ────────────────────────────────────────
 

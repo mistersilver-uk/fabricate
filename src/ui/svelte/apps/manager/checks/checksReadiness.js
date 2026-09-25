@@ -1,7 +1,9 @@
 import {
+  classifyModifierExpression,
   modifierExpressionResolves,
   resolveEligibleModifierIds,
   resolveModifierBounds,
+  resolveModifierPolicy,
 } from '../../../../../systems/checkModifierResolver.js';
 import {
   findRangeConflicts,
@@ -39,6 +41,7 @@ export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
   'modifierBoundsInverted',
   'modifierBoundsUnsafe',
   'modifierExpressionInvalid',
+  'modifierAverageUnavailable',
   'modifiersInertNoCheck',
   'modifiersInertNoModifierSupport',
   'modifiersInertNoFormula',
@@ -77,6 +80,7 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
   modifierBoundsInverted: 'modifiers',
   modifierBoundsUnsafe: 'modifiers',
   modifierExpressionInvalid: 'modifiers',
+  modifierAverageUnavailable: 'modifiers',
   modifiersInertNoCheck: 'modifiers',
   modifiersInertNoModifierSupport: 'modifiers',
   modifiersInertNoFormula: 'modifiers',
@@ -240,10 +244,16 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
   const unsafe = namesOf(faulted.filter(({ bounds }) => bounds.unsafe));
   // An entry whose EXPRESSION cannot contribute, bounds set aside; asked of the resolver, so
   // what readiness calls unusable and what the roll drops are one decision.
-  const unusable = namesOf(
-    faulted.filter(
-      ({ entry, bounds }) =>
-        !bounds.inverted && !bounds.unsafe && !modifierExpressionResolves(entry)
+  const usableCandidates = faulted
+    .filter(({ bounds }) => !bounds.inverted && !bounds.unsafe)
+    .map((candidate) => ({
+      ...candidate,
+      resolves: modifierExpressionResolves(candidate.entry),
+    }));
+  const unusable = namesOf(usableCandidates.filter(({ resolves }) => !resolves));
+  const transformed = namesOf(
+    usableCandidates.filter(
+      ({ entry, resolves }) => resolves && classifyModifierExpression(entry) === 'transformed'
     )
   );
 
@@ -256,6 +266,12 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
   if (unsafe !== '') pushIssue(issues, 'modifierBoundsUnsafe', 'critical', { names: unsafe });
   if (unusable !== '') {
     pushIssue(issues, 'modifierExpressionInvalid', 'critical', { names: unusable });
+  }
+  if (
+    transformed !== '' &&
+    ['highest', 'playerPicks'].includes(resolveModifierPolicy(modifierContext))
+  ) {
+    pushIssue(issues, 'modifierAverageUnavailable', 'warning', { names: transformed });
   }
   // The two no-check modes reach no roll for OPPOSITE reasons, so they cannot share a sentence:
   // alchemy `none` rolls nothing, while gathering `d100` rolls and has no seam for modifiers.

@@ -32,6 +32,17 @@ function scalarOf(context, resolveExpression) {
   return resolveCheckModifierContribution(context, resolveExpression).scalar;
 }
 
+class PermissiveRoll {
+  constructor(formula) {
+    this.formula = formula;
+  }
+
+  evaluateSync() {
+    this.total = 1;
+    return this;
+  }
+}
+
 const CATALOGUE = [
   { id: 'med', label: 'Medicine', expression: '@med' },
   { id: 'alch', label: 'Alchemy', expression: '@alch' },
@@ -579,6 +590,63 @@ test('the flat contribution playerPicks picks the best N even when they are nega
     -4,
     'max two of (-3,-1,-5) is -1 + -3'
   );
+});
+
+test('ranking treats finite magnitudes as one category ahead of transformed quantities', () => {
+  const catalogue = [
+    { id: 'count-a', label: 'Count A', expression: '1d20cs>15' },
+    { id: 'negative', label: 'Negative', expression: '-4' },
+    { id: 'count-b', label: 'Count B', expression: '1d20odd' },
+    { id: 'positive', label: 'Positive', expression: '8' },
+  ];
+  const resolve = (expression) => expression;
+  const selected = resolveSelectedCheckModifiers(
+    {
+      catalogue,
+      systemPolicy: 'playerPicks',
+      defaultModifierIds: catalogue.map(({ id }) => id),
+      maxModifierPicks: 3,
+    },
+    resolve,
+    PermissiveRoll
+  );
+
+  assert.deepEqual(
+    selected.map(({ id }) => id),
+    ['count-a', 'negative', 'positive'],
+    'both finite magnitudes rank first, then the first transformed entry fills the spare place; output stays eligible-order'
+  );
+  assert.deepEqual(
+    selected.map(({ id, average }) => ({ id, average })),
+    [
+      { id: 'count-a', average: null },
+      { id: 'negative', average: -4 },
+      { id: 'positive', average: 8 },
+    ],
+    'a transformed quantity carries no numeric average or sentinel'
+  );
+});
+
+test('all-transformed ranking retains authored order for highest and player picks', () => {
+  const catalogue = [
+    { id: 'first', label: 'First', expression: '1d20cs>15' },
+    { id: 'second', label: 'Second', expression: '1d20odd' },
+  ];
+  const resolve = (expression) => expression;
+  const selectedIds = (systemPolicy, maxModifierPicks) =>
+    resolveSelectedCheckModifiers(
+      {
+        catalogue,
+        systemPolicy,
+        defaultModifierIds: ['first', 'second'],
+        maxModifierPicks,
+      },
+      resolve,
+      PermissiveRoll
+    ).map(({ id }) => id);
+
+  assert.deepEqual(selectedIds('highest'), ['first']);
+  assert.deepEqual(selectedIds('playerPicks', 2), ['first', 'second']);
 });
 
 // `bySubject` needs no special case in the reduction: `resolveEligibleModifierIds` has

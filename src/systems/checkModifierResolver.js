@@ -4,8 +4,8 @@
  * "Check Modifier" states. Each of `craftingCheck`, `salvageCraftingCheck` and
  * `gatheringCraftingCheck` selects through its own `{defaultModifierPolicy, defaultModifierIds,
  * maxModifierPicks}`; the flat contribution appends as one `[Modifiers]` term and each rolling
- * entry as its own, before the formula reaches `Roll`; `highest` and `playerPicks` rank by
- * average; and `min`/`max` clamp the rolled result in the formula (`min(max((1d8), -1), 6)`,
+ * entry as its own, before the formula reaches `Roll`; `highest` and `playerPicks` rank magnitude
+ * averages before transformed quantities; and `min`/`max` clamp the rolled result in the formula (`min(max((1d8), -1), 6)`,
  * verified on 14.365 and recorded in `tests/helpers/recordedModifierRollShapes.js`). The `@`
  * substitution is injected (`makeRollDataExpressionResolver`), so the reduction is a pure function
  * of text; `Roll` defaults to `globalThis.Roll`, a fragment it cannot roll is refused per entry,
@@ -13,7 +13,7 @@
  */
 
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
-import { reduceRollExpression } from '../utils/rollExpressionAverage.js';
+import { classifyRollQuantity, reduceRollExpression } from '../utils/rollExpressionAverage.js';
 import { formulaRolls } from '../utils/rollFormulaRollability.js';
 
 import { resolveModifierLibrary } from './characterLibraries.js';
@@ -313,8 +313,8 @@ function catalogueById(catalogue) {
 }
 
 /**
- * A resolved entry: `average` ranks and is always finite; a flat entry sets `value` (summed into
- * one term) and a rolling one sets `formula` (its own term), never both. A blocked entry keeps
+ * A resolved entry: `average` ranks magnitude quantities and is null for transformed ones; a flat
+ * entry sets `value` (summed into one term) and a rolling one sets `formula` (its own term), never both. A blocked entry keeps
  * its place with `value: 0`, `average: 0` and `blocked: true`, which readiness reads rather than
  * inferring from a legitimate zero. `display` is the prompt chip. This builds the blocked shape.
  */
@@ -355,9 +355,11 @@ function resolveCatalogueEntry(id, entry, resolveExpression, Roll) {
   const raw = typeof resolveExpression === 'function' ? resolveExpression(entry?.expression) : null;
   const text = raw === null || raw === undefined ? '' : String(raw).trim();
   if (text === '') return blockedModifier(id, entry);
+  const quantity = classifyRollQuantity(text);
+  if (quantity === 'irreducible') return blockedModifier(id, entry);
   const { value, rollsDice } = reduceRollExpression(text);
   if (!Number.isFinite(value)) return blockedModifier(id, entry);
-  const average = clampModifierValue(value, entry);
+  const average = quantity === 'transformed' ? null : clampModifierValue(value, entry);
   if (!rollsDice) {
     return {
       ...blockedModifier(id, entry),
@@ -396,10 +398,16 @@ export function modifierExpressionResolves(entry, Roll = globalThis.Roll) {
   return !resolveCatalogueEntry('', entry, neutralExpressionResolver, Roll).blocked;
 }
 
+/** Quantity semantics of an authored modifier expression, with actor paths neutralized. */
+export function classifyModifierExpression(entry) {
+  return classifyRollQuantity(neutralExpressionResolver(entry?.expression) ?? '');
+}
+
 /**
- * The selected entries in eligible order: `addAll` all, `highest` the single best average,
+ * The selected entries in eligible order: `addAll` all, `highest` the single best ranked entry,
  * `bySubject` the already-capped pick, and `playerPicks` (non-interactive) the best legal
- * selection of `maxModifierPicks`. Equal averages keep authored order.
+ * selection of `maxModifierPicks`. Magnitude averages rank first; ties and transformed entries
+ * keep authored order.
  */
 export function resolveSelectedCheckModifiers(
   context = {},
@@ -412,20 +420,32 @@ export function resolveSelectedCheckModifiers(
     resolveCatalogueEntry(id, byId.get(id), resolveExpression, Roll)
   );
   if (resolved.length === 0) return resolved;
-  if (policy === 'highest') return bestByAverage(resolved, 1);
-  if (policy === 'playerPicks') return bestByAverage(resolved, resolveMaxModifierPicks(context));
+  if (policy === 'highest') return bestRankedModifiers(resolved, 1);
+  if (policy === 'playerPicks') {
+    return bestRankedModifiers(resolved, resolveMaxModifierPicks(context));
+  }
   return resolved;
 }
 
-/** The `limit` best averages, returned in eligible order; ties keep the first. */
-function bestByAverage(resolved, limit) {
+/** Magnitude averages first, then transformed quantities; output remains in eligible order. */
+function bestRankedModifiers(resolved, limit) {
   if (limit >= resolved.length) return resolved;
   return resolved
     .map((modifier, index) => ({ modifier, index }))
-    .sort((a, b) => b.modifier.average - a.modifier.average || a.index - b.index)
+    .sort((a, b) => compareRankedModifiers(a, b))
     .slice(0, limit)
     .sort((a, b) => a.index - b.index)
     .map(({ modifier }) => modifier);
+}
+
+function compareRankedModifiers(left, right) {
+  const leftFinite = Number.isFinite(left.modifier.average);
+  const rightFinite = Number.isFinite(right.modifier.average);
+  if (leftFinite !== rightFinite) return leftFinite ? -1 : 1;
+  if (leftFinite && left.modifier.average !== right.modifier.average) {
+    return right.modifier.average - left.modifier.average;
+  }
+  return left.index - right.index;
 }
 
 /** The flat `scalar` and the per-entry `rollTerms`, apart because different appenders take them
@@ -463,7 +483,8 @@ function modifierChipLabel(value, text, bounds) {
 
 /**
  * The interactive `playerPicks` descriptor: each option carries `value` (flat), `formula`
- * (rolling), `average` (ranking) and `display`, because `evaluateCheckRoll` re-derives the legal
+ * (rolling), `average` (magnitude ranking, null when transformed) and `display`, because
+ * `evaluateCheckRoll` re-derives the legal
  * selection from it and never trusts the prompt. `defaultSelectedIds` is the best legal
  * selection, so confirming reproduces the non-interactive roll; `defaultSelectedId` is its first.
  * `null` below two eligible modifiers, where there is no choice to offer. It appends nothing.
@@ -478,7 +499,9 @@ export function buildCheckModifierChoice(context = {}, resolveExpression, Roll =
   );
   const cap = resolveMaxModifierPicks(context);
   const maxPicks = Number.isFinite(cap) ? Math.min(cap, modifiers.length) : modifiers.length;
-  const defaultSelectedIds = bestByAverage(modifiers, maxPicks).map((modifier) => modifier.id);
+  const defaultSelectedIds = bestRankedModifiers(modifiers, maxPicks).map(
+    (modifier) => modifier.id
+  );
   return {
     modifiers,
     maxPicks,

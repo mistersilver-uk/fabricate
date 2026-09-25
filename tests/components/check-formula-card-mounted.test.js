@@ -120,13 +120,27 @@ describe('the formula card states what a roll actually resolves to (issue 1096)'
     assert.equal(target.querySelector('[data-check-formula-average]').dataset.checkFormulaAverage, '12.5');
   });
 
+  it('renders a visible and accessible withheld average for transformed formulas', async () => {
+    for (const formula of ['1d20cs>15', '2d6cs>=5', '1d20odd']) {
+      harness.remount();
+      const target = await harness.mount({ rollFormula: formula });
+      const average = target.querySelector('[data-check-formula-average-withheld="die-modifiers"]');
+      assert.ok(average, `${formula}: the withheld slot remains visible`);
+      assert.match(average.textContent, /avg\s*—/, `${formula}: visible avg dash`);
+      assert.equal(
+        average.querySelector('.visually-hidden').textContent.trim(),
+        lookup('FABRICATE.Admin.Manager.Checks.Odds.ReasonDieModifiers'),
+        `${formula}: the existing odds reason is available without hover`
+      );
+    }
+  });
+
   it('withholds the average rather than guessing one it cannot reduce', async () => {
     for (const formula of ['', 'not a formula at all']) {
       harness.remount();
       const target = await harness.mount({ rollFormula: formula });
-      assert.equal(
-        target.querySelector('[data-check-formula-average]'),
-        null,
+      assert.ok(
+        !target.querySelector('[data-check-formula-average]'),
         `"${formula}" must show no average reading`
       );
     }

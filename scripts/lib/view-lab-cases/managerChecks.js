@@ -5,6 +5,21 @@
 import { ANCHORED_POPOVER_SOURCES, GATHERING_ROUTE_MODEL_PATTERN } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
+const AUTHOR_TRANSFORMED_MODIFIER = Object.freeze([
+  { selector: '#manager-world-nav-rules', press: 'Enter' },
+  { selector: '#manager-rules-nav-modifiers', press: 'Enter' },
+  { selector: '[data-world-modifier="hb-mod-luck"] [data-toggle-modifier]' },
+  {
+    selector: '[data-world-modifier="hb-mod-luck"] [data-world-modifier-field="label"]',
+    fill: 'Lucky find with a deliberately long transformed modifier name',
+  },
+  {
+    selector: '[data-world-modifier="hb-mod-luck"] [data-world-modifier-field="expression"]',
+    fill: '1d20cs>15',
+  },
+  { selector: '[data-world-modifier-done="hb-mod-luck"]' },
+]);
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-gathering',
@@ -26,9 +41,15 @@ export const CASES = Object.freeze([
     label: 'Manager — Checks validation',
     smokeLabels: ['manager-checks-validation'],
     reaches: 'exact',
-    query: {},
-    steps: ['Checks', { selector: '#manager-checks-nav-validation' }],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      ...AUTHOR_TRANSFORMED_MODIFIER,
+      'Checks',
+      { selector: '#manager-checks-nav-validation' },
+      { selector: '[data-issue="modifierAverageUnavailable"]', scroll: true },
+    ],
     expectView: 'checks-validation',
+    expectSelector: '.fabricate-manager [data-issue="modifierAverageUnavailable"]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -145,9 +166,14 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     // The 1024x640 declared floor, stacked: the container ladder restacks `.manager-body` to one column at 1120.
     query: { system: 'lab-runework' },
-    steps: ['Checks', { selector: '#manager-checks-nav-crafting' }],
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-check-roll-formula]', fill: '1d20cs>15' },
+      { selector: '[data-check-formula-average-withheld="die-modifiers"]', scroll: true },
+    ],
     expectView: 'checks-crafting',
-    expectSelector: '.fabricate-manager [data-checks-rail="crafting"]',
+    expectSelector: '.fabricate-manager [data-check-formula-average-withheld="die-modifiers"]',
     position: { width: 1024, height: 640 },
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -279,9 +305,14 @@ export const CASES = Object.freeze([
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
+      ...AUTHOR_TRANSFORMED_MODIFIER,
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-policy-option="highest"] input' },
+      { selector: '[data-crafting-modifier-policy-option="playerPicks"] input' },
+      { selector: '[data-crafting-modifier-eligibility-input="hb-mod-luck"]' },
+      { selector: '[data-crafting-modifier-eligibility-input="hb-mod-luck"]' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '' },
       // Re-anchored (issue 1095 review).
       { selector: '[data-crafting-modifier-max-picks]', scroll: true },
@@ -289,9 +320,11 @@ export const CASES = Object.freeze([
     expectView: 'checks-crafting',
     // Two things at once on the `How they combine` card, which issue 1096's parity round split out of the catalogue card.
     expectSelector:
-      '.fabricate-manager [data-crafting-modifier-policy-card]' +
+      '.fabricate-manager' +
+      ':has([data-crafting-modifier-policy-card]' +
       ':has([data-crafting-modifier-policy-option="bySubject"])' +
-      ':has([data-crafting-modifier-max-picks="unlimited"])',
+      ':has([data-crafting-modifier-max-picks="unlimited"]))' +
+      ':has([data-checks-section-callout="modifierAverageUnavailable"])',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,

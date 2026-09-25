@@ -69,6 +69,10 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
     'IssueModifierExpressionInvalid',
     'A check modifier this check applies ({names}) has an expression Fabricate cannot roll, so it contributes nothing. Check it against your game system — a capitalised function name (MAX instead of max), more than 999 dice, or a decimal without a leading zero are all refused by the dice engine.',
   ],
+  modifierAverageUnavailable: [
+    'IssueModifierAverageUnavailable',
+    'A check modifier this check ranks ({names}) changes what its dice total means, so it has no comparable average. Magnitude modifiers rank first; these entries remain available and roll exactly as written when a place remains.',
+  ],
   modifiersInertNoCheck: [
     'IssueModifiersInertNoCheck',
     'This resolution mode rolls no check, so the check modifiers selected here are never applied.',
