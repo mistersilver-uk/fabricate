@@ -920,7 +920,8 @@ export function createJournalRunCommandService({
     if (
       typeof authority.shouldHandleRequest === 'function' &&
       !(await authority.shouldHandleRequest(payload))
-    ) return null;
+    )
+      return null;
     const response = await handleRequest(payload, senderId);
     // A second tab for the same elected GM has the same attested sender id. A tab that lost
     // either boot recovery or this command's claim must stay silent or it can beat the winning

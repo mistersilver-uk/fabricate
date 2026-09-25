@@ -413,7 +413,8 @@ export const CASES = Object.freeze([
       { selector: '[data-inventory-bulk-salvage]' },
     ],
     // Held to the prompt's own element, never to the tab.
-    expectSelector: '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="bulk"] .bulk-row',
+    expectSelector:
+      '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="bulk"] .bulk-row',
     sourceMatches: [
       ...BULK_DEFAULTS.sourceMatches,
       /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,

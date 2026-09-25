@@ -250,7 +250,10 @@ export function createJournalRunAuthority({
     }
   }
   const privatePreparation = createJournalRunPrivatePreparation({
-    now, currentUser, activeGM, nextRandomId,
+    now,
+    currentUser,
+    activeGM,
+    nextRandomId,
   });
 
   async function shouldHandleRequest(request) {
