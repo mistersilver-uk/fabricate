@@ -430,6 +430,51 @@ describe('AC-4 — all eight cells of (isGM, callSite, elected), each with its p
 });
 
 describe('AC-14 (facade half) — the delegator forwards NAMED KEYS, never the request', () => {
+  it('keeps GM, actor and readiness refusals ahead of evaluation validation', async () => {
+    const actor = makeGrantTargetActor('actor-1');
+    for (const [options, actorId, outcome] of [
+      [{ user: PLAYER, actors: [actor] }, actor.id, 'gmOnly'],
+      [{ actors: [] }, 'missing', 'noActor'],
+      [{ actors: [actor], ready: false }, actor.id, 'notReady'],
+    ]) {
+      const { facade, checkCalls } = standUpFacade(options);
+      const answer = await facade.rollActorCheck({
+        actorId,
+        callSite: 'gmAction',
+        formula: '1d20',
+        evaluation: { pool: { die: 0 } },
+      });
+      assert.equal(answer.outcome, outcome);
+      assert.deepEqual(checkCalls.bags, []);
+      assert.equal(checkCalls.prompt, 0);
+    }
+  });
+
+  it('forwards evaluation to the real leaf and preserves caller isolation', async () => {
+    const actor = makeGrantTargetActor('actor-1');
+    const { facade, checkCalls } = standUpFacade({ actors: [actor] });
+    const request = {
+      actorId: actor.id,
+      callSite: 'gmAction',
+      formula: '1d20',
+      dc: 15,
+      evaluation: { direction: 'under' },
+      actor: { id: 'impostor' },
+      speaker: { alias: 'impostor' },
+      prompt: () => { throw new Error('caller prompt'); },
+    };
+    const unsupported = await facade.rollActorCheck(request);
+    assert.equal(unsupported.outcome, 'evaluationUnsupported');
+    assert.deepEqual(checkCalls.bags, []);
+    request.evaluation = { product: 'sum', direction: 'over' };
+    const supported = await facade.rollActorCheck(request);
+    assert.equal(supported.outcome, 'checkPassed');
+    assert.equal(supported.product, 'sum');
+    assert.equal(supported.direction, 'over');
+    assert.equal(supported.target, 15);
+    assert.equal(checkCalls.bags[0].actor, actor);
+  });
+
   it('cannot be handed an actor that overrides the one the ownership gate resolved', async () => {
     // The mutation this exists for is `{ actor: gate.actor, …, ...request }`.
     const owned = makeGrantTargetActor('actor-1');

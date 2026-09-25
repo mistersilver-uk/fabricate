@@ -258,13 +258,24 @@ export const companionFacade = {
     label = null,
     interactive = false,
     rollDecision = null,
+    evaluation = undefined,
   } = {}) {
     const gate = this._requireGmActor(actorId, ROLL_ACTOR_CHECK_GATE_KEYS);
     if (gate.outcome || this.ready !== true) {
       return checkRollResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
     }
     return await rollStandaloneActorCheck(
-      { actor: gate.actor, callSite, formula, dc, compare, label, interactive, rollDecision },
+      {
+        actor: gate.actor,
+        callSite,
+        formula,
+        dc,
+        compare,
+        label,
+        interactive,
+        rollDecision,
+        evaluation,
+      },
       this._companionCheckSeams()
     );
   },

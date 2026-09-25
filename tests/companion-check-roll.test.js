@@ -173,9 +173,21 @@ function request(overrides = {}) {
  */
 function assertCheckAnswerShape(result) {
   assert.ok(Object.isFrozen(result), 'a contract answer crosses the boundary frozen');
+  const executed = ['checkPassed', 'checkFailed', 'rolled'].includes(result.outcome);
   assert.deepEqual(
     Object.keys(result).filter((key) => key !== 'messageData'),
-    ['success', 'passed', 'total', 'diceGroups', 'resolvedFormula', 'outcome', 'message'],
+    [
+      'success',
+      'passed',
+      'total',
+      'diceGroups',
+      'resolvedFormula',
+      ...(executed
+        ? ['product', 'direction', 'comparison', 'target', 'margin', 'successes', 'cancelled']
+        : []),
+      'outcome',
+      'message',
+    ],
     "the answer's key set (and its order) is the published contract"
   );
   assertLocalizationKey(result.message, `rollActorCheck's ${result.outcome}`);
@@ -565,9 +577,20 @@ describe('AC-9 — the module rolls nothing and reaches nothing it was not given
   // or rollPrompt.js here would let the module bypass the very seams every dismissal assertion
   // depends on. The exact set holds static, re-exported and `import()` specifiers alike.
   defineStructureContract(
-    'imports from EXACTLY two modules, so it cannot bypass its own seams',
+    'imports only its contract, evaluation boundary and formula predicate',
     MODULE,
-    { importSpecifiers: [['', ['../utils/craftingCheckExpression.js', './companionContract.js']]] }
+    {
+      importSpecifiers: [
+        [
+          '',
+          [
+            '../utils/craftingCheckExpression.js',
+            './companionCheckEvaluation.js',
+            './companionContract.js',
+          ],
+        ],
+      ],
+    }
   );
 
   // The rule "exists once" is canonical, and four members gate on it (issue 1301, D13). A local
@@ -629,6 +652,13 @@ describe('AC-10 — every REAL answer carries a key from its own member table', 
       )
     );
     record(await rollActorCheck(request({ rollDecision: { bonus: '+1' } }), makeSeams().seams));
+    record(await rollActorCheck(request({ evaluation: null }), makeSeams().seams));
+    record(
+      await rollActorCheck(
+        request({ evaluation: { direction: 'under' } }),
+        makeSeams().seams
+      )
+    );
     record(await rollActorCheck(request({ formula: '@craftingmod' }), makeSeams().seams));
     record(
       await rollActorCheck(request({ dc: 15 }), makeSeams({ hasDiceEngine: () => false }).seams)
@@ -653,6 +683,8 @@ describe('AC-10 — every REAL answer carries a key from its own member table', 
         'checkFailed',
         'checkPassed',
         'engineUnavailable',
+        'evaluationInvalid',
+        'evaluationUnsupported',
         'invalidCallSite',
         'invalidRollDecision',
         'noFormula',
@@ -741,6 +773,93 @@ describe('AC-12 — compare at the boundary, where total EQUALS dc', () => {
       assert.equal(result.total, 15);
     });
   }
+});
+
+describe('evaluation dispatch and executed evidence', () => {
+  it('refuses malformed and unavailable modes before formula, engine, prompt or runners', async () => {
+    const cases = [
+      [{ product: 'count', pool: { die: '6' } }, 'evaluationInvalid'],
+      [{ product: 'count' }, 'evaluationUnsupported'],
+      [{ direction: 'under' }, 'evaluationUnsupported'],
+      [{ target: { source: 'attribute' } }, 'evaluationUnsupported'],
+    ];
+    for (const [evaluation, outcome] of cases) {
+      const { seams, calls } = makeSeams({ hasDiceEngine: () => { throw new Error('engine read'); } });
+      const result = await rollActorCheck(
+        request({ formula: '', interactive: true, evaluation }),
+        seams
+      );
+      assert.equal(result.outcome, outcome);
+      assert.equal(result.success, false);
+      assert.deepEqual(calls.prompt, []);
+      assert.deepEqual(calls.runPassFail, []);
+      assert.deepEqual(calls.runProgressive, []);
+      assert.equal('product' in result, false);
+    }
+  });
+
+  it('keeps call-site, election and declined-decision refusals ahead of evaluation', async () => {
+    const invalid = { pool: { die: 0 } };
+    const cases = [
+      [{ callSite: null }, makeSeams().seams, 'invalidCallSite'],
+      [
+        { callSite: 'broadcast' },
+        makeSeams({ isElectedExecutor: () => false }).seams,
+        'notElected',
+      ],
+      [{ interactive: true, rollDecision: { confirmed: false } }, makeSeams().seams, 'cancelled'],
+    ];
+    for (const [overrides, seams, outcome] of cases) {
+      assert.equal(
+        (await rollActorCheck(request({ evaluation: invalid, ...overrides }), seams)).outcome,
+        outcome
+      );
+    }
+  });
+
+  it('projects graded and ungraded evidence from the real shared runners', async () => {
+    installChat();
+    installRoll({ total: 0 });
+    const { seams } = makeSeams({ real: true });
+    const graded = await rollActorCheck(
+      request({ dc: 0, compare: 'exceed', evaluation: { product: 'sum', direction: 'over' } }),
+      seams
+    );
+    assert.equal(graded.outcome, 'checkFailed');
+    assert.deepEqual(
+      [graded.total, graded.product, graded.direction, graded.comparison, graded.target, graded.margin, graded.successes, graded.cancelled],
+      [0, 'sum', 'over', 'exceed', 0, 0, null, null]
+    );
+    const ungraded = await rollActorCheck(request({ evaluation: {} }), seams);
+    assert.equal(ungraded.outcome, 'rolled');
+    assert.deepEqual(
+      [ungraded.passed, ungraded.comparison, ungraded.target, ungraded.margin, ungraded.successes, ungraded.cancelled],
+      [null, null, null, null, null, null]
+    );
+    assert.equal(ungraded.product, 'sum');
+    assert.equal(ungraded.direction, 'over');
+  });
+
+  it('settles a throwing collaborator as rollFailed without executed metadata', async () => {
+    const { seams } = makeSeams({
+      buildRollOptions: () => {
+        throw new Error('broken options');
+      },
+    });
+    const result = await rollActorCheck(request({ dc: 15 }), seams);
+    assert.equal(result.outcome, 'rollFailed');
+    assert.equal(result.success, false);
+    assert.equal('product' in result, false);
+
+    const engine = makeSeams({
+      hasDiceEngine: () => {
+        throw new Error('engine failed');
+      },
+    });
+    const refused = await rollActorCheck(request({ dc: 15 }), engine.seams);
+    assert.equal(refused.outcome, 'rollFailed');
+    assert.equal('product' in refused, false);
+  });
 });
 
 // ---------------------------------------------------------------------------
