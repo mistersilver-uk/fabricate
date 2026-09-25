@@ -1148,6 +1148,18 @@ The shared activity-agnostic roll model used by crafting, salvage, AND gathering
 
 [Notes](docs/domain/terms.md#check)
 
+#### Check Evaluation
+
+The normalized check policy that retains a product, direction, target and pool settings across crafting, salvage and gathering, including choices for modes that have not yet been activated.
+
+[Notes](docs/domain/terms.md#check-evaluation)
+
+#### Executed Check Evidence
+
+The recorded arithmetic meaning of a rolled check, separate from its authored evaluation and from any forced outcome.
+
+[Notes](docs/domain/terms.md#executed-check-evidence)
+
 #### Standalone Check Roll
 
 The check-roll MECHANICS published to a companion module that owns no crafting system: `@`-placeholder resolution against the actor's roll data, the retired-placeholder shim, the Advantage/Disadvantage rewrite, the situational-bonus input with its `Roll.validate` net, the roll mode and the chat post, and the pass/fail or raw-total answer.
@@ -1526,6 +1538,7 @@ The authority snapshots the chosen authored requirement set, including its route
 Future-stage input and yield previews instead enumerate entitled authored possibilities without choosing a route or persisting selection intent.
 
 **Historical Stage Evidence** records execution meaning separately from current configuration: `resolutionSnapshot` identifies check, ingredient-route or confirmed no-check resolution, while `presentationSnapshot` preserves permitted stage purpose captured when armed.
+Only a permitted executed versioned check snapshot adds its validated `sum/over` product and direction; a retained future authored **Check Evaluation** cannot rewrite that history.
 An implicit single stage may capture the recipe description; later description edits do not rewrite that purpose or invalidate the Journal listing.
 Actual checks remain in `lastCheckResult`; `essenceSpend` records actor-qualified consumed carriers and their contributions, and `currencySpends` records settled amounts only.
 An absent receipt is Not recorded, an explicit empty receipt establishes zero, and a recorded zero quantity never establishes a positive award.
