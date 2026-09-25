@@ -20,6 +20,24 @@ import { resolveAlchemySubmissions } from '../utils/alchemySubmissions.js';
 
 import { getGatheringEngine } from './gatheringRuntime.js';
 
+/** The entitled Journal descriptor's named display fields are the prompt's only input. */
+export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
+  return prompt({
+    name: descriptor?.subject ?? descriptor?.label,
+    actorName: descriptor?.actorName,
+    activity: descriptor?.activity,
+    img: descriptor?.img,
+    formula: descriptor?.formula,
+    resolvedFormula: descriptor?.resolvedFormula,
+    dc: descriptor?.target,
+    comparison: descriptor?.comparison,
+    thresholdMode: descriptor?.comparison === 'exceed' ? 'exceed' : null,
+    selectedModifiers: descriptor?.selectedModifiers,
+    allowAdvantage: descriptor?.allowAdvantage === true,
+    modifierChoice: descriptor?.modifierChoice ?? null,
+  });
+}
+
 async function resolveJournalSourceActors(run, payload = {}, fallbackActor = null) {
   const supplied = Array.isArray(payload.sourceActorUuids) ? payload.sourceActorUuids : null;
   const persisted = Array.isArray(run?.componentSourceActorUuids)
@@ -436,13 +454,7 @@ export function createJournalCommandsForFabricate(fabricate) {
     resolveUuid: (uuid) => globalThis.fromUuid?.(uuid),
     emit: (message, options) => game.socket?.emit(EVENT_SCENE_SOCKET, message, options ?? {}),
     randomId: () => foundry.utils.randomID(),
-    promptCheck: (descriptor) =>
-      promptCheckRoll({
-        name: descriptor?.label,
-        activity: descriptor?.label,
-        allowAdvantage: descriptor?.allowAdvantage === true,
-        modifierChoice: descriptor?.modifierChoice ?? null,
-      }),
+    promptCheck: (descriptor) => promptJournalStageCheck(descriptor),
     postRollHandoff: (handoff) => postCheckRollHandoff(handoff),
     getDismissals: () => getSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS),
     setDismissals: (value) => setSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS, value),

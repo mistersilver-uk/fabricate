@@ -108,6 +108,28 @@ export const CASES = Object.freeze([
     kinds: ['player', 'journal'],
     sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/svelte\/stores\/journalStore/],
   }),
+  playerCase({
+    id: 'player-journal-check-roll-prompt',
+    label: 'Player Journal — versioned check roll prompt',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'journal', journalCaseState: 'journal-check-prompt' },
+    steps: [
+      { selector: '[data-run-id="lab-v1-journal-check-prompt"]' },
+      { selector: '[data-journal-detail] [data-run-action="primary"]' },
+    ],
+    expectTab: 'journal',
+    expectSelector:
+      '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="single"]' +
+      ':has(.prompt-heading p):has(.formula-content code):has(.static-modifiers .modifier-chips)',
+    kinds: ['player', 'journal'],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/bootstrap\/journalOperations\.js$/,
+      /^src\/systems\/CraftingEngine\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt\.svelte|rollPrompt\.js)$/,
+    ],
+  }),
   ...journalBlindRunCases(),
   ...journalLifecycleCases(),
   ...journalHistoryBatchCases(),
