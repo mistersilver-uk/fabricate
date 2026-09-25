@@ -41,7 +41,6 @@
     systemRows = [],
     memberCount = 0,
     rosterSize = 0,
-    membershipActions = null,
     onOpenSystemRules = null,
     onEdit = () => {},
     // THE DEEP LINK OUT TO THE WORLD DEFINITION: one callback, attachable only where the
@@ -262,7 +261,7 @@
       entityName={essence.name}
       entityType="essence"
       enableable={true}
-      actions={membershipActions}
+      systemRowAction="navigate"
       {onOpenSystemRules}
       resetKey={essence.id}
     />

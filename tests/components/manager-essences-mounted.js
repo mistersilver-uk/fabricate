@@ -45,6 +45,102 @@ export function registerEssencesCases() {
   });
 
 
+  it('opens on the first sorted essence and preserves an explicit editor selection', async () => {
+    const calls = [];
+    const store = createStore(calls);
+    store.viewState.update((state) => ({
+      ...state,
+      essenceCards: [state.essenceCards[1], state.essenceCards[0]],
+    }));
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store, services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    navButton('Essence Rules').click();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('.manager-essence-row')?.dataset.essenceId,
+      'earth',
+      'Earth sorts ahead of the first authored record, Water'
+    );
+    assert.ok(target.querySelector('[data-essence-id="earth"]').classList.contains('is-selected'));
+    assert.equal(target.querySelector('.manager-inspector-name').textContent.trim(), 'Earth');
+
+    target.querySelector('[data-essence-id="water"] [data-essence-edit="water"]').click();
+    await tick();
+    flushSync();
+    target.querySelector('.manager-header-actions [data-essence-edit-back]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-essence-id="water"]').classList.contains('is-selected'));
+    assert.equal(target.querySelector('.manager-inspector-name').textContent.trim(), 'Water');
+  });
+
+  it('offers Rules navigation for non-members without an Add action', async () => {
+    const calls = [];
+    const store = createStore(calls, {
+      smithingFeatures: { essences: true, gathering: false },
+    });
+    store.viewState.update((state) => ({
+      ...state,
+      worldScope: {
+        ...state.worldScope,
+        essence: {
+          available: true,
+          entries: [
+            {
+              id: 'earth',
+              entity: { name: 'Earth' },
+              membershipCount: 1,
+              systems: [
+                { systemId: 'alchemy', member: true, enabled: true },
+                { systemId: 'smithing', member: false, enabled: false },
+              ],
+            },
+            {
+              id: 'water',
+              entity: { name: 'Water' },
+              membershipCount: 1,
+              systems: [{ systemId: 'alchemy', member: true, enabled: false }],
+            },
+          ],
+        },
+      },
+    }));
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store, services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    navButton('Essence Rules').click();
+    await tick();
+    flushSync();
+    const roster = target.querySelector('[data-essence-section="systems"]');
+    assert.ok(roster, 'the selected member renders its systems roster');
+    assert.ok(!roster.querySelector('[data-scoped-membership-add]'), 'the roster offers no Add');
+    const destination = roster.querySelector('[data-scoped-list-system-rules="smithing"]');
+    assert.ok(destination, 'the non-member system still has a Rules destination');
+    destination.click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some((call) => call[0] === 'selectSystem' && call[1] === 'smithing'));
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essences');
+    assert.equal(
+      target.querySelectorAll('[data-essence-browser-inspector]').length,
+      0,
+      'the empty destination does not retain the source system inspector'
+    );
+  });
+
+
   it('routes to the essence browser and dedicated edit route without inline editing', async () => {
     const calls = [];
     const editedComponents = [];

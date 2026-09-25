@@ -230,6 +230,50 @@ after(() => {
   entryHarness.teardown();
 });
 
+describe('the essence catalogue opens with its first shown row inspected', () => {
+  function selectedIds(root) {
+    return [...root.querySelectorAll('[data-scoped-list-row].is-selected')].map((row) =>
+      row.getAttribute('data-scoped-list-row')
+    );
+  }
+
+  function search(root, value) {
+    const input = root.querySelector('[data-scoped-list-search]');
+    input.value = value;
+    input.dispatchEvent(new root.ownerDocument.defaultView.Event('input', { bubbles: true }));
+    flushSync();
+  }
+
+  it('inspects the first row without moving the choice when a filter hides it', async () => {
+    const root = await pageHarness.mount(pageProps());
+    assert.deepEqual(selectedIds(root), ['ash']);
+    assert.equal(root.querySelector('[data-scoped-list-inspector-name]').textContent.trim(), 'Ash');
+
+    search(root, 'no matching essence');
+    assert.deepEqual(selectedIds(root), [], 'the selected id remains valid while no row is shown');
+    assert.ok(root.querySelector('[data-scoped-list-inspector-state="resting"]'));
+
+    search(root, '');
+    assert.deepEqual(selectedIds(root), ['ash'], 'clearing the filter restores the same choice');
+  });
+
+  it('waits for late data and does not replace an id whose record was deleted', async () => {
+    const empty = essenceScope();
+    empty.entries = [];
+    const root = await pageHarness.mount(pageProps({ scope: empty }));
+    assert.deepEqual(selectedIds(root), []);
+
+    await pageHarness.setProps({ scope: essenceScope() });
+    assert.deepEqual(selectedIds(root), ['ash'], 'the first late-loaded row is selected');
+
+    const withoutAsh = essenceScope();
+    withoutAsh.entries = withoutAsh.entries.filter((entry) => entry.id !== 'ash');
+    await pageHarness.setProps({ scope: withoutAsh });
+    assert.deepEqual(selectedIds(root), [], 'a stale catalogue id leaves the inspector resting');
+    assert.ok(root.querySelector('[data-scoped-list-inspector-state="resting"]'));
+  });
+});
+
 describe('criterion 4 — the essence catalogue renders NO source-item affordance', () => {
   it('renders the identity as a GLYPH, with no image and no source badge anywhere', async () => {
     const root = await pageHarness.mount(pageProps());

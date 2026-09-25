@@ -62,6 +62,7 @@
   // rows on screen this system does not have, and a GM returning from an editor to a list of absent
   // entities would read it as data loss. It resets to `in` on every mount.
   let membershipFilter = $state('in');
+  let autoSelectedEssenceId = $state('');
 
   let ownBrowserState = $state(createEssenceBrowserState());
   // The root's lifted object when bound, else the local fallback. Both are `$state` proxies, so
@@ -264,6 +265,17 @@
 
   $effect(() => {
     if (model.pageIndex !== ui.pageIndex) ui.pageIndex = model.pageIndex;
+  });
+
+  $effect(() => {
+    if ((essenceCards || []).some((essence) => essence.id === selectedEssenceId)) {
+      autoSelectedEssenceId = '';
+      return;
+    }
+    const firstEssenceId = model.essences.find((essence) => memberIds.has(essence.id))?.id || '';
+    if (!firstEssenceId || autoSelectedEssenceId === firstEssenceId) return;
+    autoSelectedEssenceId = firstEssenceId;
+    onSelectEssence(firstEssenceId);
   });
 
   const chips = $derived(
