@@ -473,7 +473,7 @@ export const CASES = Object.freeze([
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntrySystemsCard\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntrySystemsCard\.svelte$/,
     ],
   }),
   managerCase({
@@ -583,6 +583,27 @@ export const CASES = Object.freeze([
   }),
   // The catalogue's `ScopedPlaceholderPage` claim is deleted here, not merely joined by the new patterns.
   managerCase({
+    id: 'world-essence-catalogue-resting',
+    label: 'Manager — World Essence Catalogue, resting inspector',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [{ selector: '#manager-world-nav-essence-catalogue' }],
+    expectView: 'world-essences',
+    expectSelector: '[data-scoped-list-inspector-state="resting"]',
+    expectContained: [
+      {
+        container: '[data-scoped-list-inspector]',
+        target: '[data-scoped-list-inspector-state="resting"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceCataloguePage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/Entity(?:CatalogueShell|ListInspectorFrame)\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'world-essence-catalogue',
     label: 'Manager — World Essence Catalogue',
     reaches: 'beyond',
@@ -654,10 +675,43 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceEntryPage\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/MembershipActions\.svelte$/,
       // The buffered-save seam (issue 1372): the header's Back and Save pair, and the draft leaf behind it.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-essence-entry-systems',
+    label: 'Manager — World Essence entry, systems',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-essence-catalogue' },
+      { selector: '[data-scoped-list-action="open-entry"]' },
+      { selector: '[data-scoped-entry-systems-card]', scroll: true },
+    ],
+    expectView: 'world-essence-entry',
+    expectSelector: '[data-scoped-entry-systems-card]',
+    expectContained: [
+      {
+        container: '[data-scoped-entry-systems-card]',
+        target: '[data-scoped-entry-add-to-systems]',
+      },
+      {
+        container: '[data-scoped-entry-systems-card]',
+        target: '[data-scoped-entry-system-filter="with"]',
+      },
+      {
+        container: '[data-scoped-entry-systems-card]',
+        target: '[data-scoped-entry-system-count]',
+      },
+    ],
+    expectCenterHit: '[data-scoped-entry-system] [data-scoped-entry-system-rules]',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntrySystemsCard\.svelte$/,
     ],
   }),
   managerCase({

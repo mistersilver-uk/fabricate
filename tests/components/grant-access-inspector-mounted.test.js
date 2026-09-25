@@ -30,6 +30,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     // Issue 1513: the roster pager is the shared primitive now.
     'src/ui/svelte/components/Pagination.svelte',
     ...SELECT_COMPILED_MODULES,
@@ -74,6 +75,13 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 describe('GrantAccessInspector (mounted)', () => {
+  it('fills the inspector when no recipe is selected', async () => {
+    const root = await harness.mount({ recipe: null, characters: [], players: [] });
+    const empty = root.querySelector('.manager-empty');
+    assert.ok(Boolean(empty));
+    assert.ok(empty.classList.contains('is-fill'));
+  });
+
   it('renders both rosters with the character and player rows', async () => {
     const root = await harness.mount({
       recipe: makeRecipe(),

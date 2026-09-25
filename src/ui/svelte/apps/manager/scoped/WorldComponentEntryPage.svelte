@@ -23,7 +23,7 @@
   import EssenceQuantityCard from '../components/EssenceQuantityCard.svelte';
   import WorldComponentEntryPreviewRail from './WorldComponentEntryPreviewRail.svelte';
   import WorldComponentEntrySourceCard from './WorldComponentEntrySourceCard.svelte';
-  import WorldComponentEntrySystemsCard from './WorldComponentEntrySystemsCard.svelte';
+  import ScopedEntrySystemsCard from './ScopedEntrySystemsCard.svelte';
   import {
     componentDeleteNote,
     componentDuplicateSourceCount,
@@ -31,6 +31,7 @@
     componentEntryPreviewGroups,
     componentEssenceChips,
     componentSourceLine,
+    componentSystemModeLabel,
     componentSystemRowSummary,
     componentWorldCategoryNote,
     componentWorldEssenceNote,
@@ -538,6 +539,11 @@
   function summaryFor(row, context) {
     return componentSystemRowSummary(row, { ...context, text, phrase });
   }
+
+  function systemMetaFor(row) {
+    const system = systems.find((candidate) => candidate.id === row.systemId);
+    return componentSystemModeLabel(system?.resolutionMode, text);
+  }
 </script>
 
 <main class="manager-main" data-scoped-page="world-component-entry" aria-label={title}>
@@ -915,16 +921,16 @@
               </p>
             </InspectorCard>
 
-            <WorldComponentEntrySystemsCard
+            <ScopedEntrySystemsCard
               entryId={entry.id}
               entityName={shownName}
               rows={systemRows}
-              {systems}
               {worldCategory}
               {armedToken}
               {text}
               {phrase}
               {summaryFor}
+              rowMetaFor={systemMetaFor}
               onArm={(token) => (armedToken = token)}
               onDisarm={() => (armedToken = '')}
               onAdd={(rowSystemId) => actions?.addToSystem?.(entry.id, rowSystemId)}

@@ -23,6 +23,7 @@
   import ManagerButton from '../../components/ManagerButton.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import StatBox from '../../components/StatBox.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
@@ -135,15 +136,16 @@
 
 <div class="manager-books-scrolls-inspector" data-item-page-inspector>
   {#if !item}
-    <div class="manager-inspector-empty" data-item-page-empty>
-      <i class="fas fa-book" aria-hidden="true"></i>
-      <p class="manager-muted">
-        {text(
-          'FABRICATE.Admin.Manager.BooksScrolls.SelectHint',
-          'Select a recipe item to see its page.'
-        )}
-      </p>
-    </div>
+    <EmptyState
+      fill
+      icon="fas fa-book"
+      title={text('FABRICATE.Admin.Manager.BooksScrolls.SelectTitle', 'Select a recipe item')}
+      hint={text(
+        'FABRICATE.Admin.Manager.BooksScrolls.SelectHint',
+        'Select a recipe item to see its page.'
+      )}
+      dataAttr="data-item-page-empty"
+    />
   {:else}
     <p class="manager-kicker">
       {text('FABRICATE.Admin.Manager.BooksScrolls.ItemPage', 'Item page')}
@@ -302,24 +304,10 @@
 <style>
   .manager-books-scrolls-inspector {
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
     gap: var(--fab-space-3);
     min-height: 0;
-  }
-
-  .manager-inspector-empty {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-6) var(--fab-space-3);
-    text-align: center;
-  }
-
-  .manager-inspector-empty i {
-    font-size: 1.5rem;
-    color: var(--fab-text-subtle);
   }
 
   .manager-books-scrolls-inspector-meta {

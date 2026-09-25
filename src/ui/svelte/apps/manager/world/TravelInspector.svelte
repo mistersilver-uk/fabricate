@@ -11,6 +11,7 @@
   import Chip from '../../../components/Chip.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import RealmNameField from '../RealmNameField.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -31,6 +32,7 @@
 
 <section
   class="fabricate-card manager-inspector-card manager-travel-inspector"
+  class:is-empty={(travelTab === 'realms' && !realm) || (travelTab === 'map' && !mapRegion)}
   data-gathering-inspector-travel
   data-travel-inspector={travelTab}
   aria-label={travelTab === 'map'
@@ -125,12 +127,17 @@
         {/if}
       </section>
     {:else}
-      <p class="manager-muted">
-        {text(
+      <EmptyState
+        fill
+        icon="fas fa-map-location-dot"
+        title={text('FABRICATE.Admin.Manager.Travel.Realms.SelectTitle', 'Select a realm')}
+        hint={text(
           'FABRICATE.Admin.Manager.Travel.Inspector.RealmsPlaceholder',
           'Select a realm to see its details.'
         )}
-      </p>
+        dataAttr="data-travel-inspector-empty"
+        dataValue="realms"
+      />
     {/if}
   {:else if travelTab === 'map'}
     {#if mapRegion}
@@ -261,12 +268,27 @@
         {/if}
       </section>
     {:else}
-      <p class="manager-muted">
-        {text(
+      <EmptyState
+        fill
+        icon="fas fa-map"
+        title={text('FABRICATE.Admin.Manager.Travel.MapLinks.SelectTitle', 'Select a map region')}
+        hint={text(
           'FABRICATE.Admin.Manager.Travel.Inspector.MapLinksPlaceholder',
           'Select a region to map it to Scene Regions.'
         )}
-      </p>
+        dataAttr="data-travel-inspector-empty"
+        dataValue="map"
+      />
     {/if}
   {/if}
 </section>
+
+<style>
+  .manager-travel-inspector.is-empty {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+</style>

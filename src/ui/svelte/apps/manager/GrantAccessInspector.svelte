@@ -194,6 +194,7 @@
 <div class="manager-access-inspector" data-access-inspector>
   {#if !recipe}
     <EmptyState
+      fill
       icon="fas fa-hand-pointer"
       title={text('FABRICATE.Admin.Manager.Access.NoSelectionTitle', 'Select a recipe')}
       hint={text(
@@ -296,8 +297,10 @@
 <style>
   .manager-access-inspector {
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
     gap: var(--fab-space-3);
+    min-height: 0;
   }
 
   .manager-access-summary {

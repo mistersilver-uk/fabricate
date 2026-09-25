@@ -1,15 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  `Systems using this component` (issue 1371) — `proto:920-953`. THREE BANDS, EACH PADDING
-  ITSELF: the card carries `overflow: hidden` and no padding of its own, over a head band, a
-  toolbar band with a search well and a counted segmented filter, and a rows band scrolling
-  internally at 330px. THE ROW IS THREE COLUMNS ON ONE LINE: a fixed 196px name block, a
-  flexible ellipsised summary, and a trailing action cluster.
-
-  THE TRAILING CLUSTER IS COMPOSED HERE RATHER THAN THROUGH `MembershipActions`, whose contract
-  is a filled `is-primary` add with an explanatory line where the reference draws a DASHED add
-  and a 26px exit icon. Both are shipped primitives, and the arm token keeps the same
-  `scoped-membership-remove:{entity}|{system}` shape, so the one-armed-control invariant holds.
+  Shared world-entry participation card for components and essences.
+  It owns the searchable membership projection, three-column rows, and one armed removal token.
 -->
 <script>
   import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
@@ -17,19 +9,24 @@
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
-  import { componentEntrySystemFilters, componentSystemModeLabel } from './componentScoped.js';
+  import { componentEntrySystemFilters } from './componentScoped.js';
 
   let {
     entryId = '',
     entityName = '',
     rows = [],
-    /** The crafting-system roster, for the resolution mode each row states. */
-    systems = [],
     worldCategory = '',
     armedToken = '',
     text = (key, fallback) => fallback,
     phrase = (key, fallback) => fallback,
     summaryFor = () => ({ member: false, text: '' }),
+    rowMetaFor = () => '',
+    heading = '',
+    subtitle = '',
+    openRulesAria = (_row) => '',
+    removeLabel = '',
+    removeConsequenceFor = null,
+    addAria = (_row) => '',
     onArm = () => {},
     onDisarm = () => {},
     onAdd = () => {},
@@ -43,8 +40,7 @@
 
   const memberRows = $derived(rows.filter((row) => row?.member === true));
 
-  // The rows the card draws: the membership filter, then the search term. The segment counts are
-  // computed over the SAME arrays, so `with` and `without` always sum to `all`.
+  // Segment counts and visible rows use membership records independently of enabled state.
   const visibleRows = $derived(
     rows
       .filter((row) => {
@@ -67,40 +63,21 @@
     componentEntrySystemFilters({ total: rows.length, members: memberRows.length })
   );
 
-  const modeBySystem = $derived(
-    new Map(
-      (Array.isArray(systems) ? systems : []).map((system) => [
-        String(system?.id ?? ''),
-        componentSystemModeLabel(system?.resolutionMode, text),
-      ])
-    )
-  );
-
-  /**
-   * The head action, which REVEALS the addable cohort rather than opening a picker: `proto:925`
-   * draws a modal over the non-member systems, this repository has no such overlay, and `actions`
-   * exposes only the per-pair `addToSystem`. Named in the handoff as a partial.
-   */
+  /** Reveal the non-member cohort and focus its search field. */
   function revealAddable() {
     filter = 'without';
     search = '';
     searchField?.querySelector?.('input')?.focus?.();
   }
 
-  /** One row's arm token, keyed on the DOCUMENT ID PAIR so a re-project cannot arm the wrong row. */
+  /** Key an armed removal to the persisted entity/system pair. */
   function removeToken(row) {
     return `scoped-membership-remove:${entryId}|${row?.systemId ?? ''}`;
   }
 
-  /**
-   * The consequence sentence the armed exit icon announces and shows on hover. `ArmedDangerButton`
-   * requires each aria label to CONTAIN its state's visible label (WCAG 2.5.3), and this form's
-   * idle face has none, so the sentence is the only name it has. IT IS THE COMPONENT KEY, NOT THE
-   * SHARED MEMBERSHIP ONE: only `partComponentFromSystem` repairs references, disables recipes
-   * left unbuildable, cleans salvage and reconciles alchemy, and the shared key is rendered for
-   * essences and tools too.
-   */
+  /** Describe the entity-specific consequence in the icon-only removal control's name. */
   function removeConsequence(row) {
+    if (typeof removeConsequenceFor === 'function') return removeConsequenceFor(row);
     return phrase(
       'FABRICATE.Admin.Manager.Scoped.Component.RemoveConsequence',
       'Remove {entity} from {system}. Removing it also rewrites every recipe in that system that names it, and disables any recipe left without a usable ingredient set or result. The world record is untouched, and no other system changes.',
@@ -118,16 +95,18 @@
     <i class="fas fa-layer-group manager-card-glyph is-accent" aria-hidden="true"></i>
     <div class="manager-component-entry-card-head-copy">
       <h3 class="manager-card-heading">
-        {text(
-          'FABRICATE.Admin.Manager.Scoped.Component.Entry.SystemsTitle',
-          'Systems using this component'
-        )}
+        {heading ||
+          text(
+            'FABRICATE.Admin.Manager.Scoped.Component.Entry.SystemsTitle',
+            'Systems using this component'
+          )}
       </h3>
       <p class="manager-subtitle">
-        {text(
-          'FABRICATE.Admin.Manager.Scoped.Component.Entry.SystemsSubtitle',
-          'A system uses it when it has rules for it — that is where category, tags, essences and salvage live.'
-        )}
+        {subtitle ||
+          text(
+            'FABRICATE.Admin.Manager.Scoped.Component.Entry.SystemsSubtitle',
+            'A system uses it when it has rules for it — that is where category, tags, essences and salvage live.'
+          )}
       </p>
     </div>
     <ManagerButton
@@ -162,11 +141,6 @@
         inputAttrs={{ 'data-scoped-entry-system-search': '' }}
       />
     </div>
-    <!--
-      THE FILTER IS A PILL RUN ON A SOFT ACCENT TRACK (`proto:5457`). `shape` is the construction
-      and `tone` is the paint, so both are opt-in and neither moves another `SegmentedControl`.
-      The tallies stay on `badge`, not `count`, which is what inks the idle numeral subtle.
-    -->
     <SegmentedControl
       density="compact"
       shape="pill"
@@ -204,7 +178,7 @@
           <span
             class="manager-component-entry-system-mode"
             data-scoped-entry-system-mode={row.systemId}
-            >{modeBySystem.get(row.systemId) ?? ''}</span
+            >{rowMetaFor(row)}</span
           >
         </div>
         <span
@@ -219,16 +193,18 @@
               <ManagerButton
                 class="manager-component-entry-system-rules"
                 data-scoped-entry-system-rules={row.systemId}
-                title={phrase(
-                  'FABRICATE.Admin.Manager.Scoped.Component.OpenSystemRulesAria',
-                  'Open this component in {system}',
-                  { system: row.systemName }
-                )}
-                aria-label={phrase(
-                  'FABRICATE.Admin.Manager.Scoped.Component.OpenSystemRulesAria',
-                  'Open this component in {system}',
-                  { system: row.systemName }
-                )}
+                title={openRulesAria(row) ||
+                  phrase(
+                    'FABRICATE.Admin.Manager.Scoped.Component.OpenSystemRulesAria',
+                    'Open this component in {system}',
+                    { system: row.systemName }
+                  )}
+                aria-label={openRulesAria(row) ||
+                  phrase(
+                    'FABRICATE.Admin.Manager.Scoped.Component.OpenSystemRulesAria',
+                    'Open this component in {system}',
+                    { system: row.systemName }
+                  )}
                 onclick={() => onOpenSystemRules(entryId, row.systemId)}
               >
                 <span
@@ -249,7 +225,7 @@
                 'FABRICATE.Admin.Manager.Scoped.Membership.RemoveConfirm',
                 'Confirm?'
               )}
-              idleAriaLabel={`${text('FABRICATE.Admin.Manager.Scoped.Component.Entry.RemoveFromSystem', 'Remove from this system')} — ${removeConsequence(row)}`}
+              idleAriaLabel={`${removeLabel || text('FABRICATE.Admin.Manager.Scoped.Component.Entry.RemoveFromSystem', 'Remove from this system')} — ${removeConsequence(row)}`}
               armedAriaLabel={`${text('FABRICATE.Admin.Manager.Scoped.Membership.RemoveConfirm', 'Confirm?')} — ${removeConsequence(row)}`}
               {onArm}
               {onDisarm}
@@ -260,11 +236,12 @@
               role="dashed"
               class="manager-component-entry-system-add"
               data-scoped-membership-add
-              aria-label={phrase(
-                'FABRICATE.Admin.Manager.Scoped.Component.Entry.AddToSystemAria',
-                'Add {entity} to {system}',
-                { entity: entityName || entryId, system: row.systemName || row.systemId }
-              )}
+              aria-label={addAria(row) ||
+                phrase(
+                  'FABRICATE.Admin.Manager.Scoped.Component.Entry.AddToSystemAria',
+                  'Add {entity} to {system}',
+                  { entity: entityName || entryId, system: row.systemName || row.systemId }
+                )}
               onclick={() => onAdd(row.systemId)}
             >
               {text('FABRICATE.Admin.Manager.Scoped.Component.Entry.AddToSystem', 'Add to system')}

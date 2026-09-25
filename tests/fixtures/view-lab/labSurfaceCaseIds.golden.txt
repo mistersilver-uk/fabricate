@@ -5,7 +5,7 @@ world-prerequisites
 world-modifiers
 world-component-entry-definition
 world-vocabulary
-world-essence-catalogue
+world-essence-catalogue-resting
 world-essence-entry
 world-tool-catalogue-list-head
 world-tool-entry-overview

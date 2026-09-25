@@ -41,7 +41,7 @@ const componentPath = 'src/ui/svelte/apps/manager/scoped/WorldComponentEntryPage
 // THE ENTRY'S STATIC TREE beyond the shared scoped tier.
 const compiledExtras = [
   'src/ui/svelte/apps/manager/scoped/WorldComponentEntrySourceCard.svelte',
-  'src/ui/svelte/apps/manager/scoped/WorldComponentEntrySystemsCard.svelte',
+  'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
   'src/ui/svelte/apps/manager/scoped/WorldComponentEntryPreviewRail.svelte',
   'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
   'src/ui/svelte/components/Stepper.svelte',

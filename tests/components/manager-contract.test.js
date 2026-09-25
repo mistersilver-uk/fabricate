@@ -2891,7 +2891,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     const SCOPED_ENTRY_CHILDREN = new Set([
       'WorldComponentEntryPreviewRail.svelte',
       'WorldComponentEntrySourceCard.svelte',
-      'WorldComponentEntrySystemsCard.svelte',
+      'ScopedEntrySystemsCard.svelte',
     ]);
     const pages = readdirSync(resolve(repoRoot, SCOPED_DIR))
       .filter(

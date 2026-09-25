@@ -378,6 +378,7 @@
   </section>
 {:else}
   <EmptyState
+    fill
     icon="fas fa-arrow-pointer"
     title={text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
     hint={text(

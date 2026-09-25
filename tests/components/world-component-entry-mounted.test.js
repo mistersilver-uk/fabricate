@@ -39,7 +39,7 @@ const harness = createComponentScopeHarness({
     // THE ENTRY'S OWN THREE CHILDREN (issue 1371, parity round 4). Each is imported STATICALLY by
     // the page, so an omission HANGS this suite and is reported as `# cancelled`, not `# fail`.
     'src/ui/svelte/apps/manager/scoped/WorldComponentEntrySourceCard.svelte',
-    'src/ui/svelte/apps/manager/scoped/WorldComponentEntrySystemsCard.svelte',
+    'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldComponentEntryPreviewRail.svelte',
     // THE `Essence contribution` CARD'S TWO LEAVES (issue 1371 r18-entry, maintainer ruling M31):
     'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',

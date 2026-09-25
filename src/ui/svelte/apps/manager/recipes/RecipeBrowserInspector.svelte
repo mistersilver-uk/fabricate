@@ -824,6 +824,7 @@
   </section>
 {:else}
   <EmptyState
+    fill
     icon="fas fa-scroll"
     title={text('FABRICATE.Admin.Manager.Recipe.SelectRecipe', 'Select a recipe')}
     hint={text(

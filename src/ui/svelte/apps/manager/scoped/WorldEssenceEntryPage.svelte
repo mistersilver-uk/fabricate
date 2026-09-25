@@ -27,7 +27,7 @@
   import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import { resolveDropUuid } from '../../../util/dropUtils.js';
   import { statusChipTone } from '../../../util/statusChipTone.js';
-  import MembershipActions from './MembershipActions.svelte';
+  import ScopedEntrySystemsCard from './ScopedEntrySystemsCard.svelte';
   import ScopedValidationTab from './ScopedValidationTab.svelte';
   import { reportRefusedScopedEntrySave, scopedSectionLabel } from './scopedStudio.js';
   import {
@@ -55,6 +55,7 @@
     actions = null,
     entityId = '',
     onBackToCatalogue = () => {},
+    onOpenSystemRules = null,
     // THE BUFFERED EDIT'S THREE WIRES TO THE SHELL (issue 1372), which owns the header pair and
     // the route-exit cascade because `.manager-header` is a SIBLING of `.manager-main`.
     // `onDraftChange` reports a LIVE handle, read at click time where a snapshot can be a turn
@@ -325,14 +326,6 @@
   const badges = $derived({ validation: validationBadge(counts) });
   const summaryStatus = $derived(worstStatus(counts));
 
-  const systemsCountText = $derived(
-    format(
-      'FABRICATE.Admin.Manager.Scoped.Essence.SystemsCount',
-      '{count} of {total} systems have rules',
-      { count: memberCount, total: systemRows.length }
-    )
-  );
-
   // THE CONSEQUENCE OF A DELETE, STATED BEFORE IT IS ARMED. The prototype's danger card says how
   // many systems lose their rules, because that is the whole reach of the action and a GM cannot
   // recover it afterwards. `membershipCount` is the projection's own member total, so this
@@ -447,6 +440,18 @@
     if (state === 'disabled')
       return text('FABRICATE.Admin.Manager.Scoped.Essence.StateDisabled', 'Disabled here');
     return text('FABRICATE.Admin.Manager.Scoped.Essence.StateAbsent', 'Not in this system');
+  }
+
+  function essenceSummary(row) {
+    return { member: row?.member === true, text: systemSummary(row) };
+  }
+
+  function essenceRemoveConsequence(row) {
+    return format(
+      'FABRICATE.Admin.Manager.Scoped.Membership.RemoveConsequence',
+      'Remove {entity} from {system}. Its overrides go with it; the world record and every other system are untouched.',
+      { entity: entity?.name || entry?.id, system: systemLabel(row) }
+    );
   }
 
   /**
@@ -779,66 +784,46 @@
                 <span class="manager-scoped-entry-kicker-rule" aria-hidden="true"></span>
               </div>
 
-              <!-- THE MEMBERSHIP LIST. Rows come from `entry.systems` — the projection's JOIN —
-               and never from a narrowed `{id, name}` roster, which cannot answer `member`. Each
-               row carries the prototype's three cells rather than a bare name, because a stack of
-               names and switches says nothing about what the essence does in that system. -->
-              <section class="manager-scoped-entry-systems" data-scoped-entry-systems>
-                <header class="manager-scoped-entry-systems-head">
-                  <span class="manager-scoped-entry-default-glyph" aria-hidden="true">
-                    <i class="fas fa-wand-sparkles"></i>
-                  </span>
-                  <div class="manager-scoped-entry-systems-copy">
-                    <h4 class="manager-scoped-entry-default-title">
-                      {text(
-                        'FABRICATE.Admin.Manager.Scoped.Essence.SystemsHead',
-                        'Systems using this essence'
-                      )}
-                    </h4>
-                    <p class="manager-scoped-entry-systems-sub">
-                      {text(
-                        'FABRICATE.Admin.Manager.Scoped.Essence.SystemsSub',
-                        'The rules hold what the essence does on craft in that system: its active effect source item and its macro.'
-                      )}
-                    </p>
-                  </div>
-                  <span class="manager-scoped-entry-systems-count" data-scoped-entry-systems-count>
-                    {systemsCountText}
-                  </span>
-                </header>
-
-                <ul class="manager-scoped-entry-system-list" role="list">
-                  {#each systemRows as row (row.systemId)}
-                    <li
-                      class="manager-scoped-entry-system"
-                      data-scoped-entry-system={row.systemId}
-                      data-scoped-entry-system-state={essenceSystemState(row)}
-                    >
-                      <span class="manager-scoped-entry-system-copy">
-                        <span class="manager-scoped-entry-system-name">{systemLabel(row)}</span>
-                        <span class="manager-scoped-entry-system-meta">{systemMeta(row)}</span>
-                      </span>
-                      <span class="manager-scoped-entry-system-summary">{systemSummary(row)}</span>
-                      <MembershipActions
-                        entityType="essence"
-                        entityId={entry.id}
-                        systemId={row.systemId}
-                        entityName={entity?.name ?? entry.id}
-                        systemName={systemLabel(row)}
-                        member={row.member === true}
-                        enabled={row.enabled === true}
-                        {armedToken}
-                        onArm={(token) => (armedToken = token)}
-                        onDisarm={() => (armedToken = '')}
-                        onAdd={() => actions?.addToSystem?.(entry.id, row.systemId)}
-                        onRemove={() => actions?.removeFromSystem?.(entry.id, row.systemId)}
-                        onToggleEnabled={(next) =>
-                          actions?.setEnabled?.(entry.id, row.systemId, next)}
-                      />
-                    </li>
-                  {/each}
-                </ul>
-              </section>
+              <ScopedEntrySystemsCard
+                entryId={entry.id}
+                entityName={entity?.name ?? entry.id}
+                rows={systemRows}
+                {armedToken}
+                {text}
+                phrase={format}
+                heading={text(
+                  'FABRICATE.Admin.Manager.Scoped.Essence.SystemsHead',
+                  'Systems using this essence'
+                )}
+                subtitle={text(
+                  'FABRICATE.Admin.Manager.Scoped.Essence.SystemsSub',
+                  'The rules hold what the essence does on craft in that system: its active effect source item and its macro.'
+                )}
+                summaryFor={essenceSummary}
+                rowMetaFor={systemMeta}
+                openRulesAria={(row) =>
+                  format(
+                    'FABRICATE.Admin.Manager.Scoped.Essence.OpenSystemRulesAria',
+                    'Open this essence in {system}',
+                    { system: systemLabel(row) }
+                  )}
+                removeLabel={text(
+                  'FABRICATE.Admin.Manager.Scoped.Membership.Remove',
+                  'Remove'
+                )}
+                removeConsequenceFor={essenceRemoveConsequence}
+                addAria={(row) =>
+                  format(
+                    'FABRICATE.Admin.Manager.Scoped.Essence.AddToSystemAria',
+                    'Add {entity} to {system}',
+                    { entity: entity?.name ?? entry.id, system: systemLabel(row) }
+                  )}
+                onArm={(token) => (armedToken = token)}
+                onDisarm={() => (armedToken = '')}
+                onAdd={(rowSystemId) => actions?.addToSystem?.(entry.id, rowSystemId)}
+                onRemove={(rowSystemId) => actions?.removeFromSystem?.(entry.id, rowSystemId)}
+                {onOpenSystemRules}
+              />
 
               <!-- THE DANGER CARD. Deleting a world essence reaches every system that has rules for
                it, so the reach is stated beside the control rather than only in a dialog — and the
@@ -969,7 +954,6 @@
   .manager-scoped-entry-kicker,
   .manager-scoped-entry-identity,
   .manager-scoped-entry-defaults,
-  .manager-scoped-entry-systems,
   .manager-scoped-entry-preview,
   .manager-scoped-entry-danger {
     flex: 0 0 auto;
@@ -1189,117 +1173,6 @@
     color: var(--fab-text-subtle);
     font-size: 0.63rem;
     line-height: 1.45;
-  }
-
-  /* THE PER-SYSTEM CARD is one bordered panel with a header and hairline-divided rows, not a
-     bare stack: the header carries the count, and the divider is what makes a six-system list
-     scannable at row height. */
-  .manager-scoped-entry-systems {
-    display: flex;
-    flex-direction: column;
-    border: 1px solid var(--fab-border);
-    border-radius: 12px;
-    /* NO FILL (issue 1372). See the essence surface-ladder block in `styles/fabricate.css`: the
-       prototype draws every card in the content area on the pane's own surface and separates
-       them with the border alone. */
-    background: transparent;
-    min-width: 0;
-    overflow: hidden;
-  }
-
-  .manager-scoped-entry-systems-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-3) var(--fab-space-4);
-    border-bottom: 1px solid var(--fab-border);
-    min-width: 0;
-  }
-
-  .manager-scoped-entry-systems-copy {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2xs);
-    flex: 1 1 18rem;
-    min-width: 0;
-  }
-
-  .manager-scoped-entry-systems-sub {
-    margin: 0;
-    color: var(--fab-text-muted);
-    font-size: 0.63rem;
-    line-height: 1.45;
-  }
-
-  .manager-scoped-entry-systems-count {
-    flex: 0 0 auto;
-    color: var(--fab-text-subtle);
-    font-size: 0.66rem;
-    font-weight: 500;
-  }
-
-  .manager-scoped-entry-system-list {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    min-width: 0;
-  }
-
-  /* THREE CELLS ON ONE LINE: a fixed name column, a fluid summary, and the action cluster. Stacked
-     name over actions, each system cost roughly 68px and six of them pushed the preview off the
-     screen. Wrapping is still allowed, so a long system name breaks rather than forcing the
-     controls out of the panel. */
-  .manager-scoped-entry-system {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--fab-space-3);
-    padding: var(--fab-space-2) var(--fab-space-4);
-    min-width: 0;
-  }
-
-  .manager-scoped-entry-system + .manager-scoped-entry-system {
-    border-top: 1px solid var(--fab-border);
-  }
-
-  .manager-scoped-entry-system-copy {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2xs);
-    flex: 0 0 12rem;
-    min-width: 0;
-  }
-
-  .manager-scoped-entry-system-name {
-    color: var(--fab-text);
-    font-family: var(--fab-font-serif);
-    font-size: 0.78rem;
-    font-weight: 600;
-    overflow-wrap: break-word;
-  }
-
-  .manager-scoped-entry-system-meta {
-    color: var(--fab-text-subtle);
-    font-size: 0.59rem;
-    font-weight: 500;
-  }
-
-  /* A NON-MEMBER's summary is the disabled ink, so the two states are told apart without
-     reading the sentence — which is exactly what the prototype's `summaryColor` does. */
-  .manager-scoped-entry-system-summary {
-    flex: 1 1 12rem;
-    color: var(--fab-text-muted);
-    font-size: 0.69rem;
-    min-width: 0;
-    overflow-wrap: break-word;
-  }
-
-  .manager-scoped-entry-system[data-scoped-entry-system-state='absent']
-    .manager-scoped-entry-system-summary {
-    color: var(--fab-text-disabled);
   }
 
   .manager-scoped-entry-preview {

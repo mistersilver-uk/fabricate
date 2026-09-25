@@ -328,12 +328,11 @@ describe('the two file-naming gates neither shell may trip', () => {
     // `manager-contract.test.js` filters this directory on that prefix and asserts exactly seven
     // placeholder PAGES; an eighth `World…` file makes that count wrong unless both gates agree
     // it is a child. The world Component entry's rebuild (issue 1371, parity round 4) added
-    // three, each a card or the rail rather than a route, and this list is the second half of
+    // two, each a card or the rail rather than a route, and this list is the second half of
     // that agreement — the first is `SCOPED_ENTRY_CHILDREN` in the contract suite.
     const CHILDREN = [
       'WorldComponentEntryPreviewRail.svelte',
       'WorldComponentEntrySourceCard.svelte',
-      'WorldComponentEntrySystemsCard.svelte',
     ];
     const worldFiles = readdirSync(resolve(repoRoot, SCOPED_DIR)).filter(
       (name) => name.startsWith('World') && name.endsWith('.svelte')
@@ -1098,7 +1097,7 @@ describe('each remove sentence discloses what that removal actually does', () =>
 
   it('and each consumer reads the key for the scope it renders', () => {
     // The component entry card is component-only.
-    const card = sourceOf(`${SCOPED_DIR}/WorldComponentEntrySystemsCard.svelte`);
+    const card = sourceOf(`${SCOPED_DIR}/ScopedEntrySystemsCard.svelte`);
     assert.match(card, /FABRICATE\.Admin\.Manager\.Scoped\.Component\.RemoveConsequence/);
     assert.equal(
       /FABRICATE\.Admin\.Manager\.Scoped\.Membership\.RemoveConsequence/.test(card),
@@ -1277,7 +1276,7 @@ describe('the entry’s pointer proofs survive in the capture registry', () => {
   it('carries a centre-hit on the member row’s exit icon, whose token the card still mints', () => {
     assert.match(registry(), /data-arm-token="scoped-membership-remove:sm-coal\|lab-smithing"/);
     assert.match(
-      sourceOf(`${SCOPED_DIR}/WorldComponentEntrySystemsCard.svelte`),
+      sourceOf(`${SCOPED_DIR}/ScopedEntrySystemsCard.svelte`),
       /`scoped-membership-remove:\$\{entryId\}\|\$\{row\?\.systemId \?\? ''\}`/,
       'the card still mints that token shape, so the registry selector can resolve'
     );

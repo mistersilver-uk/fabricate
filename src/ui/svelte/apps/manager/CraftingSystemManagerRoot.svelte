@@ -5038,6 +5038,7 @@
         {...essenceScopeProps}
         entityId={worldScopedEntryId}
         onBackToCatalogue={() => setView('world-essences')}
+        onOpenSystemRules={(entityId, systemId) => openSystemEssenceRules(entityId, systemId)}
         onDraftChange={handleWorldEssenceEntryDraft}
         onDirtyChange={handleWorldEssenceEntryDirty}
         onDraftIdentityChange={handleScopedEntryDraftIdentity}
@@ -6079,6 +6080,7 @@
             </section>
           {:else}
             <EmptyState
+              fill
               icon="fas fa-mortar-pestle"
               title={currentView === 'essence-edit'
                 ? text('FABRICATE.Admin.Manager.Essence.CreateInspectorTitle', 'New essence draft')
@@ -6233,6 +6235,7 @@
             </section>
           {:else}
             <EmptyState
+              fill
               icon="fas fa-boxes"
               title={text(
                 'FABRICATE.Admin.Manager.Component.SelectComponent',

@@ -391,7 +391,7 @@ describe('no new scoped file trips either naming gate', () => {
   const WORLD_CHILDREN = [
     'WorldComponentEntryPreviewRail.svelte',
     'WorldComponentEntrySourceCard.svelte',
-    'WorldComponentEntrySystemsCard.svelte',
+    'ScopedEntrySystemsCard.svelte',
   ];
 
   it('the World-prefixed file count matches the seven pages plus their named children', () => {

@@ -936,10 +936,11 @@
             </div>
           {/if}
         {:else}
-          <div class="manager-scoped-list-inspector-scroll">
+          <div class="manager-scoped-list-inspector-scroll is-resting">
             <!-- THE LANE'S COPY WINS, and the shipped pair is the fallback. -->
             <EmptyState
               compact
+              fill
               {icon}
               title={restingTitle ||
                 text('FABRICATE.Admin.Manager.Scoped.List.RestingTitle', 'Nothing selected')}
@@ -1269,12 +1270,8 @@
     overflow-y: auto;
   }
 
-  /* THE RESTING PANEL IS CONTENT-HEIGHT AT THE TOP OF THE COLUMN (issue 1373, maintainer feedback
-     round 3). The ASIDE runs the full height of the app — that is finding 6 and it stays — but the
-     panel inside it does not stretch to fill it. */
-  .manager-scoped-list-inspector-scroll > :global(.manager-empty) {
-    flex: 0 0 auto;
-    min-height: 0;
+  .manager-scoped-list-inspector-scroll.is-resting > :global(.manager-empty) {
+    flex: 1 1 auto;
   }
 
   .manager-scoped-list-inspector-identity {

@@ -684,6 +684,36 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
     );
   });
 
+  it('fills the resting inspector panel from inset top to inset bottom', async () => {
+    const context = await browser.newContext({
+      viewport: { width: CATALOGUE_WINDOW_PX, height: HOST_HEIGHT_PX },
+    });
+    const tab = await context.newPage();
+    await tab.setContent(page(selectionRestingMarkup, CATALOGUE_WINDOW_PX));
+    const box = await tab.evaluate(() => {
+      const scroll = document.querySelector('.manager-scoped-list-inspector-scroll');
+      const empty = scroll?.querySelector('[data-scoped-list-inspector-state="resting"]');
+      if (!scroll || !empty) return { rendered: false };
+      const scrollBox = scroll.getBoundingClientRect();
+      const emptyBox = empty.getBoundingClientRect();
+      return {
+        rendered: true,
+        topGap: emptyBox.top - scrollBox.top,
+        bottomGap: scrollBox.bottom - emptyBox.bottom,
+        height: emptyBox.height,
+      };
+    });
+    await context.close();
+
+    assert.equal(box.rendered, true, 'the resting inspector or its panel did not render');
+    assert.ok(box.height > 0, 'the resting panel has no measurable height');
+    assert.ok(Math.abs(box.topGap) <= EPSILON_PX, `the resting panel leaves ${box.topGap}px above`);
+    assert.ok(
+      Math.abs(box.bottomGap) <= EPSILON_PX,
+      `the resting panel leaves ${box.bottomGap}px below`
+    );
+  });
+
   it('SEPARATES the list lead from whatever follows it, by more than the row rhythm', async () => {
     // FINDING 1, MEASURED RATHER THAN LOOKED AT. The gap belongs BELOW the lead and is stated
     // once there, so all three things that can follow it — the filtered hero, the empty hero and

@@ -18324,12 +18324,6 @@
   background: var(--fab-success-soft);
 }
 
-/* LAYOUT CONTEXT ONLY for the shared `EmptyState` primitive. The appearance (dashed panel, tile, type scale) belongs to `EmptyState.svelte`'s scoped block, and the per-screen 2rem glyph / 1.2rem title exception that used to live here is gone — a primitive with a per-screen size override is a second empty-state design (issue 1373). */
-.fabricate-manager .manager-tool-browser-inspector-empty {
-  flex: 0 0 auto;
-  min-height: 0;
-}
-
 .fabricate-manager .manager-tool-inspector-hero {
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
@@ -19415,6 +19409,7 @@
 
 /* ── A6. SYSTEMS USING THIS COMPONENT ── `proto:920-953`. */
 .fabricate-manager .manager-component-entry-systems-card {
+  flex: 0 0 auto;
   gap: 0;
   padding: 0;
   overflow: hidden;

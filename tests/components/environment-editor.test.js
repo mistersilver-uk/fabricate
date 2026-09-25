@@ -592,10 +592,10 @@ describe('environment composition editor structure', () => {
     'the right inspector is tab-specific (summary on overview, record on tasks/events)',
     RIGHT_INSPECTOR,
     {
-      renders: ['EnvironmentSummaryInspector', 'RecordInspector', 'InspectorCard'],
+      renders: ['EnvironmentSummaryInspector', 'RecordInspector', 'EmptyState'],
       compares: ['overview', 'event'],
       names: ['selectedKind', 'recordKind', 'recordEntry'],
-      writes: ['data-record-inspector-empty'],
+      passesProps: [['EmptyState', 'dataAttr']],
       spells: ['NoActiveTasks', 'NoActiveEvents'],
     }
   );
