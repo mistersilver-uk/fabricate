@@ -1,11 +1,12 @@
 <!-- DialogV2 owns the frame and footer; this component owns its mounted form body. -->
 <script>
+  import { untrack } from 'svelte';
   import Field from '../../components/Field.svelte';
   import Chip from '../../components/Chip.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
 
   let { data } = $props();
-  let selectedIds = $state([...data.choicePlan.defaultSelectedIds]);
+  let selectedIds = $state(untrack(() => [...data.choicePlan.defaultSelectedIds]));
   const multiPick = $derived(data.choicePlan.maxPicks > 1);
 
   function selectCheckbox(id, checked) {
