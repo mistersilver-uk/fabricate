@@ -2118,6 +2118,7 @@ test('versioned Journal preparation freezes modifier contributions across actor 
       assert.equal(descriptor.publicPrompt.target, 12);
       assert.equal(descriptor.publicPrompt.comparison, 'meet');
       assert.equal(toolAppendCalls, 1);
+      assert.equal(rolledFormulas.length, policy === 'addAll' ? 0 : 1);
       assert.equal(descriptor.privateEvaluation.rollFormula, '1d20 + 2[Tool]');
       assert.ok(!Object.hasOwn(descriptor.publicPrompt, 'checkConfig'));
       if (policy === 'playerPicks') {
@@ -2141,6 +2142,7 @@ test('versioned Journal preparation freezes modifier contributions across actor 
       );
       assert.equal(evaluated.success, true);
       assert.equal(rolledFormulas.at(-1), '1d20 + 2[Tool] + 3[Modifiers] + (1d4+1)[Modifiers]');
+      assert.equal(rolledFormulas.length, policy === 'addAll' ? 1 : 2);
     }
   } finally {
     if (originalRoll === undefined) delete globalThis.Roll;
