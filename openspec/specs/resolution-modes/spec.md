@@ -265,6 +265,7 @@ Recipe-less alchemy fizzle history retains its Alchemy label.
 
 A completed managed write records the resolution it actually executed, so a run's history can be read without consulting live configuration.
 See `recipes-and-steps/spec.md` § Captured Execution Evidence for the write-side contract and `data-models/spec.md` for the persisted shape.
+An executed, permitted versioned crafting check additionally records actual `sum/over` product and direction in its snapshot; a retained future authored record never changes those executed values in this foundation.
 
 1. Every applicable completed managed write MUST capture `resolutionSnapshot` as `{kind, mode}`, where `mode` is the resolution mode that executed and `kind` is `check`, `ingredients` or `none`.
 Legacy and version-1 immediate and timed crafting, recipe-less alchemy fizzle, native salvage, and Direct, d100, routed and legacy progressive gathering are all in scope.
@@ -282,6 +283,16 @@ Missing check evidence is likewise unknown rather than a confirmed absence of a 
 A storage or effect failure leaves the affected evidence explicitly **uncertain** under the existing no-replay and no-rollback rules; uncertainty is never resolved into invented certainty.
 6. The guarantee covers complete permitted evidence on completed managed writes.
 It does not extend to arbitrary external macro effects, and it does not promise certainty after a storage failure.
+
+## Check Evaluation Foundation
+
+Shared comparison accepts meet or strict exceed with over or under direction; ranking returns a new best-first array and retains the first authored member of each tie without mutating its input.
+Effective margin follows the selected direction, while executed formula runners and the odds classifier explicitly evaluate `sum/over` until the count and under behavior children activate those modes.
+The authored evaluation record, including inactive count/under fields, survives normalization and export/import without changing current check decisions.
+A deterministic expression accepts finite numbers, roll-data paths, arithmetic, parentheses and floor, ceil and round without rolling dice.
+It reports unresolved paths, dice syntax, invalid syntax and non-finite results distinctly and never substitutes zero for a missing path; count-specific integer policy belongs to the later behavior child.
+The private versioned check descriptor deep-clones authored `checkConfig.evaluation` beside its prepared formula and DC; evaluation reads that descriptor after preparation, so subsequent live edits cannot change its inputs.
+The public prompt and semantic `resolutionSnapshot` remain separate from that private authored record.
 
 ## Gathering Task Modes
 

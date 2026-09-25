@@ -205,6 +205,7 @@ Capture is gated by initiating-viewer entitlement at write time and by current-v
 The evidence records what that write actually did, so deleting the recipe, component, task or system configuration afterwards cannot change it.
 
 - **Executed resolution.** Every such write MUST record `resolutionSnapshot` as `{kind, mode}` for the resolution it executed, derived from the canonical active-check derivation at execution rather than from configuration read back later.
+An executed versioned crafting `kind: "check"` snapshot additionally retains validated `product: "sum"` and `direction: "over"` from the check result; neither field is inferred from authored future configuration or copied onto no-check, ingredient-routed, fizzle, legacy or gathering d100 records.
 A legacy timed crafting stage captures it on the finishing write rather than on the arming write, because the resolution is unknowable while the gate is still running.
 - **Physical effects.** Consumption and awards MUST be captured at the actual update or delete boundary: require the matching document's acknowledgment, derive each decrement from the captured source quantity, and capture name, image and actor-qualified identity before deletion.
 A requested plan, a swallowed failure, or a calculated after-value alone MUST NOT establish complete consumption.

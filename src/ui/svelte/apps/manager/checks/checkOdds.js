@@ -12,6 +12,7 @@
  * `StringTerm#isDeterministic` LIES. Every refusal carries a discriminated REASON CODE, and
  * `Roll` is a parameter, so a missing or throwing `parse` is a result rather than an exception. */
 
+import { compareToTarget } from '../../../../../systems/checkEvaluation.js';
 import {
   classifyCheckTotal,
   resolveCheckFormulaDisplay,
@@ -306,9 +307,7 @@ export function enumeratePassFailOdds({ outcomes, args }) {
     const forced = resolveForcedOutcome(args.triggers, outcome);
     const passed = forced
       ? forced.disposition === 'success'
-      : args.comparison === 'exceed'
-        ? outcome.total > args.dc
-        : outcome.total >= args.dc;
+      : compareToTarget(outcome.total, args.dc, args.comparison, 'over');
     tally[passed ? 'success' : 'failure'] += 1;
   }
   return ['failure', 'success']
