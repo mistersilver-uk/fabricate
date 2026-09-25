@@ -432,19 +432,84 @@ describe('AC-4 — all eight cells of (isGM, callSite, elected), each with its p
 describe('AC-14 (facade half) — the delegator forwards NAMED KEYS, never the request', () => {
   it('keeps GM, actor and readiness refusals ahead of evaluation validation', async () => {
     const actor = makeGrantTargetActor('actor-1');
-    for (const [options, actorId, outcome] of [
-      [{ user: PLAYER, actors: [actor] }, actor.id, 'gmOnly'],
-      [{ actors: [] }, 'missing', 'noActor'],
-      [{ actors: [actor], ready: false }, actor.id, 'notReady'],
+    for (const evaluation of [
+      { pool: { die: 0 } },
+      { direction: 'under' },
+      { product: 'count' },
+      { target: { source: 'attribute' } },
+    ]) {
+      for (const [options, actorId, outcome] of [
+        [{ user: PLAYER, actors: [actor] }, actor.id, 'gmOnly'],
+        [{ actors: [] }, 'missing', 'noActor'],
+        [{ actors: [actor], ready: false }, actor.id, 'notReady'],
+      ]) {
+        const { facade, checkCalls } = standUpFacade(options);
+        const answer = await facade.rollActorCheck({
+          actorId,
+          callSite: 'gmAction',
+          formula: '1d20',
+          evaluation,
+        });
+        assert.equal(answer.outcome, outcome);
+        assert.deepEqual(checkCalls.bags, []);
+        assert.equal(checkCalls.prompt, 0);
+      }
+    }
+  });
+
+  it('never invokes an evaluation accessor before or after the facade gates', async () => {
+    const actor = makeGrantTargetActor('actor-1');
+    let reads = 0;
+    for (const [options, actorId, requestOptions, outcome] of [
+      [{ user: PLAYER, actors: [actor] }, actor.id, {}, 'gmOnly'],
+      [{ actors: [] }, 'missing', {}, 'noActor'],
+      [{ actors: [actor], ready: false }, actor.id, {}, 'notReady'],
+      [{ actors: [actor] }, actor.id, { callSite: 'unknown' }, 'invalidCallSite'],
+      [{ actors: [actor], elected: false }, actor.id, { callSite: 'broadcast' }, 'notElected'],
+      [
+        { actors: [actor] },
+        actor.id,
+        { interactive: true, rollDecision: { confirmed: false } },
+        'cancelled',
+      ],
+      [{ actors: [actor] }, actor.id, {}, 'evaluationInvalid'],
+    ]) {
+      const request = { actorId, callSite: 'gmAction', formula: '1d20', dc: 15, ...requestOptions };
+      Object.defineProperty(request, 'evaluation', {
+        get() {
+          reads += 1;
+          throw new Error('evaluation accessor ran');
+        },
+      });
+      const { facade, checkCalls } = standUpFacade(options);
+      const answer = await facade.rollActorCheck(request);
+      assert.equal(answer.outcome, outcome);
+      assertMessageDataCovers(answer, outcome);
+      assert.deepEqual(checkCalls.bags, []);
+      assert.equal(checkCalls.prompt, 0);
+    }
+    assert.equal(reads, 0);
+  });
+
+  it('settles a request reflection failure after authorization', async () => {
+    const actor = makeGrantTargetActor('actor-1');
+    const request = new Proxy(
+      { actorId: actor.id, callSite: 'gmAction', formula: '1d20' },
+      {
+        getOwnPropertyDescriptor(record, key) {
+          if (key === 'evaluation') throw new Error('descriptor failed');
+          return Reflect.getOwnPropertyDescriptor(record, key);
+        },
+      }
+    );
+    for (const [options, outcome] of [
+      [{ user: PLAYER, actors: [actor] }, 'gmOnly'],
+      [{ actors: [] }, 'noActor'],
+      [{ actors: [actor], ready: false }, 'notReady'],
+      [{ actors: [actor] }, 'evaluationInvalid'],
     ]) {
       const { facade, checkCalls } = standUpFacade(options);
-      const answer = await facade.rollActorCheck({
-        actorId,
-        callSite: 'gmAction',
-        formula: '1d20',
-        evaluation: { pool: { die: 0 } },
-      });
-      assert.equal(answer.outcome, outcome);
+      assert.equal((await facade.rollActorCheck(request)).outcome, outcome);
       assert.deepEqual(checkCalls.bags, []);
       assert.equal(checkCalls.prompt, 0);
     }
