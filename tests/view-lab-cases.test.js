@@ -1340,8 +1340,7 @@ test('environment empty membership evidence clears the actual fixture and is sel
 });
 
 test('every combination-rule value the registry targets is a real MODIFIER_POLICIES member', () => {
-  // Twelve selectors in this registry pin a rule option by its VALUE, and NOTHING else could see them
-  // go stale (issue 1095).
+  // Twelve selectors in this registry pin a rule-option value. The cardinality assertion detects stale registry selectors.
   const pattern = new RegExp(
     String.raw`\[` + escapeForRegExp(MODIFIER_POLICY_OPTION_ATTR) + String.raw`="([^"]*)"\]`,
     'g'
