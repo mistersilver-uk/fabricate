@@ -71,30 +71,37 @@ function plainRecord(record) {
   return prototype === Object.prototype || prototype === null;
 }
 
-function validRecord(record, schema) {
-  if (!plainRecord(record)) return false;
+function validatedSnapshot(record, schema) {
+  if (!plainRecord(record)) return null;
+  const snapshot = {};
   for (const key of Reflect.ownKeys(record)) {
-    if (typeof key !== 'string' || !Object.hasOwn(schema, key)) return false;
+    if (typeof key !== 'string' || !Object.hasOwn(schema, key)) return null;
     const descriptor = Object.getOwnPropertyDescriptor(record, key);
-    if (!descriptor || !Object.hasOwn(descriptor, 'value')) return false;
+    if (!descriptor || !Object.hasOwn(descriptor, 'value')) return null;
     const rule = schema[key];
     if (typeof rule === 'function') {
-      if (!rule(descriptor.value)) return false;
-    } else if (!validRecord(descriptor.value, rule)) return false;
+      if (!rule(descriptor.value)) return null;
+      snapshot[key] = descriptor.value;
+    } else {
+      const nested = validatedSnapshot(descriptor.value, rule);
+      if (nested === null) return null;
+      snapshot[key] = nested;
+    }
   }
-  return true;
+  return snapshot;
 }
 
 /** Validate every supplied field before applying persisted-record defaults. */
 export function resolveCompanionCheckEvaluation(input) {
   if (input === undefined) return { ok: true, evaluation: normalizeCheckEvaluation() };
   try {
-    if (!validRecord(input, evaluationSchema)) return { ok: false };
-    const die = input.pool?.die ?? 10;
-    for (const value of [input.pool?.explode?.faces?.value, input.pool?.cancel?.faces?.value]) {
+    const snapshot = validatedSnapshot(input, evaluationSchema);
+    if (snapshot === null) return { ok: false };
+    const die = snapshot.pool?.die ?? 10;
+    for (const value of [snapshot.pool?.explode?.faces?.value, snapshot.pool?.cancel?.faces?.value]) {
       if (value !== undefined && value !== null && value > die) return { ok: false };
     }
-    return { ok: true, evaluation: normalizeCheckEvaluation(input) };
+    return { ok: true, evaluation: normalizeCheckEvaluation(snapshot) };
   } catch {
     return { ok: false };
   }

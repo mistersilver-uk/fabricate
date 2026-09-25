@@ -249,20 +249,28 @@ export const companionFacade = {
   },
 
   /** One formula for one actor, graded or not (issue 1293); preconditions 1-3 only. */
-  async rollActorCheck({
-    actorId = null,
-    callSite = null,
-    formula = null,
-    dc = null,
-    compare = null,
-    label = null,
-    interactive = false,
-    rollDecision = null,
-    evaluation = undefined,
-  } = {}) {
+  async rollActorCheck(request = {}) {
+    const {
+      actorId = null,
+      callSite = null,
+      formula = null,
+      dc = null,
+      compare = null,
+      label = null,
+      interactive = false,
+      rollDecision = null,
+    } = request;
     const gate = this._requireGmActor(actorId, ROLL_ACTOR_CHECK_GATE_KEYS);
     if (gate.outcome || this.ready !== true) {
       return checkRollResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    // The leaf orders call-site and roll-decision gates ahead of a malformed evaluation.
+    let evaluation = null;
+    try {
+      const descriptor = Object.getOwnPropertyDescriptor(request, 'evaluation');
+      evaluation = descriptor && !Object.hasOwn(descriptor, 'value') ? null : descriptor?.value;
+    } catch {
+      evaluation = null;
     }
     return await rollStandaloneActorCheck(
       {

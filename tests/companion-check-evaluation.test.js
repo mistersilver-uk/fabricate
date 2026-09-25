@@ -100,4 +100,47 @@ describe('companion check evaluation boundary', () => {
     assert.deepEqual(resolveCompanionCheckEvaluation(nested), { ok: false });
     assert.equal(reads, 0);
   });
+
+  it('normalizes only fields found in the validated descriptor tree', () => {
+    let hiddenReads = 0;
+    const hidden = (key, value) =>
+      new Proxy(
+        {},
+        {
+          get(_record, name) {
+            if (name === key) {
+              hiddenReads += 1;
+              return value;
+            }
+            return undefined;
+          },
+        }
+      );
+    assert.deepEqual(resolveCompanionCheckEvaluation(hidden('product', 'count')), {
+      ok: true,
+      evaluation: normalizeCheckEvaluation(),
+    });
+    assert.deepEqual(resolveCompanionCheckEvaluation({ pool: hidden('die', 1) }), {
+      ok: true,
+      evaluation: normalizeCheckEvaluation(),
+    });
+    assert.equal(hiddenReads, 0);
+  });
+
+  it('refuses reflective traps without throwing or reading hidden fields', () => {
+    for (const trap of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+      let reads = 0;
+      const record = new Proxy(
+        { product: 'sum' },
+        {
+          [trap]() {
+            reads += 1;
+            throw new Error(`${trap} failed`);
+          },
+        }
+      );
+      assert.deepEqual(resolveCompanionCheckEvaluation(record), { ok: false });
+      assert.equal(reads, 1);
+    }
+  });
 });
