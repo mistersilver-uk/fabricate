@@ -141,6 +141,6 @@
   .modifier-choice i { color: var(--fab-accent-text); }
   .modifier-choice span:last-child { font-weight: 700; }
   .bonus-group, .bonus-field, .mode-field { display: grid; gap: 4px; }
-  .bonus-field input, .mode-field select { width: 100%; box-sizing: border-box; min-height: 30px; padding: 5px 10px; border: 1px solid var(--fab-border-strong); border-radius: 6px; background: var(--fab-bg-2); color: var(--fab-text); font: inherit; }
-  .bonus-field input::placeholder { color: var(--fab-text-subtle); }
+  .fabricate-roll-prompt :global(.bonus-field input), .fabricate-roll-prompt :global(.mode-field select) { width: 100%; box-sizing: border-box; min-height: 30px; padding: 5px 10px; border: 1px solid var(--fab-border-strong); border-radius: 6px; background: var(--fab-bg-2); color: var(--fab-text); font: inherit; }
+  .fabricate-roll-prompt :global(.bonus-field input::placeholder) { color: var(--fab-text-subtle); }
 </style>
