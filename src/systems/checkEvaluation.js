@@ -2,7 +2,6 @@
  * Tests a value against a target using the selected inclusive or strict boundary.
  * Under-direction checks reverse the value ordering without changing the boundary meaning.
  */
-
 export function compareToTarget(value, target, comparison = 'meet', direction = 'over') {
   if (direction === 'under') return comparison === 'exceed' ? value < target : value <= target;
   return comparison === 'exceed' ? value > target : value >= target;
@@ -15,12 +14,14 @@ export function better(left, right, direction = 'over') {
 
 /**
  * Returns a new best-first ranking without changing the supplied entries.
- * Equal values retain their authored order.
+ * Equal values retain their authored order, and non-finite values rank last.
  */
 export function rankBest(entries, valueOf, direction = 'over') {
   return [...entries].sort((left, right) => {
     const a = valueOf(left);
     const b = valueOf(right);
+    const finiteA = Number.isFinite(a);
+    if (finiteA !== Number.isFinite(b)) return finiteA ? -1 : 1;
     return better(a, b, direction) ? -1 : better(b, a, direction) ? 1 : 0;
   });
 }
@@ -29,6 +30,10 @@ export function rankBest(entries, valueOf, direction = 'over') {
 export function effectiveMargin(value, target, direction = 'over') {
   return direction === 'under' ? target - value : value - target;
 }
+
+const PATH_TOKEN = /@(?:\{[-.\w]+\}|[-.\w]+)/g;
+const DICE_TERM = /(?:^|[^\w.])(?:\d+)?d(?:\d+|f|c|%)/i;
+const DECIMAL_STRING = /^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*$/i;
 
 /**
  * Resolves dice-free arithmetic against roll data without substituting missing paths.
@@ -44,7 +49,7 @@ export function resolveDeterministicExpression(expression, rollData = {}) {
     return { ok: false, reason: 'invalid' };
   }
   const source = expression.trim();
-  if (/(?:^|[^\w.])(?:\d+)?d(?:\d+|f|c)/i.test(source)) {
+  if (DICE_TERM.test(source.replaceAll(PATH_TOKEN, '0'))) {
     return { ok: false, reason: 'dice' };
   }
   try {
@@ -105,7 +110,7 @@ function createExpressionReader(source, rollData) {
       if (!consume(')')) throw 'invalid';
       return value;
     }
-    const path = match(/^@(?:\{[-.\w]+\}|[-.\w]+)/);
+    const path = match(new RegExp(`^${PATH_TOKEN.source}`));
     if (path) return resolvePath(path[0], rollData);
     const number = match(/^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/);
     if (number) return Number(number[0]);
@@ -126,11 +131,22 @@ function createExpressionReader(source, rollData) {
   };
 }
 
+/** Walks own keys only: an inherited or primitive property (`@name.length`) is unresolved. */
 function resolvePath(token, rollData) {
   const path = token.startsWith('@{') ? token.slice(2, -1) : token.slice(1);
-  const value = path.split('.').reduce((cursor, segment) => cursor?.[segment], rollData);
-  if ([undefined, null, ''].includes(value)) throw 'unresolved-path';
-  const number = Number(value);
-  if (!Number.isFinite(number)) throw 'non-finite';
-  return number;
+  const value = path
+    .split('.')
+    .reduce(
+      (cursor, segment) =>
+        cursor !== null && typeof cursor === 'object' && Object.hasOwn(cursor, segment)
+          ? cursor[segment]
+          : undefined,
+      rollData
+    );
+  if (value === undefined || value === null || (typeof value === 'string' && !value.trim())) {
+    throw 'unresolved-path';
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && DECIMAL_STRING.test(value)) return Number(value);
+  throw 'non-finite';
 }
