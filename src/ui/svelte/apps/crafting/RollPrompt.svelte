@@ -389,9 +389,8 @@
   }
   .modifier-choice input[type='radio']:checked {
     border-color: var(--fab-accent);
-    box-shadow:
-      inset 0 0 0 3px var(--fab-bg-1),
-      inset 0 0 0 16px var(--fab-accent);
+    background: var(--fab-accent);
+    box-shadow: inset 0 0 0 3px var(--fab-bg-1);
   }
   .modifier-choice i {
     color: var(--fab-accent-text);

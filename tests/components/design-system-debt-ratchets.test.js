@@ -631,7 +631,7 @@ function nativeSelects(templates) {
 }
 
 test('an unmarked native <select> is debt, and the marker comment is what exempts one', () => {
-  // BOTH POLARITIES, SYNTHETIC, because no file in the tree carries the marker.
+  // BOTH POLARITIES, SYNTHETIC, so the pin holds whichever shipped file carries the marker.
   const withMarker = [
     '<!-- native select: the Foundry drop-down is the only control a DialogV2 body can host. -->',
     '<select bind:value={choice}><option>a</option></select>',
@@ -1098,8 +1098,8 @@ const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
 
 /**
  * Every root that may write a `:focus-visible` ring over BARE ELEMENTS, at ANY element shape.
- * Derived from the sheet rather than asserted: 9 roots over 9 blocks, every one of them
- * legitimate today, which is exactly why a tenth would not stand out to a reader. It was 9
+ * Derived from the sheet rather than asserted: 8 roots over 8 blocks, every one of them
+ * legitimate today, which is exactly why a ninth would not stand out to a reader. It was 9
  * over 10 until issue 1508 rooted `Field` and `ManagerSearchField` at the classes they emit and
  * each gained the ring half of its own pair, and 11 over 12 until its third phase did the same
  * for `ChanceSlider`. Issue 1509 rooted `EditorTabs` and its tab strip gained
@@ -1114,6 +1114,8 @@ const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
  * `box-shadow` against the module's outset `outline`, written because an outset ring on a select
  * flush to an overflow-clipped container is clipped — and it was deleted rather than narrowed
  * because the player app's last native select converted and no carrier is left under that root.
+ * Issue 2021 took `.fabricate-roll-prompt-dialog` out the same way, one root over one block: the
+ * prompt left DialogV2 for `ManagerModal`, so its dialog-rooted `select` ring has no carrier.
  * `StatusToggle` is NOT here and must not be, for a structural reason rather than an oversight:
  */
 const RING_ROOTS = Object.freeze(
@@ -1527,8 +1529,8 @@ test("the repetition ledger publishes the figures the sheet actually produces", 
 });
 
 test("the module sheet's cross-list selector repetition does not move", () => {
-  // Filtered to count >= 2 on both sides. Unfiltered the sheet holds 3,039 `(at-context, selector)`
-  // keys under this very keying, of which 2,933 appear exactly once; `assertRatchet` compares key
+  // Filtered to count >= 2 on both sides. Unfiltered the sheet holds 3,025 `(at-context, selector)`
+  // keys under this very keying, of which 2,919 appear exactly once; `assertRatchet` compares key
   // by key, so an unfiltered table would report every singleton as new debt the first time anybody
   // added a rule. Filtering both sides keeps a selector FALLING to one appearance visible: it
   // leaves the observed tally, and a baseline row nothing matches is a VANISHED failure.

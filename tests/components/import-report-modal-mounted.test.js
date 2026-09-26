@@ -202,4 +202,15 @@ describe('ImportReportModal (mounted)', () => {
     document.querySelector('[data-import-report-close]').click();
     assert.equal(closed, 2);
   });
+
+  it('keeps the chrome the roll prompt\'s additive ManagerModal props leave at their defaults', async () => {
+    let closed = 0;
+    await harness.mount({ open: true, content: REPORTED_CONTENT, onClose: () => (closed += 1) });
+    const root = modal();
+    assert.ok(!root.querySelector('form'), 'no form wraps body and footer without onSubmit');
+    assert.ok(!root.querySelector('.manager-modal-footer').classList.contains('is-equal'));
+    assert.ok(!root.querySelector('.manager-modal-title').classList.contains('is-serif'));
+    document.body.dispatchEvent(new document.defaultView.MouseEvent('mousedown', { bubbles: true }));
+    assert.equal(closed, 1, 'an outside click still dismisses the report');
+  });
 });
