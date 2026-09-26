@@ -35,6 +35,25 @@ export function safeJournalRunResponse(response) {
   return safe;
 }
 
+/**
+ * The `[parentPath, key]` pair of every caller-private field a RAW persisted state still holds,
+ * relative to the state flag, so the adapter can delete what normalization only omits.
+ */
+export function legacyPrivatePaths(rawState) {
+  const pairs = [];
+  for (const [token, record] of Object.entries(rawState?.prepareTokens ?? {})) {
+    if (Object.hasOwn(record?.binding ?? {}, 'privateEvaluation')) {
+      pairs.push([`prepareTokens.${token}.binding`, 'privateEvaluation']);
+    }
+  }
+  for (const [id, record] of Object.entries(rawState?.requests ?? {})) {
+    for (const key of ['promptDescriptor', 'rollHandoff']) {
+      if (Object.hasOwn(record?.response ?? {}, key)) pairs.push([`requests.${id}.response`, key]);
+    }
+  }
+  return pairs;
+}
+
 export function normalizeJournalRunAuthorityState(value) {
   const source = value && typeof value === 'object' ? value : {};
   return {
