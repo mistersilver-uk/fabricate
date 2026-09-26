@@ -12,6 +12,7 @@ import {
   runFormulaProgressive,
   runFormulaRouted,
 } from '../src/systems/checkRoll.js';
+import { postBundledCheckRoll } from '../src/systems/checkModifierRolls.js';
 
 // Stubs
 
@@ -450,6 +451,128 @@ test('postCheckRollHandoff reconstructs and posts the evaluated roll in the play
   assert.equal(result.success, true);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].options.rollMode, 'selfroll');
+});
+
+test('a separate Tool die posts in one message with the main roll first', async () => {
+  installRollStub();
+  installChatStub();
+  const posted = [];
+  globalThis.Roll.fromData = (data) => ({ formula: data.formula });
+  globalThis.Roll.prototype.render = async function render() { return `<main>${this.formula}</main>`; };
+  globalThis.ChatMessage.create = async (data, options) => posted.push({ data, options });
+  try {
+    const result = await evaluateCheckRoll('1d20 + 3[Hammer]', actor, {
+      interactive: true,
+      prompt: async () => ({ confirmed: true }),
+      toolContributions: [{
+        source: 'tool', label: 'Hammer', form: 'scalar', value: 3,
+        preRoll: { expression: '1d4+1', total: 3, serializedRoll: { formula: '1d4+1' } },
+      }],
+      flavor: 'Crafting check',
+      speaker: { alias: 'Tinker' },
+      rollMode: 'blindroll',
+      includeRollHandoff: true,
+    });
+    assert.equal(posted.length, 1);
+    assert.equal(posted[0].data.rolls.length, 2);
+    assert.equal(posted[0].data.rolls[0].formula, '1d20 + 3[Hammer]');
+    assert.equal(posted[0].data.rolls[1].formula, '1d4+1');
+    assert.equal(posted[0].data.content, '<main>1d20 + 3[Hammer]</main>');
+    assert.equal(posted[0].options.rollMode, 'blindroll');
+    assert.deepEqual(result.rollHandoff.serializedPreRolls, [{ formula: '1d4+1' }]);
+  } finally {
+    clearStubs();
+  }
+});
+
+test('bundled posting resolves omitted client modes on V13 and V14', async () => {
+  const previousGame = globalThis.game;
+  const previousChat = globalThis.ChatMessage;
+  try {
+    for (const [modern, setting, expected] of [
+      [false, 'gmroll', { rollMode: 'gmroll' }],
+      [false, 'blindroll', { rollMode: 'blindroll' }],
+      [true, 'gm', { messageMode: 'gm' }],
+      [true, 'blind', { messageMode: 'blind' }],
+    ]) {
+      const reads = [];
+      const posted = [];
+      globalThis.game = { settings: { get: (...key) => { reads.push(key); return setting; } } };
+      globalThis.ChatMessage = {
+        ...(modern && { applyMode() {} }),
+        create: async (_data, options) => posted.push(options),
+      };
+      const mainRoll = { render: async () => 'main' };
+      await postBundledCheckRoll({ mainRoll, preRolls: [{}] });
+      assert.deepEqual(reads, [['core', modern ? 'messageMode' : 'rollMode']]);
+      assert.deepEqual(posted, [expected]);
+      await postBundledCheckRoll({ mainRoll, preRolls: [{}], rollMode: 'selfroll' });
+      assert.deepEqual(posted[1], modern ? { messageMode: 'self' } : { rollMode: 'selfroll' });
+      assert.equal(reads.length, 1, 'an explicit mode does not read the client setting');
+    }
+  } finally {
+    if (previousGame === undefined) delete globalThis.game;
+    else globalThis.game = previousGame;
+    if (previousChat === undefined) delete globalThis.ChatMessage;
+    else globalThis.ChatMessage = previousChat;
+  }
+});
+
+test('a bundled handoff reconstructs all evaluated rolls without rerolling', async () => {
+  const previousChat = globalThis.ChatMessage;
+  const posted = [];
+  globalThis.ChatMessage = { create: async (data) => posted.push(data) };
+  const Roll = {
+    fromData(data) {
+      return { formula: data.formula, render: async () => `<main>${data.formula}</main>` };
+    },
+  };
+  try {
+    const result = await postCheckRollHandoff({
+      serializedRoll: { formula: '1d20' },
+      serializedPreRolls: [{ formula: '1d4' }],
+      rollMode: 'selfroll',
+      speaker: { alias: 'Tinker' },
+      flavor: 'Visible check',
+    }, { Roll });
+    assert.equal(result.success, true);
+    assert.deepEqual(posted[0].rolls.map((roll) => roll.formula), ['1d20', '1d4']);
+    assert.equal(posted[0].content, '<main>1d20</main>');
+  } finally {
+    if (previousChat === undefined) delete globalThis.ChatMessage;
+    else globalThis.ChatMessage = previousChat;
+  }
+});
+
+test('prepared Tool evidence reaches an entitled handoff and stays out of a secret reply', async () => {
+  installRollStub();
+  installChatStub();
+  globalThis.Roll.fromData = (data) => ({ formula: data.formula });
+  const preparation = {
+    rollFormula: '1d20 + 3[Hammer]',
+    slot: 'simple',
+    checkConfig: {
+      toolContributions: [{
+        source: 'tool', label: 'Hammer', form: 'scalar', value: 3,
+        preRoll: { expression: '1d4', total: 3, serializedRoll: { formula: '1d4' } },
+      }],
+    },
+    decisionPolicy: { dc: 10 },
+  };
+  try {
+    const visible = await evaluatePreparedRunCheck(preparation, actor, {}, { secret: false });
+    assert.deepEqual(visible.data.preRolls, [{
+      source: 'tool', label: 'Hammer', expression: '1d4', total: 3, destination: 'append',
+    }]);
+    assert.deepEqual(visible.rollHandoff.serializedPreRolls, [{ formula: '1d4' }]);
+
+    const secret = await evaluatePreparedRunCheck(preparation, actor, {}, { secret: true });
+    assert.equal(Object.hasOwn(secret, 'rollHandoff'), false);
+    assert.equal(Object.hasOwn(secret.data, 'preRolls'), false);
+    assert.equal(chatCreated.length, 1, 'the GM posts one bundled secret message');
+  } finally {
+    clearStubs();
+  }
 });
 
 test('evaluatePreparedCraftingCheck classifies with the GM-retained decision policy', async () => {

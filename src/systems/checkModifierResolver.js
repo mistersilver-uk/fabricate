@@ -18,10 +18,12 @@ import { classifyRollQuantity, reduceRollExpression } from '../utils/rollExpress
 import { formulaRolls } from '../utils/rollFormulaRollability.js';
 
 import { resolveModifierLibrary } from './characterLibraries.js';
+import { planModifierPlacement } from './checkModifierRouter.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import {
   appendCheckModifierRollTerms,
   appendCheckModifierTerm,
+  CHECK_MODIFIER_TERM_LABEL,
   isDecimalSafeTermValue,
 } from './toolCheckBonus.js';
 
@@ -473,6 +475,33 @@ function sumOf(values) {
   return values.reduce((sum, value) => sum + value, 0);
 }
 
+export function resolvedLibraryContributions(selected) {
+  const scalar = sumOf(selected.map((modifier) => modifier.value ?? 0));
+  return [
+    { source: 'library', label: CHECK_MODIFIER_TERM_LABEL, form: 'scalar', value: scalar },
+    ...selected
+      .filter((modifier) => typeof modifier.formula === 'string' && modifier.formula !== '')
+      .map((modifier) => ({
+        source: 'library',
+        label: modifier.label,
+        form: 'expression',
+        expression: modifier.formula,
+      })),
+  ];
+}
+
+export function appendPlannedLibraryTerms(formula, placement) {
+  let result = String(formula || '').trim();
+  for (const term of placement.appendTerms) {
+    if (term.source !== 'library') continue;
+    result =
+      term.form === 'scalar'
+        ? appendCheckModifierTerm(result, { value: term.value })
+        : appendCheckModifierRollTerms(result, [term.expression]);
+  }
+  return result;
+}
+
 /** The prompt chip: a flat entry's signed number, or what a rolling one rolls (`+1d8 (-1 to 6)`),
  *  built from the fragment's inputs rather than read back out of it. */
 function modifierChipLabel(value, text, bounds) {
@@ -538,30 +567,30 @@ export function makeRollDataExpressionResolver(actor, Roll = globalThis.Roll) {
 }
 
 /**
- * Append a modifier context to a formula before it reaches `Roll` (issues 1094, 1118): the flat
- * term first, so a dice-free library emits the byte-identical formula it always did, then one
- * term per rolling entry, answering `{ formula, selected }`. The formula is trimmed with or
- * without a context. `craftingModifier` keeps the name every `checkRoll.js` options bag uses.
+ * Place a modifier context by the check's `evaluation` before the formula reaches `Roll` (issues
+ * 1094, 1118, 2001): sum/over appends the flat term first, so a dice-free library emits the
+ * byte-identical formula it always did, then one term per rolling entry, answering
+ * `{ formula, selected }`. The formula is trimmed with or without a context. `craftingModifier`
+ * keeps the name every `checkRoll.js` options bag uses.
  */
 export function resolveCheckModifierFormula(
   formula,
   actor,
   craftingModifier,
-  Roll = globalThis.Roll
+  Roll = globalThis.Roll,
+  evaluation = { product: 'sum', direction: 'over', target: { source: 'fixed' } }
 ) {
   if (!craftingModifier) return { formula: String(formula ?? '').trim(), selected: [] };
-  const { scalar, rollTerms, selected } = resolveCheckModifierContribution(
+  const { selected } = resolveCheckModifierContribution(
     craftingModifier,
     makeRollDataExpressionResolver(actor, Roll),
     Roll
   );
-  return {
-    formula: appendCheckModifierRollTerms(
-      appendCheckModifierTerm(formula, { value: scalar }),
-      rollTerms
-    ),
-    selected,
-  };
+  const placement = planModifierPlacement({
+    evaluation,
+    contributions: resolvedLibraryContributions(selected),
+  });
+  return { formula: appendPlannedLibraryTerms(formula, placement), selected };
 }
 
 /** The formula-only form of `resolveCheckModifierFormula`; a non-string passes through. */

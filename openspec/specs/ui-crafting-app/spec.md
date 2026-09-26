@@ -254,6 +254,8 @@ A roll under any other combination rule passes none — including `bySubject`, w
 On a direct runner the formula line ends in a trailing `+ (modifier)[Modifiers]` slot while the choice is unanswered.
 A versioned Journal prompt shows its prepared formula without the slot or any flavour label, with the choice offered beneath it.
 On both paths the formula line omits the terms of the modifiers the prompt itemises as chips: the producer passes a display formula, the base with any Tool terms and the deferred slot, beside the rolled formula, which is unchanged.
+After confirmation, the selected legal modifiers and any valid situational bonus enter the shared placement plan; under the active sum/over evaluation they keep their existing appended formula order.
+When another evaluation becomes active, rolling contributions evaluate once outside the main check and share its chat visibility, while cancellation still creates no new modifier roll, check roll or message.
 - **Pre-resolved roll decisions.**
 A caller MAY supply a `rollDecision` (`{ bonus, rollMode, advantage }` — the prompt's own return shape minus `confirmed`).
 The evaluator then treats it as an already-answered choice and **never opens the modal**, running the identical downstream code: the check-modifier append, the advantage transform, the situational-bonus append, the formula-validity net and the effective roll mode.

@@ -147,6 +147,22 @@ test('virtual-present contribution binds to the primary actor and evaluation fai
   assert.equal(result.value, 0);
 });
 
+test('an evaluated Tool die keeps its JSON-safe roll evidence with the one scalar payment', async () => {
+  const serializedRoll = { formula: '1d4+1', total: 4 };
+  const result = await evaluateToolCheckContribution({
+    tool: { id: 'hammer', bonus: { enabled: true, expression: '1d4+1' } },
+    primaryActor: actor('primary', {}),
+    evaluateExpression: async () => ({
+      value: 4,
+      preRoll: { expression: '1d4+1', total: 4, serializedRoll },
+    }),
+  });
+  assert.equal(result.value, 4);
+  assert.deepEqual(result.preRoll, {
+    expression: '1d4+1', total: 4, serializedRoll,
+  });
+});
+
 test('disabled Tools never evaluate or contribute their bonus', async () => {
   let evaluations = 0;
   const result = await evaluateToolCheckContribution({
