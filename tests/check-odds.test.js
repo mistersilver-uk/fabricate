@@ -9,7 +9,7 @@ import {
   enumerateProgressiveOdds,
   enumerateRoutedOdds,
 } from '../src/ui/svelte/apps/manager/checks/checkOdds.js';
-import { buildPreviewCheckArgs } from '../src/ui/svelte/apps/manager/checks/checkPreview.js';
+import { buildPreviewCheckArgs, runCheckPreview } from '../src/ui/svelte/apps/manager/checks/checkPreview.js';
 import { resolveForcedOutcome } from '../src/systems/checkRoll.js';
 import {
   RECORDED_ROLL_DATA,
@@ -388,11 +388,32 @@ describe('checkOdds: the per-face dice bag comes from the production code path',
 });
 
 describe('checkOdds: pass/fail and progressive bucketing', () => {
+  it('keeps an authored future preview evaluation on the current sum/over runner', async () => {
+    const previousRoll = globalThis.Roll;
+    globalThis.Roll = LAB_ROLL;
+    try {
+      const plan = buildPreviewCheckArgs({
+        activity: 'crafting', mode: 'simple', actor: ACTOR,
+        draft: { rollFormula: '1d20', dc: 10, evaluation: { product: 'count', direction: 'under' } },
+      });
+      const result = await runCheckPreview(plan);
+      assert.equal(result.success, true);
+      assert.equal(result.data.product, 'sum');
+      assert.equal(result.data.direction, 'over');
+    } finally {
+      if (previousRoll === undefined) delete globalThis.Roll;
+      else globalThis.Roll = previousRoll;
+    }
+  });
+
   it('splits a pass/fail check on the comparison', () => {
     assert.deepEqual(
       enumeratePassFailOdds({
         outcomes: spaceOf('1d20').outcomes,
-        args: { dc: 15, comparison: 'meet', triggers: [] },
+        args: {
+          dc: 15, comparison: 'meet', triggers: [],
+          evaluation: { product: 'count', direction: 'under' },
+        },
       }).map((row) => [row.id, row.count]),
       [
         ['failure', 14],

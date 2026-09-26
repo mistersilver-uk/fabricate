@@ -127,6 +127,20 @@ for (const failed of [false, true]) {
   });
 }
 
+test('a legacy-contract run strips executed evaluation metadata from completed stage evidence', async () => {
+  setupGlobals();
+  const actor = new FakeActor('Legacy evidence');
+  const manager = new CraftingRunManager();
+  const run = await manager.createRun(actor, singleStepRecipe('legacy-evaluation'));
+  assert.equal(Object.hasOwn(run, 'lifecycleVersion'), false, 'an unstamped run is legacy');
+  await manager.completeStepSuccess(actor, run, 0, {
+    resolutionSnapshot: { kind: 'check', mode: 'simple', product: 'sum', direction: 'over' },
+    lastCheckResult: { success: true, data: { total: 17, product: 'sum', direction: 'over' } },
+  });
+  const restored = new CraftingRunManager().getRunHistory(actor)[0];
+  assert.deepEqual(restored.steps[0].resolutionSnapshot, { kind: 'check', mode: 'simple' });
+});
+
 test('startup phantom pruning retains native invoked work requiring settlement', async () => {
   setupGlobals();
   const actor = new FakeActor('Native recovery');

@@ -1860,6 +1860,19 @@ export class CraftingEngine {
         'CHECK_RESULT_INVALID'
       );
     }
+    // The executed product/direction ride the snapshot as claimed; `checkResolutionEvidence`
+    // alone decides whether they persist.
+    const executedHistorySnapshots =
+      historySnapshots.resolutionSnapshot?.kind === 'check'
+        ? {
+            ...historySnapshots,
+            resolutionSnapshot: {
+              ...historySnapshots.resolutionSnapshot,
+              product: checkResult.data?.product,
+              direction: checkResult.data?.direction,
+            },
+          }
+        : historySnapshots;
     const isAlchemy = trusted.activityKind === 'alchemy';
     const alchemySubmittedItems = isAlchemy ? trusted.alchemySubmittedItems : null;
     if (isAlchemy) {
@@ -1892,7 +1905,9 @@ export class CraftingEngine {
       currencySettlement: null,
       resolvedEssences: null,
       essenceEnabled: null,
-      essenceSpend: historySnapshots.resolutionSnapshot ? { labels: {}, carriers: [] } : undefined,
+      essenceSpend: executedHistorySnapshots.resolutionSnapshot
+        ? { labels: {}, carriers: [] }
+        : undefined,
       toolPairs: [...prepared.toolValidation.tools],
     };
     // A stage that already spent its inputs at START never re-consumes or re-spends here: it
@@ -1904,7 +1919,7 @@ export class CraftingEngine {
       componentSourceActors,
       prepared,
       state,
-      historySnapshots,
+      historySnapshots: executedHistorySnapshots,
       spentAtStart,
       shouldConsume,
       alchemySubmittedItems: isAlchemy ? alchemySubmittedItems : null,
@@ -2001,17 +2016,21 @@ export class CraftingEngine {
           consumedIngredients: state.consumedItems.map(mapConsumedIngredientRef),
           usedTools: state.usedTools,
           createdResults: state.resultRecords,
-          ...craftingStepHistoryEvidence({
-            ...historySnapshots,
-            // Purpose was captured on arm, not rebuilt from a later edit.
-            presentationSnapshot:
-              current.steps?.[stepIndex]?.presentationSnapshot ??
-              historySnapshots.presentationSnapshot,
-            essenceSpend: state.essenceSpend,
-            currencySpends: historySnapshots.resolutionSnapshot
-              ? this._historicalCurrencySpends(state, recipe)
-              : undefined,
-          }),
+          ...craftingStepHistoryEvidence(
+            {
+              ...executedHistorySnapshots,
+              lastCheckResult: { data: checkResult.data },
+              // Purpose was captured on arm, not rebuilt from a later edit.
+              presentationSnapshot:
+                current.steps?.[stepIndex]?.presentationSnapshot ??
+                executedHistorySnapshots.presentationSnapshot,
+              essenceSpend: state.essenceSpend,
+              currencySpends: executedHistorySnapshots.resolutionSnapshot
+                ? this._historicalCurrencySpends(state, recipe)
+                : undefined,
+            },
+            { executed: true }
+          ),
         };
         const options = {
           expectedRevision: current.runRevision,
