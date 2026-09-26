@@ -267,6 +267,28 @@ test('an interactive transformed choice retains its formula and has no average',
   assert.deepEqual(choice.defaultSelectedIds, ['count', 'flat']);
 });
 
+test('an interactive pre-selection under a binding cap takes magnitudes ahead of transformed', () => {
+  const catalogue = [
+    { id: 'count', label: 'Count', expression: '1d20cs>15' },
+    { id: 'flat', label: 'Flat', expression: '-2' },
+    { id: 'odd', label: 'Odd', expression: '1d20odd' },
+  ];
+  const preselected = (maxModifierPicks) =>
+    buildCheckModifierChoice(
+      {
+        catalogue,
+        systemPolicy: 'playerPicks',
+        defaultModifierIds: catalogue.map(({ id }) => id),
+        maxModifierPicks,
+      },
+      (expression) => expression,
+      TransformedRoll
+    ).defaultSelectedIds;
+
+  assert.deepEqual(preselected(1), ['flat'], 'the one magnitude outranks both transformed');
+  assert.deepEqual(preselected(2), ['count', 'flat'], 'the first transformed fills the spare pick');
+});
+
 test('bySubject appends what the subject picked, dice included', () => {
   assert.equal(
     rolled('bySubject', ['flat', 'die', 'pool'], {
