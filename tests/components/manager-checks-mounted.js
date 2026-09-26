@@ -3050,13 +3050,45 @@ export function registerChecksCases() {
 
   it('root: the Checks card satisfies manager-checks-crafting-modifiers’ own selector (issue 1055)', async () => {
     const selector = labCaseSelector('manager-checks-crafting-modifiers');
-    const transformedSystem = modifierRuleSystem('addAll');
-    transformedSystem.modifiers = [
-      { ...MODIFIER_CATALOGUE[0], expression: '1d20cs>15' },
-      MODIFIER_CATALOGUE[1],
-    ];
-    transformedSystem.craftingCheck.defaultModifierIds = ['med', 'alch'];
-    mountManager([], transformedSystem);
+    mountManager([], modifierRuleSystem('playerPicks'));
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    await openChecksSection('modifiers');
+    assert.ok(
+      Boolean(target.querySelector(selector)),
+      'a selecting rule with no cap must put BOTH the bySubject option and the unlimited cap ' +
+        'reading inside one [data-crafting-modifier-catalogue] — a cap field rendered as a ' +
+        'SIBLING of the card would satisfy every hook-by-hook assertion above and still fail here'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // The negative control, and the state the capture job actually hit.
+    mountManager([], modifierRuleSystem('playerPicks', 1));
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      !target.querySelector(selector),
+      'a BOUNDED cap must not satisfy the unlimited case, or the frame published under it ' +
+        'would be its bounded sibling'
+    );
+  });
+
+  /** A two-entry system whose Medicine entry is transformed, so ranking it needs an average. */
+  const transformedModifierSystem = (defaultModifierPolicy) => {
+    const system = modifierRuleSystem(defaultModifierPolicy);
+    system.modifiers = [{ ...MODIFIER_CATALOGUE[0], expression: '1d20cs>15' }, MODIFIER_CATALOGUE[1]];
+    system.craftingCheck.defaultModifierIds = ['med', 'alch'];
+    return system;
+  };
+
+  it('root: the pick cap drives manager-checks-crafting-modifier-max-picks’ warning selector (issue 2000)', async () => {
+    const selector = labCaseSelector('manager-checks-crafting-modifier-max-picks');
+    mountManager([], transformedModifierSystem('addAll'));
     checksStore.saveCraftingCheckModifiers = (patch) => {
       checksStore.viewState.update((state) => ({
         ...state,
@@ -3110,29 +3142,57 @@ export function registerChecksCases() {
     };
     typeCap('1');
     assert.ok(target.querySelector(calloutSelector), 'a cap below the eligible count warns');
+    assert.ok(Boolean(target.querySelector(selector)), 'the capped, warning state is the frame');
     typeCap('');
     assert.ok(!target.querySelector(calloutSelector), 'clearing the cap clears the warning');
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // The negative control, freshly mounted: happy-dom caches a `:has()` result per selector, so a
+    // re-query after the cap is cleared would read the stale match. A cap of 1 over plain entries
+    // ranks nothing transformed out, so the frame's warning half refuses it.
+    mountManager([], modifierRuleSystem('playerPicks', 1));
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    await openChecksSection('modifiers');
+    assert.ok(
+      Boolean(target.querySelector('[data-crafting-modifier-max-picks="1"]')),
+      'the cap still reads 1, so the refusal below is the warning and nothing else'
+    );
+    assert.ok(!target.querySelector(selector), 'a cap with no transformed entry is not the frame');
+  });
+
+  it('root: Validation satisfies manager-checks-validation-average-unavailable’s own selector (issue 2000)', async () => {
+    const selector = labCaseSelector('manager-checks-validation-average-unavailable');
+    const openValidation = async (system) => {
+      mountManager([], system);
+      navButton('Checks').click();
+      await tick();
+      flushSync();
+      target.querySelector('#manager-checks-nav-validation').click();
+      await tick();
+      flushSync();
+    };
+    await openValidation(transformedModifierSystem('highest'));
     assert.ok(
       Boolean(target.querySelector(selector)),
-      'a selecting rule with no cap must put BOTH the bySubject option and the unlimited cap ' +
-        'reading inside one [data-crafting-modifier-catalogue] — a cap field rendered as a ' +
-        'SIBLING of the card would satisfy every hook-by-hook assertion above and still fail here'
+      'ranking two entries by average lists the transformed one as a Validation warning row'
     );
     unmount(mounted);
     mounted = null;
     target.remove();
     target = null;
 
-    // The negative control, and the state the capture job actually hit.
-    mountManager([], modifierRuleSystem('playerPicks', 1));
-    navButton('Checks').click();
-    await tick();
-    flushSync();
+    // The negative control: adding every entry ranks nothing, so there is no row to photograph.
+    await openValidation(transformedModifierSystem('addAll'));
     assert.ok(
-      !target.querySelector(selector),
-      'a BOUNDED cap must not satisfy the unlimited case, or the frame published under it ' +
-        'would be its bounded sibling'
+      Boolean(target.querySelector('[data-checks-panel="validation"]')),
+      'the Validation route still rendered, so the refusal below is the row and nothing else'
     );
+    assert.ok(!target.querySelector(selector), 'addAll must not satisfy the warning frame');
   });
 
   it('root: the recipe picker satisfies manager-recipe-edit-crafting-modifier-custom-set’s own selector (issue 1055)', async () => {
