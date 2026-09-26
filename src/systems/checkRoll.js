@@ -324,11 +324,12 @@ function validatedPreparedDecision(decision, modifierChoice) {
   const rollMode = ['publicroll', 'gmroll', 'blindroll', 'selfroll'].includes(source.rollMode)
     ? source.rollMode
     : null;
+  // Absent ids fall through to the descriptor's defaults; an empty array is an answer.
   return {
     bonus: typeof source.bonus === 'string' ? source.bonus : null,
     advantage,
     rollMode,
-    chosenModifierIds: selected,
+    ...(Array.isArray(source.modifierIds) && { chosenModifierIds: selected }),
   };
 }
 
