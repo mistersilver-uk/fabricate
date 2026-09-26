@@ -79,10 +79,91 @@ describe('companion check evaluation boundary', () => {
       { pool: { additionalDice: { max: 0 } } },
       { pool: { additionalDice: { path: 3 } } },
       { pool: { additionalDice: { enabled: 'false' } } },
+      { target: { source: 'actor' } },
+      { target: { baseAdjustment: Infinity } },
+      { target: { expression: true } },
+      { target: { expression: null } },
+      { pool: { modifierDestination: 'total' } },
+      { pool: { base: null } },
+      { pool: { threshold: Number.NaN } },
+      { pool: { explode: { enabled: 1 } } },
+      { pool: { explode: { once: 'yes' } } },
+      { pool: { cancel: { enabled: null } } },
+      { pool: { explode: { faces: { value: 0 } } } },
+      { pool: { additionalDice: { max: 21 } } },
+      { pool: { additionalDice: { readMacroUuid: 1 } } },
+      { pool: { additionalDice: { spendMacroUuid: {} } } },
     ];
     for (const value of invalid) {
-      assert.deepEqual(resolveCompanionCheckEvaluation(value), { ok: false }, String(value));
+      assert.deepEqual(resolveCompanionCheckEvaluation(value), { ok: false }, JSON.stringify(value));
     }
+  });
+
+  it('accepts every range boundary and nullable field as the shared normalizer reads it', () => {
+    const accepted = [
+      { pool: { die: 2 } },
+      { pool: { required: 0 } },
+      { pool: { required: 20 } },
+      { pool: { additionalDice: { max: 1 } } },
+      { pool: { additionalDice: { max: 20 } } },
+      { pool: { die: 6, explode: { faces: { value: 6 } }, cancel: { faces: { value: 1 } } } },
+      { pool: { explode: { faces: { value: null } } } },
+      { target: { baseAdjustment: null } },
+    ];
+    for (const input of accepted) {
+      assert.deepEqual(
+        resolveCompanionCheckEvaluation(input),
+        { ok: true, evaluation: normalizeCheckEvaluation(input) },
+        JSON.stringify(input)
+      );
+    }
+  });
+
+  it('treats an own undefined value as an omitted key at every nested level', () => {
+    for (const [input, omitted] of [
+      [{ direction: undefined }, {}],
+      [{ target: undefined, product: 'sum' }, { product: 'sum' }],
+      [{ target: { expression: undefined, source: 'fixed' } }, { target: { source: 'fixed' } }],
+      [{ pool: { die: undefined, explode: { faces: undefined } } }, { pool: { explode: {} } }],
+      [{ pool: { die: 6, cancel: { faces: { value: undefined } } } }, { pool: { die: 6, cancel: { faces: {} } } }],
+    ]) {
+      assert.deepEqual(
+        resolveCompanionCheckEvaluation(input),
+        { ok: true, evaluation: normalizeCheckEvaluation(omitted) },
+        JSON.stringify(omitted)
+      );
+    }
+  });
+
+  it('refuses polluting and symbol keys and reads descriptors, never get', () => {
+    for (const value of [
+      JSON.parse('{"__proto__":{}}'),
+      { constructor: {} },
+      { toString: 'x' },
+      { pool: JSON.parse('{"__proto__":{"die":6}}') },
+      { [Symbol('k')]: 1 },
+    ]) {
+      assert.deepEqual(resolveCompanionCheckEvaluation(value), { ok: false });
+    }
+    const bare = Object.assign(Object.create(null), { product: 'sum' });
+    assert.deepEqual(resolveCompanionCheckEvaluation(bare), {
+      ok: true,
+      evaluation: normalizeCheckEvaluation({ product: 'sum' }),
+    });
+    let gets = 0;
+    const lying = new Proxy(
+      { product: 'sum' },
+      {
+        get() {
+          gets += 1;
+          return 'count';
+        },
+      }
+    );
+    const resolved = resolveCompanionCheckEvaluation(lying);
+    assert.equal(resolved.ok, true);
+    assert.equal(resolved.evaluation.product, 'sum');
+    assert.equal(gets, 0);
   });
 
   it('rejects nested accessors without invoking them', () => {
