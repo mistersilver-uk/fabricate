@@ -905,8 +905,9 @@ The contribution is always resolved.
 Selected output stays in eligible order, and an unbounded selection includes every eligible entry.
 The prompt's own cap is a UI affordance re-imposed by `evaluateCheckRoll`, never the invariant.
 The pre-roll formula shows resolved contributions; a deferred `playerPicks` choice and any entered situational bonus join the posted roll only after submission.
+On a direct runner the formula ends in a neutral `+ (modifier)[Modifiers]` slot for that deferred choice; a versioned Journal prompt shows its prepared formula without the slot or any flavour label and offers the choice beneath it.
 The posted roll, chat flavor and run journal then carry the chosen contribution and labels.
-DialogV2 sanitizes the initial content, then mounts the Svelte prompt body into a surviving host; the adapter unmounts it before remount and on close.
+The prompt renders in Fabricate's shared modal chrome (`ManagerModal`), mounted by `rollPromptHost.js` over the Fabricate window holding focus, else the frontmost one, or on a themed standalone layer when none is open, and unmounted on every exit.
 For a versioned Journal check, the issuing GM captures the JSON-safe modifier context and permitted choice with the private prepared evaluation before showing the prompt.
 The entitled prompt displays applied entries from that snapshot, or offers the deferred choice; later library or actor-data edits cannot change the prepared contribution.
 The world authority ledger carries only safe token coordination, while the prepared evaluation and cached recipient-specific reply stay in the issuing authority instance and disappear on consume, release or expiry.
