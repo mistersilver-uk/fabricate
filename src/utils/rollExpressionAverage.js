@@ -196,10 +196,9 @@ function createReader(source, dieValue = null) {
     }
     if (source[index] !== '}') return NaN;
     index += 1;
-    const modifierStart = index;
-    const keep = matchAt(KEEP_AT);
-    matchAt(MODIFIER_RUN_AT);
-    noteModifierQuantity(source.slice(modifierStart, index));
+    const run = matchAt(MODIFIER_RUN_AT)[0];
+    noteModifierQuantity(run);
+    const keep = KEEP_AT.exec(run);
     skipFlavor();
     if (members.some((member) => !Number.isFinite(member))) return NaN;
     return sumOf(keep ? keptMembers(members, keep[1].toLowerCase(), keep[2]) : members);
