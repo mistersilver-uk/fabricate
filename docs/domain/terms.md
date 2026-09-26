@@ -882,7 +882,7 @@ A legacy recipe-level `policy` key is never consulted (`resolveModifierPolicy` r
 It is a property of those two rules, not an orthogonal axis over them — it names no new party and bounds one already named by the rule — and it is stored system-wide regardless of the current rule so flipping between them does not destroy it.
 **The two RANKING rules, `highest` and `playerPicks` on every non-interactive path, classify and order entries deterministically**, so no hidden roll is spent to find a winner.
 Finite magnitude averages rank first by value, including negative values, and transformed quantities fill any remaining capacity in eligible order.
-Expressions with `cs`, `cf`, `even`, `odd`, `df`, `sf` or `ms` transform their dice totals and therefore have no comparable approximate average.
+Expressions with `cs`, `cf`, `even`, `odd`, `df`, `sf` or `ms` on a die or a pool, with a comparator, a bare target or neither, transform their dice totals and therefore have no comparable approximate average.
 The `x`, `r` and `min` modifiers retain a magnitude approximation.
 Blocked entries rank last and contribute nothing, so their zero placeholder cannot outrank a valid negative magnitude.
 Selected rolling entries are appended AS DICE, so ranking deterministically never flattens what it selects.

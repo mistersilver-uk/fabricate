@@ -5,11 +5,12 @@
  * `gatheringCraftingCheck` selects through its own `{defaultModifierPolicy, defaultModifierIds,
  * maxModifierPicks}`; the flat contribution appends as one `[Modifiers]` term and each rolling
  * entry as its own, before the formula reaches `Roll`; `highest` and `playerPicks` rank magnitude
- * averages before transformed quantities; and `min`/`max` clamp the rolled result in the formula (`min(max((1d8), -1), 6)`,
- * verified on 14.365 and recorded in `tests/helpers/recordedModifierRollShapes.js`). The `@`
- * substitution is injected (`makeRollDataExpressionResolver`), so the reduction is a pure function
- * of text; `Roll` defaults to `globalThis.Roll`, a fragment it cannot roll is refused per entry,
- * and that rollability proof fails open when the global is absent.
+ * averages before transformed quantities; and `min`/`max` clamp the rolled result in the formula
+ * (`min(max((1d8), -1), 6)`, verified on 14.365 and recorded in
+ * `tests/helpers/recordedModifierRollShapes.js`). The `@` substitution is injected
+ * (`makeRollDataExpressionResolver`), so the reduction is a pure function of text; `Roll` defaults
+ * to `globalThis.Roll`, a fragment it cannot roll is refused per entry, and that rollability proof
+ * fails open when the global is absent.
  */
 
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
@@ -314,9 +315,10 @@ function catalogueById(catalogue) {
 
 /**
  * A resolved entry: `average` ranks magnitude quantities and is null for transformed ones; a flat
- * entry sets `value` (summed into one term) and a rolling one sets `formula` (its own term), never both. A blocked entry keeps
- * its place with `value: 0`, `average: 0` and `blocked: true`, which readiness reads rather than
- * inferring from a legitimate zero. `display` is the prompt chip. This builds the blocked shape.
+ * entry sets `value` (summed into one term) and a rolling one sets `formula` (its own term), never
+ * both. A blocked entry keeps its place with `value: 0`, `average: 0` and `blocked: true`, which
+ * readiness reads rather than inferring from a legitimate zero. `display` is the prompt chip. This
+ * builds the blocked shape.
  */
 function blockedModifier(id, entry) {
   return {
@@ -355,11 +357,10 @@ function resolveCatalogueEntry(id, entry, resolveExpression, Roll) {
   const raw = typeof resolveExpression === 'function' ? resolveExpression(entry?.expression) : null;
   const text = raw === null || raw === undefined ? '' : String(raw).trim();
   if (text === '') return blockedModifier(id, entry);
-  const quantity = classifyRollQuantity(text);
-  if (quantity === 'irreducible') return blockedModifier(id, entry);
   const { value, rollsDice } = reduceRollExpression(text);
   if (!Number.isFinite(value)) return blockedModifier(id, entry);
-  const average = quantity === 'transformed' ? null : clampModifierValue(value, entry);
+  const transformed = classifyRollQuantity(text) === 'transformed';
+  const average = transformed ? null : clampModifierValue(value, entry);
   if (!rollsDice) {
     return {
       ...blockedModifier(id, entry),
@@ -427,7 +428,7 @@ export function resolveSelectedCheckModifiers(
   return resolved;
 }
 
-/** Magnitude averages, then transformed quantities, then blocked entries; output keeps eligible order. */
+/** Magnitude averages, then transformed quantities, then blocked; returned in eligible order. */
 function bestRankedModifiers(resolved, limit) {
   if (limit >= resolved.length) return resolved;
   return resolved
@@ -487,10 +488,9 @@ function modifierChipLabel(value, text, bounds) {
 /**
  * The interactive `playerPicks` descriptor: each option carries `value` (flat), `formula`
  * (rolling), `average` (magnitude ranking, null when transformed) and `display`, because
- * `evaluateCheckRoll` re-derives the legal
- * selection from it and never trusts the prompt. `defaultSelectedIds` is the best legal
- * selection, so confirming reproduces the non-interactive roll; `defaultSelectedId` is its first.
- * `null` below two eligible modifiers, where there is no choice to offer. It appends nothing.
+ * `evaluateCheckRoll` re-derives the legal selection from it and never trusts the prompt.
+ * `defaultSelectedIds` is the best legal selection, so confirming reproduces the non-interactive
+ * roll; `defaultSelectedId` is its first. `null` below two eligible modifiers. It appends nothing.
  */
 export function buildCheckModifierChoice(context = {}, resolveExpression, Roll = globalThis.Roll) {
   const ids = resolveEligibleModifierIds(context);

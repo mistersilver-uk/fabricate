@@ -17,9 +17,11 @@ const KEEP_AT = /^(kh|kl|dh|dl|k|d(?![fF]))(\d+)?/i;
 /** Consumed and ignored once a keep/drop is read. */
 const MODIFIER_RUN_AT = /^(?:[a-zA-Z]+|[0-9<>=]+)*/;
 
-const TRANSFORMED_MODIFIER_AT = /^(?:cs|cf|df|sf|ms)(?:[<>=]+\d+)?|^(?:even|odd)/i;
+/** Foundry's `Die` modifier grammar: the counting family takes an optional comparator or bare
+ *  target, and `r`/`x` an optional iteration bound ahead of one. */
+const TRANSFORMED_MODIFIER_AT = /^(?:cs|cf|df|sf|ms)(?:[<>=]*\d+)?|^(?:even|odd)/i;
 const MAGNITUDE_MODIFIER_AT =
-  /^(?:kh|kl|dh|dl|k|d)\d*|^(?:rr|ro|r|xo|x)(?:[<>=]+)?\d*|^(?:min|max)\d+/i;
+  /^(?:kh|kl|dh|dl|k|d)\d*|^(?:rr|r|xo|x)\d*(?:[<>=]+\d+)?|^(?:min|max)\d+/i;
 
 /** Whether an expression represents a magnitude, a transformed total, or no readable quantity. */
 export function classifyRollQuantity(input) {
@@ -63,6 +65,12 @@ function createReader(source, dieValue = null) {
     const close = source.indexOf(']', index);
     if (close === -1) validSyntax = false;
     index = close === -1 ? source.length : close + 1;
+  };
+
+  const noteModifierQuantity = (modifiers) => {
+    const quantity = classifyDieModifiers(modifiers);
+    if (quantity === 'irreducible') validSyntax = false;
+    if (quantity === 'transformed') sawTransformed = true;
   };
 
   const matchAt = (pattern) => {
@@ -147,9 +155,7 @@ function createReader(source, dieValue = null) {
 
   function dieAverage(count, faces, modifiers) {
     sawDice = true;
-    const quantity = classifyDieModifiers(modifiers);
-    if (quantity === 'irreducible') validSyntax = false;
-    if (quantity === 'transformed') sawTransformed = true;
+    noteModifierQuantity(modifiers);
     skipFlavor();
     if (dieValue) {
       // Before the shape checks: a substituting caller decides which shapes it answers for.
@@ -190,8 +196,10 @@ function createReader(source, dieValue = null) {
     }
     if (source[index] !== '}') return NaN;
     index += 1;
+    const modifierStart = index;
     const keep = matchAt(KEEP_AT);
     matchAt(MODIFIER_RUN_AT);
+    noteModifierQuantity(source.slice(modifierStart, index));
     skipFlavor();
     if (members.some((member) => !Number.isFinite(member))) return NaN;
     return sumOf(keep ? keptMembers(members, keep[1].toLowerCase(), keep[2]) : members);

@@ -661,6 +661,24 @@ test('ranking leaves blocked modifiers behind finite and transformed contributio
   );
 });
 
+test('addAll appends bare-target, counting and unclassified dice exactly as authored', () => {
+  const expressions = ['1d20cs20', '3d6ms10', '1d20df1', '1d20unknown2'];
+  const catalogue = expressions.map((expression, index) => ({
+    id: `entry-${index}`,
+    label: `Entry ${index}`,
+    expression,
+  }));
+  for (const { id, expression } of catalogue) {
+    const { rollTerms, selected } = resolveCheckModifierContribution(
+      { catalogue, systemPolicy: 'addAll', defaultModifierIds: [id] },
+      (text) => text,
+      PermissiveRoll
+    );
+    assert.deepEqual(rollTerms, [`(${expression})`], expression);
+    assert.equal(selected[0].blocked, false, `${expression}: not blocked`);
+  }
+});
+
 test('all-transformed ranking retains authored order for highest and player picks', () => {
   const catalogue = [
     { id: 'first', label: 'First', expression: '1d20cs>15' },

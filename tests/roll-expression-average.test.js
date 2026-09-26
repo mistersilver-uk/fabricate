@@ -42,6 +42,27 @@ test('classifies magnitude controls without changing their reduced values', () =
   }
 });
 
+test('classifies the bare-target and iteration-bounded forms of Foundry die modifiers', () => {
+  for (const expression of [
+    '4d6cs6',
+    '1d20cf1',
+    '6d10cs>=6df1',
+    '1d20ms10',
+    '3d6ms10',
+    '1d20df1',
+    '2d10sf1',
+    '1D20CS>15',
+    '{1d20, 1d20}cs>15',
+    '{1d6, 1d8}cf<2',
+    '{2d6}kh1cs>=5',
+  ]) {
+    assert.equal(classifyRollQuantity(expression), 'transformed', expression);
+  }
+  for (const expression of ['2d10r2<3', '5d6x2>=5', '2D20KH1', '{1d20,1d20}kh1']) {
+    assert.equal(classifyRollQuantity(expression), 'magnitude', expression);
+  }
+});
+
 test('classifies malformed, incomplete and unknown expressions as irreducible', () => {
   for (const expression of ['', '1d20 +', 'floor(', '1d20cs>', '1d20unknown2']) {
     assert.equal(classifyRollQuantity(expression), 'irreducible', JSON.stringify(expression));
