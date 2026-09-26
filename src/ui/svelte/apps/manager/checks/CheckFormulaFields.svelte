@@ -8,8 +8,11 @@
   AUTOMATICALLY and never appear in the formula text, so the field a GM types into is not the
   expression the engine rolls. `avg` TAKES ROLL-DATA TERMS AS ZERO AND SAYS SO, a roll-data path
   having no value on this screen; showing nothing is worse, almost every real formula carrying an
-  `@` term, and an expression that cannot be reduced withholds the reading rather than guessing.
-  For the same reason THE RULE SENTENCE STOPS AT THE RULE. Controlled through `onChange`.
+  `@` term. An expression that cannot be reduced at all withholds the whole reading rather than
+  guessing, while one whose dice total is TRANSFORMED — a counting suffix, `even`/`odd`, and
+  their kin — shows a visible `avg —` with an accessible reason instead of the numeric one, so
+  the withholding is never mistaken for the malformed-input case. For the same reason THE RULE
+  SENTENCE STOPS AT THE RULE. Controlled through `onChange`.
 -->
 <script>
   import { getModifierExpressionSuggestions } from '../../../../../config/modifierExpressionSuggestions.js';

@@ -391,8 +391,9 @@ The frame below is an ordinary `1d20 + @abilities.int.mod` check on a routed sys
 A counting formula gets none of that.
 The odds histogram deliberately abstains from drawing a chart for one, and says on the panel that it has.
 That is correct behaviour: the panel refuses rather than showing a chart that would be wrong.
-The average reading, and any ranking built from it, are not trustworthy for a counting formula.
-Do not use them to compare one check against another.
+The average reading next to the formula field is withheld for the same reason, showing a dash with a short explanation in its place rather than a number that would mislead.
+A check modifier written the same way, with a counting suffix or with `even` or `odd`, is withheld there too, and **Highest** or **Player picks** ranks it after every modifier that still has an ordinary average, though it still rolls exactly as written whenever a pick is free for it.
+See [Check modifiers]({% link checks/index.md %}#check-modifiers).
 
 The roll prompt also withholds advantage and disadvantage on a pure counting formula, and that omission is a reassurance rather than a gap.
 Advantage means rolling a second d20 and keeping the higher result, which has no meaning for a pool of dice.

@@ -213,8 +213,11 @@ function fixedRangesHaveGap(outcomes, excluded) {
  * `modifierRollExpression` is RETIRED (`openspec/specs/resolution-modes/spec.md` → "Check
  * Source", whose two bounds faults stay SEPARATE ids because the repairs differ).
  * `modifierExpressionInvalid` is an entry whose EXPRESSION cannot contribute and excludes bounds
- * faults. All three NAME the offending entries and cover only entries this activity selects; the
- * three `modifiersInert*` warnings report a selection reaching no roll, gated on NON-EMPTY.
+ * faults. `modifierAverageUnavailable` is a separate, NON-BLOCKING warning naming an otherwise
+ * usable entry whose dice total is TRANSFORMED (`classifyModifierExpression`), raised only when
+ * `highest` or a capped `playerPicks` would actually rank it out (`modifiersCompete`). All four
+ * NAME the offending entries and cover only entries this activity selects; the three
+ * `modifiersInert*` warnings report a selection reaching no roll, gated on NON-EMPTY.
  * @param {object|null} modifierContext A `buildCheckModifierContext` bag, or null (no-ops).
  * @param {{ rollsNoCheck: boolean, hasRollFormula: boolean }} formulaState
  * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }} */
