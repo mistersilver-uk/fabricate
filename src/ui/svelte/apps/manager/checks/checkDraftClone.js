@@ -3,6 +3,7 @@
  * fills the defaults the editors render, so a draft and its baseline built from the same source
  * compare equal.
  */
+import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
 import { normalizePreviewSandbox } from '../../../../../systems/progressiveCheckSandbox.js';
 
 // The unified trigger block (issue 419), carried on every check draft so authoring it persists.
@@ -53,6 +54,7 @@ export function cloneRoutedCheck(routed) {
       ? source.fixedOutcomes.map((outcome) => ({ ...outcome }))
       : [],
     checkBreakage: cloneCheckBreakage(source.checkBreakage),
+    evaluation: normalizeCheckEvaluation(source.evaluation),
   };
 }
 
@@ -67,6 +69,7 @@ export function cloneSimpleCheck(simple) {
     tiers: Array.isArray(source.tiers) ? source.tiers.map((tier) => ({ ...tier })) : [],
     macroUuid: source.macroUuid || null,
     checkBreakage: cloneCheckBreakage(source.checkBreakage),
+    evaluation: normalizeCheckEvaluation(source.evaluation),
   };
 }
 
@@ -84,6 +87,7 @@ export function cloneProgressiveCheck(progressive) {
       : 'equal',
     rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
     checkBreakage: cloneCheckBreakage(source.checkBreakage),
+    evaluation: normalizeCheckEvaluation(source.evaluation),
   };
   // Attached rather than spread, so an absent preview sandbox (issue 1097) stays absent in both
   // the draft and its baseline.
