@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { Window } from 'happy-dom';
-import { buildInteractiveRollOptions, buildSinglePromptData, promptCheckRoll, waitForPrompt } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
-import { checkboxGroupField, stubDialogCapture, stubDialogDismissal, stubI18n } from './helpers/rollPromptDialogStub.js';
+import {
+  buildInteractiveRollOptions,
+  buildSinglePromptData,
+  normalizeSituationalBonus,
+  promptCheckRoll,
+  translatePromptAnswer,
+} from '../src/ui/svelte/apps/crafting/rollPrompt.js';
+import { stubI18n, stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 
 const choice = {
   modifiers: [{ id: 'a', label: 'A', display: '+1' }, { id: 'b', label: 'B', display: '+1d4' }],
@@ -10,18 +15,28 @@ const choice = {
   defaultSelectedIds: ['a', 'b'],
 };
 
-function open(args, elements, options) {
-  const dialog = stubDialogCapture(elements, options);
-  return promptCheckRoll(args).then((result) => ({ dialog, result })).finally(() => dialog.restore());
+async function open(args, answer) {
+  const surface = stubPromptSurface(() => answer);
+  try {
+    return { view: null, result: await promptCheckRoll(args), ...surface, surface };
+  } finally {
+    surface.restore();
+  }
 }
 
-describe('roll prompt DialogV2 adapter', () => {
-  it('threads the public runner options without a stray choice', () => {
-    const options = buildInteractiveRollOptions({ interactive: true, actor: { name: 'Brenna' }, activity: 'Crafting', name: 'Iron', dc: 12 });
-    assert.equal(options.name, 'Iron');
-    assert.equal(options.dc, 12);
-    assert.ok(!Object.hasOwn(options, 'modifierChoice'));
-    assert.equal(typeof options.prompt, 'function');
+describe('roll prompt adapter', () => {
+  it('builds the automated-caller bag with a strict interactive flag and no stray keys', () => {
+    for (const interactive of [false, undefined, 'true']) {
+      assert.equal(buildInteractiveRollOptions({ interactive }).interactive, false);
+    }
+    const options = buildInteractiveRollOptions({
+      interactive: true, actor: { name: 'Brenna' }, activity: 'Crafting', name: 'Iron', dc: 12, img: 'icons/iron.webp',
+    });
+    assert.equal(options.interactive, true);
+    assert.equal(options.img, 'icons/iron.webp');
+    assert.deepEqual(Object.keys(options).sort(), [
+      'activity', 'dc', 'flavor', 'img', 'interactive', 'name', 'prompt', 'rollMode', 'speaker',
+    ]);
   });
 
   it('builds localized activity and actor-subject labels without inventing a missing subject', () => {
@@ -34,6 +49,12 @@ describe('roll prompt DialogV2 adapter', () => {
     assert.equal(buildSinglePromptData({ thresholdMode: 'exceed', comparison: 'meet' }).comparison, 'meet');
   });
 
+  it('inserts user-authored names literally, never as replacement patterns', () => {
+    const data = buildSinglePromptData({ activity: "$'Forge", actorName: 'A$&B', name: '$1 Blade' });
+    assert.equal(data.title, "$'Forge check");
+    assert.equal(data.subtitle, 'A$&B · $1 Blade');
+  });
+
   it('binds the actor name while preserving the runner prompt payload', async () => {
     let captured;
     const options = buildInteractiveRollOptions({ actor: { name: 'Brenna' }, activity: 'Crafting' }, async (payload) => {
@@ -44,139 +65,92 @@ describe('roll prompt DialogV2 adapter', () => {
     assert.deepEqual(captured, { resolvedFormula: '1d20 + 2', thresholdMode: 'exceed', actorName: 'Brenna' });
   });
 
-  it('offers the retained actions in their new visual order with Roll default', async () => {
-    const { dialog, result } = await open({ activity: 'Crafting', allowAdvantage: true }, {
-      situationalBonus: { value: '+ 1d4' }, rollMode: { value: 'gmroll' },
-    });
-    assert.deepEqual(dialog.buttons.map((button) => button.action), ['disadvantage', 'normal', 'advantage']);
-    assert.equal(dialog.buttons[1].default, true);
-    assert.equal(result.advantage, 'normal');
-    assert.equal(result.bonus, '1d4');
-    assert.equal(result.rollMode, 'gmroll');
-    assert.equal(dialog.config.position.width, 500);
-    assert.match(dialog.content, /fabricate-roll-prompt-host/);
-    assert.ok(!dialog.content.includes('craftingModifier'), 'body is mounted after sanitization');
+  it('offers Advantage only for a strictly true allowAdvantage', async () => {
+    for (const allowAdvantage of [undefined, null, 'true', 1]) {
+      const { view } = await open({ activity: 'Crafting', allowAdvantage }, null);
+      assert.equal(view.allowAdvantage, false, `${String(allowAdvantage)} is not true`);
+    }
+    const { view } = await open({ activity: 'Crafting', allowAdvantage: true }, null);
+    assert.equal(view.allowAdvantage, true);
   });
 
-  it('uses a supported visible default and submitted mode when the client setting is missing or invalid', async () => {
-    for (const [setting, expected] of [[undefined, 'publicroll'], ['unknown', 'publicroll'], ['gmroll', 'gmroll']]) {
-      const restoreI18n = stubI18n({}, { rollMode: setting });
+  it('offers exactly the four legacy roll-mode tokens under Fabricate labels', async () => {
+    const restore = stubI18n({ 'FABRICATE.App.RollPrompt.RollModePrivate': 'Private GM roll (lang)' });
+    const previousConfig = globalThis.CONFIG;
+    globalThis.CONFIG = { get Dice() { throw new Error('CONFIG.Dice must not be read'); } };
+    try {
+      const { view } = await open({ activity: 'Crafting' }, null);
+      assert.deepEqual(view.rollModes.map((mode) => mode.value), ['publicroll', 'gmroll', 'blindroll', 'selfroll']);
+      assert.deepEqual(view.rollModes.map((mode) => mode.label), ['Public roll', 'Private GM roll (lang)', 'Blind GM roll', 'Self roll']);
+    } finally {
+      globalThis.CONFIG = previousConfig;
+      restore();
+    }
+  });
+
+  it('carries the client default roll mode into the view and the automated bag', async () => {
+    for (const [setting, expected] of [[undefined, 'publicroll'], ['unknown', 'publicroll'], ['blindroll', 'blindroll']]) {
+      const restore = stubI18n({}, { rollMode: setting });
       try {
         assert.equal(buildInteractiveRollOptions({ activity: 'Crafting' }).rollMode, expected);
-        const { result } = await open({ activity: 'Crafting' }, {});
-        assert.equal(result.rollMode, expected);
-        const { result: invalidField } = await open({ activity: 'Crafting' }, { rollMode: { value: 'unknown' } });
-        assert.equal(invalidField.rollMode, expected);
+        const { view, result } = await open({ activity: 'Crafting' }, { confirmed: true, rollMode: 'unknown' });
+        assert.equal(view.defaultRollMode, expected);
+        assert.equal(result.rollMode, expected, 'an unsupported submitted mode falls back to the default');
       } finally {
-        restoreI18n();
+        restore();
       }
     }
   });
 
-  it('returns the selected capped checkbox values and legacy first id', async () => {
-    const { result } = await open({ modifierChoice: choice }, {
-      situationalBonus: { value: '' }, rollMode: { value: 'publicroll' },
-      craftingModifier: checkboxGroupField(choice.modifiers, ['a', 'b']),
-    });
-    assert.deepEqual(result.chosenModifierIds, ['a', 'b']);
-    assert.equal(result.chosenModifierId, 'a');
+  it('normalizes the situational bonus', () => {
+    for (const [raw, expected] of [['', null], [null, null], ['   ', null], ['2', '2'], ['  +2  ', '2'], ['-1', '-1'], ['1d4 + 1', '1d4 + 1'], ['++2', '+2']]) {
+      assert.equal(normalizeSituationalBonus(raw), expected, JSON.stringify(raw));
+    }
   });
 
-  it('preserves explicit empty selection and headless defaults', async () => {
-    const { result } = await open({ modifierChoice: choice }, {
-      craftingModifier: checkboxGroupField(choice.modifiers, []),
-    });
+  it('re-imposes the pick cap on an over-large submitted selection', async () => {
+    const { result } = await open({ modifierChoice: choice }, { confirmed: true, chosenModifierIds: ['b', 'a', 'x'] });
+    assert.deepEqual(result.chosenModifierIds, ['b', 'a']);
+    assert.equal(result.chosenModifierId, 'b');
+  });
+
+  it('preserves an explicit empty selection and the headless defaults', async () => {
+    const { result } = await open({ modifierChoice: choice }, { confirmed: true, chosenModifierIds: [] });
     assert.deepEqual(result.chosenModifierIds, []);
     assert.ok(!Object.hasOwn(result, 'chosenModifierId'));
-    const previous = globalThis.foundry;
-    delete globalThis.foundry;
-    try {
-      const headless = await promptCheckRoll({ modifierChoice: choice });
-      assert.deepEqual(headless.chosenModifierIds, ['a', 'b']);
-    } finally {
-      globalThis.foundry = previous;
+    const defaulted = await open({ modifierChoice: choice }, { confirmed: true });
+    assert.deepEqual(defaulted.result.chosenModifierIds, ['a', 'b']);
+    const headless = await promptCheckRoll({ modifierChoice: choice });
+    assert.deepEqual(headless, { confirmed: true, chosenModifierIds: ['a', 'b'], chosenModifierId: 'a' });
+    assert.deepEqual(await promptCheckRoll(), { confirmed: true });
+  });
+
+  it('maps every non-confirmation and a failed open to the unchanged false shape', async () => {
+    for (const answer of [undefined, null, false, {}, { confirmed: 'yes' }]) {
+      assert.deepEqual((await open({}, answer)).result, { confirmed: false }, JSON.stringify(answer));
     }
-  });
-
-  it('maps dismissal and rejection to the unchanged false shape', async () => {
-    const stub = stubDialogDismissal(null);
-    try { assert.deepEqual(await promptCheckRoll(), { confirmed: false }); }
-    finally { stub.restore(); }
-  });
-
-  it('mounts after render, adds footer notes once, and unmounts once per render and close', async () => {
-    const previousDocument = globalThis.document;
-    const restoreI18n = stubI18n({ 'CHAT.RollPublic': 'Everyone' });
-    const window = new Window();
-    globalThis.document = window.document;
-    const root = window.document.createElement('div');
-    root.innerHTML = '<div class="fabricate-roll-prompt-host"></div><button data-action="disadvantage"></button><button data-action="advantage"></button>';
-    const mounted = [];
-    const removed = [];
-    const positions = [];
-    try {
-      const result = await waitForPrompt({ wait: async (config) => {
-        const dialog = { element: root, setPosition: (position) => {
-          assert.equal(mounted.length, positions.length + 1);
-          positions.push(position);
-        } };
-        config.render(null, dialog);
-        config.render(null, dialog);
-        assert.equal(root.querySelectorAll('.fabricate-roll-prompt__footer-note').length, 2);
-        config.close();
-        config.close();
-        return config.buttons[1].callback(null, { form: { elements: {} } });
-      } }, { kind: 'single', frameTitle: 'Crafting check' }, true,
-      { options: [], maxPicks: 1, defaultSelectedIds: [] }, {
-        loadBody: async () => ({ default: () => {} }),
-        mountBody: (_component, options) => {
-          assert.equal(options.target.className, 'fabricate-roll-prompt-host');
-          assert.equal(options.props.data.defaultRollMode, 'publicroll');
-          assert.equal(options.props.data.rollModes[0].label, 'Everyone');
-          const handle = { number: mounted.length };
-          mounted.push(handle);
-          return handle;
-        },
-        unmountBody: (handle) => removed.push(handle),
-      });
-      assert.equal(result.confirmed, true);
-      assert.equal(mounted.length, 2);
-      assert.deepEqual(positions, [{ height: 'auto', top: null }, { height: 'auto', top: null }]);
-      assert.deepEqual(removed, mounted);
-    } finally {
-      restoreI18n();
-      if (previousDocument === undefined) delete globalThis.document;
-      else globalThis.document = previousDocument;
-      await window.happyDOM.abort();
-    }
-  });
-
-  it('closes a failed mount as a dismissal', async () => {
-    const previousDocument = globalThis.document;
     const previousError = console.error;
-    const window = new Window();
-    globalThis.document = window.document;
     console.error = () => {};
-    let closed = 0;
+    const surface = stubPromptSurface(() => {
+      throw new Error('host refused');
+    });
     try {
-      const result = await waitForPrompt({ wait: async (config) => {
-        config.render(null, {
-          element: { querySelector: () => ({}) },
-          close: () => { closed += 1; },
-        });
-        return null;
-      } }, { kind: 'single', frameTitle: 'Crafting check' }, false,
-      { options: [], maxPicks: 1, defaultSelectedIds: [] }, {
-        loadBody: async () => ({ default: () => {} }),
-        mountBody: () => { throw new Error('mount failure'); },
-      });
-      assert.deepEqual(result, { confirmed: false });
-      assert.equal(closed, 1);
+      assert.deepEqual(await promptCheckRoll({ activity: 'Crafting' }), { confirmed: false });
     } finally {
+      surface.restore();
       console.error = previousError;
-      if (previousDocument === undefined) delete globalThis.document;
-      else globalThis.document = previousDocument;
-      await window.happyDOM.abort();
     }
+  });
+
+  it('translates a confirmed answer into the unchanged caller keys', () => {
+    const plan = { options: [], maxPicks: 1, defaultSelectedIds: [] };
+    assert.deepEqual(
+      translatePromptAnswer({ confirmed: true, bonus: ' +1d4 ', rollMode: 'gmroll', advantage: 'advantage' }, { defaultRollMode: 'publicroll', choicePlan: plan }),
+      { confirmed: true, bonus: '1d4', rollMode: 'gmroll', advantage: 'advantage' }
+    );
+    assert.equal(
+      translatePromptAnswer({ confirmed: true, advantage: 'sideways' }, { defaultRollMode: 'publicroll', choicePlan: plan }).advantage,
+      'normal'
+    );
   });
 });

@@ -1,12 +1,34 @@
-/** DialogV2 adapter for the shared single and bulk check prompt body. */
-import { flushSync, mount, unmount } from 'svelte';
+/** The single and bulk check prompt: view preparation, the modal surface and answer translation. */
+import { openRollPromptModal } from './rollPromptHost.js';
 
+// Legacy tokens on both versions (issue 1043): V14 maps them in Roll#toMessage, and core.messageMode is unregistered on V13, where reading it throws.
 const ROLL_MODES = [
-  ['publicroll', 'CHAT.RollPublic', 'Public Roll'],
-  ['gmroll', 'CHAT.RollPrivate', 'Private GM Roll'],
-  ['blindroll', 'CHAT.RollBlind', 'Blind GM Roll'],
-  ['selfroll', 'CHAT.RollSelf', 'Self Roll'],
+  ['publicroll', 'RollModePublic', 'Public roll'],
+  ['gmroll', 'RollModePrivate', 'Private GM roll'],
+  ['blindroll', 'RollModeBlind', 'Blind GM roll'],
+  ['selfroll', 'RollModeSelf', 'Self roll'],
 ];
+
+const ADVANTAGES = new Set(['normal', 'advantage', 'disadvantage']);
+
+let surfaceOverride = null;
+
+/**
+ * Replace the modal surface for a Node suite that drives engine code with no DOM, returning the
+ * restore. The surface receives the prepared view and answers like the modal, or `null`.
+ */
+export function overrideRollPromptSurface(open) {
+  const previous = surfaceOverride;
+  surfaceOverride = open;
+  return () => {
+    surfaceOverride = previous;
+  };
+}
+
+function resolveSurface() {
+  if (surfaceOverride) return surfaceOverride;
+  return globalThis.document?.body ? openRollPromptModal : null;
+}
 
 function supportedRollMode(value, fallback = 'publicroll') {
   return ROLL_MODES.some(([mode]) => mode === value) ? value : fallback;
@@ -17,28 +39,46 @@ function localize(key, fallback) {
   return typeof value === 'string' && value && value !== key ? value : fallback;
 }
 
+function promptLabel(name, fallback) {
+  return localize(`FABRICATE.App.RollPrompt.${name}`, fallback);
+}
+
+// A function replacer, so a `$&` or `$1` in a user-authored name is inserted literally.
+function fill(template, values) {
+  return Object.entries(values).reduce(
+    (text, [token, value]) => text.replace(`{${token}}`, () => String(value)),
+    template
+  );
+}
+
 function copy() {
-  const label = (name, fallback) => localize(`FABRICATE.App.RollPrompt.${name}`, fallback);
   return {
-    modifiers: label('Modifiers', 'Modifiers'),
-    modifierChoice: label('CheckModifier', 'Check modifier'),
-    unnamedModifier: label('UnnamedModifier', 'Unnamed modifier'),
-    unnamedSubject: label('UnnamedSubject', 'Unnamed item'),
-    pickUpTo: label('PickUpTo', 'Pick up to {count}'),
-    eachAdds: label('EachAdds', 'Each adds to the total.'),
-    bonus: label('SituationalBonus', 'Situational bonus'),
-    bonusPlaceholder: label('BonusPlaceholder', '+2 or 1d4'),
-    bonusHelp: label('BonusHelp', 'A number or dice expression adds to the total.'),
-    rollMode: label('RollMode', 'Roll mode'),
-    meet: label('MeetOrBeat', 'meet or beat'),
-    exceed: label('Beat', 'beat'),
-    bulkNote: label('BulkNote', 'One choice below applies to every roll in the batch.'),
-    bulkRows: label('BulkRows', 'Rolls in this batch'),
-    noCheck: label('NoCheck', 'No check'),
-    noSingleTarget: label('NoSingleTarget', 'No single target'),
-    worse: label('KeepWorse', 'keep the worse'),
-    better: label('KeepBetter', 'keep the better'),
-    dcValue: label('DcValue', 'DC {dc}'),
+    modifiers: promptLabel('Modifiers', 'Modifiers'),
+    modifierChoice: promptLabel('CheckModifier', 'Check modifier'),
+    unnamedModifier: promptLabel('UnnamedModifier', 'Unnamed modifier'),
+    unnamedSubject: promptLabel('UnnamedSubject', 'Unnamed item'),
+    pickUpTo: promptLabel('PickUpTo', 'Pick up to {count}'),
+    eachAdds: promptLabel('EachAdds', 'Each adds to the total.'),
+    bonus: promptLabel('SituationalBonus', 'Situational bonus'),
+    bonusPlaceholder: promptLabel('BonusPlaceholder', '+2 or 1d4'),
+    bonusHelp: promptLabel(
+      'BonusHelp',
+      'A bonus adds to the total. A rolled bonus such as 1d4 is rolled with the check.'
+    ),
+    rollMode: promptLabel('RollMode', 'Roll mode'),
+    meet: promptLabel('MeetOrBeat', 'meet or beat'),
+    exceed: promptLabel('Beat', 'beat'),
+    bulkNote: promptLabel('BulkNote', 'One choice below applies to every roll in the batch.'),
+    bulkRows: promptLabel('BulkRows', 'Rolls in this batch'),
+    noCheck: promptLabel('NoCheck', 'No check'),
+    noSingleTarget: promptLabel('NoSingleTarget', 'No single target'),
+    worse: promptLabel('KeepWorse', 'keep the worse'),
+    better: promptLabel('KeepBetter', 'keep the better'),
+    dcValue: promptLabel('DcValue', 'DC {dc}'),
+    roll: promptLabel('roll', 'Roll'),
+    advantage: promptLabel('advantage', 'Advantage'),
+    disadvantage: promptLabel('disadvantage', 'Disadvantage'),
+    close: promptLabel('Close', 'Close'),
   };
 }
 
@@ -59,140 +99,55 @@ function planModifierChoice(choice) {
   };
 }
 
-function readSelectedModifierIds(field) {
-  if (!field) return null;
-  const entries = typeof field.length === 'number' ? [...field] : [field];
-  const checkable = entries.filter((entry) => typeof entry?.checked === 'boolean');
-  if (checkable.length > 0)
-    return checkable.filter((entry) => entry.checked).map((entry) => String(entry.value ?? ''));
-  return field.value ? [String(field.value)] : null;
-}
-
-function readChoice(button, defaultRollMode, advantage, choicePlan) {
-  const fields = button?.form?.elements;
-  const bonus = String(fields?.situationalBonus?.value ?? '')
+/** A leading `+` is dropped and blank input means no bonus; anything else is the player's text. */
+export function normalizeSituationalBonus(value) {
+  const bonus = String(value ?? '')
     .replace(/^\s*\+/, '')
     .trim();
+  return bonus || null;
+}
+
+/** Any answer but an explicit confirmation is a dismissal; the pick cap is re-imposed here. */
+export function translatePromptAnswer(answer, { defaultRollMode, choicePlan }) {
+  if (answer?.confirmed !== true) return { confirmed: false };
   const result = {
     confirmed: true,
-    bonus: bonus || null,
-    rollMode: supportedRollMode(fields?.rollMode?.value, defaultRollMode),
-    advantage,
+    bonus: normalizeSituationalBonus(answer.bonus),
+    rollMode: supportedRollMode(answer.rollMode, defaultRollMode),
+    advantage: ADVANTAGES.has(answer.advantage) ? answer.advantage : 'normal',
   };
   if (choicePlan.options.length > 0) {
-    const selected = readSelectedModifierIds(fields?.craftingModifier);
-    const ids = (selected ?? choicePlan.defaultSelectedIds).slice(0, choicePlan.maxPicks);
+    const picked = Array.isArray(answer.chosenModifierIds)
+      ? answer.chosenModifierIds
+      : choicePlan.defaultSelectedIds;
+    const ids = picked.map(String).slice(0, choicePlan.maxPicks);
     result.chosenModifierIds = ids;
     if (ids.length > 0) result.chosenModifierId = ids[0];
   }
   return result;
 }
 
-function buttons(allowAdvantage, reader) {
-  const button = (action, label, advantage, isDefault = false) => ({
-    action,
-    label: localize(`FABRICATE.App.RollPrompt.${action}`, label),
-    default: isDefault,
-    callback: (_event, element) => reader(element, advantage),
-  });
-  if (!allowAdvantage) return [button('roll', 'Roll', 'normal', true)];
-  return [
-    button('disadvantage', 'Disadvantage', 'disadvantage'),
-    button('normal', 'Roll', 'normal', true),
-    button('advantage', 'Advantage', 'advantage'),
-  ];
-}
-
-function appendFooterSublabels(dialog, labels) {
-  const root = dialog?.element ?? dialog;
-  for (const [action, label] of [
-    ['disadvantage', labels.worse],
-    ['advantage', labels.better],
-  ]) {
-    const element = [...(root?.querySelectorAll?.('button[data-action]') ?? [])].find(
-      (button) => button.dataset.action === action
-    );
-    if (!element || element.querySelector('.fabricate-roll-prompt__footer-note')) continue;
-    const note = element.ownerDocument.createElement('small');
-    note.className = 'fabricate-roll-prompt__footer-note';
-    note.textContent = label;
-    element.append(note);
-  }
-}
-
-/**
- * Mount the interactive check body only after DialogV2 has sanitized its host.
- * The adapter unmounts before every render and on close, then answers a confirmed choice or dismissal.
- */
-export async function waitForPrompt(
-  DialogV2,
-  data,
-  allowAdvantage,
-  choicePlan,
-  { loadBody = () => import('./RollPrompt.svelte'), mountBody = mount, unmountBody = unmount } = {}
-) {
+/** Open the surface for a prepared view; a failed or rejected open is a dismissal. */
+export async function waitForPrompt(data, allowAdvantage, choicePlan, open = resolveSurface()) {
   const defaultRollMode = supportedRollMode(globalThis.game?.settings?.get?.('core', 'rollMode'));
-  const labels = copy();
-  const rollModes = ROLL_MODES.map(([value, key, fallback]) => ({
-    value,
-    label: localize(key, fallback),
-  }));
-  const state =
-    data.kind === 'bulk'
-      ? 'bulk'
-      : globalThis.document?.body?.classList?.contains('theme-light')
-        ? 'light'
-        : choicePlan.options.some((modifier) => modifier.label?.length > 40)
-          ? 'overflow'
-          : choicePlan.options.length > 0
-            ? choicePlan.maxPicks > 1
-              ? 'multipick'
-              : 'pick-one'
-            : allowAdvantage
-              ? 'advantage'
-              : 'basic';
-  const body = { ...data, state, labels, rollModes, defaultRollMode, choicePlan };
-  let Component = null;
-  try {
-    Component = typeof document === 'undefined' ? null : (await loadBody()).default;
-  } catch (error) {
-    console.error('Fabricate | Roll prompt body failed to load:', error);
-    return { confirmed: false };
-  }
-  let mounted = null;
-  const cleanup = () => {
-    if (mounted) unmountBody(mounted);
-    mounted = null;
+  const view = {
+    ...data,
+    allowAdvantage: allowAdvantage === true,
+    labels: copy(),
+    rollModes: ROLL_MODES.map(([value, key, fallback]) => ({
+      value,
+      label: promptLabel(key, fallback),
+    })),
+    defaultRollMode,
+    choicePlan,
   };
-  const result = await DialogV2.wait({
-    window: { title: data.frameTitle },
-    classes: ['fabricate', 'fabricate-dialog', 'fabricate-roll-prompt-dialog'],
-    position: { width: 500 },
-    content: '<div class="fabricate-roll-prompt-host"></div>',
-    rejectClose: false,
-    buttons: buttons(allowAdvantage, (element, advantage) =>
-      readChoice(element, defaultRollMode, advantage, choicePlan)
-    ),
-    render: (_event, dialog) => {
-      cleanup();
-      try {
-        const host = (dialog?.element ?? dialog)?.querySelector?.('.fabricate-roll-prompt-host');
-        if (!host || !Component) throw new Error('Roll prompt mount host unavailable');
-        mounted = mountBody(Component, { target: host, props: { data: body } });
-        appendFooterSublabels(dialog, labels);
-        flushSync();
-        dialog?.setPosition?.({ height: 'auto', top: null });
-      } catch (error) {
-        console.error('Fabricate | Roll prompt mount failed:', error);
-        void dialog?.close?.();
-      }
-    },
-    close: () => {
-      cleanup();
-    },
-  }).catch(() => ({ confirmed: false }));
-  cleanup();
-  return result?.confirmed === true ? result : { confirmed: false };
+  let answer = null;
+  try {
+    answer = await open(view);
+  } catch (error) {
+    console.error('Fabricate | Roll prompt failed:', error);
+  }
+  return translatePromptAnswer(answer, { defaultRollMode, choicePlan });
 }
 
 export function buildSinglePromptData({
@@ -207,20 +162,18 @@ export function buildSinglePromptData({
   thresholdMode,
   comparison,
 } = {}) {
-  const activityLabel = activity || localize('FABRICATE.App.RollPrompt.roll', 'Roll');
-  const title = localize('FABRICATE.App.RollPrompt.CheckTitle', '{activity} check').replace(
-    '{activity}',
-    activityLabel
-  );
+  const title = fill(promptLabel('CheckTitle', '{activity} check'), {
+    activity: activity || promptLabel('roll', 'Roll'),
+  });
   const subtitle =
     actorName && name
-      ? localize('FABRICATE.App.RollPrompt.ActorSubject', '{actor} · {subject}')
-          .replace('{actor}', actorName)
-          .replace('{subject}', name)
+      ? fill(promptLabel('ActorSubject', '{actor} · {subject}'), {
+          actor: actorName,
+          subject: name,
+        })
       : actorName || name || '';
   return {
     kind: 'single',
-    frameTitle: title,
     title,
     subtitle,
     img: img || '',
@@ -232,11 +185,32 @@ export function buildSinglePromptData({
   };
 }
 
+/** The bulk heading names the activity and the one actor when the caller knows them. */
+export function buildBulkPromptData({ count, subjects, activity, actorName } = {}) {
+  const rows = Array.isArray(subjects) ? subjects : [];
+  const items = fill(promptLabel('BulkHeading', '{count} items'), {
+    count: Number.isFinite(count) ? count : rows.length,
+  });
+  return {
+    kind: 'bulk',
+    title: activity
+      ? fill(promptLabel('CheckTitlePlural', '{activity} checks'), { activity })
+      : promptLabel('BulkTitle', 'Bulk check'),
+    subtitle: actorName
+      ? fill(promptLabel('ActorSubject', '{actor} · {subject}'), {
+          actor: actorName,
+          subject: items,
+        })
+      : items,
+    subjects: rows,
+  };
+}
+
 export async function promptCheckRoll(options = {}) {
   const { modifierChoice, allowAdvantage } = options;
   const plan = planModifierChoice(modifierChoice);
-  const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2;
-  if (!DialogV2?.wait) {
+  const open = resolveSurface();
+  if (!open) {
     return modifierChoice
       ? {
           confirmed: true,
@@ -247,31 +221,23 @@ export async function promptCheckRoll(options = {}) {
         }
       : { confirmed: true };
   }
-  return waitForPrompt(DialogV2, buildSinglePromptData(options), allowAdvantage, plan);
+  return waitForPrompt(buildSinglePromptData(options), allowAdvantage, plan, open);
 }
 
-export async function promptBulkCheckRoll({ allowAdvantage, count, subjects } = {}) {
-  const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2;
-  if (!DialogV2?.wait)
-    return { confirmed: true, bonus: null, rollMode: undefined, advantage: 'normal' };
-  const rows = Array.isArray(subjects) ? subjects : [];
-  const total = Number.isFinite(count) ? count : rows.length;
-  const title = localize('FABRICATE.App.RollPrompt.BulkTitle', 'Bulk check');
-  const subtitle = localize('FABRICATE.App.RollPrompt.BulkHeading', '{count} items').replace(
-    '{count}',
-    String(total)
-  );
+export async function promptBulkCheckRoll({
+  allowAdvantage,
+  count,
+  subjects,
+  activity,
+  actorName,
+} = {}) {
+  const open = resolveSurface();
+  if (!open) return { confirmed: true, bonus: null, rollMode: undefined, advantage: 'normal' };
   return waitForPrompt(
-    DialogV2,
-    {
-      kind: 'bulk',
-      frameTitle: title,
-      title,
-      subtitle,
-      subjects: rows,
-    },
+    buildBulkPromptData({ count, subjects, activity, actorName }),
     allowAdvantage,
-    planModifierChoice(null)
+    planModifierChoice(null),
+    open
   );
 }
 

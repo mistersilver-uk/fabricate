@@ -4,107 +4,122 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { flushSync } from 'svelte';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { createLabDialogV2 } from '../view-lab/foundryDialog.js';
+import { stubI18n } from '../helpers/rollPromptDialogStub.js';
 import { waitForPrompt } from '../../src/ui/svelte/apps/crafting/rollPrompt.js';
+import { openRollPromptModal } from '../../src/ui/svelte/apps/crafting/rollPromptHost.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const PROMPT = 'src/ui/svelte/apps/crafting/RollPrompt.svelte';
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-roll-prompt-',
-  componentPath: 'src/ui/svelte/apps/crafting/RollPrompt.svelte',
+  componentPath: PROMPT,
+  rawModules: [
+    'src/ui/svelte/actions/dismissOnOutsideClick.js',
+    'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/util/overlayHost.js',
+  ],
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
-    'src/ui/svelte/apps/crafting/RollPrompt.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/apps/manager/ManagerModal.svelte',
+    PROMPT,
   ],
-  rootClass: 'fabricate fabricate-roll-prompt-dialog',
+  rootClass: 'fabricate fabricate-app',
 });
 
 const labels = {
   modifiers: 'Modifiers', modifierChoice: 'Check modifier', unnamedModifier: 'Unnamed modifier',
-  unnamedSubject: 'Unnamed item', dcValue: 'DC {dc}',
-  pickUpTo: 'Pick up to {count}', eachAdds: 'Each adds', bonus: 'Situational bonus',
-  bonusPlaceholder: '+2 or 1d4', bonusHelp: 'A bonus adds', rollMode: 'Roll mode',
-  meet: 'meet or beat', exceed: 'beat', bulkNote: 'One choice applies to all',
-  bulkRows: 'Rolls in this batch', noCheck: 'No check', noSingleTarget: 'No single target',
+  unnamedSubject: 'Unnamed item', dcValue: 'DC {dc}', pickUpTo: 'Pick up to {count}',
+  eachAdds: 'Each adds', bonus: 'Situational bonus', bonusPlaceholder: '+2 or 1d4',
+  bonusHelp: 'A bonus adds', rollMode: 'Roll mode', meet: 'meet or beat', exceed: 'beat',
+  bulkNote: 'One choice applies to all', bulkRows: 'Rolls in this batch', noCheck: 'No check',
+  noSingleTarget: 'No single target', worse: 'keep the worse', better: 'keep the better',
+  roll: 'Roll', advantage: 'Advantage', disadvantage: 'Disadvantage', close: 'Close',
 };
-const modes = [{ value: 'publicroll', label: 'Public roll' }, { value: 'gmroll', label: 'Private roll' }];
+const modes = [{ value: 'publicroll', label: 'Public roll' }, { value: 'gmroll', label: 'Private GM roll' }];
 const choices = [
   { id: 'a', label: 'A', display: '+1' },
   { id: 'b', label: 'B', display: '+1d4' },
   { id: 'c', label: 'C', display: '+3' },
 ];
+const noChoice = { options: [], maxPicks: 1, defaultSelectedIds: [] };
 const base = {
-  kind: 'single', title: 'Crafting check', subtitle: 'Forge rivets', formula: '2d6 + 3',
+  kind: 'single', title: 'Crafting check', subtitle: 'Brenna · Forge rivets', formula: '2d6 + 3',
   dc: 12, comparison: 'meet', selectedModifiers: [], labels, rollModes: modes,
-  defaultRollMode: 'publicroll', choicePlan: { options: [], maxPicks: 1, defaultSelectedIds: [] },
+  defaultRollMode: 'publicroll', choicePlan: noChoice, allowAdvantage: false,
+};
+const bulk = {
+  ...base, kind: 'bulk', title: 'Salvage checks', subtitle: 'Brenna · 3 items', subjects: [
+    { name: 'Ore', need: { kind: 'dc', dc: 18 } },
+    { name: 'Scrap', need: { kind: 'noCheck' } },
+    { name: 'Map', need: { kind: 'noSingleTarget' } },
+  ],
 };
 
-function createMountedLabDialog() {
-  const nodeEventTarget = globalThis.EventTarget;
-  globalThis.EventTarget = document.defaultView.EventTarget;
-  try {
-    return createLabDialogV2({ localize: (key) => key });
-  } finally {
-    globalThis.EventTarget = nodeEventTarget;
-  }
-}
+const dialogOf = (root) => root.querySelector('[data-roll-prompt]');
+const loadPrompt = () => harness.loadRuneModule(PROMPT);
 
-async function submitMountedDialog(data, allowAdvantage, interact) {
-  const root = await harness.mount({ data });
-  const lab = createMountedLabDialog();
-  lab.setAnswer('open');
-  const pending = waitForPrompt(lab.DialogV2, data, allowAdvantage, data.choicePlan, {
-    loadBody: async () => ({ default: () => {} }),
-    mountBody: (_component, { target }) => {
-      target.append(root);
-      return root;
-    },
-    unmountBody: () => {},
-  });
-  let frame;
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    [frame] = lab.openDialogs();
-    if (frame?.querySelector('input[name="situationalBonus"]')) break;
-    await new Promise((resolve) => setImmediate(resolve));
+/** The real path: adapter, host and compiled prompt, over an application root holding focus. */
+async function openThroughHost(data, allowAdvantage, choicePlan = data.choicePlan) {
+  const root = document.createElement('div');
+  root.className = 'fabricate fabricate-app';
+  const opener = document.createElement('button');
+  root.append(opener);
+  document.body.append(root);
+  opener.focus();
+  const pending = waitForPrompt(data, allowAdvantage, choicePlan, (view) =>
+    openRollPromptModal(view, { loadComponent: loadPrompt })
+  );
+  for (let attempt = 0; attempt < 20 && !dialogOf(root); attempt += 1) {
+    await new Promise((settle) => setImmediate(settle));
   }
-  assert.ok(frame?.querySelector('input[name="situationalBonus"]'), 'DialogV2 mounted the real form body');
-  await interact(frame);
-  return pending;
+  const dialog = dialogOf(root);
+  assert.ok(dialog, 'the prompt mounted into the application root');
+  return { root, opener, dialog, pending };
 }
 
 describe('mounted roll prompt', () => {
   before(() => harness.setup());
   after(() => harness.teardown());
-  beforeEach(() => harness.remount());
+  beforeEach(() => {
+    harness.remount();
+    document.body.replaceChildren();
+  });
 
-  it('shows the actual formula, inclusive target, named bonus and native mode controls', async () => {
+  it('renders one header, the actual formula, an info DC chip and named controls', async () => {
     const root = await harness.mount({ data: base });
-    assert.match(root.textContent, /2d6 \+ 3/);
-    assert.match(root.textContent, /DC 12 · meet or beat/);
-    const bonus = root.querySelector('input[name="situationalBonus"]');
-    const mode = root.querySelector('select[name="rollMode"]');
-    assert.ok(bonus);
-    assert.ok(mode);
+    const dialog = dialogOf(root);
+    assert.equal(dialog.parentElement, root, 'the modal layers inside the app it covers');
+    assert.equal(dialog.querySelectorAll('h1, h2, h3, h4').length, 1, 'one header, no second title');
+    assert.equal(dialog.querySelector('.manager-modal-title').textContent, 'Crafting check');
+    assert.equal(dialog.querySelector('.manager-modal-subtitle').textContent, 'Brenna · Forge rivets');
+    assert.equal(dialog.querySelector('.formula').textContent, '2d6 + 3');
+    assert.ok(!dialog.querySelector('code'), 'the formula is not a core-styled code element');
+    const chip = dialog.querySelector('.formula-content .manager-chip');
+    assert.match(chip.textContent, /DC 12 · meet or beat/);
+    assert.ok(chip.classList.contains('is-info'), chip.className);
+    assert.ok(!chip.classList.contains('is-mono'), 'the DC chip is not mono');
+    const mode = dialog.querySelector('select[name="rollMode"]');
     assert.equal(mode.value, 'publicroll');
     assert.equal(mode.selectedOptions[0].textContent, 'Public roll');
-    bonus.value = '+2';
-    mode.value = 'gmroll';
-    assert.equal(bonus.value, '+2');
-    assert.equal(mode.value, 'gmroll');
-    bonus.focus();
-    assert.equal(root.ownerDocument.activeElement, bonus);
+    assert.ok(dialog.querySelector('.mode-control .fa-chevron-down'));
   });
 
-  it('uses strict comparison and the exact selected rolling modifier', async () => {
-    const root = await harness.mount({ data: { ...base, comparison: 'exceed', selectedModifiers: [choices[1]] } });
+  it('shows the exact selected modifiers, naming an unlabelled one and zeroing a non-finite value', async () => {
+    const root = await harness.mount({ data: {
+      ...base, comparison: 'exceed',
+      selectedModifiers: [choices[1], { value: 3 }, { label: 'Odd', value: 'n/a' }],
+    } });
     assert.match(root.textContent, /DC 12 · beat/);
-    assert.match(root.textContent, /B \+1d4/);
-    assert.ok(!root.textContent.includes('A +1'));
+    const chips = [...root.querySelectorAll('.static-modifiers .manager-chip')];
+    assert.deepEqual(chips.map((chip) => chip.textContent.trim()), ['B +1d4', 'Unnamed modifier +3', 'Odd 0']);
+    assert.ok(chips[1].querySelector('i.fa-dice-d20'), 'an icon-less modifier takes the d20 glyph');
   });
 
-  it('uses native radio choice and changes the submitted selection', async () => {
+  it('changes a native radio choice and spaces the legend', async () => {
     const root = await harness.mount({ data: { ...base, choicePlan: { options: choices, maxPicks: 1, defaultSelectedIds: ['b'] } } });
     const radios = [...root.querySelectorAll('input[type="radio"][name="craftingModifier"]')];
     assert.equal(radios.length, 3);
@@ -112,16 +127,16 @@ describe('mounted roll prompt', () => {
     radios[0].click();
     flushSync();
     assert.equal(radios.find((input) => input.checked)?.value, 'a');
-    assert.match(root.querySelector('fieldset legend').textContent, /Check modifier/);
-    radios[0].focus();
-    assert.equal(root.ownerDocument.activeElement, radios[0]);
+    assert.equal(root.querySelector('fieldset legend').textContent, 'Check modifier');
   });
 
   it('caps multipick checkboxes, then releases and replaces a choice', async () => {
     const root = await harness.mount({ data: { ...base, choicePlan: { options: choices, maxPicks: 2, defaultSelectedIds: ['a', 'b'] } } });
+    assert.equal(root.querySelector('fieldset legend').textContent, 'Check modifier · Pick up to 2');
     const inputs = [...root.querySelectorAll('input[type="checkbox"][name="craftingModifier"]')];
     assert.equal(inputs.length, 3);
     assert.equal(inputs[2].disabled, true);
+    assert.equal(inputs[1].getAttribute('aria-label'), 'B +1d4');
     inputs[0].click();
     flushSync();
     assert.equal(inputs[2].disabled, false);
@@ -131,129 +146,148 @@ describe('mounted roll prompt', () => {
     assert.equal(inputs[0].disabled, true);
   });
 
-  it('shows each bulk need and leaves a count-only prompt operable', async () => {
-    const bulk = { ...base, kind: 'bulk', title: 'Bulk check', subtitle: '4 items', subjects: [
-      { name: 'Ore', need: { kind: 'dc', dc: 18 } },
-      { name: 'Scrap', need: { kind: 'noCheck' } },
-      { name: 'Map', need: { kind: 'noSingleTarget' } },
-    ] };
+  it('lists each bulk need under its kicker and keeps the batch note on a count-only prompt', async () => {
     const root = await harness.mount({ data: bulk });
-    assert.match(root.textContent, /Ore.*DC 18/);
-    assert.match(root.textContent, /Scrap.*No check/);
-    assert.match(root.textContent, /Map.*No single target/);
-    const empty = await harness.mount({ data: { ...bulk, subjects: [] } });
+    const rows = [...root.querySelectorAll('.bulk-row')].map((row) => [
+      row.querySelector('.bulk-name').textContent,
+      row.querySelector('.bulk-need').textContent,
+    ]);
+    assert.deepEqual(rows, [['Ore', 'DC 18'], ['Scrap', 'No check'], ['Map', 'No single target']]);
+    const group = root.querySelector('.bulk-group');
+    assert.equal(group.firstElementChild.textContent, 'Rolls in this batch', 'the kicker sits above the list');
+    assert.ok(group.querySelector('.bulk-list + .bulk-note'));
+    harness.remount();
+    const empty = await harness.mount({ data: { ...bulk, subtitle: '3 items', subjects: [] } });
     assert.ok(!empty.querySelector('.bulk-row'));
+    assert.equal(empty.querySelector('.bulk-note')?.textContent, 'One choice applies to all');
     assert.ok(empty.querySelector('select[name="rollMode"]'));
   });
 
-  it('keeps the plain-d20 and light-frame bodies complete', async () => {
-    for (const state of ['advantage', 'light']) {
-      const root = await harness.mount({ data: { ...base, state, formula: '1d20 + 2' } });
-      assert.equal(root.querySelector('.fabricate-roll-prompt').dataset.rollPromptState, state);
-      assert.match(root.textContent, /1d20 \+ 2/);
-      assert.ok(root.querySelector('input[name="situationalBonus"]'));
-      assert.ok(root.querySelector('select[name="rollMode"]'));
+  it('keeps Roll the only submit button, before Advantage, and one Roll unless advantage is strictly true', async () => {
+    const root = await harness.mount({ data: { ...base, allowAdvantage: true } });
+    const actions = [...root.querySelectorAll('.manager-modal-footer button')];
+    assert.deepEqual(actions.map((button) => button.dataset.action), ['disadvantage', 'normal', 'advantage']);
+    assert.deepEqual(actions.map((button) => button.type), ['button', 'submit', 'button']);
+    assert.equal(root.querySelector('form').querySelector('button[type="submit"]').dataset.action, 'normal');
+    assert.deepEqual(
+      actions.map((button) => button.querySelector('.action-note')?.textContent ?? null),
+      ['keep the worse', null, 'keep the better']
+    );
+    for (const allowAdvantage of [undefined, null, 'true', 1]) {
+      harness.remount();
+      const single = await harness.mount({ data: { ...base, allowAdvantage } });
+      const buttons = [...single.querySelectorAll('.manager-modal-footer button')];
+      assert.deepEqual(buttons.map((button) => button.dataset.action), ['roll'], String(allowAdvantage));
     }
   });
 
-  it('keeps dense modifier names and a capped rolling option in operable controls', async () => {
-    const longLabel = 'Herbalism lore carried through many seasons and patient field notes';
-    const root = await harness.mount({ data: {
-      ...base, state: 'overflow', choicePlan: {
-        options: [{ ...choices[0], label: longLabel }, { ...choices[1], display: '+1d4' }, choices[2]],
-        maxPicks: 2, defaultSelectedIds: ['a', 'b'],
-      },
-    } });
-    assert.match(root.textContent, new RegExp(longLabel));
-    const inputs = [...root.querySelectorAll('input[type="checkbox"][name="craftingModifier"]')];
-    assert.equal(inputs[2].disabled, true);
-    assert.equal(inputs[1].getAttribute('aria-label'), 'B +1d4');
-    assert.equal(inputs[2].getAttribute('aria-label'), 'C +3');
-    assert.match(root.textContent, /B\+1d4/);
-  });
-
-  it('submits actual radio, bonus and mode fields through every DialogV2 footer action', async () => {
+  it('submits radio, bonus and mode fields through every footer action on the real host path', async () => {
     for (const [action, advantage] of [['disadvantage', 'disadvantage'], ['normal', 'normal'], ['advantage', 'advantage']]) {
-      harness.remount();
+      document.body.replaceChildren();
       const data = { ...base, choicePlan: { options: choices, maxPicks: 1, defaultSelectedIds: ['b'] } };
-      const result = await submitMountedDialog(data, true, async (frame) => {
-        const radio = frame.querySelector('input[value="c"]');
-        radio.click();
-        flushSync();
-        frame.querySelector('input[name="situationalBonus"]').value = '+1d4';
-        frame.querySelector('select[name="rollMode"]').value = 'gmroll';
-        frame.querySelector(`button[data-action="${action}"]`).click();
-      });
-      assert.deepEqual(result, {
+      const { dialog, pending } = await openThroughHost(data, true);
+      dialog.querySelector('input[value="c"]').click();
+      flushSync();
+      dialog.querySelector('input[name="situationalBonus"]').value = '+1d4';
+      dialog.querySelector('select[name="rollMode"]').value = 'gmroll';
+      dialog.querySelector(`button[data-action="${action}"]`).click();
+      assert.deepEqual(await pending, {
         confirmed: true, bonus: '1d4', rollMode: 'gmroll', advantage,
         chosenModifierIds: ['c'], chosenModifierId: 'c',
       });
     }
   });
 
-  it('submits cap-released multipicks and maps a DialogV2 dismissal to false', async () => {
-    const data = { ...base, choicePlan: { options: choices, maxPicks: 2, defaultSelectedIds: ['a', 'b'] } };
-    const result = await submitMountedDialog(data, false, async (frame) => {
-      const [first, , third] = frame.querySelectorAll('input[type="checkbox"]');
-      assert.equal(third.disabled, true);
-      first.click();
-      flushSync();
-      assert.equal(third.disabled, false);
-      third.click();
-      flushSync();
-      frame.querySelector('button[data-action="roll"]').click();
-    });
-    assert.deepEqual(result.chosenModifierIds, ['b', 'c']);
-    harness.remount();
-    const dismissed = await submitMountedDialog(base, false, (frame) => {
-      frame.querySelector('button[data-action="close"]').click();
-    });
-    assert.deepEqual(dismissed, { confirmed: false });
-  });
-
-  it('keeps the default Enter submit and native control order in the real dialog form', async () => {
-    const result = await submitMountedDialog(base, true, (frame) => {
-      const form = frame.querySelector('form');
-      const bonus = form.elements.namedItem('situationalBonus');
-      const mode = form.elements.namedItem('rollMode');
-      const defaultButton = frame.querySelector('button[autofocus]');
-      assert.equal(defaultButton.dataset.action, 'normal');
-      assert.ok(bonus.compareDocumentPosition(mode) & Node.DOCUMENT_POSITION_FOLLOWING);
-      assert.ok(mode.compareDocumentPosition(defaultButton) & Node.DOCUMENT_POSITION_FOLLOWING);
-      bonus.focus();
-      assert.equal(document.activeElement, bonus);
-      form.requestSubmit(defaultButton);
-    });
-    assert.equal(result.advantage, 'normal');
-    assert.equal(result.rollMode, 'publicroll');
-  });
-
-  it('re-centers an expanded DialogV2 frame while preserving other position dimensions', async () => {
-    const lab = createMountedLabDialog();
-    const dialog = new lab.DialogV2({
-      buttons: [{ action: 'roll', label: 'Roll' }], position: { width: 500, height: 'auto' },
-    });
-    await dialog.render();
-    const frame = dialog.element;
-    const oldWidth = Object.getOwnPropertyDescriptor(document.documentElement, 'clientWidth');
-    const oldHeight = Object.getOwnPropertyDescriptor(document.documentElement, 'clientHeight');
-    const priorRect = frame.getBoundingClientRect;
-    Object.defineProperty(document.documentElement, 'clientWidth', { configurable: true, value: 1280 });
-    Object.defineProperty(document.documentElement, 'clientHeight', { configurable: true, value: 860 });
-    frame.getBoundingClientRect = () => ({ width: 500, height: 600 });
+  it('rolls normally when the form submits from the bonus field, in the client default mode', async () => {
+    const restore = stubI18n({}, { rollMode: 'gmroll' });
     try {
-      assert.equal(dialog.setPosition({ top: 400 }).top, 260);
-      assert.equal(dialog.setPosition({ height: 'auto' }).top, 260, 'omitting top retains the prior offset');
-      const refit = dialog.setPosition({ height: 'auto', top: null });
-      assert.equal(refit.top, 130);
-      assert.equal(refit.width, 500);
+      const { dialog, pending } = await openThroughHost(base, true, noChoice);
+      const form = dialog.querySelector('form');
+      assert.equal(form.querySelector('button[type="submit"]').dataset.action, 'normal');
+      const bonus = form.elements.namedItem('situationalBonus');
+      assert.equal(dialog.querySelector('select[name="rollMode"]').value, 'gmroll');
+      bonus.value = '2';
+      form.requestSubmit();
+      assert.deepEqual(await pending, { confirmed: true, bonus: '2', rollMode: 'gmroll', advantage: 'normal' });
     } finally {
-      frame.getBoundingClientRect = priorRect;
-      if (oldWidth) Object.defineProperty(document.documentElement, 'clientWidth', oldWidth);
-      else delete document.documentElement.clientWidth;
-      if (oldHeight) Object.defineProperty(document.documentElement, 'clientHeight', oldHeight);
-      else delete document.documentElement.clientHeight;
-      await dialog.close();
+      restore();
+    }
+  });
+
+  it('moves focus in, traps Tab, and returns focus to the opener on close', async () => {
+    const { root, opener, dialog, pending } = await openThroughHost(base, true);
+    const bonus = dialog.querySelector('input[name="situationalBonus"]');
+    assert.equal(document.activeElement, bonus, 'focus enters on the bonus field');
+    const close = dialog.querySelector('[data-manager-modal-close]');
+    const advantage = dialog.querySelector('button[data-action="advantage"]');
+    advantage.focus();
+    advantage.dispatchEvent(new document.defaultView.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+    assert.equal(document.activeElement, close, 'Tab from the last control wraps to the first');
+    close.dispatchEvent(new document.defaultView.KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }));
+    assert.equal(document.activeElement, advantage, 'Shift+Tab from the first control wraps to the last');
+    close.click();
+    assert.deepEqual(await pending, { confirmed: false });
+    assert.ok(!dialogOf(root), 'the prompt unmounted');
+    assert.equal(document.activeElement, opener, 'focus returned to the opener');
+  });
+
+  it('dismisses on Escape without letting Foundry see the key, and ignores an outside click', async () => {
+    const { root, dialog, pending } = await openThroughHost(base, false);
+    const seen = [];
+    const onWindowKey = (event) => seen.push(event.key);
+    document.defaultView.addEventListener('keydown', onWindowKey);
+    try {
+      root.dispatchEvent(new document.defaultView.MouseEvent('mousedown', { bubbles: true }));
+      assert.ok(dialog.isConnected, 'a stray click does not cancel a roll');
+      dialog.querySelector('input[name="situationalBonus"]')
+        .dispatchEvent(new document.defaultView.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      assert.deepEqual(await pending, { confirmed: false });
+      assert.deepEqual(seen, [], 'Escape stopped at the prompt');
+      assert.ok(!dialogOf(root));
+    } finally {
+      document.defaultView.removeEventListener('keydown', onWindowKey);
+    }
+  });
+
+  it('resolves a double-activated Roll once and leaks no listener on any exit', async () => {
+    const win = document.defaultView;
+    const proto = win.EventTarget.prototype;
+    const { addEventListener, removeEventListener } = proto;
+    const live = new Set();
+    proto.addEventListener = function add(type, listener, options) {
+      if (this === document || this === win) live.add(JSON.stringify([this === win, type, String(listener)]));
+      return addEventListener.call(this, type, listener, options);
+    };
+    proto.removeEventListener = function remove(type, listener, options) {
+      if (this === document || this === win) live.delete(JSON.stringify([this === win, type, String(listener)]));
+      return removeEventListener.call(this, type, listener, options);
+    };
+    try {
+      const baseline = new Set(live);
+      for (const exit of ['roll', 'escape', 'close']) {
+        const { root, dialog, pending } = await openThroughHost(base, false);
+        let settled = 0;
+        pending.then(() => { settled += 1; });
+        if (exit === 'roll') {
+          const roll = dialog.querySelector('button[data-action="roll"]');
+          roll.click();
+          roll.click();
+        } else if (exit === 'escape') {
+          dialog.dispatchEvent(new document.defaultView.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        } else {
+          dialog.querySelector('[data-manager-modal-close]').click();
+        }
+        const result = await pending;
+        await new Promise((settle) => setImmediate(settle));
+        assert.equal(settled, 1, `${exit} settled once`);
+        assert.equal(result.confirmed, exit === 'roll');
+        assert.ok(!dialogOf(root), `${exit} unmounted the prompt`);
+        root.remove();
+      }
+      assert.deepEqual([...live].filter((entry) => !baseline.has(entry)), [], 'no document or window listener survives');
+    } finally {
+      proto.addEventListener = addEventListener;
+      proto.removeEventListener = removeEventListener;
     }
   });
 });

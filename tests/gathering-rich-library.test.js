@@ -6,6 +6,7 @@ import { GatheringEnvironmentStore } from '../src/systems/GatheringEnvironmentSt
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
 import { GatheringRichStateService } from '../src/systems/GatheringRichStateService.js';
 import { SETTING_KEYS } from '../src/config/settings.js';
+import { overrideRollPromptSurface } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 
 const actor = { id: 'actor-1', uuid: 'Actor.actor-1', name: 'Gatherer', items: [] };
 const viewer = { id: 'user-1', isGM: false };
@@ -1821,14 +1822,7 @@ test('normalizeLibraryTask coerces toolIds entries to trimmed strings and drops 
 // Interactive d100: confirm-roll prompt + Dice So Nice animation (pooled Nd100).
 
 function stubDialog(response) {
-  const original = globalThis.foundry;
-  globalThis.foundry = {
-    applications: { api: { DialogV2: { wait: async () => response } } },
-  };
-  return () => {
-    if (original === undefined) delete globalThis.foundry;
-    else globalThis.foundry = original;
-  };
+  return overrideRollPromptSurface(async () => response);
 }
 
 /**

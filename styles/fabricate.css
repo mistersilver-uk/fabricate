@@ -17433,90 +17433,14 @@
   line-height: 1.5;
 }
 
-/* DialogV2 owns the frame and footer; the Svelte body owns its own controls. */
-.fabricate-roll-prompt-dialog {
-  max-width: min(500px, calc(100vw - 24px));
-  max-height: calc(100vh - 24px);
-}
-
-.fabricate-roll-prompt-dialog .window-content {
-  min-height: 0;
-  max-height: calc(100vh - 70px);
-  overflow: hidden;
-  padding: 0;
-  background: var(--fab-bg-1);
-}
-
-.fabricate-roll-prompt-dialog form {
-  color-scheme: dark;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  overflow: hidden;
-  min-height: 0;
-  max-height: calc(100vh - 70px);
-  padding: 0;
-}
-
-.fabricate-roll-prompt-dialog .fabricate-roll-prompt-host {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.fabricate-roll-prompt-dialog .dialog-content {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-  padding: 0;
-  background: var(--fab-bg-1);
-}
-
-.fabricate-roll-prompt-dialog .form-footer,
-.fabricate-roll-prompt-dialog .dialog-buttons {
-  display: flex;
-  gap: var(--fab-space-2);
-  flex: 0 0 auto;
-  padding: var(--fab-space-3) var(--fab-space-4);
-  border-top: 1px solid var(--fab-border);
-  background: var(--fab-bg-2);
-}
-
-.fabricate-roll-prompt-dialog .form-footer button,
-.fabricate-roll-prompt-dialog .dialog-buttons button {
-  flex: 1 1 0;
-  min-height: 44px;
-  height: 44px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fab-space-2xs);
-  border: 1px solid var(--fab-border-strong);
-  border-radius: 11px;
-  background: var(--fab-bg-1);
+/* The standalone roll-prompt host (`overlayHost.js`): a companion or macro prompt opened while no Fabricate window is open. A zero-size fixed layer, so it lifts the modal it hosts above Foundry's windows without blocking the page around it. */
+.fabricate.fabricate-standalone-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: calc(var(--z-index-tooltip, 9999) - 1);
   color: var(--fab-text);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.fabricate-roll-prompt-dialog .form-footer button[data-action='normal'],
-.fabricate-roll-prompt-dialog .form-footer button[data-action='roll'],
-.fabricate-roll-prompt-dialog .dialog-buttons button[data-action='normal'],
-.fabricate-roll-prompt-dialog .dialog-buttons button[data-action='roll'] {
-  border-color: var(--fab-accent-border);
-  background: var(--fab-accent);
-  color: var(--fab-on-accent);
-}
-
-.fabricate-roll-prompt-dialog .fabricate-roll-prompt__footer-note {
-  display: block;
-  color: var(--fab-text-secondary);
-  font-size: 9.5px;
-  font-weight: 500;
+  color-scheme: dark;
 }
 
 /* The recipe row's collapse ladder (issue 643 §8). Drop order is fixed: (1) description, (2) I/O + steps readout, (3) check pill — and NEVER the lock, enable or edit controls (issue 1010). */
