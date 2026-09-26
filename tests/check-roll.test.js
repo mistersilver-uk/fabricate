@@ -11,6 +11,8 @@ const {
   runFormulaPassFail,
   runFormulaProgressive,
   runFormulaRouted,
+  resolveRolledFormula,
+  evaluatePreparedRunCheck,
 } = await import('../src/systems/checkRoll.js');
 const { rollActorCheck } = await import('../src/systems/companionCheckRoll.js');
 const { GatheringEngine } = await import('../src/systems/GatheringEngine.js');
@@ -258,10 +260,15 @@ test('check modifiers: runFormulaPassFail threads the modifier context through t
 test('the runner passes normalized comparison and the formula-selected modifier to the prompt', async () => {
   stubCraftingModRoll();
   const actor = { getRollData: () => ({ abilities: { med: { mod: 3 }, alch: { mod: 5 } } }) };
-  for (const thresholdMode of ['meet', 'exceed']) {
+  for (const [authored, thresholdMode] of [
+    ['meet', 'meet'],
+    ['exceed', 'exceed'],
+    [undefined, 'meet'],
+    ['EXCEED', 'meet'],
+  ]) {
     let shown;
     await runFormulaPassFail({
-      formula: '1d20', dc: 10, thresholdMode, actor, craftingModifier: MOD_CONTEXT,
+      formula: '1d20', dc: 10, thresholdMode: authored, actor, craftingModifier: MOD_CONTEXT,
       rollOptions: { interactive: true, prompt: async (options) => {
         shown = options;
         return { confirmed: true, advantage: 'normal' };
@@ -292,6 +299,10 @@ test('the routed runner passes its comparison and selected modifier to the promp
   assert.deepEqual(shown.selectedModifiers.map((modifier) => modifier.id), ['alch']);
   assert.equal(shown.resolvedFormula, '1d20 + 5[Modifiers]');
   delete globalThis.Roll;
+});
+
+test('resolveRolledFormula trims the authored formula when no modifier context applies', () => {
+  assert.equal(resolveRolledFormula(' 1d20 + 4 ', null, null, undefined), '1d20 + 4');
 });
 
 // ── the retirement shim, at the head of the roll path (issue 1094) ───────────
@@ -1652,11 +1663,10 @@ test('runFormulaRouted: a throwing roll fails with a labelled message', async ()
 
 const { classifyCheckTotal } = await import('../src/systems/checkRoll.js');
 
-test('executed simple evidence records the raw comparison while future evaluation stays inactive', async () => {
+test('executed simple evidence records the raw sum/over comparison under a forced success', async () => {
   stubRoll(8, [{ number: 1, faces: 20, total: 8, results: [{ result: 8 }] }]);
   const result = await runFormulaPassFail({
     formula: '1d20', dc: 10, actor: ACTOR,
-    evaluation: { product: 'count', direction: 'under' },
     triggers: [totalTrigger({ value: 8, outcome: 'success' })],
   });
   assert.equal(result.success, true);
@@ -1713,7 +1723,6 @@ test('routed evidence uses the roll-matched relative threshold before forced rou
   stubRoll(18, [{ number: 1, faces: 20, total: 18, results: [{ result: 18 }] }]);
   const result = await runFormulaRouted({
     formula: '1d20', dc: 15, actor: ACTOR, type: 'relative', relativeOutcomes: RELATIVE,
-    evaluation: { product: 'count', direction: 'under' },
     triggers: [totalTrigger({ value: 18, outcome: 'failure' })],
   });
   assert.equal(result.outcome, 'Failure');
@@ -1721,6 +1730,82 @@ test('routed evidence uses the roll-matched relative threshold before forced rou
   assert.equal(result.data.margin, 3);
   assert.equal(result.data.product, 'sum');
   assert.equal(result.data.direction, 'over');
+});
+
+test('routed evidence targets the clamped lowest tier when the total is below every threshold', async () => {
+  stubRoll(3);
+  const result = await runFormulaRouted({
+    formula: '1d20', dc: 15, actor: ACTOR, type: 'relative', clampToNearest: true,
+    relativeOutcomes: [
+      { id: 'good', name: 'Success', success: true, dc: 0 },
+      { id: 'bad', name: 'Failure', success: false, dc: -5 },
+    ],
+  });
+  assert.equal(result.outcome, 'Failure');
+  assert.equal(result.data.target, 10);
+  assert.equal(result.data.margin, -7);
+});
+
+test('fixed routed overlap picks the highest matching start and the first authored on a tie', async () => {
+  stubRoll(12);
+  const result = await runFormulaRouted({
+    formula: '1d20', dc: 0, actor: ACTOR, type: 'fixed',
+    fixedOutcomes: [
+      { id: 'wide', name: 'Wide', success: false, start: 1, end: 20 },
+      { id: 'first', name: 'First', success: true, start: 10, end: 20 },
+      { id: 'tied', name: 'Tied', success: true, start: 10, end: 15 },
+      { id: 'missed', name: 'Missed', success: true, start: 13, end: 20 },
+    ],
+  });
+  assert.equal(result.data.outcomeId, 'first');
+});
+
+// A prepared check resolves from its descriptor alone: the slot names the kind.
+function preparedCheck(slot, checkConfig = {}, decisionPolicy = {}) {
+  return { mode: slot, slot, rollFormula: '1d20', checkConfig, decisionPolicy };
+}
+
+test('a prepared simple check honours exceed at the boundary', async () => {
+  stubRoll(12);
+  const exceed = await evaluatePreparedRunCheck(
+    preparedCheck('simple', {}, { dc: 12, thresholdMode: 'exceed' }), ACTOR
+  );
+  assert.equal(exceed.success, false);
+  assert.equal(exceed.data.comparison, 'exceed');
+  assert.equal(exceed.data.margin, 0);
+  const meet = await evaluatePreparedRunCheck(
+    preparedCheck('simple', {}, { dc: 12, thresholdMode: 'meet' }), ACTOR
+  );
+  assert.equal(meet.success, true);
+  assert.equal(meet.data.comparison, 'meet');
+});
+
+test('a prepared routed check records the roll-matched relative target and margin', async () => {
+  stubRoll(18);
+  const result = await evaluatePreparedRunCheck(
+    preparedCheck('routed', {
+      type: 'relative',
+      relativeOutcomes: [
+        { id: 'good', name: 'Success', success: true, dc: 0 },
+        { id: 'bad', name: 'Failure', success: false, dc: -5 },
+      ],
+    }, { dc: 15 }),
+    ACTOR
+  );
+  assert.equal(result.outcome, 'Success');
+  assert.equal(result.data.target, 15);
+  assert.equal(result.data.margin, 3);
+});
+
+test('a prepared progressive check records sum/over evidence with no comparison or target', async () => {
+  stubRoll(9);
+  const result = await evaluatePreparedRunCheck(preparedCheck('progressive'), ACTOR);
+  assert.deepEqual(
+    ['product', 'direction', 'comparison', 'target', 'margin', 'successes', 'cancelled']
+      .map((key) => result.data[key]),
+    ['sum', 'over', null, null, null, null, null]
+  );
+  assert.equal(result.value, 9);
 });
 
 test('fixed and progressive rolls have null targets; unrolled exits add no execution metadata', async () => {
