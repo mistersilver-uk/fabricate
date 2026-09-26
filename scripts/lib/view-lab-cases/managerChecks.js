@@ -40,17 +40,10 @@ export const CASES = Object.freeze([
     id: 'manager-checks-validation',
     label: 'Manager — Checks validation',
     smokeLabels: ['manager-checks-validation'],
-    // Window, not exact: the smoke walk authors no transformed modifier before opening Validation.
-    reaches: 'window',
-    query: { system: 'lab-herbalism' },
-    steps: [
-      ...AUTHOR_TRANSFORMED_MODIFIER,
-      'Checks',
-      { selector: '#manager-checks-nav-validation' },
-      { selector: '[data-issue="modifierAverageUnavailable"]', scroll: true },
-    ],
+    reaches: 'exact',
+    query: {},
+    steps: ['Checks', { selector: '#manager-checks-nav-validation' }],
     expectView: 'checks-validation',
-    expectSelector: '.fabricate-manager [data-issue="modifierAverageUnavailable"]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -75,6 +68,27 @@ export const CASES = Object.freeze([
     expectView: 'checks-validation',
     // The critical id specifically: a presence-only assertion is satisfied by the warning, which says the opposite.
     expectSelector: '.fabricate-manager [data-issue="retiredPlaceholderBreaksFormula"]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  // The transformed-modifier average warning (issue 2000).
+  managerCase({
+    id: 'manager-checks-validation-average-unavailable',
+    label: 'Manager — Checks validation modifier average unavailable',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      ...AUTHOR_TRANSFORMED_MODIFIER,
+      'Checks',
+      { selector: '#manager-checks-nav-validation' },
+      { selector: '[data-issue="modifierAverageUnavailable"]', scroll: true },
+    ],
+    expectView: 'checks-validation',
+    expectSelector: '.fabricate-manager [data-issue="modifierAverageUnavailable"]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -303,29 +317,22 @@ export const CASES = Object.freeze([
     label: 'Manager — Checks crafting modifiers',
     smokeLabels: ['manager-checks-crafting-modifiers'],
     // The catalogue card sits last in the crafting panel, below the consumption frame's fold, so this capture scrolls to it.
-    // Window, not exact: the smoke walk neither authors a transformed modifier nor presses a rule.
-    reaches: 'window',
+    reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
-      ...AUTHOR_TRANSFORMED_MODIFIER,
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-modifiers' },
-      { selector: '[data-crafting-modifier-policy-option="highest"] input' },
-      { selector: '[data-crafting-modifier-policy-option="playerPicks"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '' },
       // Re-anchored (issue 1095 review).
       { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
     expectView: 'checks-crafting',
     // Two things at once on the `How they combine` card, which issue 1096's parity round split out of the catalogue card.
-    // An unlimited cap ranks nothing out, so the transformed entry raises no warning here.
     expectSelector:
-      '.fabricate-manager' +
-      ':has([data-crafting-modifier-policy-card])' +
-      ':has([data-crafting-modifier-policy-card] [data-crafting-modifier-policy-option="bySubject"])' +
-      ':has([data-crafting-modifier-policy-card] [data-crafting-modifier-max-picks="unlimited"])' +
-      ':not(:has([data-checks-section-callout="modifierAverageUnavailable"]))',
+      '.fabricate-manager [data-crafting-modifier-policy-card]' +
+      ':has([data-crafting-modifier-policy-option="bySubject"])' +
+      ':has([data-crafting-modifier-max-picks="unlimited"])',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,

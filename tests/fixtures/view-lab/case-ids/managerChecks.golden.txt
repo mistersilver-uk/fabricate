@@ -1,6 +1,7 @@
 manager-checks-gathering
 manager-checks-validation
 manager-checks-validation-retired-placeholder
+manager-checks-validation-average-unavailable
 manager-checks-rail-group
 manager-checks-rail-dirty
 manager-checks-section-badged-and-dotted
