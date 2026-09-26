@@ -2148,6 +2148,18 @@ test('versioned Journal preparation freezes modifier contributions across actor 
       assert.equal(evaluated.success, true);
       assert.equal(rolledFormulas.at(-1), '1d20 + 2[Tool] + 3[Modifiers] + (1d4+1)[Modifiers]');
       assert.equal(rolledFormulas.length, policy === 'addAll' ? 1 : 2);
+      if (policy !== 'playerPicks') continue;
+      // A prompt that offered no choice sends no ids: absent rolls the defaults, empty rolls none.
+      for (const [unanswered, expected] of [
+        [{}, '1d20 + 2[Tool] + 3[Modifiers] + (1d4+1)[Modifiers]'],
+        [{ modifierIds: null }, '1d20 + 2[Tool] + 3[Modifiers] + (1d4+1)[Modifiers]'],
+        [{ modifierIds: [] }, '1d20 + 2[Tool]'],
+      ]) {
+        await evaluatePreparedRunCheck(
+          JSON.parse(JSON.stringify(descriptor.privateEvaluation)), actor, unanswered
+        );
+        assert.equal(rolledFormulas.at(-1), expected, JSON.stringify(unanswered));
+      }
     }
   } finally {
     if (originalRoll === undefined) delete globalThis.Roll;

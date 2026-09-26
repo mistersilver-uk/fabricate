@@ -1674,6 +1674,40 @@ describe('journal run command protocol', () => {
     assert.deepEqual(posted, { serializedRoll: { formula: '1d20', total: 17 } });
   });
 
+  it('sends a non-interactive check no modifier ids, so the prepared defaults roll', async () => {
+    let evaluatedDecision = null;
+    let prompts = 0;
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      run,
+      promptCheck: async () => { prompts += 1; return { confirmed: true, modifierIds: [] }; },
+      operations: {
+        crafting: {
+          getRun: () => run,
+          describeCheck: async () => ({
+            required: true,
+            publicPrompt: { label: 'Forge' },
+            privateEvaluation: { rollFormula: '1d20' },
+          }),
+          evaluateCheck: async ({ decision }) => {
+            evaluatedDecision = decision;
+            return { engineEvaluated: true, success: true, data: {} };
+          },
+          execute: async () => ({ success: true }),
+        },
+      },
+    });
+    const result = await service.executeJournalRunCommand(
+      { actorUuid: 'Actor.a', runType: 'crafting', runId: 'run-1', expectedRevision: 3,
+        action: 'execute', payload: {} },
+      { interactive: false }
+    );
+    assert.equal(result.success, true, JSON.stringify(result));
+    assert.equal(prompts, 0);
+    assert.equal(evaluatedDecision.modifierIds, null, 'absent, never an empty answer');
+  });
+
   it('drops a visible roll handoff when post-commit entitlement is lost', async () => {
     let entitled = true;
     let posts = 0;

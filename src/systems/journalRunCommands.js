@@ -61,9 +61,10 @@ function safeRollDecision(value) {
     bonus: typeof decision.bonus === 'string' ? decision.bonus : null,
     rollMode: typeof decision.rollMode === 'string' ? decision.rollMode : null,
     advantage: typeof decision.advantage === 'string' ? decision.advantage : null,
+    // `null` when no choice was offered, so the prepared defaults roll; `[]` is an answer.
     modifierIds: Array.isArray(modifierIds)
       ? modifierIds.filter((id) => typeof id === 'string')
-      : [],
+      : null,
   };
 }
 
