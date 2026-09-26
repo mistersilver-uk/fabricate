@@ -99,8 +99,7 @@ Other evaluation styles are planned and not yet available.
 For an active check, Fabricate builds the roll in this order: your authored formula, eligible Tool bonuses, the selected named modifiers, Advantage or Disadvantage, and then a valid situational bonus.
 Flat named modifiers share one labelled term, while each named modifier that rolls dice keeps its own labelled term.
 
-A Tool bonus that rolls dice is evaluated once before the main check.
-Its actual result is applied to the check, and its die roll appears with the main check in one chat message.
+A Tool bonus that rolls dice is rolled once before the main check, and its total joins the check as a labelled number.
 Fabricate does not roll that Tool bonus again when it posts the check.
 
 ### Defining modifiers

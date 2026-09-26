@@ -338,10 +338,16 @@ So every non-default action MUST declare `type: "button"`, or Enter fires whiche
 - **DialogV2 has no subtitle slot, and `window.frame: false` removes the close control and dragging along with the header.**
 A secondary heading belongs in the dialog's own content, and a frameless dialog needs its own dismiss action (issue 2021).
 - **A check with modifier pre-rolls posts one message carrying multiple live rolls.**
-`Roll#toMessage` replaces the message's `rolls` with its own roll, so `postBundledCheckRoll` uses `ChatMessage.create` with `[mainRoll, ...preRolls]` and the main roll's rendered content; the pre-rolls are actual evaluated rolls, not another animation of their numeric totals.
+`Roll#toMessage` replaces the message's `rolls` with its own roll, so `postBundledCheckRoll` uses `ChatMessage.create` with `[mainRoll, ...preRolls]` and the main total as content, as `Roll#toMessage` sets it; the pre-rolls are actual evaluated rolls, not another animation of their numeric totals.
 With no explicit roll mode, the bundled post reads the posting client's current `core.rollMode` on V13 or `core.messageMode` on V14 through `chatModeOption`; passing an explicit mode keeps its precedence and the same speaker and flavor apply to the bundle.
 The prepared handoff retains `serializedRoll` and separately ordered `serializedPreRolls`; an entitled client reconstructs each with `Roll.fromData` and posts the bundle without reevaluation, while an old single-roll handoff still uses `Roll#toMessage`.
 Secret execution excludes formula-bearing handoff and pre-roll evidence from the requester; a GM-visible message may still reveal that a roll happened while hiding its content.
+- **`Roll#toJSON` is shallow.**
+A `ParentheticalTerm` serializes its inner Roll as the live object, whose `_root` links back to the outer roll and its actor roll data.
+Serialize roll evidence with a JSON round trip (`cloneJson`), never `structuredClone`, which copies that live graph or throws on it.
+- **`Roll.fromData` and `RollTerm._fromData` mutate their input**, so a caller that keeps the serialized data passes a clone.
+- **`ChatMessage#renderRollContent` renders `message.rolls` only when `content` has no child elements.**
+A bundled post therefore carries the bare total as its content, and a viewer who cannot see that content still gets every roll drawn privately.
 - **`Localization#format` is a real, separately-declared method on V13 and a bare alias of `localize` on V14, with no deprecation warning either way.**
 On V13.351, `client/helpers/localization.mjs` declares `format(stringId, data={})` as its own method, calling `this.localize(stringId)` internally, and its `localize(stringId)` takes no `data` argument at all.
 On V14.365 the class declares only `localize(stringId, data)` — which now accepts `data` itself — and `format` is not declared as a method anywhere in the class body; it survives solely because the module ends with `Object.defineProperties(Localization.prototype, {format: {value: Localization.prototype.localize}})`, a non-enumerable alias pointing at the same function as `localize`.
