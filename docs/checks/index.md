@@ -74,7 +74,7 @@ Fabricate adds the eligible modifiers to the roll itself, each labelled so the c
 The ones that work out to a plain number are summed into one term, so a roll of `1d20 + 2` with a `+3` modifier is rolled and reported as `1d20 + 2 + 3[Modifiers]`.
 Each modifier that rolls dice is added as its own term beside it, so its dice stay attributable to it.
 A `+3` modifier and a `1d4` one together give `1d20 + 2 + 3[Modifiers] + (1d4)[Modifiers]`.
-The modifiers themselves live in **one library per crafting system**, on the **Modifiers** card of the system's **System settings** page.
+The modifiers themselves live in one world library, at **World > Rules & Resources > Modifiers**.
 The **Modifiers** section of each Checks page then decides which of them that activity applies and how they combine.
 Its **Named modifiers** card lists the library and carries the switch that marks an entry eligible.
 Its **How they combine** card carries the combination rule and the pick limit.
@@ -92,12 +92,22 @@ Each shows the library read-only and links to World › Rules & Resources › Mo
 Because an eligible modifier never appears in the formula you type, **The roll** section restates it for you.
 Under the formula field, **What actually gets rolled** shows the same formula with each applied modifier beside it and names the rule that combines them.
 
+### What a check rolls today
+
+The active check engine uses the usual roll-total-over-target evaluation.
+Other evaluation styles are planned and not yet available.
+For an active check, Fabricate builds the roll in this order: your authored formula, eligible Tool bonuses, the selected named modifiers, Advantage or Disadvantage, and then a valid situational bonus.
+Flat named modifiers share one labelled term, while each named modifier that rolls dice keeps its own labelled term.
+
+A Tool bonus that rolls dice is rolled once before the main check, and its total joins the check as a labelled number.
+Fabricate does not roll that Tool bonus again when it posts the check.
+
 ### Defining modifiers
 
 A modifier's expression is an ordinary roll expression.
 See [Expressions]({% link expressions.md %}) for the syntax, the per-game-system data paths, and how bounds clamp what an entry contributes.
 
-Open **System settings** for the crafting system and find the **Modifiers** card, then choose **Add modifier**.
+Open **World > Rules & Resources > Modifiers**, then choose **Add modifier**.
 Each entry has an **Icon**, a **Label** such as Medicine or Herbalism, and an **Expression**.
 Write a character-data path with its leading `@` — for example `@abilities.med.mod` — because the field supplies nothing for you.
 A number or a dice expression takes no `@` at all: write `2` or `1d4` as they stand, and `@abilities.med.mod + 1d4` mixes the two.
@@ -107,7 +117,9 @@ This is the same library gathering drop rows and events reference for their d100
 
 {% include screenshot.html case="manager-checks-crafting-modifiers" %}
 
-The two READ it differently — a drop row works the expression out and shifts the chance by the result, while a check adds it to the roll — but **an expression that rolls dice is welcome in both**.
+The two read it differently.
+A drop row works the expression out and shifts the chance by the result, while an active check adds it to the roll.
+An expression that rolls dice is welcome in both.
 A check appends the dice to its own roll formula, so a `1d4` modifier is rolled once together with the check, animates like any other die, and shows on the chat card.
 
 Two consequences are worth knowing.

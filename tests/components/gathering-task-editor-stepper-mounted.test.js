@@ -32,6 +32,7 @@ const harness = createMountedComponentHarness({
     // The SHARED subject check-modifier picker's resolver (issue 1095).
     'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
+    'src/systems/checkModifierRouter.js',
     'src/systems/salvageCheckUsability.js',
     'src/utils/checkModifierPicks.js',
     'src/systems/toolCheckBonus.js',

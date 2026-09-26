@@ -4,6 +4,8 @@
  * different actors in a multi-actor attempt.
  */
 
+export class ToolCheckEvidenceError extends Error {}
+
 /** Whether an ingredient set's Tool references are active. Inactive ids stay serialized, so a
  *  mode switch or a restored set name is lossless; every reader checks this before using them. */
 export function ingredientSetToolsAreActive(system, ingredientSet) {
@@ -90,15 +92,26 @@ async function evaluateEnabledBonus({ tool, actor, eligible, evaluateExpression 
     !expression ||
     typeof evaluateExpression !== 'function'
   ) {
-    return 0;
+    return { value: 0 };
   }
+  let result;
   try {
-    const result = await evaluateExpression({ actor, expression, tool });
-    const numeric = result === null || result === undefined ? NaN : Number(result);
-    return Number.isFinite(numeric) ? numeric : 0;
-  } catch {
-    return 0;
+    result = await evaluateExpression({ actor, expression, tool });
+  } catch (error) {
+    if (error instanceof ToolCheckEvidenceError) throw error;
+    return { value: 0 };
   }
+  const raw = result && typeof result === 'object' ? result.value : result;
+  const numeric = raw === null || raw === undefined ? NaN : Number(raw);
+  if (!Number.isFinite(numeric)) return { value: 0 };
+  const preRoll = result && typeof result === 'object' ? result.preRoll : null;
+  if (preRoll && preRoll.total !== numeric) {
+    throw new ToolCheckEvidenceError('Tool roll evidence does not match its bonus');
+  }
+  return {
+    value: numeric,
+    ...(preRoll && { preRoll: structuredClone(preRoll) }),
+  };
 }
 
 export async function evaluateToolCheckContribution({
@@ -116,7 +129,7 @@ export async function evaluateToolCheckContribution({
     prerequisiteDefinitions,
     evaluatePrerequisite,
   });
-  const value = await evaluateEnabledBonus({
+  const bonus = await evaluateEnabledBonus({
     tool,
     actor,
     eligible: gate.bonusEligible,
@@ -127,20 +140,8 @@ export async function evaluateToolCheckContribution({
     actor,
     toolId: tool?.id ?? null,
     label: String(tool?.label || tool?.name || 'Tool'),
-    value,
-  };
-}
-
-export function composeToolBonusTerms(contributions) {
-  const terms = [];
-  for (const contribution of Array.isArray(contributions) ? contributions : []) {
-    const value = Number(contribution?.value);
-    if (!Number.isFinite(value) || value === 0) continue;
-    terms.push({ ...contribution, value });
-  }
-  return {
-    terms,
-    total: terms.reduce((sum, term) => sum + term.value, 0),
+    value: bonus.value,
+    ...(bonus.preRoll && { preRoll: bonus.preRoll }),
   };
 }
 

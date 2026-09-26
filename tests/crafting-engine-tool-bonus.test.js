@@ -71,7 +71,7 @@ function makeEngine() {
 
 test('crafting adds each distinct eligible Tool contribution once', async () => {
   const engine = makeEngine();
-  const formula = await engine._appendToolCheckBonuses('1d20', [
+  const { formula } = await engine._prepareToolCheckBonuses('1d20', [
     contribution({ id: 'hammer', label: 'Hammer [Tool]', value: 2 }),
     contribution({ id: 'saw', label: 'Saw', value: -2 }),
     contribution({ id: 'anvil', label: 'Anvil', value: 5 }),
@@ -99,7 +99,7 @@ test('owned and virtual contributions evaluate against their already-bound actor
   });
 
   assert.equal(
-    await engine._appendToolCheckBonuses('1d20', [owned, virtual]),
+    (await engine._prepareToolCheckBonuses('1d20', [owned, virtual])).formula,
     '1d20 + 3[owned] + 9[virtual]'
   );
 });
@@ -115,12 +115,12 @@ test('bonus-only prerequisite failure and expression errors contribute zero with
   });
   const broken = contribution({ id: 'broken', expression: 'bad', value: 4 });
 
-  assert.equal(await engine._appendToolCheckBonuses('1d20', [gated, broken]), '1d20');
+  assert.equal((await engine._prepareToolCheckBonuses('1d20', [gated, broken])).formula, '1d20');
 });
 
 test('disabled Tools contribute nothing', async () => {
   const engine = makeEngine();
-  const formula = await engine._appendToolCheckBonuses('1d20', [
+  const { formula } = await engine._prepareToolCheckBonuses('1d20', [
     contribution({ id: 'enabled', value: 2 }),
     contribution({ id: 'disabled', value: 6, enabled: false }),
   ]);
@@ -143,9 +143,9 @@ test('simple, routed, progressive, and salvage runners append Tool terms to thei
   const engine = makeEngine();
   const toolItems = [contribution({ id: 'bonus', value: 2 })];
   const seen = [];
-  engine._appendToolCheckBonuses = async (formula, received) => {
+  engine._prepareToolCheckBonuses = async (formula, received, evaluation) => {
     seen.push({ formula, received });
-    return formula;
+    return { formula, contributions: [], evaluation };
   };
   engine._resolveSimpleCheckDc = async () => 10;
 

@@ -47,6 +47,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js',
   'src/systems/characterLibraries.js',
   'src/systems/checkModifierResolver.js',
+  'src/systems/checkModifierRouter.js',
   'src/systems/salvageCheckUsability.js',
   'src/utils/checkModifierPicks.js',
   'src/systems/toolCheckBonus.js',
@@ -68,6 +69,8 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checkOdds.js',
   'src/systems/checkEvaluation.js',
   'src/systems/checkRoll.js',
+  'src/systems/checkRollDecision.js',
+  'src/systems/checkModifierRolls.js',
   'src/systems/bulkChatVisibility.js',
   'src/utils/progressiveAward.js',
   // The progressive PREVIEW SANDBOX derivation (issue 1097).

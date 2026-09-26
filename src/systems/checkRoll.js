@@ -5,24 +5,29 @@
  */
 
 import { evaluateCheckBreakageCondition } from '../toolBreakageRuntime.js';
-import {
-  applyD20Advantage,
-  hasPlainD20,
-  stripRetiredModifierPlaceholder,
-} from '../utils/craftingCheckExpression.js';
+import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
+import { cloneJson } from '../utils/scalars.js';
 
 import { chatModeOption } from './bulkChatVisibility.js';
 import { compareToTarget, effectiveMargin, rankBest } from './checkEvaluation.js';
 import { resolveCheckModifierFormula } from './checkModifierResolver.js';
-import {
-  appendCheckModifierRollTerms,
-  appendCheckModifierTerm,
-  CHECK_MODIFIER_TERM_LABEL,
-} from './toolCheckBonus.js';
+import { postBundledCheckRoll, resolveModifierPreRolls } from './checkModifierRolls.js';
+import { SUM_OVER_EVALUATION } from './checkModifierRouter.js';
+import { resolveCheckDecision } from './checkRollDecision.js';
 
-/** The deferred `playerPicks` slot the prompt shows as a trailing term, where the resolved term
- *  lands; `cleanHTML` strips inline handlers, so no live preview is possible. */
-const DEFERRED_MODIFIER_SLOT = `(modifier)[${CHECK_MODIFIER_TERM_LABEL}]`;
+function preRollEvidence(rolled) {
+  const entries = rolled?.modifierPlacement?.preRolls;
+  if (!Array.isArray(entries) || entries.length === 0) return {};
+  return {
+    preRolls: entries.map(({ source, label, expression, total, destination }) => ({
+      source,
+      label,
+      expression,
+      total,
+      destination,
+    })),
+  };
+}
 
 /**
  * The formula this module actually rolls: the retired-placeholder shim (issue 1094), then the
@@ -40,10 +45,16 @@ export function resolveRolledFormula(
   return resolveRolledCheck(formula, actor, craftingModifier, Roll).formula;
 }
 
-function resolveRolledCheck(formula, actor, craftingModifier, Roll = globalThis.Roll) {
+function resolveRolledCheck(
+  formula,
+  actor,
+  craftingModifier,
+  Roll = globalThis.Roll,
+  evaluation = SUM_OVER_EVALUATION
+) {
   const authored = stripRetiredModifierPlaceholder(String(formula ?? ''), Roll);
   if (authored.trim() === '') return { formula: '', selected: [] };
-  return resolveCheckModifierFormula(authored, actor, craftingModifier, Roll);
+  return resolveCheckModifierFormula(authored, actor, craftingModifier, Roll, evaluation);
 }
 
 /**
@@ -104,47 +115,6 @@ export function resolveForcedOutcome(triggers, { total, value, diceGroups } = {}
 }
 
 /**
- * The ids a returned prompt choice asks to spend, in precedence: `chosenModifierIds` (an empty
- * array is an answer, appending nothing), then the historical `chosenModifierId`, then the
- * descriptor's own pre-selection when the prompt confirmed without one.
- */
-function requestedModifierIds(modifierChoice, choice) {
-  if (Array.isArray(choice?.chosenModifierIds)) return choice.chosenModifierIds;
-  const single = choice?.chosenModifierId;
-  if (single !== undefined && single !== null) return [single];
-  const defaults = modifierChoice?.defaultSelectedIds;
-  if (Array.isArray(defaults)) return defaults;
-  const fallback = modifierChoice?.defaultSelectedId;
-  return fallback === undefined || fallback === null ? [] : [fallback];
-}
-
-/**
- * Reduce a returned selection to what counts, never trusting the prompt: unoffered ids are
- * discarded, survivors are taken in eligible order and truncated to `maxPicks` (absent or invalid
- * means 1), flat values sum, and rolling fragments are taken verbatim from the descriptor.
- */
-function resolveModifierSelection(modifierChoice, choice) {
-  const offered = Array.isArray(modifierChoice?.modifiers) ? modifierChoice.modifiers : [];
-  const requested = new Set(requestedModifierIds(modifierChoice, choice));
-  const rawCap = Number(modifierChoice?.maxPicks);
-  const maxPicks = Number.isInteger(rawCap) && rawCap > 0 ? rawCap : 1;
-  const picked = offered
-    .filter((modifier) => typeof modifier?.id === 'string' && requested.has(modifier.id))
-    .slice(0, maxPicks);
-  const value = picked.reduce((sum, modifier) => {
-    const num = Number(modifier?.value);
-    return sum + (Number.isFinite(num) ? num : 0);
-  }, 0);
-  const formulas = picked
-    .map((modifier) => modifier?.formula)
-    .filter((formula) => typeof formula === 'string' && formula.trim() !== '');
-  const labels = picked
-    .map((modifier) => modifier?.label)
-    .filter((label) => typeof label === 'string' && label !== '');
-  return { value, formulas, labels };
-}
-
-/**
  * Evaluate a check formula to `{ engine, total, diceGroups, resolvedFormula }`: `engine: false`
  * without a dice engine, and a bad formula throws for the caller to wrap. Interactive behaviour
  * is opt-in: `interactive` with a `prompt` confirms with the player, and a pre-resolved
@@ -152,6 +122,7 @@ function resolveModifierSelection(modifierChoice, choice) {
  * one answer drives N rolls. `modifierChoice` defers the `playerPicks` append until the prompt
  * returns (issues 770, 1055); otherwise `craftingModifier` appends before anything reads the
  * formula. A cancelled prompt returns `cancelled: true` so the runner aborts with zero mutation.
+ * Separately evaluated modifiers settle before the main roll and return their ordered placement.
  */
 export async function evaluateCheckRoll(formula, actor, options = {}) {
   if (typeof globalThis.Roll !== 'function')
@@ -164,109 +135,45 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   if (authoredFormula.trim() === '')
     return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
-  // Interactive `playerPicks` (issue 770): the value is picked in the prompt, so it appends later.
+  const evaluation = options?.evaluation ?? SUM_OVER_EVALUATION;
   const modifierChoice = options?.modifierChoice;
-  const useDeferredChoice =
+  const deferred =
     Boolean(modifierChoice) &&
     options?.interactive === true &&
     (typeof options.prompt === 'function' || Boolean(options?.rollDecision));
-  // Append before anything reads the formula, so dialog, roll and journal agree (issue 1097).
-  const resolvedCheck = useDeferredChoice
+  const resolvedCheck = deferred
     ? { formula: authoredFormula, selected: [] }
-    : resolveRolledCheck(authoredFormula, actor, options?.craftingModifier);
-  const baseFormula = resolvedCheck.formula;
-  // The `@`-resolved display, recomputed below whenever the formula changes.
-  let resolved = resolveCheckFormulaDisplay(baseFormula, actor);
-
-  let effectiveFormula = baseFormula;
-  let effectiveRollMode = options?.rollMode;
-  let effectiveFlavor = options?.flavor;
-  // Advantage is asked of the authored check, never the appended modifiers (issue 1118): a
-  // `(1d20)[Modifiers]` term would otherwise read as a plain d20 and be rewritten. Every appender
-  // returns `base + terms`, so the transform applies to this prefix, guarded by `startsWith`.
-  let advantageBase = authoredFormula.trim();
-
-  // A pre-resolved decision (issue 859) stands in for the dialog's return value.
-  const preResolved = options?.rollDecision ?? null;
-
-  // Interactive roll: confirm (or reuse the decision) and optionally add a situational bonus.
-  // `Boolean(preResolved) ||` is load-bearing: without it a decision with no `prompt` is dropped.
-  if (
-    options?.interactive === true &&
-    (Boolean(preResolved) || typeof options.prompt === 'function')
-  ) {
-    // Prompt-only work, never computed for a pre-resolved roll.
-    const askPlayer = async () => {
-      // A deferred choice shows a neutral trailing slot, where the resolved term will land.
-      const promptFormula = useDeferredChoice
-        ? `${effectiveFormula} + ${DEFERRED_MODIFIER_SLOT}`
-        : effectiveFormula;
-      const promptResolved = useDeferredChoice
-        ? resolveCheckFormulaDisplay(promptFormula, actor)
-        : resolved;
-      return options.prompt({
-        formula: promptFormula,
-        resolvedFormula: promptResolved?.display ?? null,
-        dc: options.dc,
-        label: options.flavor,
-        name: options.name,
-        activity: options.activity,
-        img: options.img,
-        modifierChoice,
-        selectedModifiers: resolvedCheck.selected,
-        thresholdMode: options.thresholdMode === 'exceed' ? 'exceed' : 'meet',
-        // Offered only for a plain-d20 authored check.
-        allowAdvantage: hasPlainD20(advantageBase),
-      });
-    };
-    const choice = preResolved ?? (await askPlayer());
-    // `=== false` is load-bearing: a pre-resolved decision carries no `confirmed` key.
-    if (!choice || choice.confirmed === false) {
-      return { engine: true, cancelled: true, total: 0, diceGroups: [], resolvedFormula: null };
-    }
-    // The chosen modifiers append first, so advantage and the bonus compose on top of them.
-    if (useDeferredChoice) {
-      // Flat picks sum into one term and each rolling pick appends its own (issue 1118).
-      const selection = resolveModifierSelection(modifierChoice, choice);
-      effectiveFormula = appendCheckModifierRollTerms(
-        appendCheckModifierTerm(effectiveFormula, { value: selection.value }),
-        selection.formulas
+    : resolveRolledCheck(
+        authoredFormula,
+        actor,
+        options?.craftingModifier,
+        globalThis.Roll,
+        evaluation
       );
-      resolved = resolveCheckFormulaDisplay(effectiveFormula, actor);
-      // One bullet-joined label segment rides the chat flavor, however many were picked.
-      const chosenLabel = selection.labels.join(', ');
-      if (chosenLabel) {
-        effectiveFlavor = effectiveFlavor ? `${effectiveFlavor} · ${chosenLabel}` : chosenLabel;
-      }
-    }
-    // Advantage first, so the bonus appends after the pool; only a plain 1d20 is rewritten.
-    if (choice.advantage === 'advantage' || choice.advantage === 'disadvantage') {
-      if (effectiveFormula.startsWith(advantageBase)) {
-        const rewritten = applyD20Advantage(advantageBase, choice.advantage);
-        effectiveFormula = rewritten + effectiveFormula.slice(advantageBase.length);
-        advantageBase = rewritten;
-      } else {
-        effectiveFormula = applyD20Advantage(effectiveFormula, choice.advantage);
-      }
-      resolved = resolveCheckFormulaDisplay(effectiveFormula, actor);
-    }
-    const bonus = typeof choice.bonus === 'string' ? choice.bonus.trim() : choice.bonus;
-    if (bonus) {
-      // A bonus `Roll.validate` rejects is ignored rather than rolled as a consuming failure.
-      const combined = `${effectiveFormula} + (${bonus})`;
-      // `Roll.validate` is a static that runs `new this(formula)`, so it must be called as a
-      // method: detached, it answers `false` for every formula.
-      const RollClass = globalThis.Roll;
-      if (typeof RollClass?.validate === 'function' && RollClass.validate(combined) === false) {
-        console.warn('Fabricate | Ignoring invalid situational bonus', bonus);
-      } else {
-        effectiveFormula = combined;
-        // Reconcile the displayed formula with the total actually rolled.
-        resolved = resolveCheckFormulaDisplay(effectiveFormula, actor);
-      }
-    }
-    if (choice.rollMode) effectiveRollMode = choice.rollMode;
+  const decision = await resolveCheckDecision({
+    authoredFormula,
+    actor,
+    options,
+    evaluation,
+    deferred,
+    resolvedCheck,
+    displayFormula: resolveCheckFormulaDisplay,
+    Roll: globalThis.Roll,
+  });
+  if (decision.cancelled) {
+    return { engine: true, cancelled: true, total: 0, diceGroups: [], resolvedFormula: null };
   }
+  const {
+    formula: effectiveFormula,
+    flavor: effectiveFlavor,
+    rollMode: effectiveRollMode,
+    resolvedFormula,
+    placementPlan,
+  } = decision;
+  const { placement: modifierPlacement, rolls: preRolls } = await resolveModifierPreRolls(
+    placementPlan,
+    { Roll: globalThis.Roll, rollData }
+  );
 
   // `allowInteractive: false`: no manual-fulfilment dialog mid-craft, as in V13 `Roll.simulate`.
   const roll = await new globalThis.Roll(effectiveFormula, rollData).evaluate({
@@ -282,10 +189,20 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     typeof globalThis.ChatMessage?.create === 'function'
   ) {
     try {
-      await roll.toMessage(
-        { speaker: options.speaker, flavor: effectiveFlavor },
-        { rollMode: effectiveRollMode, create: true }
-      );
+      if (preRolls.length > 0) {
+        await postBundledCheckRoll({
+          mainRoll: roll,
+          preRolls,
+          speaker: options.speaker,
+          flavor: effectiveFlavor,
+          rollMode: effectiveRollMode,
+        });
+      } else {
+        await roll.toMessage(
+          { speaker: options.speaker, flavor: effectiveFlavor },
+          { ...chatModeOption(effectiveRollMode), create: true }
+        );
+      }
     } catch (error) {
       console.error('Fabricate | Failed to post check roll to chat:', error);
     }
@@ -295,11 +212,18 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     engine: true,
     total,
     diceGroups: rolledDiceGroups(roll),
-    resolvedFormula: resolved?.display ?? null,
+    resolvedFormula,
+    modifierPlacement,
   };
-  if (options?.includeRollHandoff === true && typeof roll?.toJSON === 'function') {
+  const serializedPreRolls = modifierPlacement.preRolls.map((entry) => entry.serializedRoll);
+  if (
+    options?.includeRollHandoff === true &&
+    typeof roll?.toJSON === 'function' &&
+    serializedPreRolls.every(Boolean)
+  ) {
     result.rollHandoff = {
-      serializedRoll: roll.toJSON(),
+      serializedRoll: cloneJson(roll),
+      ...(serializedPreRolls.length > 0 && { serializedPreRolls }),
       flavor: effectiveFlavor ?? null,
       speaker: options?.speaker ?? null,
       rollMode: effectiveRollMode ?? null,
@@ -423,6 +347,8 @@ export async function evaluatePreparedRunCheck(
         rollMode: secret ? 'gmroll' : (authoritativeDecision.rollMode ?? 'selfroll'),
         craftingModifier: config.craftingModifier ?? null,
         modifierChoice: config.modifierChoice ?? null,
+        toolContributions: config.toolContributions ?? [],
+        evaluation: SUM_OVER_EVALUATION,
         speaker: preparation?.speaker ?? config.speaker ?? null,
       },
     },
@@ -452,6 +378,7 @@ export async function evaluatePreparedRunCheck(
     dc: config.resolvedDc ?? config.dc,
     total,
     diceGroups,
+    ...(!secret && preRollEvidence(rolled)),
   };
   let success = true;
   let outcome = null;
@@ -514,20 +441,38 @@ export function evaluatePreparedCraftingCheck(preparation, actor, decision = {},
   });
 }
 
-/** Reconstruct and post a GM-evaluated roll in the entitled player's own Foundry session. */
+/** Reconstruct and post an entitled GM-evaluated roll, including serialized pre-rolls without rerolling. */
 export async function postCheckRollHandoff(handoff, { Roll = globalThis.Roll } = {}) {
   if (!handoff?.serializedRoll || typeof Roll?.fromData !== 'function') {
     return { success: false, reason: 'invalid-roll-handoff' };
   }
   try {
     const roll = Roll.fromData(handoff.serializedRoll);
-    if (!roll || typeof roll.toMessage !== 'function') {
+    if (!roll) {
       return { success: false, reason: 'invalid-roll-handoff' };
     }
-    await roll.toMessage(
-      { speaker: handoff.speaker ?? undefined, flavor: handoff.flavor ?? undefined },
-      { ...chatModeOption(handoff.rollMode), create: true }
-    );
+    const serializedPreRolls = handoff.serializedPreRolls;
+    if (Array.isArray(serializedPreRolls) && serializedPreRolls.length > 0) {
+      const preRolls = serializedPreRolls.map((data) => Roll.fromData(data));
+      if (preRolls.some((entry) => !entry)) {
+        return { success: false, reason: 'invalid-roll-handoff' };
+      }
+      await postBundledCheckRoll({
+        mainRoll: roll,
+        preRolls,
+        speaker: handoff.speaker ?? undefined,
+        flavor: handoff.flavor ?? undefined,
+        rollMode: handoff.rollMode,
+      });
+    } else {
+      if (typeof roll.toMessage !== 'function') {
+        return { success: false, reason: 'invalid-roll-handoff' };
+      }
+      await roll.toMessage(
+        { speaker: handoff.speaker ?? undefined, flavor: handoff.flavor ?? undefined },
+        { ...chatModeOption(handoff.rollMode), create: true }
+      );
+    }
     return { success: true };
   } catch (error) {
     console.error('Fabricate | Failed to post authoritative check roll to chat:', error);
@@ -651,8 +596,8 @@ export async function runFormulaPassFail({
   let total = 0;
   let diceGroups = [];
   let resolvedFormula = null;
+  let rolled;
   if (formula) {
-    let rolled;
     try {
       rolled = await evaluateCheckRoll(formula, actor, {
         ...rollOptions,
@@ -700,6 +645,7 @@ export async function runFormulaPassFail({
       comparison,
       ...(formula && executedSumEvidence(total, dc, comparison)),
       diceGroups,
+      ...preRollEvidence(rolled),
     },
     message: success ? null : `${label} check failed`,
   };
@@ -722,8 +668,8 @@ export async function runFormulaProgressive({
   let total = 0;
   let diceGroups = [];
   let resolvedFormula = null;
+  let rolled;
   if (formula) {
-    let rolled;
     try {
       rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, craftingModifier });
     } catch (error) {
@@ -770,6 +716,7 @@ export async function runFormulaProgressive({
       value,
       diceGroups,
       ...(formula && executedSumEvidence(total, null, null)),
+      ...preRollEvidence(rolled),
     },
   };
 }
@@ -1099,8 +1046,8 @@ export async function runFormulaRouted({
   let total = 0;
   let diceGroups = [];
   let resolvedFormula = null;
+  let rolled;
   if (formula) {
-    let rolled;
     try {
       // No `dc` here: `evaluateCheckRoll` uses it for the prompt only, and callers already put
       // the prompt-facing DC on `rollOptions` (none for a fixed check).
@@ -1172,6 +1119,7 @@ export async function runFormulaRouted({
       type,
       comparison,
       ...(formula && executedSumEvidence(total, classified.target, classified.comparison)),
+      ...preRollEvidence(rolled),
       outcomeId: matched?.id ?? null,
       success,
       breakTools: classified.breakTools,

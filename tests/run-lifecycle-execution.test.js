@@ -13,6 +13,7 @@ import { historyEvidenceFields } from '../src/systems/runHistoryEvidence.js';
 import { IngredientSet } from '../src/models/IngredientSet.js';
 import { Recipe } from '../src/models/Recipe.js';
 import {
+  evaluatePreparedCheck,
   evaluatePreparedRunCheck,
   postCheckRollHandoff,
 } from '../src/systems/checkRoll.js';
@@ -2059,6 +2060,119 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
   assert.equal(unchanged.executionJournal.intent.trigger, 'start');
 });
 
+/** Starts a ready versioned run whose one Tool is supplied by a second actor's item. */
+async function startToolSuppliedRun(tool) {
+  const { engine, recipe, recipeManager } = setupEngineFixture();
+  const actor = new FakeActor('tool-crafter');
+  const source = new FakeActor('tool-owner');
+  actor.getRollData = () => ({ bonus: 99 });
+  source.getRollData = () => ({ bonus: 2 });
+  const system = {
+    resolutionMode: 'simple',
+    features: { craftingChecks: true },
+    craftingCheck: { simple: { rollFormula: '1d20', dc: 12 } },
+  };
+  game.fabricate.getCraftingSystemManager = () => ({ getSystem: () => system });
+  const started = await startReadyVersionedRun({ engine, recipe, actor, source });
+  game.time.worldTime = 1120;
+  recipeManager.getToolsForSet = () => [tool];
+  recipeManager.resolveToolStates = () => [{ available: true, contributionInput: {
+    tool, matchedItem: { parent: source }, primaryActor: actor,
+  } }];
+  const describe = () => engine.describeVersionedStageCheck({
+    actor, componentSourceActors: [source], runId: started.runId,
+    preparationGrant: 'prepare-grant',
+  });
+  return { actor, source, describe };
+}
+
+function installPreparedRolls(evaluations, posted) {
+  const previousRoll = globalThis.Roll;
+  const previousChat = globalThis.ChatMessage;
+  class PreparedRoll {
+    constructor(formula, data) {
+      this.formula = formula;
+      this.data = data;
+      this.total = formula === '1d4+@bonus' ? 3 : Number(formula) || 16;
+      this.dice = formula === '1d4+@bonus' ? [{}] : [];
+    }
+    async evaluate() { evaluations.push({ formula: this.formula, data: this.data }); return this; }
+    toJSON() { return { formula: this.formula, total: this.total }; }
+    async toMessage() { posted.push({ rolls: [this] }); }
+    static fromData(data) { return new PreparedRoll(data.formula); }
+    static validate() { return true; }
+    static replaceFormulaData(formula) { return formula; }
+  }
+  globalThis.Roll = PreparedRoll;
+  globalThis.ChatMessage = { getSpeaker: () => ({ alias: 'Tinker' }),
+    create: async (data) => posted.push(data) };
+  return {
+    PreparedRoll,
+    restore() {
+      if (previousRoll === undefined) delete globalThis.Roll;
+      else globalThis.Roll = previousRoll;
+      if (previousChat === undefined) delete globalThis.ChatMessage;
+      else globalThis.ChatMessage = previousChat;
+    },
+  };
+}
+
+test('a versioned Journal check applies a flat Tool bonus from its supplying actor', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '2' } };
+  const { actor, describe } = await startToolSuppliedRun(tool);
+  const evaluations = [];
+  const { restore } = installPreparedRolls(evaluations, []);
+  try {
+    const snapshot = JSON.parse(JSON.stringify((await describe()).privateEvaluation));
+    assert.equal(snapshot.rollFormula, '1d20 + 2[Hammer]');
+    await evaluatePreparedRunCheck(snapshot, actor);
+    assert.deepEqual(evaluations.map(({ formula }) => formula), ['2', '1d20 + 2[Hammer]']);
+  } finally {
+    restore();
+  }
+});
+
+test('real prepared Tool collection snapshots one roll and reuses it for every evaluation', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1d4+@bonus' } };
+  const { actor, source, describe } = await startToolSuppliedRun(tool);
+  const evaluations = [];
+  const posted = [];
+  const { PreparedRoll, restore } = installPreparedRolls(evaluations, posted);
+  try {
+    const snapshot = JSON.parse(JSON.stringify((await describe()).privateEvaluation));
+    const toolContributions = snapshot.checkConfig.toolContributions;
+    assert.equal(toolContributions[0].value, 3);
+    assert.equal(toolContributions[0].preRoll.expression, '1d4+@bonus');
+    source.getRollData = () => ({ bonus: 100 });
+
+    const appended = await evaluatePreparedRunCheck(snapshot, actor);
+    assert.deepEqual(evaluations.map(({ formula }) => formula),
+      ['1d4+@bonus', '1d20 + 3[Hammer]']);
+    assert.deepEqual(evaluations[0].data, { bonus: 2 });
+    assert.equal(Object.hasOwn(appended.data, 'preRolls'), false, 'sum/over adds no roll evidence');
+    const single = JSON.parse(JSON.stringify(appended.rollHandoff));
+    assert.equal(Object.hasOwn(single, 'serializedPreRolls'), false);
+    assert.equal((await postCheckRollHandoff(single, { Roll: PreparedRoll })).success, true);
+    assert.deepEqual(posted[0].rolls.map(({ formula }) => formula), ['1d20 + 3[Hammer]']);
+
+    const routed = await evaluatePreparedCheck({
+      formula: '1d20',
+      options: {
+        toolContributions, rollMode: 'selfroll', evaluation: { product: 'sum', direction: 'under' },
+      },
+    }, actor);
+    assert.deepEqual(routed.modifierPlacement.preRolls.map(({ expression, total }) =>
+      ({ expression, total })), [{ expression: '1d4+@bonus', total: 3 }]);
+    const handoff = JSON.parse(JSON.stringify(routed.rollHandoff));
+    assert.equal(handoff.serializedPreRolls.length, 1);
+    assert.equal((await postCheckRollHandoff(handoff, { Roll: PreparedRoll })).success, true);
+    assert.deepEqual(posted[1].rolls.map(({ formula }) => formula), ['1d20', '1d4+@bonus']);
+    assert.equal(evaluations.length, 3, 'the Tool is never rolled again');
+  } finally {
+    restore();
+  }
+});
+
 test('versioned Journal preparation freezes modifier contributions across actor and library edits', async () => {
   const originalRoll = globalThis.Roll;
   const rolledFormulas = [];
@@ -2087,9 +2201,9 @@ test('versioned Journal preparation freezes modifier contributions across actor 
     for (const policy of ['addAll', 'playerPicks']) {
       const { engine, recipe } = setupEngineFixture();
       let toolAppendCalls = 0;
-      engine._appendToolCheckBonuses = async (formula) => {
+      engine._prepareToolCheckBonuses = async (formula, _tools, evaluation) => {
         toolAppendCalls += 1;
-        return `${formula} + 2[Tool]`;
+        return { formula: `${formula} + 2[Tool]`, contributions: [], evaluation };
       };
       const actor = new FakeActor(`journal-${policy}`);
       actor.name = 'Tinker';

@@ -1643,7 +1643,10 @@ describe('journal run command protocol', () => {
               success: true,
               value: 17,
               data: {},
-              rollHandoff: { serializedRoll: { formula: '1d20', total: 17 } },
+              rollHandoff: {
+                serializedRoll: { formula: '1d20', total: 17 },
+                serializedPreRolls: [{ formula: '1d4[secret tool]', total: 3 }],
+              },
             };
           },
           execute: async (args) => {
@@ -1671,7 +1674,10 @@ describe('journal run command protocol', () => {
     assert.equal(Object.hasOwn(executeArgs.payload, 'total'), false);
     assert.equal(Object.hasOwn(executeArgs.payload, 'roll'), false);
     assert.deepEqual(executeArgs.payload.selectionPlan, { setId: 'one' });
-    assert.deepEqual(posted, { serializedRoll: { formula: '1d20', total: 17 } });
+    assert.deepEqual(posted, {
+      serializedRoll: { formula: '1d20', total: 17 },
+      serializedPreRolls: [{ formula: '1d4[secret tool]', total: 3 }],
+    });
   });
 
   it('sends a non-interactive check no modifier ids, so the prepared defaults roll', async () => {
@@ -1847,7 +1853,14 @@ describe('journal run command protocol', () => {
             success: true,
             outcome: 'hidden-tier',
             value: 19,
-            data: { diceGroups: [{ group: '1d20', results: [19] }] },
+            data: {
+              diceGroups: [{ group: '1d20', results: [19] }],
+              preRolls: [{ source: 'library', expression: '1d4[secret]', total: 3 }],
+            },
+            rollHandoff: {
+              serializedRoll: { formula: '1d20+9', total: 19 },
+              serializedPreRolls: [{ formula: '1d4[secret]', total: 3 }],
+            },
           }),
           execute: async () => ({
             success: true,

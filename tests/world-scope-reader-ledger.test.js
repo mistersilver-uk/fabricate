@@ -77,10 +77,10 @@ const SCAN_TOTALS = Object.freeze({
   // Five bulk-edit lines moved to `manager/bulkEdits.js` (+1 file).
   // Eight delete-cascade lines moved to `manager/deleteCascades.js` (+1 file), then nine
   // essence-delete lines followed them there.
-  matches: 168,
-  lines: 153,
+  matches: 169,
+  lines: 154,
   files: 26,
-  pairs: 136,
+  pairs: 137,
   collisionGroups: 14,
   collisionSites: 31,
 });
@@ -95,6 +95,7 @@ const LEDGER = Object.freeze([
   ['src/systems/CraftingEngine.js', "toolPairs: [...prepared.toolValidation.tools],", 1, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "if (shouldUseTools && prepared.toolValidation.tools.length > 0) {", 1, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "prepared.toolValidation.tools,", 1, 'not-a-system'],
+  ['src/systems/CraftingEngine.js', "prepared.toolValidation.tools", 1, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "state.usedTools = cloneJsonValue(toolReceipt.tools) ?? [];", 1, 'not-a-system'],
   ['src/systems/GatheringEngine.js', "if (resolvedTools.tools.length > 0) {", 1, 'not-a-system'],
   ['src/systems/GatheringEngine.js', "tools: resolvedTools.tools,", 1, 'not-a-system'],
