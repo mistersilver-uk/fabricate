@@ -199,3 +199,33 @@ test('_normalizeGatheringTask — the adminStore MIRROR — answers identically'
     }
   }
 });
+
+test('an unrelated gathering task save keeps its adjustment and successes overrides', async () => {
+  const { createAdminStore } = await import('../src/ui/svelte/stores/adminStore.js');
+  const settings = new Map([
+    [
+      'gatheringConfig',
+      {
+        systems: {
+          'sys-1': {
+            tasks: [{ id: 't', name: 'T', dcOverride: 14, adjustmentOverride: -1.5, successesOverride: 2 }],
+          },
+        },
+      },
+    ],
+    ['lastManagedCraftingSystem', ''],
+  ]);
+  const store = createAdminStore({
+    getSetting: (key) => settings.get(key),
+    setSetting: async (key, value) => settings.set(key, value),
+    getCraftingSystemManager: () => ({ getSystems: () => [], getSystem: () => null }),
+    getRecipeManager: () => ({ getRecipes: () => [] }),
+  });
+  await store.refresh();
+  assert.equal(await store.updateGatheringLibraryTask('sys-1', 't', { staminaCost: 2 }), true);
+  const [saved] = settings.get('gatheringConfig').systems['sys-1'].tasks;
+  assert.equal(saved.staminaCost, 2);
+  assert.equal(saved.dcOverride, 14);
+  assert.equal(saved.adjustmentOverride, -1.5);
+  assert.equal(saved.successesOverride, 2);
+});
