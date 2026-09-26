@@ -95,7 +95,7 @@ const LEDGER = Object.freeze([
   ['src/systems/CraftingEngine.js', "toolPairs: [...prepared.toolValidation.tools],", 1, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "if (shouldUseTools && prepared.toolValidation.tools.length > 0) {", 1, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "prepared.toolValidation.tools,", 1, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "prepared.toolValidation?.tools ?? prepared.toolItems", 1, 'not-a-system'],
+  ['src/systems/CraftingEngine.js', "prepared.toolValidation.tools", 1, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "state.usedTools = cloneJsonValue(toolReceipt.tools) ?? [];", 1, 'not-a-system'],
   ['src/systems/GatheringEngine.js', "if (resolvedTools.tools.length > 0) {", 1, 'not-a-system'],
   ['src/systems/GatheringEngine.js', "tools: resolvedTools.tools,", 1, 'not-a-system'],

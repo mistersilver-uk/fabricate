@@ -10,6 +10,7 @@ import { planModifierPlacement } from './checkModifierRouter.js';
 import { CHECK_MODIFIER_TERM_LABEL } from './toolCheckBonus.js';
 
 const DEFERRED_MODIFIER_SLOT = `(modifier)[${CHECK_MODIFIER_TERM_LABEL}]`;
+const KEEP_UNDER = { advantage: 'disadvantage', disadvantage: 'advantage' };
 
 function requestedModifierIds(modifierChoice, choice) {
   if (Array.isArray(choice?.chosenModifierIds)) return choice.chosenModifierIds;
@@ -83,12 +84,14 @@ function applyAdvantage(formula, authoredFormula, advantage, evaluation) {
       },
     };
   }
+  // Keeping the lowest die is the advantage when a sum must come in under its target.
+  const keep = evaluation.direction === 'under' ? KEEP_UNDER[advantage] : advantage;
   const prefix = authoredFormula.trim();
-  const rewritten = applyD20Advantage(prefix, advantage);
+  const rewritten = applyD20Advantage(prefix, keep);
   return {
     formula: formula.startsWith(prefix)
       ? rewritten + formula.slice(prefix.length)
-      : applyD20Advantage(formula, advantage),
+      : applyD20Advantage(formula, keep),
     contribution: null,
   };
 }
@@ -110,20 +113,20 @@ function applySituationalBonus(formula, rawBonus, evaluation, Roll) {
   };
 }
 
-/** The prompt returns a decision, but never determines the selected modifier data directly. */
+/**
+ * The prompt returns a decision, but never determines the selected modifier data directly.
+ * `deferred` means the offered `modifierChoice` is selected by that decision.
+ */
 export async function resolveCheckDecision({
   authoredFormula,
   actor,
   options,
   evaluation,
+  deferred,
   resolvedCheck,
   displayFormula,
   Roll,
 }) {
-  const deferred =
-    Boolean(options?.modifierChoice) &&
-    options?.interactive === true &&
-    (typeof options.prompt === 'function' || Boolean(options?.rollDecision));
   let formula = resolvedCheck.formula;
   let flavor = options?.flavor;
   let rollMode = options?.rollMode;

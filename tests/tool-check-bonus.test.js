@@ -5,11 +5,11 @@ const {
   appendCheckModifierTerm,
   appendToolBonusTerms,
   CHECK_MODIFIER_TERM_LABEL,
-  composeToolBonusTerms,
   evaluateToolCheckContribution,
   evaluateToolPrerequisiteGate,
   ingredientSetToolsAreActive,
   resolveToolPrerequisites,
+  ToolCheckEvidenceError,
 } = await import('../src/systems/toolCheckBonus.js');
 
 const definitions = [
@@ -183,18 +183,17 @@ test('disabled Tools never evaluate or contribute their bonus', async () => {
   assert.equal(result.value, 0);
 });
 
-test('composition adds every finite non-zero contribution', () => {
-  const composed = composeToolBonusTerms([
-    { toolId: 'a', label: 'A', value: 2 },
-    { toolId: 'b', label: 'B', value: 5 },
-    { toolId: 'penalty', label: 'Penalty', value: -2 },
-    { toolId: 'zero', label: 'Zero', value: 0 },
-  ]);
-
-  assert.equal(composed.total, 5);
-  assert.deepEqual(
-    composed.terms.map((term) => term.toolId),
-    ['a', 'b', 'penalty']
+test('roll evidence that disagrees with its bonus refuses the contribution', async () => {
+  await assert.rejects(
+    evaluateToolCheckContribution({
+      tool: { id: 'hammer', bonus: { enabled: true, expression: '1d4' } },
+      primaryActor: actor('primary'),
+      evaluateExpression: async () => ({
+        value: 4,
+        preRoll: { expression: '1d4', total: 3, serializedRoll: {} },
+      }),
+    }),
+    ToolCheckEvidenceError
   );
 });
 

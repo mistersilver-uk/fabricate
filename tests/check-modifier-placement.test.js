@@ -1,10 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { planModifierPlacement } from '../src/systems/checkModifierRouter.js';
+import {
+  planModifierPlacement,
+  SUM_OVER_EVALUATION,
+} from '../src/systems/checkModifierRouter.js';
 import { resolveModifierPreRolls } from '../src/systems/checkModifierRolls.js';
 import { resolveCheckDecision } from '../src/systems/checkRollDecision.js';
-import { evaluateCheckRoll, runFormulaPassFail } from '../src/systems/checkRoll.js';
+import {
+  evaluateCheckRoll,
+  runFormulaPassFail,
+  runFormulaProgressive,
+  runFormulaRouted,
+} from '../src/systems/checkRoll.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 
 const evaluation = {
@@ -24,7 +32,7 @@ test('the decision seam bounds deferred picks and preserves an explicit empty ch
   };
   const displayFormula = (formula) => ({ display: formula });
   const input = {
-    authoredFormula: '1d20', actor: null, evaluation, Roll: null,
+    authoredFormula: '1d20', actor: null, evaluation, deferred: true, Roll: null,
     resolvedCheck: { formula: '1d20', selected: [] }, displayFormula,
   };
   const capped = await resolveCheckDecision({
@@ -122,7 +130,8 @@ test('a Tool reconstruction failure aborts before the main roll and message', as
   globalThis.Roll = FakeRoll;
   globalThis.ChatMessage = { create: async () => { messages += 1; } };
   try {
-    await assert.rejects(evaluateCheckRoll('1d20 + 3[Hammer]', null, {
+    await assert.rejects(evaluateCheckRoll('1d20', null, {
+      evaluation,
       interactive: true,
       toolContributions: [{
         source: 'tool', label: 'Hammer', form: 'scalar', value: 3,
@@ -278,13 +287,14 @@ test('CraftingEngine retains a dice-bearing Tool bonus without appending it for 
   globalThis.Roll = ToolRoll;
   try {
     const engine = Object.create(CraftingEngine.prototype);
-    const result = await engine._appendToolCheckBonuses('1d20', [{
+    const result = await engine._prepareToolCheckBonuses('1d20', [{
       contributionInput: {
         tool: { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1d4' } },
         primaryActor: { getRollData: () => ({}) },
       },
-    }], { withContributions: true, evaluation });
+    }], evaluation);
     assert.equal(result.formula, '1d20');
+    assert.equal(result.evaluation, evaluation);
     assert.equal(evaluations, 1);
     assert.deepEqual(result.contributions, [{
       source: 'tool', label: 'Hammer', form: 'scalar', value: 3,
@@ -381,4 +391,184 @@ test('count advantage changes the pool even when other benefits target the thres
     if (previousRoll === undefined) delete globalThis.Roll;
     else globalThis.Roll = previousRoll;
   }
+});
+
+/** Installs a Roll whose `1d4` totals 3 and whose other formulas total 12, recording each roll
+ *  and each chat post; the returned function restores the previous globals. */
+function installEngineRolls(rolls, messages) {
+  const previousRoll = globalThis.Roll;
+  const previousChat = globalThis.ChatMessage;
+  class EngineRoll {
+    constructor(formula) {
+      this.formula = formula;
+      this.total = formula === '1d4' ? 3 : 12;
+      this.dice = [{ number: 1, faces: 4, total: this.total, results: [{ result: this.total }] }];
+      rolls.push(formula);
+    }
+    async evaluate() { return this; }
+    evaluateSync() { return this; }
+    toJSON() { return { class: 'Roll', formula: this.formula, total: this.total }; }
+    async toMessage() { messages.push([this.formula]); }
+    static fromData(data) { return { formula: data.formula, total: data.total }; }
+    static validate() { return true; }
+    static replaceFormulaData(formula) { return formula; }
+  }
+  globalThis.Roll = EngineRoll;
+  globalThis.ChatMessage = {
+    create: async (data) => { messages.push(data.rolls.map((roll) => roll.formula)); },
+    getSpeaker: () => ({ alias: 'Tinker' }),
+  };
+  return () => {
+    if (previousRoll === undefined) delete globalThis.Roll;
+    else globalThis.Roll = previousRoll;
+    if (previousChat === undefined) delete globalThis.ChatMessage;
+    else globalThis.ChatMessage = previousChat;
+  };
+}
+
+const hammer = {
+  contributionInput: {
+    tool: { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1d4' } },
+    primaryActor: { getRollData: () => ({}) },
+  },
+};
+const craftingSystem = {
+  craftingCheck: {
+    simple: { rollFormula: '1d20' },
+    routed: { rollFormula: '1d20', type: 'relative', relativeOutcomes: [] },
+    progressive: { rollFormula: '1d20' },
+  },
+};
+const engineRunners = {
+  craftingPassFail: (engine, toolItems) =>
+    engine._runSimpleCheck(craftingSystem, { name: 'Recipe' }, null, {}, { toolItems }),
+  craftingRouted: (engine, toolItems) =>
+    engine._runRoutedCheck(craftingSystem, { name: 'Recipe' }, null, {}, { toolItems }),
+  craftingProgressive: (engine, toolItems) =>
+    engine._runProgressiveCheck(craftingSystem, { name: 'Recipe' }, {}, { toolItems }),
+  salvageSimple: (engine, toolItems) =>
+    engine._runSalvageSimpleCheck({ rollFormula: '1d20', dc: 10 }, { name: 'Scrap' }, {}, {
+      interactive: true, toolItems, rollDecision: { bonus: null },
+    }),
+  salvageRouted: (engine, toolItems) =>
+    engine._runSalvageRoutedCheck(
+      { rollFormula: '1d20', dc: 10, type: 'relative', relativeOutcomes: [] },
+      { name: 'Scrap' }, {}, { interactive: true, toolItems, rollDecision: { bonus: null } }
+    ),
+  salvageProgressive: (engine, toolItems) =>
+    engine._runSalvageProgressiveCheck({ rollFormula: '1d20' }, { name: 'Scrap' }, {}, {
+      interactive: true, toolItems, rollDecision: { bonus: null },
+    }),
+};
+
+for (const [name, run] of Object.entries(engineRunners)) {
+  const interactive = name.startsWith('salvage');
+  test(`${name}: a dice-bearing Tool keeps its sum/over term and routes its evidence elsewhere`, async () => {
+    const rolls = [];
+    const messages = [];
+    const restore = installEngineRolls(rolls, messages);
+    try {
+      const engine = Object.create(CraftingEngine.prototype);
+      engine._resolveSimpleCheckDc = async () => 10;
+      const appended = await run(engine, [hammer]);
+      assert.deepEqual(rolls, ['1d4', '1d20 + 3[Hammer]']);
+      assert.equal(Object.hasOwn(appended.data, 'preRolls'), false);
+      assert.deepEqual(messages, interactive ? [['1d20 + 3[Hammer]']] : []);
+
+      rolls.length = 0;
+      messages.length = 0;
+      const prepare = CraftingEngine.prototype._prepareToolCheckBonuses;
+      engine._prepareToolCheckBonuses = function prepareUnder(formula, tools) {
+        return prepare.call(this, formula, tools, evaluation);
+      };
+      const routed = await run(engine, [hammer]);
+      assert.deepEqual(rolls, ['1d4', '1d20']);
+      assert.deepEqual(routed.data.preRolls, [
+        { source: 'tool', label: 'Hammer', expression: '1d4', total: 3, destination: 'target' },
+      ]);
+      assert.deepEqual(messages, interactive ? [['1d20', '1d4']] : []);
+    } finally {
+      restore();
+    }
+  });
+}
+
+const runeModifier = {
+  catalogue: [{ id: 'rune', label: 'Rune', expression: '1d4' }],
+  systemPolicy: 'addAll',
+  defaultModifierIds: ['rune'],
+};
+const formulaRunners = {
+  runFormulaPassFail: (input) => runFormulaPassFail({ ...input, dc: 10 }),
+  runFormulaProgressive,
+  runFormulaRouted: (input) =>
+    runFormulaRouted({ ...input, dc: 10, type: 'relative', relativeOutcomes: [] }),
+};
+
+for (const [name, runner] of Object.entries(formulaRunners)) {
+  test(`${name} reports a sum/under library pre-roll as executed evidence`, async () => {
+    const previousRoll = globalThis.Roll;
+    class FakeRoll {
+      constructor(formula) {
+        this.formula = formula;
+        this.total = formula === '(1d4)' ? 2 : 9;
+        this.dice = [];
+      }
+      evaluateSync() { return this; }
+      async evaluate() { return this; }
+      static replaceFormulaData(formula) { return formula; }
+      static validate() { return true; }
+    }
+    globalThis.Roll = FakeRoll;
+    try {
+      const result = await runner({
+        formula: '1d20',
+        actor: { getRollData: () => ({}) },
+        craftingModifier: runeModifier,
+        rollOptions: {
+          evaluation, interactive: true, prompt: async () => ({ confirmed: true }), post: false,
+        },
+      });
+      assert.deepEqual(result.data.preRolls, [
+        { source: 'library', label: 'Rune', expression: '(1d4)', total: 2, destination: 'target' },
+      ]);
+    } finally {
+      if (previousRoll === undefined) delete globalThis.Roll;
+      else globalThis.Roll = previousRoll;
+    }
+  });
+}
+
+test('keep-one advantage keeps the lowest die when the sum must come in under its target', async () => {
+  const decide = async (advantage, direction) =>
+    (await resolveCheckDecision({
+      authoredFormula: '1d20', actor: null, deferred: false, Roll: null,
+      evaluation: { ...evaluation, direction },
+      resolvedCheck: { formula: '1d20 + 2[Modifiers]', selected: [] },
+      displayFormula: (formula) => ({ display: formula }),
+      options: { interactive: true, rollDecision: { advantage } },
+    })).formula;
+  assert.equal(await decide('advantage', 'under'), '2d20kl1 + 2[Modifiers]');
+  assert.equal(await decide('disadvantage', 'under'), '2d20kh1 + 2[Modifiers]');
+  assert.equal(await decide('advantage', 'over'), '2d20kh1 + 2[Modifiers]');
+  assert.equal(await decide('disadvantage', 'over'), '2d20kl1 + 2[Modifiers]');
+});
+
+test('a malformed deferred descriptor coerces flat values and drops blank fragments', async () => {
+  const decide = async (modifiers) =>
+    (await resolveCheckDecision({
+      authoredFormula: '1d20', actor: null, deferred: true, Roll: null,
+      evaluation: SUM_OVER_EVALUATION,
+      resolvedCheck: { formula: '1d20', selected: [] },
+      displayFormula: (formula) => ({ display: formula }),
+      options: {
+        interactive: true,
+        modifierChoice: { maxPicks: 2, modifiers },
+        rollDecision: { chosenModifierIds: ['a', 'b'] },
+      },
+    })).formula;
+  const b = { id: 'b', label: 'B', value: 1 };
+  assert.equal(await decide([{ id: 'a', label: 'A', value: '2' }, b]), '1d20 + 3[Modifiers]');
+  assert.equal(await decide([{ id: 'a', label: 'A', value: Number.NaN }, b]), '1d20 + 1[Modifiers]');
+  assert.equal(await decide([{ id: 'a', label: 'A', formula: '  ' }, b]), '1d20 + 1[Modifiers]');
 });

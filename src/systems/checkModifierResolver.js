@@ -18,7 +18,7 @@ import { classifyRollQuantity, reduceRollExpression } from '../utils/rollExpress
 import { formulaRolls } from '../utils/rollFormulaRollability.js';
 
 import { resolveModifierLibrary } from './characterLibraries.js';
-import { planModifierPlacement } from './checkModifierRouter.js';
+import { planModifierPlacement, SUM_OVER_EVALUATION } from './checkModifierRouter.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import {
   appendCheckModifierRollTerms,
@@ -475,12 +475,19 @@ function sumOf(values) {
   return values.reduce((sum, value) => sum + value, 0);
 }
 
+/** A prompt descriptor is untrusted: a non-finite flat value adds nothing and a blank fragment
+ *  is no roll, as the non-deferred resolution already guarantees. */
 export function resolvedLibraryContributions(selected) {
-  const scalar = sumOf(selected.map((modifier) => modifier.value ?? 0));
+  const scalar = sumOf(
+    selected.map((modifier) => {
+      const value = Number(modifier?.value);
+      return Number.isFinite(value) ? value : 0;
+    })
+  );
   return [
     { source: 'library', label: CHECK_MODIFIER_TERM_LABEL, form: 'scalar', value: scalar },
     ...selected
-      .filter((modifier) => typeof modifier.formula === 'string' && modifier.formula !== '')
+      .filter((modifier) => typeof modifier?.formula === 'string' && modifier.formula.trim() !== '')
       .map((modifier) => ({
         source: 'library',
         label: modifier.label,
@@ -578,7 +585,7 @@ export function resolveCheckModifierFormula(
   actor,
   craftingModifier,
   Roll = globalThis.Roll,
-  evaluation = { product: 'sum', direction: 'over', target: { source: 'fixed' } }
+  evaluation = SUM_OVER_EVALUATION
 ) {
   if (!craftingModifier) return { formula: String(formula ?? '').trim(), selected: [] };
   const { selected } = resolveCheckModifierContribution(

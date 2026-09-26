@@ -5,6 +5,13 @@
 
 const SOURCES = new Set(['tool', 'library', 'situational', 'advantage']);
 
+/** The compatibility evaluation every caller places by until an engine activates another mode. */
+export const SUM_OVER_EVALUATION = Object.freeze({
+  product: 'sum',
+  direction: 'over',
+  target: Object.freeze({ source: 'fixed' }),
+});
+
 function placementOrder({ source, form }) {
   if (source === 'tool') return 0;
   if (source === 'library') return form === 'scalar' ? 1 : 2;
@@ -125,7 +132,8 @@ export function planModifierPlacement({ evaluation, contributions = [] } = {}) {
       throw new TypeError('A scalar advantage benefit belongs only to a count pool');
     }
     const destination = destinationFor(evaluation, contribution.source);
-    if (contribution.preRoll) {
+    // Sum/over appends the numeric result exactly as before, so it records no roll evidence.
+    if (contribution.preRoll && destination !== 'append') {
       plan.preRolls.push(preRollRecord({ index, contribution, destination }));
     }
     if (destination === 'append') {

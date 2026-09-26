@@ -1,5 +1,7 @@
 /** Evaluates planned modifier expressions once, outside the main check roll. */
 
+import { cloneJson } from '../utils/scalars.js';
+
 import { chatModeOption } from './bulkChatVisibility.js';
 import { settlePlacement } from './checkModifierRouter.js';
 
@@ -7,7 +9,8 @@ function restoredRoll(entry, Roll) {
   if (!entry.serializedRoll || typeof Roll?.fromData !== 'function') {
     throw new TypeError('Pre-roll reconstruction is unavailable');
   }
-  const roll = Roll.fromData(entry.serializedRoll);
+  // `Roll.fromData` mutates its input, so the retained evidence is never handed over directly.
+  const roll = Roll.fromData(structuredClone(entry.serializedRoll));
   if (!roll) throw new TypeError('Pre-roll reconstruction failed');
   return roll;
 }
@@ -31,7 +34,8 @@ export async function resolveModifierPreRolls(plan, { Roll, rollData = {} } = {}
       results.push({
         index: entry.index,
         total: roll.total,
-        ...(typeof roll.toJSON === 'function' && { serializedRoll: roll.toJSON() }),
+        // `Roll#toJSON` is shallow (a parenthetical term keeps its live inner Roll); JSON is not.
+        ...(typeof roll.toJSON === 'function' && { serializedRoll: cloneJson(roll) }),
       });
     } catch (error) {
       if (entry.source === 'library') throw error;
@@ -51,6 +55,7 @@ export async function resolveModifierPreRolls(plan, { Roll, rollData = {} } = {}
 /**
  * Posts the main check and its pre-rolls as one message under the chosen mode.
  * Without a chosen mode, the posting client's current chat-mode setting supplies the visibility.
+ * Content is the bare total, as `Roll#toMessage` sets it, so Foundry renders every roll per viewer.
  */
 export async function postBundledCheckRoll({
   mainRoll,
@@ -70,9 +75,8 @@ export async function postBundledCheckRoll({
     }
     modeOption[modeKey] = game.settings.get('core', modeKey);
   }
-  const content = typeof mainRoll?.render === 'function' ? await mainRoll.render() : '';
   return ChatMessage.create(
-    { speaker, flavor, content, rolls: [mainRoll, ...preRolls] },
+    { speaker, flavor, content: String(mainRoll?.total ?? ''), rolls: [mainRoll, ...preRolls] },
     modeOption
   );
 }

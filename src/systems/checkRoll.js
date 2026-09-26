@@ -6,14 +6,14 @@
 
 import { evaluateCheckBreakageCondition } from '../toolBreakageRuntime.js';
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
+import { cloneJson } from '../utils/scalars.js';
 
 import { chatModeOption } from './bulkChatVisibility.js';
 import { compareToTarget, effectiveMargin, rankBest } from './checkEvaluation.js';
 import { resolveCheckModifierFormula } from './checkModifierResolver.js';
 import { postBundledCheckRoll, resolveModifierPreRolls } from './checkModifierRolls.js';
+import { SUM_OVER_EVALUATION } from './checkModifierRouter.js';
 import { resolveCheckDecision } from './checkRollDecision.js';
-
-const SUM_OVER_EVALUATION = { product: 'sum', direction: 'over', target: { source: 'fixed' } };
 
 function preRollEvidence(rolled) {
   const entries = rolled?.modifierPlacement?.preRolls;
@@ -155,6 +155,7 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     actor,
     options,
     evaluation,
+    deferred,
     resolvedCheck,
     displayFormula: resolveCheckFormulaDisplay,
     Roll: globalThis.Roll,
@@ -199,7 +200,7 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
       } else {
         await roll.toMessage(
           { speaker: options.speaker, flavor: effectiveFlavor },
-          { rollMode: effectiveRollMode, create: true }
+          { ...chatModeOption(effectiveRollMode), create: true }
         );
       }
     } catch (error) {
@@ -221,7 +222,7 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     serializedPreRolls.every(Boolean)
   ) {
     result.rollHandoff = {
-      serializedRoll: roll.toJSON(),
+      serializedRoll: cloneJson(roll),
       ...(serializedPreRolls.length > 0 && { serializedPreRolls }),
       flavor: effectiveFlavor ?? null,
       speaker: options?.speaker ?? null,
