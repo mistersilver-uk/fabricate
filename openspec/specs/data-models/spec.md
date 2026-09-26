@@ -3434,7 +3434,7 @@ CraftingRunStepState = {
    A non-null margin is raw total minus target even when forcing changes the disposition.
    Error, prompt cancellation, missing engine and empty formula exits preserve their prior result shape and omit these new execution fields.
    An executed result's `data.preRolls`, when present, is an ordered array of `{ source, label, expression, total, destination }` for separately evaluated modifiers; the main `total` and `diceGroups` still describe only the authored check roll and its appended terms.
-   Error, prompt cancellation and unrolled exits do not fabricate pre-roll evidence.
+   Error, prompt cancellation and unrolled exits do not fabricate pre-roll evidence, and a secret prepared check omits it.
 6. `failureReason` is required when `status` is `failed`.
 7. `preparedConsumption.currencySpends` records what was actually deducted, never what was intended.
    It is the sole input to the cancel reversal's refund, so a spend that did not settle must not appear in it; an empty array is the correct record for a step whose currency deduction settled nothing.
