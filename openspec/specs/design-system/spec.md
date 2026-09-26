@@ -216,7 +216,7 @@ That is a measured FACT about where those importers happen to live, and it MUST 
 The tree still contradicts such a prohibition: `apps/crafting/detail/ProgressiveStageList.svelte` and `apps/inventory/bulk/InventoryBulkComplicationGroup.svelte` both import `apps/manager/ComplicationSummaryRow.svelte` and are reachable from the player application's root.
 The absence of a prohibition is a fact about scope, not about the primitive's directory.
 So an adoption whose primitive still lives in `apps/manager/` is deferred on SCOPE — the move into `components/` with a shared scope is the shape and the mechanism of the change that owns it, and it carries its own path-repair surface — never on reachability.
-After issue 1710 exactly one member row scoped `shared` lives under `apps/manager/`, `ComplicationSummaryRow.svelte`.
+After issue 2021 exactly two member rows scoped `shared` live under `apps/manager/`: `ComplicationSummaryRow.svelte` and `ManagerModal.svelte`, which the player crafting application's roll prompt renders.
 The library's routing rule decides WHICH primitive an adoption wants; the deferral decides only WHEN the move happens, and the two answers are recorded separately.
 `Pagination.svelte:262-270` renders `<Select size="inline">` with no `label`, `hint` or `error`, so `Select.svelte:220` computes `labelled` false and the `<Field as="label">` at `Select.svelte:442-451` never renders.
 That CHAIN, rather than the importer list alone, is what makes the new `.fabricate-field` floor and chrome unreachable in the player application today.

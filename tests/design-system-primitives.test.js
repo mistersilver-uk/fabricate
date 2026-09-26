@@ -802,12 +802,15 @@ test('(e) every registered path is a real, unadjudicated component', () => {
   );
 });
 
-test('(e) exactly one shared member row still lives outside the primitive directory', () => {
+test('(e) exactly two shared member rows still live outside the primitive directory', () => {
   assert.deepEqual(
     MANIFEST_ROWS.filter(
       (row) => row.scope === 'shared' && !row.path.startsWith(PRIMITIVE_DIRECTORY)
     ).map((row) => row.path),
-    ['src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte'],
+    [
+      'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+      'src/ui/svelte/apps/manager/ManagerModal.svelte',
+    ],
     'the design-system spec names this set; a promotion or a new shared row outside ' +
       `${PRIMITIVE_DIRECTORY} must update that sentence with it`
   );
