@@ -115,7 +115,10 @@ Two consequences are worth knowing.
 - **A modifier's minimum and maximum clamp the RESULT of its roll, not the formula.**
 A `1d8` capped at `+6` contributes 6 on a roll of 7 and 3 on a roll of 3, and the die still shows.
 - **Where modifiers compete, they are ranked by their AVERAGE.**
-Under **Highest**, and under **Player picks** when nothing prompts, `1d4` is worth 2.5 and beats a flat `+2` — the same winner every time, with no hidden roll to decide it — and the winner is then added as dice.
+Under **Highest**, and under **Player picks** when nothing prompts, `1d4` is worth 2.5 and beats a flat `+2`.
+The same winner is chosen every time, with no hidden roll to decide it, and the winner is then added as dice.
+A modifier whose dice total is transformed rather than summed, such as one written with a counting suffix like `cs` or `cf`, or with `even` or `odd`, has no average to rank by.
+It ranks after every modifier that does have one, keeping the order you listed it in among other such modifiers, and it still rolls exactly as written whenever a competing rule has a place left over for it.
 
 ### Upgrading from a version before 1.21.0
 
@@ -183,7 +186,7 @@ It also decides **who chooses them, and when**.
 | Combination rule | Who chooses | What it does | When you would want it |
 |:-----------------|:------------|:-------------|:------------------------|
 | **Add all** | Nobody. The system's default set applies as it stands. | Sums every modifier in the default set. | The recipe rewards stacking every relevant skill or tool bonus at once. |
-| **Highest** | Nobody. The system's default set applies as it stands. | Adds only the single best modifier in the default set. Best means highest on average, so a `1d4` beats a flat `+2`, and a winner that rolls dice is added as dice. It is not a keep-highest dice roll across the set. | Several skills can substitute for each other, and only the best should count. |
+| **Highest** | Nobody. The system's default set applies as it stands. | Adds only the single best modifier in the default set. Best means highest on average, so a `1d4` beats a flat `+2`, and a winner that rolls dice is added as dice. A modifier with no average, because its dice total is transformed rather than summed, is added only when nothing else in the set has an average. It is not a keep-highest dice roll across the set. | Several skills can substitute for each other, and only the best should count. |
 | **By recipe** / **By component** / **By gathering task** | You do, per record, on that record's own editor. | Sums the modifiers that record picked. | Different recipes (or components, or gathering tasks) in one system draw on different skills, and you want to decide that once, while authoring the record. |
 | **Player picks** | The player does, at roll time. | Sums the modifiers the player picked. | You want the player to decide, in the moment, which of their skills they are relying on for that attempt. |
 
@@ -298,9 +301,16 @@ A gathering check under **Player picks** still applies the best selection the pl
 
 When the player is prompted, the roll dialog adds a **Check modifier** choice below the formula, listing each eligible modifier by icon and label.
 A modifier that works out to a plain number shows that number.
-A modifier that rolls dice shows the dice it will roll instead, bounds included, because the average it was ranked by is not a number the roll can produce.
+A modifier that rolls dice shows the dice it will roll instead, bounds included, because that is not a number the roll can produce, whether or not the modifier has an average to rank by.
 With a **Maximum picks** of 1 it is a one-of list.
 Above 1 it is a tick list whose heading says how many may be ticked, and further ticks are refused once the cap is reached.
-The best allowed selection is pre-chosen — the highest-averaging modifiers the cap permits — so a player who just clicks **Roll** without changing anything gets the same result an unprompted craft would have produced.
+The best allowed selection is pre-chosen.
+Modifiers with an ordinary average fill the cap first, best average first, and a modifier whose dice total is transformed and has no average fills whatever places are left over, in the order you listed it.
+A player who just clicks **Roll** without changing anything gets the same result an unprompted craft would have produced.
 Because the chosen value is not known until the player picks it, the formula preview ends in a neutral `+ (modifier)[Modifiers]` term instead of a number, until the player confirms.
 The chat card names the modifiers that were picked.
+
+{: .note }
+> If a transformed modifier, one with no average, is eligible alongside others under **Highest**, or under **Player picks** with a **Maximum picks** below how many are eligible, the **Validation** page raises a warning naming it.
+> That warning does not block saving or enabling the system.
+> The modifier stays eligible and selectable, and it still rolls exactly as written whenever a pick is free for it.

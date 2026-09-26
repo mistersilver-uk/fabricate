@@ -4862,7 +4862,8 @@
           "BoundsHint": "Optional. These clamp what this modifier contributes to a check — a rolled expression is clamped after it rolls, so 1d8 with a maximum of +6 contributes 6 on a roll of 7. Leave them empty for no limit — empty is not zero.",
           "BoundsInverted": "This modifier’s minimum is above its maximum, so it contributes nothing at all until you fix the two values.",
           "BoundsUnsafe": "This modifier’s bound is too large or too small to appear in a roll formula, so it contributes nothing until you fix it.",
-          "RollNote": "This expression rolls dice. Every activity can use it: a gathering drop row applies its result, and a check appends the dice to its roll formula so the roll is made once and shows on the card. Where modifiers compete — Highest, or Player picks — this one is ranked by its average."
+          "RollNote": "This expression rolls dice. Every activity can use it: a gathering drop row applies its result, and a check appends the dice to its roll formula so the roll is made once and shows on the card. Where modifiers compete — Highest, or Player picks — this one is ranked by its average.",
+          "RollNoteTransformed": "This expression rolls dice. Every activity can use it: a gathering drop row applies its result, and a check appends the dice to its roll formula so the roll is made once and shows on the card. Where modifiers compete — Highest, or Player picks — this one has no comparable average, so modifiers with an ordinary average are chosen ahead of it."
         },
         "CharacterPrerequisites": {
           "DeleteTitle": "Delete {name}?",
@@ -6126,10 +6127,11 @@
             "FormulaLead": "Rolled once per attempt.",
             "Average": "avg",
             "AverageHint": "The average of the dice, with every character value taken as zero — no actor is chosen on this screen.",
+            "AverageWithheld": "No average: a die in this formula counts successes, subtracts failures or otherwise changes what its total means, so an average of its faces would mislead.",
             "ResolvedTitle": "What actually gets rolled",
             "ResolvedNoModifiers": "No check modifiers apply, so the roll is exactly the formula above.",
             "ResolvedAddAll": "Add all — every applied modifier is summed into the roll.",
-            "ResolvedHighest": "Highest — only the best applied modifier reaches the roll, ranked by its average.",
+            "ResolvedHighest": "Highest — only one applied modifier reaches the roll: the one with the highest average, or, when none has an ordinary average, the first listed.",
             "ResolvedBySubject": "Chosen per {record} — each {record} picks which of these apply, and the picks are summed.",
             "ResolvedPlayerPicks": "Player picks — the crafter chooses from these at roll time, and the picks are summed.",
             "TiersLeadBands": "A recipe picks one of these; its DC anchors the outcome bands on the Outcomes section.",
@@ -6190,6 +6192,7 @@
             "IssueModifierBoundsInverted": "A check modifier this check applies ({names}) has a minimum above its maximum, so it contributes nothing to the roll until you fix the two values.",
             "IssueModifierBoundsUnsafe": "A check modifier this check applies ({names}) has a minimum or maximum too large or too small to appear in a roll formula, so it contributes nothing. Use a whole number a die roll could plausibly reach.",
             "IssueModifierExpressionInvalid": "A check modifier this check applies ({names}) has an expression Fabricate cannot roll, so it contributes nothing. Check it against your game system — a capitalised function name (MAX instead of max), more than 999 dice, or a decimal without a leading zero are all refused by the dice engine.",
+            "IssueModifierAverageUnavailable": "A check modifier this check ranks ({names}) changes what its dice total means — by counting successes, for example — so it has no average to compare with the others. Modifiers with an ordinary average are chosen ahead of it; it is still rolled exactly as written whenever a pick is left over.",
             "IssueModifiersInertNoCheck": "This resolution mode rolls no check, so the check modifiers selected here are never applied.",
             "IssueModifiersInertNoModifierSupport": "The d100 roll against each drop’s chance is this mode’s check, and it cannot take check modifiers yet, so the ones selected here are never applied.",
             "IssueModifiersInertNoFormula": "This check has no roll formula yet, so the check modifiers selected here are never applied.",

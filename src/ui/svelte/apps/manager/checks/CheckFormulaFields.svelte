@@ -8,12 +8,18 @@
   AUTOMATICALLY and never appear in the formula text, so the field a GM types into is not the
   expression the engine rolls. `avg` TAKES ROLL-DATA TERMS AS ZERO AND SAYS SO, a roll-data path
   having no value on this screen; showing nothing is worse, almost every real formula carrying an
-  `@` term, and an expression that cannot be reduced withholds the reading rather than guessing.
-  For the same reason THE RULE SENTENCE STOPS AT THE RULE. Controlled through `onChange`.
+  `@` term. An expression that cannot be reduced at all withholds the whole reading rather than
+  guessing, while one whose dice total is TRANSFORMED — a counting suffix, `even`/`odd`, and
+  their kin — shows a visible `avg —` with an accessible reason instead of the numeric one, so
+  the withholding is never mistaken for the malformed-input case. For the same reason THE RULE
+  SENTENCE STOPS AT THE RULE. Controlled through `onChange`.
 -->
 <script>
   import { getModifierExpressionSuggestions } from '../../../../../config/modifierExpressionSuggestions.js';
-  import { reduceRollExpression } from '../../../../../utils/rollExpressionAverage.js';
+  import {
+    classifyRollQuantity,
+    reduceRollExpression,
+  } from '../../../../../utils/rollExpressionAverage.js';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -60,10 +66,26 @@
   const average = $derived.by(() => {
     const source = String(rollFormula || '').trim();
     if (source === '') return null;
-    const { value } = reduceRollExpression(source.replaceAll(/@[\w.[\]-]+/g, '0'));
+    const neutral = source.replaceAll(/@[\w.[\]-]+/g, '0');
+    const quantity = classifyRollQuantity(neutral);
+    if (quantity === 'irreducible') return null;
+    if (quantity === 'transformed') return { quantity };
+    const { value } = reduceRollExpression(neutral);
     if (!Number.isFinite(value)) return null;
-    return Number.isInteger(value) ? String(value) : value.toFixed(1);
+    return {
+      quantity,
+      value: Number.isInteger(value) ? String(value) : value.toFixed(1),
+    };
   });
+
+  const transformedReason = $derived(
+    text(
+      'FABRICATE.Admin.Manager.Checks.Crafting.AverageWithheld',
+      'No average: a die in this formula counts successes, subtracts failures or otherwise changes what its total means, so an average of its faces would mislead.'
+    )
+  );
+  const uid = $props.id();
+  const averageId = `${uid}-formula-average`;
 
   const DEFAULT_MODIFIER_ICON = 'fas fa-wand-magic-sparkles';
   const applied = $derived(Array.isArray(appliedModifiers) ? appliedModifiers : []);
@@ -79,7 +101,7 @@
     if (modifierPolicy === 'highest') {
       return text(
         'FABRICATE.Admin.Manager.Checks.Crafting.ResolvedHighest',
-        'Highest — only the best applied modifier reaches the roll, ranked by its average.'
+        'Highest — only one applied modifier reaches the roll: the one with the highest average, or, when none has an ordinary average, the first listed.'
       );
     }
     if (modifierPolicy === 'bySubject') {
@@ -113,21 +135,34 @@
       data-check-roll-formula
       data-validation-target="checks-roll-formula"
       aria-label={formulaLabel}
+      aria-describedby={average ? averageId : undefined}
       value={rollFormula || ''}
       {placeholder}
       oninput={(event) => onChange({ rollFormula: event.currentTarget.value })}
     />
-    {#if average !== null}
+    {#if average?.quantity === 'magnitude'}
       <span
+        id={averageId}
         class="manager-checks-formula-average"
-        data-check-formula-average={average}
+        data-check-formula-average={average.value}
         title={text(
           'FABRICATE.Admin.Manager.Checks.Crafting.AverageHint',
           'The average of the dice, with every character value taken as zero — no actor is chosen on this screen.'
         )}
       >
         {text('FABRICATE.Admin.Manager.Checks.Crafting.Average', 'avg')}
-        <span>{average}</span>
+        <span class="manager-checks-formula-average-value">{average.value}</span>
+      </span>
+    {:else if average?.quantity === 'transformed'}
+      <span
+        id={averageId}
+        class="manager-checks-formula-average"
+        data-check-formula-average-withheld="die-modifiers"
+        title={transformedReason}
+      >
+        {text('FABRICATE.Admin.Manager.Checks.Crafting.Average', 'avg')}
+        <span class="manager-checks-formula-average-value" aria-hidden="true">—</span>
+        <span class="visually-hidden">{transformedReason}</span>
       </span>
     {/if}
   </div>

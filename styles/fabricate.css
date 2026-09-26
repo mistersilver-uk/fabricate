@@ -3111,6 +3111,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+.fabricate-manager .manager-checks-formula-average-value {
+  font-family: var(--fab-font-mono);
+}
+
 /* WHAT ACTUALLY GETS ROLLED. The INFO family, because it is a standing explanation of how the surface behaves rather than a hazard — the same reason the mode callout above the cards is info. */
 .fabricate-manager .manager-checks-formula-resolved {
   display: flex;

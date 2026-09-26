@@ -91,6 +91,7 @@ Each activity route renders FIVE sections — The roll / Outcomes / Triggers / M
 The warning dot carries a text accessible name, and a section carrying both a count and an issue renders both; a count of zero renders unbadged, because five sections each wearing a `0` is chrome rather than information.
 The dot is EXPLAINED IN THE PANEL: the open section renders the shared `Callout` for each of its own issues, carrying the same sentence the Validation route renders for that issue id from one exported copy map, toned `warning` for an issue that blocks enabling and `info` for one that does not.
 A dot whose only explanation is on another route is a signal with no legend, and two surfaces describing one issue from two copies of the sentence is how they come to describe it differently.
+When ranking leaves an entry out — `highest` over two or more eligible entries, or `playerPicks` whose pick cap is below the number of eligible entries — Modifiers readiness emits one non-blocking `warning`-severity issue, `modifierAverageUnavailable`, naming every eligible transformed-quantity entry with sound bounds and a resolving expression, whose average cannot be compared; the entry remains selectable and rollable, and the warning never becomes `modifierExpressionInvalid`.
 The section strip is a real ARIA tablist driven by Arrow, Home and End, and only the SELECTED tab carries `aria-controls`, because only the selected section's panel is in the document.
 It renders through the ONE editor tab strip primitive, which draws both of its marks and offers that selected-tab-only mode; this route owns the section-to-tab mapping, its `checks-section-*` and `data-checks-*` hooks and the issue count's localized unit, and nothing about how a mark looks.
 Outcomes renders in EVERY mode and hosts that mode's own outcome model: the two-outcome pass/fail statement on `simple`, the `awardMode` selector on `progressive`, the band strip plus the tier rows on `routed`.
@@ -154,7 +155,8 @@ A formula whose only die sits inside a parenthetical, function or pool term refu
 Anything outside the shape renders a stated note rather than an approximation: a histogram that lies is worse than one that abstains.
 The caption is COMPUTED from the enumerated space, never hard-coded — a `1d12` check reads "all 12 faces".
 
-**The histogram, the `avg` annotation and the simulator MUST describe ONE formula, and it is the formula the RUNNER rolls.**
+**The histogram and the simulator MUST describe ONE formula, and it is the formula the RUNNER rolls.**
+The formula field's `avg` annotation is not a third reader of that formula: it reads the authored free-text formula alone, with no modifier contribution appended (below).
 The preview arg-builder hands the runner an AUTHORED formula plus a check-modifier context, and the runner appends the resolved scalar itself — so a derivation that describes the roll without that context describes a formula nothing rolls.
 The append therefore has ONE implementation and ONE composition (`resolveRolledFormula`: the retired-placeholder shim, then the modifier append), which the runner, the display resolver and the enumerator all ASK FOR rather than rebuild.
 A second composition is free to drift, and drift here is a histogram spanning `1..20` beside a readout rolling `5..24`, for the same check, at the same moment.
@@ -187,8 +189,10 @@ The View Lab's `Roll` double carries a `parse` static whose term shape is derive
 A capture job that fails whole now surfaces as a FAILED evidence gate rather than as silent stale evidence: the gate reds instead of passing on the previous head's frames, so the bad case is visible as the failure it is.
 The panel additionally guards a missing or throwing `Roll.parse` as a not-enumerable result rather than a throw.
 
-An `avg N` annotation on the formula field renders the expected value of the PREVIEW formula for the previewed actor and is OMITTED whenever that formula does not reduce to a number.
-It is deliberately LOOSER than the histogram's predicate — it answers for multi-group and modified formulas the histogram abstains from — because it is an annotation on a field the GM is typing in rather than a claim about a distribution.
+An `avg N` annotation on the formula field renders the deterministic magnitude average (`reduceRollExpression`) of the free-text formula with character paths taken as zero, its value set in the mono face and the annotation referenced by the formula input's `aria-describedby`.
+When a die or pool carries `cs`, `cf`, `even`, `odd`, `df`, `sf` or `ms`, the annotation renders visible `avg —`, stamps `data-check-formula-average-withheld="die-modifiers"`, and exposes, in visually hidden text that needs no hover, a localized explanation that the average is withheld because the die modifier transforms the total.
+Malformed or irreducible input omits the annotation.
+Magnitude expressions remain deliberately LOOSER than the histogram's predicate — the annotation answers for multi-group and magnitude-modified formulas the histogram abstains from — because it is an annotation on a field the GM is typing in rather than a claim about a distribution.
 Its responsive behaviour reuses the SHIPPED `fabricate-manager` container ladder and introduces no new breakpoint: `styles/fabricate.css` already declares that container with blocks at 1320 / 1120 / 960 / 900 / 831 / 680, and `.fabricate-manager .manager-inspector` already carries `overflow-y: auto; max-height: 100%`.
 At the existing 1320 breakpoint and below, the odds histogram and the simulator readout become collapsed disclosures, headers and counts retained.
 At the existing 1120 breakpoint and below, the shipped rule already restacks `.manager-body` to one column with `grid-auto-rows: max-content` and hands scrolling to the body; the rail's own `overflow-y` / `max-height` is LEFT ALONE there, because that block unsets neither and a `max-content` track cannot be squeezed.

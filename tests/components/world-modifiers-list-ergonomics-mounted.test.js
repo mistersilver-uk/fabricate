@@ -333,6 +333,26 @@ describe('world modifiers list ergonomics (mounted, issue 768)', () => {
     );
   });
 
+  it('tells a transformed roll it has no average to rank by, and a plain roll that it has', async () => {
+    const root = await harness.mount({
+      library: [
+        { id: 'mod-roll', label: 'Rolled', icon: 'fa-solid fa-b', expression: '1d6' },
+        { id: 'mod-count', label: 'Counted', icon: 'fa-solid fa-c', expression: '1d20cs>15' },
+      ],
+    });
+    const noteOf = async (id) => {
+      const row = root.querySelector(`[data-world-modifier="${id}"]`);
+      row.querySelector('[data-toggle-modifier]').dispatchEvent(clickEvent());
+      await flushRender();
+      return row.querySelector(`[data-world-modifier-roll-note="${id}"]`).textContent;
+    };
+    const plain = await noteOf('mod-roll');
+    assert.ok(plain.includes('ranked by its average'), 'a plain roll is ranked by its average');
+    const counted = await noteOf('mod-count');
+    assert.ok(counted.includes('no comparable average'), 'a transformed roll has no average');
+    assert.ok(!counted.includes('ranked by its average'), 'and is not said to be ranked by one');
+  });
+
   // An inverted or unrollable pair makes the entry contribute nothing.
   it('flags a blocking bounds fault on the collapsed row, naming the cause', async () => {
     const root = await harness.mount({

@@ -5,6 +5,21 @@
 import { ANCHORED_POPOVER_SOURCES, GATHERING_ROUTE_MODEL_PATTERN } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
+const AUTHOR_TRANSFORMED_MODIFIER = Object.freeze([
+  { selector: '#manager-world-nav-rules', press: 'Enter' },
+  { selector: '#manager-rules-nav-modifiers', press: 'Enter' },
+  { selector: '[data-world-modifier="hb-mod-luck"] [data-toggle-modifier]' },
+  {
+    selector: '[data-world-modifier="hb-mod-luck"] [data-world-modifier-field="label"]',
+    fill: 'Lucky find with a deliberately long transformed modifier name',
+  },
+  {
+    selector: '[data-world-modifier="hb-mod-luck"] [data-world-modifier-field="expression"]',
+    fill: '1d20cs>15',
+  },
+  { selector: '[data-world-modifier-done="hb-mod-luck"]' },
+]);
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-gathering',
@@ -53,6 +68,27 @@ export const CASES = Object.freeze([
     expectView: 'checks-validation',
     // The critical id specifically: a presence-only assertion is satisfied by the warning, which says the opposite.
     expectSelector: '.fabricate-manager [data-issue="retiredPlaceholderBreaksFormula"]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  // The transformed-modifier average warning (issue 2000).
+  managerCase({
+    id: 'manager-checks-validation-average-unavailable',
+    label: 'Manager — Checks validation modifier average unavailable',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      ...AUTHOR_TRANSFORMED_MODIFIER,
+      'Checks',
+      { selector: '#manager-checks-nav-validation' },
+      { selector: '[data-issue="modifierAverageUnavailable"]', scroll: true },
+    ],
+    expectView: 'checks-validation',
+    expectSelector: '.fabricate-manager [data-issue="modifierAverageUnavailable"]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -145,9 +181,14 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     // The 1024x640 declared floor, stacked: the container ladder restacks `.manager-body` to one column at 1120.
     query: { system: 'lab-runework' },
-    steps: ['Checks', { selector: '#manager-checks-nav-crafting' }],
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-check-roll-formula]', fill: '1d20cs>15' },
+      { selector: '.manager-checks-formula', scroll: true },
+    ],
     expectView: 'checks-crafting',
-    expectSelector: '.fabricate-manager [data-checks-rail="crafting"]',
+    expectSelector: '.fabricate-manager [data-check-formula-average-withheld="die-modifiers"]',
     position: { width: 1024, height: 640 },
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -307,17 +348,22 @@ export const CASES = Object.freeze([
     // The other half of the cap's two readings.
     query: { system: 'lab-herbalism' },
     steps: [
+      ...AUTHOR_TRANSFORMED_MODIFIER,
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-modifiers' },
-      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
+      { selector: '[data-crafting-modifier-policy-option="playerPicks"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '1' },
       // The cap field, this case's whole subject and the card's last element, so the rule grid sits above it.
       { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
     expectView: 'checks-crafting',
     // The value, not the presence of a field: a fill that did not land leaves it rendered and blank.
-    expectSelector: '.fabricate-manager [data-crafting-modifier-max-picks="1"]',
+    // A cap of 1 over four eligible entries ranks the transformed one out, so it warns.
+    expectSelector:
+      '.fabricate-manager' +
+      ':has([data-crafting-modifier-max-picks="1"])' +
+      ':has([data-checks-section-callout="modifierAverageUnavailable"])',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,

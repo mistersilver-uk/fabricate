@@ -500,6 +500,7 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
       // A ROLL-shaped expression, kept in the sweep as a NEGATIVE control (issue 1118): a check
       // appends it as dice now, so it must raise NOTHING.
       { id: 'rolls', label: 'Rolls', expression: '1d4' },
+      { id: 'transformed', label: 'Transformed', expression: '1d20cs>15' },
     ];
     const context = (ids) => ({ catalogue, systemPolicy: 'addAll', defaultModifierIds: ids });
     collect({ rollFormula: '' }, { mode: 'simple' });
@@ -553,6 +554,16 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
     // rolls, so it reports the missing modifier seam rather than a missing check.
     collect({}, { mode: 'none', modifierContext: context(['ok']), activity: 'gathering' });
     collect({ rollFormula: '1d20' }, { mode: 'simple', modifierContext: context(['rolls']) });
+    collect(
+      { rollFormula: '1d20' },
+      {
+        mode: 'simple',
+        modifierContext: {
+          ...context(['rolls', 'transformed']),
+          systemPolicy: 'highest',
+        },
+      }
+    );
     collect({ rollFormula: '1d20' }, { mode: 'simple', modifierContext: context(['broken']) });
     for (const id of emitted) {
       assert.ok(
@@ -663,6 +674,11 @@ describe('rangeGap', () => {
 describe('check-modifier readiness', () => {
   const catalogue = [
     { id: 'ok', label: 'Ok', expression: '@a' },
+    {
+      id: 'transformed',
+      label: 'A transformed modifier name long enough to wrap without clipping',
+      expression: '1d20cs>15',
+    },
     { id: 'inverted', label: 'Inverted', expression: '@b', min: 5, max: -1 },
     { id: 'huge', label: 'Huge', expression: '@c', min: 1e21 },
     // An expression the reducer refuses outright, so it is detectable with no dice engine.
@@ -737,6 +753,72 @@ describe('check-modifier readiness', () => {
       !Object.hasOwn(CHECK_ISSUE_SECTIONS, 'modifierRollExpression'),
       'and from the section map, so no bucket names an id nothing can raise'
     );
+  });
+
+  it('warns once about eligible transformed entries only when the rule ranks averages', () => {
+    for (const systemPolicy of ['highest', 'playerPicks']) {
+      const { checks, issues } = evaluateCheckReadiness(
+        { rollFormula: '1d20' },
+        {
+          mode: 'simple',
+          modifierContext: {
+            catalogue,
+            systemPolicy,
+            defaultModifierIds: ['ok', 'transformed'],
+            maxModifierPicks: 1,
+          },
+        }
+      );
+      const warning = issues.filter((entry) => entry.id === 'modifierAverageUnavailable');
+      assert.equal(warning.length, 1, `${systemPolicy}: one warning for the eligible set`);
+      assert.equal(warning[0].severity, 'warning', `${systemPolicy}: non-blocking severity`);
+      assert.deepEqual(warning[0].data, {
+        names: 'A transformed modifier name long enough to wrap without clipping',
+      });
+      assert.equal(
+        checks.find((check) => check.id === 'modifierExpressionsResolve')?.satisfied,
+        true,
+        'the transformed formula remains usable'
+      );
+      assert.ok(!issues.some((entry) => entry.id === 'modifierExpressionInvalid'));
+    }
+
+    for (const systemPolicy of ['addAll', 'bySubject']) {
+      const { issues } = evaluateCheckReadiness(
+        { rollFormula: '1d20' },
+        {
+          mode: 'simple',
+          modifierContext: {
+            catalogue,
+            systemPolicy,
+            defaultModifierIds: ['ok', 'transformed'],
+            subjectModifierIds: ['transformed'],
+          },
+        }
+      );
+      assert.ok(
+        !issues.some((entry) => entry.id === 'modifierAverageUnavailable'),
+        `${systemPolicy}: no average-based ranking`
+      );
+    }
+  });
+
+  it('does not warn about transformed entries when ranking leaves nothing out', () => {
+    for (const [label, modifierContext] of [
+      ['playerPicks, no cap', { systemPolicy: 'playerPicks', ids: ['ok', 'transformed'] }],
+      [
+        'playerPicks, cap 2 over two entries',
+        { systemPolicy: 'playerPicks', ids: ['ok', 'transformed'], maxModifierPicks: 2 },
+      ],
+      ['highest over one transformed entry', { systemPolicy: 'highest', ids: ['transformed'] }],
+    ]) {
+      const { ids, ...rest } = modifierContext;
+      const { issues } = evaluateCheckReadiness(
+        { rollFormula: '1d20' },
+        { mode: 'simple', modifierContext: { catalogue, defaultModifierIds: ids, ...rest } }
+      );
+      assert.ok(!issues.some((entry) => entry.id === 'modifierAverageUnavailable'), label);
+    }
   });
 
   // Both bounds faults NAME the offending entries. A shared library can be long, and the
