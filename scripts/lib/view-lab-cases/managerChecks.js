@@ -40,7 +40,8 @@ export const CASES = Object.freeze([
     id: 'manager-checks-validation',
     label: 'Manager — Checks validation',
     smokeLabels: ['manager-checks-validation'],
-    reaches: 'exact',
+    // Window, not exact: the smoke walk authors no transformed modifier before opening Validation.
+    reaches: 'window',
     query: { system: 'lab-herbalism' },
     steps: [
       ...AUTHOR_TRANSFORMED_MODIFIER,
@@ -302,7 +303,8 @@ export const CASES = Object.freeze([
     label: 'Manager — Checks crafting modifiers',
     smokeLabels: ['manager-checks-crafting-modifiers'],
     // The catalogue card sits last in the crafting panel, below the consumption frame's fold, so this capture scrolls to it.
-    reaches: 'exact',
+    // Window, not exact: the smoke walk neither authors a transformed modifier nor presses a rule.
+    reaches: 'window',
     query: { system: 'lab-herbalism' },
     steps: [
       ...AUTHOR_TRANSFORMED_MODIFIER,
@@ -311,19 +313,19 @@ export const CASES = Object.freeze([
       { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="highest"] input' },
       { selector: '[data-crafting-modifier-policy-option="playerPicks"] input' },
-      { selector: '[data-crafting-modifier-eligibility-input="hb-mod-luck"]' },
-      { selector: '[data-crafting-modifier-eligibility-input="hb-mod-luck"]' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '' },
-      { selector: '[data-checks-section-callout="modifierAverageUnavailable"]', scroll: true },
+      // Re-anchored (issue 1095 review).
+      { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
     expectView: 'checks-crafting',
     // Two things at once on the `How they combine` card, which issue 1096's parity round split out of the catalogue card.
+    // An unlimited cap ranks nothing out, so the transformed entry raises no warning here.
     expectSelector:
       '.fabricate-manager' +
       ':has([data-crafting-modifier-policy-card])' +
       ':has([data-crafting-modifier-policy-card] [data-crafting-modifier-policy-option="bySubject"])' +
       ':has([data-crafting-modifier-policy-card] [data-crafting-modifier-max-picks="unlimited"])' +
-      ':has([data-checks-section-callout="modifierAverageUnavailable"])',
+      ':not(:has([data-checks-section-callout="modifierAverageUnavailable"]))',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -339,17 +341,22 @@ export const CASES = Object.freeze([
     // The other half of the cap's two readings.
     query: { system: 'lab-herbalism' },
     steps: [
+      ...AUTHOR_TRANSFORMED_MODIFIER,
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-modifiers' },
-      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
+      { selector: '[data-crafting-modifier-policy-option="playerPicks"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '1' },
       // The cap field, this case's whole subject and the card's last element, so the rule grid sits above it.
       { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
     expectView: 'checks-crafting',
     // The value, not the presence of a field: a fill that did not land leaves it rendered and blank.
-    expectSelector: '.fabricate-manager [data-crafting-modifier-max-picks="1"]',
+    // A cap of 1 over four eligible entries ranks the transformed one out, so it warns.
+    expectSelector:
+      '.fabricate-manager' +
+      ':has([data-crafting-modifier-max-picks="1"])' +
+      ':has([data-checks-section-callout="modifierAverageUnavailable"])',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,

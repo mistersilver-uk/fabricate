@@ -559,7 +559,7 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
       {
         mode: 'simple',
         modifierContext: {
-          ...context(['transformed']),
+          ...context(['rolls', 'transformed']),
           systemPolicy: 'highest',
         },
       }
@@ -765,6 +765,7 @@ describe('check-modifier readiness', () => {
             catalogue,
             systemPolicy,
             defaultModifierIds: ['ok', 'transformed'],
+            maxModifierPicks: 1,
           },
         }
       );
@@ -799,6 +800,24 @@ describe('check-modifier readiness', () => {
         !issues.some((entry) => entry.id === 'modifierAverageUnavailable'),
         `${systemPolicy}: no average-based ranking`
       );
+    }
+  });
+
+  it('does not warn about transformed entries when ranking leaves nothing out', () => {
+    for (const [label, modifierContext] of [
+      ['playerPicks, no cap', { systemPolicy: 'playerPicks', ids: ['ok', 'transformed'] }],
+      [
+        'playerPicks, cap 2 over two entries',
+        { systemPolicy: 'playerPicks', ids: ['ok', 'transformed'], maxModifierPicks: 2 },
+      ],
+      ['highest over one transformed entry', { systemPolicy: 'highest', ids: ['transformed'] }],
+    ]) {
+      const { ids, ...rest } = modifierContext;
+      const { issues } = evaluateCheckReadiness(
+        { rollFormula: '1d20' },
+        { mode: 'simple', modifierContext: { catalogue, defaultModifierIds: ids, ...rest } }
+      );
+      assert.ok(!issues.some((entry) => entry.id === 'modifierAverageUnavailable'), label);
     }
   });
 

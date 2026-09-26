@@ -2,6 +2,7 @@ import {
   classifyModifierExpression,
   modifierExpressionResolves,
   resolveEligibleModifierIds,
+  resolveMaxModifierPicks,
   resolveModifierBounds,
   resolveModifierPolicy,
 } from '../../../../../systems/checkModifierResolver.js';
@@ -225,6 +226,14 @@ function namesOf(faulted) {
   return faulted.map(({ entry }) => entry.label || entry.id).join(', ');
 }
 
+/** Whether ranking leaves an entry out: `highest` over two or more, or a `playerPicks` cap below
+ *  the eligible count (an absent cap is `Infinity`, so it never is). */
+function modifiersCompete(modifierContext, eligibleCount) {
+  const policy = resolveModifierPolicy(modifierContext);
+  const places = policy === 'highest' ? 1 : resolveMaxModifierPicks(modifierContext);
+  return (policy === 'highest' || policy === 'playerPicks') && places < eligibleCount;
+}
+
 function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula, activity = '' }) {
   if (!modifierContext) return { checks: [], issues: [] };
   const eligible = resolveEligibleModifierIds(modifierContext);
@@ -267,10 +276,7 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
   if (unusable !== '') {
     pushIssue(issues, 'modifierExpressionInvalid', 'critical', { names: unusable });
   }
-  if (
-    transformed !== '' &&
-    ['highest', 'playerPicks'].includes(resolveModifierPolicy(modifierContext))
-  ) {
+  if (transformed !== '' && modifiersCompete(modifierContext, eligible.length)) {
     pushIssue(issues, 'modifierAverageUnavailable', 'warning', { names: transformed });
   }
   // The two no-check modes reach no roll for OPPOSITE reasons, so they cannot share a sentence:
