@@ -642,6 +642,8 @@ GatheringTaskDefinition = {
   staminaCost?: number,
   gatheringModifier?: ModifierProvider,
   dcOverride: number | null,        // default null; per-task override of the system-level gatheringCraftingCheck default DC at gather time
+  adjustmentOverride: number | null, // default null; retained per-task adjustment for an attribute target
+  successesOverride: number | null,  // default null; retained per-task required count, clamped 0–20
 }
 ```
 

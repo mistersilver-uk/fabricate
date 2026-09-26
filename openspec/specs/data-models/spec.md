@@ -3409,7 +3409,7 @@ CraftingRunStepState = {
 5. `lastCheckResult.outcome` is only valid in `routedByCheck` mode (and in alchemy when `checkMode` is `tiered`); `lastCheckResult.value` is only valid in progressive mode.
    An executed formula result's `data` preserves raw `total` and existing `dc` and adds `product`, `direction`, `comparison`, `target`, `margin`, `successes` and `cancelled`.
    In this foundation the executed values are `sum/over`; `successes` and `data.cancelled` are null, and `data.cancelled` counts cancelled successes rather than the top-level prompt-abort sentinel.
-   A simple result targets its resolved DC; a relative routed result targets the effective threshold of the roll-matched tier before forcing or stepping, or null when no tier matched; fixed routed and progressive results have null target and margin, and progressive comparison is null.
+   A simple result targets its resolved DC; a relative routed result targets the effective threshold of the roll-matched tier, including the lowest tier when a below-every-threshold total is clamped to it, before forcing or stepping, or null when no tier is matched or clamped to; fixed routed and progressive results have null target and margin, and progressive comparison is null.
    A non-null margin is raw total minus target even when forcing changes the disposition.
    Error, prompt cancellation, missing engine and empty formula exits preserve their prior result shape and omit these new execution fields.
 6. `failureReason` is required when `status` is `failed`.
