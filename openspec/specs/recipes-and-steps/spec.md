@@ -17,6 +17,7 @@ A failed `usability` gate makes the Tool absent at recipe, step, ingredient-set,
 A failed `bonus` gate preserves presence and suppresses only that Tool's numeric bonus.
 Crafting and salvage evaluate every distinct enabled eligible Tool's bonus expression once and compose every finite non-zero value additively.
 Under the active sum/over evaluation, the resulting non-zero terms are appended to simple, routed, progressive, and alchemy formulas with bracket/control characters removed from their Tool labels.
+Under sum/over a dice-bearing Tool bonus appends only its numeric result, as before, and adds no roll evidence to the check's message, result or handoff.
 When another evaluation becomes active, each Tool's resolved benefit is routed to its target, threshold, or pool instead; an evaluated dice-bearing Tool bonus retains its actual roll evidence and is never rolled again.
 The supplying actor, distinct-Tool deduplication, prerequisite gates, evaluation timing, and failure-to-zero behavior are the same in every evaluation.
 A dice-bearing Tool bonus whose roll cannot be serialized aborts check preparation before its numeric benefit can be used.
