@@ -47,6 +47,7 @@ import {
   resolveCheckModifierContribution,
   resolveModifierPolicy,
 } from './checkModifierResolver.js';
+import { planModifierPlacement } from './checkModifierRouter.js';
 import {
   resolveCheckFormulaDisplay,
   resolveRolledFormula,
@@ -99,6 +100,7 @@ import {
   itemStackQuantityPath,
   updateStackQuantity,
 } from './itemStackQuantity.js';
+import { normalizeCheckEvaluation } from './normalize/checkEvaluation.js';
 import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
 import { resolveRolledAmount, rolledAwardRecord } from './rolledAmountResolver.js';
@@ -149,9 +151,17 @@ import { buildStepRecipeView } from './stepRecipeView.js';
 import { effectiveToolBreakageAuthority } from './toolBreakageAuthority.js';
 import {
   appendToolBonusTerms,
-  composeToolBonusTerms,
   evaluateToolCheckContribution,
+  ToolCheckEvidenceError,
 } from './toolCheckBonus.js';
+
+function checkRollOptions(options, toolContributions, evaluation = normalizeCheckEvaluation()) {
+  return {
+    ...options,
+    toolContributions,
+    evaluation,
+  };
+}
 
 /** The winning alchemy match: the unique most-specific set under {@link signatureDominates}
  * (issue 774). No unique maximum fails safe to no-match, so the caller fizzles. */
@@ -378,10 +388,11 @@ export class CraftingEngine {
         'STALE_RUN_STAGE'
       );
     }
-    const rollFormula = await this._appendToolCheckBonuses(
+    const preparedTools = await this._prepareToolCheckBonuses(
       activeCheck.rollFormula,
-      prepared.toolItems
+      prepared.toolValidation?.tools ?? prepared.toolItems
     );
+    const rollFormula = preparedTools.formula;
     const modifierContext = capturePreparedModifierContext(
       buildCheckModifierContext(system, 'crafting', recipe),
       actor
@@ -429,6 +440,7 @@ export class CraftingEngine {
           ...cloneJsonValue(activeCheck.config),
           craftingModifier: cloneJsonValue(modifierContext),
           modifierChoice: cloneJsonValue(modifierChoice),
+          toolContributions: cloneJsonValue(preparedTools.contributions),
         },
         decisionPolicy: {
           dc: Number.isFinite(dc) ? dc : null,
@@ -4665,7 +4677,7 @@ export class CraftingEngine {
     return { valid: true, tools: toolItems };
   }
 
-  async _appendToolCheckBonuses(formula, toolItems = []) {
+  async _appendToolCheckBonuses(formula, toolItems = [], options = {}) {
     const contributions = [];
     const seenToolIds = new Set();
     for (const toolItem of Array.isArray(toolItems) ? toolItems : []) {
@@ -4685,12 +4697,49 @@ export class CraftingEngine {
             const roll = await new globalThis.Roll(expression, rollData).evaluate({
               allowInteractive: false,
             });
-            return roll?.total;
+            const total = roll?.total;
+            let preRoll = null;
+            if (Array.isArray(roll?.dice) && roll.dice.length > 0 && Number.isFinite(total)) {
+              try {
+                const serializedRoll = cloneJsonValue(roll.toJSON());
+                if (!serializedRoll || typeof serializedRoll !== 'object') {
+                  throw new TypeError('Tool roll data is unavailable');
+                }
+                preRoll = { expression, total, serializedRoll };
+              } catch (error) {
+                throw new ToolCheckEvidenceError('Tool roll evidence could not be serialized', {
+                  cause: error,
+                });
+              }
+            }
+            return preRoll ? { value: total, preRoll } : total;
           },
         })
       );
     }
-    return appendToolBonusTerms(formula, composeToolBonusTerms(contributions).terms);
+    const resolved = contributions.map(({ label, value, preRoll }) => ({
+      source: 'tool',
+      label,
+      form: 'scalar',
+      value,
+      ...(preRoll && { preRoll }),
+    }));
+    const placement = planModifierPlacement({
+      evaluation: options.evaluation ?? normalizeCheckEvaluation(),
+      contributions: resolved,
+    });
+    const placedFormula = appendToolBonusTerms(formula, placement.appendTerms);
+    return options.withContributions === true
+      ? { formula: placedFormula, contributions: resolved }
+      : placedFormula;
+  }
+
+  async _prepareToolCheckBonuses(formula, toolItems, evaluation) {
+    const prepared = await this._appendToolCheckBonuses(formula, toolItems, {
+      withContributions: true,
+      evaluation,
+    });
+    return typeof prepared === 'string' ? { formula: prepared, contributions: [] } : prepared;
   }
 
   /**
@@ -5576,7 +5625,8 @@ export class CraftingEngine {
     { interactive = false, toolItems = [] } = {}
   ) {
     const checkConfig = config || {};
-    const formula = await this._appendToolCheckBonuses(checkConfig.rollFormula, toolItems);
+    const preparedTools = await this._prepareToolCheckBonuses(checkConfig.rollFormula, toolItems);
+    const formula = preparedTools.formula;
     const dc = await this._resolveSimpleCheckDc(
       system,
       checkConfig,
@@ -5593,20 +5643,23 @@ export class CraftingEngine {
       actor: craftingActor,
       label: 'Crafting',
       craftingModifier,
-      rollOptions: buildInteractiveRollOptions({
-        interactive,
-        actor: craftingActor,
-        name: recipe?.name,
-        activity: 'Crafting',
-        img: this._resolveRecipePromptImg(recipe),
-        dc,
-        modifierChoice: this._buildInteractiveModifierChoice(
-          formula,
-          craftingModifier,
-          craftingActor,
-          interactive
-        ),
-      }),
+      rollOptions: checkRollOptions(
+        buildInteractiveRollOptions({
+          interactive,
+          actor: craftingActor,
+          name: recipe?.name,
+          activity: 'Crafting',
+          img: this._resolveRecipePromptImg(recipe),
+          dc,
+          modifierChoice: this._buildInteractiveModifierChoice(
+            formula,
+            craftingModifier,
+            craftingActor,
+            interactive
+          ),
+        }),
+        preparedTools.contributions
+      ),
     });
     return this._markEngineEvaluated(result);
   }
@@ -5626,7 +5679,8 @@ export class CraftingEngine {
     { interactive = false, applyMinSuccessOutcome = true, toolItems = [] } = {}
   ) {
     const routed = system?.craftingCheck?.routed || {};
-    const formula = await this._appendToolCheckBonuses(routed.rollFormula, toolItems);
+    const preparedTools = await this._prepareToolCheckBonuses(routed.rollFormula, toolItems);
+    const formula = preparedTools.formula;
     const dc = await this._resolveSimpleCheckDc(
       system,
       routed,
@@ -5652,21 +5706,24 @@ export class CraftingEngine {
       // Fixed-type only: a roll below the recipe's minimum success tier fails outright; forced
       // null for alchemy tiered.
       minOutcomeId: applyMinSuccessOutcome ? (recipe?.minSuccessOutcomeId ?? null) : null,
-      rollOptions: buildInteractiveRollOptions({
-        interactive,
-        actor: craftingActor,
-        name: recipe?.name,
-        activity: 'Crafting',
-        img: this._resolveRecipePromptImg(recipe),
-        // Fixed-type checks match by value range, so no DC chip or flavor is shown.
-        dc: routed.type === 'fixed' ? undefined : dc,
-        modifierChoice: this._buildInteractiveModifierChoice(
-          formula,
-          craftingModifier,
-          craftingActor,
-          interactive
-        ),
-      }),
+      rollOptions: checkRollOptions(
+        buildInteractiveRollOptions({
+          interactive,
+          actor: craftingActor,
+          name: recipe?.name,
+          activity: 'Crafting',
+          img: this._resolveRecipePromptImg(recipe),
+          // Fixed-type checks match by value range, so no DC chip or flavor is shown.
+          dc: routed.type === 'fixed' ? undefined : dc,
+          modifierChoice: this._buildInteractiveModifierChoice(
+            formula,
+            craftingModifier,
+            craftingActor,
+            interactive
+          ),
+        }),
+        preparedTools.contributions
+      ),
     });
     return this._markEngineEvaluated(result);
   }
@@ -5712,7 +5769,8 @@ export class CraftingEngine {
     { interactive = false, toolItems = [] } = {}
   ) {
     const progressive = system?.craftingCheck?.progressive || {};
-    const formula = await this._appendToolCheckBonuses(progressive.rollFormula, toolItems);
+    const preparedTools = await this._prepareToolCheckBonuses(progressive.rollFormula, toolItems);
+    const formula = preparedTools.formula;
     const craftingModifier = buildCheckModifierContext(system, 'crafting', recipe);
     const result = await runFormulaProgressive({
       formula,
@@ -5720,19 +5778,22 @@ export class CraftingEngine {
       actor: craftingActor,
       label: 'Crafting',
       craftingModifier,
-      rollOptions: buildInteractiveRollOptions({
-        interactive,
-        actor: craftingActor,
-        name: recipe?.name,
-        activity: 'Crafting',
-        img: this._resolveRecipePromptImg(recipe),
-        modifierChoice: this._buildInteractiveModifierChoice(
-          formula,
-          craftingModifier,
-          craftingActor,
-          interactive
-        ),
-      }),
+      rollOptions: checkRollOptions(
+        buildInteractiveRollOptions({
+          interactive,
+          actor: craftingActor,
+          name: recipe?.name,
+          activity: 'Crafting',
+          img: this._resolveRecipePromptImg(recipe),
+          modifierChoice: this._buildInteractiveModifierChoice(
+            formula,
+            craftingModifier,
+            craftingActor,
+            interactive
+          ),
+        }),
+        preparedTools.contributions
+      ),
     });
     return this._markEngineEvaluated(result);
   }
@@ -6845,7 +6906,8 @@ export class CraftingEngine {
   ) {
     const dc = this._resolveSalvageDc(simple, component);
     // Tool bonuses append first and the modifier term after, as in crafting.
-    const formula = await this._appendToolCheckBonuses(simple.rollFormula, toolItems);
+    const preparedTools = await this._prepareToolCheckBonuses(simple.rollFormula, toolItems);
+    const formula = preparedTools.formula;
     const result = await runFormulaPassFail({
       formula,
       dc,
@@ -6854,15 +6916,18 @@ export class CraftingEngine {
       actor,
       label: 'Salvage',
       craftingModifier,
-      rollOptions: this._salvageRollOptions({
-        interactive,
-        actor,
-        component,
-        dc,
-        rollDecision,
-        formula,
-        craftingModifier,
-      }),
+      rollOptions: checkRollOptions(
+        this._salvageRollOptions({
+          interactive,
+          actor,
+          component,
+          dc,
+          rollDecision,
+          formula,
+          craftingModifier,
+        }),
+        preparedTools.contributions
+      ),
     });
     return this._markEngineEvaluated(result);
   }
@@ -6875,7 +6940,8 @@ export class CraftingEngine {
     actor,
     { interactive = false, toolItems = [], rollDecision = null, craftingModifier = null } = {}
   ) {
-    const formula = await this._appendToolCheckBonuses(progressive.rollFormula, toolItems);
+    const preparedTools = await this._prepareToolCheckBonuses(progressive.rollFormula, toolItems);
+    const formula = preparedTools.formula;
     const result = await runFormulaProgressive({
       formula,
       triggers: progressive.checkBreakage?.triggers,
@@ -6883,14 +6949,17 @@ export class CraftingEngine {
       label: 'Salvage',
       craftingModifier,
       // No `dc`: progressive has none, and the prompt must show no DC chip.
-      rollOptions: this._salvageRollOptions({
-        interactive,
-        actor,
-        component,
-        rollDecision,
-        formula,
-        craftingModifier,
-      }),
+      rollOptions: checkRollOptions(
+        this._salvageRollOptions({
+          interactive,
+          actor,
+          component,
+          rollDecision,
+          formula,
+          craftingModifier,
+        }),
+        preparedTools.contributions
+      ),
     });
     return this._markEngineEvaluated(result);
   }
@@ -6907,7 +6976,8 @@ export class CraftingEngine {
     { interactive = false, toolItems = [], rollDecision = null, craftingModifier = null } = {}
   ) {
     const dc = this._resolveSalvageDc(routed, component);
-    const formula = await this._appendToolCheckBonuses(routed.rollFormula, toolItems);
+    const preparedTools = await this._prepareToolCheckBonuses(routed.rollFormula, toolItems);
+    const formula = preparedTools.formula;
     const result = await runFormulaRouted({
       formula,
       dc,
@@ -6921,15 +6991,18 @@ export class CraftingEngine {
       craftingModifier,
       // Clamp a below-lowest total to the closest tier, as crafting does.
       clampToNearest: true,
-      rollOptions: this._salvageRollOptions({
-        interactive,
-        actor,
-        component,
-        dc,
-        rollDecision,
-        formula,
-        craftingModifier,
-      }),
+      rollOptions: checkRollOptions(
+        this._salvageRollOptions({
+          interactive,
+          actor,
+          component,
+          dc,
+          rollDecision,
+          formula,
+          craftingModifier,
+        }),
+        preparedTools.contributions
+      ),
     });
     return this._markEngineEvaluated(result);
   }

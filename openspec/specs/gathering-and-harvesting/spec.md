@@ -726,6 +726,8 @@ The blocking `modifierRollExpression` readiness issue issue 1117 raised is RETIR
 The GM-facing section label on a Checks route is **"Check modifiers"** because what that route authors is a selection; the drop-row and event sections keep **"Character modifiers"** because what they author is a reference with its own arithmetic; and the one authoring surface is labelled simply **"Modifiers"**, because it is neither — it is the library both read.
 
 The check-modifier seam applies to task-owned formula modes (`routed` and legacy `progressive`).
+These formula checks use the shared modifier placement plan; their active sum/over evaluation still appends the selected library terms to the check roll.
+The separate drop-row and event chance references, the `d100` situational-bonus path, and gathering's absence of numeric Tool bonuses retain their own behavior.
 Both library normalizers preserve `GatheringTask.checkModifierIds`, `resolutionMode` and `resultGroups`, and `_libraryTaskToRuntimeTask` forwards them to the engine.
 An absent task mode defaults to `d100`; the economy's compatibility mode never overrides it.
 Task authoring controls are delivered separately by #1648; progressive remains unavailable as a new authoring option.

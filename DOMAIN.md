@@ -838,6 +838,7 @@ Svelte UI state boundary for the dedicated player gathering app.
 #### Check Modifier
 
 A named, GM-authored entry in the world's ONE **Modifier Library** (`{id, label, expression, isRollExpression, icon?, min?, max?}`) whose `expression` is a roll-data fragment (e.g. `@abilities.med.mod`) resolved against the crafter.
+Its selected, bounded benefit is placed according to the check evaluation while retaining whether the contribution was scalar or rolling.
 
 [Notes](docs/domain/terms.md#check-modifier)
 
@@ -1156,7 +1157,7 @@ The normalized check policy that retains a product, direction, target and pool s
 
 #### Executed Check Evidence
 
-The recorded arithmetic meaning of a rolled check, separate from its authored evaluation and from any forced outcome.
+The recorded arithmetic meaning of a rolled check, including ordered evidence for separately evaluated modifiers when present, separate from its authored evaluation and from any forced outcome.
 
 [Notes](docs/domain/terms.md#executed-check-evidence)
 

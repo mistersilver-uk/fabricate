@@ -42,6 +42,7 @@ const harness = createMountedComponentHarness({
     'src/ui/presenters/CraftingListingBuilder.js',
     'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
+    'src/systems/checkModifierRouter.js',
     'src/ui/presenters/craftingBrowseStatus.js',
     'src/systems/foundryCalendar.js',
     'src/systems/inventorySnapshot.js',

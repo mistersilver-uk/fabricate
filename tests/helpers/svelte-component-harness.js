@@ -277,6 +277,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // Same rule, issue 1055: the builder resolves the displayed check formula through the
   // SAME check-modifier context the engine rolls, so it imports the resolver.
   'src/systems/checkModifierResolver.js',
+  'src/systems/checkModifierRouter.js',
   // …and issue 1094 gave that resolver its first two imports, so one entry no longer suffices.
   'src/systems/toolCheckBonus.js',
   'src/utils/craftingCheckExpression.js',

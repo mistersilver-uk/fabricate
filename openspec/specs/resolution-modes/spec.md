@@ -79,7 +79,7 @@ Its reach is bounded by what each mode's model can express: real on crafting `si
 - A world carries **ONE named modifier library, at WORLD level**, in the `characterLibraries` setting, of `{id, label, expression, isRollExpression, icon?, min?, max?}` (issue 1117 absorbed the gathering character-modifier library into a single system-level list; issue 1308 lifted that list off the crafting system, so a WORLD authors modifiers in exactly one place and three crafting systems no longer mean three copies of the same expression).
   A crafting system carries no `modifiers` key and no participation flag over the library; what it still owns is the SELECTION, below.
 - **A roll-shaped expression is legal EVERYWHERE, a check included** (issue 1118).
-  `isRollExpression` is derived and is a DISPLAY classification only: a check appends a rolling entry to its formula AS DICE, so the authored variance survives to the roll, appears in `roll.dice`, animates and shows on the chat card.
+  `isRollExpression` is derived and is a DISPLAY classification only: under active sum/over a check appends a rolling entry to its formula AS DICE, so the authored variance survives to the roll, appears in `roll.dice`, animates and shows on the chat card.
   This reverses the rule issue 1117 shipped, which modelled a check modifier on a tool bonus (a scalar) and raised a blocking `modifierRollExpression`; that issue id is RETIRED, not reworded, because there is nothing left to report about an entry that rolls.
 Each of the three activity checks — `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` — still carries its OWN selection over that one library, on the crafting system: a **COMBINATION RULE** (`defaultModifierPolicy`), a default eligible id set (`defaultModifierIds`) and an optional pick cap (`maxModifierPicks`).
 The catalogue is defined once; each activity decides which entries apply and how they combine.
@@ -89,7 +89,7 @@ The rule states BOTH how the eligible entries combine AND **who selects them**, 
 Finite magnitude averages rank first by value, including when every value is negative; transformed quantities fill remaining capacity in eligible-set order.
 An expression carrying `cs`, `cf`, `even`, `odd`, `df`, `sf` or `ms` on a die or on a pool, with a comparator, a bare target or neither, transforms the dice total and therefore has no magnitude average or numeric sentinel.
 Classification never blocks an entry: an entry is blocked only by a bounds fault, an empty expression, an expression that does not reduce to a finite number, or a fragment that cannot roll, and blocked entries rank after transformed entries, so their placeholder average of zero cannot outrank a valid negative magnitude.
-A selected rolling entry is then appended AS DICE, so ranking deterministically never flattens what it selects.
+A selected rolling entry retains its dice expression after ranking; active sum/over appends it AS DICE, while other evaluations pre-roll it when activated, so ranking never flattens what it selects.
 The average RANKS and never PAYS: it decides which entries apply and nothing about what they contribute.
 It is exact for arithmetic, plain dice and keep/drop dice (order statistics — `2d20kh1` averages 13.825, where its plain sum of 21 would win `highest` against anything), and an explicit approximation for a `min`/`max` around a die (Jensen's inequality), for a pool's non-identically-distributed members, and for magnitude-preserving die modifiers such as `x`, `r` and `min`.
 Selected output always returns in eligible-set order, including a mixed capped selection that uses transformed entries only after every finite magnitude.
@@ -134,7 +134,7 @@ Under `playerPicks` the eligible list is the full set of OPTIONS OFFERED and is 
 **The reduction is STRICTER than it was before issue 1118, and that is a live behaviour change for existing worlds**: the retired evaluator returned its partial parse with no end-of-input assertion, so `3 nonsense` contributed **3** and `1d4` contributed **1**; the walk now refuses anything it cannot read whole, so both contribute nothing and readiness reports them.
 Safer in both cases, and not silent: `modifierExpressionInvalid` names the entry.
 Resolution is **deterministic** for `addAll`, `highest` and `bySubject` (by the time the engine rolls, a `bySubject` selection is already made and stored, so the contribution is simply that already-narrowed, already-capped, already-clamped list), and for `playerPicks` whenever the deferred control below is not offered.
-- **The resolved contribution is APPENDED, not substituted**, by the same operation that applies tool bonuses, **before** the string reaches Foundry's `Roll` and feeding **both** evaluation (`checkRoll.js` `evaluateCheckRoll`) and display (`resolveCheckFormulaDisplay`) so the shown formula equals what evaluates.
+- **Under active sum/over, the resolved contribution is APPENDED, not substituted**, by the same placement operation that applies tool bonuses, **before** the string reaches Foundry's `Roll` and feeding **both** evaluation (`checkRoll.js` `evaluateCheckRoll`) and display (`resolveCheckFormulaDisplay`) so the shown formula equals what evaluates.
 The FLAT entries collapse into ONE `+ N[Modifiers]` term and each ROLLING entry gets its OWN `+ (…)[Modifiers]` term, in eligible order, with the flat term leading — so a catalogue carrying no dice emits the byte-identical formula it always did.
 One term per rolling entry rather than one combined term, because a rolling contribution is a distribution rather than a number: folding two of them together would hide which entry each die came from on the card and in `roll.dice`, and it would let one refused fragment take another entry's contribution with it.
 A rolling fragment is ALWAYS parenthesised before its flavour is attached, which is a correctness requirement and not tidiness: an authored expression may carry its own flavour, and `1d4[fire][Modifiers]` is a SYNTAX ERROR on 14.365 where `(1d4[fire])[Modifiers]` parses and rolls.
@@ -146,7 +146,7 @@ Measured against the shipped 14.365 stack over 355 emitted formulas, 25 validate
 The check fails OPEN with no dice engine (headless, tests), where nothing evaluates the formula anyway.
 The FLAT term is **sign-aware** — `Constant` is unsigned in the dice grammar, which is why `appendToolBonusTerms`' `sign` + `Math.abs` split is required and correct (`+ -3[Modifiers]` would not parse; `- 3[Modifiers]` does) — **label-sanitized**, **SKIPPED when the value is `0`**, and **formatted through a decimal-safe formatter that refuses exponent notation and non-finite values**, because `Constant = _ [0-9]+ ("." [0-9]+)?` has no exponent production and `+ 1e-7[Modifiers]` would parse as a `StringTerm` and throw at evaluate.
 Ordering: tool bonuses append first, then the modifier term, then the advantage transform, then the situational bonus.
-- **A rolling modifier's dice enter `roll.dice`, and therefore the `diceGroup` trigger DSL's index space.**
+- **Under active sum/over, a rolling modifier's dice enter `roll.dice`, and therefore the `diceGroup` trigger DSL's index space.**
 Modifier terms are APPENDED, so every die the authored formula declares keeps its existing `groupId` and no working trigger changes meaning.
 A trigger whose `groupId` already DANGLED — authored against a formula that has since lost a die — used to match nothing and can now resolve against a modifier's die.
 That is accepted rather than guarded: the only available guard is a group count re-parsed from the authored formula, and `parseDiceGroups` does not agree term-for-term with `roll.dice` on every formula, so a slice would sometimes drop an AUTHORED group from trigger matching, which is a worse failure than the one it fixes.
@@ -155,8 +155,10 @@ The trigger editor offers only the authored formula's groups, so the state is re
 `parsePlainDiceGroups` splits on parentheses and flavour brackets alike, so `(1d20)[Modifiers]` tokenizes as a plain `1d20`; without scoping, a `2d10` check carrying a `1d20` modifier would offer Advantage it does not have and the transform would rewrite the MODIFIER's die.
 Both `hasPlainD20` and `applyD20Advantage` are therefore applied to the post-shim authored formula, and the appended terms are re-attached afterwards.
 The `[Modifiers]` label is a **fixed ASCII literal and deliberately not localized**, because `parsePlainDiceGroups` tokenizes on flavour brackets and a localized label containing a `\d*d\d+` token would be read as a phantom crit-eligible die group by the same tokenizer that backs `hasPlainD20` and `applyD20Advantage`.
+
 Both paths build the modifier context through the one shared `buildCheckModifierContext(system, activity, subject)`, so a displayed formula cannot disagree with the rolled one on any axis the context carries.
 The `activity` argument is load-bearing: the catalogue is shared but the SELECTION is not, so a two-argument call would resolve one activity's formula against another's rule.
+
 - **The `@craftingmod` placeholder is RETIRED.** The `1.21.0` migration strips it from every stored roll formula and the runtime shim `stripRetiredModifierPlaceholder` (`src/utils/craftingCheckExpression.js`) removes any that survives — hand-edited, imported, or seeded by a fixture — so it can never double-count against the appended term.
 The shim's rule is TOTAL, and it is stated as five steps because each one is load-bearing:
 (1) a formula carrying no token is returned **untouched, without calling `Roll.validate` at all**, so the majority path takes on no Foundry dependency;
@@ -283,6 +285,22 @@ Missing check evidence is likewise unknown rather than a confirmed absence of a 
 A storage or effect failure leaves the affected evidence explicitly **uncertain** under the existing no-replay and no-rollback rules; uncertainty is never resolved into invented certainty.
 6. The guarantee covers complete permitted evidence on completed managed writes.
 It does not extend to arbitrary external macro effects, and it does not promise certainty after a storage failure.
+
+### Modifier Placement and Pre-roll Evidence
+
+After actor resolution, eligibility, bounds, ranking and selection, one immutable placement plan routes Tool, library, situational and advantage contributions by source and by scalar or rolling form.
+Sum/over appends in this exact order: authored post-shim formula, numeric Tool terms in Tool order, combined library scalar, library rolling fragments in eligible order, authored-prefix advantage rewrite and parenthesized situational bonus.
+Sum/under routes benefit-signed scalars and separately evaluated expressions to the target; count routes them to the pool or threshold according to `pool.modifierDestination`, while count advantage always changes the pool.
+The plan retains fractional and negative benefits without rounding; the count-mode integer policy belongs to its behavior child, after pool benefits aggregate.
+Rolling contributions outside sum/over evaluate once after confirmation with `allowInteractive: false`; their actual totals and ordered evidence settle the plan without changing the main check's total or dice groups.
+A valid library pre-roll failure aborts under the runner's roll-error contract before a main roll or message; invalid situational and Tool contributions keep their local failure-to-zero handling and create no fabricated roll evidence.
+An already evaluated dice-bearing Tool contribution keeps its scalar benefit paired with its serialized roll.
+Serialization failure, or reconstruction failure before the main roll posts, aborts before the main check rather than paying a bonus whose evidence was lost.
+An entitled handoff reconstructs after GM execution and reports a failed chat post without rerolling or rolling back that check.
+The optional executed `data.preRolls` records `{ source, label, expression, total, destination }` in placement order; a posted check bundles the main roll first and the pre-rolls after it in one message under the same roll mode, speaker and flavor.
+When that bundled post has no explicit roll mode, it reads the posting client's current core mode with the supported-version key (`rollMode` on V13, `messageMode` on V14); an explicit mode takes precedence.
+An entitled prepared handoff carries the already evaluated serialized pre-rolls beside its existing `serializedRoll`, and reconstruction does not reroll; secret execution exposes no formula-bearing handoff or pre-roll evidence to its requester.
+The active engine remains sum/over until the count and under behavior children activate the other evaluations, so an authored inactive evaluation record does not yet change a check decision.
 
 ## Check Evaluation Foundation
 

@@ -16,7 +16,12 @@ A virtual-present Tool binds those evaluations to the primary acting or check ac
 A failed `usability` gate makes the Tool absent at recipe, step, ingredient-set, salvage, and gathering availability gates and uses the existing missing-Tool feedback.
 A failed `bonus` gate preserves presence and suppresses only that Tool's numeric bonus.
 Crafting and salvage evaluate every distinct enabled eligible Tool's bonus expression once and compose every finite non-zero value additively.
-The resulting non-zero terms are appended to simple, routed, progressive, and alchemy formulas with bracket/control characters removed from their Tool labels.
+Under the active sum/over evaluation, the resulting non-zero terms are appended to simple, routed, progressive, and alchemy formulas with bracket/control characters removed from their Tool labels.
+When another evaluation becomes active, each Tool's resolved benefit is routed to its target, threshold, or pool instead; an evaluated dice-bearing Tool bonus retains its actual roll evidence and is never rolled again.
+The supplying actor, distinct-Tool deduplication, prerequisite gates, evaluation timing, and failure-to-zero behavior are the same in every evaluation.
+A dice-bearing Tool bonus whose roll cannot be serialized aborts check preparation before its numeric benefit can be used.
+If its evidence must be reconstructed before a main check posts, failure likewise aborts preparation.
+An entitled handoff instead reports a failed chat post after GM execution, without rerolling or rolling back that check.
 A missing evaluator, thrown evaluation, non-finite result, or otherwise failed bonus evaluation contributes zero without aborting the attempt.
 Gathering never applies numeric Tool bonuses.
 

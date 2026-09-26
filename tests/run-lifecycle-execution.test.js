@@ -2059,6 +2059,76 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
   assert.equal(unchanged.executionJournal.intent.trigger, 'start');
 });
 
+test('real prepared Tool collection snapshots one roll and hands its evidence to the player', async () => {
+  const { engine, recipe, recipeManager } = setupEngineFixture();
+  const actor = new FakeActor('tool-crafter');
+  const source = new FakeActor('tool-owner');
+  actor.getRollData = () => ({ bonus: 99 });
+  source.getRollData = () => ({ bonus: 2 });
+  const system = {
+    resolutionMode: 'simple',
+    features: { craftingChecks: true },
+    craftingCheck: { simple: { rollFormula: '1d20', dc: 12 } },
+  };
+  game.fabricate.getCraftingSystemManager = () => ({ getSystem: () => system });
+  const started = await startReadyVersionedRun({ engine, recipe, actor, source });
+  game.time.worldTime = 1120;
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1d4+@bonus' } };
+  const ownerItem = { parent: source };
+  recipeManager.getToolsForSet = () => [tool];
+  recipeManager.resolveToolStates = () => [{ available: true, contributionInput: {
+    tool, matchedItem: ownerItem, primaryActor: actor,
+  } }];
+  const previousRoll = globalThis.Roll;
+  const previousChat = globalThis.ChatMessage;
+  const evaluations = [];
+  const posted = [];
+  class PreparedRoll {
+    constructor(formula, data) {
+      this.formula = formula;
+      this.data = data;
+      this.total = formula === '1d4+@bonus' ? 3 : 16;
+      this.dice = formula === '1d4+@bonus' ? [{}] : [];
+    }
+    async evaluate() { evaluations.push({ formula: this.formula, data: this.data }); return this; }
+    toJSON() { return { formula: this.formula, total: this.total }; }
+    static fromData(data) { return new PreparedRoll(data.formula); }
+    static validate() { return true; }
+    static replaceFormulaData(formula) { return formula; }
+    async render() { return this.formula; }
+  }
+  globalThis.Roll = PreparedRoll;
+  globalThis.ChatMessage = { getSpeaker: () => ({ alias: 'Tinker' }),
+    create: async (data) => posted.push(data) };
+  try {
+    const descriptor = await engine.describeVersionedStageCheck({
+      actor, componentSourceActors: [source], runId: started.runId,
+      preparationGrant: 'prepare-grant',
+    });
+    const snapshot = JSON.parse(JSON.stringify(descriptor.privateEvaluation));
+    assert.equal(snapshot.checkConfig.toolContributions[0].value, 3);
+    assert.equal(snapshot.checkConfig.toolContributions[0].preRoll.expression, '1d4+@bonus');
+    source.getRollData = () => ({ bonus: 100 });
+    const evaluated = await evaluatePreparedRunCheck(snapshot, actor);
+    assert.deepEqual(evaluations.map(({ formula }) => formula),
+      ['1d4+@bonus', '1d20 + 3[Hammer]']);
+    assert.deepEqual(evaluations[0].data, { bonus: 2 });
+    assert.deepEqual(evaluated.data.preRolls.map(({ expression, total }) => ({ expression, total })),
+      [{ expression: '1d4+@bonus', total: 3 }]);
+    const handoff = JSON.parse(JSON.stringify(evaluated.rollHandoff));
+    assert.equal(handoff.serializedPreRolls.length, 1);
+    assert.equal((await postCheckRollHandoff(handoff, { Roll: PreparedRoll })).success, true);
+    assert.deepEqual(posted[0].rolls.map(({ formula }) => formula),
+      ['1d20 + 3[Hammer]', '1d4+@bonus']);
+    assert.equal(evaluations.length, 2, 'posting reconstructs without another roll');
+  } finally {
+    if (previousRoll === undefined) delete globalThis.Roll;
+    else globalThis.Roll = previousRoll;
+    if (previousChat === undefined) delete globalThis.ChatMessage;
+    else globalThis.ChatMessage = previousChat;
+  }
+});
+
 test('versioned Journal preparation freezes modifier contributions across actor and library edits', async () => {
   const originalRoll = globalThis.Roll;
   const rolledFormulas = [];

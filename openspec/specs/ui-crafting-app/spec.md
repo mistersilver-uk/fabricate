@@ -237,6 +237,8 @@ This group is only the presentation of the crafting-check `playerPicks` combinat
 **GATHERING supplies none**: it threads the modifier context and resolves a `playerPicks` selection deterministically, and its roll-time prompt is deferred to issue 683 with the rest of the seam (`resolution-modes/spec.md` §Check Source is normative).
 A roll under any other combination rule passes none — including `bySubject`, whose selection was already made at authoring time — so no `modifierChoice`, no fieldset.
 The dialog's formula line ends in a trailing `+ (modifier)[Modifiers]` slot while the choice is unanswered.
+After confirmation, the selected legal modifiers and any valid situational bonus enter the shared placement plan; under the active sum/over evaluation they keep their existing appended formula order.
+When another evaluation becomes active, rolling contributions evaluate once outside the main check and share its chat visibility, while cancellation still creates no new modifier roll, check roll or message.
 - **Pre-resolved roll decisions.**
 A caller MAY supply a `rollDecision` (`{ bonus, rollMode, advantage }` — the prompt's own return shape minus `confirmed`).
 The evaluator then treats it as an already-answered choice and **never opens the modal**, running the identical downstream code: the check-modifier append, the advantage transform, the situational-bonus append, the formula-validity net and the effective roll mode.
