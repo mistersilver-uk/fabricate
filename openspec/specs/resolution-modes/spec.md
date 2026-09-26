@@ -290,7 +290,8 @@ It does not extend to arbitrary external macro effects, and it does not promise 
 
 After actor resolution, eligibility, bounds, ranking and selection, one immutable placement plan routes Tool, library, situational and advantage contributions by source and by scalar or rolling form.
 Sum/over appends in this exact order: authored post-shim formula, numeric Tool terms in Tool order, combined library scalar, library rolling fragments in eligible order, authored-prefix advantage rewrite and parenthesized situational bonus.
-Sum/under routes benefit-signed scalars and separately evaluated expressions to the target; count routes them to the pool or threshold according to `pool.modifierDestination`, while count advantage always changes the pool.
+Sum/under routes scalars and separately evaluated expressions to the target; count routes them to the pool or threshold according to `pool.modifierDestination`, while count advantage always changes the pool.
+Under sum/under the authored-prefix advantage rewrite keeps the lowest d20 and disadvantage keeps the highest, because a sum that must come in under its target benefits from the lower die.
 The plan retains fractional and negative benefits without rounding; the count-mode integer policy belongs to its behavior child, after pool benefits aggregate.
 `targetDelta`, `thresholdDelta` and `poolDelta` are amounts to add to the effective target, per-die threshold and pool; a count/over threshold benefit is therefore stored negated and a count/under one unchanged.
 A pre-roll `destination` is one of `target`, `threshold` or `pool`.
@@ -298,6 +299,7 @@ Under sum/over a dice-bearing Tool bonus contributes only its numeric result, ap
 Rolling contributions outside sum/over evaluate once after confirmation with `allowInteractive: false`; their actual totals and ordered evidence settle the plan without changing the main check's total or dice groups.
 A valid library pre-roll failure aborts under the runner's roll-error contract before a main roll or message; invalid situational and Tool contributions keep their local failure-to-zero handling and create no fabricated roll evidence.
 An already evaluated dice-bearing Tool contribution keeps its scalar benefit paired with its JSON-serialized roll.
+A versioned Journal crafting check collects these Tool contributions once, from the stage's validated Tools, when the issuing GM prepares the check, and its execution places that prepared snapshot rather than evaluating the Tools again.
 Serialization failure, or reconstruction failure before the main roll posts, aborts before the main check rather than paying a bonus whose evidence was lost.
 An entitled handoff reconstructs after GM execution and reports a failed chat post without rerolling or rolling back that check.
 The optional executed `data.preRolls` records `{ source, label, expression, total, destination }` in placement order; a posted check bundles the main roll first and the pre-rolls after it in one message under the same roll mode, speaker and flavor, with the main total as its content so each viewer sees every roll they may see.
