@@ -229,7 +229,7 @@ A failed `usability` prerequisite gate makes the Tool absent; a failed `bonus` g
 Crafting and salvage add every distinct enabled eligible Tool's finite non-zero contribution once; gathering never applies numeric Tool bonuses.
 Recipe data stores Tool references only and owns no bonus policy.
 
-Canonical mapping: `Tool.prerequisites`, `Tool.bonus`, `evaluateToolCheckContribution`, `composeToolBonusTerms`
+Canonical mapping: `Tool.prerequisites`, `Tool.bonus`, `evaluateToolCheckContribution`, `planModifierPlacement`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/recipes-and-steps/spec.md
 

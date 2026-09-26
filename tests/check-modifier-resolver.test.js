@@ -26,6 +26,9 @@ const {
   isRollExpression,
 } = await import(RESOLVER_MODULE);
 const { appendCheckModifierTerm } = await import('../src/systems/toolCheckBonus.js');
+const { resolveRolledFormula } = await import('../src/systems/checkRoll.js');
+const { resolveCheckDecision } = await import('../src/systems/checkRollDecision.js');
+const { SUM_OVER_EVALUATION } = await import('../src/systems/checkModifierRouter.js');
 
 // The FLAT half of a resolved contribution (issue 1118).
 function scalarOf(context, resolveExpression) {
@@ -1670,4 +1673,23 @@ test('isRollExpression answers the same question the resolver does', () => {
   for (const junk of [null, undefined, 7, {}, []]) {
     assert.equal(isRollExpression(junk), false, `${String(junk)} is not an expression`);
   }
+});
+
+test('a padded authored formula rolls trimmed once a modifier context applies', async () => {
+  const context = { catalogue: [], systemPolicy: 'addAll', defaultModifierIds: [] };
+  assert.equal(resolveRolledFormula('1d20 ', null, context, PermissiveRoll), '1d20');
+  const decision = await resolveCheckDecision({
+    authoredFormula: ' 1d20 ',
+    actor: null,
+    options: { interactive: true, rollDecision: { advantage: 'advantage' } },
+    evaluation: SUM_OVER_EVALUATION,
+    deferred: false,
+    resolvedCheck: {
+      formula: resolveRolledFormula(' 1d20 ', null, context, PermissiveRoll),
+      selected: [],
+    },
+    displayFormula: (formula) => ({ display: formula }),
+    Roll: null,
+  });
+  assert.equal(decision.formula, '2d20kh1');
 });

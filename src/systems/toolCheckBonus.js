@@ -145,19 +145,6 @@ export async function evaluateToolCheckContribution({
   };
 }
 
-export function composeToolBonusTerms(contributions) {
-  const terms = [];
-  for (const contribution of Array.isArray(contributions) ? contributions : []) {
-    const value = Number(contribution?.value);
-    if (!Number.isFinite(value) || value === 0) continue;
-    terms.push({ ...contribution, value });
-  }
-  return {
-    terms,
-    total: terms.reduce((sum, term) => sum + term.value, 0),
-  };
-}
-
 function isControlCharacter(character) {
   const codePoint = character.codePointAt(0);
   return codePoint <= 0x1f || codePoint === 0x7f;

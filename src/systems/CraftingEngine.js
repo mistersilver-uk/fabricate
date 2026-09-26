@@ -47,7 +47,7 @@ import {
   resolveCheckModifierContribution,
   resolveModifierPolicy,
 } from './checkModifierResolver.js';
-import { planModifierPlacement } from './checkModifierRouter.js';
+import { planModifierPlacement, SUM_OVER_EVALUATION } from './checkModifierRouter.js';
 import {
   resolveCheckFormulaDisplay,
   resolveRolledFormula,
@@ -100,7 +100,6 @@ import {
   itemStackQuantityPath,
   updateStackQuantity,
 } from './itemStackQuantity.js';
-import { normalizeCheckEvaluation } from './normalize/checkEvaluation.js';
 import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
 import { resolveRolledAmount, rolledAwardRecord } from './rolledAmountResolver.js';
@@ -155,12 +154,34 @@ import {
   ToolCheckEvidenceError,
 } from './toolCheckBonus.js';
 
-function checkRollOptions(options, toolContributions, evaluation = normalizeCheckEvaluation()) {
-  return {
-    ...options,
-    toolContributions,
-    evaluation,
-  };
+/** The contributions and the evaluation that placed them come from one prepared collection. */
+function checkRollOptions(options, { contributions, evaluation }) {
+  return { ...options, toolContributions: contributions, evaluation };
+}
+
+/**
+ * Rolls a Tool bonus against its supplying actor. A dice-bearing result keeps JSON evidence, and
+ * evidence that cannot be serialized refuses the check rather than keep a bonus without its roll.
+ */
+async function rollToolBonusExpression({ actor, expression }) {
+  if (typeof globalThis.Roll !== 'function') return 0;
+  const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
+  const roll = await new globalThis.Roll(expression, rollData).evaluate({
+    allowInteractive: false,
+  });
+  const total = roll?.total;
+  if (!Array.isArray(roll?.dice) || roll.dice.length === 0 || !Number.isFinite(total)) return total;
+  try {
+    const serializedRoll = cloneJsonValue(roll.toJSON());
+    if (!serializedRoll || typeof serializedRoll !== 'object') {
+      throw new TypeError('Tool roll data is unavailable');
+    }
+    return { value: total, preRoll: { expression, total, serializedRoll } };
+  } catch (error) {
+    throw new ToolCheckEvidenceError('Tool roll evidence could not be serialized', {
+      cause: error,
+    });
+  }
 }
 
 /** The winning alchemy match: the unique most-specific set under {@link signatureDominates}
@@ -390,7 +411,7 @@ export class CraftingEngine {
     }
     const preparedTools = await this._prepareToolCheckBonuses(
       activeCheck.rollFormula,
-      prepared.toolValidation?.tools ?? prepared.toolItems
+      prepared.toolValidation.tools
     );
     const rollFormula = preparedTools.formula;
     const modifierContext = capturePreparedModifierContext(
@@ -4677,7 +4698,12 @@ export class CraftingEngine {
     return { valid: true, tools: toolItems };
   }
 
-  async _appendToolCheckBonuses(formula, toolItems = [], options = {}) {
+  /**
+   * Collects each distinct Tool's bonus once, against its supplying actor, and places it by
+   * `evaluation`: sum/over appends numeric terms, while any other evaluation leaves the formula
+   * alone and routes the returned contributions.
+   */
+  async _prepareToolCheckBonuses(formula, toolItems = [], evaluation = SUM_OVER_EVALUATION) {
     const contributions = [];
     const seenToolIds = new Set();
     for (const toolItem of Array.isArray(toolItems) ? toolItems : []) {
@@ -4686,60 +4712,26 @@ export class CraftingEngine {
       const toolId = input.tool?.id ?? null;
       if (toolId && seenToolIds.has(toolId)) continue;
       if (toolId) seenToolIds.add(toolId);
-      contributions.push(
-        await evaluateToolCheckContribution({
-          ...input,
-          evaluatePrerequisite: ({ actor, prerequisite }) =>
-            evaluatePrerequisite(actor?.getRollData?.() ?? actor?.system ?? {}, prerequisite),
-          evaluateExpression: async ({ actor, expression }) => {
-            if (typeof globalThis.Roll !== 'function') return 0;
-            const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
-            const roll = await new globalThis.Roll(expression, rollData).evaluate({
-              allowInteractive: false,
-            });
-            const total = roll?.total;
-            let preRoll = null;
-            if (Array.isArray(roll?.dice) && roll.dice.length > 0 && Number.isFinite(total)) {
-              try {
-                const serializedRoll = cloneJsonValue(roll.toJSON());
-                if (!serializedRoll || typeof serializedRoll !== 'object') {
-                  throw new TypeError('Tool roll data is unavailable');
-                }
-                preRoll = { expression, total, serializedRoll };
-              } catch (error) {
-                throw new ToolCheckEvidenceError('Tool roll evidence could not be serialized', {
-                  cause: error,
-                });
-              }
-            }
-            return preRoll ? { value: total, preRoll } : total;
-          },
-        })
-      );
+      const { label, value, preRoll } = await evaluateToolCheckContribution({
+        ...input,
+        evaluatePrerequisite: ({ actor, prerequisite }) =>
+          evaluatePrerequisite(actor?.getRollData?.() ?? actor?.system ?? {}, prerequisite),
+        evaluateExpression: rollToolBonusExpression,
+      });
+      contributions.push({
+        source: 'tool',
+        label,
+        form: 'scalar',
+        value,
+        ...(preRoll && { preRoll }),
+      });
     }
-    const resolved = contributions.map(({ label, value, preRoll }) => ({
-      source: 'tool',
-      label,
-      form: 'scalar',
-      value,
-      ...(preRoll && { preRoll }),
-    }));
-    const placement = planModifierPlacement({
-      evaluation: options.evaluation ?? normalizeCheckEvaluation(),
-      contributions: resolved,
-    });
-    const placedFormula = appendToolBonusTerms(formula, placement.appendTerms);
-    return options.withContributions === true
-      ? { formula: placedFormula, contributions: resolved }
-      : placedFormula;
-  }
-
-  async _prepareToolCheckBonuses(formula, toolItems, evaluation) {
-    const prepared = await this._appendToolCheckBonuses(formula, toolItems, {
-      withContributions: true,
+    const placement = planModifierPlacement({ evaluation, contributions });
+    return {
+      formula: appendToolBonusTerms(formula, placement.appendTerms),
+      contributions,
       evaluation,
-    });
-    return typeof prepared === 'string' ? { formula: prepared, contributions: [] } : prepared;
+    };
   }
 
   /**
@@ -5658,7 +5650,7 @@ export class CraftingEngine {
             interactive
           ),
         }),
-        preparedTools.contributions
+        preparedTools
       ),
     });
     return this._markEngineEvaluated(result);
@@ -5722,7 +5714,7 @@ export class CraftingEngine {
             interactive
           ),
         }),
-        preparedTools.contributions
+        preparedTools
       ),
     });
     return this._markEngineEvaluated(result);
@@ -5792,7 +5784,7 @@ export class CraftingEngine {
             interactive
           ),
         }),
-        preparedTools.contributions
+        preparedTools
       ),
     });
     return this._markEngineEvaluated(result);
@@ -6926,7 +6918,7 @@ export class CraftingEngine {
           formula,
           craftingModifier,
         }),
-        preparedTools.contributions
+        preparedTools
       ),
     });
     return this._markEngineEvaluated(result);
@@ -6958,7 +6950,7 @@ export class CraftingEngine {
           formula,
           craftingModifier,
         }),
-        preparedTools.contributions
+        preparedTools
       ),
     });
     return this._markEngineEvaluated(result);
@@ -7001,7 +6993,7 @@ export class CraftingEngine {
           formula,
           craftingModifier,
         }),
-        preparedTools.contributions
+        preparedTools
       ),
     });
     return this._markEngineEvaluated(result);
