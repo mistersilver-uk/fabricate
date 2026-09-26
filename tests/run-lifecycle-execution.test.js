@@ -40,18 +40,15 @@ test('both history allowlists retain only executed check evaluation metadata', (
   }
 });
 
-test('a completed versioned check retains executed evaluation after actor-flag reload', async () => {
-  const fixture = await createPersistedCraftingHistory({
+/** Completes a one-stage versioned check with `data` as the validated result and reloads it. */
+function completeVersionedCheck(data) {
+  return createPersistedCraftingHistory({
     stageCount: 1,
     drive: async ({ engine, actor, sources, gm, runId, manager }) => {
       engine.installVersionedRunAuthority({
         consumeExecutionGrant: async (_grant, context) => ({
           operationId: `evaluation-${context.requestId}`,
-          resolvedCheckResult: {
-            success: true, outcome: 'pass', value: 17,
-            data: { dc: 12, total: 17, product: 'sum', direction: 'over',
-              comparison: 'meet', target: 12, margin: 5, successes: null, cancelled: null },
-          },
+          resolvedCheckResult: { success: true, outcome: 'pass', value: 17, data },
         }),
       });
       game.time.worldTime += 60;
@@ -64,11 +61,23 @@ test('a completed versioned check retains executed evaluation after actor-flag r
       return { reloaded: new CraftingRunManager().getRunHistory(actor)[0] };
     },
   });
+}
+
+test('a completed versioned check retains executed evaluation after actor-flag reload', async () => {
+  const fixture = await completeVersionedCheck({ dc: 12, total: 17, product: 'sum',
+    direction: 'over', comparison: 'meet', target: 12, margin: 5, successes: null, cancelled: null });
   assert.deepEqual(fixture.record.steps[0].resolutionSnapshot, {
     kind: 'check', mode: 'simple', product: 'sum', direction: 'over',
   });
   assert.deepEqual(fixture.reloaded.steps[0].resolutionSnapshot, fixture.record.steps[0].resolutionSnapshot);
   assert.equal(fixture.reloaded.steps[0].lastCheckResult.data.margin, 5);
+});
+
+test('a versioned check result without evaluation metadata records none in its snapshot', async () => {
+  const fixture = await completeVersionedCheck({ dc: 12, total: 17 });
+  for (const record of [fixture.record, fixture.reloaded]) {
+    assert.deepEqual(record.steps[0].resolutionSnapshot, { kind: 'check', mode: 'simple' });
+  }
 });
 
 for (const failLast of [false, true]) {

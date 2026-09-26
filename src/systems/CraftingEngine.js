@@ -1860,16 +1860,16 @@ export class CraftingEngine {
         'CHECK_RESULT_INVALID'
       );
     }
+    // The executed product/direction ride the snapshot as claimed; `checkResolutionEvidence`
+    // alone decides whether they persist.
     const executedHistorySnapshots =
-      historySnapshots.resolutionSnapshot?.kind === 'check' &&
-      checkResult.data?.product === 'sum' &&
-      checkResult.data?.direction === 'over'
+      historySnapshots.resolutionSnapshot?.kind === 'check'
         ? {
             ...historySnapshots,
             resolutionSnapshot: {
               ...historySnapshots.resolutionSnapshot,
-              product: 'sum',
-              direction: 'over',
+              product: checkResult.data?.product,
+              direction: checkResult.data?.direction,
             },
           }
         : historySnapshots;
