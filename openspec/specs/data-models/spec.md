@@ -422,6 +422,7 @@ Its `target` contains `source: "fixed" | "attribute"`, `expression`, `adjustment
 Its `pool` contains integer `die` (at least 2), string `base` and `threshold` expressions, integer `required` (0–20), `modifierDestination: "pool" | "threshold"`, `zeroPoolFails`, `explode` and `cancel` face configurations, and `additionalDice` source/path/macro/max fields.
 The normalized defaults are fixed target, additive adjustment, d10, base `"2"`, threshold `"8"`, required 1, pool destination, zero-pool failure on, and explode, cancel and additional dice off with additional maximum 1.
 Normalization MUST retain inactive mode fields and finite/null sibling adjustments; unknown enum tokens take their defaults, counts clamp to 0–20 and additional maximum clamps to 1–20.
+An explode or cancel face `value` is a positive integer or null and is not clamped to `die`, so changing the die loses no authored face; readiness flags a face the die cannot roll.
 The three activities' eight check subobjects share this shape, and schema-6 export/import MUST preserve the normalized record without a migration.
 Recipe difficulty tiers retain finite nullable `adjustment` and integer nullable `successes` beside their existing DC fields; relative outcome rows retain their finite nullable `adjustment` sibling.
 Component salvage and gathering task overrides retain `adjustmentOverride` and `successesOverride` beside `dcOverride`, including through their save projections.

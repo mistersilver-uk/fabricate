@@ -14,7 +14,9 @@ globalThis.game = {
 globalThis.ui = { notifications: { warn: () => {}, error: () => {} } };
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
-const { normalizeCheckEvaluation } = await import('../src/systems/normalize/checkEvaluation.js');
+const { normalizeCheckEvaluation, normalizeNullableSuccesses } = await import(
+  '../src/systems/normalize/checkEvaluation.js'
+);
 
 // Helper: make a minimal manager
 function makeManager() {
@@ -174,6 +176,33 @@ test('evaluation clamps bounded integers while preserving finite adjustment valu
   assert.equal(normalized.pool.die, 10);
   assert.equal(normalized.pool.required, 20);
   assert.equal(normalized.pool.additionalDice.max, 20);
+});
+
+test('explode and cancel faces keep authored values beyond the die for readiness to flag', () => {
+  const normalized = normalizeCheckEvaluation({
+    pool: {
+      die: 10,
+      explode: { enabled: true, faces: { kind: 'from', value: 18 } },
+      cancel: { enabled: true, faces: { kind: 'from', value: 0 } },
+    },
+  });
+  assert.deepEqual(normalized.pool.explode.faces, { kind: 'from', value: 18 });
+  assert.deepEqual(normalized.pool.cancel.faces, { kind: 'from', value: null });
+  assert.deepEqual(normalizeCheckEvaluation(normalized), normalized);
+});
+
+test('nullable success counts clamp to 0-20 like the required count', () => {
+  for (const [input, expected] of [
+    [25, 20],
+    [-1, 0],
+    [7, 7],
+    ['3', 3],
+    [2.5, null],
+    ['', null],
+    [null, null],
+  ]) {
+    assert.equal(normalizeNullableSuccesses(input), expected, String(input));
+  }
 });
 
 test('tier and routed outcome difficulty siblings retain inactive values', () => {
