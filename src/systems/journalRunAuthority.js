@@ -1,3 +1,5 @@
+import { forcedDeletionEntry, isSafeFlagKeySegment } from '../config/flags.js';
+
 import {
   createJournalRunLedgerProvisioner,
   createLedgerRetry,
@@ -5,6 +7,7 @@ import {
 } from './journalRunLedger.js';
 import {
   createJournalRunPrivatePreparation,
+  legacyPrivatePaths,
   normalizeJournalRunAuthorityState,
   safeJournalRunResponse,
 } from './journalRunPrivatePreparation.js';
@@ -12,6 +15,7 @@ import {
 const AUTHORITY_VERSION = 1;
 const AUTHORITY_FLAG = 'journalRunAuthorityLedger';
 const AUTHORITY_STATE_FLAG = 'journalRunAuthorityState';
+const AUTHORITY_STATE_PATH = `flags.fabricate.${AUTHORITY_STATE_FLAG}`;
 const NON_MUTATING_GRANTS = new Set(['describeCheck', 'prepareAlchemyStart']);
 
 /** Fixed embedded-page ID used for arbitration, distinct from the claim's random `claimId`. */
@@ -754,6 +758,18 @@ export function createJournalRunAuthority({
 }
 
 /**
+ * The forced deletions for every legacy private field the persisted flag still holds: the state
+ * write deep-merges, so a key normalization omits survives it. An id that is not one flag-key
+ * segment cannot be addressed by a dotted path and is skipped.
+ */
+function legacyPrivateDeletions(rawState) {
+  const entries = legacyPrivatePaths(rawState)
+    .filter(([parent]) => parent.split('.').every(isSafeFlagKeySegment))
+    .map(([parent, key]) => forcedDeletionEntry(`${AUTHORITY_STATE_PATH}.${parent}`, key));
+  return Object.fromEntries(entries.filter(Boolean));
+}
+
+/**
  * Create the Foundry V13/V14 JournalEntry-backed authority adapter.
  * Ledger ownership defaults to NONE and claims use `JournalEntryPage` creation with `keepId`.
  * The elected GM provisions the ledger automatically on boot and on its first command.
@@ -841,8 +857,12 @@ export function createFoundryJournalRunAuthority({
       });
     },
     readState: async (entry) => entry?.getFlag?.('fabricate', AUTHORITY_STATE_FLAG),
-    writeState: async (entry, state) =>
-      entry.update({ [`flags.fabricate.${AUTHORITY_STATE_FLAG}`]: state }),
+    // Two sequential awaited updates, never one payload mixing the deletions with the write.
+    writeState: async (entry, state) => {
+      const deletions = legacyPrivateDeletions(entry?.getFlag?.('fabricate', AUTHORITY_STATE_FLAG));
+      if (Object.keys(deletions).length > 0) await entry.update(deletions);
+      return entry.update({ [AUTHORITY_STATE_PATH]: state });
+    },
     // This create KEEPS its duplicate-`_id` rejection: it is the lock's compare-and-set
     // (`_createDocuments` runs inside the database semaphore), which asking first could not
     // replace. `ledgerResult` refuses a LIVE claim locally, so only two realms that BOTH saw the

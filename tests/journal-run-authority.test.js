@@ -10,6 +10,31 @@ import {
 } from '../src/systems/journalRunAuthority.js';
 import { JOURNAL_RUN_COMMAND_TIMEOUT_MS } from '../src/systems/journalRunCommands.js';
 import { defineStructureContract } from './helpers/structureContract.js';
+import { deletedKey, forEachDeletionForm, isForcedDeletion } from './helpers/forcedDeletion.js';
+
+const isMergeable = (value) =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value) && !isForcedDeletion(value);
+
+/** `mergeObject` as `Document#update` applies it: a deep merge honouring both deletion forms. */
+function mergeUpdate(target, patch) {
+  for (const [key, value] of Object.entries(patch)) {
+    const deleted = deletedKey(key, value);
+    if (deleted !== null) delete target[deleted];
+    else if (isMergeable(value) && isMergeable(target[key])) mergeUpdate(target[key], value);
+    else target[key] = isMergeable(value) ? mergeUpdate({}, value) : structuredClone(value);
+  }
+  return target;
+}
+
+/** A dotted `Document#update` payload: each key is expanded, then merged, never replaced. */
+function applyDocumentUpdate(document, changes) {
+  for (const [path, value] of Object.entries(changes)) {
+    const segments = path.split('.');
+    const leaf = segments.pop();
+    const parent = segments.reduce((node, segment) => (node[segment] ??= {}), document);
+    mergeUpdate(parent, { [leaf]: value });
+  }
+}
 
 /**
  * Models the V13.351/V14.365 server rules the arbitration rests on: `keepId` is what preserves a
@@ -25,7 +50,8 @@ function foundryAuthorityFixture(crypto, { failServerRead = () => false } = {}) 
   let generatedPageIds = 0;
   let ledgerSeq = 0;
   const makeEntry = (source) => {
-    let state = source.flags.fabricate.journalRunAuthorityState;
+    const document = { flags: structuredClone(source.flags) };
+    const updates = [];
     // The SERVER's pages, and the broadcast-fed LOCAL mirror of them, kept as two collections so
     // a test can drive them apart the way a missed delete broadcast does in a real world.
     const serverPages = new Map();
@@ -38,15 +64,16 @@ function foundryAuthorityFixture(crypto, { failServerRead = () => false } = {}) 
       _stats: { createdTime: 5000 },
       pages,
       serverPages,
-      getFlag: (scope, key) =>
-        scope === 'fabricate' && key === 'journalRunAuthorityState'
-          ? state
-          : source.flags?.[scope]?.[key],
+      flags: document.flags,
+      updates,
+      getFlag: (scope, key) => document.flags?.[scope]?.[key],
+      // A flag write DEEP-MERGES, as core's does: a key omitted from it survives.
       update: async (changes) => {
-        state = changes['flags.fabricate.journalRunAuthorityState'];
+        updates.push(changes);
+        applyDocumentUpdate(document, changes);
       },
       get state() {
-        return state;
+        return document.flags.fabricate.journalRunAuthorityState;
       },
       createEmbeddedDocuments: async (_type, [pageSource], options = {}) => {
         claimCalls.push({ source: pageSource, options });
@@ -1868,4 +1895,34 @@ describe('journal run authority ledger', () => {
     assert.equal(response.reason, 'operation-failed', JSON.stringify(response));
     assert.match(response.message, /handler exploded/);
   });
+});
+
+// The flag write deep-merges, so a scrub that only omits a key leaves it on every player client.
+forEachDeletionForm('deletes legacy private fields from the persisted Foundry flag on boot', async (deletion) => {
+  deletion.apply();
+  const authority = foundryAuthorityFixture({ randomUUID: () => 'secure-uuid' });
+  const response = { success: true, checkRequired: true, prepareToken: 'old' };
+  const ledger = authority.makeEntry({ flags: { fabricate: {
+    journalRunAuthorityLedger: true,
+    journalRunAuthorityState: {
+      version: 1,
+      requests: { legacy: { kind: 'command', status: 'settled', senderId: 'player', sessionId: 'one',
+        response: { ...response, promptDescriptor: { formula: 'LEGACY_PROMPT' },
+          rollHandoff: { formula: 'LEGACY_HANDOFF' } } } },
+      prepareTokens: { old: { status: 'active', expiresAt: 2000, binding: {
+        senderId: 'player', actorUuid: 'Actor.a', runType: 'crafting', runId: 'run-1',
+        expectedRevision: 2, privateEvaluation: { formula: 'LEGACY_FORMULA' } } } },
+      reconciliations: [],
+    },
+  } } });
+  authority.journal.push(ledger);
+
+  assert.equal((await authority.bootstrapRecovery()).success, true);
+
+  assert.doesNotMatch(JSON.stringify(ledger.flags), /LEGACY_/);
+  assert.deepEqual(ledger.state.requests.legacy.response, response, 'the safe outcome survives');
+  assert.equal(ledger.state.prepareTokens.old.status, 'released');
+  assert.equal(ledger.state.prepareTokens.old.binding.runId, 'run-1');
+  deletion.assertOperators(ledger.updates[0], 3);
+  assert.ok(ledger.updates.length > 1, 'the deletions precede the state write, never share it');
 });
