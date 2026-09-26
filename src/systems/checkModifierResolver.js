@@ -540,8 +540,31 @@ export function makeRollDataExpressionResolver(actor, Roll = globalThis.Roll) {
 /**
  * Append a modifier context to a formula before it reaches `Roll` (issues 1094, 1118): the flat
  * term first, so a dice-free library emits the byte-identical formula it always did, then one
- * term per rolling entry. `craftingModifier` keeps the name every `checkRoll.js` options bag uses.
+ * term per rolling entry, answering `{ formula, selected }`. The formula is trimmed with or
+ * without a context. `craftingModifier` keeps the name every `checkRoll.js` options bag uses.
  */
+export function resolveCheckModifierFormula(
+  formula,
+  actor,
+  craftingModifier,
+  Roll = globalThis.Roll
+) {
+  if (!craftingModifier) return { formula: String(formula ?? '').trim(), selected: [] };
+  const { scalar, rollTerms, selected } = resolveCheckModifierContribution(
+    craftingModifier,
+    makeRollDataExpressionResolver(actor, Roll),
+    Roll
+  );
+  return {
+    formula: appendCheckModifierRollTerms(
+      appendCheckModifierTerm(formula, { value: scalar }),
+      rollTerms
+    ),
+    selected,
+  };
+}
+
+/** The formula-only form of `resolveCheckModifierFormula`; a non-string passes through. */
 export function appendResolvedCheckModifier(
   formula,
   actor,
@@ -549,14 +572,5 @@ export function appendResolvedCheckModifier(
   Roll = globalThis.Roll
 ) {
   if (typeof formula !== 'string') return formula;
-  if (!craftingModifier) return appendCheckModifierTerm(formula, { value: 0 });
-  const { scalar, rollTerms } = resolveCheckModifierContribution(
-    craftingModifier,
-    makeRollDataExpressionResolver(actor, Roll),
-    Roll
-  );
-  return appendCheckModifierRollTerms(
-    appendCheckModifierTerm(formula, { value: scalar }),
-    rollTerms
-  );
+  return resolveCheckModifierFormula(formula, actor, craftingModifier, Roll).formula;
 }

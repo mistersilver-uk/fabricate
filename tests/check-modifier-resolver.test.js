@@ -1078,7 +1078,7 @@ test('makeRollDataExpressionResolver resolves @-paths to the substituted TEXT', 
   );
 });
 
-// ── appendResolvedCheckModifier (the seam checkRoll uses) ──────────────────────────
+// ── appendResolvedCheckModifier (the formula-only form of the seam checkRoll uses) ──
 
 test('appendResolvedCheckModifier APPENDS the resolved scalar before Foundry sees it', () => {
   const Roll = stubReplaceRoll();
