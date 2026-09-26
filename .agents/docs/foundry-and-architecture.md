@@ -323,6 +323,8 @@ Do not conflate the two: reading the setting warns once per session; the truthy 
 An unrecognised mode also changes failure shape across the boundary: on 13.351 `ChatMessage.applyRollMode` treats every mode other than `publicroll` and `selfroll` as a GM whisper (keeping an already non-empty `whisper`) and sets `blind` only for `blindroll`, so a V14 key never posts publicly there but `blind` loses its blindness, while on 14.365 `applyMode` throws reading `handler` of an undefined `CONFIG.ChatMessage.modes[mode]`.
 Both fail safe on Fabricate's own check-roll path regardless, because the chat post is wrapped in a swallowed-error guard (`checkRoll.js`), so the roll still returns a valid total and only the chat message is lost.
 This narrows any future fix to threading `messageMode` instead of `rollMode`, not merely silencing the warning (issue 1293; reported by Foundry review, core source not in this tree).
+- **On V14 the chat-mode labels are `CHAT.MODES.public`, `.gm`, `.blind` and `.self`; the `CHAT.Roll*` keys are absent from 14.365, and `CONFIG.Dice.rollModes` is a deprecation proxy (since 14, until 16).**
+A `CHAT.Roll*` label therefore localizes to the key itself on V14, and any read of `CONFIG.Dice.rollModes` warns, so a V14 roll-mode label reads its `CHAT.MODES.*` key (issue 2021).
 - **A roll-free chat card's visibility is applied to its data, with the applier and its vocabulary chosen together.**
 `ChatMessage#_preCreate` maps the legacy `rollMode` create option only inside `if ( this.isRoll )`, and `isRoll` is `rolls.length > 0` (`client/documents/chat-message.mjs`, V13.351 and V14.365), so `ChatMessage.create(data, {rollMode: 'blindroll'})` for a card carrying no rolls maps nothing and posts it publicly.
 V14.365 applies a `messageMode` create option outside that guard, but V13.351 has no such option.
@@ -331,6 +333,10 @@ V13's `ChatMessage.applyRollMode` takes the legacy tokens (`publicroll`, `gmroll
 `src/systems/bulkChatVisibility.js` therefore probes `typeof ChatMessage.applyMode === 'function'`, a static that a subclassed `CONFIG.ChatMessage.documentClass` inherits, and picks the applier and the vocabulary in that one step, translating through a copy of core's `_mapLegacyRollMode` table.
 An unmapped token passes through rather than defaulting to `public`, because V14.365's deprecated `core.rollMode` shim answers `ic` verbatim for an In-Character user, and a `?? 'public'` default would also downgrade a blind client default to public.
 `applyMode`'s `ic` branch reads `chatData.speaker.actor` unguarded, so every caller sets `speaker` before the visibility pass, and a build exposing neither applier makes `applyBulkChatVisibility` throw into the caller's `catch` rather than post with core's public default.
+- **DialogV2's `default` button option only sets `autofocus`; Enter submits through the FIRST `type="submit"` button in document order.**
+So every non-default action MUST declare `type: "button"`, or Enter fires whichever submit button renders first, whatever `default` names (issue 2021).
+- **DialogV2 has no subtitle slot, and `window.frame: false` removes the close control and dragging along with the header.**
+A secondary heading belongs in the dialog's own content, and a frameless dialog needs its own dismiss action (issue 2021).
 - **`Localization#format` is a real, separately-declared method on V13 and a bare alias of `localize` on V14, with no deprecation warning either way.**
 On V13.351, `client/helpers/localization.mjs` declares `format(stringId, data={})` as its own method, calling `this.localize(stringId)` internally, and its `localize(stringId)` takes no `data` argument at all.
 On V14.365 the class declares only `localize(stringId, data)` — which now accepts `data` itself — and `format` is not declared as a method anywhere in the class body; it survives solely because the module ends with `Object.defineProperties(Localization.prototype, {format: {value: Localization.prototype.localize}})`, a non-enumerable alias pointing at the same function as `localize`.
@@ -435,7 +441,7 @@ The authority ledger MUST stay a world `JournalEntry`, and that is a correctness
 Its flags therefore hold only safe request outcomes and prepare-token bindings, status, expiry and issuer identities; the full prepared evaluation and cached recipient-specific prompt or roll handoff stay in the issuing GM authority instance until an entitled reply is sent.
 The issuer instance alone consumes an active token or replays a private preparation reply; another tab of the same GM stays silent, and a lost snapshot or new GM requires fresh preparation without rolling or spending.
 Committed requests may replay only their safe durable outcome without repeating effects or disclosing a roll handoff.
-Boot normalization scrubs legacy private fields from replicated flags under the active-GM claim.
+Boot recovery scrubs legacy private fields from the replicated flag under the active-GM claim; because the state write deep-merges, the adapter deletes each one through `forcedDeletionEntry` in an update awaited before that write, since normalizing a field away alone leaves it persisted.
 Every player-side read in `createFoundryJournalRunAuthority` in `src/systems/journalRunAuthority.js` relies on that: move the ledger into a compendium, or assume its absence, and each player client resolves `ledger-missing` and refuses every Journal run control permanently.
 The restored-availability announcement is local in the same way — `Hooks.callAll` never crosses the socket, so a remote client re-derives only because the core `deleteJournalEntryPage` hook fires its own refresh, which holds because the collection delete precedes the `callAll`.
 
