@@ -8,7 +8,7 @@
  * not a thing that can be done. Keyed on the selector ALONE the sheet holds 215 repeated selectors
  * rather than these 106, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,025 `(at-context, selector)` keys, of which 2,919 appear exactly
+ * Unfiltered, the sheet holds 3,026 `(at-context, selector)` keys, of which 2,920 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -19,7 +19,7 @@
  * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,525 rules at that head, 106 repeated keys and 217 appearances
+ * printed from. The sheet holds 2,526 rules at that head, 106 repeated keys and 217 appearances
  * between them; five keys appear three times and none appears four or more.
  * ISSUE 1510 PHASE 2 moves both the contextual figures and one repeated row. The component
  * studio conversion is already in main; the checks conversion adds two net rules and one net
@@ -192,7 +192,7 @@
  * fall by one, to 2,569 rules, 3,077 keys and 2,970 singletons. Re-derived by running the same
  * census command.
  * Issue 2021 moves the roll prompt off DialogV2 into `ManagerModal`: the dialog's rules leave the
- * sheet and one standalone-host rule arrives, leaving 2,525 rules, 3,025 keys and 2,919
+ * sheet and one standalone-host rule arrives, leaving 2,526 rules, 3,026 keys and 2,920
  * singletons; the `.fabricate-roll-prompt__modifier-value` pair leaves the repeated table, now 106
  * keys and 217 appearances. Re-derived by running the same census command.
  */
