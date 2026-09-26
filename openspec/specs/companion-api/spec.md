@@ -186,7 +186,7 @@ The scalars are `null` for the opposite reason: their absence is meaningful, and
 
 **An optional evaluation is validated before either pre-dispatch gate.**
 After authorization, readiness, call-site, election and forwarded roll-decision gates, the member validates an optional `evaluation` before formula, dice-engine, prompt or runner work.
-Absent or `undefined` evaluation receives complete shared defaults; a supplied evaluation must be a plain data record whose nested records contain only the normalizer's declared keys and no accessors.
+Absent or `undefined` evaluation receives complete shared defaults; a supplied evaluation, `null` included, must be a plain data record whose every level contains only the normalizer's declared keys, as data properties rather than accessors.
 An `evaluation` inherited from the request's prototype chain below `Object.prototype` refuses `evaluationInvalid` without invoking an accessor, while a key present only on `Object.prototype` is ignored as absent.
 A nested key whose own value is `undefined` is treated as omitted, so its default applies exactly as it does for a top-level `evaluation: undefined`.
 Validation checks even inactive fields without coercing types, clamping numbers or replacing invalid enum values, then applies the shared normalizer only to valid partial records.
@@ -199,7 +199,9 @@ Malformed evaluation refuses `evaluationInvalid`; a valid combination absent fro
 Count, sum-under and attribute target requests remain unavailable until their respective engine and prompt successors activate them and update the advertised rows with composition tests.
 On count activation, the standalone member ignores `formula`, uses a supplied non-null `dc` as an integer required-count override from 0 through 20 and otherwise uses `pool.required`; an invalid override refuses `evaluationInvalid`.
 On attribute activation it ignores `dc` and resolves the target against the actor.
-Inactive count-pool data on a sum check is retained after validation, while active additional dice on count remain unavailable until the additional-dice successor.
+On the advertised `sum/over/fixed` row the validated evaluation selects the mode and nothing more: the member still rolls `formula`, grades it against `dc` as the fixed target when `dc` is finite and otherwise answers ungraded, and compares through `compare`, so the executed `target` is that `dc`.
+`target.expression`, `target.adjustmentKind`, `target.baseAdjustment` and every `pool` field are validated, inactive count-pool data on a sum check included, and are then ignored: an evaluation whose `target.expression` differs from `dc` rolls against `dc`, and one sent without a finite `dc` rolls ungraded.
+Active additional dice on count remain unavailable until the additional-dice successor.
 
 **Two pre-dispatch gates are required, not one.**
 First a **post-shim usability test**, defined identically to `resolveActiveCraftingCheckFormula`'s — the retirement shim, then a trim, then an emptiness test — refusing `noFormula`.

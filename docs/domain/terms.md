@@ -1557,6 +1557,7 @@ It is therefore NOT a **Check**: a Check is taken on a subject inside a Crafting
 A companion wanting those routes a real craft or salvage instead.
 Its optional evaluation is strictly validated after the existing authorization and roll-decision gates: malformed records refuse `evaluationInvalid`, and valid modes absent from `game.fabricate.api.companion.features.checkEvaluation` refuse `evaluationUnsupported` before rolling or prompting.
 The version-1 capability descriptor advertises only `sum/over/fixed`, including interactive use; count, under and attribute choices remain valid authored data but have no standalone execution route yet.
+On that row the evaluation only selects the mode: the roll still grades `formula` against `dc` through `compare`, so `target.expression` and the pool settings are validated but never change the roll.
 A rolled standalone answer projects **Executed Check Evidence** from the shared runner, while every refusal omits those execution fields.
 
 Canonical mapping: `src/systems/companionCheckRoll.js` (`rollActorCheck`, `resolveBulkCheckDecision`); `src/systems/companionCheckEvaluation.js`; `src/systems/companionContract.js` (`COMPANION_CONTRACT`); published as `game.fabricate.rollActorCheck` / `game.fabricate.resolveBulkCheckDecision` on the `companion` contract (issue 1293)
