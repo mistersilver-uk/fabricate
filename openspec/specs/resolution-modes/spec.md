@@ -286,10 +286,12 @@ It does not extend to arbitrary external macro effects, and it does not promise 
 
 ## Check Evaluation Foundation
 
-Shared comparison accepts meet or strict exceed with over or under direction; ranking returns a new best-first array and retains the first authored member of each tie without mutating its input.
+Shared comparison accepts meet or strict exceed with over or under direction; ranking returns a new best-first array, ranks non-finite values last, and retains the first authored member of each tie without mutating its input.
 Effective margin follows the selected direction, while executed formula runners and the odds classifier explicitly evaluate `sum/over` until the count and under behavior children activate those modes.
 The authored evaluation record, including inactive count/under fields, survives normalization and export/import without changing current check decisions.
 A deterministic expression accepts finite numbers, roll-data paths, arithmetic, parentheses and floor, ceil and round without rolling dice.
+A roll-data path reads only the roll data's own keys and resolves a finite number or a decimal numeric string; a missing, null or blank value is an unresolved path, and a boolean, array, object or non-decimal string is refused as non-finite rather than coerced.
+A path token is never read as dice, so `@dc` and `@d20` resolve as paths while `1d%` is refused as dice.
 It reports unresolved paths, dice syntax, invalid syntax and non-finite results distinctly and never substitutes zero for a missing path; count-specific integer policy belongs to the later behavior child.
 The private versioned check descriptor deep-clones authored `checkConfig.evaluation` beside its prepared formula and DC; evaluation reads that descriptor after preparation, so subsequent live edits cannot change its inputs.
 The public prompt and semantic `resolutionSnapshot` remain separate from that private authored record.

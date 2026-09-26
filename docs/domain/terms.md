@@ -1539,7 +1539,8 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-mo
 ## Executed Check Evidence
 
 An executed formula result records raw `data.total` and the existing `data.dc` alongside the actual product, direction, comparison, target, margin, successes and cancelled-success count.
-In the current `sum/over` execution, successes and cancelled-success count are null; simple checks target their resolved DC, relative routed checks target the roll-matched tier's effective threshold before forcing or stepping, and fixed routed and progressive checks have no single target or margin.
+In the current `sum/over` execution, successes and cancelled-success count are null.
+Simple checks target their resolved DC; relative routed checks target the effective threshold of the roll-matched tier, including the lowest tier when a below-every-threshold total is clamped to it, before forcing or stepping, or null when no tier is matched or clamped to; fixed routed and progressive checks have no single target or margin.
 A non-null margin measures raw total minus target regardless of any forced disposition.
 An unrolled, prompt-cancelled, no-engine, empty-formula or errored evaluation does not gain executed fields.
 The result's `data.cancelled` is distinct from the top-level `cancelled` flag that aborts a prompt.
