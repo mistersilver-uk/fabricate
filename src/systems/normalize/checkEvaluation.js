@@ -29,12 +29,12 @@ export function normalizeCheckEvaluation(input = {}) {
       zeroPoolFails: pool.zeroPoolFails !== false,
       explode: {
         enabled: explode.enabled === true,
-        faces: normalizeFaces(explode.faces, 'best', die),
+        faces: normalizeFaces(explode.faces, 'best'),
         once: explode.once === true,
       },
       cancel: {
         enabled: cancel.enabled === true,
-        faces: normalizeFaces(cancel.faces, 'worst', die),
+        faces: normalizeFaces(cancel.faces, 'worst'),
       },
       additionalDice: {
         enabled: additional.enabled === true,
@@ -55,18 +55,17 @@ export function normalizeNullableAdjustment(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-/** Converts an authored success count in the supported range to an integer or returns null. */
+/** Clamps an authored integer success count to 0–20; an absent or non-integer value is null. */
 export function normalizeNullableSuccesses(value) {
-  if ([null, undefined, ''].includes(value)) return null;
-  const number = Number(value);
-  return Number.isInteger(number) && number >= 0 && number <= 20 ? number : null;
+  return integerInRange(value, 0, 20, null);
 }
 
-function normalizeFaces(input, defaultKind, die) {
+// A face beyond the die is kept, not clamped: switching dice is lossless and readiness flags it.
+function normalizeFaces(input, defaultKind) {
   const source = input && typeof input === 'object' ? input : {};
   return {
     kind: source.kind === 'from' ? 'from' : defaultKind,
-    value: integerInRange(source.value, 1, die, null),
+    value: integerAtLeast(source.value, 1, null),
   };
 }
 
