@@ -71,7 +71,7 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
   ],
   modifierAverageUnavailable: [
     'IssueModifierAverageUnavailable',
-    'A check modifier this check ranks ({names}) changes what its dice total means, so it has no comparable average. Magnitude modifiers rank first; these entries remain available and roll exactly as written when a place remains.',
+    'A check modifier this check ranks ({names}) changes what its dice total means — by counting successes, for example — so it has no average to compare with the others. Modifiers with an ordinary average are chosen ahead of it; it is still rolled exactly as written whenever a pick is left over.',
   ],
   modifiersInertNoCheck: [
     'IssueModifiersInertNoCheck',

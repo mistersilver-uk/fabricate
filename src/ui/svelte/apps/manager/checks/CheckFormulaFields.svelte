@@ -98,7 +98,7 @@
     if (modifierPolicy === 'highest') {
       return text(
         'FABRICATE.Admin.Manager.Checks.Crafting.ResolvedHighest',
-        'Highest — only the best applied modifier reaches the roll, ranked by its average.'
+        'Highest — only one applied modifier reaches the roll: the one with the highest average, or, when none has an ordinary average, the first listed.'
       );
     }
     if (modifierPolicy === 'bySubject') {
