@@ -78,6 +78,8 @@ function validatedSnapshot(record, schema) {
     if (typeof key !== 'string' || !Object.hasOwn(schema, key)) return null;
     const descriptor = Object.getOwnPropertyDescriptor(record, key);
     if (!descriptor || !Object.hasOwn(descriptor, 'value')) return null;
+    // An own `undefined` is omitted, as a top-level `evaluation: undefined` is.
+    if (descriptor.value === undefined) continue;
     const rule = schema[key];
     if (typeof rule === 'function') {
       if (!rule(descriptor.value)) return null;
