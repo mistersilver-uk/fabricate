@@ -25,6 +25,7 @@ export async function seedRollPromptFixture(world, state) {
       },
     });
   }
+  if (state === 'compact') await seedCompactChoice(world);
   if (state === 'overflow') {
     const store = world.fabricate.characterLibrariesStore;
     const herbalism = manager.getSystem('lab-herbalism');
@@ -40,4 +41,27 @@ export async function seedRollPromptFixture(world, state) {
       ...store.listModifiers().filter((entry) => !editedIds.has(entry.id)),
     ]);
   }
+}
+
+/** Nine long-named world modifiers Herbalism's check offers, so the prompt meets the height cap. */
+async function seedCompactChoice(world) {
+  const store = world.fabricate.characterLibrariesStore;
+  const notes = Array.from({ length: 9 }, (_, index) => ({
+    id: `hb-mod-field-note-${index + 1}`,
+    label: `Field note ${index + 1} from the longest remembered herbalist tradition`,
+    icon: 'fa-solid fa-leaf',
+    expression: String(index % 3),
+  }));
+  await store.saveModifiers([...notes, ...store.listModifiers()]);
+  const manager = world.fabricate.craftingSystemManager;
+  const system = manager.getSystem('lab-herbalism');
+  await manager.updateSystem(system.id, {
+    craftingCheck: {
+      ...system.craftingCheck,
+      defaultModifierIds: [
+        ...system.craftingCheck.defaultModifierIds,
+        ...notes.map((note) => note.id),
+      ],
+    },
+  });
 }

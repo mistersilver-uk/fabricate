@@ -22,6 +22,7 @@ player-crafting-roll-result
 player-crafting-roll-prompt
 player-crafting-roll-prompt-multipick
 player-crafting-roll-prompt-overflow
+player-crafting-roll-prompt-compact
 player-crafting-essence-alternative
 player-crafting-alternatives
 player-crafting-essence-legacy

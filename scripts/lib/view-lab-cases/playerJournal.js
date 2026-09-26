@@ -120,9 +120,9 @@ export const CASES = Object.freeze([
     ],
     expectTab: 'journal',
     expectSelector:
-      '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="advantage"]' +
-      ':has(.prompt-heading p:has-text("Brenna Karrunsdottir · Inscribe a Runeblade"))' +
-      ':has(.formula-content code:has-text("1d20 + 3 + 6[Modifiers]"))' +
+      '.fabricate-app .manager-modal[data-roll-prompt="single"]:has(button[data-action="advantage"])' +
+      ':has(.manager-modal-subtitle:has-text("Brenna Karrunsdottir · Inscribe a Runeblade"))' +
+      ':has(.formula-content .formula:text-is("1d20 + 3 + 6"))' +
       ':not(:has(.formula-content .manager-chip))' +
       ':has(.static-modifiers .manager-chip:has-text("Rune lore +3"))' +
       ':has(.static-modifiers .manager-chip:has-text("Etching hand +0"))' +
