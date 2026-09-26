@@ -12,11 +12,8 @@ import {
 } from '../utils/craftingCheckExpression.js';
 
 import { chatModeOption } from './bulkChatVisibility.js';
-import { better, compareToTarget, effectiveMargin, rankBest } from './checkEvaluation.js';
-import {
-  makeRollDataExpressionResolver,
-  resolveCheckModifierContribution,
-} from './checkModifierResolver.js';
+import { compareToTarget, effectiveMargin, rankBest } from './checkEvaluation.js';
+import { resolveCheckModifierFormula } from './checkModifierResolver.js';
 import {
   appendCheckModifierRollTerms,
   appendCheckModifierTerm,
@@ -46,19 +43,7 @@ export function resolveRolledFormula(
 function resolveRolledCheck(formula, actor, craftingModifier, Roll = globalThis.Roll) {
   const authored = stripRetiredModifierPlaceholder(String(formula ?? ''), Roll);
   if (authored.trim() === '') return { formula: '', selected: [] };
-  if (!craftingModifier) return { formula: authored, selected: [] };
-  const { scalar, rollTerms, selected } = resolveCheckModifierContribution(
-    craftingModifier,
-    makeRollDataExpressionResolver(actor, Roll),
-    Roll
-  );
-  return {
-    formula: appendCheckModifierRollTerms(
-      appendCheckModifierTerm(authored, { value: scalar }),
-      rollTerms
-    ),
-    selected,
-  };
+  return resolveCheckModifierFormula(authored, actor, craftingModifier, Roll);
 }
 
 /**
@@ -229,7 +214,7 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
         img: options.img,
         modifierChoice,
         selectedModifiers: resolvedCheck.selected,
-        thresholdMode: options.thresholdMode,
+        thresholdMode: options.thresholdMode === 'exceed' ? 'exceed' : 'meet',
         // Offered only for a plain-d20 authored check.
         allowAdvantage: hasPlainD20(advantageBase),
       });
@@ -912,7 +897,7 @@ function resolveTierStepTarget(stepping, inPlay) {
     if (typeof tierId !== 'string' || tierId === '') continue;
     const found = inPlay.findIndex((outcome) => outcome.id === tierId);
     if (found === -1) continue;
-    if (index === -1 || better(found, index, 'under')) {
+    if (index === -1 || found < index) {
       index = found;
       trigger = candidate;
     }
