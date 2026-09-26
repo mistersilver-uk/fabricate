@@ -181,8 +181,8 @@
       "library": "<Modal>",
       "status": "target",
       "evidence": "broad",
-      "scope": "manager-only",
-      "why": "`library.html:1282` and `:1315` name it and its two callers — the import folder-mapping step and the import report — and `:1315` records that ruling it out as single-caller was wrong. Scoped `manager-only`: it is the manager window’s own modal chrome, and the name says so."
+      "scope": "shared",
+      "why": "`library.html:1282` and `:1315` name it and its manager callers — the import folder-mapping step and the import report — and `:1315` records that ruling it out as single-caller was wrong. Scoped `shared` DESPITE its `apps/manager/` path, as `ComplicationSummaryRow` is: issue 2021 made it the roll prompt's chrome in the player crafting application (`apps/crafting/RollPrompt.svelte`), at the maintainer's direction that Fabricate dialogs use this modal rather than Foundry's."
     },
     {
       "path": "src/ui/svelte/apps/manager/ModifierLibraryRow.svelte",

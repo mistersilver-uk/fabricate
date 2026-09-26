@@ -211,25 +211,33 @@
         type="button"
         class="prompt-action"
         data-action="disadvantage"
+        data-keyboard-focus="true"
         onclick={(event) => answer(event.currentTarget.form, 'disadvantage')}
         ><span>{data.labels.disadvantage}</span><small class="action-note"
           >{data.labels.worse}</small
         ></button
       >
-      <button type="submit" class="prompt-action is-primary" data-action="normal"
-        ><span>{data.labels.roll}</span></button
+      <button
+        type="submit"
+        class="prompt-action is-primary"
+        data-action="normal"
+        data-keyboard-focus="true"><span>{data.labels.roll}</span></button
       >
       <button
         type="button"
         class="prompt-action"
         data-action="advantage"
+        data-keyboard-focus="true"
         onclick={(event) => answer(event.currentTarget.form, 'advantage')}
         ><span>{data.labels.advantage}</span><small class="action-note">{data.labels.better}</small
         ></button
       >
     {:else}
-      <button type="submit" class="prompt-action is-primary" data-action="roll"
-        ><span>{data.labels.roll}</span></button
+      <button
+        type="submit"
+        class="prompt-action is-primary"
+        data-action="roll"
+        data-keyboard-focus="true"><span>{data.labels.roll}</span></button
       >
     {/if}
   {/snippet}
