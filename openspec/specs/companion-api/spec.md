@@ -184,19 +184,24 @@ The member never forces an outcome — it passes an empty trigger list explicitl
 `diceGroups` and `covered` are **lists**, so their absence is `[]`; a `null` would force every caller to guard a length read.
 The scalars are `null` for the opposite reason: their absence is meaningful, and `0` or `false` would be a confident wrong answer.
 
-**Two pre-dispatch gates are required, not one.**
+**An optional evaluation is validated before either pre-dispatch gate.**
 After authorization, readiness, call-site, election and forwarded roll-decision gates, the member validates an optional `evaluation` before formula, dice-engine, prompt or runner work.
 Absent or `undefined` evaluation receives complete shared defaults; a supplied evaluation must be a plain data record whose nested records contain only the normalizer's declared keys and no accessors.
+An `evaluation` inherited from the request's prototype chain below `Object.prototype` refuses `evaluationInvalid` without invoking an accessor, while a key present only on `Object.prototype` is ignored as absent.
+A nested key whose own value is `undefined` is treated as omitted, so its default applies exactly as it does for a top-level `evaluation: undefined`.
 Validation checks even inactive fields without coercing types, clamping numbers or replacing invalid enum values, then applies the shared normalizer only to valid partial records.
 Expressions accept strings or finite numbers; the pool die is an integer at least 2, required is an integer from 0 through 20, additional-dice max is an integer from 1 through 20, and face values are `null` or integers from 1 through the effective die.
 The standalone `compare` key remains the sole inclusive versus strict comparison choice: `exceed` is strict and every other legacy value meets the target.
-For schemaVersion 1, `features.checkEvaluation` is recursively frozen and describes executable mode rows with a version, supported target sources, interactive support, and additional-dice availability.
-The initial row supports `{ product: 'sum', direction: 'over', target.source: 'fixed' }` with or without the interactive prompt and reports `additionalDice: false`.
+For schemaVersion 1, `features.checkEvaluation` is a recursively frozen `{ version, modes, additionalDice }`, where each `modes` row is `{ product, direction, targetSources, interactive }`; a normalized evaluation is supported when a row matches its `product` and `direction`, lists its `target.source` in `targetSources`, and allows `interactive` when the request is interactive.
+`version` versions that shape; activating a mode appends a row without changing it.
+The initial descriptor is `{ version: 1, modes: [{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }], additionalDice: false }`.
 Malformed evaluation refuses `evaluationInvalid`; a valid combination absent from the capability rows refuses `evaluationUnsupported`, both before any rolling or prompting.
 Count, sum-under and attribute target requests remain unavailable until their respective engine and prompt successors activate them and update the advertised rows with composition tests.
 On count activation, the standalone member ignores `formula`, uses a supplied non-null `dc` as an integer required-count override from 0 through 20 and otherwise uses `pool.required`; an invalid override refuses `evaluationInvalid`.
 On attribute activation it ignores `dc` and resolves the target against the actor.
 Inactive count-pool data on a sum check is retained after validation, while active additional dice on count remain unavailable until the additional-dice successor.
+
+**Two pre-dispatch gates are required, not one.**
 First a **post-shim usability test**, defined identically to `resolveActiveCraftingCheckFormula`'s — the retirement shim, then a trim, then an emptiness test — refusing `noFormula`.
 Then a **dice-engine test**, refusing `engineUnavailable`.
 Both are required because the shared evaluator reports "no engine" from **two** sites: a missing dice engine, and a formula the retirement shim empties with the dice engine fully present.
