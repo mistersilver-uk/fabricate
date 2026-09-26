@@ -242,5 +242,11 @@ Alchemy makes that the DEFAULT case: brewing is never gated by visibility, and d
 - Because a redacted model carries no `recipeId`, `Fabricate#advanceCraftingRun` resolves the recipe from the PERSISTED RUN rather than from its caller.
 The client-supplied `recipeId` is ignored; trusting it also allowed advancing one run while naming another run's recipe.
 - The initial versioned secret-check prompt MUST remain generic, omitting protected subject names, artwork, formula, DC and modifier details before any reply leaves the GM.
+An entitled visible versioned check prompt MUST receive a Crafting activity label, actor and recipe or step subject, the tool-appended formula, a finite simple-check target with its meet-or-exceed comparison, and the display entries resolved from the same prepared modifier snapshot that evaluation uses.
+Its offered player choices MUST remain deferred rather than appear as already-applied modifiers; routed and progressive checks MUST expose no single public target or comparison.
+The prompt projection MUST omit private configuration, outcome tiers, source actors, speaker and execution results.
+The complete prepared evaluation MUST stay in the issuing GM authority instance rather than replicated JournalEntry flags.
+If that instance loses its snapshot or another GM takes over, the pending token MUST fail without evaluation or effects and the viewer may prepare a fresh check.
+Changing the modifier library or actor roll data after preparation MUST NOT change the prepared modifier contribution or its displayed value.
 Secret evaluation uses GM private posting and a sanitized response without player roll-data handoff.
 A non-secret evaluated-roll handoff MUST separately recheck the initiating viewer's entitlement after commit; this cannot substitute for initial-prompt redaction.

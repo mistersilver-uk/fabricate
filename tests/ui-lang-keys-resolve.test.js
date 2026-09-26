@@ -96,8 +96,8 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
   const objectResolving = resolved.filter(([, value]) => value !== undefined && typeof value !== 'string');
   assert.equal(
     objectResolving.length,
-    48,
-    'expected 48 legitimate namespace bases to resolve to an object — ' +
+    49,
+    'expected 49 legitimate namespace bases, including the dynamic RollPrompt labels, to resolve to an object — ' +
       '#1648 uses Journal Mode, Verdict, History, StepDetails and Yields.AwardModes (the parity correction replaces Stage.State), whose ' +
       'leaf suffixes are selected from run state. ' +
       'update this count only if the number of such bases genuinely changes. It fell from 44 ' +

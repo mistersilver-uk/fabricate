@@ -1951,6 +1951,10 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
   // A check is describable only once every other stage requirement is met, elapsed time
   // included, so the preflight runs against a matured gate.
   game.time.worldTime = 1120;
+  const originalI18n = game.i18n;
+  game.i18n = {
+    localize: (key) => key === 'FABRICATE.App.Nav.Crafting' ? 'Artesanía' : key,
+  };
 
   try {
     const descriptor = await engine.describeVersionedStageCheck({
@@ -1961,6 +1965,15 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
     });
     assert.deepEqual(descriptor.publicPrompt, {
       label: 'Sun Tea',
+      activity: 'Artesanía',
+      subject: 'Sun Tea',
+      actorName: 'Tinker',
+      img: 'icons/sundries/documents/blueprint-recipe-alchemical.webp',
+      formula: '1d20 + 3',
+      resolvedFormula: null,
+      target: 12,
+      comparison: 'meet',
+      selectedModifiers: [],
       mode: 'simple',
       allowsSituationalModifier: true,
       allowAdvantage: true,
@@ -2021,6 +2034,7 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
       else globalThis.Roll = originalRoll;
     }
   } finally {
+    game.i18n = originalI18n;
     if (originalChatMessage === undefined) delete globalThis.ChatMessage;
     else globalThis.ChatMessage = originalChatMessage;
   }
@@ -2043,6 +2057,142 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
   // The start committed its own journal; the refused execute neither planned nor changed one.
   assert.equal(unchanged.executionJournal.status, 'committed');
   assert.equal(unchanged.executionJournal.intent.trigger, 'start');
+});
+
+test('versioned Journal preparation freezes modifier contributions across actor and library edits', async () => {
+  const originalRoll = globalThis.Roll;
+  const rolledFormulas = [];
+  class PreparedModifierRoll {
+    constructor(formula) {
+      this.formula = formula;
+      this.total = 17;
+      this.dice = [];
+    }
+    static replaceFormulaData(formula, data, { missing = '0' } = {}) {
+      return formula.replace(/@([\w.]+)/g, (_match, path) => {
+        const value = path.split('.').reduce((entry, key) => entry?.[key], data);
+        return value === undefined ? missing : String(value);
+      });
+    }
+    static validate() { return true; }
+    evaluateSync() { return this; }
+    async evaluate() {
+      rolledFormulas.push(this.formula);
+      return this;
+    }
+    toJSON() { return { formula: this.formula, total: this.total, terms: [] }; }
+  }
+  globalThis.Roll = PreparedModifierRoll;
+  try {
+    for (const policy of ['addAll', 'playerPicks']) {
+      const { engine, recipe } = setupEngineFixture();
+      let toolAppendCalls = 0;
+      engine._appendToolCheckBonuses = async (formula) => {
+        toolAppendCalls += 1;
+        return `${formula} + 2[Tool]`;
+      };
+      const actor = new FakeActor(`journal-${policy}`);
+      actor.name = 'Tinker';
+      actor.system = { focus: 3, spark: 1 };
+      actor.getRollData = () => actor.system;
+      const system = {
+        resolutionMode: 'simple',
+        craftingCheck: {
+          simple: { rollFormula: '1d20', dc: 12 },
+          defaultModifierPolicy: policy,
+          defaultModifierIds: ['focus', 'spark'],
+          maxModifierPicks: 2,
+        },
+        modifiers: [
+          { id: 'focus', label: 'Focus', expression: '@focus' },
+          { id: 'spark', label: 'Spark', expression: '1d4+@spark' },
+        ],
+      };
+      game.fabricate.getCraftingSystemManager = () => ({ getSystem: () => system });
+      const source = new FakeActor('source');
+      const started = await startReadyVersionedRun({
+        engine, recipe, actor, source,
+      });
+      game.time.worldTime = 1120;
+      const descriptor = await engine.describeVersionedStageCheck({
+        actor, componentSourceActors: [source], runId: started.runId,
+        preparationGrant: 'prepare-grant',
+      });
+      assert.equal(descriptor.publicPrompt.actorName, 'Tinker');
+      assert.equal(descriptor.publicPrompt.subject, 'Sun Tea');
+      assert.equal(descriptor.publicPrompt.target, 12);
+      assert.equal(descriptor.publicPrompt.comparison, 'meet');
+      assert.equal(toolAppendCalls, 1);
+      assert.equal(rolledFormulas.length, policy === 'addAll' ? 0 : 1);
+      assert.equal(descriptor.privateEvaluation.rollFormula, '1d20 + 2[Tool]');
+      assert.ok(!Object.hasOwn(descriptor.publicPrompt, 'checkConfig'));
+      if (policy === 'playerPicks') {
+        assert.deepEqual(descriptor.publicPrompt.selectedModifiers, []);
+        assert.deepEqual(descriptor.publicPrompt.modifierChoice.modifiers.map(({ id }) => id), ['focus', 'spark']);
+        assert.ok(!Object.hasOwn(descriptor.publicPrompt.modifierChoice.modifiers[1], 'formula'));
+      } else {
+        assert.equal(descriptor.publicPrompt.formula, '1d20 + 2[Tool] + 3[Modifiers] + (1d4+1)[Modifiers]');
+        assert.deepEqual(descriptor.publicPrompt.selectedModifiers.map(({ label, display }) => ({ label, display })), [
+          { label: 'Focus', display: '+3' },
+          { label: 'Spark', display: '+1d4+1' },
+        ]);
+      }
+      actor.system.focus = 9;
+      actor.system.spark = 8;
+      system.modifiers[0].expression = '77';
+      system.modifiers[1].expression = '8d8';
+      const decision = policy === 'playerPicks' ? { modifierIds: ['focus', 'spark'] } : {};
+      const evaluated = await evaluatePreparedRunCheck(
+        JSON.parse(JSON.stringify(descriptor.privateEvaluation)), actor, decision
+      );
+      assert.equal(evaluated.success, true);
+      assert.equal(rolledFormulas.at(-1), '1d20 + 2[Tool] + 3[Modifiers] + (1d4+1)[Modifiers]');
+      assert.equal(rolledFormulas.length, policy === 'addAll' ? 1 : 2);
+      if (policy !== 'playerPicks') continue;
+      // A prompt that offered no choice sends no ids: absent rolls the defaults, empty rolls none.
+      for (const [unanswered, expected] of [
+        [{}, '1d20 + 2[Tool] + 3[Modifiers] + (1d4+1)[Modifiers]'],
+        [{ modifierIds: null }, '1d20 + 2[Tool] + 3[Modifiers] + (1d4+1)[Modifiers]'],
+        [{ modifierIds: [] }, '1d20 + 2[Tool]'],
+      ]) {
+        await evaluatePreparedRunCheck(
+          JSON.parse(JSON.stringify(descriptor.privateEvaluation)), actor, unanswered
+        );
+        assert.equal(rolledFormulas.at(-1), expected, JSON.stringify(unanswered));
+      }
+    }
+  } finally {
+    if (originalRoll === undefined) delete globalThis.Roll;
+    else globalThis.Roll = originalRoll;
+  }
+});
+
+test('versioned Journal prompts keep routed and progressive targets private', async () => {
+  for (const mode of ['routedByCheck', 'progressive']) {
+    const { engine, recipe } = setupEngineFixture();
+    const actor = new FakeActor(`journal-${mode}`);
+    const system = {
+      resolutionMode: mode,
+      craftingCheck: {
+        routed: { rollFormula: '1d20', type: 'relative', dc: 12,
+          relativeOutcomes: [{ id: 'pass', name: 'Pass', dc: 0 }] },
+        progressive: { rollFormula: '1d20' },
+      },
+    };
+    game.fabricate.getCraftingSystemManager = () => ({ getSystem: () => system });
+    const source = new FakeActor('source');
+    const started = await startReadyVersionedRun({
+      engine, recipe, actor, source,
+    });
+    game.time.worldTime = 1120;
+    const descriptor = await engine.describeVersionedStageCheck({
+      actor, componentSourceActors: [source], runId: started.runId,
+      preparationGrant: 'prepare-grant',
+    });
+    assert.equal(descriptor.publicPrompt.target, null);
+    assert.equal(descriptor.publicPrompt.comparison, null);
+    if (mode === 'routedByCheck') assert.equal(descriptor.privateEvaluation.decisionPolicy.dc, 12);
+  }
 });
 
 test('CraftingEngine world-time execution keeps an input stage blocked with zero journal effects', async () => {

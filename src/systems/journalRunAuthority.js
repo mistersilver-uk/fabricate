@@ -1,12 +1,21 @@
+import { forcedDeletionEntry, isSafeFlagKeySegment } from '../config/flags.js';
+
 import {
   createJournalRunLedgerProvisioner,
   createLedgerRetry,
   retainedClaimIdentity,
 } from './journalRunLedger.js';
+import {
+  createJournalRunPrivatePreparation,
+  legacyPrivatePaths,
+  normalizeJournalRunAuthorityState,
+  safeJournalRunResponse,
+} from './journalRunPrivatePreparation.js';
 
 const AUTHORITY_VERSION = 1;
 const AUTHORITY_FLAG = 'journalRunAuthorityLedger';
 const AUTHORITY_STATE_FLAG = 'journalRunAuthorityState';
+const AUTHORITY_STATE_PATH = `flags.fabricate.${AUTHORITY_STATE_FLAG}`;
 const NON_MUTATING_GRANTS = new Set(['describeCheck', 'prepareAlchemyStart']);
 
 /** Fixed embedded-page ID used for arbitration, distinct from the claim's random `claimId`. */
@@ -55,23 +64,7 @@ function emptyState() {
 }
 
 function normalizedState(value) {
-  const source = value && typeof value === 'object' ? value : {};
-  return {
-    version: AUTHORITY_VERSION,
-    requests: source.requests && typeof source.requests === 'object' ? { ...source.requests } : {},
-    prepareTokens:
-      source.prepareTokens && typeof source.prepareTokens === 'object'
-        ? { ...source.prepareTokens }
-        : {},
-    reconciliations: Array.isArray(source.reconciliations) ? [...source.reconciliations] : [],
-  };
-}
-
-function sameBinding(actual, expected) {
-  for (const key of ['senderId', 'actorUuid', 'runType', 'runId', 'expectedRevision']) {
-    if (String(actual?.[key] ?? '') !== String(expected?.[key] ?? '')) return false;
-  }
-  return true;
+  return normalizeJournalRunAuthorityState(value);
 }
 
 function includesExpectedBinding(actual, expected) {
@@ -100,7 +93,7 @@ function activeGmMatches(currentUser, activeGM) {
   );
 }
 
-/** The private ledger's creation source; its top-level `_id` must stay server-assigned. */
+/** The GM-owned ledger's creation source; its top-level `_id` must stay server-assigned. */
 function newLedgerSource() {
   return {
     name: 'Fabricate Run Authority',
@@ -158,7 +151,7 @@ function claimedLedgerWriter({ ledger, claimId, requestId, writeLedgerState, cla
 }
 
 /**
- * Cross-realm exclusion requires exclusive fixed-page creation under exactly one private ledger.
+ * Cross-realm exclusion requires exclusive fixed-page creation under exactly one GM-owned ledger.
  * The elected GM provisions and arbitrates that ledger; settled requests deduplicate, a pre-write
  * refusal releases its claim, and a claim left by an uncertain effect never expires — while one
  * whose guarded request provably finished is reaped once it outlives
@@ -259,6 +252,30 @@ export function createJournalRunAuthority({
     } catch {
       return null;
     }
+  }
+  const privatePreparation = createJournalRunPrivatePreparation({
+    now,
+    currentUser,
+    activeGM,
+    nextRandomId,
+  });
+
+  async function shouldHandleRequest(request) {
+    privatePreparation.prune();
+    let ledgers;
+    try {
+      ledgers = (await listLedgers()) ?? [];
+    } catch {
+      return false;
+    }
+    if (ledgers.length !== 1) return true;
+    let state;
+    try {
+      state = normalizedState(await readState(ledgers[0]));
+    } catch {
+      return false;
+    }
+    return privatePreparation.belongsHere(request, state);
   }
 
   /**
@@ -520,48 +537,19 @@ export function createJournalRunAuthority({
 
   function tokenHelpers({ state, request, persist }) {
     return {
-      issuePrepareToken(binding, { expiresAt } = {}) {
-        const token = nextRandomId();
-        if (!token) throw new Error('Secure random ID API unavailable');
-        state.prepareTokens[token] = {
-          status: 'active',
-          binding: { ...binding, senderId: request.senderId },
-          createdAt: now(),
-          expiresAt: Number.isFinite(Number(expiresAt)) ? Number(expiresAt) : now() + 60_000,
-        };
-        return token;
-      },
-      consumePrepareToken(token, binding) {
-        const record = state.prepareTokens[token];
-        if (
-          record?.status !== 'active' ||
-          record.expiresAt <= now() ||
-          !sameBinding(record.binding, { ...binding, senderId: request.senderId })
-        ) {
-          return null;
-        }
-        record.status = 'consumed';
-        record.consumedByRequestId = request.requestId;
-        return structuredClone(record);
-      },
-      releasePrepareToken(token, binding) {
-        const record = state.prepareTokens[token];
-        if (
-          record?.status !== 'active' ||
-          !sameBinding(record.binding, { ...binding, senderId: request.senderId })
-        ) {
-          return false;
-        }
-        record.status = 'released';
-        record.releasedAt = now();
-        return true;
-      },
+      issuePrepareToken: (binding, { expiresAt } = {}) =>
+        privatePreparation.issue(state, request, binding, expiresAt),
+      consumePrepareToken: (token, binding) =>
+        privatePreparation.consume(state, request, token, binding),
+      releasePrepareToken: (token, binding) =>
+        privatePreparation.release(state, request, token, binding),
       persist,
     };
   }
 
   function run(request, handler) {
     return queue(`command:${request?.requestId ?? 'unknown'}`, async () => {
+      privatePreparation.prune();
       if (!activeGmMatches(currentUser?.(), activeGM?.())) {
         recoveryReady = false;
         await refreshAvailability();
@@ -616,6 +604,9 @@ export function createJournalRunAuthority({
           return unavailable('claim-release-failed');
         }
         publishAvailability({ available: true, reason: null });
+        const privateReply = privatePreparation.reply(request.requestId);
+        if (privateReply) return privateReply;
+        if (prior.response?.checkRequired) return unavailable('prepare-token-invalid');
         return structuredClone(prior.response ?? unavailable('request-not-replayable'));
       }
 
@@ -625,6 +616,8 @@ export function createJournalRunAuthority({
         status: 'processing',
         senderId: request.senderId,
         sessionId: request.sessionId,
+        issuerGMId: currentUser?.()?.id,
+        issuerInstanceId: privatePreparation.instanceId(),
         startedAt: now(),
       };
       const persist = () => writer.persist(state);
@@ -657,7 +650,7 @@ export function createJournalRunAuthority({
       const recoveryRequired = response?.recoveryRequired === true;
       let durableResponse;
       try {
-        durableResponse = structuredClone(response);
+        durableResponse = safeJournalRunResponse(structuredClone(response));
       } catch {
         response = unavailable('response-not-serializable', { recoveryRequired: true });
         durableResponse = structuredClone(response);
@@ -677,6 +670,7 @@ export function createJournalRunAuthority({
         publishAvailability({ available: false, reason: 'recovery-required' });
         return response;
       }
+      privatePreparation.rememberReply(request.requestId, response, state);
       for (const record of createdGrantRecords) {
         if (record.requestId === request.requestId) createdGrantRecords.delete(record);
       }
@@ -754,12 +748,25 @@ export function createJournalRunAuthority({
   return {
     setup,
     run,
+    shouldHandleRequest,
     reconcile,
     consumeExecutionGrant,
     availability: () => ({ ...cachedAvailability }),
     refreshAvailability,
     bootstrapRecovery,
   };
+}
+
+/**
+ * The forced deletions for every legacy private field the persisted flag still holds: the state
+ * write deep-merges, so a key normalization omits survives it. An id that is not one flag-key
+ * segment cannot be addressed by a dotted path and is skipped.
+ */
+function legacyPrivateDeletions(rawState) {
+  const entries = legacyPrivatePaths(rawState)
+    .filter(([parent]) => parent.split('.').every(isSafeFlagKeySegment))
+    .map(([parent, key]) => forcedDeletionEntry(`${AUTHORITY_STATE_PATH}.${parent}`, key));
+  return Object.fromEntries(entries.filter(Boolean));
 }
 
 /**
@@ -850,8 +857,12 @@ export function createFoundryJournalRunAuthority({
       });
     },
     readState: async (entry) => entry?.getFlag?.('fabricate', AUTHORITY_STATE_FLAG),
-    writeState: async (entry, state) =>
-      entry.update({ [`flags.fabricate.${AUTHORITY_STATE_FLAG}`]: state }),
+    // Two sequential awaited updates, never one payload mixing the deletions with the write.
+    writeState: async (entry, state) => {
+      const deletions = legacyPrivateDeletions(entry?.getFlag?.('fabricate', AUTHORITY_STATE_FLAG));
+      if (Object.keys(deletions).length > 0) await entry.update(deletions);
+      return entry.update({ [AUTHORITY_STATE_PATH]: state });
+    },
     // This create KEEPS its duplicate-`_id` rejection: it is the lock's compare-and-set
     // (`_createDocuments` runs inside the database semaphore), which asking first could not
     // replace. `ledgerResult` refuses a LIVE claim locally, so only two realms that BOTH saw the

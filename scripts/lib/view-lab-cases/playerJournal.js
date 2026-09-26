@@ -108,6 +108,33 @@ export const CASES = Object.freeze([
     kinds: ['player', 'journal'],
     sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/svelte\/stores\/journalStore/],
   }),
+  playerCase({
+    id: 'player-journal-check-roll-prompt',
+    label: 'Player Journal — versioned check roll prompt',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'journal', journalCaseState: 'journal-check-prompt', dialog: 'open' },
+    steps: [
+      { selector: '[data-run-id="lab-v1-journal-check-prompt"]' },
+      { selector: '[data-journal-detail] [data-run-action="primary"]' },
+    ],
+    expectTab: 'journal',
+    expectSelector:
+      '.application.dialog .fabricate-roll-prompt[data-roll-prompt-state="advantage"]' +
+      ':has(.prompt-heading p:has-text("Brenna Karrunsdottir · Inscribe a Runeblade"))' +
+      ':has(.formula-content code:has-text("1d20 + 3 + 6[Modifiers]"))' +
+      ':not(:has(.formula-content .manager-chip))' +
+      ':has(.static-modifiers .manager-chip:has-text("Rune lore +3"))' +
+      ':has(.static-modifiers .manager-chip:has-text("Etching hand +0"))' +
+      ':has(.static-modifiers .manager-chip:has-text("Inscriber’s chisel +3"))',
+    kinds: ['player', 'journal'],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/bootstrap\/journalOperations\.js$/,
+      /^src\/systems\/CraftingEngine\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt\.svelte|rollPrompt\.js)$/,
+    ],
+  }),
   ...journalBlindRunCases(),
   ...journalLifecycleCases(),
   ...journalHistoryBatchCases(),

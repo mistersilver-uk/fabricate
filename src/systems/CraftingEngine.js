@@ -44,9 +44,16 @@ import {
   buildCheckModifierContext,
   makeRollDataExpressionResolver,
   resolveActiveCraftingCheckFormula,
+  resolveCheckModifierContribution,
   resolveModifierPolicy,
 } from './checkModifierResolver.js';
-import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
+import {
+  resolveCheckFormulaDisplay,
+  resolveRolledFormula,
+  runFormulaPassFail,
+  runFormulaProgressive,
+  runFormulaRouted,
+} from './checkRoll.js';
 import { fireComplications } from './complicationRuntime.js';
 import { createOrStackComponentItem } from './componentStacking.js';
 import {
@@ -375,7 +382,10 @@ export class CraftingEngine {
       activeCheck.rollFormula,
       prepared.toolItems
     );
-    const modifierContext = buildCheckModifierContext(system, 'crafting', recipe);
+    const modifierContext = capturePreparedModifierContext(
+      buildCheckModifierContext(system, 'crafting', recipe),
+      actor
+    );
     const modifierChoice = this._buildInteractiveModifierChoice(
       rollFormula,
       modifierContext,
@@ -391,13 +401,16 @@ export class CraftingEngine {
     const speaker = cloneJsonValue(globalThis.ChatMessage?.getSpeaker?.({ actor })) ?? null;
     return {
       required: activeCheck.checkUsable || activeCheck.requiresCheck,
-      publicPrompt: {
-        label: recipe.name || step.name || 'Crafting',
-        mode: activeCheck.mode,
-        allowsSituationalModifier: activeCheck.checkUsable,
-        allowAdvantage: hasPlainD20(activeCheck.rollFormula),
+      publicPrompt: versionedCheckPrompt({
+        activeCheck,
+        recipe,
+        step,
+        actor,
+        rollFormula,
+        dc,
+        modifierContext,
         modifierChoice,
-      },
+      }),
       privateEvaluation: {
         actorUuid: actor?.uuid ?? null,
         flavor,
@@ -412,7 +425,11 @@ export class CraftingEngine {
         mode: activeCheck.mode,
         slot: activeCheck.slot,
         rollFormula,
-        checkConfig: cloneJsonValue(activeCheck.config) ?? null,
+        checkConfig: {
+          ...cloneJsonValue(activeCheck.config),
+          craftingModifier: cloneJsonValue(modifierContext),
+          modifierChoice: cloneJsonValue(modifierChoice),
+        },
         decisionPolicy: {
           dc: Number.isFinite(dc) ? dc : null,
           thresholdMode: activeCheck.config?.thresholdMode ?? null,
@@ -7097,6 +7114,75 @@ function authorityUnavailableResult() {
 
 function versionedFailure(message) {
   return { success: false, results: null, message };
+}
+
+function capturePreparedModifierContext(context, actor) {
+  const resolveExpression = makeRollDataExpressionResolver(actor);
+  return {
+    ...cloneJsonValue(context),
+    catalogue: (context?.catalogue ?? []).map((entry) => ({
+      ...cloneJsonValue(entry),
+      expression: resolveExpression(entry?.expression) ?? '',
+    })),
+  };
+}
+
+function versionedCheckPrompt({
+  activeCheck,
+  recipe,
+  step,
+  actor,
+  rollFormula,
+  dc,
+  modifierContext,
+  modifierChoice,
+}) {
+  const selectedModifiers = modifierChoice
+    ? []
+    : resolveCheckModifierContribution(modifierContext, makeRollDataExpressionResolver(actor))
+        .selected.filter((entry) => !entry.blocked)
+        .map(publicModifierDisplay);
+  const formula = modifierChoice
+    ? rollFormula
+    : resolveRolledFormula(rollFormula, actor, modifierContext);
+  const target = activeCheck.slot === 'simple' && Number.isFinite(dc) ? dc : null;
+  const comparison = activeCheck.config?.thresholdMode === 'exceed' ? 'exceed' : 'meet';
+  const activityKey = 'FABRICATE.App.Nav.Crafting';
+  const localizedActivity = globalThis.game?.i18n?.localize?.(activityKey);
+  return {
+    label: recipe.name || step.name || 'Crafting',
+    activity:
+      localizedActivity && localizedActivity !== activityKey ? localizedActivity : 'Crafting',
+    subject: recipe.name || step.name || '',
+    actorName: actor?.name ?? '',
+    img: resolveRecipeImage(recipe),
+    formula,
+    resolvedFormula: resolveCheckFormulaDisplay(formula, actor)?.display ?? null,
+    target,
+    comparison: target === null ? null : comparison,
+    selectedModifiers,
+    mode: activeCheck.mode,
+    allowsSituationalModifier: activeCheck.checkUsable,
+    allowAdvantage: hasPlainD20(activeCheck.rollFormula),
+    modifierChoice: publicModifierChoice(modifierChoice),
+  };
+}
+
+function publicModifierDisplay({ label, icon, display }) {
+  return { label, icon, display };
+}
+
+function publicModifierChoice(choice) {
+  if (!choice) return null;
+  return {
+    modifiers: choice.modifiers.map((modifier) => ({
+      id: modifier.id,
+      ...publicModifierDisplay(modifier),
+    })),
+    maxPicks: choice.maxPicks,
+    defaultSelectedIds: choice.defaultSelectedIds,
+    defaultSelectedId: choice.defaultSelectedId,
+  };
 }
 
 function cloneJsonValue(value) {
