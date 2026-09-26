@@ -1528,11 +1528,12 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-mo
 
 ## Check Evaluation
 
-Every normalized simple, routed and progressive check subobject in crafting, salvage and gathering retains an `evaluation` record, even when its selected product, direction, target or pool settings are inactive.
+Each of the eight normalized check subobjects (crafting and salvage simple, routed and progressive; gathering routed and progressive) retains an `evaluation` record, even when its selected product, direction, target or pool settings are inactive.
 The record defaults to `sum/over`, and the current runners and odds classifier execute `sum/over` even when a future count or under choice was authored.
-The private prepared check descriptor clones that authored record beside the prepared formula and DC; it is not the public executed `resolutionSnapshot`.
+Recipe tiers retain nullable `adjustment` and `successes` siblings beside `dc`, and relative outcome tiers retain a nullable `adjustment`; no current runner reads them.
+The private crafting and gathering prepared check descriptors clone that authored record beside the prepared formula and DC; it is not the public executed `resolutionSnapshot`.
 
-Canonical mapping: `normalizeCheckEvaluation` in `src/systems/normalize/checkEvaluation.js`; `system.{craftingCheck,salvageCraftingCheck,gatheringCraftingCheck}`; `CraftingEngine.describeVersionedStageCheck`
+Canonical mapping: `normalizeCheckEvaluation`/`normalizeNullableAdjustment`/`normalizeNullableSuccesses` in `src/systems/normalize/checkEvaluation.js`; `system.{craftingCheck,salvageCraftingCheck,gatheringCraftingCheck}`; `CraftingEngine.describeVersionedStageCheck`, `GatheringEngine._versionedCheckDescriptor`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
 
@@ -1613,10 +1614,12 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and
 
 A per-component `salvage.dcOverride` and a per-task gathering `dcOverride` replace the check sub-object's default `dc` (else fallback 15) when finite.
 Progressive checks have **no DC**, so an override is irrelevant to (and ignored by) progressive salvage and progressive gathering: it is not a universal knob.
+Each `dcOverride` has two sibling overrides, `adjustmentOverride` (a finite number or null) and `successesOverride` (an integer clamped to 0–20, or null), both defaulting to null.
+They hold the per-record difficulty for an attribute target and a success count under a **Check Evaluation**; the current `sum/over` runners never read them, but normalization, the component salvage save, the admin gathering task save and the gathering runtime task projection all retain them.
 
-Canonical mapping: `salvage.dcOverride`, `GatheringTask.dcOverride`; `_resolveSalvageDc` in `CraftingEngine`, `_resolveGatheringRoutedDc` in `GatheringEngine`
+Canonical mapping: `salvage.dcOverride`, `GatheringTask.dcOverride`; `_resolveSalvageDc` in `CraftingEngine`, `_resolveGatheringRoutedDc` in `GatheringEngine`; `salvage.adjustmentOverride`/`salvage.successesOverride` via `normalizeSalvage` in `src/systems/normalize/salvage.js`; `GatheringTask.adjustmentOverride`/`GatheringTask.successesOverride` via `_normalizeGatheringTask` in `src/ui/svelte/stores/adminStore.js` and `normalizeLibraryTask` in `src/systems/GatheringRichStateService.js`
 
-Spec reference: openspec/specs/recipes-and-steps/spec.md, openspec/specs/gathering-and-harvesting/spec.md
+Spec reference: openspec/specs/recipes-and-steps/spec.md, openspec/specs/gathering-and-harvesting/spec.md, openspec/specs/data-models/spec.md
 
 ## Character Modifier
 

@@ -109,8 +109,8 @@ CraftingSystem = {
     // renders a tier table (the Checks tab mounts the simple editor with its DC-source
     // half hidden and the routed editor with tiers hidden), so neither slot's `tiers`
     // is authored there.
-    simple: SimpleCheck,               // { rollFormula, dc, thresholdMode, dcMode, tiers, macroUuid, checkBreakage }
-    routed: RoutedCheck,               // { type, rollFormula, dc, thresholdMode, dcMode, macroUuid, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
+    simple: SimpleCheck,               // { rollFormula, evaluation, dc, thresholdMode, dcMode, tiers, macroUuid, checkBreakage }
+    routed: RoutedCheck,               // { type, rollFormula, evaluation, dc, thresholdMode, dcMode, macroUuid, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
       rollFormula: string,             // default ""; total drives progressive awarding
@@ -248,7 +248,7 @@ CraftingSystem = {
   //     dc: number,                                // default 15; the default DC
   //     thresholdMode: "meet" | "exceed",          // default "meet"
   //     dcMode: "static" | "dynamic",              // default "static" (crafting only)
-  //     tiers: { id, name, dc }[],                 // recipe-DC overrides (crafting only)
+  //     tiers: { id, name, dc, adjustment, successes }[], // recipe-DC overrides (crafting only)
   //     macroUuid: string | null,                  // dynamic-DC macro (crafting only)
   //     checkBreakage: CheckBreakage,              // unified per-check trigger list
   //   }
@@ -258,12 +258,27 @@ CraftingSystem = {
   //     rollFormula: string, dc: number, thresholdMode: "meet" | "exceed",
   //     dcMode: "static" | "dynamic",              // default "static" (crafting only)
   //     macroUuid: string | null,                  // dynamic-DC macro (crafting only)
-  //     tiers: { id, name, dc }[],                 // recipe-DC overrides (crafting only)
-  //     relativeOutcomes: { id, name, success, breakTools, dc }[],
+  //     tiers: { id, name, dc, adjustment, successes }[], // recipe-DC overrides (crafting only)
+  //     relativeOutcomes: { id, name, success, breakTools, dc, adjustment }[],
   //     fixedOutcomes: { id, name, success, breakTools, start, end }[],
   //     checkBreakage: CheckBreakage,              // unified per-check trigger list
   //   }
   //   // (The progressive check sub-object likewise carries a checkBreakage block.)
+  //
+  //   // Normalized by `normalizeCheckEvaluation`; see § Check evaluation record.
+  //   CheckEvaluation = {
+  //     product: "sum" | "count", direction: "over" | "under",
+  //     target: { source: "fixed" | "attribute", expression: string,
+  //               adjustmentKind: "add" | "multiply", baseAdjustment: number | null },
+  //     pool: {
+  //       die: number, base: string, threshold: string, required: number,
+  //       modifierDestination: "pool" | "threshold", zeroPoolFails: boolean,
+  //       explode: { enabled: boolean, faces: { kind: "best" | "from", value: number | null }, once: boolean },
+  //       cancel: { enabled: boolean, faces: { kind: "worst" | "from", value: number | null } },
+  //       additionalDice: { enabled: boolean, source: "path" | "macro", path: string,
+  //                         readMacroUuid: string, spendMacroUuid: string, max: number },
+  //     },
+  //   }
   //
   //   // Unified per-check trigger list (issue 419 recombine). Each trigger pairs an
   //   // expressive dice-matching condition with three effects: force an outcome,
@@ -417,13 +432,13 @@ CraftingSystem = {
 
 ### Check evaluation record
 
-Every normalized simple, routed and progressive check subobject in crafting, salvage and gathering MUST carry `evaluation` with `product: "sum" | "count"` and `direction: "over" | "under"`, defaulting to `sum/over`.
+Each of the eight normalized check subobjects — crafting and salvage `simple`, `routed` and `progressive`, and gathering `routed` and `progressive` — MUST carry `evaluation` with `product: "sum" | "count"` and `direction: "over" | "under"`, defaulting to `sum/over`.
 Its `target` contains `source: "fixed" | "attribute"`, `expression`, `adjustmentKind: "add" | "multiply"` and nullable `baseAdjustment`.
-Its `pool` contains integer `die` (at least 2), string `base` and `threshold` expressions, integer `required` (0–20), `modifierDestination: "pool" | "threshold"`, `zeroPoolFails`, `explode` and `cancel` face configurations, and `additionalDice` source/path/macro/max fields.
-The normalized defaults are fixed target, additive adjustment, d10, base `"2"`, threshold `"8"`, required 1, pool destination, zero-pool failure on, and explode, cancel and additional dice off with additional maximum 1.
-Normalization MUST retain inactive mode fields and finite/null sibling adjustments; unknown enum tokens take their defaults, counts clamp to 0–20 and additional maximum clamps to 1–20.
-An explode or cancel face `value` is a positive integer or null and is not clamped to `die`, so changing the die loses no authored face; readiness flags a face the die cannot roll.
-The three activities' eight check subobjects share this shape, and schema-6 export/import MUST preserve the normalized record without a migration.
+Its `pool` contains integer `die` (at least 2), string `base` and `threshold` expressions, integer `required` (0–20), `modifierDestination: "pool" | "threshold"`, `zeroPoolFails`, `explode` and `cancel` face configurations, and `additionalDice` enabled/source/path/read-macro/spend-macro/max fields.
+The normalized defaults are an empty fixed target expression, additive adjustment, d10, base `"2"`, threshold `"8"`, required 1, pool destination, zero-pool failure on, and explode, cancel and additional dice off with additional maximum 1.
+Normalization MUST retain inactive mode fields and finite/null sibling adjustments; unknown enum tokens take their defaults, an invalid die reads d10, a finite numeric expression is kept as its string, integer counts clamp to 0–20 and additional maximum clamps to 1–20, and a non-integer count takes its default (1 for `required`, null for a sibling).
+An explode or cancel face `value` is a positive integer or null and is not clamped to `die`, so changing the die loses no authored face; a face the die cannot roll is left for readiness to flag rather than repaired by normalization.
+Checks studio drafts carry the normalized record and the tier and outcome siblings, so a studio save preserves them, and schema-6 export/import MUST preserve the normalized record without a migration.
 Recipe difficulty tiers retain finite nullable `adjustment` and integer nullable `successes` beside their existing DC fields; relative outcome rows retain their finite nullable `adjustment` sibling.
 Component salvage and gathering task overrides retain `adjustmentOverride` and `successesOverride` beside `dcOverride`, including through their save projections.
 
@@ -1347,8 +1362,8 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
     toolIds: string[],             // references to per-system library Tools
     resultGroups: ResultGroup[],
     dcOverride: number | null,     // default null; per-component salvage check DC override (replaces salvageCraftingCheck.simple/routed.dc at salvage time)
-    adjustmentOverride: number | null,
-    successesOverride: number | null,
+    adjustmentOverride: number | null, // default null; retained per-component adjustment for an attribute target
+    successesOverride: number | null,  // default null; retained per-component required count, clamped 0–20
     outcomeRouting?: { [outcome: string]: string },  // routed only
     timeRequirement?: TimeRequirement,
     currencyRequirement?: CurrencyRequirement,

@@ -293,7 +293,7 @@ A deterministic expression accepts finite numbers, roll-data paths, arithmetic, 
 A roll-data path reads only the roll data's own keys and resolves a finite number or a decimal numeric string; a missing, null or blank value is an unresolved path, and a boolean, array, object or non-decimal string is refused as non-finite rather than coerced.
 A path token is never read as dice, so `@dc` and `@d20` resolve as paths while `1d%` is refused as dice.
 It reports unresolved paths, dice syntax, invalid syntax and non-finite results distinctly and never substitutes zero for a missing path; count-specific integer policy belongs to the later behavior child.
-The private versioned check descriptor deep-clones authored `checkConfig.evaluation` beside its prepared formula and DC; evaluation reads that descriptor after preparation, so subsequent live edits cannot change its inputs.
+The private crafting and gathering versioned check descriptors deep-clone authored `checkConfig.evaluation` beside their prepared formula and DC; the prepared evaluator reads only that descriptor, so subsequent live edits cannot change its inputs.
 The public prompt and semantic `resolutionSnapshot` remain separate from that private authored record.
 
 ## Gathering Task Modes

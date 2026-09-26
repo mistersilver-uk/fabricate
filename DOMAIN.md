@@ -855,7 +855,7 @@ The RECORD that selects check modifiers under the `bySubject` combination rule, 
 
 #### Recipe Check Tier
 
-The per-recipe reference to one of the `{id, name, dc}` DC tiers a crafting system's check slot authors (`Recipe.checkTierId`), naming the DC that recipe rolls against.
+The per-recipe reference to one of the `{id, name, dc}` DC tiers (with retained nullable `adjustment` and `successes` siblings) a crafting system's check slot authors (`Recipe.checkTierId`), naming the DC that recipe rolls against.
 
 [Notes](docs/domain/terms.md#recipe-check-tier)
 
@@ -1323,7 +1323,7 @@ Crafting System
 |  |- tags
 |  |- essences
 |  |- difficulty
-|  `- salvage definition (enabled: the GM-authorable per-component gate, default FALSE — no migration seeds it, so an existing component with authored resultGroups and no explicit enabled reads as disabled; _normalizeSalvage clamps it to false whenever resultGroups is empty — and, in simple mode, whenever no success group survives the success-first retain-one clamp (issue 764: keep one success group at resultGroups[0], keep at most one reserved role:'failure' group iff salvageCraftingCheck.simple.rollFormula is authored, drop the rest, re-order failure-first input); this is where Component Requirement 5's lower AND simple-mode upper bound is enforced for EVERY writer — GM save, import, copy-mode, migration — never by a UI control's disabled state; toolIds; dcOverride applies only to simple/routed; outcomeRouting maps routed tier name → result-group id; allowPlayerResultReorder default true — the Result Order Permission for progressive salvage)
+|  `- salvage definition (enabled: the GM-authorable per-component gate, default FALSE — no migration seeds it, so an existing component with authored resultGroups and no explicit enabled reads as disabled; _normalizeSalvage clamps it to false whenever resultGroups is empty — and, in simple mode, whenever no success group survives the success-first retain-one clamp (issue 764: keep one success group at resultGroups[0], keep at most one reserved role:'failure' group iff salvageCraftingCheck.simple.rollFormula is authored, drop the rest, re-order failure-first input); this is where Component Requirement 5's lower AND simple-mode upper bound is enforced for EVERY writer — GM save, import, copy-mode, migration — never by a UI control's disabled state; toolIds; dcOverride applies only to simple/routed; adjustmentOverride and successesOverride are retained Check Evaluation siblings of dcOverride that the current sum/over runners do not read; outcomeRouting maps routed tier name → result-group id; allowPlayerResultReorder default true — the Result Order Permission for progressive salvage)
 |- tools (system-owned canonical Tool library; the single source all consumers read)
 |- visibilityMode (canonical flat recipe-visibility strategy: global | restricted | item | knowledge; seeded from legacy recipeVisibility by the 1.12.0 migration; supersedes listMode + knowledge.mode)
 |- recipeItemDefinitions
@@ -1367,6 +1367,7 @@ Gathering Environment
    |- timeRequirement
    |- check (LEGACY per-task formula; no longer consulted at runtime — the system-level gatheringCraftingCheck is authoritative; 1.5.0 migration seeds the system check from the first per-task check.formula)
    |- dcOverride (per-task DC shift; applies only to simple/routed; ignored by progressive)
+   |- adjustmentOverride / successesOverride (retained Check Evaluation siblings of dcOverride; not read by the current sum/over runners)
    |- resultGroups (routed: matched by name to the system routed-check outcome tier; no per-task resultSelection provider as of 1.6.0)
    |- progressive config
    `- failureOutcome
