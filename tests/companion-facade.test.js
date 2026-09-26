@@ -515,6 +515,40 @@ describe('AC-14 (facade half) — the delegator forwards NAMED KEYS, never the r
     }
   });
 
+  it('refuses an inherited or getter evaluation and ignores Object.prototype pollution', async () => {
+    const actor = makeGrantTargetActor('actor-1');
+    const fields = { actorId: actor.id, callSite: 'gmAction', formula: '1d20', dc: 15 };
+    let reads = 0;
+    class GetterRequest {
+      get evaluation() {
+        reads += 1;
+        return { product: 'sum' };
+      }
+    }
+    for (const request of [
+      Object.assign(Object.create({ evaluation: { direction: 'under' } }), fields),
+      Object.assign(new GetterRequest(), fields),
+    ]) {
+      const { facade, checkCalls } = standUpFacade({ actors: [actor] });
+      assert.equal((await facade.rollActorCheck(request)).outcome, 'evaluationInvalid');
+      assert.deepEqual(checkCalls.bags, []);
+      assert.equal(checkCalls.prompt, 0);
+    }
+    assert.equal(reads, 0);
+
+    Object.defineProperty(Object.prototype, 'evaluation', {
+      configurable: true,
+      value: { direction: 'under' },
+    });
+    try {
+      const { facade, checkCalls } = standUpFacade({ actors: [actor] });
+      assert.equal((await facade.rollActorCheck({ ...fields })).outcome, 'checkPassed');
+      assert.equal(checkCalls.bags.length, 1);
+    } finally {
+      delete Object.prototype.evaluation;
+    }
+  });
+
   it('forwards evaluation to the real leaf and preserves caller isolation', async () => {
     const actor = makeGrantTargetActor('actor-1');
     const { facade, checkCalls } = standUpFacade({ actors: [actor] });

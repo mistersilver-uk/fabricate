@@ -49,6 +49,26 @@ const ROLL_ACTOR_CHECK_GATE_KEYS = Object.freeze({
   noActorKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
 });
 
+/**
+ * The request's own data `evaluation`, read without invoking an accessor; `null` (which the leaf
+ * refuses after its call-site and roll-decision gates) for an accessor, an inherited key below
+ * `Object.prototype` or a throwing reflection. A key only on `Object.prototype` is pollution.
+ */
+function readRequestEvaluation(request) {
+  try {
+    for (let record = request; record !== null && record !== Object.prototype; ) {
+      const descriptor = Object.getOwnPropertyDescriptor(record, 'evaluation');
+      if (descriptor) {
+        return record === request && Object.hasOwn(descriptor, 'value') ? descriptor.value : null;
+      }
+      record = Object.getPrototypeOf(record);
+    }
+    return;
+  } catch {
+    return null;
+  }
+}
+
 // Each member refuses in its own words, so award and credit keep separate pairs (issue 1301).
 const AWARD_COMPONENTS_GATE_KEYS = Object.freeze({
   gmOnlyKey: COMPONENT_AWARD_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
@@ -248,10 +268,7 @@ export const companionFacade = {
     };
   },
 
-  /**
-   * Roll one formula for one actor, graded or ungraded.
-   * Read `evaluation` without invoking an accessor so the leaf retains its gate ordering.
-   */
+  /** Roll one formula for one actor, graded or ungraded. */
   async rollActorCheck(request = {}) {
     const {
       actorId = null,
@@ -267,14 +284,6 @@ export const companionFacade = {
     if (gate.outcome || this.ready !== true) {
       return checkRollResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
     }
-    // The leaf orders call-site and roll-decision gates ahead of a malformed evaluation.
-    let evaluation;
-    try {
-      const descriptor = Object.getOwnPropertyDescriptor(request, 'evaluation');
-      evaluation = descriptor && !Object.hasOwn(descriptor, 'value') ? null : descriptor?.value;
-    } catch {
-      evaluation = null;
-    }
     return await rollStandaloneActorCheck(
       {
         actor: gate.actor,
@@ -285,7 +294,7 @@ export const companionFacade = {
         label,
         interactive,
         rollDecision,
-        evaluation,
+        evaluation: readRequestEvaluation(request),
       },
       this._companionCheckSeams()
     );
