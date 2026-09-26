@@ -1162,7 +1162,8 @@ The recorded arithmetic meaning of a rolled check, separate from its authored ev
 
 #### Standalone Check Roll
 
-The check-roll MECHANICS published to a companion module that owns no crafting system: `@`-placeholder resolution against the actor's roll data, the retired-placeholder shim, the Advantage/Disadvantage rewrite, the situational-bonus input with its `Roll.validate` net, the roll mode and the chat post, and the pass/fail or raw-total answer.
+The check-roll mechanics published to a companion module that owns no crafting system: actor roll-data resolution, the retired-placeholder shim, roll decisions and chat, with a pass/fail or raw-total answer.
+An optional **Check Evaluation** is validated at this boundary; only advertised executable modes roll, and a rolled answer carries **Executed Check Evidence**.
 **"Standalone" is a claim about the CRAFTING-SYSTEM axis** — the roll stands outside any **Crafting System** — and is **NOT** a claim about the GAME-SYSTEM axis, where Fabricate is agnostic on this path exactly as on every other.
 
 [Notes](docs/domain/terms.md#standalone-check-roll)

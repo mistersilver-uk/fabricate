@@ -1759,6 +1759,8 @@
         "EngineUnavailable": "This client has no dice engine, so the {label} check could not be rolled.",
         "NoFormula": "The {label} check has no usable roll formula, so there is nothing to roll.",
         "InvalidRollDecision": "A roll decision was supplied for a non-interactive {label} check, where it would have been silently discarded and the base formula rolled.",
+        "EvaluationInvalid": "The {label} check has an invalid evaluation configuration.",
+        "EvaluationUnsupported": "The {label} check evaluation is not available in this version of Fabricate.",
         "InvalidCallSite": "A check roll must declare where it is called from, as either a GM action or a broadcast handler.",
         "NotElected": "Another connected GM is the elected executor for this broadcast, so this client did not roll.",
         "GMOnly": "Only a GM can roll a check for an actor.",

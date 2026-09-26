@@ -585,7 +585,8 @@ if (!contract) return;                    // Fabricate has not loaded yet — re
 if (contract.schemaVersion !== 1) return; // A version this companion does not understand.
 ```
 
-The descriptor is frozen data with exactly four fields — `schemaVersion`, `members`, `outcomes`, and `callSites` — and it is assigned when Fabricate's own `init` listener runs, before any service exists.
+The frozen descriptor retains the original `schemaVersion`, `members`, `outcomes` and `callSites` fields, with additive `features` for advertised capabilities.
+It is assigned when Fabricate's own `init` listener runs, before any service exists.
 `outcomes` and `callSites` are both published so you can read a **symbol** rather than write a bare string; `callSites` matters most, because `callSite` is the one required input with no default, and `invalidCallSite` is the whole of a typo's punishment.
 
 {: .warning }
@@ -610,7 +611,7 @@ Every member is declared at exactly one promise tier, and nothing outside this s
 | `getActorInventoryCoinSpender` | `handle` | `game.fabricate` | The coin spender for the `actorInventory` strategy, or `null` before readiness. |
 | `getCraftingEngine` | `handle` | `game.fabricate` | The live crafting engine, or `null` before readiness. |
 | `getCraftingEngine().findComponentItems` | `handle` | the crafting engine | `(actor, component, system)` finds an actor's existing stacks of a component, so an award can **stack** rather than duplicate. See its carve-outs below. |
-| `rollActorCheck` | `stable` | `game.fabricate` | `({ actorId, callSite, formula, dc, compare, label, interactive, rollDecision })` rolls one **Standalone Check Roll** for one actor, graded against a `dc` or ungraded, and answers the total, the dice groups and the resolved formula. GM-gated, call-site-gated, and a dismissed prompt is a refusal rather than a rolled failure. |
+| `rollActorCheck` | `stable` | `game.fabricate` | `({ actorId, callSite, formula, dc, compare, label, interactive, rollDecision, evaluation })` rolls one **Standalone Check Roll** for one actor, graded against a `dc` or ungraded. It answers the total, dice groups, resolved formula and runner-produced evaluation metadata on a rolled outcome. GM-gated, call-site-gated, and a dismissed prompt is a refusal rather than a rolled failure. |
 | `resolveBulkCheckDecision` | `stable` | `game.fabricate` | `({ callSite, formulas })` settles **one** roll decision — situational bonus, roll mode, Advantage — for N rolls the caller will make. It rolls nothing, takes no `actorId`, and answers which of the caller's formulas the decision covers. |
 | `awardComponents` | `stable` | `game.fabricate` | `({ actorId, callSite, systemId, awards })` places components on an actor's sheet, stacking onto what they already hold rather than duplicating it. GM-gated, call-site-gated, **not idempotent**, and it answers one `placements` entry per requested award so partial success is legible. |
 | `creditCurrency` | `stable` | `game.fabricate` | `({ actorId, callSite, unitId, amount })` credits one denomination of the **world** coin ladder to an actor. GM-gated, call-site-gated, **not idempotent**, whole amounts only, and `credited` is `null` wherever Fabricate cannot prove what landed. |
@@ -702,6 +703,31 @@ if (result.passed) applyReward(result.total);
 A legitimate rolled `0` answers `0`, never `null`, so you can always tell a real zero from a refusal.
 `passed` is `true`, `false`, or `null` for an ungraded roll, which is not graded and therefore has no pass.
 `diceGroups` is a list, so its absence is `[]` rather than `null`.
+
+`evaluation` is optional.
+When it is absent or `undefined`, Fabricate uses the shared Check Evaluation defaults.
+When supplied, it must be a plain data record with only recognized keys at every nested level.
+`null` is a supplied value and refuses `evaluationInvalid`.
+Unlike `dc`, `label` and `rollDecision`, it does not mean absent.
+A nested key whose value is `undefined` counts as omitted, so its default applies.
+Fabricate validates every supplied field before applying defaults, without coercing invalid types or replacing invalid values.
+
+Read `game.fabricate.api.companion.features.checkEvaluation` before sending an evaluation.
+This additive `features` field leaves `schemaVersion` at `1`.
+Its shape is `{ version, modes, additionalDice }`: each `modes` row is `{ product, direction, targetSources, interactive }`, and an evaluation is executable when one row matches its `product` and `direction`, lists its `target.source` in `targetSources`, and has `interactive: true` when the roll is interactive.
+`version` names this descriptor's shape, not its rows.
+Activating a mode appends a row without changing it, so match rows rather than comparing versions.
+Today the one row is `{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }` and `additionalDice` is `false`, so additional dice have no standalone execution route.
+On that row the evaluation only selects the mode.
+Fabricate still grades `formula` against `dc` through `compare`, so `target.expression` and the pool settings are validated but never change the roll, and a request without a finite `dc` rolls ungraded.
+Count, under and attribute-target evaluations remain authored data without a standalone route until Fabricate advertises and executes them.
+
+A malformed evaluation returns `evaluationInvalid`.
+A valid evaluation whose mode is absent from the advertised rows returns `evaluationUnsupported`.
+Both outcomes are stable refusals before Fabricate prompts or rolls.
+
+Only `checkPassed`, `checkFailed` and `rolled` results carry executed evaluation metadata from the runner: `product`, `direction`, `comparison`, `target`, `margin`, `successes` and `cancelled`.
+Every refusal omits those fields, including evaluation refusals.
 
 **`callSite` is required and has no default.**
 Nothing in the request or the environment distinguishes your deliberate click from a synced `updateWorldTime` tick, so Fabricate refuses `invalidCallSite` rather than guessing.
