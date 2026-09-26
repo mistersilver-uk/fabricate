@@ -117,7 +117,14 @@ describe('the formula card states what a roll actually resolves to (issue 1096)'
   it('reads the average with every character value taken as zero', async () => {
     const target = await harness.mount({ rollFormula: '1d20 + @abilities.int.mod + 2' });
     // 1d20 averages 10.5, the roll-data term is taken as 0, and the flat +2 is exact.
-    assert.equal(target.querySelector('[data-check-formula-average]').dataset.checkFormulaAverage, '12.5');
+    const average = target.querySelector('[data-check-formula-average]');
+    assert.equal(average.dataset.checkFormulaAverage, '12.5');
+    assert.ok(average.id, 'the reading carries an id');
+    assert.equal(
+      target.querySelector('[data-check-roll-formula]').getAttribute('aria-describedby'),
+      average.id,
+      'the formula input is described by its average reading'
+    );
   });
 
   it('renders a visible and accessible withheld average for transformed formulas', async () => {
@@ -129,19 +136,33 @@ describe('the formula card states what a roll actually resolves to (issue 1096)'
       assert.match(average.textContent, /avg\s*—/, `${formula}: visible avg dash`);
       assert.equal(
         average.querySelector('.visually-hidden').textContent.trim(),
-        lookup('FABRICATE.Admin.Manager.Checks.Odds.ReasonDieModifiers'),
-        `${formula}: the existing odds reason is available without hover`
+        lookup('FABRICATE.Admin.Manager.Checks.Crafting.AverageWithheld'),
+        `${formula}: the withheld reason is available without hover`
       );
+      assert.equal(
+        target.querySelector('[data-check-roll-formula]').getAttribute('aria-describedby'),
+        average.id,
+        `${formula}: the formula input is described by the withheld reading`
+      );
+      assert.ok(!target.querySelector('[data-check-formula-average]'), `${formula}: no numeric reading`);
     }
   });
 
   it('withholds the average rather than guessing one it cannot reduce', async () => {
-    for (const formula of ['', 'not a formula at all']) {
+    for (const formula of ['', 'not a formula at all', '1d20cs>']) {
       harness.remount();
       const target = await harness.mount({ rollFormula: formula });
       assert.ok(
         !target.querySelector('[data-check-formula-average]'),
         `"${formula}" must show no average reading`
+      );
+      assert.ok(
+        !target.querySelector('[data-check-formula-average-withheld]'),
+        `"${formula}" must show no withheld reading either`
+      );
+      assert.ok(
+        !target.querySelector('[data-check-roll-formula]').hasAttribute('aria-describedby'),
+        `"${formula}" describes the input by nothing`
       );
     }
   });

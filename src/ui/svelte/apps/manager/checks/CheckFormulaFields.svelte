@@ -77,10 +77,12 @@
 
   const transformedReason = $derived(
     text(
-      'FABRICATE.Admin.Manager.Checks.Odds.ReasonDieModifiers',
-      'This die carries a modifier (keep, reroll, explode, clamp), which changes the spread of results.'
+      'FABRICATE.Admin.Manager.Checks.Crafting.AverageWithheld',
+      'No average: a die in this formula counts successes, subtracts failures or otherwise changes what its total means, so an average of its faces would mislead.'
     )
   );
+  const uid = $props.id();
+  const averageId = `${uid}-formula-average`;
 
   const DEFAULT_MODIFIER_ICON = 'fas fa-wand-magic-sparkles';
   const applied = $derived(Array.isArray(appliedModifiers) ? appliedModifiers : []);
@@ -130,12 +132,14 @@
       data-check-roll-formula
       data-validation-target="checks-roll-formula"
       aria-label={formulaLabel}
+      aria-describedby={average ? averageId : undefined}
       value={rollFormula || ''}
       {placeholder}
       oninput={(event) => onChange({ rollFormula: event.currentTarget.value })}
     />
     {#if average?.quantity === 'magnitude'}
       <span
+        id={averageId}
         class="manager-checks-formula-average"
         data-check-formula-average={average.value}
         title={text(
@@ -144,16 +148,17 @@
         )}
       >
         {text('FABRICATE.Admin.Manager.Checks.Crafting.Average', 'avg')}
-        <span>{average.value}</span>
+        <span class="manager-checks-formula-average-value">{average.value}</span>
       </span>
     {:else if average?.quantity === 'transformed'}
       <span
+        id={averageId}
         class="manager-checks-formula-average"
         data-check-formula-average-withheld="die-modifiers"
         title={transformedReason}
       >
         {text('FABRICATE.Admin.Manager.Checks.Crafting.Average', 'avg')}
-        <span aria-hidden="true">—</span>
+        <span class="manager-checks-formula-average-value" aria-hidden="true">—</span>
         <span class="visually-hidden">{transformedReason}</span>
       </span>
     {/if}

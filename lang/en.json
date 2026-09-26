@@ -6126,6 +6126,7 @@
             "FormulaLead": "Rolled once per attempt.",
             "Average": "avg",
             "AverageHint": "The average of the dice, with every character value taken as zero — no actor is chosen on this screen.",
+            "AverageWithheld": "No average: a die in this formula counts successes, subtracts failures or otherwise changes what its total means, so an average of its faces would mislead.",
             "ResolvedTitle": "What actually gets rolled",
             "ResolvedNoModifiers": "No check modifiers apply, so the roll is exactly the formula above.",
             "ResolvedAddAll": "Add all — every applied modifier is summed into the roll.",

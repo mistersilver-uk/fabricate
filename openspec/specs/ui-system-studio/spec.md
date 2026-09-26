@@ -188,8 +188,8 @@ The View Lab's `Roll` double carries a `parse` static whose term shape is derive
 A capture job that fails whole now surfaces as a FAILED evidence gate rather than as silent stale evidence: the gate reds instead of passing on the previous head's frames, so the bad case is visible as the failure it is.
 The panel additionally guards a missing or throwing `Roll.parse` as a not-enumerable result rather than a throw.
 
-An `avg N` annotation on the formula field renders the face-sum magnitude of the free-text formula with character paths taken as zero.
-When a die carries `cs`, `cf`, `even`, `odd`, `df`, `sf` or `ms`, the annotation renders visible `avg —`, stamps `data-check-formula-average-withheld="die-modifiers"`, and exposes the localized die-modifier explanation in visually hidden text without requiring hover.
+An `avg N` annotation on the formula field renders the deterministic magnitude average (`reduceRollExpression`) of the free-text formula with character paths taken as zero, set in the mono face and referenced by the formula input's `aria-describedby`.
+When a die or pool carries `cs`, `cf`, `even`, `odd`, `df`, `sf` or `ms`, the annotation renders visible `avg —`, stamps `data-check-formula-average-withheld="die-modifiers"`, and exposes, in visually hidden text that needs no hover, a localized explanation that the average is withheld because the die modifier transforms the total.
 Malformed or irreducible input omits the annotation.
 Magnitude expressions remain deliberately LOOSER than the histogram's predicate — the annotation answers for multi-group and magnitude-modified formulas the histogram abstains from — because it is an annotation on a field the GM is typing in rather than a claim about a distribution.
 Its responsive behaviour reuses the SHIPPED `fabricate-manager` container ladder and introduces no new breakpoint: `styles/fabricate.css` already declares that container with blocks at 1320 / 1120 / 960 / 900 / 831 / 680, and `.fabricate-manager .manager-inspector` already carries `overflow-y: auto; max-height: 100%`.
