@@ -27,9 +27,7 @@ import { chooseSelectOption } from './selectControl.mjs';
  */
 export async function handleRollPromptIfPresent(ctx, label, { timeout = 2500 } = {}) {
   const { page, screenshot } = ctx;
-  const dialog = page
-    .locator('.manager-modal[data-roll-prompt]')
-    .first();
+  const dialog = page.locator('.manager-modal[data-roll-prompt]').first();
   try {
     await dialog.waitFor({ state: 'visible', timeout });
   } catch {
