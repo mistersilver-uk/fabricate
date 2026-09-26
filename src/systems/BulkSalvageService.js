@@ -323,8 +323,11 @@ export class BulkSalvageService {
     const allowAdvantage = usable.every((entry) =>
       hasPlainD20(resolveSalvageCheck(entry.system).rollFormula)
     );
+    const actorNames = new Set(runnable.map((entry) => entry.item.actorName));
     const choice = await this.promptRollDecision({
       allowAdvantage,
+      activity: this._salvageActivity(),
+      actorName: actorNames.size === 1 ? [...actorNames][0] || undefined : undefined,
       count: runnable.length,
       subjects: runnable.map((entry) => ({
         name: entry.item.name,
@@ -347,6 +350,13 @@ export class BulkSalvageService {
         advantage: choice.advantage,
       },
     };
+  }
+
+  /** The prompt heading's activity, localized when the key resolves. */
+  _salvageActivity() {
+    const key = 'FABRICATE.App.Journal.Filters.Kind.Salvage';
+    const label = this.localize(key);
+    return label && label !== key ? label : 'Salvage';
   }
 
   /** Salvage one target, never throwing: a throw becomes an `error` row and the run goes on. */

@@ -20,6 +20,15 @@ import { resolveAlchemySubmissions } from '../utils/alchemySubmissions.js';
 
 import { getGatheringEngine } from './gatheringRuntime.js';
 
+/** Formula flavour such as `[Modifiers]` labels a term for the chat card, not for the prompt. */
+function displayFormula(formula) {
+  if (typeof formula !== 'string') return formula;
+  return formula
+    .replaceAll(/\[[^\]]*\]/g, '')
+    .replaceAll(/\s+/g, ' ')
+    .trim();
+}
+
 /** The entitled Journal descriptor's named display fields are the prompt's only input. */
 export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
   return prompt({
@@ -27,8 +36,8 @@ export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
     actorName: descriptor?.actorName,
     activity: descriptor?.activity,
     img: descriptor?.img,
-    formula: descriptor?.formula,
-    resolvedFormula: descriptor?.resolvedFormula,
+    formula: displayFormula(descriptor?.formula),
+    resolvedFormula: displayFormula(descriptor?.resolvedFormula),
     dc: descriptor?.target,
     comparison: descriptor?.comparison,
     thresholdMode: descriptor?.comparison === 'exceed' ? 'exceed' : null,
@@ -36,6 +45,29 @@ export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
     allowAdvantage: descriptor?.allowAdvantage === true,
     modifierChoice: descriptor?.modifierChoice ?? null,
   });
+}
+
+function localizeOr(key, fallback) {
+  const value = globalThis.game?.i18n?.localize?.(key);
+  return value && value !== key ? value : fallback;
+}
+
+/**
+ * A named gathering prompt carries its activity, as a crafting one already does; a descriptor
+ * without a `label` is a hidden check and keeps the prompt's generic title.
+ */
+export function withPromptActivity(operations, activity) {
+  const describeCheck = operations.describeCheck;
+  if (typeof describeCheck !== 'function') return operations;
+  return {
+    ...operations,
+    describeCheck: async (request) => {
+      const descriptor = await describeCheck(request);
+      const prompt = descriptor?.publicPrompt;
+      if (!prompt?.label || prompt.activity) return descriptor;
+      return { ...descriptor, publicPrompt: { ...prompt, activity: activity() } };
+    },
+  };
 }
 
 async function resolveJournalSourceActors(run, payload = {}, fallbackActor = null) {
@@ -441,12 +473,15 @@ export function createJournalCommandsForFabricate(fabricate) {
     authority,
     operations: {
       crafting: createCraftingJournalOperations(fabricate, () => service),
-      gathering: createGatheringJournalRunOperations({
-        getEngine: () => getGatheringEngine(),
-        runManager: fabricate.gatheringRunManager,
-        getService: () => service,
-        getUser: (userId) => game.users?.get(userId) ?? null,
-      }),
+      gathering: withPromptActivity(
+        createGatheringJournalRunOperations({
+          getEngine: () => getGatheringEngine(),
+          runManager: fabricate.gatheringRunManager,
+          getService: () => service,
+          getUser: (userId) => game.users?.get(userId) ?? null,
+        }),
+        () => localizeOr('FABRICATE.App.Nav.Gathering', 'Gathering')
+      ),
     },
     currentUser: () => game.user,
     activeGM: () => game.users?.activeGM ?? null,

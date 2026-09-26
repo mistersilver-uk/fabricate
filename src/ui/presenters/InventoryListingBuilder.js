@@ -1678,16 +1678,6 @@ export class InventoryListingBuilder {
   }
 
   /**
-   * The salvage DC to DISPLAY, mirroring `CraftingEngine._resolveSalvageDc` — the
-   * per-component override when set, else the check sub-object's default (fallback 15).
-   *
-   * Null for `routed + fixed` and for `progressive`: neither has a DC. This is the
-   * highest-risk line in the projection, because the smoke fixture's routed salvage is
-   * `relative`, so an override-shift applied to everything passes every gate while a
-   * fixed-authored world is shown a routing table the engine will not honour.
-   * @private
-   */
-  /**
    * Project a salvage result group's results for display. Mirrors
    * `CraftingEngine._resolveSalvageResultGroups`'s `allGroups.slice(0, 1)` for simple
    * mode UNDER `disposition: 'success'`, so the list shown is the list the engine awards

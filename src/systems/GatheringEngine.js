@@ -3748,6 +3748,7 @@ export class GatheringEngine {
       const choice = await promptCheckRoll({
         label: `${rollLabel} — Gathering`,
         name: identityHidden ? rollLabel : task?.name,
+        actorName: actor?.name,
         activity: 'Gathering',
         img: identityHidden ? null : task?.img,
       });
