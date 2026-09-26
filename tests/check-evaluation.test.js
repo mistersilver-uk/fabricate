@@ -83,3 +83,55 @@ test('deterministic expressions refuse missing paths, dice, invalid syntax and n
     reason: 'invalid',
   });
 });
+
+test('rankBest sinks non-finite values last in either direction, keeping their authored order', () => {
+  const entries = [
+    { id: 'nan', value: Number.NaN },
+    { id: 'low', value: 2 },
+    { id: 'null', value: null },
+    { id: 'high', value: 9 },
+  ];
+  for (const [direction, expected] of [
+    ['over', ['high', 'low', 'nan', 'null']],
+    ['under', ['low', 'high', 'nan', 'null']],
+  ]) {
+    assert.deepEqual(
+      rankBest(entries, (entry) => entry.value, direction).map((entry) => entry.id),
+      expected
+    );
+  }
+});
+
+test('path tokens that contain a d are paths, not dice, and every dice form is refused', () => {
+  const data = { dc: 12, d20: 4, attributes: { 'spell-dc': 15 } };
+  assert.deepEqual(resolveDeterministicExpression('@dc', data), { ok: true, value: 12 });
+  assert.deepEqual(resolveDeterministicExpression('@{dc}', data), { ok: true, value: 12 });
+  assert.deepEqual(resolveDeterministicExpression('@attributes.spell-dc - @d20', data), {
+    ok: true,
+    value: 11,
+  });
+  for (const dice of ['1d%', 'd20', '4dF', '2 * d6', '@dc + 1d4']) {
+    assert.deepEqual(resolveDeterministicExpression(dice, data), { ok: false, reason: 'dice' }, dice);
+  }
+});
+
+test('a path resolves only an own finite number or decimal string, never a coerced value', () => {
+  assert.deepEqual(resolveDeterministicExpression('@v', { v: ' 7 ' }), { ok: true, value: 7 });
+  assert.deepEqual(resolveDeterministicExpression('@v', { v: '-2.5' }), { ok: true, value: -2.5 });
+  for (const v of [' ', '', null, undefined]) {
+    assert.deepEqual(resolveDeterministicExpression('@v', { v }), {
+      ok: false,
+      reason: 'unresolved-path',
+    });
+  }
+  for (const v of [[], false, true, {}, [7], '0x10', 'Infinity', 'seven']) {
+    assert.deepEqual(resolveDeterministicExpression('@v', { v }), {
+      ok: false,
+      reason: 'non-finite',
+    });
+  }
+  const inherited = Object.create({ v: 3 });
+  assert.equal(resolveDeterministicExpression('@v', inherited).ok, false);
+  assert.equal(resolveDeterministicExpression('@name.length', { name: 'abc' }).ok, false);
+  assert.equal(resolveDeterministicExpression('@toString', {}).ok, false);
+});
