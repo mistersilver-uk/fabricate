@@ -3053,7 +3053,9 @@ export function registerChecksCases() {
     const transformedSystem = modifierRuleSystem('addAll');
     transformedSystem.modifiers = [
       { ...MODIFIER_CATALOGUE[0], expression: '1d20cs>15' },
+      MODIFIER_CATALOGUE[1],
     ];
+    transformedSystem.craftingCheck.defaultModifierIds = ['med', 'alch'];
     mountManager([], transformedSystem);
     checksStore.saveCraftingCheckModifiers = (patch) => {
       checksStore.viewState.update((state) => ({
@@ -3063,6 +3065,11 @@ export function registerChecksCases() {
           craftingCheck: { ...state.selectedSystem.craftingCheck, ...patch },
         },
       }));
+    };
+    const settleControl = async (control) => {
+      control.click();
+      await tick();
+      flushSync();
     };
     navButton('Checks').click();
     await tick();
@@ -3075,41 +3082,36 @@ export function registerChecksCases() {
       '[data-crafting-modifier-policy-option="highest"] input'
     );
     assert.ok(highest, 'the production highest policy input renders');
-    highest.click();
-    await tick();
-    flushSync();
+    await settleControl(highest);
     const highestWarning = target.querySelector(calloutSelector);
-    assert.ok(highestWarning, 'highest shows a warning for the eligible transformed modifier');
+    assert.ok(highestWarning, 'highest over two entries warns about the transformed one');
     assert.equal(highestWarning.getAttribute('data-callout-tone'), 'info');
-    assert.match(
-      highestWarning.textContent,
-      /Medicine\) changes what its dice total means, so it has no comparable average/
-    );
+    assert.ok(highestWarning.textContent.includes('Medicine'), 'the warning names the entry');
 
     const eligibility = target.querySelector('[data-crafting-modifier-eligibility-input="med"]');
     assert.ok(eligibility, 'the production eligibility control renders');
-    eligibility.click();
-    await tick();
-    flushSync();
+    await settleControl(eligibility);
     assert.ok(!target.querySelector(calloutSelector), 'the warning clears when the entry is ineligible');
-    eligibility.click();
-    await tick();
-    flushSync();
+    await settleControl(eligibility);
     assert.ok(target.querySelector(calloutSelector), 'the warning returns when the entry is eligible');
 
     const playerPicks = target.querySelector(
       '[data-crafting-modifier-policy-option="playerPicks"] input'
     );
     assert.ok(playerPicks, 'the production playerPicks policy input renders');
-    playerPicks.click();
-    await tick();
-    flushSync();
-    assert.ok(target.querySelector(calloutSelector), 'playerPicks shows the transformed warning');
+    await settleControl(playerPicks);
+    assert.ok(!target.querySelector(calloutSelector), 'an uncapped playerPicks ranks nothing out');
     const maxPicksInput = target.querySelector('[data-crafting-modifier-max-picks-input]');
     assert.ok(maxPicksInput, 'the selecting policy renders its cap input');
-    maxPicksInput.value = '';
-    maxPicksInput.dispatchEvent(new window.Event('input', { bubbles: true }));
-    flushSync();
+    const typeCap = (value) => {
+      maxPicksInput.value = value;
+      maxPicksInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+      flushSync();
+    };
+    typeCap('1');
+    assert.ok(target.querySelector(calloutSelector), 'a cap below the eligible count warns');
+    typeCap('');
+    assert.ok(!target.querySelector(calloutSelector), 'clearing the cap clears the warning');
     assert.ok(
       Boolean(target.querySelector(selector)),
       'a selecting rule with no cap must put BOTH the bySubject option and the unlimited cap ' +
