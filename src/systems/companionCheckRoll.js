@@ -65,6 +65,7 @@ async function runStandaloneCheck(
     activity: label,
     dc: graded ? dc : undefined,
   });
+  // Fabricate's own prompt owns dismissal, since Foundry's RollResolver fulfils rather than aborts on close; set after the builder so a test seam can inject a dismissing prompt.
   rollOptions.prompt = seams.prompt;
   if (rollDecision) {
     rollOptions.rollDecision = {

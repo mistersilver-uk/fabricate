@@ -798,23 +798,77 @@ describe('evaluation dispatch and executed evidence', () => {
     }
   });
 
-  it('keeps call-site, election and declined-decision refusals ahead of evaluation', async () => {
-    const invalid = { pool: { die: 0 } };
+  it('keeps call-site, election and roll-decision refusals ahead of evaluation', async () => {
     const cases = [
-      [{ callSite: null }, makeSeams().seams, 'invalidCallSite'],
-      [
-        { callSite: 'broadcast' },
-        makeSeams({ isElectedExecutor: () => false }).seams,
-        'notElected',
-      ],
-      [{ interactive: true, rollDecision: { confirmed: false } }, makeSeams().seams, 'cancelled'],
+      [{ callSite: null }, {}, 'invalidCallSite'],
+      [{ callSite: 'broadcast' }, { isElectedExecutor: () => false }, 'notElected'],
+      [{ rollDecision: { bonus: '+1' } }, {}, 'invalidRollDecision'],
+      [{ interactive: true, rollDecision: { confirmed: false } }, {}, 'cancelled'],
     ];
-    for (const [overrides, seams, outcome] of cases) {
-      assert.equal(
-        (await rollActorCheck(request({ evaluation: invalid, ...overrides }), seams)).outcome,
-        outcome
-      );
+    for (const evaluation of [{ pool: { die: 0 } }, { direction: 'under' }]) {
+      for (const [overrides, seamOverrides, outcome] of cases) {
+        const { seams, calls } = makeSeams(seamOverrides);
+        const result = await rollActorCheck(request({ evaluation, ...overrides }), seams);
+        assert.equal(result.outcome, outcome, `${outcome} for ${JSON.stringify(evaluation)}`);
+        assert.deepEqual(calls.prompt, []);
+        assert.deepEqual(calls.runPassFail, []);
+        assert.deepEqual(calls.runProgressive, []);
+      }
     }
+  });
+
+  it('prompts once and meets the DC for an interactive advertised evaluation', async () => {
+    installChat();
+    installRoll({ total: 15 });
+    const { seams, calls } = makeSeams({ real: true });
+    const result = await rollActorCheck(
+      request({
+        dc: 15,
+        compare: 'meet',
+        interactive: true,
+        evaluation: { product: 'sum', direction: 'over', target: { source: 'fixed' } },
+      }),
+      seams
+    );
+    assert.equal(result.outcome, 'checkPassed');
+    assert.equal(calls.prompt.length, 1);
+    assert.deepEqual([result.comparison, result.target, result.margin], ['meet', 15, 0]);
+  });
+
+  it('projects every executed field from the runner data by name', async () => {
+    const diceGroups = [{ faces: 6, results: [] }];
+    const data = {
+      total: 9,
+      diceGroups,
+      resolvedFormula: '3d6cs<=4',
+      product: 'count',
+      direction: 'under',
+      comparison: 'exceed',
+      target: 4,
+      margin: 2,
+      successes: 3,
+      cancelled: 1,
+      value: 99,
+    };
+    const { seams } = makeSeams({
+      runPassFail: async () => ({ success: true, outcome: 'pass', value: 99, data }),
+    });
+    const result = await rollActorCheck(request({ dc: 15 }), seams);
+    assert.equal(result.outcome, 'checkPassed');
+    for (const key of [
+      'total',
+      'resolvedFormula',
+      'product',
+      'direction',
+      'comparison',
+      'target',
+      'margin',
+      'successes',
+      'cancelled',
+    ]) {
+      assert.equal(result[key], data[key], key);
+    }
+    assert.deepEqual(result.diceGroups, diceGroups);
   });
 
   it('projects graded and ungraded evidence from the real shared runners', async () => {
@@ -846,9 +900,10 @@ describe('evaluation dispatch and executed evidence', () => {
         throw new Error('broken options');
       },
     });
-    const result = await rollActorCheck(request({ dc: 15 }), seams);
+    const result = await rollActorCheck(request({ dc: 15, label: 'Forge check' }), seams);
     assert.equal(result.outcome, 'rollFailed');
     assert.equal(result.success, false);
+    assert.equal(result.messageData.label, 'Forge check');
     assert.equal('product' in result, false);
 
     const engine = makeSeams({
