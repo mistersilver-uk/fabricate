@@ -707,13 +707,15 @@ A legitimate rolled `0` answers `0`, never `null`, so you can always tell a real
 `evaluation` is optional.
 When it is absent or `undefined`, Fabricate uses the shared Check Evaluation defaults.
 When supplied, it must be a plain data record with only recognized keys at every nested level.
+`null` is a supplied value and refuses `evaluationInvalid`; unlike `dc`, `label` and `rollDecision`, it does not mean absent.
+A nested key whose value is `undefined` counts as omitted, so its default applies.
 Fabricate validates every supplied field before applying defaults, without coercing invalid types or replacing invalid values.
 
 Read `game.fabricate.api.companion.features.checkEvaluation` before sending an evaluation.
 This additive `features` field leaves `schemaVersion` at `1`.
-Version `1` advertises only the `sum` product, `over` direction and `fixed` target source.
-That mode supports both interactive and non-interactive rolls.
-It advertises `additionalDice: false`, so additional dice have no standalone execution route.
+Its shape is `{ version, modes, additionalDice }`: each `modes` row is `{ product, direction, targetSources, interactive }`, and an evaluation is executable when one row matches its `product` and `direction`, lists its `target.source` in `targetSources`, and has `interactive: true` when the roll is interactive.
+`version` names this descriptor's shape, not its rows; activating a mode appends a row without changing it, so match rows rather than comparing versions.
+Today the one row is `{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }` and `additionalDice` is `false`, so additional dice have no standalone execution route.
 The current activity runners still execute sum/over semantics under their existing simple, routed, and progressive resolution rules.
 Count, under and attribute-target evaluations remain authored data without a standalone route until Fabricate advertises and executes them.
 
