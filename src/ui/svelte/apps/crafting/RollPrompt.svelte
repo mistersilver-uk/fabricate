@@ -351,7 +351,9 @@
     gap: var(--fab-space-chip);
     max-width: 100%;
     box-sizing: border-box;
-    padding: calc(var(--fab-space-2xs) + 1.5px) var(--fab-space-3);
+    /* 25px, the static modifier chip's height, so both chip kinds line up. */
+    min-height: 25px;
+    padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border-strong);
     border-radius: 999px;
     background: var(--fab-bg-2);
@@ -437,7 +439,7 @@
   /* The manager root is a size container, so it is this fixed modal's containing block there and
      `100%` is its height; everywhere else `100%` is the viewport's. */
   :global(.manager-modal.is-banded[data-roll-prompt]) {
-    max-height: min(640px, calc(100% - 32px));
+    max-height: min(640px, calc(100% - (2 * var(--fab-space-4))));
   }
   .prompt-action {
     display: flex;
