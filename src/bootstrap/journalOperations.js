@@ -17,8 +17,55 @@ import {
 import { resolvedComponentsFor } from '../systems/scopedEntityReads.js';
 import { promptCheckRoll } from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { resolveAlchemySubmissions } from '../utils/alchemySubmissions.js';
+import { localizeWith } from '../utils/localizeWithFallback.js';
 
 import { getGatheringEngine } from './gatheringRuntime.js';
+
+/** Formula flavour such as `[Modifiers]` labels a term for the chat card, not for the prompt. */
+function displayFormula(formula) {
+  if (typeof formula !== 'string') return formula;
+  return formula
+    .replaceAll(/\[[^\]]*\]/g, '')
+    .replaceAll(/\s+/g, ' ')
+    .trim();
+}
+
+/** The entitled Journal descriptor's named display fields are the prompt's only input. */
+export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
+  return prompt({
+    name: descriptor?.subject ?? descriptor?.label,
+    actorName: descriptor?.actorName,
+    activity: descriptor?.activity,
+    img: descriptor?.img,
+    formula: displayFormula(descriptor?.formula),
+    resolvedFormula: displayFormula(descriptor?.resolvedFormula),
+    displayFormula: displayFormula(descriptor?.displayFormula),
+    dc: descriptor?.target,
+    comparison: descriptor?.comparison,
+    thresholdMode: descriptor?.comparison === 'exceed' ? 'exceed' : null,
+    selectedModifiers: descriptor?.selectedModifiers,
+    allowAdvantage: descriptor?.allowAdvantage === true,
+    modifierChoice: descriptor?.modifierChoice ?? null,
+  });
+}
+
+/**
+ * A named gathering prompt carries its activity, as a crafting one already does; a descriptor
+ * without a `label` is a hidden check and keeps the prompt's generic title.
+ */
+export function withPromptActivity(operations, activity) {
+  const describeCheck = operations.describeCheck;
+  if (typeof describeCheck !== 'function') return operations;
+  return {
+    ...operations,
+    describeCheck: async (request) => {
+      const descriptor = await describeCheck(request);
+      const prompt = descriptor?.publicPrompt;
+      if (!prompt?.label || prompt.activity) return descriptor;
+      return { ...descriptor, publicPrompt: { ...prompt, activity: activity() } };
+    },
+  };
+}
 
 async function resolveJournalSourceActors(run, payload = {}, fallbackActor = null) {
   const supplied = Array.isArray(payload.sourceActorUuids) ? payload.sourceActorUuids : null;
@@ -423,12 +470,21 @@ export function createJournalCommandsForFabricate(fabricate) {
     authority,
     operations: {
       crafting: createCraftingJournalOperations(fabricate, () => service),
-      gathering: createGatheringJournalRunOperations({
-        getEngine: () => getGatheringEngine(),
-        runManager: fabricate.gatheringRunManager,
-        getService: () => service,
-        getUser: (userId) => game.users?.get(userId) ?? null,
-      }),
+      gathering: withPromptActivity(
+        createGatheringJournalRunOperations({
+          getEngine: () => getGatheringEngine(),
+          runManager: fabricate.gatheringRunManager,
+          getService: () => service,
+          getUser: (userId) => game.users?.get(userId) ?? null,
+        }),
+        () =>
+          localizeWith(
+            (key) => globalThis.game?.i18n?.localize?.(key),
+            'FABRICATE.App.Nav.Gathering',
+            undefined,
+            'Gathering'
+          )
+      ),
     },
     currentUser: () => game.user,
     activeGM: () => game.users?.activeGM ?? null,
@@ -436,13 +492,7 @@ export function createJournalCommandsForFabricate(fabricate) {
     resolveUuid: (uuid) => globalThis.fromUuid?.(uuid),
     emit: (message, options) => game.socket?.emit(EVENT_SCENE_SOCKET, message, options ?? {}),
     randomId: () => foundry.utils.randomID(),
-    promptCheck: (descriptor) =>
-      promptCheckRoll({
-        name: descriptor?.label,
-        activity: descriptor?.label,
-        allowAdvantage: descriptor?.allowAdvantage === true,
-        modifierChoice: descriptor?.modifierChoice ?? null,
-      }),
+    promptCheck: (descriptor) => promptJournalStageCheck(descriptor),
     postRollHandoff: (handoff) => postCheckRollHandoff(handoff),
     getDismissals: () => getSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS),
     setDismissals: (value) => setSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS, value),

@@ -47,7 +47,7 @@ export function knownDebt(gate) {
 export const KNOWN_BARE_FOCUS_SELECTORS = knownDebt('bareFocusSelectors');
 
 /** @see KNOWN_BARE_FOCUS_SELECTORS */
-export const KNOWN_BARE_FOCUS_TOTAL = 22;
+export const KNOWN_BARE_FOCUS_TOTAL = 21;
 
 /** An `@media` query that is not a user preference, keyed `file | query`. */
 export const KNOWN_VIEWPORT_MEDIA_QUERIES = knownDebt('viewportMediaQueries');
@@ -79,7 +79,7 @@ export const KNOWN_OFF_TOKEN_SHADOWS = knownDebt('offTokenShadows');
  *
  * @see KNOWN_OFF_TOKEN_SHADOWS
  */
-export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 26;
+export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 24;
 
 /** A native `<select>` rendered by a Svelte template, keyed `file`. */
 export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
@@ -118,7 +118,7 @@ export const KNOWN_NATIVE_SELECT_TOTAL = 14;
 export const KNOWN_NATIVE_SELECTS_IN_JS = knownDebt('nativeSelectsInDialogBodies');
 
 /** @see KNOWN_NATIVE_SELECTS_IN_JS */
-export const KNOWN_NATIVE_SELECTS_IN_JS_TOTAL = 4;
+export const KNOWN_NATIVE_SELECTS_IN_JS_TOTAL = 3;
 
 /** A corner radius off the published ladder, keyed `file | property | value`. */
 export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
@@ -150,7 +150,7 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
 // Issue 1512: the retired stage-row box (8px) and rocker buttons (4px) took four with them.
 // #1510: the Tool library's sort select took its 8px corner with it; the `inline` rung draws 7px.
 // Issue 1973: the Travel Realms pane dropped its retired card chrome's 8px corner.
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 268;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 266;
 
 /** A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`. */
 export const KNOWN_AREA_SCOPED_STYLE_READS = knownDebt('areaScopedStyleReads');

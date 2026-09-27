@@ -216,7 +216,7 @@ That is a measured FACT about where those importers happen to live, and it MUST 
 The tree still contradicts such a prohibition: `apps/crafting/detail/ProgressiveStageList.svelte` and `apps/inventory/bulk/InventoryBulkComplicationGroup.svelte` both import `apps/manager/ComplicationSummaryRow.svelte` and are reachable from the player application's root.
 The absence of a prohibition is a fact about scope, not about the primitive's directory.
 So an adoption whose primitive still lives in `apps/manager/` is deferred on SCOPE — the move into `components/` with a shared scope is the shape and the mechanism of the change that owns it, and it carries its own path-repair surface — never on reachability.
-After issue 1710 exactly one member row scoped `shared` lives under `apps/manager/`, `ComplicationSummaryRow.svelte`.
+After issue 2021 exactly two member rows scoped `shared` live under `apps/manager/`: `ComplicationSummaryRow.svelte` and `ManagerModal.svelte`, which the player crafting application's roll prompt renders.
 The library's routing rule decides WHICH primitive an adoption wants; the deferral decides only WHEN the move happens, and the two answers are recorded separately.
 `Pagination.svelte:262-270` renders `<Select size="inline">` with no `label`, `hint` or `error`, so `Select.svelte:220` computes `labelled` false and the `<Field as="label">` at `Select.svelte:442-451` never renders.
 That CHAIN, rather than the importer list alone, is what makes the new `.fabricate-field` floor and chrome unreachable in the player application today.
@@ -675,7 +675,7 @@ Focus MUST be expressed as `:focus-visible` and never `:focus`, so a pointer act
 Its one exemption is SUPPRESSING Foundry core's own focus ring, which the global sheet does for ONE root — `.fabricate` itself, the shared module root every Fabricate window emits — and it is recognised by the SHAPE of that block — one root class crossed with a published list of element targets — rather than by naming lines, so appending a seventh selector to an exempt block breaks the shape instead of inheriting the exemption.
 It named five roots until the three interactables windows and the roll-prompt dialog had their copies deleted, and the rule that reduction establishes is general: a per-area copy of a suppression the module root already writes reaches the same elements at the same rank, so which one paints is decided by source order rather than by anything a reader of either block can see, and the copy is deleted by the change that proves the module rule reaches it.
 The licence extends to COPIES and not to VARIANTS.
-Where an area rule declares a DIFFERENT treatment it is not a copy and it survives: the roll-prompt dialog keeps a `:focus-visible` ring of its own on `select`, painting an inset `box-shadow` where the module ring paints an outset `outline`, because an outset ring on a `<select>` flush to that dialog's overflow-clipped edge is clipped and reads as a one-sided flash.
+Where an area rule declares a DIFFERENT treatment it is not a copy and it survives while it has a carrier: the roll-prompt dialog kept a `:focus-visible` ring of its own on `select`, painting an inset `box-shadow` where the module ring paints an outset `outline`, because an outset ring on a `<select>` flush to that dialog's overflow-clipped edge is clipped and reads as a one-sided flash; it went with the dialog when issue 2021 moved the prompt into `ManagerModal`.
 So the dialog left the reset exemption and stayed in the ring population in the same commit, and the ratchet cannot tell the two cases apart on its own — its population is keyed on ELEMENTS, which is the part a variant shares with the rule it varies from, so membership is never a licence to delete.
 Readonly is DISTINCT from disabled: a readonly control takes focus and refuses edit, while a disabled control does not take focus.
 A focus SUPPRESSION and the ring that replaces it are a PAIR, and their element lists MUST stay identical, or an element type is stripped of a ring by the first half and given none by the second.
@@ -1526,7 +1526,7 @@ A shared skin that a conversion appears to strand is NARROWED onto its remaining
 Deleting it early drops a still-shipping control to the platform's own treatment, which is the defect this requirement exists to remove.
 The player app's shared select skin is the first one to reach the end of that rule rather than to be narrowed by it.
 Three rules under `.fabricate-app` themed the closed control, its option list and its focus ring, and all three are DELETED with the app's last native select, because no select is rendered under `.fabricate-app` any more — the shared play-surface class the player window and the three interactables windows all emit.
-That is the rule's reach and therefore the right test: the manager's remaining selects and the four `DialogV2` bodies carry their own skins, the dialog root being `.fabricate-roll-prompt-dialog` and the body root `.fabricate-roll-prompt`, and neither ever inherited this one.
+That is the rule's reach and therefore the right test: the manager's remaining selects and the three `DialogV2` bodies carry their own skins, and neither ever inherited this one.
 The carriers a root's skin answers for are this repository's own markup under that root; a companion module renders its own DOM inside the player host and styles it itself.
 Deletion is right exactly when no carrier is left, and the check is the carrier rather than the calendar.
 
@@ -1536,7 +1536,7 @@ A select there stays native, and the surrounding stylesheet gives the control a 
 There is no second exception by prose.
 A component that states a reason of its own in a docblock is NOT exempt: the precedence order above no longer puts a shipped component's reasoning over this capability, and a reason nothing reads is not a decision anything can act on.
 An element is exempted only by the mechanism `tests/components/design-system-debt-ratchets.test.js` reads — a `<!-- native select: reason -->` marker on the lines above it — or, where the component is a set member, by a `divergent` entry naming the decision that keeps it native.
-The figure is the RATCHET'S PIN rather than a prose count, so it cannot drift from what the gate measures: `KNOWN_NATIVE_SELECT_TOTAL` stands at 14 elements across 4 `.svelte` files, baselined row by row in `tests/components/design-system-known-debt.json`, plus four written into JavaScript dialog bodies.
+The figure is the RATCHET'S PIN rather than a prose count, so it cannot drift from what the gate measures: `KNOWN_NATIVE_SELECT_TOTAL` stands at 14 elements across 4 `.svelte` files, baselined row by row in `tests/components/design-system-known-debt.json`, plus three written into JavaScript dialog bodies.
 Both numerals are asserted against those constants by `tests/components/design-system-debt-ratchets.test.js`, because this sentence has rotted once already.
 It was 100 across 39 before those three shared controls converted, 84 across 33 before the player app's six, 78 across 28 before the manager's settings and tabs, 69 across 26 before the manager's editors and 40 across 16 before its browse screens; no file carries the marker.
 The one component long counted as a stated exception, `InventorySystemSelector.svelte`, carried a DOCBLOCK rather than the marker and was baselined with the rest; it converted at issue 1511 and its docblock reason went with the element it justified, which is what withdrawing that precedence looks like in practice rather than in principle.
@@ -1663,11 +1663,26 @@ This is distinct from a one-shot confirmation, which stays `confirmDialog`, and 
 The modal portals into the application root so it stacks above the window rather than beneath it, and its close control takes an accessible name as a REQUIRED prop, because it renders as an icon alone.
 It dismisses on an outside click; a step that would lose work confirms first.
 
+The interactive roll prompt also renders in this chrome, and it is a decision rather than a flow: one header, a scrolling body and a footer rail of equal actions, drawn as the library's banded Modal.
+It mounts over the Fabricate window the player started the roll from — the one holding focus, or the one under the pointer when the clicked button disabled itself and left focus nowhere — and otherwise over a themed standalone layer on the page, which stays frontmost; it answers as a dismissal when the window hosting it closes.
+Its differences from the flow are additive `ManagerModal` props whose defaults leave every other caller unchanged: a stray outside click never dismisses it, focus enters it, Tab stays inside it, it owns every key while open, Escape and the close control dismiss it, and focus returns to the opener, or to the window hosting it while the opener is still disabled.
+
 #### Scenario: An import needs two steps
 
 - **WHEN** a flow spans more than one step and must complete before the manager continues
 - **THEN** it renders in the shared modal chrome
 - **AND** its close control carries an accessible name
+
+#### Scenario: A roll prompt opens outside every Fabricate window
+
+- **WHEN** a companion or macro opens the roll prompt while focus is outside every Fabricate window
+- **THEN** the prompt renders in the shared modal chrome on a themed standalone layer
+- **AND** closing it removes the layer and returns focus to where it was
+
+#### Scenario: The window hosting a roll prompt closes
+
+- **WHEN** the Fabricate window a roll prompt opened over closes while the prompt is open
+- **THEN** the prompt answers as a dismissal and unmounts
 
 ### Requirement: One blocking notice, and non-blocking notices stack
 

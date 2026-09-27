@@ -21,15 +21,13 @@ import {
 import { chooseSelectOption } from './selectControl.mjs';
 
 /**
- * A UI-triggered craft / immediate-d100 gather now opens the interactive roll prompt (a Foundry
- * DialogV2 carrying `.fabricate-roll-prompt`). A caller that knows the prompt opens passes a longer
- * `timeout`; the default keeps a prompt-less path cheap.
+ * A UI-triggered craft / immediate-d100 gather now opens the interactive roll prompt (Fabricate's
+ * shared modal, `.manager-modal[data-roll-prompt]`). A caller that knows the prompt opens passes a
+ * longer `timeout`; the default keeps a prompt-less path cheap.
  */
 export async function handleRollPromptIfPresent(ctx, label, { timeout = 2500 } = {}) {
   const { page, screenshot } = ctx;
-  const dialog = page
-    .locator('.application.dialog:has(.fabricate-roll-prompt), .dialog:has(.fabricate-roll-prompt)')
-    .first();
+  const dialog = page.locator('.manager-modal[data-roll-prompt]').first();
   try {
     await dialog.waitFor({ state: 'visible', timeout });
   } catch {

@@ -102,6 +102,7 @@ const RAW_MODULES = [
   // harness, whose inline list has no validator.
   'src/systems/characterLibraries.js',
   'src/systems/checkModifierResolver.js',
+  'src/systems/checkModifierRouter.js',
   // …and issue 1094 gave that resolver its first two imports.
   'src/systems/toolCheckBonus.js',
   'src/utils/craftingCheckExpression.js',

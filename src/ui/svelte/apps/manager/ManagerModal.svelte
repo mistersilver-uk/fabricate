@@ -5,6 +5,16 @@
   round close control and the right-aligned footer rail. Everything between header and footer is the
   caller's `body` snippet, which keeps its own style scope, and `rootAttributes` lets a caller keep
   its own stable automation hook on the dialog root without this component knowing the feature.
+
+  Props added for the roll prompt (issue 2021); each default leaves an earlier caller unchanged:
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `closeOnOutsideClick` | boolean | `true` | `false` keeps a stray click from dismissing; Escape still calls `onClose`. |
+  | `trapFocus` | boolean | `false` | Focus enters on open, Tab cycles inside, the modal owns every key, and focus returns to the opener, or the host while the opener is disabled. |
+  | `initialFocus` | selector | `''` | The element `trapFocus` focuses first; the first focusable one when absent. |
+  | `footerLayout` | `'end'` \| `'equal'` | `'end'` | `equal` gives every footer child one equal share of the rail. |
+  | `banded` | boolean | `false` | The design-system Modal: header and footer bands on `--fab-bg-2`, a padded body, a 14px serif title and a 24px close. |
+  | `onSubmit(event)` | function | none | Wraps body and footer in one form; Enter submits through its first submit button. |
 -->
 <script>
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
@@ -22,7 +32,17 @@
     onClose = () => {},
     body = undefined,
     footer = undefined,
+    closeOnOutsideClick = true,
+    trapFocus = false,
+    initialFocus = '',
+    footerLayout = 'end',
+    banded = false,
+    onSubmit = undefined,
   } = $props();
+
+  const FOCUSABLE =
+    'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), ' +
+    'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
   // Resolved from the dialog node UPWARDS, never by querying the document for an application root
   // by name (issue 1466): a `document.querySelector` lookup finds the manager window wherever it
@@ -31,12 +51,99 @@
   function getHost(node) {
     return resolveOverlayHost(node, { component: 'ManagerModal' });
   }
+
+  function focusables(node) {
+    return [...node.querySelectorAll(FOCUSABLE)].filter((element) => !element.closest('[inert]'));
+  }
+
+  function restoreFocus(opener, host) {
+    if (opener?.isConnected && !opener.disabled) {
+      opener.focus?.();
+      return;
+    }
+    if (!host?.isConnected) return;
+    if (!host.hasAttribute('tabindex')) host.tabIndex = -1;
+    host.focus?.();
+  }
+
+  function modalFocus(node, enabled) {
+    if (!enabled) return {};
+    const opener = node.ownerDocument.activeElement;
+    const host = getHost(node);
+    const first = (initialFocus && node.querySelector(initialFocus)) || focusables(node)[0];
+    first?.focus?.();
+    return {
+      destroy() {
+        // A frame later, so an opener the answer's own flow re-enables can take focus back.
+        node.ownerDocument.defaultView.requestAnimationFrame(() => restoreFocus(opener, host));
+      },
+    };
+  }
+
+  // A trapped modal owns the keyboard: Foundry's window-level keybindings read only
+  // `document.activeElement`. Stopped at the document, so Svelte's delegated handlers still run.
+  function ownKeyboard(node, enabled) {
+    if (!enabled) return {};
+    const doc = node.ownerDocument;
+    const stop = (event) => {
+      if (node.contains(event.target)) event.stopPropagation();
+    };
+    doc.addEventListener('keydown', stop);
+    return { destroy: () => doc.removeEventListener('keydown', stop) };
+  }
+
+  function handleKeydown(event) {
+    if (event.isComposing) return;
+    // An expanded control inside, such as an open Select, closes its own list first.
+    const expanded = event.target?.closest?.('[aria-expanded="true"]');
+    if (event.key === 'Escape' && !closeOnOutsideClick && !expanded) {
+      // Foundry's `core.dismiss` would otherwise close every framed window.
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+      return;
+    }
+    if (event.key !== 'Tab' || !trapFocus) return;
+    const inside = focusables(event.currentTarget);
+    if (inside.length === 0) return;
+    const active = event.currentTarget.ownerDocument.activeElement;
+    const edge = event.shiftKey ? inside[0] : inside.at(-1);
+    if (active !== edge && inside.includes(active)) return;
+    event.preventDefault();
+    (event.shiftKey ? inside.at(-1) : inside[0]).focus();
+  }
+
+  // A node listener rather than a delegated handler: it runs before Foundry's window-level one.
+  function modalKeys(node) {
+    node.addEventListener('keydown', handleKeydown);
+    return { destroy: () => node.removeEventListener('keydown', handleKeydown) };
+  }
+
+  function submit(event) {
+    event.preventDefault();
+    onSubmit(event);
+  }
 </script>
+
+{#snippet content()}
+  {#if body && banded}
+    <div class="manager-modal-body">{@render body()}</div>
+  {:else if body}
+    {@render body()}
+  {/if}
+
+  {#if footer}
+    <div class="manager-modal-footer" class:is-equal={footerLayout === 'equal'}>
+      {@render footer()}
+    </div>
+  {/if}
+{/snippet}
 
 {#if open}
   <div class="manager-modal-overlay" data-manager-modal-overlay>
     <div
       class="manager-modal"
+      class:is-banded={banded}
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -44,7 +151,10 @@
       data-manager-modal
       {...rootAttributes}
       use:portal={(node) => getHost(node)}
-      use:dismissOnOutsideClick={{ enabled: open, onDismiss: onClose }}
+      use:dismissOnOutsideClick={{ enabled: open && closeOnOutsideClick, onDismiss: onClose }}
+      use:modalFocus={trapFocus}
+      use:ownKeyboard={trapFocus}
+      use:modalKeys
     >
       <div class="manager-modal-header">
         <div class="manager-modal-heading">
@@ -53,15 +163,20 @@
             <p class="manager-modal-subtitle manager-muted">{subtitle}</p>
           {/if}
         </div>
-        <IconButton data-manager-modal-close="" ariaLabel={closeLabel} onclick={() => onClose()}>
+        <IconButton
+          data-manager-modal-close=""
+          size={banded ? 24 : 'default'}
+          ariaLabel={closeLabel}
+          onclick={() => onClose()}
+        >
           <i class="fas fa-xmark" aria-hidden="true"></i>
         </IconButton>
       </div>
 
-      {#if body}{@render body()}{/if}
-
-      {#if footer}
-        <div class="manager-modal-footer">{@render footer()}</div>
+      {#if onSubmit}
+        <form class="manager-modal-form" novalidate onsubmit={submit}>{@render content()}</form>
+      {:else}
+        {@render content()}
       {/if}
     </div>
   </div>
@@ -106,7 +221,12 @@
 
   .manager-modal-subtitle {
     margin: var(--fab-space-2xs) 0 0;
+    color: var(--fab-text-muted);
     font-size: 0.72rem;
+  }
+
+  .manager-modal-form {
+    display: contents;
   }
 
   .manager-modal-footer {
@@ -114,5 +234,49 @@
     align-items: center;
     justify-content: flex-end;
     gap: var(--fab-space-2);
+  }
+
+  .manager-modal-footer.is-equal > :global(*) {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  /* The library's canonical Modal: banded header and footer around a padded body. */
+  .manager-modal.is-banded {
+    gap: 0;
+    padding: 0;
+    border-radius: 11px;
+    overflow: hidden;
+  }
+
+  .is-banded .manager-modal-header {
+    align-items: center;
+    padding: var(--fab-space-3) calc(var(--fab-space-3) + var(--fab-space-2xs));
+    border-bottom: 1px solid var(--fab-border);
+    background: var(--fab-bg-2);
+  }
+
+  .is-banded .manager-modal-title {
+    font-family: var(--fab-font-serif);
+    font-size: 14px;
+  }
+
+  .is-banded .manager-modal-subtitle {
+    color: var(--fab-text-subtle);
+    font-size: 10.5px;
+    font-weight: 500;
+  }
+
+  .manager-modal-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: calc(var(--fab-space-3) + var(--fab-space-2xs)) var(--fab-space-4);
+  }
+
+  .is-banded .manager-modal-footer {
+    padding: var(--fab-space-3) var(--fab-space-4);
+    border-top: 1px solid var(--fab-border);
+    background: var(--fab-bg-2);
   }
 </style>
