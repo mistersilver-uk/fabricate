@@ -16,13 +16,19 @@ describe('companion check evaluation boundary', () => {
     });
     assert.deepEqual(CHECK_EVALUATION_CAPABILITIES, {
       version: 1,
-      modes: [{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }],
+      modes: [
+        { product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true },
+        { product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: false },
+        { product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false },
+      ],
       additionalDice: false,
     });
     assert.ok(Object.isFrozen(CHECK_EVALUATION_CAPABILITIES));
     assert.ok(Object.isFrozen(CHECK_EVALUATION_CAPABILITIES.modes));
-    assert.ok(Object.isFrozen(CHECK_EVALUATION_CAPABILITIES.modes[0]));
-    assert.ok(Object.isFrozen(CHECK_EVALUATION_CAPABILITIES.modes[0].targetSources));
+    for (const mode of CHECK_EVALUATION_CAPABILITIES.modes) {
+      assert.ok(Object.isFrozen(mode));
+      assert.ok(Object.isFrozen(mode.targetSources));
+    }
   });
 
   it('retains valid inactive fields and supplies defaults for a partial record', () => {
@@ -36,14 +42,27 @@ describe('companion check evaluation boundary', () => {
     const result = resolveCompanionCheckEvaluation(input);
     assert.equal(result.ok, true);
     assert.deepEqual(result.evaluation, normalizeCheckEvaluation(input));
+    // The base row: sum/over/fixed, interactive.
     assert.equal(supportsCompanionCheckEvaluation(result.evaluation, true), true);
-    assert.equal(supportsCompanionCheckEvaluation({ ...result.evaluation, direction: 'under' }), false);
+    // sum/under/fixed and sum/over/attribute are both published, but neither is interactive.
+    assert.equal(supportsCompanionCheckEvaluation({ ...result.evaluation, direction: 'under' }), true);
+    assert.equal(
+      supportsCompanionCheckEvaluation({ ...result.evaluation, direction: 'under' }, true),
+      false
+    );
     assert.equal(supportsCompanionCheckEvaluation({ ...result.evaluation, product: 'count' }), false);
     assert.equal(
       supportsCompanionCheckEvaluation({
         ...result.evaluation,
         target: { ...result.evaluation.target, source: 'attribute' },
       }),
+      true
+    );
+    assert.equal(
+      supportsCompanionCheckEvaluation(
+        { ...result.evaluation, target: { ...result.evaluation.target, source: 'attribute' } },
+        true
+      ),
       false
     );
   });

@@ -42,6 +42,7 @@ import {
 import {
   assertContractResult,
   assertLocalizationKey,
+  assertMessageDataCovers,
   assertMessageIsFromTable,
   localizedString,
 } from './helpers/companionContractOutcomes.js';
@@ -101,6 +102,7 @@ const EXPECTED_OUTCOMES = Object.freeze([
   'invalidRollDecision',
   'evaluationInvalid',
   'evaluationUnsupported',
+  'targetUnresolved',
   'cancelled',
   'invalidCallSite',
   'notElected',
@@ -297,7 +299,11 @@ test('the descriptor publishes versioned evaluation features, frozen', () => {
   assert.ok(Object.isFrozen(COMPANION_CONTRACT.callSites), 'the call-site pair is frozen');
   assert.deepEqual(COMPANION_CONTRACT.features.checkEvaluation, {
     version: 1,
-    modes: [{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }],
+    modes: [
+      { product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true },
+      { product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: false },
+      { product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false },
+    ],
     additionalDice: false,
   });
   assert.ok(Object.isFrozen(COMPANION_CONTRACT.features));
@@ -417,9 +423,21 @@ test('the outcome vocabulary is complete for this schema version and maps token 
   }
 });
 
+// `rollActorCheck`'s table also carries these two, auxiliary to `checkPassed`/`checkFailed`
+// (issue 2003): a target-graded answer keeps that OUTCOME and picks one of these two keys
+// instead of Passed/Failed, so neither is itself a declared outcome token.
+const CHECK_ROLL_AUXILIARY_MESSAGE_KEYS = Object.freeze([
+  'checkPassedTarget',
+  'checkFailedTarget',
+]);
+
 test('every declared outcome is emittable by a member, and every member outcome is declared', () => {
   const declared = new Set(Object.values(COMPANION_OUTCOMES));
-  const emittable = new Set(MEMBER_KEY_TABLES.flatMap(({ keys }) => Object.keys(keys)));
+  const emittable = new Set(
+    MEMBER_KEY_TABLES.flatMap(({ keys }) =>
+      Object.keys(keys).filter((key) => !CHECK_ROLL_AUXILIARY_MESSAGE_KEYS.includes(key))
+    )
+  );
   assert.deepEqual(
     [...declared].filter((outcome) => !emittable.has(outcome)),
     [],
@@ -734,6 +752,7 @@ test('every rollActorCheck refusal answers the WHOLE refusal shape', () => {
     'cancelled',
     'evaluationInvalid',
     'evaluationUnsupported',
+    'targetUnresolved',
   ]) {
     assertContractResult(
       checkRollResult(outcome, { label: 'Fabricate' }),
@@ -797,6 +816,46 @@ test('a legitimate rolled zero answers 0, and never the null a refusal answers',
 
   const refusal = checkRollResult('engineUnavailable', { label: 'Fabricate' });
   assert.equal(refusal.total, null, 'and the two are distinguishable, which is the whole point');
+});
+
+test('a target-graded pass or fail picks the target key over Passed/Failed (issue 2003)', () => {
+  const targetEvidence = {
+    total: 8,
+    product: 'sum',
+    direction: 'under',
+    comparison: 'meet',
+    target: 10,
+    margin: 2,
+    successes: null,
+    cancelled: null,
+    targetGraded: true,
+  };
+  const passed = checkRollResult('checkPassed', { label: 'Fabricate', total: 8, target: 10 }, targetEvidence);
+  assert.equal(passed.message, CHECK_ROLL_MESSAGE_KEYS.checkPassedTarget);
+  assert.equal(passed.outcome, 'checkPassed', 'the OUTCOME stays checkPassed; only the key differs');
+  assertMessageDataCovers(passed, 'a target-graded pass');
+
+  const failed = checkRollResult(
+    'checkFailed',
+    { label: 'Fabricate', total: 12, target: 10 },
+    { ...targetEvidence, total: 12, margin: -2 }
+  );
+  assert.equal(failed.message, CHECK_ROLL_MESSAGE_KEYS.checkFailedTarget);
+  assertMessageDataCovers(failed, 'a target-graded failure');
+
+  // Un-targeted (sum/over/fixed): the plain Passed/Failed key, whatever `messageData` carries.
+  const fixed = checkRollResult(
+    'checkPassed',
+    { label: 'Fabricate', total: 20, dc: 15 },
+    { ...targetEvidence, target: 15, targetGraded: false }
+  );
+  assert.equal(fixed.message, CHECK_ROLL_MESSAGE_KEYS.checkPassed);
+
+  // `targetGraded` is read only for a rolled outcome: a refusal never picks the target key.
+  const refused = checkRollResult('rollFailed', { label: 'Fabricate', detail: '' }, {
+    targetGraded: true,
+  });
+  assert.equal(refused.message, CHECK_ROLL_MESSAGE_KEYS.rollFailed);
 });
 
 test('an ungraded roll has no pass, and a bulk answer derives its own three fields', () => {
