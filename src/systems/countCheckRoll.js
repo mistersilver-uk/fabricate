@@ -51,6 +51,7 @@ export async function evaluateCountCheckRoll(actor, options = {}) {
     resolvedCheck: { formula: '', selected },
     displayFormula: () => null,
     Roll,
+    countPolicy: unrolled.policy,
   });
   if (decision.cancelled) return { ...NO_ENGINE, engine: true, cancelled: true };
   const { placement, rolls: preRolls } = await resolveModifierPreRolls(decision.placementPlan, {
@@ -270,9 +271,19 @@ async function rollCountCheck({ actor, options, label, kind = '', headless }) {
   return { rolled };
 }
 
-/** The runner options a count check rolls with: no DC reaches the prompt or the flavor. */
-function countOptions({ rollOptions, evaluation, thresholdMode, craftingModifier }) {
-  return { ...rollOptions, evaluation, thresholdMode, craftingModifier, dc: null };
+/**
+ * The runner options a count check rolls with: no DC reaches the prompt or the flavor, and the
+ * prompt reads the required count, which a progressive check does not have.
+ */
+function countOptions({ rollOptions, evaluation, thresholdMode, craftingModifier, required }) {
+  return {
+    ...rollOptions,
+    evaluation,
+    thresholdMode,
+    craftingModifier,
+    dc: null,
+    required: required ?? null,
+  };
 }
 
 /** `runFormulaPassFail` for a count check; with no dice engine it passes rather than block. */
@@ -280,7 +291,7 @@ export async function runCountPassFail({ dc: required, triggers, actor, label, .
   const roll = await rollCountCheck({
     actor,
     label,
-    options: countOptions(input),
+    options: countOptions({ ...input, required }),
     headless: { success: true, outcome: 'pass', value: null, data: { dc: null }, message: null },
   });
   return roll.exit ?? gradeCountPassFail(roll.rolled, { required, triggers, label });
@@ -293,7 +304,7 @@ export async function runCountRouted({ dc: required, actor, label, type, ...inpu
     actor,
     label,
     kind: 'routed ',
-    options: countOptions(input),
+    options: countOptions({ ...input, required }),
     headless: {
       success: true,
       outcome: null,

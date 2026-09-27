@@ -4,6 +4,7 @@ import {
   buildInteractiveRollOptions,
   buildSinglePromptData,
   normalizeSituationalBonus,
+  promptBulkCheckRoll,
   promptCheckRoll,
   translatePromptAnswer,
 } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
@@ -171,8 +172,87 @@ describe('roll prompt adapter', () => {
     assert.deepEqual(await received({ direction: 'under' }), { target: 15, direction: 'under', dc: 15 });
     assert.deepEqual(await received({}), { target: 15, direction: 'over', dc: 15 });
     assert.deepEqual(await received({ product: 'count', direction: 'under' }, null), {
-      target: null, direction: null, dc: null,
-    }, 'a count prompt names no direction and no target');
+      target: null, direction: 'under', dc: null,
+    }, 'a count prompt names its per-die direction and no target');
+  });
+
+  it('hands a count prompt its pre-modifier pool, threshold and required count (issue 2004)', async () => {
+    const received = async (evaluation, { required = 3, countPolicy, thresholdMode } = {}) => {
+      let input;
+      await resolveCheckDecision({
+        authoredFormula: '', actor: null, deferred: false, Roll: null,
+        evaluation: normalizeCheckEvaluation({ product: 'count', ...evaluation }),
+        resolvedCheck: { formula: '', selected: [] },
+        displayFormula: () => null,
+        countPolicy,
+        options: {
+          interactive: true, dc: null, required, thresholdMode,
+          prompt: async (payload) => { input = payload; return null; },
+        },
+      });
+      return input;
+    };
+    const policy = { dice: 4, die: 6, threshold: 5, comparison: 'exceed', resolved: { base: 4.9 } };
+    const input = await received(
+      { direction: 'under', pool: { modifierDestination: 'threshold' } },
+      { countPolicy: policy, thresholdMode: 'exceed' }
+    );
+    const { product, direction, comparison, pool, threshold, die, required, modifierDestination } = input;
+    assert.deepEqual(
+      { product, direction, comparison, pool, threshold, die, required, modifierDestination },
+      {
+        product: 'count', direction: 'under', comparison: 'exceed', pool: 4, threshold: 5, die: 6,
+        required: 3, modifierDestination: 'threshold',
+      },
+      'the floored pool the policy resolved, never the unfloored base'
+    );
+    assert.deepEqual([input.dc, input.target, input.formula, input.allowAdvantage], [null, null, '', false]);
+    assert.equal(input.thresholdMode, 'exceed');
+    const bare = await received({}, { required: null });
+    assert.deepEqual(
+      [bare.direction, bare.pool, bare.threshold, bare.die, bare.required, bare.modifierDestination],
+      ['over', null, null, null, null, 'pool'],
+      'no policy and a progressive check name no pool or required count'
+    );
+    const summed = await received({ product: 'sum' });
+    assert.ok(!Object.hasOwn(summed, 'product') && !Object.hasOwn(summed, 'pool'), 'sum adds no count field');
+  });
+
+  it('shows a count prompt its pool line and successes chip, never a formula or DC', async () => {
+    const count = (fields) => open({
+      product: 'count', pool: 6, die: 10, threshold: 8, required: 2, comparison: 'meet',
+      modifierDestination: 'pool', dc: 12, target: 12, formula: '1d20', displayFormula: '1d20', ...fields,
+    }, null);
+    const { view } = await count({ direction: 'over' });
+    assert.equal(view.formula, '6d10 · each ≥ 8');
+    assert.deepEqual([view.dc, view.dcText, view.neededText], [null, '', '2 successes needed']);
+    assert.deepEqual(view.count, { pool: 6, die: 10, threshold: 8, required: 2, destination: 'pool' });
+    assert.equal(view.labels.eachAdds, 'Each adds dice.');
+    assert.equal(
+      view.labels.bonusHelp,
+      'A bonus adds that many dice. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    );
+    const signs = [];
+    for (const direction of ['over', 'under']) {
+      for (const comparison of ['meet', 'exceed']) {
+        signs.push((await count({ direction, comparison, threshold: 7.456 })).view.formula);
+      }
+    }
+    assert.deepEqual(signs, [
+      '6d10 · each ≥ 7.46', '6d10 · each > 7.46', '6d10 · each ≤ 7.46', '6d10 · each < 7.46',
+    ]);
+    const under = (await count({ direction: 'under', modifierDestination: 'threshold', required: 1 })).view;
+    assert.equal(under.direction, 'under');
+    assert.equal(under.neededText, '1 success needed');
+    assert.equal(under.labels.eachAdds, 'Each moves the threshold.');
+    assert.equal(
+      under.labels.bonusHelp,
+      'A bonus moves the threshold by that much. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    );
+    assert.equal((await count({ required: 0 })).view.neededText, '0 successes needed');
+    const progressive = (await count({ required: null })).view;
+    assert.deepEqual([progressive.count.required, progressive.neededText], [null, '']);
+    assert.equal((await count({ comparison: undefined, thresholdMode: 'exceed' })).view.comparison, 'exceed');
   });
 
   it('names a summed roll-under target to stay under, and leaves roll-over copy unchanged', async () => {
@@ -197,6 +277,19 @@ describe('roll prompt adapter', () => {
         'a roll-over prompt keeps its DC copy byte for byte'
       );
       assert.equal(view.labels.formulaNote, undefined, 'a roll-over formula carries no note');
+    }
+  });
+
+  it('names a count row\'s required successes in a bulk batch', async () => {
+    const surface = stubPromptSurface(() => null);
+    try {
+      await promptBulkCheckRoll({ subjects: [
+        { name: 'Ore', need: { kind: 'successes', count: 3 } },
+        { name: 'Scrap', need: { kind: 'dc', dc: 12 } },
+      ] });
+      assert.deepEqual(surface.view.subjects.map((row) => row.needText), ['3 needed', 'DC 12']);
+    } finally {
+      surface.restore();
     }
   });
 

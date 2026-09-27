@@ -991,6 +991,43 @@ test('count/under fixed ranges rank and gate by higher net, and a net below ever
   );
 });
 
+test('the interactive count prompt reads the pre-modifier pool and each runner\'s required count', async () => {
+  const prompted = [];
+  const rollOptions = {
+    interactive: true,
+    prompt: async (input) => {
+      prompted.push(input);
+      return { confirmed: true, bonus: '1' };
+    },
+  };
+  const actor = { getRollData: () => ({ skills: { smith: { rank: 3.6 } } }) };
+  const evaluation = normalized({ base: '@skills.smith.rank', threshold: '5', modifierDestination: 'threshold' }, 'under');
+  const shared = { formula: '1d20', actor, evaluation, rollOptions, thresholdMode: 'exceed' };
+  const routing = { type: 'relative', relativeOutcomes: LADDER, fixedOutcomes: [], clampToNearest: true };
+  await withDice([1, 2, 3, 1, 2, 3, 1, 2, 3], async (dice) => {
+    await runFormulaPassFail({ ...shared, dc: 2 });
+    await runFormulaRouted({ ...shared, dc: 4, ...routing });
+    await runFormulaProgressive({ ...shared, dc: 7 });
+    assert.deepEqual(dice.formulas(), ['3d10', '3d10', '3d10'], 'the bonus moved the threshold, not the pool');
+  });
+  const fields = ({ product, direction, comparison, pool, threshold, die, required, modifierDestination }) => ({
+    product, direction, comparison, pool, threshold, die, required, modifierDestination,
+  });
+  const expected = {
+    product: 'count', direction: 'under', comparison: 'exceed', pool: 3, threshold: 5, die: 10,
+    modifierDestination: 'threshold',
+  };
+  assert.deepEqual(prompted.map(fields), [
+    { ...expected, required: 2 },
+    { ...expected, required: 4 },
+    // The progressive runner takes no threshold mode, so it compares as it rolls: met.
+    { ...expected, comparison: 'meet', required: null },
+  ], 'the pool 3.6 shows rounded down, and a progressive check needs no count');
+  for (const input of prompted) {
+    assert.deepEqual([input.dc, input.target, input.formula, input.allowAdvantage], [null, null, '', false]);
+  }
+});
+
 test('a zero pool fails in every mode with no Roll and no triggers, even needing nothing', async () => {
   const zero = normalized({ base: '0', required: 0 });
   const triggers = [

@@ -1,5 +1,6 @@
 /** The single and bulk check prompt: view preparation, the modal surface and answer translation. */
 import { dcFlavorSuffix } from '../../../../systems/checkTarget.js';
+import { countFormulaValues } from '../../../../systems/countEvaluation.js';
 
 import { openRollPromptModal } from './rollPromptHost.js';
 import { fill } from './rollPromptTarget.js';
@@ -71,6 +72,7 @@ function copy() {
     better: promptLabel('KeepBetter', 'keep the better'),
     dcValue: promptLabel('DcValue', 'DC {dc}'),
     targetValue: promptLabel('TargetValue', 'Target {target}'),
+    countNeed: promptLabel('CountNeed', '{count} needed'),
     roll: promptLabel('roll', 'Roll'),
     advantage: promptLabel('advantage', 'Advantage'),
     disadvantage: promptLabel('disadvantage', 'Disadvantage'),
@@ -143,10 +145,52 @@ function underCopy() {
   };
 }
 
+/** A count check's wording: every modifier and bonus adds dice or moves the threshold. */
+function countCopy(destination) {
+  const threshold = destination === 'threshold';
+  return {
+    eachAdds: threshold
+      ? promptLabel('EachMovesThreshold', 'Each moves the threshold.')
+      : promptLabel('EachAddsDice', 'Each adds dice.'),
+    bonusHelp: threshold
+      ? promptLabel(
+          'BonusHelpThreshold',
+          'A bonus moves the threshold by that much. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+        )
+      : promptLabel(
+          'BonusHelpDice',
+          'A bonus adds that many dice. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+        ),
+  };
+}
+
 function needText(need, labels) {
   if (need?.kind === 'dc') return fill(labels.dcValue, { dc: need.dc });
   if (need?.kind === 'target') return fill(labels.targetValue, { target: need.target });
+  if (need?.kind === 'successes') return fill(labels.countNeed, { count: need.count });
   return need?.kind === 'noSingleTarget' ? labels.noSingleTarget : labels.noCheck;
+}
+
+/** The count formula line, `{pool}d{die} · each ≥ {threshold}`, and its successes chip. */
+function countText(data) {
+  const { pool, die, threshold, required } = data.count;
+  const resolved = [pool, die, threshold].every(Number.isFinite);
+  const { direction, comparison } = data;
+  let neededText = '';
+  if (required === 1) neededText = promptLabel('CountNeededOne', '1 success needed');
+  else if (required !== null) {
+    neededText = fill(promptLabel('CountNeeded', '{count} successes needed'), { count: required });
+  }
+  return {
+    formula: resolved
+      ? fill(
+          promptLabel('CountFormula', '{pool}d{die} · each {comparison} {threshold}'),
+          countFormulaValues({ dice: pool, die, threshold, direction, comparison })
+        )
+      : '',
+    dcText: '',
+    neededText,
+  };
 }
 
 function targetText(data, labels) {
@@ -157,11 +201,16 @@ function targetText(data, labels) {
 }
 
 /** The target, bulk-need and pick-cap copy, formatted here so the component renders strings only. */
+function labelsFor(data) {
+  if (data.count) return { ...copy(), ...countCopy(data.count.destination) };
+  return data.direction === 'under' ? { ...copy(), ...underCopy() } : copy();
+}
+
 function formatCopy(data, choicePlan) {
-  const labels = data.direction === 'under' ? { ...copy(), ...underCopy() } : copy();
+  const labels = labelsFor(data);
   const formatted = {
     labels: { ...labels, pickUpTo: fill(labels.pickUpTo, { count: choicePlan.maxPicks }) },
-    dcText: targetText(data, labels),
+    ...(data.count ? countText(data) : { dcText: targetText(data, labels) }),
   };
   if (Array.isArray(data.subjects)) {
     formatted.subjects = data.subjects.map((subject) => ({
@@ -200,10 +249,22 @@ function rollsUnder(need) {
   return need?.kind === 'target' || (need?.kind === 'noSingleTarget' && need.direction === 'under');
 }
 
+/** A count check's view: the pre-modifier pool, per-die threshold and required count. */
+function countPromptView({ pool, die, threshold, required, modifierDestination }) {
+  return {
+    pool: Number.isFinite(pool) ? pool : null,
+    die: Number.isFinite(die) ? die : null,
+    threshold: Number.isFinite(threshold) ? threshold : null,
+    required: Number.isInteger(required) ? required : null,
+    destination: modifierDestination === 'threshold' ? 'threshold' : 'pool',
+  };
+}
+
 /**
  * `displayFormula` is the producer's base without the itemised modifier terms, shown as chips.
  * `target` (else `dc`) is the pre-modifier number; `direction: 'under'` names it a target, which
- * `targetBasis` and `toolBonus` explain (see `rollPromptTarget`).
+ * `targetBasis` and `toolBonus` explain (see `rollPromptTarget`). A `product: 'count'` check shows
+ * its pool line and required count instead of any formula or DC.
  */
 export function buildSinglePromptData({
   formula,
@@ -221,6 +282,12 @@ export function buildSinglePromptData({
   comparison,
   targetBasis = null,
   toolBonus = 0,
+  product,
+  pool,
+  die,
+  threshold,
+  required,
+  modifierDestination,
 } = {}) {
   const title = fill(promptLabel('CheckTitle', '{activity} check'), {
     activity: activity || promptLabel('roll', 'Roll'),
@@ -233,6 +300,20 @@ export function buildSinglePromptData({
           subject: name,
         })
       : actorName || name || '';
+  if (product === 'count') {
+    return {
+      kind: 'single',
+      title,
+      subtitle,
+      img: img || '',
+      formula: '',
+      dc: null,
+      direction: direction === 'under' ? 'under' : 'over',
+      comparison: (comparison ?? thresholdMode) === 'exceed' ? 'exceed' : 'meet',
+      selectedModifiers: Array.isArray(selectedModifiers) ? selectedModifiers : [],
+      count: countPromptView({ pool, die, threshold, required, modifierDestination }),
+    };
+  }
   const under = direction === 'under' && Number.isFinite(value);
   return {
     kind: 'single',

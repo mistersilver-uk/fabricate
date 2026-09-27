@@ -6,6 +6,7 @@
 import { isPlainObject } from '../utils/scalars.js';
 
 import {
+  countFormulaValues,
   explodesOnEveryFace,
   extremeFace,
   MAX_COUNT_POOL,
@@ -205,18 +206,9 @@ function markResult(result, { qualified, cancelled, contribution }) {
   result.count = contribution;
 }
 
-const COMPARISON_SIGNS = { over: { meet: '≥', exceed: '>' }, under: { meet: '≤', exceed: '<' } };
-
 function describeCountRoll({ policy }, i18n) {
-  const { dice, die, direction, comparison, threshold, explode, cancel } = policy;
-  const clauses = [
-    format(i18n, 'FABRICATE.Check.CountRoll.Pool', {
-      pool: dice,
-      die,
-      comparison: COMPARISON_SIGNS[direction][comparison],
-      threshold: Number(threshold.toFixed(2)),
-    }),
-  ];
+  const { die, direction, explode, cancel } = policy;
+  const clauses = [format(i18n, 'FABRICATE.Check.CountRoll.Pool', countFormulaValues(policy))];
   if (explode && !beyondDie(explode, die)) {
     const key = explode.once
       ? 'FABRICATE.Check.CountRoll.ExplodeOnce'

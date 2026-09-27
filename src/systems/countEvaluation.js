@@ -109,6 +109,19 @@ export function countCheckPasses({ policy, net, required }) {
   return !policy.zeroPool && Number.isFinite(net) && net >= required;
 }
 
+const COMPARISON_SIGNS = { over: { meet: '≥', exceed: '>' }, under: { meet: '≤', exceed: '<' } };
+
+/** The values a `{pool}d{die} · each {comparison} {threshold}` formula line shows. */
+export function countFormulaValues({ dice, die, direction, comparison, threshold }) {
+  const signs = COMPARISON_SIGNS[direction === 'under' ? 'under' : 'over'];
+  return {
+    pool: dice,
+    die,
+    comparison: signs[comparison === 'exceed' ? 'exceed' : 'meet'],
+    threshold: Number.isFinite(threshold) ? Number(threshold.toFixed(2)) : threshold,
+  };
+}
+
 /** The pool shortfall against the required count, not a proof that the check cannot pass. */
 export function minimumAdditionalDice({ required, dice }) {
   return Math.max(0, required - dice);

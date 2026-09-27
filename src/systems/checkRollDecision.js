@@ -78,6 +78,24 @@ export function underTargetPromptFields(
   };
 }
 
+/**
+ * A count prompt's fields: the pre-modifier pool and threshold from the pool resolved before the
+ * prompt opens (`policy`, or null), and the required count, or null for a progressive check.
+ */
+export function countPromptFields(evaluation, policy, required) {
+  return {
+    product: 'count',
+    direction: evaluation.direction === 'under' ? 'under' : 'over',
+    comparison: policy?.comparison ?? null,
+    pool: policy?.dice ?? null,
+    threshold: policy?.threshold ?? null,
+    die: policy?.die ?? null,
+    required: Number.isFinite(required) ? required : null,
+    modifierDestination:
+      evaluation.pool?.modifierDestination === 'threshold' ? 'threshold' : 'pool',
+  };
+}
+
 function promptInput({
   authoredFormula,
   actor,
@@ -86,6 +104,7 @@ function promptInput({
   resolvedCheck,
   displayFormula,
   deferred,
+  countPolicy,
 }) {
   // A count check shows no formula, so no bare deferred slot either (issue 2004).
   const formula =
@@ -113,6 +132,8 @@ function promptInput({
     thresholdMode: options.thresholdMode === 'exceed' ? 'exceed' : 'meet',
     // A count check offers no advantage until it is mode-aware (issue 2007).
     allowAdvantage: evaluation.product !== 'count' && hasPlainD20(authoredFormula.trim()),
+    ...(evaluation.product === 'count' &&
+      countPromptFields(evaluation, countPolicy, options.required)),
   };
 }
 
@@ -153,7 +174,8 @@ function applySituationalBonus(formula, rawBonus, evaluation, Roll) {
 
 /**
  * The prompt returns a decision, but never determines the selected modifier data directly.
- * `deferred` means the offered `modifierChoice` is selected by that decision.
+ * `deferred` means the offered `modifierChoice` is selected by that decision; a count check
+ * passes the `countPolicy` its pool resolved to before the prompt.
  */
 export async function resolveCheckDecision({
   authoredFormula,
@@ -164,6 +186,7 @@ export async function resolveCheckDecision({
   resolvedCheck,
   displayFormula,
   Roll,
+  countPolicy = null,
 }) {
   let formula = resolvedCheck.formula;
   let flavor = options?.flavor;
@@ -185,6 +208,7 @@ export async function resolveCheckDecision({
           resolvedCheck,
           displayFormula,
           deferred,
+          countPolicy,
         })
       ));
     if (!choice || choice.confirmed === false) return { cancelled: true };
