@@ -1494,6 +1494,34 @@ describe('journal run command protocol', () => {
     }
   });
 
+  it('keeps a run command identified by its request, whatever operationId the payload names', async () => {
+    const seen = [];
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      authority: {
+        availability: () => ({ available: true, reason: null }),
+        run: async (request) => (seen.push(request), { success: true }),
+      },
+    });
+    await service.handleRequest(
+      {
+        requestId: 'r1',
+        operationId: 'Forged0000000001',
+        sessionId: 's1',
+        actorUuid: 'Actor.a',
+        runType: 'crafting',
+        runId: 'run-1',
+        expectedRevision: 3,
+        action: 'execute',
+      },
+      'player'
+    );
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].operationId, undefined, 'the authority defaults it to the request id');
+    assert.equal(seen[0].requestId, 'r1');
+    assert.equal(seen[0].senderId, 'player');
+  });
+
   it('rejects stale revision before invoking an operation', async () => {
     const { service } = commandHarness({ currentUserId: 'gm' });
     const reply = await service.handleRequest(

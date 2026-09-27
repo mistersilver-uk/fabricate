@@ -1,5 +1,6 @@
 import { forcedDeletionEntry, isSafeFlagKeySegment } from '../config/flags.js';
 
+import { createFoundryLedgerReads, createHeldClaimContext } from './journalRunHeldClaim.js';
 import {
   createJournalRunLedgerProvisioner,
   createLedgerRetry,
@@ -168,6 +169,11 @@ function claimedLedgerWriter({ ledger, claimId, requestId, writeLedgerState, cla
  * @param {Function} deps.writeState `async (ledger, state) => void`.
  * @param {Function} deps.createClaim `async (ledger, source) => claim|null` with exclusive creation.
  * @param {Function} deps.readClaim `async (ledger) => {claimId, requestId, acquiredAt}|null`.
+ * @param {Function} [deps.readAuthoritativeLedger] `async (ledgerId) => {status: 'available',
+ *   ledger}|{status: 'unavailable'}`, the server copy of one ledger with its pages. Without it no
+ *   claim can be verified, so every held-claim check fails closed.
+ * @param {Function} [deps.hasLedgerEvidence] `async (ledger) => boolean|null`, whether a ledger
+ *   holds any embedded page, for pristine arbitration; `null` when unanswered.
  * @param {Function} deps.deleteClaim `async (ledger, claimId) => boolean`, matching the exact claim.
  * @param {Function} deps.reconstructExecutions `async ({operationId, orphaned}) => {success}`.
  * @param {Function} deps.randomId Secure nonempty ID supplier.
@@ -189,6 +195,8 @@ export function createJournalRunAuthority({
   createClaim,
   readClaim,
   deleteClaim,
+  readAuthoritativeLedger = null,
+  hasLedgerEvidence = null,
   reconstructExecutions,
   randomId,
   now = () => Date.now(),
@@ -229,6 +237,7 @@ export function createJournalRunAuthority({
     deleteLedger,
     readState,
     readClaim,
+    hasLedgerEvidence,
     canCreateLedger,
     ledgerSource: newLedgerSource,
   });
@@ -535,6 +544,21 @@ export function createJournalRunAuthority({
     return { success: true, ledger, claimId };
   }
 
+  /**
+   * The context a handler proves its claim with; `operationId` on the request record is the
+   * logical operation a retry keeps while its transport request and session change.
+   */
+  function heldClaimFor(writer, claimId, requestId) {
+    return createHeldClaimContext({
+      writer,
+      claimId,
+      requestId,
+      readAuthoritativeLedger,
+      readClaim,
+      isElected: () => activeGmMatches(currentUser?.(), activeGM?.()),
+    });
+  }
+
   function tokenHelpers({ state, request, persist }) {
     return {
       issuePrepareToken: (binding, { expiresAt } = {}) =>
@@ -612,7 +636,7 @@ export function createJournalRunAuthority({
 
       state.requests[request.requestId] = {
         kind: 'command',
-        operationId: request.requestId,
+        operationId: request.operationId ?? request.requestId,
         status: 'processing',
         senderId: request.senderId,
         sessionId: request.sessionId,
@@ -633,6 +657,7 @@ export function createJournalRunAuthority({
       try {
         response = await handler({
           ...helpers,
+          heldClaim: heldClaimFor(writer, claimId, request.requestId),
           createExecutionGrant: (binding) =>
             createGrant({ ...binding, requestId: request.requestId, senderId: request.senderId }),
         });
@@ -712,7 +737,9 @@ export function createJournalRunAuthority({
       const scope =
         prior.kind === 'bootRecovery'
           ? { operationId: null, orphaned: true }
-          : { operationId: prior.operationId ?? requestId, orphaned: false };
+          : // Run reconstruction is keyed by the run command's request, which a companion
+            // operation's logical id is not.
+            { operationId: requestId, orphaned: false };
       try {
         const result = await reconstruct(scope);
         if (result.success !== true) throw new Error(result.reason);
@@ -819,6 +846,8 @@ export function createFoundryJournalRunAuthority({
       createdTime: Number(entry._stats?.createdTime) || 0,
     }));
   };
+  const { readAuthoritativeLedger, hasLedgerEvidence } =
+    createFoundryLedgerReads(authoritativeEntries);
   /**
    * Read ONE ledger's claim page from the SERVER, not from the broadcast-fed local copy. Scoped
    * by `_id` so an ordinary release ships one entry rather than the whole journal, and re-checked
@@ -933,6 +962,8 @@ export function createFoundryJournalRunAuthority({
         return after !== null && !after.present;
       }
     },
+    readAuthoritativeLedger,
+    hasLedgerEvidence,
     reconstructExecutions,
     randomId,
     now,

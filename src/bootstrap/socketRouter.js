@@ -6,6 +6,7 @@
 import { InteractableManager } from '../canvas/InteractableManager.js';
 import { handleInteractableSocketMessage } from '../canvas/interactableSocketBridge.js';
 import { applyBulkChatVisibility } from '../systems/bulkChatVisibility.js';
+import { COMPANION_OPERATION_SOCKET_KIND } from '../systems/companionOperationAuthority.js';
 import {
   buildGmComplicationCardContent,
   gmComplicationCardEntries,
@@ -395,6 +396,15 @@ export function installSocketRouter(io) {
     ) {
       Promise.resolve(fabricate.journalRunCommands?.handleSocketMessage(payload, senderId)).catch(
         (error) => console.error('Fabricate | Journal run socket command failed', error)
+      );
+    }
+    // GM-only: the handler authenticates the attested sender and answers only the elected GM.
+    if (
+      payload?.kind === COMPANION_OPERATION_SOCKET_KIND.REQUEST ||
+      payload?.kind === COMPANION_OPERATION_SOCKET_KIND.REPLY
+    ) {
+      Promise.resolve(fabricate.companionOperations?.handleSocketMessage(payload, senderId)).catch(
+        (error) => console.error('Fabricate | Companion operation socket message failed', error)
       );
     }
     try {

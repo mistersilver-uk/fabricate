@@ -232,6 +232,12 @@ function sharedAuthorityWorld() {
       // this is the seam that drives a genuine CHAIN rejection rather than a handled failure.
       beforeList = null,
       queueWaitMs = undefined,
+      // The server copy of one ledger; the fake's single store is already authoritative.
+      readAuthoritativeLedger = async (ledgerId) =>
+        server.has(ledgerId)
+          ? { status: 'available', ledger: server.get(ledgerId) }
+          : { status: 'unavailable' },
+      hasLedgerEvidence = null,
     } = {}
   ) =>
     createJournalRunAuthority({
@@ -277,6 +283,8 @@ function sharedAuthorityWorld() {
       randomId: () => `id-${++nextId}`,
       now: () => currentTime,
       queueWaitMs,
+      readAuthoritativeLedger,
+      hasLedgerEvidence,
       reconstructExecutions,
       onAvailabilityRestored,
     });
@@ -1894,6 +1902,160 @@ describe('journal run authority ledger', () => {
     );
     assert.equal(response.reason, 'operation-failed', JSON.stringify(response));
     assert.match(response.message, /handler exploded/);
+  });
+
+  it('records the logical operation identity, defaulting to the request for run callers', async () => {
+    const world = sharedAuthorityWorld();
+    const authority = world.realm();
+    await authority.run({ requestId: 'legacy', senderId: 'gm', sessionId: 'one' }, async () => ({
+      success: true,
+    }));
+    await authority.run(
+      { requestId: 'retry-2', operationId: 'Operation0000001', senderId: 'gm', sessionId: 'two' },
+      async () => ({ success: true })
+    );
+    const { requests } = world.ledger.state;
+    assert.equal(requests.legacy.operationId, 'legacy', 'an omitted operationId is the request');
+    assert.equal(requests['retry-2'].operationId, 'Operation0000001');
+    assert.equal(requests['retry-2'].sessionId, 'two', 'request and session stay their own');
+  });
+
+  it('hands the handler the exact held claim and verifies it against the server copy', async () => {
+    const world = sharedAuthorityWorld();
+    let elected = true;
+    const authority = world.realm('gm', {
+      getActiveGM: () => (elected ? { id: 'gm', isGM: true } : { id: 'other', isGM: true }),
+    });
+    const observed = [];
+    await authority.run({ requestId: 'held', senderId: 'gm', sessionId: 'one' }, async (helpers) => {
+      const { heldClaim } = helpers;
+      assert.ok(Object.isFrozen(heldClaim));
+      assert.equal(heldClaim.ledger, world.ledger, 'the exact live ledger the claim is on');
+      assert.equal(heldClaim.requestId, 'held');
+      assert.equal(heldClaim.claimId, world.ledger.claim.claimId);
+      assert.deepEqual(await heldClaim.readAuthoritativeLedger(world.ledger.id), {
+        status: 'available',
+        ledger: world.ledger,
+      });
+      observed.push(['held', await heldClaim.claimStillHeld()]);
+
+      const original = world.ledger.claim;
+      world.ledger.claim = { ...original, requestId: 'another-request' };
+      observed.push(['request mismatch', await heldClaim.claimStillHeld()]);
+      world.ledger.claim = { ...original, claimId: 'replacement' };
+      observed.push(['replaced', await heldClaim.claimStillHeld()]);
+      world.ledger.claim = null;
+      observed.push(['removed', await heldClaim.claimStillHeld()]);
+      world.ledger.claim = original;
+      elected = false;
+      observed.push(['election lost', await heldClaim.claimStillHeld()]);
+      elected = true;
+      observed.push(['restored', await heldClaim.claimStillHeld()]);
+      return { success: true };
+    });
+    assert.deepEqual(observed, [
+      ['held', true],
+      ['request mismatch', false],
+      ['replaced', false],
+      ['removed', false],
+      ['election lost', false],
+      ['restored', true],
+    ]);
+  });
+
+  it('fails the held-claim check closed whenever the server copy cannot be read', async () => {
+    for (const [label, readAuthoritativeLedger] of [
+      ['a rejection', async () => Promise.reject(new Error('socket closed'))],
+      ['an unavailable answer', async () => ({ status: 'unavailable' })],
+      ['a different ledger', async () => ({ status: 'available', ledger: { id: 'elsewhere' } })],
+      ['no reader at all', null],
+    ]) {
+      const world = sharedAuthorityWorld();
+      const authority = world.realm('gm', { readAuthoritativeLedger });
+      let held;
+      let read;
+      await authority.run({ requestId: 'r', senderId: 'gm', sessionId: 's' }, async (helpers) => {
+        held = await helpers.heldClaim.claimStillHeld();
+        read = await helpers.heldClaim.readAuthoritativeLedger(world.ledger.id);
+        return { success: true };
+      });
+      assert.equal(held, false, label);
+      assert.deepEqual(read, { status: 'unavailable' }, label);
+    }
+  });
+
+  it('never deletes a duplicate ledger holding operation or unrecognised pages', async () => {
+    const world = sharedAuthorityWorld();
+    world.addLedger();
+    const evidence = world.addLedger();
+    evidence.pages = 1;
+    const gm = world.realm('gm', { hasLedgerEvidence: async (ledger) => (ledger.pages ?? 0) > 0 });
+    assert.deepEqual(await gm.bootstrapRecovery(), { success: true });
+    assert.deepEqual(
+      world.ledgers().map((entry) => entry.id),
+      [evidence.id],
+      'the page-bearing ledger outranks the empty one, which alone is deleted'
+    );
+
+    const ambiguous = sharedAuthorityWorld();
+    ambiguous.addLedger().pages = 1;
+    ambiguous.addLedger().pages = 1;
+    const judge = ambiguous.realm('gm', {
+      hasLedgerEvidence: async (ledger) => (ledger.pages ?? 0) > 0,
+    });
+    assert.deepEqual(await judge.bootstrapRecovery(), {
+      success: false,
+      reason: 'ledger-ambiguous',
+    });
+    assert.equal(ambiguous.ledgers().length, 2, 'two evidence-bearing ledgers need a person');
+  });
+
+  it('treats an unanswered page inspection as unsettled, never as permission to delete', async () => {
+    for (const [label, hasLedgerEvidence] of [
+      ['a null answer', async () => null],
+      ['a rejection', async () => Promise.reject(new Error('socket closed'))],
+    ]) {
+      const world = sharedAuthorityWorld();
+      world.addLedger();
+      world.addLedger();
+      const gm = world.realm('gm', { hasLedgerEvidence });
+      const boot = await gm.bootstrapRecovery();
+      assert.deepEqual(boot, { success: false, reason: 'ledger-unsettled' }, label);
+      assert.equal(world.ledgers().length, 2, `${label} deleted nothing`);
+    }
+  });
+
+  it('inspects live and server pages in the Foundry adapter before deleting a duplicate', async () => {
+    let failRead = false;
+    const authority = foundryAuthorityFixture(
+      { randomUUID: () => 'uuid' },
+      { failServerRead: (query) => failRead && Object.hasOwn(query, '_id') }
+    );
+    const source = {
+      flags: {
+        fabricate: {
+          journalRunAuthorityLedger: true,
+          journalRunAuthorityState: { version: 1, requests: {}, prepareTokens: {} },
+        },
+      },
+    };
+    const first = authority.makeEntry(source);
+    const second = authority.makeEntry(source);
+    second._stats = { createdTime: 6000 };
+    authority.journal.push(first, second);
+    for (const entry of [first, second]) {
+      entry.delete = async () => authority.journal.splice(authority.journal.indexOf(entry), 1);
+    }
+    // A malformed operation page known only to the server: its create broadcast never arrived.
+    second.serverPages.set('Operation0000001', { id: 'Operation0000001', getFlag: () => null });
+
+    failRead = true;
+    assert.equal((await authority.bootstrapRecovery()).reason, 'ledger-unsettled');
+    assert.equal(authority.journal.length, 2, 'an unanswered page read deletes nothing');
+
+    failRead = false;
+    assert.deepEqual(await authority.bootstrapRecovery(), { success: true });
+    assert.deepEqual(authority.journal, [second], 'only the empty earlier ledger is deleted');
   });
 });
 
