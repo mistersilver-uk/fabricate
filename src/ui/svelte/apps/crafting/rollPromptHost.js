@@ -7,28 +7,23 @@ import {
   STANDALONE_OVERLAY_HOST_CLASS,
 } from '../../util/overlayHost.js';
 
-function windowDepth(root) {
-  const frame = root.closest('.application') ?? root;
-  const depth = Number.parseInt(
-    frame.ownerDocument.defaultView?.getComputedStyle(frame).zIndex,
-    10
-  );
-  return Number.isFinite(depth) ? depth : 0;
-}
-
 /**
- * Engine code has no node to walk up from, so this is the one document-wide root lookup. With
- * several Fabricate windows open the innermost root holding focus wins, then the frontmost window
- * by z-index, then the later one in document order.
+ * The Fabricate root holding focus, for a roll the player started from that window; `null` for
+ * a companion, macro or engine call, which takes the standalone layer. A root inside a minimized
+ * window never hosts, and of nested roots holding focus the innermost wins.
  */
 export function findApplicationHost(doc) {
   const roots = [...doc.querySelectorAll(APPLICATION_HOST_SELECTOR)];
-  const focused = roots.findLast((root) => root.contains(doc.activeElement));
-  if (focused) return focused;
-  return roots.reduce(
-    (best, root) => (best && windowDepth(best) > windowDepth(root) ? best : root),
+  return (
+    roots.findLast((root) => root.contains(doc.activeElement) && !root.closest('.minimized')) ??
     null
   );
+}
+
+/** The ApplicationV2 that owns a host, so its `close` event can settle the prompt. */
+function applicationOf(host) {
+  const frame = host.closest('.application');
+  return frame ? (globalThis.foundry?.applications?.instances?.get(frame.id) ?? null) : null;
 }
 
 function createStandaloneHost(doc) {
@@ -41,8 +36,27 @@ function createStandaloneHost(doc) {
 }
 
 /**
- * Resolve with the prompt's raw answer, or `null` when it is dismissed or cannot open. The
- * component, the standalone layer and focus are all released on every exit path.
+ * Settle when the host window goes away: its application's `close` event where one resolves,
+ * otherwise a document observer watching for the host leaving the page. Returns the release.
+ */
+function watchHostClose(doc, host, app, onClose) {
+  if (app) {
+    app.addEventListener('close', onClose, { once: true });
+    return () => app.removeEventListener('close', onClose);
+  }
+  const Observer = doc.defaultView?.MutationObserver;
+  if (typeof Observer !== 'function') return () => {};
+  const observer = new Observer(() => {
+    if (!host.isConnected) onClose();
+  });
+  observer.observe(doc.body, { childList: true, subtree: true });
+  return () => observer.disconnect();
+}
+
+/**
+ * Resolve with the prompt's raw answer, or `null` when it is dismissed, its window closes or it
+ * cannot open. The component, the standalone layer, the close watch and focus are all released
+ * on every exit path.
  */
 export async function openRollPromptModal(
   data,
@@ -51,6 +65,7 @@ export async function openRollPromptModal(
     loadComponent = () => import('./RollPrompt.svelte'),
     mountComponent = mount,
     unmountComponent = unmount,
+    resolveApplication = applicationOf,
   } = {}
 ) {
   let Component;
@@ -65,14 +80,19 @@ export async function openRollPromptModal(
   return new Promise((resolve) => {
     let mounted = null;
     let settled = false;
+    let releaseWatch = () => {};
     const settle = (answer) => {
       if (settled) return;
       settled = true;
+      releaseWatch();
       if (mounted) unmountComponent(mounted);
       mounted = null;
       if (!applicationHost) host.remove();
       resolve(answer);
     };
+    if (applicationHost) {
+      releaseWatch = watchHostClose(doc, host, resolveApplication(host), () => settle(null));
+    }
     try {
       mounted = mountComponent(Component, {
         target: host,
