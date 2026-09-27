@@ -93,9 +93,13 @@ describe('roll prompt host', () => {
     const { frame, button } = appWindow('fabricate-app', 100);
     button.focus();
     const listeners = new Set();
+    let removals = 0;
     const app = {
       addEventListener: (type, listener) => type === 'close' && listeners.add(listener),
-      removeEventListener: (type, listener) => type === 'close' && listeners.delete(listener),
+      removeEventListener: (type, listener) => {
+        removals += 1;
+        listeners.delete(listener);
+      },
     };
     frame.id = 'fabricate-app';
     const previousFoundry = globalThis.foundry;
@@ -112,6 +116,7 @@ describe('roll prompt host', () => {
       assert.equal(listeners.size, 0, 'settling removes the close listener');
       calls.mounted[0].props.onSubmit({ confirmed: true });
       assert.equal(calls.unmounted.length, 1, 'a late answer after the close does not unmount twice');
+      assert.equal(removals, 1, 'and does not release the settled prompt a second time');
     } finally {
       globalThis.foundry = previousFoundry;
     }

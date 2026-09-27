@@ -127,13 +127,34 @@ export function translatePromptAnswer(answer, { defaultRollMode, choicePlan }) {
   return result;
 }
 
+function needText(need, labels) {
+  if (need?.kind === 'dc') return fill(labels.dcValue, { dc: need.dc });
+  return need?.kind === 'noSingleTarget' ? labels.noSingleTarget : labels.noCheck;
+}
+
+/** The DC, bulk-need and pick-cap copy, formatted here so the component renders strings only. */
+function formatCopy(data, choicePlan) {
+  const labels = copy();
+  const formatted = {
+    labels: { ...labels, pickUpTo: fill(labels.pickUpTo, { count: choicePlan.maxPicks }) },
+    dcText: Number.isFinite(data.dc) ? fill(labels.dcValue, { dc: data.dc }) : '',
+  };
+  if (Array.isArray(data.subjects)) {
+    formatted.subjects = data.subjects.map((subject) => ({
+      ...subject,
+      needText: needText(subject?.need, labels),
+    }));
+  }
+  return formatted;
+}
+
 /** Open the surface for a prepared view; a failed or rejected open is a dismissal. */
 export async function waitForPrompt(data, allowAdvantage, choicePlan, open = resolveSurface()) {
   const defaultRollMode = supportedRollMode(globalThis.game?.settings?.get?.('core', 'rollMode'));
   const view = {
     ...data,
+    ...formatCopy(data, choicePlan),
     allowAdvantage: allowAdvantage === true,
-    labels: copy(),
     rollModes: ROLL_MODES.map(([value, key, fallback]) => ({
       value,
       label: promptLabel(key, fallback),
@@ -150,9 +171,11 @@ export async function waitForPrompt(data, allowAdvantage, choicePlan, open = res
   return translatePromptAnswer(answer, { defaultRollMode, choicePlan });
 }
 
+/** `displayFormula` is the producer's base without the itemised modifier terms, shown as chips. */
 export function buildSinglePromptData({
   formula,
   resolvedFormula,
+  displayFormula,
   dc,
   name,
   actorName,
@@ -177,7 +200,7 @@ export function buildSinglePromptData({
     title,
     subtitle,
     img: img || '',
-    formula: resolvedFormula || formula || '',
+    formula: displayFormula || resolvedFormula || formula || '',
     dc: Number.isFinite(dc) ? dc : null,
     comparison:
       comparison === undefined ? (thresholdMode === 'exceed' ? 'exceed' : 'meet') : comparison,

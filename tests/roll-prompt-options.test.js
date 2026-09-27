@@ -142,6 +142,29 @@ describe('roll prompt adapter', () => {
     }
   });
 
+  it('formats the pick cap and the DC before the component sees them', async () => {
+    const { view } = await open({ modifierChoice: choice, dc: 12 }, null);
+    assert.equal(view.labels.pickUpTo, 'Pick up to 2');
+    assert.equal(view.dcText, 'DC 12');
+    assert.equal((await open({}, null)).view.dcText, '', 'no DC, no DC copy');
+  });
+
+  it('opens the modal whenever the page has a body, rather than confirming headlessly', async () => {
+    const previousDocument = globalThis.document;
+    const previousError = console.error;
+    const errors = [];
+    console.error = (...args) => errors.push(String(args[0]));
+    globalThis.document = { body: {} };
+    try {
+      // Node cannot load the `.svelte` module, so the attempted open fails and reads as a dismissal.
+      assert.deepEqual(await promptCheckRoll({ activity: 'Crafting' }), { confirmed: false });
+      assert.ok(errors.some((line) => line.includes('Roll prompt failed to load')), errors.join('\n'));
+    } finally {
+      globalThis.document = previousDocument;
+      console.error = previousError;
+    }
+  });
+
   it('translates a confirmed answer into the unchanged caller keys', () => {
     const plan = { options: [], maxPicks: 1, defaultSelectedIds: [] };
     assert.deepEqual(

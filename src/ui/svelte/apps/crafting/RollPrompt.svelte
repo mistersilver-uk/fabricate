@@ -5,7 +5,7 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `data` | the view `rollPrompt.js` prepares | none | Localized labels, roll modes, the choice plan and either the single formula or the bulk subject rows. |
+  | `data` | the view `rollPrompt.js` prepares | none | Localized, pre-formatted labels, roll modes, the choice plan and either the single formula or the bulk subject rows. |
   | `onSubmit(answer)` | function | no-op | Called once with the raw form answer; `rollPrompt.js` translates it. |
   | `onDismiss()` | function | no-op | Called once when Escape or the close control dismisses the prompt. |
 
@@ -17,19 +17,18 @@
   import { untrack } from 'svelte';
   import Chip from '../../components/Chip.svelte';
   import Field from '../../components/Field.svelte';
+  import Select from '../../components/Select.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
   import ManagerModal from '../manager/ManagerModal.svelte';
 
   let { data, onSubmit = () => {}, onDismiss = () => {} } = $props();
   let selectedIds = $state(untrack(() => [...data.choicePlan.defaultSelectedIds]));
+  let rollMode = $state(untrack(() => data.defaultRollMode));
   let settled = false;
+  const instanceId = $props.id();
+  const modeCaptionId = `${instanceId}-roll-mode`;
   const multiPick = $derived(data.choicePlan.maxPicks > 1);
   const atCap = $derived(selectedIds.length >= data.choicePlan.maxPicks);
-  const pickCap = $derived(fill(data.labels.pickUpTo, 'count', data.choicePlan.maxPicks));
-
-  function fill(template, token, value) {
-    return template.replace(`{${token}}`, () => String(value));
-  }
 
   function selectCheckbox(id, checked) {
     if (checked && atCap) return;
@@ -47,11 +46,6 @@
     return value >= 0 ? `+${value}` : String(value);
   }
 
-  function needText(need) {
-    if (need?.kind === 'dc') return fill(data.labels.dcValue, 'dc', need.dc);
-    return need?.kind === 'noSingleTarget' ? data.labels.noSingleTarget : data.labels.noCheck;
-  }
-
   function answer(form, advantage) {
     if (settled || !form) return;
     settled = true;
@@ -59,7 +53,7 @@
     onSubmit({
       confirmed: true,
       bonus: form.elements.namedItem('situationalBonus')?.value ?? '',
-      rollMode: form.elements.namedItem('rollMode')?.value,
+      rollMode,
       advantage,
       chosenModifierIds: [...checked].map((input) => input.value),
     });
@@ -81,9 +75,9 @@
   rootAttributes={{ 'data-roll-prompt': data.kind }}
   closeOnOutsideClick={false}
   trapFocus
-  initialFocus="input[name='situationalBonus']"
+  initialFocus="input[name='situationalBonus'], button[type='submit']"
   footerLayout="equal"
-  serifTitle
+  banded
   onClose={dismiss}
   onSubmit={(event) => answer(event.target, 'normal')}
 >
@@ -97,7 +91,7 @@
               {#if data.formula}<span class="formula">{data.formula}</span>{/if}
               {#if data.dc !== null}
                 <Chip tone="info" density="tag-run" icon="fa-solid fa-bullseye"
-                  >{fill(data.labels.dcValue, 'dc', data.dc)} · {data.comparison === 'exceed'
+                  >{data.dcText} · {data.comparison === 'exceed'
                     ? data.labels.exceed
                     : data.labels.meet}</Chip
                 >
@@ -113,7 +107,7 @@
               {#each data.subjects as subject, index (index)}
                 <div class="bulk-row">
                   <span class="bulk-name">{subject.name || data.labels.unnamedSubject}</span>
-                  <span class="bulk-need">{needText(subject.need)}</span>
+                  <span class="bulk-need">{subject.needText}</span>
                 </div>
               {/each}
             </div>
@@ -125,7 +119,7 @@
       {#if data.choicePlan.options.length}
         <fieldset class="modifier-group">
           <legend class="eyebrow"
-            >{data.labels.modifierChoice}{#if multiPick}{` · ${pickCap}`}{/if}</legend
+            >{data.labels.modifierChoice}{#if multiPick}{` · ${data.labels.pickUpTo}`}{/if}</legend
           >
           <div class="modifier-chips">
             {#each data.choicePlan.options as modifier (modifier.id)}
@@ -190,17 +184,18 @@
         <p class="help">{data.labels.bonusHelp}</p>
       </div>
 
-      <Field as="label" class="prompt-field mode-field">
-        <span class="eyebrow field-caption">{data.labels.rollMode}</span>
-        <span class="mode-control">
-          <!-- native select: the roll mode is a named form field whose popup stays native. -->
-          <select name="rollMode" value={data.defaultRollMode}>
-            {#each data.rollModes as mode (mode.value)}
-              <option value={mode.value}>{mode.label}</option>
-            {/each}
-          </select>
-          <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-        </span>
+      <!-- A `div`, not a `label`: a caption click would re-open the list its mousedown dismissed. -->
+      <Field as="div" class="prompt-field mode-field">
+        <span class="eyebrow field-caption" id={modeCaptionId}>{data.labels.rollMode}</span>
+        <Select
+          size="inline"
+          name="rollMode"
+          value={rollMode}
+          options={data.rollModes}
+          showTick={false}
+          ariaLabelledBy={modeCaptionId}
+          onChange={(next) => (rollMode = next)}
+        />
       </Field>
     </div>
   {/snippet}
@@ -356,7 +351,7 @@
     gap: var(--fab-space-chip);
     max-width: 100%;
     box-sizing: border-box;
-    padding: var(--fab-space-2xs) calc(var(--fab-space-2) + 1px);
+    padding: calc(var(--fab-space-2xs) + 1.5px) var(--fab-space-3);
     border: 1px solid var(--fab-border-strong);
     border-radius: 999px;
     background: var(--fab-bg-2);
@@ -416,8 +411,7 @@
   .fabricate-roll-prompt :global(.fabricate-field.prompt-field) {
     gap: var(--fab-space-chip);
   }
-  .fabricate-roll-prompt :global(.fabricate-field.manager-field.bonus-field input[type='text']),
-  .fabricate-roll-prompt :global(.fabricate-field.manager-field.mode-field select) {
+  .fabricate-roll-prompt :global(.fabricate-field.manager-field.bonus-field input[type='text']) {
     width: 100%;
     box-sizing: border-box;
     height: 30px;
@@ -437,26 +431,13 @@
   .fabricate-roll-prompt :global(.bonus-field input::placeholder) {
     color: var(--fab-text-subtle);
   }
-  .mode-control {
-    position: relative;
-    display: block;
+  .fabricate-roll-prompt :global(.mode-field .fabricate-select-trigger) {
+    width: 100%;
   }
-  .fabricate-roll-prompt :global(.fabricate-field.manager-field.mode-field select) {
-    padding-right: calc(var(--fab-space-6) + var(--fab-space-2));
-    appearance: none;
-    -webkit-appearance: none;
-    font-size: 11.5px;
-    font-weight: 500;
-    cursor: pointer;
-  }
-  .mode-control i {
-    position: absolute;
-    top: 50%;
-    right: var(--fab-space-3);
-    transform: translateY(-50%);
-    color: var(--fab-text-subtle);
-    font-size: 10px;
-    pointer-events: none;
+  /* The manager root is a size container, so it is this fixed modal's containing block there and
+     `100%` is its height; everywhere else `100%` is the viewport's. */
+  :global(.manager-modal.is-banded[data-roll-prompt]) {
+    max-height: min(640px, calc(100% - 32px));
   }
   .prompt-action {
     display: flex;
@@ -491,7 +472,7 @@
   }
   .action-note {
     display: block;
-    color: var(--fab-text-muted);
+    color: var(--fab-text-secondary);
     font-size: 9.5px;
     font-weight: 500;
   }

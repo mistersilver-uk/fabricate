@@ -27,7 +27,12 @@ describe('bulk roll prompt adapter', () => {
     );
     assert.equal(view.kind, 'bulk');
     assert.equal(view.allowAdvantage, false);
-    assert.deepEqual(view.subjects, subjects);
+    assert.deepEqual(
+      view.subjects,
+      subjects.map((subject, index) => ({ ...subject, needText: ['DC 17', 'No check', 'No single target'][index] })),
+      'each need arrives formatted beside its raw shape'
+    );
+    assert.equal(view.dcText, '', 'a batch has no single DC');
     assert.deepEqual(result, { confirmed: true, bonus: '3', rollMode: 'blindroll', advantage: 'normal' });
   });
 
