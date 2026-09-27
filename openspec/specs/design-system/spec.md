@@ -1526,7 +1526,7 @@ A shared skin that a conversion appears to strand is NARROWED onto its remaining
 Deleting it early drops a still-shipping control to the platform's own treatment, which is the defect this requirement exists to remove.
 The player app's shared select skin is the first one to reach the end of that rule rather than to be narrowed by it.
 Three rules under `.fabricate-app` themed the closed control, its option list and its focus ring, and all three are DELETED with the app's last native select, because no select is rendered under `.fabricate-app` any more — the shared play-surface class the player window and the three interactables windows all emit.
-That is the rule's reach and therefore the right test: the manager's remaining selects, the three `DialogV2` bodies and the roll prompt carry their own skins, the prompt's in its scoped `.fabricate-roll-prompt` body, and none ever inherited this one.
+That is the rule's reach and therefore the right test: the manager's remaining selects and the three `DialogV2` bodies carry their own skins, and neither ever inherited this one.
 The carriers a root's skin answers for are this repository's own markup under that root; a companion module renders its own DOM inside the player host and styles it itself.
 Deletion is right exactly when no carrier is left, and the check is the carrier rather than the calendar.
 
@@ -1536,11 +1536,10 @@ A select there stays native, and the surrounding stylesheet gives the control a 
 There is no second exception by prose.
 A component that states a reason of its own in a docblock is NOT exempt: the precedence order above no longer puts a shipped component's reasoning over this capability, and a reason nothing reads is not a decision anything can act on.
 An element is exempted only by the mechanism `tests/components/design-system-debt-ratchets.test.js` reads — a `<!-- native select: reason -->` marker on the lines above it — or, where the component is a set member, by a `divergent` entry naming the decision that keeps it native.
-The figure is the RATCHET'S PIN rather than a prose count, so it cannot drift from what the gate measures: `KNOWN_NATIVE_SELECT_TOTAL` stands at 14 elements across 4 `.svelte` files, baselined row by row in `tests/components/design-system-known-debt.json`, plus three written into JavaScript dialog bodies and one marked roll-prompt select.
+The figure is the RATCHET'S PIN rather than a prose count, so it cannot drift from what the gate measures: `KNOWN_NATIVE_SELECT_TOTAL` stands at 14 elements across 4 `.svelte` files, baselined row by row in `tests/components/design-system-known-debt.json`, plus three written into JavaScript dialog bodies.
 Both numerals are asserted against those constants by `tests/components/design-system-debt-ratchets.test.js`, because this sentence has rotted once already.
-It was 100 across 39 before those three shared controls converted, 84 across 33 before the player app's six, 78 across 28 before the manager's settings and tabs, 69 across 26 before the manager's editors and 40 across 16 before its browse screens.
-The one marked element is the roll prompt's roll-mode select, and it is a review disposition rather than a structural exception: issue 2021 moved the prompt off `DialogV2` into `ManagerModal`, and the select stays a named native form field whose trigger is drawn as the `inline` rung while its popup stays native.
-Converting it to `Select` removes the marker; every other mounted select stays inside the debt table until converted.
+It was 100 across 39 before those three shared controls converted, 84 across 33 before the player app's six, 78 across 28 before the manager's settings and tabs, 69 across 26 before the manager's editors and 40 across 16 before its browse screens; no file carries the marker.
+The one component long counted as a stated exception, `InventorySystemSelector.svelte`, carried a DOCBLOCK rather than the marker and was baselined with the rest; it converted at issue 1511 and its docblock reason went with the element it justified, which is what withdrawing that precedence looks like in practice rather than in principle.
 
 The selected tick is CONFIGURABLE and is a property of the list rather than of an option: it earns its column where options are close cousins and a reader must confirm which is live AND the trigger's own label does not settle it, and is dropped where the trigger already states the value and the list is short.
 It ships and is exercised in BOTH polarities: kept for the scoped catalogue's lane filters and sort key, and for the bulk panel's check-tier list where two INSTRUCTIONS sit beside named tiers; dropped for the pager's page size and the bulk panel's category axis.
@@ -1664,9 +1663,9 @@ This is distinct from a one-shot confirmation, which stays `confirmDialog`, and 
 The modal portals into the application root so it stacks above the window rather than beneath it, and its close control takes an accessible name as a REQUIRED prop, because it renders as an icon alone.
 It dismisses on an outside click; a step that would lose work confirms first.
 
-The interactive roll prompt is the chrome's second shipped site, and it is a decision rather than a flow: one header, a scrolling body and a footer rail of equal actions.
-Engine code opens it, so it mounts over the Fabricate window holding focus, else the frontmost, and over a themed standalone layer on the page when no Fabricate window is open.
-Its differences from the flow are additive `ManagerModal` props whose defaults leave every other caller unchanged: a stray outside click never dismisses it, focus enters it, Tab stays inside it, Escape and the close control dismiss it, and focus returns to the opener.
+The interactive roll prompt also renders in this chrome, and it is a decision rather than a flow: one header, a scrolling body and a footer rail of equal actions, drawn as the library's banded Modal.
+It mounts over the Fabricate window holding focus when the player started the roll there, and otherwise over a themed standalone layer on the page, which stays frontmost; it answers as a dismissal when the window hosting it closes.
+Its differences from the flow are additive `ManagerModal` props whose defaults leave every other caller unchanged: a stray outside click never dismisses it, focus enters it, Tab stays inside it, it owns every key while open, Escape and the close control dismiss it, and focus returns to the opener, or to the window hosting it while the opener is still disabled.
 
 #### Scenario: An import needs two steps
 
@@ -1674,11 +1673,16 @@ Its differences from the flow are additive `ManagerModal` props whose defaults l
 - **THEN** it renders in the shared modal chrome
 - **AND** its close control carries an accessible name
 
-#### Scenario: A roll prompt opens with no Fabricate window open
+#### Scenario: A roll prompt opens outside every Fabricate window
 
-- **WHEN** a companion or macro opens the roll prompt and no Fabricate window is open
+- **WHEN** a companion or macro opens the roll prompt while focus is outside every Fabricate window
 - **THEN** the prompt renders in the shared modal chrome on a themed standalone layer
 - **AND** closing it removes the layer and returns focus to where it was
+
+#### Scenario: The window hosting a roll prompt closes
+
+- **WHEN** the Fabricate window a roll prompt opened over closes while the prompt is open
+- **THEN** the prompt answers as a dismissal and unmounts
 
 ### Requirement: One blocking notice, and non-blocking notices stack
 

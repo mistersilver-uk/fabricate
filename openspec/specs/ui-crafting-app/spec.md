@@ -221,12 +221,13 @@ This is the PR #497 per-call-flag decision, consumed uniformly by the crafting s
 
 - **One modal, one header.**
 The prompt renders in Fabricate's shared modal chrome (`ManagerModal`), never in a Foundry dialog, so it has one header: the activity check as its title and the actor and subject beneath it.
-Engine code opens it, so it mounts over the Fabricate window holding focus, else the frontmost one; with no Fabricate window open it mounts on a themed standalone layer on the page, which closing removes.
+It mounts over the Fabricate window holding focus, where the player started the roll, unless that window is minimized; any other call, such as a companion or macro, mounts it on a themed standalone layer on the page that stays frontmost and that closing removes.
+When the window hosting it closes, the prompt answers with the not-confirmed shape and unmounts.
 It is 500px wide within the viewport, and when crowded only its body scrolls while the footer stays visible.
-A stray outside click never dismisses it; Escape and the close control dismiss it with the not-confirmed shape, focus enters it on open and stays inside it, and focus returns to the opener on every exit.
+A stray outside click never dismisses it; Escape and the close control dismiss it with the not-confirmed shape, focus enters it on open and stays inside it, it keeps every key from Foundry's window-level keybindings while open, and focus returns to the opener on every exit, or to the window hosting it while the opener is still disabled.
 - **Order and controls.**
 The body reads: a generic dice glyph beside the formula and, when the check has one target, its DC chip (`DC N · meet or beat` inclusive, `DC N · beat` strict); the applied modifier chips or the bounded player choice; the situational bonus; roll mode; then the footer.
-The roll-mode options are Fabricate's own labels over the legacy `publicroll`/`gmroll`/`blindroll`/`selfroll` tokens, defaulting to the client's supported setting and otherwise to a public roll.
+The roll mode is the shared `Select`, whose options are Fabricate's own labels over the legacy `publicroll`/`gmroll`/`blindroll`/`selfroll` tokens, defaulting to the client's supported setting and otherwise to a public roll.
 Advantage-eligible checks offer Disadvantage, Roll and Advantage in that order, each outer action naming what it keeps; other checks offer one Roll.
 Roll is the form's only submit button, so Enter from any field rolls normally and never with Advantage or Disadvantage.
 Displayed comparison and applied modifiers come from the actual normalized runner and the selected formula contributions, and existing result keys and advantage eligibility are unchanged.
@@ -251,6 +252,7 @@ This group is only the presentation of the crafting-check `playerPicks` combinat
 A roll under any other combination rule passes none — including `bySubject`, whose selection was already made at authoring time — so no `modifierChoice`, no fieldset.
 On a direct runner the formula line ends in a trailing `+ (modifier)[Modifiers]` slot while the choice is unanswered.
 A versioned Journal prompt shows its prepared formula without the slot or any flavour label, with the choice offered beneath it.
+On both paths the formula line omits the terms of the modifiers the prompt itemises as chips: the producer passes a display formula, the base with any Tool terms and the deferred slot, beside the rolled formula, which is unchanged.
 - **Pre-resolved roll decisions.**
 A caller MAY supply a `rollDecision` (`{ bonus, rollMode, advantage }` — the prompt's own return shape minus `confirmed`).
 The evaluator then treats it as an already-answered choice and **never opens the modal**, running the identical downstream code: the check-modifier append, the advantage transform, the situational-bonus append, the formula-validity net and the effective roll mode.
