@@ -933,6 +933,7 @@
       "fabricate.listGatheringForActor",
       {
         "actorId": "pc-arden",
+        "interactableRef": null,
         "presentTools": null
       }
     ],
