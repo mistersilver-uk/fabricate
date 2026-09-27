@@ -381,6 +381,31 @@ describe('roll prompt adapter', () => {
     }
   });
 
+  it('gives an all-count batch with one destination that count\'s help, and a mix the summed help', async () => {
+    const help = async (subjects) => {
+      const surface = stubPromptSurface(() => null);
+      try {
+        await promptBulkCheckRoll({ subjects });
+        return surface.view.labels.bonusHelp;
+      } finally {
+        surface.restore();
+      }
+    };
+    const row = (destination, kind = 'successes') => ({ name: 'Ore', need: { kind, count: 2, destination } });
+    assert.equal(
+      await help([row('pool'), row('pool')]),
+      'A bonus adds that many dice. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    );
+    assert.equal(
+      await help([row('threshold'), row('threshold')]),
+      'A bonus moves the threshold by that much. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    );
+    const summed = 'A bonus adds to the total. A rolled bonus such as 1d4 is rolled with the check.';
+    assert.equal(await help([row('pool'), row('threshold')]), summed, 'two destinations have no one answer');
+    assert.equal(await help([row('pool'), { name: 'Scrap', need: { kind: 'dc', dc: 12 } }]), summed);
+    assert.equal(await help([row(undefined)]), summed, 'a row naming no destination keeps the summed help');
+  });
+
   it('reads the target before the legacy dc, and names no direction without a number', () => {
     assert.equal(buildSinglePromptData({ dc: 12, target: 9, direction: 'under' }).dc, 9);
     assert.equal(buildSinglePromptData({ dc: 12 }).dc, 12);

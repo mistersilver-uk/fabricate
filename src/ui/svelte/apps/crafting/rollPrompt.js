@@ -242,6 +242,7 @@ function targetText(data, labels) {
 /** The target, bulk-need and pick-cap copy, formatted here so the component renders strings only. */
 function labelsFor(data) {
   if (data.count) return { ...copy(), ...countCopy(data.count.destination) };
+  if (data.countDestination) return { ...copy(), ...countCopy(data.countDestination) };
   return data.direction === 'under' ? { ...copy(), ...underCopy() } : copy();
 }
 
@@ -420,11 +421,17 @@ export function buildBulkPromptData({ count, subjects, activity, actorName } = {
   const items = fill(promptLabel('BulkHeading', '{count} items'), {
     count: Number.isFinite(count) ? count : rows.length,
   });
+  const destinations = new Set(rows.map((row) => row?.need?.destination));
   return {
     kind: 'bulk',
     // Every row rolling under (a fixed target or a character value) gets the roll-under bonus
     // help; any other row (or an empty batch) keeps the roll-over copy.
     direction: rows.length > 0 && rows.every((row) => rollsUnder(row?.need)) ? 'under' : 'over',
+    // Likewise every row a count check with one modifier destination gets that count's help.
+    countDestination:
+      destinations.size === 1 && rows.every((row) => row?.need?.kind === 'successes')
+        ? ([...destinations].find((entry) => entry === 'pool' || entry === 'threshold') ?? null)
+        : null,
     title: activity
       ? fill(promptLabel('CheckTitlePlural', '{activity} checks'), { activity })
       : promptLabel('BulkTitle', 'Bulk check'),

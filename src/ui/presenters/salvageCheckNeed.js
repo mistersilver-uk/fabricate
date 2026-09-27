@@ -15,7 +15,8 @@ export function salvageDisplayDc({ mode, routedType, config, component }) {
 /**
  * Display-only need; evaluation continues to use the system's authored check. A character-value
  * target differs per actor, so a summed check reading one has no single target. A count check
- * needs the component's successes override, else its pool's required count.
+ * needs the component's successes override, else its pool's required count, and names where
+ * its modifiers go.
  */
 export function salvageCheckNeed({ mode, config, checkUsable, component }) {
   if (!checkUsable) return { kind: 'noCheck' };
@@ -30,6 +31,7 @@ export function salvageCheckNeed({ mode, config, checkUsable, component }) {
     return {
       kind: 'successes',
       count: countRequired(evaluation, component?.salvage?.successesOverride),
+      destination: evaluation.pool?.modifierDestination === 'threshold' ? 'threshold' : 'pool',
     };
   }
   const dc = salvageDisplayDc({ mode, routedType, config, component });
