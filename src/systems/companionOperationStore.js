@@ -1,10 +1,14 @@
+import { forcedReplacementEntry } from '../config/flags.js';
+
 import {
   CompanionOperationRecordError,
   archiveCompanionOperationRecord,
+  completeCompanionOperationRecord,
   createCompanionOperationRecord,
   observeCompanionOperationId,
   observeCompanionOperationRecord,
   sameCompanionOperationPlan,
+  transitionCompanionOperationEffect,
 } from './companionOperationRecord.js';
 
 const FLAG_SCOPE = 'fabricate';
@@ -14,7 +18,7 @@ const FLAG_KEY = 'companionOperationRecord';
 export const COMPANION_OPERATION_RECORD_FLAG = `flags.${FLAG_SCOPE}.${FLAG_KEY}`;
 
 /**
- * Create the internal Journal adapter for accepting, reading and archiving operation records.
+ * Create the internal Journal adapter for accepting, reading, transitioning and archiving records.
  * The authoritative reader is the only read source; the live ledger is used only for writes.
  */
 export function createCompanionOperationStore({ ledger, readAuthoritativeLedger, clock }) {
@@ -142,6 +146,60 @@ class CompanionOperationStore {
     if (returned && recordsEqual(returned, next)) return result('archived', returned);
     return reconcileArchive((recordId) => this.readStored(recordId), next);
   }
+
+  /** Persist one effect change; input is the record transition's without `at`. */
+  async transitionEffect(operationId, input) {
+    return this.writeTransition(operationId, input, transitionCompanionOperationEffect);
+  }
+
+  /** Persist completion of a record whose every effect is applied; input `{ expectedRevision }`. */
+  async complete(operationId, input) {
+    return this.writeTransition(operationId, input, completeCompanionOperationRecord);
+  }
+
+  /**
+   * Read authoritatively, refuse a moved revision as `stale`, then replace the record flag
+   * wholesale. Read-then-write, not compare-and-set: the held run claim serializes writers.
+   */
+  async writeTransition(operationId, input, transition) {
+    let id;
+    let at;
+    try {
+      id = observeCompanionOperationId(operationId);
+      if (!input || typeof input !== 'object') throw new TypeError('invalid input');
+      at = this.clock();
+    } catch {
+      return { status: 'invalidInput' };
+    }
+    const stored = await this.readStored(id);
+    if (stored.kind === 'absent') return { status: 'notFound' };
+    if (stored.kind === 'invalid') return { status: 'invalidStored' };
+    if (stored.kind !== 'found') return { status: 'unavailable' };
+    const { expectedRevision } = input;
+    if (stored.record.revision !== expectedRevision) return result('stale', stored.record);
+
+    let next;
+    try {
+      next = transition(stored.record, { ...input, at });
+    } catch (error) {
+      if (!(error instanceof CompanionOperationRecordError)) return { status: 'invalidInput' };
+      return result('invalidTransition', stored.record);
+    }
+    const [path, value] = forcedReplacementEntry(`flags.${FLAG_SCOPE}`, FLAG_KEY, next);
+    const reconcile = () =>
+      reconcileTransition((recordId) => this.readStored(recordId), next, expectedRevision);
+    let updated;
+    try {
+      updated = await this.ledger.updateEmbeddedDocuments('JournalEntryPage', [
+        { _id: id, [path]: value },
+      ]);
+    } catch {
+      return reconcile();
+    }
+    const returned = verifiedReturnedRecord(updated, id);
+    if (returned && recordsEqual(returned, next)) return result('updated', returned);
+    return reconcile();
+  }
 }
 
 function operationPageSource(record) {
@@ -193,6 +251,15 @@ async function reconcileArchive(readStored, intended) {
   if (stored.kind !== 'found') return { status: 'unavailable' };
   if (recordsEqual(stored.record, intended)) return result('archived', stored.record);
   if (stored.record.archive.hiddenAt !== null) return result('duplicate', stored.record);
+  return { status: 'unavailable' };
+}
+
+async function reconcileTransition(readStored, intended, expectedRevision) {
+  const stored = await readStored(intended.operationId);
+  if (stored.kind === 'invalid') return { status: 'invalidStored' };
+  if (stored.kind !== 'found') return { status: 'unavailable' };
+  if (recordsEqual(stored.record, intended)) return result('updated', stored.record);
+  if (stored.record.revision !== expectedRevision) return result('stale', stored.record);
   return { status: 'unavailable' };
 }
 

@@ -14,6 +14,7 @@ import {
   JOURNAL_RUN_CLAIM_PAGE_ID,
   createJournalRunAuthority,
 } from '../src/systems/journalRunAuthority.js';
+import { effectEvidence } from './helpers/companionEffectEvidence.js';
 
 const CLAIM = JOURNAL_RUN_CLAIM_PAGE_ID;
 const OPERATION_ID = 'AbCdEfGhIjKlMn01';
@@ -165,7 +166,7 @@ function sharedWorld() {
 function storedRecord(state, effectPhase, extra = {}) {
   const initial = createCompanionOperationRecord({ operationId: OPERATION_ID, plan: plan() }, 400);
   if (state === 'accepted') return initial;
-  const evidence = effectPhase === 'pending' || effectPhase === 'applying' ? null : { at: 450 };
+  const evidence = effectPhase === 'pending' || effectPhase === 'applying' ? null : effectEvidence(effectPhase);
   return observeCompanionOperationRecord({
     ...initial,
     state,
