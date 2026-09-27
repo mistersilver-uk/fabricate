@@ -23,7 +23,7 @@ export function salvageCheckNeed({ mode, config, checkUsable, component }) {
   const routedType = mode === 'routed' && config?.type === 'fixed' ? 'fixed' : 'relative';
   const dc = salvageDisplayDc({ mode, routedType, config, component });
   if (!Number.isFinite(dc)) return { kind: 'noSingleTarget' };
-  return summed && evaluation.direction === 'under'
-    ? { kind: 'target', target: dc }
-    : { kind: 'dc', dc };
+  // A finite `dc` here is only reachable for a summed check (a count check's
+  // `salvageDisplayDc` returns null and returns above), so `summed` is redundant.
+  return evaluation.direction === 'under' ? { kind: 'target', target: dc } : { kind: 'dc', dc };
 }
