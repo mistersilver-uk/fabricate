@@ -36,6 +36,7 @@ export const CASES = Object.freeze([
       CRAFTING_SIMPLE,
       /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPromptHost\.js$/,
     ],
   }),
   playerCase({
@@ -466,6 +467,7 @@ export const CASES = Object.freeze([
       CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPromptHost\.js$/,
     ],
   }),
   playerCase({

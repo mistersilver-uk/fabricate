@@ -637,6 +637,7 @@ export function installFoundryShim(world) {
     },
     restore() {
       random.restore();
+      rollPrompts.disconnect();
       globalThis.game = previous.game;
       globalThis.ui = previous.ui;
       globalThis.Hooks = previous.Hooks;

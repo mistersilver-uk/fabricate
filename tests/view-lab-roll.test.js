@@ -514,3 +514,36 @@ test('the lab fixtures still reach the interactive modifier fieldset (issues 105
     'the cap leaves room for a MULTI-pick checkbox group rather than a pick-one radio group'
   );
 });
+
+test('the lab roll-prompt answerer stops answering once disconnected', async () => {
+  const { Window } = await import('happy-dom');
+  const { createLabRollPromptAnswerer } = await import('./view-lab/rollPromptAnswer.js');
+  const window = new Window();
+  const previousObserver = globalThis.MutationObserver;
+  globalThis.MutationObserver = window.MutationObserver;
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const prompt = (onRoll) => {
+    const node = window.document.createElement('div');
+    node.setAttribute('data-roll-prompt', 'single');
+    const button = window.document.createElement('button');
+    button.dataset.action = 'roll';
+    button.addEventListener('click', onRoll);
+    node.append(button);
+    return node;
+  };
+  try {
+    const answerer = createLabRollPromptAnswerer(window.document);
+    answerer.setAnswer('roll');
+    let answered = 0;
+    window.document.body.append(prompt(() => (answered += 1)));
+    await flush();
+    assert.equal(answered, 1, 'a watched prompt is answered');
+    answerer.disconnect();
+    window.document.body.append(prompt(() => (answered += 1)));
+    await flush();
+    assert.equal(answered, 1, 'a prompt after disconnect is left standing');
+  } finally {
+    globalThis.MutationObserver = previousObserver;
+    await window.happyDOM.abort();
+  }
+});

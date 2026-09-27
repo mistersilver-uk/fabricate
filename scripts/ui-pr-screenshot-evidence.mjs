@@ -789,7 +789,7 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'player-crafting-roll-prompt',
     label: 'Player crafting — interactive check roll prompt',
     smokeLabels: ['player-crafting-roll-prompt'],
-    matches: [/^src\/ui\/svelte\/apps\/crafting\/(?:rollPrompt\.js|RollPrompt\.svelte)$/],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\/(?:rollPrompt\.js|rollPromptHost\.js|RollPrompt\.svelte)$/],
   },
   {
     id: 'player-crafting-essence-legacy',

@@ -30,7 +30,7 @@ export function createLabRollPromptAnswerer(doc = globalThis.document) {
   const answered = new WeakSet();
   // A Node suite installs the shim with no page to watch.
   if (!doc?.body || typeof MutationObserver !== 'function') {
-    return { setAnswer: () => {}, openPrompts: () => [] };
+    return { setAnswer: () => {}, openPrompts: () => [], disconnect: () => {} };
   }
   const observer = new MutationObserver(() => {
     if (answer === 'open') return;
@@ -46,5 +46,7 @@ export function createLabRollPromptAnswerer(doc = globalThis.document) {
       answer = requested;
     },
     openPrompts: () => [...doc.querySelectorAll(ROLL_PROMPT_SELECTOR)],
+    /** Stop watching, so a restored shim leaves no observer answering prompts. */
+    disconnect: () => observer.disconnect(),
   };
 }
