@@ -3999,15 +3999,9 @@ export class GatheringEngine {
     const evaluation = activeCheckEvaluation(progressive);
     const refusal = progressiveCheckRefusal(progressive, () => actorRollData(actor));
     if (refusal) {
-      const { data, message } = checkTargetRefusal(refusal.reason, 'Gathering', refusal);
-      return {
-        success: null,
-        status: null,
-        value: null,
-        data,
-        reasonCode: 'CHECK_TARGET_INVALID',
-        diagnostic: { code: 'CHECK_TARGET_INVALID', message },
-      };
+      return progressiveCheckTargetInvalid(
+        checkTargetRefusal(refusal.reason, 'Gathering', refusal)
+      );
     }
     if (hasActiveCheck(progressive, rollFormula)) {
       // Unavailable from the authoring surface, but legacy and external tasks still reach it.
@@ -4030,6 +4024,8 @@ export class GatheringEngine {
       if (rolled.cancelled) {
         return { success: false, status: null, value: null, cancelled: true };
       }
+      // A pool the settled modifiers push past 999 dice, or Foundry's explosion limit.
+      if (rolled.misconfigured) return progressiveCheckTargetInvalid(rolled);
       // Value-driven: `status` stays null so `resolveProgressiveAward` decides from `value`; a
       // roll error surfaces `success: false`, a terminal failure.
       return {
@@ -5042,6 +5038,18 @@ function normalizeCheckStatus(status) {
 
 function hasOutcomeDiagnostics(raw) {
   return Boolean(raw.diagnostic) || normalizeList(raw.diagnostics).length > 0;
+}
+
+/** A progressive check refusal, before or during the roll: a diagnostic, never a failed attempt. */
+function progressiveCheckTargetInvalid({ data, message }) {
+  return {
+    success: null,
+    status: null,
+    value: null,
+    data,
+    reasonCode: 'CHECK_TARGET_INVALID',
+    diagnostic: { code: 'CHECK_TARGET_INVALID', message },
+  };
 }
 
 function misconfiguredOutcome({

@@ -522,6 +522,14 @@ test('gathering legacy progressive executes count: a refusal before any roll, el
   assert.equal(control.actor.items.length, 1, 'a budget of one awards the difficulty-1 herb');
 });
 
+test('gathering legacy progressive: a pool above 999 dice refuses at settlement, never a failed attempt', async () => {
+  const refused = await gatheringAttempt('progressive', progressiveCheck(countEvaluation({ base: '1000' })));
+  assert.equal(refused.response.accepted, false);
+  assert.equal(refused.response.blockedReasons[0].data.code, 'CHECK_TARGET_INVALID');
+  assert.deepEqual(refused.constructed, []);
+  assert.equal(refused.runManagerCalls.createTerminalRun.length, 0);
+});
+
 test('the gathering descriptor refuses a count pool and captures its resolved policy', () => {
   const engine = new GatheringEngine({ localize: (key) => key });
   const { system, environment, task } = gatheringFixture({ mode: 'routed' });
