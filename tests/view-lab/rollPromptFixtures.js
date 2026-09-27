@@ -21,7 +21,7 @@ export async function seedRollPromptFixture(world, state) {
   if (state === 'salvage-under' || state === 'salvage-under-attribute') {
     await seedSalvageUnder(world, state);
   }
-  if (state === 'count') await seedCount(manager);
+  if (state === 'count' || state === 'count-threshold') await seedCount(world, state);
   if (state === 'pick-one' || state === 'overflow') {
     const system = manager.getSystem('lab-herbalism');
     await manager.updateSystem(system.id, {
@@ -120,20 +120,42 @@ async function seedSalvageUnder(world, state) {
 }
 
 /**
- * Smithing's simple slot counts successes: six d10s, each qualifying at 8 or more, two needed.
- * The retained roll formula stays authored and inert, so the prompt must not show it.
+ * Smithing's simple slot counts successes with one applied modifier, "Steady hands +1". `count` is
+ * frame 35: six d10s, each qualifying at 8 or more, the best face exploding and the worst
+ * cancelling. `count-threshold` is frame 30: two d20s, each qualifying at or under a threshold
+ * read from the character, and modifiers move the threshold. Both need two successes; the retained
+ * roll formula stays authored and inert, so the prompt must not show it.
  */
-async function seedCount(manager) {
+async function seedCount(world, state) {
+  const store = world.fabricate.characterLibrariesStore;
+  await store.saveModifiers([
+    { id: 'lab-mod-steady-hands', label: 'Steady hands', icon: 'fa-solid fa-hand', expression: '1' },
+    ...store.listModifiers().filter((entry) => entry.id !== 'lab-mod-steady-hands'),
+  ]);
+  const pool =
+    state === 'count'
+      ? {
+          die: 10,
+          base: '6',
+          threshold: '8',
+          explode: { enabled: true, faces: { kind: 'best' } },
+          cancel: { enabled: true, faces: { kind: 'worst' } },
+          modifierDestination: 'pool',
+        }
+      : { die: 20, base: '2', threshold: '@abilities.int.mod + 11', modifierDestination: 'threshold' };
+  const manager = world.fabricate.craftingSystemManager;
   const system = manager.getSystem('lab-smithing');
   await manager.updateSystem(system.id, {
     craftingCheck: {
       ...system.craftingCheck,
+      defaultModifierPolicy: 'addAll',
+      defaultModifierIds: ['lab-mod-steady-hands'],
       simple: {
         ...system.craftingCheck.simple,
         evaluation: normalizeCheckEvaluation({
           product: 'count',
-          direction: 'over',
-          pool: { die: 10, base: '6', threshold: '8', required: 2, modifierDestination: 'pool' },
+          direction: state === 'count' ? 'over' : 'under',
+          pool: { ...pool, required: 2 },
         }),
       },
     },

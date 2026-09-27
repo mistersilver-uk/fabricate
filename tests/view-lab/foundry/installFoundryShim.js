@@ -2,6 +2,8 @@
  * The Foundry globals the View Lab installs before it imports any Fabricate runtime module.
  * `game.settings` is the entire persistence layer.
  */
+import { registerCountRoll } from '../../../src/systems/countRoll.js';
+
 import { createLabRoll } from './labRoll.js';
 import { installLabRandom } from './labRandom.js';
 import { createLabDialogV2 } from '../foundryDialog.js';
@@ -294,6 +296,7 @@ export function installFoundryShim(world) {
     foundry: globalThis.foundry,
     fromUuid: globalThis.fromUuid,
     fromUuidSync: globalThis.fromUuidSync,
+    CONFIG: globalThis.CONFIG,
   };
 
   const gmUser = { id: 'user-lab-gm', name: 'Lab GM', isGM: true, color: { css: '#f1d1b5' } };
@@ -473,6 +476,14 @@ export function installFoundryShim(world) {
     replaceFormulaData: LAB_ROLL_STATICS.replaceFormulaData,
     validate: LAB_ROLL_STATICS.validate,
   });
+  // `init` registers the count Roll over core `Roll`; the lab registers it over `LabRoll` through
+  // the same factory, so a count check reaches its prompt (issue 2004).
+  globalThis.CONFIG = { Dice: { rolls: [globalThis.Roll] } };
+  registerCountRoll({
+    config: globalThis.CONFIG,
+    BaseRoll: globalThis.Roll,
+    i18n: () => globalThis.game?.i18n,
+  });
 
   // A run that SUCCEEDS posts a chat card.
   const createChatMessage = async (spec = {}) =>
@@ -645,6 +656,7 @@ export function installFoundryShim(world) {
       globalThis.foundry = previous.foundry;
       globalThis.fromUuid = previous.fromUuid;
       globalThis.fromUuidSync = previous.fromUuidSync;
+      globalThis.CONFIG = previous.CONFIG;
     },
   };
 }

@@ -28,6 +28,9 @@ import {
 import { resolveModifierLibrary } from '../src/systems/characterLibraries.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { installCountDice } from './helpers/countEngineDice.js';
+import { evaluateCountCheckRoll } from '../src/systems/countCheckRoll.js';
+import { findCountRoll } from '../src/systems/countRoll.js';
+import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import { stubInteractiveRollEnvironment, stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
 
@@ -114,27 +117,37 @@ async function underPromptView(world) {
   }
 }
 
-/** The `count` state: the horseshoe's real engine prompt shows six d10s and two successes needed. */
+/** The `count` and `count-threshold` states: the horseshoe's real engine prompt, frames 35 and 30. */
 async function countPromptView(world, content) {
   const manager = world.fabricate.craftingSystemManager;
-  await seedRollPromptFixture(world, 'count');
-  const system = manager.getSystem('lab-smithing');
   const recipe = content.recipes.find((entry) => entry.id === 'sm-r-horseshoe');
-  const dice = installCountDice();
-  const surface = stubPromptSurface(() => null);
-  try {
-    await new CraftingEngine(null)._runPassFailCheck(
-      system, system.craftingCheck.simple, recipe, null, { name: 'Idrin', getRollData: () => ({}) },
-      { interactive: true }
-    );
-    const { view } = surface;
-    assert.equal(view.formula, '6d10 · each ≥ 8', 'the pool line, not the retained formula');
-    assert.equal(view.neededText, '2 successes needed');
-    assert.deepEqual([view.dc, view.allowAdvantage], [null, false]);
-    assert.deepEqual(dice.constructed, [], 'a dismissed prompt rolls nothing');
-  } finally {
-    surface.restore();
-    dice.restore();
+  const frames = {
+    count: ['6d10 · each ≥ 8', 'Success on ≥ 8 · best face explodes · worst face cancels', 'Each adds dice.'],
+    'count-threshold': ['2d20 · each ≤ 14', 'Success on ≤ 14 (@abilities.int.mod + 11)', 'Each moves the threshold.'],
+  };
+  for (const [state, [formula, rules, eachAdds]] of Object.entries(frames)) {
+    await seedRollPromptFixture(world, state);
+    const system = manager.getSystem('lab-smithing');
+    assert.deepEqual(system.craftingCheck.defaultModifierIds, ['lab-mod-steady-hands'], 'the frames\' one modifier');
+    const dice = installCountDice();
+    const surface = stubPromptSurface(() => null);
+    try {
+      await new CraftingEngine(null)._runPassFailCheck(
+        system, system.craftingCheck.simple, recipe, null,
+        { name: 'Idrin', getRollData: () => ({ abilities: { int: { mod: 3 } } }) },
+        { interactive: true }
+      );
+      const { view } = surface;
+      assert.equal(view.formula, formula, `${state}: the pool line, not the retained formula`);
+      assert.equal(view.labels.formulaNote, rules);
+      assert.equal(view.neededText, '2 successes needed');
+      assert.equal(view.labels.eachAdds, eachAdds);
+      assert.deepEqual([view.dc, view.allowAdvantage], [null, false]);
+      assert.deepEqual(dice.constructed, [], 'a dismissed prompt rolls nothing');
+    } finally {
+      surface.restore();
+      dice.restore();
+    }
   }
 }
 
@@ -505,6 +518,45 @@ test('the statics behave exactly as the object they replaced', () => {
   assert.equal(Roll.validate('1d20 + 3'), true);
   assert.equal(Roll.validate('1d20 + @x'), false);
   assert.equal(Roll.validate('1d20 + NaN'), false);
+});
+
+test('the shim registers the count Roll over its Roll, so a count check reaches its prompt', async () => {
+  const content = buildLabContent();
+  const previous = { Roll: globalThis.Roll, CONFIG: globalThis.CONFIG };
+  const shim = installFoundryShim({
+    seed: LIVE_SEED,
+    actorList: buildLabActors(content),
+    scenes: [],
+    settings: new Map(),
+    i18n: { localize: (key) => key, format: (key) => key },
+    worldTime: 0,
+    documents: new Map(),
+  });
+  try {
+    const CountRoll = findCountRoll(globalThis.CONFIG);
+    assert.equal(CountRoll?.name, 'FabricateCountRoll', 'registered through the production factory');
+    assert.ok(CountRoll.prototype instanceof globalThis.Roll, 'over the lab Roll, never replacing it');
+    assert.equal(globalThis.CONFIG.Dice.rolls[0], globalThis.Roll);
+    let prompted = null;
+    const result = await evaluateCountCheckRoll(
+      { getRollData: () => ({}) },
+      {
+        interactive: true,
+        evaluation: normalizeCheckEvaluation({ product: 'count', pool: { die: 10, base: '6', threshold: '8', required: 2 } }),
+        required: 2,
+        prompt: async (input) => {
+          prompted = input;
+          return { confirmed: false };
+        },
+      }
+    );
+    assert.equal(result.cancelled, true);
+    assert.deepEqual([prompted.product, prompted.pool, prompted.die, prompted.threshold], ['count', 6, 10, 8]);
+  } finally {
+    shim.restore();
+    globalThis.Roll = previous.Roll;
+  }
+  assert.equal(globalThis.CONFIG, previous.CONFIG, 'restore puts CONFIG back');
 });
 
 test('the shim installs a Roll CONSTRUCTOR, so evaluateCheckRoll reaches the prompt', async () => {

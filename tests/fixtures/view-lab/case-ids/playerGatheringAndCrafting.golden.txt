@@ -2,6 +2,8 @@ player-crafting-roll-prompt-basic
 player-crafting-roll-prompt-advantage
 player-crafting-roll-prompt-under
 player-crafting-check-under
+player-crafting-roll-prompt-count
+player-crafting-roll-prompt-count-threshold
 player-crafting-roll-prompt-light
 player-gathering-events
 player-gathering-task-ready
