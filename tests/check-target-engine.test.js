@@ -163,6 +163,29 @@ for (const site of CRAFT_SITES) {
   });
 }
 
+test('routedByCheck fixed ranges read no target, so a missing path still rolls once and routes', async () => {
+  const ranges = {
+    ...routedCheck(attribute('@skills.missing.value', { direction: 'under' })),
+    type: 'fixed',
+    relativeOutcomes: [],
+    fixedOutcomes: [
+      { id: 'r-fine', name: 'Fine', success: true, breakTools: false, start: 0, end: 11 },
+      { id: 'r-botch', name: 'Botch', success: false, breakTools: false, start: 12, end: 40 },
+    ],
+  };
+  const world = craftingWorld({ resolutionMode: 'routedByCheck', slot: 'routed', config: ranges });
+  const checks = recordChecks(world.engine);
+  const constructed = installCountingRoll();
+  await world.craft();
+  assert.equal(checks[0].misconfigured, undefined, 'a fixed-range target source is inert');
+  assert.deepEqual(
+    [checks[0].data.outcomeId, checks[0].success],
+    ['r-fine', true],
+    'under, the Tool 1d4 (12) raises the benefit, so the total 12 matches 12 − 12 = 0'
+  );
+  assert.deepEqual(constructed, ['1d4', '1d20'], 'the Tool and the check each roll once');
+});
+
 test('crafting progressive: sum/under refuses before its Tool roll, and sum/over rolls once', async () => {
   const progressive = (evaluation) => ({ rollFormula: '1d20', evaluation });
   const site = { resolutionMode: 'progressive', slot: 'progressive' };

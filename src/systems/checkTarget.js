@@ -111,9 +111,11 @@ export function checkTargetRefusal(reason, label = 'Crafting') {
 
 /**
  * An activity's target from its check config. `anchor` is its fixed DC, `override` its non-null
- * adjustment override, and `readRollData` is called only for an attribute source.
+ * adjustment override, and `readRollData` is called only for an attribute source. A fixed-range
+ * routed check reads no target, so its target source is inert, as a progressive one is.
  */
 export function resolveActivityTarget(config, { anchor, override = null, readRollData }) {
+  if (config?.type === 'fixed') return { ok: true, target: anchor, source: 'fixed' };
   const evaluation = activeCheckEvaluation(config);
   const attribute = evaluation.target.source === 'attribute';
   return resolveCheckTarget({
