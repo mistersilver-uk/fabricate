@@ -552,21 +552,28 @@ describe('AC-14 (facade half) — the delegator forwards NAMED KEYS, never the r
   it('forwards evaluation to the real leaf and preserves caller isolation', async () => {
     const actor = makeGrantTargetActor('actor-1');
     const { facade, checkCalls } = standUpFacade({ actors: [actor] });
-    const request = {
+    const base = {
       actorId: actor.id,
       callSite: 'gmAction',
       formula: '1d20',
       dc: 15,
-      evaluation: { product: 'count' },
       actor: { id: 'impostor' },
       speaker: { alias: 'impostor' },
       prompt: () => { throw new Error('caller prompt'); },
     };
-    const unsupported = await facade.rollActorCheck(request);
+    // Every non-interactive product/direction/source combination is published (issue 2004), so an
+    // INTERACTIVE count request is what stays unsupported.
+    const unsupported = await facade.rollActorCheck({
+      ...base,
+      interactive: true,
+      evaluation: { product: 'count' },
+    });
     assert.equal(unsupported.outcome, 'evaluationUnsupported');
     assert.deepEqual(checkCalls.bags, []);
-    request.evaluation = { product: 'sum', direction: 'over' };
-    const supported = await facade.rollActorCheck(request);
+    const supported = await facade.rollActorCheck({
+      ...base,
+      evaluation: { product: 'sum', direction: 'over' },
+    });
     assert.equal(supported.outcome, 'checkPassed');
     assert.equal(supported.product, 'sum');
     assert.equal(supported.direction, 'over');

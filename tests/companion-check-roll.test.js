@@ -18,6 +18,8 @@ import {
   assertMessageDataCovers,
   assertMessageIsFromTable,
 } from './helpers/companionContractOutcomes.js';
+import { installCountDice } from './helpers/countEngineDice.js';
+import { countEvaluation } from './helpers/countFixtures.js';
 import { defineStructureContract } from './helpers/structureContract.js';
 
 // Stubs
@@ -578,7 +580,8 @@ describe('AC-9 — the module rolls nothing and reaches nothing it was not given
   // or rollPrompt.js here would let the module bypass the very seams every dismissal assertion
   // depends on. The exact set holds static, re-exported and `import()` specifiers alike.
   defineStructureContract(
-    'imports only its contract, target resolution, evaluation boundary and formula predicate',
+    'imports only its contract, target resolution, evaluation boundary, the active-check ' +
+      'predicate and formula predicate',
     MODULE,
     {
       importSpecifiers: [
@@ -589,6 +592,7 @@ describe('AC-9 — the module rolls nothing and reaches nothing it was not given
             './checkTarget.js',
             './companionCheckEvaluation.js',
             './companionContract.js',
+            './salvageCheckUsability.js',
           ],
         ],
       ],
@@ -655,7 +659,19 @@ describe('AC-10 — every REAL answer carries a key from its own member table', 
     );
     record(await rollActorCheck(request({ rollDecision: { bonus: '+1' } }), makeSeams().seams));
     record(await rollActorCheck(request({ evaluation: null }), makeSeams().seams));
-    record(await rollActorCheck(request({ evaluation: { product: 'count' } }), makeSeams().seams));
+    // Every count row is non-interactive (issue 2004): an interactive request refuses.
+    record(
+      await rollActorCheck(
+        request({ interactive: true, evaluation: { product: 'count' } }),
+        makeSeams().seams
+      )
+    );
+    record(
+      await rollActorCheck(
+        request({ evaluation: { product: 'count', pool: { base: '@missing.pool' } } }),
+        makeSeams({ real: true }).seams
+      )
+    );
     record(
       await rollActorCheck(
         request({
@@ -694,6 +710,7 @@ describe('AC-10 — every REAL answer carries a key from its own member table', 
         'invalidRollDecision',
         'noFormula',
         'notElected',
+        'poolUnresolved',
         'rollFailed',
         'rolled',
         'targetUnresolved',
@@ -934,8 +951,8 @@ const SKILLED_ACTOR = {
 };
 
 describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
-  it('iterates every published capability row, and an unlisted row refuses evaluationUnsupported', async () => {
-    for (const mode of CHECK_EVALUATION_CAPABILITIES.modes) {
+  it('iterates every published SUM capability row', async () => {
+    for (const mode of CHECK_EVALUATION_CAPABILITIES.modes.filter((m) => m.product === 'sum')) {
       for (const source of mode.targetSources) {
         installChat();
         installRoll({ total: 10 });
@@ -962,16 +979,37 @@ describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
         );
       }
     }
+  });
 
-    installChat();
-    installRoll();
-    const { seams } = makeSeams();
-    const unlisted = await rollActorCheck(request({ evaluation: { product: 'count' } }), seams);
-    assert.equal(unlisted.outcome, 'evaluationUnsupported');
+  it('iterates every published COUNT capability row (issue 2004), always graded', async () => {
+    for (const mode of CHECK_EVALUATION_CAPABILITIES.modes.filter((m) => m.product === 'count')) {
+      for (const source of mode.targetSources) {
+        const dice = installCountDice({ faces: [9, 3] });
+        try {
+          const { seams } = makeSeams({ real: true });
+          const evaluation = countEvaluation({ direction: mode.direction, required: 1 });
+          evaluation.target = { source };
+          const result = await rollActorCheck(
+            request({ actor: SKILLED_ACTOR, evaluation }),
+            seams
+          );
+          assert.ok(
+            ['checkPassed', 'checkFailed'].includes(result.outcome),
+            JSON.stringify({ mode, source, outcome: result.outcome })
+          );
+        } finally {
+          dice.restore();
+        }
+      }
+    }
   });
 
   it('refuses an interactive request for a non-interactive row, before any prompt', async () => {
-    for (const evaluation of [{ direction: 'under' }, { target: { source: 'attribute' } }]) {
+    for (const evaluation of [
+      { direction: 'under' },
+      { target: { source: 'attribute' } },
+      { product: 'count' },
+    ]) {
       installChat();
       installRoll();
       const { seams, calls } = makeSeams({ real: true });
@@ -1123,6 +1161,129 @@ describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
     assert.equal(result.outcome, 'checkPassed');
     assert.equal(result.message, CHECK_ROLL_MESSAGE_KEYS.checkPassed);
     assert.deepEqual(result.messageData, { label: 'Fabricate', total: 20, dc: 15 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Count check rows (issue 2004): pool grading, zero pool and pool refusals
+// ---------------------------------------------------------------------------
+
+describe('count check rows: no formula, ignores the caller dc and target', () => {
+  it('passes with PassedCount, naming total and required, never dc or target', async () => {
+    installChat();
+    const dice = installCountDice({ faces: [9, 3] });
+    try {
+      const { seams } = makeSeams({ real: true });
+      const result = await rollActorCheck(
+        request({ dc: 99, evaluation: countEvaluation() }),
+        seams
+      );
+      assert.equal(result.outcome, 'checkPassed');
+      assert.equal(result.message, CHECK_ROLL_MESSAGE_KEYS.checkPassedCount);
+      assert.deepEqual(result.messageData, { label: 'Fabricate', total: 1, required: 1 });
+      assert.equal(result.total, 1);
+      assert.equal(result.product, 'count');
+      assert.equal(result.successes, 1);
+      assert.equal(result.cancelled, 0);
+    } finally {
+      dice.restore();
+    }
+  });
+
+  it('fails with FailedCount when the net is below the required count', async () => {
+    installChat();
+    const dice = installCountDice({ faces: [3, 3] });
+    try {
+      const { seams } = makeSeams({ real: true });
+      const result = await rollActorCheck(request({ evaluation: countEvaluation() }), seams);
+      assert.equal(result.outcome, 'checkFailed');
+      assert.equal(result.message, CHECK_ROLL_MESSAGE_KEYS.checkFailedCount);
+      assert.deepEqual(result.messageData, { label: 'Fabricate', total: 0, required: 1 });
+    } finally {
+      dice.restore();
+    }
+  });
+
+  it('fails with FailedZeroPool (no total or required) once the pool floors to zero', async () => {
+    installChat();
+    const dice = installCountDice({ faces: [] });
+    try {
+      const { seams } = makeSeams({ real: true });
+      const result = await rollActorCheck(
+        request({ evaluation: countEvaluation({ base: '0' }) }),
+        seams
+      );
+      assert.equal(result.outcome, 'checkFailed');
+      assert.equal(result.message, CHECK_ROLL_MESSAGE_KEYS.checkFailedZeroPool);
+      assert.deepEqual(result.messageData, { label: 'Fabricate' });
+      assert.equal(result.total, null);
+      assert.deepEqual(dice.constructed, [], 'a zero pool constructs no Roll');
+    } finally {
+      dice.restore();
+    }
+  });
+
+  it('answers poolUnresolved for an unresolved base or threshold path, before any roll', async () => {
+    installChat();
+    const rolled = installRoll();
+    const { seams } = makeSeams({ real: true });
+
+    const base = await rollActorCheck(
+      request({ evaluation: countEvaluation({ base: '@skills.missing.value' }) }),
+      seams
+    );
+    assert.equal(base.outcome, 'poolUnresolved');
+    assert.deepEqual(base.messageData, { label: 'Fabricate' });
+
+    const threshold = await rollActorCheck(
+      request({ evaluation: countEvaluation({ threshold: '@skills.missing.value' }) }),
+      seams
+    );
+    assert.equal(threshold.outcome, 'poolUnresolved');
+    assert.deepEqual(rolled.constructions, [], 'neither refusal ever constructs a Roll');
+  });
+
+  it('answers evaluationInvalid for a count refusal naming a different input, not poolUnresolved', async () => {
+    installChat();
+    installRoll();
+    const { seams } = makeSeams({ real: true });
+
+    const evaluation = countEvaluation({
+      explode: { enabled: true, faces: { kind: 'from', value: null }, once: false },
+    });
+    const result = await rollActorCheck(request({ evaluation }), seams);
+
+    assert.equal(result.outcome, 'evaluationInvalid');
+    assert.deepEqual(result.messageData, { label: 'Fabricate' });
+  });
+
+  it('needs no formula at all: a blank formula still rolls a count check', async () => {
+    installChat();
+    const dice = installCountDice({ faces: [9, 3] });
+    try {
+      const { seams } = makeSeams({ real: true });
+      const result = await rollActorCheck(
+        request({ formula: '', evaluation: countEvaluation() }),
+        seams
+      );
+      assert.notEqual(result.outcome, 'noFormula');
+      assert.equal(result.outcome, 'checkPassed');
+    } finally {
+      dice.restore();
+    }
+  });
+
+  it('ignores the caller dc, always grading the runner against pool.required', async () => {
+    installChat();
+    const dice = installCountDice({ faces: [9, 3] });
+    try {
+      const { seams, calls } = makeSeams({ real: true });
+      await rollActorCheck(request({ dc: 999, evaluation: countEvaluation({ required: 1 }) }), seams);
+      const [bag] = calls.runPassFail;
+      assert.equal(bag.dc, 1, 'the runner grades against pool.required, never the caller dc');
+    } finally {
+      dice.restore();
+    }
   });
 });
 
