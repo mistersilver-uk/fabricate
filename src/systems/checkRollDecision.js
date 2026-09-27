@@ -68,9 +68,11 @@ function promptInput({
   displayFormula,
   deferred,
 }) {
-  const formula = deferred
-    ? `${resolvedCheck.formula} + ${DEFERRED_MODIFIER_SLOT}`
-    : resolvedCheck.formula;
+  // A count check shows no formula, so no bare deferred slot either (issue 2004).
+  const formula =
+    deferred && evaluation.product !== 'count'
+      ? `${resolvedCheck.formula} + ${DEFERRED_MODIFIER_SLOT}`
+      : resolvedCheck.formula;
   const resolved = displayFormula(formula, actor);
   // The modifiers `selectedModifiers` itemises are chips, so the shown formula omits their terms.
   const shownFormula = deferred ? formula : authoredFormula.trim();

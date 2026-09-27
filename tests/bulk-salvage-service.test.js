@@ -950,6 +950,21 @@ describe('BulkSalvageService.run: what the run hands back', () => {
     assert.equal(result.items[0].rollValue, 17);
   });
 
+  it('reads a zero-pool count failure as no roll, not a roll of 0', async () => {
+    const service = makeService({
+      systems: [bulkSystem({ components: [ORE] })],
+      salvage: async () => ({
+        success: false,
+        results: [],
+        salvageRun: { checkResult: { data: { total: null, zeroPool: true }, value: 0 } },
+      }),
+    });
+
+    const result = await service.run({ targets: [bulkTarget({})], interactive: false });
+
+    assert.equal(result.items[0].rollValue, null);
+  });
+
   it('reads the roll off a RUNLESS failure as null rather than inventing one', async () => {
     const service = makeService({
       systems: [bulkSystem({ components: [ORE] })],

@@ -109,7 +109,7 @@ const COUNT_REFUSAL_COPY = Object.freeze({
     ],
     'explode-unbounded': [
       'FABRICATE.Check.CountRefusal.ExplodeUnbounded',
-      'too many dice would roll after explosions',
+      'its dice would explode past the most Foundry can roll at once',
     ],
   },
   cancel: {

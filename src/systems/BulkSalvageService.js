@@ -63,6 +63,16 @@ function firstFinite(...values) {
 }
 
 /**
+ * A row's rolled total: the raw `data.total` first, since a forced crit overwrites `value` (as
+ * `rollTotalForCard` reads it), the top-level `value` last, since `salvage()` threads it only on
+ * success, and null for a zero pool, which rolled nothing.
+ */
+function rowRollValue(checkResult, result) {
+  if (checkResult?.data?.zeroPool === true) return null;
+  return firstFinite(checkResult?.data?.total, checkResult?.value, result?.value);
+}
+
+/**
  * The tools that broke in one salvage, as `{ name, img }`, read from the run record because
  * `salvage()` returns tool evidence only there (the runless path has none, a stated limit). It
  * answers the question `CraftingEngine._resolveBrokenToolChatEntries` answers but is no mirror: it
@@ -384,13 +394,7 @@ export class BulkSalvageService {
       entry.outcome = outcome;
       item.outcome = outcome;
       item.message = result?.message ?? '';
-      // The raw `data.total` first, since a forced crit overwrites `value` (as `rollTotalForCard`
-      // reads it); the top-level `value` last, since `salvage()` threads it only on success.
-      item.rollValue = firstFinite(
-        salvageRun?.checkResult?.data?.total,
-        salvageRun?.checkResult?.value,
-        result?.value
-      );
+      item.rollValue = rowRollValue(salvageRun?.checkResult, result);
       item.tierStep = salvageRun?.checkResult?.data?.tierStepApplied ?? null;
       item.results = awardReceipts(result?.results).map((created) => ({
         name: created?.name || '',

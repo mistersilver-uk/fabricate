@@ -258,7 +258,7 @@ test('crafting simple: each count refusal names its reason, its input and, for a
       { explode: { enabled: true, faces: { kind: 'from', value: 1 }, once: false } },
       'explode-unbounded',
       'explode',
-      'too many dice would roll after explosions',
+      'its dice would explode past the most Foundry can roll at once',
     ],
   ];
   for (const [pool, reason, refusedInput, detail] of cases) {
@@ -1219,7 +1219,7 @@ test('every count refusal sentence in lang/en.json reads as its English fallback
   assert.equal(seen.size, pairs.length, 'each reason and input reads distinctly');
   assert.match(
     refusalMessage({ reason: 'explode-unbounded', refusedInput: 'explode' }, 'Salvage', i18n.format),
-    /too many dice would roll after explosions/,
+    /its dice would explode past the most Foundry can roll at once\.$/,
     'neutral copy, whichever limit stopped the roll'
   );
 });

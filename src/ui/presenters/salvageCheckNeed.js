@@ -1,6 +1,9 @@
-/** The salvage DC shown to players; fixed routing and stages have no single DC. */
+import { isCountCheck } from '../../systems/salvageCheckUsability.js';
+
+/** The salvage DC shown to players; fixed routing, stages and a count check have no single DC. */
 export function salvageDisplayDc({ mode, routedType, config, component }) {
   if (mode === 'progressive' || (mode === 'routed' && routedType === 'fixed')) return null;
+  if (isCountCheck(config)) return null;
   const override = component?.salvage?.dcOverride;
   if (Number.isFinite(override)) return Math.trunc(override);
   const dc = Number(config?.dc);

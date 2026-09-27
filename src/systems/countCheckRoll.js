@@ -15,7 +15,7 @@ import {
   rolledDiceGroups,
 } from './checkRollOutput.js';
 import { classifyCheckTotal, forcedFailureTier, resolveForcedOutcome } from './checkRouting.js';
-import { checkTargetRefusal } from './checkTarget.js';
+import { actorRollData, checkTargetRefusal } from './checkTarget.js';
 import { namedPoolRefusal } from './countCheck.js';
 import { COUNT_CHECK_REFUSALS, countCheckPasses, resolvePool } from './countEvaluation.js';
 import { CountRollRefusal, findCountRoll } from './countRoll.js';
@@ -32,7 +32,7 @@ export async function evaluateCountCheckRoll(actor, options = {}) {
   const Roll = globalThis.Roll;
   if (typeof Roll !== 'function') return NO_ENGINE;
   const { evaluation, thresholdMode } = options;
-  const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
+  const rollData = actorRollData(actor);
   const unrolled = resolvePool({ evaluation, thresholdMode, rollData });
   if (!unrolled.ok)
     return { engine: true, refusal: namedPoolRefusal(unrolled, evaluation, rollData) };

@@ -15,3 +15,9 @@ test('prompt need distinguishes usable DC, no check, and no single target', () =
   assert.deepEqual(salvageCheckNeed({ mode: 'routed', config: { type: 'fixed', dc: 12 }, checkUsable: true }), { kind: 'noSingleTarget' });
   assert.deepEqual(salvageCheckNeed({ mode: 'progressive', config: {}, checkUsable: true }), { kind: 'noSingleTarget' });
 });
+
+test('a count check shows no DC: it grades successes, not its retained DC (issue 2004)', () => {
+  const config = { dc: 15, evaluation: { product: 'count', direction: 'over', pool: {} } };
+  assert.equal(salvageDisplayDc({ mode: 'simple', config, component: { salvage: { dcOverride: 9 } } }), null);
+  assert.deepEqual(salvageCheckNeed({ mode: 'simple', config, checkUsable: true }), { kind: 'noSingleTarget' });
+});

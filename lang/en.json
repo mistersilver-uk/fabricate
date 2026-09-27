@@ -1834,7 +1834,7 @@
         "ThresholdInvalid": "{label} check cannot roll: its success threshold cannot be read as a number.",
         "DieInvalid": "{label} check cannot roll: its die needs at least two faces.",
         "ExplodeFaceMissing": "{label} check cannot roll: the face its dice explode on is not set.",
-        "ExplodeUnbounded": "{label} check cannot roll: too many dice would roll after explosions.",
+        "ExplodeUnbounded": "{label} check cannot roll: its dice would explode past the most Foundry can roll at once.",
         "CancelFaceMissing": "{label} check cannot roll: the face that cancels a success is not set.",
         "PoolNonFinite": "{label} check cannot roll: its dice pool is not a number once modifiers apply.",
         "PoolTooLarge": "{label} check cannot roll: its dice pool is more than 999 dice once modifiers apply.",
