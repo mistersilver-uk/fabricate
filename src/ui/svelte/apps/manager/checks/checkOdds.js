@@ -20,6 +20,7 @@ import {
   resolveRolledFormula,
   rolledDiceGroups,
 } from '../../../../../systems/checkRoll.js';
+import { MAX_PRE_ROLL_OUTCOMES } from '../../../../../systems/countOdds.js';
 import { resolveProgressiveAward } from '../../../../../utils/progressiveAward.js';
 import { reduceRollExpression } from '../../../../../utils/rollExpressionAverage.js';
 
@@ -46,10 +47,6 @@ export const ODDS_REASONS = Object.freeze({
  * deliberately NOT an {@link ODDS_REASONS} member: those say the formula cannot be enumerated,
  * where this says the missing input is the GM's own sandbox order. @type {string} */
 export const SANDBOX_ABSENT = 'no-sandbox-order';
-
-/** The largest joint outcome space this will walk. The enumeration is a cartesian product, so
- *  the cap REFUSES with a stated reason rather than sampling. */
-const MAX_ENUMERATED_OUTCOMES = 50_000;
 
 /** Foundry's non-numeric denominations, whose faces are not values (`1df`, `1dc`). */
 const NON_NUMERIC_DENOMINATION = /^[fc]$/i;
@@ -213,7 +210,7 @@ export function describeFormulaEnumerability(
   if (plan.enumerable === false) return plan;
 
   const combinations = plan.dice.reduce((product, die) => product * die.faces, 1);
-  if (combinations > MAX_ENUMERATED_OUTCOMES) return refuse(ODDS_REASONS.tooManyOutcomes);
+  if (combinations > MAX_PRE_ROLL_OUTCOMES) return refuse(ODDS_REASONS.tooManyOutcomes);
 
   const outcomes = enumerateOutcomes(display.display, plan.dice);
   if (outcomes.some((outcome) => !Number.isFinite(outcome.total))) {
