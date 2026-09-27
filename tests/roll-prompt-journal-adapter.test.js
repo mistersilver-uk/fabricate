@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { promptJournalStageCheck, withPromptActivity } from '../src/bootstrap/journalOperations.js';
-import { buildSinglePromptData } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
+import { buildSinglePromptData, promptCheckRoll } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
+import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 
 describe('Journal roll prompt adapter', () => {
   it('shows the prepared formula without its chat-card flavour labels', async () => {
@@ -75,6 +76,39 @@ describe('Journal roll prompt adapter', () => {
       received = options;
     });
     assert.ok(!Object.hasOwn(received, 'pool'), 'a summed descriptor forwards no count field');
+    const rules = { thresholdSource: '@abilities.int.mod + 11', explode: { kind: 'best', value: null, once: false }, cancel: { kind: 'worst', value: null } };
+    await promptJournalStageCheck({ ...count, ...rules }, async (options) => {
+      received = options;
+    });
+    assert.deepEqual([received.thresholdSource, received.explode, received.cancel], [rules.thresholdSource, rules.explode, rules.cancel]);
+  });
+
+  it('words a redacted count prompt by its destination and shows no pool, threshold or count', async () => {
+    let received;
+    const redacted = {
+      allowsSituationalModifier: true, allowAdvantage: false,
+      product: 'count', direction: 'under', comparison: 'exceed', modifierDestination: 'threshold',
+    };
+    await promptJournalStageCheck(redacted, async (options) => {
+      received = options;
+    });
+    const surface = stubPromptSurface(() => null);
+    try {
+      await promptCheckRoll(received);
+    } finally {
+      surface.restore();
+    }
+    const { view } = surface;
+    assert.equal(
+      view.labels.bonusHelp,
+      'A bonus moves the threshold by that much. A rolled bonus such as 1d4 is rolled first, and its result is applied.',
+      'the count help, not the summed "adds to the total"'
+    );
+    assert.deepEqual([view.formula, view.dc, view.neededText, view.labels.formulaNote], ['', null, '', undefined]);
+    assert.deepEqual(view.count, {
+      pool: null, die: null, threshold: null, thresholdSource: null, explode: null, cancel: null, required: null,
+      destination: 'threshold',
+    });
   });
 
   it('titles a named gathering check with its activity and leaves a hidden one generic', async () => {

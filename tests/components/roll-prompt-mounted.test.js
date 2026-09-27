@@ -584,6 +584,22 @@ describe('mounted roll prompt', () => {
     }
   });
 
+  it('shows a count prompt whose pool is hidden no pool line, rule or chip, only its wording', async () => {
+    const view = buildSinglePromptData({
+      product: 'count', direction: 'under', comparison: 'exceed', modifierDestination: 'threshold',
+      displayFormula: '1d20 + 3', dc: 12,
+    });
+    const { dialog, pending } = await openThroughHost(view, false, noChoice);
+    assert.equal(dialog.querySelector('.formula-row'), null, 'no pool, threshold or count to show');
+    assert.ok(!/\d/.test(dialog.querySelector('.fabricate-roll-prompt').textContent.replace('1d4', '')), 'no number');
+    assert.equal(
+      dialog.querySelector('.bonus-group .help').textContent,
+      'A bonus moves the threshold by that much. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    );
+    dialog.querySelector('[data-manager-modal-close]').click();
+    await pending;
+  });
+
   it('shows a progressive count check its pool line and no successes chip', async () => {
     const view = buildSinglePromptData({
       product: 'count', direction: 'over', pool: 4, die: 6, threshold: 5, required: null, modifierDestination: 'pool',
