@@ -591,3 +591,75 @@ describe('ThresholdBandStrip: the drag scale is frozen for the gesture', () => {
     assert.deepEqual(emitted.at(-1), { binding: 'relative', index: 2, dc: 3 });
   });
 });
+
+/** ── The read-only band picture (issue 2005, ruling R2) ─────────────────────────────── */
+
+/** A roll-under ×1/×½/×⅕ ladder against 55, with each band's range caller-formatted. */
+const UNDER_BANDS = [
+  { id: 'extreme', name: 'Extreme', from: 1, range: '11 or under' },
+  { id: 'hard', name: 'Hard', from: 12, range: '12–27' },
+  { id: 'regular', name: 'Regular', from: 28, range: '28–55' },
+  { id: 'otherwise', name: 'Otherwise', from: 56, range: '56 or over' },
+];
+
+describe('ThresholdBandStrip: readonly', () => {
+  it('draws the bands with no slider, tab stop or draggable handle', async () => {
+    const writes = [];
+    const root = await harness.mount({
+      bands: UNDER_BANDS,
+      readonly: true,
+      onChange: (patch) => writes.push(patch),
+    });
+    assert.equal(root.querySelectorAll('[data-band-strip-band]').length, 4, 'every band drawn');
+    assert.equal(handles(root).length, 0, 'no handle, so no drag cursor either');
+    assert.ok(!root.querySelector('[role="slider"]'), 'no slider role');
+    assert.ok(!root.querySelector('[tabindex]'), 'nothing joins the tab order');
+    const track = root.querySelector('[data-band-strip-track]');
+    press(track, 'ArrowRight');
+    track.dispatchEvent(pointer('pointerdown', 100));
+    track.dispatchEvent(pointer('pointermove', 200));
+    assert.deepEqual(writes, [], 'and no key or pointer path writes anything');
+  });
+
+  it('describes the group by a visually hidden list naming each band and its range', async () => {
+    const root = await harness.mount({ bands: UNDER_BANDS, readonly: true });
+    const track = root.querySelector('[data-band-strip-track]');
+    assert.equal(track.getAttribute('role'), 'group');
+    const describedBy = track.getAttribute('aria-describedby');
+    assert.ok(describedBy, 'the group names its description');
+    const list = root.querySelector('[data-band-strip-band-list]');
+    assert.equal(list.id, describedBy, 'which is the hidden band list');
+    assert.ok(list.classList.contains('visually-hidden'));
+    assert.deepEqual(
+      [...list.querySelectorAll('li')].map((item) => item.textContent.trim()),
+      ['Extreme: 11 or under', 'Hard: 12–27', 'Regular: 28–55', 'Otherwise: 56 or over']
+    );
+  });
+
+  it('gives two read-only strips on one page distinct descriptions', async () => {
+    const first = await harness.mount({ bands: UNDER_BANDS, readonly: true });
+    const firstId = first.querySelector('[data-band-strip-band-list]').id;
+    const second = await harness.mount({ bands: UNDER_BANDS, readonly: true });
+    assert.notEqual(second.querySelector('[data-band-strip-band-list]').id, firstId);
+    first.remove();
+  });
+
+  it('reuses the fallback note when the picture cannot be drawn', async () => {
+    const root = await harness.mount({ bands: [], readonly: true, fallbackNote: 'Unresolved.' });
+    assert.match(root.querySelector('[data-band-strip-fallback]').textContent, /Unresolved/);
+    assert.ok(!root.querySelector('[data-band-strip-band-list]'));
+  });
+
+  it('leaves the default strip exactly as it was: handles, and no description', async () => {
+    const root = await harness.mount({ bands: RELATIVE_BANDS, previewDc: 12 });
+    const track = root.querySelector('[data-band-strip-track]');
+    assert.ok(!track.hasAttribute('aria-describedby'));
+    assert.ok(!root.querySelector('[data-band-strip-band-list]'));
+    assert.ok(!root.querySelector('.visually-hidden'));
+    assert.equal(handles(root).length, 4);
+    assert.deepEqual(
+      handles(root).map((handle) => [handle.getAttribute('role'), handle.getAttribute('tabindex')]),
+      Array.from({ length: 4 }, () => ['slider', '0'])
+    );
+  });
+});
