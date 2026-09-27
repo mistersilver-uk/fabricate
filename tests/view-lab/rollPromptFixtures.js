@@ -1,5 +1,6 @@
 /** Persist production-valid check variants before the View Lab mounts the player app. */
 import { resolveModifierLibrary } from '../../src/systems/characterLibraries.js';
+import { normalizeCheckEvaluation } from '../../src/systems/normalize/checkEvaluation.js';
 
 export async function seedRollPromptFixture(world, state) {
   if (!state || !world) return;
@@ -16,6 +17,7 @@ export async function seedRollPromptFixture(world, state) {
       },
     });
   }
+  if (state === 'under') await seedRollUnder(manager);
   if (state === 'pick-one' || state === 'overflow') {
     const system = manager.getSystem('lab-herbalism');
     await manager.updateSystem(system.id, {
@@ -41,6 +43,21 @@ export async function seedRollPromptFixture(world, state) {
       ...store.listModifiers().filter((entry) => !editedIds.has(entry.id)),
     ]);
   }
+}
+
+/** Smithing's simple slot rolls a bare `1d20` that must stay at or under its fixed target. */
+async function seedRollUnder(manager) {
+  const system = manager.getSystem('lab-smithing');
+  await manager.updateSystem(system.id, {
+    craftingCheck: {
+      ...system.craftingCheck,
+      simple: {
+        ...system.craftingCheck.simple,
+        rollFormula: '1d20',
+        evaluation: normalizeCheckEvaluation({ product: 'sum', direction: 'under' }),
+      },
+    },
+  });
 }
 
 /** Nine long-named world modifiers Herbalism's check offers, so the prompt meets the height cap. */

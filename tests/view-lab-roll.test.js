@@ -26,6 +26,8 @@ import {
   resolveModifierPolicy,
 } from '../src/systems/checkModifierResolver.js';
 import { resolveModifierLibrary } from '../src/systems/characterLibraries.js';
+import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { stubInteractiveRollEnvironment } from './helpers/rollPromptDialogStub.js';
 
 test('roll-prompt View Lab variants project valid checks and long world modifier labels', async () => {
   const content = buildLabContent();
@@ -50,11 +52,33 @@ test('roll-prompt View Lab variants project valid checks and long world modifier
   assert.equal(resolveActiveCraftingCheckFormula(manager.getSystem('lab-smithing')).rollFormula, '1d20 + @abilities.int.mod');
   await seedRollPromptFixture(world, 'pick-one');
   assert.equal(manager.getSystem('lab-herbalism').craftingCheck.maxModifierPicks, 1);
+  await underPromptView(world, content);
   await seedRollPromptFixture(world, 'overflow');
   const herbalism = manager.getSystem('lab-herbalism');
   assert.equal(herbalism.craftingCheck.maxModifierPicks, 2);
   assert.ok(resolveModifierLibrary(herbalism, store).some((entry) => entry.id === 'hb-mod-luck' && entry.label.length > 40));
 });
+
+/** The `under` state: the horseshoe's real engine prompt names a target of 15 to stay at or under. */
+async function underPromptView(world, content) {
+  const manager = world.fabricate.craftingSystemManager;
+  await seedRollPromptFixture(world, 'under');
+  const system = manager.getSystem('lab-smithing');
+  const recipe = content.recipes.find((entry) => entry.id === 'sm-r-horseshoe');
+  const stub = stubInteractiveRollEnvironment();
+  try {
+    await new CraftingEngine(null)._runPassFailCheck(
+      system, system.craftingCheck.simple, recipe, null, { name: 'Idrin', getRollData: () => ({}) },
+      { interactive: true }
+    );
+    const view = stub.surface.view;
+    assert.equal(view.formula, '1d20');
+    assert.equal(view.direction, 'under');
+    assert.equal(`${view.dcText} · ${view.labels.meet}`, 'Target 15 · stay at or under');
+  } finally {
+    stub.restore();
+  }
+}
 
 /** The two statics the shim hands through, reproduced verbatim from `installFoundryShim.js`. */
 const STATICS = {
