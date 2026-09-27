@@ -55,6 +55,7 @@ export function cloneRoutedCheck(routed) {
       : [],
     checkBreakage: cloneCheckBreakage(source.checkBreakage),
     evaluation: normalizeCheckEvaluation(source.evaluation),
+    offerSituationalBonus: source.offerSituationalBonus !== false,
   };
 }
 
@@ -70,6 +71,7 @@ export function cloneSimpleCheck(simple) {
     macroUuid: source.macroUuid || null,
     checkBreakage: cloneCheckBreakage(source.checkBreakage),
     evaluation: normalizeCheckEvaluation(source.evaluation),
+    offerSituationalBonus: source.offerSituationalBonus !== false,
   };
 }
 
@@ -88,6 +90,7 @@ export function cloneProgressiveCheck(progressive) {
     rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
     checkBreakage: cloneCheckBreakage(source.checkBreakage),
     evaluation: normalizeCheckEvaluation(source.evaluation),
+    offerSituationalBonus: source.offerSituationalBonus !== false,
   };
   // Attached rather than spread, so an absent preview sandbox (issue 1097) stays absent in both
   // the draft and its baseline.

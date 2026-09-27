@@ -95,6 +95,7 @@ export function normalizeSimpleCraftingCheck(simple = {}) {
   return {
     rollFormula,
     evaluation: normalizeCheckEvaluation(source.evaluation),
+    offerSituationalBonus: normalizeSituationalBonusOffer(source.offerSituationalBonus),
     dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
     thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
     dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
@@ -122,12 +123,19 @@ export function normalizeProgressiveCraftingCheck(progressive = {}) {
       : 'equal',
     rollFormula,
     evaluation: normalizeCheckEvaluation(source.evaluation),
+    offerSituationalBonus: normalizeSituationalBonusOffer(source.offerSituationalBonus),
     checkBreakage: normalizeUnifiedTriggers(rollFormula, source.diceCrits, source.checkBreakage),
   };
   // Attached rather than spread, the same way `_normalizeCheckModifierCatalogue` attaches
   // its optional bounds: the key is ABSENT when no experiment has been run.
   if (preview) normalized.preview = preview;
   return normalized;
+}
+
+/** Whether the roll prompt shows the situational-bonus field: true unless explicitly false. A
+ * display flag only; `allowsSituationalModifier` stays the authority gate (issue 2005). */
+function normalizeSituationalBonusOffer(offer) {
+  return offer !== false;
 }
 
 export function normalizeSimpleTier(tier) {
@@ -230,6 +238,7 @@ export function normalizeRoutedCraftingCheck(routed = {}) {
     type,
     rollFormula,
     evaluation: normalizeCheckEvaluation(source.evaluation),
+    offerSituationalBonus: normalizeSituationalBonusOffer(source.offerSituationalBonus),
     dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
     thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
     // WHERE THE DC COMES FROM, on the routed slot too (issue 1096): a routed RELATIVE check is

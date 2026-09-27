@@ -236,6 +236,7 @@ test('a percentile roll-under ladder authored in the Studio saves, reopens and e
   );
 
   const reloaded = manager.getSystem(SYSTEM_ID).craftingCheck;
+  assert.equal(reloaded.routed.offerSituationalBonus, false, 'the offer persists');
   assert.deepEqual(reloaded.routed.evaluation.target, {
     source: 'attribute',
     expression: '@skills.craft.value',
@@ -266,6 +267,11 @@ test('a percentile roll-under ladder authored in the Studio saves, reopens and e
         reopened.root.querySelector(`[data-outcome-row="${id}"] [data-outcome-adjustment]`).value
     ),
     ['×⅕', '×½', '×1', 'Otherwise']
+  );
+  assert.equal(
+    reopened.root.querySelector('[data-check-offer-situational-bonus]').getAttribute('aria-pressed'),
+    'false',
+    'the reopened editor shows the offer off'
   );
   harness.remount();
 
