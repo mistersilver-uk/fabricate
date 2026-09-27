@@ -171,7 +171,7 @@ function needText(need, labels) {
   return need?.kind === 'noSingleTarget' ? labels.noSingleTarget : labels.noCheck;
 }
 
-/** The count formula line, `{pool}d{die} · each ≥ {threshold}`, and its successes chip. */
+/** The count formula line, `{pool}d{die} · each ≥ {threshold}`, its rules line and successes chip. */
 function countText(data) {
   const { pool, die, threshold, required } = data.count;
   const resolved = [pool, die, threshold].every(Number.isFinite);
@@ -181,16 +181,55 @@ function countText(data) {
   else if (required !== null) {
     neededText = fill(promptLabel('CountNeeded', '{count} successes needed'), { count: required });
   }
+  const values = countFormulaValues({ dice: pool, die, threshold, direction, comparison });
   return {
     formula: resolved
-      ? fill(
-          promptLabel('CountFormula', '{pool}d{die} · each {comparison} {threshold}'),
-          countFormulaValues({ dice: pool, die, threshold, direction, comparison })
-        )
+      ? fill(promptLabel('CountFormula', '{pool}d{die} · each {comparison} {threshold}'), values)
       : '',
+    formulaNote: resolved ? countRules(data.count, values, direction) : '',
     dcText: '',
     neededText,
   };
+}
+
+/** Frames 30 and 35: `Success on ≥ 8 · best face explodes · worst face cancels`. */
+function countRules({ die, thresholdSource, explode, cancel }, values, direction) {
+  const clauses = [
+    thresholdSource
+      ? fill(promptLabel('CountRuleSource', 'Success on {comparison} {threshold} ({source})'), {
+          ...values,
+          source: thresholdSource,
+        })
+      : fill(promptLabel('CountRule', 'Success on {comparison} {threshold}'), values),
+  ];
+  // A `from` face beyond the die never explodes, and cancels every face over and none under.
+  if (explode && !(explode.kind === 'from' && explode.value > die)) {
+    clauses.push(faceRuleText(explode, direction, explode.once ? 'ExplodeOnce' : 'Explode'));
+  }
+  const against = direction === 'under' ? 'over' : 'under';
+  if (cancel && !(direction === 'under' && cancel.kind === 'from' && cancel.value > die)) {
+    clauses.push(faceRuleText(cancel, against, 'Cancel'));
+  }
+  return clauses.join(' · ');
+}
+
+const FACE_RULES = {
+  Explode: ['CountExplodeBest', 'best face explodes', 'CountExplodeFrom', 'faces {faces} explode'],
+  ExplodeOnce: [
+    'CountExplodeBestOnce',
+    'best face explodes once',
+    'CountExplodeFromOnce',
+    'faces {faces} explode once',
+  ],
+  Cancel: ['CountCancelWorst', 'worst face cancels', 'CountCancelFrom', 'faces {faces} cancel'],
+};
+
+function faceRuleText({ kind, value }, direction, rule) {
+  const [extremeKey, extremeText, fromKey, fromText] = FACE_RULES[rule];
+  if (kind !== 'from') return promptLabel(extremeKey, extremeText);
+  return fill(promptLabel(fromKey, fromText), {
+    faces: `${direction === 'under' ? '≤' : '≥'} ${value}`,
+  });
 }
 
 function targetText(data, labels) {
@@ -208,9 +247,14 @@ function labelsFor(data) {
 
 function formatCopy(data, choicePlan) {
   const labels = labelsFor(data);
+  const { formulaNote, ...counted } = data.count ? countText(data) : {};
   const formatted = {
-    labels: { ...labels, pickUpTo: fill(labels.pickUpTo, { count: choicePlan.maxPicks }) },
-    ...(data.count ? countText(data) : { dcText: targetText(data, labels) }),
+    labels: {
+      ...labels,
+      pickUpTo: fill(labels.pickUpTo, { count: choicePlan.maxPicks }),
+      ...(formulaNote && { formulaNote }),
+    },
+    ...(data.count ? counted : { dcText: targetText(data, labels) }),
   };
   // The one target chip: a count's successes needed, else the DC or target and its comparison.
   formatted.chipText = data.count
@@ -255,13 +299,36 @@ function rollsUnder(need) {
 }
 
 /** A count check's view: the pre-modifier pool, per-die threshold and required count. */
-function countPromptView({ pool, die, threshold, required, modifierDestination }) {
+function countPromptView({
+  pool,
+  die,
+  threshold,
+  thresholdSource,
+  explode,
+  cancel,
+  required,
+  modifierDestination,
+}) {
   return {
     pool: Number.isFinite(pool) ? pool : null,
     die: Number.isFinite(die) ? die : null,
     threshold: Number.isFinite(threshold) ? threshold : null,
+    thresholdSource:
+      typeof thresholdSource === 'string' && thresholdSource ? thresholdSource : null,
+    explode: faceRule(explode),
+    cancel: faceRule(cancel),
     required: Number.isInteger(required) ? required : null,
     destination: modifierDestination === 'threshold' ? 'threshold' : 'pool',
+  };
+}
+
+function faceRule(rule) {
+  if (!rule || typeof rule !== 'object') return null;
+  if (rule.kind === 'from' && !Number.isInteger(rule.value)) return null;
+  return {
+    kind: rule.kind === 'from' ? 'from' : 'extreme',
+    value: rule.value ?? null,
+    once: rule.once === true,
   };
 }
 
@@ -291,6 +358,9 @@ export function buildSinglePromptData({
   pool,
   die,
   threshold,
+  thresholdSource,
+  explode,
+  cancel,
   required,
   modifierDestination,
 } = {}) {
@@ -316,7 +386,16 @@ export function buildSinglePromptData({
       direction: direction === 'under' ? 'under' : 'over',
       comparison: (comparison ?? thresholdMode) === 'exceed' ? 'exceed' : 'meet',
       selectedModifiers: Array.isArray(selectedModifiers) ? selectedModifiers : [],
-      count: countPromptView({ pool, die, threshold, required, modifierDestination }),
+      count: countPromptView({
+        pool,
+        die,
+        threshold,
+        thresholdSource,
+        explode,
+        cancel,
+        required,
+        modifierDestination,
+      }),
     };
   }
   const under = direction === 'under' && Number.isFinite(value);

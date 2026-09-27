@@ -79,8 +79,9 @@ export function underTargetPromptFields(
 }
 
 /**
- * A count prompt's fields: the pre-modifier pool and threshold from the pool resolved before the
- * prompt opens (`policy`, or null), and the required count, or null for a progressive check.
+ * A count prompt's fields: the pre-modifier pool, threshold and face rules from the pool resolved
+ * before the prompt opens (`policy`, or null), and the required count, or null for a progressive
+ * check. `thresholdSource` is the authored threshold when it is not a plain number.
  */
 export function countPromptFields(evaluation, policy, required) {
   return {
@@ -89,11 +90,21 @@ export function countPromptFields(evaluation, policy, required) {
     comparison: policy?.comparison ?? null,
     pool: policy?.dice ?? null,
     threshold: policy?.threshold ?? null,
+    thresholdSource: policy ? authoredThreshold(evaluation.pool?.threshold) : null,
     die: policy?.die ?? null,
+    explode: policy?.explode
+      ? { kind: policy.explode.kind, value: policy.explode.value, once: policy.explode.once }
+      : null,
+    cancel: policy?.cancel ? { kind: policy.cancel.kind, value: policy.cancel.value } : null,
     required: Number.isFinite(required) ? required : null,
     modifierDestination:
       evaluation.pool?.modifierDestination === 'threshold' ? 'threshold' : 'pool',
   };
+}
+
+function authoredThreshold(expression) {
+  const text = String(expression ?? '').trim();
+  return text && !/^[+-]?\d+(?:\.\d+)?$/.test(text) ? text : null;
 }
 
 function promptInput({

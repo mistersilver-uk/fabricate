@@ -537,17 +537,25 @@ describe('mounted roll prompt', () => {
     const focus = [{ label: 'Focus', display: '+2', value: 2 }];
     const cases = [
       {
-        input: { direction: 'over', comparison: 'meet', pool: 6, die: 10, threshold: 8, required: 2, modifierDestination: 'pool' },
+        input: {
+          direction: 'over', comparison: 'meet', pool: 6, die: 10, threshold: 8, required: 2, modifierDestination: 'pool',
+          explode: { kind: 'best', value: null, once: false }, cancel: { kind: 'worst', value: null },
+        },
         formula: '6d10 · each ≥ 8', chip: '2 successes needed', note: 'Each adds dice.',
+        rules: 'Success on ≥ 8 · best face explodes · worst face cancels',
         help: 'A bonus adds that many dice. A rolled bonus such as 1d4 is rolled first, and its result is applied.',
       },
       {
-        input: { direction: 'under', comparison: 'exceed', pool: 3, die: 20, threshold: 13, required: 1, modifierDestination: 'threshold' },
+        input: {
+          direction: 'under', comparison: 'exceed', pool: 3, die: 20, threshold: 13, required: 1, modifierDestination: 'threshold',
+          thresholdSource: '@abilities.int.mod + 10',
+        },
         formula: '3d20 · each < 13', chip: '1 success needed', note: 'Each moves the threshold.',
+        rules: 'Success on < 13 (@abilities.int.mod + 10)',
         help: 'A bonus moves the threshold by that much. A rolled bonus such as 1d4 is rolled first, and its result is applied.',
       },
     ];
-    for (const { input, formula, chip: chipText, note, help } of cases) {
+    for (const { input, formula, chip: chipText, note, rules, help } of cases) {
       document.body.replaceChildren();
       const view = buildSinglePromptData({
         product: 'count', displayFormula: '1d20 + 3', dc: 12, target: 12, selectedModifiers: focus, ...input,
@@ -556,6 +564,10 @@ describe('mounted roll prompt', () => {
       const line = dialog.querySelector('.formula-content .formula');
       assert.equal(line.textContent, formula, 'the pool line, never the retained 1d20 + 3');
       assert.equal(line.dataset.rollPromptCount, input.direction);
+      const ruleLine = line.nextElementSibling;
+      assert.ok(ruleLine.matches('p.help.formula-note'), 'frames 30 and 35: the rule sits under the pool line');
+      assert.equal(ruleLine.textContent.trim(), rules);
+      assert.ok(ruleLine.nextElementSibling.matches('.manager-chip'), 'and above the successes chip');
       const chips = [...dialog.querySelectorAll('.formula-content .manager-chip')];
       assert.equal(chips.length, 1);
       assert.equal(chips[0].textContent.trim(), chipText);
@@ -578,6 +590,7 @@ describe('mounted roll prompt', () => {
     });
     const { dialog, pending } = await openThroughHost(view, false, noChoice);
     assert.equal(dialog.querySelector('.formula-content .formula').textContent, '4d6 · each ≥ 5');
+    assert.equal(dialog.querySelector('.formula-note').textContent.trim(), 'Success on ≥ 5');
     assert.ok(!dialog.querySelector('.formula-content .manager-chip'), 'a budget has no count to reach');
     dialog.querySelector('[data-manager-modal-close]').click();
     await pending;

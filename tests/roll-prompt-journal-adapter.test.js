@@ -67,7 +67,10 @@ describe('Journal roll prompt adapter', () => {
       '',
       'a count view carries no retained formula, even when one is supplied'
     );
-    assert.deepEqual(view.count, { pool: 3, die: 20, threshold: 13, required: 2, destination: 'threshold' });
+    assert.deepEqual(view.count, {
+      pool: 3, die: 20, threshold: 13, thresholdSource: null, explode: null, cancel: null, required: 2,
+      destination: 'threshold',
+    });
     await promptJournalStageCheck({ ...count, product: undefined }, async (options) => {
       received = options;
     });
