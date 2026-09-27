@@ -261,6 +261,12 @@ describe('roll prompt adapter', () => {
     assert.equal(meet.direction, 'under');
     assert.equal(`${meet.dcText} · ${meet.labels.meet}`, 'Target 15 · stay at or under');
     assert.equal(`${meet.dcText} · ${(await under('exceed')).view.labels.exceed}`, 'Target 15 · stay under');
+    assert.deepEqual(
+      [meet.chipText, (await under('exceed')).view.chipText, (await open({ dc: 12, thresholdMode: 'exceed' }, null)).view.chipText],
+      ['Target 15 · stay at or under', 'Target 15 · stay under', 'DC 12 · beat'],
+      'the one target chip reads the number and its comparison'
+    );
+    assert.equal((await open({ name: 'Vein' }, null)).view.chipText, '', 'no number, no chip');
     assert.equal(meet.labels.eachAdds, 'Each raises the target.');
     assert.equal(meet.labels.formulaNote, 'The dice are compared as rolled.');
     assert.equal(

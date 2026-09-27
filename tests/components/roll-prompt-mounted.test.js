@@ -63,7 +63,7 @@ const choices = [
 const noChoice = { options: [], maxPicks: 1, defaultSelectedIds: [] };
 const base = {
   kind: 'single', title: 'Crafting check', subtitle: 'Brenna · Forge rivets', formula: '2d6 + 3',
-  dc: 12, dcText: 'DC 12', comparison: 'meet', selectedModifiers: [], labels, rollModes: modes,
+  dc: 12, dcText: 'DC 12', chipText: 'DC 12 · meet or beat', comparison: 'meet', selectedModifiers: [], labels, rollModes: modes,
   defaultRollMode: 'publicroll', choicePlan: noChoice, allowAdvantage: false,
 };
 const bulk = {
@@ -146,7 +146,7 @@ describe('mounted roll prompt', () => {
 
   it('shows the exact selected modifiers, naming an unlabelled one and zeroing a non-finite value', async () => {
     const root = await harness.mount({ data: {
-      ...base, comparison: 'exceed',
+      ...base, comparison: 'exceed', chipText: 'DC 12 · beat',
       selectedModifiers: [choices[1], { value: 3 }, { label: 'Odd', value: 'n/a' }],
     } });
     assert.match(root.textContent, /DC 12 · beat/);
@@ -534,7 +534,7 @@ describe('mounted roll prompt', () => {
   });
 
   it('shows a count check its pool line and successes chip, in both directions and destinations', async () => {
-    const focus = [{ label: 'Focus', display: '+2' }];
+    const focus = [{ label: 'Focus', display: '+2', value: 2 }];
     const cases = [
       {
         input: { direction: 'over', comparison: 'meet', pool: 6, die: 10, threshold: 8, required: 2, modifierDestination: 'pool' },
@@ -562,6 +562,7 @@ describe('mounted roll prompt', () => {
       assert.equal(chips[0].dataset.rollPromptRequired, String(input.required));
       assert.ok(chips[0].classList.contains('is-info'), 'the DC chip primitive, retoned nowhere');
       assert.ok(!chips[0].hasAttribute('data-roll-prompt-target'));
+      assert.equal(dialog.querySelector('.target-row, .target-source'), null, 'a count explains no target');
       assert.ok(!/DC|meet or beat|beat/.test(dialog.querySelector('.formula-row').textContent), 'no DC');
       assert.equal(dialog.querySelector('.static-modifiers .help').textContent, note);
       assert.equal(dialog.querySelector('.bonus-group .help').textContent, help);

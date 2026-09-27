@@ -99,20 +99,12 @@
               {#if data.labels.formulaNote}<p class="help formula-note">
                   {data.labels.formulaNote}
                 </p>{/if}
-              {#if data.count}
-                {#if data.count.required !== null}
-                  <Chip
-                    tone="info"
-                    density="tag-run"
-                    icon="fa-solid fa-bullseye"
-                    data-roll-prompt-required={data.count.required}>{data.neededText}</Chip
-                  >
-                {/if}
-              {:else if data.dc !== null}
+              {#if data.chipText}
                 <RollPromptTarget
                   text={target.chipText}
                   source={target.source}
-                  data-roll-prompt-target={data.direction === 'under' ? 'under' : undefined}
+                  under={!data.count && data.direction === 'under'}
+                  data-roll-prompt-required={data.count?.required}
                 />
               {/if}
             </div>

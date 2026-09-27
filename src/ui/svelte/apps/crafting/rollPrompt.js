@@ -212,6 +212,11 @@ function formatCopy(data, choicePlan) {
     labels: { ...labels, pickUpTo: fill(labels.pickUpTo, { count: choicePlan.maxPicks }) },
     ...(data.count ? countText(data) : { dcText: targetText(data, labels) }),
   };
+  // The one target chip: a count's successes needed, else the DC or target and its comparison.
+  formatted.chipText = data.count
+    ? formatted.neededText
+    : formatted.dcText &&
+      `${formatted.dcText} · ${data.comparison === 'exceed' ? labels.exceed : labels.meet}`;
   if (Array.isArray(data.subjects)) {
     formatted.subjects = data.subjects.map((subject) => ({
       ...subject,

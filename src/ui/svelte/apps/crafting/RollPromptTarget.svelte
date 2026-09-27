@@ -7,6 +7,7 @@
   | --- | --- | --- | --- |
   | `text` | string | none | The chip's prepared text, from `rollPromptTarget`. |
   | `source` | string | `''` | The prepared explanation; blank renders the bare chip with no row around it. |
+  | `under` | boolean | `false` | A summed roll-under target, which the chip's `data-roll-prompt-target` hook names. |
 
   Rest spread:
   - `{...rest}` lands on the `Chip`, so its `data-roll-prompt-*` hooks forward.
@@ -14,11 +15,17 @@
 <script>
   import Chip from '../../components/Chip.svelte';
 
-  let { text, source = '', ...rest } = $props();
+  let { text, source = '', under = false, ...rest } = $props();
 </script>
 
 {#snippet chip()}
-  <Chip tone="info" density="tag-run" icon="fa-solid fa-bullseye" {...rest}>{text}</Chip>
+  <Chip
+    tone="info"
+    density="tag-run"
+    icon="fa-solid fa-bullseye"
+    data-roll-prompt-target={under ? 'under' : undefined}
+    {...rest}>{text}</Chip
+  >
 {/snippet}
 
 {#if source}
