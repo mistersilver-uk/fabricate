@@ -495,6 +495,9 @@ export class CraftingEngine {
       resolved = this._resolveCheckTarget(activeCheck.config, recipe, actor);
     }
     if (!resolved.ok) {
+      if (!(activeCheck.checkUsable || activeCheck.requiresCheck)) {
+        return { evaluation, target: null, source: null };
+      }
       throw new CraftingLifecycleExecutionError(
         checkRefusalMessage(resolved.reason),
         'CHECK_TARGET_INVALID'

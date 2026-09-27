@@ -2165,6 +2165,28 @@ test('the versioned crafting descriptor refuses its target before the Tool roll 
   }
 });
 
+test('an unusable optional check describes as not required, whatever its target', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1d4+@bonus' } };
+  const skill = { product: 'sum', direction: 'over', target: { source: 'attribute', expression: '@skill' } };
+  const describeUnusable = async (evaluation) => {
+    const evaluations = [];
+    const { restore } = installPreparedRolls(evaluations, []);
+    try {
+      const { actor, describe } = await startToolSuppliedRun(tool, {
+        check: { rollFormula: '', dc: 12, evaluation },
+      });
+      actor.getRollData = () => ({});
+      return { required: (await describe()).required, rolled: evaluations.map((e) => e.formula) };
+    } finally {
+      restore();
+    }
+  };
+  const attribute = await describeUnusable(skill);
+  assert.equal(attribute.required, false, 'no check rolls, so its missing target never refuses');
+  // The descriptor prepares its Tools for an unusable check at base too; the target adds no roll.
+  assert.deepEqual(attribute, await describeUnusable(undefined));
+});
+
 test('the versioned prompt derives its formula with the evaluation, so sum/under appends nothing', async () => {
   const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '2' } };
   const { restore } = installPreparedRolls([], []);
