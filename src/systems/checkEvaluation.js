@@ -190,7 +190,7 @@ function isPropertyHolder(value) {
   return Boolean(value) && (typeof value === 'object' || typeof value === 'function');
 }
 
-/** Foundry writes these as JSON terms rather than their text, so they never read as a number. */
+/** V13.351 writes these as JSON terms (V14.367 too, unless a plain object overrides toString), so they never read as a number. */
 function serializesAsData(value) {
   if (typeof value !== 'object') return false;
   if (Array.isArray(value) || value instanceof Set || value instanceof Map) return true;
