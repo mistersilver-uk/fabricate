@@ -1802,6 +1802,13 @@
         "GMOnly": "Only a GM can settle a bulk check decision.",
         "NotReady": "Fabricate is still starting up, so no bulk check decision can be settled yet.",
         "Failed": "The bulk check decision could not be settled."
+      },
+      "CountRoll": {
+        "Pool": "{pool}d{die} · each {comparison} {threshold}",
+        "Explode": "dice explode on {faces}",
+        "ExplodeOnce": "dice explode once on {faces}",
+        "Cancel": "dice cancel a success on {faces}",
+        "Overlap": "{face}: counts a success and cancels one, so it adds nothing"
       }
     },
     "Knowledge": {
