@@ -355,6 +355,7 @@ test('a dynamic target macro runs only after validation and receives the adjuste
       'the payload evaluation is a clone'
     );
     assert.equal(result.data.target, 15, 'the truncated macro result replaces the anchor');
+    assert.deepEqual(result.data.targetTerms, [{ kind: 'anchor', value: 15 }], 'issue 2005');
 
     MacroExecutor.run = async () => {
       throw new Error('boom');
@@ -363,6 +364,10 @@ test('a dynamic target macro runs only after validation and receives the adjuste
       world.recipe, world.craftingActor, [world.sourceActor], null, null, {}
     );
     assert.equal(fallback.data.target, 12, 'a failed macro keeps the adjusted anchor');
+    assert.deepEqual(fallback.data.targetTerms, [
+      { kind: 'anchor', value: 14 },
+      { kind: 'adjustment', value: -2 },
+    ]);
   } finally {
     MacroExecutor.run = original;
   }
@@ -733,5 +738,27 @@ test('a sum/over fixed check records no target terms', async () => {
   await world.salvage();
   assert.equal(checks[0].data.target, 8);
   assert.ok(!Object.hasOwn(checks[0].data, 'targetTerms'));
+  delete globalThis.Roll;
+});
+
+test('the gathering evaluator hands back no executed visibility, which its run would persist', async () => {
+  installCountingRoll();
+  const prepared = {
+    mode: 'routedByCheck',
+    slot: 'routed',
+    rollFormula: '1d20',
+    checkConfig: { rollFormula: '1d20', type: 'relative', relativeOutcomes: TIERS },
+    decisionPolicy: { target: 10, targetSource: 'fixed' },
+  };
+  const crafted = await evaluatePreparedRunCheck(prepared, { getRollData: () => ({}) });
+  assert.deepEqual(crafted.visibility, { rollMode: 'selfroll', secret: false });
+  const gathering = new GatheringEngine({ localize: (key) => key });
+  gathering.installVersionedRunAuthority({ evaluatePreparedRunCheck });
+  const gathered = await gathering.evaluatePreparedVersionedCheck({
+    actor: { getRollData: () => ({}) },
+    privateEvaluation: prepared,
+  });
+  assert.equal(gathered.success, true);
+  assert.ok(!Object.hasOwn(gathered, 'visibility'));
   delete globalThis.Roll;
 });

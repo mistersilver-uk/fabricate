@@ -15,6 +15,7 @@ const {
   evaluatePreparedRunCheck,
 } = await import('../src/systems/checkRoll.js');
 const { rollActorCheck } = await import('../src/systems/companionCheckRoll.js');
+const { foldTargetTerms } = await import('../src/ui/presenters/checkDisplay.js');
 const { GatheringEngine } = await import('../src/systems/GatheringEngine.js');
 
 // A unified trigger forcing `outcome` when its `diceGroup`/`total`/`==` condition
@@ -317,6 +318,40 @@ test('the prompt shows the offer it is given, and a bonus still applies with it 
     assert.equal(shown.offerSituationalBonus, shownOffer, String(offer));
     assert.equal(rolledFormulas.at(-1), '1d20 + (2)', 'the decision bonus is applied regardless');
   }
+  delete globalThis.Roll;
+});
+
+test('a forced routed roll-under keeps the rolled tier in terms that fold to its target (issue 2005)', async () => {
+  stubRoll(35);
+  globalThis.Roll.fromData = (data) => ({ ...data });
+  const result = await runFormulaRouted({
+    formula: '1d100', dc: 50, thresholdMode: 'meet', type: 'relative', actor: ACTOR,
+    evaluation: { product: 'sum', direction: 'under', target: { source: 'fixed' } },
+    relativeOutcomes: [
+      { id: 'good', name: 'Good', success: true, dc: 10 },
+      { id: 'ok', name: 'Ok', success: true, dc: 0 },
+      { id: 'bad', name: 'Bad', success: false, dc: -10 },
+    ],
+    triggers: [{ id: 'f', condition: { type: 'rollTotal', operator: '==', value: 35 }, outcome: 'failure' }],
+    rollOptions: {
+      toolContributions: [
+        { source: 'tool', label: 'Hammer', form: 'scalar', value: 2 },
+        {
+          source: 'tool', label: 'Kit', form: 'scalar', value: 3,
+          preRoll: { expression: '1d4', total: 3, serializedRoll: { formula: '1d4', total: 3 } },
+        },
+      ],
+    },
+  });
+  assert.equal(result.data.outcomeId, 'bad', 'the forced failure routes away from the rolled tier');
+  assert.equal(result.data.target, 45, 'the rolled Good tier: 50 − 10, then +2 and the 3 pre-rolled');
+  assert.deepEqual(result.data.targetTerms, [
+    { kind: 'anchor', value: 50 },
+    { kind: 'adjustment', value: -10 },
+    { kind: 'benefit', value: 2, source: 'tool' },
+  ]);
+  assert.equal(foldTargetTerms(result.data.targetTerms, result.data.preRolls), 45);
+  assert.ok(!Object.hasOwn(result, 'visibility'), 'visibility is reported only when asked');
   delete globalThis.Roll;
 });
 

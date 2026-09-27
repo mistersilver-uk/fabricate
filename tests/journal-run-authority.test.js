@@ -1595,7 +1595,10 @@ describe('journal run authority ledger', () => {
         },
         decisionPolicy: {
           target: 10, targetSource: 'attribute',
-          targetTerms: [{ kind: 'anchor', value: 12 }, { kind: 'adjustment', value: -2 }],
+          targetTerms: [
+            { kind: 'anchor', value: 12, path: '@skills.SECRET_PATH.value' },
+            { kind: 'adjustment', value: -2 },
+          ],
         },
       });
       const actor = { getRollData: () => ({}) };
