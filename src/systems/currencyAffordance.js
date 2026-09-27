@@ -769,6 +769,45 @@ async function judgeObservedCredit({
   });
 }
 
+/** The credit's spend context; under `macro` `caller` tells a credit from a cancelled craft. */
+function buildWorldCreditContext({ profile, unit, amount, actor }) {
+  const ctx = buildSpendContext({
+    profile,
+    unit,
+    amount,
+    recipe: null,
+    config: null,
+    caller: CURRENCY_SPEND_CALLERS.award,
+  });
+  ctx.macroContext.actor = actor || null;
+  return ctx;
+}
+
+/**
+ * Resolve a world-actor credit without writing (issue 1954): `{ outcome, messageData }` on a
+ * refusal, else the actor, unit, `baseValue`, `creditedBase`, strategy, spender and context.
+ * `seams.resolveActor(actorId)` must answer world actors only.
+ */
+export function prepareWorldCurrencyCredit({ actorId, unitId, amount } = {}, seams = {}) {
+  const request = resolveWorldCurrencyRequest(unitId, amount, seams, resolveCreditAmount);
+  if (request.outcome) return { outcome: request.outcome, messageData: request.messageData };
+  const actor = seams.resolveActor?.(actorId) ?? null;
+  if (!actor) return { outcome: COMPANION_OUTCOMES.noActor, messageData: null };
+  const { unit, baseValue, profile, world } = request;
+  return {
+    outcome: null,
+    actor,
+    unit,
+    amount: request.amount,
+    baseValue,
+    profile,
+    creditedBase: request.amount * baseValue,
+    strategy: world.spendStrategy,
+    spender: resolveCoinSpender(world, seams),
+    ctx: buildWorldCreditContext({ profile, unit, amount: request.amount, actor }),
+  };
+}
+
 /**
  * Run the spender's `refund` as a contract result, mirroring `runWorldAffordabilityCheck`. The
  * marker ladder tests `wroteNothing` before `thrown`, routing a never-ran macro refusal to
@@ -783,16 +822,7 @@ async function runWorldCurrencyCredit({ actor, unit, amount, baseValue, profile,
     });
   }
 
-  const ctx = buildSpendContext({
-    profile,
-    unit,
-    amount,
-    // Under `macro` this runs `increment`; `caller` tells a credit from a cancelled craft.
-    recipe: null,
-    config: null,
-    caller: CURRENCY_SPEND_CALLERS.award,
-  });
-  ctx.macroContext.actor = actor || null;
+  const ctx = buildWorldCreditContext({ profile, unit, amount, actor });
 
   // Only `actorInventory` is observed (D7b): `actorProperty` tests `actor.update`'s own return,
   // and `macro` stays unverified (`creditUnavailable`), since its `readCoins` runs the optional
