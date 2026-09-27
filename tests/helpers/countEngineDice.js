@@ -2,7 +2,9 @@
  * Installs the core-faithful dice double as `globalThis.Roll` and `CONFIG`, with the count Roll
  * registered over it, so an engine rolls count checks through the production projection. Every
  * construction and every evaluation is recorded, a constant formula totals itself, and chat posts
- * are recorded.
+ * are recorded. Limits: `validate()` accepts every formula, `replaceFormulaData` resolves no `@`
+ * path, and a rolled formula parses only as one constant or one `NdX` term, so an invalid bonus,
+ * a roll-data Tool bonus or a multi-term bonus cannot be exercised through it.
  */
 import { registerCountRoll } from '../../src/systems/countRoll.js';
 

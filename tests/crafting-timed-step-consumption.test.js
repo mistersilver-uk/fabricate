@@ -880,7 +880,6 @@ async function maturedTimedCountCheck(pool) {
   const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set }), runManager, null);
   await engine.craft(craftingActor, [sourceActor], recipe, null, {});
   assert.equal(wood._deleted, true, 'START consumed the inputs');
-  wood._deleted = false;
   sourceActor.items = [];
   game.time.worldTime = 2000 + 3600 + 1;
   let consumedAgain = false;
@@ -891,9 +890,10 @@ async function maturedTimedCountCheck(pool) {
   return {
     craftingActor,
     runManager,
-    wood,
     finish: () => engine.craft(craftingActor, [sourceActor], recipe, null, {}),
     consumedAgain: () => consumedAgain,
+    /** Every item FINISH created on either actor: a refund or an award would appear here. */
+    created: () => [...sourceActor._createdDocs, ...craftingActor._createdDocs],
   };
 }
 
@@ -908,8 +908,7 @@ test('QE10: a timed FINISH count refusal rolls, awards and spends nothing and st
     );
     assert.deepEqual(dice.constructed, [], 'no Roll is built');
     assert.equal(world.consumedAgain(), false, 'no new spend');
-    assert.equal(world.wood._deleted, false, 'no refund and no second consumption');
-    assert.equal(world.craftingActor._createdDocs.length, 0, 'no award');
+    assert.equal(world.created().length, 0, 'no refund and no award');
     assert.equal(world.runManager.getActiveRuns(world.craftingActor).length, 1, 'still resumable');
     assert.equal(world.runManager.getRunHistory(world.craftingActor).length, 0);
   } finally {
@@ -930,7 +929,7 @@ for (const [name, pool, faces, rolled] of [
       assert.equal(finished.misconfigured, undefined);
       assert.deepEqual(dice.formulas(), rolled);
       assert.equal(world.consumedAgain(), false, 'no new spend');
-      assert.equal(world.wood._deleted, false, 'no refund');
+      assert.equal(world.created().length, 0, 'no refund');
       assert.equal(world.runManager.getActiveRuns(world.craftingActor).length, 0);
       const [record] = world.runManager.getRunHistory(world.craftingActor);
       assert.equal(record.status, 'failed');
