@@ -38,8 +38,8 @@ export const craftingFacade = {
           ? (game.i18n?.localize?.(key) ?? key)
           : (game.i18n?.format?.(key, data) ?? key),
       nowWorldTime: () => game.time?.worldTime ?? 0,
-      resolveCheckFormula: (formula, actor, craftingModifier) =>
-        resolveCheckFormulaDisplay(formula, actor, craftingModifier),
+      resolveCheckFormula: (formula, actor, craftingModifier, evaluation) =>
+        resolveCheckFormulaDisplay(formula, actor, craftingModifier, undefined, evaluation),
       // The resolver `InventoryListingBuilder` uses, so "looks makeable" and the owned count
       // cannot disagree (issue 1075).
       resolveComponentForItem: findMatchingComponent,

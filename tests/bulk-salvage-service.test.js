@@ -577,6 +577,33 @@ describe('BulkSalvageService.run: the ONE roll prompt', () => {
     assert.equal(prompts[0].actorName, 'Akra', 'one actor in the batch is named');
   });
 
+  it('names a roll-under row by its target and a character-value row as no single target', async () => {
+    const prompts = [];
+    const skill = { source: 'attribute', expression: '@skills.craft.value' };
+    const service = makeService({
+      systems: [
+        bulkSystem({ id: 'sys-a', rollFormula: '1d20', check: { dc: 12, evaluation: { direction: 'under' } }, components: [ORE] }),
+        bulkSystem({ id: 'sys-b', rollFormula: '1d100', check: { evaluation: { direction: 'under', target: skill } }, components: [HIDE] }),
+      ],
+      salvage: async () => ({ success: true, results: [] }),
+      promptRollDecision: async (args) => {
+        prompts.push(args);
+        return { confirmed: true, advantage: 'normal' };
+      },
+    });
+    await service.run({
+      targets: [
+        bulkTarget({ systemId: 'sys-a', componentId: 'comp-ore' }),
+        bulkTarget({ systemId: 'sys-b', componentId: 'comp-hide' }),
+      ],
+      interactive: true,
+    });
+    assert.deepEqual(prompts[0].subjects.map((subject) => subject.need), [
+      { kind: 'target', target: 12 },
+      { kind: 'noSingleTarget' },
+    ]);
+  });
+
   it('names no actor for a batch spanning two actors', async () => {
     let offered;
     const service = makeService({
