@@ -135,7 +135,10 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   if (authoredFormula.trim() === '')
     return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
-  const evaluation = options?.evaluation ?? SUM_OVER_EVALUATION;
+  // An own key only: an inherited `evaluation` (prototype pollution) never selects a mode.
+  const evaluation =
+    (options != null && Object.hasOwn(options, 'evaluation') ? options.evaluation : null) ??
+    SUM_OVER_EVALUATION;
   const modifierChoice = options?.modifierChoice;
   const deferred =
     Boolean(modifierChoice) &&
