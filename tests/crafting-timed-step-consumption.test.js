@@ -5,6 +5,8 @@ import assert from 'node:assert/strict';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
+import { installCountDice } from './helpers/countEngineDice.js';
+import { countEvaluation } from './helpers/countFixtures.js';
 import { createPersistedCraftingHistory, mergeHistoryFlag } from './helpers/journal-fixtures.js';
 
 for (const timed of [false, true]) {
@@ -848,6 +850,95 @@ test('timed step failed FINISH check does not refund and completes the run as fa
   assert.deepEqual(projected.createdResults, []);
   assert.equal(projected.presentationSnapshot.name, 'Timed Step');
 });
+
+/** A timed simple count check started (inputs consumed) and matured, ready to FINISH for real. */
+async function maturedTimedCountCheck(pool) {
+  const system = {
+    id: 'sys-count',
+    resolutionMode: 'simple',
+    features: { craftingChecks: true, essences: false },
+    craftingCheck: {
+      enabled: true,
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false },
+      simple: { rollFormula: '', dc: 10, evaluation: countEvaluation(pool) },
+    },
+    components: [{ id: 'wood', name: 'Wood' }],
+  };
+  setupGame(system, 2000);
+  const wood = new FakeItem('wood', 'Wood', 2);
+  const craftingActor = new FakeActor('Crafter');
+  const sourceActor = new FakeActor('Source', [wood]);
+  const resultGroups = [{ id: 'rg-1', results: [] }];
+  const set = buildIngredientSet('set-1', [{ componentId: 'wood', quantity: 2 }]);
+  const recipe = buildRecipe({
+    craftingSystemId: 'sys-count',
+    ingredientSets: [set],
+    resultGroups,
+    steps: [timedStep({ ingredientSets: [set], resultGroups })],
+  });
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set }), runManager, null);
+  await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+  assert.equal(wood._deleted, true, 'START consumed the inputs');
+  wood._deleted = false;
+  sourceActor.items = [];
+  game.time.worldTime = 2000 + 3600 + 1;
+  let consumedAgain = false;
+  engine._consumeIngredients = async () => {
+    consumedAgain = true;
+    return [];
+  };
+  return {
+    craftingActor,
+    runManager,
+    wood,
+    finish: () => engine.craft(craftingActor, [sourceActor], recipe, null, {}),
+    consumedAgain: () => consumedAgain,
+  };
+}
+
+test('QE10: a timed FINISH count refusal rolls, awards and spends nothing and stays resumable', async () => {
+  const dice = installCountDice({ faces: [] });
+  try {
+    const world = await maturedTimedCountCheck({ threshold: '@skills.craft.value' });
+    const finished = await world.finish();
+    assert.deepEqual(
+      [finished.misconfigured, finished.data],
+      [true, { targetRefusal: 'unresolved-path', refusedInput: 'threshold' }]
+    );
+    assert.deepEqual(dice.constructed, [], 'no Roll is built');
+    assert.equal(world.consumedAgain(), false, 'no new spend');
+    assert.equal(world.wood._deleted, false, 'no refund and no second consumption');
+    assert.equal(world.craftingActor._createdDocs.length, 0, 'no award');
+    assert.equal(world.runManager.getActiveRuns(world.craftingActor).length, 1, 'still resumable');
+    assert.equal(world.runManager.getRunHistory(world.craftingActor).length, 0);
+  } finally {
+    dice.restore();
+  }
+});
+
+for (const [name, pool, faces, rolled] of [
+  ['a rolled count failure', { threshold: '8' }, [2, 3], ['2d10']],
+  ['a zero-pool failure', { base: '0' }, [], []],
+]) {
+  test(`QE10: ${name} at timed FINISH records failure without refund`, async () => {
+    const dice = installCountDice({ faces });
+    try {
+      const world = await maturedTimedCountCheck(pool);
+      const finished = await world.finish();
+      assert.equal(finished.success, false);
+      assert.equal(finished.misconfigured, undefined);
+      assert.deepEqual(dice.formulas(), rolled);
+      assert.equal(world.consumedAgain(), false, 'no new spend');
+      assert.equal(world.wood._deleted, false, 'no refund');
+      assert.equal(world.runManager.getActiveRuns(world.craftingActor).length, 0);
+      const [record] = world.runManager.getRunHistory(world.craftingActor);
+      assert.equal(record.status, 'failed');
+    } finally {
+      dice.restore();
+    }
+  });
+}
 
 // 6. Missing components at START: no lingering run + component names in message
 
