@@ -12,6 +12,7 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   // ABSENT `maxModifierPicks` means rather than coercing it. These four close its graph.
   'src/systems/characterLibraries.js',
   'src/systems/checkModifierResolver.js',
+  'src/systems/checkModifierRouter.js',
   'src/systems/salvageCheckUsability.js',
   'src/utils/checkModifierPicks.js',
   'src/systems/toolCheckBonus.js',

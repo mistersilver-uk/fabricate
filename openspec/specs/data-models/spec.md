@@ -1016,7 +1016,8 @@ ModifierLibraryEntry = {
    A finite bound no dice-grammar `Constant` can express (`1e21`, `1e-7`) is the second blocking bounds fault, `modifierBoundsUnsafe`, and contains the entry to 0 in the same way.
 6. **AN ENTRY WITH NO EXPRESSION IS KEPT.** The library has an "Add modifier" button, and an entry that vanished on save the moment it was created would make that button appear broken.
    It is still a runtime misconfiguration wherever it is referenced.
-7. **A ROLL-SHAPED expression is legal for BOTH consumers** (issue 1118): a gathering drop row evaluates the expression and applies the result as a percentage-point delta, and a check appends the DICE to its roll formula so the authored variance survives to the roll and shows on the card.
+7. **A ROLL-SHAPED expression is legal for BOTH consumers** (issue 1118): a gathering drop row evaluates the expression and applies the result as a percentage-point delta, while the active sum/over check appends the DICE to its roll formula so the authored variance survives to the roll and shows on the card.
+   Other evaluations place the same selected, actor-resolved and bounded expression as a separate pre-roll whose actual total benefits the target, threshold, or pool; this changes no persisted modifier shape.
    `isRollExpression` is therefore a DISPLAY classification and never a gate; the blocking `modifierRollExpression` readiness issue is RETIRED.
 
 ## CurrencyUnit
@@ -3432,6 +3433,8 @@ CraftingRunStepState = {
    A simple result targets its resolved DC; a relative routed result targets the effective threshold of the roll-matched tier, including the lowest tier when a below-every-threshold total is clamped to it, before forcing or stepping, or null when no tier is matched or clamped to; fixed routed and progressive results have null target and margin, and progressive comparison is null.
    A non-null margin is raw total minus target even when forcing changes the disposition.
    Error, prompt cancellation, missing engine and empty formula exits preserve their prior result shape and omit these new execution fields.
+   An executed result's `data.preRolls`, when present, is an ordered array of `{ source, label, expression, total, destination }` for separately evaluated modifiers; the main `total` and `diceGroups` still describe only the authored check roll and its appended terms.
+   Error, prompt cancellation and unrolled exits do not fabricate pre-roll evidence, and a secret prepared check omits it.
 6. `failureReason` is required when `status` is `failed`.
 7. `preparedConsumption.currencySpends` records what was actually deducted, never what was intended.
    It is the sole input to the cancel reversal's refund, so a spend that did not settle must not appear in it; an empty array is the correct record for a step whose currency deduction settled nothing.

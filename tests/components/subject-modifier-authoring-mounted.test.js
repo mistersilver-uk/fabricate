@@ -286,6 +286,7 @@ const gatheringHarness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
+    'src/systems/checkModifierRouter.js',
     'src/systems/salvageCheckUsability.js',
     'src/utils/checkModifierPicks.js',
     'src/systems/toolCheckBonus.js',

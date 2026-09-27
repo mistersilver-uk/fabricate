@@ -190,6 +190,14 @@ async function settle() {
   flushSync();
 }
 
+async function rollAndSettle(root) {
+  root.querySelector('[data-checks-simulator-roll]').click();
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await settle();
+    if (root.querySelector('[data-checks-simulator-readout]')) return;
+  }
+}
+
 // The three converted record controls, each by the hook that rode onto its trigger (issue 1510).
 const RAIL_RECORD = '[data-checks-preview-record]';
 const CARD_RECORD = '[data-preview-against-select]';
@@ -373,9 +381,7 @@ describe('the outcome-preview readout', () => {
   it('rolls through the engine runner and renders what came back', async () => {
     const root = await mountChecks();
     await choosePreviewActor(root, 'sera');
-    root.querySelector('[data-checks-simulator-roll]').click();
-    await settle();
-    await settle();
+    await rollAndSettle(root);
     assert.equal(root.querySelector('[data-checks-simulator-total]').textContent.trim(), '12');
     assert.equal(
       root.querySelector('[data-checks-simulator-breakdown]').textContent.trim(),
@@ -396,9 +402,7 @@ describe('the outcome-preview readout', () => {
   it('lists "What happens" rows derived from the same result object', async () => {
     const root = await mountChecks();
     await choosePreviewActor(root, 'sera');
-    root.querySelector('[data-checks-simulator-roll]').click();
-    await settle();
-    await settle();
+    await rollAndSettle(root);
     const facts = [...root.querySelectorAll('[data-checks-simulator-fact]')].map((row) =>
       row.getAttribute('data-checks-simulator-fact')
     );
@@ -408,9 +412,7 @@ describe('the outcome-preview readout', () => {
   it('DROPS a stale readout when the previewed record changes underneath it', async () => {
     const root = await mountChecks();
     await choosePreviewActor(root, 'sera');
-    root.querySelector('[data-checks-simulator-roll]').click();
-    await settle();
-    await settle();
+    await rollAndSettle(root);
     assert.ok(root.querySelector('[data-checks-simulator-readout]'));
     await choose(root, RAIL_RECORD, 'rare');
     assert.ok(

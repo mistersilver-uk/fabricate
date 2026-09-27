@@ -117,9 +117,13 @@ test('salvage appends TOOL bonuses first and the modifier term after them', asyn
   const rolled = [];
   const restore = stubRoll(rolled);
   const engine = new CraftingEngine(null);
-  // The tool-bonus append is its own seam (`_appendToolCheckBonuses`); stub it to a known
+  // The tool-bonus append is its own seam (`_prepareToolCheckBonuses`); stub it to a known
   // rewrite so the ORDER is observable rather than inferred.
-  engine._appendToolCheckBonuses = async (formula) => `${formula} + 2[Tools]`;
+  engine._prepareToolCheckBonuses = async (formula, _tools, evaluation) => ({
+    formula: `${formula} + 2[Tools]`,
+    contributions: [],
+    evaluation,
+  });
   try {
     await engine._runSalvageCraftingCheck(
       SALVAGE_COMPONENT,

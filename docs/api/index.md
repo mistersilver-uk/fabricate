@@ -397,6 +397,18 @@ Destroy removes the component's WHOLE stack on the target actor, with no quantit
 It is deliberately not gated on the system's Salvage feature or the component's own salvage setup, since deleting an owned item is something a player could already do from the Foundry sheet.
 It posts no chat card, because a result card reports what an activity produced, and destroying produces nothing.
 
+### System-Owned Check Evidence
+
+System-owned check results can also contain `data.preRolls`.
+Each entry records a separately evaluated modifier as `{ source, label, expression, total, destination }` in evaluation order.
+The main `total` and `diceGroups` continue to describe only the authored check roll.
+Fabricate omits `data.preRolls` when no separately evaluated modifier completed, including cancelled, unrolled, and secret executions.
+Under the active roll-total-over-target evaluation, a dice-bearing Tool bonus joins the formula as a number and adds no entry.
+An entitled roll handoff carries serialized pre-rolls with its main serialized roll and reconstructs them for the recipient after GM execution, without rerolling.
+If that handoff cannot reconstruct its rolls, it refuses the chat post without rolling back the executed check.
+If Fabricate cannot serialize a dice-bearing Tool bonus's roll, the check does not run, rather than applying a bonus whose roll was lost.
+A bundled post uses its chosen roll mode, or the posting client's current default when no mode was chosen.
+
 ### Actor Selection
 
 These methods back the unified Fabricate window's actor-selection bar and persist the remembered gathering actor:
