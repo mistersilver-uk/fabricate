@@ -557,7 +557,7 @@ describe('AC-14 (facade half) — the delegator forwards NAMED KEYS, never the r
       callSite: 'gmAction',
       formula: '1d20',
       dc: 15,
-      evaluation: { direction: 'under' },
+      evaluation: { product: 'count' },
       actor: { id: 'impostor' },
       speaker: { alias: 'impostor' },
       prompt: () => { throw new Error('caller prompt'); },
@@ -614,8 +614,9 @@ describe('AC-14 (facade half) — the delegator forwards NAMED KEYS, never the r
         'label',
         'rollOptions',
         'craftingModifier',
+        'evaluation',
       ],
-      'the runner call carries exactly the eight keys the delegator names'
+      'the runner call carries exactly the nine keys the delegator names'
     );
     assert.equal(bag.craftingModifier, null, 'no smuggled modifier catalogue');
     assert.deepEqual(bag.triggers, [], 'no smuggled forced-outcome trigger');

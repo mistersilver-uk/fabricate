@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { runFormulaPassFail, runFormulaProgressive } from '../src/systems/checkRoll.js';
+import { CHECK_EVALUATION_CAPABILITIES } from '../src/systems/companionCheckEvaluation.js';
 import { resolveBulkCheckDecision, rollActorCheck } from '../src/systems/companionCheckRoll.js';
 import {
   BULK_CHECK_DECISION_MESSAGE_KEYS,
@@ -577,7 +578,7 @@ describe('AC-9 — the module rolls nothing and reaches nothing it was not given
   // or rollPrompt.js here would let the module bypass the very seams every dismissal assertion
   // depends on. The exact set holds static, re-exported and `import()` specifiers alike.
   defineStructureContract(
-    'imports only its contract, evaluation boundary and formula predicate',
+    'imports only its contract, target resolution, evaluation boundary and formula predicate',
     MODULE,
     {
       importSpecifiers: [
@@ -585,6 +586,7 @@ describe('AC-9 — the module rolls nothing and reaches nothing it was not given
           '',
           [
             '../utils/craftingCheckExpression.js',
+            './checkTarget.js',
             './companionCheckEvaluation.js',
             './companionContract.js',
           ],
@@ -653,9 +655,12 @@ describe('AC-10 — every REAL answer carries a key from its own member table', 
     );
     record(await rollActorCheck(request({ rollDecision: { bonus: '+1' } }), makeSeams().seams));
     record(await rollActorCheck(request({ evaluation: null }), makeSeams().seams));
+    record(await rollActorCheck(request({ evaluation: { product: 'count' } }), makeSeams().seams));
     record(
       await rollActorCheck(
-        request({ evaluation: { direction: 'under' } }),
+        request({
+          evaluation: { target: { source: 'attribute', expression: '@missing.path' } },
+        }),
         makeSeams().seams
       )
     );
@@ -691,6 +696,7 @@ describe('AC-10 — every REAL answer carries a key from its own member table', 
         'notElected',
         'rollFailed',
         'rolled',
+        'targetUnresolved',
       ],
       'every outcome the member can emit from its own body was exercised'
     );
@@ -918,6 +924,175 @@ describe('evaluation dispatch and executed evidence', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Attribute dispatch and roll-under (issue 2003, QE15, F1, D10)
+// ---------------------------------------------------------------------------
+
+const SKILLED_ACTOR = {
+  id: 'actor-skilled',
+  name: 'Idrin',
+  getRollData: () => ({ skills: { craft: { value: 55 } } }),
+};
+
+describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
+  it('iterates every published capability row, and an unlisted row refuses evaluationUnsupported', async () => {
+    for (const mode of CHECK_EVALUATION_CAPABILITIES.modes) {
+      installChat();
+      installRoll({ total: 10 });
+      const { seams } = makeSeams({ real: true });
+      const attribute = mode.targetSources[0] === 'attribute';
+      const evaluation = {
+        product: mode.product,
+        direction: mode.direction,
+        target: attribute
+          ? { source: 'attribute', expression: '@skills.craft.value' }
+          : { source: 'fixed' },
+      };
+      const result = await rollActorCheck(
+        request({
+          actor: SKILLED_ACTOR,
+          dc: attribute ? undefined : 15,
+          evaluation,
+        }),
+        seams
+      );
+      assert.notEqual(result.outcome, 'evaluationUnsupported', JSON.stringify(mode));
+      assert.notEqual(result.outcome, 'evaluationInvalid', JSON.stringify(mode));
+      assert.notEqual(result.outcome, 'targetUnresolved', JSON.stringify(mode));
+    }
+
+    installChat();
+    installRoll();
+    const { seams } = makeSeams();
+    const unlisted = await rollActorCheck(request({ evaluation: { product: 'count' } }), seams);
+    assert.equal(unlisted.outcome, 'evaluationUnsupported');
+  });
+
+  it('refuses an interactive request for a non-interactive row, before any prompt', async () => {
+    for (const evaluation of [{ direction: 'under' }, { target: { source: 'attribute' } }]) {
+      installChat();
+      installRoll();
+      const { seams, calls } = makeSeams({ real: true });
+      const result = await rollActorCheck(
+        request({ actor: SKILLED_ACTOR, dc: 15, interactive: true, evaluation }),
+        seams
+      );
+      assert.equal(result.outcome, 'evaluationUnsupported', JSON.stringify(evaluation));
+      assert.equal(calls.prompt.length, 0);
+    }
+  });
+
+  it('refuses a fixed sum/under request with no finite dc, before any roll', async () => {
+    installChat();
+    const rolled = installRoll();
+    const { seams } = makeSeams({ real: true });
+
+    const result = await rollActorCheck(request({ evaluation: { direction: 'under' } }), seams);
+
+    assert.equal(result.outcome, 'evaluationInvalid');
+    assert.deepEqual(rolled.constructions, []);
+  });
+
+  it('grades an attribute target by its resolved value alone, ignoring a conflicting dc', async () => {
+    installChat();
+    installRoll({ total: 60 });
+    const { seams } = makeSeams({ real: true });
+
+    const result = await rollActorCheck(
+      request({
+        actor: SKILLED_ACTOR,
+        dc: 99,
+        evaluation: { target: { source: 'attribute', expression: '@skills.craft.value' } },
+      }),
+      seams
+    );
+
+    assert.equal(result.outcome, 'checkPassed');
+    assert.equal(result.message, CHECK_ROLL_MESSAGE_KEYS.checkPassedTarget);
+    assert.deepEqual(result.messageData, { label: 'Fabricate', total: 60, target: 55 });
+    assert.equal('dc' in result.messageData, false);
+  });
+
+  it('answers targetUnresolved for an attribute whose path does not resolve, before any roll', async () => {
+    installChat();
+    const rolled = installRoll();
+    const { seams } = makeSeams({ real: true });
+
+    const result = await rollActorCheck(
+      request({
+        actor: SKILLED_ACTOR,
+        evaluation: { target: { source: 'attribute', expression: '@skills.missing.value' } },
+      }),
+      seams
+    );
+
+    assert.equal(result.outcome, 'targetUnresolved');
+    assert.deepEqual(rolled.constructions, []);
+  });
+
+  it('refuses evaluationInvalid for a multiply baseAdjustment at or below zero', async () => {
+    for (const baseAdjustment of [0, -2]) {
+      installChat();
+      const rolled = installRoll();
+      const { seams } = makeSeams({ real: true });
+
+      const result = await rollActorCheck(
+        request({
+          actor: SKILLED_ACTOR,
+          evaluation: {
+            target: {
+              source: 'attribute',
+              expression: '@skills.craft.value',
+              adjustmentKind: 'multiply',
+              baseAdjustment,
+            },
+          },
+        }),
+        seams
+      );
+
+      assert.equal(result.outcome, 'evaluationInvalid', `baseAdjustment ${baseAdjustment}`);
+      assert.deepEqual(rolled.constructions, []);
+    }
+  });
+
+  it('grades a fixed sum/under request against its own dc, keyed by target', async () => {
+    installChat();
+    installRoll({ total: 8 });
+    const { seams } = makeSeams({ real: true });
+
+    const passed = await rollActorCheck(
+      request({ dc: 10, evaluation: { direction: 'under' } }),
+      seams
+    );
+
+    assert.equal(passed.outcome, 'checkPassed');
+    assert.equal(passed.message, CHECK_ROLL_MESSAGE_KEYS.checkPassedTarget);
+    assert.deepEqual(passed.messageData, { label: 'Fabricate', total: 8, target: 10 });
+
+    installRoll({ total: 90 });
+    const failed = await rollActorCheck(
+      request({ dc: 10, evaluation: { direction: 'under' } }),
+      makeSeams({ real: true }).seams
+    );
+
+    assert.equal(failed.outcome, 'checkFailed');
+    assert.equal(failed.message, CHECK_ROLL_MESSAGE_KEYS.checkFailedTarget);
+  });
+
+  it('keeps sum/over/fixed graded by dc, using the plain Passed/Failed key', async () => {
+    installChat();
+    installRoll({ total: 20 });
+    const { seams } = makeSeams({ real: true });
+
+    const result = await rollActorCheck(request({ dc: 15 }), seams);
+
+    assert.equal(result.outcome, 'checkPassed');
+    assert.equal(result.message, CHECK_ROLL_MESSAGE_KEYS.checkPassed);
+    assert.deepEqual(result.messageData, { label: 'Fabricate', total: 20, dc: 15 });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // AC-14 — the request key allowlist, at BOTH levels, against a HOSTILE request
 // ---------------------------------------------------------------------------
 
@@ -930,6 +1105,7 @@ const RUNNER_KEYS = [
   'label',
   'rollOptions',
   'craftingModifier',
+  'evaluation',
 ];
 
 describe('AC-14 — nothing a caller supplies reaches the runner or the roll options', () => {
