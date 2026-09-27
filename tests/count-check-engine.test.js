@@ -2,7 +2,8 @@
  * Issue 2004 — a success-counting check through the real engine entry points. The activity
  * adapters validate the pool before any Tool or modifier roll (QE3), then roll the registered
  * count Roll once over the core-faithful double, so every construction, Tool die included, is
- * counted and nothing is overridden but the recorder `_runCraftingCheck` passes through.
+ * counted. The seams replaced are the recorder `_runCraftingCheck` passes through, the Tool states
+ * `craftingWorld` resolves, and `MacroExecutor.run` in the macro test.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -405,6 +406,38 @@ for (const { mode, check } of SALVAGE_SITES) {
   });
 }
 
+const SALVAGE_TOOL_ITEMS = [
+  {
+    tool: HAMMER,
+    contributionInput: {
+      tool: { ...HAMMER, bonus: { enabled: true, expression: '1d4' } },
+      primaryActor: { system: {} },
+    },
+  },
+];
+
+for (const [method, config] of [
+  ['_runSalvageSimpleCheck', simpleCheck],
+  ['_runSalvageRoutedCheck', (evaluation) => routedCheck(evaluation, { relativeOutcomes: [{ ...TIERS[0] }] })],
+  ['_runSalvageProgressiveCheck', progressiveCheck],
+]) {
+  test(`${method}: a count refusal precedes the Tool roll, and a valid pool rolls the Tool then the pool`, async () => {
+    const engine = Object.create(CraftingEngine.prototype);
+    const component = { name: 'Scrap', salvage: {} };
+    const salvage = (evaluation, faces) =>
+      withDice(faces, async (dice) => {
+        const result = await engine[method](config(evaluation), component, { system: {} }, {
+          toolItems: SALVAGE_TOOL_ITEMS,
+        });
+        return { result, constructed: dice.constructed, formulas: dice.formulas() };
+      });
+    const refused = await salvage(countEvaluation({ threshold: MISSING }), []);
+    assert.equal(refused.result.misconfigured, true);
+    assert.deepEqual(refused.constructed, [], 'no Tool die before the refusal');
+    assert.deepEqual((await salvage(countEvaluation(), [1, 9, 3, 8])).formulas, ['1d4', '3d10']);
+  });
+}
+
 test('bulk salvage: a refused count row is misconfigured, rolls nothing and consumes nothing', async () => {
   const run = (threshold, faces) =>
     withDice(faces, async (dice) => {
@@ -441,7 +474,7 @@ test('bulk salvage: a refused count row is misconfigured, rolls nothing and cons
 
 test('bulk salvage offers no advantage over a count check whose retained formula is a d20', async () => {
   const prompts = [];
-  const world = salvageWorld('simple', simpleCheck(countEvaluation(), { rollFormula: '1d20' }));
+  salvageWorld('simple', simpleCheck(countEvaluation(), { rollFormula: '1d20' }));
   const system = globalThis.game.fabricate.getCraftingSystemManager().getSystem('sys-salvage');
   const service = new BulkSalvageService({
     salvage: async () => ({ success: true }),
@@ -456,7 +489,6 @@ test('bulk salvage offers no advantage over a count check whose retained formula
     true
   );
   assert.equal(prompts[0].allowAdvantage, false);
-  assert.equal(world.engine instanceof CraftingEngine, true);
 });
 
 // ── gathering ─────────────────────────────────────────────────────────────────
@@ -474,6 +506,7 @@ async function gatheringAttempt(mode, check, { faces = [], skills = null, task =
   Object.assign(fixture.environment.tasks[0], task);
   const actor = new GatheringDocumentActor('Gatherer', { ownerIds: ['user-gathering'] });
   if (skills) actor.system = { skills };
+  const previousConfig = globalThis.CONFIG;
   let dice = null;
   try {
     const result = await runRealGatheringAttempt({
@@ -485,7 +518,10 @@ async function gatheringAttempt(mode, check, { faces = [], skills = null, task =
     });
     return { ...result, formulas: dice.formulas(), constructed: dice.constructed };
   } finally {
-    delete globalThis.CONFIG;
+    // The attempt restores Roll and ChatMessage itself, so `dice.restore()` here would reinstate
+    // its stubs; only CONFIG is this installer's to undo.
+    if (previousConfig === undefined) delete globalThis.CONFIG;
+    else globalThis.CONFIG = previousConfig;
   }
 }
 
@@ -554,8 +590,18 @@ test('the gathering descriptor refuses a count pool and captures its resolved po
   );
 
   const actor = { uuid: 'Actor.g', getRollData: () => ({ skills: { craft: { value: 4 } } }) };
+  const explode = { enabled: true, faces: { kind: 'from', value: 9 }, once: true };
+  const cancel = { enabled: true, faces: { kind: 'worst', value: null } };
   const described = describe(
-    countEvaluation({ base: '@skills.craft.value', direction: 'under', required: 3 }),
+    countEvaluation({
+      base: '@skills.craft.value',
+      direction: 'under',
+      required: 3,
+      modifierDestination: 'threshold',
+      zeroPoolFails: false,
+      explode,
+      cancel,
+    }),
     actor,
     'routed',
     { successesOverride: 0 }
@@ -569,10 +615,10 @@ test('the gathering descriptor refuses a count pool and captures its resolved po
     threshold: 8,
     required: 0,
     comparison: 'meet',
-    explode: countEvaluation().pool.explode,
-    cancel: countEvaluation().pool.cancel,
-    zeroPoolFails: true,
-    modifierDestination: 'pool',
+    explode,
+    cancel,
+    zeroPoolFails: false,
+    modifierDestination: 'threshold',
   });
   assert.equal(described.publicPrompt.allowAdvantage, false, 'the retained 1d20 offers none');
   assert.equal(described.publicPrompt.allowsSituationalModifier, true);
@@ -1120,6 +1166,52 @@ test('a secret count check posts one gmroll carrying only the numeric replay pol
   } finally {
     dice.restore();
   }
+});
+
+test('the prepared evaluator honours every captured field, not the authored defaults', async () => {
+  const toolContributions = [{ source: 'tool', label: 'Hammer', form: 'scalar', value: 1 }];
+  const prepared = preparedCountCheck({
+    toolContributions,
+    count: {
+      direction: 'under',
+      comparison: 'exceed',
+      threshold: 5,
+      required: 2,
+      modifierDestination: 'threshold',
+      explode: { enabled: true, faces: { kind: 'best', value: null }, once: true },
+    },
+  });
+  await withDice([1, 6, 2], async (dice) => {
+    const result = await evaluatePreparedRunCheck(prepared, LIVE_ACTOR);
+    // Under and exceeding 5 + 1: the 1 qualifies and explodes once into a 2; the 6 misses.
+    assert.deepEqual(dice.formulas(), ['2d10xo=1']);
+    assert.deepEqual(
+      [result.success, result.data.direction, result.data.comparison, result.data.target],
+      [true, 'under', 'exceed', 6]
+    );
+    assert.deepEqual([result.data.total, result.data.margin], [2, 0], 'graded against the captured 2');
+  });
+});
+
+test('a secret prepared count check keeps a rolled pre-roll, a zero pool and a refusal inside', async () => {
+  const bonus = { allowsSituationalModifier: true, bonus: '1d4' };
+  const secret = { secret: true };
+  await withDice([3, 9, 9, 1, 1, 1], async (dice) => {
+    const result = await evaluatePreparedRunCheck(preparedCountCheck(), LIVE_ACTOR, bonus, secret);
+    assert.equal(dice.formulas()[0], '1d4', 'the situational bonus pre-rolled');
+    assert.equal(Object.hasOwn(result.data, 'preRolls'), false);
+  });
+  await withDice([], async (dice) => {
+    const zero = await evaluatePreparedRunCheck(preparedCountCheck({ count: { base: 0 } }), LIVE_ACTOR, {}, secret);
+    assert.deepEqual([zero.success, zero.data.zeroPool, dice.constructed.length], [false, true, 0]);
+  });
+  await withDice([4], async () => {
+    const big = await evaluatePreparedRunCheck(preparedCountCheck({ count: { base: 998 } }), LIVE_ACTOR, bonus, secret);
+    assert.deepEqual(
+      [big.misconfigured, big.data],
+      [true, { targetRefusal: 'pool-too-large', refusedInput: 'pool' }]
+    );
+  });
 });
 
 test('an entitled count check hands back its roll, which reconstructs with no RNG', async () => {
