@@ -1,8 +1,8 @@
 <!--
   The product's ONE threshold band strip: N ordered, named bands over a value track, with a
-  draggable, keyboard-operable handle on every INTERNAL boundary, so N bands yield N−1 handles. It is
-  a VISUALISATION, never the authority: the numeric `Stepper`s in the tier rows below edit the same
-  state through the same `onChange`.
+  draggable, keyboard-operable handle on every INTERNAL boundary unless `readonly`, so N bands yield
+  N−1 handles. It is a VISUALISATION, never the authority: the numeric `Stepper`s in the tier rows
+  below edit the same state through the same `onChange`.
 
   Props:
   | prop | values | default | contract |
@@ -14,6 +14,7 @@
   | `groupLabel` / `boundaryLabel(band, next)` | string / function | `'Outcome bands'` / name pair | The group's accessible name, and the accessible name of the handle between two bands. |
   | `fallbackNote` | string | `''` | Rendered INSTEAD of the strip when the authored set is not contiguous: a gapped or overlapping FIXED set is reachable and a contiguous strip cannot draw it, so the tier rows are left as the only editor. |
   | `disabled` / `dataAttr` / `dataValue` | boolean / strings | `false` / `''` | The handles go inert, and the caller's own hook on the root. |
+  | `readonly` | boolean | `false` | A derived band PICTURE: no handles, so no slider role, tabindex or drag cursor, and the group is described by a visually hidden list of each band's `name` and caller-formatted `range` (`bands[].range`). |
   | `onChange(patch)` | function | no-op | The authored patch, per binding above. |
 
   Invariants:
@@ -51,8 +52,12 @@
     disabled = false,
     dataAttr = '',
     dataValue = '',
+    readonly = false,
     onChange = () => {},
   } = $props();
+
+  const instanceId = $props.id();
+  const bandListId = `${instanceId}-bands`;
 
   let trackElement = $state(null);
   let dragIndex = $state(-1);
@@ -73,6 +78,7 @@
         name: band?.name ?? '',
         color: typeof band?.color === 'string' ? band.color : '',
         ink: typeof band?.ink === 'string' ? band.ink : '',
+        range: typeof band?.range === 'string' ? band.range : '',
         from: numeric(band?.from),
         to: numeric(band?.to),
         index: Number.isInteger(band?.index) ? band.index : position,
@@ -237,6 +243,7 @@
       bind:this={trackElement}
       role="group"
       aria-label={previewLabel ? `${groupLabel} — ${previewLabel}` : groupLabel}
+      aria-describedby={readonly ? bandListId : undefined}
       data-band-strip-track
     >
       {#each resolved as band, index (band.id || index)}
@@ -254,7 +261,7 @@
         </span>
       {/each}
 
-      {#each boundaries as boundary, index (index)}
+      {#each readonly ? [] : boundaries as boundary, index (index)}
         {@const bounds = ariaBoundsFor(index)}
         <span
           class="fab-band-strip-handle"
@@ -287,6 +294,13 @@
         <span class="fab-band-strip-tick" style={`left: ${percentOf(boundary)}%;`}>{boundary}</span>
       {/each}
     </div>
+    {#if readonly}
+      <ul class="visually-hidden" id={bandListId} data-band-strip-band-list>
+        {#each resolved as band, index (band.id || index)}
+          <li>{band.range ? `${band.name}: ${band.range}` : band.name}</li>
+        {/each}
+      </ul>
+    {/if}
   </div>
 {/if}
 

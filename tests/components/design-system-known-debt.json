@@ -351,8 +351,7 @@
     "src/ui/svelte/components/IconPicker.svelte | 1",
     "src/ui/svelte/components/ManagerColorPicker.svelte | 1",
     "src/ui/svelte/components/ManagerColorPopover.svelte | 2",
-    "src/ui/svelte/components/SearchablePopover.svelte | 2",
-    "src/ui/svelte/components/Stepper.svelte | 2"
+    "src/ui/svelte/components/SearchablePopover.svelte | 2"
   ],
   "offLadderArtSizes": [
     "src/ui/svelte/apps/alchemy/AlchemyDisciplineChooser.svelte | 44 | 1",

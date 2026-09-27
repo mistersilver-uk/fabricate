@@ -96,7 +96,7 @@ tests/components/shopping-list-mounted.test.js	4
 tests/components/status-chip-tone-contract.test.js	1
 tests/components/status-toggle-mounted.test.js	1
 tests/components/stepper-call-site-contract.test.js	4
-tests/components/stepper-spinner.test.js	7
+tests/components/stepper-spinner.test.js	6
 tests/components/stepper-unset-fill.test.js	15
 tests/components/subject-modifier-authoring-mounted.test.js	1
 tests/components/system-modifier-row-geometry.test.js	2
