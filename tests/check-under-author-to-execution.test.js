@@ -227,6 +227,7 @@ test('a percentile roll-under ladder authored in the Studio saves, reopens and e
 
   assert.equal(model.checksDirty, true);
   assert.equal(await model.saveChecks(), true, 'the header Save lands');
+  assert.equal(model.checksDirty, false, 'the saved draft is the new baseline');
 
   // The route model hands the store the whole draft: evaluation and offer included.
   const saved = saves.at(-1);
