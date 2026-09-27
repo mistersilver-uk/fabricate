@@ -413,6 +413,13 @@ describe('mounted roll prompt', () => {
     assert.equal(answers.length, 1, 'the component settles once');
   });
 
+  it('leaves a composing Escape to the input method editor', async () => {
+    let dismissed = 0;
+    const root = await harness.mount({ data: base, onDismiss: () => (dismissed += 1) });
+    dialogOf(root).querySelector('input[name="situationalBonus"]').dispatchEvent(keydown('Escape', { isComposing: true }));
+    assert.equal(dismissed, 0, 'Escape that ends a composition does not dismiss the prompt');
+  });
+
   it('stops handling keys once it is destroyed', async () => {
     let dismissed = 0;
     const root = await harness.mount({ data: base, onDismiss: () => (dismissed += 1) });
