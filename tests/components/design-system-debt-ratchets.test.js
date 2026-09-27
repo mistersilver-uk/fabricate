@@ -631,7 +631,7 @@ function nativeSelects(templates) {
 }
 
 test('an unmarked native <select> is debt, and the marker comment is what exempts one', () => {
-  // BOTH POLARITIES, SYNTHETIC, so the pin holds whichever shipped file carries the marker.
+  // BOTH POLARITIES, SYNTHETIC, because no file in the tree carries the marker.
   const withMarker = [
     '<!-- native select: the Foundry drop-down is the only control a DialogV2 body can host. -->',
     '<select bind:value={choice}><option>a</option></select>',
