@@ -630,7 +630,7 @@ test('a bundled handoff reconstructs all evaluated rolls without rerolling', asy
   }
 });
 
-test('prepared Tool evidence reaches an entitled handoff and stays out of a secret reply', async () => {
+test('entitled handoff carries Tool evidence while secret projection keeps settled placement inside the authority', async () => {
   installRollStub();
   installChatStub();
   globalThis.Roll.fromData = (data) => ({ formula: data.formula });
@@ -672,6 +672,31 @@ test('a prepared sum/over run check keeps a rolled Tool as its numeric term alon
     await evaluatePreparedRunCheck(preparation, actor, {}, { secret: true });
     assert.equal(chatCreated.length, 0);
     assert.equal(lastRoll.toMessageCalls.length, 1, 'the secret roll posts through Roll#toMessage');
+  } finally {
+    clearStubs();
+  }
+});
+
+test('secret prepared run check with Tool pre-roll omits authority fields from the reply', async () => {
+  installRollStub();
+  installChatStub();
+  const preparation = {
+    rollFormula: '1d20',
+    slot: 'simple',
+    checkConfig: { toolContributions: [rolledHammer] },
+    decisionPolicy: { dc: 10 },
+  };
+  try {
+    const secret = await evaluatePreparedRunCheck(preparation, actor, {}, { secret: true });
+    // Verify the returned value omits authority-side fields
+    assert.equal(Object.hasOwn(secret, 'modifierPlacement'), false, 'no modifierPlacement in the reply');
+    assert.equal(Object.hasOwn(secret.data, 'preRolls'), false, 'no preRolls evidence in the reply');
+    assert.equal(Object.hasOwn(secret, 'rollHandoff'), false, 'no rollHandoff in the reply');
+    assert.equal(Object.hasOwn(secret.data, 'formula'), false, 'no formula in the reply');
+    assert.equal(Object.hasOwn(secret.data, 'resolvedFormula'), false, 'no resolvedFormula in the reply');
+    // Verify classification still worked (used targetDelta)
+    assert.equal(secret.engineEvaluated, true, 'check was evaluated');
+    assert.equal(secret.secret, true, 'reply is marked secret');
   } finally {
     clearStubs();
   }
