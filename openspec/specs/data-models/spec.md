@@ -109,11 +109,12 @@ CraftingSystem = {
     // renders a tier table (the Checks tab mounts the simple editor with its DC-source
     // half hidden and the routed editor with tiers hidden), so neither slot's `tiers`
     // is authored there.
-    simple: SimpleCheck,               // { rollFormula, dc, thresholdMode, dcMode, tiers, macroUuid, checkBreakage }
-    routed: RoutedCheck,               // { type, rollFormula, dc, thresholdMode, dcMode, macroUuid, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
+    simple: SimpleCheck,               // { rollFormula, evaluation, dc, thresholdMode, dcMode, tiers, macroUuid, checkBreakage }
+    routed: RoutedCheck,               // { type, rollFormula, evaluation, dc, thresholdMode, dcMode, macroUuid, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
       rollFormula: string,             // default ""; total drives progressive awarding
+      evaluation: CheckEvaluation,
       checkBreakage: CheckBreakage,    // unified per-check trigger list (force award-all/none and/or break tools)
     },
 
@@ -138,6 +139,7 @@ CraftingSystem = {
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
       rollFormula: string,
+      evaluation: CheckEvaluation,
       checkBreakage: CheckBreakage,
     },
     routed: RoutedCheck,
@@ -195,6 +197,7 @@ CraftingSystem = {
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
       rollFormula: string,         // default ""; total drives progressive awarding
+      evaluation: CheckEvaluation,
       checkBreakage: CheckBreakage,
     },
 
@@ -241,24 +244,41 @@ CraftingSystem = {
   // gatheringCraftingCheck so the GM Checks-tab editors are common across activities.
   //   SimpleCheck = {
   //     rollFormula: string,                       // default ""
+  //     evaluation: CheckEvaluation,
   //     dc: number,                                // default 15; the default DC
   //     thresholdMode: "meet" | "exceed",          // default "meet"
   //     dcMode: "static" | "dynamic",              // default "static" (crafting only)
-  //     tiers: { id, name, dc }[],                 // recipe-DC overrides (crafting only)
+  //     tiers: { id, name, dc, adjustment, successes }[], // recipe-DC overrides (crafting only)
   //     macroUuid: string | null,                  // dynamic-DC macro (crafting only)
   //     checkBreakage: CheckBreakage,              // unified per-check trigger list
   //   }
   //   RoutedCheck = {
   //     type: "relative" | "fixed",                // default "relative"
+  //     evaluation: CheckEvaluation,
   //     rollFormula: string, dc: number, thresholdMode: "meet" | "exceed",
   //     dcMode: "static" | "dynamic",              // default "static" (crafting only)
   //     macroUuid: string | null,                  // dynamic-DC macro (crafting only)
-  //     tiers: { id, name, dc }[],                 // recipe-DC overrides (crafting only)
-  //     relativeOutcomes: { id, name, success, breakTools, dc }[],
+  //     tiers: { id, name, dc, adjustment, successes }[], // recipe-DC overrides (crafting only)
+  //     relativeOutcomes: { id, name, success, breakTools, dc, adjustment }[],
   //     fixedOutcomes: { id, name, success, breakTools, start, end }[],
   //     checkBreakage: CheckBreakage,              // unified per-check trigger list
   //   }
   //   // (The progressive check sub-object likewise carries a checkBreakage block.)
+  //
+  //   // Normalized by `normalizeCheckEvaluation`; see § Check evaluation record.
+  //   CheckEvaluation = {
+  //     product: "sum" | "count", direction: "over" | "under",
+  //     target: { source: "fixed" | "attribute", expression: string,
+  //               adjustmentKind: "add" | "multiply", baseAdjustment: number | null },
+  //     pool: {
+  //       die: number, base: string, threshold: string, required: number,
+  //       modifierDestination: "pool" | "threshold", zeroPoolFails: boolean,
+  //       explode: { enabled: boolean, faces: { kind: "best" | "from", value: number | null }, once: boolean },
+  //       cancel: { enabled: boolean, faces: { kind: "worst" | "from", value: number | null } },
+  //       additionalDice: { enabled: boolean, source: "path" | "macro", path: string,
+  //                         readMacroUuid: string, spendMacroUuid: string, max: number },
+  //     },
+  //   }
   //
   //   // Unified per-check trigger list (issue 419 recombine). Each trigger pairs an
   //   // expressive dice-matching condition with three effects: force an outcome,
@@ -409,6 +429,18 @@ CraftingSystem = {
   gatheringRealmSettings?: GatheringRealmSettings, // { enabled } only; default false. The realm library, reveal mode and modifier visibility are world scope — see TravelConfig
 }
 ```
+
+### Check evaluation record
+
+Each of the eight normalized check subobjects — crafting and salvage `simple`, `routed` and `progressive`, and gathering `routed` and `progressive` — MUST carry `evaluation` with `product: "sum" | "count"` and `direction: "over" | "under"`, defaulting to `sum/over`.
+Its `target` contains `source: "fixed" | "attribute"`, `expression`, `adjustmentKind: "add" | "multiply"` and nullable `baseAdjustment`.
+Its `pool` contains integer `die` (at least 2), string `base` and `threshold` expressions, integer `required` (0–20), `modifierDestination: "pool" | "threshold"`, `zeroPoolFails`, `explode` and `cancel` face configurations, and `additionalDice` enabled/source/path/read-macro/spend-macro/max fields.
+The normalized defaults are an empty fixed target expression, additive adjustment, d10, base `"2"`, threshold `"8"`, required 1, pool destination, zero-pool failure on, and explode, cancel and additional dice off with additional maximum 1.
+Normalization MUST retain inactive mode fields and finite/null sibling adjustments; unknown enum tokens take their defaults, an invalid die reads d10, a finite numeric expression is kept as its string, integer counts clamp to 0–20 and additional maximum clamps to 1–20, and a non-integer count takes its default (1 for `required`, null for a sibling).
+An explode or cancel face `value` is a positive integer or null and is not clamped to `die`, so changing the die loses no authored face; a face the die cannot roll is left for readiness to flag rather than repaired by normalization.
+Checks studio drafts carry the normalized record and the tier and outcome siblings, so a studio save preserves them, and schema-6 export/import MUST preserve the normalized record without a migration.
+Recipe difficulty tiers retain finite nullable `adjustment` and integer nullable `successes` beside their existing DC fields; relative outcome rows retain their finite nullable `adjustment` sibling.
+Component salvage and gathering task overrides retain `adjustmentOverride` and `successesOverride` beside `dcOverride`, including through their save projections.
 
 ### Requirements
 
@@ -1330,6 +1362,8 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
     toolIds: string[],             // references to per-system library Tools
     resultGroups: ResultGroup[],
     dcOverride: number | null,     // default null; per-component salvage check DC override (replaces salvageCraftingCheck.simple/routed.dc at salvage time)
+    adjustmentOverride: number | null, // default null; retained per-component adjustment for an attribute target
+    successesOverride: number | null,  // default null; retained per-component required count, clamped 0–20
     outcomeRouting?: { [outcome: string]: string },  // routed only
     timeRequirement?: TimeRequirement,
     currencyRequirement?: CurrencyRequirement,
@@ -3290,7 +3324,7 @@ CraftingRunStepState = {
   selectedRequirementSnapshot?: object, // full selected authored set, including route/currency/tag/essence
 
   // Optional permitted historical meaning and purpose; never a live narrative lookup.
-  resolutionSnapshot?: { kind: "check" | "ingredients" | "none", mode: string },
+  resolutionSnapshot?: { kind: "check" | "ingredients" | "none", mode: string, product?: "sum", direction?: "over" },
   presentationSnapshot?: { name: string, description: string },
   currencySpends?: Array<{ unit: string, amount: number }>, // applied settledSpends only
   essenceSpend?: {
@@ -3388,6 +3422,11 @@ CraftingRunStepState = {
 3. `timeGate.availableAt` must be `> initiatedAt` when both are present.
 4. `completedAt` is required when `status` is `succeeded`, or `failed`.
 5. `lastCheckResult.outcome` is only valid in `routedByCheck` mode (and in alchemy when `checkMode` is `tiered`); `lastCheckResult.value` is only valid in progressive mode.
+   An executed formula result's `data` preserves raw `total` and existing `dc` and adds `product`, `direction`, `comparison`, `target`, `margin`, `successes` and `cancelled`.
+   In this foundation the executed values are `sum/over`; `successes` and `data.cancelled` are null, and `data.cancelled` counts cancelled successes rather than the top-level prompt-abort sentinel.
+   A simple result targets its resolved DC; a relative routed result targets the effective threshold of the roll-matched tier, including the lowest tier when a below-every-threshold total is clamped to it, before forcing or stepping, or null when no tier is matched or clamped to; fixed routed and progressive results have null target and margin, and progressive comparison is null.
+   A non-null margin is raw total minus target even when forcing changes the disposition.
+   Error, prompt cancellation, missing engine and empty formula exits preserve their prior result shape and omit these new execution fields.
 6. `failureReason` is required when `status` is `failed`.
 7. `preparedConsumption.currencySpends` records what was actually deducted, never what was intended.
    It is the sole input to the cancel reversal's refund, so a spend that did not settle must not appear in it; an empty array is the correct record for a step whose currency deduction settled nothing.
@@ -3403,6 +3442,8 @@ Versioned stage arming captures `presentationSnapshot` from the authoritative ex
 For an implicit single stage whose wrapper has no description, the permitted recipe description supplies that captured purpose.
 Its first permitted name and description remain unchanged through execution and completion; later narrative edits do not rewrite history or require whole-Journal invalidation.
 `resolutionSnapshot` captures effective resolution meaning, with the executed meaning retained at completion and across an applied-prefix reload.
+Only an executed, permitted versioned `kind: "check"` stage may additionally retain validated `product: "sum"` and `direction: "over"`; both history allowlists require an executed versioned boundary and matching values beside a finite raw total in the check result.
+No-check, ingredient-routed, fizzle, legacy and gathering d100 snapshots gain no evaluation metadata.
 The canonical active-check resolver determines `kind: "check"`; an unchecked ingredient-routed stage records `"ingredients"`, and another confirmed unchecked stage records `"none"`.
 Actual rolls remain in `lastCheckResult` and selected route identity and authored thresholds remain in `selectedRequirementSnapshot`.
 Neither snapshot duplicates check formula, DC or modifier configuration.

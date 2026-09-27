@@ -9,8 +9,16 @@ import {
   cloneSimpleCheck,
   readCheckActive,
 } from '../src/ui/svelte/apps/manager/checks/checkDraftClone.js';
+import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 
 const EMPTY_BREAKAGE = Object.freeze({ triggers: [] });
+const DEFAULT_EVALUATION = Object.freeze(normalizeCheckEvaluation());
+const AUTHORED_EVALUATION = normalizeCheckEvaluation({
+  product: 'count',
+  direction: 'under',
+  target: { source: 'attribute', expression: '@skills.repair.value', baseAdjustment: -2 },
+  pool: { die: 6, base: '@abilities.str.value', threshold: '5', required: 3 },
+});
 
 describe('cloneCheckBreakage', () => {
   it('fills every trigger field and drops an unknown outcome to none', () => {
@@ -65,6 +73,7 @@ describe('cloneRoutedCheck', () => {
       relativeOutcomes: [],
       fixedOutcomes: [],
       checkBreakage: EMPTY_BREAKAGE,
+      evaluation: DEFAULT_EVALUATION,
     });
   });
 
@@ -107,6 +116,7 @@ describe('cloneSimpleCheck', () => {
       tiers: [],
       macroUuid: null,
       checkBreakage: EMPTY_BREAKAGE,
+      evaluation: DEFAULT_EVALUATION,
     });
   });
 
@@ -125,7 +135,12 @@ describe('cloneSimpleCheck', () => {
 describe('cloneProgressiveCheck', () => {
   it('defaults the award mode and attaches no preview when none is authored', () => {
     const draft = cloneProgressiveCheck({ awardMode: 'sideways' });
-    assert.deepEqual(draft, { awardMode: 'equal', rollFormula: '', checkBreakage: EMPTY_BREAKAGE });
+    assert.deepEqual(draft, {
+      awardMode: 'equal',
+      rollFormula: '',
+      checkBreakage: EMPTY_BREAKAGE,
+      evaluation: DEFAULT_EVALUATION,
+    });
     assert.ok(!Object.hasOwn(draft, 'preview'), 'an absent sandbox stays absent');
   });
 
@@ -136,6 +151,33 @@ describe('cloneProgressiveCheck', () => {
     });
     assert.equal(draft.awardMode, 'exceed');
     assert.deepEqual(draft.preview, { difficulties: [5, 2, 9] });
+  });
+});
+
+describe('the authored evaluation record', () => {
+  for (const [name, clone] of [
+    ['cloneRoutedCheck', cloneRoutedCheck],
+    ['cloneSimpleCheck', cloneSimpleCheck],
+    ['cloneProgressiveCheck', cloneProgressiveCheck],
+  ]) {
+    it(`${name} keeps it deep-equal and detached`, () => {
+      const source = { evaluation: structuredClone(AUTHORED_EVALUATION) };
+      const draft = clone(source);
+      assert.deepEqual(draft.evaluation, AUTHORED_EVALUATION);
+      assert.notEqual(draft.evaluation, source.evaluation);
+      assert.notEqual(draft.evaluation.pool, source.evaluation.pool);
+      assert.notEqual(draft.evaluation.target, source.evaluation.target);
+    });
+  }
+
+  it('keeps tier and outcome difficulty siblings on the copied rows', () => {
+    const draft = cloneRoutedCheck({
+      tiers: [{ id: 't', dc: 12, adjustment: 1.5, successes: 3 }],
+      relativeOutcomes: [{ id: 'o', dc: 0, adjustment: -1 }],
+    });
+    assert.deepEqual(draft.tiers[0], { id: 't', dc: 12, adjustment: 1.5, successes: 3 });
+    assert.equal(draft.relativeOutcomes[0].adjustment, -1);
+    assert.equal(cloneSimpleCheck({ tiers: [{ id: 't', successes: 4 }] }).tiers[0].successes, 4);
   });
 });
 

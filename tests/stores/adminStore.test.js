@@ -7,6 +7,11 @@ import {
   DEFAULT_GATHERING_TASK_IMG,
 } from '../../src/gatheringImageDefaults.js';
 import { CraftingSystemManager } from '../../src/systems/CraftingSystemManager.js';
+import { normalizeCheckEvaluation } from '../../src/systems/normalize/checkEvaluation.js';
+import {
+  cloneRoutedCheck,
+  cloneSimpleCheck,
+} from '../../src/ui/svelte/apps/manager/checks/checkDraftClone.js';
 import { InventoryListingBuilder } from '../../src/ui/presenters/InventoryListingBuilder.js';
 import {
   REPORTER_ENRICHER_DESCRIPTION,
@@ -3873,6 +3878,84 @@ describe('createAdminStore', () => {
       assert.ok(updateArgs !== null);
       assert.deepEqual(updateArgs.updates.craftingCheck.simple, simple);
       assert.deepEqual(updateArgs.updates.craftingCheck.outcomes, ['fail', 'pass']);
+    });
+
+    // A Checks Studio draft is cloned from the projection, edited, and saved over the whole slot, so
+    // every field the clone drops is wiped by an unrelated save (issue 1999).
+    const COUNT_UNDER_EVALUATION = normalizeCheckEvaluation({
+      product: 'count',
+      direction: 'under',
+      target: { source: 'attribute', expression: '@skills.repair.value', baseAdjustment: 2 },
+      pool: { die: 6, base: '3', threshold: '4', required: 2, zeroPoolFails: false },
+    });
+
+    async function selectSeededSystem(seed) {
+      const services = createMockServices();
+      const manager = services.getCraftingSystemManager();
+      Object.assign(manager.getSystem('sys1'), structuredClone(seed));
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      return { store, manager, system: get(store.viewState).selectedSystem };
+    }
+
+    it('saving an edited simple crafting draft keeps the authored evaluation record', async () => {
+      const { store, manager, system } = await selectSeededSystem({
+        craftingCheck: {
+          enabled: true,
+          simple: { rollFormula: '1d20', dc: 12, evaluation: COUNT_UNDER_EVALUATION },
+        },
+      });
+      const draft = cloneSimpleCheck(system.craftingCheck.simple);
+      draft.dc = 18;
+      await store.saveCraftingCheckSimple(draft);
+      const stored = manager.getSystem('sys1').craftingCheck.simple;
+      assert.equal(stored.dc, 18);
+      assert.deepEqual(stored.evaluation, COUNT_UNDER_EVALUATION);
+    });
+
+    it('saving an edited salvage routed draft keeps its evaluation and difficulty siblings', async () => {
+      const tiers = [{ id: 't1', name: 'Hard', dc: 16, adjustment: 1.5, successes: 3 }];
+      const relativeOutcomes = [{ id: 'o1', name: 'Pass', success: true, dc: 0, adjustment: -1 }];
+      const { store, manager, system } = await selectSeededSystem({
+        salvageCraftingCheck: {
+          enabled: true,
+          routed: {
+            type: 'relative',
+            rollFormula: '1d20',
+            dc: 14,
+            tiers,
+            relativeOutcomes,
+            evaluation: COUNT_UNDER_EVALUATION,
+          },
+        },
+      });
+      const draft = cloneRoutedCheck(system.salvageCraftingCheck.routed);
+      draft.dc = 10;
+      await store.saveSalvageCheckRouted(draft);
+      const stored = manager.getSystem('sys1').salvageCraftingCheck.routed;
+      assert.equal(stored.dc, 10);
+      assert.deepEqual(stored.evaluation, COUNT_UNDER_EVALUATION);
+      assert.deepEqual(stored.tiers, tiers);
+      assert.deepEqual(stored.relativeOutcomes, relativeOutcomes);
+    });
+
+    it("an unrelated tier edit keeps that tier's successes and adjustment", async () => {
+      const { store, manager, system } = await selectSeededSystem({
+        craftingCheck: {
+          enabled: true,
+          simple: {
+            rollFormula: '1d20',
+            dc: 12,
+            tiers: [{ id: 't1', name: 'Hard', dc: 18, adjustment: 0.5, successes: 4 }],
+          },
+        },
+      });
+      const draft = cloneSimpleCheck(system.craftingCheck.simple);
+      draft.tiers = draft.tiers.map((tier) => ({ ...tier, name: 'Harder' }));
+      await store.saveCraftingCheckSimple(draft);
+      assert.deepEqual(manager.getSystem('sys1').craftingCheck.simple.tiers, [
+        { id: 't1', name: 'Harder', dc: 18, adjustment: 0.5, successes: 4 },
+      ]);
     });
 
     it('surfaces the simple crafting check config in the selected-system view state', async () => {

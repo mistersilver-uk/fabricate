@@ -8,6 +8,7 @@ import {
   transitionExecutionJournal,
 } from './runExecutionJournal.js';
 import {
+  checkResolutionEvidence,
   historyEvidenceFields,
   itemReceipt,
   retainUncertainReceipt,
@@ -269,7 +270,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
     step.consumedIngredients = payload.consumedIngredients || step.consumedIngredients || [];
     step.usedTools = payload.usedTools || step.usedTools || [];
     step.createdResults = payload.createdResults || step.createdResults || [];
-    applyStepHistoryEvidence(step, payload);
+    applyStepHistoryEvidence(step, payload, run);
 
     const nextIndex = stepIndex + 1;
     if (nextIndex >= (run.steps?.length || 0)) {
@@ -310,7 +311,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
     step.consumedIngredients = payload.consumedIngredients || step.consumedIngredients || [];
     step.usedTools = payload.usedTools || step.usedTools || [];
     step.createdResults = payload.createdResults || step.createdResults || [];
-    applyStepHistoryEvidence(step, payload);
+    applyStepHistoryEvidence(step, payload, run);
 
     return this.completeRun(actor, run, 'failed', options);
   }
@@ -966,7 +967,7 @@ function buildSelectionPlan(selection) {
  * receipt. Callers own initiating-viewer disclosure; absent evidence stays absent, and a captured
  * empty array stays an explicit zero.
  */
-export function craftingStepHistoryEvidence(input = {}) {
+export function craftingStepHistoryEvidence(input = {}, options = {}) {
   const source = input ?? {};
   const evidence = {};
   const resolution = source.resolutionSnapshot;
@@ -974,7 +975,11 @@ export function craftingStepHistoryEvidence(input = {}) {
     ['check', 'ingredients', 'none'].includes(resolution?.kind) &&
     typeof resolution.mode === 'string'
   ) {
-    evidence.resolutionSnapshot = { kind: resolution.kind, mode: resolution.mode };
+    evidence.resolutionSnapshot = {
+      kind: resolution.kind,
+      mode: resolution.mode,
+      ...checkResolutionEvidence(source, options),
+    };
   }
   const presentation = source.presentationSnapshot;
   if (typeof presentation?.name === 'string' && typeof presentation.description === 'string') {
@@ -1036,11 +1041,12 @@ function historyText(value) {
   return typeof value === 'string' ? value.trim() || null : null;
 }
 
-function applyStepHistoryEvidence(step, payload) {
-  const evidence = craftingStepHistoryEvidence(payload);
+function applyStepHistoryEvidence(step, payload, run) {
+  const options = { executed: getRunLifecycleContract(run) === 'current' };
+  const evidence = craftingStepHistoryEvidence(payload, options);
   if (step.presentationSnapshot) delete evidence.presentationSnapshot;
   Object.assign(step, evidence);
-  Object.assign(step, historyEvidenceFields(payload));
+  Object.assign(step, historyEvidenceFields(payload, options));
   for (const field of ['consumedIngredients', 'createdResults']) {
     if (Array.isArray(step[field])) step[field] = step[field].map(itemReceipt);
   }

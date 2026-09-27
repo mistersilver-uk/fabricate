@@ -22,8 +22,83 @@ const {
 } = await import('./helpers/fullAuthoringFixture.js');
 const { emptyCopyOptions } = await import('./helpers/worldEntityIndex.js');
 
+function seedFutureCheckFields(fixture) {
+  const authoredEvaluations = new Map();
+  let ordinal = 0;
+  for (const [checkName, slots] of [
+    ['craftingCheck', ['simple', 'progressive', 'routed']],
+    ['salvageCraftingCheck', ['simple', 'progressive', 'routed']],
+    ['gatheringCraftingCheck', ['progressive', 'routed']],
+  ]) {
+    for (const slot of slots) {
+      ordinal += 1;
+      const evaluation = {
+        product: 'count',
+        direction: 'under',
+        target: {
+          source: 'attribute',
+          expression: `@skills.repair.value + ${ordinal}`,
+          adjustmentKind: 'multiply',
+          baseAdjustment: 0.5,
+        },
+        pool: {
+          die: 20,
+          base: '@abilities.int.value',
+          threshold: '@skills.repair.value',
+          required: ordinal,
+          modifierDestination: 'threshold',
+          zeroPoolFails: false,
+          explode: { enabled: true, faces: { kind: 'from', value: 19 }, once: true },
+          cancel: { enabled: true, faces: { kind: 'from', value: 2 } },
+          additionalDice: {
+            enabled: true,
+            source: 'macro',
+            path: 'system.resources.ap.value',
+            readMacroUuid: 'Macro.read',
+            spendMacroUuid: 'Macro.spend',
+            max: 4,
+          },
+        },
+      };
+      fixture.system[checkName][slot] ??= {};
+      fixture.system[checkName][slot].evaluation = evaluation;
+      authoredEvaluations.set(`${checkName}.${slot}`, evaluation);
+    }
+  }
+  fixture.system.craftingCheck.simple.tiers = [
+    { id: 'tier', name: 'Hard', dc: 15, adjustment: 0.5, successes: 3 },
+  ];
+  fixture.system.craftingCheck.routed.relativeOutcomes = [
+    { id: 'outcome', name: 'Hard', dc: 3, adjustment: 0.2 },
+  ];
+  fixture.system.components.find((component) => component.id === 'comp-herb').salvage = {
+    ...fixture.system.components.find((component) => component.id === 'comp-herb').salvage,
+    adjustmentOverride: 0.5,
+    successesOverride: 2,
+  };
+  fixture.gatheringConfig.systems[FIXTURE_SYSTEM_ID].tasks[0].adjustmentOverride = 0.2;
+  fixture.gatheringConfig.systems[FIXTURE_SYSTEM_ID].tasks[0].successesOverride = 4;
+  return authoredEvaluations;
+}
+
+function assertFutureCheckFields(payload, authoredEvaluations, stage) {
+  for (const [key, evaluation] of authoredEvaluations) {
+    const [checkName, slot] = key.split('.');
+    assert.deepEqual(payload.system[checkName][slot].evaluation, evaluation, `${key} ${stage}`);
+  }
+  assert.equal(payload.system.craftingCheck.simple.tiers[0].adjustment, 0.5);
+  assert.equal(payload.system.craftingCheck.simple.tiers[0].successes, 3);
+  assert.equal(payload.system.craftingCheck.routed.relativeOutcomes[0].adjustment, 0.2);
+  const salvage = payload.system.components.find((component) => component.id === 'comp-herb').salvage;
+  assert.equal(salvage.adjustmentOverride, 0.5);
+  assert.equal(salvage.successesOverride, 2);
+  assert.equal(payload.gatheringConfig.system.tasks[0].adjustmentOverride, 0.2);
+  assert.equal(payload.gatheringConfig.system.tasks[0].successesOverride, 4);
+}
+
 test('round-trip: export → import(keep) → export is deep-equal modulo volatile fields', async () => {
   const fixture = buildFullAuthoringFixture();
+  const authoredEvaluations = seedFutureCheckFields(fixture);
   const sourceTask = fixture.gatheringConfig.systems[FIXTURE_SYSTEM_ID].tasks[0];
   sourceTask.resolutionMode = 'routed';
   sourceTask.resultGroups = [
@@ -45,6 +120,7 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
   const h = makeHarness(fixture);
 
   const first = exportCurrent(h, FIXTURE_SYSTEM_ID);
+  assertFutureCheckFields(first, authoredEvaluations, 'first export');
 
   // Envelope carries the explicit schema markers.
   assert.equal(first.schemaVersion, 6);
@@ -75,6 +151,7 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
   await importer.importFromPackData(packData, { overwriteExisting: true });
 
   const second = exportCurrent(h, FIXTURE_SYSTEM_ID);
+  assertFutureCheckFields(second, authoredEvaluations, 're-export');
 
   assert.deepEqual(normalizeExportEnvelope(second), normalizeExportEnvelope(first));
 

@@ -11,7 +11,11 @@ const {
   runFormulaPassFail,
   runFormulaProgressive,
   runFormulaRouted,
+  resolveRolledFormula,
+  evaluatePreparedRunCheck,
 } = await import('../src/systems/checkRoll.js');
+const { rollActorCheck } = await import('../src/systems/companionCheckRoll.js');
+const { GatheringEngine } = await import('../src/systems/GatheringEngine.js');
 
 // A unified trigger forcing `outcome` when its `diceGroup`/`total`/`==` condition
 // matches the rolled group total (the recombined replacement for a per-die crit).
@@ -251,6 +255,54 @@ test('check modifiers: runFormulaPassFail threads the modifier context through t
   assert.equal(rolledFormulas.at(-1), '1d20 + 5[Modifiers]');
   assert.equal(r.data.resolvedFormula, '1d20 + 5[Modifiers]');
   delete globalThis.Roll;
+});
+
+test('the runner passes normalized comparison and the formula-selected modifier to the prompt', async () => {
+  stubCraftingModRoll();
+  const actor = { getRollData: () => ({ abilities: { med: { mod: 3 }, alch: { mod: 5 } } }) };
+  for (const [authored, thresholdMode] of [
+    ['meet', 'meet'],
+    ['exceed', 'exceed'],
+    [undefined, 'meet'],
+    ['EXCEED', 'meet'],
+  ]) {
+    let shown;
+    await runFormulaPassFail({
+      formula: '1d20', dc: 10, thresholdMode: authored, actor, craftingModifier: MOD_CONTEXT,
+      rollOptions: { interactive: true, prompt: async (options) => {
+        shown = options;
+        return { confirmed: true, advantage: 'normal' };
+      } },
+    });
+    assert.equal(shown.thresholdMode, thresholdMode);
+    assert.deepEqual(shown.selectedModifiers.map((modifier) => modifier.id), ['alch']);
+    assert.equal(shown.selectedModifiers[0].display, '+5');
+    assert.equal(shown.resolvedFormula, '1d20 + 5[Modifiers]');
+  }
+  delete globalThis.Roll;
+});
+
+test('the routed runner passes its comparison and selected modifier to the prompt', async () => {
+  stubCraftingModRoll();
+  const actor = { getRollData: () => ({ abilities: { med: { mod: 3 }, alch: { mod: 5 } } }) };
+  let shown;
+  await runFormulaRouted({
+    formula: '1d20', dc: 10, thresholdMode: 'exceed', type: 'relative',
+    relativeOutcomes: [{ id: 'pass', name: 'Pass', success: true, dcOffset: 0 }],
+    actor, craftingModifier: MOD_CONTEXT,
+    rollOptions: { interactive: true, prompt: async (options) => {
+      shown = options;
+      return { confirmed: true, advantage: 'normal' };
+    } },
+  });
+  assert.equal(shown.thresholdMode, 'exceed');
+  assert.deepEqual(shown.selectedModifiers.map((modifier) => modifier.id), ['alch']);
+  assert.equal(shown.resolvedFormula, '1d20 + 5[Modifiers]');
+  delete globalThis.Roll;
+});
+
+test('resolveRolledFormula trims the authored formula when no modifier context applies', () => {
+  assert.equal(resolveRolledFormula(' 1d20 + 4 ', null, null, undefined), '1d20 + 4');
 });
 
 // ── the retirement shim, at the head of the roll path (issue 1094) ───────────
@@ -1364,6 +1416,8 @@ test('runFormulaRouted: a forced disposition with no matching tier leaves outcom
   });
   assert.equal(r.outcome, null);
   assert.equal(r.success, false);
+  assert.equal(r.data.target, null);
+  assert.equal(r.data.margin, null);
 });
 
 test('runFormulaRouted: the matched (or rerouted) tier surfaces its breakTools', async () => {
@@ -1608,6 +1662,195 @@ test('runFormulaRouted: a throwing roll fails with a labelled message', async ()
 // through this function, and `runFormulaRouted` resolves a real roll through it too.
 
 const { classifyCheckTotal } = await import('../src/systems/checkRoll.js');
+
+test('executed simple evidence records the raw sum/over comparison under a forced success', async () => {
+  stubRoll(8, [{ number: 1, faces: 20, total: 8, results: [{ result: 8 }] }]);
+  const result = await runFormulaPassFail({
+    formula: '1d20', dc: 10, actor: ACTOR,
+    triggers: [totalTrigger({ value: 8, outcome: 'success' })],
+  });
+  assert.equal(result.success, true);
+  assert.deepEqual(
+    Object.fromEntries(['product', 'direction', 'comparison', 'target', 'margin', 'successes', 'cancelled']
+      .map((key) => [key, result.data[key]])),
+    { product: 'sum', direction: 'over', comparison: 'meet', target: 10, margin: -2,
+      successes: null, cancelled: null }
+  );
+});
+
+test('standalone companion check keeps its closed request on the current over comparison', async () => {
+  stubRoll(8);
+  const result = await rollActorCheck(
+    { actor: ACTOR, callSite: 'gmAction', formula: '1d20', dc: 10,
+      evaluation: { product: 'count', direction: 'under' } },
+    {
+      isElectedExecutor: () => true,
+      hasDiceEngine: () => true,
+      localize: (_key, fallback) => fallback,
+      buildRollOptions: () => ({ post: false }),
+      prompt: async () => ({ confirmed: true }),
+      runPassFail: runFormulaPassFail,
+      runProgressive: runFormulaProgressive,
+    }
+  );
+  assert.equal(result.outcome, 'checkFailed');
+  assert.equal(result.passed, false);
+  assert.equal(result.total, 8);
+});
+
+test('gathering routed adapter retains a future check record while executing sum/over', async () => {
+  stubRoll(8);
+  const engine = Object.create(GatheringEngine.prototype);
+  const result = await engine._resolveRoutedFormulaOutcome({
+    routed: {
+      dc: 10, thresholdMode: 'meet', type: 'relative',
+      relativeOutcomes: [
+        { id: 'high', name: 'High', dc: 0, success: true },
+        { id: 'low', name: 'Low', dc: -5, success: false },
+      ],
+      evaluation: { product: 'count', direction: 'under' },
+    },
+    rollFormula: '1d20', actor: ACTOR,
+    task: { name: 'Gather ore', resultGroups: [] },
+  });
+  assert.equal(result.status, 'failed');
+  assert.equal(result.checkResult.data.product, 'sum');
+  assert.equal(result.checkResult.data.direction, 'over');
+  assert.equal(result.checkResult.data.target, 5);
+});
+
+test('routed evidence uses the roll-matched relative threshold before forced routing', async () => {
+  stubRoll(18, [{ number: 1, faces: 20, total: 18, results: [{ result: 18 }] }]);
+  const result = await runFormulaRouted({
+    formula: '1d20', dc: 15, actor: ACTOR, type: 'relative', relativeOutcomes: RELATIVE,
+    triggers: [totalTrigger({ value: 18, outcome: 'failure' })],
+  });
+  assert.equal(result.outcome, 'Failure');
+  assert.equal(result.data.target, 15);
+  assert.equal(result.data.margin, 3);
+  assert.equal(result.data.product, 'sum');
+  assert.equal(result.data.direction, 'over');
+});
+
+test('routed evidence targets the clamped lowest tier when the total is below every threshold', async () => {
+  stubRoll(3);
+  const result = await runFormulaRouted({
+    formula: '1d20', dc: 15, actor: ACTOR, type: 'relative', clampToNearest: true,
+    relativeOutcomes: [
+      { id: 'good', name: 'Success', success: true, dc: 0 },
+      { id: 'bad', name: 'Failure', success: false, dc: -5 },
+    ],
+  });
+  assert.equal(result.outcome, 'Failure');
+  assert.equal(result.data.target, 10);
+  assert.equal(result.data.margin, -7);
+});
+
+test('fixed routed overlap picks the highest matching start and the first authored on a tie', async () => {
+  stubRoll(12);
+  const result = await runFormulaRouted({
+    formula: '1d20', dc: 0, actor: ACTOR, type: 'fixed',
+    fixedOutcomes: [
+      { id: 'wide', name: 'Wide', success: false, start: 1, end: 20 },
+      { id: 'first', name: 'First', success: true, start: 10, end: 20 },
+      { id: 'tied', name: 'Tied', success: true, start: 10, end: 15 },
+      { id: 'missed', name: 'Missed', success: true, start: 13, end: 20 },
+    ],
+  });
+  assert.equal(result.data.outcomeId, 'first');
+});
+
+// A prepared check resolves from its descriptor alone: the slot names the kind.
+function preparedCheck(slot, checkConfig = {}, decisionPolicy = {}) {
+  return { mode: slot, slot, rollFormula: '1d20', checkConfig, decisionPolicy };
+}
+
+test('a prepared simple check honours exceed at the boundary', async () => {
+  stubRoll(12);
+  const exceed = await evaluatePreparedRunCheck(
+    preparedCheck('simple', {}, { dc: 12, thresholdMode: 'exceed' }), ACTOR
+  );
+  assert.equal(exceed.success, false);
+  assert.equal(exceed.data.comparison, 'exceed');
+  assert.equal(exceed.data.margin, 0);
+  const meet = await evaluatePreparedRunCheck(
+    preparedCheck('simple', {}, { dc: 12, thresholdMode: 'meet' }), ACTOR
+  );
+  assert.equal(meet.success, true);
+  assert.equal(meet.data.comparison, 'meet');
+});
+
+test('a prepared routed check records the roll-matched relative target and margin', async () => {
+  stubRoll(18);
+  const result = await evaluatePreparedRunCheck(
+    preparedCheck('routed', {
+      type: 'relative',
+      relativeOutcomes: [
+        { id: 'good', name: 'Success', success: true, dc: 0 },
+        { id: 'bad', name: 'Failure', success: false, dc: -5 },
+      ],
+    }, { dc: 15 }),
+    ACTOR
+  );
+  assert.equal(result.outcome, 'Success');
+  assert.equal(result.data.target, 15);
+  assert.equal(result.data.margin, 3);
+});
+
+test('a prepared progressive check records sum/over evidence with no comparison or target', async () => {
+  stubRoll(9);
+  const result = await evaluatePreparedRunCheck(preparedCheck('progressive'), ACTOR);
+  assert.deepEqual(
+    ['product', 'direction', 'comparison', 'target', 'margin', 'successes', 'cancelled']
+      .map((key) => result.data[key]),
+    ['sum', 'over', null, null, null, null, null]
+  );
+  assert.equal(result.value, 9);
+});
+
+test('fixed and progressive rolls have null targets; unrolled exits add no execution metadata', async () => {
+  stubRoll(8);
+  const fixed = await runFormulaRouted({
+    formula: '1d20', dc: 0, actor: ACTOR, type: 'fixed', fixedOutcomes: FIXED,
+  });
+  const progressive = await runFormulaProgressive({ formula: '1d20', actor: ACTOR });
+  for (const result of [fixed, progressive]) {
+    assert.equal(result.data.product, 'sum');
+    assert.equal(result.data.direction, 'over');
+    assert.equal(result.data.target, null);
+    assert.equal(result.data.margin, null);
+    assert.equal(result.data.successes, null);
+    assert.equal(result.data.cancelled, null);
+  }
+  assert.equal(progressive.data.comparison, null);
+  delete globalThis.Roll;
+  for (const unrolled of [
+    await runFormulaPassFail({ formula: '1d20', dc: 10, actor: ACTOR }),
+    await runFormulaRouted({ formula: '1d20', dc: 10, actor: ACTOR, type: 'fixed', fixedOutcomes: FIXED }),
+    await runFormulaProgressive({ formula: '1d20', actor: ACTOR }),
+  ]) {
+    assert.equal(Object.hasOwn(unrolled.data, 'product'), false);
+    assert.equal(Object.hasOwn(unrolled.data, 'target'), false);
+  }
+  stubRoll(8);
+  for (const result of [
+    await runFormulaPassFail({ formula: '', dc: 10, actor: ACTOR }),
+    await runFormulaRouted({ formula: '', dc: 10, actor: ACTOR, type: 'fixed', fixedOutcomes: FIXED }),
+    await runFormulaProgressive({ formula: '', actor: ACTOR }),
+  ]) {
+    assert.equal(Object.hasOwn(result.data, 'product'), false);
+    assert.equal(Object.hasOwn(result.data, 'target'), false);
+  }
+  const rollOptions = { interactive: true, prompt: async () => ({ confirmed: false }) };
+  for (const cancelled of [
+    await runFormulaPassFail({ formula: '1d20', dc: 10, actor: ACTOR, rollOptions }),
+    await runFormulaRouted({ formula: '1d20', dc: 10, actor: ACTOR, type: 'fixed', fixedOutcomes: FIXED, rollOptions }),
+    await runFormulaProgressive({ formula: '1d20', actor: ACTOR, rollOptions }),
+  ]) {
+    assert.equal(cancelled.cancelled, true);
+    assert.equal(Object.hasOwn(cancelled.data, 'product'), false);
+  }
+});
 
 /** The fixed-range tier set, with a recipe minimum to gate against. */
 const FIXED_TIERS = [

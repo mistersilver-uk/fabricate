@@ -1518,13 +1518,38 @@ Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/recipe-vi
 
 ## Check
 
-One roll engine (`src/systems/checkRoll.js`) exposes three runners: `runFormulaPassFail` (roll vs a DC met-or-exceeded → `pass`/`fail`), `runFormulaProgressive` (roll total IS the numeric value progressive awarding spends against result difficulties — **no DC**), and `runFormulaRouted` (map the total onto a named **Outcome Tier** whose name routes to a result group).
+One roll engine (`src/systems/checkRoll.js`) exposes three runners: `runFormulaPassFail` (roll vs a DC met or strictly exceeded according to `thresholdMode` → `pass`/`fail`), `runFormulaProgressive` (roll total IS the numeric value progressive awarding spends against result difficulties — **no DC**), and `runFormulaRouted` (map the total onto a named **Outcome Tier** whose name routes to a result group).
 A `label` (`Crafting`/`Salvage`/`Gathering`) only customises failure-message wording; the result shape is identical across activities.
 The persisted system keys are `craftingCheck`, `salvageCraftingCheck`, and `gatheringCraftingCheck` — the `*CraftingCheck` naming is kept **verbatim for back-compat** even though the model is now activity-agnostic, so `gatheringCraftingCheck` is the gathering check, NOT misplaced crafting config.
 
 Canonical mapping: `runFormulaPassFail`/`runFormulaProgressive`/`runFormulaRouted`/`evaluateCheckRoll` in `src/systems/checkRoll.js`; `system.{craftingCheck,salvageCraftingCheck,gatheringCraftingCheck}`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md, openspec/specs/gathering-and-harvesting/spec.md
+
+## Check Evaluation
+
+Each of the eight normalized check subobjects (crafting and salvage simple, routed and progressive; gathering routed and progressive) retains an `evaluation` record, even when its selected product, direction, target or pool settings are inactive.
+The record defaults to `sum/over`, and the current runners and odds classifier execute `sum/over` even when a future count or under choice was authored.
+Recipe tiers retain nullable `adjustment` and `successes` siblings beside `dc`, and relative outcome tiers retain a nullable `adjustment`; no current runner reads them.
+The private crafting and gathering prepared check descriptors clone that authored record beside the prepared formula and DC; it is not the public executed `resolutionSnapshot`.
+
+Canonical mapping: `normalizeCheckEvaluation`/`normalizeNullableAdjustment`/`normalizeNullableSuccesses` in `src/systems/normalize/checkEvaluation.js`; `system.{craftingCheck,salvageCraftingCheck,gatheringCraftingCheck}`; `CraftingEngine.describeVersionedStageCheck`, `GatheringEngine._versionedCheckDescriptor`
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
+
+## Executed Check Evidence
+
+An executed formula result records raw `data.total` and the existing `data.dc` alongside the actual product, direction, comparison, target, margin, successes and cancelled-success count.
+In the current `sum/over` execution, successes and cancelled-success count are null.
+Simple checks target their resolved DC; relative routed checks target the effective threshold of the roll-matched tier, including the lowest tier when a below-every-threshold total is clamped to it, before forcing or stepping, or null when no tier is matched or clamped to; fixed routed and progressive checks have no single target or margin.
+A non-null margin measures raw total minus target regardless of any forced disposition.
+An unrolled, prompt-cancelled, no-engine, empty-formula or errored evaluation does not gain executed fields.
+The result's `data.cancelled` is distinct from the top-level `cancelled` flag that aborts a prompt.
+Only a permitted executed versioned crafting check may carry matching `sum/over` metadata into its historical `resolutionSnapshot`.
+
+Canonical mapping: `executedSumEvidence` and the formula runners in `src/systems/checkRoll.js`; `craftingStepHistoryEvidence` in `src/systems/CraftingRunManager.js`; `checkResolutionEvidence` and `historyEvidenceFields` in `src/systems/runHistoryEvidence.js`
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md, openspec/specs/recipes-and-steps/spec.md
 
 ## Standalone Check Roll
 
@@ -1589,10 +1614,12 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and
 
 A per-component `salvage.dcOverride` and a per-task gathering `dcOverride` replace the check sub-object's default `dc` (else fallback 15) when finite.
 Progressive checks have **no DC**, so an override is irrelevant to (and ignored by) progressive salvage and progressive gathering: it is not a universal knob.
+Each `dcOverride` has two sibling overrides, `adjustmentOverride` (a finite number or null) and `successesOverride` (an integer clamped to 0–20, or null), both defaulting to null.
+They hold the per-record difficulty for an attribute target and a success count under a **Check Evaluation**; the current `sum/over` runners never read them, but normalization, the component salvage save, the admin gathering task save and the gathering runtime task projection all retain them.
 
-Canonical mapping: `salvage.dcOverride`, `GatheringTask.dcOverride`; `_resolveSalvageDc` in `CraftingEngine`, `_resolveGatheringRoutedDc` in `GatheringEngine`
+Canonical mapping: `salvage.dcOverride`, `GatheringTask.dcOverride`; `_resolveSalvageDc` in `CraftingEngine`, `_resolveGatheringRoutedDc` in `GatheringEngine`; `salvage.adjustmentOverride`/`salvage.successesOverride` via `normalizeSalvage` in `src/systems/normalize/salvage.js`; `GatheringTask.adjustmentOverride`/`GatheringTask.successesOverride` via `_normalizeGatheringTask` in `src/ui/svelte/stores/adminStore.js` and `normalizeLibraryTask` in `src/systems/GatheringRichStateService.js`
 
-Spec reference: openspec/specs/recipes-and-steps/spec.md, openspec/specs/gathering-and-harvesting/spec.md
+Spec reference: openspec/specs/recipes-and-steps/spec.md, openspec/specs/gathering-and-harvesting/spec.md, openspec/specs/data-models/spec.md
 
 ## Character Modifier
 

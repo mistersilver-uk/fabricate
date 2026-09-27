@@ -8,6 +8,8 @@ import {
 import { CraftingFizzleExecutor } from '../src/systems/CraftingFizzleExecutor.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
+import { craftingStepHistoryEvidence } from '../src/systems/CraftingRunManager.js';
+import { historyEvidenceFields } from '../src/systems/runHistoryEvidence.js';
 import { IngredientSet } from '../src/models/IngredientSet.js';
 import { Recipe } from '../src/models/Recipe.js';
 import {
@@ -16,6 +18,67 @@ import {
 } from '../src/systems/checkRoll.js';
 import { transitionExecutionJournal } from '../src/systems/runExecutionJournal.js';
 import { createPersistedCraftingHistory, mergeHistoryFlag } from './helpers/journal-fixtures.js';
+
+test('both history allowlists retain only executed check evaluation metadata', () => {
+  const executed = {
+    resolutionSnapshot: { kind: 'check', mode: 'simple', product: 'sum', direction: 'over' },
+    lastCheckResult: { data: { total: 17, product: 'sum', direction: 'over' } },
+  };
+  for (const allow of [craftingStepHistoryEvidence, historyEvidenceFields]) {
+    assert.deepEqual(allow(executed, { executed: true }).resolutionSnapshot, executed.resolutionSnapshot);
+    assert.deepEqual(allow(executed).resolutionSnapshot, { kind: 'check', mode: 'simple' });
+    for (const invalid of [
+      { ...executed, lastCheckResult: undefined },
+      { ...executed, lastCheckResult: { data: { product: 'sum', direction: 'over' } } },
+      { ...executed, resolutionSnapshot: { ...executed.resolutionSnapshot, product: 'count' } },
+      { ...executed, resolutionSnapshot: { ...executed.resolutionSnapshot, kind: 'ingredients' } },
+    ]) {
+      assert.deepEqual(allow(invalid, { executed: true }).resolutionSnapshot, {
+        kind: invalid.resolutionSnapshot.kind, mode: 'simple',
+      });
+    }
+  }
+});
+
+/** Completes a one-stage versioned check with `data` as the validated result and reloads it. */
+function completeVersionedCheck(data) {
+  return createPersistedCraftingHistory({
+    stageCount: 1,
+    drive: async ({ engine, actor, sources, gm, runId, manager }) => {
+      engine.installVersionedRunAuthority({
+        consumeExecutionGrant: async (_grant, context) => ({
+          operationId: `evaluation-${context.requestId}`,
+          resolvedCheckResult: { success: true, outcome: 'pass', value: 17, data },
+        }),
+      });
+      game.time.worldTime += 60;
+      const result = await engine.executeVersionedStage({
+        viewer: gm, actor, componentSourceActors: sources, runId,
+        expectedRevision: manager().getRun(actor, runId).runRevision,
+        requestId: 'check-evaluation', executionGrant: 'grant',
+      });
+      assert.equal(result.success, true);
+      return { reloaded: new CraftingRunManager().getRunHistory(actor)[0] };
+    },
+  });
+}
+
+test('a completed versioned check retains executed evaluation after actor-flag reload', async () => {
+  const fixture = await completeVersionedCheck({ dc: 12, total: 17, product: 'sum',
+    direction: 'over', comparison: 'meet', target: 12, margin: 5, successes: null, cancelled: null });
+  assert.deepEqual(fixture.record.steps[0].resolutionSnapshot, {
+    kind: 'check', mode: 'simple', product: 'sum', direction: 'over',
+  });
+  assert.deepEqual(fixture.reloaded.steps[0].resolutionSnapshot, fixture.record.steps[0].resolutionSnapshot);
+  assert.equal(fixture.reloaded.steps[0].lastCheckResult.data.margin, 5);
+});
+
+test('a versioned check result without evaluation metadata records none in its snapshot', async () => {
+  const fixture = await completeVersionedCheck({ dc: 12, total: 17 });
+  for (const record of [fixture.record, fixture.reloaded]) {
+    assert.deepEqual(record.steps[0].resolutionSnapshot, { kind: 'check', mode: 'simple' });
+  }
+});
 
 for (const failLast of [false, true]) {
   test(`writer/reload/projection retains distinct stage awards, source-qualified essence and settled currency (failure=${failLast})`, async () => {
@@ -1861,13 +1924,17 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
       alias: speakerActor.name,
     }),
   };
-  game.fabricate.getCraftingSystemManager = () => ({
-    getSystem: () => ({
-      resolutionMode: 'simple',
-      features: { craftingChecks: true },
-      craftingCheck: { simple: { rollFormula: '1d20 + 3', dc: 12 } },
-    }),
-  });
+  const system = {
+    resolutionMode: 'simple',
+    features: { craftingChecks: true },
+    craftingCheck: {
+      simple: {
+        rollFormula: '1d20 + 3', dc: 12,
+        evaluation: { product: 'count', direction: 'under', pool: { required: 3 } },
+      },
+    },
+  };
+  game.fabricate.getCraftingSystemManager = () => ({ getSystem: () => system });
   engine.installVersionedRunAuthority({
     consumeExecutionGrant: async (_grant, context) => ({
       operationId: `${context.operation}-operation`,
@@ -1904,6 +1971,11 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
     assert.equal(descriptor.privateEvaluation.decisionPolicy.dc, 12);
     assert.deepEqual(descriptor.privateEvaluation.speaker, expectedSpeaker);
     assert.equal(descriptor.privateEvaluation.flavor, 'Sun Tea — Crafting check (DC 12)');
+    assert.deepEqual(descriptor.privateEvaluation.checkConfig.evaluation, {
+      product: 'count', direction: 'under', pool: { required: 3 },
+    });
+    system.craftingCheck.simple.evaluation.pool.required = 12;
+    assert.equal(descriptor.privateEvaluation.checkConfig.evaluation.pool.required, 3);
 
     const originalRoll = globalThis.Roll;
     const posts = [];
@@ -1933,6 +2005,12 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
     try {
       const privateEvaluation = JSON.parse(JSON.stringify(descriptor.privateEvaluation));
       const evaluated = await evaluatePreparedRunCheck(privateEvaluation, actor);
+      assert.deepEqual(
+        Object.fromEntries(['product', 'direction', 'comparison', 'target', 'margin', 'successes', 'cancelled']
+          .map((key) => [key, evaluated.data[key]])),
+        { product: 'sum', direction: 'over', comparison: 'meet', target: 12, margin: 3,
+          successes: null, cancelled: null }
+      );
       const handoff = JSON.parse(JSON.stringify(evaluated.rollHandoff));
       const posted = await postCheckRollHandoff(handoff, { Roll: ReconstructedRoll });
       assert.equal(posted.success, true);

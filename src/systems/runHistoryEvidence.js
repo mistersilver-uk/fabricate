@@ -12,6 +12,21 @@ const text = (value) => (typeof value === 'string' && value.trim() ? value : nul
 const list = (value) => (Array.isArray(value) ? value : []);
 const states = new Set(['pending', 'complete', 'uncertain', 'notApplicable']);
 
+/** Executed check metadata is accepted only when it agrees with the result being persisted. */
+export function checkResolutionEvidence(source, { executed = false } = {}) {
+  const snapshot = source?.resolutionSnapshot;
+  const result = source?.lastCheckResult?.data;
+  return executed &&
+    snapshot?.kind === 'check' &&
+    snapshot.product === 'sum' &&
+    snapshot.direction === 'over' &&
+    Number.isFinite(result?.total) &&
+    result?.product === 'sum' &&
+    result.direction === 'over'
+    ? { product: 'sum', direction: 'over' }
+    : {};
+}
+
 export function receiptQuantity(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 }
@@ -56,7 +71,7 @@ export function mapConsumedIngredientRef({ item, quantity, receipt }) {
   };
 }
 
-export function historyEvidenceFields(source = {}) {
+export function historyEvidenceFields(source = {}, options = {}) {
   const evidence = {};
   if (
     ['check', 'ingredients', 'none'].includes(source.resolutionSnapshot?.kind) &&
@@ -65,6 +80,7 @@ export function historyEvidenceFields(source = {}) {
     evidence.resolutionSnapshot = {
       kind: source.resolutionSnapshot.kind,
       mode: source.resolutionSnapshot.mode,
+      ...checkResolutionEvidence(source, options),
     };
   }
   if (source.historySettlement) {
