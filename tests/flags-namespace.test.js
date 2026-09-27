@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   forcedDeletionEntry,
+  forcedReplacementEntry,
   getFabricateFlag,
   markForcedDeletion,
   setFabricateFlag,
@@ -11,8 +12,11 @@ import {
 import {
   assertNoLegacyDeletionKeys,
   FakeForcedDeletion,
+  FakeForcedReplacement,
   forEachDeletionForm,
+  forEachReplacementForm,
   isForcedDeletion,
+  isForcedReplacement,
 } from './helpers/forcedDeletion.js';
 
 function getPathValue(object, path) {
@@ -302,6 +306,45 @@ test('a non-function ForcedDeletion falls back to the V13 form', (t) => {
     globalThis.foundry = { data: { operators: { ForcedDeletion } } };
     assert.deepEqual(forcedDeletionEntry('p', 'k'), ['p.-=k', null]);
     assert.deepEqual(markForcedDeletion({}, 'k'), { '-=k': null });
+  }
+});
+
+// Forced replacement (issue 2012): one helper spells the wholesale write for the running build.
+
+forEachReplacementForm('forcedReplacementEntry spells the replacement for the running build', (form) => {
+  form.apply();
+  const map = { r2: { discoveredAt: 2 } };
+  const [path, value] = forcedReplacementEntry('flags.fabricate.fabricate', 'realms', map);
+  if (form.v14) {
+    assert.equal(path, 'flags.fabricate.fabricate.realms');
+    assert.ok(isForcedReplacement(value), 'V14 carries the operator at the bare key');
+    assert.deepEqual(value.value, map, 'the operator holds the replacement value');
+  } else {
+    assert.deepEqual([path, value], ['flags.fabricate.fabricate.==realms', map]);
+  }
+});
+
+forEachReplacementForm('forcedReplacementEntry refuses an unsafe key like the deletion', (form) => {
+  form.apply();
+  for (const key of ['a.b', '', '==x', 'has space', 7, undefined]) {
+    assert.throws(() => forcedReplacementEntry('flags.x', key, {}), TypeError, String(key));
+  }
+  for (const key of ['__proto__', 'constructor', 'prototype']) {
+    assert.equal(forcedReplacementEntry('flags.x', key, {}), null, key);
+  }
+});
+
+test('the replacement operator is detected at call time and needs a create factory', (t) => {
+  const priorFoundry = globalThis.foundry;
+  t.after(() => {
+    globalThis.foundry = priorFoundry;
+  });
+  assert.deepEqual(forcedReplacementEntry('p', 'k', 1), ['p.==k', 1], 'no operator yet');
+  globalThis.foundry = { data: { operators: { ForcedReplacement: FakeForcedReplacement } } };
+  assert.ok(isForcedReplacement(forcedReplacementEntry('p', 'k', 1)[1]), 'installed after import');
+  for (const ForcedReplacement of [{}, class {}, null, 1]) {
+    globalThis.foundry = { data: { operators: { ForcedReplacement } } };
+    assert.deepEqual(forcedReplacementEntry('p', 'k', 1), ['p.==k', 1]);
   }
 });
 
