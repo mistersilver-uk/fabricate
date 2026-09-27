@@ -51,5 +51,4 @@ export const TARGET_LIBRARY_NAME_TOTAL = 56;
 export const TARGET_MANIFEST_ROWS = rows('manifestTargetRows');
 
 /** @see TARGET_MANIFEST_ROWS */
-// Issue 2005 re-promoted `RollDataExpressionInput` at `target` on its second caller.
 export const TARGET_MANIFEST_ROW_TOTAL = 50;
