@@ -21,6 +21,7 @@ export async function seedRollPromptFixture(world, state) {
   if (state === 'salvage-under' || state === 'salvage-under-attribute') {
     await seedSalvageUnder(world, state);
   }
+  if (state === 'count') await seedCount(manager);
   if (state === 'pick-one' || state === 'overflow') {
     const system = manager.getSystem('lab-herbalism');
     await manager.updateSystem(system.id, {
@@ -113,6 +114,27 @@ async function seedSalvageUnder(world, state) {
         ...runework.salvageCraftingCheck.routed,
         rollFormula: '1d20',
         evaluation: under(attribute && { source: 'attribute', expression: '@abilities.int.value' }),
+      },
+    },
+  });
+}
+
+/**
+ * Smithing's simple slot counts successes: six d10s, each qualifying at 8 or more, two needed.
+ * The retained roll formula stays authored and inert, so the prompt must not show it.
+ */
+async function seedCount(manager) {
+  const system = manager.getSystem('lab-smithing');
+  await manager.updateSystem(system.id, {
+    craftingCheck: {
+      ...system.craftingCheck,
+      simple: {
+        ...system.craftingCheck.simple,
+        evaluation: normalizeCheckEvaluation({
+          product: 'count',
+          direction: 'over',
+          pool: { die: 10, base: '6', threshold: '8', required: 2, modifierDestination: 'pool' },
+        }),
       },
     },
   });

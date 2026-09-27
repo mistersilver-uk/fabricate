@@ -27,7 +27,8 @@ import {
 } from '../src/systems/checkModifierResolver.js';
 import { resolveModifierLibrary } from '../src/systems/characterLibraries.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
-import { stubInteractiveRollEnvironment } from './helpers/rollPromptDialogStub.js';
+import { installCountDice } from './helpers/countEngineDice.js';
+import { stubInteractiveRollEnvironment, stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
 
 test('roll-prompt View Lab variants project valid checks and long world modifier labels', async () => {
@@ -62,6 +63,7 @@ test('roll-prompt View Lab variants project valid checks and long world modifier
   await seedRollPromptFixture(world, 'pick-one');
   assert.equal(manager.getSystem('lab-herbalism').craftingCheck.maxModifierPicks, 1);
   await underPromptView(world);
+  await countPromptView(world, content);
   await seedRollPromptFixture(world, 'overflow');
   const herbalism = manager.getSystem('lab-herbalism');
   assert.equal(herbalism.craftingCheck.maxModifierPicks, 2);
@@ -109,6 +111,30 @@ async function underPromptView(world) {
     if (previousGame === undefined) delete globalThis.game;
     else globalThis.game = previousGame;
     stub.restore();
+  }
+}
+
+/** The `count` state: the horseshoe's real engine prompt shows six d10s and two successes needed. */
+async function countPromptView(world, content) {
+  const manager = world.fabricate.craftingSystemManager;
+  await seedRollPromptFixture(world, 'count');
+  const system = manager.getSystem('lab-smithing');
+  const recipe = content.recipes.find((entry) => entry.id === 'sm-r-horseshoe');
+  const dice = installCountDice();
+  const surface = stubPromptSurface(() => null);
+  try {
+    await new CraftingEngine(null)._runPassFailCheck(
+      system, system.craftingCheck.simple, recipe, null, { name: 'Idrin', getRollData: () => ({}) },
+      { interactive: true }
+    );
+    const { view } = surface;
+    assert.equal(view.formula, '6d10 · each ≥ 8', 'the pool line, not the retained formula');
+    assert.equal(view.neededText, '2 successes needed');
+    assert.deepEqual([view.dc, view.allowAdvantage], [null, false]);
+    assert.deepEqual(dice.constructed, [], 'a dismissed prompt rolls nothing');
+  } finally {
+    surface.restore();
+    dice.restore();
   }
 }
 
