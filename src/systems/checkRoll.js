@@ -4,21 +4,31 @@
  * value. `label` only customises the failure messages; the result shape is identical.
  */
 
-import { evaluateCheckBreakageCondition } from '../toolBreakageRuntime.js';
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 import { cloneJson } from '../utils/scalars.js';
 
 import { chatModeOption } from './bulkChatVisibility.js';
-import { compareToTarget, effectiveMargin, rankBest } from './checkEvaluation.js';
-import { resolveCheckModifierFormula } from './checkModifierResolver.js';
+import { compareToTarget, effectiveMargin } from './checkEvaluation.js';
+import {
+  resolveCheckModifierFormula,
+  resolvedLibraryContributions,
+} from './checkModifierResolver.js';
 import { postBundledCheckRoll, resolveModifierPreRolls } from './checkModifierRolls.js';
-import { SUM_OVER_EVALUATION } from './checkModifierRouter.js';
+import { planModifierPlacement, SUM_OVER_EVALUATION } from './checkModifierRouter.js';
 import { resolveCheckDecision } from './checkRollDecision.js';
+import {
+  classifyCheckTotal,
+  effectiveTarget,
+  resolveForcedOutcome,
+  sumGrading,
+} from './checkRouting.js';
 import {
   activeCheckEvaluation,
   checkTargetRefusal,
   progressiveTargetRefusal,
 } from './checkTarget.js';
+
+export { classifyCheckTotal, resolveForcedOutcome } from './checkRouting.js';
 
 function preRollEvidence(rolled) {
   const entries = rolled?.modifierPlacement?.preRolls;
@@ -35,19 +45,40 @@ function preRollEvidence(rolled) {
 }
 
 /**
- * The formula this module actually rolls: the retired-placeholder shim (issue 1094), then the
- * check-modifier append. One derivation, because the roll, the display and the Checks Studio's
- * odds enumerator must agree (issue 1097). `craftingModifier` is `null` where no term appends,
- * including the deferred `playerPicks` path; `Roll` is a parameter so an injected engine drives
- * both steps. Returns `''` when the shim emptied the formula.
+ * The formula this module actually rolls and its modifier placement: the retired-placeholder shim
+ * (issue 1094), then the library append for `evaluation`. One derivation, because the roll, the
+ * display and the Checks Studio's odds enumerator must agree (issue 1097). `craftingModifier` is
+ * `null` where no term appends; `Roll` is a parameter so an injected engine drives both steps.
+ * Tool contributions already sit in a sum/over formula and join the placement only.
  */
+export function deriveCheckRoll(
+  formula,
+  actor,
+  craftingModifier = null,
+  Roll = globalThis.Roll,
+  evaluation = SUM_OVER_EVALUATION,
+  toolContributions = []
+) {
+  const rolled = resolveRolledCheck(formula, actor, craftingModifier, Roll, evaluation);
+  const placement = planModifierPlacement({
+    evaluation,
+    contributions: [
+      ...(Array.isArray(toolContributions) ? toolContributions : []),
+      ...resolvedLibraryContributions(rolled.selected),
+    ],
+  });
+  return { formula: rolled.formula, placement };
+}
+
+/** The formula half of {@link deriveCheckRoll}; `''` when the shim emptied the formula. */
 export function resolveRolledFormula(
   formula,
   actor,
   craftingModifier = null,
-  Roll = globalThis.Roll
+  Roll = globalThis.Roll,
+  evaluation = SUM_OVER_EVALUATION
 ) {
-  return resolveRolledCheck(formula, actor, craftingModifier, Roll).formula;
+  return resolveRolledCheck(formula, actor, craftingModifier, Roll, evaluation).formula;
 }
 
 function resolveRolledCheck(
@@ -92,31 +123,6 @@ export function rolledDiceGroups(roll) {
       results,
     };
   });
-}
-
-/**
- * The forced outcome from the unified trigger list (issue 419): a matching `success`/`failure`
- * trigger forces that disposition, and a forced failure beats a forced success. `outcomeTier`
- * conditions are skipped here, because the tier is resolved after this, but stay live for tier
- * steps and tool breakage. Answers `{ disposition }` or `null`.
- */
-export function resolveForcedOutcome(triggers, { total, value, diceGroups } = {}) {
-  const list = Array.isArray(triggers) ? triggers : [];
-  const checkResult = {
-    value,
-    data: { total, diceGroups: Array.isArray(diceGroups) ? diceGroups : [] },
-  };
-  let forcedSuccess = null;
-  for (const trigger of list) {
-    if (!trigger || typeof trigger !== 'object') continue;
-    const outcome = trigger.outcome;
-    if (outcome !== 'success' && outcome !== 'failure') continue;
-    if (trigger.condition?.type === 'outcomeTier') continue;
-    if (!evaluateCheckBreakageCondition(trigger.condition, checkResult)) continue;
-    if (outcome === 'failure') return { disposition: 'failure' }; // forced failure wins
-    forcedSuccess = { disposition: 'success' };
-  }
-  return forcedSuccess;
 }
 
 /**
@@ -297,11 +303,13 @@ export async function evaluatePreparedCheck(preparation, actor, decision = {}) {
     includeRollHandoff: !secret,
   });
   if (!secret) return result;
+  // The settled placement stays inside the authority for classification; callers never return it.
   return {
     engine: result.engine,
     total: result.total,
     diceGroups: result.diceGroups,
     resolvedFormula: null,
+    modifierPlacement: result.modifierPlacement,
     secret: true,
   };
 }
@@ -316,21 +324,97 @@ function preparedCheckKind(preparation) {
   return 'simple';
 }
 
-function executedSumEvidence(total, target, comparison) {
+/** The executed evidence of a summed check: `target` is effective and `margin` benefit-positive. */
+function executedSumEvidence(total, target, comparison, direction = 'over') {
   return {
     product: 'sum',
-    direction: 'over',
+    direction,
     comparison,
     target,
-    margin: target === null ? null : effectiveMargin(total, target, 'over'),
+    margin: target === null ? null : effectiveMargin(total, target, direction),
     successes: null,
     cancelled: null,
   };
 }
 
+/** `data.dc` names only a fixed target; an attribute result carries its number in `data.target`. */
+function fixedDc(dc, grading) {
+  return grading.source === 'fixed' ? dc : null;
+}
+
+/** A prepared check refuses progressive sum/under, and a blank sum/under formula, before any roll. */
+function preparedCheckRefusal(kind, evaluation, formula) {
+  if (kind === 'progressive') return progressiveTargetRefusal(evaluation);
+  const blank = String(formula ?? '').trim() === '';
+  return blank && sumGrading(evaluation).direction === 'under' ? 'formula-empty' : null;
+}
+
+/** Grades a prepared total as the matching runner does, against the captured anchor. */
+function gradePreparedTotal(kind, { config, evaluation, anchor, targetDelta, total, diceGroups }) {
+  const grading = sumGrading(evaluation);
+  const triggers = config.checkBreakage?.triggers ?? config.triggers ?? [];
+  const comparison = config.thresholdMode === 'exceed' ? 'exceed' : 'meet';
+  if (kind === 'routed') {
+    const classified = classifyCheckTotal({
+      type: config.type,
+      total,
+      dc: anchor,
+      comparison,
+      relativeOutcomes: config.relativeOutcomes,
+      fixedOutcomes: config.fixedOutcomes,
+      triggers,
+      diceGroups,
+      clampToNearest: config.clampToNearest !== false,
+      minOutcomeId: config.minOutcomeId ?? null,
+      evaluation,
+      targetDelta,
+    });
+    return {
+      success: classified.success,
+      outcome: classified.matched?.name ?? null,
+      value: total,
+      data: {
+        type: config.type,
+        ...executedSumEvidence(total, classified.target, classified.comparison, grading.direction),
+        outcomeId: classified.matched?.id ?? null,
+        success: classified.success,
+        breakTools: classified.breakTools,
+        ...(classified.tierStepApplied && { tierStepApplied: classified.tierStepApplied }),
+        ...(classified.minTierFailed && {
+          minTierFailed: true,
+          blockedOutcomeId: classified.blockedOutcomeId,
+        }),
+      },
+    };
+  }
+  const forced = resolveForcedOutcome(triggers, { total, diceGroups });
+  if (kind === 'progressive') {
+    let value = total;
+    if (forced?.disposition === 'success') value = Number.MAX_SAFE_INTEGER;
+    if (forced?.disposition === 'failure') value = 0;
+    return {
+      success: true,
+      outcome: null,
+      value,
+      data: { ...executedSumEvidence(total, null, null), value },
+    };
+  }
+  const target = effectiveTarget(Number(anchor), grading, targetDelta);
+  const success = forced
+    ? forced.disposition === 'success'
+    : compareToTarget(total, target, comparison, grading.direction);
+  return {
+    success,
+    outcome: success ? 'pass' : 'fail',
+    value: total,
+    data: executedSumEvidence(total, target, comparison, grading.direction),
+  };
+}
+
 /**
  * Evaluate and classify the private CraftingEngine check descriptor without accepting a client
- * formula or total. This is the authority-side twin of the three existing formula runners.
+ * formula or total. This is the authority-side twin of the three existing formula runners; it
+ * places by the prepared evaluation and grades against the captured `decisionPolicy.target`.
  */
 export async function evaluatePreparedRunCheck(
   preparation,
@@ -348,8 +432,8 @@ export async function evaluatePreparedRunCheck(
       : {};
   const config = { ...checkConfig, ...decisionPolicy };
   const kind = preparedCheckKind(preparation);
-  const refusal =
-    kind === 'progressive' && progressiveTargetRefusal(activeCheckEvaluation(checkConfig));
+  const evaluation = activeCheckEvaluation(checkConfig);
+  const refusal = preparedCheckRefusal(kind, evaluation, preparation?.rollFormula);
   if (refusal) return checkTargetRefusal(refusal, 'Prepared');
   const authoritativeDecision = {
     ...decision,
@@ -370,7 +454,7 @@ export async function evaluatePreparedRunCheck(
         craftingModifier: config.craftingModifier ?? null,
         modifierChoice: config.modifierChoice ?? null,
         toolContributions: config.toolContributions ?? [],
-        evaluation: SUM_OVER_EVALUATION,
+        evaluation,
         speaker: preparation?.speaker ?? config.speaker ?? null,
       },
     },
@@ -393,61 +477,26 @@ export async function evaluatePreparedRunCheck(
   }
   const total = Number(rolled.total) || 0;
   const diceGroups = Array.isArray(rolled.diceGroups) ? rolled.diceGroups : [];
-  const triggers = config.checkBreakage?.triggers ?? config.triggers ?? [];
-  const forced = resolveForcedOutcome(triggers, { total, diceGroups });
-  const data = {
-    dc: config.resolvedDc ?? config.dc,
+  const graded = gradePreparedTotal(kind, {
+    config,
+    evaluation,
+    anchor: decisionPolicy.target ?? config.resolvedDc ?? config.dc,
+    targetDelta: rolled.modifierPlacement?.targetDelta,
     total,
     diceGroups,
-    ...(!secret && preRollEvidence(rolled)),
-  };
-  let success = true;
-  let outcome = null;
-  let value = total;
-  if (kind === 'progressive') {
-    Object.assign(data, executedSumEvidence(total, null, null));
-    if (forced?.disposition === 'success') value = Number.MAX_SAFE_INTEGER;
-    if (forced?.disposition === 'failure') value = 0;
-    data.value = value;
-  } else if (kind === 'routed') {
-    const classified = classifyCheckTotal({
-      type: config.type,
-      total,
-      dc: data.dc,
-      comparison: config.thresholdMode === 'exceed' ? 'exceed' : 'meet',
-      relativeOutcomes: config.relativeOutcomes,
-      fixedOutcomes: config.fixedOutcomes,
-      triggers,
-      diceGroups,
-      clampToNearest: config.clampToNearest !== false,
-      minOutcomeId: config.minOutcomeId ?? null,
-    });
-    success = classified.success;
-    outcome = classified.matched?.name ?? null;
-    data.type = config.type;
-    Object.assign(data, executedSumEvidence(total, classified.target, classified.comparison));
-    data.outcomeId = classified.matched?.id ?? null;
-    data.success = success;
-    data.breakTools = classified.breakTools;
-    if (classified.tierStepApplied) data.tierStepApplied = classified.tierStepApplied;
-    if (classified.minTierFailed) {
-      data.minTierFailed = true;
-      data.blockedOutcomeId = classified.blockedOutcomeId;
-    }
-  } else {
-    const comparison = config.thresholdMode === 'exceed' ? 'exceed' : 'meet';
-    success = forced
-      ? forced.disposition === 'success'
-      : compareToTarget(total, Number(data.dc), comparison, 'over');
-    outcome = success ? 'pass' : 'fail';
-    Object.assign(data, executedSumEvidence(total, Number(data.dc), comparison));
-  }
+  });
   return {
-    success,
-    outcome,
-    value,
-    data,
-    message: success ? null : failureMessage,
+    success: graded.success,
+    outcome: graded.outcome,
+    value: graded.value,
+    data: {
+      dc: config.resolvedDc ?? config.dc,
+      total,
+      diceGroups,
+      ...(!secret && preRollEvidence(rolled)),
+      ...graded.data,
+    },
+    message: graded.success ? null : failureMessage,
     engineEvaluated: true,
     secret,
     ...(rolled.rollHandoff && { rollHandoff: rolled.rollHandoff }),
@@ -548,11 +597,12 @@ export function resolveCheckFormulaDisplay(
   formula,
   actor,
   craftingModifier = null,
-  Roll = globalThis.Roll
+  Roll = globalThis.Roll,
+  evaluation = SUM_OVER_EVALUATION
 ) {
   if (typeof formula !== 'string' || formula.trim() === '') return null;
   if (typeof Roll?.replaceFormulaData !== 'function') return null;
-  const substituted = resolveRolledFormula(formula, actor, craftingModifier, Roll);
+  const substituted = resolveRolledFormula(formula, actor, craftingModifier, Roll, evaluation);
   if (substituted.trim() === '') return null;
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
   const display = Roll.replaceFormulaData(substituted, rollData, {
@@ -599,9 +649,39 @@ export async function evaluateSituationalBonus(bonus, actor = null) {
 }
 
 /**
- * A pass/fail check: the total against `dc`, met or (`thresholdMode: 'exceed'`) strictly
- * exceeded, honouring forced outcomes. A dismissed prompt returns `cancelled: true` so the
- * caller aborts with zero mutation; with no dice engine it passes rather than block.
+ * Rolls a runner's formula, or answers `{ exit }`: the runner's result for a thrown roll, a
+ * cancelled prompt (zero mutation) or a missing dice engine. A blank formula rolls nothing.
+ */
+async function rollRunnerFormula({ formula, actor, options, label, kind = '', data, headless }) {
+  if (!formula) return { total: 0, diceGroups: [], resolvedFormula: null };
+  let rolled;
+  try {
+    rolled = await evaluateCheckRoll(formula, actor, options);
+  } catch (error) {
+    console.error(`Fabricate | ${label} ${kind}check roll failed (${formula})`, error);
+    return {
+      exit: {
+        success: false,
+        outcome: kind ? null : 'fail',
+        value: null,
+        data,
+        message: `${label} check roll failed: ${error.message}`,
+      },
+    };
+  }
+  if (rolled.cancelled) {
+    return { exit: { success: false, cancelled: true, outcome: null, value: null, data } };
+  }
+  if (!rolled.engine) return { exit: headless };
+  const { total, diceGroups, resolvedFormula } = rolled;
+  return { rolled, total, diceGroups, resolvedFormula };
+}
+
+/**
+ * A pass/fail check: the total against `dc` (the resolved anchor), met or (`thresholdMode:
+ * 'exceed'`) strictly exceeded in the evaluation's direction, honouring forced outcomes. Under,
+ * the settled `targetDelta` raises the target once. A dismissed prompt returns `cancelled: true`;
+ * with no dice engine it passes rather than block.
  */
 export async function runFormulaPassFail({
   formula: rawFormula,
@@ -615,59 +695,38 @@ export async function runFormulaPassFail({
   ...input
 }) {
   const evaluation = ownEvaluation(input, rollOptions);
+  const grading = sumGrading(evaluation);
   const formula = String(rawFormula || '').trim();
-  let total = 0;
-  let diceGroups = [];
-  let resolvedFormula = null;
-  let rolled;
-  if (formula) {
-    try {
-      rolled = await evaluateCheckRoll(formula, actor, {
-        ...rollOptions,
-        evaluation,
-        dc,
-        thresholdMode,
-        craftingModifier,
-      });
-    } catch (error) {
-      console.error(`Fabricate | ${label} check roll failed (${formula})`, error);
-      return {
-        success: false,
-        outcome: 'fail',
-        value: null,
-        data: { dc, formula },
-        message: `${label} check roll failed: ${error.message}`,
-      };
-    }
-    // A cancelled prompt aborts with zero mutation.
-    if (rolled.cancelled) {
-      return { success: false, cancelled: true, outcome: null, value: null, data: { dc, formula } };
-    }
-    if (!rolled.engine) {
-      // No dice engine: cannot evaluate, so do not block the activity.
-      return { success: true, outcome: 'pass', value: null, data: { dc, formula }, message: null };
-    }
-    total = rolled.total;
-    diceGroups = rolled.diceGroups;
-    resolvedFormula = rolled.resolvedFormula;
-  }
+  if (!formula && grading.direction === 'under') return checkTargetRefusal('formula-empty', label);
+  const data = { dc: fixedDc(dc, grading), formula };
+  const roll = await rollRunnerFormula({
+    formula,
+    actor,
+    label,
+    data,
+    options: { ...rollOptions, evaluation, dc, thresholdMode, craftingModifier },
+    headless: { success: true, outcome: 'pass', value: null, data, message: null },
+  });
+  if (roll.exit) return roll.exit;
+  const { total, diceGroups, resolvedFormula, rolled } = roll;
 
   const forced = resolveForcedOutcome(triggers, { total, diceGroups });
   const comparison = thresholdMode === 'exceed' ? 'exceed' : 'meet';
+  const target = effectiveTarget(dc, grading, rolled?.modifierPlacement?.targetDelta);
   const success = forced
     ? forced.disposition === 'success'
-    : compareToTarget(total, dc, comparison, 'over');
+    : compareToTarget(total, target, comparison, grading.direction);
   return {
     success,
     outcome: success ? 'pass' : 'fail',
     value: total,
     data: {
-      dc,
+      dc: data.dc,
       formula,
       resolvedFormula,
       total,
       comparison,
-      ...(formula && executedSumEvidence(total, dc, comparison)),
+      ...(formula && executedSumEvidence(total, target, comparison, grading.direction)),
       diceGroups,
       ...preRollEvidence(rolled),
     },
@@ -693,39 +752,18 @@ export async function runFormulaProgressive({
   const refusal = progressiveTargetRefusal(evaluation);
   if (refusal) return checkTargetRefusal(refusal, label);
   const formula = String(rawFormula || '').trim();
-  let total = 0;
-  let diceGroups = [];
-  let resolvedFormula = null;
-  let rolled;
-  if (formula) {
-    try {
-      rolled = await evaluateCheckRoll(formula, actor, {
-        ...rollOptions,
-        evaluation,
-        craftingModifier,
-      });
-    } catch (error) {
-      console.error(`Fabricate | ${label} progressive check roll failed (${formula})`, error);
-      return {
-        success: false,
-        outcome: null,
-        value: null,
-        data: { formula },
-        message: `${label} check roll failed: ${error.message}`,
-      };
-    }
-    // The player cancelled the interactive roll dialog: abort with zero mutation.
-    if (rolled.cancelled) {
-      return { success: false, cancelled: true, outcome: null, value: null, data: { formula } };
-    }
-    if (!rolled.engine) {
-      // No dice engine: award nothing (a finite value) rather than block.
-      return { success: true, outcome: null, value: 0, data: { formula, total: 0, value: 0 } };
-    }
-    total = rolled.total;
-    diceGroups = rolled.diceGroups;
-    resolvedFormula = rolled.resolvedFormula;
-  }
+  const roll = await rollRunnerFormula({
+    formula,
+    actor,
+    label,
+    kind: 'progressive ',
+    data: { formula },
+    options: { ...rollOptions, evaluation, craftingModifier },
+    // No dice engine: award nothing (a finite value) rather than block.
+    headless: { success: true, outcome: null, value: 0, data: { formula, total: 0, value: 0 } },
+  });
+  if (roll.exit) return roll.exit;
+  const { total, diceGroups, resolvedFormula, rolled } = roll;
 
   // Forcing sees the raw total as the value, which `progressiveValue` conditions target.
   const forced = resolveForcedOutcome(triggers, { total, value: total, diceGroups });
@@ -754,304 +792,6 @@ export async function runFormulaProgressive({
 }
 
 /**
- * Match a total to a routed tier, or `null`. Relative tiers carry a DC delta over the base `dc`
- * and the matching tier with the highest threshold wins; fixed tiers carry `[start, end]` and
- * the highest matching `start` wins. `clampToNearest` (relative only) routes a total below every
- * threshold to the lowest tier; there is no top-end clamp.
- */
-function matchRoutedOutcome({
-  type,
-  total,
-  dc,
-  comparison,
-  relativeOutcomes,
-  fixedOutcomes,
-  clampToNearest = false,
-}) {
-  if (type === 'fixed') {
-    const outcomes = Array.isArray(fixedOutcomes) ? fixedOutcomes : [];
-    const matching = outcomes.filter((outcome) => {
-      const start = Number(outcome?.start);
-      const end = Number(outcome?.end);
-      return Number.isFinite(start) && Number.isFinite(end) && total >= start && total <= end;
-    });
-    return rankBest(matching, (outcome) => Number(outcome.start), 'over')[0] ?? null;
-  }
-  const outcomes = Array.isArray(relativeOutcomes) ? relativeOutcomes : [];
-  const valid = outcomes.filter((outcome) => outcome && Number.isFinite(Number(outcome.dc)));
-  const thresholdOf = (outcome) => dc + Number(outcome.dc);
-  const matching = valid.filter((outcome) =>
-    compareToTarget(total, thresholdOf(outcome), comparison, 'over')
-  );
-  if (matching.length > 0) return rankBest(matching, thresholdOf, 'over')[0];
-  return clampToNearest ? (rankBest(valid, thresholdOf, 'under')[0] ?? null) : null;
-}
-
-/** A relative tier ranks by DC delta, a fixed one by range start. */
-function routedRankKey(type) {
-  return type === 'fixed' ? 'start' : 'dc';
-}
-
-/**
- * The single derivation of routed tier order (issue 975), ascending by `dc` or `start`: tiers
- * with a non-finite rank are dropped and ties keep author order. Callers locate a tier by id,
- * never by identity, because this is a copy.
- */
-function rankedRoutedOutcomes({ type, relativeOutcomes, fixedOutcomes }) {
-  const key = routedRankKey(type);
-  const source = type === 'fixed' ? fixedOutcomes : relativeOutcomes;
-  return rankBest(
-    (Array.isArray(source) ? source : []).filter(
-      (outcome) => Boolean(outcome) && Number.isFinite(Number(outcome[key]))
-    ),
-    (outcome) => Number(outcome[key]),
-    'under'
-  );
-}
-
-/** The ranked tiers of one disposition, the only subset a forced outcome or a step moves in. */
-function dispositionSubset(ranked, disposition) {
-  const wantSuccess = disposition === 'success';
-  return ranked.filter((outcome) => (outcome.success === true) === wantSuccess);
-}
-
-/** A forced failure routes to the lowest-ranked failing tier and a forced success to the
- *  highest-ranked succeeding one; equal ranks keep the first authored. `null` when none exists. */
-function routeCritOutcome({ type, forcedSuccess, relativeOutcomes, fixedOutcomes }) {
-  const wantSuccess = forcedSuccess === true;
-  const ranked = dispositionSubset(
-    rankedRoutedOutcomes({ type, relativeOutcomes, fixedOutcomes }),
-    wantSuccess ? 'success' : 'failure'
-  );
-  if (ranked.length === 0) return null;
-  // Ascending order: index 0 already IS the lowest-ranked, author-first tier.
-  if (!wantSuccess) return ranked[0];
-  return rankBest(ranked, (outcome) => Number(outcome[routedRankKey(type)]), 'over')[0];
-}
-
-/** The `tierStep.mode` values that move; `none` and anything unrecognised is inert. */
-const TIER_STEP_MODES = new Set(['target', 'up', 'down']);
-
-/**
- * The frozen rolled-tier snapshot every step condition is evaluated against, once: a step asks
- * about the tier the dice landed on, never the stepped one, so steps cannot cycle. `value` stays
- * `undefined` so `progressiveValue` is invisible, as in `resolveForcedOutcome`.
- */
-function rolledTierSnapshot(rolled, total, diceGroups) {
-  return Object.freeze({
-    value: undefined,
-    outcome: rolled?.name ?? null,
-    data: Object.freeze({
-      total,
-      diceGroups: Array.isArray(diceGroups) ? diceGroups : [],
-      outcomeId: rolled?.id ?? null,
-    }),
-  });
-}
-
-/** Triggers matching the rolled tier whose `tierStep` moves, in author order. */
-function matchedTierStepTriggers(triggers, snapshot) {
-  return (Array.isArray(triggers) ? triggers : []).filter((trigger) => {
-    if (!TIER_STEP_MODES.has(trigger?.tierStep?.mode)) return false;
-    return evaluateCheckBreakageCondition(trigger.condition, snapshot);
-  });
-}
-
-/** An integer `>= 1`, clamped here too so a raw negative never inverts the authored direction. */
-function tierStepMagnitude(steps) {
-  const value = Math.trunc(Number(steps));
-  return Number.isFinite(value) && value >= 1 ? value : 1;
-}
-
-/**
- * The winning `target` trigger: a target is eligible only when its `tierId` is in the array in
- * play, and among eligible ones the lowest-ranked tier wins, order-independent and pessimistic.
- * `index` is -1 when none survives.
- */
-function resolveTierStepTarget(stepping, inPlay) {
-  let index = -1;
-  let trigger = null;
-  for (const candidate of stepping) {
-    if (candidate.tierStep.mode !== 'target') continue;
-    const tierId = candidate.tierStep.tierId;
-    if (typeof tierId !== 'string' || tierId === '') continue;
-    const found = inPlay.findIndex((outcome) => outcome.id === tierId);
-    if (found === -1) continue;
-    if (index === -1 || found < index) {
-      index = found;
-      trigger = candidate;
-    }
-  }
-  return { index, trigger };
-}
-
-/** `Σ up − Σ down`: summing is commutative, so `up 1` plus `down 1` is a deliberate no-op. */
-function netTierSteps(stepping) {
-  return stepping.reduce((net, trigger) => {
-    const { mode, steps } = trigger.tierStep;
-    if (mode === 'up') return net + tierStepMagnitude(steps);
-    if (mode === 'down') return net - tierStepMagnitude(steps);
-    return net;
-  }, 0);
-}
-
-/** The winning target plus every matched relative trigger; a losing target is not credited. */
-function appliedTierStepTriggerIds(stepping, winningTarget) {
-  return stepping
-    .filter((trigger) => trigger.tierStep.mode !== 'target' || trigger === winningTarget)
-    .map((trigger) => trigger.id)
-    .filter((id) => typeof id === 'string' && id !== '');
-}
-
-/**
- * Apply every matching trigger's `tierStep` to the rolled tier (issue 975). Stepping preserves
- * disposition: under a forced outcome the array in play is that disposition's subset, so
- * `data.success` always agrees with the final tier. A winning target sets the base, the net
- * relative offset applies, and the result clamps to the array (`stepClamped`, unrelated to
- * `clampToNearest`). A `null` rolled tier steps nothing; `tierStepApplied` marks a real change.
- */
-function applyTierStepTriggers({
-  rolled,
-  type,
-  forcedDisposition = null,
-  triggers,
-  relativeOutcomes,
-  fixedOutcomes,
-  total,
-  diceGroups,
-}) {
-  if (!rolled) return { matched: null, tierStepApplied: null };
-
-  const stepping = matchedTierStepTriggers(triggers, rolledTierSnapshot(rolled, total, diceGroups));
-  if (stepping.length === 0) return { matched: rolled, tierStepApplied: null };
-
-  const ranked = rankedRoutedOutcomes({ type, relativeOutcomes, fixedOutcomes });
-  const inPlay = forcedDisposition === null ? ranked : dispositionSubset(ranked, forcedDisposition);
-  const fromIndex = inPlay.findIndex((outcome) => outcome.id === rolled.id);
-  if (fromIndex === -1) return { matched: rolled, tierStepApplied: null };
-
-  const target = resolveTierStepTarget(stepping, inPlay);
-  const base = target.index === -1 ? fromIndex : target.index;
-  const requestedIndex = base + netTierSteps(stepping);
-  const toIndex = Math.min(Math.max(requestedIndex, 0), inPlay.length - 1);
-  // A clamped no-op or a cancelling pair leaves the rolled tier with no evidence.
-  if (toIndex === fromIndex) return { matched: rolled, tierStepApplied: null };
-
-  const stepped = inPlay[toIndex];
-  // A winning target is `target` whatever the delta: a placement has no direction.
-  let mode = 'target';
-  if (target.index === -1) mode = toIndex > fromIndex ? 'up' : 'down';
-  return {
-    matched: stepped,
-    tierStepApplied: {
-      mode,
-      // The realized magnitude, which the chat card renders; `stepClamped` says more was asked.
-      steps: Math.abs(toIndex - fromIndex),
-      fromOutcomeId: rolled.id ?? null,
-      toOutcomeId: stepped.id ?? null,
-      stepClamped: requestedIndex !== toIndex,
-      triggerIds: appliedTierStepTriggerIds(stepping, target.trigger),
-    },
-  };
-}
-
-/**
- * Whether the fixed-type recipe minimum tier blocks the final tier. It compares `start` values,
- * not rank indices, because overlapping ranges are a readiness issue rather than refused, and
- * two tiers sharing a `start` must compare equal.
- */
-function minSuccessTierFailed({ type, minOutcomeId, matched, relativeOutcomes, fixedOutcomes }) {
-  if (type !== 'fixed' || !minOutcomeId) return false;
-  const ranked = rankedRoutedOutcomes({ type, relativeOutcomes, fixedOutcomes });
-  const requiredIndex = ranked.findIndex((outcome) => outcome.id === minOutcomeId);
-  const requiredStart = Number(ranked[requiredIndex]?.start);
-  // A stale/unknown `minOutcomeId` no-ops gracefully, like `checkTierId`.
-  if (!Number.isFinite(requiredStart)) return false;
-  const matchedStart = Number(matched?.start);
-  return !Number.isFinite(matchedStart) || !compareToTarget(matchedStart, requiredStart);
-}
-
-/**
- * Classify one total against a routed check's tiers: the whole post-roll resolution, which
- * `runFormulaRouted` calls so the Checks Studio's odds histogram cannot drift from it (issue
- * 1097). Order is load-bearing: forced reroute (an extreme tier), then the relative tier step,
- * then the minimum gate on the final tier. A caller synthesising `diceGroups` must build them
- * through `rolledDiceGroups`, or per-die triggers go silently invisible. `matched` is the
- * effective tier (`null` when the gate blocked it, naming it in `blockedOutcomeId`).
- */
-export function classifyCheckTotal({
-  type,
-  total,
-  dc,
-  comparison,
-  relativeOutcomes,
-  fixedOutcomes,
-  triggers,
-  diceGroups = [],
-  clampToNearest = false,
-  minOutcomeId = null,
-}) {
-  const forced = resolveForcedOutcome(triggers, { total, diceGroups });
-  const effectiveComparison = comparison === 'exceed' ? 'exceed' : 'meet';
-  const rollMatched = matchRoutedOutcome({
-    type,
-    total,
-    dc,
-    comparison: effectiveComparison,
-    relativeOutcomes,
-    fixedOutcomes,
-    clampToNearest,
-  });
-
-  let matched = forced
-    ? routeCritOutcome({
-        type,
-        forcedSuccess: forced.disposition === 'success',
-        relativeOutcomes,
-        fixedOutcomes,
-      })
-    : rollMatched;
-
-  const tierStep = applyTierStepTriggers({
-    rolled: matched,
-    type,
-    forcedDisposition: forced ? forced.disposition : null,
-    triggers,
-    relativeOutcomes,
-    fixedOutcomes,
-    total,
-    diceGroups,
-  });
-  matched = tierStep.matched;
-
-  const minTierFailed =
-    !forced &&
-    minSuccessTierFailed({ type, minOutcomeId, matched, relativeOutcomes, fixedOutcomes });
-  const effectiveMatched = minTierFailed ? null : matched;
-
-  const success = minTierFailed
-    ? false
-    : forced
-      ? forced.disposition === 'success'
-      : effectiveMatched
-        ? effectiveMatched.success === true
-        : false;
-
-  return {
-    matched: effectiveMatched,
-    comparison: effectiveComparison,
-    target: type === 'fixed' || !rollMatched ? null : dc + Number(rollMatched.dc),
-    forcedDisposition: forced ? forced.disposition : null,
-    success,
-    // The final tier's `breakTools` is the only `data.breakTools` source.
-    breakTools: effectiveMatched ? effectiveMatched.breakTools === true : false,
-    tierStepApplied: tierStep.tierStepApplied,
-    minTierFailed,
-    blockedOutcomeId: minTierFailed ? (matched?.id ?? null) : null,
-  };
-}
-
-/**
  * A routed check: roll, then `classifyCheckTotal`, returning the final tier's name as `outcome`
  * for result-group routing. Headless it returns a non-blocking `success: true, outcome: null`
  * rather than fabricate a route, and a cancelled prompt returns `cancelled: true`. Every routed
@@ -1075,84 +815,54 @@ export async function runFormulaRouted({
   craftingModifier = null,
   ...input
 }) {
+  const evaluation = ownEvaluation(input, rollOptions);
+  const grading = sumGrading(evaluation);
   const formula = String(rawFormula || '').trim();
-  let total = 0;
-  let diceGroups = [];
-  let resolvedFormula = null;
-  let rolled;
-  if (formula) {
-    try {
-      // No `dc` here: `evaluateCheckRoll` uses it for the prompt only, and callers already put
-      // the prompt-facing DC on `rollOptions` (none for a fixed check).
-      rolled = await evaluateCheckRoll(formula, actor, {
-        ...rollOptions,
-        evaluation: ownEvaluation(input, rollOptions),
-        thresholdMode,
-        craftingModifier,
-      });
-    } catch (error) {
-      console.error(`Fabricate | ${label} routed check roll failed (${formula})`, error);
-      return {
-        success: false,
-        outcome: null,
-        value: null,
-        data: { dc, formula, type },
-        message: `${label} check roll failed: ${error.message}`,
-      };
-    }
-    // The player cancelled the interactive roll dialog: abort with zero mutation.
-    if (rolled.cancelled) {
-      return {
-        success: false,
-        cancelled: true,
-        outcome: null,
-        value: null,
-        data: { dc, formula, type },
-      };
-    }
-    if (!rolled.engine) {
-      return {
-        success: true,
-        outcome: null,
-        value: null,
-        data: { dc, formula, type },
-        message: null,
-      };
-    }
-    total = rolled.total;
-    diceGroups = rolled.diceGroups;
-    resolvedFormula = rolled.resolvedFormula;
-  }
-
-  const comparison = thresholdMode === 'exceed' ? 'exceed' : 'meet';
+  if (!formula && grading.direction === 'under') return checkTargetRefusal('formula-empty', label);
+  const data = { dc: fixedDc(dc, grading), formula, type };
+  const roll = await rollRunnerFormula({
+    formula,
+    actor,
+    label,
+    kind: 'routed ',
+    data,
+    // No `dc` here: `evaluateCheckRoll` uses it for the prompt only, and callers already put
+    // the prompt-facing DC on `rollOptions` (none for a fixed check).
+    options: { ...rollOptions, evaluation, thresholdMode, craftingModifier },
+    headless: { success: true, outcome: null, value: null, data, message: null },
+  });
+  if (roll.exit) return roll.exit;
+  const { total, diceGroups, resolvedFormula, rolled } = roll;
 
   // The whole post-roll resolution, shared with the odds histogram (issue 1097).
   const classified = classifyCheckTotal({
     type,
     total,
     dc,
-    comparison,
+    comparison: thresholdMode,
     relativeOutcomes,
     fixedOutcomes,
     triggers,
     diceGroups,
     clampToNearest,
     minOutcomeId,
+    evaluation,
+    targetDelta: rolled?.modifierPlacement?.targetDelta,
   });
-  const { matched, success } = classified;
+  const { matched, success, comparison } = classified;
 
   return {
     success,
     outcome: matched ? matched.name : null,
     value: total,
     data: {
-      dc,
+      dc: data.dc,
       formula,
       resolvedFormula,
       total,
       type,
       comparison,
-      ...(formula && executedSumEvidence(total, classified.target, classified.comparison)),
+      ...(formula && executedSumEvidence(total, classified.target, comparison, grading.direction)),
       ...preRollEvidence(rolled),
       outcomeId: matched?.id ?? null,
       success,

@@ -2162,6 +2162,29 @@ test('the versioned crafting descriptor refuses its target before the Tool roll 
   }
 });
 
+test('the versioned prompt derives its formula with the evaluation, so sum/under appends nothing', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '2' } };
+  const { restore } = installPreparedRolls([], []);
+  try {
+    const promptFormula = async (evaluation) => {
+      const { describe } = await startToolSuppliedRun(tool, {
+        check: { rollFormula: '1d20', dc: 12, evaluation },
+      });
+      const system = game.fabricate.getCraftingSystemManager().getSystem();
+      system.modifiers = [{ id: 'knack', label: 'Knack', expression: '2' }];
+      Object.assign(system.craftingCheck, {
+        defaultModifierPolicy: 'addAll',
+        defaultModifierIds: ['knack'],
+      });
+      return (await describe()).publicPrompt.formula;
+    };
+    assert.equal(await promptFormula({ product: 'sum', direction: 'under' }), '1d20');
+    assert.match(await promptFormula(undefined), /^1d20 \+ 2\[Hammer\] \+ .*2/);
+  } finally {
+    restore();
+  }
+});
+
 test('real prepared Tool collection snapshots one roll and reuses it for every evaluation', async () => {
   const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1d4+@bonus' } };
   const { actor, source, describe } = await startToolSuppliedRun(tool);

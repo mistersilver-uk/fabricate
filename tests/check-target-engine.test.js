@@ -151,7 +151,12 @@ for (const site of CRAFT_SITES) {
     const constructed = installCountingRoll();
     await world.craft();
     assert.equal(checks[0].misconfigured, undefined);
-    assert.equal(checks[0].data.dc, 14, 'graded against the character value, not the DC of 10');
+    // A total of 12 misses Fine at 14 and routes Botch, whose threshold is 14 − 10.
+    assert.deepEqual(
+      [checks[0].data.dc, checks[0].data.target],
+      [null, site.slot === 'routed' ? 4 : 14],
+      'graded against the character value, not the DC of 10, which names no DC'
+    );
     assert.deepEqual(constructed, ['1d4', '1d20 + 12[Hammer]']);
   });
 }
@@ -202,7 +207,10 @@ for (const checkMode of ['simple', 'tiered']) {
     assert.deepEqual(effects(refused.world.journal), []);
 
     const control = await run(VALID);
-    assert.equal(control.result.data.dc, 14);
+    assert.deepEqual(
+      [control.result.data.dc, control.result.data.target],
+      [null, checkMode === 'simple' ? 14 : 4]
+    );
     assert.deepEqual(control.constructed, ['1d4', '1d20 + 12[Hammer]']);
   });
 }
@@ -327,7 +335,7 @@ test('a dynamic target macro runs only after validation and receives the adjuste
       '@skills.craft.value',
       'the payload evaluation is a clone'
     );
-    assert.equal(result.data.dc, 15, 'the truncated macro result replaces the anchor');
+    assert.equal(result.data.target, 15, 'the truncated macro result replaces the anchor');
 
     MacroExecutor.run = async () => {
       throw new Error('boom');
@@ -335,7 +343,7 @@ test('a dynamic target macro runs only after validation and receives the adjuste
     const fallback = await world.engine._runCraftingCheck(
       world.recipe, world.craftingActor, [world.sourceActor], null, null, {}
     );
-    assert.equal(fallback.data.dc, 12, 'a failed macro keeps the adjusted anchor');
+    assert.equal(fallback.data.target, 12, 'a failed macro keeps the adjusted anchor');
   } finally {
     MacroExecutor.run = original;
   }
@@ -379,14 +387,12 @@ test('QE5: a sum/under Tool and library scalar append no term to the rolled form
   assert.deepEqual(constructed, ['2', '1d20'], 'the Tool scalar evaluates once; the check rolls bare');
 });
 
-test(
-  'QE5: the Tool and library scalars raise the target by 3 exactly once',
-  { todo: 'Task 3 of issue 2003 activates direction-aware grading' },
-  async () => {
-    assert.equal((await sumUnderWithScalars(13)).result.success, true, 'anchor + 3 passes');
-    assert.equal((await sumUnderWithScalars(14)).result.success, false, 'anchor + 4 fails');
-  }
-);
+test('QE5: the Tool and library scalars raise the target by 3 exactly once', async () => {
+  const passed = (await sumUnderWithScalars(13)).result;
+  assert.equal(passed.success, true, 'anchor + 3 passes');
+  assert.deepEqual([passed.data.dc, passed.data.target, passed.data.margin], [10, 13, 0]);
+  assert.equal((await sumUnderWithScalars(14)).result.success, false, 'anchor + 4 fails');
+});
 
 // ── salvage ───────────────────────────────────────────────────────────────────
 

@@ -649,7 +649,7 @@ test('prepared Tool evidence reaches an entitled handoff and stays out of a secr
 
     const secret = await evaluatePreparedCheck(preparation(true), actor);
     assert.equal(Object.hasOwn(secret, 'rollHandoff'), false);
-    assert.equal(Object.hasOwn(secret, 'modifierPlacement'), false);
+    assert.equal(secret.modifierPlacement.targetDelta, 3, 'placement stays in the authority');
     assert.equal(chatCreated.length, 1, 'the GM posts one bundled secret message');
   } finally {
     clearStubs();

@@ -73,6 +73,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/systems/checkTarget.js',
   'src/systems/normalize/checkEvaluation.js',
   'src/systems/checkRollDecision.js',
+  'src/systems/checkRouting.js',
   'src/systems/checkModifierRolls.js',
   'src/systems/bulkChatVisibility.js',
   'src/utils/progressiveAward.js',

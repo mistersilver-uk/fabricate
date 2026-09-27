@@ -7246,7 +7246,7 @@ function versionedCheckPrompt({
         .map(publicModifierDisplay);
   const formula = modifierChoice
     ? rollFormula
-    : resolveRolledFormula(rollFormula, actor, modifierContext);
+    : resolveRolledFormula(rollFormula, actor, modifierContext, undefined, evaluation);
   const target = activeCheck.slot === 'simple' && Number.isFinite(dc) ? dc : null;
   const comparison = activeCheck.config?.thresholdMode === 'exceed' ? 'exceed' : 'meet';
   const activityKey = 'FABRICATE.App.Nav.Crafting';
@@ -7259,9 +7259,12 @@ function versionedCheckPrompt({
     actorName: actor?.name ?? '',
     img: resolveRecipeImage(recipe),
     formula,
-    resolvedFormula: resolveCheckFormulaDisplay(formula, actor)?.display ?? null,
+    resolvedFormula:
+      resolveCheckFormulaDisplay(formula, actor, null, undefined, evaluation)?.display ?? null,
     // The itemised `selectedModifiers` are chips, so the prompt's formula omits their terms.
-    displayFormula: resolveCheckFormulaDisplay(rollFormula, actor)?.display ?? rollFormula,
+    displayFormula:
+      resolveCheckFormulaDisplay(rollFormula, actor, null, undefined, evaluation)?.display ??
+      rollFormula,
     target,
     direction: target === null ? null : evaluation.direction,
     comparison: target === null ? null : comparison,
