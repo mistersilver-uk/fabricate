@@ -61,6 +61,26 @@ describe('roll prompt host', () => {
     assert.equal(findApplicationHost(doc), null, 'a minimized window never hosts');
   });
 
+  it('falls back to the root under the pointer only when focus is nowhere', () => {
+    doc.body.replaceChildren();
+    appWindow('fabricate-manager', 120);
+    const player = appWindow('fabricate-app', 110);
+    const hovered = (element) => {
+      const matches = element.matches.bind(element);
+      element.matches = (selector) => selector === ':hover' || matches(selector);
+    };
+    hovered(player.root);
+    doc.activeElement?.blur?.();
+    assert.equal(findApplicationHost(doc), player.root, 'a click whose button disabled itself still hosts');
+    const chat = doc.createElement('textarea');
+    doc.body.append(chat);
+    chat.focus();
+    assert.equal(findApplicationHost(doc), null, 'focus elsewhere wins over the pointer');
+    chat.blur();
+    player.frame.classList.add('minimized');
+    assert.equal(findApplicationHost(doc), null, 'a minimized window never hosts');
+  });
+
   it('takes the standalone layer when focus is outside every Fabricate root', async () => {
     doc.body.replaceChildren();
     appWindow('fabricate-app', 130);

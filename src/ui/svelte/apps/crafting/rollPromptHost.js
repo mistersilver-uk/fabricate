@@ -8,16 +8,17 @@ import {
 } from '../../util/overlayHost.js';
 
 /**
- * The Fabricate root holding focus, for a roll the player started from that window; `null` for
- * a companion, macro or engine call, which takes the standalone layer. A root inside a minimized
- * window never hosts, and of nested roots holding focus the innermost wins.
+ * The Fabricate root a player started the roll from: the one holding focus or, when focus is
+ * nowhere because the clicked button disabled itself, the one under the pointer. Anything else,
+ * such as a companion or macro call, returns `null` and takes the standalone layer. A minimized
+ * window never hosts, and of nested roots the innermost wins.
  */
 export function findApplicationHost(doc) {
+  const active = doc.activeElement;
+  const focusNowhere = !active || active === doc.body || active === doc.documentElement;
+  const started = (root) => (focusNowhere ? root.matches(':hover') : root.contains(active));
   const roots = [...doc.querySelectorAll(APPLICATION_HOST_SELECTOR)];
-  return (
-    roots.findLast((root) => root.contains(doc.activeElement) && !root.closest('.minimized')) ??
-    null
-  );
+  return roots.findLast((root) => started(root) && !root.closest('.minimized')) ?? null;
 }
 
 /** The ApplicationV2 that owns a host, so its `close` event can settle the prompt. */
