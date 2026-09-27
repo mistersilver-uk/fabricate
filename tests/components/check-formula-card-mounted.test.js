@@ -27,6 +27,7 @@ const harness = createMountedComponentHarness({
     'src/utils/rollFormulaRollability.js',
     // The direction axis and the roll-prompt group (issue 2005).
     'src/systems/normalize/checkEvaluation.js',
+    'src/ui/svelte/apps/manager/checks/checksCopy.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Chip.svelte',
@@ -222,9 +223,16 @@ describe('the formula card under a roll-under check (issue 2005, Q14)', () => {
     under({ source: 'attribute', expression: '@skills.craft.value', adjustmentKind: 'multiply' }),
   ];
 
-  it('names the comparison and target and never joins the modifiers to the dice with +', async () => {
+  /** The inset's direct children in reading order, each as its visible text. */
+  const insetTerms = (target) =>
+    [...target.querySelector('.manager-checks-formula-expression').children].map((node) =>
+      node.textContent.trim()
+    );
+
+  it('joins the target and the modifier chips with + and joins nothing to the dice (Q14)', async () => {
     for (const thresholdMode of ['meet', 'exceed']) {
       harness.remount();
+      const cmp = thresholdMode === 'meet' ? 'at or under' : 'under';
       const target = await harness.mount({
         rollFormula: '1d100',
         appliedModifiers: MODIFIERS,
@@ -232,20 +240,45 @@ describe('the formula card under a roll-under check (issue 2005, Q14)', () => {
         thresholdMode,
         targetChip: 'Target 12',
       });
-      const expression = target.querySelector('.manager-checks-formula-expression');
-      const glyphs = [...expression.querySelectorAll('span')].map((span) => span.textContent.trim());
-      assert.ok(!glyphs.includes('+'), `${thresholdMode}: no + joins the under inset`);
-      assert.equal(
-        target.querySelector('[data-check-formula-comparison]').textContent.trim(),
-        thresholdMode === 'meet' ? 'at or under' : 'under'
-      );
-      assert.equal(target.querySelector('[data-check-formula-target]').textContent.trim(), 'Target 12');
-      assert.equal(target.querySelectorAll('[data-check-formula-modifier]').length, 2);
+      assert.deepEqual(insetTerms(target), [
+        '1d100',
+        cmp,
+        'Target 12',
+        '+',
+        'Dexterity',
+        '+',
+        'Intelligence',
+      ]);
       assert.match(
         target.querySelector('[data-check-direction-note]').textContent,
-        new RegExp(`stay ${thresholdMode === 'meet' ? 'at or under' : 'under'} the target`)
+        new RegExp(`stay ${cmp} the target`)
       );
     }
+  });
+
+  it('with no target, lists the modifiers without joining the first to the dice', async () => {
+    const target = await harness.mount({
+      rollFormula: '1d100',
+      appliedModifiers: MODIFIERS,
+      evaluation: under(),
+    });
+    assert.deepEqual(insetTerms(target), ['1d100', 'Dexterity', '+', 'Intelligence']);
+    assert.ok(!target.querySelector('[data-check-formula-target]'));
+  });
+
+  it('omits the under note where the runtime refuses a roll-under check', async () => {
+    const target = await harness.mount({ rollFormula: '1d20', evaluation: under(), underNote: false });
+    assert.ok(!target.querySelector('[data-check-direction-note]'));
+    assert.ok(target.querySelector('[data-check-direction]'), 'the axis stays so the GM can switch back');
+  });
+
+  it('names the roll-prompt options as a group and draws the offer without a glyph', async () => {
+    const target = await harness.mount({ rollFormula: '1d20', evaluation: under() });
+    const group = target.querySelector('[data-check-prompt-options]');
+    assert.equal(group.getAttribute('role'), 'group');
+    const title = target.querySelector(`[id="${group.getAttribute('aria-labelledby')}"]`);
+    assert.equal(title?.textContent.trim(), 'In the roll prompt');
+    assert.ok(!group.querySelector('.manager-recipe-status-icon'), 'the offer row has no icon');
   });
 
   it('keeps the withheld average under every direction, source and kind', async () => {

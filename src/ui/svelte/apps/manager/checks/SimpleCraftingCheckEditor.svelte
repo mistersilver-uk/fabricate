@@ -25,6 +25,8 @@
   import Select from '../../../components/Select.svelte';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
+  import { activeCheckEvaluation } from '../../../../../systems/checkTarget.js';
+  import { checkTargetChip, underComparisonPhrase } from './checksCopy.js';
   import {
     bandsAreEditable,
     buildPassFailBands,
@@ -83,19 +85,15 @@
   }
 
   const dc = $derived(Number(value?.dc ?? 0) || 0);
+  // `evaluation` is the authored record the controls write back; `graded` is the one the runtime
+  // grades with, which gates the strip and its direction.
   const evaluation = $derived(normalizeCheckEvaluation(value?.evaluation));
-  const editableBands = $derived(bandsAreEditable(evaluation));
+  const graded = $derived(activeCheckEvaluation(value));
+  const editableBands = $derived(bandsAreEditable(value?.evaluation));
   const comparison = $derived(value?.thresholdMode === 'exceed' ? 'exceed' : 'meet');
-  const targetChip = $derived(
-    evaluation.target.source === 'attribute'
-      ? evaluation.target.expression
-      : text('FABRICATE.Admin.Manager.Checks.Evaluation.TargetChip', 'Target {dc}').replace(
-          '{dc}',
-          String(dc)
-        )
-  );
+  const targetChip = $derived(checkTargetChip(evaluation, dc, text));
 
-  // THE READ-ONLY PICTURE (issue 2005): the previewed record's target, graded by the runtime.
+  // The read-only picture (issue 2005): the previewed record's target, graded by the runtime.
   const previewedTier = $derived(
     (Array.isArray(value?.tiers) ? value.tiers : []).find((tier) => tier.id === previewRecordId) ??
       null
@@ -105,7 +103,7 @@
       ? null
       : previewBandTarget(
           {
-            evaluation,
+            evaluation: graded,
             anchor: previewedTier ? Number(previewedTier.dc) : dc,
             tier: previewedTier,
             character: previewCharacter,
@@ -113,31 +111,20 @@
           text
         )
   );
-  const cmp = $derived(
-    comparison === 'exceed'
-      ? text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpExceed', 'under')
-      : text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpMeet', 'at or under')
+  const readonlyScale = $derived(
+    readonlyTarget?.state === 'ok'
+      ? describeBandScale(
+          {
+            direction: graded.direction,
+            comparison,
+            target: readonlyTarget.target,
+            source: readonlyTarget.source,
+            cmp: underComparisonPhrase(comparison, text),
+          },
+          text
+        )
+      : ''
   );
-  const readonlyNote = $derived.by(() => {
-    if (editableBands) return '';
-    if (readonlyTarget?.state !== 'ok') {
-      return describeBandsUnavailable(
-        readonlyTarget ?? { state: 'needs-actor' },
-        { character: previewCharacter, expression: evaluation.target.expression },
-        text
-      );
-    }
-    return describeBandScale(
-      {
-        direction: evaluation.direction,
-        comparison,
-        target: readonlyTarget.target,
-        source: readonlyTarget.source,
-        cmp,
-      },
-      text
-    );
-  });
 
   const failureLabel = $derived(
     text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailure', 'Failure')
@@ -167,7 +154,7 @@
   const readonlyBands = $derived(
     readonlyTarget?.state === 'ok'
       ? buildPassFailBands({
-          evaluation,
+          evaluation: graded,
           comparison,
           target: readonlyTarget.target,
           min: suppliedBound(trackMin),
@@ -183,20 +170,8 @@
 
   // TWO bands and therefore ONE handle, the whole outcome model of a simple check.
   const editableBandsList = $derived([
-    {
-      id: 'failure',
-      index: 0,
-      name: failureLabel,
-      from: stripMin,
-      color: 'color-mix(in srgb, var(--fab-danger) 22%, var(--fab-bg-0))',
-    },
-    {
-      id: 'success',
-      index: 1,
-      name: successLabel,
-      from: dc,
-      color: 'color-mix(in srgb, var(--fab-success) 22%, var(--fab-bg-0))',
-    },
+    { id: 'failure', index: 0, name: failureLabel, from: stripMin, color: BAND_COLORS.failure },
+    { id: 'success', index: 1, name: successLabel, from: dc, color: BAND_COLORS.success },
   ]);
   const bandStripBands = $derived(editableBands ? editableBandsList : readonlyBands);
 
@@ -268,12 +243,16 @@
           <h3 class="manager-checks-card-title">
             {text('FABRICATE.Admin.Manager.Checks.Crafting.TwoOutcomesTitle', 'Two outcomes')}
           </h3>
-          <p class="manager-checks-card-description">
-            {text(
-              'FABRICATE.Admin.Manager.Checks.Crafting.TwoOutcomesLead',
-              'A simple check either clears the difficulty or it does not.'
-            )}
-          </p>
+          {#if readonlyScale}
+            <p class="manager-checks-card-description" data-simple-band-scale>{readonlyScale}</p>
+          {:else}
+            <p class="manager-checks-card-description">
+              {text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.TwoOutcomesLead',
+                'A simple check either clears the difficulty or it does not.'
+              )}
+            </p>
+          {/if}
         </div>
       </div>
       <div class="manager-checks-card-body">
@@ -303,8 +282,8 @@
           binding="simple"
           bands={bandStripBands}
           {previewLabel}
-          min={stripMin}
-          max={stripMax}
+          min={editableBands ? stripMin : null}
+          max={editableBands ? stripMax : null}
           groupLabel={text(
             'FABRICATE.Admin.Manager.Checks.Crafting.TwoOutcomesTitle',
             'Two outcomes'
@@ -312,7 +291,11 @@
           boundaryLabel={() =>
             text('FABRICATE.Admin.Manager.Checks.Crafting.SimpleBoundary', 'Difficulty class')}
           fallbackNote={readonlyTarget && readonlyTarget.state !== 'ok'
-            ? readonlyNote
+            ? describeBandsUnavailable(
+                readonlyTarget,
+                { character: previewCharacter, expression: graded.target.expression },
+                text
+              )
             : text(
                 'FABRICATE.Admin.Manager.Checks.Crafting.SimpleBandsFallback',
                 'This check has no reachable range to draw against yet. Set a roll formula and a DC.'
@@ -327,8 +310,6 @@
               'A total of {dc} or more succeeds; anything lower fails. Drag the edge or type the DC on the Difficulty card — the number is the authority.'
             ).replace('{dc}', String(dc))}
           </p>
-        {:else if readonlyTarget?.state === 'ok'}
-          <p class="manager-muted" data-simple-band-scale>{readonlyNote}</p>
         {/if}
 
         <div class="manager-checks-flag-list">

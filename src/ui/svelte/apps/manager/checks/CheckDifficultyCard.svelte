@@ -9,12 +9,11 @@
   with `BASE DC` and `COMPARISON` alone rather than a chooser that cannot choose. The record noun
   is a PROP, hard-coding one activity's word being how a gathering screen talks about recipes.
 
-  WHAT THE ROLL IS MEASURED AGAINST (issue 2005): a fixed DC or a character value that difficulty
-  adjusts. Every switch writes only its own field, so the inactive source's DC, expression and
-  adjustments survive a round trip. `character` is the Preview-as actor, `{ name, rollData }`.
+  The target source (issue 2005) is a fixed DC or a character value that difficulty adjusts. Every
+  switch writes only its own field, so the inactive source's DC, expression and adjustments survive
+  a round trip. `character` is the Preview-as actor, `{ name, rollData }`.
 -->
 <script>
-  import { resolveDeterministicExpression } from '../../../../../systems/checkEvaluation.js';
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import { localize } from '../../../util/foundryBridge.js';
   import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
@@ -23,7 +22,8 @@
     formatCheckAdjustment,
     parseCheckAdjustment,
   } from './checkAdjustmentLabel.js';
-  import { interpolate } from './checksCopy.js';
+  import { interpolate, underComparisonPhrase } from './checksCopy.js';
+  import { targetValueStatus } from './checkTargetStatus.js';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
@@ -63,11 +63,7 @@
   const attribute = $derived(normalized.target.source === 'attribute');
   const adjustmentKind = $derived(normalized.target.adjustmentKind);
 
-  const cmp = $derived(
-    comparison === 'exceed'
-      ? text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpExceed', 'under')
-      : text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpMeet', 'at or under')
-  );
+  const cmp = $derived(underComparisonPhrase(comparison, text));
 
   function emitEvaluation(patch) {
     onChange({ evaluation: { ...normalized, ...patch } });
@@ -216,37 +212,10 @@
 
   // What the character value resolves to for the Preview-as actor, never read as zero.
   const expression = $derived(normalized.target.expression);
-  const resolution = $derived.by(() => {
-    if (!character) {
-      return {
-        tone: 'muted',
-        text: text(
-          'FABRICATE.Admin.Manager.Checks.Evaluation.ValueNoActor',
-          'Choose a character in Preview as to see what this resolves to.'
-        ),
-      };
-    }
-    const read = resolveDeterministicExpression(expression, character.rollData ?? {}, {
-      pathMode: 'foundry',
-    });
-    if (read.ok) {
-      return {
-        tone: 'resolved',
-        text: text('FABRICATE.Admin.Manager.Checks.Evaluation.ValueResolved', '{actor} → {value}')
-          .replace('{actor}', character.name)
-          .replace('{value}', String(read.value)),
-      };
-    }
-    return {
-      tone: 'unresolved',
-      text: text(
-        'FABRICATE.Admin.Manager.Checks.Evaluation.ValueUnresolved',
-        '{actor} has no value at {path}. The check cannot resolve for them.'
-      )
-        .replace('{actor}', character.name)
-        .replace('{path}', expression),
-    };
-  });
+  const resolution = $derived(targetValueStatus(expression, character, text));
+  const uid = $props.id();
+  const hintId = `${uid}-target-expression-hint`;
+  const resolutionId = `${uid}-target-resolution`;
 
   const formatAdjustment = (value) => formatCheckAdjustment(adjustmentKind, value);
   const parseAdjustment = (value) => parseCheckAdjustment(adjustmentKind, value);
@@ -282,8 +251,9 @@
       <RadioCardGroup
         legendKey={attribute
           ? 'FABRICATE.Admin.Manager.Checks.Evaluation.AdjustmentSourceTitle'
-          : 'FABRICATE.Admin.Manager.Checks.Crafting.DcTitle'}
-        legend={attribute ? 'How the adjustment is set' : 'DC source'}
+          : 'FABRICATE.Admin.Manager.Checks.Evaluation.NumberSourceTitle'}
+        legend={attribute ? 'How the adjustment is set' : 'How the number is set'}
+        legendVisible
         options={DC_MODE_OPTIONS}
         selectedValue={resolvedDcMode}
         groupName="check-dc-mode"
@@ -310,22 +280,25 @@
                 'FABRICATE.Admin.Manager.Checks.Evaluation.SourceAttribute',
                 'Character value'
               ),
+              'aria-describedby': resolution ? `${hintId} ${resolutionId}` : hintId,
             }}
             value={expression}
             placeholder="@skills.craft.value"
             onChange={(next) => emitTarget({ expression: next })}
           />
-          <small class="manager-muted" data-check-target-expression-hint>
+          <small class="manager-muted" id={hintId} data-check-target-expression-hint>
             {text(
               'FABRICATE.Admin.Manager.Checks.Evaluation.ValueHint',
               'A character path with its leading @, or arithmetic on paths without dice, such as @skills.craft.value - 2.'
             )}
           </small>
-          <small
-            class="manager-muted"
-            data-check-target-resolution={resolution.tone}
-            aria-live="polite">{resolution.text}</small
-          >
+          {#if resolution}
+            <small
+              class="manager-muted"
+              id={resolutionId}
+              data-check-target-resolution={resolution.tone}>{resolution.text}</small
+            >
+          {/if}
         </div>
         <div class="manager-checks-difficulty-field is-comparison">
           <span class="manager-checks-difficulty-label">
@@ -362,7 +335,7 @@
               fill
               allowUnset
               value={normalized.target.baseAdjustment}
-              placeholder={adjustmentKind === 'multiply' ? '×1' : '0'}
+              placeholder="—"
               formatValue={formatAdjustment}
               parseValue={parseAdjustment}
               stops={adjustmentKind === 'multiply' ? MULTIPLIER_STOPS : []}
@@ -409,3 +382,29 @@
     </div>
   </div>
 </InspectorCard>
+
+<style>
+  /* Two option-card groups stack with the gap the fields below them keep from a chooser. */
+  .manager-checks-card-body
+    > :global(.manager-resolution-mode-card + .manager-resolution-mode-card) {
+    margin-top: 13px;
+  }
+
+  /* Each group's visible name takes the card's micro-label style. */
+  .manager-checks-card-body :global(.manager-resolution-mode-legend) {
+    color: var(--fab-text-subtle);
+    font-size: 8.5px;
+    letter-spacing: 0.08em;
+  }
+
+  /* The character-value row stacks, so its expression and kind segments never overflow the card. */
+  .manager-checks-difficulty-fields[data-check-attribute-fields] {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .manager-checks-difficulty-fields[data-check-attribute-fields]
+    + .manager-checks-difficulty-fields {
+    margin-top: 13px;
+  }
+</style>

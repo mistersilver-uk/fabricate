@@ -113,6 +113,9 @@
         );
   });
 
+  const uid = $props.id();
+  const missingId = (tier) => `${uid}-tier-adjustment-missing-${tier.id}`;
+
   function tierName(tier) {
     return tier.name || text('FABRICATE.Admin.Manager.Checks.Crafting.UnnamedTier', 'Unnamed tier');
   }
@@ -166,6 +169,12 @@
           value={tier.name || ''}
           oninput={(event) => updateTier(tier.id, { name: event.currentTarget.value })}
         />
+        <!-- A missing adjustment is named before the unit and describes the stepper it belongs to. -->
+        {#if attribute && tier.adjustment == null}
+          <span class="manager-checks-tier-unit" id={missingId(tier)} data-tier-adjustment-missing>
+            {text('FABRICATE.Admin.Manager.Checks.Evaluation.SetAdjustment', 'Set an adjustment')}
+          </span>
+        {/if}
         <!-- The number is labelled in the row rather than in a column header, so the row stays
              self-describing with no header row above it. `aria-hidden`, because the stepper already
              carries the same word as its own accessible name. -->
@@ -175,11 +184,6 @@
              real DC, and the `data-*` hook rides `inputProps` onto the real `<input>`. `min={0}`
              because -1 is not a DC, and without the clamp one click of the `−` adjunct commits one. -->
         {#if attribute}
-          {#if tier.adjustment == null}
-            <span class="manager-checks-tier-unit" data-tier-adjustment-missing>
-              {text('FABRICATE.Admin.Manager.Checks.Evaluation.SetAdjustment', 'Set an adjustment')}
-            </span>
-          {/if}
           <div class="manager-checks-tier-stepper">
             {#key kind}
               <Stepper
@@ -191,7 +195,10 @@
                 parseValue={parseAdjustment}
                 stops={kind === 'multiply' ? MULTIPLIER_STOPS : []}
                 {...stepperLabels(dcLabel)}
-                inputProps={{ 'data-tier-adjustment': '' }}
+                inputProps={{
+                  'data-tier-adjustment': '',
+                  'aria-describedby': tier.adjustment == null ? missingId(tier) : undefined,
+                }}
                 onChange={(adjustment) => updateTier(tier.id, { adjustment })}
               />
             {/key}

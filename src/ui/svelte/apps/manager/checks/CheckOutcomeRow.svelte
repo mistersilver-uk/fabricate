@@ -1,9 +1,10 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  ONE routed outcome tier row: its band swatch, name, threshold field, success toggle, the
+  One routed outcome tier row: its band swatch, name, threshold field, success toggle, the
   `checkDriven` break-tools toggle and delete. `column` names the threshold field: `dc` (`DC ±`)
   and `benefit` (`Benefit ±`) edit the tier's `dc` offset, `adjustment` edits its multiplier with
-  a null endpoint read as Otherwise, and a fixed-type row edits its `start`/`end` range.
+  a null endpoint read as Otherwise, and a fixed-type row edits its `start`/`end` range. Outside
+  `dc` the field's name is also shown, since the bands no longer read as plain offsets.
 -->
 <script>
   import ManagerButton from '../../../components/ManagerButton.svelte';
@@ -128,9 +129,11 @@
       />
     </div>
   {:else if column === 'adjustment'}
+    <span class="manager-checks-tier-unit" aria-hidden="true">{thresholdLabel}</span>
     <!-- The multiplier, with Otherwise one step below the lowest stop: the tier a roll lands in
-         when it meets no multiplied threshold. Its kept `dc` offset is left untouched. -->
-    <div class="manager-checks-tier-stepper">
+         when it meets no multiplied threshold. Its kept `dc` offset is left untouched. The wider
+         track fits the Otherwise label. -->
+    <div class="manager-checks-tier-stepper is-wide">
       <Stepper
         fill
         value={outcome.adjustment ?? null}
@@ -144,6 +147,9 @@
       />
     </div>
   {:else}
+    {#if column !== 'dc'}
+      <span class="manager-checks-tier-unit" aria-hidden="true">{thresholdLabel}</span>
+    {/if}
     <div class="manager-checks-tier-stepper">
       <Stepper
         fill
@@ -194,3 +200,9 @@
     <i class="fas fa-trash" aria-hidden="true"></i>
   </ManagerButton>
 </div>
+
+<style>
+  .manager-checks-tier-stepper.is-wide {
+    width: 136px;
+  }
+</style>

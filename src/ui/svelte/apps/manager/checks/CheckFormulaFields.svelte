@@ -14,9 +14,9 @@
   the withholding is never mistaken for the malformed-input case. For the same reason THE RULE
   SENTENCE STOPS AT THE RULE. Controlled through `onChange`.
 
-  The card also carries WHICH WAY IS BETTER and the `In the roll prompt` group (issue 2005). Under,
-  the dice stay as rolled and modifiers raise the target, so the inset names the comparison and the
-  target and never joins the modifiers to the roll with `+`.
+  The card also carries the `Which way is better` axis and the `In the roll prompt` group (issue
+  2005). Under, the dice stay as rolled and modifiers raise the target, so the inset joins the
+  target chip and the modifier chips with `+` and joins nothing to the dice.
 -->
 <script>
   import { getModifierExpressionSuggestions } from '../../../../../config/modifierExpressionSuggestions.js';
@@ -29,6 +29,7 @@
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import CheckPromptOptions from './CheckPromptOptions.svelte';
+  import { underComparisonPhrase } from './checksCopy.js';
 
   let {
     rollFormula = '',
@@ -42,17 +43,19 @@
     // The activity's word for the thing a check is rolled for, for the `bySubject` sentence.
     recordNoun = 'recipe',
     // The check's evaluation and comparison, and the under inset's target chip (`Target 12`, or the
-    // character expression); a slot with no target passes none and keeps the roll-over inset.
+    // character expression); a check with no target passes none. `underNote` is false where the
+    // runtime refuses a roll-under check, so the note does not describe a roll that never happens.
     evaluation = null,
     thresholdMode = 'meet',
     targetChip = '',
+    underNote = true,
     offerSituationalBonus = true,
     onChange = () => {},
   } = $props();
 
   const normalizedEvaluation = $derived(normalizeCheckEvaluation(evaluation));
   const direction = $derived(normalizedEvaluation.direction);
-  const underInset = $derived(direction === 'under' && Boolean(targetChip));
+  const underInset = $derived(direction === 'under');
 
   const DIRECTION_OPTIONS = [
     {
@@ -67,11 +70,7 @@
     },
   ];
 
-  const comparisonPhrase = $derived(
-    thresholdMode === 'exceed'
-      ? text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpExceed', 'under')
-      : text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpMeet', 'at or under')
-  );
+  const comparisonPhrase = $derived(underComparisonPhrase(thresholdMode, text));
 
   const directionLabel = $derived(
     text('FABRICATE.Admin.Manager.Checks.Evaluation.DirectionTitle', 'Which way is better')
@@ -188,7 +187,7 @@
       onChange={setDirection}
     />
   </div>
-  {#if direction === 'under'}
+  {#if direction === 'under' && underNote}
     <p class="manager-checks-formula-rule" data-check-direction-note>
       {interpolateCmp(
         text(
@@ -251,15 +250,20 @@
       <p class="manager-checks-formula-expression">
         <span class="manager-checks-formula-base">{rollFormula || placeholder}</span>
         {#if underInset}
-          <!-- Under, the modifiers raise the TARGET: they sit after it with no `+` joining them to
+          <!-- Under, the modifiers raise the target: `+` joins them to the target chip, never to
                the dice, which a reader would take for a sum. -->
-          <span class="manager-checks-formula-join" data-check-formula-comparison
-            >{comparisonPhrase}</span
-          >
-          <Chip tone="info" density="tag-run" icon="fas fa-bullseye" data-check-formula-target
-            >{targetChip}</Chip
-          >
-          {#each applied as modifier (modifier.id)}
+          {#if targetChip}
+            <span class="manager-checks-formula-join" data-check-formula-comparison
+              >{comparisonPhrase}</span
+            >
+            <Chip tone="info" density="tag-run" icon="fas fa-bullseye" data-check-formula-target
+              >{targetChip}</Chip
+            >
+          {/if}
+          {#each applied as modifier, index (modifier.id)}
+            {#if targetChip || index > 0}
+              <span class="manager-checks-formula-sep" aria-hidden="true">+</span>
+            {/if}
             <span class="manager-checks-formula-chip" data-check-formula-modifier={modifier.id}>
               <i class={modifier.icon || DEFAULT_MODIFIER_ICON} aria-hidden="true"></i>
               <span>{modifier.name}</span>

@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  IN THE ROLL PROMPT: what a player may change before the dice are rolled, rendered once inside the
-  Formula card. The situational-bonus offer is a display flag only; `allowsSituationalModifier`
+  `In the roll prompt`: what a player may change before the dice are rolled, rendered once inside
+  the Formula card as a group named by its title. The situational-bonus offer is a display flag only; `allowsSituationalModifier`
   stays the runtime's authority gate. `extra` is the slot later prompt options extend.
 -->
 <script>
@@ -15,6 +15,8 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  const uid = $props.id();
+  const titleId = `${uid}-prompt-options-title`;
   const offered = $derived(offer !== false);
   const title = $derived(
     text('FABRICATE.Admin.Manager.Checks.Evaluation.OfferBonus', 'Offer a situational bonus')
@@ -38,18 +40,25 @@
   });
 </script>
 
-<div class="manager-checks-prompt-options" data-check-prompt-options>
-  <p class="manager-checks-formula-kicker">
-    {text('FABRICATE.Admin.Manager.Checks.Evaluation.PromptTitle', 'In the roll prompt')}
-  </p>
-  <p class="manager-checks-formula-rule">
-    {text(
-      'FABRICATE.Admin.Manager.Checks.Evaluation.PromptLead',
-      'What the player can change before the dice are rolled.'
-    )}
-  </p>
+<div
+  class="manager-checks-prompt-options"
+  role="group"
+  aria-labelledby={titleId}
+  data-check-prompt-options
+>
+  <div class="manager-checks-prompt-options-head">
+    <p class="manager-checks-prompt-options-title" id={titleId}>
+      {text('FABRICATE.Admin.Manager.Checks.Evaluation.PromptTitle', 'In the roll prompt')}
+    </p>
+    <p class="manager-checks-formula-rule">
+      {text(
+        'FABRICATE.Admin.Manager.Checks.Evaluation.PromptLead',
+        'What the player can change before the dice are rolled.'
+      )}
+    </p>
+  </div>
   <ToggleCard
-    icon="fas fa-plus-minus"
+    icon=""
     {title}
     sub={hint}
     on={offered}
@@ -65,5 +74,18 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
+    margin-top: var(--fab-space-3);
+  }
+
+  /* The prototype's group head: a bold title with its lead directly beneath. */
+  .manager-checks-prompt-options-head .manager-checks-formula-rule {
+    margin-top: 2px;
+  }
+
+  .manager-checks-prompt-options-title {
+    margin: 0;
+    color: var(--fab-text);
+    font-size: 12.5px;
+    font-weight: 600;
   }
 </style>

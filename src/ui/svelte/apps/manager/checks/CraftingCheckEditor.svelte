@@ -17,6 +17,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { findRangeConflicts } from '../../../../../utils/craftingCheckExpression.js';
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
+  import { activeCheckEvaluation } from '../../../../../systems/checkTarget.js';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
@@ -34,6 +35,7 @@
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
+  import { checkTargetChip, underComparisonPhrase } from './checksCopy.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import Select from '../../../components/Select.svelte';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
@@ -132,10 +134,13 @@
   // set drives the per-row highlight; the textual messages live on the Validation tab.
   const conflicts = $derived(type === 'fixed' ? findRangeConflicts(outcomes) : null);
 
+  // `evaluation` is the authored record every control writes back losslessly; `graded` is the one
+  // the runtime grades with, which gates the strip, its direction and the outcome column.
   const evaluation = $derived(normalizeCheckEvaluation(value?.evaluation));
-  const editableBands = $derived(bandsAreEditable(evaluation));
+  const graded = $derived(activeCheckEvaluation(value));
+  const editableBands = $derived(bandsAreEditable(value?.evaluation));
   const multiplyTiers = $derived(
-    evaluation.target.source === 'attribute' && evaluation.target.adjustmentKind === 'multiply'
+    graded.target.source === 'attribute' && graded.target.adjustmentKind === 'multiply'
   );
   // Which field a relative row's threshold edits: the offset reads `DC ±` only for roll-over against
   // a fixed DC, and a multiply row edits its multiplier instead.
@@ -144,15 +149,8 @@
     return editableBands ? 'dc' : 'benefit';
   });
   const comparison = $derived(value?.thresholdMode === 'exceed' ? 'exceed' : 'meet');
-  // The under inset's target chip: the fixed target, or the character expression it reads.
-  const targetChip = $derived(
-    evaluation.target.source === 'attribute'
-      ? evaluation.target.expression
-      : text('FABRICATE.Admin.Manager.Checks.Evaluation.TargetChip', 'Target {dc}').replace(
-          '{dc}',
-          String(Number(value?.dc ?? 0) || 0)
-        )
-  );
+  // The under inset's target chip; absolute ranges read no target, so they have none.
+  const targetChip = $derived(bandsAreAbsolute ? '' : checkTargetChip(evaluation, value?.dc, text));
 
   function emit(patch) {
     onChange({ ...value, ...patch });
@@ -273,32 +271,38 @@
     return `color-mix(in oklab, var(--fab-${tone}) ${BAND_TONE_MIX}%, ${BAND_TONE_BASE})`;
   }
 
-  // THE READ-ONLY PICTURE (issue 2005): the runtime's own classification of each total against
-  // the previewed target, toned by RANK so the best band takes the same hue in either direction.
+  // The read-only picture (issue 2005): the runtime's own classification of each total against
+  // the previewed target, toned by rank so the best band takes the same hue in either direction.
+  // A fixed-type check reads no target, so its ranges are drawn as authored.
   const previewedTier = $derived(
     recipeTiers.find((tier) => tier.id === selectedPreviewRecordId) ?? null
   );
   const readonlyTarget = $derived(
-    editableBands
+    editableBands || type === 'fixed'
       ? null
       : previewBandTarget(
-          { evaluation, anchor: previewDc, tier: previewedTier, character: previewCharacter },
+          {
+            evaluation: graded,
+            anchor: previewDc,
+            tier: previewedTier,
+            character: previewCharacter,
+          },
           text
         )
   );
   const readonlyBands = $derived.by(() => {
-    if (readonlyTarget?.state !== 'ok') return [];
+    if (editableBands || (type !== 'fixed' && readonlyTarget?.state !== 'ok')) return [];
     const bands = buildRoutedBands({
-      evaluation,
+      evaluation: graded,
       comparison,
-      anchor: readonlyTarget.target,
+      anchor: readonlyTarget?.target ?? null,
       type,
       outcomes,
       min: trackMin,
       max: trackMax,
     });
     return bands.map((band, position) => {
-      const rank = evaluation.direction === 'under' ? bands.length - 1 - position : position;
+      const rank = graded.direction === 'under' ? bands.length - 1 - position : position;
       const tone = toneFor(rank, bands.length);
       return {
         ...band,
@@ -309,27 +313,37 @@
       };
     });
   });
-  const readonlyNote = $derived.by(() => {
-    if (editableBands) return '';
-    if (readonlyTarget?.state !== 'ok') {
+  const readonlyScale = $derived(
+    readonlyTarget?.state === 'ok'
+      ? describeBandScale(
+          {
+            direction: graded.direction,
+            comparison,
+            target: readonlyTarget.target,
+            source: readonlyTarget.source,
+            cmp: underComparisonPhrase(comparison, text),
+          },
+          text
+        )
+      : ''
+  );
+  const bandsFallback = $derived.by(() => {
+    if (readonlyTarget && readonlyTarget.state !== 'ok') {
       return describeBandsUnavailable(
-        readonlyTarget ?? { state: 'needs-actor' },
-        { character: previewCharacter, expression: evaluation.target.expression },
+        readonlyTarget,
+        { character: previewCharacter, expression: graded.target.expression },
         text
       );
     }
-    return describeBandScale(
-      {
-        direction: evaluation.direction,
-        comparison,
-        target: readonlyTarget.target,
-        source: readonlyTarget.source,
-        cmp:
-          comparison === 'exceed'
-            ? text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpExceed', 'under')
-            : text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpMeet', 'at or under'),
-      },
-      text
+    if (!editableBands && multiplyTiers && type !== 'fixed') {
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Evaluation.BandsMultiplyFallback',
+        'Give every tier but one a multiplier to draw the bands; the tier without one is Otherwise.'
+      );
+    }
+    return text(
+      'FABRICATE.Admin.Manager.Checks.Crafting.BandsFallback',
+      'These tiers leave a gap or overlap, so they cannot be drawn as one continuous strip. Edit the numbers in the rows below; the strip returns once the ranges meet.'
     );
   });
 
@@ -522,12 +536,16 @@
           <h3 class="manager-checks-card-title">
             {text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}
           </h3>
-          <p class="manager-checks-card-description">
-            {text(
-              'FABRICATE.Admin.Manager.Checks.Crafting.BandsLead',
-              'Transition points between the tiers below. Anything under the first band or over the last clamps into the end band.'
-            )}
-          </p>
+          {#if editableBands}
+            <p class="manager-checks-card-description">
+              {text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.BandsLead',
+                'Transition points between the tiers below. Anything under the first band or over the last clamps into the end band.'
+              )}
+            </p>
+          {:else if readonlyScale}
+            <p class="manager-checks-card-description" data-outcome-band-scale>{readonlyScale}</p>
+          {/if}
         </div>
       </div>
       <div class="manager-checks-card-body is-roomy">
@@ -564,20 +582,11 @@
               )
                 .replace('{from}', band?.name || '')
                 .replace('{to}', nextBand?.name || '')}
-            fallbackNote={readonlyTarget && readonlyTarget.state !== 'ok'
-              ? readonlyNote
-              : text(
-                  'FABRICATE.Admin.Manager.Checks.Crafting.BandsFallback',
-                  'These tiers leave a gap or overlap, so they cannot be drawn as one continuous strip. Edit the numbers in the rows below; the strip returns once the ranges meet.'
-                )}
+            fallbackNote={bandsFallback}
             dataAttr="data-outcome-band-strip"
             onChange={applyBandStripChange}
           />
-          {#if !editableBands}
-            {#if readonlyTarget?.state === 'ok'}
-              <p class="manager-muted" data-outcome-band-scale>{readonlyNote}</p>
-            {/if}
-          {:else}
+          {#if editableBands}
             <p class="manager-muted" data-outcome-band-strip-hint>
               <!-- The pointer glyph leads the sentence: the hint is about a DIRECT-MANIPULATION
                              affordance. -->

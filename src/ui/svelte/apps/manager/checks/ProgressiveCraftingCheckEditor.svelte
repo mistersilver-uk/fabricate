@@ -5,9 +5,14 @@
   stops. There is no DC, comparison or recipe tier — just the formula, the award mode and the
   unified `CheckTriggers` editor, whose outcome select is relabelled for this numeric context.
   Controlled: renders `value` (`{ awardMode, rollFormula, checkBreakage }`) and emits the next.
+  The runtime refuses a summed roll-under progressive check, so that state carries a warning.
 -->
 <script>
+  import { progressiveTargetRefusal } from '../../../../../systems/checkTarget.js';
+  import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
+  import Notice from '../../../components/Notice.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import { targetRefusalSentence } from './checkTargetStatus.js';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckAwardMode from './CheckAwardMode.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
@@ -34,6 +39,8 @@
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
+
+  const refusal = $derived(progressiveTargetRefusal(normalizeCheckEvaluation(value?.evaluation)));
 
   function emit(patch) {
     onChange({ ...value, ...patch });
@@ -64,11 +71,19 @@
           {recordNoun}
           {foundrySystemId}
           evaluation={value?.evaluation ?? null}
+          underNote={!refusal}
           offerSituationalBonus={value?.offerSituationalBonus !== false}
           onChange={emit}
         />
       </div>
     </InspectorCard>
+    {#if refusal}
+      <Notice
+        tone="warning"
+        title={targetRefusalSentence(refusal, text)}
+        dataAttr="data-check-progressive-refusal"
+      />
+    {/if}
   {/if}
 
   {#if shows('triggers')}
