@@ -70,6 +70,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // The Studio's adjustment labels and read-only band pictures (issue 2005).
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
   'src/ui/svelte/apps/manager/checks/checkBandModel.js',
+  'src/ui/svelte/apps/manager/checks/checkTargetStatus.js',
   'src/systems/checkEvaluation.js',
   'src/systems/checkRoll.js',
   // `checkRoll.js` resolves and validates check targets (issue 2003), and localizes a refusal.
@@ -179,6 +180,8 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // The Formula card's `In the roll prompt` group and the routed outcome row (issue 2005).
   'src/ui/svelte/apps/manager/checks/CheckPromptOptions.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOutcomeRow.svelte',
+  // The progressive editor's roll-under refusal (issue 2005).
+  'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte',

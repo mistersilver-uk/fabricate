@@ -131,3 +131,26 @@ export function interpolate(sentence, data) {
     Object.hasOwn(data, key) ? String(data[key]) : match
   );
 }
+
+/** The roll-under comparison word: `at or under`, or `under` for a strict comparison. */
+export function underComparisonPhrase(thresholdMode, text) {
+  return thresholdMode === 'exceed'
+    ? text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpExceed', 'under')
+    : text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpMeet', 'at or under');
+}
+
+/**
+ * The Formula inset's target chip: `Target {dc}` for a fixed source, else the character expression,
+ * or `Character value` while none is written.
+ */
+export function checkTargetChip(evaluation, dc, text) {
+  if (evaluation?.target?.source === 'attribute') {
+    return (
+      String(evaluation.target.expression ?? '').trim() ||
+      text('FABRICATE.Admin.Manager.Checks.Evaluation.SourceAttribute', 'Character value')
+    );
+  }
+  return interpolate(text('FABRICATE.Admin.Manager.Checks.Evaluation.TargetChip', 'Target {dc}'), {
+    dc: Number(dc ?? 0) || 0,
+  });
+}

@@ -54,16 +54,20 @@ describe('parseCheckAdjustment', () => {
       ['add', '-2', -2],
       ['add', '+4', 4],
       ['add', '7', 7],
+      ['add', '0', 0],
     ];
     for (const [kind, text, value] of cases) assert.equal(parseCheckAdjustment(kind, text), value, text);
   });
 
-  it('reads nonsense, a negative multiplier and a zero denominator as NaN', () => {
+  it('reads nonsense, a multiplier not above zero and a zero denominator as NaN', () => {
     for (const [kind, text] of [
       ['add', 'abc'],
       ['add', ''],
       ['add', '1d4'],
       ['multiply', '-0.5'],
+      ['multiply', '0'],
+      ['multiply', '0/3'],
+      ['multiply', '×0'],
       ['multiply', '1/0'],
       ['multiply', 'Otherwise'],
     ]) {

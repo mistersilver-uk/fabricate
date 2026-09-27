@@ -10,6 +10,7 @@ import {
 } from '../../../../../systems/checkEvaluation.js';
 import { classifyCheckTotal } from '../../../../../systems/checkRouting.js';
 import {
+  activeCheckEvaluation,
   isFixedSumOver,
   multiplyTierThreshold,
   resolveCheckTarget,
@@ -18,13 +19,18 @@ import {
 import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
 
 import { formatCheckAdjustment } from './checkAdjustmentLabel.js';
+import { interpolate } from './checksCopy.js';
+import { missingTargetPaths, targetRefusalSentence } from './checkTargetStatus.js';
 
 const WINDOW_PADDING = 5;
 const MAX_WINDOW = 5000;
 
-/** Whether a strip keeps its drag handles: only summed roll-over against a fixed DC (R2). */
+/**
+ * Whether a strip keeps its drag handles: only summed roll-over against a fixed DC (R2), judged by
+ * the evaluation the runtime grades with, so an inert count record keeps them.
+ */
 export function bandsAreEditable(evaluation) {
-  return isFixedSumOver(normalizeCheckEvaluation(evaluation));
+  return isFixedSumOver(activeCheckEvaluation({ evaluation }));
 }
 
 /**
@@ -215,9 +221,33 @@ export function describeBandRange(band, text) {
     .replace('{to}', String(band.high));
 }
 
+function overExceedScale(source, text) {
+  return source
+    ? text(
+        'FABRICATE.Admin.Manager.Checks.Evaluation.ScaleOverExceedSourced',
+        'Target {target} ({source}). Success sits at the high end: a total above {target} succeeds.'
+      )
+    : text(
+        'FABRICATE.Admin.Manager.Checks.Evaluation.ScaleOverExceed',
+        'Target {target}. Success sits at the high end: a total above {target} succeeds.'
+      );
+}
+
+function overMeetScale(source, text) {
+  return source
+    ? text(
+        'FABRICATE.Admin.Manager.Checks.Evaluation.ScaleOverMeetSourced',
+        'Target {target} ({source}). Success sits at the high end: a total of {target} or more succeeds.'
+      )
+    : text(
+        'FABRICATE.Admin.Manager.Checks.Evaluation.ScaleOverMeet',
+        'Target {target}. Success sits at the high end: a total of {target} or more succeeds.'
+      );
+}
+
 /**
- * The sentence under a read-only strip naming its target and where success sits. `source` is the
- * already-joined character reading (`Idrin 55, Hard ×½`), or `''` for a fixed target.
+ * The sentence a read-only strip's card leads with, naming its target and where success sits.
+ * `source` is the joined character reading (`Idrin 55, Hard ×½`), or `''` when unsourced.
  */
 export function describeBandScale({ direction, comparison, target, source = '', cmp }, text) {
   let sentence;
@@ -233,15 +263,7 @@ export function describeBandScale({ direction, comparison, target, source = '', 
         );
   } else {
     sentence =
-      comparison === 'exceed'
-        ? text(
-            'FABRICATE.Admin.Manager.Checks.Evaluation.ScaleOverExceed',
-            'Target {target} ({source}). Success sits at the high end: a total above {target} succeeds.'
-          )
-        : text(
-            'FABRICATE.Admin.Manager.Checks.Evaluation.ScaleOverMeet',
-            'Target {target} ({source}). Success sits at the high end: a total of {target} or more succeeds.'
-          );
+      comparison === 'exceed' ? overExceedScale(source, text) : overMeetScale(source, text);
   }
   return sentence
     .replaceAll('{target}', String(target))
@@ -250,9 +272,9 @@ export function describeBandScale({ direction, comparison, target, source = '', 
 }
 
 /**
- * The previewed target plus the `source` reading {@link describeBandScale} names: the character
- * value and, when the previewed recipe tier sets one, its adjustment. `tier` is `{ name,
- * adjustment }` or null for the base.
+ * The previewed target plus the `source` reading {@link describeBandScale} names: the actor's
+ * value and the adjustment applied, the previewed tier's or else the base. Without an actor the
+ * target is unsourced. `tier` is `{ name, adjustment }` or null for the base.
  */
 export function previewBandTarget({ evaluation, anchor, tier = null, character = null }, text) {
   const normalized = normalizeCheckEvaluation(evaluation);
@@ -262,33 +284,49 @@ export function previewBandTarget({ evaluation, anchor, tier = null, character =
     adjustment: tier?.adjustment ?? null,
     character,
   });
-  if (resolved.state !== 'ok' || normalized.target.source !== 'attribute') {
+  if (resolved.state !== 'ok' || normalized.target.source !== 'attribute' || !character) {
     return { ...resolved, source: '' };
   }
   const parts = [
-    character
-      ? text('FABRICATE.Admin.Manager.Checks.Evaluation.ScaleSourceActor', '{actor} {value}')
-          .replace('{actor}', character.name)
-          .replace('{value}', String(resolved.value))
-      : String(resolved.value),
+    interpolate(
+      text('FABRICATE.Admin.Manager.Checks.Evaluation.ScaleSourceActor', '{actor} {value}'),
+      { actor: character.name, value: resolved.value }
+    ),
   ];
-  const label = formatCheckAdjustment(normalized.target.adjustmentKind, tier?.adjustment);
-  if (label) parts.push(`${tier.name} ${label}`.trim());
+  const { adjustmentKind, baseAdjustment } = normalized.target;
+  const tierLabel = formatCheckAdjustment(adjustmentKind, tier?.adjustment);
+  const baseLabel = formatCheckAdjustment(adjustmentKind, baseAdjustment);
+  if (tierLabel) parts.push(`${tier.name} ${tierLabel}`.trim());
+  else if (baseLabel) {
+    parts.push(
+      interpolate(
+        text('FABRICATE.Admin.Manager.Checks.Evaluation.ScaleSourceBase', 'base {adjustment}'),
+        { adjustment: baseLabel }
+      )
+    );
+  }
   return { ...resolved, source: parts.join(', ') };
 }
 
-/** Why a read-only strip draws nothing: no Preview-as actor, or one the value is missing on. */
+/** Why a read-only strip draws nothing, from a non-ok {@link resolvePreviewTarget} state. */
 export function describeBandsUnavailable(state, { character = null, expression = '' }, text) {
-  if (state.state === 'needs-actor') {
+  if (state?.state === 'needs-actor') {
     return text(
       'FABRICATE.Admin.Manager.Checks.Evaluation.BandsNeedActor',
       'This check reads the character, so there is nothing to chart without one. Choose a character in Preview as.'
     );
   }
-  return text(
-    'FABRICATE.Admin.Manager.Checks.Evaluation.BandsUnresolved',
-    '{actor} is missing a value this check reads ({path}), so it cannot resolve for them.'
-  )
-    .replace('{actor}', character?.name ?? '')
-    .replace('{path}', expression);
+  if (state?.reason === 'unresolved-path' && character) {
+    return interpolate(
+      text(
+        'FABRICATE.Admin.Manager.Checks.Evaluation.BandsUnresolved',
+        '{actor} is missing a value this check reads ({path}), so it cannot resolve for them.'
+      ),
+      {
+        actor: character.name,
+        path: missingTargetPaths(expression, character.rollData ?? {}).join(', '),
+      }
+    );
+  }
+  return targetRefusalSentence(state?.reason, text);
 }

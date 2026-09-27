@@ -31,7 +31,8 @@ export function effectiveMargin(value, target, direction = 'over') {
   return direction === 'under' ? target - value : value - target;
 }
 
-const PATH_TOKEN = /@(?:\{[-.\w]+\}|[-.\w]+)/g;
+/** A roll-data path token, `@a.b` or `@{a.b}`. */
+export const PATH_TOKEN = /@(?:\{[-.\w]+\}|[-.\w]+)/g;
 const DICE_TERM = /(?:^|[^\w.])(?:\d+)?d(?:\d+|f|c|%)/i;
 const DECIMAL_STRING = /^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*$/i;
 

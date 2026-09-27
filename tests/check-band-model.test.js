@@ -9,8 +9,13 @@ import {
   buildPassFailBands,
   buildRoutedBands,
   describeBandRange,
+  previewBandTarget,
   resolvePreviewTarget,
 } from '../src/ui/svelte/apps/manager/checks/checkBandModel.js';
+import {
+  missingTargetPaths,
+  targetValueStatus,
+} from '../src/ui/svelte/apps/manager/checks/checkTargetStatus.js';
 
 const fallback = (_key, text) => text;
 const NAMES = { success: 'Success', failure: 'Failure' };
@@ -36,6 +41,10 @@ describe('bandsAreEditable', () => {
     assert.equal(bandsAreEditable({ product: 'sum', direction: 'over' }), true);
     assert.equal(bandsAreEditable(UNDER_FIXED), false);
     assert.equal(bandsAreEditable(attribute('over')), false);
+  });
+
+  it('judges an inert count record by the sum/over/fixed evaluation the runtime grades it with', () => {
+    assert.equal(bandsAreEditable({ ...attribute('under'), product: 'count' }), true);
   });
 });
 
@@ -194,6 +203,10 @@ describe('the read-only strip copy', () => {
       describeBandScale({ direction: 'over', comparison: 'meet', target: 14, source: 'Idrin 14' }, fallback),
       'Target 14 (Idrin 14). Success sits at the high end: a total of 14 or more succeeds.'
     );
+    assert.equal(
+      describeBandScale({ direction: 'over', comparison: 'exceed', target: 14 }, fallback),
+      'Target 14. Success sits at the high end: a total above 14 succeeds.'
+    );
   });
 
   it('names the missing actor or value instead of charting a zero', () => {
@@ -206,5 +219,110 @@ describe('the read-only strip copy', () => {
       ),
       'Vosk is missing a value this check reads (@skills.craft.value), so it cannot resolve for them.'
     );
+  });
+
+  it('names only the paths the character is missing', () => {
+    assert.equal(
+      describeBandsUnavailable(
+        { state: 'unresolved', reason: 'unresolved-path' },
+        {
+          character: { name: 'Idrin', rollData: { skills: { craft: { value: 55 } } } },
+          expression: '@skills.craft.value + @skills.nope.mod + @skills.nope.mod',
+        },
+        fallback
+      ),
+      'Idrin is missing a value this check reads (@skills.nope.mod), so it cannot resolve for them.'
+    );
+  });
+
+  it('gives every other refusal its own sentence, with or without a character', () => {
+    const vosk = { name: 'Vosk', rollData: {} };
+    const cases = [
+      ['expression-missing', null, 'This check cannot roll: no target formula is set.'],
+      ['expression-missing', vosk, 'This check cannot roll: no target formula is set.'],
+      [
+        'dice',
+        null,
+        'This check cannot roll: its target formula rolls dice, but a target must be a fixed number.',
+      ],
+      [
+        'adjustment-invalid',
+        vosk,
+        'This check cannot roll: its difficulty adjustment is invalid; a multiplier must be above zero.',
+      ],
+    ];
+    for (const [reason, character, sentence] of cases) {
+      assert.equal(
+        describeBandsUnavailable({ state: 'unresolved', reason }, { character, expression: '' }, fallback),
+        sentence,
+        reason
+      );
+    }
+  });
+
+  it('reports a real refusal from the preview target, never a missing value', () => {
+    const idrin = { name: 'Idrin', rollData: { skills: { craft: { value: 55 } } } };
+    const blank = { ...attribute('under'), target: { source: 'attribute', expression: '' } };
+    const dice = { ...attribute('under'), target: { source: 'attribute', expression: '1d4 + 10' } };
+    for (const [evaluation, character, pattern] of [
+      [blank, null, /no target formula is set/],
+      [blank, idrin, /no target formula is set/],
+      [dice, null, /rolls dice/],
+    ]) {
+      const state = resolvePreviewTarget({ evaluation, anchor: 12, character });
+      assert.match(describeBandsUnavailable(state, { character, expression: '' }, fallback), pattern);
+    }
+  });
+});
+
+describe('previewBandTarget', () => {
+  const idrin = { name: 'Idrin', rollData: { skills: { craft: { value: 55 } } } };
+
+  it('names the base adjustment when the previewed tier sets none', () => {
+    const evaluation = attribute('over', 'add', -5);
+    assert.equal(previewBandTarget({ evaluation, anchor: 0, character: idrin }, fallback).source, 'Idrin 55, base −5');
+    assert.equal(
+      previewBandTarget({ evaluation, anchor: 0, tier: { name: 'Hard', adjustment: -2 }, character: idrin }, fallback)
+        .source,
+      'Idrin 55, Hard −2'
+    );
+  });
+
+  it('leaves an actor-free literal unsourced', () => {
+    const evaluation = { ...attribute('under'), target: { source: 'attribute', expression: '14' } };
+    assert.deepEqual(previewBandTarget({ evaluation, anchor: 0 }, fallback), {
+      state: 'ok',
+      target: 14,
+      value: 14,
+      source: '',
+    });
+  });
+});
+
+describe('targetValueStatus', () => {
+  const idrin = { name: 'Idrin', rollData: { skills: { craft: { value: 55 } } } };
+
+  it('says nothing until an expression is written', () => {
+    assert.equal(targetValueStatus('  ', idrin, fallback), null);
+  });
+
+  it('asks for a character before reading a path, and resolves one for the actor', () => {
+    assert.equal(targetValueStatus('@skills.craft.value', null, fallback).tone, 'muted');
+    assert.deepEqual(targetValueStatus('@skills.craft.value - 2', idrin, fallback), {
+      tone: 'resolved',
+      text: 'Idrin → 53',
+    });
+  });
+
+  it('names only the missing paths, and states any other refusal as the runtime does', () => {
+    assert.equal(
+      targetValueStatus('@skills.nope.mod + 40', idrin, fallback).text,
+      'Idrin has no value at @skills.nope.mod. The check cannot resolve for them.'
+    );
+    assert.deepEqual(targetValueStatus('1d4 + 10', null, fallback), {
+      tone: 'unresolved',
+      text: 'This check cannot roll: its target formula rolls dice, but a target must be a fixed number.',
+    });
+    assert.deepEqual(missingTargetPaths('@a + @{b.c} + @a', { a: 1 }), ['@{b.c}']);
   });
 });

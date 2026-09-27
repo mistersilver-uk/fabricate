@@ -45,8 +45,9 @@ function readMagnitude(text) {
 }
 
 /**
- * The value a typed label names, or NaN for text that names none. It accepts every label
- * {@link formatCheckAdjustment} emits plus plain forms: `½`, `1/2`, `0.5`, `x0.5`, `-2`.
+ * The value a typed label names, or NaN for text that names none or for a multiplier that is not
+ * above zero. It accepts every label {@link formatCheckAdjustment} emits plus plain forms: `½`,
+ * `1/2`, `0.5`, `x0.5`, `-2`.
  */
 export function parseCheckAdjustment(kind, text) {
   let source = String(text ?? '')
@@ -56,6 +57,7 @@ export function parseCheckAdjustment(kind, text) {
   const sign = /^[+-]/.exec(source)?.[0] ?? '';
   const magnitude = readMagnitude(source.slice(sign.length).trim());
   if (!Number.isFinite(magnitude)) return NaN;
-  if (kind === 'multiply' && sign === '-') return NaN;
+  // A multiplier must be above zero, as the runtime's `isValidTargetAdjustment` requires.
+  if (kind === 'multiply' && (sign === '-' || !(magnitude > 0))) return NaN;
   return sign === '-' ? -magnitude : magnitude;
 }
