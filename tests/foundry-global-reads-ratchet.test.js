@@ -192,9 +192,4 @@ test('the rule is armed on the domain layer and absent from the sanctioned edges
     false,
     'the bridge exists to make these globals reachable'
   );
-  assert.equal(
-    await armed('src/integrations/ItemPilesIntegration.js'),
-    false,
-    'the third-party integration layer is an edge'
-  );
 });

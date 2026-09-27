@@ -58,7 +58,6 @@ export const RECIPE_OMITTED_WHEN_DEFAULT = {
   checkTierId: isNull,
   minSuccessOutcomeId: isNull,
   craftingModifier: isNull,
-  currencyCost: isNull,
   teaser: isDefaultTeaser,
   importSource: isNull,
 };
@@ -137,7 +136,6 @@ export class Recipe {
         : null;
     // Honoured only under the system's `bySubject` combination rule (issues 770, 1055).
     this.craftingModifier = this._normalizeCraftingModifier(data.craftingModifier);
-    this.currencyCost = this._normalizeCurrencyCost(data.currencyCost);
     this.teaser = this._normalizeTeaser(data.teaser);
 
     this.metadata = data.metadata || {
@@ -475,7 +473,6 @@ export class Recipe {
       checkTierId: this.checkTierId,
       minSuccessOutcomeId: this.minSuccessOutcomeId,
       craftingModifier: this.craftingModifier,
-      currencyCost: this.currencyCost,
       teaser: this.teaser,
       metadata: this.metadata,
       importSource: this.importSource,
@@ -611,7 +608,6 @@ export class Recipe {
       resultGroups: this._normalizeResultGroups(step),
       toolIds: this._normalizeToolIds(step.toolIds),
       timeRequirement: this._normalizeTimeRequirement(step.timeRequirement),
-      currencyCost: this._normalizeCurrencyCost(step.currencyCost),
       outcomeRouting:
         step.outcomeRouting && typeof step.outcomeRouting === 'object'
           ? { ...step.outcomeRouting }
@@ -648,18 +644,6 @@ export class Recipe {
       normalized.months +
       normalized.years;
     return total > 0 ? normalized : null;
-  }
-
-  _normalizeCurrencyCost(cost) {
-    if (!cost || typeof cost !== 'object') return null;
-    const currencies = Array.isArray(cost.currencies) ? cost.currencies : [];
-    const normalized = currencies
-      .map((c) => ({
-        abbreviation: String(c.abbreviation || '').trim(),
-        amount: Math.max(0, Number(c.amount) || 0),
-      }))
-      .filter((c) => c.abbreviation && c.amount > 0);
-    return normalized.length > 0 ? { currencies: normalized } : null;
   }
 
   _normalizeTeaser(teaser) {

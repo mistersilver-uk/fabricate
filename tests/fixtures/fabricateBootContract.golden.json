@@ -356,14 +356,6 @@
       "length": null
     },
     {
-      "name": "itemPilesIntegration",
-      "enumerable": true,
-      "writable": true,
-      "configurable": true,
-      "accessor": false,
-      "length": null
-    },
-    {
       "name": "journalRunCommands",
       "enumerable": true,
       "writable": true,
@@ -1046,14 +1038,6 @@
       "length": 0
     },
     {
-      "name": "getItemPilesIntegration",
-      "enumerable": false,
-      "writable": true,
-      "configurable": true,
-      "accessor": false,
-      "length": 0
-    },
-    {
       "name": "getJournalRunAuthorityAvailability",
       "enumerable": false,
       "writable": true,
@@ -1588,7 +1572,6 @@
     "HOOKS",
     "Ingredient",
     "IngredientGroup",
-    "ItemPilesIntegration",
     "Recipe",
     "RecipeManager",
     "RecipeVisibilityService",
@@ -1694,7 +1677,6 @@
     "assign:gatheringGateAndCheckEvaluator",
     "assign:recipeVisibilityService",
     "assign:resolutionModeService",
-    "assign:itemPilesIntegration",
     "assign:actorInventoryCoinSpender",
     "assign:actorPropertyCoinSpender",
     "assign:compendiumImporter",

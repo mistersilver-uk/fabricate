@@ -54,7 +54,6 @@ class Fabricate {
   toolScopeStore = null;
   worldVocabularyStore = null;
   complicationDeliveryWriter = null;
-  itemPilesIntegration = null;
   actorInventoryCoinSpender = null;
   actorPropertyCoinSpender = null;
   compendiumImporter = null;
@@ -235,10 +234,6 @@ class Fabricate {
 
   getResolutionModeService() {
     return this.resolutionModeService;
-  }
-
-  getItemPilesIntegration() {
-    return this.itemPilesIntegration;
   }
 
   /** `COMPANION`'s `handle` tier (issue 1289), ungated like the world-scope accessors. */

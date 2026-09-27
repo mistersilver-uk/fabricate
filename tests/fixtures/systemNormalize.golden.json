@@ -320,7 +320,6 @@
       "gathering": false,
       "salvage": true,
       "chatOutput": true,
-      "itemPiles": false,
       "refundOnPlayerCancel": true
     },
     "featuresEmpty": {
@@ -336,7 +335,6 @@
       "gathering": false,
       "salvage": true,
       "chatOutput": true,
-      "itemPiles": false,
       "refundOnPlayerCancel": true
     },
     "featuresMultiStepAgreesWithLegacy": {
@@ -352,7 +350,6 @@
       "gathering": false,
       "salvage": true,
       "chatOutput": true,
-      "itemPiles": false,
       "refundOnPlayerCancel": true
     },
     "featuresMultiStepDisagreesWithLegacy": {
@@ -368,7 +365,6 @@
       "gathering": false,
       "salvage": true,
       "chatOutput": true,
-      "itemPiles": false,
       "refundOnPlayerCancel": true
     },
     "featuresLegacyComplexOnly": {
@@ -384,7 +380,6 @@
       "gathering": false,
       "salvage": true,
       "chatOutput": true,
-      "itemPiles": false,
       "refundOnPlayerCancel": true
     },
     "featuresDefaultOnTogglesExplicitlyFalse": {
@@ -400,7 +395,6 @@
       "gathering": true,
       "salvage": false,
       "chatOutput": false,
-      "itemPiles": true,
       "refundOnPlayerCancel": false
     },
     "featuresEssencesFromSystemFlag": {
@@ -416,7 +410,6 @@
       "gathering": false,
       "salvage": true,
       "chatOutput": true,
-      "itemPiles": false,
       "refundOnPlayerCancel": true
     },
     "visibilityModeGlobal": "global",
@@ -2068,7 +2061,6 @@
         "gathering": false,
         "salvage": true,
         "chatOutput": true,
-        "itemPiles": false,
         "refundOnPlayerCancel": true
       },
       "itemTags": [],
@@ -2583,7 +2575,6 @@
         "gathering": false,
         "salvage": true,
         "chatOutput": true,
-        "itemPiles": false,
         "refundOnPlayerCancel": true
       },
       "itemTags": [
@@ -3464,7 +3455,6 @@
         "gathering": false,
         "salvage": true,
         "chatOutput": true,
-        "itemPiles": false,
         "refundOnPlayerCancel": true
       },
       "itemTags": [
@@ -4073,7 +4063,6 @@
         "gathering": false,
         "salvage": true,
         "chatOutput": true,
-        "itemPiles": false,
         "refundOnPlayerCancel": true
       },
       "itemTags": [],
@@ -4659,7 +4648,6 @@
         "gathering": false,
         "salvage": true,
         "chatOutput": true,
-        "itemPiles": false,
         "refundOnPlayerCancel": true
       },
       "itemTags": [],

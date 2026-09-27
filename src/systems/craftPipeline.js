@@ -238,7 +238,7 @@ export async function resolveCraftInputs(engine, ctx) {
   };
 }
 
-/** The tool, currency and Item Piles gates, all of them before any mutation. */
+/** The tool and currency gates, all of them before any mutation. */
 export async function runAffordGates(engine, ctx, craftInputs) {
   const { craftingActor, componentSourceActors, presentTools } = ctx;
   const { craftSelection, currencySpends, executionRecipe, ingredientSet } = craftInputs;
@@ -269,9 +269,6 @@ export async function runAffordGates(engine, ctx, craftInputs) {
     engine._currencySeams()
   );
   if (!currencyAffordCheck.valid) return refuse(currencyAffordCheck.message);
-
-  const itemPilesAffordCheck = await engine._checkItemPilesCurrencyCost(craftingActor, ctx.recipe);
-  if (!itemPilesAffordCheck.valid) return refuse(itemPilesAffordCheck.message);
   return null;
 }
 
@@ -633,8 +630,7 @@ export async function commitCraft(engine, ctx, craftInputs) {
   });
 
   // Deduct the chosen currency spends after item consumption (`runAffordGates` already
-  // confirmed every spend is affordable). A mid-loop spend failure is logged
-  // like the Item-Piles deduct error below — not refunded.
+  // confirmed every spend is affordable). A mid-loop spend failure is logged, not refunded.
   await engine._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
 
   // Apply tool usage/breakage via the single shared `evaluateCheckBreakage` seam: under
@@ -651,10 +647,6 @@ export async function commitCraft(engine, ctx, craftInputs) {
     reason: successBreakDecision.reason,
     triggerId: successBreakDecision.triggerId,
   });
-
-  // Deduct Item Piles currency cost after ingredients are consumed to avoid
-  // losing currency if ingredient consumption throws.
-  await engine._deductItemPilesCurrencyCost(craftingActor, ctx.recipe);
 
   // Create the result item(s). The awarded group was already resolved and validated by
   // `runResolutionPreflight`, so this re-resolution yields real groups.

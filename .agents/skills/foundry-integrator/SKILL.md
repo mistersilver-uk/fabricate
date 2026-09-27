@@ -37,12 +37,12 @@ The driver runs these rounds at model tier `medium`, because the scope is fixed 
 - **Design time (plan-review):** when the workflow driver routes a plan whose change calls Foundry APIs or hooks the Foundry lifecycle.
 - **Implementation review (post-implementation):** when the branch diff touches Foundry-facing code.
 
-The driver auto-spawns this role from the routing table in `AGENTS.md` whenever a change touches Foundry-facing surfaces — for example `Hooks` registration; the runtime globals `game` / `ui` / `Hooks` / `CONFIG`; document, `ApplicationV2`, `DialogV2`, or sheet APIs; UUID resolution, flags, or settings registration; `src/integrations/`, `src/canvas/`, Foundry-facing parts of `src/main.js`; or `module.json` compatibility metadata.
+The driver auto-spawns this role from the routing table in `AGENTS.md` whenever a change touches Foundry-facing surfaces — for example `Hooks` registration; the runtime globals `game` / `ui` / `Hooks` / `CONFIG`; document, `ApplicationV2`, `DialogV2`, or sheet APIs; UUID resolution, flags, or settings registration; `src/canvas/`, Foundry-facing parts of `src/main.js`; or `module.json` compatibility metadata.
 
 ## Required context
 
 - the change under review — the issue's `openspec-delta` block at design time, and the assigned target's diff against the supplied base SHA at implementation review.
-- the Foundry-facing code involved: `src/integrations/`, `src/canvas/`, hook registrations, settings registration, and `src/main.js` bootstrap wiring.
+- the Foundry-facing code involved: `src/canvas/`, hook registrations, settings registration, and `src/main.js` bootstrap wiring.
 - `.agents/docs/foundry-and-architecture.md`, which carries the FoundryVTT notes and the architecture pointers (moved whole out of `AGENTS.md` by issue #1661), and the Foundry deep-dives in `CONTRIBUTING.md`.
 - the Foundry compatibility range declared in `module.json` (currently `minimum: "13"`, `verified: "14"`) and the exact build the smoke boots (pinned in `docker-compose.foundry.yml`) — every finding is pinned to a named version rather than to "current".
 

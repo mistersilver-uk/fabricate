@@ -42,7 +42,7 @@ Stop and return `BLOCKED` when the assignment does not match the worktree.
 
 ## Plan-review duty
 
-When the workflow driver routes a plan for domain review (change touches `src/models/`, `src/systems/`, `src/integrations/`, `openspec/specs/`, `lang/`, or domain language), audit the issue's `openspec-delta` block:
+When the workflow driver routes a plan for domain review (change touches `src/models/`, `src/systems/`, `openspec/specs/`, `lang/`, or domain language), audit the issue's `openspec-delta` block:
 
 - check naming, lifecycle, and aggregate boundaries are consistent with `DOMAIN.md` and canonical specs;
 - flag hidden concepts the change introduces but does not name;

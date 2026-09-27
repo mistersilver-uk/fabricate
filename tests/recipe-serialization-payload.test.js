@@ -66,7 +66,6 @@ function maximalRecipe() {
     checkTierId: 'tier-1',
     minSuccessOutcomeId: 'outcome-1',
     craftingModifier: { modifierIds: ['mod-1'] },
-    currencyCost: { currencies: [{ abbreviation: 'gp', amount: 5 }] },
     teaser: {
       enabled: false,
       hiddenFields: ['tools'],

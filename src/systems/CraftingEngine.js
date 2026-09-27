@@ -238,7 +238,6 @@ export class CraftingEngine {
     recipeManager,
     craftingRunManager = null,
     resolutionModeService = null,
-    itemPilesIntegration = null,
     salvageRunManager = null,
     actorInventoryCoinSpender = null,
     actorPropertyCoinSpender = null,
@@ -256,7 +255,6 @@ export class CraftingEngine {
     this.recipeManager = recipeManager;
     this.craftingRunManager = craftingRunManager;
     this.resolutionModeService = resolutionModeService;
-    this.itemPilesIntegration = itemPilesIntegration;
     this.salvageRunManager = salvageRunManager;
     // Stubbable spend seams, both handed to the shared currency-affordance resolver.
     this.actorInventoryCoinSpender = actorInventoryCoinSpender;
@@ -1596,12 +1594,6 @@ export class CraftingEngine {
     ) {
       return { code: 'tools', message: 'Automatic completion cannot use crafting tools.' };
     }
-    if (
-      Array.isArray(recipe?.currencyCost?.currencies) &&
-      recipe.currencyCost.currencies.length > 0
-    ) {
-      return { code: 'currency', message: 'Automatic completion cannot spend currency.' };
-    }
     const activeCheck = resolveActiveCraftingCheckFormula(this._getRecipeSystem(recipe));
     if (activeCheck.requiresCheck || activeCheck.checkUsable) {
       return {
@@ -1738,10 +1730,6 @@ export class CraftingEngine {
     );
     if (!currencyCheck.valid) {
       return { valid: false, blocker: STAGE_BLOCKERS.currency, message: currencyCheck.message };
-    }
-    const itemPilesCheck = await this._checkItemPilesCurrencyCost(actor, recipe);
-    if (!itemPilesCheck.valid) {
-      return { valid: false, blocker: STAGE_BLOCKERS.currency, message: itemPilesCheck.message };
     }
     return {
       valid: true,
@@ -1954,15 +1942,6 @@ export class CraftingEngine {
       });
     }
 
-    if (succeeded && this._hasItemPilesCurrencyCost(recipe)) {
-      effects.push({
-        effectId: 'spend-item-piles-currency',
-        kind: 'spendItemPilesCurrency',
-        planned: cloneJsonValue(recipe.currencyCost.currencies),
-        apply: async () => this._deductItemPilesCurrencyCostVersioned(actor, recipe),
-      });
-    }
-
     if (
       succeeded ||
       this._versionedFailureAwardAllowed(prepared, checkResult, alchemySimpleFailure)
@@ -2026,7 +2005,7 @@ export class CraftingEngine {
                 executedHistorySnapshots.presentationSnapshot,
               essenceSpend: state.essenceSpend,
               currencySpends: executedHistorySnapshots.resolutionSnapshot
-                ? this._historicalCurrencySpends(state, recipe)
+                ? this._historicalCurrencySpends(state)
                 : undefined,
             },
             { executed: true }
@@ -2276,11 +2255,10 @@ export class CraftingEngine {
     }).essenceSpend;
   }
 
-  _historicalCurrencySpends(state, recipe) {
-    if (Array.isArray(state.currencySettlement?.settledSpends)) {
-      return state.currencySettlement.settledSpends;
-    }
-    return this._hasItemPilesCurrencyCost(recipe) ? undefined : [];
+  _historicalCurrencySpends(state) {
+    return Array.isArray(state.currencySettlement?.settledSpends)
+      ? state.currencySettlement.settledSpends
+      : [];
   }
 
   _appendVersionedPostEffects(
@@ -2536,20 +2514,6 @@ export class CraftingEngine {
       groups: Array.isArray(result?.groups) ? result.groups : [],
       settledSpends: Array.isArray(result?.settledSpends) ? result.settledSpends : [],
     };
-  }
-
-  _hasItemPilesCurrencyCost(recipe) {
-    const currencies = recipe?.currencyCost?.currencies;
-    if (!Array.isArray(currencies) || currencies.length === 0) return false;
-    const integration = this.itemPilesIntegration || game.fabricate?.getItemPilesIntegration?.();
-    if (!integration) return false;
-    return integration.isEnabled(this._getRecipeSystem(recipe));
-  }
-
-  async _deductItemPilesCurrencyCostVersioned(craftingActor, recipe) {
-    const integration = this.itemPilesIntegration || game.fabricate?.getItemPilesIntegration?.();
-    await integration.deductCurrency(craftingActor, recipe.currencyCost.currencies);
-    return { deducted: true };
   }
 
   async _routeVersionedCraft(actor, sourceActors, recipe, ingredientSetId, options) {
@@ -3013,11 +2977,6 @@ export class CraftingEngine {
       return abort(currencyAffordCheck.message);
     }
 
-    const itemPilesAffordCheck = await this._checkItemPilesCurrencyCost(craftingActor, recipe);
-    if (!itemPilesAffordCheck.valid) {
-      return abort(itemPilesAffordCheck.message);
-    }
-
     // Items first, then currency; both gates have passed.
     await this._beginNativeStage({
       craftingActor,
@@ -3042,7 +3001,6 @@ export class CraftingEngine {
       executionRecipe,
       currencySpends
     );
-    await this._deductItemPilesCurrencyCost(craftingActor, recipe);
 
     // Snapshot for FINISH: essences are precomputed because the source items are deleted first.
     const { resolvedEssences } = this._buildEssenceContext(
@@ -5331,53 +5289,6 @@ export class CraftingEngine {
       breakToolsOnFail:
         (consumption.breakToolsOnFail ?? consumption.consumeCatalystsOnFail) === true,
     };
-  }
-
-  /** Check a recipe's Item Piles currency cost, when the integration is enabled. */
-  async _checkItemPilesCurrencyCost(craftingActor, recipe) {
-    const cost = recipe?.currencyCost;
-    if (!cost?.currencies?.length) return { valid: true };
-
-    const integration = this.itemPilesIntegration || game.fabricate?.getItemPilesIntegration?.();
-    if (!integration) return { valid: true };
-
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
-    const system = systemManager?.getSystem(recipe?.craftingSystemId);
-    if (!integration.isEnabled(system)) return { valid: true };
-
-    try {
-      const affordable = await integration.canAfford(craftingActor, cost.currencies);
-      if (!affordable) {
-        return {
-          valid: false,
-          message: 'Insufficient currency (Item Piles). Cannot afford recipe cost.',
-        };
-      }
-      return { valid: true };
-    } catch (error) {
-      console.error('Fabricate | Item Piles canAfford error', error);
-      return { valid: false, message: 'Item Piles currency check failed: ' + error.message };
-    }
-  }
-
-  /** Deduct a recipe's Item Piles currency cost after a successful craft; errors are logged, never
-   * thrown, so results are not lost. */
-  async _deductItemPilesCurrencyCost(craftingActor, recipe) {
-    const cost = recipe?.currencyCost;
-    if (!cost?.currencies?.length) return;
-
-    const integration = this.itemPilesIntegration || game.fabricate?.getItemPilesIntegration?.();
-    if (!integration) return;
-
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
-    const system = systemManager?.getSystem(recipe?.craftingSystemId);
-    if (!integration.isEnabled(system)) return;
-
-    try {
-      await integration.deductCurrency(craftingActor, cost.currencies);
-    } catch (error) {
-      console.error('Fabricate | Item Piles deductCurrency error', error);
-    }
   }
 
   /**

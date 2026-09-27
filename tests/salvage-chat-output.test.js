@@ -430,7 +430,6 @@ async function runProgressiveSalvage({ awardedComplications, missedComplications
     },
     null,
     { validateSalvage: () => ({ valid: true, errors: [] }) },
-    null,
     salvageRunManager
   );
   // Budget 3 covers the difficulty-2 stage and stops at the difficulty-5 one.

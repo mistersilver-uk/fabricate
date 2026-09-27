@@ -18,7 +18,6 @@ import {
 } from '../gatheringBootstrapAdapters.js';
 import { createGatheringResultCreator } from '../gatheringResultCreation.js';
 import { createGatheringToolAvailability } from '../gatheringToolRuntime.js';
-import { ItemPilesIntegration } from '../integrations/ItemPilesIntegration.js';
 import { logMigrationNoticeDetail } from '../migration/migrationNoticeDetail.js';
 import { CharacterLibrariesStore } from '../systems/CharacterLibrariesStore.js';
 import { evaluatePreparedRunCheck } from '../systems/checkRoll.js';
@@ -187,8 +186,6 @@ function buildCoreManagers(fabricate) {
   fabricate.resolutionModeService = new ResolutionModeService(fabricate.craftingSystemManager, {
     getPlayerResultOrder: (entry) => fabricate._readPlayerResultOrder(entry),
   });
-  fabricate.itemPilesIntegration = new ItemPilesIntegration();
-  fabricate.itemPilesIntegration.detect();
   // Coin adapters are keyed by `game.system.id`; pf2e is the only one.
   fabricate.actorInventoryCoinSpender = new ActorInventoryCoinSpender({
     adapters: new Map([['pf2e', new Pf2eInventoryCoinAdapter()]]),
@@ -224,7 +221,6 @@ function buildCoreManagers(fabricate) {
     fabricate.recipeManager,
     fabricate.craftingRunManager,
     fabricate.resolutionModeService,
-    fabricate.itemPilesIntegration,
     fabricate.salvageRunManager,
     fabricate.actorInventoryCoinSpender,
     fabricate.actorPropertyCoinSpender,
