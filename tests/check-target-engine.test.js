@@ -443,6 +443,7 @@ for (const { mode, check } of SALVAGE_SITES) {
     const result = await world.salvage();
     assert.equal(result.misconfigured, true);
     assert.equal(result.message, `Salvage ${UNRESOLVED}`);
+    assert.deepEqual(result.data, { targetRefusal: 'unresolved-path' });
     assert.deepEqual(constructed, []);
     assert.deepEqual(effects(world.journal), []);
 
@@ -462,6 +463,7 @@ test('salvage progressive: sum/under refuses with zero mutation, sum/over rolls 
   const result = await world.salvage();
   assert.equal(result.misconfigured, true);
   assert.equal(result.message, `Salvage ${PROGRESSIVE_UNDER}`);
+  assert.deepEqual(result.data, { targetRefusal: 'progressive-under' });
   assert.deepEqual(constructed, []);
   assert.deepEqual(effects(world.journal), []);
 
