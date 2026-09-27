@@ -115,15 +115,22 @@ const settled = (status, intent, receipt, failure) => ({ status, intent, receipt
  * Grant one validated recipe on the effect path (issue 1954), answering `{ status, intent,
  * receipt, failure }`. Already known is `applied` with no write and a null intent; otherwise
  * `applied` only when the learned entry is in the returned `_source`. `null` or `undefined` wrote
- * nothing; a write throw or a missing entry is `uncertain`; `beforeWrite(intent)` gates the write
- * as in `placeComponentAward` (`notAttempted` unless it answers `true`; its throw propagates).
+ * nothing; a learned-map read that throws is `knownFailure`, a write throw or a missing entry is
+ * `uncertain`; `beforeWrite(intent)` gates the write as in `placeComponentAward` (`notAttempted`
+ * unless it answers `true`; its throw propagates).
  */
 export async function grantRecipeKnowledgeEntry(
   { actor, recipeId, grantedBy = null, beforeWrite = null },
   { readFlag, writeFlag }
 ) {
   const id = String(recipeId);
-  const learnedMap = readLearnedMap(actor, readFlag);
+  let learnedMap;
+  try {
+    learnedMap = readLearnedMap(actor, readFlag);
+  } catch (error) {
+    const detail = error?.message ?? String(error);
+    return settled('knownFailure', null, null, { reason: 'preflightThrew', detail });
+  }
   if (knownIn(learnedMap, id)) return settled('applied', null, { result: 'alreadyKnown' }, null);
 
   const intent = { recipeId: id, grantedBy };

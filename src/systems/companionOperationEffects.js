@@ -125,10 +125,8 @@ class EffectRun {
   async runEffect(effect) {
     const where = { effectId: effect.effectId };
     const { evidence } = effectState(this.record, effect.effectId);
-    const kind = Object.hasOwn(this.kinds, effect.kind) ? this.kinds[effect.kind] : null;
-    const planned = kind
-      ? await kind.plan(effect.payload, evidence)
-      : { failure: effectFailureOf('unknownKind', effect.kind) };
+    const planned = await planEffect(this.kinds, effect, evidence);
+    if (planned.threw && evidence !== null) return stopped('planThrew', where);
     if (planned.failure && evidence === null) {
       return (
         (await this.persistClaimed(where, { type: 'effectFailure', failure: planned.failure })) ??
@@ -191,17 +189,45 @@ class EffectRun {
   }
 }
 
+/**
+ * The effect's fresh plan, or `{ failure }`. A world seam that throws while planning is
+ * `planThrew` with `threw: true`, so a resumed effect can stop without settling anything.
+ */
+async function planEffect(kinds, effect, evidence) {
+  if (!Object.hasOwn(kinds, effect.kind)) {
+    return { failure: effectFailureOf('unknownKind', effect.kind) };
+  }
+  try {
+    return await kinds[effect.kind].plan(effect.payload, evidence);
+  } catch (error) {
+    return { failure: effectFailureOf('planThrew', error?.message ?? String(error)), threw: true };
+  }
+}
+
+/** Flat JSON targets compared by key set and value, independent of key order. */
+function sameTarget(left, right) {
+  const keys = Object.keys(left ?? {});
+  return (
+    keys.length === Object.keys(right ?? {}).length &&
+    keys.every((key) => Object.hasOwn(right, key) && right[key] === left[key])
+  );
+}
+
 /** The failure a resumed effect's evidence and its fresh plan disagree by, or `null`. */
 function planDrift(planned, evidence) {
   if (evidence === null) return null;
   if (planned.replayClass !== evidence.replayClass) {
     return effectFailureOf('planChanged', 'replayClass');
   }
-  const ids = planned.units.map(({ subwriteId }) => subwriteId);
-  const same =
-    ids.length === evidence.subwrites.length &&
-    evidence.subwrites.every(({ subwriteId }, index) => ids[index] === subwriteId);
-  return same ? null : effectFailureOf('planChanged', 'subwrites');
+  const { units } = planned;
+  const sameIds =
+    units.length === evidence.subwrites.length &&
+    evidence.subwrites.every(({ subwriteId }, index) => units[index].subwriteId === subwriteId);
+  if (!sameIds) return effectFailureOf('planChanged', 'subwrites');
+  const sameTargets = evidence.subwrites.every(({ target }, index) =>
+    sameTarget(target, units[index].target)
+  );
+  return sameTargets ? null : effectFailureOf('planChanged', 'target');
 }
 
 function storeFor(createStore, heldClaim, clock) {
@@ -238,12 +264,16 @@ export function createCompanionOperationEffectExecutor(seams = {}) {
     const subwrite = effectState(record, effectId)?.evidence?.subwrites.find(
       (entry) => entry.subwriteId === subwriteId
     );
-    if (!effect || !subwrite?.intent || !Object.hasOwn(kinds, effect.kind)) return uncertain;
-    const planned = await kinds[effect.kind].plan(effect.payload, null);
+    if (!effect || !subwrite?.intent) return uncertain;
+    const planned = await planEffect(kinds, effect, null);
     const unit = planned.units?.find((entry) => entry.subwriteId === subwriteId);
     if (!unit) return uncertain;
     const marker = { operationId: record.operationId, effectId, subwriteId };
-    return unit.probe(subwrite, marker);
+    try {
+      return unit.probe(subwrite, marker);
+    } catch {
+      return uncertain;
+    }
   }
 
   execute.probe = probe;

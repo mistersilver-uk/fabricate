@@ -27,6 +27,8 @@ import {
   resetItemStackQuantityPath,
 } from '../src/systems/itemStackQuantity.js';
 
+import { expandObject } from './helpers/foundryExpandObject.js';
+
 const QUANTITY_PATH = 'system.count.value';
 const SYSTEM = { id: 'sys-1', name: 'Test System' };
 const MARKER = Object.freeze({ operationId: 'op-1', effectId: 'e0', subwriteId: 'r0.a0' });
@@ -36,7 +38,12 @@ after(() => resetItemStackQuantityPath());
 
 // Fixtures
 
-/** Apply a flattened update to `_source` the way Foundry does, honouring `==` replacement. */
+const isPlain = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+/**
+ * Apply a flattened update to `_source` the way Foundry does: values are dot-expanded first,
+ * and `==` replaces wholesale.
+ */
 function applyUpdate(source, payload, { drop = [] } = {}) {
   for (const [path, value] of Object.entries(payload)) {
     if (drop.includes(path)) continue;
@@ -44,10 +51,11 @@ function applyUpdate(source, payload, { drop = [] } = {}) {
     let node = source;
     for (const segment of segments.slice(0, -1)) node = node[segment] ??= {};
     const last = segments.at(-1);
-    if (last.startsWith('==')) node[last.slice(2)] = structuredClone(value);
-    else if (value && typeof value === 'object' && node[last] && typeof node[last] === 'object') {
-      Object.assign(node[last], structuredClone(value));
-    } else node[last] = structuredClone(value);
+    const expanded = expandObject(value);
+    if (last.startsWith('==')) node[last.slice(2)] = structuredClone(expanded);
+    else if (isPlain(expanded) && isPlain(node[last])) {
+      Object.assign(node[last], structuredClone(expanded));
+    } else node[last] = structuredClone(expanded);
   }
 }
 
@@ -215,6 +223,28 @@ describe('placeComponentAward — create', () => {
       actor: makeActor({ create: () => [{ uuid: 'x', _source: { system: { count: { value: 2 } } } }] }),
     });
     assert.equal(unmarked.status, 'uncertain');
+  });
+
+  it('applies a sourced item with no quantity field at quantity 1, and probes it applied', async () => {
+    const seams = {
+      ...makeSeams(),
+      resolveSourceItem: async () => ({
+        toObject: () => ({ name: 'Iron', type: 'loot', system: {} }),
+      }),
+    };
+    const actor = makeActor();
+    const entry = { componentId: 'iron', quantity: 1 };
+    const answer = await place({ actor, entry }, seams);
+    const [data] = actor.createCalls[0];
+    assert.equal(data.system.count, undefined, 'no count field was invented');
+    assert.equal(answer.status, 'applied');
+    assert.deepEqual(answer.receipt, { itemUuid: 'Actor.a1.Item.new0', placed: 1, stacked: false });
+
+    const created = { uuid: 'Actor.a1.Item.new0', _source: structuredClone(data) };
+    const probe = (quantity) =>
+      probeComponentAward({ intent: answer.intent, marker: MARKER, quantity, documents: [created] });
+    assert.equal(probe(1).status, 'applied');
+    assert.equal(probe(2).status, 'uncertain', 'an absent count proves only one unit');
   });
 
   it('refuses a pre-write throw as knownFailure, having written nothing', async () => {

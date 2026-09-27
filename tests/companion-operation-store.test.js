@@ -10,6 +10,7 @@ import {
   createCompanionOperationStore,
 } from '../src/systems/companionOperationStore.js';
 import { INTENT, RECEIPT, TARGET, effectEvidence } from './helpers/companionEffectEvidence.js';
+import { expandObject } from './helpers/foundryExpandObject.js';
 import {
   forEachReplacementForm,
   isForcedReplacement,
@@ -55,7 +56,10 @@ const isMergeable = (value) =>
   !Array.isArray(value) &&
   !isForcedReplacement(value);
 
-/** `Document#update` as Foundry applies it: dotted keys merge, while `==` or the operator replace. */
+/**
+ * `Document#update` as Foundry applies it: values are dot-expanded, dotted keys merge, while `==`
+ * or the operator replace.
+ */
 function applyDocumentUpdate(document, changes) {
   for (const [path, value] of Object.entries(changes)) {
     if (path === '_id') continue;
@@ -63,8 +67,8 @@ function applyDocumentUpdate(document, changes) {
     const leaf = segments.pop();
     const node = segments.reduce((target, segment) => (target[segment] ??= {}), document);
     const replaced = replacedKey(leaf, value);
-    if (replaced) node[replaced.key] = structuredClone(replaced.value);
-    else mergeInto(node, leaf, value);
+    if (replaced) node[replaced.key] = structuredClone(expandObject(replaced.value));
+    else mergeInto(node, leaf, expandObject(value));
   }
 }
 
@@ -442,6 +446,39 @@ forEachReplacementForm('a key the transition drops is gone from the stored recor
     'left by a merge',
     'the fake merges an ordinary dotted update, so the replacement above is what dropped it'
   );
+});
+
+forEachReplacementForm('a stored applying intent reads back exactly as sent through expansion', async (form) => {
+  form.apply();
+  const fixture = harness({ now: 150 });
+  fixture.stored.set(OPERATION_ID, page(createCompanionOperationRecord(submission(), 100)));
+  const intent = {
+    ...INTENT,
+    postValues: [{ path: 'system.currency.gp', value: 4 }],
+    nested: { list: [{ inner: { deep: 1 } }] },
+  };
+  const change = { type: 'applying', intent, skeleton: SKELETON };
+
+  const result = await fixture.store.transitionEffect(OPERATION_ID, transitionInput(0, change));
+  assert.equal(result.status, 'updated');
+  const stored = fixture.stored.get(OPERATION_ID).flags.fabricate.companionOperationRecord;
+  assert.deepEqual(stored, result.record);
+  assert.deepEqual(stored.effectStates[0].evidence.subwrites[0].intent, intent);
+
+  const dotted = { ...INTENT, postValues: { 'system.currency.gp': 4 } };
+  const refused = await fixture.store.transitionEffect(
+    OPERATION_ID,
+    transitionInput(1, { type: 'applied', receipt: { ...RECEIPT, 'a.b': 1 } })
+  );
+  assert.equal(refused.status, 'invalidTransition');
+  assert.equal(fixture.calls.updates.length, 1, 'a dotted key is refused before any write');
+
+  const fresh = harness({ now: 150 });
+  fresh.stored.set(OPERATION_ID, page(createCompanionOperationRecord(submission(), 100)));
+  const dottedChange = { type: 'applying', intent: dotted, skeleton: SKELETON };
+  const answer = await fresh.store.transitionEffect(OPERATION_ID, transitionInput(0, dottedChange));
+  assert.equal(answer.status, 'invalidTransition');
+  assert.deepEqual(fresh.calls.updates, []);
 });
 
 test('complete persists the derived outcome once every effect is applied', async () => {

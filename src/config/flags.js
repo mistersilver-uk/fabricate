@@ -124,3 +124,31 @@ export function markForcedDeletion(node, key) {
   else node[`-=${key}`] = null;
   return node;
 }
+
+/**
+ * The single-slot companion effect marker, `flags.fabricate.companionEffect` (issue 1954): the
+ * effect identity a companion reward write carries in the same update as its value.
+ */
+export const COMPANION_EFFECT_MARKER_PARENT = `flags.${FABRICATE_FLAG_NAMESPACE}`;
+export const COMPANION_EFFECT_MARKER_KEY = 'companionEffect';
+
+/** The update fields that replace the companion effect marker slot wholesale. */
+export function companionEffectMarkerUpdate(marker) {
+  const entry = forcedReplacementEntry(
+    COMPANION_EFFECT_MARKER_PARENT,
+    COMPANION_EFFECT_MARKER_KEY,
+    marker
+  );
+  return Object.fromEntries([entry]);
+}
+
+/** Whether a document's `_source` carries exactly `marker` in the companion effect slot. */
+export function sourceCarriesCompanionEffectMarker(document, marker) {
+  const slot = document?._source?.flags?.[FABRICATE_FLAG_NAMESPACE];
+  const stored = slot && typeof slot === 'object' ? slot[COMPANION_EFFECT_MARKER_KEY] : null;
+  if (!marker || !stored || typeof stored !== 'object') return false;
+  const keys = Object.keys(marker);
+  return (
+    keys.length === Object.keys(stored).length && keys.every((key) => stored[key] === marker[key])
+  );
+}

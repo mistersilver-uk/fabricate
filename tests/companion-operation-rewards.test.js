@@ -42,6 +42,8 @@ function seamsFor(actors, overrides = {}) {
       actor.items.filter((item) => item.name === component.name),
     resolveSourceItem: async () => null,
     resolveRecipe: (id) => (id.startsWith('recipe') ? { id } : null),
+    resolveRecipeSystem: () => SYSTEM,
+    isKnowledgeObservable: (system) => system === SYSTEM,
     readFlag: (actor, key, fallback) => actor._source.flags.fabricate?.fabricate?.[key] ?? fallback,
     writeFlag: (actor, key, value) => actor.update({ [`flags.fabricate.fabricate.${key}`]: value }),
     getCurrencyConfig: () => ({ spendStrategy: 'actorProperty', units: LADDER, macros: MACROS }),
@@ -442,7 +444,7 @@ describe('scenario 6: currency', () => {
       amount: 3,
       baseValue: 100,
       creditedBase: 300,
-      postValues: { 'system.currency.gp': 4 },
+      postValues: [{ path: 'system.currency.gp', value: 4 }],
       strategy: 'actorProperty',
       unitId: 'gp',
     });
@@ -664,5 +666,190 @@ describe('validation on reach', () => {
       effectId: 'e0',
       subwriteId: 'r0.a0',
     });
+  });
+});
+
+describe('plan throws, plan drift and pre-flight refusals', () => {
+  const throwing = () => {
+    throw new Error('world seam broke');
+  };
+  const twoIron = () =>
+    award('e0', [
+      [
+        'hero',
+        [
+          ['iron', 2],
+          ['iron', 3],
+        ],
+      ],
+    ]);
+
+  it('fails a pending effect planThrew when a world seam throws, and never throws', async () => {
+    const hero = makeWorldActor('hero');
+    const world = rewardWorld();
+    await accept(world, [award('e0', [['hero', [['iron', 2]]]])]);
+    const { summary } = await run(world, seamsFor([hero], { resolveActor: throwing }));
+
+    assert.equal(summary.reason, 'effectFailed');
+    assert.deepEqual(evidence(world).failure, { reason: 'planThrew', detail: 'world seam broke' });
+    assert.equal(world.record().state, 'failed');
+    assert.equal(hero.createCalls.length, 0);
+  });
+
+  it('stops a resumed effect whose plan throws without settling anything', async () => {
+    const hero = makeWorldActor('hero');
+    const world = rewardWorld();
+    const seams = seamsFor([hero], { findComponentItems: async () => [] });
+    await accept(world, [twoIron()]);
+    await run(world, seams, (call) => call < 3);
+    const before = world.record();
+    assert.deepEqual(phases(world), ['applied', 'pending']);
+
+    const { summary } = await run(world, { ...seams, resolveActor: throwing });
+    assert.equal(summary.status, 'stopped');
+    assert.equal(summary.reason, 'planThrew');
+    assert.deepEqual(world.record(), before, 'no store write');
+    assert.equal(hero.createCalls.length, 1);
+  });
+
+  it('settles a knowledge grant knownFailure when the learned-map read throws', async () => {
+    const hero = makeWorldActor('hero');
+    const world = rewardWorld();
+    await accept(world, [grant('e0', [['hero', ['recipe-a']]])]);
+    const { summary } = await run(world, seamsFor([hero], { readFlag: throwing }));
+
+    assert.equal(summary.reason, 'effectNotApplied');
+    const [subwrite] = evidence(world).subwrites;
+    assert.equal(subwrite.phase, 'knownFailure');
+    assert.deepEqual(subwrite.failure, { reason: 'preflightThrew', detail: 'world seam broke' });
+    assert.equal(hero.updates.length, 0);
+  });
+
+  it('fails pending credit subwrites planChanged when the strategy moves to macro', async () => {
+    const hero = makeWorldActor('hero', { system: { currency: { gp: 1, cp: 0 } } });
+    const ally = makeWorldActor('ally', { system: { currency: { gp: 0, cp: 0 } } });
+    const world = rewardWorld();
+    await accept(world, [
+      credit('e0', [
+        ['hero', 3],
+        ['ally', 2],
+      ]),
+    ]);
+    // Claim checks: r0 start and after intent, then r1's start, where the run crashes.
+    const crashed = await run(world, seamsFor([hero, ally]), (call) => call < 3);
+    assert.equal(crashed.summary.reason, 'claimLost');
+    assert.deepEqual(phases(world), ['applied', 'pending']);
+
+    const macroRuns = [];
+    const resumed = await run(
+      world,
+      seamsFor([hero, ally], {
+        getCurrencyConfig: () => ({ spendStrategy: 'macro', units: LADDER, macros: MACROS }),
+        resolveMacro: async () => ({ type: 'script', command: 'return true;' }),
+        runMacro: async (...args) => (macroRuns.push(args), true),
+      })
+    );
+    assert.equal(resumed.summary.reason, 'effectNotApplied');
+    assert.deepEqual(phases(world), ['applied', 'knownFailure']);
+    assert.deepEqual(evidence(world).subwrites[1].failure, {
+      reason: 'planChanged',
+      detail: 'replayClass',
+    });
+    assert.equal(macroRuns.length, 0, 'the macro never ran');
+    assert.equal(ally._source.system.currency.gp, 0);
+    assert.equal(world.record().state, 'failed');
+  });
+
+  it('fails pending subwrites planChanged when the recipient resolves to another actor', async () => {
+    const hero = makeWorldActor('hero');
+    const impostor = makeWorldActor('impostor');
+    const world = rewardWorld();
+    const seams = seamsFor([hero], { findComponentItems: async () => [] });
+    await accept(world, [twoIron()]);
+    await run(world, seams, (call) => call < 3);
+
+    await run(world, { ...seams, resolveActor: () => impostor });
+    assert.deepEqual(phases(world), ['applied', 'knownFailure']);
+    assert.deepEqual(evidence(world).subwrites[1].failure, {
+      reason: 'planChanged',
+      detail: 'target',
+    });
+    assert.equal(impostor.createCalls.length, 0);
+    assert.equal(hero.createCalls.length, 1);
+  });
+
+  for (const [label, overrides, reason] of [
+    ['an unresolved recipe system', { resolveRecipeSystem: () => null }, 'systemNotFound'],
+    ['an unobservable system', { isKnowledgeObservable: () => false }, 'knowledgeNotObservable'],
+  ]) {
+    it(`refuses a knowledge grant for ${label} before any write`, async () => {
+      const hero = makeWorldActor('hero');
+      const world = rewardWorld();
+      await accept(world, [grant('e0', [['hero', ['recipe-a']]])]);
+      const { summary } = await run(world, seamsFor([hero], overrides));
+
+      assert.equal(summary.reason, 'effectFailed');
+      assert.deepEqual(evidence(world).failure, { reason, detail: 'recipe-a' });
+      assert.equal(hero.updates.length, 0);
+    });
+  }
+
+  it('fails an actorProperty credit whose _source lacks the value path, writing nothing', async () => {
+    const hero = makeWorldActor('hero', { system: { currency: { gp: 1, cp: 0 } } });
+    Object.defineProperty(hero, 'system', { value: { currency: { gp: 1, cp: 0 } } });
+    delete hero._source.system.currency;
+    const world = rewardWorld();
+    await accept(world, [credit('e0', [['hero', 3]])]);
+    await run(world, seamsFor([hero]));
+
+    const [subwrite] = evidence(world).subwrites;
+    assert.equal(subwrite.phase, 'knownFailure');
+    assert.equal(subwrite.failure.reason, 'currencySourceMissing');
+    assert.equal(hero.updates.length, 0);
+  });
+});
+
+describe('in-flight evidence and single-slot markers', () => {
+  const failReceipt = (world) => {
+    world.hooks.beforeUpdate = (update) => {
+      const phase = recordIn(update)?.effectStates[0].evidence?.subwrites[0].phase;
+      if (phase !== 'pending' && phase !== 'applying') throw new Error('socket closed');
+    };
+  };
+
+  it('stops on a record with an applying subwrite, with no adapter or store write', async () => {
+    const hero = makeWorldActor('hero');
+    const world = rewardWorld();
+    const seams = seamsFor([hero]);
+    await accept(world, [award('e0', [['hero', [['iron', 2]]]])]);
+    failReceipt(world);
+    await run(world, seams);
+    assert.deepEqual(phases(world), ['applying']);
+
+    const writes = [];
+    world.hooks.beforeUpdate = (update) => void writes.push(update);
+    const before = world.record();
+    const { summary, claim } = await run(world, seams);
+    assert.equal(summary.status, 'stopped');
+    assert.equal(summary.reason, 'effectNotApplied');
+    assert.deepEqual(writes, []);
+    assert.deepEqual(claim.calls, [], 'not even a claim check');
+    assert.equal(hero.createCalls.length, 1, 'the one earlier write only');
+    assert.deepEqual(world.record(), before);
+  });
+
+  it("probes a credit uncertain once another operation's marker overwrites the slot", async () => {
+    const hero = makeWorldActor('hero', { system: { currency: { gp: 1, cp: 0 } } });
+    const world = rewardWorld();
+    await accept(world, [credit('e0', [['hero', 3]])]);
+    failReceipt(world);
+    const { executor } = await run(world, seamsFor([hero]));
+    const where = { record: world.record(), effectId: 'e0', subwriteId: 'r0' };
+    assert.equal((await executor.probe(where)).status, 'applied');
+
+    const other = { operationId: 'ZzZzZzZzZzZzZz99', effectId: 'e0', subwriteId: 'r0' };
+    hero._source.flags.fabricate.companionEffect = other;
+    assert.equal(hero._source.system.currency.gp, 4, 'the post-value still matches');
+    assert.deepEqual(await executor.probe(where), { status: 'uncertain', receipt: null });
   });
 });

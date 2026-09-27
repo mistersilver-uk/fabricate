@@ -1,11 +1,7 @@
 /** Payload, actor and marker helpers the companion reward effect kinds share (issue 1954). */
-import { forcedReplacementEntry } from '../config/flags.js';
+import { sourceCarriesCompanionEffectMarker } from '../config/flags.js';
 import { getByPath } from '../utils/objectPath.js';
 import { isPlainObject } from '../utils/scalars.js';
-
-const MARKER_PARENT = 'flags.fabricate';
-const MARKER_KEY = 'companionEffect';
-const MARKER_PATH = `${MARKER_PARENT}.${MARKER_KEY}`;
 
 /** A plan failure or a subwrite failure, always `{ reason, detail }`. */
 export function effectFailureOf(reason, detail = null) {
@@ -63,17 +59,22 @@ export function resolveRecipientActors(recipients, resolveActor) {
 }
 
 /** The update fields that replace the single marker slot wholesale. */
-export function markerUpdateFor(marker) {
-  return Object.fromEntries([forcedReplacementEntry(MARKER_PARENT, MARKER_KEY, marker)]);
+export { companionEffectMarkerUpdate as markerUpdateFor } from '../config/flags.js';
+
+/**
+ * Update fields as the persisted post-value list `[{ path, value }]`: a record flag never holds
+ * a dotted key, since Foundry would expand it on write and the stored record would differ.
+ */
+export function postValuesOf(updates) {
+  return Object.entries(updates).map(([path, value]) => ({ path, value }));
 }
 
-/** Marker AND every intended post-value on the document's `_source`. */
-export function sourceCarries(document, marker, values) {
+/** Marker AND every intended `[{ path, value }]` post-value on the document's `_source`. */
+export function sourceCarries(document, marker, postValues) {
+  if (!Array.isArray(postValues) || postValues.length === 0) return false;
+  if (!sourceCarriesCompanionEffectMarker(document, marker)) return false;
   const source = document?._source;
-  const stored = getByPath(source, MARKER_PATH);
-  if (!isPlainObject(stored) || !isPlainObject(values)) return false;
-  const keys = Object.keys(marker);
-  if (keys.length !== Object.keys(stored).length) return false;
-  if (keys.some((key) => stored[key] !== marker[key])) return false;
-  return Object.entries(values).every(([path, value]) => getByPath(source, path) === value);
+  return postValues.every(
+    (entry) => isPlainObject(entry) && getByPath(source, entry.path) === entry.value
+  );
 }

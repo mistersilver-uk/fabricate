@@ -4689,6 +4689,8 @@ An effect's evidence, when non-null, is exactly `{ evidenceVersion: 1, replayCla
 Every key is always present: an empty value is `null`, never an absent key.
 A subwrite id is a nonblank string unique within its effect, its `target` is always a JSON object, and a non-null `intent`, `receipt` or `failure` is a JSON object.
 Unknown versions, missing or extra keys and any pairing below that does not hold fail closed as an invalid record.
+No object key at any depth under a subwrite's `target`, `intent`, `receipt` or `failure`, or under the effect-level `failure`, may contain a `.`: Foundry expands a dotted key on every document write, so such a record could never read back equal to the one sent, and it fails closed as an invalid record.
+A document path therefore travels as a value, never as a key: an `actorProperty` currency credit's intent is `{ unitId, amount, baseValue, creditedBase, strategy, postValues }`, where `postValues` is the list `[{ path, value }]` of the balances its one update intends, and every other credit's intent carries `postValues: null`.
 
 `replayClass` names how a subwrite's effect can be proven, from a closed set:
 
@@ -4743,6 +4745,7 @@ In create data it is a plain nested object; in an update it is written by forced
 It is never written through `setFabricateFlag`, which nests beneath `flags.fabricate.fabricate`, and a receipt or probe reads the same path.
 The marker is one Fabricate-owned slot per document: it is overwritten by a later operation, never accumulated and never cleared, and a write outside the effect path omits the key rather than writing `null`.
 It is operation evidence, not an idempotency key: a marker proves a write only together with the intended value at its path, and a missing or overwritten marker makes the subwrite uncertain, never unapplied.
+For a stacked item the intended value is the stored count, which must be present; a created item whose source carries no count field holds one unit, so it proves a quantity of 1 exactly as the award admitted it.
 
 ## Behavioural Ownership
 

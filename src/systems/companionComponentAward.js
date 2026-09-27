@@ -14,7 +14,12 @@
  * marker and judges the write by the returned document's `_source`.
  */
 
-import { forcedReplacementEntry, stampItemDataRoleIdentity } from '../config/flags.js';
+import {
+  COMPANION_EFFECT_MARKER_KEY,
+  companionEffectMarkerUpdate,
+  sourceCarriesCompanionEffectMarker,
+  stampItemDataRoleIdentity,
+} from '../config/flags.js';
 
 import {
   AWARD_ENTRIES_MAX,
@@ -42,11 +47,6 @@ const AWARD_ENTRY_KEYS = Object.freeze(['componentId', 'quantity']);
 const FALLBACK_ITEM_NAME = 'Awarded Item';
 const FALLBACK_ITEM_IMG = 'icons/svg/item-bag.svg';
 
-/** The single-slot companion effect marker, `flags.fabricate.companionEffect`. */
-const MARKER_PARENT = 'flags.fabricate';
-const MARKER_KEY = 'companionEffect';
-const MARKER_PATH = `${MARKER_PARENT}.${MARKER_KEY}`;
-
 /** A dotted read of a document's `_source`, as Foundry's `getProperty`. */
 function sourceValue(document, path) {
   let node = document?._source;
@@ -57,19 +57,16 @@ function sourceValue(document, path) {
   return node;
 }
 
-function carriesMarker(document, marker) {
-  const stored = sourceValue(document, MARKER_PATH);
-  if (!stored || typeof stored !== 'object') return false;
-  const keys = Object.keys(marker);
-  return (
-    keys.length === Object.keys(stored).length && keys.every((key) => stored[key] === marker[key])
-  );
-}
-
-/** Marker AND post-value on `_source`: the only proof a placement landed. */
-function landed(document, { marker, quantityPath, expected }) {
-  if (marker && !carriesMarker(document, marker)) return false;
-  return Number(sourceValue(document, quantityPath)) === expected;
+/**
+ * Marker AND post-value on `_source`: the only proof a placement landed. A stack must carry the
+ * count; a created item may lack the field at quantity 1, as `buildAwardItemData` admits.
+ */
+function landed(document, { marker, quantityPath, expected, stack }) {
+  if (marker && !sourceCarriesCompanionEffectMarker(document, marker)) return false;
+  const stored = stack
+    ? Number(sourceValue(document, quantityPath))
+    : readStoredStackQuantity(document?._source, { absentDefault: 1, path: quantityPath });
+  return stored === expected;
 }
 
 /**
@@ -137,7 +134,7 @@ async function buildAwardItemData({
       };
   itemData.system ??= {};
   // A copied marker would claim another operation's placement.
-  if (itemData.flags?.fabricate) delete itemData.flags.fabricate[MARKER_KEY];
+  if (itemData.flags?.fabricate) delete itemData.flags.fabricate[COMPANION_EFFECT_MARKER_KEY];
 
   if (hasStackQuantity(itemData, quantityPath) || !sourceItem) {
     setStackQuantity(itemData, quantity, quantityPath);
@@ -181,9 +178,7 @@ async function writeAwardEntry(args) {
     const payload = stackQuantityUpdate(target, before + quantity, quantityPath);
     if (!payload) return { intent, quantity, target, written: null };
     if (proceed && !(await proceed(intent))) return { intent, aborted: true };
-    const markerFields = marker
-      ? Object.fromEntries([forcedReplacementEntry(MARKER_PARENT, MARKER_KEY, marker)])
-      : {};
+    const markerFields = marker ? companionEffectMarkerUpdate(marker) : {};
     const written = await target.update?.({ ...payload, ...markerFields });
     return { intent, quantity, target, written };
   }
@@ -197,7 +192,8 @@ async function writeAwardEntry(args) {
   });
   if (!itemData) return { refusal: COMPANION_OUTCOMES.multiUnitUnsupported };
   // A plain nested object, never an operator: creation data takes no update operators.
-  if (marker) ((itemData.flags ??= {}).fabricate ??= {})[MARKER_KEY] = { ...marker };
+  if (marker)
+    ((itemData.flags ??= {}).fabricate ??= {})[COMPANION_EFFECT_MARKER_KEY] = { ...marker };
 
   const intent = { mode: 'create', targetItemUuid: null, stackBefore: null };
   if (proceed && !(await proceed(intent))) return { intent, aborted: true };
@@ -266,7 +262,7 @@ function judgePlacement(placed, { marker, quantityPath }) {
   const single = Array.isArray(written) && written.length === 1 ? written[0] : null;
   const document = stack ? written : single;
   const expected = stack ? intent.stackBefore + quantity : quantity;
-  if (!document || !landed(document, { marker, quantityPath, expected })) {
+  if (!document || !landed(document, { marker, quantityPath, expected, stack })) {
     return settled('uncertain', intent, null, failure('receiptMismatch'));
   }
   const receipt = { itemUuid: document.uuid ?? null, placed: quantity, stacked: stack };
@@ -345,7 +341,7 @@ export function probeComponentAward({
   const stack = intent?.mode === 'stack';
   const expected = stack ? intent.stackBefore + quantity : quantity;
   const document = marker
-    ? documents.find((candidate) => landed(candidate, { marker, quantityPath, expected }))
+    ? documents.find((candidate) => landed(candidate, { marker, quantityPath, expected, stack }))
     : null;
   if (!document) return { status: 'uncertain', receipt: null };
   const receipt = { itemUuid: document.uuid ?? null, placed: quantity, stacked: stack };

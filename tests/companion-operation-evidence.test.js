@@ -168,6 +168,28 @@ test('evidence that breaks its shape, pairing or phase fails closed', () => {
   for (const record of cases) invalidRecord(record);
 });
 
+test('a dotted key anywhere under target, intent, receipt or failure fails closed', () => {
+  const dotted = { 'system.currency.gp': 4 };
+  const cases = [
+    ['applying', 'intent', { ...INTENT, postValues: dotted }],
+    ['applying', 'intent', { ...INTENT, postValues: [{ path: 'p', value: dotted }] }],
+    ['applied', 'receipt', { ...RECEIPT, nested: { deeper: dotted } }],
+    ['applied', 'target', { ...TARGET, 'a.b': 1 }],
+    ['knownFailure', 'failure', { ...FAILURE, detail: dotted }],
+  ];
+  for (const [phase, field, value] of cases) {
+    const evidence = evidenceOf([phase]);
+    evidence.subwrites[0][field] = value;
+    invalidRecord(withEvidence(evidence, { phase: phaseOf([phase]) }));
+  }
+  const failed = { evidenceVersion: 1, replayClass: null, failure: dotted, subwrites: [] };
+  invalidRecord(withEvidence(failed, { phase: 'knownFailure' }));
+
+  const listed = evidenceOf(['applying']);
+  listed.subwrites[0].intent = { ...INTENT, postValues: [{ path: 'system.currency.gp', value: 4 }] };
+  assert.doesNotThrow(() => observeCompanionOperationRecord(withEvidence(listed)));
+});
+
 test('effect phase derivation follows the stated precedence', () => {
   const derive = (phases, failure = null) =>
     deriveCompanionEffectPhase({ ...evidenceOf(phases), failure });

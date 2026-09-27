@@ -141,6 +141,7 @@ function assertEvidenceShape(evidence, code) {
     if (evidence.subwrites.length === 0) fail('Effect evidence requires a subwrite', code);
   } else {
     objectValue(evidence.failure, 'effect failure', code);
+    assertUndottedKeys(evidence.failure, code);
     if (evidence.replayClass !== null || evidence.subwrites.length > 0) {
       fail('A failed effect carries no replay class or subwrites', code);
     }
@@ -158,6 +159,25 @@ function assertEvidenceShape(evidence, code) {
     if (!pairingHolds(subwrite, evidence.replayClass)) {
       fail('Subwrite fields contradict its phase', code);
     }
+    for (const field of ['target', 'intent', 'receipt', 'failure']) {
+      assertUndottedKeys(subwrite[field], code);
+    }
+  }
+}
+
+/**
+ * Refuse any object key holding `.` anywhere in a value: Foundry expands a dotted key on every
+ * document write, so a record carrying one could never read back equal to what was sent.
+ */
+function assertUndottedKeys(value, code) {
+  if (Array.isArray(value)) {
+    for (const inner of value) assertUndottedKeys(inner, code);
+    return;
+  }
+  if (!isPlainObject(value)) return;
+  for (const [key, inner] of Object.entries(value)) {
+    if (key.includes('.')) fail('Effect evidence keys may not contain a dot', code);
+    assertUndottedKeys(inner, code);
   }
 }
 

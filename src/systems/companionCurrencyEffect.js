@@ -12,6 +12,7 @@ import {
   exactObject,
   markerUpdateFor,
   nonblank,
+  postValuesOf,
   readRecipients,
   sourceCarries,
 } from './companionEffectSupport.js';
@@ -67,12 +68,13 @@ async function creditActorProperty(prepared, { marker, beforeWrite }) {
   if (paths.length === 0 || paths.some((path) => getByPath(actor._source, path) == null)) {
     return knownFailure(null, 'currencySourceMissing');
   }
-  const intent = intentOf(prepared, planned.updates);
+  const intent = intentOf(prepared, postValuesOf(planned.updates));
   if ((await beforeWrite(intent)) !== true) return settled('notAttempted', intent, null, null);
   const ctx = { ...prepared.ctx, markerUpdate: markerUpdateFor(marker) };
   const { answer, result } = await refundOnce(prepared, intent, ctx);
   if (answer) return answer;
-  if (result?.valid !== true || !sourceCarries(result.document, marker, result.updates)) {
+  const written = postValuesOf(result?.updates ?? {});
+  if (result?.valid !== true || !sourceCarries(result.document, marker, written)) {
     return uncertain(intent, 'receiptMismatch');
   }
   return settled('applied', intent, receiptOf(prepared), null);
@@ -117,8 +119,9 @@ const WRITERS = Object.freeze({
 
 function probeCredit(prepared, { intent }, marker) {
   const values = intent?.postValues;
-  if (prepared.strategy !== 'actorProperty' || !values)
+  if (prepared.strategy !== 'actorProperty' || !Array.isArray(values)) {
     return { status: 'uncertain', receipt: null };
+  }
   return sourceCarries(prepared.actor, marker, values)
     ? { status: 'applied', receipt: receiptOf(prepared) }
     : { status: 'uncertain', receipt: null };

@@ -1,7 +1,7 @@
 /**
  * A Foundry-shaped world for the companion reward executor (issue 1954): one private ledger whose
- * pages apply `updateEmbeddedDocuments` as Foundry does (dotted keys merge, forced replacement
- * replaces), world actors whose items and updates land on `_source`, and the real Journal run
+ * pages apply `updateEmbeddedDocuments` as Foundry does (values are dot-expanded, dotted keys
+ * merge, forced replacement replaces), world actors whose items and updates land on `_source`, and the real Journal run
  * and companion authorities over that ledger.
  */
 import { createCompanionOperationAuthority } from '../../src/systems/companionOperationAuthority.js';
@@ -11,6 +11,7 @@ import {
   createJournalRunAuthority,
 } from '../../src/systems/journalRunAuthority.js';
 import { isForcedReplacement, replacedKey } from './forcedDeletion.js';
+import { expandObject } from './foundryExpandObject.js';
 
 export const CLAIM = JOURNAL_RUN_CLAIM_PAGE_ID;
 export const OPERATION_ID = 'AbCdEfGhIjKlMn01';
@@ -34,8 +35,8 @@ export function applyDocumentUpdate(source, changes, { drop = [] } = {}) {
     const leaf = segments.pop();
     const node = segments.reduce((target, segment) => (target[segment] ??= {}), source);
     const replaced = replacedKey(leaf, value);
-    if (replaced) node[replaced.key] = structuredClone(replaced.value);
-    else mergeInto(node, leaf, value);
+    if (replaced) node[replaced.key] = structuredClone(expandObject(replaced.value));
+    else mergeInto(node, leaf, expandObject(value));
   }
 }
 

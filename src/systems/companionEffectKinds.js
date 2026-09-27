@@ -86,6 +86,21 @@ function createComponentAwardKind(seams) {
   return Object.freeze({ plan });
 }
 
+/**
+ * The legacy grant's refusals, in its order: the recipe, its system (`resolveRecipeSystem`, the
+ * legacy `resolveSystem(recipe)`), and whether that system's learned knowledge is observable.
+ */
+function refuseRecipe(recipeId, seams) {
+  const recipe = nonblank(recipeId) ? seams.resolveRecipe?.(recipeId) || null : null;
+  if (!recipe) return effectFailureOf('recipeNotFound', recipeId);
+  const system = seams.resolveRecipeSystem?.(recipe) || null;
+  if (!system) return effectFailureOf('systemNotFound', recipeId);
+  if (seams.isKnowledgeObservable?.(system) !== true) {
+    return effectFailureOf('knowledgeNotObservable', recipeId);
+  }
+  return null;
+}
+
 function createKnowledgeGrantKind(seams) {
   const flags = { readFlag: seams.readFlag, writeFlag: seams.writeFlag };
   function plan(payload) {
@@ -97,8 +112,10 @@ function createKnowledgeGrantKind(seams) {
     const read = readRecipients(payload, 'recipeIds');
     if (read.failure) return read;
     for (const { recipeIds } of read.recipients) {
-      const unknown = recipeIds.find((id) => !nonblank(id) || !seams.resolveRecipe?.(id));
-      if (unknown !== undefined) return { failure: effectFailureOf('recipeNotFound', unknown) };
+      for (const recipeId of recipeIds) {
+        const refusal = refuseRecipe(recipeId, seams);
+        if (refusal) return { failure: refusal };
+      }
     }
     const resolved = resolveRecipientActors(read.recipients, seams.resolveActor);
     if (resolved.failure) return resolved;
@@ -120,7 +137,9 @@ function createKnowledgeGrantKind(seams) {
 
 /**
  * The kinds by plan `kind` string. `seams.resolveActor(actorId)` must answer world actors only;
- * the component, knowledge and currency seams are those their writers take.
+ * the component, knowledge and currency seams are those their writers take, except that the
+ * knowledge grant's `resolveSystem(recipe)` and `isObservable(system)` are named
+ * `resolveRecipeSystem` and `isKnowledgeObservable`, since `resolveSystem` takes a system id.
  */
 export function createCompanionEffectKinds(seams = {}) {
   return Object.freeze({

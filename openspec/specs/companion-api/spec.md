@@ -624,6 +624,9 @@ This increment publishes no operation method on `game.fabricate.api.companion`, 
 The internal executor runs one stored record's effects in plan order under the held run claim, and is not wired into bootstrap.
 It stops at the first effect whose declared decision is still pending, leaving that effect and every later one untouched.
 It validates an effect only when the walk reaches it: an unknown kind, an invalid payload, an empty recipient list, a recipient with an empty award or recipe list, or an actor that does not resolve to a world actor fails that effect whole before any write, and the walk stops.
+A knowledge grant also refuses, in the legacy grant's order, a recipe that does not resolve (`recipeNotFound`), a recipe whose crafting system does not resolve (`systemNotFound`), and a system whose learned knowledge is not observable (`knowledgeNotObservable`).
+A world seam that throws while an effect is planned never throws out of the executor: a pending effect fails whole as `planThrew`, and a resumed effect stops with nothing written, leaving its pending subwrites pending.
+A resumed effect is planned afresh and compared with its evidence; when the replay class, the subwrite ids or any subwrite target (the resolved actor, and the recipe of a knowledge grant) differ, its pending subwrites become known failures `planChanged` and nothing is written for them.
 
 Three kinds exist, and each names its subwrites by plan position:
 
@@ -639,9 +642,11 @@ When every effect is applied it completes the record.
 A resumed run skips settled subwrites, runs only pending ones, and stacks a later award onto the item an applied receipt names.
 
 A component or `actorProperty` subwrite is applied only when the returned document's `_source` carries the marker and the intended post-value; a create answering no document or an update answering nothing is a known failure, and a throw or a mismatch is uncertain.
+A created item whose source item carries no stack-quantity field holds one unit, so it proves a quantity of 1; a stacked item must carry its count.
+An `actorProperty` credit whose value path is missing from the actor's `_source` is a known failure before any write.
 An `actorInventory` credit is applied only when the balance measured around the write moved by exactly the credited base amount; a spender that provably wrote nothing is a known failure, and any other delta, zero included, is uncertain.
 A `macro` credit runs once under intent then receipt, and a throw or anything but a clean success is uncertain.
-A knowledge grant is applied only when the learned entry is in the returned `_source`.
+A knowledge grant is applied only when the learned entry is in the returned `_source`, and a learned-map read that throws before the write is a known failure.
 Each kind also exposes a probe for later recovery, answering `applied` or `uncertain` and never unapplied; nothing calls it in this increment, and an `actorInventory` or `macro` probe is always `uncertain`.
 
 These proofs have stated limits:
