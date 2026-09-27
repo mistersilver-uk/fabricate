@@ -8,7 +8,8 @@
 
   `showDcSource` (default true) renders the DC-SOURCE half. Salvage and gathering reuse this
   editor with it off, having no records to pick a tier from and no dynamic-DC macro, and take a
-  per-entity DC override elsewhere. Controlled through `onChange`.
+  per-entity DC override elsewhere. Controlled through `onChange`. Outside summed roll-over against
+  a fixed DC (issue 2005, ruling R2) the two-band strip is a read-only picture of the target.
 -->
 <script>
   import Field from '../../../components/Field.svelte';
@@ -23,6 +24,15 @@
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import Select from '../../../components/Select.svelte';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
+  import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
+  import {
+    bandsAreEditable,
+    buildPassFailBands,
+    describeBandRange,
+    describeBandScale,
+    describeBandsUnavailable,
+    previewBandTarget,
+  } from './checkBandModel.js';
 
   // `breakageAuthority` gates the per-trigger break-tools toggle on `checkDriven`, and
   // `section` selects which cards render, so one editor serves the five-section strip.
@@ -46,6 +56,8 @@
     previewLabel = '',
     trackMin = null,
     trackMax = null,
+    // The Preview-as actor, `{ name, rollData }`, that a character-value target resolves against.
+    previewCharacter = null,
     onSelectPreviewRecord = () => {},
     onChange = () => {},
   } = $props();
@@ -71,6 +83,61 @@
   }
 
   const dc = $derived(Number(value?.dc ?? 0) || 0);
+  const evaluation = $derived(normalizeCheckEvaluation(value?.evaluation));
+  const editableBands = $derived(bandsAreEditable(evaluation));
+  const comparison = $derived(value?.thresholdMode === 'exceed' ? 'exceed' : 'meet');
+  const targetChip = $derived(
+    evaluation.target.source === 'attribute'
+      ? evaluation.target.expression
+      : text('FABRICATE.Admin.Manager.Checks.Evaluation.TargetChip', 'Target {dc}').replace(
+          '{dc}',
+          String(dc)
+        )
+  );
+
+  // THE READ-ONLY PICTURE (issue 2005): the previewed record's target, graded by the runtime.
+  const previewedTier = $derived(
+    (Array.isArray(value?.tiers) ? value.tiers : []).find((tier) => tier.id === previewRecordId) ??
+      null
+  );
+  const readonlyTarget = $derived(
+    editableBands
+      ? null
+      : previewBandTarget(
+          {
+            evaluation,
+            anchor: previewedTier ? Number(previewedTier.dc) : dc,
+            tier: previewedTier,
+            character: previewCharacter,
+          },
+          text
+        )
+  );
+  const cmp = $derived(
+    comparison === 'exceed'
+      ? text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpExceed', 'under')
+      : text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpMeet', 'at or under')
+  );
+  const readonlyNote = $derived.by(() => {
+    if (editableBands) return '';
+    if (readonlyTarget?.state !== 'ok') {
+      return describeBandsUnavailable(
+        readonlyTarget ?? { state: 'needs-actor' },
+        { character: previewCharacter, expression: evaluation.target.expression },
+        text
+      );
+    }
+    return describeBandScale(
+      {
+        direction: evaluation.direction,
+        comparison,
+        target: readonlyTarget.target,
+        source: readonlyTarget.source,
+        cmp,
+      },
+      text
+    );
+  });
 
   const failureLabel = $derived(
     text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailure', 'Failure')
@@ -93,8 +160,29 @@
   const stripMin = $derived(Math.min(suppliedBound(trackMin) ?? dc - 10, dc - 1));
   const stripMax = $derived(Math.max(suppliedBound(trackMax) ?? dc + 10, dc + 1));
 
+  const BAND_COLORS = {
+    failure: 'color-mix(in srgb, var(--fab-danger) 22%, var(--fab-bg-0))',
+    success: 'color-mix(in srgb, var(--fab-success) 22%, var(--fab-bg-0))',
+  };
+  const readonlyBands = $derived(
+    readonlyTarget?.state === 'ok'
+      ? buildPassFailBands({
+          evaluation,
+          comparison,
+          target: readonlyTarget.target,
+          min: suppliedBound(trackMin),
+          max: suppliedBound(trackMax),
+          names: { success: successLabel, failure: failureLabel },
+        }).map((band) => ({
+          ...band,
+          range: describeBandRange(band, text),
+          color: band.success ? BAND_COLORS.success : BAND_COLORS.failure,
+        }))
+      : []
+  );
+
   // TWO bands and therefore ONE handle, the whole outcome model of a simple check.
-  const bandStripBands = $derived([
+  const editableBandsList = $derived([
     {
       id: 'failure',
       index: 0,
@@ -110,6 +198,7 @@
       color: 'color-mix(in srgb, var(--fab-success) 22%, var(--fab-bg-0))',
     },
   ]);
+  const bandStripBands = $derived(editableBands ? editableBandsList : readonlyBands);
 
   /**
    * Apply the single boundary move. The strip has already clamped the value inside the track,
@@ -146,6 +235,10 @@
           {modifierPolicy}
           {recordNoun}
           {foundrySystemId}
+          {evaluation}
+          thresholdMode={comparison}
+          {targetChip}
+          offerSituationalBonus={value?.offerSituationalBonus !== false}
           onChange={emit}
         />
       </div>
@@ -159,6 +252,8 @@
       dcMode={value?.dcMode || 'static'}
       {showDcSource}
       {recordNoun}
+      {evaluation}
+      character={previewCharacter}
       onChange={emit}
     />
   {/if}
@@ -204,6 +299,7 @@
         {/if}
 
         <ThresholdBandStrip
+          readonly={!editableBands}
           binding="simple"
           bands={bandStripBands}
           {previewLabel}
@@ -215,19 +311,25 @@
           )}
           boundaryLabel={() =>
             text('FABRICATE.Admin.Manager.Checks.Crafting.SimpleBoundary', 'Difficulty class')}
-          fallbackNote={text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.SimpleBandsFallback',
-            'This check has no reachable range to draw against yet. Set a roll formula and a DC.'
-          )}
+          fallbackNote={readonlyTarget && readonlyTarget.state !== 'ok'
+            ? readonlyNote
+            : text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.SimpleBandsFallback',
+                'This check has no reachable range to draw against yet. Set a roll formula and a DC.'
+              )}
           dataAttr="data-simple-band-strip"
           onChange={applyBandStripChange}
         />
-        <p class="manager-muted" data-simple-band-strip-hint>
-          {text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.SimpleBandsHint',
-            'A total of {dc} or more succeeds; anything lower fails. Drag the edge or type the DC on the Difficulty card — the number is the authority.'
-          ).replace('{dc}', String(dc))}
-        </p>
+        {#if editableBands}
+          <p class="manager-muted" data-simple-band-strip-hint>
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.SimpleBandsHint',
+              'A total of {dc} or more succeeds; anything lower fails. Drag the edge or type the DC on the Difficulty card — the number is the authority.'
+            ).replace('{dc}', String(dc))}
+          </p>
+        {:else if readonlyTarget?.state === 'ok'}
+          <p class="manager-muted" data-simple-band-scale>{readonlyNote}</p>
+        {/if}
 
         <div class="manager-checks-flag-list">
           <IconFactRow
@@ -273,11 +375,12 @@
       <CheckRecipeTiers
         tiers={value?.tiers || []}
         defaultDc={value?.dc ?? 0}
+        {evaluation}
         onChange={(tiers) => emit({ tiers })}
       />
     </InspectorCard>
     {#if dcMode === 'dynamic'}
-      <CheckDcMacroCard macroUuid={value?.macroUuid ?? null} onChange={emit} />
+      <CheckDcMacroCard macroUuid={value?.macroUuid ?? null} {evaluation} onChange={emit} />
     {/if}
   {/if}
 </div>

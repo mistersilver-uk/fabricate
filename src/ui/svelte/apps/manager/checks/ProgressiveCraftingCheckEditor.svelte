@@ -63,6 +63,8 @@
           {modifierPolicy}
           {recordNoun}
           {foundrySystemId}
+          evaluation={value?.evaluation ?? null}
+          offerSituationalBonus={value?.offerSituationalBonus !== false}
           onChange={emit}
         />
       </div>

@@ -67,6 +67,9 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // The outcome simulator and the odds enumerator (issue 1097), plus the engine modules they drive.
   'src/ui/svelte/apps/manager/checks/checkPreview.js',
   'src/ui/svelte/apps/manager/checks/checkOdds.js',
+  // The Studio's adjustment labels and read-only band pictures (issue 2005).
+  'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+  'src/ui/svelte/apps/manager/checks/checkBandModel.js',
   'src/systems/checkEvaluation.js',
   'src/systems/checkRoll.js',
   // `checkRoll.js` resolves and validates check targets (issue 2003), and localizes a refusal.
@@ -168,6 +171,10 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // The On-failure section's failure-result policy card (issue 1098), rendered by all
   // three activity routes and by the alchemy branch through one snippet in `ChecksView`.
   'src/ui/svelte/apps/manager/checks/CheckFailurePolicy.svelte',
+  // The Formula card's `In the roll prompt` group and the routed outcome row (issue 2005).
+  'src/ui/svelte/apps/manager/checks/CheckPromptOptions.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckOutcomeRow.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte',
   // THE manager's editor tab strip (issue 1362).
@@ -179,4 +186,24 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // The catalogue's entry row, extracted so the Tool Studio's check-bonus picker draws the same one
   // (issue 1373, maintainer round 4).
   'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
+]);
+
+/** The three check EDITORS beside the tree above, for a suite mounting one directly (issue 2005). */
+export const CHECK_EDITOR_RAW_MODULES = Object.freeze([
+  ...CHECKS_TREE_RAW_MODULES,
+  'src/ui/svelte/actions/dragDrop.js',
+  'src/ui/svelte/util/dropUtils.js',
+  'src/ui/model/macroReference.js',
+]);
+
+export const CHECK_EDITOR_COMPILED_MODULES = Object.freeze([
+  ...CHECKS_TREE_COMPILED_MODULES,
+  'src/ui/svelte/components/ItemDropZone.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
+  'src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte',
+  'src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte',
 ]);

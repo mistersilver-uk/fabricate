@@ -9,18 +9,27 @@
   kept on each outcome, so switching type destroys neither, and each also carries a name, a
   generated secret id, a success toggle and, under `checkDriven`, a break-tools toggle.
 
-  Controlled; range parsing lives in `utils/craftingCheckExpression.js`.
+  Controlled; range parsing lives in `utils/craftingCheckExpression.js`. Outside summed roll-over
+  against a fixed DC (issue 2005, ruling R2) the strip is a read-only picture from
+  `checkBandModel.js`, and each row edits the field its evaluation reads through `CheckOutcomeRow`.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { findRangeConflicts } from '../../../../../utils/craftingCheckExpression.js';
+  import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
-  import SegmentedControl from '../../../components/SegmentedControl.svelte';
-  import Stepper from '../../../components/Stepper.svelte';
   import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
-  import { stepperLabels } from '../../../components/stepperLabels.js';
+  import {
+    bandsAreEditable,
+    buildRoutedBands,
+    describeBandRange,
+    describeBandScale,
+    describeBandsUnavailable,
+    previewBandTarget,
+  } from './checkBandModel.js';
   import CheckDcMacroCard from './CheckDcMacroCard.svelte';
+  import CheckOutcomeRow from './CheckOutcomeRow.svelte';
   import CheckDifficultyCard from './CheckDifficultyCard.svelte';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
@@ -59,6 +68,10 @@
     previewRecordId = '',
     previewDcOverride = null,
     previewLabel = '',
+    // The Preview-as actor, `{ name, rollData }`, that a character-value strip resolves against.
+    previewCharacter = null,
+    trackMin = null,
+    trackMax = null,
     onSelectPreviewRecord = () => {},
     onChange = () => {},
   } = $props();
@@ -119,24 +132,26 @@
   // set drives the per-row highlight; the textual messages live on the Validation tab.
   const conflicts = $derived(type === 'fixed' ? findRangeConflicts(outcomes) : null);
 
-  // The three numeric column labels, hoisted because each is needed THREE times.
-  const dcLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±'));
-  const startLabel = $derived(
-    text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeStart', 'Start')
+  const evaluation = $derived(normalizeCheckEvaluation(value?.evaluation));
+  const editableBands = $derived(bandsAreEditable(evaluation));
+  const multiplyTiers = $derived(
+    evaluation.target.source === 'attribute' && evaluation.target.adjustmentKind === 'multiply'
   );
-  const endLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End'));
-
-  const successOnLabel = $derived(
-    text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOn', 'Success')
-  );
-  const successOffLabel = $derived(
-    text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOff', 'Failure')
-  );
-  const breakOnLabel = $derived(
-    text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOn', 'Break')
-  );
-  const breakOffLabel = $derived(
-    text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOff', "Don't break")
+  // Which field a relative row's threshold edits: the offset reads `DC ±` only for roll-over against
+  // a fixed DC, and a multiply row edits its multiplier instead.
+  const outcomeColumn = $derived.by(() => {
+    if (multiplyTiers) return 'adjustment';
+    return editableBands ? 'dc' : 'benefit';
+  });
+  const comparison = $derived(value?.thresholdMode === 'exceed' ? 'exceed' : 'meet');
+  // The under inset's target chip: the fixed target, or the character expression it reads.
+  const targetChip = $derived(
+    evaluation.target.source === 'attribute'
+      ? evaluation.target.expression
+      : text('FABRICATE.Admin.Manager.Checks.Evaluation.TargetChip', 'Target {dc}').replace(
+          '{dc}',
+          String(Number(value?.dc ?? 0) || 0)
+        )
   );
 
   function emit(patch) {
@@ -168,7 +183,8 @@
       const nextStart = last ? Number(last.end) + 1 : 1;
       next = { ...base, start: nextStart, end: nextStart };
     } else {
-      next = { ...base, dc: 0 };
+      // A new multiply row is ×1, never a second Otherwise; its `dc` is kept for a switch back.
+      next = multiplyTiers ? { ...base, dc: 0, adjustment: 1 } : { ...base, dc: 0 };
     }
     emit({ [outcomesKey]: [...outcomes, next] });
   }
@@ -234,18 +250,6 @@
     onSelectPreviewRecord(id);
   }
 
-  // The two segments of the per-tier outcome toggle, hoisted rather than rebuilt per row.
-  const outcomeSegments = $derived([
-    { value: 'success', fallback: successOnLabel, variant: 'success' },
-    { value: 'failure', fallback: successOffLabel, variant: 'danger' },
-  ]);
-
-  // The same shape for the `checkDriven`-only tool-breakage choice; `keep` is the benign one.
-  const breakToolsSegments = $derived([
-    { value: 'keep', fallback: breakOffLabel, variant: 'success' },
-    { value: 'break', fallback: breakOnLabel, variant: 'danger' },
-  ]);
-
   // THE RAMP IS BOUNDED BY THE BAND NAME'S CONTRAST, and is mixed into an OPAQUE base for that
   // reason: each band carries its tier's NAME as normal-size text, so WCAG AA wants 4.5:1, and
   // a TRANSLUCENT surface token makes the mix percentage double as an opacity, dropping the
@@ -269,7 +273,67 @@
     return `color-mix(in oklab, var(--fab-${tone}) ${BAND_TONE_MIX}%, ${BAND_TONE_BASE})`;
   }
 
-  const bandStripBands = $derived.by(() => {
+  // THE READ-ONLY PICTURE (issue 2005): the runtime's own classification of each total against
+  // the previewed target, toned by RANK so the best band takes the same hue in either direction.
+  const previewedTier = $derived(
+    recipeTiers.find((tier) => tier.id === selectedPreviewRecordId) ?? null
+  );
+  const readonlyTarget = $derived(
+    editableBands
+      ? null
+      : previewBandTarget(
+          { evaluation, anchor: previewDc, tier: previewedTier, character: previewCharacter },
+          text
+        )
+  );
+  const readonlyBands = $derived.by(() => {
+    if (readonlyTarget?.state !== 'ok') return [];
+    const bands = buildRoutedBands({
+      evaluation,
+      comparison,
+      anchor: readonlyTarget.target,
+      type,
+      outcomes,
+      min: trackMin,
+      max: trackMax,
+    });
+    return bands.map((band, position) => {
+      const rank = evaluation.direction === 'under' ? bands.length - 1 - position : position;
+      const tone = toneFor(rank, bands.length);
+      return {
+        ...band,
+        range: describeBandRange(band, text),
+        color: bandFill(tone),
+        ink: `var(--fab-${tone}-text)`,
+        swatch: `var(--fab-${tone})`,
+      };
+    });
+  });
+  const readonlyNote = $derived.by(() => {
+    if (editableBands) return '';
+    if (readonlyTarget?.state !== 'ok') {
+      return describeBandsUnavailable(
+        readonlyTarget ?? { state: 'needs-actor' },
+        { character: previewCharacter, expression: evaluation.target.expression },
+        text
+      );
+    }
+    return describeBandScale(
+      {
+        direction: evaluation.direction,
+        comparison,
+        target: readonlyTarget.target,
+        source: readonlyTarget.source,
+        cmp:
+          comparison === 'exceed'
+            ? text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpExceed', 'under')
+            : text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpMeet', 'at or under'),
+      },
+      text
+    );
+  });
+
+  const editableBandsList = $derived.by(() => {
     const rows = outcomes.map((outcome, index) => ({
       id: outcome.id,
       index,
@@ -297,6 +361,7 @@
       };
     });
   });
+  const bandStripBands = $derived(editableBands ? editableBandsList : readonlyBands);
 
   // The key to the strip, on the tier ROW: the band's tone at FULL STRENGTH, without which the
   // ramp is a pattern with no legend. Undiluted, because it carries no text.
@@ -385,6 +450,10 @@
           {recordNoun}
           placeholder="1d20"
           {foundrySystemId}
+          {evaluation}
+          thresholdMode={comparison}
+          {targetChip}
+          offerSituationalBonus={value?.offerSituationalBonus !== false}
           onChange={emit}
         />
       </div>
@@ -401,6 +470,8 @@
         thresholdMode={value?.thresholdMode || 'meet'}
         dcMode={value?.dcMode || 'static'}
         {recordNoun}
+        {evaluation}
+        character={previewCharacter}
         onChange={emit}
       />
     {/if}
@@ -428,13 +499,14 @@
         anchorsBands
         tiers={value?.tiers || []}
         defaultDc={value?.dc ?? 0}
+        {evaluation}
         onChange={(tiers) => emit({ tiers })}
       />
     </InspectorCard>
   {/if}
 
   {#if !bandsAreAbsolute && shows('roll') && value?.dcMode === 'dynamic'}
-    <CheckDcMacroCard macroUuid={value?.macroUuid ?? null} onChange={emit} />
+    <CheckDcMacroCard macroUuid={value?.macroUuid ?? null} {evaluation} onChange={emit} />
   {/if}
 
   {#if shows('outcomes')}
@@ -479,6 +551,7 @@
                      not exist, and an invitation to drag a band edge on a strip with no edges. -->
         {#if outcomes.length > 0}
           <ThresholdBandStrip
+            readonly={!editableBands}
             binding={type === 'fixed' ? 'fixed' : 'relative'}
             bands={bandStripBands}
             {previewDc}
@@ -491,22 +564,30 @@
               )
                 .replace('{from}', band?.name || '')
                 .replace('{to}', nextBand?.name || '')}
-            fallbackNote={text(
-              'FABRICATE.Admin.Manager.Checks.Crafting.BandsFallback',
-              'These tiers leave a gap or overlap, so they cannot be drawn as one continuous strip. Edit the numbers in the rows below; the strip returns once the ranges meet.'
-            )}
+            fallbackNote={readonlyTarget && readonlyTarget.state !== 'ok'
+              ? readonlyNote
+              : text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.BandsFallback',
+                  'These tiers leave a gap or overlap, so they cannot be drawn as one continuous strip. Edit the numbers in the rows below; the strip returns once the ranges meet.'
+                )}
             dataAttr="data-outcome-band-strip"
             onChange={applyBandStripChange}
           />
-          <p class="manager-muted" data-outcome-band-strip-hint>
-            <!-- The pointer glyph leads the sentence: the hint is about a DIRECT-MANIPULATION
+          {#if !editableBands}
+            {#if readonlyTarget?.state === 'ok'}
+              <p class="manager-muted" data-outcome-band-scale>{readonlyNote}</p>
+            {/if}
+          {:else}
+            <p class="manager-muted" data-outcome-band-strip-hint>
+              <!-- The pointer glyph leads the sentence: the hint is about a DIRECT-MANIPULATION
                              affordance. -->
-            <i class="fas fa-arrow-pointer" aria-hidden="true"></i>
-            {text(
-              'FABRICATE.Admin.Manager.Checks.Crafting.BandsHint',
-              'Drag or arrow-key a band edge to move its threshold, or type the numbers below. The numbers are the authority.'
-            )}
-          </p>
+              <i class="fas fa-arrow-pointer" aria-hidden="true"></i>
+              {text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.BandsHint',
+                'Drag or arrow-key a band edge to move its threshold, or type the numbers below. The numbers are the authority.'
+              )}
+            </p>
+          {/if}
         {/if}
 
         {#if outcomes.length === 0}
@@ -528,111 +609,16 @@
             )}
           >
             {#each outcomes as outcome, index (outcome.id)}
-              <div
-                class={`manager-checks-tier-row ${rowInvalid(index) ? 'is-invalid' : ''}`}
-                role="listitem"
-                data-outcome-row={outcome.id}
-                data-outcome-id={outcome.id}
-              >
-                <!-- The KEY to the strip above: this row's band in its own tone, decorative to a screen
-                                     reader, the row's accessible name coming from the Name field. -->
-                <span
-                  class="manager-checks-tier-swatch"
-                  data-outcome-swatch={outcome.id}
-                  style={`--fab-outcome-swatch: ${bandSwatchById[outcome.id] || 'var(--fab-surface-active)'};`}
-                  aria-hidden="true"
-                ></span>
-                <input
-                  class="manager-checks-tier-name"
-                  data-outcome-name
-                  aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeName', 'Name')}
-                  value={outcome.name || ''}
-                  oninput={(event) =>
-                    updateOutcome(outcome.id, { name: event.currentTarget.value })}
-                />
-
-                <!-- `fill` plus a WIDTH from the layout context, the one thing it may take from this
-                                     primitive. `allowUnset` is absent, a tier threshold having no "unset" meaning, and
-                                     every `data-*` hook goes through `inputProps` onto the real `<input>`. -->
-                {#if type === 'relative'}
-                  <div class="manager-checks-tier-stepper">
-                    <Stepper
-                      fill
-                      value={outcome.dc ?? 0}
-                      {...stepperLabels(dcLabel)}
-                      inputProps={{ 'data-outcome-dc': '' }}
-                      onChange={(dc) => updateOutcome(outcome.id, { dc })}
-                    />
-                  </div>
-                {:else}
-                  <div class="manager-checks-tier-stepper is-narrow">
-                    <Stepper
-                      fill
-                      value={outcome.start ?? 0}
-                      {...stepperLabels(startLabel)}
-                      inputProps={{ 'data-outcome-start': '' }}
-                      onChange={(start) => updateOutcome(outcome.id, { start })}
-                    />
-                  </div>
-                  <div class="manager-checks-tier-stepper is-narrow">
-                    <Stepper
-                      fill
-                      value={outcome.end ?? 0}
-                      {...stepperLabels(endLabel)}
-                      inputProps={{ 'data-outcome-end': '' }}
-                      onChange={(end) => updateOutcome(outcome.id, { end })}
-                    />
-                  </div>
-                {/if}
-
-                <!-- A SEGMENTED TOGGLE, not a pill that swaps its own label: the click-in-place pill
-                                     showed only the state the tier is IN, readable as either a reading or a verb. -->
-                <SegmentedControl
-                  density="compact"
-                  options={outcomeSegments}
-                  value={outcome.success === true ? 'success' : 'failure'}
-                  groupName={`outcome-success-${outcome.id}`}
-                  ariaLabel={text(
-                    'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess',
-                    'Success'
-                  )}
-                  dataAttr="data-outcome-success"
-                  optionDataAttr="data-outcome-success-option"
-                  onChange={(next) => updateOutcome(outcome.id, { success: next === 'success' })}
-                />
-
-                <!-- KEPT, and gated, on purpose: the MATCHED TIER's own `breakTools` is read by
-                                     `checkRoll.js`, so under `checkDriven` this is the only authoring surface for a
-                                     live engine field. -->
-                {#if checkDriven}
-                  <SegmentedControl
-                    density="compact"
-                    options={breakToolsSegments}
-                    value={outcome.breakTools === true ? 'break' : 'keep'}
-                    groupName={`outcome-break-${outcome.id}`}
-                    ariaLabel={text(
-                      'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak',
-                      'Break tools'
-                    )}
-                    dataAttr="data-outcome-break"
-                    optionDataAttr="data-outcome-break-option"
-                    onChange={(next) => updateOutcome(outcome.id, { breakTools: next === 'break' })}
-                  />
-                {/if}
-
-                <ManagerButton
-                  role="danger"
-                  class="manager-checks-tier-remove"
-                  data-remove-outcome
-                  aria-label={text(
-                    'FABRICATE.Admin.Manager.Checks.Crafting.RemoveOutcome',
-                    'Remove outcome'
-                  )}
-                  onclick={() => removeOutcome(outcome.id)}
-                >
-                  <i class="fas fa-trash" aria-hidden="true"></i>
-                </ManagerButton>
-              </div>
+              <CheckOutcomeRow
+                {outcome}
+                {type}
+                column={outcomeColumn}
+                invalid={rowInvalid(index)}
+                swatch={bandSwatchById[outcome.id] || ''}
+                {checkDriven}
+                onUpdate={(patch) => updateOutcome(outcome.id, patch)}
+                onRemove={() => removeOutcome(outcome.id)}
+              />
             {/each}
           </div>
         {/if}

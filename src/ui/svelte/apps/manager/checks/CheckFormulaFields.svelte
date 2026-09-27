@@ -13,6 +13,10 @@
   their kin — shows a visible `avg —` with an accessible reason instead of the numeric one, so
   the withholding is never mistaken for the malformed-input case. For the same reason THE RULE
   SENTENCE STOPS AT THE RULE. Controlled through `onChange`.
+
+  The card also carries WHICH WAY IS BETTER and the `In the roll prompt` group (issue 2005). Under,
+  the dice stay as rolled and modifiers raise the target, so the inset names the comparison and the
+  target and never joins the modifiers to the roll with `+`.
 -->
 <script>
   import { getModifierExpressionSuggestions } from '../../../../../config/modifierExpressionSuggestions.js';
@@ -20,7 +24,11 @@
     classifyRollQuantity,
     reduceRollExpression,
   } from '../../../../../utils/rollExpressionAverage.js';
+  import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
+  import Chip from '../../../components/Chip.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import CheckPromptOptions from './CheckPromptOptions.svelte';
 
   let {
     rollFormula = '',
@@ -33,8 +41,50 @@
     modifierPolicy = 'addAll',
     // The activity's word for the thing a check is rolled for, for the `bySubject` sentence.
     recordNoun = 'recipe',
+    // The check's evaluation and comparison, and the under inset's target chip (`Target 12`, or the
+    // character expression); a slot with no target passes none and keeps the roll-over inset.
+    evaluation = null,
+    thresholdMode = 'meet',
+    targetChip = '',
+    offerSituationalBonus = true,
     onChange = () => {},
   } = $props();
+
+  const normalizedEvaluation = $derived(normalizeCheckEvaluation(evaluation));
+  const direction = $derived(normalizedEvaluation.direction);
+  const underInset = $derived(direction === 'under' && Boolean(targetChip));
+
+  const DIRECTION_OPTIONS = [
+    {
+      value: 'over',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Evaluation.DirectionOver',
+      fallback: 'Higher is better',
+    },
+    {
+      value: 'under',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Evaluation.DirectionUnder',
+      fallback: 'Lower is better',
+    },
+  ];
+
+  const comparisonPhrase = $derived(
+    thresholdMode === 'exceed'
+      ? text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpExceed', 'under')
+      : text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpMeet', 'at or under')
+  );
+
+  const directionLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Evaluation.DirectionTitle', 'Which way is better')
+  );
+
+  function interpolateCmp(sentence) {
+    return sentence.replaceAll('{cmp}', comparisonPhrase);
+  }
+
+  function setDirection(next) {
+    if (next === direction) return;
+    onChange({ evaluation: { ...normalizedEvaluation, direction: next } });
+  }
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -124,6 +174,31 @@
 </script>
 
 <div class="manager-checks-formula">
+  <div class="manager-checks-difficulty-field" data-check-direction-field>
+    <span class="manager-checks-difficulty-label">{directionLabel}</span>
+    <SegmentedControl
+      fill
+      density="field"
+      options={DIRECTION_OPTIONS}
+      value={direction}
+      groupName="check-evaluation-direction"
+      ariaLabel={directionLabel}
+      dataAttr="data-check-direction"
+      optionDataAttr="data-check-direction-option"
+      onChange={setDirection}
+    />
+  </div>
+  {#if direction === 'under'}
+    <p class="manager-checks-formula-rule" data-check-direction-note>
+      {interpolateCmp(
+        text(
+          'FABRICATE.Admin.Manager.Checks.Evaluation.UnderNote',
+          'The total must stay {cmp} the target. Modifiers raise the target; the dice stay as rolled.'
+        )
+      )}
+    </p>
+  {/if}
+
   <!-- The CARD TITLE is `Formula`, so the input takes an `aria-label` rather than a second
          visible label. -->
   <div class="manager-checks-formula-input">
@@ -175,21 +250,38 @@
       </p>
       <p class="manager-checks-formula-expression">
         <span class="manager-checks-formula-base">{rollFormula || placeholder}</span>
-        {#if applied.length > 0}
-          <!-- The join between the FORMULA and the modifier list carries the accent and the list's
-                         own separators are subtle, so the expression reads as one written term plus a set
-                         of automatic ones rather than a flat sum. -->
-          <span class="manager-checks-formula-join" aria-hidden="true">+</span>
-        {/if}
-        {#each applied as modifier, index (modifier.id)}
-          {#if index > 0}
-            <span class="manager-checks-formula-sep" aria-hidden="true">+</span>
+        {#if underInset}
+          <!-- Under, the modifiers raise the TARGET: they sit after it with no `+` joining them to
+               the dice, which a reader would take for a sum. -->
+          <span class="manager-checks-formula-join" data-check-formula-comparison
+            >{comparisonPhrase}</span
+          >
+          <Chip tone="info" density="tag-run" icon="fas fa-bullseye" data-check-formula-target
+            >{targetChip}</Chip
+          >
+          {#each applied as modifier (modifier.id)}
+            <span class="manager-checks-formula-chip" data-check-formula-modifier={modifier.id}>
+              <i class={modifier.icon || DEFAULT_MODIFIER_ICON} aria-hidden="true"></i>
+              <span>{modifier.name}</span>
+            </span>
+          {/each}
+        {:else}
+          {#if applied.length > 0}
+            <!-- The join between the FORMULA and the modifier list carries the accent and the list's
+                 own separators are subtle, so the expression reads as one written term plus a set
+                 of automatic ones rather than a flat sum. -->
+            <span class="manager-checks-formula-join" aria-hidden="true">+</span>
           {/if}
-          <span class="manager-checks-formula-chip" data-check-formula-modifier={modifier.id}>
-            <i class={modifier.icon || DEFAULT_MODIFIER_ICON} aria-hidden="true"></i>
-            <span>{modifier.name}</span>
-          </span>
-        {/each}
+          {#each applied as modifier, index (modifier.id)}
+            {#if index > 0}
+              <span class="manager-checks-formula-sep" aria-hidden="true">+</span>
+            {/if}
+            <span class="manager-checks-formula-chip" data-check-formula-modifier={modifier.id}>
+              <i class={modifier.icon || DEFAULT_MODIFIER_ICON} aria-hidden="true"></i>
+              <span>{modifier.name}</span>
+            </span>
+          {/each}
+        {/if}
       </p>
       <p class="manager-checks-formula-rule" data-check-formula-rule={modifierPolicy}>
         {ruleSentence}
@@ -213,4 +305,10 @@
       </button>
     {/each}
   </span>
+
+  <CheckPromptOptions
+    offer={offerSituationalBonus}
+    {direction}
+    onChange={(offer) => onChange({ offerSituationalBonus: offer })}
+  />
 </div>

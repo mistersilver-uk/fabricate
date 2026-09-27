@@ -49,6 +49,7 @@
     NO_ACTOR_ID,
     buildPreviewCheckArgs,
     buildPreviewRecords,
+    cloneRollData,
     listPreviewActors,
     resolvePreviewActor,
     runCheckPreview,
@@ -65,6 +66,7 @@
     formatPreviewDifficulties,
     parsePreviewDifficulties,
   } from '../../../../../systems/progressiveCheckSandbox.js';
+  import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
 
   // `resolutionMode` picks the crafting editor; the three `craftingCheck*` props are its drafts.
   let {
@@ -452,6 +454,13 @@
   const activeActivity = $derived(validationSections.find((row) => row.subsystem === activity));
   const activeCheck = $derived(activeActivity?.check || null);
   const activeMode = $derived(activeActivity?.mode || '');
+  // The evaluation the active editor stack authors, stated on the stack for its captures.
+  const activeEvaluation = $derived(normalizeCheckEvaluation(activeCheck?.evaluation));
+  const evaluationAttrs = $derived({
+    'data-checks-evaluation-direction': activeEvaluation.direction,
+    'data-checks-target-source': activeEvaluation.target.source,
+    'data-checks-adjustment-kind': activeEvaluation.target.adjustmentKind,
+  });
 
   const activeReadiness = $derived(
     activeActivity
@@ -808,6 +817,10 @@
 
   const previewActors = $derived(activity === 'validation' ? [] : listPreviewActors());
   const previewActor = $derived(resolvePreviewActor(previewActorId));
+  // The Preview-as actor as the editors' character-value fields and strips read it: a copy.
+  const previewCharacter = $derived(
+    previewActor ? { name: previewActor.name, rollData: cloneRollData(previewActor) } : null
+  );
 
   // THE PROGRESSIVE PREVIEW SANDBOX: a progressive histogram needs an ORDERED list of result
   // difficulties, and that list is SANDBOX STATE ON THE CHECK rather than a record's. Read
@@ -1108,6 +1121,8 @@
       previewActorId,
       previewRecord?.id ?? '',
       previewPlan.dc,
+      JSON.stringify(activeEvaluation),
+      JSON.stringify(activeCheck?.tiers?.find((tier) => tier.id === previewRecord?.id) ?? null),
     ].join('\0')
   );
   let adoptedPreviewSignature = $state('');
@@ -1143,6 +1158,9 @@
     previewRecordId: previewRecord?.id ?? '',
     previewDcOverride: previewRecord?.dc ?? null,
     previewLabel: previewRecord?.name ?? '',
+    previewCharacter,
+    trackMin: previewTrack.min,
+    trackMax: previewTrack.max,
     onSelectPreviewRecord: selectPreviewRecord,
   });
   const simplePreviewProps = $derived({
@@ -1151,6 +1169,7 @@
     previewLabel: previewRecord?.name ?? '',
     trackMin: previewTrack.min,
     trackMax: previewTrack.max,
+    previewCharacter,
     onSelectPreviewRecord: selectPreviewRecord,
   });
   const previewActorSummary = $derived(
@@ -1409,7 +1428,7 @@
           </EmptyState>
         </div>
       {:else if activity === 'crafting' && craftingAlchemy}
-        <div class="manager-checks-editor-stack" data-checks-panel="crafting">
+        <div class="manager-checks-editor-stack" data-checks-panel="crafting" {...evaluationAttrs}>
           {#if activeSection === 'roll'}
             <InspectorCard>
               <h3 class="manager-checks-card-title">
@@ -1555,7 +1574,7 @@
         <!-- Non-alchemy crafting: the per-mode editor plus the system-level failure consumption
                      policy. The wrapper keeps `data-checks-panel="crafting"` but deliberately NOT the
                      `manager-checks-page` class, which a test asserts is absent here. -->
-        <div class="manager-checks-editor-stack" data-checks-panel="crafting">
+        <div class="manager-checks-editor-stack" data-checks-panel="crafting" {...evaluationAttrs}>
           {#if craftingRouted}
             <CraftingCheckEditor
               {appliedModifiers}
@@ -1659,7 +1678,7 @@
           {/if}
         </div>
       {:else if activity === 'salvage'}
-        <div class="manager-checks-editor-stack" data-checks-panel="salvage">
+        <div class="manager-checks-editor-stack" data-checks-panel="salvage" {...evaluationAttrs}>
           {#if salvageRouted}
             <CraftingCheckEditor
               {appliedModifiers}
@@ -1790,7 +1809,7 @@
           {/if}
         </div>
       {:else if activity === 'gathering'}
-        <div class="manager-checks-editor-stack" data-checks-panel="gathering">
+        <div class="manager-checks-editor-stack" data-checks-panel="gathering" {...evaluationAttrs}>
           {#if gatheringProgressive}
             <ProgressiveCraftingCheckEditor
               {recordNoun}
@@ -1855,6 +1874,7 @@
       previewRecordId={previewRecord?.id ?? ''}
       {previewDifficultiesText}
       previewIsProgressive={isProgressive}
+      {recordNoun}
       preview={previewModel}
       odds={oddsModel}
       onSelectPreviewActor={(id) => (previewActorId = id)}

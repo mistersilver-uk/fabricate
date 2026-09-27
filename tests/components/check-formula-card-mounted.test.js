@@ -25,8 +25,17 @@ const harness = createMountedComponentHarness({
     'src/config/gatheringCharacterModifierPresets.js',
     'src/utils/rollExpressionAverage.js',
     'src/utils/rollFormulaRollability.js',
+    // The direction axis and the roll-prompt group (issue 2005).
+    'src/systems/normalize/checkEvaluation.js',
   ],
-  compiledModules: ['src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte'],
+  compiledModules: [
+    'src/ui/svelte/components/Chip.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
+    'src/ui/svelte/components/ToggleCard.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckPromptOptions.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
+  ],
   componentPath: 'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
 });
 
@@ -198,5 +207,74 @@ describe('a suggestion chip appends its term when CLICKED', () => {
     const chip = target.querySelector('[data-check-formula-token]');
     chip.click();
     assert.equal(emitted.at(-1).rollFormula, chip.dataset.checkFormulaToken);
+  });
+});
+
+describe('the formula card under a roll-under check (issue 2005, Q14)', () => {
+  const under = (target = {}) => ({
+    product: 'sum',
+    direction: 'under',
+    target: { source: 'fixed', expression: '', adjustmentKind: 'add', ...target },
+  });
+  const EVALUATIONS = [
+    under(),
+    under({ source: 'attribute', expression: '@skills.craft.value' }),
+    under({ source: 'attribute', expression: '@skills.craft.value', adjustmentKind: 'multiply' }),
+  ];
+
+  it('names the comparison and target and never joins the modifiers to the dice with +', async () => {
+    for (const thresholdMode of ['meet', 'exceed']) {
+      harness.remount();
+      const target = await harness.mount({
+        rollFormula: '1d100',
+        appliedModifiers: MODIFIERS,
+        evaluation: under(),
+        thresholdMode,
+        targetChip: 'Target 12',
+      });
+      const expression = target.querySelector('.manager-checks-formula-expression');
+      const glyphs = [...expression.querySelectorAll('span')].map((span) => span.textContent.trim());
+      assert.ok(!glyphs.includes('+'), `${thresholdMode}: no + joins the under inset`);
+      assert.equal(
+        target.querySelector('[data-check-formula-comparison]').textContent.trim(),
+        thresholdMode === 'meet' ? 'at or under' : 'under'
+      );
+      assert.equal(target.querySelector('[data-check-formula-target]').textContent.trim(), 'Target 12');
+      assert.equal(target.querySelectorAll('[data-check-formula-modifier]').length, 2);
+      assert.match(
+        target.querySelector('[data-check-direction-note]').textContent,
+        new RegExp(`stay ${thresholdMode === 'meet' ? 'at or under' : 'under'} the target`)
+      );
+    }
+  });
+
+  it('keeps the withheld average under every direction, source and kind', async () => {
+    for (const evaluation of EVALUATIONS) {
+      harness.remount();
+      const target = await harness.mount({
+        rollFormula: '2d6cs>=5',
+        evaluation,
+        targetChip: evaluation.target.expression || 'Target 12',
+      });
+      assert.ok(
+        target.querySelector('[data-check-formula-average-withheld="die-modifiers"]'),
+        `${evaluation.target.source}/${evaluation.target.adjustmentKind}: avg — stays`
+      );
+    }
+  });
+
+  it('writes the direction through its segmented control and leaves the rest of the record', async () => {
+    const emitted = [];
+    const target = await harness.mount({
+      rollFormula: '1d20',
+      evaluation: under({ source: 'attribute', expression: '@a.b', adjustmentKind: 'multiply' }),
+      onChange: (patch) => emitted.push(patch),
+    });
+    const radio = target.querySelector('[data-check-direction-option="over"] input[type="radio"]');
+    radio.checked = true;
+    radio.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    assert.equal(emitted.at(-1).evaluation.direction, 'over');
+    assert.equal(emitted.at(-1).evaluation.target.expression, '@a.b');
+    assert.equal(emitted.at(-1).evaluation.target.adjustmentKind, 'multiply');
   });
 });

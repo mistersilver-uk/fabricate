@@ -16,6 +16,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/apps/manager/checks/checksCopy.js',
+    // The target source, character value and adjustment controls (issue 2005).
+    'src/systems/checkEvaluation.js',
+    'src/systems/normalize/checkEvaluation.js',
+    'src/systems/characterModifierPrerequisiteCopy.js',
+    'src/systems/characterPrerequisites.js',
+    'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+    'src/utils/scalars.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/RadioCardGroup.svelte',
@@ -23,6 +30,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
+    'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
