@@ -78,6 +78,7 @@ import { craftingStepHistoryEvidence } from './CraftingRunManager.js';
 import {
   commitCraft,
   continueCollapsedChain,
+  misconfiguredCheckResult,
   openCraftStep,
   publishCraftSuccess,
   resolveCheckFailure,
@@ -3223,10 +3224,7 @@ export class CraftingEngine {
 
     if (checkResult.misconfigured) {
       // GM-side gap: inputs stay consumed, and the run stays resumable for a fixed check.
-      return {
-        resolved: true,
-        result: { success: false, results: null, message: checkResult.message },
-      };
+      return { resolved: true, result: misconfiguredCheckResult(checkResult) };
     }
     if (checkResult.cancelled) {
       // A dismissed roll is retryable: inputs stay consumed and the run stays active.

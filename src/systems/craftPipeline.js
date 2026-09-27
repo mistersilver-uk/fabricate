@@ -22,6 +22,18 @@ const refuse = (message) => ({
   resolved: false,
 });
 
+/** A misconfigured check's craft result, keeping the discriminator and any target refusal. */
+export function misconfiguredCheckResult(checkResult) {
+  const targetRefusal = checkResult?.data?.targetRefusal;
+  return {
+    success: false,
+    results: null,
+    message: checkResult?.message,
+    misconfigured: true,
+    ...(targetRefusal && { data: { targetRefusal } }),
+  };
+}
+
 /** The recipe-access guard, the execution step this call runs, and mode validation of the recipe. */
 export async function openCraftStep(engine, ctx) {
   const { craftingActor, componentSourceActors, recipe, run, user, visibilityService } = ctx;
@@ -296,7 +308,9 @@ export async function runCraftCheck(engine, ctx, craftInputs) {
   // A misconfigured required check (no authored roll formula for the active mode) is a
   // GM-side system gap, not a rolled failure: abort with ZERO mutation. The
   // failure-consumption policy in `resolveCheckFailure` applies only to genuine rolled failures.
-  if (checkResult.misconfigured) return refuse(checkResult.message);
+  if (checkResult.misconfigured) {
+    return { result: misconfiguredCheckResult(checkResult), resolved: false };
+  }
   // The player dismissed the interactive roll dialog: a user choice, not a
   // failure. Abort with ZERO mutation (no consumption, no breakage, no chat)
   // before the failure-consumption path in `resolveCheckFailure`.

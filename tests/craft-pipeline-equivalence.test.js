@@ -626,7 +626,12 @@ const SCENARIOS = [
       ['visibility.guardCraftStart', { recipe: 'recipe-probe' }],
       ['run.getActiveRun', 'Actor:Crafter', 'rid-1'],
       ['run.discardRun', 'Actor:Crafter', 'rid-1'],
-      ['returned', { success: false, results: null, message: 'simple mode requires a configured crafting check roll formula' }],
+      ['returned', {
+        success: false,
+        results: null,
+        message: 'simple mode requires a configured crafting check roll formula',
+        misconfigured: true,
+      }],
     ],
   },
   {

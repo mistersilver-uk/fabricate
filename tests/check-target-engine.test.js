@@ -133,6 +133,11 @@ for (const site of CRAFT_SITES) {
     const result = await world.craft();
     assert.equal(result.success, false);
     assert.equal(result.message, 'Crafting check target is invalid (unresolved-path)');
+    assert.deepEqual(
+      [result.misconfigured, result.data],
+      [true, { targetRefusal: 'unresolved-path' }],
+      'craft() carries the refusal channel and its reason'
+    );
     assert.equal(checks[0].misconfigured, true);
     assert.deepEqual(checks[0].data, { targetRefusal: 'unresolved-path' });
     assert.deepEqual(constructed, [], 'no Tool die and no check roll');
@@ -272,6 +277,11 @@ test('timed FINISH: a refusal rolls and awards nothing and leaves the run resuma
   const finished = await world.craft(null, { runId });
   assert.equal(finished.success, false);
   assert.equal(finished.message, 'Crafting check target is invalid (unresolved-path)');
+  assert.deepEqual(
+    [finished.misconfigured, finished.data],
+    [true, { targetRefusal: 'unresolved-path' }],
+    'FINISH carries the refusal channel and its reason'
+  );
   assert.deepEqual(constructed, []);
   assert.equal(effects(world.journal).length, startEffects, 'FINISH awards and posts nothing');
   assert.equal(world.runManager.getActiveRuns(world.craftingActor)[0]?.id, runId, 'still resumable');
