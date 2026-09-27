@@ -247,6 +247,10 @@ export function buildBulkPromptData({ count, subjects, activity, actorName } = {
   });
   return {
     kind: 'bulk',
+    // Every row a fixed roll-under target gets the roll-under bonus help; any `dc` row
+    // (or an empty batch) keeps today's roll-over copy, since a mix has no single answer.
+    direction:
+      rows.length > 0 && rows.every((row) => row?.need?.kind === 'target') ? 'under' : 'over',
     title: activity
       ? fill(promptLabel('CheckTitlePlural', '{activity} checks'), { activity })
       : promptLabel('BulkTitle', 'Bulk check'),

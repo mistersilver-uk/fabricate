@@ -53,6 +53,35 @@ describe('bulk roll prompt adapter', () => {
     assert.equal(buildBulkPromptData({ count: 2, activity: '$&', actorName: '$1' }).subtitle, '$1 · 2 items');
   });
 
+  it('computes direction from the rows: all-target is under, otherwise over', () => {
+    const under = [{ need: { kind: 'target', target: 12 } }, { need: { kind: 'target', target: 9 } }];
+    const mixed = [{ need: { kind: 'target', target: 12 } }, { need: { kind: 'dc', dc: 15 } }];
+    assert.equal(buildBulkPromptData({ subjects: under }).direction, 'under');
+    assert.equal(buildBulkPromptData({ subjects: mixed }).direction, 'over');
+    assert.equal(buildBulkPromptData({ subjects: [] }).direction, 'over');
+  });
+
+  it('gives an all-target batch the roll-under bonus help; a mixed batch keeps roll-over copy', async () => {
+    const under = [
+      { name: 'Tempered Blade', need: { kind: 'target', target: 12 } },
+      { name: 'Fitted Hilt', need: { kind: 'target', target: 9 } },
+    ];
+    const mixed = [
+      { name: 'Tempered Blade', need: { kind: 'target', target: 12 } },
+      { name: 'Ore', need: { kind: 'dc', dc: 17 } },
+    ];
+    const { view: underView } = await open({ subjects: under }, null);
+    assert.equal(
+      underView.labels.bonusHelp,
+      'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    );
+    const { view: mixedView } = await open({ subjects: mixed }, null);
+    assert.equal(
+      mixedView.labels.bonusHelp,
+      'A bonus adds to the total. A rolled bonus such as 1d4 is rolled with the check.'
+    );
+  });
+
   it('keeps count-only companion calls operable without subjects', async () => {
     const { view, result } = await open({ count: 3 }, { confirmed: true, bonus: '' });
     assert.deepEqual(view.subjects, []);
