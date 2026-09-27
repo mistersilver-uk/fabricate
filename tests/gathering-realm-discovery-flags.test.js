@@ -8,6 +8,7 @@ import {
   isGatheringRealmDiscovered,
   revealGatheringRealm
 } from '../src/systems/gatheringRealmDiscovery.js';
+import { deletedKey, forEachDeletionForm, recordWrite } from './helpers/forcedDeletion.js';
 
 function getPathValue(object, path) {
   return String(path).split('.').reduce((value, part) => {
@@ -45,6 +46,36 @@ class FakeDocument {
   }
 }
 
+const isObject = (value) => Boolean(value) && typeof value === 'object';
+
+function mergeNeverDeleting(target, source) {
+  for (const [key, value] of Object.entries(source)) {
+    if (isObject(value) && isObject(target[key])) mergeNeverDeleting(target[key], value);
+    else target[key] = value;
+  }
+}
+
+// `Actor#update` as core runs it: a recursive merge that removes a key only for a forced
+// deletion, never because the written map omits it (issue 2012).
+class MergingActor extends FakeDocument {
+  updateCalls = [];
+  updateSource() {}
+  async update(changes) {
+    recordWrite(this.updateCalls, changes);
+    for (const [path, value] of Object.entries(changes)) {
+      const parts = path.split('.');
+      const last = parts.pop();
+      let node = this;
+      for (const part of parts) node = node[part] ??= {};
+      const deleted = deletedKey(last, value);
+      if (deleted !== null) delete node[deleted];
+      else if (isObject(value) && isObject(node[last])) mergeNeverDeleting(node[last], value);
+      else node[last] = value;
+    }
+    return this;
+  }
+}
+
 const travelConfig = { realms: [{ id: 'r1' }, { id: 'r2' }] };
 
 test('revealGatheringRealm writes a discovery entry validated against the WORLD library', async () => {
@@ -76,14 +107,29 @@ test('revealGatheringRealm rejects an unknown source token', async () => {
   assert.equal(ok, false);
 });
 
-test('hideGatheringRealm removes the entry by re-setting the map', async () => {
-  const doc = new FakeDocument();
+test('hideGatheringRealm removes the entry', async () => {
+  const doc = new MergingActor();
   await revealGatheringRealm(doc, { realmId: 'r1', source: 'manual', validateRealmExists: travelConfig });
   await revealGatheringRealm(doc, { realmId: 'r2', source: 'api', validateRealmExists: travelConfig });
   const removed = await hideGatheringRealm(doc, { realmId: 'r1' });
   assert.equal(removed, true);
   assert.equal(isGatheringRealmDiscovered(doc, 'r1'), false);
   assert.equal(isGatheringRealmDiscovered(doc, 'r2'), true);
+});
+
+forEachDeletionForm('hideGatheringRealm deletes the key from a flag that core merges', async (deletion) => {
+  deletion.apply();
+  const actor = new MergingActor({ flags: { fabricate: { fabricate: { discoveredGatheringRealms: {
+    r1: { discoveredAt: 1, source: 'manual' },
+    r2: { discoveredAt: 2, source: 'api' }
+  } } } } });
+  assert.equal(await hideGatheringRealm(actor, { realmId: 'r1' }), true);
+  assert.equal(isGatheringRealmDiscovered(actor, 'r1'), false, 'an omitted key survives the merge');
+  assert.equal(isGatheringRealmDiscovered(actor, 'r2'), true);
+  assert.deepEqual(
+    actor.updateCalls,
+    deletion.expect([{ 'flags.fabricate.fabricate.discoveredGatheringRealms.-=r1': null }])
+  );
 });
 
 test('discovery entry with a stale partyId remains readable', async () => {

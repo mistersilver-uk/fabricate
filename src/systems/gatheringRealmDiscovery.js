@@ -1,4 +1,4 @@
-import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import { forcedDeletionEntry, getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 
 /**
  * Actor-flag helpers for realm discovery, which follows the character across parties. The flag
@@ -7,8 +7,8 @@ import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
  * migration runner has no actor access, so the re-key is lazy on read, and writes persist only the
  * new shape. A numeric `discoveredAt` marks a realm entry, anything else object-shaped is a legacy
  * bucket, and a half-upgraded mixed map is normal; on a collision the earliest `discoveredAt`
- * wins. Reads never throw, keeping entries with a stale `partyId`. `hideGatheringRealm` re-sets
- * the whole map rather than relying on Foundry `-=` deletion.
+ * wins. Reads never throw, keeping entries with a stale `partyId`. `hideGatheringRealm` writes
+ * a Foundry forced deletion for the individual realm key.
  */
 
 const DISCOVERY_FLAG_KEY = 'discoveredGatheringRealms';
@@ -108,17 +108,14 @@ export async function revealGatheringRealm(
   return true;
 }
 
-/** Remove one entry by re-setting the whole map, `true` when one was removed. */
+/** Remove one entry with a forced deletion, `true` when one was removed. */
 export async function hideGatheringRealm(actor, { realmId } = {}) {
   if (!realmId) return false;
   const map = getDiscoveredGatheringRealms(actor);
   if (!(realmId in map)) return false;
-  const next = {};
-  for (const [key, value] of Object.entries(map)) {
-    if (key === realmId) continue;
-    next[key] = value;
-  }
-  await setFabricateFlag(actor, DISCOVERY_FLAG_KEY, next);
+  const deletion = forcedDeletionEntry(`flags.fabricate.fabricate.${DISCOVERY_FLAG_KEY}`, realmId);
+  if (!deletion) return false;
+  await actor.update(Object.fromEntries([deletion]));
   return true;
 }
 

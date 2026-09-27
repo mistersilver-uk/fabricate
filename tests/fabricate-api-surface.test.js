@@ -319,6 +319,7 @@ describe('the location API no-ops when realms are disabled for the system', () =
           ? { 'realm-seen': { discoveredAt: 1, source: 'manual' } }
           : undefined,
       setFlag: async (...args) => writes.push(['setFlag', ...args]),
+      update: async (...args) => writes.push(['update', ...args]),
     };
     globalThis.game = { user: { id: 'gm', isGM: true }, actors: { get: () => actor } };
     const facade = readyFacade({
