@@ -341,7 +341,15 @@ export function probeSocketRoutes(facade, listener) {
       sender
     );
   const count = (prefix) => warnings.filter((message) => message.startsWith(prefix)).length;
+  const companionKinds = [];
+  // The composed service is frozen, so the probe stands a recorder in for it on the facade.
+  const restoreCompanion = spyOn(facade, 'companionOperations', {
+    handleSocketMessage: (payload) => companionKinds.push(payload.kind),
+  });
   try {
+    for (const kind of ['request', 'reply']) {
+      listener({ kind: `fabricate.companionOperation.${kind}` }, sender);
+    }
     let depletionThrowContained = true;
     try {
       deplete('throws');
@@ -369,8 +377,10 @@ export function probeSocketRoutes(facade, listener) {
       complicationRateLimitRefusals: count(
         'Fabricate | Refused a complication delivery: sender rate limit'
       ),
+      companionOperationKindsRouted: companionKinds,
     };
   } finally {
+    restoreCompanion();
     restore();
     console.warn = originalWarn;
   }

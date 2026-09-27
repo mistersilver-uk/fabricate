@@ -67,6 +67,7 @@ import { applyCurrentFabricateTheme } from '../ui/theme.js';
 import { findMatchingComponent } from '../utils/essenceResolver.js';
 import { STARTUP_PHASES, createStartupMarks } from '../utils/startupMarks.js';
 
+import { createCompanionOperationsForFabricate } from './companionOperations.js';
 import {
   createGatheringFailureFeedback,
   createGatheringToolBreakage,
@@ -80,7 +81,10 @@ import {
   setGatheringEngine,
 } from './gatheringRuntime.js';
 import { applyItemStackQuantityPathSetting } from './hooks.js';
-import { createJournalCommandsForFabricate } from './journalOperations.js';
+import {
+  createJournalAuthorityForFabricate,
+  createJournalCommandsForFabricate,
+} from './journalOperations.js';
 import {
   applyComplicationDelivery,
   applyGatheringBlindStart,
@@ -235,7 +239,11 @@ function buildCoreManagers(fabricate) {
       currencyConfigStore: fabricate.currencyConfigStore,
     }
   );
-  fabricate.journalRunCommands = createJournalCommandsForFabricate(fabricate);
+  const journalAuthority = createJournalAuthorityForFabricate(fabricate);
+  fabricate.journalRunCommands = createJournalCommandsForFabricate(fabricate, journalAuthority);
+  fabricate.companionOperations = createCompanionOperationsForFabricate({
+    authority: journalAuthority,
+  });
 }
 
 /** Both deserializations, the corpus-proportional half of startup. */

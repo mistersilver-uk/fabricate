@@ -890,7 +890,8 @@ export function createJournalRunCommandService({
     if (!currentRealmIsActiveGm()) {
       return failure('active-gm-required');
     }
-    return authority.run({ ...request, senderId }, async (helpers) => {
+    // A run command's logical identity is its request, whatever the payload names.
+    return authority.run({ ...request, operationId: undefined, senderId }, async (helpers) => {
       // Every lookup occurs after the server-arbitrated claim has been acquired.
       const context = await resolveCommandContext(request, senderId);
       if (!context.success) return context;
