@@ -1,4 +1,5 @@
 import { activeCheckEvaluation } from '../../systems/checkTarget.js';
+import { countRequired } from '../../systems/countCheck.js';
 import { isCountCheck } from '../../systems/salvageCheckUsability.js';
 
 /** The salvage DC shown to players; fixed routing, stages and a count check have no single DC. */
@@ -13,7 +14,8 @@ export function salvageDisplayDc({ mode, routedType, config, component }) {
 
 /**
  * Display-only need; evaluation continues to use the system's authored check. A character-value
- * target differs per actor, so a summed check reading one has no single target.
+ * target differs per actor, so a summed check reading one has no single target. A count check
+ * needs the component's successes override, else its pool's required count.
  */
 export function salvageCheckNeed({ mode, config, checkUsable, component }) {
   if (!checkUsable) return { kind: 'noCheck' };
@@ -23,9 +25,15 @@ export function salvageCheckNeed({ mode, config, checkUsable, component }) {
     return { kind: 'noSingleTarget', direction: evaluation.direction };
   }
   const routedType = mode === 'routed' && config?.type === 'fixed' ? 'fixed' : 'relative';
+  if (!summed) {
+    if (mode === 'progressive' || routedType === 'fixed') return { kind: 'noSingleTarget' };
+    return {
+      kind: 'successes',
+      count: countRequired(evaluation, component?.salvage?.successesOverride),
+    };
+  }
   const dc = salvageDisplayDc({ mode, routedType, config, component });
   if (!Number.isFinite(dc)) return { kind: 'noSingleTarget' };
-  // A finite `dc` here is only reachable for a summed check (a count check's
-  // `salvageDisplayDc` returns null and returns above), so `summed` is redundant.
+  // Only a summed check reaches here: a count check returned above.
   return evaluation.direction === 'under' ? { kind: 'target', target: dc } : { kind: 'dc', dc };
 }

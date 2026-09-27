@@ -288,6 +288,8 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/systems/checkModifierRouter.js',
   // Issue 2003: the builder reads the check evaluation to hide the DC chip off sum/over/fixed.
   ...CHECK_TARGET_RAW_MODULES,
+  // Issue 2004: it resolves a count check's pool for the formula line it shows.
+  'src/systems/countEvaluation.js',
   // …and issue 1094 gave that resolver its first two imports, so one entry no longer suffices.
   'src/systems/toolCheckBonus.js',
   'src/utils/craftingCheckExpression.js',
