@@ -77,12 +77,15 @@ function installRoll(face) {
       const match = /(\d*)d(\d+)/i.exec(replaced);
       if (!match) throw new SyntaxError(`no die in ${replaced}`);
       const faces = Number(match[2]);
+      const modifier = /^(cs(?:[<>=]+\d+)?|cf(?:[<>=]+\d+)?|even|odd|df(?:[<>=]+\d+)?|sf(?:[<>=]+\d+)?|ms(?:[<>=]+\d+)?)/i.exec(
+        replaced.slice(match.index + match[0].length)
+      )?.[0];
       return [
         {
           faces,
           number: match[1] === '' ? 1 : Number(match[1]),
           denomination: `d${faces}`,
-          modifiers: [],
+          modifiers: modifier ? [modifier] : [],
           isDeterministic: false,
         },
         ...[...replaced.replaceAll(/\[[^\]]*]/g, '').matchAll(/(\d+)/g)].slice(1).flatMap(() => [
@@ -436,6 +439,26 @@ describe('the outcome-preview readout', () => {
 });
 
 describe('the odds histogram', () => {
+  it('withholds the formula average and states the odds refusal after the formula control changes', async () => {
+    const changes = [];
+    const root = await mountChecks({
+      craftingCheck: { ...ROUTED_CHECK, rollFormula: '1d20cs>15' },
+      onUpdateCraftingCheck: (next) => changes.push(next),
+    });
+    const field = root.querySelector('[data-check-roll-formula]');
+    field.value = '1d20odd';
+    field.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    await settle();
+    assert.equal(changes.at(-1).rollFormula, '1d20odd', 'the production formula control emitted');
+    assert.ok(root.querySelector('[data-check-formula-average-withheld="die-modifiers"]'));
+
+    await choosePreviewActor(root, 'sera');
+    const note = root.querySelector('[data-checks-odds-state="not-enumerable"]');
+    assert.ok(note, 'the sibling odds panel abstains');
+    assert.equal(note.dataset.checksOddsReason, 'die-modifiers');
+    assert.match(note.textContent, /modifier/i, 'the refusal is stated in words');
+  });
+
   it('enumerates the faces, and the rail heading names that space rather than guessing it', async () => {
     // The `all N faces` adjunct is issue 1096's heading slot and its fallback is a REGEX over
     // the authored formula. Since issue 1118 the formula that is ROLLED can carry a check

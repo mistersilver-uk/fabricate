@@ -21,6 +21,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { reorderAnnouncementText } from '../../../util/listReorderAnnouncement.js';
   import {
+    classifyModifierExpression,
     isRollExpression,
     resolveModifierBounds,
   } from '../../../../../systems/checkModifierResolver.js';
@@ -104,6 +105,20 @@
   // persisted flag can never differ.
   function modifierIsRoll(entry) {
     return Boolean(entry?.expression) && isRollExpression(entry.expression);
+  }
+
+  // A transformed total has no average for a competing rule to rank it by.
+  function rollNote(entry) {
+    if (classifyModifierExpression(entry) === 'transformed') {
+      return text(
+        'FABRICATE.Admin.Manager.Modifiers.RollNoteTransformed',
+        'This expression rolls dice. Every activity can use it: a gathering drop row applies its result, and a check appends the dice to its roll formula so the roll is made once and shows on the card. Where modifiers compete — Highest, or Player picks — this one has no comparable average, so modifiers with an ordinary average are chosen ahead of it.'
+      );
+    }
+    return text(
+      'FABRICATE.Admin.Manager.Modifiers.RollNote',
+      'This expression rolls dice. Every activity can use it: a gathering drop row applies its result, and a check appends the dice to its roll formula so the roll is made once and shows on the card. Where modifiers compete — Highest, or Player picks — this one is ranked by its average.'
+    );
   }
 
   // The read-only bounds chip, e.g. `-1 to +5`. Signed on BOTH ends: a modifier is a signed
@@ -497,15 +512,12 @@
                          applies its result and a check appends the dice to its formula. The
                          note stays because two consequences are worth stating where the
                          expression is authored — the dice are rolled once with the check and
-                         shown on the card, and a competing rule ranks this entry by its
-                         average. It carries the shared muted note class rather than the fault
+                         shown on the card, and how a competing rule ranks this entry. It
+                         carries the shared muted note class rather than the fault
                          class the two BLOCKING bounds problems use, because nothing here is
                          wrong. -->
                     <p class="manager-muted" role="note" data-world-modifier-roll-note={entry.id}>
-                      {text(
-                        'FABRICATE.Admin.Manager.Modifiers.RollNote',
-                        'This expression rolls dice. Every activity can use it: a gathering drop row applies its result, and a check appends the dice to its roll formula so the roll is made once and shows on the card. Where modifiers compete — Highest, or Player picks — this one is ranked by its average.'
-                      )}
+                      {rollNote(entry)}
                     </p>
                   {/if}
                   <!-- Both verbs carried a BARE `manager-button` before issue 1096: `Delete

@@ -1,7 +1,10 @@
 import {
+  classifyModifierExpression,
   modifierExpressionResolves,
   resolveEligibleModifierIds,
+  resolveMaxModifierPicks,
   resolveModifierBounds,
+  resolveModifierPolicy,
 } from '../../../../../systems/checkModifierResolver.js';
 import {
   findRangeConflicts,
@@ -39,6 +42,7 @@ export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
   'modifierBoundsInverted',
   'modifierBoundsUnsafe',
   'modifierExpressionInvalid',
+  'modifierAverageUnavailable',
   'modifiersInertNoCheck',
   'modifiersInertNoModifierSupport',
   'modifiersInertNoFormula',
@@ -77,6 +81,7 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
   modifierBoundsInverted: 'modifiers',
   modifierBoundsUnsafe: 'modifiers',
   modifierExpressionInvalid: 'modifiers',
+  modifierAverageUnavailable: 'modifiers',
   modifiersInertNoCheck: 'modifiers',
   modifiersInertNoModifierSupport: 'modifiers',
   modifiersInertNoFormula: 'modifiers',
@@ -208,8 +213,11 @@ function fixedRangesHaveGap(outcomes, excluded) {
  * `modifierRollExpression` is RETIRED (`openspec/specs/resolution-modes/spec.md` → "Check
  * Source", whose two bounds faults stay SEPARATE ids because the repairs differ).
  * `modifierExpressionInvalid` is an entry whose EXPRESSION cannot contribute and excludes bounds
- * faults. All three NAME the offending entries and cover only entries this activity selects; the
- * three `modifiersInert*` warnings report a selection reaching no roll, gated on NON-EMPTY.
+ * faults. `modifierAverageUnavailable` is a separate, NON-BLOCKING warning naming an otherwise
+ * usable entry whose dice total is TRANSFORMED (`classifyModifierExpression`), raised only when
+ * `highest` or a capped `playerPicks` would actually rank it out (`modifiersCompete`). All four
+ * NAME the offending entries and cover only entries this activity selects; the three
+ * `modifiersInert*` warnings report a selection reaching no roll, gated on NON-EMPTY.
  * @param {object|null} modifierContext A `buildCheckModifierContext` bag, or null (no-ops).
  * @param {{ rollsNoCheck: boolean, hasRollFormula: boolean }} formulaState
  * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }} */
@@ -219,6 +227,14 @@ function fixedRangesHaveGap(outcomes, excluded) {
  * @param {Array<{entry: object}>} faulted @returns {string} */
 function namesOf(faulted) {
   return faulted.map(({ entry }) => entry.label || entry.id).join(', ');
+}
+
+/** Whether ranking leaves an entry out: `highest` over two or more, or a `playerPicks` cap below
+ *  the eligible count (an absent cap is `Infinity`, so it never is). */
+function modifiersCompete(modifierContext, eligibleCount) {
+  const policy = resolveModifierPolicy(modifierContext);
+  const places = policy === 'highest' ? 1 : resolveMaxModifierPicks(modifierContext);
+  return (policy === 'highest' || policy === 'playerPicks') && places < eligibleCount;
 }
 
 function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula, activity = '' }) {
@@ -240,10 +256,16 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
   const unsafe = namesOf(faulted.filter(({ bounds }) => bounds.unsafe));
   // An entry whose EXPRESSION cannot contribute, bounds set aside; asked of the resolver, so
   // what readiness calls unusable and what the roll drops are one decision.
-  const unusable = namesOf(
-    faulted.filter(
-      ({ entry, bounds }) =>
-        !bounds.inverted && !bounds.unsafe && !modifierExpressionResolves(entry)
+  const usableCandidates = faulted
+    .filter(({ bounds }) => !bounds.inverted && !bounds.unsafe)
+    .map((candidate) => ({
+      ...candidate,
+      resolves: modifierExpressionResolves(candidate.entry),
+    }));
+  const unusable = namesOf(usableCandidates.filter(({ resolves }) => !resolves));
+  const transformed = namesOf(
+    usableCandidates.filter(
+      ({ entry, resolves }) => resolves && classifyModifierExpression(entry) === 'transformed'
     )
   );
 
@@ -256,6 +278,9 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
   if (unsafe !== '') pushIssue(issues, 'modifierBoundsUnsafe', 'critical', { names: unsafe });
   if (unusable !== '') {
     pushIssue(issues, 'modifierExpressionInvalid', 'critical', { names: unusable });
+  }
+  if (transformed !== '' && modifiersCompete(modifierContext, eligible.length)) {
+    pushIssue(issues, 'modifierAverageUnavailable', 'warning', { names: transformed });
   }
   // The two no-check modes reach no roll for OPPOSITE reasons, so they cannot share a sentence:
   // alchemy `none` rolls nothing, while gathering `d100` rolls and has no seam for modifiers.

@@ -165,6 +165,16 @@ describe('checkOdds: every refusal carries its OWN reason code', () => {
     assert.deepEqual(domainOf(pool), { min: 1, max: 20 }, 'keep-highest of the two members');
   });
 
+  it('retains the die-modifier refusal for free-text transformed quantities', () => {
+    for (const formula of ['1d20cs>15', '2d6cs>5', '1d20odd']) {
+      assert.deepEqual(
+        describeFormulaEnumerability(formula, ACTOR, { Roll: LAB_ROLL }),
+        { enumerable: false, reason: ODDS_REASONS.dieModifiers },
+        formula
+      );
+    }
+  });
+
   it('refuses a space too large to walk, rather than sampling one', () => {
     // A cap is a REFUSAL with a stated reason, because a sampled histogram is the approximation
     // this whole module exists to avoid.

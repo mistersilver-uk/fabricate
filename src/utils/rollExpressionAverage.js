@@ -1,7 +1,6 @@
 /**
- * A deterministic average of a roll expression, and whether it rolls (issue 1118). It only ranks
- * (`highest`, `playerPicks`' fallback), never pays. Keep/drop is exact; other die modifiers use
- * the plain average, off by ~10 for `cs`/`cf`. Unreducible is `NaN`, read as "contributes nothing".
+ * Deterministic reduction and quantity classification for roll expressions. Reduction preserves
+ * the face-sum approximation; classification prevents transformed totals from being read as it.
  */
 
 /** `CONFIG.Dice.terms`' single-letter denominations. */
@@ -17,6 +16,23 @@ const KEEP_AT = /^(kh|kl|dh|dl|k|d(?![fF]))(\d+)?/i;
 
 /** Consumed and ignored once a keep/drop is read. */
 const MODIFIER_RUN_AT = /^(?:[a-zA-Z]+|[0-9<>=]+)*/;
+
+/** Foundry's `Die` modifier grammar: the counting family takes an optional comparator or bare
+ *  target, and `r`/`x` an optional iteration bound ahead of one. */
+const TRANSFORMED_MODIFIER_AT = /^(?:cs|cf|df|sf|ms)(?:[<>=]*\d+)?|^(?:even|odd)/i;
+const MAGNITUDE_MODIFIER_AT =
+  /^(?:kh|kl|dh|dl|k|d)\d*|^(?:rr|r|xo|x)\d*(?:[<>=]+\d+)?|^(?:min|max)\d+/i;
+
+/** Whether an expression represents a magnitude, a transformed total, or no readable quantity. */
+export function classifyRollQuantity(input) {
+  const source = String(input ?? '').trim();
+  if (source === '') return 'irreducible';
+  const reader = createReader(source);
+  const value = reader.parseExpression();
+  reader.skipWhitespace();
+  if (!reader.atEnd() || !Number.isFinite(value) || !reader.syntaxValid()) return 'irreducible';
+  return reader.transformed() ? 'transformed' : 'magnitude';
+}
 
 export function reduceRollExpression(input, { dieValue = null } = {}) {
   const source = String(input ?? '').trim();
@@ -35,6 +51,8 @@ export function reduceRollExpression(input, { dieValue = null } = {}) {
 function createReader(source, dieValue = null) {
   let index = 0;
   let sawDice = false;
+  let sawTransformed = false;
+  let validSyntax = true;
   let dieOrdinal = 0;
 
   const skipWhitespace = () => {
@@ -45,7 +63,14 @@ function createReader(source, dieValue = null) {
   const skipFlavor = () => {
     if (source[index] !== '[') return;
     const close = source.indexOf(']', index);
+    if (close === -1) validSyntax = false;
     index = close === -1 ? source.length : close + 1;
+  };
+
+  const noteModifierQuantity = (modifiers) => {
+    const quantity = classifyDieModifiers(modifiers);
+    if (quantity === 'irreducible') validSyntax = false;
+    if (quantity === 'transformed') sawTransformed = true;
   };
 
   const matchAt = (pattern) => {
@@ -130,6 +155,7 @@ function createReader(source, dieValue = null) {
 
   function dieAverage(count, faces, modifiers) {
     sawDice = true;
+    noteModifierQuantity(modifiers);
     skipFlavor();
     if (dieValue) {
       // Before the shape checks: a substituting caller decides which shapes it answers for.
@@ -170,8 +196,9 @@ function createReader(source, dieValue = null) {
     }
     if (source[index] !== '}') return NaN;
     index += 1;
-    const keep = matchAt(KEEP_AT);
-    matchAt(MODIFIER_RUN_AT);
+    const run = matchAt(MODIFIER_RUN_AT)[0];
+    noteModifierQuantity(run);
+    const keep = KEEP_AT.exec(run);
     skipFlavor();
     if (members.some((member) => !Number.isFinite(member))) return NaN;
     return sumOf(keep ? keptMembers(members, keep[1].toLowerCase(), keep[2]) : members);
@@ -207,7 +234,26 @@ function createReader(source, dieValue = null) {
     skipWhitespace,
     atEnd: () => index >= source.length,
     rollsDice: () => sawDice,
+    syntaxValid: () => validSyntax,
+    transformed: () => sawTransformed,
   };
+}
+
+function classifyDieModifiers(modifiers) {
+  let remaining = String(modifiers ?? '');
+  let transformed = false;
+  while (remaining !== '') {
+    const quantity = TRANSFORMED_MODIFIER_AT.exec(remaining);
+    if (quantity) {
+      transformed = true;
+      remaining = remaining.slice(quantity[0].length);
+      continue;
+    }
+    const magnitude = MAGNITUDE_MODIFIER_AT.exec(remaining);
+    if (!magnitude) return 'irreducible';
+    remaining = remaining.slice(magnitude[0].length);
+  }
+  return transformed ? 'transformed' : 'magnitude';
 }
 
 function keepsHighest(mode) {

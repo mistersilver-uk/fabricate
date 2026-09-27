@@ -109,6 +109,34 @@ describe('ChecksValidationTab (mounted)', () => {
     harness.remount();
   });
 
+  it('shows transformed modifier names as one warning without blocking readiness', async () => {
+    const longName = 'A transformed modifier name long enough to wrap without clipping';
+    const target = await harness.mount({
+      sections: [
+        {
+          subsystem: 'crafting',
+          mode: 'simple',
+          check: { rollFormula: '1d20' },
+          modifierContext: {
+            catalogue: [
+              { id: 'count', label: longName, expression: '1d20cs>15' },
+              { id: 'flat', label: 'Flat', expression: '-2' },
+            ],
+            systemPolicy: 'highest',
+            defaultModifierIds: ['count', 'flat'],
+          },
+        },
+      ],
+    });
+    const issue = target.querySelector('[data-issue="modifierAverageUnavailable"]');
+    assert.ok(issue, 'the ranking warning renders on the shared Validation row');
+    assert.equal(issue.dataset.issueSeverity, 'warning');
+    assert.match(issue.textContent, new RegExp(longName));
+    assert.ok(!target.querySelector('[data-issue-severity="critical"]'), 'saving remains unblocked');
+    assert.ok(!target.querySelector('[data-issue="modifierExpressionInvalid"]'));
+    harness.remount();
+  });
+
   it('lists routed outcome-tier issues (unnamed tier, no Success) as critical', async () => {
     const target = await harness.mount({
       sections: [unfinishedRoutedSection('crafting', '1d20', '  ')],

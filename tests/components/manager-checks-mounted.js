@@ -3078,6 +3078,123 @@ export function registerChecksCases() {
     );
   });
 
+  /** A two-entry system whose Medicine entry is transformed, so ranking it needs an average. */
+  const transformedModifierSystem = (defaultModifierPolicy) => {
+    const system = modifierRuleSystem(defaultModifierPolicy);
+    system.modifiers = [{ ...MODIFIER_CATALOGUE[0], expression: '1d20cs>15' }, MODIFIER_CATALOGUE[1]];
+    system.craftingCheck.defaultModifierIds = ['med', 'alch'];
+    return system;
+  };
+
+  it('root: the pick cap drives manager-checks-crafting-modifier-max-picks’ warning selector (issue 2000)', async () => {
+    const selector = labCaseSelector('manager-checks-crafting-modifier-max-picks');
+    mountManager([], transformedModifierSystem('addAll'));
+    checksStore.saveCraftingCheckModifiers = (patch) => {
+      checksStore.viewState.update((state) => ({
+        ...state,
+        selectedSystem: {
+          ...state.selectedSystem,
+          craftingCheck: { ...state.selectedSystem.craftingCheck, ...patch },
+        },
+      }));
+    };
+    const settleControl = async (control) => {
+      control.click();
+      await tick();
+      flushSync();
+    };
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    await openChecksSection('modifiers');
+    const calloutSelector = '[data-checks-section-callout="modifierAverageUnavailable"]';
+    assert.ok(!target.querySelector(calloutSelector), 'addAll has no transformed-ranking warning');
+
+    const highest = target.querySelector(
+      '[data-crafting-modifier-policy-option="highest"] input'
+    );
+    assert.ok(highest, 'the production highest policy input renders');
+    await settleControl(highest);
+    const highestWarning = target.querySelector(calloutSelector);
+    assert.ok(highestWarning, 'highest over two entries warns about the transformed one');
+    assert.equal(highestWarning.getAttribute('data-callout-tone'), 'info');
+    assert.ok(highestWarning.textContent.includes('Medicine'), 'the warning names the entry');
+
+    const eligibility = target.querySelector('[data-crafting-modifier-eligibility-input="med"]');
+    assert.ok(eligibility, 'the production eligibility control renders');
+    await settleControl(eligibility);
+    assert.ok(!target.querySelector(calloutSelector), 'the warning clears when the entry is ineligible');
+    await settleControl(eligibility);
+    assert.ok(target.querySelector(calloutSelector), 'the warning returns when the entry is eligible');
+
+    const playerPicks = target.querySelector(
+      '[data-crafting-modifier-policy-option="playerPicks"] input'
+    );
+    assert.ok(playerPicks, 'the production playerPicks policy input renders');
+    await settleControl(playerPicks);
+    assert.ok(!target.querySelector(calloutSelector), 'an uncapped playerPicks ranks nothing out');
+    const maxPicksInput = target.querySelector('[data-crafting-modifier-max-picks-input]');
+    assert.ok(maxPicksInput, 'the selecting policy renders its cap input');
+    const typeCap = (value) => {
+      maxPicksInput.value = value;
+      maxPicksInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+      flushSync();
+    };
+    typeCap('1');
+    assert.ok(target.querySelector(calloutSelector), 'a cap below the eligible count warns');
+    assert.ok(Boolean(target.querySelector(selector)), 'the capped, warning state is the frame');
+    typeCap('');
+    assert.ok(!target.querySelector(calloutSelector), 'clearing the cap clears the warning');
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // The negative control, freshly mounted: happy-dom caches a `:has()` result per selector, so a
+    // re-query after the cap is cleared would read the stale match. A cap of 1 over plain entries
+    // ranks nothing transformed out, so the frame's warning half refuses it.
+    mountManager([], modifierRuleSystem('playerPicks', 1));
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    await openChecksSection('modifiers');
+    assert.ok(
+      Boolean(target.querySelector('[data-crafting-modifier-max-picks="1"]')),
+      'the cap still reads 1, so the refusal below is the warning and nothing else'
+    );
+    assert.ok(!target.querySelector(selector), 'a cap with no transformed entry is not the frame');
+  });
+
+  it('root: Validation satisfies manager-checks-validation-average-unavailable’s own selector (issue 2000)', async () => {
+    const selector = labCaseSelector('manager-checks-validation-average-unavailable');
+    const openValidation = async (system) => {
+      mountManager([], system);
+      navButton('Checks').click();
+      await tick();
+      flushSync();
+      target.querySelector('#manager-checks-nav-validation').click();
+      await tick();
+      flushSync();
+    };
+    await openValidation(transformedModifierSystem('highest'));
+    assert.ok(
+      Boolean(target.querySelector(selector)),
+      'ranking two entries by average lists the transformed one as a Validation warning row'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // The negative control: adding every entry ranks nothing, so there is no row to photograph.
+    await openValidation(transformedModifierSystem('addAll'));
+    assert.ok(
+      Boolean(target.querySelector('[data-checks-panel="validation"]')),
+      'the Validation route still rendered, so the refusal below is the row and nothing else'
+    );
+    assert.ok(!target.querySelector(selector), 'addAll must not satisfy the warning frame');
+  });
+
   it('root: the recipe picker satisfies manager-recipe-edit-crafting-modifier-custom-set’s own selector (issue 1055)', async () => {
     const selector = labCaseSelector('manager-recipe-edit-crafting-modifier-custom-set');
     const custom = { craftingModifier: { modifierIds: ['med', 'alch'] } };
