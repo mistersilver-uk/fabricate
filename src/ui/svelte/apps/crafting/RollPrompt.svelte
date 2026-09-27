@@ -453,7 +453,7 @@
     margin: 0;
     padding: 0 var(--fab-space-2);
     border: 1px solid var(--fab-border-strong);
-    border-radius: 11px;
+    border-radius: 9px;
     appearance: none;
     -webkit-appearance: none;
     background: var(--fab-bg-1);
