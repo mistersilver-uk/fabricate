@@ -1068,6 +1068,11 @@ export class GatheringRichStateService {
     return environment ? cloneJson(environment) : null;
   }
 
+  /** The node service's per-row interactable scope (issue 2048). */
+  interactableRefFor(payload) {
+    return this.nodeService.interactableRefFor(payload);
+  }
+
   buildListingMetadata({ environment, task, actor, viewer, interactableRef = null }) {
     const opaqueBlind = environment?.selectionMode === 'blind' && viewer?.isGM !== true;
     const staminaEnabled = this.staminaEnabled(environment?.craftingSystemId);

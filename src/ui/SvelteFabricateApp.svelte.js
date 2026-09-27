@@ -211,6 +211,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       getActiveCanvasTool: () => this._activeCanvasTool ?? null,
       listGatheringForActor: (opts = {}) => game?.fabricate?.listGatheringForActor?.({
         presentTools: presentTools(),
+        // The same ref the attempt carries, so the listing shows and gates on the pool the attempt
+        // will decrement (issue 2048). Read per call, so a refresh follows a re-show or close.
+        interactableRef: this._scopedInteractableRef,
         ...opts
       }) ?? null,
       startGatheringAttempt: (opts = {}) => game?.fabricate?.startGatheringAttempt?.({
