@@ -30,6 +30,23 @@ describe('Journal roll prompt adapter', () => {
     assert.deepEqual(view.selectedModifiers, selectedModifiers, 'the modifier is still itemised');
   });
 
+  it('forwards the versioned target direction, so a roll-under stage names its target', async () => {
+    const view = async (descriptor) => {
+      let received;
+      await promptJournalStageCheck({ subject: 'Horseshoe', ...descriptor }, async (options) => {
+        received = options;
+      });
+      return { received, view: buildSinglePromptData(received) };
+    };
+    const under = await view({ target: 15, direction: 'under', comparison: 'exceed' });
+    assert.equal(under.received.direction, 'under');
+    assert.deepEqual([under.view.dc, under.view.direction, under.view.comparison], [15, 'under', 'exceed']);
+    const over = await view({ target: 12, direction: 'over', comparison: 'meet' });
+    assert.deepEqual([over.view.dc, over.view.direction], [12, 'over']);
+    const none = await view({ target: null, direction: null, comparison: null });
+    assert.deepEqual([none.view.dc, none.view.direction], [null, 'over']);
+  });
+
   it('titles a named gathering check with its activity and leaves a hidden one generic', async () => {
     const describe = (publicPrompt) => async () => ({ required: true, publicPrompt, privateEvaluation: {} });
     const named = withPromptActivity({ describeCheck: describe({ label: 'Copper vein' }) }, () => 'Gathering');

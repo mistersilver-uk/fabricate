@@ -90,7 +90,11 @@
             <div class="formula-content">
               {#if data.formula}<span class="formula">{data.formula}</span>{/if}
               {#if data.dc !== null}
-                <Chip tone="info" density="tag-run" icon="fa-solid fa-bullseye"
+                <Chip
+                  tone="info"
+                  density="tag-run"
+                  icon="fa-solid fa-bullseye"
+                  data-roll-prompt-target={data.direction === 'under' ? 'under' : undefined}
                   >{data.dcText} · {data.comparison === 'exceed'
                     ? data.labels.exceed
                     : data.labels.meet}</Chip

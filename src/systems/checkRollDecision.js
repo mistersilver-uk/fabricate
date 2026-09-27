@@ -81,6 +81,9 @@ function promptInput({
     resolvedFormula: resolved?.display ?? null,
     displayFormula: displayFormula(shownFormula, actor)?.display ?? shownFormula,
     dc: options.dc,
+    // The pre-modifier target and, for a summed check, the direction the roll must land on.
+    target: Number.isFinite(options.dc) ? options.dc : null,
+    direction: evaluation.product === 'sum' ? evaluation.direction : null,
     label: options.flavor,
     name: options.name,
     activity: options.activity,

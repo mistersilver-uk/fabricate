@@ -131,8 +131,8 @@ it('Journal prompt adapter forwards only named, permitted display fields', async
   const descriptor = {
     label: 'Old subject label', subject: 'Steep tea', activity: 'Crafting', actorName: 'Tinker',
     img: 'icons/tea.webp', formula: '1d20 + 3[Modifiers]',
-    resolvedFormula: '1d20 + 3[Modifiers]', displayFormula: '1d20', target: 14, comparison: 'exceed',
-    selectedModifiers: [{ label: 'Focus', display: '+3' }],
+    resolvedFormula: '1d20 + 3[Modifiers]', displayFormula: '1d20', target: 14, direction: 'under',
+    comparison: 'exceed', selectedModifiers: [{ label: 'Focus', display: '+3' }],
     allowAdvantage: true, allowsSituationalModifier: true,
     modifierChoice: null, privateEvaluation: { rollFormula: 'SECRET' },
   };
@@ -141,7 +141,7 @@ it('Journal prompt adapter forwards only named, permitted display fields', async
   assert.deepEqual(received, {
     name: 'Steep tea', actorName: 'Tinker', activity: 'Crafting', img: 'icons/tea.webp',
     formula: '1d20 + 3', resolvedFormula: '1d20 + 3', displayFormula: '1d20',
-    dc: 14, comparison: 'exceed', thresholdMode: 'exceed',
+    dc: 14, direction: 'under', comparison: 'exceed', thresholdMode: 'exceed',
     selectedModifiers: [{ label: 'Focus', display: '+3' }],
     allowAdvantage: true, modifierChoice: null,
   });

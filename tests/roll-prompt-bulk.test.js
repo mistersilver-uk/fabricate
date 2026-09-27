@@ -36,6 +36,11 @@ describe('bulk roll prompt adapter', () => {
     assert.deepEqual(result, { confirmed: true, bonus: '3', rollMode: 'blindroll', advantage: 'normal' });
   });
 
+  it('formats a roll-under row as a target', async () => {
+    const { view } = await open({ count: 1, subjects: [{ name: 'Gear', need: { kind: 'target', target: 12 } }] }, null);
+    assert.equal(view.subjects[0].needText, 'Target 12');
+  });
+
   it('counts the batch, not the rows, and names the activity and one actor when known', () => {
     assert.equal(buildBulkPromptData({ count: 25, subjects }).subtitle, '25 items');
     assert.equal(buildBulkPromptData({ subjects: [...subjects, subjects[0]] }).subtitle, '4 items');

@@ -77,6 +77,7 @@ function copy() {
     worse: promptLabel('KeepWorse', 'keep the worse'),
     better: promptLabel('KeepBetter', 'keep the better'),
     dcValue: promptLabel('DcValue', 'DC {dc}'),
+    targetValue: promptLabel('TargetValue', 'Target {target}'),
     roll: promptLabel('roll', 'Roll'),
     advantage: promptLabel('advantage', 'Advantage'),
     disadvantage: promptLabel('disadvantage', 'Disadvantage'),
@@ -129,17 +130,38 @@ export function translatePromptAnswer(answer, { defaultRollMode, choicePlan }) {
   return result;
 }
 
+/** A summed roll-under check's wording: the chip names a target, and every bonus raises it. */
+function underCopy() {
+  return {
+    meet: promptLabel('StayAtOrUnder', 'stay at or under'),
+    exceed: promptLabel('StayUnder', 'stay under'),
+    eachAdds: promptLabel('EachRaises', 'Each raises the target.'),
+    bonusHelp: promptLabel(
+      'BonusHelpUnder',
+      'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    ),
+  };
+}
+
 function needText(need, labels) {
   if (need?.kind === 'dc') return fill(labels.dcValue, { dc: need.dc });
+  if (need?.kind === 'target') return fill(labels.targetValue, { target: need.target });
   return need?.kind === 'noSingleTarget' ? labels.noSingleTarget : labels.noCheck;
 }
 
-/** The DC, bulk-need and pick-cap copy, formatted here so the component renders strings only. */
+function targetText(data, labels) {
+  if (!Number.isFinite(data.dc)) return '';
+  return data.direction === 'under'
+    ? fill(labels.targetValue, { target: data.dc })
+    : fill(labels.dcValue, { dc: data.dc });
+}
+
+/** The target, bulk-need and pick-cap copy, formatted here so the component renders strings only. */
 function formatCopy(data, choicePlan) {
-  const labels = copy();
+  const labels = data.direction === 'under' ? { ...copy(), ...underCopy() } : copy();
   const formatted = {
     labels: { ...labels, pickUpTo: fill(labels.pickUpTo, { count: choicePlan.maxPicks }) },
-    dcText: Number.isFinite(data.dc) ? fill(labels.dcValue, { dc: data.dc }) : '',
+    dcText: targetText(data, labels),
   };
   if (Array.isArray(data.subjects)) {
     formatted.subjects = data.subjects.map((subject) => ({
@@ -173,12 +195,17 @@ export async function waitForPrompt(data, allowAdvantage, choicePlan, open = res
   return translatePromptAnswer(answer, { defaultRollMode, choicePlan });
 }
 
-/** `displayFormula` is the producer's base without the itemised modifier terms, shown as chips. */
+/**
+ * `displayFormula` is the producer's base without the itemised modifier terms, shown as chips.
+ * `target` (else `dc`) is the pre-modifier number; `direction: 'under'` names it a target.
+ */
 export function buildSinglePromptData({
   formula,
   resolvedFormula,
   displayFormula,
   dc,
+  target,
+  direction,
   name,
   actorName,
   activity,
@@ -190,6 +217,7 @@ export function buildSinglePromptData({
   const title = fill(promptLabel('CheckTitle', '{activity} check'), {
     activity: activity || promptLabel('roll', 'Roll'),
   });
+  const value = Number.isFinite(target) ? target : dc;
   const subtitle =
     actorName && name
       ? fill(promptLabel('ActorSubject', '{actor} · {subject}'), {
@@ -203,7 +231,8 @@ export function buildSinglePromptData({
     subtitle,
     img: img || '',
     formula: displayFormula || resolvedFormula || formula || '',
-    dc: Number.isFinite(dc) ? dc : null,
+    dc: Number.isFinite(value) ? value : null,
+    direction: direction === 'under' && Number.isFinite(value) ? 'under' : 'over',
     comparison:
       comparison === undefined ? (thresholdMode === 'exceed' ? 'exceed' : 'meet') : comparison,
     selectedModifiers: Array.isArray(selectedModifiers) ? selectedModifiers : [],

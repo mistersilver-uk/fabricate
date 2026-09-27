@@ -7,6 +7,8 @@ import {
   promptCheckRoll,
   translatePromptAnswer,
 } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
+import { resolveCheckDecision } from '../src/systems/checkRollDecision.js';
+import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import { stubI18n, stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 
 const choice = {
@@ -151,6 +153,55 @@ describe('roll prompt adapter', () => {
       surface.restore();
       console.error = previousError;
     }
+  });
+
+  it('hands the prompt the pre-modifier target and a summed check direction', async () => {
+    const received = async (evaluation, dc = 15) => {
+      let input;
+      await resolveCheckDecision({
+        authoredFormula: '1d20', actor: null, deferred: false, Roll: null,
+        evaluation: normalizeCheckEvaluation(evaluation),
+        resolvedCheck: { formula: '1d20', selected: [] },
+        displayFormula: (formula) => ({ display: formula }),
+        options: { interactive: true, dc, prompt: async (payload) => { input = payload; return null; } },
+      });
+      return { target: input.target, direction: input.direction, dc: input.dc };
+    };
+    assert.deepEqual(await received({ direction: 'under' }), { target: 15, direction: 'under', dc: 15 });
+    assert.deepEqual(await received({}), { target: 15, direction: 'over', dc: 15 });
+    assert.deepEqual(await received({ product: 'count', direction: 'under' }, null), {
+      target: null, direction: null, dc: null,
+    }, 'a count prompt names no direction and no target');
+  });
+
+  it('names a summed roll-under target to stay under, and leaves roll-over copy unchanged', async () => {
+    const under = (thresholdMode) => open({ dc: 15, target: 15, direction: 'under', thresholdMode }, null);
+    const meet = (await under('meet')).view;
+    assert.equal(meet.direction, 'under');
+    assert.equal(`${meet.dcText} · ${meet.labels.meet}`, 'Target 15 · stay at or under');
+    assert.equal(`${meet.dcText} · ${(await under('exceed')).view.labels.exceed}`, 'Target 15 · stay under');
+    assert.equal(meet.labels.eachAdds, 'Each raises the target.');
+    assert.equal(
+      meet.labels.bonusHelp,
+      'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    );
+    for (const args of [{ dc: 12 }, { dc: 12, target: 12, direction: 'over' }]) {
+      const { view } = await open(args, null);
+      assert.equal(view.direction, 'over');
+      assert.deepEqual(
+        [view.dcText, view.labels.meet, view.labels.exceed, view.labels.eachAdds, view.labels.bonusHelp],
+        ['DC 12', 'meet or beat', 'beat', 'Each adds to the total.',
+          'A bonus adds to the total. A rolled bonus such as 1d4 is rolled with the check.'],
+        'a roll-over prompt keeps its DC copy byte for byte'
+      );
+    }
+  });
+
+  it('reads the target before the legacy dc, and names no direction without a number', () => {
+    assert.equal(buildSinglePromptData({ dc: 12, target: 9, direction: 'under' }).dc, 9);
+    assert.equal(buildSinglePromptData({ dc: 12 }).dc, 12);
+    const blank = buildSinglePromptData({ dc: null, direction: 'under' });
+    assert.deepEqual([blank.dc, blank.direction], [null, 'over']);
   });
 
   it('formats the pick cap and the DC before the component sees them', async () => {

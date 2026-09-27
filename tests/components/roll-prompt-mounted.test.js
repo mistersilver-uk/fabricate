@@ -439,6 +439,50 @@ describe('mounted roll prompt', () => {
     assert.deepEqual(answer.chosenModifierIds, ['a', 'c']);
   });
 
+  it('names a roll-under target to stay under, and raises it with every modifier and bonus', async () => {
+    const focus = [{ label: 'Focus', display: '+2' }];
+    for (const [thresholdMode, text] of [['meet', 'Target 15 · stay at or under'], ['exceed', 'Target 15 · stay under']]) {
+      document.body.replaceChildren();
+      const view = buildSinglePromptData({
+        displayFormula: '1d20', dc: 15, target: 15, direction: 'under', thresholdMode, selectedModifiers: focus,
+      });
+      const { dialog, pending } = await openThroughHost(view, false, noChoice);
+      const chip = dialog.querySelector('.formula-content .manager-chip');
+      assert.equal(chip.textContent.trim(), text);
+      assert.equal(chip.dataset.rollPromptTarget, 'under');
+      assert.ok(chip.classList.contains('is-info'), 'the DC chip primitive, retoned nowhere');
+      assert.equal(dialog.querySelector('.static-modifiers .help').textContent, 'Each raises the target.');
+      assert.equal(
+        dialog.querySelector('.bonus-group .help').textContent,
+        'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+      );
+      dialog.querySelector('[data-manager-modal-close]').click();
+      await pending;
+    }
+  });
+
+  it('keeps a roll-over prompt byte-identical, whether or not it names a direction', async () => {
+    const focus = [{ label: 'Focus', display: '+2' }];
+    const rendered = [];
+    for (const extra of [{}, { target: 12, direction: 'over' }]) {
+      document.body.replaceChildren();
+      const view = buildSinglePromptData({ displayFormula: '1d20', dc: 12, selectedModifiers: focus, ...extra });
+      const { dialog, pending } = await openThroughHost(view, false, noChoice);
+      const chip = dialog.querySelector('.formula-content .manager-chip');
+      assert.equal(chip.textContent.trim(), 'DC 12 · meet or beat');
+      assert.ok(!chip.hasAttribute('data-roll-prompt-target'), 'no target hook on a roll-over chip');
+      assert.equal(dialog.querySelector('.static-modifiers .help').textContent, 'Each adds to the total.');
+      assert.equal(
+        dialog.querySelector('.bonus-group .help').textContent,
+        'A bonus adds to the total. A rolled bonus such as 1d4 is rolled with the check.'
+      );
+      rendered.push(dialog.querySelector('.fabricate-roll-prompt').innerHTML.replaceAll(/id="[^"]*"|aria-labelledby="[^"]*"/g, ''));
+      dialog.querySelector('[data-manager-modal-close]').click();
+      await pending;
+    }
+    assert.equal(rendered[1], rendered[0], 'a named roll-over direction renders the same markup as none');
+  });
+
   it('shows the base formula once and itemises each applied modifier as a chip', async () => {
     const view = buildSinglePromptData({
       formula: '1d20 + 3 + 6[Modifiers]', resolvedFormula: '1d20 + 3 + 6[Modifiers]',
