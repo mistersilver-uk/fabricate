@@ -562,6 +562,10 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
       'High: 51 or over',
     ]);
     assert.doesNotMatch(state.root.querySelector('[data-outcome-bands]').textContent, /Choose a character/);
+
+    routedHarness.remount();
+    const read = await mount({ ...routedCheck(), type: 'fixed' }, { resolutionMode: 'routedByCheck' });
+    assert.ok(!read.root.querySelector('[data-outcome-band-scale]'), 'no target sentence for a chosen actor');
   });
 });
 

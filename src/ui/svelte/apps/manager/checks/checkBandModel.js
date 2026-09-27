@@ -19,7 +19,7 @@ import {
 import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
 
 import { formatCheckAdjustment } from './checkAdjustmentLabel.js';
-import { interpolate } from './checksCopy.js';
+import { interpolate, underComparisonPhrase } from './checksCopy.js';
 import { missingTargetPaths, targetRefusalSentence } from './checkTargetStatus.js';
 
 const WINDOW_PADDING = 5;
@@ -269,6 +269,21 @@ export function describeBandScale({ direction, comparison, target, source = '', 
     .replaceAll('{target}', String(target))
     .replaceAll('{source}', source)
     .replaceAll('{cmp}', cmp);
+}
+
+/** The read-only card lead for a previewed target `state`, or `''` when it has none. */
+export function previewScaleSentence(state, { direction, comparison }, text) {
+  if (state?.state !== 'ok') return '';
+  return describeBandScale(
+    {
+      direction,
+      comparison,
+      target: state.target,
+      source: state.source,
+      cmp: underComparisonPhrase(comparison, text),
+    },
+    text
+  );
 }
 
 /**

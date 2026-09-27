@@ -26,14 +26,14 @@
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import { activeCheckEvaluation } from '../../../../../systems/checkTarget.js';
-  import { checkTargetChip, underComparisonPhrase } from './checksCopy.js';
+  import { checkTargetChip } from './checksCopy.js';
   import {
     bandsAreEditable,
     buildPassFailBands,
     describeBandRange,
-    describeBandScale,
     describeBandsUnavailable,
     previewBandTarget,
+    previewScaleSentence,
   } from './checkBandModel.js';
 
   // `breakageAuthority` gates the per-trigger break-tools toggle on `checkDriven`, and
@@ -112,18 +112,7 @@
         )
   );
   const readonlyScale = $derived(
-    readonlyTarget?.state === 'ok'
-      ? describeBandScale(
-          {
-            direction: graded.direction,
-            comparison,
-            target: readonlyTarget.target,
-            source: readonlyTarget.source,
-            cmp: underComparisonPhrase(comparison, text),
-          },
-          text
-        )
-      : ''
+    previewScaleSentence(readonlyTarget, { direction: graded.direction, comparison }, text)
   );
 
   const failureLabel = $derived(

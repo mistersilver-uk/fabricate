@@ -25,9 +25,9 @@
     bandsAreEditable,
     buildRoutedBands,
     describeBandRange,
-    describeBandScale,
     describeBandsUnavailable,
     previewBandTarget,
+    previewScaleSentence,
   } from './checkBandModel.js';
   import CheckDcMacroCard from './CheckDcMacroCard.svelte';
   import CheckOutcomeRow from './CheckOutcomeRow.svelte';
@@ -35,7 +35,7 @@
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
-  import { checkTargetChip, underComparisonPhrase } from './checksCopy.js';
+  import { checkTargetChip } from './checksCopy.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import Select from '../../../components/Select.svelte';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
@@ -314,18 +314,7 @@
     });
   });
   const readonlyScale = $derived(
-    readonlyTarget?.state === 'ok'
-      ? describeBandScale(
-          {
-            direction: graded.direction,
-            comparison,
-            target: readonlyTarget.target,
-            source: readonlyTarget.source,
-            cmp: underComparisonPhrase(comparison, text),
-          },
-          text
-        )
-      : ''
+    previewScaleSentence(readonlyTarget, { direction: graded.direction, comparison }, text)
   );
   const bandsFallback = $derived.by(() => {
     if (readonlyTarget && readonlyTarget.state !== 'ok') {
