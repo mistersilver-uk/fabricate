@@ -47,6 +47,33 @@ describe('Journal roll prompt adapter', () => {
     assert.deepEqual([none.view.dc, none.view.direction], [null, 'over']);
   });
 
+  it('forwards a versioned count prompt, so it shows its pool line and required successes', async () => {
+    let received;
+    const count = {
+      subject: 'Horseshoe', product: 'count', direction: 'under', comparison: 'exceed', pool: 3, die: 20,
+      threshold: 13, required: 2, modifierDestination: 'threshold', target: null, formula: '', displayFormula: '',
+    };
+    await promptJournalStageCheck(count, async (options) => {
+      received = options;
+    });
+    assert.deepEqual(
+      [received.product, received.pool, received.die, received.threshold, received.required, received.modifierDestination],
+      ['count', 3, 20, 13, 2, 'threshold']
+    );
+    const view = buildSinglePromptData(received);
+    assert.deepEqual([view.dc, view.direction, view.comparison], [null, 'under', 'exceed']);
+    assert.equal(
+      buildSinglePromptData({ ...received, formula: '1d20', displayFormula: '1d20' }).formula,
+      '',
+      'a count view carries no retained formula, even when one is supplied'
+    );
+    assert.deepEqual(view.count, { pool: 3, die: 20, threshold: 13, required: 2, destination: 'threshold' });
+    await promptJournalStageCheck({ ...count, product: undefined }, async (options) => {
+      received = options;
+    });
+    assert.ok(!Object.hasOwn(received, 'pool'), 'a summed descriptor forwards no count field');
+  });
+
   it('titles a named gathering check with its activity and leaves a hidden one generic', async () => {
     const describe = (publicPrompt) => async () => ({ required: true, publicPrompt, privateEvaluation: {} });
     const named = withPromptActivity({ describeCheck: describe({ label: 'Copper vein' }) }, () => 'Gathering');

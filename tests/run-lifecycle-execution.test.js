@@ -21,9 +21,9 @@ import { transitionExecutionJournal } from '../src/systems/runExecutionJournal.j
 import { promptJournalStageCheck } from '../src/bootstrap/journalOperations.js';
 import { buildSinglePromptData } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
-import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 import { installCountDice } from './helpers/countEngineDice.js';
 import { countEvaluation } from './helpers/countFixtures.js';
+import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 import { createPersistedCraftingHistory, mergeHistoryFlag } from './helpers/journal-fixtures.js';
 
 test('both history allowlists retain only executed check evaluation metadata', () => {
@@ -2251,6 +2251,31 @@ test('a roll-under versioned prompt explains a character-value target through th
   } finally {
     surface.restore();
     restore();
+  }
+});
+
+test('a count versioned prompt shows its pre-modifier pool line and successes through the Journal adapter', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1d4' } };
+  const evaluation = countEvaluation({
+    direction: 'under', die: 20, base: '@skill', threshold: '13', required: 2, modifierDestination: 'threshold',
+  });
+  const { actor, describe } = await startToolSuppliedRun(tool, {
+    check: { rollFormula: '1d20', dc: 12, thresholdMode: 'exceed', evaluation },
+  });
+  actor.getRollData = () => ({ skill: 3.7 });
+  const dice = installCountDice({ faces: [4] });
+  const surface = stubPromptSurface(() => null);
+  try {
+    const { publicPrompt } = await describe();
+    await promptJournalStageCheck(publicPrompt);
+    const { view } = surface;
+    assert.equal(view.formula, '3d20 · each < 13', 'the pool 3.7 rounded down, before the Tool die');
+    assert.equal(view.neededText, '2 successes needed');
+    assert.deepEqual([view.dc, view.dcText, view.allowAdvantage], [null, '', false]);
+    assert.equal(view.labels.eachAdds, 'Each moves the threshold.');
+  } finally {
+    surface.restore();
+    dice.restore();
   }
 });
 

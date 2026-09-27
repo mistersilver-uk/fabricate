@@ -49,6 +49,14 @@ export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
     selectedModifiers: descriptor?.selectedModifiers,
     allowAdvantage: descriptor?.allowAdvantage === true,
     modifierChoice: descriptor?.modifierChoice ?? null,
+    ...(descriptor?.product === 'count' && {
+      product: 'count',
+      pool: descriptor.pool,
+      threshold: descriptor.threshold,
+      die: descriptor.die,
+      required: descriptor.required,
+      modifierDestination: descriptor.modifierDestination,
+    }),
   });
 }
 

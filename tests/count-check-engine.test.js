@@ -624,6 +624,43 @@ test('the gathering descriptor refuses a count pool and captures its resolved po
   assert.equal(described.publicPrompt.allowsSituationalModifier, true);
   assert.equal(described.privateEvaluation.flavor, 'Forage — Gathering check', 'no DC suffix');
   assert.equal(JSON.stringify(described.publicPrompt).includes('skills'), false);
+  const { product, direction, comparison, pool, threshold, die, required, modifierDestination } =
+    described.publicPrompt;
+  assert.deepEqual(
+    { product, direction, comparison, pool, threshold, die, required, modifierDestination },
+    {
+      product: 'count',
+      direction: 'under',
+      comparison: 'meet',
+      pool: 4,
+      threshold: 8,
+      die: 10,
+      required: 0,
+      modifierDestination: 'threshold',
+    },
+    'the prompt shows the resolved pool line and the override required count'
+  );
+});
+
+test('a hidden gathering task prompts with count wording but no pool or required count', () => {
+  const engine = new GatheringEngine({ localize: (key) => key });
+  const { system, environment, task } = gatheringFixture({ mode: 'routed' });
+  system.gatheringCraftingCheck.routed = routedCheck(countEvaluation({ modifierDestination: 'threshold' }));
+  const describeFor = (taskId) =>
+    engine._versionedCheckDescriptor({
+      actor: { uuid: 'Actor.g', system: {} },
+      run: { taskId },
+      system,
+      environment,
+      task: { ...task, resolutionMode: 'routed' },
+    }).publicPrompt;
+  const hidden = describeFor('blind:1');
+  assert.deepEqual(
+    [hidden.product, hidden.modifierDestination, hidden.pool, hidden.threshold, hidden.required],
+    ['count', 'threshold', null, null, null]
+  );
+  const visible = describeFor(task.id);
+  assert.deepEqual([visible.pool, visible.threshold, visible.required], [2, 8, 1]);
 });
 
 // ── the prepared evaluator ────────────────────────────────────────────────────

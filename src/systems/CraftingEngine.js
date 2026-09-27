@@ -55,7 +55,7 @@ import {
   runFormulaProgressive,
   runFormulaRouted,
 } from './checkRoll.js';
-import { underTargetPromptFields } from './checkRollDecision.js';
+import { countPromptFields, underTargetPromptFields } from './checkRollDecision.js';
 import {
   activeCheckEvaluation,
   actorRollData,
@@ -7322,7 +7322,7 @@ function versionedCheckPrompt({
   modifierChoice,
   toolContributions,
 }) {
-  const { evaluation } = checkTarget;
+  const { evaluation, policy: countPolicy } = checkTarget;
   const selectedModifiers = modifierChoice
     ? []
     : resolveCheckModifierContribution(modifierContext, makeRollDataExpressionResolver(actor))
@@ -7365,6 +7365,8 @@ function versionedCheckPrompt({
     // A count check offers no advantage until it is mode-aware (issue 2007).
     allowAdvantage: !counts && hasPlainD20(activeCheck.rollFormula),
     modifierChoice: publicModifierChoice(modifierChoice),
+    // The pool resolved before any Tool roll, and the required count the macro settled.
+    ...(counts && countPromptFields(evaluation, countPolicy, dc)),
   };
 }
 

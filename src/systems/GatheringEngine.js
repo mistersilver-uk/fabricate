@@ -18,6 +18,7 @@ import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOut
 
 import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { evaluateSituationalBonus, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
+import { countPromptFields } from './checkRollDecision.js';
 import {
   activeCheckEvaluation,
   actorRollData,
@@ -773,6 +774,13 @@ export class GatheringEngine {
         allowsSituationalModifier: hasActiveCheck(config, rollFormula),
         // A count check offers no advantage until it is mode-aware (issue 2007).
         allowAdvantage: !count && Boolean(rollFormula && /(?:^|\W)d20(?:\W|$)/i.test(rollFormula)),
+        // A hidden task's prompt keeps the count wording but shows no pool or required count.
+        ...(count &&
+          countPromptFields(
+            evaluation,
+            secret ? null : target.policy,
+            secret ? null : target.target
+          )),
       },
       privateEvaluation: {
         secret,
