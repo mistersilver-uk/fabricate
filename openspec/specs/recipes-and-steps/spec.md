@@ -19,7 +19,8 @@ Crafting and salvage evaluate every distinct enabled eligible Tool's bonus expre
 A versioned Journal crafting check applies the same bonuses: the issuing GM evaluates them once from the stage's validated Tools when preparing the check, the prepared descriptor retains the contributions, and the prompt and execution use that Tool-appended formula.
 Under the active sum/over evaluation, the resulting non-zero terms are appended to simple, routed, progressive, and alchemy formulas with bracket/control characters removed from their Tool labels.
 Under sum/over a dice-bearing Tool bonus appends only its numeric result, as before, and adds no roll evidence to the check's message, result or handoff.
-When another evaluation becomes active, each Tool's resolved benefit is routed to its target, threshold, or pool instead; an evaluated dice-bearing Tool bonus retains its actual roll evidence and is never rolled again.
+Under any other evaluation each Tool's resolved benefit is routed to its target, threshold, or pool instead; an evaluated dice-bearing Tool bonus retains its actual roll evidence and is never rolled again.
+Tools are prepared by the check's own normalized evaluation, and only after its target has resolved, because preparation rolls dice-bearing Tool bonuses.
 The supplying actor, distinct-Tool deduplication, prerequisite gates, evaluation timing, and failure-to-zero behavior are the same in every evaluation.
 A dice-bearing Tool bonus whose roll cannot be serialized aborts check preparation before its numeric benefit can be used.
 If its evidence must be reconstructed before a main check rolls, failure likewise aborts before that roll.
@@ -267,6 +268,22 @@ They change no existing contract: the crafting and gathering economies, legacy c
      (It uses the shared `craftingCheck.simple` slot, not `craftingCheck.routed`.)
    - **Progressive**: roll the progressive formula;
      its total is the numeric `value` spent against ordered result difficulties.
+
+   A simple or routed check grades in its evaluation's direction against its resolved target
+   (`resolution-modes/spec.md` § Check Target Resolution).
+   A fixed target is the resolved DC above; an attribute target reads the crafting actor's
+   character value, adjusted by the selected recipe tier's non-null `adjustment`, else the
+   evaluation's `target.baseAdjustment`, and is kept separate from the DC fields.
+   The target resolves and validates before Tool preparation and before any dynamic-DC macro.
+   A target refusal aborts the attempt as misconfigured before any roll, consumption or award:
+   `craft()` returns `{ success: false, results: null, message, misconfigured: true }` with
+   `data.targetRefusal` naming the reason.
+   Every misconfigured required check carries that additive `misconfigured: true`
+   discriminator, as salvage already does, including a sum/over check with no roll formula;
+   `success` and `message` are unchanged.
+   A timed FINISH refusal returns the same shape, rolls nothing, awards nothing and leaves the
+   run resumable, its inputs having been consumed at START.
+   Anything an arbitrary configured macro does cannot be rolled back.
 
    A crafting check is not optional-by-absence.
    Simple mode always carries a system-level check that is either active or deactivated;
@@ -665,6 +682,8 @@ Salvage is a single-step operation (no multi-step salvage):
 3. **Check**: Roll the salvage check for the active `salvageResolutionMode`.
 A salvage check is usable only when its mode has an authored roll formula (`salvageCraftingCheck.simple|routed|progressive.rollFormula`); the optional simple check runs only when `salvageCraftingCheck.simple.rollFormula` is authored.
 Routed and progressive salvage require their roll formula and fail loudly (with zero mutation) when it is missing.
+A simple or routed salvage check grades against its resolved target in its evaluation's direction: a fixed target is the component's finite `salvage.dcOverride`, else the slot's `dc`, else 15, and an attribute target reads the actor's character value adjusted by the component's non-null `salvage.adjustmentOverride`, else the evaluation's `target.baseAdjustment`, with no macro and no recipe tier.
+A target refusal, a progressive `sum/under` check included, aborts as misconfigured with zero mutation before any roll, and `salvage()` returns `misconfigured: true` with `data.targetRefusal` naming the reason.
 4. **Resolve**: Determine result group by `salvageResolutionMode` rules (same as recipe resolution per `resolution-modes/spec.md`, but using salvage-specific settings).
 5. **Consume**: remove N = `Component.salvage.ingredientQuantity` instances (default 1, any positive integer) of the component from the actor's inventory, matching §Implicit Ingredient and `data-models/spec.md`.
 Apply tool usage/breakage as applicable.

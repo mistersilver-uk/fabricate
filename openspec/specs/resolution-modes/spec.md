@@ -267,7 +267,7 @@ Recipe-less alchemy fizzle history retains its Alchemy label.
 
 A completed managed write records the resolution it actually executed, so a run's history can be read without consulting live configuration.
 See `recipes-and-steps/spec.md` § Captured Execution Evidence for the write-side contract and `data-models/spec.md` for the persisted shape.
-An executed, permitted versioned crafting check additionally records actual `sum/over` product and direction in its snapshot; a retained future authored record never changes those executed values in this foundation.
+An executed, permitted versioned crafting check additionally records the product and direction it actually executed in its snapshot; a later edit to the authored record never changes those executed values.
 
 1. Every applicable completed managed write MUST capture `resolutionSnapshot` as `{kind, mode}`, where `mode` is the resolution mode that executed and `kind` is `check`, `ingredients` or `none`.
 Legacy and version-1 immediate and timed crafting, recipe-less alchemy fizzle, native salvage, and Direct, d100, routed and legacy progressive gathering are all in scope.
@@ -305,18 +305,47 @@ An entitled handoff reconstructs after GM execution and reports a failed chat po
 The optional executed `data.preRolls` records `{ source, label, expression, total, destination }` in placement order; a posted check bundles the main roll first and the pre-rolls after it in one message under the same roll mode, speaker and flavor, with the main total as its content so each viewer sees every roll they may see.
 When that bundled post has no explicit roll mode, it reads the posting client's current core mode with the supported-version key (`rollMode` on V13, `messageMode` on V14); an explicit mode takes precedence.
 An entitled prepared handoff carries the already evaluated serialized pre-rolls beside its existing `serializedRoll`, and reconstruction does not reroll; secret execution exposes no formula-bearing handoff or pre-roll evidence to its requester.
-The active engine remains sum/over until the count and under behavior children activate the other evaluations, so an authored inactive evaluation record does not yet change a check decision.
+Crafting and salvage prepare their Tool contributions, and every activity places its modifiers, by the check's own normalized evaluation, so the prepared plan and the grading runner always agree.
+Under sum/under the settled `targetDelta` raises or lowers the effective target exactly once, after target resolution and any tier arithmetic, and no benefit term is appended to the rolled formula.
 
 ## Check Evaluation Foundation
 
 Shared comparison accepts meet or strict exceed with over or under direction; ranking returns a new best-first array, ranks non-finite values last, and retains the first authored member of each tie without mutating its input.
-Effective margin follows the selected direction, while executed formula runners and the odds classifier explicitly evaluate `sum/over` until the count and under behavior children activate those modes.
-The authored evaluation record, including inactive count/under fields, survives normalization and export/import without changing current check decisions.
+Effective margin follows the selected direction and is benefit-positive: `total − target` over and `target − total` under.
+The formula runners, the routed classifier and the prepared evaluator grade a summed total over or under a fixed or character-value target; how a count evaluation executes belongs to its own behavior child.
+The Checks Studio preview and odds enumerator still grade every record as `sum/over` until the preview behavior child activates the other evaluations.
+The authored evaluation record, including fields the selected mode does not read, survives normalization and export/import.
 A deterministic expression accepts finite numbers, roll-data paths, arithmetic, parentheses and floor, ceil and round without rolling dice.
 A roll-data path reads only the roll data's own keys and resolves a finite number or a decimal numeric string; a missing, null or blank value is an unresolved path, and a boolean, array, object or non-decimal string is refused as non-finite rather than coerced.
 A path token is never read as dice, so `@dc` and `@d20` resolve as paths while `1d%` is refused as dice.
 It reports unresolved paths, dice syntax, invalid syntax and non-finite results distinctly and never substitutes zero for a missing path; count-specific integer policy belongs to the later behavior child.
-The private crafting and gathering versioned check descriptors deep-clone authored `checkConfig.evaluation` beside their prepared formula and DC; the prepared evaluator reads only that descriptor, so subsequent live edits cannot change its inputs.
+That strict own-key reader stays the default for every caller.
+
+### Check Target Resolution
+
+A check's pre-modifier target has a **target source**: `fixed` keeps the activity's anchor DC, and `attribute` reads a character value from the acting actor.
+A fixed target keeps its existing precedence: crafting uses the recipe's selected difficulty tier, else the slot's static `dc`, then any dynamic-DC macro; salvage and gathering use a finite `dcOverride`, else the static `dc`, else 15.
+An attribute target ignores those DC fields and resolves `target.expression` against `actor.getRollData()`, else `actor.system`, without mutating it.
+It then applies one **difficulty adjustment**: crafting takes the selected recipe tier's non-null `adjustment`, salvage the component's non-null `salvage.adjustmentOverride`, and gathering the task's non-null `adjustmentOverride`, each else the evaluation's `target.baseAdjustment`; a null adjustment is identity.
+An added adjustment is any finite number and a multiplier is a finite number above zero.
+The order is resolve, adjust, then floor (`floor(value + a)` or `floor(value × m)`).
+
+Target resolution reads paths in a **Foundry path mode** that mirrors Foundry's `Roll.replaceFormulaData`.
+A path resolves with `foundry.utils.getProperty` semantics: the whole key first, then an `in` walk that stops at a non-object, so a prototype getter resolves.
+The found value is read as `String(value).trim()` reads it, so an object whose `toString()` yields a decimal number resolves.
+In that mode a null, undefined or blank value is `unresolved-path`, a dice string is `dice`, other text, a boolean, a function, an array, a `Set`, a `Map` or a plain object is `invalid`, and `NaN` or `Infinity` is `non-finite`; an unresolved or non-numeric value never reads as 0.
+The reason names therefore differ by mode for a boolean or plain object, which the strict reader refuses as `non-finite`.
+
+A target that cannot resolve is a **target refusal**, one of `expression-missing`, `unresolved-path`, `non-finite`, `dice`, `invalid`, `adjustment-invalid`, `progressive-under` and `formula-empty`.
+The refusal is answered before any Fabricate-controlled roll, Tool roll, spend or award, through the misconfigured channel (`success: false, misconfigured: true`) with `data.targetRefusal` set to the reason.
+Its message is a localized sentence naming the activity, such as "Crafting check cannot roll: the character value its target reads was not found.", and never the raw reason code.
+A versioned crafting or gathering descriptor refuses by throwing its lifecycle error with code `CHECK_TARGET_INVALID` and mutates nothing.
+Only a check that reads a target validates one: a progressive check and a fixed-range routed check read no target, so their target source is inert and never refuses.
+An empty formula under sum/under refuses `formula-empty` rather than grading a total of 0 as a pass.
+
+The private crafting and gathering versioned check descriptors deep-clone authored `checkConfig.evaluation` beside their prepared formula; the prepared evaluator reads only that descriptor, so subsequent live edits cannot change its inputs.
+Each descriptor resolves its target before Tool preparation and captures the resolved pre-modifier target, after any macro, privately as `decisionPolicy.target` beside `decisionPolicy.targetSource`, while `decisionPolicy.dc` names only a fixed target.
+The prepared evaluator places by that evaluation and grades against `decisionPolicy.target` plus the settled `targetDelta` under, so a later actor or configuration edit cannot move a prepared target.
 The public prompt and semantic `resolutionSnapshot` remain separate from that private authored record.
 
 ## Gathering Task Modes
@@ -346,8 +375,9 @@ Alchemy `none` has no check, `simple` reads the simple check slot, and `tiered` 
 Versioned player checks use an authenticated prepare/resolve exchange: the player chooses permitted roll options, while the active GM evaluates the authoritative check.
 The private prepared descriptor captures the JSON-safe modifier context with actor expression substitutions and the full permitted player choice before the prompt; the public projection carries only the already-applied display entries or deferred choice display, never the private catalogue or evaluation policy.
 The shared resolver supplies both the displayed static contribution and the contribution later appended to the authoritative roll, so a library or actor-data edit after preparation cannot change it.
-Only a simple pass/fail check projects a finite single target and normalized meet-or-exceed comparison to the public Journal prompt; routed and progressive classification inputs stay private.
+Only a simple pass/fail check projects a finite single target, its normalized meet-or-exceed comparison and its direction (`over` or `under`) to the public Journal prompt; routed and progressive classification inputs stay private.
 Initial secret prompts MUST omit protected subject, artwork, formula, DC and modifier details before transport.
+A secret check classifies inside the authority with its full settled modifier placement, so a sum/under `targetDelta` still moves its target, while the answer returned to the requester carries no placement, pre-roll evidence, formula or roll handoff.
 Secret checks use GM private posting without serialized roll-data handoff; non-secret roll handoff additionally requires a fresh post-commit entitlement check and never rolls a second time.
 Roll delivery and chat posting are separate from run settlement; missing chat delivery MUST NOT authorize replay of spending or awards.
 
@@ -407,10 +437,21 @@ No other result groups are awarded.**
 - The crafting check is **required**.
 The outcome is produced by the system's configured routed crafting check, whose required field is an authored `craftingCheck.routed.rollFormula`.
 - `outcome` is trim-normalized and case-insensitive.
-- **Relative tier clamp:** when the routed check uses **relative** outcome tiers and the rolled total meets no tier's effective threshold (`baseDc + outcome.dc`), the outcome is the lowest (closest) tier rather than an empty/null outcome, so a recipe tier or dynamic DC that raises the base difficulty never yields a rolled-but-unrouted craft.
+- **Relative tier thresholds follow the check's direction.**
+A relative tier's threshold is `anchor + outcome.dc` over and `anchor − outcome.dc + targetDelta` under, where the anchor is the resolved target and `outcome.dc` is the tier's benefit-signed step; an inactive `outcome.adjustment` is ignored for these tiers.
+Under an attribute target with a `multiply` adjustment kind, a relative tier's threshold is instead `floor(anchor × outcome.adjustment)`, plus `targetDelta` under.
+The best qualifying tier wins.
+- **Otherwise tier (attribute/multiply only).**
+Under an attribute/multiply check, a relative tier whose `adjustment` is null is the **Otherwise tier**: it applies when no multiplied threshold qualifies, has no threshold, and ranks below every tier with one whatever its own `success` flag.
+Exactly one is intended; at runtime several take the first authored, and none falls back to the clamp below.
+A null adjustment on a fixed or additive check does not make a tier Otherwise, and a non-finite imported multiplier normalizes to null and so becomes Otherwise.
+- **Relative tier clamp:** when the routed check uses **relative** outcome tiers and the rolled total meets no tier's effective threshold, and no Otherwise tier applies, the outcome is the least demanding tier (the lowest threshold over, the highest under) rather than an empty/null outcome, so a recipe tier or dynamic DC that raises the base difficulty never yields a rolled-but-unrouted craft.
 The clamp is relative-only; **fixed** tiers keep the "outside every range → no outcome" behaviour (their ranges are authored explicitly).
 - **Fixed tiers carry no DC.**
 Fixed outcome tiers own explicit, non-overlapping `[start, end]` value ranges and the roll total is matched by range, so the check DC and the meet/exceed `thresholdMode` comparison are unused in fixed mode — DC and the comparison are relative-only.
+A fixed-range check therefore reads no target, and its target source is inert: runtime never resolves or refuses it.
+Under sum/under the matched value is `total − targetDelta` against the inclusive ranges, so a benefit shifts the match toward the better, lower end; `data.total` stays raw and no threshold or margin is invented, and sum/over fixed ranges still match the raw total.
+A matched value that is not a whole number falls between two inclusive integer ranges and matches none, so a fractional appended scalar over, or a fractional `targetDelta` under, can leave the attempt rolled but unrouted; how such a value maps to a range awaits a ruling (#2059).
 **A fixed tier set MUST leave no GAP inside its own span**, and a set that does is the BLOCKING readiness issue `rangeGap` (`critical`), alongside the `rangeInvalid` and `rangeOverlap` its two siblings raise.
 A gap is a value BETWEEN two authored tiers that no tier claims — Slag 1–9, Rough 11–17, with 10 claimed by nobody — and it is reachable by ordinary authoring: edit one boundary and stop.
 It is `critical` rather than a warning because fixed mode has no `clampToNearest` rescue: a roll landing in the hole matches no tier at all, so the attempt is rolled but UNROUTED, which fails it rather than degrading it.
@@ -418,7 +459,7 @@ The measurement is SPAN-INTERIOR ONLY: a set that simply does not cover every va
 Invalid and overlapping ranges are excluded from the measurement first, since both already raise their own `critical` and a `start > end` range would otherwise manufacture a phantom gap.
 The DC still governs `routedByIngredients` (whose pass/fail gate compares the roll against it — that DC now lives on its simple check, `craftingCheck.simple.dc`) and relative-type routed checks (which read `craftingCheck.routed.dc`); only `routedByCheck` with `type: "fixed"` drops it.
 - **Per-recipe minimum success tier (fixed only).**
-A `routedByCheck` recipe MAY carry an optional `minSuccessOutcomeId` referencing a fixed success outcome tier id; fixed tiers rank by their `start` value.
+A `routedByCheck` recipe MAY carry an optional `minSuccessOutcomeId` referencing a fixed success outcome tier id; fixed tiers rank by their `start` value in the check's direction, so a lower `start` ranks higher under.
 When set, a craft whose **final (post-step) tier** ranks below the required tier — or whose total lands outside every fixed range, so no tier matched at all — fails outright: `success: false`, no outcome routes, and the recipe takes its normal failure/consumption path with no success result.
 The gate judges the final tier because tier stepping is applied before it (see *Routed Tier Stepping* below), so a `down` step can drop a craft below the recipe minimum and an `up` step can lift it over.
 Because no tier routes on this failure, the blocked tier's own `breakTools` flag is dropped (the per-tier breakage bridge fires only for a routed tier); independent dice-group / roll-total breakage triggers are unaffected.
@@ -458,13 +499,15 @@ It is available on every routed check — crafting, salvage AND gathering — in
 It supersedes the retired `natStepping` boolean, which hard-coded the die (d20), the faces (1 and 20), the magnitude (±1) and the scope (relative crafting and salvage only); a persisted `natStepping: true` converts to an equivalent trigger pair on read (see `data-models`).
 
 **One classifier.**
-The whole post-roll resolution of a routed check — forced reroute, then tier stepping, then the recipe minimum-success-tier gate, in that order — is a SINGLE exported function (`classifyCheckTotal`), and `runFormulaRouted` calls it rather than restating it.
+The whole post-roll resolution of a routed check — forced reroute, then tier stepping, then the recipe minimum-success-tier gate, in that order — is a SINGLE exported function (`classifyCheckTotal` in `src/systems/checkRouting.js`, re-exported by `checkRoll.js`), and `runFormulaRouted` and the prepared evaluator call it rather than restating it.
+It takes the resolved anchor as `dc`, the check's `evaluation` for direction and multiply, and the settled `targetDelta`.
 That is what makes the Checks Studio's per-outcome odds histogram incapable of disagreeing with a real roll: the histogram buckets each enumerated die face through the same function the engine resolves through, so "they cannot drift" is a property of the code rather than a promise (see `ui-system-studio` §Per-outcome odds histogram).
 Any other consumer of routed classification consumes it the same way.
 
 **One rolled formula.**
 The same rule governs the INPUT to that classifier.
-Two transforms stand between an authored formula and the one Foundry evaluates — the retired check-modifier placeholder is stripped, and the resolved check-modifier scalar is appended as one term — and both are a SINGLE exported derivation (`resolveRolledFormula`) rather than a composition each caller assembles.
+Two transforms stand between an authored formula and the one Foundry evaluates — the retired check-modifier placeholder is stripped, and the library contribution is placed by the check's evaluation (appended as terms under sum/over) — and both are a SINGLE exported derivation (`deriveCheckRoll`, which returns `{ formula, placement }` for a formula, actor, modifier context, `Roll`, evaluation and Tool contributions) rather than a composition each caller assembles.
+`resolveRolledFormula` is its formula half, and it and `resolveCheckFormulaDisplay` take the evaluation as a fifth argument.
 The roll path, the display resolver and the Checks Studio's odds enumerator all ask it for the formula, so a change to what the engine rolls moves the histogram with it.
 The tool bonus is NOT part of that derivation: it is appended above the runner, by the engine on a real craft and by the preview arg-builder on a preview, and the runner appends none of its own.
 
@@ -506,8 +549,10 @@ When no tier matched at all, nothing steps — `target` included — because a r
 On a fixed check whose total falls outside every authored range this is the ordinary outcome; a GM wanting a floor for un-ranged totals authors a covering range, not a step.
 
 **One ranking.**
-Tier order is derived in exactly one place (`rankedRoutedOutcomes`), shared by the forced reroute, the minimum-success-tier gate and the step pass: ascending by `dc` (relative) or `start` (fixed), dropping any tier whose rank is not a finite number, and keeping the FIRST authored tier among equal ranks in both directions.
-The minimum-success-tier gate consumes that ranking only to LOCATE the required tier and continues to compare threshold VALUES, so two fixed tiers sharing a `start` compare equal and the craft passes.
+One ranking rule decides which qualifying tier is best and which tier the clamp picks, and the tier order derived from it in exactly one place (`rankedRoutedOutcomes`) is shared by the forced reroute, the minimum-success-tier gate and the step pass, where "up" is always better.
+A fixed range ranks by `start` and a multiply tier by its computed threshold, both in the check's direction; an additive relative tier ranks by its benefit-signed `dc`, which orders exactly as its threshold does in either direction.
+An Otherwise tier ranks lowest, any other tier whose rank is not a finite number is dropped, and the FIRST authored tier is kept among equal ranks in both directions.
+The minimum-success-tier gate consumes that ranking only to LOCATE the required tier and compares the final and required `start` VALUES as a meet in the check's direction, so two fixed tiers sharing a `start` compare equal and the craft passes.
 
 ### Validation
 
@@ -535,6 +580,9 @@ This `difficulty` IS the component's **progressive DC** — the field the GM com
 It is distinct from the progressive **check**, which has **no DC** of its own: the check produces the numeric budget (`value`), and each stage spends that budget against its component's progressive DC.
 Player-facing progressive surfaces therefore show both per stage — the component's progressive DC (`DC N`) and the cumulative budget that reaches the stage (`Reach ≥N`).
 - Check is mandatory and returns numeric `value`.
+- A progressive check reads no target, so its target source is inert.
+A summed roll-under (`sum/under`) progressive check refuses `progressive-under` before any roll, Tool roll or modifier pre-roll, because its total is spent as a budget that no target can grade; the refusal applies only to `product: 'sum'`.
+The crafting and salvage progressive runners, gathering's progressive evaluation, both versioned descriptors and the prepared evaluator refuse it, and `runFormulaProgressive` refuses it again as a backstop.
 - Awarding evaluates ordered results using `awardMode`.
 - **All result groups whose difficulty threshold is met or exceeded are awarded, not just the highest matching group.
 This is the key distinction from the routed modes, which select exactly one result group.**
