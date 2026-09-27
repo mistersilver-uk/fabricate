@@ -10,6 +10,7 @@ import { resolve } from 'node:path';
 
 import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
 import { createAdminStore } from '../src/ui/svelte/stores/adminStore.js';
+import { foldTargetTerms } from '../src/ui/presenters/checkDisplay.js';
 import { createServices } from './helpers/adminStoreServices.js';
 import {
   CHECK_EDITOR_COMPILED_MODULES,
@@ -283,6 +284,11 @@ test('a percentile roll-under ladder authored in the Studio saves, reopens and e
     [20, 27, 7]
   );
   assert.deepEqual([hard.check.data.outcomeId, hard.check.success], ['hard', true]);
+  assert.deepEqual(hard.check.data.targetTerms, [
+    { kind: 'anchor', value: SKILL },
+    { kind: 'multiplier', value: 0.5 },
+  ]);
+  assert.equal(foldTargetTerms(hard.check.data.targetTerms, hard.check.data.preRolls), 27);
   assert.equal(hard.awarded, 1, 'the success tier produces its result');
 
   const extreme = await execute(reloaded, 11);
@@ -296,5 +302,6 @@ test('a percentile roll-under ladder authored in the Studio saves, reopens and e
     ['otherwise', false]
   );
   assert.deepEqual([otherwise.check.data.target, otherwise.check.data.margin], [null, null]);
+  assert.ok(!Object.hasOwn(otherwise.check.data, 'targetTerms'), 'Otherwise invents no target');
   assert.equal(otherwise.awarded, 0);
 });

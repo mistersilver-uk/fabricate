@@ -6,6 +6,7 @@
 import { refusalData } from './checkTarget.js';
 import {
   VERSIONED_EXECUTION_CONTEXT,
+  checkDisplayForCard,
   rollTotalForCard,
   tierStepForCard,
 } from './craftCardFields.js';
@@ -458,6 +459,7 @@ async function publishCheckFailure(engine, ctx, craftInputs, failure) {
     failureReason: checkResult.message || 'Crafting check failed',
     rollValue: rollTotalForCard(checkResult),
     tierStep: tierStepForCard(checkResult),
+    check: checkDisplayForCard(checkResult),
   });
   return {
     result: {
@@ -554,6 +556,7 @@ export async function resolveModeValidationFailure(engine, ctx, craftInputs) {
     failureReason: message,
     rollValue: rollTotalForCard(checkResult),
     tierStep: tierStepForCard(checkResult),
+    check: checkDisplayForCard(checkResult),
   });
   return refuse(message);
 }
@@ -607,6 +610,7 @@ export async function runResolutionPreflight(engine, ctx, craftInputs) {
     failureReason: message,
     rollValue: rollTotalForCard(checkResult),
     tierStep: tierStepForCard(checkResult),
+    check: checkDisplayForCard(checkResult),
   });
   return {
     result: {
@@ -735,6 +739,7 @@ export async function publishCraftSuccess(engine, ctx, craftInputs, award) {
     createdResults: award.resultItems,
     rollValue: rollTotalForCard(checkResult),
     tierStep: tierStepForCard(checkResult),
+    check: checkDisplayForCard(checkResult),
     // Redacted inside the poster, which holds the system the component names resolve
     // against. Null for every non-progressive craft (issue 1286).
     firedComplications: firedComplications?.fired ?? null,

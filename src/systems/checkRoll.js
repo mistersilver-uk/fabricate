@@ -45,6 +45,44 @@ export { classifyCheckTotal, resolveForcedOutcome } from './checkRouting.js';
 export { rolledDiceGroups } from './checkRollOutput.js';
 
 /**
+ * `data.targetTerms` outside sum/over/fixed (issue 2005): the resolved target's terms, else its
+ * anchor, then the rolled tier's step, then the settled scalar benefits. Folded in order with
+ * `preRolls` they reproduce `data.target`. A term is `{ kind, value, source? }` and nothing else.
+ */
+function targetTermsEvidence({ grading, target, anchor, baseTerms, tierTerm = null, rolled }) {
+  if (target === null || (grading.direction === 'over' && grading.source === 'fixed')) return {};
+  const base =
+    Array.isArray(baseTerms) && baseTerms.length > 0
+      ? baseTerms
+      : [{ kind: 'anchor', value: anchor }];
+  const benefits = grading.direction === 'under' ? (rolled?.benefitTerms ?? []) : [];
+  return {
+    targetTerms: [
+      ...base.map(({ kind, value }) => ({ kind, value })),
+      ...(tierTerm ? [tierTerm] : []),
+      ...benefits.map(({ kind, value, source }) => ({ kind, value, source })),
+    ],
+  };
+}
+
+/** The relative tier the roll matched, before forcing or steps, as its target term; its
+ * threshold is the executed target, so forced and stepped outcomes keep it. */
+function rolledTierTerm(grading, classifyInput) {
+  const { matched } = classifyCheckTotal({ ...classifyInput, triggers: [], minOutcomeId: null });
+  if (!matched) return null;
+  if (grading.multiply) return { kind: 'multiplier', value: Number(matched.adjustment) };
+  const step = Number(matched.dc);
+  return { kind: 'adjustment', value: grading.direction === 'under' ? 0 - step : step };
+}
+
+/** The executed roll mode, on a result whose caller asked for it; never persisted. */
+function reportedVisibility(rolled) {
+  return rolled && Object.hasOwn(rolled, 'rollMode')
+    ? { visibility: { rollMode: rolled.rollMode, secret: false } }
+    : {};
+}
+
+/**
  * The formula this module actually rolls and its modifier placement: the retired-placeholder shim
  * (issue 1094), then the library append for `evaluation`. One derivation, because the roll, the
  * display and the Checks Studio's odds enumerator must agree (issue 1097). `craftingModifier` is
@@ -146,6 +184,7 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     rollMode: effectiveRollMode,
     resolvedFormula,
     placementPlan,
+    benefitTerms,
   } = decision;
   const { placement: modifierPlacement, rolls: preRolls } = await resolveModifierPreRolls(
     placementPlan,
@@ -172,6 +211,8 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     diceGroups: rolledDiceGroups(roll),
     resolvedFormula,
     modifierPlacement,
+    ...(benefitTerms?.length > 0 && { benefitTerms }),
+    ...(options?.reportVisibility === true && { rollMode: effectiveRollMode ?? null }),
   };
   const rollHandoff = checkRollHandoff({
     roll,
@@ -297,12 +338,27 @@ function preparedCheckRefusal(kind, evaluation, formula) {
 }
 
 /** Grades a prepared total as the matching runner does, against the captured anchor. */
-function gradePreparedTotal(kind, { config, evaluation, anchor, targetDelta, total, diceGroups }) {
+function gradePreparedTotal(
+  kind,
+  { config, evaluation, anchor, rolled, total, diceGroups, secret }
+) {
   const grading = sumGrading(evaluation);
+  const targetDelta = rolled.modifierPlacement?.targetDelta;
   const triggers = config.checkBreakage?.triggers ?? config.triggers ?? [];
   const comparison = config.thresholdMode === 'exceed' ? 'exceed' : 'meet';
+  const terms = (target, tierTerm) =>
+    secret
+      ? {}
+      : targetTermsEvidence({
+          grading,
+          target,
+          anchor,
+          baseTerms: config.targetTerms,
+          tierTerm,
+          rolled,
+        });
   if (kind === 'routed') {
-    const classified = classifyCheckTotal({
+    const classifyInput = {
       type: config.type,
       total,
       dc: anchor,
@@ -315,7 +371,9 @@ function gradePreparedTotal(kind, { config, evaluation, anchor, targetDelta, tot
       minOutcomeId: config.minOutcomeId ?? null,
       evaluation,
       targetDelta,
-    });
+    };
+    const classified = classifyCheckTotal(classifyInput);
+    const tierTerm = classified.target === null ? null : rolledTierTerm(grading, classifyInput);
     return {
       success: classified.success,
       outcome: classified.matched?.name ?? null,
@@ -323,6 +381,7 @@ function gradePreparedTotal(kind, { config, evaluation, anchor, targetDelta, tot
       data: {
         type: config.type,
         ...executedSumEvidence(total, classified.target, classified.comparison, grading.direction),
+        ...terms(classified.target, tierTerm),
         outcomeId: classified.matched?.id ?? null,
         success: classified.success,
         breakTools: classified.breakTools,
@@ -354,7 +413,10 @@ function gradePreparedTotal(kind, { config, evaluation, anchor, targetDelta, tot
     success,
     outcome: success ? 'pass' : 'fail',
     value: total,
-    data: executedSumEvidence(total, target, comparison, grading.direction),
+    data: {
+      ...executedSumEvidence(total, target, comparison, grading.direction),
+      ...terms(target, null),
+    },
   };
 }
 
@@ -410,6 +472,7 @@ export async function evaluatePreparedRunCheck(
         evaluation,
         speaker: preparation?.speaker ?? config.speaker ?? null,
         ...(count && { evaluation: count.evaluation, thresholdMode: count.thresholdMode }),
+        reportVisibility: true,
       },
     },
     actor,
@@ -439,9 +502,10 @@ export async function evaluatePreparedRunCheck(
     config,
     evaluation,
     anchor: decisionPolicy.target ?? config.resolvedDc ?? config.dc,
-    targetDelta: rolled.modifierPlacement?.targetDelta,
+    rolled,
     total,
     diceGroups,
+    secret,
   });
   return {
     success: graded.success,
@@ -457,6 +521,7 @@ export async function evaluatePreparedRunCheck(
     message: graded.success ? null : failureMessage,
     engineEvaluated: true,
     secret,
+    visibility: { rollMode: secret ? 'gmroll' : (rolled.rollMode ?? null), secret },
     ...(rolled.rollHandoff && { rollHandoff: rolled.rollHandoff }),
   };
 }
@@ -650,6 +715,7 @@ export async function runFormulaPassFail({
   label = 'Crafting',
   rollOptions = null,
   craftingModifier = null,
+  targetTerms = null,
   ...input
 }) {
   const evaluation = ownEvaluation(input, rollOptions);
@@ -689,10 +755,13 @@ export async function runFormulaPassFail({
       total,
       comparison,
       ...(formula && executedSumEvidence(total, target, comparison, grading.direction)),
+      ...(formula &&
+        targetTermsEvidence({ grading, target, anchor: dc, baseTerms: targetTerms, rolled })),
       diceGroups,
       ...preRollEvidence(rolled),
     },
     message: success ? null : `${label} check failed`,
+    ...reportedVisibility(rolled),
   };
 }
 
@@ -760,6 +829,7 @@ export async function runFormulaProgressive({
       ...(formula && executedSumEvidence(total, null, null)),
       ...preRollEvidence(rolled),
     },
+    ...reportedVisibility(rolled),
   };
 }
 
@@ -785,6 +855,7 @@ export async function runFormulaRouted({
   clampToNearest = false,
   minOutcomeId = null,
   craftingModifier = null,
+  targetTerms = null,
   ...input
 }) {
   const evaluation = ownEvaluation(input, rollOptions);
@@ -824,7 +895,7 @@ export async function runFormulaRouted({
   const { total, diceGroups, resolvedFormula, rolled } = roll;
 
   // The whole post-roll resolution, shared with the odds histogram (issue 1097).
-  const classified = classifyCheckTotal({
+  const classifyInput = {
     type,
     total,
     dc,
@@ -837,8 +908,10 @@ export async function runFormulaRouted({
     minOutcomeId,
     evaluation,
     targetDelta: rolled?.modifierPlacement?.targetDelta,
-  });
+  };
+  const classified = classifyCheckTotal(classifyInput);
   const { matched, success, comparison } = classified;
+  const tierTerm = classified.target === null ? null : rolledTierTerm(grading, classifyInput);
 
   return {
     success,
@@ -852,6 +925,15 @@ export async function runFormulaRouted({
       type,
       comparison,
       ...(formula && executedSumEvidence(total, classified.target, comparison, grading.direction)),
+      ...(formula &&
+        targetTermsEvidence({
+          grading,
+          target: classified.target,
+          anchor: dc,
+          baseTerms: targetTerms,
+          tierTerm,
+          rolled,
+        })),
       ...preRollEvidence(rolled),
       outcomeId: matched?.id ?? null,
       success,
@@ -866,5 +948,6 @@ export async function runFormulaRouted({
       }),
     },
     message: success ? null : `${label} check failed`,
+    ...reportedVisibility(rolled),
   };
 }

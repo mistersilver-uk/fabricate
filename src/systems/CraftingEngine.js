@@ -72,6 +72,7 @@ import {
   resolveActivityCheck,
 } from './countCheck.js';
 import {
+  checkDisplayForCard,
   rollTotalForCard,
   tierStepForCard,
   VERSIONED_EXECUTION_CONTEXT,
@@ -170,14 +171,22 @@ import {
 } from './toolCheckBonus.js';
 
 /** The contributions and the evaluation that placed them come from one prepared collection; the
- * check config supplies the prompt's situational-bonus offer. */
+ * check config supplies the prompt's situational-bonus offer, and the executed roll mode is
+ * reported for the result card. */
 function checkRollOptions(options, { contributions, evaluation }, config) {
   return {
     ...options,
     toolContributions: contributions,
     evaluation,
     offerSituationalBonus: config?.offerSituationalBonus !== false,
+    reportVisibility: true,
   };
+}
+
+/** The executed target's opening terms: the resolution's, unless a dynamic macro replaced its
+ * number, which then stands as the anchor. */
+function resolvedTargetTerms(target, dc) {
+  return dc === target.target ? target.terms : [{ kind: 'anchor', value: dc }];
 }
 
 /**
@@ -520,6 +529,7 @@ export class CraftingEngine {
       target: progressive ? null : resolved.target,
       source: resolved.source,
       policy: resolved.policy ?? null,
+      terms: progressive ? null : (resolved.terms ?? null),
     };
   }
 
@@ -2425,6 +2435,7 @@ export class CraftingEngine {
           failureReason: succeeded ? null : checkResult.message || 'Crafting check failed',
           rollValue: rollTotalForCard(checkResult),
           tierStep: tierStepForCard(checkResult),
+          check: checkDisplayForCard(checkResult),
           firedComplications: state.firedComplications?.fired ?? null,
         });
         return { posted: true };
@@ -3324,6 +3335,7 @@ export class CraftingEngine {
         failureReason: message,
         rollValue: rollTotalForCard(checkResult),
         tierStep: tierStepForCard(checkResult),
+        check: checkDisplayForCard(checkResult),
       });
       return {
         resolved: true,
@@ -3420,6 +3432,7 @@ export class CraftingEngine {
         failureReason: message,
         rollValue: rollTotalForCard(checkResult),
         tierStep: tierStepForCard(checkResult),
+        check: checkDisplayForCard(checkResult),
       });
       return {
         resolved: true,
@@ -3479,6 +3492,7 @@ export class CraftingEngine {
       createdResults: resultItems,
       rollValue: rollTotalForCard(checkResult),
       tierStep: tierStepForCard(checkResult),
+      check: checkDisplayForCard(checkResult),
       firedComplications: firedComplications?.fired ?? null,
     });
 
@@ -3657,6 +3671,7 @@ export class CraftingEngine {
       failureReason: checkResult.message || 'Crafting check failed',
       rollValue: rollTotalForCard(checkResult),
       tierStep: tierStepForCard(checkResult),
+      check: checkDisplayForCard(checkResult),
     });
 
     return {
@@ -5594,6 +5609,7 @@ export class CraftingEngine {
     const result = await runFormulaPassFail({
       formula,
       dc,
+      targetTerms: resolvedTargetTerms(target, dc),
       thresholdMode: checkConfig.thresholdMode,
       triggers: checkConfig.checkBreakage?.triggers,
       actor: craftingActor,
@@ -5659,6 +5675,7 @@ export class CraftingEngine {
     const result = await runFormulaRouted({
       formula,
       dc,
+      targetTerms: resolvedTargetTerms(target, dc),
       thresholdMode: routed.thresholdMode,
       type: routed.type,
       relativeOutcomes: routed.relativeOutcomes,
@@ -6012,6 +6029,7 @@ export class CraftingEngine {
     failureReason,
     rollValue = null,
     tierStep = null,
+    check = null,
     firedComplications = null,
   }) {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
@@ -6038,6 +6056,7 @@ export class CraftingEngine {
         tools: toolEntries,
         rollValue: Number.isFinite(rollValue) ? rollValue : null,
         tierStep,
+        check,
         failureReason: failureReason || '',
         complications: this._complicationChatEntries(firedComplications, system),
       },
@@ -6135,6 +6154,7 @@ export class CraftingEngine {
     failureReason,
     rollValue = null,
     tierStep = null,
+    check = null,
     suppressed = false,
     firedComplications = null,
   }) {
@@ -6163,6 +6183,7 @@ export class CraftingEngine {
         tools: this._resolveBrokenToolChatEntries(usedTools, system),
         rollValue: Number.isFinite(rollValue) ? rollValue : null,
         tierStep,
+        check,
         failureReason: failureReason || '',
         complications: this._complicationChatEntries(firedComplications, system),
       },
@@ -6953,6 +6974,7 @@ export class CraftingEngine {
     const result = await runFormulaPassFail({
       formula,
       dc,
+      targetTerms: target.terms,
       thresholdMode: simple.thresholdMode,
       triggers: simple.checkBreakage?.triggers,
       actor,
@@ -7041,6 +7063,7 @@ export class CraftingEngine {
     const result = await runFormulaRouted({
       formula,
       dc,
+      targetTerms: target.terms,
       thresholdMode: routed.thresholdMode,
       type: routed.type,
       relativeOutcomes: routed.relativeOutcomes,
@@ -7260,6 +7283,7 @@ function versionedDecisionPolicy(activeCheck, recipe, dc, checkTarget) {
     dc: source === 'fixed' ? target : null,
     target,
     targetSource: target === null ? null : source,
+    targetTerms: target === null ? null : resolvedTargetTerms(checkTarget, target),
     ...(count && { count }),
     thresholdMode: activeCheck.config?.thresholdMode ?? null,
     type: activeCheck.config?.type ?? null,

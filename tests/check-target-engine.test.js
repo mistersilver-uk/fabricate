@@ -12,6 +12,7 @@ import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { evaluatePreparedRunCheck } from '../src/systems/checkRoll.js';
 import { MacroExecutor } from '../src/utils/MacroExecutor.js';
+import { foldTargetTerms } from '../src/ui/presenters/checkDisplay.js';
 import {
   GatheringDocumentActor,
   gatheringFixture,
@@ -642,4 +643,95 @@ test('the prepared evaluator refuses progressive sum/under before any roll', asy
   });
   assert.equal(gathered.message, `Gathering ${PROGRESSIVE_UNDER}`);
   assert.deepEqual(constructed, []);
+});
+
+// ── executed target terms (issue 2005) ─────────────────────────────────────────
+
+/** A `Roll` whose `1d4` pre-roll totals 3 and whose main `3d6` totals 9; a constant totals itself. */
+function installVerificationRoll() {
+  globalThis.Roll = class VerificationRoll {
+    constructor(formula) {
+      this.formula = String(formula);
+      const constant = Number(this.formula);
+      if (Number.isFinite(constant)) this.total = constant;
+      else this.total = this.formula === '1d4' ? 3 : 9;
+      this.dice = Number.isFinite(constant) ? [] : [{ number: 1, faces: 4, total: this.total }];
+    }
+    async evaluate() {
+      return this;
+    }
+    evaluateSync() {
+      return this;
+    }
+    toJSON() {
+      return { formula: this.formula, total: this.total };
+    }
+    async toMessage() {}
+    static replaceFormulaData(formula) {
+      return formula;
+    }
+    static validate() {
+      return true;
+    }
+  };
+}
+
+test('attribute 12, adjustment −2, library +1 and a situational 1d4 of 3 grade 3d6 = 9 against 14', async () => {
+  installVerificationRoll();
+  const world = salvageWorld('simple', {
+    rollFormula: '3d6',
+    evaluation: attribute('@skills.craft.value', { direction: 'under' }),
+  });
+  const system = game.fabricate.getCraftingSystemManager().getSystem('sys-salvage');
+  system.modifiers = [{ id: 'steady', label: 'Steady hands', expression: '1' }];
+  system.salvageCraftingCheck.defaultModifierIds = ['steady'];
+  system.components[0].salvage.adjustmentOverride = -2;
+  world.actor.system.skills = { craft: { value: 12 } };
+  const checks = [];
+  const cards = [];
+  const run = world.engine._runSalvageCraftingCheck.bind(world.engine);
+  world.engine._runSalvageCraftingCheck = async (...args) => {
+    checks.push(await run(...args));
+    return checks.at(-1);
+  };
+  const post = world.engine._postSalvageChatMessage.bind(world.engine);
+  world.engine._postSalvageChatMessage = async (params) => {
+    cards.push(params.check);
+    return post(params);
+  };
+
+  await world.salvage({ interactive: true, rollDecision: { bonus: '1d4' } });
+
+  const { data, visibility } = checks[0];
+  assert.deepEqual([data.total, data.target, data.margin], [9, 14, 5]);
+  assert.deepEqual(data.targetTerms, [
+    { kind: 'anchor', value: 12 },
+    { kind: 'adjustment', value: -2 },
+    { kind: 'benefit', value: 1, source: 'library' },
+  ]);
+  assert.deepEqual(
+    data.preRolls.map(({ source, total }) => [source, total]),
+    [['situational', 3]],
+    'one pre-roll'
+  );
+  assert.equal(foldTargetTerms(data.targetTerms, data.preRolls), data.target);
+  assert.deepEqual(visibility, { rollMode: 'publicroll', secret: false });
+  assert.equal(cards[0].evidence.target, 14, 'the card reads the executed target');
+  assert.deepEqual(cards[0].visibility, { rollMode: 'publicroll', secret: false });
+  delete globalThis.Roll;
+});
+
+test('a sum/over fixed check records no target terms', async () => {
+  installVerificationRoll();
+  const world = salvageWorld('simple', { rollFormula: '3d6', dc: 8 });
+  const checks = [];
+  const run = world.engine._runSalvageCraftingCheck.bind(world.engine);
+  world.engine._runSalvageCraftingCheck = async (...args) => {
+    checks.push(await run(...args));
+    return checks.at(-1);
+  };
+  await world.salvage();
+  assert.equal(checks[0].data.target, 8);
+  assert.ok(!Object.hasOwn(checks[0].data, 'targetTerms'));
+  delete globalThis.Roll;
 });

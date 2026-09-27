@@ -9,6 +9,8 @@ import {
   createJournalRunAuthority,
 } from '../src/systems/journalRunAuthority.js';
 import { JOURNAL_RUN_COMMAND_TIMEOUT_MS } from '../src/systems/journalRunCommands.js';
+import { evaluatePreparedRunCheck } from '../src/systems/checkRoll.js';
+import { executedCheckDisplay } from '../src/ui/presenters/checkDisplay.js';
 import { defineStructureContract } from './helpers/structureContract.js';
 import { deletedKey, forEachDeletionForm, isForcedDeletion } from './helpers/forcedDeletion.js';
 
@@ -1560,6 +1562,69 @@ describe('journal run authority ledger', () => {
     assert.ok(replicated.some(([kind]) => kind === 'create'));
     for (const [, document] of replicated) {
       assert.doesNotMatch(JSON.stringify(document), /SECRET_FORMULA|SECRET_CHOICE|SECRET_PROMPT/);
+    }
+  });
+
+  it('replies with executed check evidence that carries no private path, label or policy (Q5)', async () => {
+    const originalRoll = globalThis.Roll;
+    globalThis.Roll = class EvidenceRoll {
+      constructor(formula) {
+        this.formula = String(formula);
+        this.total = Number.isFinite(Number(this.formula)) ? Number(this.formula) : 9;
+        this.dice = [];
+      }
+      async evaluate() { return this; }
+      evaluateSync() { return this; }
+      toJSON() { return { formula: this.formula, total: this.total }; }
+      static replaceFormulaData(formula) { return formula; }
+      static validate() { return true; }
+    };
+    try {
+      const preparation = () => ({
+        mode: 'simple', slot: 'simple', rollFormula: '3d6',
+        checkConfig: {
+          rollFormula: '3d6', thresholdMode: 'meet',
+          evaluation: {
+            product: 'sum', direction: 'under',
+            target: { source: 'attribute', expression: '@skills.SECRET_PATH.value', adjustmentKind: 'add' },
+          },
+          craftingModifier: {
+            catalogue: [{ id: 'steady', label: 'SECRET_LABEL', expression: '1' }],
+            systemPolicy: 'addAll', defaultModifierPolicy: 'SECRET_POLICY', defaultModifierIds: ['steady'],
+          },
+        },
+        decisionPolicy: {
+          target: 10, targetSource: 'attribute',
+          targetTerms: [{ kind: 'anchor', value: 12 }, { kind: 'adjustment', value: -2 }],
+        },
+      });
+      const actor = { getRollData: () => ({}) };
+      const visible = await evaluatePreparedRunCheck(preparation(), actor);
+      assert.deepEqual(visible.data.targetTerms, [
+        { kind: 'anchor', value: 12 },
+        { kind: 'adjustment', value: -2 },
+        { kind: 'benefit', value: 1, source: 'library' },
+      ]);
+      const hidden = await evaluatePreparedRunCheck(preparation(), actor, {}, { secret: true });
+      assert.ok(!Object.hasOwn(hidden.data, 'targetTerms'), 'a secret projection omits them');
+
+      const world = sharedAuthorityWorld();
+      const authority = world.realm();
+      await authority.setup();
+      const reply = await authority.run(
+        { requestId: 'evidence-reply', senderId: 'player', sessionId: 'one' },
+        () => ({ success: true, check: executedCheckDisplay(visible) })
+      );
+      assert.equal(reply.check.evidence.target, 11, 'anchor 12, adjustment −2, library +1');
+      const sentinels = /SECRET_PATH|SECRET_LABEL|SECRET_POLICY/;
+      assert.doesNotMatch(JSON.stringify(reply), sentinels);
+      assert.doesNotMatch(JSON.stringify(visible.data.targetTerms), sentinels);
+      for (const [, document] of world.log.filter(([kind]) => ['create', 'write'].includes(kind))) {
+        assert.doesNotMatch(JSON.stringify(document), sentinels);
+      }
+    } finally {
+      if (originalRoll === undefined) delete globalThis.Roll;
+      else globalThis.Roll = originalRoll;
     }
   });
 
