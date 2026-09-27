@@ -93,6 +93,28 @@ export class GatheringNodeService {
   }
 
   /**
+   * `interactableRef` when its behaviour is the gathering interactable for this environment and
+   * task, else `null`. A listing enumerates many rows, and {@link _resolveNodeSource} does not check
+   * identity, so this keeps one interactable's pool on its own row (issue 2048). A blind environment
+   * matches on the environment alone, because its attempt draws the task and still routes to the
+   * interactable's pool.
+   */
+  interactableRefFor({ environment, task, interactableRef = null } = {}) {
+    if (!interactableRef || typeof this.resolveRegionBehavior !== 'function') return null;
+    let view;
+    try {
+      const behavior = this.resolveRegionBehavior(interactableRef);
+      view = behavior ? readInteractableBehaviorSystem(behavior) : null;
+    } catch {
+      return null;
+    }
+    if (view?.interactableType !== 'gatheringTask') return null;
+    if (!environment?.id || view.environmentId !== String(environment.id)) return null;
+    if (environment.selectionMode === 'blind') return interactableRef;
+    return task?.id && view.taskId === String(task.id) ? interactableRef : null;
+  }
+
+  /**
    * The attempt's node source as a `{ kind, routed, read, write, deplete }` handle. An
    * `interactableRef` whose behaviour is `taskNodeLink: 'unlinked'` with a node selects that
    * self-authoritative pool, with no library merge (issue 302); anything else, including a
