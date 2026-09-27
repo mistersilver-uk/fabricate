@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 
 import { craftProbe, probeResolutionService, salvageProbe } from './helpers/craftPipelineProbe.js';
 import { BulkSalvageService } from '../src/systems/BulkSalvageService.js';
+import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { evaluatePreparedRunCheck } from '../src/systems/checkRoll.js';
 import { MacroExecutor } from '../src/utils/MacroExecutor.js';
@@ -64,6 +65,16 @@ const PROGRESSIVE_UNDER = 'check cannot roll: a progressive check cannot roll un
 /** Journal entries that consume, spend, award or post. */
 const EFFECT = /^(item\.|actor\.|chat\.|currency\.|itemPiles\.deduct|complication\.)/;
 const effects = (journal) => journal.entries.filter(([name]) => EFFECT.test(name));
+
+/** A refused craft opens its run, discards it and returns: nothing else is journalled. */
+const REFUSED_CRAFT_JOURNAL = [
+  'run.findActiveRunForRecipe',
+  'run.createRun',
+  'visibility.guardCraftStart',
+  'run.getActiveRun',
+  'run.discardRun',
+  'returned',
+];
 
 const HAMMER = { id: 'tool-hammer', componentId: 'hammer', name: 'Hammer' };
 const TIERS = [
@@ -144,6 +155,11 @@ for (const site of CRAFT_SITES) {
     assert.deepEqual(checks[0].data, { targetRefusal: 'unresolved-path' });
     assert.deepEqual(constructed, [], 'no Tool die and no check roll');
     assert.deepEqual(effects(world.journal), []);
+    assert.deepEqual(
+      world.journal.entries.map(([name]) => name),
+      REFUSED_CRAFT_JOURNAL,
+      'the run it opened is discarded, not kept'
+    );
   });
 
   test(`${site.name}: a resolvable character value rolls the check exactly once`, async () => {
@@ -374,6 +390,39 @@ test('a dynamic target macro runs only after validation and receives the adjuste
   }
 });
 
+// ── the adjustment each activity selects ──────────────────────────────────────
+
+/** A summed evaluation against `@skill` with the given adjustment kind and base. */
+const skillTarget = (direction, adjustmentKind, baseAdjustment) =>
+  attribute('@skill', { direction, adjustmentKind, baseAdjustment });
+
+test('salvage takes the component adjustmentOverride over the base, read from getRollData', async () => {
+  const engine = Object.create(CraftingEngine.prototype);
+  installCountingRoll();
+  const result = await engine._runSalvageSimpleCheck(
+    { rollFormula: '1d20', dc: 10, evaluation: skillTarget('over', 'add', 0) },
+    { name: 'Scrap', salvage: { adjustmentOverride: -4 } },
+    { system: {}, getRollData: () => ({ skill: 14 }) },
+    {}
+  );
+  assert.deepEqual([result.data.dc, result.data.target, result.success], [null, 10, true]);
+});
+
+test('crafting takes the selected recipe tier adjustment over the base', async () => {
+  const engine = Object.create(CraftingEngine.prototype);
+  installCountingRoll();
+  const tiers = [{ id: 'hard', name: 'Hard', dc: 20, adjustment: 0.5 }];
+  const simple = { rollFormula: '1d100', dc: 10, tiers, evaluation: skillTarget('under', 'multiply', 1) };
+  const result = await engine._runSimpleCheck(
+    { craftingCheck: { simple } },
+    { name: 'R', checkTierId: 'hard' },
+    null,
+    { getRollData: () => ({ skill: 55 }) },
+    {}
+  );
+  assert.deepEqual([result.data.target, result.success], [27, true], '55 × ½, floored');
+});
+
 // ── QE5: the production placement path ────────────────────────────────────────
 
 /** A sum/under crafting check with a Tool scalar +2 and a library scalar +1, and no overrides. */
@@ -535,6 +584,14 @@ test('gathering routed: a missing character path answers CHECK_TARGET_INVALID be
   const control = await gatheringAttempt('routed', { evaluation: VALID }, { skills: SKILLS });
   assert.equal(control.response.accepted, true);
   assert.deepEqual(control.constructed, ['1d20']);
+});
+
+test('gathering routed: a sum/under check grades under through the engine', async () => {
+  const under = await gatheringAttempt('routed', {
+    evaluation: { product: 'sum', direction: 'under', target: { source: 'fixed' } },
+  });
+  assert.equal(under.response.accepted, true);
+  assert.equal(under.actor.items.length, 1, '12 ≤ 15 lands Yield; graded over it would miss to Ruined');
 });
 
 test('gathering progressive: sum/under answers CHECK_TARGET_INVALID before any roll', async () => {
