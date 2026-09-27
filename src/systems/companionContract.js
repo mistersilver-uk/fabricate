@@ -129,6 +129,7 @@ export const COMPANION_OUTCOMES = Object.freeze({
   invalidRollDecision: 'invalidRollDecision',
   evaluationInvalid: 'evaluationInvalid',
   evaluationUnsupported: 'evaluationUnsupported',
+  targetUnresolved: 'targetUnresolved',
 
   // Shared by the call-site members. `cancelled` is the shipped word for a dismissed roll prompt.
   cancelled: 'cancelled',
@@ -250,10 +251,15 @@ export const AFFORDABILITY_MESSAGE_KEYS = Object.freeze({
  * `rollActorCheck`'s table (issue 1293); namespaces name what they are about, never who asks.
  * `RollFailed` is the generic refusal and needs `detail`. The facade refusals, `InvalidCallSite`
  * and `NotElected` interpolate nothing: they are answered before a label exists.
+ * `checkPassedTarget`/`checkFailedTarget` (issue 2003) are auxiliary re-keys, not outcomes: a
+ * graded sum answer stays `checkPassed`/`checkFailed` and `checkRollResult` alone decides which
+ * key names its total, by whether it was graded against a resolved target rather than a `dc`.
  */
 export const CHECK_ROLL_MESSAGE_KEYS = Object.freeze({
   [COMPANION_OUTCOMES.checkPassed]: 'FABRICATE.Check.Roll.Passed',
   [COMPANION_OUTCOMES.checkFailed]: 'FABRICATE.Check.Roll.Failed',
+  checkPassedTarget: 'FABRICATE.Check.Roll.PassedTarget',
+  checkFailedTarget: 'FABRICATE.Check.Roll.FailedTarget',
   [COMPANION_OUTCOMES.rolled]: 'FABRICATE.Check.Roll.Rolled',
   [COMPANION_OUTCOMES.rollFailed]: 'FABRICATE.Check.Roll.RollFailed',
   [COMPANION_OUTCOMES.cancelled]: 'FABRICATE.Check.Roll.Cancelled',
@@ -262,6 +268,7 @@ export const CHECK_ROLL_MESSAGE_KEYS = Object.freeze({
   [COMPANION_OUTCOMES.invalidRollDecision]: 'FABRICATE.Check.Roll.InvalidRollDecision',
   [COMPANION_OUTCOMES.evaluationInvalid]: 'FABRICATE.Check.Roll.EvaluationInvalid',
   [COMPANION_OUTCOMES.evaluationUnsupported]: 'FABRICATE.Check.Roll.EvaluationUnsupported',
+  [COMPANION_OUTCOMES.targetUnresolved]: 'FABRICATE.Check.Roll.TargetUnresolved',
   [COMPANION_OUTCOMES.invalidCallSite]: 'FABRICATE.Check.Roll.InvalidCallSite',
   [COMPANION_OUTCOMES.notElected]: 'FABRICATE.Check.Roll.NotElected',
   [COMPANION_OUTCOMES.gmOnly]: 'FABRICATE.Check.Roll.GMOnly',
@@ -478,8 +485,15 @@ export const POOLED_ACTORS_MAX = 32;
 /** The longest pooled `costs` list, the other half of that product; interpolated as `max`. */
 export const POOLED_COSTS_MAX = 32;
 
-function buildResult(outcome, messageKeys, fallbackKey, messageData, extra) {
-  const message = messageKeys[outcome] ?? fallbackKey;
+function buildResult(
+  outcome,
+  messageKeys,
+  fallbackKey,
+  messageData,
+  extra,
+  messageOverride = null
+) {
+  const message = messageOverride ?? messageKeys[outcome] ?? fallbackKey;
   const result = {
     success: SUCCESSFUL_OUTCOMES.includes(outcome) && messageKeys[outcome] !== undefined,
     ...extra,
@@ -529,12 +543,21 @@ const ROLLED_OUTCOMES = Object.freeze([
  * Build `rollActorCheck`'s answer from the outcome and the runner-owned record, never a caller bag.
  * `passed` is `null` when ungraded and `total` is `null` for a refusal, while rolled `0` stays `0`.
  * Refusals use empty dice data and omit executed evaluation fields, which come only from the runner.
+ * `roll.targetGraded` (issue 2003) picks `checkPassedTarget`/`checkFailedTarget` over the plain
+ * `dc`-graded keys for a summed answer graded against a resolved target rather than a caller `dc`.
  */
 export function checkRollResult(outcome, messageData = null, roll = null) {
   const rolled = ROLLED_OUTCOMES.includes(outcome);
   let passed = null;
   if (outcome === COMPANION_OUTCOMES.checkPassed) passed = true;
   else if (outcome === COMPANION_OUTCOMES.checkFailed) passed = false;
+  const targetGraded = rolled && roll?.targetGraded === true;
+  let messageOverride;
+  if (targetGraded && outcome === COMPANION_OUTCOMES.checkPassed) {
+    messageOverride = CHECK_ROLL_MESSAGE_KEYS.checkPassedTarget;
+  } else if (targetGraded && outcome === COMPANION_OUTCOMES.checkFailed) {
+    messageOverride = CHECK_ROLL_MESSAGE_KEYS.checkFailedTarget;
+  }
   return buildResult(
     outcome,
     CHECK_ROLL_MESSAGE_KEYS,
@@ -554,7 +577,8 @@ export function checkRollResult(outcome, messageData = null, roll = null) {
         successes: roll?.successes ?? null,
         cancelled: roll?.cancelled ?? null,
       }),
-    }
+    },
+    messageOverride
   );
 }
 

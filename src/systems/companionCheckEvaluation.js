@@ -7,9 +7,25 @@ const SUM_OVER_FIXED = Object.freeze({
   interactive: true,
 });
 
+/** An attribute target is always graded, never interactive: the reader has no prompt yet. */
+const SUM_OVER_ATTRIBUTE = Object.freeze({
+  product: 'sum',
+  direction: 'over',
+  targetSources: Object.freeze(['attribute']),
+  interactive: false,
+});
+
+/** Roll-under, either target source; not interactive until the companion gains its own prompt. */
+const SUM_UNDER = Object.freeze({
+  product: 'sum',
+  direction: 'under',
+  targetSources: Object.freeze(['fixed', 'attribute']),
+  interactive: false,
+});
+
 export const CHECK_EVALUATION_CAPABILITIES = Object.freeze({
   version: 1,
-  modes: Object.freeze([SUM_OVER_FIXED]),
+  modes: Object.freeze([SUM_OVER_FIXED, SUM_OVER_ATTRIBUTE, SUM_UNDER]),
   additionalDice: false,
 });
 
