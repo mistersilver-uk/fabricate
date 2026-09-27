@@ -135,3 +135,98 @@ test('a path resolves only an own finite number or decimal string, never a coerc
   assert.equal(resolveDeterministicExpression('@name.length', { name: 'abc' }).ok, false);
   assert.equal(resolveDeterministicExpression('@toString', {}).ok, false);
 });
+
+const FOUNDRY_PATHS = { pathMode: 'foundry' };
+
+test('the Foundry path mode walks with `in`, so inherited values and prototype getters resolve', () => {
+  class ActorData {
+    get level() {
+      return 7;
+    }
+  }
+  const data = { actor: new ActorData(), inherited: Object.create({ v: 3 }), 'skills.craft': 40 };
+  assert.deepEqual(resolveDeterministicExpression('@actor.level + 1', data, FOUNDRY_PATHS), {
+    ok: true,
+    value: 8,
+  });
+  assert.deepEqual(resolveDeterministicExpression('@inherited.v', data, FOUNDRY_PATHS), {
+    ok: true,
+    value: 3,
+  });
+  assert.deepEqual(resolveDeterministicExpression('@skills.craft', data, FOUNDRY_PATHS), {
+    ok: true,
+    value: 40,
+  });
+  for (const expression of ['@actor.level', '@inherited.v', '@skills.craft']) {
+    assert.equal(resolveDeterministicExpression(expression, data).ok, false, expression);
+  }
+});
+
+test('the Foundry path mode stops its walk at a non-object and at a missing key', () => {
+  const data = { name: 'abc', list: [4, 5], nested: { zero: 0 } };
+  for (const expression of ['@name.length', '@missing.value', '@nested.zero.value']) {
+    assert.deepEqual(resolveDeterministicExpression(expression, data, FOUNDRY_PATHS), {
+      ok: false,
+      reason: 'unresolved-path',
+    });
+  }
+  assert.deepEqual(resolveDeterministicExpression('@list.length', data, FOUNDRY_PATHS), {
+    ok: true,
+    value: 2,
+  });
+  assert.deepEqual(resolveDeterministicExpression('@nested.zero', data, FOUNDRY_PATHS), {
+    ok: true,
+    value: 0,
+  });
+  assert.deepEqual(resolveDeterministicExpression('@v', null, FOUNDRY_PATHS), {
+    ok: false,
+    reason: 'unresolved-path',
+  });
+});
+
+test('the Foundry path mode coerces a value as trimmed text and refuses each non-number by reason', () => {
+  class Proficiency {
+    constructor(value) {
+      this.value = value;
+    }
+    toString() {
+      return String(this.value);
+    }
+  }
+  const resolved = (v) => resolveDeterministicExpression('@v', { v }, FOUNDRY_PATHS);
+  assert.deepEqual(resolved(new Proficiency(2.5)), { ok: true, value: 2.5 });
+  assert.deepEqual(resolved(' -4 '), { ok: true, value: -4 });
+  assert.deepEqual(resolved(6), { ok: true, value: 6 });
+  for (const [v, reason] of [
+    [undefined, 'unresolved-path'],
+    [null, 'unresolved-path'],
+    ['', 'unresolved-path'],
+    [new Proficiency('  '), 'unresolved-path'],
+    ['1d4', 'dice'],
+    [new Proficiency('2d6 + 1'), 'dice'],
+    ['seven', 'invalid'],
+    ['0x10', 'invalid'],
+    [true, 'invalid'],
+    [{}, 'invalid'],
+    [[7], 'invalid'],
+    [new Set([7]), 'invalid'],
+    [() => 7, 'invalid'],
+    [Number.NaN, 'non-finite'],
+    [Infinity, 'non-finite'],
+    ['-Infinity', 'non-finite'],
+    ['1e999', 'non-finite'],
+  ]) {
+    assert.deepEqual(resolved(v), { ok: false, reason }, String(v));
+  }
+});
+
+test('the strict reader stays the default and ignores an unknown path mode', () => {
+  const data = { v: '1d4', inherited: Object.create({ v: 3 }) };
+  for (const options of [undefined, {}, { pathMode: 'strict' }, { pathMode: 'other' }]) {
+    assert.deepEqual(resolveDeterministicExpression('@v', data, options), {
+      ok: false,
+      reason: 'non-finite',
+    });
+    assert.equal(resolveDeterministicExpression('@inherited.v', data, options).ok, false);
+  }
+});

@@ -35,11 +35,15 @@ const PATH_TOKEN = /@(?:\{[-.\w]+\}|[-.\w]+)/g;
 const DICE_TERM = /(?:^|[^\w.])(?:\d+)?d(?:\d+|f|c|%)/i;
 const DECIMAL_STRING = /^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*$/i;
 
+const NON_FINITE_TEXT = /^[+-]?(?:Infinity|NaN)$/;
+const THROWN_REASONS = ['unresolved-path', 'non-finite', 'dice'];
+
 /**
  * Resolves dice-free arithmetic against roll data without substituting missing paths.
  * An unsuccessful result identifies whether the source was unresolved, dice-based, invalid, or non-finite.
+ * Paths use the strict own-key reader unless `pathMode` is `'foundry'` ({@link resolveFoundryPath}).
  */
-export function resolveDeterministicExpression(expression, rollData = {}) {
+export function resolveDeterministicExpression(expression, rollData = {}, { pathMode } = {}) {
   if (typeof expression === 'number') {
     return Number.isFinite(expression)
       ? { ok: true, value: expression }
@@ -53,19 +57,20 @@ export function resolveDeterministicExpression(expression, rollData = {}) {
     return { ok: false, reason: 'dice' };
   }
   try {
-    const reader = createExpressionReader(source, rollData);
+    const readPath = pathMode === 'foundry' ? resolveFoundryPath : resolvePath;
+    const reader = createExpressionReader(source, (token) => readPath(token, rollData));
     const value = reader.parseExpression();
     if (!reader.atEnd()) return { ok: false, reason: 'invalid' };
     return Number.isFinite(value) ? { ok: true, value } : { ok: false, reason: 'non-finite' };
   } catch (error) {
     return {
       ok: false,
-      reason: ['unresolved-path', 'non-finite'].includes(error) ? error : 'invalid',
+      reason: THROWN_REASONS.includes(error) ? error : 'invalid',
     };
   }
 }
 
-function createExpressionReader(source, rollData) {
+function createExpressionReader(source, readPath) {
   let index = 0;
   const skip = () => {
     while (/\s/.test(source[index] ?? '')) index += 1;
@@ -111,7 +116,7 @@ function createExpressionReader(source, rollData) {
       return value;
     }
     const path = match(new RegExp(`^${PATH_TOKEN.source}`));
-    if (path) return resolvePath(path[0], rollData);
+    if (path) return readPath(path[0]);
     const number = match(/^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/);
     if (number) return Number(number[0]);
     const fn = match(/^(?:floor|ceil|round)\b/);
@@ -149,4 +154,45 @@ function resolvePath(token, rollData) {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string' && DECIMAL_STRING.test(value)) return Number(value);
   throw 'non-finite';
+}
+
+/**
+ * Reads a path as Foundry's `Roll.replaceFormulaData` does (maintainer ruling F6): `getProperty`
+ * semantics, then the value as trimmed text. A value that is not a finite number throws its reason.
+ */
+function resolveFoundryPath(token, rollData) {
+  const value = foundryProperty(rollData, token.replaceAll(/^@\{?|\}?$/g, ''));
+  if (value === undefined || value === null) throw 'unresolved-path';
+  if (typeof value === 'function' || serializesAsData(value)) throw 'invalid';
+  const text = String(value).trim();
+  if (!text) throw 'unresolved-path';
+  if (DECIMAL_STRING.test(text) || NON_FINITE_TEXT.test(text)) {
+    const number = Number(text);
+    if (Number.isFinite(number)) return number;
+    throw 'non-finite';
+  }
+  throw DICE_TERM.test(text.replaceAll(PATH_TOKEN, '0')) ? 'dice' : 'invalid';
+}
+
+/** `foundry.utils.getProperty`: the whole key first, then an `in` walk that stops at a non-object. */
+function foundryProperty(object, key) {
+  if (isPropertyHolder(object) && key in object) return object[key];
+  return key
+    .split('.')
+    .reduce(
+      (cursor, segment) =>
+        isPropertyHolder(cursor) && segment in cursor ? cursor[segment] : undefined,
+      object
+    );
+}
+
+function isPropertyHolder(value) {
+  return Boolean(value) && (typeof value === 'object' || typeof value === 'function');
+}
+
+/** Foundry writes these as JSON terms rather than their text, so they never read as a number. */
+function serializesAsData(value) {
+  if (typeof value !== 'object') return false;
+  if (Array.isArray(value) || value instanceof Set || value instanceof Map) return true;
+  return !value.constructor || value.constructor === Object;
 }
