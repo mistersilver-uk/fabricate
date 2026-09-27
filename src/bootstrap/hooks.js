@@ -24,6 +24,7 @@ import { notifyUnresolvedItemDescriptions } from '../config/repairItemData.js';
 import { handleFabricateSettingChange } from '../config/settingChangeBridge.js';
 import { getSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE } from '../config/settings.js';
 import { stackQuantityPathPresetFor } from '../config/stackQuantityPathPresets.js';
+import { registerCountRoll } from '../systems/countRoll.js';
 import {
   configureItemStackQuantityPath,
   probeStackQuantityPath,
@@ -85,10 +86,18 @@ function describeStackQuantityProbe(report) {
   return game.i18n?.format?.(advisory.key, advisory.data) ?? advisory.key;
 }
 
-// The Interactable CONFIG entries. Idempotent, so safe from both `init` and the `ready` backstop.
+// The CONFIG entries. Idempotent, so safe from both `init` and the `ready` backstop.
 function registerFabricateConfig() {
   // A no-op when the Foundry region APIs are unavailable.
   registerInteractableRegionBehavior(CONFIG);
+
+  // In `init`: a message whose roll class is unregistered at document preparation drops that roll.
+  registerCountRoll({
+    config: CONFIG,
+    BaseRoll: globalThis.foundry?.dice?.Roll,
+    i18n: () => game.i18n,
+    renderTemplate: (...args) => foundry.applications.handlebars.renderTemplate(...args),
+  });
 
   // Core `RegionBehaviorConfig` is the sheet: `InteractableConfigApp` is an ApplicationV2, not a
   // DocumentSheet, so registering it leaves `behavior.sheet` null and breaks the edit pencil.
