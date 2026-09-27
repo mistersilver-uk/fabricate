@@ -39,6 +39,17 @@ describe('roll prompt adapter', () => {
     ]);
   });
 
+  it('names a DC in the chat flavor only for a summed roll-over fixed target', () => {
+    const flavor = (evaluation) => buildInteractiveRollOptions(
+      { interactive: true, actor: null, name: 'Rope', activity: 'Crafting', dc: 14, evaluation },
+      () => null
+    ).flavor;
+    const skill = { product: 'sum', direction: 'over', target: { source: 'attribute', expression: '@skill' } };
+    assert.equal(flavor(undefined), 'Rope — Crafting check (DC 14)');
+    assert.equal(flavor({ product: 'sum', direction: 'under', target: { source: 'fixed' } }), 'Rope — Crafting check');
+    assert.equal(flavor(skill), 'Rope — Crafting check');
+  });
+
   it('builds localized activity and actor-subject labels without inventing a missing subject', () => {
     const named = buildSinglePromptData({ activity: 'Crafting', actorName: 'Brenna', name: 'Iron', dc: 12, thresholdMode: 'exceed' });
     assert.equal(named.title, 'Crafting check');

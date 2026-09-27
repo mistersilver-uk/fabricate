@@ -304,6 +304,8 @@ test('R6: under fixed ranges match total − targetDelta, keeping the raw total'
   );
   assert.equal(await outcomeOf(12, options), 'poor');
   assert.equal(await outcomeOf(12, { ...options, evaluation: SUM_OVER, delta: 3 }), 'poor');
+  const multiply = { type: 'fixed', evaluation: UNDER_MULTIPLY, outcomes: RANGES };
+  assert.equal(await outcomeOf(5, multiply), 'great', 'a range is never an Otherwise tier');
 });
 
 test('R6: the minimum gate compares starts in the direction, and equal starts pass', async () => {

@@ -212,6 +212,9 @@ export async function runSalvageCheck(engine, ctx) {
       // failed roll that never happened.
       misconfigured: true,
       salvageRun: ctx.salvageRunCreatedThisCall ? null : ctx.salvageRun,
+      ...(checkResult.data?.targetRefusal && {
+        data: { targetRefusal: checkResult.data.targetRefusal },
+      }),
     });
   }
 

@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 
 import { craftProbe, probeResolutionService, salvageProbe } from './helpers/craftPipelineProbe.js';
 import { BulkSalvageService } from '../src/systems/BulkSalvageService.js';
+import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { evaluatePreparedRunCheck } from '../src/systems/checkRoll.js';
 import { MacroExecutor } from '../src/utils/MacroExecutor.js';
@@ -58,10 +59,22 @@ const MISSING = attribute('@skills.missing.value');
 const VALID = attribute('@skills.craft.value');
 const SUM_UNDER = { product: 'sum', direction: 'under' };
 const SKILLS = { craft: { value: 14 } };
+const UNRESOLVED = 'check cannot roll: the character value its target reads was not found.';
+const PROGRESSIVE_UNDER = 'check cannot roll: a progressive check cannot roll under a target.';
 
 /** Journal entries that consume, spend, award or post. */
 const EFFECT = /^(item\.|actor\.|chat\.|currency\.|itemPiles\.deduct|complication\.)/;
 const effects = (journal) => journal.entries.filter(([name]) => EFFECT.test(name));
+
+/** A refused craft opens its run, discards it and returns: nothing else is journalled. */
+const REFUSED_CRAFT_JOURNAL = [
+  'run.findActiveRunForRecipe',
+  'run.createRun',
+  'visibility.guardCraftStart',
+  'run.getActiveRun',
+  'run.discardRun',
+  'returned',
+];
 
 const HAMMER = { id: 'tool-hammer', componentId: 'hammer', name: 'Hammer' };
 const TIERS = [
@@ -132,7 +145,7 @@ for (const site of CRAFT_SITES) {
     const constructed = installCountingRoll();
     const result = await world.craft();
     assert.equal(result.success, false);
-    assert.equal(result.message, 'Crafting check target is invalid (unresolved-path)');
+    assert.equal(result.message, `Crafting ${UNRESOLVED}`);
     assert.deepEqual(
       [result.misconfigured, result.data],
       [true, { targetRefusal: 'unresolved-path' }],
@@ -142,6 +155,11 @@ for (const site of CRAFT_SITES) {
     assert.deepEqual(checks[0].data, { targetRefusal: 'unresolved-path' });
     assert.deepEqual(constructed, [], 'no Tool die and no check roll');
     assert.deepEqual(effects(world.journal), []);
+    assert.deepEqual(
+      world.journal.entries.map(([name]) => name),
+      REFUSED_CRAFT_JOURNAL,
+      'the run it opened is discarded, not kept'
+    );
   });
 
   test(`${site.name}: a resolvable character value rolls the check exactly once`, async () => {
@@ -160,6 +178,29 @@ for (const site of CRAFT_SITES) {
     assert.deepEqual(constructed, ['1d4', '1d20 + 12[Hammer]']);
   });
 }
+
+test('routedByCheck fixed ranges read no target, so a missing path still rolls once and routes', async () => {
+  const ranges = {
+    ...routedCheck(attribute('@skills.missing.value', { direction: 'under' })),
+    type: 'fixed',
+    relativeOutcomes: [],
+    fixedOutcomes: [
+      { id: 'r-fine', name: 'Fine', success: true, breakTools: false, start: 0, end: 11 },
+      { id: 'r-botch', name: 'Botch', success: false, breakTools: false, start: 12, end: 40 },
+    ],
+  };
+  const world = craftingWorld({ resolutionMode: 'routedByCheck', slot: 'routed', config: ranges });
+  const checks = recordChecks(world.engine);
+  const constructed = installCountingRoll();
+  await world.craft();
+  assert.equal(checks[0].misconfigured, undefined, 'a fixed-range target source is inert');
+  assert.deepEqual(
+    [checks[0].data.outcomeId, checks[0].success],
+    ['r-fine', true],
+    'under, the Tool 1d4 (12) raises the benefit, so the total 12 matches 12 − 12 = 0'
+  );
+  assert.deepEqual(constructed, ['1d4', '1d20'], 'the Tool and the check each roll once');
+});
 
 test('crafting progressive: sum/under refuses before its Tool roll, and sum/over rolls once', async () => {
   const progressive = (evaluation) => ({ rollFormula: '1d20', evaluation });
@@ -284,7 +325,7 @@ test('timed FINISH: a refusal rolls and awards nothing and leaves the run resuma
   const startEffects = effects(world.journal).length;
   const finished = await world.craft(null, { runId });
   assert.equal(finished.success, false);
-  assert.equal(finished.message, 'Crafting check target is invalid (unresolved-path)');
+  assert.equal(finished.message, `Crafting ${UNRESOLVED}`);
   assert.deepEqual(
     [finished.misconfigured, finished.data],
     [true, { targetRefusal: 'unresolved-path' }],
@@ -347,6 +388,39 @@ test('a dynamic target macro runs only after validation and receives the adjuste
   } finally {
     MacroExecutor.run = original;
   }
+});
+
+// ── the adjustment each activity selects ──────────────────────────────────────
+
+/** A summed evaluation against `@skill` with the given adjustment kind and base. */
+const skillTarget = (direction, adjustmentKind, baseAdjustment) =>
+  attribute('@skill', { direction, adjustmentKind, baseAdjustment });
+
+test('salvage takes the component adjustmentOverride over the base, read from getRollData', async () => {
+  const engine = Object.create(CraftingEngine.prototype);
+  installCountingRoll();
+  const result = await engine._runSalvageSimpleCheck(
+    { rollFormula: '1d20', dc: 10, evaluation: skillTarget('over', 'add', 0) },
+    { name: 'Scrap', salvage: { adjustmentOverride: -4 } },
+    { system: {}, getRollData: () => ({ skill: 14 }) },
+    {}
+  );
+  assert.deepEqual([result.data.dc, result.data.target, result.success], [null, 10, true]);
+});
+
+test('crafting takes the selected recipe tier adjustment over the base', async () => {
+  const engine = Object.create(CraftingEngine.prototype);
+  installCountingRoll();
+  const tiers = [{ id: 'hard', name: 'Hard', dc: 20, adjustment: 0.5 }];
+  const simple = { rollFormula: '1d100', dc: 10, tiers, evaluation: skillTarget('under', 'multiply', 1) };
+  const result = await engine._runSimpleCheck(
+    { craftingCheck: { simple } },
+    { name: 'R', checkTierId: 'hard' },
+    null,
+    { getRollData: () => ({ skill: 55 }) },
+    {}
+  );
+  assert.deepEqual([result.data.target, result.success], [27, true], '55 × ½, floored');
 });
 
 // ── QE5: the production placement path ────────────────────────────────────────
@@ -417,7 +491,8 @@ for (const { mode, check } of SALVAGE_SITES) {
     const constructed = installCountingRoll();
     const result = await world.salvage();
     assert.equal(result.misconfigured, true);
-    assert.equal(result.message, 'Salvage check target is invalid (unresolved-path)');
+    assert.equal(result.message, `Salvage ${UNRESOLVED}`);
+    assert.deepEqual(result.data, { targetRefusal: 'unresolved-path' });
     assert.deepEqual(constructed, []);
     assert.deepEqual(effects(world.journal), []);
 
@@ -436,7 +511,8 @@ test('salvage progressive: sum/under refuses with zero mutation, sum/over rolls 
   const constructed = installCountingRoll();
   const result = await world.salvage();
   assert.equal(result.misconfigured, true);
-  assert.equal(result.message, 'Salvage check target is invalid (progressive-under)');
+  assert.equal(result.message, `Salvage ${PROGRESSIVE_UNDER}`);
+  assert.deepEqual(result.data, { targetRefusal: 'progressive-under' });
   assert.deepEqual(constructed, []);
   assert.deepEqual(effects(world.journal), []);
 
@@ -510,6 +586,14 @@ test('gathering routed: a missing character path answers CHECK_TARGET_INVALID be
   assert.deepEqual(control.constructed, ['1d20']);
 });
 
+test('gathering routed: a sum/under check grades under through the engine', async () => {
+  const under = await gatheringAttempt('routed', {
+    evaluation: { product: 'sum', direction: 'under', target: { source: 'fixed' } },
+  });
+  assert.equal(under.response.accepted, true);
+  assert.equal(under.actor.items.length, 1, '12 ≤ 15 lands Yield; graded over it would miss to Ruined');
+});
+
 test('gathering progressive: sum/under answers CHECK_TARGET_INVALID before any roll', async () => {
   const progressive = { rollFormula: '1d20', checkBreakage: { triggers: [] } };
   const refused = await gatheringAttempt('progressive', { ...progressive, evaluation: SUM_UNDER });
@@ -539,7 +623,10 @@ test('the gathering versioned descriptor refuses a target and captures a resolve
     });
   };
   const bare = { uuid: 'Actor.g', system: {} };
-  assert.throws(() => describe(MISSING, bare), { code: 'CHECK_TARGET_INVALID' });
+  assert.throws(() => describe(MISSING, bare), {
+    code: 'CHECK_TARGET_INVALID',
+    message: `Gathering ${UNRESOLVED}`,
+  });
   assert.throws(() => describe(SUM_UNDER, bare, 'progressive'), { code: 'CHECK_TARGET_INVALID' });
 
   const described = describe(VALID, { uuid: 'Actor.g', getRollData: () => ({ skills: SKILLS }) });
@@ -569,6 +656,14 @@ test('the prepared evaluator refuses progressive sum/under before any roll', asy
   const refused = await evaluatePreparedRunCheck(prepared(SUM_UNDER), { getRollData: () => ({}) });
   assert.equal(refused.misconfigured, true);
   assert.deepEqual(refused.data, { targetRefusal: 'progressive-under' });
+  assert.equal(refused.message, `Crafting ${PROGRESSIVE_UNDER}`, 'the activity, not "Prepared"');
+  const gathering = new GatheringEngine({ localize: (key) => key });
+  gathering.installVersionedRunAuthority({ evaluatePreparedRunCheck });
+  const gathered = await gathering.evaluatePreparedVersionedCheck({
+    actor: { getRollData: () => ({}) },
+    privateEvaluation: prepared(SUM_UNDER),
+  });
+  assert.equal(gathered.message, `Gathering ${PROGRESSIVE_UNDER}`);
   assert.deepEqual(constructed, []);
 
   const count = await evaluatePreparedRunCheck(
