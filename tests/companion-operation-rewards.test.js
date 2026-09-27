@@ -821,10 +821,10 @@ describe('in-flight evidence and single-slot markers', () => {
     const hero = makeWorldActor('hero');
     const world = rewardWorld();
     const seams = seamsFor([hero]);
-    await accept(world, [award('e0', [['hero', [['iron', 2]]]])]);
+    await accept(world, [award('e0', [['hero', [['iron', 2], ['iron', 1]]]])]);
     failReceipt(world);
     await run(world, seams);
-    assert.deepEqual(phases(world), ['applying']);
+    assert.deepEqual(phases(world), ['applying', 'pending']);
 
     const writes = [];
     world.hooks.beforeUpdate = (update) => void writes.push(update);
