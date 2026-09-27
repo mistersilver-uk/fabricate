@@ -10,25 +10,16 @@ import {
   countPassProbability,
 } from '../src/systems/countOdds.js';
 
+import {
+  countEvaluation as d10CountEvaluation,
+  deepFreeze,
+  scalar,
+} from './helpers/countFixtures.js';
+
 const TOLERANCE = 1e-12;
 
-function countEvaluation({ direction = 'over', ...pool } = {}) {
-  return {
-    product: 'count',
-    direction,
-    pool: {
-      die: 6,
-      base: '2',
-      threshold: '5',
-      required: 1,
-      modifierDestination: 'pool',
-      zeroPoolFails: true,
-      explode: { enabled: false, faces: { kind: 'best', value: null }, once: false },
-      cancel: { enabled: false, faces: { kind: 'worst', value: null } },
-      ...pool,
-    },
-  };
-}
+// The odds chart d6 pools, whose masses are small fractions of 6^n.
+const countEvaluation = (pool = {}) => d10CountEvaluation({ die: 6, threshold: '5', ...pool });
 
 const explodeBest = (once) => ({ enabled: true, faces: { kind: 'best', value: null }, once });
 const explodeFrom = (value, once) => ({ enabled: true, faces: { kind: 'from', value }, once });
@@ -79,19 +70,8 @@ function meanNet(result) {
   return result.outcomes.reduce((sum, outcome) => sum + outcome.net * outcome.probability, 0);
 }
 
-function scalar(source, value) {
-  return { source, label: source, form: 'scalar', value };
-}
-
 function rolling(source, expression) {
   return { source, label: source, form: 'expression', expression };
-}
-
-function deepFreeze(value) {
-  for (const child of Object.values(value)) {
-    if (child && typeof child === 'object') deepFreeze(child);
-  }
-  return Object.freeze(value);
 }
 
 const range = (count) => Array.from({ length: count }, (_, index) => index + 1);

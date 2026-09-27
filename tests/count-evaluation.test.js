@@ -13,23 +13,7 @@ import {
   resolvePool,
 } from '../src/systems/countEvaluation.js';
 
-function countEvaluation({ direction = 'over', ...pool } = {}) {
-  return {
-    product: 'count',
-    direction,
-    pool: {
-      die: 10,
-      base: '2',
-      threshold: '8',
-      required: 1,
-      modifierDestination: 'pool',
-      zeroPoolFails: true,
-      explode: { enabled: false, faces: { kind: 'best', value: null }, once: false },
-      cancel: { enabled: false, faces: { kind: 'worst', value: null } },
-      ...pool,
-    },
-  };
-}
+import { countEvaluation, deepFreeze, scalar } from './helpers/countFixtures.js';
 
 function resolved(pool, options = {}) {
   const result = resolvePool({ evaluation: countEvaluation(pool), ...options });
@@ -39,17 +23,6 @@ function resolved(pool, options = {}) {
 
 function placementFor(evaluation, contributions, preRollResults = []) {
   return settlePlacement(planModifierPlacement({ evaluation, contributions }), preRollResults);
-}
-
-function scalar(source, value) {
-  return { source, label: source, form: 'scalar', value };
-}
-
-function deepFreeze(value) {
-  for (const child of Object.values(value)) {
-    if (child && typeof child === 'object') deepFreeze(child);
-  }
-  return Object.freeze(value);
 }
 
 const faces = (...values) => values.map((result) => ({ result, active: true }));
@@ -67,7 +40,10 @@ test('count adds exactly four refusal reasons to the shared enum, none already i
 });
 
 test('the #861 threshold resolves to the sum of two character values with Foundry paths', () => {
-  const rollData = deepFreeze({ abilities: { int: { value: 3 } }, skills: { repair: { value: 4 } } });
+  const rollData = deepFreeze({
+    abilities: { int: { value: 3 } },
+    skills: { repair: { value: 4 } },
+  });
   const policy = resolved(
     { threshold: '@abilities.int.value + @skills.repair.value' },
     { rollData }
@@ -145,7 +121,9 @@ test('a missing threshold path refuses where reading 0 would qualify every die',
 
 test('a missing pool path refuses rather than failing as a zero pool or flooring to one die', () => {
   for (const zeroPoolFails of [true, false]) {
-    const result = resolvePool({ evaluation: countEvaluation({ base: '@missing', zeroPoolFails }) });
+    const result = resolvePool({
+      evaluation: countEvaluation({ base: '@missing', zeroPoolFails }),
+    });
     assert.deepEqual(result, { ok: false, reason: 'unresolved-path', refusedInput: 'base' });
   }
 });
@@ -225,10 +203,7 @@ test('a recursive explosion that holds on every face refuses before any roll', (
 test('a scalar pool benefit adds dice exactly once and never touches the threshold', () => {
   const evaluation = countEvaluation({ die: 6, base: '2', threshold: '5' });
   const placement = placementFor(evaluation, [scalar('tool', 1), scalar('library', 1)]);
-  const policy = resolved(
-    { die: 6, base: '2', threshold: '5' },
-    { placement }
-  );
+  const policy = resolved({ die: 6, base: '2', threshold: '5' }, { placement });
   assert.equal(policy.dice, 4);
   assert.equal(policy.threshold, 5);
 });
