@@ -1802,6 +1802,17 @@
         "GMOnly": "Only a GM can settle a bulk check decision.",
         "NotReady": "Fabricate is still starting up, so no bulk check decision can be settled yet.",
         "Failed": "The bulk check decision could not be settled."
+      },
+      "TargetRefusal": {
+        "ExpressionMissing": "{label} check cannot roll: no target formula is set.",
+        "UnresolvedPath": "{label} check cannot roll: the character value its target reads was not found.",
+        "NonFinite": "{label} check cannot roll: its target did not resolve to a number.",
+        "Dice": "{label} check cannot roll: its target formula rolls dice, but a target must be a fixed number.",
+        "Invalid": "{label} check cannot roll: its target value cannot be read as a number.",
+        "AdjustmentInvalid": "{label} check cannot roll: its difficulty adjustment is invalid; a multiplier must be above zero.",
+        "ProgressiveUnder": "{label} check cannot roll: a progressive check cannot roll under a target.",
+        "FormulaEmpty": "{label} check cannot roll: a roll-under check needs a roll formula.",
+        "Misconfigured": "{label} check cannot roll: its target is misconfigured."
       }
     },
     "Knowledge": {

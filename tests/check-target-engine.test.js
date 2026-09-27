@@ -58,6 +58,8 @@ const MISSING = attribute('@skills.missing.value');
 const VALID = attribute('@skills.craft.value');
 const SUM_UNDER = { product: 'sum', direction: 'under' };
 const SKILLS = { craft: { value: 14 } };
+const UNRESOLVED = 'check cannot roll: the character value its target reads was not found.';
+const PROGRESSIVE_UNDER = 'check cannot roll: a progressive check cannot roll under a target.';
 
 /** Journal entries that consume, spend, award or post. */
 const EFFECT = /^(item\.|actor\.|chat\.|currency\.|itemPiles\.deduct|complication\.)/;
@@ -132,7 +134,7 @@ for (const site of CRAFT_SITES) {
     const constructed = installCountingRoll();
     const result = await world.craft();
     assert.equal(result.success, false);
-    assert.equal(result.message, 'Crafting check target is invalid (unresolved-path)');
+    assert.equal(result.message, `Crafting ${UNRESOLVED}`);
     assert.deepEqual(
       [result.misconfigured, result.data],
       [true, { targetRefusal: 'unresolved-path' }],
@@ -284,7 +286,7 @@ test('timed FINISH: a refusal rolls and awards nothing and leaves the run resuma
   const startEffects = effects(world.journal).length;
   const finished = await world.craft(null, { runId });
   assert.equal(finished.success, false);
-  assert.equal(finished.message, 'Crafting check target is invalid (unresolved-path)');
+  assert.equal(finished.message, `Crafting ${UNRESOLVED}`);
   assert.deepEqual(
     [finished.misconfigured, finished.data],
     [true, { targetRefusal: 'unresolved-path' }],
@@ -417,7 +419,7 @@ for (const { mode, check } of SALVAGE_SITES) {
     const constructed = installCountingRoll();
     const result = await world.salvage();
     assert.equal(result.misconfigured, true);
-    assert.equal(result.message, 'Salvage check target is invalid (unresolved-path)');
+    assert.equal(result.message, `Salvage ${UNRESOLVED}`);
     assert.deepEqual(constructed, []);
     assert.deepEqual(effects(world.journal), []);
 
@@ -436,7 +438,7 @@ test('salvage progressive: sum/under refuses with zero mutation, sum/over rolls 
   const constructed = installCountingRoll();
   const result = await world.salvage();
   assert.equal(result.misconfigured, true);
-  assert.equal(result.message, 'Salvage check target is invalid (progressive-under)');
+  assert.equal(result.message, `Salvage ${PROGRESSIVE_UNDER}`);
   assert.deepEqual(constructed, []);
   assert.deepEqual(effects(world.journal), []);
 
@@ -539,7 +541,10 @@ test('the gathering versioned descriptor refuses a target and captures a resolve
     });
   };
   const bare = { uuid: 'Actor.g', system: {} };
-  assert.throws(() => describe(MISSING, bare), { code: 'CHECK_TARGET_INVALID' });
+  assert.throws(() => describe(MISSING, bare), {
+    code: 'CHECK_TARGET_INVALID',
+    message: `Gathering ${UNRESOLVED}`,
+  });
   assert.throws(() => describe(SUM_UNDER, bare, 'progressive'), { code: 'CHECK_TARGET_INVALID' });
 
   const described = describe(VALID, { uuid: 'Actor.g', getRollData: () => ({ skills: SKILLS }) });
@@ -569,6 +574,14 @@ test('the prepared evaluator refuses progressive sum/under before any roll', asy
   const refused = await evaluatePreparedRunCheck(prepared(SUM_UNDER), { getRollData: () => ({}) });
   assert.equal(refused.misconfigured, true);
   assert.deepEqual(refused.data, { targetRefusal: 'progressive-under' });
+  assert.equal(refused.message, `Crafting ${PROGRESSIVE_UNDER}`, 'the activity, not "Prepared"');
+  const gathering = new GatheringEngine({ localize: (key) => key });
+  gathering.installVersionedRunAuthority({ evaluatePreparedRunCheck });
+  const gathered = await gathering.evaluatePreparedVersionedCheck({
+    actor: { getRollData: () => ({}) },
+    privateEvaluation: prepared(SUM_UNDER),
+  });
+  assert.equal(gathered.message, `Gathering ${PROGRESSIVE_UNDER}`);
   assert.deepEqual(constructed, []);
 
   const count = await evaluatePreparedRunCheck(

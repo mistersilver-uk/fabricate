@@ -420,7 +420,7 @@ export async function evaluatePreparedRunCheck(
   preparation,
   actor,
   decision = {},
-  { secret = false, failureMessage = 'Check failed' } = {}
+  { secret = false, failureMessage = 'Check failed', label = 'Crafting' } = {}
 ) {
   const checkConfig =
     preparation?.checkConfig && typeof preparation.checkConfig === 'object'
@@ -434,7 +434,7 @@ export async function evaluatePreparedRunCheck(
   const kind = preparedCheckKind(preparation);
   const evaluation = activeCheckEvaluation(checkConfig);
   const refusal = preparedCheckRefusal(kind, evaluation, preparation?.rollFormula);
-  if (refusal) return checkTargetRefusal(refusal, 'Prepared');
+  if (refusal) return checkTargetRefusal(refusal, label);
   const authoritativeDecision = {
     ...decision,
     bonus: decision?.allowsSituationalModifier === true ? decision.bonus : null,

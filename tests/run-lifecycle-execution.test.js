@@ -2131,17 +2131,20 @@ test('the versioned crafting descriptor refuses its target before the Tool roll 
   const { restore } = installPreparedRolls(evaluations, []);
   try {
     for (const [options, reason] of [
-      [{ check: { rollFormula: '1d20', dc: 12, evaluation: skill } }, 'unresolved-path'],
+      [{ check: { rollFormula: '1d20', dc: 12, evaluation: skill } },
+        'the character value its target reads was not found'],
       [{
         resolutionMode: 'progressive',
         slot: 'progressive',
         check: { rollFormula: '1d20', evaluation: { product: 'sum', direction: 'under' } },
-      }, 'progressive-under'],
+      }, 'a progressive check cannot roll under a target'],
     ]) {
       const { describe, revision } = await startToolSuppliedRun(tool, options);
       const before = revision();
-      await assert.rejects(describe, (error) =>
-        error.code === 'CHECK_TARGET_INVALID' && error.message.includes(reason));
+      await assert.rejects(describe, {
+        code: 'CHECK_TARGET_INVALID',
+        message: `Crafting check cannot roll: ${reason}.`,
+      });
       assert.equal(revision(), before, `${reason}: the run is untouched`);
     }
     assert.deepEqual(evaluations, [], 'no Tool die rolls before a refusal');

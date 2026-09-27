@@ -57,6 +57,7 @@ import {
 } from './checkRoll.js';
 import {
   activeCheckEvaluation,
+  checkRefusalMessage,
   checkTargetRefusal,
   dcFlavorSuffix,
   progressiveTargetRefusal,
@@ -495,7 +496,7 @@ export class CraftingEngine {
     }
     if (!resolved.ok) {
       throw new CraftingLifecycleExecutionError(
-        `The crafting check target is invalid (${resolved.reason})`,
+        checkRefusalMessage(resolved.reason),
         'CHECK_TARGET_INVALID'
       );
     }

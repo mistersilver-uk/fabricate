@@ -20,6 +20,7 @@ import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { evaluateSituationalBonus, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import {
   activeCheckEvaluation,
+  checkRefusalMessage,
   checkTargetRefusal,
   dcFlavorSuffix,
   progressiveTargetRefusal,
@@ -532,6 +533,7 @@ export class GatheringEngine {
     return evaluate(privateEvaluation, actor, decision, {
       secret: privateEvaluation?.secret === true,
       failureMessage: 'Gathering check failed',
+      label: 'Gathering',
     });
   }
 
@@ -795,7 +797,7 @@ export class GatheringEngine {
     const reason = mode === 'progressive' ? progressiveTargetRefusal(evaluation) : resolved.reason;
     if (reason) {
       throw gatheringLifecycleError(
-        `The gathering check target is invalid (${reason})`,
+        checkRefusalMessage(reason, 'Gathering'),
         'CHECK_TARGET_INVALID'
       );
     }

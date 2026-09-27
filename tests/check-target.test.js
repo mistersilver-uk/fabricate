@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { compareToTarget } from '../src/systems/checkEvaluation.js';
 import {
   CHECK_TARGET_REFUSALS,
+  checkRefusalMessage,
   isValidTargetAdjustment,
   multiplyTierThreshold,
   resolveCheckTarget,
@@ -247,4 +249,20 @@ test('F10: deep-frozen roll data resolves without throwing or being mutated', ()
   assert.equal(resolveAttribute('@details.level + @actor.level', rollData, 'add', -1).target, 9);
   assert.equal(resolveAttribute('@skills.missing', rollData).reason, 'unresolved-path');
   assert.equal(JSON.stringify(rollData), before);
+});
+
+test('a refusal reads as a localized sentence whose English fallback matches en.json', () => {
+  const { TargetRefusal } = JSON.parse(readFileSync('lang/en.json', 'utf8')).FABRICATE.Check;
+  const english = (key, data) =>
+    TargetRefusal[key.replace('FABRICATE.Check.TargetRefusal.', '')]?.replace('{label}', data.label);
+  const keys = new Set();
+  for (const reason of [...CHECK_TARGET_REFUSALS, 'unknown']) {
+    let asked = null;
+    const localized = checkRefusalMessage(reason, 'Salvage', (key, data) => (asked = key) && english(key, data));
+    keys.add(asked);
+    assert.match(localized, /^Salvage check cannot roll: [a-z].*\.$/, reason);
+    assert.equal(checkRefusalMessage(reason, 'Salvage', () => undefined), localized, reason);
+  }
+  assert.equal(keys.size, CHECK_TARGET_REFUSALS.length + 1, 'one sentence per reason, plus a fallback');
+  assert.equal(keys.size, Object.keys(TargetRefusal).length, 'every en.json sentence is used');
 });

@@ -2,6 +2,8 @@
  * Resolves a check's pre-modifier target from explicit inputs. It reads no Actor, recipe,
  * component, task or macro: callers pass the roll data, the fixed anchor and the chosen adjustment.
  */
+import { localizeWith } from '../utils/localizeWithFallback.js';
+
 import { resolveDeterministicExpression } from './checkEvaluation.js';
 import { normalizeCheckEvaluation } from './normalize/checkEvaluation.js';
 
@@ -16,6 +18,53 @@ export const CHECK_TARGET_REFUSALS = Object.freeze([
   'progressive-under',
   'formula-empty',
 ]);
+
+/** Each refusal's sentence key and English fallback detail, after "{label} check cannot roll: ". */
+const REFUSAL_COPY = Object.freeze({
+  'expression-missing': [
+    'FABRICATE.Check.TargetRefusal.ExpressionMissing',
+    'no target formula is set',
+  ],
+  'unresolved-path': [
+    'FABRICATE.Check.TargetRefusal.UnresolvedPath',
+    'the character value its target reads was not found',
+  ],
+  'non-finite': [
+    'FABRICATE.Check.TargetRefusal.NonFinite',
+    'its target did not resolve to a number',
+  ],
+  dice: [
+    'FABRICATE.Check.TargetRefusal.Dice',
+    'its target formula rolls dice, but a target must be a fixed number',
+  ],
+  invalid: ['FABRICATE.Check.TargetRefusal.Invalid', 'its target value cannot be read as a number'],
+  'adjustment-invalid': [
+    'FABRICATE.Check.TargetRefusal.AdjustmentInvalid',
+    'its difficulty adjustment is invalid; a multiplier must be above zero',
+  ],
+  'progressive-under': [
+    'FABRICATE.Check.TargetRefusal.ProgressiveUnder',
+    'a progressive check cannot roll under a target',
+  ],
+  'formula-empty': [
+    'FABRICATE.Check.TargetRefusal.FormulaEmpty',
+    'a roll-under check needs a roll formula',
+  ],
+});
+const REFUSAL_FALLBACK = [
+  'FABRICATE.Check.TargetRefusal.Misconfigured',
+  'its target is misconfigured',
+];
+
+const foundryFormat = (key, data) => globalThis.game?.i18n?.format?.(key, data);
+
+/** The sentence a refusal shows, localized with an English fallback; never the raw reason code. */
+export function checkRefusalMessage(reason, label = 'Crafting', localize = foundryFormat) {
+  const [key, detail] = Object.hasOwn(REFUSAL_COPY, reason)
+    ? REFUSAL_COPY[reason]
+    : REFUSAL_FALLBACK;
+  return localizeWith(localize, key, { label }, `${label} check cannot roll: ${detail}.`);
+}
 
 /**
  * The normalized evaluation a check config runs by. A count evaluation stays inert until #2004
@@ -56,7 +105,7 @@ export function checkTargetRefusal(reason, label = 'Crafting') {
     outcome: null,
     value: null,
     data: { targetRefusal: reason },
-    message: `${label} check target is invalid (${reason})`,
+    message: checkRefusalMessage(reason, label),
   };
 }
 
