@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 
 import { craftProbe, probeResolutionService, salvageProbe } from './helpers/craftPipelineProbe.js';
 import { installCountDice } from './helpers/countEngineDice.js';
-import { countEvaluation } from './helpers/countFixtures.js';
+import { countEvaluation, preparedCountCheck } from './helpers/countFixtures.js';
 import { createLangBackedI18n } from './helpers/langBackedI18n.js';
 import {
   GatheringDocumentActor,
@@ -1068,42 +1068,9 @@ test('progressive spends max(0, net): progressiveValue reads the budget, rollTot
 
 // ── prepared and secret checks ────────────────────────────────────────────────
 
-/** A JSON-prepared simple count check whose descriptor resolved a base of 2 before any Tool. */
-function preparedCount({ toolContributions = [] } = {}) {
-  const evaluation = countEvaluation({ base: '@skills.craft.value' });
-  return JSON.parse(
-    JSON.stringify({
-      mode: 'simple',
-      slot: 'simple',
-      rollFormula: '',
-      flavor: 'Sun Tea — Crafting check',
-      checkConfig: { ...simpleCheck(evaluation), toolContributions },
-      decisionPolicy: {
-        dc: null,
-        target: null,
-        targetSource: null,
-        thresholdMode: null,
-        type: null,
-        relativeOutcomes: [],
-        fixedOutcomes: [],
-        clampToNearest: false,
-        minOutcomeId: null,
-        count: {
-          die: 10,
-          direction: 'over',
-          base: 2,
-          threshold: 8,
-          required: 1,
-          comparison: 'meet',
-          explode: evaluation.pool.explode,
-          cancel: evaluation.pool.cancel,
-          zeroPoolFails: true,
-          modifierDestination: 'pool',
-        },
-      },
-    })
-  );
-}
+/** A prepared count check authoring a live base path, whose capture resolved a base of 2. */
+const preparedCount = (options) =>
+  preparedCountCheck({ evaluation: countEvaluation({ base: '@skills.craft.value' }), ...options });
 
 const LIVE_ACTOR = { getRollData: () => ({ skills: { craft: { value: 5 } } }) };
 

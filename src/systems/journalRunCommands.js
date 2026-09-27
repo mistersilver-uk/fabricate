@@ -763,6 +763,10 @@ export function createJournalRunCommandService({
           ...token.binding?.decisionPolicy,
         },
       });
+      // A check that cannot roll carries its refusal sentence, which the player sees.
+      if (resolvedCheckResult?.misconfigured === true) {
+        return failure('roll-unavailable', { message: resolvedCheckResult.message ?? null });
+      }
       if (resolvedCheckResult?.engineEvaluated !== true || resolvedCheckResult.cancelled) {
         return failure(resolvedCheckResult?.cancelled ? 'roll-cancelled' : 'roll-unavailable');
       }
