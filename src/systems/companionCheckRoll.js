@@ -5,6 +5,7 @@
 
 import { hasPlainD20, stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 
+import { isFixedSumOver, resolveCheckTarget, selectTargetAdjustment } from './checkTarget.js';
 import {
   resolveCompanionCheckEvaluation,
   supportsCompanionCheckEvaluation,
@@ -55,7 +56,7 @@ function discriminateCheckOutcome(result, graded) {
 }
 
 async function runStandaloneCheck(
-  { formula, dc, compare, actor, label, interactive, rollDecision },
+  { formula, dc, compare, actor, label, interactive, rollDecision, evaluation },
   seams
 ) {
   const graded = Number.isFinite(dc);
@@ -84,6 +85,7 @@ async function runStandaloneCheck(
         label,
         rollOptions,
         craftingModifier: null,
+        evaluation,
       })
     : await seams.runProgressive({
         formula,
@@ -92,8 +94,38 @@ async function runStandaloneCheck(
         label,
         rollOptions,
         craftingModifier: null,
+        evaluation,
       });
   return { result, graded };
+}
+
+/**
+ * The `dc` `runStandaloneCheck` grades against, resolved before any roll (issue 2003). A fixed
+ * sum/under request needs its own finite `dc` (D10, preferred over an ungraded roll); an attribute
+ * request ignores `dc` and reads the resolved actor instead, and any resolution failure other than
+ * an invalid multiplier answers `targetUnresolved` rather than a reason code no caller expects.
+ */
+function resolveCompanionCheckTarget(evaluation, requestDc, actor) {
+  if (evaluation.target.source !== 'attribute') {
+    if (evaluation.direction === 'under' && !Number.isFinite(requestDc)) {
+      return { refusal: COMPANION_OUTCOMES.evaluationInvalid };
+    }
+    return { dc: requestDc };
+  }
+  const rollData = typeof actor?.getRollData === 'function' ? actor.getRollData() : {};
+  const resolved = resolveCheckTarget({
+    evaluation,
+    rollData,
+    anchor: requestDc,
+    adjustment: selectTargetAdjustment(evaluation, null),
+  });
+  if (resolved.ok) return { dc: resolved.target };
+  return {
+    refusal:
+      resolved.reason === 'adjustment-invalid'
+        ? COMPANION_OUTCOMES.evaluationInvalid
+        : COMPANION_OUTCOMES.targetUnresolved,
+  };
 }
 
 /**
@@ -131,7 +163,8 @@ async function settleRollActorCheck(request, seams) {
 
   const resolved = resolveCompanionCheckEvaluation(request?.evaluation);
   if (!resolved.ok) return checkRollResult(COMPANION_OUTCOMES.evaluationInvalid, { label });
-  if (!supportsCompanionCheckEvaluation(resolved.evaluation, interactive)) {
+  const evaluation = resolved.evaluation;
+  if (!supportsCompanionCheckEvaluation(evaluation, interactive)) {
     return checkRollResult(COMPANION_OUTCOMES.evaluationUnsupported, { label });
   }
 
@@ -145,7 +178,11 @@ async function settleRollActorCheck(request, seams) {
     return checkRollResult(COMPANION_OUTCOMES.engineUnavailable, { label });
   }
 
-  const dc = request?.dc;
+  const actor = request?.actor ?? null;
+  const targeting = resolveCompanionCheckTarget(evaluation, request?.dc, actor);
+  if (targeting.refusal) return checkRollResult(targeting.refusal, { label });
+  const dc = targeting.dc;
+
   let result;
   let graded;
   try {
@@ -154,10 +191,11 @@ async function settleRollActorCheck(request, seams) {
         formula,
         dc,
         compare: request?.compare,
-        actor: request?.actor ?? null,
+        actor,
         label,
         interactive,
         rollDecision,
+        evaluation,
       },
       seams
     ));
@@ -181,8 +219,13 @@ async function settleRollActorCheck(request, seams) {
   // `data.total`, never `value`: on the ungraded arm `value` is the awarding value a forced
   // outcome can overwrite.
   const total = result.data.total;
-  // Only the graded strings name the DC; `assertMessageDataCovers` derives keys from the string.
-  return checkRollResult(outcome, graded ? { label, total, dc } : { label, total }, {
+  // A caller-`dc` grade (sum/over/fixed) names it; any other grade names its resolved target
+  // instead, taken from the runner's own executed evidence and never from the request `dc`.
+  const fixedOver = isFixedSumOver(evaluation);
+  let messageData = { label, total };
+  if (graded)
+    messageData = fixedOver ? { label, total, dc } : { label, total, target: result.data.target };
+  return checkRollResult(outcome, messageData, {
     total,
     diceGroups: result.data.diceGroups,
     resolvedFormula: result.data.resolvedFormula ?? null,
@@ -193,6 +236,7 @@ async function settleRollActorCheck(request, seams) {
     margin: result.data.margin,
     successes: result.data.successes,
     cancelled: result.data.cancelled,
+    targetGraded: graded && !fixedOver,
   });
 }
 
