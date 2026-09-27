@@ -62,6 +62,30 @@ export const CASES = Object.freeze([
     ],
   }),
   playerCase({
+    id: 'player-crafting-roll-prompt-under',
+    label: 'Player app — roll-under crafting roll prompt',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under' },
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+    ],
+    expectSelector:
+      `${SINGLE_PROMPT}:has(button[data-action="advantage"])` +
+      ':has(.manager-modal-subtitle:has-text("Bend Horseshoe"))' +
+      ':has(.formula-content .formula:text-is("1d20") + .formula-note:text-is("The dice are compared as rolled."))' +
+      ':has(.formula-content .manager-chip[data-roll-prompt-target="under"]:has-text("Target 15 · stay at or under"))' +
+      ':has(.static-modifiers .manager-chip:has-text("Steady hands +1"))' +
+      ':has(.static-modifiers > .help:text-is("Each raises the target."))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+    ],
+  }),
+  playerCase({
     id: 'player-crafting-roll-prompt-light',
     label: 'Player app — light frame crafting roll prompt',
     smokeLabels: [],

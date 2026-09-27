@@ -89,6 +89,9 @@
             <span class="die-glyph" aria-hidden="true"><i class="fa-solid fa-dice"></i></span>
             <div class="formula-content">
               {#if data.formula}<span class="formula">{data.formula}</span>{/if}
+              {#if data.labels.formulaNote}<p class="help formula-note">
+                  {data.labels.formulaNote}
+                </p>{/if}
               {#if data.dc !== null}
                 <Chip
                   tone="info"
@@ -281,7 +284,12 @@
     font-family: var(--fab-font-mono);
     font-size: 14px;
     font-weight: 500;
+    line-height: normal;
     overflow-wrap: anywhere;
+  }
+  /* Frame 29: the note sits 2px under the formula, inside the column's 8px rhythm. */
+  .formula + .formula-note {
+    margin-top: calc(var(--fab-space-2xs) - var(--fab-space-2));
   }
   .eyebrow {
     margin: 0 0 var(--fab-space-chip);
@@ -289,6 +297,7 @@
     color: var(--fab-text-subtle);
     font-size: 8.5px;
     font-weight: 700;
+    line-height: normal;
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
@@ -412,7 +421,7 @@
   }
   .bonus-group {
     display: grid;
-    gap: var(--fab-space-chip);
+    gap: calc(var(--fab-space-1) + 1px);
   }
   .fabricate-roll-prompt :global(.fabricate-field.prompt-field) {
     gap: var(--fab-space-chip);
@@ -427,6 +436,7 @@
     border-radius: 7px;
     background: var(--fab-bg-2);
     color: var(--fab-text);
+    line-height: normal;
   }
   .fabricate-roll-prompt :global(.fabricate-field.manager-field.bonus-field input[type='text']),
   .fabricate-roll-prompt :global(.bonus-field input::placeholder) {
@@ -450,12 +460,12 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--fab-space-2xs);
+    gap: calc(var(--fab-space-2xs) / 2);
     box-sizing: border-box;
     height: 44px;
     min-height: 44px;
     margin: 0;
-    padding: 0 var(--fab-space-2);
+    padding: 0 calc(var(--fab-space-2) + var(--fab-space-2xs));
     border: 1px solid var(--fab-border-strong);
     border-radius: 9px;
     appearance: none;
@@ -464,7 +474,7 @@
     color: var(--fab-text-secondary);
     font-size: 12px;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: normal;
     cursor: pointer;
   }
   .prompt-action:hover {

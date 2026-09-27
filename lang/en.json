@@ -482,6 +482,7 @@
         "Beat": "beat",
         "StayAtOrUnder": "stay at or under",
         "StayUnder": "stay under",
+        "ComparedAsRolled": "The dice are compared as rolled.",
         "BulkRows": "Rolls in this batch",
         "NoCheck": "No check",
         "NoSingleTarget": "No single target",

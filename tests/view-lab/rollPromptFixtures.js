@@ -17,7 +17,7 @@ export async function seedRollPromptFixture(world, state) {
       },
     });
   }
-  if (state === 'under') await seedRollUnder(manager);
+  if (state === 'under') await seedRollUnder(world);
   if (state === 'pick-one' || state === 'overflow') {
     const system = manager.getSystem('lab-herbalism');
     await manager.updateSystem(system.id, {
@@ -45,12 +45,23 @@ export async function seedRollPromptFixture(world, state) {
   }
 }
 
-/** Smithing's simple slot rolls a bare `1d20` that must stay at or under its fixed target. */
-async function seedRollUnder(manager) {
+/**
+ * Smithing's simple slot rolls a bare `1d20` that must stay at or under its fixed target, with
+ * frame 29's one applied modifier.
+ */
+async function seedRollUnder(world) {
+  const store = world.fabricate.characterLibrariesStore;
+  await store.saveModifiers([
+    { id: 'lab-mod-steady-hands', label: 'Steady hands', icon: 'fa-solid fa-hand', expression: '1' },
+    ...store.listModifiers(),
+  ]);
+  const manager = world.fabricate.craftingSystemManager;
   const system = manager.getSystem('lab-smithing');
   await manager.updateSystem(system.id, {
     craftingCheck: {
       ...system.craftingCheck,
+      defaultModifierPolicy: 'addAll',
+      defaultModifierIds: ['lab-mod-steady-hands'],
       simple: {
         ...system.craftingCheck.simple,
         rollFormula: '1d20',

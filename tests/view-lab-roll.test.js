@@ -64,6 +64,11 @@ async function underPromptView(world, content) {
   const manager = world.fabricate.craftingSystemManager;
   await seedRollPromptFixture(world, 'under');
   const system = manager.getSystem('lab-smithing');
+  const store = world.fabricate.characterLibrariesStore;
+  assert.equal(system.craftingCheck.defaultModifierPolicy, 'addAll');
+  assert.deepEqual(system.craftingCheck.defaultModifierIds, ['lab-mod-steady-hands']);
+  const steady = resolveModifierLibrary(system, store).find((entry) => entry.id === 'lab-mod-steady-hands');
+  assert.deepEqual([steady?.label, steady?.expression], ['Steady hands', '1'], "frame 29's applied modifier");
   const recipe = content.recipes.find((entry) => entry.id === 'sm-r-horseshoe');
   const stub = stubInteractiveRollEnvironment();
   try {

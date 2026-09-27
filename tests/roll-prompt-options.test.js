@@ -181,6 +181,7 @@ describe('roll prompt adapter', () => {
     assert.equal(`${meet.dcText} · ${meet.labels.meet}`, 'Target 15 · stay at or under');
     assert.equal(`${meet.dcText} · ${(await under('exceed')).view.labels.exceed}`, 'Target 15 · stay under');
     assert.equal(meet.labels.eachAdds, 'Each raises the target.');
+    assert.equal(meet.labels.formulaNote, 'The dice are compared as rolled.');
     assert.equal(
       meet.labels.bonusHelp,
       'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
@@ -194,6 +195,7 @@ describe('roll prompt adapter', () => {
           'A bonus adds to the total. A rolled bonus such as 1d4 is rolled with the check.'],
         'a roll-over prompt keeps its DC copy byte for byte'
       );
+      assert.equal(view.labels.formulaNote, undefined, 'a roll-over formula carries no note');
     }
   });
 

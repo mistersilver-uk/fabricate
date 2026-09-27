@@ -135,6 +135,7 @@ function underCopy() {
   return {
     meet: promptLabel('StayAtOrUnder', 'stay at or under'),
     exceed: promptLabel('StayUnder', 'stay under'),
+    formulaNote: promptLabel('ComparedAsRolled', 'The dice are compared as rolled.'),
     eachAdds: promptLabel('EachRaises', 'Each raises the target.'),
     bonusHelp: promptLabel(
       'BonusHelpUnder',

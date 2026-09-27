@@ -451,6 +451,8 @@ describe('mounted roll prompt', () => {
       assert.equal(chip.textContent.trim(), text);
       assert.equal(chip.dataset.rollPromptTarget, 'under');
       assert.ok(chip.classList.contains('is-info'), 'the DC chip primitive, retoned nowhere');
+      const note = dialog.querySelector('.formula-content .formula + .formula-note');
+      assert.equal(note.textContent, 'The dice are compared as rolled.');
       assert.equal(dialog.querySelector('.static-modifiers .help').textContent, 'Each raises the target.');
       assert.equal(
         dialog.querySelector('.bonus-group .help').textContent,
@@ -471,6 +473,7 @@ describe('mounted roll prompt', () => {
       const chip = dialog.querySelector('.formula-content .manager-chip');
       assert.equal(chip.textContent.trim(), 'DC 12 · meet or beat');
       assert.ok(!chip.hasAttribute('data-roll-prompt-target'), 'no target hook on a roll-over chip');
+      assert.equal(dialog.querySelector('.formula-note'), null, 'no compared-as-rolled note over');
       assert.equal(dialog.querySelector('.static-modifiers .help').textContent, 'Each adds to the total.');
       assert.equal(
         dialog.querySelector('.bonus-group .help').textContent,
