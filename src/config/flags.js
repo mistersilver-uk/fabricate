@@ -75,10 +75,15 @@ function forcedDeletionOperator() {
   return typeof operator === 'function' ? operator : null;
 }
 
-function isDeletableKey(key) {
+function forcedReplacementOperator() {
+  const operator = globalThis.foundry?.data?.operators?.ForcedReplacement;
+  return typeof operator === 'function' && typeof operator.create === 'function' ? operator : null;
+}
+
+function isDeletableKey(key, form = 'deletion') {
   if (PROTOTYPE_SEGMENTS.has(key)) return false;
   if (!isSafeFlagKeySegment(key)) {
-    throw new TypeError(`Fabricate | a forced deletion needs a single flag-key segment: ${key}`);
+    throw new TypeError(`Fabricate | a forced ${form} needs a single flag-key segment: ${key}`);
   }
   return true;
 }
@@ -92,6 +97,19 @@ export function forcedDeletionEntry(parentPath, key) {
   if (!isDeletableKey(key)) return null;
   const Operator = forcedDeletionOperator();
   return Operator ? [`${parentPath}.${key}`, new Operator()] : [`${parentPath}.-=${key}`, null];
+}
+
+/**
+ * The `[path, value]` entry that assigns `value` to `key` wholesale, dropping any inner key it
+ * omits instead of merging: V13 spells it `<parent>.==<key>: value`, V14
+ * `<parent>.<key>: ForcedReplacement.create(value)`, detected on every call. Keys are refused
+ * exactly as {@link forcedDeletionEntry} refuses them.
+ */
+export function forcedReplacementEntry(parentPath, key, value) {
+  if (!isDeletableKey(key, 'replacement')) return null;
+  const Operator = forcedReplacementOperator();
+  if (Operator) return [`${parentPath}.${key}`, Operator.create(value)];
+  return [`${parentPath}.==${key}`, value];
 }
 
 /**
