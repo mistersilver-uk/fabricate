@@ -27,7 +27,6 @@
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import { NO_ACTOR_ID } from './checkPreview.js';
-  import { bandsAreEditable } from './checkBandModel.js';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
   import {
     formatPreviewDifficulties,
@@ -54,8 +53,6 @@
     // The progressive PREVIEW SANDBOX: with no DC the record selector has nothing to offer, so
     // the ordered result difficulties take that slot.
     previewIsProgressive = false,
-    // The activity's word for what a check is rolled for, for the digest's per-record row.
-    recordNoun = 'recipe',
     previewDifficultiesText = '',
     preview = null,
     odds = null,
@@ -242,22 +239,6 @@
         tone: hasFormula ? 'set' : 'absent',
       },
     ];
-    // What each record picks outside summed roll-over against a fixed DC (issue 2005): one
-    // target, or one adjustment to the character value. A progressive check picks neither.
-    if (activeCheck && !previewIsProgressive && !bandsAreEditable(activeCheck.evaluation)) {
-      const attribute = activeCheck.evaluation?.target?.source === 'attribute';
-      rows.push({
-        id: 'target',
-        icon: 'fas fa-bullseye',
-        title: `${text('FABRICATE.Admin.Manager.Checks.Digest.PerRecord', 'Per {record}').replace('{record}', recordNoun)} · ${
-          attribute
-            ? text('FABRICATE.Admin.Manager.Checks.Digest.OneAdjustment', 'One adjustment')
-            : text('FABRICATE.Admin.Manager.Checks.Digest.OneTarget', 'One target')
-        }`,
-        target: [activeTab, 'roll'],
-        tone: 'set',
-      });
-    }
     if (typeof outcomeCount === 'number') {
       rows.push({
         id: 'outcomes',

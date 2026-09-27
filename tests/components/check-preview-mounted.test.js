@@ -440,7 +440,7 @@ describe('the outcome-preview readout', () => {
   });
 });
 
-describe('the evaluation reaches the stack, the rail and the preview (issue 2005)', () => {
+describe('the evaluation reaches the stack, the editors and the preview (issue 2005)', () => {
   const underFixed = { product: 'sum', direction: 'under', target: { source: 'fixed' } };
   const attribute = {
     product: 'sum',
@@ -461,19 +461,64 @@ describe('the evaluation reaches the stack, the rail and the preview (issue 2005
     );
   });
 
-  it('names one target or one adjustment per record in the digest, and nothing roll-over fixed', async () => {
-    const digestRow = (root) => root.querySelector('[data-checks-digest-row="target"]');
-    const over = await mountChecks();
-    assert.ok(!digestRow(over), 'a roll-over fixed check keeps its digest');
-    harness.remount();
-    const fixed = await mountChecks({ craftingCheck: { ...ROUTED_CHECK, evaluation: underFixed } });
-    assert.match(digestRow(fixed).textContent, /Per recipe · One target/);
-    harness.remount();
-    const adjusted = await mountChecks({ craftingCheck: { ...ROUTED_CHECK, evaluation: attribute } });
-    assert.match(digestRow(adjusted).textContent, /Per recipe · One adjustment/);
+  it('states the authored evaluation on the salvage stack too', async () => {
+    const root = await mountChecks({
+      activity: 'salvage',
+      salvageResolutionMode: 'simple',
+      salvageCheckSimple: { ...SIMPLE_CHECK, evaluation: attribute },
+      activation: { salvage: { enabled: true, optional: false } },
+      features: { salvage: true },
+    });
+    const stack = root.querySelector('[data-checks-panel="salvage"]');
+    assert.ok(Boolean(stack), 'the salvage stack renders');
+    assert.deepEqual(
+      [
+        stack.dataset.checksEvaluationDirection,
+        stack.dataset.checksTargetSource,
+        stack.dataset.checksAdjustmentKind,
+      ],
+      ['under', 'attribute', 'multiply']
+    );
   });
 
-  it('DROPS a stale readout when the evaluation changes underneath it', async () => {
+  it('reads the character value for the Preview-as actor in the routed and simple editors', async () => {
+    const routed = await mountChecks({ craftingCheck: { ...ROUTED_CHECK, evaluation: attribute } });
+    await choosePreviewActor(routed, 'sera');
+    assert.equal(
+      routed.querySelector('[data-check-target-resolution]')?.textContent.trim(),
+      'Sera Vane → 3'
+    );
+    harness.remount();
+    const simple = await mountChecks({
+      resolutionMode: 'simple',
+      craftingCheck: null,
+      craftingCheckSimple: { ...SIMPLE_CHECK, evaluation: attribute },
+    });
+    await choosePreviewActor(simple, 'sera');
+    assert.equal(
+      simple.querySelector('[data-check-target-resolution]')?.textContent.trim(),
+      'Sera Vane → 3'
+    );
+  });
+
+  it('drops a stale readout when only the previewed tier changes underneath it', async () => {
+    const root = await mountChecks();
+    await choose(root, RAIL_RECORD, 'rare');
+    await choosePreviewActor(root, 'sera');
+    await rollAndSettle(root);
+    assert.ok(root.querySelector('[data-checks-simulator-readout]'));
+    const tiers = ROUTED_CHECK.tiers.map((tier) =>
+      tier.id === 'rare' ? { ...tier, adjustment: -2 } : tier
+    );
+    await harness.setProps({ craftingCheck: { ...ROUTED_CHECK, tiers } });
+    await settle();
+    assert.ok(
+      !root.querySelector('[data-checks-simulator-readout]'),
+      'a result graded against the old tier must not stay on screen'
+    );
+  });
+
+  it('drops a stale readout when the evaluation changes underneath it', async () => {
     const root = await mountChecks();
     await choosePreviewActor(root, 'sera');
     await rollAndSettle(root);

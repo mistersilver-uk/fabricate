@@ -6532,10 +6532,7 @@
             "NoFormula": "No roll formula yet",
             "Outcomes": "{count} outcome tiers, {success} count as success",
             "Triggers": "{count} triggers active",
-            "Modifiers": "{count} check modifiers apply",
-            "PerRecord": "Per {record}",
-            "OneTarget": "One target",
-            "OneAdjustment": "One adjustment"
+            "Modifiers": "{count} check modifiers apply"
           },
           "Mode": {
             "FactCheck": "Check",

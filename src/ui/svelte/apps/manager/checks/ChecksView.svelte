@@ -1874,7 +1874,6 @@
       previewRecordId={previewRecord?.id ?? ''}
       {previewDifficultiesText}
       previewIsProgressive={isProgressive}
-      {recordNoun}
       preview={previewModel}
       odds={oddsModel}
       onSelectPreviewActor={(id) => (previewActorId = id)}
