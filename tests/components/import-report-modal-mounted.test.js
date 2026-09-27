@@ -205,12 +205,30 @@ describe('ImportReportModal (mounted)', () => {
 
   it('keeps the chrome the roll prompt\'s additive ManagerModal props leave at their defaults', async () => {
     let closed = 0;
+    const opener = document.createElement('button');
+    document.body.append(opener);
+    opener.focus();
     await harness.mount({ open: true, content: REPORTED_CONTENT, onClose: () => (closed += 1) });
     const root = modal();
     assert.ok(!root.querySelector('form'), 'no form wraps body and footer without onSubmit');
     assert.ok(!root.querySelector('.manager-modal-footer').classList.contains('is-equal'));
-    assert.ok(!root.querySelector('.manager-modal-title').classList.contains('is-serif'));
+    assert.ok(!root.classList.contains('is-banded'), 'the panel is not banded');
+    assert.ok(!root.querySelector('.manager-modal-body'), 'the body keeps no padded wrapper');
+    assert.ok(document.activeElement === opener, 'focus stays where it was without trapFocus');
+    const seen = [];
+    const onWindowKey = (event) => seen.push([event.key, event.defaultPrevented]);
+    document.defaultView.addEventListener('keydown', onWindowKey);
+    try {
+      root.querySelector('[data-manager-modal-close]').dispatchEvent(
+        new document.defaultView.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      );
+    } finally {
+      document.defaultView.removeEventListener('keydown', onWindowKey);
+    }
+    assert.equal(closed, 1, 'Escape closes once, through the outside-click dismissal alone');
+    assert.deepEqual(seen, [['Escape', false]], 'the modal neither stops nor claims Escape');
     document.body.dispatchEvent(new document.defaultView.MouseEvent('mousedown', { bubbles: true }));
-    assert.equal(closed, 1, 'an outside click still dismisses the report');
+    assert.equal(closed, 2, 'an outside click still dismisses the report');
+    opener.remove();
   });
 });
