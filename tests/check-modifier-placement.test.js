@@ -432,37 +432,42 @@ const hammer = {
     primaryActor: { getRollData: () => ({}) },
   },
 };
-const craftingSystem = {
-  craftingCheck: {
-    simple: { rollFormula: '1d20' },
-    routed: { rollFormula: '1d20', type: 'relative', relativeOutcomes: [] },
-    progressive: { rollFormula: '1d20' },
-  },
-};
+/** Each slot authors `authored` as its evaluation, so the engine places by the config it reads. */
+function craftingSystem(authored) {
+  return {
+    craftingCheck: {
+      simple: { rollFormula: '1d20', evaluation: authored },
+      routed: { rollFormula: '1d20', type: 'relative', relativeOutcomes: [], evaluation: authored },
+      progressive: { rollFormula: '1d20', evaluation: authored },
+    },
+  };
+}
+const salvageRoll = (toolItems) => ({ interactive: true, toolItems, rollDecision: { bonus: null } });
 const engineRunners = {
-  craftingPassFail: (engine, toolItems) =>
-    engine._runSimpleCheck(craftingSystem, { name: 'Recipe' }, null, {}, { toolItems }),
-  craftingRouted: (engine, toolItems) =>
-    engine._runRoutedCheck(craftingSystem, { name: 'Recipe' }, null, {}, { toolItems }),
-  craftingProgressive: (engine, toolItems) =>
-    engine._runProgressiveCheck(craftingSystem, { name: 'Recipe' }, {}, { toolItems }),
-  salvageSimple: (engine, toolItems) =>
-    engine._runSalvageSimpleCheck({ rollFormula: '1d20', dc: 10 }, { name: 'Scrap' }, {}, {
-      interactive: true, toolItems, rollDecision: { bonus: null },
-    }),
-  salvageRouted: (engine, toolItems) =>
-    engine._runSalvageRoutedCheck(
-      { rollFormula: '1d20', dc: 10, type: 'relative', relativeOutcomes: [] },
-      { name: 'Scrap' }, {}, { interactive: true, toolItems, rollDecision: { bonus: null } }
+  craftingPassFail: (engine, toolItems, authored) =>
+    engine._runSimpleCheck(craftingSystem(authored), { name: 'Recipe' }, null, {}, { toolItems }),
+  craftingRouted: (engine, toolItems, authored) =>
+    engine._runRoutedCheck(craftingSystem(authored), { name: 'Recipe' }, null, {}, { toolItems }),
+  craftingProgressive: (engine, toolItems, authored) =>
+    engine._runProgressiveCheck(craftingSystem(authored), { name: 'Recipe' }, {}, { toolItems }),
+  salvageSimple: (engine, toolItems, authored) =>
+    engine._runSalvageSimpleCheck(
+      { rollFormula: '1d20', dc: 10, evaluation: authored }, { name: 'Scrap' }, {}, salvageRoll(toolItems)
     ),
-  salvageProgressive: (engine, toolItems) =>
-    engine._runSalvageProgressiveCheck({ rollFormula: '1d20' }, { name: 'Scrap' }, {}, {
-      interactive: true, toolItems, rollDecision: { bonus: null },
-    }),
+  salvageRouted: (engine, toolItems, authored) =>
+    engine._runSalvageRoutedCheck(
+      { rollFormula: '1d20', dc: 10, type: 'relative', relativeOutcomes: [], evaluation: authored },
+      { name: 'Scrap' }, {}, salvageRoll(toolItems)
+    ),
+  salvageProgressive: (engine, toolItems, authored) =>
+    engine._runSalvageProgressiveCheck(
+      { rollFormula: '1d20', evaluation: authored }, { name: 'Scrap' }, {}, salvageRoll(toolItems)
+    ),
 };
 
 for (const [name, run] of Object.entries(engineRunners)) {
   const interactive = name.startsWith('salvage');
+  const progressive = name.endsWith('Progressive');
   test(`${name}: a dice-bearing Tool keeps its sum/over term and routes its evidence elsewhere`, async () => {
     const rolls = [];
     const messages = [];
@@ -470,18 +475,21 @@ for (const [name, run] of Object.entries(engineRunners)) {
     try {
       const engine = Object.create(CraftingEngine.prototype);
       engine._resolveSimpleCheckDc = async () => 10;
-      const appended = await run(engine, [hammer]);
+      const appended = await run(engine, [hammer], undefined);
       assert.deepEqual(rolls, ['1d4', '1d20 + 3[Hammer]']);
       assert.equal(Object.hasOwn(appended.data, 'preRolls'), false);
       assert.deepEqual(messages, interactive ? [['1d20 + 3[Hammer]']] : []);
 
       rolls.length = 0;
       messages.length = 0;
-      const prepare = CraftingEngine.prototype._prepareToolCheckBonuses;
-      engine._prepareToolCheckBonuses = function prepareUnder(formula, tools) {
-        return prepare.call(this, formula, tools, evaluation);
-      };
-      const routed = await run(engine, [hammer]);
+      const routed = await run(engine, [hammer], evaluation);
+      if (progressive) {
+        assert.equal(routed.misconfigured, true, 'a summed roll-under progressive check refuses');
+        assert.deepEqual(routed.data, { targetRefusal: 'progressive-under' });
+        assert.deepEqual(rolls, [], 'the refusal precedes the Tool roll');
+        assert.deepEqual(messages, []);
+        return;
+      }
       assert.deepEqual(rolls, ['1d4', '1d20']);
       assert.deepEqual(routed.data.preRolls, [
         { source: 'tool', label: 'Hammer', expression: '1d4', total: 3, destination: 'target' },
@@ -500,10 +508,36 @@ const runeModifier = {
 };
 const formulaRunners = {
   runFormulaPassFail: (input) => runFormulaPassFail({ ...input, dc: 10 }),
-  runFormulaProgressive,
   runFormulaRouted: (input) =>
     runFormulaRouted({ ...input, dc: 10, type: 'relative', relativeOutcomes: [] }),
 };
+
+test('runFormulaProgressive refuses a sum/under check before any pre-roll or roll', async () => {
+  const previousRoll = globalThis.Roll;
+  const constructed = [];
+  globalThis.Roll = class {
+    constructor(formula) {
+      constructed.push(formula);
+    }
+  };
+  try {
+    for (const rollOptions of [{ evaluation }, null]) {
+      const result = await runFormulaProgressive({
+        formula: '1d20',
+        actor: { getRollData: () => ({}) },
+        craftingModifier: runeModifier,
+        rollOptions,
+        ...(rollOptions ? {} : { evaluation }),
+      });
+      assert.equal(result.misconfigured, true);
+      assert.deepEqual(result.data, { targetRefusal: 'progressive-under' });
+    }
+    assert.deepEqual(constructed, [], 'neither the library pre-roll nor the main roll is built');
+  } finally {
+    if (previousRoll === undefined) delete globalThis.Roll;
+    else globalThis.Roll = previousRoll;
+  }
+});
 
 for (const [name, runner] of Object.entries(formulaRunners)) {
   test(`${name} reports a sum/under library pre-roll as executed evidence`, async () => {

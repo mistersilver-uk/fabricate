@@ -55,6 +55,13 @@ import {
   runFormulaProgressive,
   runFormulaRouted,
 } from './checkRoll.js';
+import {
+  activeCheckEvaluation,
+  checkTargetRefusal,
+  dcFlavorSuffix,
+  progressiveTargetRefusal,
+  resolveActivityTarget,
+} from './checkTarget.js';
 import { fireComplications } from './complicationRuntime.js';
 import { createOrStackComponentItem } from './componentStacking.js';
 import {
@@ -71,6 +78,7 @@ import { craftingStepHistoryEvidence } from './CraftingRunManager.js';
 import {
   commitCraft,
   continueCollapsedChain,
+  misconfiguredCheckResult,
   openCraftStep,
   publishCraftSuccess,
   resolveCheckFailure,
@@ -390,6 +398,7 @@ export class CraftingEngine {
     }
     const system = this._getRecipeSystem(recipe);
     const activeCheck = resolveActiveCraftingCheckFormula(system);
+    const checkTarget = this._versionedCheckTarget(activeCheck, recipe, actor);
     const prepared = await this._versionedStagePreparation({
       started: this._versionedStageStarted(run, stepIndex),
       run,
@@ -407,9 +416,11 @@ export class CraftingEngine {
         'STALE_RUN_STAGE'
       );
     }
+    const { evaluation } = checkTarget;
     const preparedTools = await this._prepareToolCheckBonuses(
       activeCheck.rollFormula,
-      prepared.toolValidation.tools
+      prepared.toolValidation.tools,
+      evaluation
     );
     const rollFormula = preparedTools.formula;
     const modifierContext = capturePreparedModifierContext(
@@ -423,12 +434,16 @@ export class CraftingEngine {
       true
     );
     const dc =
-      activeCheck.slot && activeCheck.slot !== 'progressive'
-        ? await this._resolveSimpleCheckDc(system, activeCheck.config, recipe, selectedSet, actor)
-        : null;
-    const dcLabel = Number.isFinite(dc) ? ` (DC ${dc})` : '';
-    const flavor = `${recipe.name ? `${recipe.name} — ` : ''}Crafting check${dcLabel}`;
-    const speaker = cloneJsonValue(globalThis.ChatMessage?.getSpeaker?.({ actor })) ?? null;
+      checkTarget.target === null
+        ? null
+        : await this._resolveSimpleCheckDc(
+            system,
+            activeCheck.config,
+            recipe,
+            selectedSet,
+            actor,
+            checkTarget.target
+          );
     return {
       required: activeCheck.checkUsable || activeCheck.requiresCheck,
       publicPrompt: versionedCheckPrompt({
@@ -438,13 +453,14 @@ export class CraftingEngine {
         actor,
         rollFormula,
         dc,
+        evaluation,
         modifierContext,
         modifierChoice,
       }),
       privateEvaluation: {
         actorUuid: actor?.uuid ?? null,
-        flavor,
-        speaker,
+        flavor: `${recipe.name ? `${recipe.name} — ` : ''}Crafting check${dcFlavorSuffix(dc, evaluation)}`,
+        speaker: cloneJsonValue(globalThis.ChatMessage?.getSpeaker?.({ actor })) ?? null,
         componentSourceActorUuids: (componentSourceActors || [])
           .map((source) => source?.uuid)
           .filter(Boolean),
@@ -461,18 +477,29 @@ export class CraftingEngine {
           modifierChoice: cloneJsonValue(modifierChoice),
           toolContributions: cloneJsonValue(preparedTools.contributions),
         },
-        decisionPolicy: {
-          dc: Number.isFinite(dc) ? dc : null,
-          thresholdMode: activeCheck.config?.thresholdMode ?? null,
-          type: activeCheck.config?.type ?? null,
-          relativeOutcomes: cloneJsonValue(activeCheck.config?.relativeOutcomes) ?? [],
-          fixedOutcomes: cloneJsonValue(activeCheck.config?.fixedOutcomes) ?? [],
-          clampToNearest: activeCheck.slot === 'routed',
-          minOutcomeId:
-            activeCheck.mode === 'routedByCheck' ? (recipe.minSuccessOutcomeId ?? null) : null,
-        },
+        decisionPolicy: versionedDecisionPolicy(activeCheck, recipe, dc, checkTarget.source),
       },
     };
+  }
+
+  /** The descriptor's evaluation and target before any Tool roll; a refusal throws before any
+   * mutation. A progressive slot has no target and refuses only summed roll-under. */
+  _versionedCheckTarget(activeCheck, recipe, actor) {
+    const evaluation = activeCheckEvaluation(activeCheck.config);
+    let resolved = { ok: true, target: null, source: null };
+    if (activeCheck.slot === 'progressive') {
+      const reason = progressiveTargetRefusal(evaluation);
+      if (reason) resolved = { ok: false, reason };
+    } else if (activeCheck.slot) {
+      resolved = this._resolveCheckTarget(activeCheck.config, recipe, actor);
+    }
+    if (!resolved.ok) {
+      throw new CraftingLifecycleExecutionError(
+        `The crafting check target is invalid (${resolved.reason})`,
+        'CHECK_TARGET_INVALID'
+      );
+    }
+    return { evaluation, target: resolved.target, source: resolved.source };
   }
 
   async prepareVersionedAlchemyStart({
@@ -3197,10 +3224,7 @@ export class CraftingEngine {
 
     if (checkResult.misconfigured) {
       // GM-side gap: inputs stay consumed, and the run stays resumable for a fixed check.
-      return {
-        resolved: true,
-        result: { success: false, results: null, message: checkResult.message },
-      };
+      return { resolved: true, result: misconfiguredCheckResult(checkResult) };
     }
     if (checkResult.cancelled) {
       // A dismissed roll is retryable: inputs stay consumed and the run stays active.
@@ -5528,14 +5552,22 @@ export class CraftingEngine {
     { interactive = false, toolItems = [] } = {}
   ) {
     const checkConfig = config || {};
-    const preparedTools = await this._prepareToolCheckBonuses(checkConfig.rollFormula, toolItems);
+    const target = this._resolveCheckTarget(checkConfig, recipe, craftingActor);
+    if (!target.ok) return checkTargetRefusal(target.reason);
+    const evaluation = activeCheckEvaluation(checkConfig);
+    const preparedTools = await this._prepareToolCheckBonuses(
+      checkConfig.rollFormula,
+      toolItems,
+      evaluation
+    );
     const formula = preparedTools.formula;
     const dc = await this._resolveSimpleCheckDc(
       system,
       checkConfig,
       recipe,
       ingredientSet,
-      craftingActor
+      craftingActor,
+      target.target
     );
     const craftingModifier = buildCheckModifierContext(system, 'crafting', recipe);
     const result = await runFormulaPassFail({
@@ -5554,6 +5586,7 @@ export class CraftingEngine {
           activity: 'Crafting',
           img: this._resolveRecipePromptImg(recipe),
           dc,
+          evaluation,
           modifierChoice: this._buildInteractiveModifierChoice(
             formula,
             craftingModifier,
@@ -5582,14 +5615,22 @@ export class CraftingEngine {
     { interactive = false, applyMinSuccessOutcome = true, toolItems = [] } = {}
   ) {
     const routed = system?.craftingCheck?.routed || {};
-    const preparedTools = await this._prepareToolCheckBonuses(routed.rollFormula, toolItems);
+    const target = this._resolveCheckTarget(routed, recipe, craftingActor);
+    if (!target.ok) return checkTargetRefusal(target.reason);
+    const evaluation = activeCheckEvaluation(routed);
+    const preparedTools = await this._prepareToolCheckBonuses(
+      routed.rollFormula,
+      toolItems,
+      evaluation
+    );
     const formula = preparedTools.formula;
     const dc = await this._resolveSimpleCheckDc(
       system,
       routed,
       recipe,
       ingredientSet,
-      craftingActor
+      craftingActor,
+      target.target
     );
     const craftingModifier = buildCheckModifierContext(system, 'crafting', recipe);
     const result = await runFormulaRouted({
@@ -5618,6 +5659,7 @@ export class CraftingEngine {
           img: this._resolveRecipePromptImg(recipe),
           // Fixed-type checks match by value range, so no DC chip or flavor is shown.
           dc: routed.type === 'fixed' ? undefined : dc,
+          evaluation,
           modifierChoice: this._buildInteractiveModifierChoice(
             formula,
             craftingModifier,
@@ -5672,7 +5714,14 @@ export class CraftingEngine {
     { interactive = false, toolItems = [] } = {}
   ) {
     const progressive = system?.craftingCheck?.progressive || {};
-    const preparedTools = await this._prepareToolCheckBonuses(progressive.rollFormula, toolItems);
+    const evaluation = activeCheckEvaluation(progressive);
+    const refusal = progressiveTargetRefusal(evaluation);
+    if (refusal) return checkTargetRefusal(refusal);
+    const preparedTools = await this._prepareToolCheckBonuses(
+      progressive.rollFormula,
+      toolItems,
+      evaluation
+    );
     const formula = preparedTools.formula;
     const craftingModifier = buildCheckModifierContext(system, 'crafting', recipe);
     const result = await runFormulaProgressive({
@@ -5830,11 +5879,16 @@ export class CraftingEngine {
     return system?.alchemy?.checkMode || 'none';
   }
 
-  /** The check DC: a dynamic macro's number, else the recipe's static tier, else the default;
-   * any failure falls back to the default. Shared with the routed base DC. */
-  async _resolveSimpleCheckDc(system, simple, recipe, ingredientSet, craftingActor) {
-    // The anchor first: the selected tier when it still exists, else the static default.
-    const anchor = this._resolveCheckAnchorDc(simple, recipe);
+  /** The check target after a dynamic macro, which receives the validated `anchor` and returns
+   * the final number; any macro failure keeps the anchor. Shared with the routed base DC. */
+  async _resolveSimpleCheckDc(
+    system,
+    simple,
+    recipe,
+    ingredientSet,
+    craftingActor,
+    anchor = this._resolveCheckAnchorDc(simple, recipe)
+  ) {
     if (simple.dcMode !== 'dynamic') return anchor;
     if (!simple.macroUuid) return anchor;
     try {
@@ -5846,6 +5900,7 @@ export class CraftingEngine {
         // The macro receives the anchor and returns the final number (issue 1096), so tier and
         // macro compose. Additive to a named bag, so existing macros are unaffected.
         anchorDc: anchor,
+        evaluation: structuredClone(activeCheckEvaluation(simple)),
       });
       const numeric = Number(value);
       return Number.isFinite(numeric) ? Math.trunc(numeric) : anchor;
@@ -5855,14 +5910,21 @@ export class CraftingEngine {
     }
   }
 
-  /** The DC before any macro: the selected difficulty tier, else the static default; one
-   * definition because {@link _resolveSimpleCheckDc} needs it twice. */
+  /** The crafting target before any macro: the fixed anchor DC, or the actor's character value
+   * adjusted by the selected recipe tier's adjustment, else the base. */
+  _resolveCheckTarget(config, recipe, actor) {
+    return resolveActivityTarget(config, {
+      anchor: this._resolveCheckAnchorDc(config, recipe),
+      override: selectedCheckTier(config, recipe)?.adjustment,
+      readRollData: () => actor?.getRollData?.() ?? actor?.system ?? {},
+    });
+  }
+
+  /** The fixed DC before any macro: the selected difficulty tier, else the static default; one
+   * definition for the target adapter and {@link _resolveSimpleCheckDc}'s default anchor. */
   _resolveCheckAnchorDc(config, recipe) {
     const fallback = Number.isFinite(Number(config?.dc)) ? Math.trunc(Number(config.dc)) : 15;
-    const tierId = recipe?.checkTierId;
-    if (!tierId) return fallback;
-    const tiers = Array.isArray(config?.tiers) ? config.tiers : [];
-    const tier = tiers.find((entry) => entry.id === tierId);
+    const tier = selectedCheckTier(config, recipe);
     const tierDc = Number(tier?.dc);
     return tier && Number.isFinite(tierDc) ? Math.trunc(tierDc) : fallback;
   }
@@ -6757,6 +6819,16 @@ export class CraftingEngine {
     return { success: true, outcome: null, value: null, data: {} };
   }
 
+  /** The salvage target: the fixed DC, or the actor's character value adjusted by the
+   * component's adjustment override, else the base. */
+  _resolveSalvageTarget(checkMode, component, actor) {
+    return resolveActivityTarget(checkMode, {
+      anchor: this._resolveSalvageDc(checkMode, component),
+      override: component?.salvage?.adjustmentOverride,
+      readRollData: () => actor?.getRollData?.() ?? actor?.system ?? {},
+    });
+  }
+
   /** Resolve the salvage check DC: the per-component override when set, else the
    * check sub-object's default DC (fallback 15). */
   _resolveSalvageDc(checkMode, component) {
@@ -6777,6 +6849,7 @@ export class CraftingEngine {
     actor,
     component,
     dc,
+    evaluation,
     rollDecision = null,
     formula = '',
     craftingModifier = null,
@@ -6788,6 +6861,7 @@ export class CraftingEngine {
       activity: 'Salvage',
       img: component?.img,
       dc,
+      evaluation,
       modifierChoice: this._buildInteractiveModifierChoice(
         formula,
         craftingModifier,
@@ -6807,9 +6881,16 @@ export class CraftingEngine {
     actor,
     { interactive = false, toolItems = [], rollDecision = null, craftingModifier = null } = {}
   ) {
-    const dc = this._resolveSalvageDc(simple, component);
+    const target = this._resolveSalvageTarget(simple, component, actor);
+    if (!target.ok) return checkTargetRefusal(target.reason, 'Salvage');
+    const dc = target.target;
+    const evaluation = activeCheckEvaluation(simple);
     // Tool bonuses append first and the modifier term after, as in crafting.
-    const preparedTools = await this._prepareToolCheckBonuses(simple.rollFormula, toolItems);
+    const preparedTools = await this._prepareToolCheckBonuses(
+      simple.rollFormula,
+      toolItems,
+      evaluation
+    );
     const formula = preparedTools.formula;
     const result = await runFormulaPassFail({
       formula,
@@ -6825,6 +6906,7 @@ export class CraftingEngine {
           actor,
           component,
           dc,
+          evaluation,
           rollDecision,
           formula,
           craftingModifier,
@@ -6843,7 +6925,14 @@ export class CraftingEngine {
     actor,
     { interactive = false, toolItems = [], rollDecision = null, craftingModifier = null } = {}
   ) {
-    const preparedTools = await this._prepareToolCheckBonuses(progressive.rollFormula, toolItems);
+    const evaluation = activeCheckEvaluation(progressive);
+    const refusal = progressiveTargetRefusal(evaluation);
+    if (refusal) return checkTargetRefusal(refusal, 'Salvage');
+    const preparedTools = await this._prepareToolCheckBonuses(
+      progressive.rollFormula,
+      toolItems,
+      evaluation
+    );
     const formula = preparedTools.formula;
     const result = await runFormulaProgressive({
       formula,
@@ -6878,8 +6967,15 @@ export class CraftingEngine {
     actor,
     { interactive = false, toolItems = [], rollDecision = null, craftingModifier = null } = {}
   ) {
-    const dc = this._resolveSalvageDc(routed, component);
-    const preparedTools = await this._prepareToolCheckBonuses(routed.rollFormula, toolItems);
+    const target = this._resolveSalvageTarget(routed, component, actor);
+    if (!target.ok) return checkTargetRefusal(target.reason, 'Salvage');
+    const dc = target.target;
+    const evaluation = activeCheckEvaluation(routed);
+    const preparedTools = await this._prepareToolCheckBonuses(
+      routed.rollFormula,
+      toolItems,
+      evaluation
+    );
     const formula = preparedTools.formula;
     const result = await runFormulaRouted({
       formula,
@@ -6900,6 +6996,7 @@ export class CraftingEngine {
           actor,
           component,
           dc,
+          evaluation,
           rollDecision,
           formula,
           craftingModifier,
@@ -7088,6 +7185,34 @@ function authorityUnavailableResult() {
   };
 }
 
+/**
+ * The prepared check's private routing policy. `dc` stays fixed-only and `target` is the resolved
+ * pre-modifier target after any macro, so a later actor or config edit cannot move either.
+ */
+function versionedDecisionPolicy(activeCheck, recipe, dc, targetSource) {
+  const target = Number.isFinite(dc) ? dc : null;
+  return {
+    dc: targetSource === 'fixed' ? target : null,
+    target,
+    targetSource: target === null ? null : targetSource,
+    thresholdMode: activeCheck.config?.thresholdMode ?? null,
+    type: activeCheck.config?.type ?? null,
+    relativeOutcomes: cloneJsonValue(activeCheck.config?.relativeOutcomes) ?? [],
+    fixedOutcomes: cloneJsonValue(activeCheck.config?.fixedOutcomes) ?? [],
+    clampToNearest: activeCheck.slot === 'routed',
+    minOutcomeId:
+      activeCheck.mode === 'routedByCheck' ? (recipe.minSuccessOutcomeId ?? null) : null,
+  };
+}
+
+/** The recipe's selected difficulty tier on a check config, while it still exists. */
+function selectedCheckTier(config, recipe) {
+  const tierId = recipe?.checkTierId;
+  if (!tierId) return null;
+  const tiers = Array.isArray(config?.tiers) ? config.tiers : [];
+  return tiers.find((entry) => entry.id === tierId) ?? null;
+}
+
 function versionedFailure(message) {
   return { success: false, results: null, message };
 }
@@ -7110,6 +7235,7 @@ function versionedCheckPrompt({
   actor,
   rollFormula,
   dc,
+  evaluation,
   modifierContext,
   modifierChoice,
 }) {
@@ -7120,7 +7246,7 @@ function versionedCheckPrompt({
         .map(publicModifierDisplay);
   const formula = modifierChoice
     ? rollFormula
-    : resolveRolledFormula(rollFormula, actor, modifierContext);
+    : resolveRolledFormula(rollFormula, actor, modifierContext, undefined, evaluation);
   const target = activeCheck.slot === 'simple' && Number.isFinite(dc) ? dc : null;
   const comparison = activeCheck.config?.thresholdMode === 'exceed' ? 'exceed' : 'meet';
   const activityKey = 'FABRICATE.App.Nav.Crafting';
@@ -7133,10 +7259,14 @@ function versionedCheckPrompt({
     actorName: actor?.name ?? '',
     img: resolveRecipeImage(recipe),
     formula,
-    resolvedFormula: resolveCheckFormulaDisplay(formula, actor)?.display ?? null,
+    resolvedFormula:
+      resolveCheckFormulaDisplay(formula, actor, null, undefined, evaluation)?.display ?? null,
     // The itemised `selectedModifiers` are chips, so the prompt's formula omits their terms.
-    displayFormula: resolveCheckFormulaDisplay(rollFormula, actor)?.display ?? rollFormula,
+    displayFormula:
+      resolveCheckFormulaDisplay(rollFormula, actor, null, undefined, evaluation)?.display ??
+      rollFormula,
     target,
+    direction: target === null ? null : evaluation.direction,
     comparison: target === null ? null : comparison,
     selectedModifiers,
     mode: activeCheck.mode,

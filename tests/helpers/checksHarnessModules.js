@@ -69,7 +69,11 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checkOdds.js',
   'src/systems/checkEvaluation.js',
   'src/systems/checkRoll.js',
+  // `checkRoll.js` resolves and validates check targets (issue 2003).
+  'src/systems/checkTarget.js',
+  'src/systems/normalize/checkEvaluation.js',
   'src/systems/checkRollDecision.js',
+  'src/systems/checkRouting.js',
   'src/systems/checkModifierRolls.js',
   'src/systems/bulkChatVisibility.js',
   'src/utils/progressiveAward.js',
