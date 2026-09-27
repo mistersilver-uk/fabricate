@@ -18,6 +18,8 @@ import {
   postCheckRollHandoff,
 } from '../src/systems/checkRoll.js';
 import { transitionExecutionJournal } from '../src/systems/runExecutionJournal.js';
+import { installCountDice } from './helpers/countEngineDice.js';
+import { countEvaluation } from './helpers/countFixtures.js';
 import { createPersistedCraftingHistory, mergeHistoryFlag } from './helpers/journal-fixtures.js';
 
 test('both history allowlists retain only executed check evaluation metadata', () => {
@@ -36,6 +38,33 @@ test('both history allowlists retain only executed check evaluation metadata', (
     ]) {
       assert.deepEqual(allow(invalid, { executed: true }).resolutionSnapshot, {
         kind: invalid.resolutionSnapshot.kind, mode: 'simple',
+      });
+    }
+  }
+});
+
+test('the history allowlists keep count evaluation only where snapshot and result agree', () => {
+  const snapshot = { kind: 'check', mode: 'simple', product: 'count', direction: 'under' };
+  const agreeing = [
+    { total: -1, product: 'count', direction: 'under' },
+    { total: null, zeroPool: true, product: 'count', direction: 'under' },
+  ];
+  const disagreeing = [
+    { total: null, product: 'count', direction: 'under' },
+    { total: 2, product: 'count', direction: 'over' },
+    { total: 2, product: 'sum', direction: 'under' },
+    { total: null, zeroPool: true, product: 'sum', direction: 'under' },
+  ];
+  for (const allow of [craftingStepHistoryEvidence, historyEvidenceFields]) {
+    for (const data of agreeing) {
+      const source = { resolutionSnapshot: snapshot, lastCheckResult: { data } };
+      assert.deepEqual(allow(source, { executed: true }).resolutionSnapshot, snapshot);
+    }
+    for (const data of disagreeing) {
+      const source = { resolutionSnapshot: snapshot, lastCheckResult: { data } };
+      assert.deepEqual(allow(source, { executed: true }).resolutionSnapshot, {
+        kind: 'check',
+        mode: 'simple',
       });
     }
   }
@@ -1914,7 +1943,7 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
     craftingCheck: {
       simple: {
         rollFormula: '1d20 + 3', dc: 12,
-        evaluation: { product: 'count', direction: 'under', pool: { required: 3 } },
+        evaluation: { product: 'sum', direction: 'over', pool: { required: 3 } },
       },
     },
   };
@@ -1971,7 +2000,7 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
     assert.deepEqual(descriptor.privateEvaluation.speaker, expectedSpeaker);
     assert.equal(descriptor.privateEvaluation.flavor, 'Sun Tea — Crafting check (DC 12)');
     assert.deepEqual(descriptor.privateEvaluation.checkConfig.evaluation, {
-      product: 'count', direction: 'under', pool: { required: 3 },
+      product: 'sum', direction: 'over', pool: { required: 3 },
     });
     system.craftingCheck.simple.evaluation.pool.required = 12;
     assert.equal(descriptor.privateEvaluation.checkConfig.evaluation.pool.required, 3);
@@ -2162,6 +2191,58 @@ test('the versioned crafting descriptor refuses its target before the Tool roll 
     assert.equal(JSON.stringify(publicPrompt).includes('@skill'), false, 'the expression stays private');
   } finally {
     restore();
+  }
+});
+
+test('the versioned count descriptor refuses before the Tool roll and captures its policy privately', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1d4' } };
+  const check = (pool) => ({
+    rollFormula: '1d20',
+    dc: 12,
+    evaluation: countEvaluation({ base: '@skill', ...pool }),
+  });
+  const dice = installCountDice({ faces: [2, 9, 3, 8, 7] });
+  try {
+    const refused = await startToolSuppliedRun(tool, { check: check({}) });
+    const before = refused.revision();
+    await assert.rejects(refused.describe, {
+      code: 'CHECK_TARGET_INVALID',
+      message: 'Crafting check cannot roll: its dice pool reads @skill, which this character does not have.',
+    });
+    assert.equal(refused.revision(), before, 'the run is untouched');
+    assert.deepEqual(dice.constructed, [], 'no Tool die rolls before the refusal');
+
+    const { actor, describe } = await startToolSuppliedRun(tool, { check: check({}) });
+    actor.getRollData = () => ({ bonus: 99, skill: 2 });
+    const { publicPrompt, privateEvaluation } = await describe();
+    assert.deepEqual(dice.formulas(), ['1d4'], 'the Tool rolls once, after validation');
+    const { dc, target, targetSource, count } = privateEvaluation.decisionPolicy;
+    assert.deepEqual([dc, target, targetSource], [null, null, null]);
+    assert.deepEqual([count.base, count.threshold, count.required, count.die], [2, 8, 1, 10]);
+    assert.equal(privateEvaluation.flavor, 'Sun Tea — Crafting check', 'no DC suffix');
+    assert.deepEqual(
+      [publicPrompt.target, publicPrompt.allowAdvantage, publicPrompt.allowsSituationalModifier],
+      [null, false, true],
+      'the retained 1d20 offers no advantage and names no target'
+    );
+    assert.deepEqual(
+      [publicPrompt.formula, publicPrompt.displayFormula, publicPrompt.resolvedFormula],
+      ['', '', null],
+      'the inert retained formula never reaches the prompt'
+    );
+    assert.equal(JSON.stringify(publicPrompt).includes('@skill'), false);
+
+    const snapshot = JSON.parse(JSON.stringify(privateEvaluation));
+    actor.getRollData = () => ({ bonus: 99, skill: 6 });
+    const result = await evaluatePreparedRunCheck(snapshot, actor);
+    assert.deepEqual(
+      dice.formulas(),
+      ['1d4', '4d10'],
+      'the captured base 2 plus the Tool 2, never the live 6, and the Tool never rerolls'
+    );
+    assert.deepEqual([result.data.total, result.success], [2, true], '9 and 8 qualify');
+  } finally {
+    dice.restore();
   }
 });
 

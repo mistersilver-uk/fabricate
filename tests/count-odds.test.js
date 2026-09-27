@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { planModifierPlacement } from '../src/systems/checkModifierRouter.js';
+import { runFormulaPassFail } from '../src/systems/checkRoll.js';
+import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import {
   COUNT_ODDS_MAX_DEPTH,
   COUNT_ODDS_REASONS,
@@ -11,6 +13,7 @@ import {
   countPassProbability,
 } from '../src/systems/countOdds.js';
 
+import { installCountDice } from './helpers/countEngineDice.js';
 import {
   countEvaluation as d10CountEvaluation,
   deepFreeze,
@@ -565,4 +568,89 @@ test('odds read deep-frozen inputs without mutating them', () => {
   const result = countOdds({ evaluation, rollData, placement, preRollTotals });
   assert.equal(result.ok, true);
   assertClose(result.expected, 4.5 / 3, 'four or five dice');
+});
+
+// ── QE6, the runner half: the real runner over every face sequence the dice can show ──
+
+/** Walks every scripted face sequence the runner draws, weighting each by its probability. */
+async function runnerDistribution(pool, { thresholdMode = 'meet', library = null } = {}) {
+  const evaluation = normalizeCheckEvaluation(countEvaluation(pool));
+  const craftingModifier =
+    library === null
+      ? null
+      : {
+          activity: 'crafting',
+          catalogue: [{ id: 'knack', label: 'Knack', expression: String(library) }],
+          systemPolicy: 'addAll',
+          defaultModifierIds: ['knack'],
+        };
+  const totals = { masses: {}, pass: 0, mean: 0 };
+  const walk = async (prefix) => {
+    const dice = installCountDice({ faces: prefix });
+    let result;
+    try {
+      result = await runFormulaPassFail({
+        formula: '',
+        dc: 1,
+        thresholdMode,
+        actor: { getRollData: () => ({}) },
+        craftingModifier,
+        evaluation,
+      });
+    } finally {
+      dice.restore();
+    }
+    if (/scripted faces ran out/.test(result.message ?? '')) {
+      for (const face of range(evaluation.pool.die)) await walk([...prefix, face]);
+      return;
+    }
+    const weight = (1 / evaluation.pool.die) ** prefix.length;
+    totals.masses[result.value] = (totals.masses[result.value] ?? 0) + weight;
+    if (result.success) totals.pass += weight;
+    totals.mean += result.value * weight;
+  };
+  const report = console.error;
+  console.error = () => {};
+  try {
+    await walk([]);
+  } finally {
+    console.error = report;
+  }
+  return totals;
+}
+
+test('QE6: the runner agrees with the odds on 2d6 at threshold 5, met 20/36 and exceeded 11/36', async () => {
+  for (const [thresholdMode, expected] of [['meet', 20 / 36], ['exceed', 11 / 36]]) {
+    const runner = await runnerDistribution({}, { thresholdMode });
+    assertClose(runner.pass, expected, `runner ${thresholdMode}`);
+    assertClose(countPassProbability({ odds: odds({}, { thresholdMode }), required: 1 }), runner.pass);
+  }
+});
+
+test('QE6: the runner agrees on a library +1 to the threshold (27/36) and to the pool (152/216)', async () => {
+  for (const [modifierDestination, expected] of [['threshold', 27 / 36], ['pool', 152 / 216]]) {
+    const runner = await runnerDistribution({ modifierDestination }, { library: 1 });
+    assertClose(runner.pass, expected, `runner ${modifierDestination}`);
+    const evaluation = countEvaluation({ modifierDestination });
+    const placement = planModifierPlacement({ evaluation, contributions: [scalar('library', 1)] });
+    assertClose(countPassProbability({ odds: countOdds({ evaluation, placement }), required: 1 }), runner.pass);
+  }
+});
+
+test('QE6: the runner mean over all outcomes agrees on cancelling nets of 1/3 and 5/6', async () => {
+  for (const [pool, expected] of [
+    [{ cancel: cancelWorst }, 1 / 3],
+    [{ base: '1', threshold: '1', cancel: cancelFrom(1) }, 5 / 6],
+  ]) {
+    const runner = await runnerDistribution(pool);
+    assertClose(runner.mean, expected, 'runner mean');
+    assertClose(odds(pool).expected, runner.mean, 'odds expected');
+  }
+});
+
+test('QE6: the runner agrees on a once-exploding 1d6: 24/36, 10/36 and 2/36', async () => {
+  const pool = { base: '1', explode: explodeBest(true) };
+  const runner = await runnerDistribution(pool);
+  assertMasses(runner.masses, { 0: 24 / 36, 1: 10 / 36, 2: 2 / 36 }, 'runner');
+  assertMasses(byNet(odds(pool)), runner.masses, 'odds');
 });

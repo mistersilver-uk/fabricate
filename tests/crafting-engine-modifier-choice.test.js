@@ -126,6 +126,14 @@ test('engine gating: an unauthored formula threads no modifierChoice', () => {
   });
 });
 
+test('engine gating: an empty-formula count check still offers the playerPicks descriptor (issue 2004)', () => {
+  withRoll({ med: 2, herb: 5 }, () => {
+    const count = { product: 'count', direction: 'over', pool: {} };
+    assert.notEqual(engine._buildInteractiveModifierChoice('', context(), ACTOR, true, count), null);
+    assert.equal(build('', context(), true), null, 'an empty sum still offers none');
+  });
+});
+
 // …and a formula whose only content was the retired placeholder is unauthored too, once the shim
 // has stripped it.
 test('engine gating: a formula that strips to empty threads no modifierChoice', () => {

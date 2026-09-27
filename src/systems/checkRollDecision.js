@@ -50,10 +50,29 @@ function situationalContribution(bonus, evaluation) {
   return { source: 'situational', label: '', form: 'expression', expression: String(bonus) };
 }
 
-function promptInput({ authoredFormula, actor, options, resolvedCheck, displayFormula, deferred }) {
-  const formula = deferred
-    ? `${resolvedCheck.formula} + ${DEFERRED_MODIFIER_SLOT}`
-    : resolvedCheck.formula;
+/** Whether the offered `modifierChoice` waits for the prompt's answer before it appends. */
+export function defersModifierChoice(options) {
+  return (
+    Boolean(options?.modifierChoice) &&
+    options?.interactive === true &&
+    (typeof options.prompt === 'function' || Boolean(options?.rollDecision))
+  );
+}
+
+function promptInput({
+  authoredFormula,
+  actor,
+  options,
+  evaluation,
+  resolvedCheck,
+  displayFormula,
+  deferred,
+}) {
+  // A count check shows no formula, so no bare deferred slot either (issue 2004).
+  const formula =
+    deferred && evaluation.product !== 'count'
+      ? `${resolvedCheck.formula} + ${DEFERRED_MODIFIER_SLOT}`
+      : resolvedCheck.formula;
   const resolved = displayFormula(formula, actor);
   // The modifiers `selectedModifiers` itemises are chips, so the shown formula omits their terms.
   const shownFormula = deferred ? formula : authoredFormula.trim();
@@ -69,7 +88,8 @@ function promptInput({ authoredFormula, actor, options, resolvedCheck, displayFo
     modifierChoice: options.modifierChoice,
     selectedModifiers: resolvedCheck.selected,
     thresholdMode: options.thresholdMode === 'exceed' ? 'exceed' : 'meet',
-    allowAdvantage: hasPlainD20(authoredFormula.trim()),
+    // A count check offers no advantage until it is mode-aware (issue 2007).
+    allowAdvantage: evaluation.product !== 'count' && hasPlainD20(authoredFormula.trim()),
   };
 }
 
@@ -77,17 +97,8 @@ function applyAdvantage(formula, authoredFormula, advantage, evaluation) {
   if (advantage !== 'advantage' && advantage !== 'disadvantage') {
     return { formula, contribution: null };
   }
-  if (evaluation.product === 'count') {
-    return {
-      formula,
-      contribution: {
-        source: 'advantage',
-        label: '',
-        form: 'scalar',
-        value: advantage === 'advantage' ? 1 : -1,
-      },
-    };
-  }
+  // A count check drops a supplied advantage before placement until issue 2007.
+  if (evaluation.product === 'count') return { formula, contribution: null };
   // Keeping the lowest die is the advantage when a sum must come in under its target.
   const keep = evaluation.direction === 'under' ? KEEP_UNDER[advantage] : advantage;
   const prefix = authoredFormula.trim();
@@ -147,6 +158,7 @@ export async function resolveCheckDecision({
           authoredFormula,
           actor,
           options,
+          evaluation,
           resolvedCheck,
           displayFormula,
           deferred,

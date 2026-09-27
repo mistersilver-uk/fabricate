@@ -6,6 +6,7 @@
 import { publicComplications } from '../utils/complicationPlan.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 
+import { refusalData } from './checkTarget.js';
 import { rollTotalForCard, tierStepForCard } from './craftCardFields.js';
 import { readStackQuantity } from './itemStackQuantity.js';
 import {
@@ -202,6 +203,7 @@ export async function runSalvageCheck(engine, ctx) {
   // run created by THIS call so nothing is left `inProgress`; a reused pre-existing run is left
   // untouched. The failure-consumption policy below applies only to genuine rolled failures.
   if (checkResult.misconfigured) {
+    const refusal = refusalData(checkResult);
     if (salvageRunManager && ctx.salvageRun && ctx.salvageRunCreatedThisCall) {
       await salvageRunManager.discardRun(actor, ctx.salvageRun.id);
     }
@@ -212,9 +214,7 @@ export async function runSalvageCheck(engine, ctx) {
       // failed roll that never happened.
       misconfigured: true,
       salvageRun: ctx.salvageRunCreatedThisCall ? null : ctx.salvageRun,
-      ...(checkResult.data?.targetRefusal && {
-        data: { targetRefusal: checkResult.data.targetRefusal },
-      }),
+      ...(refusal && { data: refusal }),
     });
   }
 

@@ -2,9 +2,11 @@
  * re-enters `craft()` under: identity-typed, so re-declaring it elsewhere reads as `undefined`. */
 export const VERSIONED_EXECUTION_CONTEXT = Symbol('fabricate.versionedCraftingExecution');
 
-/** The RAW rolled total for a result chat card, or null when no check ran. A progressive check
- * overwrites `value` with the AWARDING value on a forced crit, so the card reads `data.total`. */
+/** The RAW rolled total for a result chat card, or null when no check ran or a zero pool rolled
+ * nothing. A progressive check overwrites `value` with the AWARDING value on a forced crit, so the
+ * card reads `data.total`. */
 export function rollTotalForCard(checkResult) {
+  if (checkResult?.data?.zeroPool === true) return null;
   return checkResult?.data?.total ?? checkResult?.value ?? null;
 }
 

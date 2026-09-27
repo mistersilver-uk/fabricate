@@ -10,6 +10,7 @@ import {
   readCheckActive,
 } from '../src/ui/svelte/apps/manager/checks/checkDraftClone.js';
 import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
+import { normalizeSalvage } from '../src/systems/normalize/salvage.js';
 
 const EMPTY_BREAKAGE = Object.freeze({ triggers: [] });
 const DEFAULT_EVALUATION = Object.freeze(normalizeCheckEvaluation());
@@ -178,6 +179,58 @@ describe('the authored evaluation record', () => {
     assert.deepEqual(draft.tiers[0], { id: 't', dc: 12, adjustment: 1.5, successes: 3 });
     assert.equal(draft.relativeOutcomes[0].adjustment, -1);
     assert.equal(cloneSimpleCheck({ tiers: [{ id: 't', successes: 4 }] }).tiers[0].successes, 4);
+  });
+});
+
+describe('count data through update, save and reseed (issue 2004)', () => {
+  const COUNT = normalizeCheckEvaluation({
+    product: 'count',
+    pool: {
+      die: 10,
+      base: '@skills.smith.rank + 2',
+      threshold: '8',
+      required: 2,
+      explode: { enabled: true, faces: { kind: 'from', value: 9 }, once: true },
+      cancel: { enabled: true, faces: { kind: 'worst', value: null } },
+    },
+  });
+
+  for (const [name, clone] of [
+    ['cloneRoutedCheck', cloneRoutedCheck],
+    ['cloneSimpleCheck', cloneSimpleCheck],
+    ['cloneProgressiveCheck', cloneProgressiveCheck],
+  ]) {
+    it(`${name} never aliases the count pool or its face rules`, () => {
+      const source = { evaluation: structuredClone(COUNT) };
+      const draft = clone(source);
+      draft.evaluation.pool.explode.faces.value = 3;
+      draft.evaluation.pool.cancel.enabled = false;
+      draft.evaluation.pool.additionalDice.max = 5;
+      assert.deepEqual(source.evaluation, COUNT, 'an update leaves the source untouched');
+      const saved = clone(draft);
+      assert.equal(saved.evaluation.pool.explode.faces.value, 3, 'the save keeps the edit');
+      assert.notEqual(saved.evaluation.pool.explode, draft.evaluation.pool.explode);
+      assert.notEqual(saved.evaluation.pool.cancel, draft.evaluation.pool.cancel);
+      assert.deepEqual(clone(source).evaluation, COUNT, 'a reseed restores the authored pool');
+    });
+  }
+
+  it('tier successes, zero included, copy onto detached rows', () => {
+    const source = { tiers: [{ id: 't', dc: 12, successes: 0 }] };
+    const draft = cloneSimpleCheck(source);
+    draft.tiers[0].successes = 4;
+    assert.equal(source.tiers[0].successes, 0);
+    assert.equal(cloneSimpleCheck(draft).tiers[0].successes, 4);
+    assert.equal(cloneRoutedCheck(source).tiers[0].successes, 0, 'zero is kept, not dropped');
+  });
+
+  it('a component successesOverride of 0 survives normalization, and null stays null', () => {
+    assert.equal(normalizeSalvage({ successesOverride: 0 }).successesOverride, 0);
+    assert.equal(normalizeSalvage({ successesOverride: null }).successesOverride, null);
+    const source = { successesOverride: 2 };
+    const normalized = normalizeSalvage(source);
+    normalized.successesOverride = 5;
+    assert.equal(source.successesOverride, 2);
   });
 });
 

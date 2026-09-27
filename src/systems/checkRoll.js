@@ -5,7 +5,6 @@
  */
 
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
-import { cloneJson } from '../utils/scalars.js';
 
 import { chatModeOption } from './bulkChatVisibility.js';
 import { compareToTarget, effectiveMargin } from './checkEvaluation.js';
@@ -15,7 +14,13 @@ import {
 } from './checkModifierResolver.js';
 import { postBundledCheckRoll, resolveModifierPreRolls } from './checkModifierRolls.js';
 import { planModifierPlacement, SUM_OVER_EVALUATION } from './checkModifierRouter.js';
-import { resolveCheckDecision } from './checkRollDecision.js';
+import { defersModifierChoice, resolveCheckDecision } from './checkRollDecision.js';
+import {
+  checkRollHandoff,
+  postCheckRoll,
+  preRollEvidence,
+  rolledDiceGroups,
+} from './checkRollOutput.js';
 import {
   classifyCheckTotal,
   effectiveTarget,
@@ -27,22 +32,17 @@ import {
   checkTargetRefusal,
   progressiveTargetRefusal,
 } from './checkTarget.js';
+import { preparedCountEvaluation } from './countCheck.js';
+import {
+  evaluateCountCheckRoll,
+  preparedCountResult,
+  runCountPassFail,
+  runCountProgressive,
+  runCountRouted,
+} from './countCheckRoll.js';
 
 export { classifyCheckTotal, resolveForcedOutcome } from './checkRouting.js';
-
-function preRollEvidence(rolled) {
-  const entries = rolled?.modifierPlacement?.preRolls;
-  if (!Array.isArray(entries) || entries.length === 0) return {};
-  return {
-    preRolls: entries.map(({ source, label, expression, total, destination }) => ({
-      source,
-      label,
-      expression,
-      total,
-      destination,
-    })),
-  };
-}
+export { rolledDiceGroups } from './checkRollOutput.js';
 
 /**
  * The formula this module actually rolls and its modifier placement: the retired-placeholder shim
@@ -94,38 +94,6 @@ function resolveRolledCheck(
 }
 
 /**
- * The evaluated roll's dice as `{ groupId, group: "NdS", sum, results }`. `groupId` is the index
- * in `roll.dice` order, which `diceGroup` triggers target. Rolling check modifiers append their
- * dice after the authored ones (issue 1118), so authored indices never move; a trigger whose
- * index already dangled may now match a modifier's die, deliberately unguarded because a
- * re-parsed group count disagrees with `roll.dice` on some formulas. `sum` is the post-modifier
- * `DiceTerm#total` (else the active faces' sum) and `results` are the active-only raw faces
- * (`.agents/docs/foundry-and-architecture.md`, `DiceTerm#total`).
- */
-export function rolledDiceGroups(roll) {
-  const dice = Array.isArray(roll?.dice) ? roll.dice : [];
-  return dice.map((die, groupId) => {
-    const count = Number(die?.number);
-    const faces = Number(die?.faces);
-    const dieTotal = Number(die?.total);
-    // `active !== false`: Foundry omits `active` on a kept result (issue 419).
-    const rawResults = Array.isArray(die?.results) ? die.results : [];
-    const results = rawResults
-      .filter((entry) => entry?.active !== false)
-      .map((entry) => Number(entry?.result))
-      .filter((face) => Number.isFinite(face));
-    // Post-modifier total, else the active faces' sum for an unevaluated die (issue 443).
-    const sum = Number.isFinite(dieTotal) ? dieTotal : results.reduce((acc, face) => acc + face, 0);
-    return {
-      groupId,
-      group: `${Number.isFinite(count) ? count : 0}d${Number.isFinite(faces) ? faces : 0}`,
-      sum,
-      results,
-    };
-  });
-}
-
-/**
  * Evaluate a check formula to `{ engine, total, diceGroups, resolvedFormula }`: `engine: false`
  * without a dice engine, and a bad formula throws for the caller to wrap. Interactive behaviour
  * is opt-in: `interactive` with a `prompt` confirms with the player, and a pre-resolved
@@ -136,6 +104,8 @@ export function rolledDiceGroups(roll) {
  * Separately evaluated modifiers settle before the main roll and return their ordered placement.
  */
 export async function evaluateCheckRoll(formula, actor, options = {}) {
+  // A count check rolls its structured pool, so its retained formula never reaches `Roll`.
+  if (ownEvaluation(options).product === 'count') return evaluateCountCheckRoll(actor, options);
   if (typeof globalThis.Roll !== 'function')
     return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
   // The retirement shim runs first, unconditionally (issue 1094): a surviving token never
@@ -147,11 +117,7 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
   const evaluation = ownEvaluation(options);
-  const modifierChoice = options?.modifierChoice;
-  const deferred =
-    Boolean(modifierChoice) &&
-    options?.interactive === true &&
-    (typeof options.prompt === 'function' || Boolean(options?.rollDecision));
+  const deferred = defersModifierChoice(options);
   const resolvedCheck = deferred
     ? { formula: authoredFormula, selected: [] }
     : resolveRolledCheck(
@@ -193,32 +159,13 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   const rolledTotal = Number(roll?.total);
   const total = Number.isFinite(rolledTotal) ? rolledTotal : 0;
 
-  // Interactive rolls post to chat, which is what Dice So Nice animates; a failure is swallowed.
-  if (
-    options?.interactive &&
-    options?.post !== false &&
-    typeof globalThis.ChatMessage?.create === 'function'
-  ) {
-    try {
-      if (preRolls.length > 0) {
-        await postBundledCheckRoll({
-          mainRoll: roll,
-          preRolls,
-          speaker: options.speaker,
-          flavor: effectiveFlavor,
-          rollMode: effectiveRollMode,
-        });
-      } else {
-        await roll.toMessage(
-          { speaker: options.speaker, flavor: effectiveFlavor },
-          { ...chatModeOption(effectiveRollMode), create: true }
-        );
-      }
-    } catch (error) {
-      console.error('Fabricate | Failed to post check roll to chat:', error);
-    }
-  }
-
+  await postCheckRoll({
+    roll,
+    preRolls,
+    options,
+    flavor: effectiveFlavor,
+    rollMode: effectiveRollMode,
+  });
   const result = {
     engine: true,
     total,
@@ -226,20 +173,14 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     resolvedFormula,
     modifierPlacement,
   };
-  const serializedPreRolls = modifierPlacement.preRolls.map((entry) => entry.serializedRoll);
-  if (
-    options?.includeRollHandoff === true &&
-    typeof roll?.toJSON === 'function' &&
-    serializedPreRolls.every(Boolean)
-  ) {
-    result.rollHandoff = {
-      serializedRoll: cloneJson(roll),
-      ...(serializedPreRolls.length > 0 && { serializedPreRolls }),
-      flavor: effectiveFlavor ?? null,
-      speaker: options?.speaker ?? null,
-      rollMode: effectiveRollMode ?? null,
-    };
-  }
+  const rollHandoff = checkRollHandoff({
+    roll,
+    placement: modifierPlacement,
+    options,
+    flavor: effectiveFlavor,
+    rollMode: effectiveRollMode,
+  });
+  if (rollHandoff) result.rollHandoff = rollHandoff;
   return result;
 }
 
@@ -310,6 +251,12 @@ export async function evaluatePreparedCheck(preparation, actor, decision = {}) {
     diceGroups: result.diceGroups,
     resolvedFormula: null,
     modifierPlacement: result.modifierPlacement,
+    ...(result.refusal && { refusal: result.refusal }),
+    ...(result.policy && {
+      policy: result.policy,
+      zeroPool: result.zeroPool === true,
+      countProjection: result.countProjection ?? null,
+    }),
     secret: true,
   };
 }
@@ -435,6 +382,12 @@ export async function evaluatePreparedRunCheck(
   const evaluation = activeCheckEvaluation(checkConfig);
   const refusal = preparedCheckRefusal(kind, evaluation, preparation?.rollFormula);
   if (refusal) return checkTargetRefusal(refusal, label);
+  // A count check replays its captured policy and never re-reads the live actor's pool.
+  const count =
+    evaluation.product === 'count' ? preparedCountEvaluation(decisionPolicy.count) : null;
+  if (evaluation.product === 'count' && !count) {
+    return checkTargetRefusal('invalid', label, { refusedInput: 'pool' });
+  }
   const authoritativeDecision = {
     ...decision,
     bonus: decision?.allowsSituationalModifier === true ? decision.bonus : null,
@@ -456,6 +409,7 @@ export async function evaluatePreparedRunCheck(
         toolContributions: config.toolContributions ?? [],
         evaluation,
         speaker: preparation?.speaker ?? config.speaker ?? null,
+        ...(count && { evaluation: count.evaluation, thresholdMode: count.thresholdMode }),
       },
     },
     actor,
@@ -463,6 +417,10 @@ export async function evaluatePreparedRunCheck(
   );
   if (rolled.cancelled) {
     return { success: false, cancelled: true, outcome: null, value: null, data: {} };
+  }
+  if (count) {
+    const grading = { config, required: count.required, secret, failureMessage, label };
+    return preparedCountResult(kind, rolled, grading);
   }
   if (!rolled.engine) {
     return {
@@ -695,6 +653,10 @@ export async function runFormulaPassFail({
   ...input
 }) {
   const evaluation = ownEvaluation(input, rollOptions);
+  if (evaluation.product === 'count') {
+    const count = { rollOptions, evaluation, thresholdMode, craftingModifier };
+    return runCountPassFail({ ...count, dc, triggers, actor, label });
+  }
   const grading = sumGrading(evaluation);
   const formula = String(rawFormula || '').trim();
   if (!formula && grading.direction === 'under') return checkTargetRefusal('formula-empty', label);
@@ -749,6 +711,16 @@ export async function runFormulaProgressive({
   ...input
 }) {
   const evaluation = ownEvaluation(input, rollOptions);
+  if (evaluation.product === 'count') {
+    return runCountProgressive({
+      rollOptions,
+      evaluation,
+      craftingModifier,
+      triggers,
+      actor,
+      label,
+    });
+  }
   const refusal = progressiveTargetRefusal(evaluation);
   if (refusal) return checkTargetRefusal(refusal, label);
   const formula = String(rawFormula || '').trim();
@@ -816,6 +788,23 @@ export async function runFormulaRouted({
   ...input
 }) {
   const evaluation = ownEvaluation(input, rollOptions);
+  if (evaluation.product === 'count') {
+    return runCountRouted({
+      rollOptions,
+      evaluation,
+      thresholdMode,
+      craftingModifier,
+      dc,
+      actor,
+      label,
+      type,
+      relativeOutcomes,
+      fixedOutcomes,
+      triggers,
+      clampToNearest,
+      minOutcomeId,
+    });
+  }
   const grading = sumGrading(evaluation);
   const formula = String(rawFormula || '').trim();
   if (!formula && grading.direction === 'under') return checkTargetRefusal('formula-empty', label);

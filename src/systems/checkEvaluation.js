@@ -70,6 +70,19 @@ export function resolveDeterministicExpression(expression, rollData = {}, { path
   }
 }
 
+/** The first `@` path in `expression` that `rollData` lacks, for a refusal to name; else null. */
+export function firstUnresolvedPath(expression, rollData = {}, { pathMode } = {}) {
+  const readPath = pathMode === 'foundry' ? resolveFoundryPath : resolvePath;
+  for (const [token] of String(expression ?? '').matchAll(PATH_TOKEN)) {
+    try {
+      readPath(token, rollData);
+    } catch (error) {
+      if (error === 'unresolved-path') return token;
+    }
+  }
+  return null;
+}
+
 function createExpressionReader(source, readPath) {
   let index = 0;
   const skip = () => {

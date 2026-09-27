@@ -3,9 +3,21 @@ import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpressio
 /** Canonical salvage modes; legacy `tiered`/`mapped` are rewritten upstream (1.4.0 migration). */
 const SALVAGE_MODES = ['simple', 'routed', 'progressive'];
 
-/** A config with a non-blank `rollFormula`: the one notion of a usable check (issue 859). */
+/** A config with a non-blank `rollFormula`, the formula half of {@link hasActiveCheck}. */
 export function hasCheckFormula(config) {
   return typeof config?.rollFormula === 'string' && config.rollFormula.trim().length > 0;
+}
+
+/** Whether a check config's own `evaluation` counts successes; its retained formula is inert. */
+export function isCountCheck(config) {
+  return (
+    config != null && Object.hasOwn(config, 'evaluation') && config.evaluation?.product === 'count'
+  );
+}
+
+/** The one active-check predicate: a count, or the non-blank formula each site computes. */
+export function hasActiveCheck(config, rollFormula = config?.rollFormula) {
+  return isCountCheck(config) || (typeof rollFormula === 'string' && rollFormula.trim() !== '');
 }
 
 /**
@@ -13,8 +25,8 @@ export function hasCheckFormula(config) {
  * `system.salvageCraftingCheck`, never the recipe `craftingCheck`. An absent or unsupported mode
  * reports `simple`, but a caller that mutates must test `unsupportedMode` before `mode`.
  * `rollFormula` is trimmed with the retired placeholder stripped before the emptiness test that
- * sets `checkUsable` (issue 1094); `requiresCheck` marks `routed` and `progressive`, which abort
- * with zero mutation when `!checkUsable`.
+ * sets `checkUsable`, "has an active check" (issue 1094); `requiresCheck` marks `routed` and
+ * `progressive`, which abort with zero mutation when `!checkUsable`.
  */
 export function resolveSalvageCheck(system) {
   const authoredMode = system?.salvageResolutionMode || 'simple';
@@ -27,7 +39,7 @@ export function resolveSalvageCheck(system) {
     mode,
     config,
     rollFormula,
-    checkUsable: rollFormula.length > 0,
+    checkUsable: hasActiveCheck(config, rollFormula),
     requiresCheck: mode === 'routed' || mode === 'progressive',
     unsupportedMode,
   };
