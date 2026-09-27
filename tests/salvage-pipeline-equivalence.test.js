@@ -7,7 +7,8 @@ import test from 'node:test';
 import { stubRoll } from './helpers/routedCheckEngine.js';
 import { failRollEngine, salvageRunProbe } from './helpers/salvagePipelineProbe.js';
 
-const INACTIVE_EVALUATION = { product: 'count', direction: 'under', pool: { required: 3 } };
+// A summed check that still carries authored count pool data, which stays inert.
+const INACTIVE_EVALUATION = { product: 'sum', direction: 'over', pool: { required: 3, base: '@missing' } };
 const PASS_FAIL = { rollFormula: '1d20', dc: 10, thresholdMode: 'meet', evaluation: INACTIVE_EVALUATION };
 
 const RELATIVE_TIERS = [

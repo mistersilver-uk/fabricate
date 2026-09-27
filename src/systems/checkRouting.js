@@ -1,7 +1,7 @@
 /**
- * Grading and routed classification for summed checks (DOMAIN.md "Check"). One direction-aware
- * ranking drives matching, clamping, forcing, tier steps and the minimum gate, so the runners, the
- * prepared evaluator and the odds histogram cannot disagree.
+ * Grading and routed classification for summed checks (DOMAIN.md "Check"), which a count check
+ * reaches as sum/over on its net. One direction-aware ranking drives matching, clamping, forcing,
+ * tier steps and the minimum gate, so the runners, the prepared evaluator and the odds agree.
  */
 
 import { evaluateCheckBreakageCondition } from '../toolBreakageRuntime.js';
@@ -162,6 +162,28 @@ function routeCritOutcome(routing, forcedSuccess) {
   if (!forcedSuccess) return ranked[0];
   const { valueOf, direction } = tierRanking(routing);
   return rankBest(ranked, valueOf, direction)[0];
+}
+
+/**
+ * The tier a forced failure routes to, with no step and no minimum gate: the lowest-ranked
+ * failing tier, else `null`. A count check's zero pool routes here.
+ */
+export function forcedFailureTier({
+  type,
+  dc,
+  relativeOutcomes,
+  fixedOutcomes,
+  evaluation = SUM_OVER_EVALUATION,
+}) {
+  const routing = routingOf({
+    type,
+    dc,
+    evaluation,
+    targetDelta: 0,
+    relativeOutcomes,
+    fixedOutcomes,
+  });
+  return routeCritOutcome(routing, false);
 }
 
 /** The `tierStep.mode` values that move; `none` and anything unrecognised is inert. */

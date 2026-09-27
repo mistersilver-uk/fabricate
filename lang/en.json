@@ -1823,6 +1823,25 @@
         "ExplodeOnce": "explodes once on {faces}",
         "Cancel": "{faces} cancels a success",
         "Overlap": "{face}, qualified and cancelled, so it adds nothing to the net"
+      },
+      "CountRefusal": {
+        "BaseMissing": "{label} check cannot roll: its dice pool is blank.",
+        "BaseUnresolvedPath": "{label} check cannot roll: its dice pool reads {path}, which this character does not have.",
+        "BaseNonFinite": "{label} check cannot roll: its dice pool did not resolve to a number.",
+        "BaseDice": "{label} check cannot roll: its dice pool rolls dice, but a pool must be a fixed number.",
+        "BaseInvalid": "{label} check cannot roll: its dice pool cannot be read as a number.",
+        "ThresholdMissing": "{label} check cannot roll: its success threshold is blank.",
+        "ThresholdUnresolvedPath": "{label} check cannot roll: its success threshold reads {path}, which this character does not have.",
+        "ThresholdNonFinite": "{label} check cannot roll: its success threshold did not resolve to a number.",
+        "ThresholdDice": "{label} check cannot roll: its success threshold rolls dice, but a threshold must be a fixed number.",
+        "ThresholdInvalid": "{label} check cannot roll: its success threshold cannot be read as a number.",
+        "DieInvalid": "{label} check cannot roll: its die needs at least two faces.",
+        "ExplodeFaceMissing": "{label} check cannot roll: the face its dice explode on is not set.",
+        "ExplodeUnbounded": "{label} check cannot roll: its dice would explode past the most Foundry can roll at once.",
+        "CancelFaceMissing": "{label} check cannot roll: the face that cancels a success is not set.",
+        "PoolNonFinite": "{label} check cannot roll: its dice pool is not a number once modifiers apply.",
+        "PoolTooLarge": "{label} check cannot roll: its dice pool is more than 999 dice once modifiers apply.",
+        "Misconfigured": "{label} check cannot roll: its dice pool is misconfigured."
       }
     },
     "Knowledge": {

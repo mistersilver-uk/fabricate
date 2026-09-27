@@ -37,3 +37,7 @@ test('returns null when no check ran (null value, no data, or absent result)', (
 test('preserves a raw total of 0 rather than collapsing to null', () => {
   assert.equal(rollTotalForCard({ value: 0, data: { total: 0 } }), 0);
 });
+
+test('returns null for a zero pool, which rolled nothing, rather than its value of 0', () => {
+  assert.equal(rollTotalForCard({ value: 0, data: { total: null, zeroPool: true } }), null);
+});

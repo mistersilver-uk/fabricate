@@ -13,21 +13,24 @@ const list = (value) => (Array.isArray(value) ? value : []);
 const states = new Set(['pending', 'complete', 'uncertain', 'notApplicable']);
 
 /**
- * Executed check metadata is accepted only when it agrees with the result being persisted:
- * a summed check's `direction` is `over` or `under`, and snapshot and result must name the same.
+ * Executed check metadata is accepted only when it agrees with the result being persisted: the
+ * `product` is `sum` or `count`, the `direction` `over` or `under`, snapshot and result name the
+ * same, and the result rolled a finite total or, counting, failed on a zero pool.
  */
 export function checkResolutionEvidence(source, { executed = false } = {}) {
   const snapshot = source?.resolutionSnapshot;
   const result = source?.lastCheckResult?.data;
-  const direction = snapshot?.direction;
+  const { product, direction } = snapshot ?? {};
+  const rolled =
+    Number.isFinite(result?.total) || (product === 'count' && result?.zeroPool === true);
   return executed &&
     snapshot?.kind === 'check' &&
-    snapshot.product === 'sum' &&
+    (product === 'sum' || product === 'count') &&
     (direction === 'over' || direction === 'under') &&
-    Number.isFinite(result?.total) &&
-    result?.product === 'sum' &&
+    rolled &&
+    result?.product === product &&
     result.direction === direction
-    ? { product: 'sum', direction }
+    ? { product, direction }
     : {};
 }
 

@@ -279,29 +279,6 @@ test('crafting simple: each target refusal reason reaches the misconfigured chan
   }
 });
 
-test('a count evaluation stays inert: its fixed DC grades and progressive count/under rolls', async () => {
-  const count = { product: 'count', direction: 'under', target: { source: 'attribute' } };
-  const simple = craftingWorld({ resolutionMode: 'simple', slot: 'simple', config: simpleCheck(count) });
-  const simpleRolls = installCountingRoll();
-  const passFail = await simple.engine._runCraftingCheck(
-    simple.recipe, simple.craftingActor, [simple.sourceActor], null, null, {}
-  );
-  assert.equal(passFail.data.dc, 10);
-  assert.deepEqual(simpleRolls, ['1d20']);
-
-  const progressive = craftingWorld({
-    resolutionMode: 'progressive',
-    slot: 'progressive',
-    config: { rollFormula: '1d20', evaluation: count },
-  });
-  const progressiveRolls = installCountingRoll();
-  const rolled = await progressive.engine._runCraftingCheck(
-    progressive.recipe, progressive.craftingActor, [progressive.sourceActor], null, null, {}
-  );
-  assert.equal(rolled.misconfigured, undefined);
-  assert.deepEqual(progressiveRolls, ['1d20']);
-});
-
 // ── timed FINISH ──────────────────────────────────────────────────────────────
 
 test('timed FINISH: a refusal rolls and awards nothing and leaves the run resumable', async () => {
@@ -665,11 +642,4 @@ test('the prepared evaluator refuses progressive sum/under before any roll', asy
   });
   assert.equal(gathered.message, `Gathering ${PROGRESSIVE_UNDER}`);
   assert.deepEqual(constructed, []);
-
-  const count = await evaluatePreparedRunCheck(
-    prepared({ product: 'count', direction: 'under' }),
-    { getRollData: () => ({}) }
-  );
-  assert.equal(count.misconfigured, undefined, 'count/under progressive still rolls');
-  assert.deepEqual(constructed, ['1d20']);
 });

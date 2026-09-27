@@ -10,6 +10,9 @@ import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
 import { resolvedComponentsFor } from '../src/systems/scopedEntityReads.js';
 import { promptJournalStageCheck } from '../src/bootstrap/journalOperations.js';
 import { createJournalRunAuthority } from '../src/systems/journalRunAuthority.js';
+import { evaluatePreparedRunCheck } from '../src/systems/checkRoll.js';
+import { installCountDice } from './helpers/countEngineDice.js';
+import { preparedCountCheck } from './helpers/countFixtures.js';
 import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
 
 import {
@@ -1322,6 +1325,44 @@ describe('journal run command protocol', () => {
       reason: null,
     });
     assert.equal(posts, 0);
+  });
+
+  it('answers a count check that cannot roll with its refusal sentence, and executes nothing', async () => {
+    const run = { id: 'count-run', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const prepared = preparedCountCheck({
+      toolContributions: [{ source: 'tool', label: 'Hammer', form: 'scalar', value: 2 }],
+      count: { base: 998 },
+    });
+    const dice = installCountDice({ faces: [] });
+    try {
+      const { service } = commandHarness({
+        currentUserId: 'gm',
+        run,
+        promptCheck: async () => ({ confirmed: true }),
+        operations: {
+          crafting: {
+            getRun: () => run,
+            describeCheck: async () => ({ required: true, publicPrompt: {}, privateEvaluation: {} }),
+            evaluateCheck: () => evaluatePreparedRunCheck(prepared, { getRollData: () => ({}) }),
+            execute: async () => {
+              throw new Error('a refused check must never execute');
+            },
+          },
+        },
+      });
+      const response = await service.executeJournalRunCommand({
+        actorUuid: 'Actor.a', runType: 'crafting', runId: run.id,
+        expectedRevision: 3, action: 'execute',
+      });
+      assert.deepEqual(response, {
+        success: false,
+        reason: 'roll-unavailable',
+        message: 'Crafting check cannot roll: its dice pool is more than 999 dice once modifiers apply.',
+      });
+      assert.deepEqual(dice.constructed, [], 'the 1000-die pool never rolls');
+    } finally {
+      dice.restore();
+    }
   });
 
   /**

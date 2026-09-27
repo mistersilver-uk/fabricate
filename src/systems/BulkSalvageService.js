@@ -21,7 +21,7 @@ import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { checkTriggerIdsOf } from '../utils/progressiveStageComplications.js';
 
 import { awardReceipts } from './runHistoryEvidence.js';
-import { resolveSalvageCheck } from './salvageCheckUsability.js';
+import { isCountCheck, resolveSalvageCheck } from './salvageCheckUsability.js';
 import { resolvedComponentsFor } from './scopedEntityReads.js';
 
 /**
@@ -60,6 +60,16 @@ function firstFinite(...values) {
     if (Number.isFinite(numeric)) return numeric;
   }
   return null;
+}
+
+/**
+ * A row's rolled total: the raw `data.total` first, since a forced crit overwrites `value` (as
+ * `rollTotalForCard` reads it), the top-level `value` last, since `salvage()` threads it only on
+ * success, and null for a zero pool, which rolled nothing.
+ */
+function rowRollValue(checkResult, result) {
+  if (checkResult?.data?.zeroPool === true) return null;
+  return firstFinite(checkResult?.data?.total, checkResult?.value, result?.value);
 }
 
 /**
@@ -321,9 +331,11 @@ export class BulkSalvageService {
     const usable = runnable.filter((entry) => resolveSalvageCheck(entry.system).checkUsable);
     if (usable.length === 0) return none;
 
-    const allowAdvantage = usable.every((entry) =>
-      hasPlainD20(resolveSalvageCheck(entry.system).rollFormula)
-    );
+    // A count check offers no advantage until it is mode-aware (issue 2007).
+    const allowAdvantage = usable.every((entry) => {
+      const check = resolveSalvageCheck(entry.system);
+      return !isCountCheck(check.config) && hasPlainD20(check.rollFormula);
+    });
     const actorNames = new Set(runnable.map((entry) => entry.item.actorName));
     const choice = await this.promptRollDecision({
       allowAdvantage,
@@ -382,13 +394,7 @@ export class BulkSalvageService {
       entry.outcome = outcome;
       item.outcome = outcome;
       item.message = result?.message ?? '';
-      // The raw `data.total` first, since a forced crit overwrites `value` (as `rollTotalForCard`
-      // reads it); the top-level `value` last, since `salvage()` threads it only on success.
-      item.rollValue = firstFinite(
-        salvageRun?.checkResult?.data?.total,
-        salvageRun?.checkResult?.value,
-        result?.value
-      );
+      item.rollValue = rowRollValue(salvageRun?.checkResult, result);
       item.tierStep = salvageRun?.checkResult?.data?.tierStepApplied ?? null;
       item.results = awardReceipts(result?.results).map((created) => ({
         name: created?.name || '',
