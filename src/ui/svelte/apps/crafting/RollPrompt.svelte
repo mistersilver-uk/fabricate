@@ -436,8 +436,8 @@
   .fabricate-roll-prompt :global(.mode-field .fabricate-select-trigger) {
     width: 100%;
   }
-  /* The manager root is a size container, so it is this fixed modal's containing block there and
-     `100%` is its height; everywhere else `100%` is the viewport's. */
+  /* `100%` is the viewport at scale 1 and the window when Foundry scales it with a transform,
+     where `vh` would overflow the window. */
   :global(.manager-modal.is-banded[data-roll-prompt]) {
     max-height: min(640px, calc(100% - (2 * var(--fab-space-4))));
   }
