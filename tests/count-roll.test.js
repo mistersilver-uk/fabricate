@@ -15,7 +15,7 @@ import {
   registerCountRoll,
 } from '../src/systems/countRoll.js';
 
-import { createCoreDice, renderCoreTemplate } from './helpers/coreDice.js';
+import { createCoreDice, renderCoreTemplate, TOOLTIP_TEMPLATE } from './helpers/coreDice.js';
 import { countEvaluation, deepFreeze } from './helpers/countFixtures.js';
 import { createLangBackedI18n } from './helpers/langBackedI18n.js';
 import { repoRoot } from './helpers/sourceScan.js';
@@ -23,6 +23,7 @@ import { repoRoot } from './helpers/sourceScan.js';
 const i18n = createLangBackedI18n(repoRoot);
 
 const SETTLED = Object.freeze({ poolDelta: 0, thresholdDelta: 0, preRolls: [] });
+const thresholdBenefit = (thresholdDelta) => ({ poolDelta: 0, thresholdDelta, preRolls: [] });
 
 function settledPolicy({
   thresholdMode = 'meet',
@@ -103,12 +104,17 @@ test('registration appends the count Roll once, extends core Roll and never repl
   assert.equal(findCountRoll({}), null);
 });
 
-test('the count Roll is registered inside the init handler, before ready runs', async () => {
-  const { Roll, config } = createCoreDice();
+test('the init handler registers the count Roll, wired to game.i18n and renderTemplate', async () => {
+  const { Roll, config } = createCoreDice({ faces: [9, 9] });
   const SystemRoll = class D20Roll extends Roll {};
   config.Dice.rolls.unshift(SystemRoll);
   const handlers = new Map();
   const record = (event, handler) => handlers.set(event, handler);
+  const rendered = [];
+  const renderTemplate = async (path, data) => {
+    rendered.push({ path, data });
+    return renderCoreTemplate(path, data);
+  };
   const previous = {
     Hooks: globalThis.Hooks,
     CONFIG: globalThis.CONFIG,
@@ -118,7 +124,7 @@ test('the count Roll is registered inside the init handler, before ready runs', 
   Object.assign(globalThis, {
     Hooks: { on: record, once: record },
     CONFIG: config,
-    foundry: { dice: { Roll }, applications: { handlebars: { renderTemplate: async () => '' } } },
+    foundry: { dice: { Roll }, applications: { handlebars: { renderTemplate } } },
     game: { i18n },
   });
   const originalLog = console.log;
@@ -132,6 +138,15 @@ test('the count Roll is registered inside the init handler, before ready runs', 
     assert.equal(Object.getPrototypeOf(CountRoll), Roll, 'over foundry.dice.Roll');
     assert.deepEqual(config.Dice.rolls.slice(0, 2), [SystemRoll, Roll], 'rolls[0] is untouched');
     assert.equal(config.Dice.rolls.length, 3);
+
+    const roll = await CountRoll.fromPolicy(settledPolicy()).evaluate();
+    const context = await roll._prepareChatRenderContext({});
+    assert.equal(context.formula, '2d10 · each ≥ 8', 'described through game.i18n');
+    assert.deepEqual(
+      rendered.map(({ path, data }) => [path, data.parts[0].formula]),
+      [[TOOLTIP_TEMPLATE, '2d10 · each ≥ 8']],
+      'the tooltip went through Foundry renderTemplate'
+    );
   } finally {
     console.log = originalLog;
     Object.assign(globalThis, previous);
@@ -280,9 +295,23 @@ test('an overlapping face counts zero with both marks and is not styled as a fai
   assert.match(overlapClasses, /fabricate-count-overlap/);
   assert.match(
     overlapLabel,
-    /aria-label="1: counts a success and cancels one, so it adds nothing"/
+    /aria-label="1, qualified and cancelled, so it adds nothing to the net"/
   );
   assert.match(plainClasses, /\bsuccess\b/);
+});
+
+test('the overlap label is escaped for its attribute', async () => {
+  const core = createCoreDice({ faces: [1] });
+  const CountRoll = registerCountRoll({
+    config: core.config,
+    BaseRoll: core.Roll,
+    i18n: () => ({ format: () => 'a "quoted" <label> & more' }),
+    renderTemplate: async (path, data) => renderCoreTemplate(path, data),
+  });
+  const policy = settledPolicy({ die: 6, base: '1', threshold: '1', cancel: cancelRule(WORST) });
+  const roll = await CountRoll.fromPolicy(policy).evaluate();
+  const [[, , overlapLabel]] = rollItems(await roll.getTooltip());
+  assert.match(overlapLabel, /aria-label="a &#34;quoted&#34; &#60;label&#62; &#38; more"/);
 });
 
 test('generated dice qualify and cancel, and explode-once explodes originals only', async () => {
@@ -478,7 +507,7 @@ test('after reload a player sees the count description, tooltip totals equal the
   assert.equal(reloaded.content, String(rolled.total));
 
   const html = await roll.render();
-  const description = '4d10 · each ≥ 8 · dice explode on 10 · dice cancel a success on 1';
+  const description = '4d10 · each ≥ 8 · explodes on 10 · 1 cancels a success';
   assert.match(html, new RegExp(`<div class="dice-formula">${description}</div>`));
   assert.doesNotMatch(html, /dice-formula">4d10x/, 'the raw formula is not paired with the net');
   assert.deepEqual(tooltipTotals(html), [String(rolled.total)]);
@@ -525,7 +554,7 @@ test('with the count Roll unregistered, a message drops the roll and keeps its p
   assert.equal(reloaded.content, '2');
 });
 
-test('the description states direction, strictness and an unclamped fractional threshold', async () => {
+test('the description states direction, strictness, a rounded threshold and possible faces', async () => {
   const cases = [
     [{ direction: 'under', thresholdMode: 'exceed', threshold: '7.5' }, '2d10 · each < 7.5'],
     [{ direction: 'over', thresholdMode: 'exceed', threshold: '-1' }, '2d10 · each > -1'],
@@ -536,9 +565,17 @@ test('the description states direction, strictness and an unclamped fractional t
         explode: explodeRule({ kind: 'from', value: 2 }, true),
         cancel: cancelRule({ kind: 'from', value: 9 }),
       },
-      '2d10 · each ≤ 3 · dice explode once on ≤ 2 · dice cancel a success on ≥ 9',
+      '2d10 · each ≤ 3 · explodes once on ≤ 2 · ≥ 9 cancels a success',
     ],
     [{ threshold: '8', explode: explodeRule({ kind: 'from', value: 12 }) }, '2d10 · each ≥ 8'],
+    // A cancel face beyond the die cancels no face under, and every face over.
+    [{ direction: 'under', cancel: cancelRule({ kind: 'from', value: 12 }) }, '2d10 · each ≤ 8'],
+    [
+      { cancel: cancelRule({ kind: 'from', value: 12 }) },
+      '2d10 · each ≥ 8 · ≤ 12 cancels a success',
+    ],
+    [{ threshold: '0', placement: thresholdBenefit(0.1 + 0.2) }, '2d10 · each ≥ 0.3'],
+    [{ threshold: '7', placement: thresholdBenefit(1 / 3) }, '2d10 · each ≥ 7.33'],
   ];
   for (const [pool, description] of cases) {
     const dice = countDice({ faces: [5, 5] });

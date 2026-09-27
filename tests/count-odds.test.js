@@ -6,6 +6,7 @@ import {
   COUNT_ODDS_MAX_DEPTH,
   COUNT_ODDS_REASONS,
   COUNT_ODDS_RESIDUAL,
+  MAX_PRE_ROLL_OUTCOMES,
   countOdds,
   countPassProbability,
 } from '../src/systems/countOdds.js';
@@ -115,7 +116,7 @@ function jointMasses(result) {
   return masses;
 }
 
-test('the reasons reuse the shared odds codes and the recursion limits are the stated ones', () => {
+test('the odds refusal codes and recursion limits are the stated ones', () => {
   assert.deepEqual(COUNT_ODDS_REASONS, {
     preRollNotEnumerable: 'modifier-preroll-not-enumerable',
     tooManyOutcomes: 'too-many-outcomes',
@@ -124,6 +125,7 @@ test('the reasons reuse the shared odds codes and the recursion limits are the s
   assert.ok(Object.isFrozen(COUNT_ODDS_REASONS));
   assert.equal(COUNT_ODDS_RESIDUAL, 1e-9);
   assert.equal(COUNT_ODDS_MAX_DEPTH, 20);
+  assert.equal(MAX_PRE_ROLL_OUTCOMES, 50_000);
 });
 
 test('2d6 meet threshold 5 needing one success passes 20/36, and exceed charts 11/36', () => {
@@ -452,6 +454,39 @@ test('pool refusals pass through unchanged, including one only a pre-roll outcom
     'pool-too-large',
     'pool'
   );
+});
+
+test('duplicate equally likely pre-roll totals each carry their own share', () => {
+  const evaluation = countEvaluation({ base: '1' });
+  const placement = planModifierPlacement({
+    evaluation,
+    contributions: [rolling('library', '2d2')],
+  });
+  const result = countOdds({
+    evaluation,
+    placement,
+    preRollTotals: [{ index: 0, totals: [2, 3, 3, 4] }],
+  });
+  assert.equal(result.ok, true);
+  assertClose(totalMass(result), 1, 'mass');
+  const pass = [3, 4, 4, 5].reduce((sum, dice) => sum + (1 - (2 / 3) ** dice) / 4, 0);
+  assertClose(countPassProbability({ odds: result, required: 1 }), pass, '2d2 pool');
+});
+
+test('a pre-roll mixture of recursive pools keeps mass plus residual at one', () => {
+  const evaluation = countEvaluation({ base: '1', explode: explodeBest(false) });
+  const placement = planModifierPlacement({
+    evaluation,
+    contributions: [rolling('library', '1d2')],
+  });
+  const result = countOdds({
+    evaluation,
+    placement,
+    preRollTotals: [{ index: 0, totals: [1, 2] }],
+  });
+  assert.equal(result.ok, true);
+  assert.ok(result.residual > 0);
+  assert.ok(Math.abs(totalMass(result) + result.residual - 1) <= 1e-14);
 });
 
 test('a zero pool is one zeroPool outcome that never passes, and floors to one die when allowed', () => {

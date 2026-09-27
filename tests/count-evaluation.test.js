@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { CHECK_TARGET_REFUSALS } from '../src/systems/checkTarget.js';
 import { planModifierPlacement, settlePlacement } from '../src/systems/checkModifierRouter.js';
 import {
+  COUNT_CHECK_REFUSALS,
   COUNT_REFUSALS,
   MAX_COUNT_POOL,
   countCheckPasses,
@@ -27,7 +28,7 @@ function placementFor(evaluation, contributions, preRollResults = []) {
 
 const faces = (...values) => values.map((result) => ({ result, active: true }));
 
-test('count adds exactly four refusal reasons to the shared enum, none already in it', () => {
+test("count's four refusal reasons are new to CHECK_TARGET_REFUSALS, and one list joins both", () => {
   assert.deepEqual(COUNT_REFUSALS, [
     'die-invalid',
     'faces-invalid',
@@ -36,6 +37,8 @@ test('count adds exactly four refusal reasons to the shared enum, none already i
   ]);
   assert.ok(Object.isFrozen(COUNT_REFUSALS));
   assert.ok(COUNT_REFUSALS.every((reason) => !CHECK_TARGET_REFUSALS.includes(reason)));
+  assert.deepEqual(COUNT_CHECK_REFUSALS, [...CHECK_TARGET_REFUSALS, ...COUNT_REFUSALS]);
+  assert.ok(Object.isFrozen(COUNT_CHECK_REFUSALS));
   assert.equal(MAX_COUNT_POOL, 999);
 });
 
@@ -285,6 +288,26 @@ test('a fractional effective pool rounds down after every benefit and always rol
   assert.equal(nearlyOne.zeroPool, true);
   assert.equal(nearlyOne.dice, 0);
   assert.equal(resolved({ base: '0.9', zeroPoolFails: false }).dice, 1);
+});
+
+test('floating-point noise in the settled pool never rounds a whole die away', () => {
+  const benefits = { poolDelta: 0.7 + 0.2 + 0.1, thresholdDelta: 0, preRolls: [] };
+  const policy = resolved({ base: '0' }, { placement: benefits });
+  assert.equal(policy.zeroPool, false);
+  assert.equal(policy.dice, 1);
+});
+
+test('a non-finite effective threshold or pool refuses non-finite for its own input', () => {
+  const threshold = resolvePool({
+    evaluation: countEvaluation({ threshold: Number.MAX_VALUE }),
+    placement: { poolDelta: 0, thresholdDelta: Number.MAX_VALUE, preRolls: [] },
+  });
+  assert.deepEqual(threshold, { ok: false, reason: 'non-finite', refusedInput: 'threshold' });
+  const pool = resolvePool({
+    evaluation: countEvaluation({ base: Number.MAX_VALUE }),
+    placement: { poolDelta: Number.MAX_VALUE, thresholdDelta: 0, preRolls: [] },
+  });
+  assert.deepEqual(pool, { ok: false, reason: 'non-finite', refusedInput: 'pool' });
 });
 
 test('at or below zero dice, zeroPoolFails decides between an automatic failure and one die', () => {

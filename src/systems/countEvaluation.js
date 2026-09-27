@@ -154,11 +154,16 @@ function settlePool(rules, resolved, zeroPoolFails, placement) {
   }
   const threshold = resolved.threshold + (placement?.thresholdDelta ?? 0);
   if (!Number.isFinite(threshold)) return refusal('non-finite', 'threshold');
-  const floored = Math.floor(resolved.base + (placement?.poolDelta ?? 0));
+  const floored = Math.floor(roundAwayFloatNoise(resolved.base + (placement?.poolDelta ?? 0)));
   if (!Number.isFinite(floored)) return refusal('non-finite', 'pool');
   if (placement && floored > MAX_COUNT_POOL) return refusal('pool-too-large', 'pool');
   const zeroPool = floored <= 0 && zeroPoolFails;
   let dice = Math.max(1, floored);
   if (zeroPool) dice = 0;
   return { ok: true, policy: { ...rules, resolved, threshold, dice, zeroPool } };
+}
+
+// 0.7 + 0.2 + 0.1 sums to 0.9999999999999999, which must not round down to one die fewer.
+function roundAwayFloatNoise(value) {
+  return Math.round(value * 1e9) / 1e9;
 }

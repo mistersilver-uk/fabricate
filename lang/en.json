@@ -1805,10 +1805,10 @@
       },
       "CountRoll": {
         "Pool": "{pool}d{die} · each {comparison} {threshold}",
-        "Explode": "dice explode on {faces}",
-        "ExplodeOnce": "dice explode once on {faces}",
-        "Cancel": "dice cancel a success on {faces}",
-        "Overlap": "{face}: counts a success and cancels one, so it adds nothing"
+        "Explode": "explodes on {faces}",
+        "ExplodeOnce": "explodes once on {faces}",
+        "Cancel": "{faces} cancels a success",
+        "Overlap": "{face}, qualified and cancelled, so it adds nothing to the net"
       }
     },
     "Knowledge": {

@@ -214,7 +214,7 @@ function describeCountRoll({ policy }, i18n) {
       pool: dice,
       die,
       comparison: COMPARISON_SIGNS[direction][comparison],
-      threshold,
+      threshold: Number(threshold.toFixed(2)),
     }),
   ];
   if (explode && !beyondDie(explode, die)) {
@@ -223,7 +223,8 @@ function describeCountRoll({ policy }, i18n) {
       : 'FABRICATE.Check.CountRoll.Explode';
     clauses.push(format(i18n, key, { faces: faceLabel(explode, die, direction) }));
   }
-  if (cancel) {
+  // A `from` cancel face beyond the die cancels every face over and none under.
+  if (cancel && !(direction === 'under' && beyondDie(cancel, die))) {
     const faces = faceLabel(cancel, die, direction === 'under' ? 'over' : 'under');
     clauses.push(format(i18n, 'FABRICATE.Check.CountRoll.Cancel', { faces }));
   }
