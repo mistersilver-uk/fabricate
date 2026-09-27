@@ -37,7 +37,7 @@ const cancelFrom = (value) => ({ enabled: true, faces: { kind: 'from', value } }
 
 function odds(pool = {}, options = {}) {
   const result = countOdds({ evaluation: countEvaluation(pool), ...options });
-  assert.equal(result.ok, true, `expected odds, got ${JSON.stringify(result)}`);
+  assert.equal(result.ok, true, `expected odds, got ${result.reason}`);
   return result;
 }
 
@@ -62,6 +62,13 @@ function assertMasses(actual, expected, message) {
   for (const [key, mass] of Object.entries(expected)) {
     assertClose(actual[key], mass, `${message} net ${key}`);
   }
+}
+
+// Field by field: deep-diffing a whole odds result that regressed to charting can exhaust the heap.
+function assertRefusal(result, reason, refusedInput) {
+  assert.equal(result.ok, false, `expected a refusal, got ok ${result.ok}`);
+  assert.equal(result.reason, reason);
+  assert.equal(result.refusedInput, refusedInput);
 }
 
 function totalMass(result) {
@@ -396,7 +403,6 @@ test('a pending pre-roll without enumerable totals refuses modifier-preroll-not-
     evaluation,
     contributions: [rolling('library', '1d4')],
   });
-  const refusal = { ok: false, reason: 'modifier-preroll-not-enumerable' };
   for (const preRollTotals of [
     [],
     [{ index: 1, totals: [1, 2] }],
@@ -405,7 +411,10 @@ test('a pending pre-roll without enumerable totals refuses modifier-preroll-not-
     [{ index: 0, totals: [1, Number.NaN] }],
     [{ index: 0, totals: [1, Infinity] }],
   ]) {
-    assert.deepEqual(countOdds({ evaluation, placement, preRollTotals }), refusal);
+    assertRefusal(
+      countOdds({ evaluation, placement, preRollTotals }),
+      'modifier-preroll-not-enumerable'
+    );
   }
 });
 
@@ -433,18 +442,19 @@ test('a joint pre-roll space above 50,000 outcomes refuses too-many-outcomes bef
       { index: 1, totals: [...totals, 251] },
     ],
   });
-  assert.deepEqual(refused, { ok: false, reason: 'too-many-outcomes' });
+  assertRefusal(refused, 'too-many-outcomes');
 });
 
 test('pool refusals pass through unchanged, including one only a pre-roll outcome reaches', () => {
-  assert.deepEqual(countOdds({ evaluation: countEvaluation({ base: '@missing' }) }), {
-    ok: false,
-    reason: 'unresolved-path',
-    refusedInput: 'base',
-  });
-  assert.deepEqual(
+  assertRefusal(
+    countOdds({ evaluation: countEvaluation({ base: '@missing' }) }),
+    'unresolved-path',
+    'base'
+  );
+  assertRefusal(
     countOdds({ evaluation: countEvaluation({ die: 6, explode: explodeFrom(1, false) }) }),
-    { ok: false, reason: 'explode-unbounded', refusedInput: 'explode' }
+    'explode-unbounded',
+    'explode'
   );
   const evaluation = countEvaluation({ base: '997' });
   const placement = planModifierPlacement({
@@ -456,12 +466,12 @@ test('pool refusals pass through unchanged, including one only a pre-roll outcom
     placement,
     preRollTotals: [{ index: 0, totals: [1, 2, 3] }],
   });
-  assert.deepEqual(result, { ok: false, reason: 'pool-too-large', refusedInput: 'pool' });
-  assert.deepEqual(countOdds({ evaluation: countEvaluation({ base: '1000' }) }), {
-    ok: false,
-    reason: 'pool-too-large',
-    refusedInput: 'pool',
-  });
+  assertRefusal(result, 'pool-too-large', 'pool');
+  assertRefusal(
+    countOdds({ evaluation: countEvaluation({ base: '1000' }) }),
+    'pool-too-large',
+    'pool'
+  );
 });
 
 test('a zero pool is one zeroPool outcome that never passes, and floors to one die when allowed', () => {
@@ -518,10 +528,8 @@ test('odds whose convolution would exceed the work budget refuse too-many-outcom
     { aggregate: 'anyDie', matches: (face) => face === 10 },
     { aggregate: 'allDice', matches: (face) => face === 1 },
   ];
-  assert.deepEqual(countOdds({ evaluation: countEvaluation(pool), faceAggregates: aggregates }), {
-    ok: false,
-    reason: 'too-many-outcomes',
-  });
+  const refused = countOdds({ evaluation: countEvaluation(pool), faceAggregates: aggregates });
+  assertRefusal(refused, 'too-many-outcomes');
 });
 
 test('an unknown face aggregate is a contract error', () => {
