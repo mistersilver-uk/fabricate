@@ -1971,6 +1971,7 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
       img: 'icons/sundries/documents/blueprint-recipe-alchemical.webp',
       formula: '1d20 + 3',
       resolvedFormula: null,
+      displayFormula: '1d20 + 3',
       target: 12,
       comparison: 'meet',
       selectedModifiers: [],
@@ -2132,6 +2133,7 @@ test('versioned Journal preparation freezes modifier contributions across actor 
         assert.ok(!Object.hasOwn(descriptor.publicPrompt.modifierChoice.modifiers[1], 'formula'));
       } else {
         assert.equal(descriptor.publicPrompt.formula, '1d20 + 2[Tool] + 3[Modifiers] + (1d4+1)[Modifiers]');
+        assert.equal(descriptor.publicPrompt.displayFormula, '1d20 + 2[Tool]', 'Tool terms stay, chips do not');
         assert.deepEqual(descriptor.publicPrompt.selectedModifiers.map(({ label, display }) => ({ label, display })), [
           { label: 'Focus', display: '+3' },
           { label: 'Spark', display: '+1d4+1' },

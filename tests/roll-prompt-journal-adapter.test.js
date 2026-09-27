@@ -16,6 +16,20 @@ describe('Journal roll prompt adapter', () => {
     assert.equal(received.resolvedFormula, '1d20 + 3 + 6');
   });
 
+  it('shows the base formula without the modifier terms its chips itemise', async () => {
+    let received;
+    const selectedModifiers = [{ label: 'Focus', display: '+6' }];
+    await promptJournalStageCheck(
+      { subject: 'Runeblade', formula: '1d20 + 3[Tool] + 6[Modifiers]', resolvedFormula: '1d20 + 3[Tool] + 6[Modifiers]', displayFormula: '1d20 + 3[Tool]', selectedModifiers },
+      async (options) => {
+        received = options;
+      }
+    );
+    const view = buildSinglePromptData(received);
+    assert.equal(view.formula, '1d20 + 3', 'the Tool term stays and the itemised modifier does not');
+    assert.deepEqual(view.selectedModifiers, selectedModifiers, 'the modifier is still itemised');
+  });
+
   it('titles a named gathering check with its activity and leaves a hidden one generic', async () => {
     const describe = (publicPrompt) => async () => ({ required: true, publicPrompt, privateEvaluation: {} });
     const named = withPromptActivity({ describeCheck: describe({ label: 'Copper vein' }) }, () => 'Gathering');

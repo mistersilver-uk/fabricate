@@ -20,8 +20,7 @@ import {
   CHECK_MODIFIER_TERM_LABEL,
 } from './toolCheckBonus.js';
 
-/** The deferred `playerPicks` slot the prompt shows as a trailing term, where the resolved term
- *  lands; `cleanHTML` strips inline handlers, so no live preview is possible. */
+/** The deferred `playerPicks` slot the prompt shows as a trailing term, where the resolved term lands. */
 const DEFERRED_MODIFIER_SLOT = `(modifier)[${CHECK_MODIFIER_TERM_LABEL}]`;
 
 /**
@@ -204,9 +203,12 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
       const promptResolved = useDeferredChoice
         ? resolveCheckFormulaDisplay(promptFormula, actor)
         : resolved;
+      // The modifiers `selectedModifiers` itemises are chips, so the shown formula omits their terms.
+      const shownFormula = useDeferredChoice ? promptFormula : authoredFormula.trim();
       return options.prompt({
         formula: promptFormula,
         resolvedFormula: promptResolved?.display ?? null,
+        displayFormula: resolveCheckFormulaDisplay(shownFormula, actor)?.display ?? shownFormula,
         dc: options.dc,
         label: options.flavor,
         name: options.name,

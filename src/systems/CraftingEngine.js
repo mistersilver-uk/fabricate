@@ -7158,6 +7158,8 @@ function versionedCheckPrompt({
     img: resolveRecipeImage(recipe),
     formula,
     resolvedFormula: resolveCheckFormulaDisplay(formula, actor)?.display ?? null,
+    // The itemised `selectedModifiers` are chips, so the prompt's formula omits their terms.
+    displayFormula: resolveCheckFormulaDisplay(rollFormula, actor)?.display ?? rollFormula,
     target,
     comparison: target === null ? null : comparison,
     selectedModifiers,

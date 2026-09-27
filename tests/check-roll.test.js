@@ -278,6 +278,7 @@ test('the runner passes normalized comparison and the formula-selected modifier 
     assert.deepEqual(shown.selectedModifiers.map((modifier) => modifier.id), ['alch']);
     assert.equal(shown.selectedModifiers[0].display, '+5');
     assert.equal(shown.resolvedFormula, '1d20 + 5[Modifiers]');
+    assert.equal(shown.displayFormula, '1d20', 'the itemised modifier is a chip, not a formula term');
   }
   delete globalThis.Roll;
 });
@@ -298,6 +299,7 @@ test('the routed runner passes its comparison and selected modifier to the promp
   assert.equal(shown.thresholdMode, 'exceed');
   assert.deepEqual(shown.selectedModifiers.map((modifier) => modifier.id), ['alch']);
   assert.equal(shown.resolvedFormula, '1d20 + 5[Modifiers]');
+  assert.equal(shown.displayFormula, '1d20');
   delete globalThis.Roll;
 });
 

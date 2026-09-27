@@ -17,6 +17,7 @@ import {
 import { resolvedComponentsFor } from '../systems/scopedEntityReads.js';
 import { promptCheckRoll } from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { resolveAlchemySubmissions } from '../utils/alchemySubmissions.js';
+import { localizeWith } from '../utils/localizeWithFallback.js';
 
 import { getGatheringEngine } from './gatheringRuntime.js';
 
@@ -38,6 +39,7 @@ export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
     img: descriptor?.img,
     formula: displayFormula(descriptor?.formula),
     resolvedFormula: displayFormula(descriptor?.resolvedFormula),
+    displayFormula: displayFormula(descriptor?.displayFormula),
     dc: descriptor?.target,
     comparison: descriptor?.comparison,
     thresholdMode: descriptor?.comparison === 'exceed' ? 'exceed' : null,
@@ -45,11 +47,6 @@ export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
     allowAdvantage: descriptor?.allowAdvantage === true,
     modifierChoice: descriptor?.modifierChoice ?? null,
   });
-}
-
-function localizeOr(key, fallback) {
-  const value = globalThis.game?.i18n?.localize?.(key);
-  return value && value !== key ? value : fallback;
 }
 
 /**
@@ -480,7 +477,13 @@ export function createJournalCommandsForFabricate(fabricate) {
           getService: () => service,
           getUser: (userId) => game.users?.get(userId) ?? null,
         }),
-        () => localizeOr('FABRICATE.App.Nav.Gathering', 'Gathering')
+        () =>
+          localizeWith(
+            (key) => globalThis.game?.i18n?.localize?.(key),
+            'FABRICATE.App.Nav.Gathering',
+            undefined,
+            'Gathering'
+          )
       ),
     },
     currentUser: () => game.user,

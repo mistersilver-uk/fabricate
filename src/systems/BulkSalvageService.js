@@ -16,6 +16,7 @@ import { salvageCheckNeed } from '../ui/presenters/salvageCheckNeed.js';
 import { forecastComplications } from '../utils/complicationPlan.js';
 import { hasPlainD20 } from '../utils/craftingCheckExpression.js';
 import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
+import { localizeWith } from '../utils/localizeWithFallback.js';
 import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { checkTriggerIdsOf } from '../utils/progressiveStageComplications.js';
 
@@ -354,9 +355,12 @@ export class BulkSalvageService {
 
   /** The prompt heading's activity, localized when the key resolves. */
   _salvageActivity() {
-    const key = 'FABRICATE.App.Journal.Filters.Kind.Salvage';
-    const label = this.localize(key);
-    return label && label !== key ? label : 'Salvage';
+    return localizeWith(
+      this.localize,
+      'FABRICATE.App.Journal.Filters.Kind.Salvage',
+      undefined,
+      'Salvage'
+    );
   }
 
   /** Salvage one target, never throwing: a throw becomes an `error` row and the run goes on. */
