@@ -14,6 +14,11 @@ import { resolveCheckModifierFormula } from './checkModifierResolver.js';
 import { postBundledCheckRoll, resolveModifierPreRolls } from './checkModifierRolls.js';
 import { SUM_OVER_EVALUATION } from './checkModifierRouter.js';
 import { resolveCheckDecision } from './checkRollDecision.js';
+import {
+  activeCheckEvaluation,
+  checkTargetRefusal,
+  progressiveTargetRefusal,
+} from './checkTarget.js';
 
 function preRollEvidence(rolled) {
   const entries = rolled?.modifierPlacement?.preRolls;
@@ -135,10 +140,7 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   if (authoredFormula.trim() === '')
     return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
-  // An own key only: an inherited `evaluation` (prototype pollution) never selects a mode.
-  const evaluation =
-    (options != null && Object.hasOwn(options, 'evaluation') ? options.evaluation : null) ??
-    SUM_OVER_EVALUATION;
+  const evaluation = ownEvaluation(options);
   const modifierChoice = options?.modifierChoice;
   const deferred =
     Boolean(modifierChoice) &&
@@ -233,6 +235,19 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     };
   }
   return result;
+}
+
+/**
+ * The first own `evaluation` among `sources`, else sum/over. An own key only: an inherited
+ * `evaluation` (prototype pollution) never selects a mode.
+ */
+function ownEvaluation(...sources) {
+  for (const source of sources) {
+    const evaluation =
+      source != null && Object.hasOwn(source, 'evaluation') ? source.evaluation : null;
+    if (evaluation != null) return evaluation;
+  }
+  return SUM_OVER_EVALUATION;
 }
 
 function validatedPreparedDecision(decision, modifierChoice) {
@@ -332,6 +347,10 @@ export async function evaluatePreparedRunCheck(
       ? preparation.decisionPolicy
       : {};
   const config = { ...checkConfig, ...decisionPolicy };
+  const kind = preparedCheckKind(preparation);
+  const refusal =
+    kind === 'progressive' && progressiveTargetRefusal(activeCheckEvaluation(checkConfig));
+  if (refusal) return checkTargetRefusal(refusal, 'Prepared');
   const authoritativeDecision = {
     ...decision,
     bonus: decision?.allowsSituationalModifier === true ? decision.bonus : null,
@@ -361,7 +380,6 @@ export async function evaluatePreparedRunCheck(
   if (rolled.cancelled) {
     return { success: false, cancelled: true, outcome: null, value: null, data: {} };
   }
-  const kind = preparedCheckKind(preparation);
   if (!rolled.engine) {
     return {
       success: true,
@@ -594,7 +612,9 @@ export async function runFormulaPassFail({
   label = 'Crafting',
   rollOptions = null,
   craftingModifier = null,
+  ...input
 }) {
+  const evaluation = ownEvaluation(input, rollOptions);
   const formula = String(rawFormula || '').trim();
   let total = 0;
   let diceGroups = [];
@@ -604,6 +624,7 @@ export async function runFormulaPassFail({
     try {
       rolled = await evaluateCheckRoll(formula, actor, {
         ...rollOptions,
+        evaluation,
         dc,
         thresholdMode,
         craftingModifier,
@@ -666,7 +687,11 @@ export async function runFormulaProgressive({
   label = 'Crafting',
   rollOptions = null,
   craftingModifier = null,
+  ...input
 }) {
+  const evaluation = ownEvaluation(input, rollOptions);
+  const refusal = progressiveTargetRefusal(evaluation);
+  if (refusal) return checkTargetRefusal(refusal, label);
   const formula = String(rawFormula || '').trim();
   let total = 0;
   let diceGroups = [];
@@ -674,7 +699,11 @@ export async function runFormulaProgressive({
   let rolled;
   if (formula) {
     try {
-      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, craftingModifier });
+      rolled = await evaluateCheckRoll(formula, actor, {
+        ...rollOptions,
+        evaluation,
+        craftingModifier,
+      });
     } catch (error) {
       console.error(`Fabricate | ${label} progressive check roll failed (${formula})`, error);
       return {
@@ -1044,6 +1073,7 @@ export async function runFormulaRouted({
   clampToNearest = false,
   minOutcomeId = null,
   craftingModifier = null,
+  ...input
 }) {
   const formula = String(rawFormula || '').trim();
   let total = 0;
@@ -1056,6 +1086,7 @@ export async function runFormulaRouted({
       // the prompt-facing DC on `rollOptions` (none for a fixed check).
       rolled = await evaluateCheckRoll(formula, actor, {
         ...rollOptions,
+        evaluation: ownEvaluation(input, rollOptions),
         thresholdMode,
         craftingModifier,
       });

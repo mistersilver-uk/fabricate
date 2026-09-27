@@ -3,6 +3,7 @@
  * component, task or macro: callers pass the roll data, the fixed anchor and the chosen adjustment.
  */
 import { resolveDeterministicExpression } from './checkEvaluation.js';
+import { normalizeCheckEvaluation } from './normalize/checkEvaluation.js';
 
 /** The refusal reasons runtime, preview and readiness share; count evaluation (#2004) extends it. */
 export const CHECK_TARGET_REFUSALS = Object.freeze([
@@ -15,6 +16,64 @@ export const CHECK_TARGET_REFUSALS = Object.freeze([
   'progressive-under',
   'formula-empty',
 ]);
+
+/**
+ * The normalized evaluation a check config runs by. A count evaluation stays inert until #2004
+ * activates it, so it runs as the default sum/over/fixed record.
+ */
+export function activeCheckEvaluation(config) {
+  const authored = config != null && Object.hasOwn(config, 'evaluation') ? config.evaluation : null;
+  const evaluation = normalizeCheckEvaluation(authored);
+  return evaluation.product === 'sum' ? evaluation : normalizeCheckEvaluation();
+}
+
+/** Whether a check grades a summed total over a fixed DC, the only case a `(DC n)` label names. */
+export function isFixedSumOver(evaluation) {
+  return (
+    (evaluation?.product ?? 'sum') === 'sum' &&
+    (evaluation?.direction ?? 'over') === 'over' &&
+    (evaluation?.target?.source ?? 'fixed') === 'fixed'
+  );
+}
+
+/** The ` (DC n)` chat-flavor suffix, which names only a summed roll-over fixed DC. */
+export function dcFlavorSuffix(dc, evaluation) {
+  return Number.isFinite(dc) && isFixedSumOver(evaluation) ? ` (DC ${dc})` : '';
+}
+
+/** A progressive check spends its total as a budget, so summed roll-under refuses; count/under rolls. */
+export function progressiveTargetRefusal(evaluation) {
+  return evaluation?.product === 'sum' && evaluation?.direction === 'under'
+    ? 'progressive-under'
+    : null;
+}
+
+/** The misconfigured check result a refusal returns before any roll, spend or award. */
+export function checkTargetRefusal(reason, label = 'Crafting') {
+  return {
+    success: false,
+    misconfigured: true,
+    outcome: null,
+    value: null,
+    data: { targetRefusal: reason },
+    message: `${label} check target is invalid (${reason})`,
+  };
+}
+
+/**
+ * An activity's target from its check config. `anchor` is its fixed DC, `override` its non-null
+ * adjustment override, and `readRollData` is called only for an attribute source.
+ */
+export function resolveActivityTarget(config, { anchor, override = null, readRollData }) {
+  const evaluation = activeCheckEvaluation(config);
+  const attribute = evaluation.target.source === 'attribute';
+  return resolveCheckTarget({
+    evaluation,
+    rollData: attribute ? readRollData() : {},
+    anchor,
+    adjustment: selectTargetAdjustment(evaluation, override),
+  });
+}
 
 /** An added adjustment is any finite number; a multiplier is a finite number above zero. */
 export function isValidTargetAdjustment(kind, value) {

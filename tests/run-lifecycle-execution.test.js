@@ -1957,6 +1957,7 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
       resolvedFormula: null,
       displayFormula: '1d20 + 3',
       target: 12,
+      direction: 'over',
       comparison: 'meet',
       selectedModifiers: [],
       mode: 'simple',

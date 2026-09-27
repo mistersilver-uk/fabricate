@@ -18,6 +18,13 @@ import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOut
 
 import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { evaluateSituationalBonus, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
+import {
+  activeCheckEvaluation,
+  checkTargetRefusal,
+  dcFlavorSuffix,
+  progressiveTargetRefusal,
+  resolveActivityTarget,
+} from './checkTarget.js';
 import { fireComplications } from './complicationRuntime.js';
 import {
   createGatheringAttemptResolution,
@@ -741,9 +748,10 @@ export class GatheringEngine {
     const requiresCheck = gatheringTaskRequiresPlayerCheck(task);
     const slot = mode === 'routed' ? 'routed' : mode === 'progressive' ? 'progressive' : null;
     const checkMode = mode === 'routed' ? 'routedByCheck' : mode;
-    const dc = mode === 'routed' ? this._resolveGatheringRoutedDc(config, task) : null;
+    const evaluation = activeCheckEvaluation(config);
+    const target = this._versionedGatheringTarget({ mode, config, task, actor, evaluation });
+    const dc = target.target;
     const label = secret ? this.localize(BLIND_TASK_LABEL_KEY) : stringOrEmpty(task?.name);
-    const dcLabel = Number.isFinite(dc) ? ` (DC ${dc})` : '';
     return {
       required: requiresCheck,
       publicPrompt: {
@@ -755,7 +763,7 @@ export class GatheringEngine {
       privateEvaluation: {
         secret,
         actorUuid: stringOrNull(actor?.uuid),
-        flavor: `${label ? `${label} — ` : ''}Gathering check${dcLabel}`,
+        flavor: `${label ? `${label} — ` : ''}Gathering check${dcFlavorSuffix(dc, evaluation)}`,
         speaker: cloneJson(globalThis.ChatMessage?.getSpeaker?.({ actor })) ?? null,
         craftingSystemId: stringOrNull(system?.id),
         environmentId: stringOrNull(environment?.id),
@@ -765,7 +773,9 @@ export class GatheringEngine {
         rollFormula,
         checkConfig: config ? cloneJson(config) : null,
         decisionPolicy: {
-          dc: Number.isFinite(dc) ? dc : null,
+          dc: target.source === 'fixed' ? dc : null,
+          target: dc,
+          targetSource: target.source,
           thresholdMode: stringOrNull(config?.thresholdMode),
           type: stringOrNull(config?.type),
           relativeOutcomes: cloneJson(normalizeList(config?.relativeOutcomes)),
@@ -775,6 +785,21 @@ export class GatheringEngine {
         },
       },
     };
+  }
+
+  /** The descriptor's routed target, or none; a refusal throws before any mutation. A progressive
+   * check has no target and refuses only summed roll-under. */
+  _versionedGatheringTarget({ mode, config, task, actor, evaluation }) {
+    let resolved = { ok: true, target: null, source: null };
+    if (mode === 'routed') resolved = this._resolveGatheringRoutedTarget(config, task, actor);
+    const reason = mode === 'progressive' ? progressiveTargetRefusal(evaluation) : resolved.reason;
+    if (reason) {
+      throw gatheringLifecycleError(
+        `The gathering check target is invalid (${reason})`,
+        'CHECK_TARGET_INVALID'
+      );
+    }
+    return resolved;
   }
 
   /**
@@ -3627,34 +3652,26 @@ export class GatheringEngine {
     interactive = false,
     resolvedCheckResult = null,
   }) {
-    const dc = this._resolveGatheringRoutedDc(routed, task);
     // Gathering has no tool-bonus seam, so nothing is appended before the modifier term.
     const craftingModifier = buildCheckModifierContext(system, 'gathering', task);
     const rolled =
       resolvedCheckResult ??
-      (await runFormulaRouted({
-        formula: rollFormula,
-        dc,
-        thresholdMode: routed.thresholdMode,
-        type: routed.type,
-        relativeOutcomes: routed.relativeOutcomes,
-        fixedOutcomes: routed.fixedOutcomes,
-        triggers: routed.checkBreakage?.triggers,
+      (await this._rollRoutedFormula({
+        routed,
+        rollFormula,
         actor,
-        label: 'Gathering',
+        task,
+        interactive,
         craftingModifier,
-        // Clamp a below-lowest total to the closest tier, as crafting and salvage do.
-        clampToNearest: true,
-        rollOptions: buildInteractiveRollOptions({
-          interactive,
-          actor,
-          name: task?.name,
-          activity: 'Gathering',
-          img: task?.img,
-          dc,
-        }),
       }));
 
+    if (rolled.misconfigured) {
+      return misconfiguredOutcome({
+        code: 'CHECK_TARGET_INVALID',
+        message: rolled.message,
+        checkResult: { data: rolled.data },
+      });
+    }
     // A cancelled interactive roll aborts `_resolveImmediateAttempt` with zero mutation.
     if (rolled.cancelled) {
       return { status: 'cancelled', resultGroups: [], checkResult: null };
@@ -3707,6 +3724,47 @@ export class GatheringEngine {
       outcome: outcomeName,
       resultGroups: matched,
       checkResult,
+    });
+  }
+
+  /** Resolves the routed target before any roll; a refusal returns the misconfigured check result. */
+  async _rollRoutedFormula({ routed, rollFormula, actor, task, interactive, craftingModifier }) {
+    const target = this._resolveGatheringRoutedTarget(routed, task, actor);
+    if (!target.ok) return checkTargetRefusal(target.reason, 'Gathering');
+    const evaluation = activeCheckEvaluation(routed);
+    return runFormulaRouted({
+      formula: rollFormula,
+      dc: target.target,
+      thresholdMode: routed.thresholdMode,
+      type: routed.type,
+      relativeOutcomes: routed.relativeOutcomes,
+      fixedOutcomes: routed.fixedOutcomes,
+      triggers: routed.checkBreakage?.triggers,
+      actor,
+      label: 'Gathering',
+      craftingModifier,
+      evaluation,
+      // Clamp a below-lowest total to the closest tier, as crafting and salvage do.
+      clampToNearest: true,
+      rollOptions: buildInteractiveRollOptions({
+        interactive,
+        actor,
+        name: task?.name,
+        activity: 'Gathering',
+        img: task?.img,
+        dc: target.target,
+        evaluation,
+      }),
+    });
+  }
+
+  /** The routed target: the fixed DC, or the actor's character value adjusted by the task's
+   * adjustment override, else the base. */
+  _resolveGatheringRoutedTarget(routed, task, actor) {
+    return resolveActivityTarget(routed, {
+      anchor: this._resolveGatheringRoutedDc(routed, task),
+      override: task?.adjustmentOverride,
+      readRollData: () => actor?.getRollData?.() ?? actor?.system ?? {},
     });
   }
 
@@ -3889,6 +3947,19 @@ export class GatheringEngine {
     // progressive has no DC, so `task.dcOverride` never applies.
     const progressive = system?.gatheringCraftingCheck?.progressive;
     const rollFormula = stringOrNull(progressive?.rollFormula);
+    const evaluation = activeCheckEvaluation(progressive);
+    const refusal = progressiveTargetRefusal(evaluation);
+    if (refusal) {
+      const { data, message } = checkTargetRefusal(refusal, 'Gathering');
+      return {
+        success: null,
+        status: null,
+        value: null,
+        data,
+        reasonCode: 'CHECK_TARGET_INVALID',
+        diagnostic: { code: 'CHECK_TARGET_INVALID', message },
+      };
+    }
     if (rollFormula) {
       // Unavailable from the authoring surface, but legacy and external tasks still reach it.
       const rolled = await runFormulaProgressive({
@@ -3897,6 +3968,7 @@ export class GatheringEngine {
         actor,
         label: 'Gathering',
         craftingModifier: buildCheckModifierContext(system, 'gathering', task),
+        evaluation,
         rollOptions: buildInteractiveRollOptions({
           interactive,
           actor,

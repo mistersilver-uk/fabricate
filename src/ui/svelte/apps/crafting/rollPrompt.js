@@ -1,4 +1,6 @@
 /** The single and bulk check prompt: view preparation, the modal surface and answer translation. */
+import { dcFlavorSuffix } from '../../../../systems/checkTarget.js';
+
 import { openRollPromptModal } from './rollPromptHost.js';
 
 // Legacy tokens on both versions (issue 1043): V14 maps them in Roll#toMessage, and core.messageMode is unregistered on V13, where reading it throws.
@@ -265,10 +267,10 @@ export async function promptBulkCheckRoll({
 }
 
 export function buildInteractiveRollOptions(
-  { interactive, actor, name, activity, dc, img, modifierChoice },
+  { interactive, actor, name, activity, dc, img, modifierChoice, ...input },
   prompt = promptCheckRoll
 ) {
-  const dcLabel = Number.isFinite(dc) ? ` (DC ${dc})` : '';
+  const dcLabel = dcFlavorSuffix(dc, input.evaluation);
   const rollOptions = {
     interactive: interactive === true,
     prompt: (rollOptions) => prompt({ ...rollOptions, actorName: actor?.name }),
