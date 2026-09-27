@@ -1755,6 +1755,7 @@ export class GatheringEngine {
     viewer,
     transparent = false,
     presentTools = null,
+    interactableRef = null,
   }) {
     const blockedReasons = [];
     // A revealed blind task keeps its real reason data; an opaque one stays nulled.
@@ -1827,6 +1828,7 @@ export class GatheringEngine {
       environment,
       task,
       transparent,
+      interactableRef: this._listingInteractableRef({ environment, task, interactableRef }),
     });
     blockedReasons.push(...richAttempt.blockedReasons);
 
@@ -1996,11 +1998,18 @@ export class GatheringEngine {
     blockedReasons,
     forceVisible = false,
     tools = null,
+    interactableRef = null,
   }) {
     const blind = environment.selectionMode === 'blind';
     // `forceVisible` builds a transparent model for an already-revealed blind task.
     const opaqueBlind = !forceVisible && this._isOpaqueBlindTask({ environment, viewer });
-    const rich = this._richListingMetadata({ environment, task, actor, viewer });
+    const rich = this._richListingMetadata({
+      environment,
+      task,
+      actor,
+      viewer,
+      interactableRef: this._listingInteractableRef({ environment, task, interactableRef }),
+    });
 
     if (opaqueBlind) {
       return {
@@ -2047,9 +2056,25 @@ export class GatheringEngine {
     };
   }
 
-  _richListingMetadata({ environment, task, actor = null, viewer = null }) {
+  /**
+   * The session's interactable ref for THIS listing row only, so a scoped listing shows and gates
+   * on the interactable's own pool while every other row keeps the environment pool (issue 2048).
+   */
+  _listingInteractableRef({ environment, task, interactableRef = null }) {
+    const ref = normalizeInteractableRef(interactableRef);
+    if (!ref || typeof this.richState?.interactableRefFor !== 'function') return null;
+    return this.richState.interactableRefFor({ environment, task, interactableRef: ref }) ?? null;
+  }
+
+  _richListingMetadata({ environment, task, actor = null, viewer = null, interactableRef = null }) {
     if (typeof this.richState?.buildListingMetadata === 'function') {
-      return this.richState.buildListingMetadata({ environment, task, actor, viewer });
+      return this.richState.buildListingMetadata({
+        environment,
+        task,
+        actor,
+        viewer,
+        interactableRef,
+      });
     }
     return {
       nodes: task?.nodes

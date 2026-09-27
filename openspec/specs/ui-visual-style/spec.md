@@ -229,6 +229,10 @@ Eight bullets follow: the `CollapsibleGroupHeader` one states which primitive ow
 A shared primitive rendering N ordered, named bands over a value track with draggable boundaries, at `src/ui/svelte/components/ThresholdBandStrip.svelte`.
 The numeric steppers in the tier rows remain AUTHORITATIVE; the strip is a visualisation bound to the same state.
 
+Handles, `role="slider"` and the "DC" `aria-valuetext` remain only on the strip of a summed check graded over a fixed target.
+Every other strip — roll under, a character-value target, or a count — is a READ-ONLY derived picture drawn through the primitive's `readonly` mode: it renders no handle, so no slider role, tabindex or drag cursor, and its group's `aria-describedby` names a visually hidden list stating each band and its range.
+The caller derives those bands and formats each range; the strip derives nothing, and the tier steppers are its only editor.
+
 It uses NO gradient.
 Each band is a solid fill from that band's own runtime colour applied inline via `style=` (authored data, never a source literal), and it claims NO §Product UI Visual Style exemption — the exemption's own rule (a gradient across the complete track, fill kept full-width) conflicts with per-band identity, which is the whole point of the control.
 Per-band identity is therefore a real requirement on the CALLER, not just on the primitive: a caller deriving the colour from a two-valued flag renders two bands of a five-band set identically and has not got it.
@@ -486,6 +490,7 @@ Both published calls answer from the catalogue and cannot make that mistake.
 #### Numeric entry
 
 Every editable numeric field in the manager and in the interactable and component editors renders through one shared stepper primitive — a typeable `type="number"` input with `−`/`+` adjuncts, a clamp, and no native spinner — EXCEPT the documented non-conformances recorded below.
+A value whose reading is not a plain number, such as a tier multiplier read as `×½`, renders through the same primitive's opt-in formatted mode rather than a second control.
 The exception clause is not optional decoration: two such fields exist today, so a rule stated absolutely would be falsified the moment it was written.
 The Recipe Studio duration-unit requirement is an INSTANCE of this rule rather than a local exception of its own.
 A bare `type="number"` with no adjuncts is a second numeric-entry design and is not an acceptable rendering: it inherits Foundry's host chrome, offers the browser's drawn arrows as its only pointer affordance, and shares neither the clamp nor the commit path.
@@ -498,6 +503,13 @@ A numeric field whose domain admits "unset" — a DC override that inherits the 
 Neither adjunct is disabled while the field is unset, because nothing is at a bound when there is no value.
 A field whose blank rendering is merely cosmetic for zero is NOT such a field: `0` is its real persisted value, so it shows `0`.
 The distinction is a domain fact and is decided per field from what the model stores, never from how the old control happened to look.
+
+**Formatted numeric values.**
+A formatted stepper is a `role="spinbutton"` text input with decimal inputmode that commits a valid finite value on Enter or blur, and nothing while the GM types.
+Enter never submits an enclosing form, invalid or partial text restores the committed display, and Escape during an edit restores it without blurring and without reaching Foundry's bindings.
+Stepping moves to the nearest strictly greater or smaller stop, so an off-list value stays exact until it is stepped, and Home and End select the lowest and highest numeric stops.
+A caller-named null endpoint (Otherwise) is distinct from an unset value: the endpoint sits one step below the lowest stop, renders its label and states it in `aria-valuetext` with no `aria-valuenow`, while an unset value renders the placeholder and persists null.
+An empty edit never manufactures the endpoint.
 
 **Native spinner suppression.**
 A numeric field's native spinner is suppressed IF AND ONLY IF the field carries another pointer-driven stepping affordance — the stepper's `−`/`+` adjuncts, or a sibling range track in the same control bound to the same value.

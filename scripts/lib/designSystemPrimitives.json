@@ -454,7 +454,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "`library.html:551` — \"The most-used control in the app\", and 23 callers here agree. Carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry naming the gathering economy actor frame, which is the only published frame that renders filled steppers, disabled steppers and a rolled-max placeholder at once."
+      "why": "`library.html:551` — \"The most-used control in the app\", and 23 callers here agree. Carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry naming the gathering economy actor frame, which is the only published frame that renders filled steppers, disabled steppers and a rolled-max placeholder at once. Issue 2005 adds the opt-in formatted mode — `formatValue`, `parseValue`, `stops` and `nullLabel` — a `role=\"spinbutton\"` text input that commits on Enter or blur and steps between stops, and its −/+ adjuncts declare `data-keyboard-focus=\"true\"`, which retired its formless-button debt row."
     },
     {
       "path": "src/ui/svelte/components/ThresholdBandStrip.svelte",
@@ -462,7 +462,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "`library.html:716` — a tiled strip of spans whose dividers are dragged, \"outcome tiers against a DC\", which is exactly this. Exactly 2 callers, `checks/CraftingCheckEditor.svelte` and `checks/SimpleCraftingCheckEditor.svelte`, and it carries a two-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because those are its two modes and each renders chrome the other does not."
+      "why": "`library.html:716` — a tiled strip of spans whose dividers are dragged, \"outcome tiers against a DC\", which is exactly this. Exactly 2 callers, `checks/CraftingCheckEditor.svelte` and `checks/SimpleCraftingCheckEditor.svelte`, and it carries a two-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because those are its two modes and each renders chrome the other does not. Issue 2005 adds `readonly`, a derived band picture with no handles whose group is described by a visually hidden list of each band's name and caller-formatted `range`."
     },
     {
       "path": "src/ui/svelte/components/RunProgress.svelte",

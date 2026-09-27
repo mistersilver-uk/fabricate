@@ -293,6 +293,31 @@ describe('SvelteFabricateApp shell window', () => {
       );
     });
   });
+  // Issue 2048: the listing and the attempt must carry the SAME interactable ref, read per call,
+  // so a scoped listing shows and gates on the pool the attempt decrements, and a re-show or close
+  // never leaves a stale scope behind for the next refresh.
+  it('threads the scoped interactable ref into listings as well as attempts', async () => {
+    await withFabricateLifecycleReplay(async ({ loadModule }) => {
+      const { SvelteFabricateApp } = await loadModule('/src/ui/SvelteFabricateApp.svelte.js');
+      const app = Object.create(SvelteFabricateApp.prototype);
+      const calls = [];
+      globalThis.game.fabricate.listGatheringForActor = (opts) => calls.push(['list', opts]);
+      globalThis.game.fabricate.startGatheringAttempt = (opts) => calls.push(['start', opts]);
+      const services = app._buildServices();
+      const ref = { sceneId: 's1', regionId: 'r1', behaviorId: 'b1' };
+
+      app._scopedInteractableRef = ref;
+      services.listGatheringForActor({ actorId: 'actor-1' });
+      services.startGatheringAttempt({ taskId: 'task-a' });
+      app._scopedInteractableRef = null;
+      services.listGatheringForActor();
+
+      assert.deepEqual(calls[0][1].interactableRef, ref, 'the listing carries the scoped ref');
+      assert.equal(calls[0][1].actorId, 'actor-1');
+      assert.deepEqual(calls[1][1].interactableRef, ref, 'the attempt carries the same ref');
+      assert.equal(calls[2][1].interactableRef, null, 'a cleared scope lists the shared pool');
+    });
+  });
   it('is a single shared window keyed by a stable id', () => {
     assert.ok(appSource.includes("id: 'fabricate-app'"), 'window id should be fabricate-app');
     assert.ok(appSource.includes('static _instance'), 'a single shared instance should be tracked');
