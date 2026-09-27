@@ -3,6 +3,7 @@
  * returns null to proceed or `{ result, resolved }` for `craft()` to return; only `craft()` reads
  * a Foundry global, assigns `ctx.resolved`, or handles the errors these propagate.
  */
+import { refusalData } from './checkTarget.js';
 import {
   VERSIONED_EXECUTION_CONTEXT,
   rollTotalForCard,
@@ -24,13 +25,13 @@ const refuse = (message) => ({
 
 /** A misconfigured check's craft result, keeping the discriminator and any target refusal. */
 export function misconfiguredCheckResult(checkResult) {
-  const targetRefusal = checkResult?.data?.targetRefusal;
+  const data = refusalData(checkResult);
   return {
     success: false,
     results: null,
     message: checkResult?.message,
     misconfigured: true,
-    ...(targetRefusal && { data: { targetRefusal } }),
+    ...(data && { data }),
   };
 }
 

@@ -28,6 +28,7 @@ import {
 import { trimString as trimmed } from '../utils/scalars.js';
 
 import { ResolutionModeService } from './ResolutionModeService.js';
+import { hasActiveCheck } from './salvageCheckUsability.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 function asArray(value) {
@@ -287,7 +288,7 @@ function collectSystemBlockers(system, recipes, components) {
   // `craftingCheck.routed.rollFormula` (never the `enabled` flag) is an unconditional blocker,
   // with no recipe scan; `routedByIngredients` never raises it.
   if (mode === 'routedByCheck') {
-    const hasRoutedFormula = Boolean(trimmed(check.routed?.rollFormula));
+    const hasRoutedFormula = hasActiveCheck(check.routed);
     if (!hasRoutedFormula) {
       blockers.push({
         kind: 'system',
@@ -309,7 +310,7 @@ function collectSystemBlockers(system, recipes, components) {
   // gap here so it is reported once.
   if (features.salvage !== false && system?.salvageResolutionMode === 'routed') {
     const salvageCheck = system?.salvageCraftingCheck || {};
-    const hasSalvageFormula = Boolean(trimmed(salvageCheck.routed?.rollFormula));
+    const hasSalvageFormula = hasActiveCheck(salvageCheck.routed);
     const hasSalvageTiers = routedOutcomeTierNames(salvageCheck.routed).length > 0;
     const salvageInUse = asArray(components).some(
       (component) =>
@@ -347,7 +348,7 @@ function collectSystemBlockers(system, recipes, components) {
   // component with `difficulty >= 1`.
   if (mode === 'progressive') {
     const progressive = check.progressive || {};
-    const hasProgressiveCheck = Boolean(trimmed(progressive.rollFormula));
+    const hasProgressiveCheck = hasActiveCheck(progressive);
     if (!hasProgressiveCheck) {
       blockers.push({
         kind: 'system',
@@ -402,7 +403,7 @@ function collectSystemBlockers(system, recipes, components) {
         : alchemyCheckMode === 'simple'
           ? check.simple
           : null;
-    if (mandatorySlot && !trimmed(mandatorySlot.rollFormula)) {
+    if (mandatorySlot && !hasActiveCheck(mandatorySlot)) {
       blockers.push({
         kind: 'system',
         entityId: null,

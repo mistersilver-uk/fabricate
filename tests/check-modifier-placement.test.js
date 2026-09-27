@@ -14,6 +14,9 @@ import {
   runFormulaRouted,
 } from '../src/systems/checkRoll.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
+import { installCountDice } from './helpers/countEngineDice.js';
+import { countEvaluation } from './helpers/countFixtures.js';
 
 const evaluation = {
   product: 'sum',
@@ -358,38 +361,25 @@ test('a valid library pre-roll failure aborts the real runner before its main ro
   }
 });
 
-test('count advantage changes the pool even when other benefits target the threshold', async () => {
-  const previousRoll = globalThis.Roll;
-  class FakeRoll {
-    constructor(formula) {
-      this.formula = formula;
-      this.total = 4;
-      this.dice = [];
-    }
-    async evaluate() {
-      return this;
-    }
-    static validate() {
-      return true;
-    }
-    static replaceFormulaData(formula) {
-      return formula;
-    }
-  }
-  globalThis.Roll = FakeRoll;
+test('a count check drops a supplied advantage before placement until advantage is mode-aware', async () => {
+  const dice = installCountDice({ faces: [9, 9] });
+  const prompts = [];
   try {
-    const result = await evaluateCheckRoll('2d10', { getRollData: () => ({}) }, {
-      evaluation: { product: 'count', direction: 'over', pool: { modifierDestination: 'threshold' } },
+    const result = await evaluateCheckRoll('1d20', { getRollData: () => ({}) }, {
+      evaluation: normalizeCheckEvaluation(countEvaluation({ modifierDestination: 'threshold' })),
       interactive: true,
-      prompt: async () => ({ confirmed: true, bonus: '2', advantage: 'advantage' }),
+      prompt: async (input) => {
+        prompts.push(input);
+        return { confirmed: true, bonus: '2', advantage: 'advantage' };
+      },
       post: false,
     });
-    assert.equal(result.modifierPlacement.poolDelta, 1);
-    assert.equal(result.modifierPlacement.thresholdDelta, -2);
-    assert.equal(result.resolvedFormula, '2d10');
+    assert.equal(prompts[0].allowAdvantage, false, 'the retained 1d20 offers no advantage');
+    assert.equal(result.modifierPlacement.poolDelta, 0, 'no advantage die joins the pool');
+    assert.equal(result.modifierPlacement.thresholdDelta, -2, 'the bonus still moves the threshold');
+    assert.deepEqual(dice.formulas(), ['2d10'], 'two dice, and the retained formula never rolls');
   } finally {
-    if (previousRoll === undefined) delete globalThis.Roll;
-    else globalThis.Roll = previousRoll;
+    dice.restore();
   }
 });
 

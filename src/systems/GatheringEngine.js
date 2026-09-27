@@ -20,13 +20,19 @@ import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { evaluateSituationalBonus, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import {
   activeCheckEvaluation,
-  checkRefusalMessage,
+  actorRollData,
   checkTargetRefusal,
   dcFlavorSuffix,
   progressiveTargetRefusal,
-  resolveActivityTarget,
+  refusalMessage,
 } from './checkTarget.js';
 import { fireComplications } from './complicationRuntime.js';
+import {
+  countDecisionPolicy,
+  countRequired,
+  progressiveCheckRefusal,
+  resolveActivityCheck,
+} from './countCheck.js';
 import {
   createGatheringAttemptResolution,
   noRefusal,
@@ -72,6 +78,7 @@ import {
   unconfirmedHistoryError,
 } from './runHistoryEvidence.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
+import { hasActiveCheck } from './salvageCheckUsability.js';
 import { resolvedComponentsFor } from './scopedEntityReads.js';
 import { computeSystemVisibility } from './systemValidation.js';
 
@@ -752,15 +759,19 @@ export class GatheringEngine {
     const checkMode = mode === 'routed' ? 'routedByCheck' : mode;
     const evaluation = activeCheckEvaluation(config);
     const target = this._versionedGatheringTarget({ mode, config, task, actor, evaluation });
-    const dc = target.target;
+    const count = target.policy
+      ? countDecisionPolicy(evaluation, target.policy, target.target)
+      : null;
+    const dc = count ? null : target.target;
     const label = secret ? this.localize(BLIND_TASK_LABEL_KEY) : stringOrEmpty(task?.name);
     return {
       required: requiresCheck,
       publicPrompt: {
         label,
         mode: checkMode,
-        allowsSituationalModifier: Boolean(rollFormula),
-        allowAdvantage: Boolean(rollFormula && /(?:^|\W)d20(?:\W|$)/i.test(rollFormula)),
+        allowsSituationalModifier: hasActiveCheck(config, rollFormula),
+        // A count check offers no advantage until it is mode-aware (issue 2007).
+        allowAdvantage: !count && Boolean(rollFormula && /(?:^|\W)d20(?:\W|$)/i.test(rollFormula)),
       },
       privateEvaluation: {
         secret,
@@ -777,7 +788,8 @@ export class GatheringEngine {
         decisionPolicy: {
           dc: target.source === 'fixed' ? dc : null,
           target: dc,
-          targetSource: target.source,
+          targetSource: count ? null : target.source,
+          ...(count && { count }),
           thresholdMode: stringOrNull(config?.thresholdMode),
           type: stringOrNull(config?.type),
           relativeOutcomes: cloneJson(normalizeList(config?.relativeOutcomes)),
@@ -789,17 +801,20 @@ export class GatheringEngine {
     };
   }
 
-  /** The descriptor's routed target, or none; a refusal throws before any mutation. A progressive
-   * check has no target and refuses only summed roll-under. */
+  /** The descriptor's routed target and a count check's resolved pool, or none; a refusal throws
+   * before any mutation. A progressive check has no target: it refuses summed roll-under, and a
+   * count pool that cannot resolve. */
   _versionedGatheringTarget({ mode, config, task, actor, evaluation }) {
     let resolved = { ok: true, target: null, source: null };
     if (mode === 'routed') resolved = this._resolveGatheringRoutedTarget(config, task, actor);
-    const reason = mode === 'progressive' ? progressiveTargetRefusal(evaluation) : resolved.reason;
-    if (reason) {
-      throw gatheringLifecycleError(
-        checkRefusalMessage(reason, 'Gathering'),
-        'CHECK_TARGET_INVALID'
-      );
+    if (mode === 'progressive' && evaluation.product === 'count') {
+      const readRollData = () => actorRollData(actor);
+      resolved = { ...resolveActivityCheck(config, { readRollData }), target: null };
+    }
+    const reason = mode === 'progressive' ? progressiveTargetRefusal(evaluation) : null;
+    if (reason) resolved = { ok: false, reason };
+    if (!resolved.ok) {
+      throw gatheringLifecycleError(refusalMessage(resolved, 'Gathering'), 'CHECK_TARGET_INVALID');
     }
     return resolved;
   }
@@ -3647,7 +3662,7 @@ export class GatheringEngine {
     // that name to a result group, as crafting and salvage do; no formula is a misconfiguration.
     const routed = system?.gatheringCraftingCheck?.routed;
     const rollFormula = stringOrNull(routed?.rollFormula);
-    if (!rollFormula) {
+    if (!hasActiveCheck(routed, rollFormula)) {
       return misconfiguredOutcome({
         code: 'MISSING_ROUTED_CHECK',
         message: 'Routed gathering resolution requires a system-level gathering check roll formula',
@@ -3757,7 +3772,7 @@ export class GatheringEngine {
   /** Resolves the routed target before any roll; a refusal returns the misconfigured check result. */
   async _rollRoutedFormula({ routed, rollFormula, actor, task, interactive, craftingModifier }) {
     const target = this._resolveGatheringRoutedTarget(routed, task, actor);
-    if (!target.ok) return checkTargetRefusal(target.reason, 'Gathering');
+    if (!target.ok) return checkTargetRefusal(target.reason, 'Gathering', target);
     const evaluation = activeCheckEvaluation(routed);
     return runFormulaRouted({
       formula: rollFormula,
@@ -3788,11 +3803,18 @@ export class GatheringEngine {
   /** The routed target: the fixed DC, or the actor's character value adjusted by the task's
    * adjustment override, else the base. */
   _resolveGatheringRoutedTarget(routed, task, actor) {
-    return resolveActivityTarget(routed, {
+    return resolveActivityCheck(routed, {
       anchor: this._resolveGatheringRoutedDc(routed, task),
       override: task?.adjustmentOverride,
-      readRollData: () => actor?.getRollData?.() ?? actor?.system ?? {},
+      required: this._resolveGatheringRoutedRequired(routed, task),
+      readRollData: () => actorRollData(actor),
     });
+  }
+
+  /** A count routed check's required count: the task's non-null `successesOverride`, else the
+   * pool's; the DC override is never read. */
+  _resolveGatheringRoutedRequired(routed, task) {
+    return countRequired(activeCheckEvaluation(routed), task?.successesOverride);
   }
 
   /** The routed base DC: a finite task `dcOverride`, else the routed `dc` (default 15), like
@@ -3975,9 +3997,9 @@ export class GatheringEngine {
     const progressive = system?.gatheringCraftingCheck?.progressive;
     const rollFormula = stringOrNull(progressive?.rollFormula);
     const evaluation = activeCheckEvaluation(progressive);
-    const refusal = progressiveTargetRefusal(evaluation);
+    const refusal = progressiveCheckRefusal(progressive, () => actorRollData(actor));
     if (refusal) {
-      const { data, message } = checkTargetRefusal(refusal, 'Gathering');
+      const { data, message } = checkTargetRefusal(refusal.reason, 'Gathering', refusal);
       return {
         success: null,
         status: null,
@@ -3987,7 +4009,7 @@ export class GatheringEngine {
         diagnostic: { code: 'CHECK_TARGET_INVALID', message },
       };
     }
-    if (rollFormula) {
+    if (hasActiveCheck(progressive, rollFormula)) {
       // Unavailable from the authoring surface, but legacy and external tasks still reach it.
       const rolled = await runFormulaProgressive({
         formula: rollFormula,
@@ -5239,9 +5261,10 @@ function validateTaskConfiguration(task, system = null) {
   }
 
   // Routed gathering resolves through the system-level check formula, not a per-task provider.
+  const routedCheck = system?.gatheringCraftingCheck?.routed;
   if (
     resolutionMode === 'routed' &&
-    !stringOrNull(system?.gatheringCraftingCheck?.routed?.rollFormula)
+    !hasActiveCheck(routedCheck, stringOrNull(routedCheck?.rollFormula))
   ) {
     errors.push('Routed gathering task requires a system-level gathering check roll formula');
   }

@@ -21,7 +21,7 @@ import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { checkTriggerIdsOf } from '../utils/progressiveStageComplications.js';
 
 import { awardReceipts } from './runHistoryEvidence.js';
-import { resolveSalvageCheck } from './salvageCheckUsability.js';
+import { isCountCheck, resolveSalvageCheck } from './salvageCheckUsability.js';
 import { resolvedComponentsFor } from './scopedEntityReads.js';
 
 /**
@@ -321,9 +321,11 @@ export class BulkSalvageService {
     const usable = runnable.filter((entry) => resolveSalvageCheck(entry.system).checkUsable);
     if (usable.length === 0) return none;
 
-    const allowAdvantage = usable.every((entry) =>
-      hasPlainD20(resolveSalvageCheck(entry.system).rollFormula)
-    );
+    // A count check offers no advantage until it is mode-aware (issue 2007).
+    const allowAdvantage = usable.every((entry) => {
+      const check = resolveSalvageCheck(entry.system);
+      return !isCountCheck(check.config) && hasPlainD20(check.rollFormula);
+    });
     const actorNames = new Set(runnable.map((entry) => entry.item.actorName));
     const choice = await this.promptRollDecision({
       allowAdvantage,

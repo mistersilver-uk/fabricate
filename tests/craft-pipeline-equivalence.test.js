@@ -17,7 +17,8 @@ const RELATIVE_TIERS = [
   { id: 't-botch', name: 'Botch', success: false, breakTools: false, dc: -10 },
 ];
 
-const INACTIVE_EVALUATION = { product: 'count', direction: 'under', pool: { required: 3 } };
+// A summed check that still carries authored count pool data, which stays inert.
+const INACTIVE_EVALUATION = { product: 'sum', direction: 'over', pool: { required: 3, base: '@missing' } };
 
 const ROUTED = {
   evaluation: INACTIVE_EVALUATION,

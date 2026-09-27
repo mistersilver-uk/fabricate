@@ -19,7 +19,7 @@ import { formulaRolls } from '../utils/rollFormulaRollability.js';
 
 import { resolveModifierLibrary } from './characterLibraries.js';
 import { planModifierPlacement, SUM_OVER_EVALUATION } from './checkModifierRouter.js';
-import { resolveSalvageCheck } from './salvageCheckUsability.js';
+import { hasActiveCheck, resolveSalvageCheck } from './salvageCheckUsability.js';
 import {
   appendCheckModifierRollTerms,
   appendCheckModifierTerm,
@@ -158,7 +158,7 @@ export function resolveActiveCraftingCheckFormula(system) {
     slot,
     config,
     rollFormula,
-    checkUsable: rollFormula.length > 0,
+    checkUsable: hasActiveCheck(config, rollFormula),
     requiresCheck: REQUIRED_CHECK_MODES.has(mode) || (mode === 'alchemy' && slot !== null),
   };
 }
@@ -204,7 +204,7 @@ export function resolveActiveGatheringCheckFormula(system, resolutionMode = 'd10
     slot,
     config,
     rollFormula,
-    checkUsable: rollFormula.length > 0,
+    checkUsable: hasActiveCheck(config, rollFormula),
     // Routed routes by tier name and progressive spends the total, so both need a roll.
     requiresCheck: slot !== null,
   };

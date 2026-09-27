@@ -56,6 +56,84 @@ const REFUSAL_FALLBACK = [
   'its target is misconfigured',
 ];
 
+/** A count refusal's sentence by the input it names, then its reason; `{path}` names the path. */
+const COUNT_REFUSAL_COPY = Object.freeze({
+  base: {
+    'expression-missing': ['FABRICATE.Check.CountRefusal.BaseMissing', 'its dice pool is blank'],
+    'unresolved-path': [
+      'FABRICATE.Check.CountRefusal.BaseUnresolvedPath',
+      'its dice pool reads {path}, which this character does not have',
+    ],
+    'non-finite': [
+      'FABRICATE.Check.CountRefusal.BaseNonFinite',
+      'its dice pool did not resolve to a number',
+    ],
+    dice: [
+      'FABRICATE.Check.CountRefusal.BaseDice',
+      'its dice pool rolls dice, but a pool must be a fixed number',
+    ],
+    invalid: [
+      'FABRICATE.Check.CountRefusal.BaseInvalid',
+      'its dice pool cannot be read as a number',
+    ],
+  },
+  threshold: {
+    'expression-missing': [
+      'FABRICATE.Check.CountRefusal.ThresholdMissing',
+      'its success threshold is blank',
+    ],
+    'unresolved-path': [
+      'FABRICATE.Check.CountRefusal.ThresholdUnresolvedPath',
+      'its success threshold reads {path}, which this character does not have',
+    ],
+    'non-finite': [
+      'FABRICATE.Check.CountRefusal.ThresholdNonFinite',
+      'its success threshold did not resolve to a number',
+    ],
+    dice: [
+      'FABRICATE.Check.CountRefusal.ThresholdDice',
+      'its success threshold rolls dice, but a threshold must be a fixed number',
+    ],
+    invalid: [
+      'FABRICATE.Check.CountRefusal.ThresholdInvalid',
+      'its success threshold cannot be read as a number',
+    ],
+  },
+  die: {
+    'die-invalid': ['FABRICATE.Check.CountRefusal.DieInvalid', 'its die needs at least two faces'],
+  },
+  explode: {
+    'faces-invalid': [
+      'FABRICATE.Check.CountRefusal.ExplodeFaceMissing',
+      'the face its dice explode on is not set',
+    ],
+    'explode-unbounded': [
+      'FABRICATE.Check.CountRefusal.ExplodeUnbounded',
+      'too many dice would roll after explosions',
+    ],
+  },
+  cancel: {
+    'faces-invalid': [
+      'FABRICATE.Check.CountRefusal.CancelFaceMissing',
+      'the face that cancels a success is not set',
+    ],
+  },
+  pool: {
+    'non-finite': [
+      'FABRICATE.Check.CountRefusal.PoolNonFinite',
+      'its dice pool is not a number once modifiers apply',
+    ],
+    'pool-too-large': [
+      'FABRICATE.Check.CountRefusal.PoolTooLarge',
+      'its dice pool is more than 999 dice once modifiers apply',
+    ],
+  },
+});
+const COUNT_REFUSAL_FALLBACK = [
+  'FABRICATE.Check.CountRefusal.Misconfigured',
+  'its dice pool is misconfigured',
+];
+
 const foundryFormat = (key, data) => globalThis.game?.i18n?.format?.(key, data);
 
 /** The sentence a refusal shows, localized with an English fallback; never the raw reason code. */
@@ -67,13 +145,24 @@ export function checkRefusalMessage(reason, label = 'Crafting', localize = found
 }
 
 /**
- * The normalized evaluation a check config runs by. A count evaluation stays inert until #2004
- * activates it, so it runs as the default sum/over/fixed record.
+ * A refusal's sentence: a count refusal (one with `refusedInput`) names its input and, for an
+ * unresolved path, the path; any other refusal reads as {@link checkRefusalMessage}.
  */
+export function refusalMessage(refusal, label = 'Crafting', localize = foundryFormat) {
+  const { reason, refusedInput, path = null } = refusal ?? {};
+  if (!refusedInput) return checkRefusalMessage(reason, label, localize);
+  const copy = Object.hasOwn(COUNT_REFUSAL_COPY, refusedInput)
+    ? COUNT_REFUSAL_COPY[refusedInput]
+    : {};
+  const [key, detail] = Object.hasOwn(copy, reason) ? copy[reason] : COUNT_REFUSAL_FALLBACK;
+  const fallback = `${label} check cannot roll: ${detail.replace('{path}', path)}.`;
+  return localizeWith(localize, key, { label, path }, fallback);
+}
+
+/** The normalized evaluation a check config runs by, read from its own `evaluation` key. */
 export function activeCheckEvaluation(config) {
   const authored = config != null && Object.hasOwn(config, 'evaluation') ? config.evaluation : null;
-  const evaluation = normalizeCheckEvaluation(authored);
-  return evaluation.product === 'sum' ? evaluation : normalizeCheckEvaluation();
+  return normalizeCheckEvaluation(authored);
 }
 
 /** Whether a check grades a summed total over a fixed DC, the only case a `(DC n)` label names. */
@@ -97,16 +186,31 @@ export function progressiveTargetRefusal(evaluation) {
     : null;
 }
 
-/** The misconfigured check result a refusal returns before any roll, spend or award. */
-export function checkTargetRefusal(reason, label = 'Crafting') {
+/**
+ * The misconfigured check result a refusal returns before any roll, spend or award. A count
+ * refusal also names its input as `data.refusedInput`, and `path` only reaches the message.
+ */
+export function checkTargetRefusal(reason, label = 'Crafting', { refusedInput, path } = {}) {
   return {
     success: false,
     misconfigured: true,
     outcome: null,
     value: null,
-    data: { targetRefusal: reason },
-    message: checkRefusalMessage(reason, label),
+    data: { targetRefusal: reason, ...(refusedInput && { refusedInput }) },
+    message: refusalMessage({ reason, refusedInput, path }, label),
   };
+}
+
+/** The `data` a misconfigured result carries on to its caller: the refusal channel, or nothing. */
+export function refusalData(checkResult) {
+  const { targetRefusal, refusedInput } = checkResult?.data ?? {};
+  if (!targetRefusal) return null;
+  return { targetRefusal, ...(refusedInput && { refusedInput }) };
+}
+
+/** The roll data a check reads from its actor: `getRollData()`, else `system`, never mutated. */
+export function actorRollData(actor) {
+  return actor?.getRollData?.() ?? actor?.system ?? {};
 }
 
 /**

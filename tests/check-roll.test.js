@@ -1701,7 +1701,7 @@ test('standalone companion check refuses a future mode before the current over r
   assert.deepEqual(evaluateArgs, [], 'the unsupported mode never reached the dice engine');
 });
 
-test('gathering routed adapter retains a future check record while executing sum/over', async () => {
+test('gathering routed adapter keeps inert count pool data while executing sum/over', async () => {
   stubRoll(8);
   const engine = Object.create(GatheringEngine.prototype);
   const result = await engine._resolveRoutedFormulaOutcome({
@@ -1711,7 +1711,7 @@ test('gathering routed adapter retains a future check record while executing sum
         { id: 'high', name: 'High', dc: 0, success: true },
         { id: 'low', name: 'Low', dc: -5, success: false },
       ],
-      evaluation: { product: 'count', direction: 'under' },
+      evaluation: { product: 'sum', direction: 'over', pool: { base: '@missing' } },
     },
     rollFormula: '1d20', actor: ACTOR,
     task: { name: 'Gather ore', resultGroups: [] },

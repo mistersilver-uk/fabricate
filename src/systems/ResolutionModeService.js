@@ -14,6 +14,7 @@ import {
   routedSuccessTierOptions,
 } from '../utils/routedOutcomeKeywords.js';
 
+import { hasActiveCheck } from './salvageCheckUsability.js';
 import { resolvedComponentsFor } from './scopedEntityReads.js';
 
 /** The full progressive `meta` for an award of nothing (no authored group), never a short shape. */
@@ -68,9 +69,9 @@ export class ResolutionModeService {
     return this.craftingSystemManager?.getSystem(recipe.craftingSystemId) || null;
   }
 
-  /** A check sub-object is usable only with a non-blank roll formula. */
+  /** A check sub-object is usable only with an active check: a count, or a roll formula. */
   _hasRollFormula(check) {
-    return typeof check?.rollFormula === 'string' && check.rollFormula.trim().length > 0;
+    return hasActiveCheck(check);
   }
 
   getMode(recipe) {
