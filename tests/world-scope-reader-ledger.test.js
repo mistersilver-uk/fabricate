@@ -76,13 +76,14 @@ const SCAN_TOTALS = Object.freeze({
   // pairs/collisions re-derived. Ten tool-source lines moved to `manager/toolSources.js` (+1 file).
   // Five bulk-edit lines moved to `manager/bulkEdits.js` (+1 file).
   // Eight delete-cascade lines moved to `manager/deleteCascades.js` (+1 file), then nine
-  // essence-delete lines followed them there.
+  // essence-delete lines followed them there. Issue 2003 gave one Tool-validation argument a trailing
+  // comma, so two identical reads now share one anchor (pairs 137 -> 136, one more collision group).
   matches: 169,
   lines: 154,
   files: 26,
-  pairs: 137,
-  collisionGroups: 14,
-  collisionSites: 31,
+  pairs: 136,
+  collisionGroups: 15,
+  collisionSites: 33,
 });
 
 /**
@@ -94,8 +95,7 @@ const LEDGER = Object.freeze([
   ['src/systems/CraftingEngine.js', "const tools = toolValidation.tools;", 1, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "toolPairs: [...prepared.toolValidation.tools],", 1, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "if (shouldUseTools && prepared.toolValidation.tools.length > 0) {", 1, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "prepared.toolValidation.tools,", 1, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "prepared.toolValidation.tools", 1, 'not-a-system'],
+  ['src/systems/CraftingEngine.js', "prepared.toolValidation.tools,", 2, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "state.usedTools = cloneJsonValue(toolReceipt.tools) ?? [];", 1, 'not-a-system'],
   ['src/systems/GatheringEngine.js', "if (resolvedTools.tools.length > 0) {", 1, 'not-a-system'],
   ['src/systems/GatheringEngine.js', "tools: resolvedTools.tools,", 1, 'not-a-system'],
