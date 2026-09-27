@@ -48,6 +48,9 @@ const evaluation = (overrides = {}, target = {}) =>
     },
   });
 
+/** A record whose base adjustment is set, so a switch that resets it is visible. */
+const BASE_HALF = evaluation({}, { baseAdjustment: 0.5 });
+
 /** Every inactive field is populated, so a switch that clears one is visible in the round trip. */
 function routedCheck(evaluationRecord = evaluation()) {
   return {
@@ -126,7 +129,7 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
     mountControlled(routedHarness, value, { previewCharacter: IDRIN, ...props });
 
   it('switches direction and back without touching anything else', async () => {
-    const start = routedCheck();
+    const start = routedCheck(BASE_HALF);
     const state = await mount(start);
     await state.act((root) => choose(root, 'data-check-direction-option', 'over'));
     assert.deepEqual(state.value, {
@@ -138,7 +141,7 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
   });
 
   it('switches the target source and back, keeping the DC, expression and adjustments', async () => {
-    const start = routedCheck();
+    const start = routedCheck(BASE_HALF);
     const state = await mount(start);
     await state.act((root) => choose(root, 'data-check-target-source-option', 'fixed'));
     assert.equal(state.value.evaluation.target.source, 'fixed');
@@ -149,7 +152,7 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
   });
 
   it('switches the adjustment kind and back, reading kept values through each kind', async () => {
-    const start = routedCheck();
+    const start = routedCheck(BASE_HALF);
     const state = await mount(start);
     await state.act((root) => choose(root, 'data-check-adjustment-kind-option', 'add'));
     const extreme = state.root.querySelector('[data-outcome-row="extreme"] [data-outcome-dc]');

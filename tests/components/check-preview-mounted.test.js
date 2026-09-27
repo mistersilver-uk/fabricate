@@ -440,6 +440,53 @@ describe('the outcome-preview readout', () => {
   });
 });
 
+describe('the evaluation reaches the stack, the rail and the preview (issue 2005)', () => {
+  const underFixed = { product: 'sum', direction: 'under', target: { source: 'fixed' } };
+  const attribute = {
+    product: 'sum',
+    direction: 'under',
+    target: { source: 'attribute', expression: '@prof', adjustmentKind: 'multiply' },
+  };
+
+  it('states the authored evaluation on the editor stack', async () => {
+    const root = await mountChecks({ craftingCheck: { ...ROUTED_CHECK, evaluation: attribute } });
+    const stack = root.querySelector('[data-checks-panel="crafting"]');
+    assert.deepEqual(
+      [
+        stack.dataset.checksEvaluationDirection,
+        stack.dataset.checksTargetSource,
+        stack.dataset.checksAdjustmentKind,
+      ],
+      ['under', 'attribute', 'multiply']
+    );
+  });
+
+  it('names one target or one adjustment per record in the digest, and nothing roll-over fixed', async () => {
+    const digestRow = (root) => root.querySelector('[data-checks-digest-row="target"]');
+    const over = await mountChecks();
+    assert.ok(!digestRow(over), 'a roll-over fixed check keeps its digest');
+    harness.remount();
+    const fixed = await mountChecks({ craftingCheck: { ...ROUTED_CHECK, evaluation: underFixed } });
+    assert.match(digestRow(fixed).textContent, /Per recipe · One target/);
+    harness.remount();
+    const adjusted = await mountChecks({ craftingCheck: { ...ROUTED_CHECK, evaluation: attribute } });
+    assert.match(digestRow(adjusted).textContent, /Per recipe · One adjustment/);
+  });
+
+  it('DROPS a stale readout when the evaluation changes underneath it', async () => {
+    const root = await mountChecks();
+    await choosePreviewActor(root, 'sera');
+    await rollAndSettle(root);
+    assert.ok(root.querySelector('[data-checks-simulator-readout]'));
+    await harness.setProps({ craftingCheck: { ...ROUTED_CHECK, evaluation: underFixed } });
+    await settle();
+    assert.ok(
+      !root.querySelector('[data-checks-simulator-readout]'),
+      'a result graded the other way round must not stay on screen'
+    );
+  });
+});
+
 describe('the odds histogram', () => {
   it('withholds the formula average and states the odds refusal after the formula control changes', async () => {
     const changes = [];
