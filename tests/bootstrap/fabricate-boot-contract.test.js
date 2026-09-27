@@ -54,6 +54,7 @@ const COMPOSED_FIELDS = Object.freeze([
   'compendiumImporter',
   'craftingEngine',
   'journalRunCommands',
+  'companionOperations',
   'gatheringRealmStore',
   'gatheringEnvironmentStore',
   'gatheringPartyStore',
@@ -587,14 +588,14 @@ test('the boot contract golden is not vacuous', () => {
   assert.equal(golden.hookEventsAtYield.length, 12);
   assert.equal(golden.hookEventsAfterReady.length, 29);
   assert.equal(golden.socketListenerCount, 1);
-  assert.equal(golden.instanceProperties.length, 45);
+  assert.equal(golden.instanceProperties.length, 46);
   assert.equal(golden.prototypeProperties.length, 139);
   assert.equal(golden.gatheringKeys.length, 17);
   assert.equal(golden.deprecationWarnings.length, 10);
   assert.equal(new Set(golden.deprecationWarnings).size, 10);
   assert.equal(
     golden.instanceProperties.filter((row) => row.enumerable).length,
-    45,
+    46,
     'every own property is a plain assignment'
   );
   assert.equal(

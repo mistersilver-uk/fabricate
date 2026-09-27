@@ -117,6 +117,7 @@ const BOOTSTRAP_MODULES = [
   'src/bootstrap/Fabricate.js',
   'src/bootstrap/bulkFacade.js',
   'src/bootstrap/companionFacade.js',
+  'src/bootstrap/companionOperations.js',
   'src/bootstrap/composeServices.js',
   'src/bootstrap/craftingFacade.js',
   'src/bootstrap/gatheringFacade.js',

@@ -579,6 +579,37 @@ The operation id is reused across users, clients, delivery attempts, reloads and
 This submission and its persistence adapter remain internal in this increment.
 They publish no operation method on `game.fabricate.api.companion`, execute no effect and do not alter the compatibility contract below.
 
+## Companion Operation Authority
+
+Any authenticated GM can submit an operation, and every local or relayed submission enters the same durable claim the Journal run authority takes on its private ledger.
+Foundry's elected GM User decides routing; one exclusive claim page on that ledger then selects the single browser session that accepts, because one elected User can have several browsers open.
+The elected GM's browser enters the claim directly, without waiting for its own broadcast; a non-elected GM relays to the elected GM User and does not accept locally; a non-GM caller, or a relayed request whose server-attested sender is not a GM, is refused before acceptance whatever identity its payload names.
+
+The logical operation id stays distinct from the transport request id and the requesting browser session id, so a retry may change both while naming the same accepted record.
+A legacy Journal run request that names no operation id records its request id as its operation id, and keeps its signature, results, replay, prepare tokens and reconciliation.
+The claim page's fixed id `FabRunAuthority1` is itself a well-formed operation id and is refused as one before acceptance; every other id is used exactly as submitted.
+
+A handler under the claim receives a held-claim context binding the exact live ledger the claim was taken on, an authoritative reader of that ledger's server copy, and an exact claim verifier.
+The operation store is bound to that live ledger and that reader alone, never to a cached collection.
+The verifier answers held only when the server copy shows the same claim page with the same claim id and request id and this browser's User is still the elected GM; a missing, unreadable, replaced or mismatched claim, or a lost election, fails closed.
+The claim id names the attempt; no timestamp establishes ownership, and no compare-and-set or fencing primitive is claimed.
+
+Acceptance itself is first-wins by the operation id, so it can finish while a claim is lost.
+After the awaited acceptance Core verifies the exact claim, rereads the stored record from the server copy and verifies the claim again before it invokes the injected executor, passing that stored record and the held-claim context rather than anything derived from the request.
+Only an accepted or pending stored record with no applying effect may continue; a conflict, invalid input, invalid stored evidence, unavailable storage, a terminal record, and a failed, review-required or awaiting-decision record are observation-only, as is any record with an applying effect.
+An equal eligible retry may invoke the executor again serially; this is not an exactly-once callback promise for the world's lifetime.
+A claim check cannot preempt a mutation already in flight, so an executor checks before each next step, and an executor that throws leaves its claim retained for reconciliation rather than released on a timeout.
+
+Evidence is never discarded to settle duplicate ledgers: any embedded page, including a valid or malformed operation record or a page nothing recognises, makes a ledger non-pristine, an inspection that did not answer authorizes no deletion, and two evidence-bearing ledgers remain ambiguous for explicit reconciliation.
+
+Requests and replies use their own socket kinds on the module channel.
+A request targets the elected GM User; a reply targets only the attested sender and settles only the pending request whose recipient, operation id, request id and session id all match, sent by the elected GM.
+A second browser of the elected User that loses the claim sends no contention reply, so it cannot settle the request before the winner answers.
+The socket acknowledgement confirms relay only.
+A relay that times out reports the same operation id as pending and indeterminate, never as a rejection, a replacement identity or a reason to retire a claim.
+
+This increment publishes no operation method on `game.fabricate.api.companion`, ships no executor or effect, and performs no automatic startup or handoff recovery.
+
 ## The Compatibility Promise
 
 While `game.fabricate.api.companion.schemaVersion` is unchanged, every member of the declared set keeps its name, keeps accepting the arguments documented for it, and keeps answering in the documented shape.

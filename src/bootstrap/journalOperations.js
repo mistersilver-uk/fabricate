@@ -454,17 +454,10 @@ function createCraftingJournalOperations(fabricate, getService) {
   };
 }
 
-export function createJournalCommandsForFabricate(fabricate) {
-  const authority = createFoundryJournalRunAuthority({
-    reconstructExecutions: createJournalExecutionReconstructor({
-      getCraftingRunManager: () => fabricate.craftingRunManager,
-      getGatheringRunManager: () => fabricate.gatheringRunManager,
-    }),
-    // A refusal that has LIFTED invalidates every surface that captured it, the Journal having read
-    // availability when it built its listing (issue 1648, M25). Broadcast the LIFT, never the
-    // refusal: a refusal is true while it holds, and announcing it repaints mid-command.
-    onAvailabilityRestored: () => Hooks.callAll('fabricate.journalRunAuthorityRestored'),
-  });
+export function createJournalCommandsForFabricate(
+  fabricate,
+  authority = createJournalAuthorityForFabricate(fabricate)
+) {
   let service = null;
   service = createJournalRunCommandService({
     authority,
@@ -500,4 +493,21 @@ export function createJournalCommandsForFabricate(fabricate) {
   });
   installCraftingJournalRunAuthority({ engine: fabricate.craftingEngine, service });
   return service;
+}
+
+/**
+ * The world's one Journal run authority. The run commands and the companion operations share this
+ * instance, so both queue on one local chain and contend on one claim page.
+ */
+export function createJournalAuthorityForFabricate(fabricate) {
+  return createFoundryJournalRunAuthority({
+    reconstructExecutions: createJournalExecutionReconstructor({
+      getCraftingRunManager: () => fabricate.craftingRunManager,
+      getGatheringRunManager: () => fabricate.gatheringRunManager,
+    }),
+    // A refusal that has LIFTED invalidates every surface that captured it, the Journal having read
+    // availability when it built its listing (issue 1648, M25). Broadcast the LIFT, never the
+    // refusal: a refusal is true while it holds, and announcing it repaints mid-command.
+    onAvailabilityRestored: () => Hooks.callAll('fabricate.journalRunAuthorityRestored'),
+  });
 }
