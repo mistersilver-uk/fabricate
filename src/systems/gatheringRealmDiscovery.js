@@ -1,4 +1,9 @@
-import { forcedDeletionEntry, getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import {
+  FABRICATE_FLAG_NAMESPACE,
+  forcedReplacementEntry,
+  getFabricateFlag,
+  setFabricateFlag,
+} from '../config/flags.js';
 
 /**
  * Actor-flag helpers for realm discovery, which follows the character across parties. The flag
@@ -7,8 +12,8 @@ import { forcedDeletionEntry, getFabricateFlag, setFabricateFlag } from '../conf
  * migration runner has no actor access, so the re-key is lazy on read, and writes persist only the
  * new shape. A numeric `discoveredAt` marks a realm entry, anything else object-shaped is a legacy
  * bucket, and a half-upgraded mixed map is normal; on a collision the earliest `discoveredAt`
- * wins. Reads never throw, keeping entries with a stale `partyId`. `hideGatheringRealm` writes
- * a Foundry forced deletion for the individual realm key.
+ * wins. Reads never throw, keeping entries with a stale `partyId`. `hideGatheringRealm`
+ * force-replaces the whole flat map, so no legacy copy of the realm survives core's merge.
  */
 
 const DISCOVERY_FLAG_KEY = 'discoveredGatheringRealms';
@@ -108,14 +113,24 @@ export async function revealGatheringRealm(
   return true;
 }
 
-/** Remove one entry with a forced deletion, `true` when one was removed. */
+/**
+ * Remove one entry by force-replacing the flag with the flat map minus it, `true` when one was
+ * removed. A non-Document actor falls back to `setFabricateFlag`, or is refused with `false`.
+ */
 export async function hideGatheringRealm(actor, { realmId } = {}) {
   if (!realmId) return false;
   const map = getDiscoveredGatheringRealms(actor);
-  if (!(realmId in map)) return false;
-  const deletion = forcedDeletionEntry(`flags.fabricate.fabricate.${DISCOVERY_FLAG_KEY}`, realmId);
-  if (!deletion) return false;
-  await actor.update(Object.fromEntries([deletion]));
+  if (!Object.hasOwn(map, realmId)) return false;
+  const next = Object.fromEntries(Object.entries(map).filter(([key]) => key !== realmId));
+  if (typeof actor.update === 'function' && typeof actor.updateSource === 'function') {
+    const parentPath = `flags.${FABRICATE_FLAG_NAMESPACE}.${FABRICATE_FLAG_NAMESPACE}`;
+    await actor.update(
+      Object.fromEntries([forcedReplacementEntry(parentPath, DISCOVERY_FLAG_KEY, next)])
+    );
+    return true;
+  }
+  if (typeof actor.setFlag !== 'function') return false;
+  await setFabricateFlag(actor, DISCOVERY_FLAG_KEY, next);
   return true;
 }
 

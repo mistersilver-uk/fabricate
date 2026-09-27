@@ -8,7 +8,13 @@ import {
   isGatheringRealmDiscovered,
   revealGatheringRealm
 } from '../src/systems/gatheringRealmDiscovery.js';
-import { deletedKey, forEachDeletionForm, recordWrite } from './helpers/forcedDeletion.js';
+import {
+  deletedKey,
+  forEachReplacementForm,
+  isForcedReplacement,
+  recordWrite,
+  replacedKey
+} from './helpers/forcedDeletion.js';
 
 function getPathValue(object, path) {
   return String(path).split('.').reduce((value, part) => {
@@ -56,7 +62,8 @@ function mergeNeverDeleting(target, source) {
 }
 
 // `Actor#update` as core runs it: a recursive merge that removes a key only for a forced
-// deletion, never because the written map omits it (issue 2012).
+// deletion, never because the written map omits it (issue 2012), and assigns a forced
+// replacement wholesale. A missing parent on the path is created, as core's diff creates one.
 class MergingActor extends FakeDocument {
   updateCalls = [];
   updateSource() {}
@@ -68,13 +75,21 @@ class MergingActor extends FakeDocument {
       let node = this;
       for (const part of parts) node = node[part] ??= {};
       const deleted = deletedKey(last, value);
+      const replaced = replacedKey(last, value);
       if (deleted !== null) delete node[deleted];
+      else if (replaced) node[replaced.key] = structuredClone(replaced.value);
       else if (isObject(value) && isObject(node[last])) mergeNeverDeleting(node[last], value);
       else node[last] = value;
     }
     return this;
   }
 }
+
+const discoveryActor = (fabricateFlags) =>
+  new MergingActor({ flags: { fabricate: { fabricate: fabricateFlags } } });
+const storedDiscoveryMap = (actor) => actor.flags.fabricate.fabricate.discoveredGatheringRealms;
+const R1 = { discoveredAt: 1, source: 'manual' };
+const R2 = { discoveredAt: 2, source: 'api' };
 
 const travelConfig = { realms: [{ id: 'r1' }, { id: 'r2' }] };
 
@@ -117,19 +132,88 @@ test('hideGatheringRealm removes the entry', async () => {
   assert.equal(isGatheringRealmDiscovered(doc, 'r2'), true);
 });
 
-forEachDeletionForm('hideGatheringRealm deletes the key from a flag that core merges', async (deletion) => {
-  deletion.apply();
-  const actor = new MergingActor({ flags: { fabricate: { fabricate: { discoveredGatheringRealms: {
-    r1: { discoveredAt: 1, source: 'manual' },
-    r2: { discoveredAt: 2, source: 'api' }
-  } } } } });
+forEachReplacementForm('hideGatheringRealm replaces the map that core merges', async (form) => {
+  form.apply();
+  const actor = discoveryActor({ discoveredGatheringRealms: { r1: R1, r2: R2 } });
   assert.equal(await hideGatheringRealm(actor, { realmId: 'r1' }), true);
   assert.equal(isGatheringRealmDiscovered(actor, 'r1'), false, 'an omitted key survives the merge');
   assert.equal(isGatheringRealmDiscovered(actor, 'r2'), true);
   assert.deepEqual(
     actor.updateCalls,
-    deletion.expect([{ 'flags.fabricate.fabricate.discoveredGatheringRealms.-=r1': null }])
+    form.expect([{ 'flags.fabricate.fabricate.==discoveredGatheringRealms': { r2: R2 } }])
   );
+  const [[, written]] = Object.entries(actor.updateCalls[0]);
+  assert.equal(isForcedReplacement(written), form.v14, 'V14 writes the operator, V13 the plain map');
+});
+
+forEachReplacementForm('hiding on a legacy-key-only actor keeps its other discoveries', async (form) => {
+  form.apply();
+  const actor = discoveryActor({ discoveredGatheringRegions: { 'system-a': { r1: R1, r2: R2 } } });
+  assert.equal(await hideGatheringRealm(actor, { realmId: 'r1' }), true);
+  assert.deepEqual([...getDiscoveredRealmIds(actor)], ['r2'], 'r1 hidden, nothing else wiped');
+  assert.deepEqual(storedDiscoveryMap(actor), { r2: R2 }, 'migrated to the flat key');
+});
+
+forEachReplacementForm('hiding a realm inside a legacy bucket removes it', async (form) => {
+  form.apply();
+  const actor = discoveryActor({ discoveredGatheringRealms: { 'system-a': { r1: R1, r2: R2 } } });
+  assert.equal(await hideGatheringRealm(actor, { realmId: 'r1' }), true);
+  assert.deepEqual([...getDiscoveredRealmIds(actor)], ['r2']);
+  assert.deepEqual(storedDiscoveryMap(actor), { r2: R2 }, 'the bucket is flattened away');
+});
+
+forEachReplacementForm('hiding a realm both flat and bucketed removes both copies', async (form) => {
+  form.apply();
+  const actor = discoveryActor({ discoveredGatheringRealms: {
+    r1: R1,
+    'system-b': { r1: { discoveredAt: 5, source: 'api' }, r2: R2 }
+  } });
+  assert.equal(await hideGatheringRealm(actor, { realmId: 'r1' }), true);
+  assert.equal(isGatheringRealmDiscovered(actor, 'r1'), false);
+  assert.deepEqual(storedDiscoveryMap(actor), { r2: R2 });
+});
+
+forEachReplacementForm('hiding the last realm leaves an empty map, not the legacy one', async (form) => {
+  form.apply();
+  for (const flags of [
+    { discoveredGatheringRealms: { r1: R1 } },
+    { discoveredGatheringRegions: { 'system-a': { r1: R1 } } }
+  ]) {
+    const actor = discoveryActor(flags);
+    assert.equal(await hideGatheringRealm(actor, { realmId: 'r1' }), true);
+    assert.deepEqual(storedDiscoveryMap(actor), {});
+    assert.deepEqual([...getDiscoveredRealmIds(actor)], [], 'the legacy key is no longer read');
+  }
+});
+
+test('hiding an undiscovered or inherited id answers false and writes nothing', async () => {
+  for (const realmId of ['r-unknown', 'constructor', 'toString', 'hasOwnProperty', '__proto__']) {
+    const actor = discoveryActor({ discoveredGatheringRealms: { r1: R1 } });
+    assert.equal(await hideGatheringRealm(actor, { realmId }), false, realmId);
+    assert.deepEqual(actor.updateCalls, [], `${realmId} writes nothing`);
+    assert.equal(isGatheringRealmDiscovered(actor, 'r1'), true);
+  }
+});
+
+test('hiding a dotted realm id removes it, since the id never enters an update path', async () => {
+  const actor = discoveryActor({ discoveredGatheringRealms: { 'r.1': R1, r2: R2 } });
+  await assert.doesNotReject(async () => {
+    assert.equal(await hideGatheringRealm(actor, { realmId: 'r.1' }), true);
+  });
+  assert.deepEqual(storedDiscoveryMap(actor), { r2: R2 });
+});
+
+test('a non-Document actor gets the setFabricateFlag fallback or a quiet refusal', async () => {
+  const readOnly = { getFlag: () => ({ r1: R1 }) };
+  assert.equal(await hideGatheringRealm(readOnly, { realmId: 'r1' }), false);
+
+  const writes = [];
+  const flagOnly = {
+    getFlag: () => ({ r1: R1, r2: R2 }),
+    setFlag: async (...args) => writes.push(args)
+  };
+  assert.equal(await hideGatheringRealm(flagOnly, { realmId: 'r1' }), true);
+  assert.deepEqual(writes, [['fabricate', 'fabricate.discoveredGatheringRealms', { r2: R2 }]]);
 });
 
 test('discovery entry with a stale partyId remains readable', async () => {
