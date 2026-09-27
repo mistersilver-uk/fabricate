@@ -1664,7 +1664,7 @@ The modal portals into the application root so it stacks above the window rather
 It dismisses on an outside click; a step that would lose work confirms first.
 
 The interactive roll prompt also renders in this chrome, and it is a decision rather than a flow: one header, a scrolling body and a footer rail of equal actions, drawn as the library's banded Modal.
-It mounts over the Fabricate window holding focus when the player started the roll there, and otherwise over a themed standalone layer on the page, which stays frontmost; it answers as a dismissal when the window hosting it closes.
+It mounts over the Fabricate window the player started the roll from — the one holding focus, or the one under the pointer when the clicked button disabled itself and left focus nowhere — and otherwise over a themed standalone layer on the page, which stays frontmost; it answers as a dismissal when the window hosting it closes.
 Its differences from the flow are additive `ManagerModal` props whose defaults leave every other caller unchanged: a stray outside click never dismisses it, focus enters it, Tab stays inside it, it owns every key while open, Escape and the close control dismiss it, and focus returns to the opener, or to the window hosting it while the opener is still disabled.
 
 #### Scenario: An import needs two steps
