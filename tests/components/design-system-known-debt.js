@@ -248,7 +248,8 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
 // #1720: the root's last 25 leave for three page-header units that hold 25 between them --
 // the trail's 22, the action group's downtime provider button and the Tool Studio trail's two
 // -- so the total is unchanged (199 - 0). Nothing was converted, and no slot is left open.
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 199;
+// #2005: `Stepper`'s −/+ adjuncts declare the attribute, so its row leaves whole (199 - 2).
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 197;
 
 /** A shared component outside `components/` with no manifest row, keyed `path`. */
 /** An ART TILE render site whose `size` is off the published art ladder, keyed `path | size`. */
