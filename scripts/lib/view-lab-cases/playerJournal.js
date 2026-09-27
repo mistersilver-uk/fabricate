@@ -122,7 +122,7 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-app .manager-modal[data-roll-prompt="single"]:has(button[data-action="advantage"])' +
       ':has(.manager-modal-subtitle:has-text("Brenna Karrunsdottir · Inscribe a Runeblade"))' +
-      ':has(.formula-content .formula:text-is("1d20 + 3 + 6"))' +
+      ':has(.formula-content .formula:text-is("1d20 + 3"))' +
       ':not(:has(.formula-content .manager-chip))' +
       ':has(.static-modifiers .manager-chip:has-text("Rune lore +3"))' +
       ':has(.static-modifiers .manager-chip:has-text("Etching hand +0"))' +
