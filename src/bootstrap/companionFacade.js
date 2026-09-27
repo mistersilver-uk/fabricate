@@ -49,6 +49,26 @@ const ROLL_ACTOR_CHECK_GATE_KEYS = Object.freeze({
   noActorKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
 });
 
+/**
+ * The request's own data `evaluation`, read without invoking an accessor; `null` (which the leaf
+ * refuses after its call-site and roll-decision gates) for an accessor, an inherited key below
+ * `Object.prototype` or a throwing reflection. A key only on `Object.prototype` is pollution.
+ */
+function readRequestEvaluation(request) {
+  try {
+    for (let record = request; record !== null && record !== Object.prototype; ) {
+      const descriptor = Object.getOwnPropertyDescriptor(record, 'evaluation');
+      if (descriptor) {
+        return record === request && Object.hasOwn(descriptor, 'value') ? descriptor.value : null;
+      }
+      record = Object.getPrototypeOf(record);
+    }
+    return;
+  } catch {
+    return null;
+  }
+}
+
 // Each member refuses in its own words, so award and credit keep separate pairs (issue 1301).
 const AWARD_COMPONENTS_GATE_KEYS = Object.freeze({
   gmOnlyKey: COMPONENT_AWARD_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
@@ -248,23 +268,34 @@ export const companionFacade = {
     };
   },
 
-  /** One formula for one actor, graded or not (issue 1293); preconditions 1-3 only. */
-  async rollActorCheck({
-    actorId = null,
-    callSite = null,
-    formula = null,
-    dc = null,
-    compare = null,
-    label = null,
-    interactive = false,
-    rollDecision = null,
-  } = {}) {
+  /** Roll one formula for one actor, graded or ungraded. */
+  async rollActorCheck(request = {}) {
+    const {
+      actorId = null,
+      callSite = null,
+      formula = null,
+      dc = null,
+      compare = null,
+      label = null,
+      interactive = false,
+      rollDecision = null,
+    } = request;
     const gate = this._requireGmActor(actorId, ROLL_ACTOR_CHECK_GATE_KEYS);
     if (gate.outcome || this.ready !== true) {
       return checkRollResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
     }
     return await rollStandaloneActorCheck(
-      { actor: gate.actor, callSite, formula, dc, compare, label, interactive, rollDecision },
+      {
+        actor: gate.actor,
+        callSite,
+        formula,
+        dc,
+        compare,
+        label,
+        interactive,
+        rollDecision,
+        evaluation: readRequestEvaluation(request),
+      },
       this._companionCheckSeams()
     );
   },

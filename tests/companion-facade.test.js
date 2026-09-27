@@ -430,6 +430,150 @@ describe('AC-4 — all eight cells of (isGM, callSite, elected), each with its p
 });
 
 describe('AC-14 (facade half) — the delegator forwards NAMED KEYS, never the request', () => {
+  it('keeps GM, actor and readiness refusals ahead of evaluation validation', async () => {
+    const actor = makeGrantTargetActor('actor-1');
+    for (const evaluation of [
+      { pool: { die: 0 } },
+      { direction: 'under' },
+      { product: 'count' },
+      { target: { source: 'attribute' } },
+    ]) {
+      for (const [options, actorId, outcome] of [
+        [{ user: PLAYER, actors: [actor] }, actor.id, 'gmOnly'],
+        [{ actors: [] }, 'missing', 'noActor'],
+        [{ actors: [actor], ready: false }, actor.id, 'notReady'],
+      ]) {
+        const { facade, checkCalls } = standUpFacade(options);
+        const answer = await facade.rollActorCheck({
+          actorId,
+          callSite: 'gmAction',
+          formula: '1d20',
+          evaluation,
+        });
+        assert.equal(answer.outcome, outcome);
+        assert.deepEqual(checkCalls.bags, []);
+        assert.equal(checkCalls.prompt, 0);
+      }
+    }
+  });
+
+  it('never invokes an evaluation accessor before or after the facade gates', async () => {
+    const actor = makeGrantTargetActor('actor-1');
+    let reads = 0;
+    for (const [options, actorId, requestOptions, outcome] of [
+      [{ user: PLAYER, actors: [actor] }, actor.id, {}, 'gmOnly'],
+      [{ actors: [] }, 'missing', {}, 'noActor'],
+      [{ actors: [actor], ready: false }, actor.id, {}, 'notReady'],
+      [{ actors: [actor] }, actor.id, { callSite: 'unknown' }, 'invalidCallSite'],
+      [{ actors: [actor], elected: false }, actor.id, { callSite: 'broadcast' }, 'notElected'],
+      [
+        { actors: [actor] },
+        actor.id,
+        { interactive: true, rollDecision: { confirmed: false } },
+        'cancelled',
+      ],
+      [{ actors: [actor] }, actor.id, {}, 'evaluationInvalid'],
+    ]) {
+      const request = { actorId, callSite: 'gmAction', formula: '1d20', dc: 15, ...requestOptions };
+      Object.defineProperty(request, 'evaluation', {
+        get() {
+          reads += 1;
+          throw new Error('evaluation accessor ran');
+        },
+      });
+      const { facade, checkCalls } = standUpFacade(options);
+      const answer = await facade.rollActorCheck(request);
+      assert.equal(answer.outcome, outcome);
+      assertMessageDataCovers(answer, outcome);
+      assert.deepEqual(checkCalls.bags, []);
+      assert.equal(checkCalls.prompt, 0);
+    }
+    assert.equal(reads, 0);
+  });
+
+  it('settles a request reflection failure after authorization', async () => {
+    const actor = makeGrantTargetActor('actor-1');
+    const request = new Proxy(
+      { actorId: actor.id, callSite: 'gmAction', formula: '1d20' },
+      {
+        getOwnPropertyDescriptor(record, key) {
+          if (key === 'evaluation') throw new Error('descriptor failed');
+          return Reflect.getOwnPropertyDescriptor(record, key);
+        },
+      }
+    );
+    for (const [options, outcome] of [
+      [{ user: PLAYER, actors: [actor] }, 'gmOnly'],
+      [{ actors: [] }, 'noActor'],
+      [{ actors: [actor], ready: false }, 'notReady'],
+      [{ actors: [actor] }, 'evaluationInvalid'],
+    ]) {
+      const { facade, checkCalls } = standUpFacade(options);
+      assert.equal((await facade.rollActorCheck(request)).outcome, outcome);
+      assert.deepEqual(checkCalls.bags, []);
+      assert.equal(checkCalls.prompt, 0);
+    }
+  });
+
+  it('refuses an inherited or getter evaluation and ignores Object.prototype pollution', async () => {
+    const actor = makeGrantTargetActor('actor-1');
+    const fields = { actorId: actor.id, callSite: 'gmAction', formula: '1d20', dc: 15 };
+    let reads = 0;
+    class GetterRequest {
+      get evaluation() {
+        reads += 1;
+        return { product: 'sum' };
+      }
+    }
+    for (const request of [
+      Object.assign(Object.create({ evaluation: { direction: 'under' } }), fields),
+      Object.assign(new GetterRequest(), fields),
+    ]) {
+      const { facade, checkCalls } = standUpFacade({ actors: [actor] });
+      assert.equal((await facade.rollActorCheck(request)).outcome, 'evaluationInvalid');
+      assert.deepEqual(checkCalls.bags, []);
+      assert.equal(checkCalls.prompt, 0);
+    }
+    assert.equal(reads, 0);
+
+    Object.defineProperty(Object.prototype, 'evaluation', {
+      configurable: true,
+      value: { direction: 'under' },
+    });
+    try {
+      const { facade, checkCalls } = standUpFacade({ actors: [actor] });
+      assert.equal((await facade.rollActorCheck({ ...fields })).outcome, 'checkPassed');
+      assert.equal(checkCalls.bags.length, 1);
+    } finally {
+      delete Object.prototype.evaluation;
+    }
+  });
+
+  it('forwards evaluation to the real leaf and preserves caller isolation', async () => {
+    const actor = makeGrantTargetActor('actor-1');
+    const { facade, checkCalls } = standUpFacade({ actors: [actor] });
+    const request = {
+      actorId: actor.id,
+      callSite: 'gmAction',
+      formula: '1d20',
+      dc: 15,
+      evaluation: { direction: 'under' },
+      actor: { id: 'impostor' },
+      speaker: { alias: 'impostor' },
+      prompt: () => { throw new Error('caller prompt'); },
+    };
+    const unsupported = await facade.rollActorCheck(request);
+    assert.equal(unsupported.outcome, 'evaluationUnsupported');
+    assert.deepEqual(checkCalls.bags, []);
+    request.evaluation = { product: 'sum', direction: 'over' };
+    const supported = await facade.rollActorCheck(request);
+    assert.equal(supported.outcome, 'checkPassed');
+    assert.equal(supported.product, 'sum');
+    assert.equal(supported.direction, 'over');
+    assert.equal(supported.target, 15);
+    assert.equal(checkCalls.bags[0].actor, actor);
+  });
+
   it('cannot be handed an actor that overrides the one the ownership gate resolved', async () => {
     // The mutation this exists for is `{ actor: gate.actor, …, ...request }`.
     const owned = makeGrantTargetActor('actor-1');

@@ -13,6 +13,8 @@
  * its `null`-before-readiness answer.
  */
 
+import { CHECK_EVALUATION_CAPABILITIES } from './companionCheckEvaluation.js';
+
 /**
  * The contract version; a companion refuses one it does not understand. Readable from
  * Fabricate's own `init` onward but not from another package's `init` (script execution order,
@@ -125,6 +127,8 @@ export const COMPANION_OUTCOMES = Object.freeze({
   engineUnavailable: 'engineUnavailable',
   noFormula: 'noFormula',
   invalidRollDecision: 'invalidRollDecision',
+  evaluationInvalid: 'evaluationInvalid',
+  evaluationUnsupported: 'evaluationUnsupported',
 
   // Shared by the call-site members. `cancelled` is the shipped word for a dismissed roll prompt.
   cancelled: 'cancelled',
@@ -256,6 +260,8 @@ export const CHECK_ROLL_MESSAGE_KEYS = Object.freeze({
   [COMPANION_OUTCOMES.engineUnavailable]: 'FABRICATE.Check.Roll.EngineUnavailable',
   [COMPANION_OUTCOMES.noFormula]: 'FABRICATE.Check.Roll.NoFormula',
   [COMPANION_OUTCOMES.invalidRollDecision]: 'FABRICATE.Check.Roll.InvalidRollDecision',
+  [COMPANION_OUTCOMES.evaluationInvalid]: 'FABRICATE.Check.Roll.EvaluationInvalid',
+  [COMPANION_OUTCOMES.evaluationUnsupported]: 'FABRICATE.Check.Roll.EvaluationUnsupported',
   [COMPANION_OUTCOMES.invalidCallSite]: 'FABRICATE.Check.Roll.InvalidCallSite',
   [COMPANION_OUTCOMES.notElected]: 'FABRICATE.Check.Roll.NotElected',
   [COMPANION_OUTCOMES.gmOnly]: 'FABRICATE.Check.Roll.GMOnly',
@@ -520,11 +526,9 @@ const ROLLED_OUTCOMES = Object.freeze([
 ]);
 
 /**
- * Build `rollActorCheck`'s answer (issue 1293). Every field is derived from the outcome and the
- * member's internal roll record, never a caller bag: `buildResult` writes `success` before it
- * spreads `extra`. `passed` is `null` when ungraded; `total` is the raw total or `null` for a
- * refusal (a rolled `0` stays `0`); `diceGroups` is `[]` and `resolvedFormula` (the `@`-resolved
- * formula) is `null` on a refusal.
+ * Build `rollActorCheck`'s answer from the outcome and the runner-owned record, never a caller bag.
+ * `passed` is `null` when ungraded and `total` is `null` for a refusal, while rolled `0` stays `0`.
+ * Refusals use empty dice data and omit executed evaluation fields, which come only from the runner.
  */
 export function checkRollResult(outcome, messageData = null, roll = null) {
   const rolled = ROLLED_OUTCOMES.includes(outcome);
@@ -541,6 +545,15 @@ export function checkRollResult(outcome, messageData = null, roll = null) {
       total: rolled ? (roll?.total ?? null) : null,
       diceGroups: Object.freeze(rolled ? (roll?.diceGroups ?? []) : []),
       resolvedFormula: rolled ? (roll?.resolvedFormula ?? null) : null,
+      ...(rolled && {
+        product: roll?.product ?? null,
+        direction: roll?.direction ?? null,
+        comparison: roll?.comparison ?? null,
+        target: roll?.target ?? null,
+        margin: roll?.margin ?? null,
+        successes: roll?.successes ?? null,
+        cancelled: roll?.cancelled ?? null,
+      }),
     }
   );
 }
@@ -885,11 +898,13 @@ export function normalizeGrantedBy(value) {
 
 /**
  * The frozen descriptor published as `game.fabricate.api.companion`, readable before any
- * collaborator exists; `callSites` gives the required `callSite` a symbol.
+ * collaborator exists; `callSites` gives the required `callSite` a symbol and `features` names
+ * executable evaluation modes.
  */
 export const COMPANION_CONTRACT = Object.freeze({
   schemaVersion: COMPANION_CONTRACT_SCHEMA_VERSION,
   members: COMPANION_MEMBERS,
   outcomes: COMPANION_OUTCOMES,
   callSites: COMPANION_CALL_SITES,
+  features: Object.freeze({ checkEvaluation: CHECK_EVALUATION_CAPABILITIES }),
 });

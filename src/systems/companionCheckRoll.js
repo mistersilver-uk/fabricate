@@ -1,19 +1,14 @@
 /**
- * The Standalone Check Roll (issue 1293): the check-roll mechanics published to a companion that
- * owns no crafting system. Standalone on the crafting-system axis only; it is as game-system
- * agnostic as every Fabricate check. It keeps placeholder resolution, the retired-placeholder
- * shim, Advantage, the situational bonus, roll mode, chat post and pass/fail or raw total, and
- * drops every system-derived term: `craftingModifier: null`, no `modifierChoice`.
- * `evaluateCheckRoll` always passes `allowInteractive: false`, suppressing Foundry's
- * `RollResolver` (dismissing it fulfils the roll with `term.randomFace()`); the seam restores
- * Fabricate's `promptCheckRoll`, which reports its own dismissal so a caller aborts cleanly.
- * A Foundry-free leaf: it imports only `./companionContract.js` and
- * `../utils/craftingCheckExpression.js`, every runner, prompt and dice-engine test is a seam, and
- * the facade resolves the actor, so the file needs no `globalThis.Roll` reference.
+ * Standalone check rolls use shared mechanics without a crafting system.
+ * The resolved actor, prompt, runners and dice-engine check enter through named seams.
  */
 
 import { hasPlainD20, stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 
+import {
+  resolveCompanionCheckEvaluation,
+  supportsCompanionCheckEvaluation,
+} from './companionCheckEvaluation.js';
 import {
   CHECK_ROLL_DEFAULT_LABEL,
   COMPANION_OUTCOMES,
@@ -59,51 +54,18 @@ function discriminateCheckOutcome(result, graded) {
     : COMPANION_OUTCOMES.checkFailed;
 }
 
-/**
- * Roll one formula for one actor, graded against a finite `dc` or ungraded; never throws.
- * The request key set is closed (`actor, callSite, formula, dc, compare, label, interactive,
- * rollDecision`) and no `...request` spread reaches the builder, runner or `rollOptions`, so a
- * caller cannot inject a `prompt` or a `speaker`. `rollDecision` is refused unless `interactive`.
- */
-export async function rollActorCheck(request, seams) {
-  const refusal = gateCompanionCallSite(request, seams);
-  if (refusal) return checkRollResult(refusal);
-
-  const label = resolveCheckLabel(request?.label, seams);
-  const interactive = request?.interactive === true;
-  const rollDecision = request?.rollDecision ?? null;
-  // A decision with `interactive: false` is refused, not discarded: `evaluateCheckRoll` reads it
-  // only in its interactive branch, so the base formula would silently roll.
-  if (rollDecision && !interactive) {
-    return checkRollResult(COMPANION_OUTCOMES.invalidRollDecision, { label });
-  }
-  // A forwarded prompt answer with `confirmed: false` is a decline; `confirmed` is read as a named
-  // key, never spread, so nothing else the caller attached is honoured.
-  if (rollDecision?.confirmed === false) {
-    return checkRollResult(COMPANION_OUTCOMES.cancelled, { label });
-  }
-
-  // `noFormula` before `engineUnavailable`; safe either way, as the shim fails open without `Roll`
-  // and so never manufactures a spurious `noFormula`.
-  const formula = String(request?.formula ?? '');
-  if (!isUsableCheckFormula(formula)) {
-    return checkRollResult(COMPANION_OUTCOMES.noFormula, { label });
-  }
-  if (seams.hasDiceEngine() !== true) {
-    return checkRollResult(COMPANION_OUTCOMES.engineUnavailable, { label });
-  }
-
-  const dc = request?.dc;
+async function runStandaloneCheck(
+  { formula, dc, compare, actor, label, interactive, rollDecision },
+  seams
+) {
   const graded = Number.isFinite(dc);
-  const actor = request?.actor ?? null;
-  // `prompt` is overridden after the builder: its `promptCheckRoll` auto-confirms without
-  // `DialogV2`, so the dismissal case would be unreachable under test.
   const rollOptions = seams.buildRollOptions({
     interactive,
     actor,
     activity: label,
     dc: graded ? dc : undefined,
   });
+  // Fabricate's own prompt owns dismissal, since Foundry's RollResolver fulfils rather than aborts on close; set after the builder so a test seam can inject a dismissing prompt.
   rollOptions.prompt = seams.prompt;
   if (rollDecision) {
     rollOptions.rollDecision = {
@@ -112,12 +74,11 @@ export async function rollActorCheck(request, seams) {
       advantage: rollDecision.advantage,
     };
   }
-
   const result = graded
     ? await seams.runPassFail({
         formula,
         dc,
-        thresholdMode: request?.compare === 'exceed' ? 'exceed' : 'meet',
+        thresholdMode: compare === 'exceed' ? 'exceed' : 'meet',
         triggers: [],
         actor,
         label,
@@ -132,6 +93,80 @@ export async function rollActorCheck(request, seams) {
         rollOptions,
         craftingModifier: null,
       });
+  return { result, graded };
+}
+
+/**
+ * Roll one formula for one actor, graded against a finite `dc` or ungraded, without throwing.
+ * The request is closed and does not spread caller properties into the runner or roll options.
+ * A supplied evaluation is strictly validated after call-site and roll-decision gates, then matched to a published mode.
+ */
+export async function rollActorCheck(request, seams) {
+  try {
+    const refusal = gateCompanionCallSite(request, seams);
+    if (refusal) return checkRollResult(refusal);
+    return await settleRollActorCheck(request, seams);
+  } catch (error) {
+    return checkRollResult(COMPANION_OUTCOMES.rollFailed, {
+      label: CHECK_ROLL_DEFAULT_LABEL.fallback,
+      detail: typeof error?.message === 'string' ? error.message : '',
+    });
+  }
+}
+
+async function settleRollActorCheck(request, seams) {
+  const label = resolveCheckLabel(request?.label, seams);
+  const interactive = request?.interactive === true;
+  const rollDecision = request?.rollDecision ?? null;
+  // A decision with `interactive: false` is refused, not discarded: `evaluateCheckRoll` reads it
+  // only in its interactive branch, so the base formula would silently roll.
+  if (rollDecision && !interactive) {
+    return checkRollResult(COMPANION_OUTCOMES.invalidRollDecision, { label });
+  }
+  // A forwarded prompt answer with `confirmed: false` is a decline; `confirmed` is read as a named
+  // key, never spread, so nothing else the caller attached is honoured.
+  if (rollDecision?.confirmed === false) {
+    return checkRollResult(COMPANION_OUTCOMES.cancelled, { label });
+  }
+
+  const resolved = resolveCompanionCheckEvaluation(request?.evaluation);
+  if (!resolved.ok) return checkRollResult(COMPANION_OUTCOMES.evaluationInvalid, { label });
+  if (!supportsCompanionCheckEvaluation(resolved.evaluation, interactive)) {
+    return checkRollResult(COMPANION_OUTCOMES.evaluationUnsupported, { label });
+  }
+
+  // `noFormula` before `engineUnavailable`; safe either way, as the shim fails open without `Roll`
+  // and so never manufactures a spurious `noFormula`.
+  const formula = String(request?.formula ?? '');
+  if (!isUsableCheckFormula(formula)) {
+    return checkRollResult(COMPANION_OUTCOMES.noFormula, { label });
+  }
+  if (seams.hasDiceEngine() !== true) {
+    return checkRollResult(COMPANION_OUTCOMES.engineUnavailable, { label });
+  }
+
+  const dc = request?.dc;
+  let result;
+  let graded;
+  try {
+    ({ result, graded } = await runStandaloneCheck(
+      {
+        formula,
+        dc,
+        compare: request?.compare,
+        actor: request?.actor ?? null,
+        label,
+        interactive,
+        rollDecision,
+      },
+      seams
+    ));
+  } catch (error) {
+    return checkRollResult(COMPANION_OUTCOMES.rollFailed, {
+      label,
+      detail: typeof error?.message === 'string' ? error.message : '',
+    });
+  }
 
   const outcome = discriminateCheckOutcome(result, graded);
   if (outcome === COMPANION_OUTCOMES.cancelled) {
@@ -151,6 +186,13 @@ export async function rollActorCheck(request, seams) {
     total,
     diceGroups: result.data.diceGroups,
     resolvedFormula: result.data.resolvedFormula ?? null,
+    product: result.data.product,
+    direction: result.data.direction,
+    comparison: result.data.comparison,
+    target: result.data.target,
+    margin: result.data.margin,
+    successes: result.data.successes,
+    cancelled: result.data.cancelled,
   });
 }
 
