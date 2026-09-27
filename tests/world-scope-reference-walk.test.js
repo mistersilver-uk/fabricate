@@ -481,6 +481,7 @@ const NON_SITE_KEY_NAMES = new Set([
   'modified',
   'multiStepRecipes',
   'name',
+  'offerSituationalBonus',
   'originItemUuid',
   'outcomeRouting',
   'outcomes',

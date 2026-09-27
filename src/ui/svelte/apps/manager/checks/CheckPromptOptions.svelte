@@ -79,7 +79,7 @@
 
   /* The prototype's group head: a bold title with its lead directly beneath. */
   .manager-checks-prompt-options-head .manager-checks-formula-rule {
-    margin-top: 2px;
+    margin-top: var(--fab-space-2xs);
   }
 
   .manager-checks-prompt-options-title {

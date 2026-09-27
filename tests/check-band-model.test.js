@@ -43,8 +43,8 @@ describe('bandsAreEditable', () => {
     assert.equal(bandsAreEditable(attribute('over')), false);
   });
 
-  it('judges an inert count record by the sum/over/fixed evaluation the runtime grades it with', () => {
-    assert.equal(bandsAreEditable({ ...attribute('under'), product: 'count' }), true);
+  it('keeps a count record read-only, since the runtime grades it as count (issue 2004)', () => {
+    assert.equal(bandsAreEditable({ ...attribute('under'), product: 'count' }), false);
   });
 });
 

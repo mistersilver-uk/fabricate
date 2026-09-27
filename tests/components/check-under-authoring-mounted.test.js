@@ -532,16 +532,12 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
     assert.ok(!root.querySelector('[data-outcome-row="extreme"] .manager-checks-tier-unit'));
   });
 
-  it('grades an inert count record as the runtime does, and keeps it on write', async () => {
+  it('draws a count record read-only, as the runtime grades it (issue 2004), and keeps it on write', async () => {
     const count = { ...evaluation(), product: 'count' };
     const state = await mount(routedCheck(count));
-    assert.ok(state.root.querySelector('[data-outcome-band-strip] [role="slider"]'), 'handles stay');
-    assert.equal(
-      state.root
-        .querySelector('[data-outcome-row="extreme"] [data-outcome-dc]')
-        ?.getAttribute('aria-label'),
-      'DC ±'
-    );
+    assert.ok(state.root.querySelector('[data-outcome-band-strip]'), 'the strip still draws');
+    assert.ok(!state.root.querySelector('[data-outcome-band-strip] [role="slider"]'), 'no handles');
+    assert.ok(!state.root.querySelector('[data-outcome-row="extreme"] [data-outcome-dc]'), 'no DC field');
     await state.act((root) => choose(root, 'data-check-direction-option', 'over'));
     assert.equal(state.value.evaluation.product, 'count', 'writes keep the authored product');
   });

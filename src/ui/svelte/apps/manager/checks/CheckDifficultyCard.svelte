@@ -387,7 +387,7 @@
   /* Two option-card groups stack with the gap the fields below them keep from a chooser. */
   .manager-checks-card-body
     > :global(.manager-resolution-mode-card + .manager-resolution-mode-card) {
-    margin-top: 13px;
+    margin-top: var(--fab-space-3);
   }
 
   /* Each group's visible name takes the card's micro-label style. */
@@ -405,6 +405,6 @@
 
   .manager-checks-difficulty-fields[data-check-attribute-fields]
     + .manager-checks-difficulty-fields {
-    margin-top: 13px;
+    margin-top: var(--fab-space-3);
   }
 </style>
