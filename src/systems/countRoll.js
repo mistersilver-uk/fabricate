@@ -5,7 +5,12 @@
  */
 import { isPlainObject } from '../utils/scalars.js';
 
-import { countFacePredicates, MAX_COUNT_POOL, projectCountResults } from './countEvaluation.js';
+import {
+  explodesOnEveryFace,
+  extremeFace,
+  MAX_COUNT_POOL,
+  projectCountResults,
+} from './countEvaluation.js';
 
 /** The serialized class name `Roll.fromData` looks up in `CONFIG.Dice.rolls`. */
 export const COUNT_ROLL_CLASS = 'FabricateCountRoll';
@@ -16,7 +21,10 @@ export const COUNT_POLICY_VERSION = 1;
 /** The reasons only the Roll raises; the rest are `COUNT_REFUSALS`. */
 export const COUNT_ROLL_REFUSALS = Object.freeze(['policy-invalid', 'evaluation-mode-unsupported']);
 
-/** Raised before any RNG, except `explode-unbounded`, which Foundry's explosion limit raises. */
+/**
+ * Raised before any RNG, except `explode-unbounded`, which Foundry raises once a recursive
+ * explosion passes 1000 results.
+ */
 export class CountRollRefusal extends Error {
   constructor(reason, refusedInput, options) {
     super(`Fabricate count roll refused: ${reason} (${refusedInput})`, options);
@@ -41,9 +49,9 @@ export function countReplayPolicy({ direction, comparison, threshold, explode, c
 /** `${dice}d${die}` plus the one explosion token; a digit never follows `x`/`xo` directly. */
 export function countRollFormula({ dice, die, direction, explode }) {
   const pool = `${dice}d${die}`;
-  if (!explode || (explode.kind === 'from' && explode.value > die)) return pool;
+  if (!explode || beyondDie(explode, die)) return pool;
   const token = explode.once ? 'xo' : 'x';
-  if (explode.kind !== 'from') return `${pool}${token}=${direction === 'under' ? 1 : die}`;
+  if (explode.kind !== 'from') return `${pool}${token}=${extremeFace(die, direction)}`;
   return `${pool}${token}${direction === 'under' ? '<=' : '>='}${explode.value}`;
 }
 
@@ -189,15 +197,6 @@ function readFaceRule(rule, extremeKind, input) {
   return { kind: 'from', value: rule.value, ...settled };
 }
 
-function explodesOnEveryFace(policy) {
-  if (!policy.explode || policy.explode.once) return false;
-  const { explodes } = countFacePredicates(policy);
-  for (let face = 1; face <= policy.die; face += 1) {
-    if (!explodes(face, { generated: true })) return false;
-  }
-  return true;
-}
-
 // `success` on every result and `failure` only when cancelled; an overlap keeps both marks.
 function markResult(result, { qualified, cancelled, contribution }) {
   result.success = qualified;
@@ -218,7 +217,7 @@ function describeCountRoll({ policy }, i18n) {
       threshold,
     }),
   ];
-  if (explode && !(explode.kind === 'from' && explode.value > die)) {
+  if (explode && !beyondDie(explode, die)) {
     const key = explode.once
       ? 'FABRICATE.Check.CountRoll.ExplodeOnce'
       : 'FABRICATE.Check.CountRoll.Explode';
@@ -231,8 +230,12 @@ function describeCountRoll({ policy }, i18n) {
   return clauses.join(' · ');
 }
 
+function beyondDie({ kind, value }, die) {
+  return kind === 'from' && value > die;
+}
+
 function faceLabel({ kind, value }, die, direction) {
-  if (kind !== 'from') return String(direction === 'under' ? 1 : die);
+  if (kind !== 'from') return String(extremeFace(die, direction));
   return `${direction === 'under' ? '≤' : '≥'} ${value}`;
 }
 

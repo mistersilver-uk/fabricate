@@ -22,7 +22,9 @@ export const COUNT_ODDS_REASONS = Object.freeze({
 export const COUNT_ODDS_RESIDUAL = 1e-9;
 export const COUNT_ODDS_MAX_DEPTH = 20;
 
-const MAX_PRE_ROLL_OUTCOMES = 50_000;
+/** The largest joint outcome space sum and count odds walk; above it both refuse, not sample. */
+export const MAX_PRE_ROLL_OUTCOMES = 50_000;
+
 const MAX_CONVOLUTION_WORK = 25_000_000;
 const AGGREGATES = new Set(['anyDie', 'allDice']);
 

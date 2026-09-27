@@ -94,7 +94,7 @@ function registerFabricateConfig() {
   // In `init`: a message whose roll class is unregistered at document preparation drops that roll.
   registerCountRoll({
     config: CONFIG,
-    BaseRoll: foundry?.dice?.Roll,
+    BaseRoll: globalThis.foundry?.dice?.Roll,
     i18n: () => game.i18n,
     renderTemplate: (...args) => foundry.applications.handlebars.renderTemplate(...args),
   });

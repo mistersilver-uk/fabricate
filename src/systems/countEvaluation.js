@@ -3,14 +3,18 @@
  * It reads no Actor, recipe, component, task or macro: callers pass the roll data and placement.
  */
 import { compareToTarget, resolveDeterministicExpression } from './checkEvaluation.js';
+import { CHECK_TARGET_REFUSALS } from './checkTarget.js';
 
-/** The reasons count adds to `CHECK_TARGET_REFUSALS`; every count refusal names its input. */
+/** The refusal reasons count contributes; every count refusal names its input. */
 export const COUNT_REFUSALS = Object.freeze([
   'die-invalid',
   'faces-invalid',
   'explode-unbounded',
   'pool-too-large',
 ]);
+
+/** Every reason a count check's pool or target can refuse. */
+export const COUNT_CHECK_REFUSALS = Object.freeze([...CHECK_TARGET_REFUSALS, ...COUNT_REFUSALS]);
 
 /** Foundry's `DiceTerm` limit on the dice one term rolls. */
 export const MAX_COUNT_POOL = 999;
@@ -128,11 +132,13 @@ function faceRule(rule, extremeKind) {
   return Number.isInteger(value) && value >= 1 ? { kind: 'from', value } : INVALID_FACE;
 }
 
-function extremeFace(die, direction) {
+/** The best face for `direction`: the maximum over, one under. */
+export function extremeFace(die, direction) {
   return direction === 'under' ? 1 : die;
 }
 
-function explodesOnEveryFace(rules) {
+/** Whether a recursive explosion holds on every face, so the roll could never stop. */
+export function explodesOnEveryFace(rules) {
   if (!rules.explode || rules.explode.once) return false;
   const { explodes } = countFacePredicates(rules);
   for (let face = 1; face <= rules.die; face += 1) {
