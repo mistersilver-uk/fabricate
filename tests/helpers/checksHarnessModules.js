@@ -206,4 +206,6 @@ export const CHECK_EDITOR_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
   'src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte',
   'src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckAwardMode.svelte',
+  'src/ui/svelte/apps/manager/checks/ProgressiveCraftingCheckEditor.svelte',
 ]);

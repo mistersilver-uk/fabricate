@@ -32,6 +32,14 @@ const simpleHarness = createMountedComponentHarness({
   componentPath: 'src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte',
 });
 
+const progressiveHarness = createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-check-under-progressive-',
+  rawModules: CHECK_EDITOR_RAW_MODULES,
+  compiledModules: CHECK_EDITOR_COMPILED_MODULES,
+  componentPath: 'src/ui/svelte/apps/manager/checks/ProgressiveCraftingCheckEditor.svelte',
+});
+
 const IDRIN = Object.freeze({ name: 'Idrin', rollData: { skills: { craft: { value: 55 } } } });
 
 const evaluation = (overrides = {}, target = {}) =>
@@ -70,7 +78,10 @@ function routedCheck(evaluationRecord = evaluation()) {
       { id: 'regular', name: 'Regular', success: true, breakTools: false, dc: 0, adjustment: 1 },
       { id: 'other', name: 'Otherwise', success: false, breakTools: false, dc: -4, adjustment: null },
     ],
-    fixedOutcomes: [{ id: 'f1', name: 'Low', start: 1, end: 50, success: false }],
+    fixedOutcomes: [
+      { id: 'f1', name: 'Low', start: 1, end: 50, success: true },
+      { id: 'f2', name: 'High', start: 51, end: 100, success: false },
+    ],
     checkBreakage: { triggers: [] },
     evaluation: evaluationRecord,
     offerSituationalBonus: true,
@@ -275,6 +286,80 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
     );
   });
 
+  it('keyboard-steps a multiplier and the read-only strip redraws from it', async () => {
+    const state = await mount();
+    await state.act((root) => {
+      const input = root.querySelector('[data-outcome-row="hard"] [data-outcome-adjustment]');
+      input.dispatchEvent(
+        new globalThis.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
+      );
+    });
+    assert.ok(Math.abs(state.value.relativeOutcomes[1].adjustment - 1 / 3) < 1e-9);
+    assert.deepEqual(bandList(state.root, 'data-outcome-band-strip').slice(0, 2), [
+      'Extreme: 11 or under',
+      'Hard: 12–18',
+    ]);
+  });
+
+  it('chooses a macro-adjusted target and keeps the linked macro', async () => {
+    const state = await mount({ ...routedCheck(), macroUuid: 'Macro.adjust' });
+    const option = state.root.querySelector('[data-dc-mode-option="dynamic"]');
+    assert.match(option.textContent, /returns the one to roll under/);
+    await state.act((root) => choose(root, 'data-dc-mode-option', 'dynamic'));
+    assert.equal(state.value.dcMode, 'dynamic');
+    assert.equal(state.value.macroUuid, 'Macro.adjust');
+    assert.match(
+      state.root.querySelector('[data-dynamic-dc]').textContent,
+      /target already computed from the character value, and must return the target to roll under/
+    );
+  });
+
+  it('adds a recipe tier that asks for its adjustment and keeps an off-list multiplier exact', async () => {
+    const state = await mount({ ...routedCheck(), tiers: [] });
+    assert.ok(state.root.querySelector('[data-tiers-empty]'));
+    await state.act((root) => root.querySelector('[data-add-tier]').click());
+    const row = () => state.root.querySelector('[data-tier-row]');
+    assert.ok(row().querySelector('[data-tier-adjustment-missing]'));
+    await state.act(() => typeFormatted(row().querySelector('[data-tier-adjustment]'), '0.7'));
+    assert.equal(state.value.tiers[0].adjustment, 0.7);
+    assert.equal(row().querySelector('[data-tier-adjustment]').value, '\u00d70.7');
+  });
+
+  it('pictures a roll-over character value at the high end with benefit offsets', async () => {
+    const overAdd = evaluation({ direction: 'over' }, { adjustmentKind: 'add', baseAdjustment: -5 });
+    const state = await mount(routedCheck(overAdd));
+    assert.equal(
+      state.root
+        .querySelector('[data-outcome-row="extreme"] [data-outcome-dc]')
+        .getAttribute('aria-label'),
+      'Benefit ±'
+    );
+    assert.match(
+      state.root.querySelector('[data-outcome-band-scale]').textContent,
+      /^Target 50 \(Idrin 55\)\. Success sits at the high end: a total of 50 or more succeeds\.$/
+    );
+    assert.ok(!state.root.querySelector('[data-outcome-band-strip] [role="slider"]'));
+  });
+
+  it('keeps range controls on a fixed-type under check and draws its ranges read-only', async () => {
+    const state = await mount({ ...routedCheck(evaluation({}, { source: 'fixed' })), type: 'fixed' });
+    assert.ok(state.root.querySelector('[data-outcome-row="f1"] [data-outcome-start]'));
+    assert.ok(!state.root.querySelector('[data-outcome-band-strip] [role="slider"]'));
+    assert.deepEqual(bandList(state.root, 'data-outcome-band-strip'), [
+      'Low: 50 or under',
+      'High: 51 or over',
+    ]);
+  });
+
+  it('authors a gathering-style routed check with no recipe tiers', async () => {
+    const underAdd = evaluation({}, { adjustmentKind: 'add', baseAdjustment: -2 });
+    const state = await mount(routedCheck(underAdd), { showTiers: false });
+    assert.ok(!state.root.querySelector('[data-routed-tiers]'));
+    assert.equal(state.root.querySelector('[data-check-base-adjustment]').value, '\u22122');
+    await state.act((root) => choose(root, 'data-check-direction-option', 'over'));
+    assert.equal(state.value.evaluation.target.baseAdjustment, -2);
+  });
+
   it('keeps a roll-over fixed check on its draggable strip and roll-over copy', async () => {
     const start = { ...routedCheck(normalizeCheckEvaluation()) };
     const state = await mount(start, {
@@ -332,9 +417,53 @@ describe('the simple editor draws an under target read-only', () => {
     assert.equal(state.root.querySelector('[data-check-formula-target]').textContent.trim(), 'Target 12');
   });
 
+  it('authors a salvage-style character value with no DC source and no recipe tiers', async () => {
+    const underAdd = evaluation({}, { adjustmentKind: 'add', expression: '14', baseAdjustment: null });
+    const state = await mountControlled(simpleHarness, simple(underAdd), {
+      showDcSource: false,
+      previewCharacter: null,
+    });
+    assert.ok(!state.root.querySelector('[data-dc-mode-option]'), 'no DC source chooser');
+    assert.ok(!state.root.querySelector('[data-static-dc]'), 'no recipe tiers');
+    await state.act((root) =>
+      typeFormatted(root.querySelector('[data-check-base-adjustment]'), '\u22122')
+    );
+    assert.equal(state.value.evaluation.target.baseAdjustment, -2);
+    assert.deepEqual(bandList(state.root, 'data-simple-band-strip'), [
+      'Success: 12 or under',
+      'Failure: 13 or over',
+    ]);
+    assert.equal(
+      state.root.querySelector('[data-simple-band-scale]').textContent.trim(),
+      'Target 12 (14). Success sits at the low end: a total at or under 12 succeeds.'
+    );
+  });
+
   it('keeps the roll-over fixed strip draggable', async () => {
     const state = await mountControlled(simpleHarness, simple(normalizeCheckEvaluation()));
     assert.ok(state.root.querySelector('[data-simple-band-strip] [role="slider"]'));
     assert.ok(state.root.querySelector('[data-simple-band-strip-hint]'));
+  });
+});
+
+describe('a progressive check offers the axis and prompt group but no Difficulty editor', () => {
+  before(() => progressiveHarness.setup());
+  after(() => progressiveHarness.teardown());
+  afterEach(() => progressiveHarness.remount());
+
+  it('switches direction and back, keeping the inactive target data', async () => {
+    const start = {
+      awardMode: 'equal',
+      rollFormula: '1d20',
+      checkBreakage: { triggers: [] },
+      evaluation: evaluation({ direction: 'over' }, { baseAdjustment: -2 }),
+    };
+    const state = await mountControlled(progressiveHarness, start);
+    assert.ok(state.root.querySelector('[data-check-direction]'));
+    assert.ok(state.root.querySelector('[data-check-prompt-options]'));
+    assert.ok(!state.root.querySelector('[data-check-difficulty-card]'), 'no inert Difficulty editor');
+    await state.act((root) => choose(root, 'data-check-direction-option', 'under'));
+    await state.act((root) => choose(root, 'data-check-direction-option', 'over'));
+    assert.deepEqual(state.value, start);
   });
 });
