@@ -10,9 +10,16 @@
  * has item-reading callers, so this module stacks itself with the same target predicate and
  * passes `matchingItems: []` to create; the matcher stays `findComponentItems`.
  * A Foundry-free leaf with exactly four imports; everything else arrives as a seam.
+ * `placeComponentAward` is the effect-path primitive (issue 1954): it may stamp a companion effect
+ * marker and judges the write by the returned document's `_source`.
  */
 
-import { stampItemDataRoleIdentity } from '../config/flags.js';
+import {
+  COMPANION_EFFECT_MARKER_KEY,
+  companionEffectMarkerUpdate,
+  sourceCarriesCompanionEffectMarker,
+  stampItemDataRoleIdentity,
+} from '../config/flags.js';
 
 import {
   AWARD_ENTRIES_MAX,
@@ -26,7 +33,7 @@ import {
   itemStackQuantityPath,
   readStoredStackQuantity,
   setStackQuantity,
-  updateStackQuantity,
+  stackQuantityUpdate,
 } from './itemStackQuantity.js';
 
 /**
@@ -39,6 +46,28 @@ const AWARD_ENTRY_KEYS = Object.freeze(['componentId', 'quantity']);
 /** The crafting engine's own fallback payload, for an unresolvable `registeredItemUuid`. */
 const FALLBACK_ITEM_NAME = 'Awarded Item';
 const FALLBACK_ITEM_IMG = 'icons/svg/item-bag.svg';
+
+/** A dotted read of a document's `_source`, as Foundry's `getProperty`. */
+function sourceValue(document, path) {
+  let node = document?._source;
+  for (const segment of path.split('.')) {
+    if (node === null || typeof node !== 'object') return;
+    node = node[segment];
+  }
+  return node;
+}
+
+/**
+ * Marker AND post-value on `_source`: the only proof a placement landed. A stack must carry the
+ * count; a created item may lack the field at quantity 1, as `buildAwardItemData` admits.
+ */
+function landed(document, { marker, quantityPath, expected, stack }) {
+  if (marker && !sourceCarriesCompanionEffectMarker(document, marker)) return false;
+  const stored = stack
+    ? Number(sourceValue(document, quantityPath))
+    : readStoredStackQuantity(document?._source, { absentDefault: 1, path: quantityPath });
+  return stored === expected;
+}
 
 /**
  * A whole positive safe-integer quantity (a numeric string included), or `null`; refused, never
@@ -104,6 +133,8 @@ async function buildAwardItemData({
         system: {},
       };
   itemData.system ??= {};
+  // A copied marker would claim another operation's placement.
+  if (itemData.flags?.fabricate) delete itemData.flags.fabricate[COMPANION_EFFECT_MARKER_KEY];
 
   if (hasStackQuantity(itemData, quantityPath) || !sourceItem) {
     setStackQuantity(itemData, quantity, quantityPath);
@@ -119,24 +150,60 @@ async function buildAwardItemData({
 }
 
 /**
- * The stack branch, judged by `updateStackQuantity`'s own return (`null` when nothing was
- * written). `absentDefault: null` answers `null` for a target with no readable count, so the
- * caller creates rather than inventing a field; a stored `0` is kept as a base.
+ * Resolve and write one entry: `{ refusal }` before any write, `{ intent, aborted }` when
+ * `proceed` declines, else `{ intent, quantity, target, written }` with the raw write answer.
+ * `absentDefault: null` sends a target with no readable count to create; throws propagate.
  */
-async function attemptStack({ target, quantity, quantityPath }) {
-  const before = readStoredStackQuantity(target, { absentDefault: null, path: quantityPath });
-  if (before === null) return null;
-  const written = await updateStackQuantity(target, before + quantity, quantityPath);
-  if (!written) {
-    return { placed: 0, stacked: null, outcome: COMPANION_OUTCOMES.awardFailed };
+async function writeAwardEntry(args) {
+  const { actor, entry, system, quantityPath, carried, seams, marker, strict, create, proceed } =
+    args;
+  const quantity = normalizeAwardQuantity(entry.quantity);
+  if (quantity === null) return { refusal: COMPANION_OUTCOMES.invalidQuantity };
+
+  // Resolve the component before the resolver seam: `findComponentItems` throws on a null
+  // component, and a `stable` member may not throw.
+  const component = seams.resolveComponent(system, entry.componentId) || null;
+  if (!component) return { refusal: COMPANION_OUTCOMES.componentNotFound };
+
+  const matchingItems = await seams.findComponentItems(actor, component, system);
+  const target = carried.get(entry.componentId) ?? selectStackTarget(matchingItems);
+  const before = target
+    ? readStoredStackQuantity(target, { absentDefault: null, path: quantityPath })
+    : null;
+  if (before !== null) {
+    const intent = { mode: 'stack', targetItemUuid: target.uuid ?? null, stackBefore: before };
+    if (strict && sourceValue(target, quantityPath) == null) {
+      return { intent, refusal: 'stackSourceMissing' };
+    }
+    const payload = stackQuantityUpdate(target, before + quantity, quantityPath);
+    if (!payload) return { intent, quantity, target, written: null };
+    if (proceed && !(await proceed(intent))) return { intent, aborted: true };
+    const markerFields = marker ? companionEffectMarkerUpdate(marker) : {};
+    const written = await target.update?.({ ...payload, ...markerFields });
+    return { intent, quantity, target, written };
   }
-  return { placed: quantity, stacked: true, outcome: COMPANION_OUTCOMES.awarded };
+
+  const itemData = await buildAwardItemData({
+    component,
+    quantity,
+    quantityPath,
+    systemId: system?.id,
+    resolveSourceItem: seams.resolveSourceItem,
+  });
+  if (!itemData) return { refusal: COMPANION_OUTCOMES.multiUnitUnsupported };
+  // A plain nested object, never an operator: creation data takes no update operators.
+  if (marker)
+    ((itemData.flags ??= {}).fabricate ??= {})[COMPANION_EFFECT_MARKER_KEY] = { ...marker };
+
+  const intent = { mode: 'create', targetItemUuid: null, stackBefore: null };
+  if (proceed && !(await proceed(intent))) return { intent, aborted: true };
+  return { intent, quantity, target: null, written: await create(itemData, quantity) };
 }
 
 /**
  * Place one entry with the whole body in one `try`: `resolveSourceItem` (`fromUuid`) can reject
  * too, and a `stable` member may not throw. The caller's loop accumulates, never aborts: an award
- * is a give, and stopping withholds value the GM authorised.
+ * is a give, and stopping withholds value the GM authorised. Judged by the write's truthy answer.
  */
 async function placeAwardEntry({ actor, entry, system, quantityPath, carried, seams }) {
   const record = (outcome, placed = 0, stacked = null) => ({
@@ -148,45 +215,31 @@ async function placeAwardEntry({ actor, entry, system, quantityPath, carried, se
   });
 
   try {
-    const quantity = normalizeAwardQuantity(entry.quantity);
-    if (quantity === null) return record(COMPANION_OUTCOMES.invalidQuantity);
-
-    // Resolve the component before the resolver seam: `findComponentItems` throws on a null
-    // component, and a `stable` member may not throw.
-    const component = seams.resolveComponent(system, entry.componentId) || null;
-    if (!component) return record(COMPANION_OUTCOMES.componentNotFound);
-
-    const matchingItems = await seams.findComponentItems(actor, component, system);
-    const target = carried.get(entry.componentId) ?? selectStackTarget(matchingItems);
-    if (target) {
-      const stacked = await attemptStack({ target, quantity, quantityPath });
-      if (stacked) {
-        if (stacked.placed > 0) carried.set(entry.componentId, target);
-        return record(stacked.outcome, stacked.placed, stacked.stacked);
-      }
-    }
-
-    const itemData = await buildAwardItemData({
-      component,
-      quantity,
-      quantityPath,
-      systemId: system?.id,
-      resolveSourceItem: seams.resolveSourceItem,
-    });
-    if (!itemData) return record(COMPANION_OUTCOMES.multiUnitUnsupported);
-
     // Always `matchingItems: []`, so the seam cannot take its own stack branch; the quantity
     // rides on `itemData` too, because the seam ignores `awardedQuantity` when it creates.
-    const created = await seams.createOrStack({
+    const create = (itemData, quantity) =>
+      seams.createOrStack({
+        actor,
+        itemData,
+        matchingItems: [],
+        awardedQuantity: quantity,
+        quantityPath,
+      });
+    const placed = await writeAwardEntry({
       actor,
-      itemData,
-      matchingItems: [],
-      awardedQuantity: quantity,
+      entry,
+      system,
       quantityPath,
+      carried,
+      seams,
+      create,
+      marker: null,
     });
-    if (!created) return record(COMPANION_OUTCOMES.awardFailed);
-    carried.set(entry.componentId, created);
-    return record(COMPANION_OUTCOMES.awarded, quantity, false);
+    if (placed.refusal) return record(placed.refusal);
+    if (!placed.written) return record(COMPANION_OUTCOMES.awardFailed);
+    const stacked = placed.intent.mode === 'stack';
+    carried.set(entry.componentId, stacked ? placed.target : placed.written);
+    return record(COMPANION_OUTCOMES.awarded, placed.quantity, stacked);
   } catch (error) {
     console.error(
       `Fabricate | Could not award component "${entry?.componentId ?? ''}" to an actor`,
@@ -194,6 +247,105 @@ async function placeAwardEntry({ actor, entry, system, quantityPath, carried, se
     );
     return record(COMPANION_OUTCOMES.awardFailed);
   }
+}
+
+const settled = (status, intent, receipt, failure) => ({ status, intent, receipt, failure });
+const failure = (reason, detail = null) => ({ reason, detail });
+
+/** Judge an effect-path write: `undefined`, `null` or `[]` wrote nothing; else marker AND value. */
+function judgePlacement(placed, { marker, quantityPath }) {
+  const { intent, quantity, written } = placed;
+  const stack = intent.mode === 'stack';
+  if (written == null || (Array.isArray(written) && written.length === 0)) {
+    return settled('knownFailure', intent, null, failure('writeRefused'));
+  }
+  const single = Array.isArray(written) && written.length === 1 ? written[0] : null;
+  const document = stack ? written : single;
+  const expected = stack ? intent.stackBefore + quantity : quantity;
+  if (!document || !landed(document, { marker, quantityPath, expected, stack })) {
+    return settled('uncertain', intent, null, failure('receiptMismatch'));
+  }
+  const receipt = { itemUuid: document.uuid ?? null, placed: quantity, stacked: stack };
+  return settled('applied', intent, receipt, null);
+}
+
+/**
+ * Place one award entry on the effect path (issue 1954), answering `{ status, intent, receipt,
+ * failure }` with status `applied`, `knownFailure`, `uncertain`, or `notAttempted` when
+ * `beforeWrite(intent)` does not answer `true`. A pre-write throw is `knownFailure`, a throw from
+ * `beforeWrite` propagates, and a throw during the write is `uncertain`. `carried` maps
+ * componentId to the document to stack onto, so a caller can rebuild it from prior receipts.
+ */
+export async function placeComponentAward(
+  {
+    actor,
+    entry,
+    system,
+    marker = null,
+    carried = new Map(),
+    quantityPath = itemStackQuantityPath(),
+    beforeWrite = null,
+  },
+  seams
+) {
+  let phase = 'preflight';
+  let intent = null;
+  const proceed = async (planned) => {
+    intent = planned;
+    phase = 'hook';
+    const go = beforeWrite ? (await beforeWrite(planned)) === true : true;
+    phase = 'write';
+    return go;
+  };
+  const create = (itemData) => actor.createEmbeddedDocuments('Item', [itemData]);
+  try {
+    const placed = await writeAwardEntry({
+      actor,
+      entry,
+      system,
+      quantityPath,
+      carried,
+      seams,
+      marker,
+      create,
+      proceed,
+      strict: true,
+    });
+    intent = placed.intent ?? intent;
+    if (placed.refusal) return settled('knownFailure', intent, null, failure(placed.refusal));
+    if (placed.aborted) return settled('notAttempted', intent, null, null);
+    const answer = judgePlacement(placed, { marker, quantityPath });
+    if (answer.status === 'applied') {
+      carried.set(entry.componentId, placed.target ?? placed.written[0]);
+    }
+    return answer;
+  } catch (error) {
+    if (phase === 'hook') throw error;
+    const detail = error?.message ?? String(error);
+    if (phase === 'write') return settled('uncertain', intent, null, failure('writeThrew', detail));
+    return settled('knownFailure', intent, null, failure('preflightThrew', detail));
+  }
+}
+
+/**
+ * Recovery probe (issue 1954): `applied` with a receipt only when a candidate document carries
+ * `marker` AND the intended post-value on `_source`; otherwise `uncertain`, never unapplied.
+ */
+export function probeComponentAward({
+  intent,
+  marker,
+  quantity,
+  documents = [],
+  quantityPath = itemStackQuantityPath(),
+}) {
+  const stack = intent?.mode === 'stack';
+  const expected = stack ? intent.stackBefore + quantity : quantity;
+  const document = marker
+    ? documents.find((candidate) => landed(candidate, { marker, quantityPath, expected, stack }))
+    : null;
+  if (!document) return { status: 'uncertain', receipt: null };
+  const receipt = { itemUuid: document.uuid ?? null, placed: quantity, stacked: stack };
+  return { status: 'applied', receipt };
 }
 
 /**

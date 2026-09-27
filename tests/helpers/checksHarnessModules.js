@@ -72,6 +72,9 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // `checkRoll.js` resolves and validates check targets (issue 2003), and localizes a refusal.
   'src/systems/checkTarget.js',
   'src/utils/localizeWithFallback.js',
+  // `checkOdds.js` shares the count odds' 50,000-outcome cap (issue 2004).
+  'src/systems/countOdds.js',
+  'src/systems/countEvaluation.js',
   'src/systems/normalize/checkEvaluation.js',
   'src/systems/checkRollDecision.js',
   'src/systems/checkRouting.js',

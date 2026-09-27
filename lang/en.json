@@ -1813,6 +1813,13 @@
         "ProgressiveUnder": "{label} check cannot roll: a progressive check cannot roll under a target.",
         "FormulaEmpty": "{label} check cannot roll: a roll-under check needs a roll formula.",
         "Misconfigured": "{label} check cannot roll: its target is misconfigured."
+      },
+      "CountRoll": {
+        "Pool": "{pool}d{die} · each {comparison} {threshold}",
+        "Explode": "explodes on {faces}",
+        "ExplodeOnce": "explodes once on {faces}",
+        "Cancel": "{faces} cancels a success",
+        "Overlap": "{face}, qualified and cancelled, so it adds nothing to the net"
       }
     },
     "Knowledge": {

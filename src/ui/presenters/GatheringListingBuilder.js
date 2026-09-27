@@ -145,6 +145,9 @@ export class GatheringListingBuilder {
     actor = null,
     rememberedActorId = null,
     presentTools = null,
+    // The scoped session's interactable (issue 2048). Each row keeps it only when the
+    // interactable is that row's, so its own node pool drives the counts and the depletion gate.
+    interactableRef = null,
   } = {}) {
     const selectableActors = normalizeActorList(
       await callMaybe(this.getSelectableActors, { viewer })
@@ -194,6 +197,7 @@ export class GatheringListingBuilder {
         viewer,
         actor: selectedActor,
         presentTools,
+        interactableRef,
         realmContextCache,
       });
       if (model.visible) {
@@ -481,6 +485,7 @@ export class GatheringListingBuilder {
     viewer,
     actor,
     presentTools = null,
+    interactableRef = null,
     realmContextCache = null,
   }) {
     // Disabled environments surface to every viewer (players and GMs alike) as
@@ -574,6 +579,7 @@ export class GatheringListingBuilder {
           actor,
           viewer,
           presentTools,
+          interactableRef,
         })),
       ];
       taskEntries.push({
@@ -590,6 +596,7 @@ export class GatheringListingBuilder {
         viewer,
         visibility: entry.visibility,
         blockedReasons: entry.blockedReasons,
+        interactableRef,
         tools: this._resolveTaskToolStates({
           actor,
           system,
@@ -638,6 +645,7 @@ export class GatheringListingBuilder {
           taskEntries,
           environmentBlockedReasons,
           presentTools,
+          interactableRef,
         })
       : [];
 
@@ -731,6 +739,7 @@ export class GatheringListingBuilder {
     taskEntries,
     environmentBlockedReasons,
     presentTools = null,
+    interactableRef = null,
   }) {
     const { policy, scope } = this._resolveRevealPolicy(environment);
     if (policy === 'never') return [];
@@ -752,6 +761,7 @@ export class GatheringListingBuilder {
           viewer,
           transparent: true,
           presentTools,
+          interactableRef,
         })),
       ];
       const model = this._taskModel({
@@ -762,6 +772,7 @@ export class GatheringListingBuilder {
         visibility: entry.visibility,
         blockedReasons,
         forceVisible: true,
+        interactableRef,
         tools: this._resolveTaskToolStates({
           actor,
           system,

@@ -83,8 +83,11 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
       1,
       'the one shared numericField snippet is the component\'s only number input'
     );
+    // Issue 2005: the only text input is the opt-in formatted field, a spinbutton with its own keys.
+    const numberField = /<input\b[^>]*\btype="number"[^>]*>/.exec(markup)?.[0] ?? '';
     assert.ok(
-      !/type="text"/.test(markup),
+      (markup.match(/type="text"\s+inputmode="decimal"\s+role="spinbutton"/g) ?? []).length
+        === (markup.match(/type="text"/g) ?? []).length,
       'it does not drift to a text input, which would remove native keyboard stepping'
     );
     // …and both orientations really do reach it.
@@ -93,9 +96,9 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
       2,
       'the vertical and horizontal branches both render it'
     );
-    // The component still owns no keydown handler.
+    // The number field still owns no keydown handler.
     assert.ok(
-      !/onkeydown|on:keydown/.test(markup),
+      numberField.length > 0 && !/onkeydown|on:keydown/.test(numberField),
       'stepping is still native, so the input type is what guarantees it'
     );
   });
