@@ -23,9 +23,27 @@ const SUM_UNDER = Object.freeze({
   interactive: false,
 });
 
+/**
+ * Success counting (issue 2004), either direction and target source; the target is inert (a count
+ * always grades against `pool.required`) and neither row is interactive until #2006.
+ */
+const COUNT_OVER = Object.freeze({
+  product: 'count',
+  direction: 'over',
+  targetSources: Object.freeze(['fixed', 'attribute']),
+  interactive: false,
+});
+
+const COUNT_UNDER = Object.freeze({
+  product: 'count',
+  direction: 'under',
+  targetSources: Object.freeze(['fixed', 'attribute']),
+  interactive: false,
+});
+
 export const CHECK_EVALUATION_CAPABILITIES = Object.freeze({
   version: 1,
-  modes: Object.freeze([SUM_OVER_FIXED, SUM_OVER_ATTRIBUTE, SUM_UNDER]),
+  modes: Object.freeze([SUM_OVER_FIXED, SUM_OVER_ATTRIBUTE, SUM_UNDER, COUNT_OVER, COUNT_UNDER]),
   additionalDice: false,
 });
 

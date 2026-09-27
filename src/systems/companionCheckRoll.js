@@ -17,6 +17,7 @@ import {
   checkRollResult,
   gateCompanionCallSite,
 } from './companionContract.js';
+import { hasActiveCheck } from './salvageCheckUsability.js';
 
 /**
  * The post-shim formula, or `''` when nothing is left to roll. Re-derives
@@ -27,12 +28,6 @@ function resolveUsableCheckFormula(formula) {
   return stripRetiredModifierPlaceholder(String(formula ?? '')).trim();
 }
 
-/**
- * Internal, never a seam: an injectable copy would let the `noFormula` gate and the bulk usable
- * filter disagree, and taking no `Roll` keeps it on `evaluateCheckRoll`'s dice-engine binding.
- */
-const isUsableCheckFormula = (formula) => resolveUsableCheckFormula(formula) !== '';
-
 /** Defaulted to a localized noun: an unguarded flavor would read "undefined check (DC 15)". */
 function resolveCheckLabel(label, seams) {
   const supplied = typeof label === 'string' ? label.trim() : '';
@@ -41,13 +36,27 @@ function resolveCheckLabel(label, seams) {
 }
 
 /**
- * The ordered outcome ladder for both runners: `cancelled === true` first, then `value === null`
- * (strictly: a rolled `0` is falsy) as `rollFailed`, then `outcome`, ungraded answering `rolled`.
- * The null step is sound only because both pre-dispatch gates ran: `evaluateCheckRoll` also
- * answers `value: null` with no `globalThis.Roll` and for a post-shim-empty formula.
+ * A count refusal (issue 2004) names its input as `data.refusedInput`: an unresolved or
+ * non-numeric base or threshold is `poolUnresolved`, and every other named input (die, explode,
+ * cancel, the settled pool) is `evaluationInvalid`.
  */
-function discriminateCheckOutcome(result, graded) {
+function countRefusalOutcome(result) {
+  const refusedInput = result?.data?.refusedInput;
+  return refusedInput === 'base' || refusedInput === 'threshold'
+    ? COMPANION_OUTCOMES.poolUnresolved
+    : COMPANION_OUTCOMES.evaluationInvalid;
+}
+
+/**
+ * The ordered outcome ladder for both runners: `cancelled === true` first, then (for a count
+ * request only) a `misconfigured` pool refusal, then `value === null` (strictly: a rolled `0` is
+ * falsy) as `rollFailed`, then `outcome`, ungraded answering `rolled`. The null step is sound only
+ * because both pre-dispatch gates ran: `evaluateCheckRoll` also answers `value: null` with no
+ * `globalThis.Roll` and for a post-shim-empty formula.
+ */
+function discriminateCheckOutcome(result, graded, counted = false) {
   if (result?.cancelled === true) return COMPANION_OUTCOMES.cancelled;
+  if (counted && result?.misconfigured === true) return countRefusalOutcome(result);
   if (result?.value === null) return COMPANION_OUTCOMES.rollFailed;
   if (!graded) return COMPANION_OUTCOMES.rolled;
   return result?.outcome === 'pass'
@@ -129,6 +138,89 @@ function resolveCompanionCheckTarget(evaluation, requestDc, actor) {
 }
 
 /**
+ * The `dc` a request grades against: a count request ignores its own `dc` and target, always
+ * grading against `pool.required` (issue 2004); any other request resolves its sum target.
+ */
+function resolveCompanionDc(evaluation, counted, requestDc, actor) {
+  if (counted) return { dc: evaluation.pool.required };
+  return resolveCompanionCheckTarget(evaluation, requestDc, actor);
+}
+
+/**
+ * `rollActorCheck`'s `messageData` once graded: a caller-`dc` grade (sum/over/fixed) names it, a
+ * count grade names its required count (a zero pool needs neither), and any other grade names its
+ * resolved target from the runner's own executed evidence, never the request `dc`.
+ */
+function companionCheckMessageData({
+  label,
+  total,
+  dc,
+  graded,
+  counted,
+  fixedOver,
+  zeroPool,
+  target,
+  required,
+}) {
+  if (!graded) return { label, total };
+  if (counted) return zeroPool ? { label } : { label, total, required };
+  return fixedOver ? { label, total, dc } : { label, total, target };
+}
+
+/**
+ * Discriminate a settled runner result into `rollActorCheck`'s answer: a dismissal, a count pool
+ * refusal (before any executed evidence), a generic roll failure, or the executed evidence.
+ */
+function buildCheckRollAnswer({ result, graded, counted, evaluation, label, dc }) {
+  const outcome = discriminateCheckOutcome(result, graded, counted);
+  if (outcome === COMPANION_OUTCOMES.cancelled) {
+    return checkRollResult(COMPANION_OUTCOMES.cancelled, { label });
+  }
+  if (outcome === COMPANION_OUTCOMES.rollFailed) {
+    return checkRollResult(COMPANION_OUTCOMES.rollFailed, {
+      label,
+      detail: typeof result?.message === 'string' ? result.message : '',
+    });
+  }
+  if (
+    outcome === COMPANION_OUTCOMES.poolUnresolved ||
+    outcome === COMPANION_OUTCOMES.evaluationInvalid
+  ) {
+    return checkRollResult(outcome, { label });
+  }
+  // `data.total`, never `value`: on the ungraded arm `value` is the awarding value a forced
+  // outcome can overwrite.
+  const total = result.data.total;
+  const zeroPool = result.data.zeroPool === true;
+  const fixedOver = !counted && isFixedSumOver(evaluation);
+  const messageData = companionCheckMessageData({
+    label,
+    total,
+    dc,
+    graded,
+    counted,
+    fixedOver,
+    zeroPool,
+    target: result.data.target,
+    required: evaluation.pool.required,
+  });
+  return checkRollResult(outcome, messageData, {
+    total,
+    diceGroups: result.data.diceGroups,
+    resolvedFormula: result.data.resolvedFormula ?? null,
+    product: result.data.product,
+    direction: result.data.direction,
+    comparison: result.data.comparison,
+    target: result.data.target,
+    margin: result.data.margin,
+    successes: result.data.successes,
+    cancelled: result.data.cancelled,
+    targetGraded: graded && !counted && !fixedOver,
+    zeroPool,
+  });
+}
+
+/**
  * Roll one formula for one actor, graded against a finite `dc` or ungraded, without throwing.
  * The request is closed and does not spread caller properties into the runner or roll options.
  * A supplied evaluation is strictly validated after call-site and roll-decision gates, then matched to a published mode.
@@ -167,11 +259,13 @@ async function settleRollActorCheck(request, seams) {
   if (!supportsCompanionCheckEvaluation(evaluation, interactive)) {
     return checkRollResult(COMPANION_OUTCOMES.evaluationUnsupported, { label });
   }
+  const counted = evaluation.product === 'count';
 
-  // `noFormula` before `engineUnavailable`; safe either way, as the shim fails open without `Roll`
-  // and so never manufactures a spurious `noFormula`.
+  // `noFormula` applies to sum only (issue 2004): `hasActiveCheck` reads a count evaluation as
+  // active regardless of `formula`. Checked before `engineUnavailable`; safe either way, as the
+  // shim fails open without `Roll` and so never manufactures a spurious `noFormula`.
   const formula = String(request?.formula ?? '');
-  if (!isUsableCheckFormula(formula)) {
+  if (!hasActiveCheck({ evaluation }, resolveUsableCheckFormula(formula))) {
     return checkRollResult(COMPANION_OUTCOMES.noFormula, { label });
   }
   if (seams.hasDiceEngine() !== true) {
@@ -179,7 +273,7 @@ async function settleRollActorCheck(request, seams) {
   }
 
   const actor = request?.actor ?? null;
-  const targeting = resolveCompanionCheckTarget(evaluation, request?.dc, actor);
+  const targeting = resolveCompanionDc(evaluation, counted, request?.dc, actor);
   if (targeting.refusal) return checkRollResult(targeting.refusal, { label });
   const dc = targeting.dc;
 
@@ -206,38 +300,7 @@ async function settleRollActorCheck(request, seams) {
     });
   }
 
-  const outcome = discriminateCheckOutcome(result, graded);
-  if (outcome === COMPANION_OUTCOMES.cancelled) {
-    return checkRollResult(COMPANION_OUTCOMES.cancelled, { label });
-  }
-  if (outcome === COMPANION_OUTCOMES.rollFailed) {
-    return checkRollResult(COMPANION_OUTCOMES.rollFailed, {
-      label,
-      detail: typeof result?.message === 'string' ? result.message : '',
-    });
-  }
-  // `data.total`, never `value`: on the ungraded arm `value` is the awarding value a forced
-  // outcome can overwrite.
-  const total = result.data.total;
-  // A caller-`dc` grade (sum/over/fixed) names it; any other grade names its resolved target
-  // instead, taken from the runner's own executed evidence and never from the request `dc`.
-  const fixedOver = isFixedSumOver(evaluation);
-  let messageData = { label, total };
-  if (graded)
-    messageData = fixedOver ? { label, total, dc } : { label, total, target: result.data.target };
-  return checkRollResult(outcome, messageData, {
-    total,
-    diceGroups: result.data.diceGroups,
-    resolvedFormula: result.data.resolvedFormula ?? null,
-    product: result.data.product,
-    direction: result.data.direction,
-    comparison: result.data.comparison,
-    target: result.data.target,
-    margin: result.data.margin,
-    successes: result.data.successes,
-    cancelled: result.data.cancelled,
-    targetGraded: graded && !fixedOver,
-  });
+  return buildCheckRollAnswer({ result, graded, counted, evaluation, label, dc });
 }
 
 /**
