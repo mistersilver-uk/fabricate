@@ -1,9 +1,8 @@
 /**
- * The shared `DialogV2` / `game.i18n` stubs the roll-prompt suites drive
- * (`tests/roll-prompt-options.test.js` and `tests/roll-prompt-bulk.test.js`), plus the whole
- * interactive ROLL environment the engine suites drive
- * (`tests/crafting-engine-modifier-choice.test.js`) (issue 1055).
+ * The roll-prompt surface and `game.i18n` stubs the prompt suites drive, plus the whole interactive
+ * ROLL environment the engine suites drive (`tests/crafting-engine-modifier-choice.test.js`).
  */
+import { overrideRollPromptSurface } from '../../src/ui/svelte/apps/crafting/rollPrompt.js';
 
 /**
  * A dependency-free `foundry.utils.getProperty`: the engine's roll runners walk dotted paths
@@ -17,63 +16,24 @@ function getProperty(object, path) {
 }
 
 /**
- * Stub `foundry.applications.api.DialogV2.wait`: capture the rendered content and button list, then
- * invoke the DEFAULT button's callback with a fake form so the prompt's own `readChoice` runs
- * against known field values.
+ * Replace the modal surface: record every prepared view and answer with `respond(view)`, which
+ * may return the raw answer the modal would (`{ confirmed: true, bonus, rollMode, advantage,
+ * chosenModifierIds }`), a dismissal (`null`), or throw.
  *
- * @param {object} formElements The `button.form.elements` map the prompt reads (`situationalBonus`,
- * `rollMode`, and — for the single-subject prompt — `craftingModifier`). A field omitted here is
- * ABSENT, which is the headless-form case each prompt has its own fallback for.
- * @param {(buttons: Array<object>) => object} [options.pick] Choose which button to click. Defaults
- * to the one marked `default`, else the first. Pass a picker to drive the Advantage / Disadvantage
- * buttons.
- * @returns {{content: string, buttons: Array<object>, result: object, restore: () => void}}
- * Populated once the prompt has been awaited.
+ * @returns {{views: object[], readonly view: object, restore: () => void}}
  */
-export function stubDialogCapture(formElements, { pick = null } = {}) {
-  const original = globalThis.foundry;
-  const captured = {};
-  globalThis.foundry = {
-    applications: {
-      api: {
-        DialogV2: {
-          wait: async (config) => {
-            captured.content = config.content;
-            captured.buttons = config.buttons;
-            captured.config = config;
-            const button = { form: { elements: formElements } };
-            const chosenButton = pick
-              ? pick(config.buttons)
-              : (config.buttons.find((entry) => entry.default) ?? config.buttons[0]);
-            captured.result = chosenButton.callback({}, button);
-            return captured.result;
-          },
-        },
-      },
-    },
-  };
-  captured.restore = () => {
-    if (original === undefined) delete globalThis.foundry;
-    else globalThis.foundry = original;
-  };
-  return captured;
-}
-
-/**
- * Stub a `DialogV2.wait` that resolves as a DISMISSAL.
- *
- * @param {*} [resolved] What `wait` resolves to (`null` is the real shape).
- */
-export function stubDialogDismissal(resolved = null) {
-  const original = globalThis.foundry;
-  globalThis.foundry = {
-    applications: { api: { DialogV2: { wait: async () => resolved } } },
-  };
+export function stubPromptSurface(respond = () => ({ confirmed: true })) {
+  const views = [];
+  const restore = overrideRollPromptSurface(async (view) => {
+    views.push(view);
+    return respond(view);
+  });
   return {
-    restore: () => {
-      if (original === undefined) delete globalThis.foundry;
-      else globalThis.foundry = original;
+    views,
+    get view() {
+      return views.at(-1);
     },
+    restore,
   };
 }
 
@@ -82,7 +42,7 @@ export function stubDialogDismissal(resolved = null) {
  * default), returning a restore function.
  *
  * @param {string} [options.rollMode] The client's `core.rollMode` setting value. Absent installs no
- * settings seam at all, which is the "unregistered / headless" read the prompt normalizes to `''`.
+ * settings seam at all, which is the "unregistered / headless" read the prompt normalizes.
  */
 export function stubI18n(table, { rollMode } = {}) {
   const original = globalThis.game;
@@ -99,36 +59,13 @@ export function stubI18n(table, { rollMode } = {}) {
 }
 
 /**
- * Build the `button.form.elements.craftingModifier` stand-in for a MULTI-PICK selection.
- *
- * @param {Array<{id: string}|string>} offered Every option the descriptor offers, in descriptor
- * order.
- * @param {string[]} checkedIds The ids the player ticked.
- */
-export function checkboxGroupField(offered, checkedIds) {
-  const checked = new Set(checkedIds);
-  const entries = offered.map((option) => {
-    const value = typeof option === 'string' ? option : option.id;
-    return { value, checked: checked.has(value) };
-  });
-  // `RadioNodeList`-shaped: indexed, `length`, iterable — and NOT an `Array`.
-  const field = { length: entries.length, [Symbol.iterator]: () => entries[Symbol.iterator]() };
-  for (const [index, entry] of entries.entries()) field[index] = entry;
-  return field;
-}
-
-/**
  * Install the interactive roll environment an engine check runner needs: a `Roll` that RECORDS
- * every rolled formula, and a `DialogV2.wait` that either answers with a selection or dismisses.
+ * every rolled formula, and a prompt surface that either answers with a selection or dismisses.
  *
- * @param {string|null} [options.pickedId] The value a SINGLE-pick prompt's `craftingModifier` radio
- * reports. An id the descriptor does not offer is discarded in production, which is what makes "a
- * descriptor was built at all" observable in the rolled string.
- * @param {{offered: Array<{id: string}|string>, checkedIds: string[]}} [options.multiPick] A
- * MULTI-pick answer, supplied as the real checkbox group's shape (see {@link checkboxGroupField}).
- * Wins over `pickedId` when both are given.
- * @param {boolean} [options.dismiss] Resolve `wait` as a DISMISSAL (`null`, the real `rejectClose:
- * false` shape) instead of confirming.
+ * @param {string|null} [options.pickedId] The single pick the player submits; `null` submits no
+ * selection, so the prompt falls back to the descriptor's defaults.
+ * @param {{checkedIds: string[]}} [options.multiPick] A MULTI-pick answer. Wins over `pickedId`.
+ * @param {boolean} [options.dismiss] Dismiss the prompt instead of confirming.
  */
 export function stubInteractiveRollEnvironment({
   pickedId = null,
@@ -137,6 +74,7 @@ export function stubInteractiveRollEnvironment({
 } = {}) {
   const rolled = [];
   const previousRoll = globalThis.Roll;
+  const previousFoundry = globalThis.foundry;
   class RollStub {
     constructor(formula) {
       this.formula = formula;
@@ -153,27 +91,29 @@ export function stubInteractiveRollEnvironment({
     });
   RollStub.validate = () => true;
   globalThis.Roll = RollStub;
+  globalThis.foundry = { utils: { getProperty } };
 
-  // Both dialog stubs REPLACE `globalThis.foundry` wholesale and restore the original,
-  // so the utils half is attached to whichever object they installed rather than being
-  // built alongside a third copy of the DialogV2 stub.
-  const dialog = dismiss
-    ? stubDialogDismissal()
-    : stubDialogCapture({
-        situationalBonus: { value: '' },
-        rollMode: { value: 'publicroll' },
-        craftingModifier: multiPick
-          ? checkboxGroupField(multiPick.offered, multiPick.checkedIds)
-          : { value: pickedId },
-      });
-  globalThis.foundry.utils = { getProperty };
+  const chosen = multiPick ? multiPick.checkedIds : pickedId ? [pickedId] : undefined;
+  const surface = stubPromptSurface(() =>
+    dismiss
+      ? null
+      : {
+          confirmed: true,
+          bonus: '',
+          rollMode: 'publicroll',
+          advantage: 'normal',
+          chosenModifierIds: chosen,
+        }
+  );
 
   return {
     rolled,
-    dialog,
+    surface,
     restore() {
       globalThis.Roll = previousRoll;
-      dialog.restore();
+      if (previousFoundry === undefined) delete globalThis.foundry;
+      else globalThis.foundry = previousFoundry;
+      surface.restore();
     },
   };
 }

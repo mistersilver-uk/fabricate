@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
 import { normalizeGatheringResultGroups } from '../src/systems/gatheringResultGroups.js';
+import { overrideRollPromptSurface } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 import { routedRoll, routedSystemCheck, stubRoll } from './helpers/gathering.js';
 import { createPersistedGatheringHistory } from './helpers/journal-fixtures.js';
 
@@ -1418,14 +1419,7 @@ test('_resolveRoutedOutcome: no system roll formula reports a MISSING_ROUTED_CHE
 // Interactive roll cancel: dismissing the dialog aborts with ZERO mutation.
 
 function stubCancelDialog() {
-  const original = globalThis.foundry;
-  globalThis.foundry = {
-    applications: { api: { DialogV2: { wait: async () => ({ confirmed: false }) } } }
-  };
-  return () => {
-    if (original === undefined) delete globalThis.foundry;
-    else globalThis.foundry = original;
-  };
+  return overrideRollPromptSurface(async () => ({ confirmed: false }));
 }
 
 test('immediate interactive cancel (routed): dismissing the roll dialog aborts with zero mutation', async () => {

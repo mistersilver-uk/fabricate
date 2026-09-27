@@ -3009,6 +3009,30 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
     assert.deepEqual(calls.bulkClear, [true]);
   });
 
+  it('leaves Escape inside a modal on top, such as the bulk roll prompt, to that modal', async () => {
+    const { services, calls } = makeServices(makeItem(), {
+      selectedKeys: ['sys:c1'],
+      entries: [bulkEntry()],
+      salvageable: [bulkEntry()],
+      counts: { selected: 1, salvageable: 1, blocked: 0, atMax: false },
+    });
+    const target = await harness.mount({ services });
+    await settle();
+    const modal = document.createElement('div');
+    modal.setAttribute('aria-modal', 'true');
+    const field = document.createElement('input');
+    modal.append(field);
+    target.append(modal);
+    let reachedModal = false;
+    modal.addEventListener('keydown', () => (reachedModal = true));
+
+    fire(field, 'keydown', { key: 'Escape' });
+    await settle();
+
+    assert.deepEqual(calls.bulkClear, [], 'the selection underneath is kept');
+    assert.equal(reachedModal, true, 'the key reaches the modal');
+  });
+
   it('does NOT arm Escape when the selection is empty', async () => {
     // A permanently-armed capturing listener would swallow Escape for every other
     // surface in the app.

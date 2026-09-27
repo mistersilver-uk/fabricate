@@ -5,6 +5,7 @@
 import { createLabRoll } from './labRoll.js';
 import { installLabRandom } from './labRandom.js';
 import { createLabDialogV2 } from '../foundryDialog.js';
+import { createLabRollPromptAnswerer } from '../rollPromptAnswer.js';
 import { installUpdateSemantics, makeGetFlag, makeSetFlag } from '../world/labFlags.js';
 
 /**
@@ -570,6 +571,7 @@ export function installFoundryShim(world) {
 
   // A REAL DialogV2, drawn from Foundry's own `client/applications/api/dialog.mjs`.
   const dialogs = createLabDialogV2({ localize: world.i18n.localize });
+  const rollPrompts = createLabRollPromptAnswerer();
 
   globalThis.foundry = {
     utils,
@@ -627,13 +629,15 @@ export function installFoundryShim(world) {
      */
     setDialogAnswer(answer) {
       dialogs.setAnswer(answer);
+      rollPrompts.setAnswer(answer);
     },
-    /** @returns {HTMLElement[]} The dialog elements currently rendered into the page. */
+    /** @returns {HTMLElement[]} The dialogs and roll prompts currently rendered into the page. */
     openDialogs() {
-      return dialogs.openDialogs();
+      return [...dialogs.openDialogs(), ...rollPrompts.openPrompts()];
     },
     restore() {
       random.restore();
+      rollPrompts.disconnect();
       globalThis.game = previous.game;
       globalThis.ui = previous.ui;
       globalThis.Hooks = previous.Hooks;

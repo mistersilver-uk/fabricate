@@ -219,6 +219,21 @@ A check-bearing execution accepts a per-call `interactive` flag (default `false`
 When `true`, the shared system-agnostic dialog (`src/ui/svelte/apps/crafting/rollPrompt.js`, `promptCheckRoll`/`buildInteractiveRollOptions`) prompts the player to roll; a dismissed prompt yields `{ success: false, cancelled: true, results: null }` with guaranteed zero mutation, distinct from `success: false`.
 This is the PR #497 per-call-flag decision, consumed uniformly by the crafting store, salvage (inventory) store, alchemy store, gathering view, and the Journal Trigger Next Step path; `CraftingEngine.craft` discards any phantom run created by a cancelled interactive call.
 
+- **One modal, one header.**
+The prompt renders in Fabricate's shared modal chrome (`ManagerModal`), never in a Foundry dialog, so it has one header: the activity check as its title and the actor and subject beneath it.
+It mounts over the Fabricate window the player started the roll from, unless that window is minimized: the window holding focus or, when the clicked button disabled itself and focus is nowhere, the window under the pointer.
+Any other call, such as a companion or macro, mounts it on a themed standalone layer on the page that stays frontmost and that closing removes.
+When the window hosting it closes, the prompt answers with the not-confirmed shape and unmounts.
+It is 500px wide within the viewport, and when crowded only its body scrolls while the footer stays visible.
+A stray outside click never dismisses it; Escape and the close control dismiss it with the not-confirmed shape, focus enters it on open and stays inside it, it keeps every key from Foundry's window-level keybindings while open, and focus returns to the opener on every exit, or to the window hosting it while the opener is still disabled.
+- **Order and controls.**
+The body reads: a generic dice glyph beside the formula and, when the check has one target, its DC chip (`DC N · meet or beat` inclusive, `DC N · beat` strict); the applied modifier chips or the bounded player choice; the situational bonus; roll mode; then the footer.
+The roll mode is the shared `Select`, whose options are Fabricate's own labels over the legacy `publicroll`/`gmroll`/`blindroll`/`selfroll` tokens, defaulting to the client's supported setting and otherwise to a public roll.
+Advantage-eligible checks offer Disadvantage, Roll and Advantage in that order, each outer action naming what it keeps; other checks offer one Roll.
+Roll is the form's only submit button, so Enter from any field rolls normally and never with Advantage or Disadvantage.
+Displayed comparison and applied modifiers come from the actual normalized runner and the selected formula contributions, and existing result keys and advantage eligibility are unchanged.
+Count and pool controls belong to their evaluation-mode requirements and do not appear as inactive controls in this summing baseline.
+
 - **The companion path opens the SAME dialog, on the EXECUTING GM's client.**
 A Standalone Check Roll published to a companion (`companion-api/spec.md`) opens this dialog and no other — never the subject player's client, and never a relayed one.
 Its chat flavor and its dialog titles are built from the caller's own `label`, defaulted to a **localized activity noun** so that no flavor can render `undefined` and none can render a doubled "check check".
@@ -228,7 +243,7 @@ A dismissal is reported to the caller as `cancelled` with **zero mutation**, whi
 When — and only when — the caller supplies `rollOptions.modifierChoice`, the dialog renders one extra control between the formula block and the situational-bonus input: a fieldset legended "Check modifier" holding one input per eligible modifier, each showing that modifier's icon, its label, and a signed value chip (`+3` / `0` / `-2`).
 The **input type follows the descriptor's `maxPicks`**, which is clamped into `[1, options.length]`: at 1 it is the pick-one **radio** group it has always been, and above 1 it is a **checkbox** group whose legend states the bound in words ("Pick up to 3").
 The two are not interchangeable — a radio group that permitted several picks and a checkbox group that permitted one would each lie about the control — so the type is chosen from the bound rather than fixed.
-The best legal selection is pre-checked, and the confirmed choice returns the checked ids as `chosenModifierIds` (falling back to the descriptor's `defaultSelectedIds` when the field is absent, as on the headless no-`DialogV2` path; a legacy single `chosenModifierId` is still honoured).
+The best legal selection is pre-checked, and the confirmed choice returns the checked ids as `chosenModifierIds` (falling back to the descriptor's `defaultSelectedIds` when no selection is submitted, as on the headless path with no page to render into; a legacy single `chosenModifierId` is still honoured).
 Above 1, the dialog disables the unchecked inputs once `maxPicks` are ticked and releases them again when one is cleared.
 That is a UI affordance only: `evaluateCheckRoll` re-imposes the same cap on the returned selection, since a UI control's constraint is never the invariant.
 A descriptor carrying no usable `maxPicks` renders — and is reduced as — a single pick, so a descriptor built before the field existed cannot silently widen.
@@ -236,7 +251,9 @@ This group is only the presentation of the crafting-check `playerPicks` combinat
 **CRAFTING and SALVAGE supply a `modifierChoice`** under `playerPicks` (issue 1095), and their dialogs render the modifier fieldset on the same terms; the pre-1095 claim that salvage never passes one retired with the crafting-only catalogue.
 **GATHERING supplies none**: it threads the modifier context and resolves a `playerPicks` selection deterministically, and its roll-time prompt is deferred to issue 683 with the rest of the seam (`resolution-modes/spec.md` §Check Source is normative).
 A roll under any other combination rule passes none — including `bySubject`, whose selection was already made at authoring time — so no `modifierChoice`, no fieldset.
-The dialog's formula line ends in a trailing `+ (modifier)[Modifiers]` slot while the choice is unanswered.
+On a direct runner the formula line ends in a trailing `+ (modifier)[Modifiers]` slot while the choice is unanswered.
+A versioned Journal prompt shows its prepared formula without the slot or any flavour label, with the choice offered beneath it.
+On both paths the formula line omits the terms of the modifiers the prompt itemises as chips: the producer passes a display formula, the base with any Tool terms and the deferred slot, beside the rolled formula, which is unchanged.
 - **Pre-resolved roll decisions.**
 A caller MAY supply a `rollDecision` (`{ bonus, rollMode, advantage }` — the prompt's own return shape minus `confirmed`).
 The evaluator then treats it as an already-answered choice and **never opens the modal**, running the identical downstream code: the check-modifier append, the advantage transform, the situational-bonus append, the formula-validity net and the effective roll mode.
@@ -246,7 +263,10 @@ A decision supplied without a prompt function must still apply, or the base form
 Only the salvage runners attach a decision today — one gate (`CraftingEngine._salvageRollOptions`) serving all three salvage check paths, so a fourth salvage runner cannot ship without it — because putting the attachment in the shared prompt module would advertise pre-resolved-roll support the crafting and gathering paths do not wire.
 - **The bulk prompt.**
 A bulk run answers **one** prompt whose answer applies to every roll in the batch, and the dialog's own note says so.
-It shows **no formula and no DC** — a batch has no single subject — and instead shows a subject strip of thumbnails with an overflow count, the situational-bonus input and the roll-mode picker.
+It shows **no formula and no DC** — a batch has no single subject — and instead lists each subject as a row with its display-only need, the situational-bonus input and the roll-mode picker.
+A need is the subject's finite DC, "No check" for a subject with no usable check (never an invented fallback DC), or "No single target" for a routed fixed or progressive check; it never drives evaluation.
+The note that one choice applies to every roll renders on every bulk prompt, including a count-only companion call with no subject rows, which keeps its controls and its normal result.
+The heading names the activity and, for a batch of one actor, that actor with the item count; a caller that names neither reads "Bulk check" over the item count.
 Advantage is offered only when **every** usable-check subject's **authored** formula carries a plain `1d20`, computed from the crafting system rather than from the listing projection, which carries no formula at all.
 It is all-or-nothing across those subjects: offering advantage only some rolls could honour would be a lie about the rest of the batch.
 The prompt is not shown at all when no selected item has a usable check, and dismissal returns the same not-confirmed shape the single-item prompt returns.

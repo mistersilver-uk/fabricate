@@ -20,6 +20,7 @@ const MOUNTED_ROOTS = [
   'src/ui/svelte/apps/InteractableBrowserRoot.svelte',
   'src/ui/svelte/apps/InteractableConfigRoot.svelte',
   'src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte',
+  'src/ui/svelte/apps/crafting/RollPrompt.svelte',
 ];
 
 /** Components inside the closure that no case claims ON PURPOSE, each with the reason. */

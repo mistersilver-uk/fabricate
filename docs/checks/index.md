@@ -307,10 +307,21 @@ Above 1 it is a tick list whose heading says how many may be ticked, and further
 The best allowed selection is pre-chosen.
 Modifiers with an ordinary average fill the cap first, best average first, and a modifier whose dice total is transformed and has no average fills whatever places are left over, in the order you listed it.
 A player who just clicks **Roll** without changing anything gets the same result an unprompted craft would have produced.
-Because the chosen value is not known until the player picks it, the formula preview ends in a neutral `+ (modifier)[Modifiers]` term instead of a number, until the player confirms.
+The prompt shows the prepared formula, and lists every contribution that is already resolved as a chip beneath it rather than as a term in it.
+Rolled from the crafting or inventory screen, the formula ends in a placeholder `+ (modifier)[Modifiers]` term where the picked modifiers will go; a Journal check shows its prepared formula and offers the choice beneath it.
+A deferred **Player picks** contribution and a **Situational bonus** join the roll only after the player confirms.
 The chat card names the modifiers that were picked.
 
 {: .note }
 > If a transformed modifier, one with no average, is eligible alongside others under **Highest**, or under **Player picks** with a **Maximum picks** below how many are eligible, the **Validation** page raises a warning naming it.
 > That warning does not block saving or enabling the system.
 > The modifier stays eligible and selectable, and it still rolls exactly as written whenever a pick is free for it.
+
+A visible interactive check prompt names the activity and, when available, the character and its subject; a hidden Journal check keeps generic copy and omits protected identity and formula.
+The prompt opens over the Fabricate window you rolled from, or over the page when a macro or another module opens it, and closing that window cancels the roll.
+Clicking outside it does not cancel the roll; **Escape** pressed inside the prompt or its close button does, and pressing **Enter** rolls normally.
+Outside the prompt, **Escape** keeps its usual Foundry meaning.
+It offers **Situational bonus** and **Roll mode**, plus **Advantage** and **Disadvantage** when the formula supports them.
+It shows a **DC** chip only when the check has one target.
+For an entitled visible Journal check, the prepared modifier contributions stay fixed while the prompt is open.
+Changing character data or the modifier library after preparation cannot change those captured modifier terms; other actor-dependent formula terms are resolved when the authority evaluates the roll.

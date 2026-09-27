@@ -540,9 +540,61 @@ describe('BulkSalvageService.run: the ONE roll prompt', () => {
     assert.equal(prompts.length, 1, 'one prompt, not one per item');
     assert.equal(prompts[0].count, 2);
     assert.deepEqual(prompts[0].subjects, [
-      { name: 'Iron Ore', img: 'icons/ore.webp' },
-      { name: 'Boar Hide', img: 'icons/hide.webp' },
+      { name: 'Iron Ore', img: 'icons/ore.webp', need: { kind: 'dc', dc: 15 } },
+      { name: 'Boar Hide', img: 'icons/hide.webp', need: { kind: 'dc', dc: 15 } },
     ]);
+  });
+
+  it('projects each subject\'s own need across a mixed batch, and names the activity and actor', async () => {
+    const prompts = [];
+    const override = bulkComponent({ id: 'comp-ore', name: 'Iron Ore', salvage: { dcOverride: 21 } });
+    const service = makeService({
+      systems: [
+        bulkSystem({ id: 'sys-a', rollFormula: '1d20 + 3', check: { dc: 12 }, components: [override] }),
+        bulkSystem({ id: 'sys-b', rollFormula: '', components: [HIDE] }),
+        bulkSystem({ id: 'sys-c', mode: 'routed', rollFormula: '1d20', check: { type: 'fixed' }, components: [BONE] }),
+      ],
+      salvage: async () => ({ success: true, results: [] }),
+      promptRollDecision: async (args) => {
+        prompts.push(args);
+        return { confirmed: true, advantage: 'normal' };
+      },
+    });
+    await service.run({
+      targets: [
+        bulkTarget({ systemId: 'sys-a', componentId: 'comp-ore' }),
+        bulkTarget({ systemId: 'sys-b', componentId: 'comp-hide' }),
+        bulkTarget({ systemId: 'sys-c', componentId: 'comp-bone' }),
+      ],
+      interactive: true,
+    });
+    assert.deepEqual(prompts[0].subjects.map((subject) => subject.need), [
+      { kind: 'dc', dc: 21 },
+      { kind: 'noCheck' },
+      { kind: 'noSingleTarget' },
+    ]);
+    assert.equal(prompts[0].activity, 'Salvage');
+    assert.equal(prompts[0].actorName, 'Akra', 'one actor in the batch is named');
+  });
+
+  it('names no actor for a batch spanning two actors', async () => {
+    let offered;
+    const service = makeService({
+      systems: [usable()],
+      salvage: async () => ({ success: true, results: [] }),
+      promptRollDecision: async (args) => {
+        offered = args;
+        return { confirmed: true };
+      },
+    });
+    await service.run({
+      targets: [
+        bulkTarget({ componentId: 'comp-ore' }),
+        bulkTarget({ actorUuid: 'Actor.b2', actorId: 'b2', actorName: 'Brenna', componentId: 'comp-hide' }),
+      ],
+      interactive: true,
+    });
+    assert.equal(offered.actorName, undefined);
   });
 
   it('a dismissal records ZERO salvage calls and returns before any mutation', async () => {

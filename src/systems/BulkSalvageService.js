@@ -11,10 +11,12 @@ import {
   buildBulkSalvageChatContent,
   sumChatEntriesByName,
 } from '../ui/presenters/BulkSalvageChatCard.js';
+import { salvageCheckNeed } from '../ui/presenters/salvageCheckNeed.js';
 // The player forecast projection and its trigger-id read, both import-free leaves.
 import { forecastComplications } from '../utils/complicationPlan.js';
 import { hasPlainD20 } from '../utils/craftingCheckExpression.js';
 import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
+import { localizeWith } from '../utils/localizeWithFallback.js';
 import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { checkTriggerIdsOf } from '../utils/progressiveStageComplications.js';
 
@@ -322,12 +324,19 @@ export class BulkSalvageService {
     const allowAdvantage = usable.every((entry) =>
       hasPlainD20(resolveSalvageCheck(entry.system).rollFormula)
     );
+    const actorNames = new Set(runnable.map((entry) => entry.item.actorName));
     const choice = await this.promptRollDecision({
       allowAdvantage,
+      activity: this._salvageActivity(),
+      actorName: actorNames.size === 1 ? [...actorNames][0] || undefined : undefined,
       count: runnable.length,
       subjects: runnable.map((entry) => ({
         name: entry.item.name,
         img: entry.item.img,
+        need: salvageCheckNeed({
+          ...resolveSalvageCheck(entry.system),
+          component: entry.component,
+        }),
       })),
     });
     if (!choice || choice.confirmed === false) return { cancelled: true, rollDecision: null };
@@ -342,6 +351,16 @@ export class BulkSalvageService {
         advantage: choice.advantage,
       },
     };
+  }
+
+  /** The prompt heading's activity, localized when the key resolves. */
+  _salvageActivity() {
+    return localizeWith(
+      this.localize,
+      'FABRICATE.App.Journal.Filters.Kind.Salvage',
+      undefined,
+      'Salvage'
+    );
   }
 
   /** Salvage one target, never throwing: a throw becomes an `error` row and the run goes on. */

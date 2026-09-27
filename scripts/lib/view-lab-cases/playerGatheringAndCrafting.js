@@ -12,7 +12,77 @@ import {
 } from './caseConstants.js';
 import { playerCase, responsiveLayout } from './caseFactories.js';
 
+/** The single-subject roll prompt: Fabricate's own modal, mounted over the player window. */
+const SINGLE_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="single"]';
+
 export const CASES = Object.freeze([
+  playerCase({
+    id: 'player-crafting-roll-prompt-basic',
+    label: 'Player app — 2d6 crafting roll prompt',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'basic' },
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+    ],
+    expectSelector:
+      `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
+      ':has(.manager-modal-subtitle:has-text("Bend Horseshoe"))' +
+      ':has(.formula-content .formula:has-text("2d6 + 3"))' +
+      ':has(.formula-content .manager-chip:has-text("DC 15 · meet or beat"))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPromptHost\.js$/,
+    ],
+  }),
+  playerCase({
+    id: 'player-crafting-roll-prompt-advantage',
+    label: 'Player app — d20 crafting roll prompt',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'advantage' },
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+    ],
+    expectSelector:
+      `${SINGLE_PROMPT}:has(button[data-action="advantage"])` +
+      ':has(.manager-modal-subtitle:has-text("Bend Horseshoe"))' +
+      ':has(.formula-content .formula:has-text("1d20 + 3"))' +
+      ':has(.formula-content .manager-chip:has-text("DC 15 · meet or beat"))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+    ],
+  }),
+  playerCase({
+    id: 'player-crafting-roll-prompt-light',
+    label: 'Player app — light frame crafting roll prompt',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'light', colorScheme: 'light' },
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+    ],
+    expectSelector:
+      `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
+      ':has(.manager-modal-subtitle:has-text("Bend Horseshoe"))' +
+      ':has(.formula-content .formula:has-text("2d6 + 3"))' +
+      ':has(.formula-content .manager-chip:has-text("DC 15 · meet or beat"))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+    ],
+  }),
   playerCase({
     id: 'player-gathering-events',
     label: 'Player app — Gathering events',
@@ -295,22 +365,109 @@ export const CASES = Object.freeze([
     smokeLabels: ['player-crafting-roll-prompt'],
     // The interactive check roll prompt, standing and unanswered, with the `playerPicks` fieldset issue 855 adds.
     reaches: 'exact',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'pick-one' },
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Stillroom' },
+      { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+    ],
+    // The app route alone is satisfied by a prompt that never opened, so the prompt is asserted.
+    expectSelector:
+      `${SINGLE_PROMPT}:has(input[type="radio"][name="craftingModifier"])` +
+      ':has(.manager-modal-subtitle:has-text("Reduce a Stillroom Batch"))' +
+      ':has(.formula-content .formula:has-text("1d20 + 3"))' +
+      ':not(:has(.formula-content .manager-chip))' +
+      ':has(.modifier-choice span:has-text("Medicine") ~ span:last-child:has-text("+4"))' +
+      ':has(.modifier-choice span:has-text("Nature") ~ span:last-child:has-text("+2"))' +
+      ':has(.modifier-choice span:has-text("Herbalism kit") ~ span:last-child:has-text("+3"))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      // Narrow rather than `CRAFTING_SHARED`: `rollPrompt.js` builds this dialog end to end and nothing else does.
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPromptHost\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+      CRAFTING_PROGRESSIVE,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
+      /^src\/utils\/progressiveResultOrder\.js$/,
+    ],
+  }),
+  playerCase({
+    id: 'player-crafting-roll-prompt-multipick',
+    label: 'Player app — multipick crafting roll prompt',
+    smokeLabels: [],
+    reaches: 'beyond',
     query: { tab: 'crafting', dialog: 'open' },
     steps: [
       { selector: '.crafting-browser-search input', fill: 'Stillroom' },
       { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
-    // The dialog is a sibling of the window, so the app route alone is satisfied by a prompt that never opened.
-    expectSelector: '.application.dialog .fabricate-roll-prompt__modifiers',
+    expectSelector:
+      SINGLE_PROMPT +
+      ':has(.manager-modal-subtitle:has-text("Reduce a Stillroom Batch"))' +
+      ':has(.formula-content .formula:has-text("1d20 + 3"))' +
+      ':not(:has(.formula-content .manager-chip))' +
+      ':has(input[type="checkbox"][name="craftingModifier"][aria-label="Medicine +4"])' +
+      ':has(input[type="checkbox"][name="craftingModifier"][aria-label="Nature +2"])',
     kinds: ['player', 'crafting'],
     sourceMatches: [
-      // Narrow rather than `CRAFTING_SHARED`: `rollPrompt.js` builds this dialog end to end and nothing else does.
-      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
       CRAFTING_PROGRESSIVE,
-      /^src\/ui\/svelte\/stores\/craftingStore/,
-      /^src\/ui\/svelte\/stores\/playerResultOrder/,
-      /^src\/utils\/progressiveResultOrder\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+    ],
+  }),
+  playerCase({
+    id: 'player-crafting-roll-prompt-overflow',
+    label: 'Player app — dense crafting roll prompt',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'overflow' },
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Stillroom' },
+      { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+    ],
+    expectSelector:
+      SINGLE_PROMPT +
+      ':has(.manager-modal-subtitle:has-text("Reduce a Stillroom Batch"))' +
+      ':has(.formula-content .formula:has-text("1d20 + 3"))' +
+      ':not(:has(.formula-content .manager-chip))' +
+      ':has(.modifier-choice span:has-text("of the longest remembered herbalist tradition"))' +
+      ':has(input[type="checkbox"][name="craftingModifier"][aria-label*="Medicine"][aria-label*="+4"])',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_PROGRESSIVE,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+    ],
+  }),
+  playerCase({
+    id: 'player-crafting-roll-prompt-compact',
+    label: 'Player app — crafting roll prompt at its height cap',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // Enough long-named choices to meet the modal's height cap: the body scrolls, the footer stays.
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'compact' },
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Stillroom' },
+      { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+    ],
+    expectSelector:
+      SINGLE_PROMPT +
+      ':has(.manager-modal-subtitle:has-text("Reduce a Stillroom Batch"))' +
+      ':has(.modifier-choice span:has-text("Field note 9"))',
+    expectScrollable: `${SINGLE_PROMPT} .fabricate-roll-prompt`,
+    expectContained: [
+      { container: SINGLE_PROMPT, target: `${SINGLE_PROMPT} .manager-modal-footer` },
+    ],
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_PROGRESSIVE,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPromptHost\.js$/,
     ],
   }),
   playerCase({
