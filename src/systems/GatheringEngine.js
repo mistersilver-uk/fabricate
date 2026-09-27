@@ -770,6 +770,7 @@ export class GatheringEngine {
         label,
         mode: checkMode,
         allowsSituationalModifier: hasActiveCheck(config, rollFormula),
+        offerSituationalBonus: config?.offerSituationalBonus !== false,
         // A count check offers no advantage until it is mode-aware (issue 2007).
         allowAdvantage: !count && Boolean(rollFormula && /(?:^|\W)d20(?:\W|$)/i.test(rollFormula)),
       },
@@ -3788,15 +3789,18 @@ export class GatheringEngine {
       evaluation,
       // Clamp a below-lowest total to the closest tier, as crafting and salvage do.
       clampToNearest: true,
-      rollOptions: buildInteractiveRollOptions({
-        interactive,
-        actor,
-        name: task?.name,
-        activity: 'Gathering',
-        img: task?.img,
-        dc: target.target,
-        evaluation,
-      }),
+      rollOptions: {
+        ...buildInteractiveRollOptions({
+          interactive,
+          actor,
+          name: task?.name,
+          activity: 'Gathering',
+          img: task?.img,
+          dc: target.target,
+          evaluation,
+        }),
+        offerSituationalBonus: routed?.offerSituationalBonus !== false,
+      },
     });
   }
 
@@ -4012,13 +4016,16 @@ export class GatheringEngine {
         label: 'Gathering',
         craftingModifier: buildCheckModifierContext(system, 'gathering', task),
         evaluation,
-        rollOptions: buildInteractiveRollOptions({
-          interactive,
-          actor,
-          name: task?.name,
-          activity: 'Gathering',
-          img: task?.img,
-        }),
+        rollOptions: {
+          ...buildInteractiveRollOptions({
+            interactive,
+            actor,
+            name: task?.name,
+            activity: 'Gathering',
+            img: task?.img,
+          }),
+          offerSituationalBonus: progressive?.offerSituationalBonus !== false,
+        },
       });
       // A cancelled roll makes `_resolveProgressiveOutcome` abort with zero mutation.
       if (rolled.cancelled) {

@@ -169,9 +169,15 @@ import {
   ToolCheckEvidenceError,
 } from './toolCheckBonus.js';
 
-/** The contributions and the evaluation that placed them come from one prepared collection. */
-function checkRollOptions(options, { contributions, evaluation }) {
-  return { ...options, toolContributions: contributions, evaluation };
+/** The contributions and the evaluation that placed them come from one prepared collection; the
+ * check config supplies the prompt's situational-bonus offer. */
+function checkRollOptions(options, { contributions, evaluation }, config) {
+  return {
+    ...options,
+    toolContributions: contributions,
+    evaluation,
+    offerSituationalBonus: config?.offerSituationalBonus !== false,
+  };
 }
 
 /**
@@ -5610,7 +5616,8 @@ export class CraftingEngine {
             evaluation
           ),
         }),
-        preparedTools
+        preparedTools,
+        checkConfig
       ),
     });
     return this._markEngineEvaluated(result);
@@ -5684,7 +5691,8 @@ export class CraftingEngine {
             evaluation
           ),
         }),
-        preparedTools
+        preparedTools,
+        routed
       ),
     });
     return this._markEngineEvaluated(result);
@@ -5771,7 +5779,8 @@ export class CraftingEngine {
             evaluation
           ),
         }),
-        preparedTools
+        preparedTools,
+        progressive
       ),
     });
     return this._markEngineEvaluated(result);
@@ -6960,7 +6969,8 @@ export class CraftingEngine {
           formula,
           craftingModifier,
         }),
-        preparedTools
+        preparedTools,
+        simple
       ),
     });
     return this._markEngineEvaluated(result);
@@ -7000,7 +7010,8 @@ export class CraftingEngine {
           formula,
           craftingModifier,
         }),
-        preparedTools
+        preparedTools,
+        progressive
       ),
     });
     return this._markEngineEvaluated(result);
@@ -7051,7 +7062,8 @@ export class CraftingEngine {
           formula,
           craftingModifier,
         }),
-        preparedTools
+        preparedTools,
+        routed
       ),
     });
     return this._markEngineEvaluated(result);
@@ -7327,6 +7339,7 @@ function versionedCheckPrompt({
     selectedModifiers,
     mode: activeCheck.mode,
     allowsSituationalModifier: activeCheck.checkUsable,
+    offerSituationalBonus: activeCheck.config?.offerSituationalBonus !== false,
     // A count check offers no advantage until it is mode-aware (issue 2007).
     allowAdvantage: !counts && hasPlainD20(activeCheck.rollFormula),
     modifierChoice: publicModifierChoice(modifierChoice),

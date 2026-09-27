@@ -303,6 +303,23 @@ test('the routed runner passes its comparison and selected modifier to the promp
   delete globalThis.Roll;
 });
 
+test('the prompt shows the offer it is given, and a bonus still applies with it off (issue 2005)', async () => {
+  for (const [offer, shownOffer] of [[false, false], [true, true], [undefined, true]]) {
+    const rolledFormulas = stubCraftingModRoll();
+    let shown;
+    await runFormulaPassFail({
+      formula: '1d20', dc: 10, actor: ACTOR,
+      rollOptions: { interactive: true, offerSituationalBonus: offer, prompt: async (options) => {
+        shown = options;
+        return { confirmed: true, bonus: '2' };
+      } },
+    });
+    assert.equal(shown.offerSituationalBonus, shownOffer, String(offer));
+    assert.equal(rolledFormulas.at(-1), '1d20 + (2)', 'the decision bonus is applied regardless');
+  }
+  delete globalThis.Roll;
+});
+
 test('resolveRolledFormula trims the authored formula when no modifier context applies', () => {
   assert.equal(resolveRolledFormula(' 1d20 + 4 ', null, null, undefined), '1d20 + 4');
 });

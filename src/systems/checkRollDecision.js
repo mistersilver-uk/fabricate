@@ -90,6 +90,8 @@ function promptInput({
     thresholdMode: options.thresholdMode === 'exceed' ? 'exceed' : 'meet',
     // A count check offers no advantage until it is mode-aware (issue 2007).
     allowAdvantage: evaluation.product !== 'count' && hasPlainD20(authoredFormula.trim()),
+    // Display only: a bonus the decision carries still applies when the offer is off.
+    offerSituationalBonus: options.offerSituationalBonus !== false,
   };
 }
 
