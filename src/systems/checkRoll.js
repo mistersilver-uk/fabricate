@@ -303,7 +303,7 @@ export async function evaluatePreparedCheck(preparation, actor, decision = {}) {
     includeRollHandoff: !secret,
   });
   if (!secret) return result;
-  // The settled placement stays inside the authority for classification; callers never return it.
+  // The settled placement stays inside the authority for classification; the requester's reply never carries it.
   return {
     engine: result.engine,
     total: result.total,
