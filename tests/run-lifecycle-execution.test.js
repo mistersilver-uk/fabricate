@@ -18,6 +18,8 @@ import {
   postCheckRollHandoff,
 } from '../src/systems/checkRoll.js';
 import { transitionExecutionJournal } from '../src/systems/runExecutionJournal.js';
+import { promptJournalStageCheck } from '../src/bootstrap/journalOperations.js';
+import { buildSinglePromptData } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 import { installCountDice } from './helpers/countEngineDice.js';
 import { countEvaluation } from './helpers/countFixtures.js';
 import { createPersistedCraftingHistory, mergeHistoryFlag } from './helpers/journal-fixtures.js';
@@ -2189,6 +2191,28 @@ test('the versioned crafting descriptor refuses its target before the Tool roll 
     assert.equal(privateEvaluation.flavor, 'Sun Tea — Crafting check', 'no DC names a character value');
     assert.deepEqual([publicPrompt.target, publicPrompt.direction], [16, 'over']);
     assert.equal(JSON.stringify(publicPrompt).includes('@skill'), false, 'the expression stays private');
+  } finally {
+    restore();
+  }
+});
+
+test('a roll-under versioned prompt names its pre-modifier target through the Journal adapter', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '2' } };
+  const under = { product: 'sum', direction: 'under' };
+  const { describe } = await startToolSuppliedRun(tool, {
+    check: { rollFormula: '1d20', dc: 12, thresholdMode: 'exceed', evaluation: under },
+  });
+  const { restore } = installPreparedRolls([], []);
+  try {
+    const { publicPrompt } = await describe();
+    assert.deepEqual([publicPrompt.target, publicPrompt.direction, publicPrompt.comparison], [12, 'under', 'exceed']);
+    assert.equal(publicPrompt.displayFormula, '1d20', 'the Tool scalar raises the target, not the roll');
+    let received;
+    await promptJournalStageCheck(publicPrompt, async (options) => {
+      received = options;
+    });
+    const view = buildSinglePromptData(received);
+    assert.deepEqual([view.dc, view.direction, view.comparison], [12, 'under', 'exceed']);
   } finally {
     restore();
   }
