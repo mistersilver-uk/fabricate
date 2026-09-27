@@ -52,7 +52,6 @@ game.fabricate.getGatheringEnvironmentStore() // Gathering environment persisten
 game.fabricate.getGatheringRunManager()     // Gathering run persistence
 game.fabricate.getGatheringGateAndCheckEvaluator() // Gathering gate/check evaluation
 game.fabricate.getGatheringRichStateService() // Gathering rich-state internals
-game.fabricate.getItemPilesIntegration()     // Item Piles integration facade
 game.fabricate.listGatheringForActor({ actor }) // Player-visible gathering listing
 game.fabricate.startGatheringAttempt({ actor, environmentId, taskId }) // Start gathering
 game.fabricate.getGatheringDropBreakdown({ environmentId, taskId }) // Task drop preview data
@@ -122,7 +121,7 @@ const {
   GatheringLocationService,
   GatheringGateAndCheckEvaluator, GatheringEngine,
   RecipeVisibilityService, ResolutionModeService,
-  SignatureValidator, ItemPilesIntegration,
+  SignatureValidator,
   CompendiumImporter, CraftingSystemExporter
 } = game.fabricate.api;
 ```

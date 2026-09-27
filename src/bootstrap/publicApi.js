@@ -11,7 +11,6 @@ import {
 } from '../canvas/regions/interactableCleanup.js';
 import { FABRICATE_HOOKS } from '../config/hooks.js';
 import { getSetting, SETTING_KEYS } from '../config/settings.js';
-import { ItemPilesIntegration } from '../integrations/ItemPilesIntegration.js';
 import { Ingredient } from '../models/Ingredient.js';
 import { IngredientGroup } from '../models/IngredientGroup.js';
 import { Recipe } from '../models/Recipe.js';
@@ -126,7 +125,6 @@ function buildApiClasses(io) {
     RecipeVisibilityService,
     ResolutionModeService,
     SignatureValidator,
-    ItemPilesIntegration,
     CompendiumImporter,
     CraftingSystemExporter,
     HOOKS: FABRICATE_HOOKS,

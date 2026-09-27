@@ -13,7 +13,6 @@ src/canvas	18
 src/canvas/linkedVisuals	21
 src/canvas/regions	19
 src/config	20
-src/integrations	27
 src/migration	15
 src/models	9
 src/models/match	15

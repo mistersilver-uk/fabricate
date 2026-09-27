@@ -125,7 +125,6 @@ const SAFE_EXECUTION_EFFECT_KINDS = new Set([
   'consumeAlchemyExtras',
   'spendCurrency',
   'applyToolUsage',
-  'spendItemPilesCurrency',
   'awardResults',
   'finalizeCraftingStage',
   'recordRecipeUse',

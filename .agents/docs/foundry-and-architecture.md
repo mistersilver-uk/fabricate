@@ -423,7 +423,7 @@ Interrupted or stale per-worktree smoke recovery is defined in `.agents/skills/f
 - `src/ui/model/` holds the Foundry-free view models the UI owns — pure filtering, sorting, pagination, selection and validation logic with no Foundry global and no importer outside `src/ui/`.
 - Svelte UI components live in `src/ui/svelte/apps/` and `src/ui/svelte/components/`.
 - Svelte stores live in `src/ui/svelte/stores/`.
-- Domain and runtime logic lives under `src/models/`, `src/systems/`, `src/utils/`, `src/integrations/`, `src/config/`, and related `src/` modules.
+- Domain and runtime logic lives under `src/models/`, `src/systems/`, `src/utils/`, `src/config/`, and related `src/` modules.
 - Tests live under `tests/`.
 - Styles live in `styles/`, primarily `styles/fabricate.css`.
 - When a Svelte component is shared between task and event (or similar `kind`-driven) contexts, split shared i18n keys into kind-specific siblings (`…Task` / `…Event`) and select with a ternary on `kind`.

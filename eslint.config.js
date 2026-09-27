@@ -99,8 +99,7 @@ const svelteRuneGlobals = {
 
 /**
  * The DOMAIN LAYER's roots (issue 1677) — the Architecture Pointers list in
- * `.agents/docs/foundry-and-architecture.md` of where domain and runtime logic lives, minus
- * `src/integrations/`, which is on that list and is an edge by definition.
+ * `.agents/docs/foundry-and-architecture.md` of where domain and runtime logic lives.
  *
  * Exported because `tests/foundry-global-reads-ratchet.test.js` counts this rule's reports over
  * these roots, and a second spelling of the roots or the names would be a second, drifting answer.
@@ -118,8 +117,7 @@ export const DOMAIN_LAYER_ROOTS = Object.freeze([
  * carries.
  *
  * There is no in-scope allow-list, because every sanctioned edge already lies outside these roots:
- * `src/main.js` holds 260 bare reads, `src/ui/` (the shells and `foundryBridge.js`) 173, and
- * `src/integrations/` 5. The 13 in-scope files that are not clean are debt, carried in
+ * `src/main.js` holds 260 bare reads and `src/ui/` (the shells and `foundryBridge.js`) 173. The 13 in-scope files that are not clean are debt, carried in
  * `eslint-debt.txt` and held at an exact per-file count by the ratchet named above.
  *
  * `globalThis.game?.…` is out of reach here and stays that way — see the

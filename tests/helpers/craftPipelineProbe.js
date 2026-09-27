@@ -295,21 +295,6 @@ function visibilityDouble(journal, guard) {
   };
 }
 
-/** An Item Piles afford/deduct seam whose two calls are journalled in the order craft() makes them. */
-function itemPilesDouble(journal, itemPiles) {
-  if (!itemPiles) return null;
-  return {
-    isEnabled: () => true,
-    async canAfford(actor, currencies) {
-      journal.push('itemPiles.canAfford', actor, currencies);
-      return itemPiles.afford !== false;
-    },
-    async deductCurrency(actor, currencies) {
-      journal.push('itemPiles.deductCurrency', actor, currencies);
-    },
-  };
-}
-
 /** A coin spender whose every check/spend/refund is journalled against an actor-property balance. */
 function coinSpenderDouble(journal, { afford = true } = {}) {
   const balanceOf = (actor, requirement) =>
@@ -630,7 +615,6 @@ function probeRecipeDocument({
   sets,
   executionSteps,
   tools,
-  recipeCurrencyCost,
   recipeValid,
   noActiveStep,
 }) {
@@ -646,7 +630,6 @@ function probeRecipeDocument({
     transferEffects: false,
     steps: executionSteps,
     probeRef: `Recipe:${recipeId}`,
-    ...(recipeCurrencyCost ? { currencyCost: recipeCurrencyCost } : {}),
     getExecutionSteps: () => (noActiveStep ? [] : executionSteps),
     validate: () =>
       recipeValid ? { valid: true, errors: [] } : { valid: false, errors: ['no result groups'] },
@@ -660,7 +643,6 @@ function probeEngine(journal, spec, { runManager, coinSpender }) {
     probeRecipeManager(spec),
     runManager,
     spec.resolutionService,
-    itemPilesDouble(journal, spec.itemPiles),
     null,
     null,
     coinSpender,
@@ -709,7 +691,6 @@ export function craftProbe(spec = {}) {
     visibilityGuard = { craftable: true },
     recipeId = 'recipe-probe',
     recipeName = 'Probe Recipe',
-    recipeCurrencyCost = null,
     recipeValid = true,
     noActiveStep = false,
     toolItemsPresent = true,
@@ -749,7 +730,6 @@ export function craftProbe(spec = {}) {
     sets,
     executionSteps,
     tools,
-    recipeCurrencyCost,
     recipeValid,
     noActiveStep,
   });

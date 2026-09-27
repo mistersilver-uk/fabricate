@@ -54,7 +54,6 @@ CraftingSystem = {
     salvage: boolean, // default true (absent key defaults on for backward compatibility; an explicit false is honoured)
     chatOutput: boolean, // default true; gates the crafting, salvage, and gathering result chat cards
     refundOnPlayerCancel: boolean, // default true (absent key defaults on; an explicit false is honoured); when a player cancels an in-progress craft, ON restores the consumed ingredients + refunds the spent currency, OFF forfeits them
-    itemPiles: boolean, // default false; the Item Piles integration toggle referenced by integrations/spec.md
   },
 
   // SHADOWED by a world scope setting and still authoritative — requirement 36.
@@ -3459,7 +3458,7 @@ Neither snapshot duplicates check formula, DC or modifier configuration.
 The consumption receipt captures each actor-qualified carrier's source contributions before source deletion can prevent later reads.
 `essenceSpend` retains one row per physical `(actorUuid, itemUuid)` carrier, its actual consumed quantity and every recorded essence contribution; spent totals are derived from those contributions rather than stored again.
 Applied-prefix reconstruction hydrates this evidence, and both successful and failed stage finalization retain it through the manager's persistence allowlist.
-`currencySpends` copies applied `settledSpends` only; prepared intent and an Item Piles deducted boolean are not itemized spend evidence.
+`currencySpends` copies applied `settledSpends` only; prepared intent is not itemized spend evidence.
 Legacy timed `preparedConsumption.currencySpends` remains a valid settled receipt.
 Missing optional evidence stays absent in persistence and projects as `null` (Not recorded), while an explicitly recorded empty array or empty carrier list establishes zero.
 Legacy records gain no retrospective mode, presentation or contribution data from the current catalogue.
@@ -3770,8 +3769,8 @@ StepModel = {
    That predicate names an unmade choice, a physical material shortfall, an essence gap the carrier ledger cannot cover, a price the actor cannot pay, and a required tool the actor does not hold, and both `actions.beginStep` and `actions.execute` MUST stay refused while any of them holds.
    Affordability MUST be asked of the whole selection AGGREGATED onto the common base unit, as the engine's own gate asks it, not option by option: two currency ingredients each affordable alone but not together are not affordable.
    The tool probe MUST exclude the items the selection will spend, as the engine's tool validation does, because one physical Item cannot be both a consumed ingredient and a held tool.
-   Two causes are knowable only asynchronously and so remain the engine's alone: a `macro` spend strategy, whose affordability only the macro can answer, and an Item Piles currency cost read through that module's API.
-   The projection stays OPTIMISTIC on both rather than inventing a refusal it cannot substantiate.
+   One cause is knowable only asynchronously and so remains the engine's alone: a `macro` spend strategy, whose affordability only the macro can answer.
+   The projection stays OPTIMISTIC on it rather than inventing a refusal it cannot substantiate.
    A stage's inputs are spent and its choice is locked when it starts, so a started stage is re-judged only on what is still re-validated live: its tools, which are never consumed and which a sale during the wait can remove.
    The player's own pick MUST be judged on the PERSISTED plan, not on the resolver's verdict: the resolver invents a greedy option and a suggested essence allocation when neither is persisted and then reports success, so a stage whose multi-option group or essence allocation is unrecorded is waiting on a choice however well its inputs resolve.
    Which control renders — the begin decision in place of the resolve action, or the resolve action itself — is decided by `actions.atStageStart` alone, never by `actions.beginStep` being truthy nor by matching `actions.disabledReason`: a refused cause at a stage's start boundary MUST keep the (disabled) begin control on screen rather than silently fall back to an enabled resolve action the command would refuse.

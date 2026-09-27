@@ -34,7 +34,6 @@ export function normalizeFeatures(system = {}) {
     // reversible.
     salvage: has('salvage') ? features.salvage === true : true,
     chatOutput: has('chatOutput') ? features.chatOutput === true : true,
-    itemPiles: has('itemPiles') ? features.itemPiles === true : false,
     // Whether a player self-cancelling an in-progress craft gets their consumed
     // ingredients + spent currency back (issue 848). Default ON for a forgiving
     // experience, but a GM may forfeit inputs on cancel by setting it false — an

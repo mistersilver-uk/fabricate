@@ -114,7 +114,6 @@ src/config/settingChangeBridge.js
 src/config/settings.js
 src/config/settingsMenu.js
 src/config/stackQuantityPathPresets.js
-src/integrations/ItemPilesIntegration.js
 src/migration/MigrationRunner.js
 src/migration/mergeEquivalentWorldEssences.js
 src/migration/migrateAlchemyCheckMode.js

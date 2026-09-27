@@ -1293,7 +1293,6 @@ async function startTimedCurrencyCraft({
     null,
     null,
     null,
-    null,
     spy
   );
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });

@@ -693,8 +693,7 @@ export class CraftingListingBuilder {
    */
   _evaluateSet({ recipe, set, step = null, craftSources, craftingActor }) {
     if (typeof this.recipeManager?.evaluateCraftability !== 'function') return null;
-    // A shallow copy preserves the recipe's data fields (craftingSystemId,
-    // currencyCost, …) and the IngredientSet instance methods, while narrowing the
+    // A shallow copy preserves the recipe's data fields (craftingSystemId, …) and the IngredientSet instance methods, while narrowing the
     // evaluation to this one set and applying the owning step's tool union (D1) —
     // evaluateCraftability reads recipe data only (never recipe prototype methods),
     // so the copy is sufficient. When no step is supplied (single-step callers) it

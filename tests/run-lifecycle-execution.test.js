@@ -795,23 +795,6 @@ test('CraftingEngine never leaves an uncommitted active run for an unresolved st
       },
     },
     {
-      name: 'currency',
-      refuses: true,
-      configure({ engine, recipe }) {
-        recipe.currencyCost = { currencies: [{ name: 'gp', cost: 5 }] };
-        engine.itemPilesIntegration = {
-          isEnabled: () => true,
-          canAfford: async () => false,
-          deductCurrency: async () => {
-            throw new Error('readiness must not spend currency');
-          },
-        };
-        game.fabricate.getCraftingSystemManager = () => ({
-          getSystem: () => ({ resolutionMode: 'simple' }),
-        });
-      },
-    },
-    {
       name: 'tool',
       refuses: true,
       configure({ recipeManager }) {

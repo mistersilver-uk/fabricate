@@ -177,7 +177,6 @@ export const RECIPE_FIELD_DOMAINS = Object.freeze({
   checkTierId: Object.freeze([RESOLUTION_CONFIG]),
   minSuccessOutcomeId: Object.freeze([RESOLUTION_CONFIG]),
   craftingModifier: Object.freeze([RESOLUTION_CONFIG]),
-  currencyCost: Object.freeze([RESOLUTION_CONFIG]),
   allowPlayerResultReorder: Object.freeze([RESOLUTION_CONFIG]),
   locked: Object.freeze([ACCESS_AND_KNOWLEDGE]),
   visibility: Object.freeze([ACCESS_AND_KNOWLEDGE]),

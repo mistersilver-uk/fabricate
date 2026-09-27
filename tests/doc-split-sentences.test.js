@@ -507,10 +507,18 @@ const RENAMED = [
       ],
     ],
   },
+  {
+    // The Item Piles removal deleted `src/integrations/`, its only occupant, so the path left the list.
+    before:
+      'Domain and runtime logic lives under `src/models/`, `src/systems/`, `src/utils/`, `src/integrations/`, `src/config/`, and related `src/` modules.',
+    after:
+      'Domain and runtime logic lives under `src/models/`, `src/systems/`, `src/utils/`, `src/config/`, and related `src/` modules.',
+    identifiers: [['`src/utils/`, `src/config/`', '`src/utils/`, `src/integrations/`, `src/config/`']],
+  },
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 26;
+const RENAMED_COUNT = 27;
 
 /** Everything `extract` yields from the post-split set, as one multiset. */
 function survivingLines(extract) {
@@ -580,7 +588,11 @@ test('every sentence, table row and fenced line of the pre-#1936 AGENTS.md still
       before.length === count,
       `${PRE_1936.fixture} yields ${before.length} ${kind}, not its pinned ${count}`
     );
-    const lost = missingSentences(multiset(before), survivingLines(extract));
+    // A verified rename excuses its sentence here too; `every rename claim` checks each one.
+    const renamed = new Set(RENAMED.map(({ before: was }) => was));
+    const lost = missingSentences(multiset(before), survivingLines(extract)).filter(
+      ({ sentence }) => !renamed.has(sentence)
+    );
     assert.deepEqual(
       lost.map(({ sentence, before: was, after: now }) => `(${was} -> ${now}) ${sentence}`),
       [],

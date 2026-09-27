@@ -170,7 +170,7 @@ function makeEngine(salvageRunManager) {
     toolMatchesItem: (_r, tool, item) => item.id === (tool.componentId || tool.systemItemId),
     ingredientMatchesItem: () => false,
   };
-  return new CraftingEngine(mockRecipeManager, null, null, null, salvageRunManager);
+  return new CraftingEngine(mockRecipeManager, null, null, salvageRunManager);
 }
 
 function setupSalvageGame(system, actor) {

@@ -223,22 +223,6 @@ const REFUSALS = [
     },
     journal: refused('Not enough coin.', ['currency.check', { unit: 'gp', amount: 9 }]),
   },
-  {
-    name: 'Item Piles afford failure',
-    async run() {
-      const world = craftProbe({
-        recipeCurrencyCost: { currencies: [{ id: 'gold', amount: 3 }] },
-        itemPiles: { afford: false },
-      });
-      await world.craft();
-      return world.journal.entries;
-    },
-    journal: refused('Insufficient currency (Item Piles). Cannot afford recipe cost.', [
-      'itemPiles.canAfford',
-      'Actor:Crafter',
-      [{ id: 'gold', amount: 3 }],
-    ]),
-  },
 ];
 
 /** The journal a plain craft with no check, no tools and no currency commits. */
@@ -904,15 +888,13 @@ const SCENARIOS = [
     ],
   },
   {
-    name: 'currency and Item Piles spend after consumption and before the award',
+    name: 'currency spends after consumption and before the award',
     async run() {
       const world = craftProbe({
         requirements: { currency: { enabled: true } },
         currencySpends: [{ unit: 'gp', amount: 2 }],
         currencyUnits: PROBE_CURRENCY_UNITS,
         actorCurrency: { gp: 5 },
-        recipeCurrencyCost: { currencies: [{ id: 'gold', amount: 3 }] },
-        itemPiles: { afford: true },
       });
       await world.craft();
       return world.journal.entries;
@@ -922,7 +904,6 @@ const SCENARIOS = [
       ['run.createRun', 'Actor:Crafter', 'Recipe:recipe-probe', ['Actor:Source'], 'user-probe'],
       ['visibility.guardCraftStart', { recipe: 'recipe-probe' }],
       ['currency.check', { unit: 'gp', amount: 2 }],
-      ['itemPiles.canAfford', 'Actor:Crafter', [{ id: 'gold', amount: 3 }]],
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r notApplicable/pending]'],
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r pending/pending]'],
       ['item.update', 'Item:wood', { 'system.quantity': 3 }],
@@ -930,7 +911,6 @@ const SCENARIOS = [
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
       ['currency.spend', { unit: 'gp', amount: 2 }],
       ['actor.update', 'Actor:Crafter', { 'system.currency.gp': 3 }],
-      ['itemPiles.deductCurrency', 'Actor:Crafter', [{ id: 'gold', amount: 3 }]],
       ['actor.createEmbedded', 'Actor:Crafter', 'Item', [{ name: 'plank', quantity: 1 }]],
       ['run.completeStepSuccess', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, { selectedIngredientSetId: 'set-1', lastCheckResult: { success: true, reason: 'Success', data: {} }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [], createdResults: [{ actorUuid: 'Actor.Crafter', itemUuid: 'Actor.Crafter.Item.made-1', name: 'plank', img: 'icons/src-plank.png', quantity: 1, componentId: 'plank', resultRowId: 'rg-1:r-1-1:0', sourceItemUuid: 'Item.src-plank' }] }, {}],
       ['visibility.applyRecipeItemUseOnCraft', { recipe: 'recipe-probe' }],

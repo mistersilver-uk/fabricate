@@ -1316,8 +1316,7 @@ Crafting System
 |  |- effectTransfer
 |  |- multiStepRecipes
 |  |- gathering
-|  |- salvage (GM toggle, default-ON when absent; an explicit false IS honoured — additionally gated per-component by salvage.enabled)
-|  `- itemPiles
+|  `- salvage (GM toggle, default-ON when absent; an explicit false IS honoured — additionally gated per-component by salvage.enabled)
 |- categories (RECIPE categories; custom only; General implied)
 |- componentCategories (COMPONENT categories; custom only; General implied — a sibling of, and independent from, categories)
 |- components
@@ -1797,8 +1796,6 @@ The gathering implementation checkpoints are in [the domain history](docs/domain
 
 ### 8. Module Integration (Infrastructure)
 
-- Item Piles integration
-- Future calendar/time integrations
 - Foundry hooks that bridge document events into domain behavior
 
 ## Remaining Drift to Track

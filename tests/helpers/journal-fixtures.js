@@ -234,7 +234,7 @@ export async function createPersistedCraftingHistory({
     getCurrencyConfig: () => currencyConfigStore.get(),
   };
   const configure = () => {
-    const engine = new CraftingEngine(recipeManager, manager, null, null, null, null,
+    const engine = new CraftingEngine(recipeManager, manager, null, null, null,
       currencySeams.actorPropertyCoinSpender, { currencyConfigStore });
     engine.installVersionedRunAuthority({ consumeExecutionGrant: async (_grant, context) => ({
       operationId: `operation-${context.requestId}`,
@@ -514,7 +514,7 @@ export async function createPersistedSalvageHistory({ timed = false } = {}) {
       fabricate: { getCraftingSystemManager: () => ({ getSystem: () => system }) } };
     globalThis.fromUuid = async (uuid) => uuid === actor.uuid ? actor : null;
     const manager = new SalvageRunManager();
-    const engine = new CraftingEngine({ getToolsForSet: () => [] }, null, null, null, manager);
+    const engine = new CraftingEngine({ getToolsForSet: () => [] }, null, null, manager);
     const response = await engine.salvage(actor.uuid, system.id, component.id);
     if (timed) { game.time.worldTime += 60; await engine.processPendingSalvageRuns(game.time.worldTime); }
     actor.flags = JSON.parse(JSON.stringify(actor.flags));

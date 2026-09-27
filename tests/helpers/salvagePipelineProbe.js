@@ -286,7 +286,6 @@ export function salvageRunProbe(spec = {}) {
     { toolMatchesItem: (_recipe, tool, item) => item?.componentId === tool?.componentId },
     null,
     resolutionService,
-    null,
     manager.recording,
     probeCoinSpender(journal),
     probeCoinSpender(journal),

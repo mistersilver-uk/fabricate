@@ -42,7 +42,7 @@ function installSystem({ components = [] } = {}) {
 }
 
 function replacementEngine(resolveItemUuid = async () => null) {
-  return new CraftingEngine(null, null, null, null, null, null, null, {
+  return new CraftingEngine(null, null, null, null, null, null, {
     getCraftingSystem: () => installedSystem,
     resolveItemUuid,
   });
