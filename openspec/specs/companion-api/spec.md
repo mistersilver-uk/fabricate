@@ -292,6 +292,10 @@ Both members therefore derive every reported amount from what the write itself r
 An award has no natural key: awarding 3 hides twice is legitimately 6 hides, and crediting 50 gp twice is legitimately 100 gp.
 `grantRecipeKnowledge` is idempotent only because the learned map is its own key, and no equivalent state exists here.
 Fabricate will not add an idempotency key: a per-actor ledger of caller-supplied award ids is a new persisted shape with unbounded growth and no restore semantics, and a partial guarantee is more dangerous than a published non-guarantee because it invites a caller to stop defending itself.
+The companion effect marker is operation evidence, not an award idempotency key: it is one Fabricate-owned slot per document, keyed by operation, effect and subwrite id rather than a caller-supplied award id.
+It is overwritten, never accumulated, and `awardComponents` and `creditCurrency` never read it.
+Neither member gains an idempotency guarantee.
+Knowledge grants carry no marker; their learned map remains their own key.
 The recommended caller discipline is a **claim recorded in front of the irreversible act**, not a guard inside it, and Fabricate cannot supply that claim because it does not own the activity the award settles.
 
 The election gate is a mitigation rather than a lock, and its strength is stated exactly.
@@ -577,7 +581,8 @@ An equal retry observes the existing record unchanged, while a different plan fo
 The operation id is reused across users, clients, delivery attempts, reloads and restarts; transport request identity is separate.
 
 This submission and its persistence adapter remain internal in this increment.
-They publish no operation method on `game.fabricate.api.companion`, execute no effect and do not alter the compatibility contract below.
+They publish no operation method on `game.fabricate.api.companion` and do not alter the compatibility contract below.
+Core ships an internal effect executor that no ingress invokes; no effect runs in this increment.
 
 ## Companion Operation Authority
 
@@ -596,9 +601,13 @@ The claim id names the attempt; no timestamp establishes ownership, and no compa
 
 Acceptance itself is first-wins by the operation id, so it can finish while a claim is lost.
 After the awaited acceptance Core verifies the exact claim, rereads the stored record from the server copy and verifies the claim again before it invokes the injected executor, passing that stored record and the held-claim context rather than anything derived from the request.
-Only an accepted or pending stored record with no applying effect may continue; a conflict, invalid input, invalid stored evidence, unavailable storage, a terminal record, and a failed, review-required or awaiting-decision record are observation-only, as is any record with an applying effect.
+Only an accepted or pending stored record with no mutation in flight may continue; a conflict, invalid input, invalid stored evidence, unavailable storage, a terminal record, and a failed, review-required or awaiting-decision record are observation-only, as is any record with a subwrite `applying` or an `applying` effect with null evidence.
+Otherwise an `applying` effect whose subwrites are all settled or pending may continue, and a run resumes only its pending subwrites.
 An equal eligible retry may invoke the executor again serially; this is not an exactly-once callback promise for the world's lifetime.
 A claim check cannot preempt a mutation already in flight, so an executor checks before each next step, and an executor that throws leaves its claim retained for reconciliation rather than released on a timeout.
+An executor that has durably recorded an applying, uncertain or failed subwrite returns normally and its claim is released; the stored evidence, not the claim, keeps the record observation-only.
+Only an executor that throws, having recorded nothing about a mutation it may have begun, leaves its claim retained.
+An executor whose claim is lost after it recorded an intent writes nothing further and reports recovery required, so that run is kept for reconciliation as a throw is.
 
 Evidence is never discarded to settle duplicate ledgers: any embedded page, including a valid or malformed operation record or a page nothing recognises, makes a ledger non-pristine, an inspection that did not answer authorizes no deletion, and two evidence-bearing ledgers remain ambiguous for explicit reconciliation.
 
@@ -608,7 +617,42 @@ A second browser of the elected User that loses the claim sends no contention re
 The socket acknowledgement confirms relay only.
 A relay that times out reports the same operation id as pending and indeterminate, never as a rejection, a replacement identity or a reason to retire a claim.
 
-This increment publishes no operation method on `game.fabricate.api.companion`, ships no executor or effect, and performs no automatic startup or handoff recovery.
+This increment publishes no operation method on `game.fabricate.api.companion`, ships an internal effect executor that no ingress invokes (no effect runs in this increment), and performs no automatic startup or handoff recovery.
+
+## Companion Reward Effects
+
+The internal executor runs one stored record's effects in plan order under the held run claim, and is not wired into bootstrap.
+It stops at the first effect whose declared decision is still pending, leaving that effect and every later one untouched.
+It validates an effect only when the walk reaches it: an unknown kind, an invalid payload, an empty recipient list, a recipient with an empty award or recipe list, or an actor that does not resolve to a world actor fails that effect whole before any write, and the walk stops.
+
+Three kinds exist, and each names its subwrites by plan position:
+
+- `componentAward` `{ systemId, recipients: [{ actorId, awards: [{ componentId, quantity }] }] }`, one subwrite `r<i>.a<j>` per award, replay class `structuredMarker`;
+- `currencyCredit` `{ unitId, recipients: [{ actorId, amount }] }`, one subwrite `r<i>` per recipient, whose replay class follows the world spend strategy: `structuredMarker` for `actorProperty`, `structuredObserved` for `actorInventory` and `opaqueMacro` for `macro`;
+- `recipeKnowledgeGrant` `{ grantedBy, recipients: [{ actorId, recipeIds }] }`, one subwrite `r<i>.k<j>` per recipe, replay class `idempotentKey`.
+
+A subwrite target records the resolved world actor's uuid.
+For each subwrite the executor verifies the claim, persists `applying` with its intent and requires the store to answer `updated`, verifies the claim again, writes once, and persists `applied`, `knownFailure` or `uncertain`.
+An already-known recipe goes from pending to `applied` with no write, under the claim.
+Within one effect it continues past a known failure, as the legacy award does; it stops on an uncertain subwrite, on any store answer other than `updated`, on a lost claim, and at an effect that did not end applied.
+When every effect is applied it completes the record.
+A resumed run skips settled subwrites, runs only pending ones, and stacks a later award onto the item an applied receipt names.
+
+A component or `actorProperty` subwrite is applied only when the returned document's `_source` carries the marker and the intended post-value; a create answering no document or an update answering nothing is a known failure, and a throw or a mismatch is uncertain.
+An `actorInventory` credit is applied only when the balance measured around the write moved by exactly the credited base amount; a spender that provably wrote nothing is a known failure, and any other delta, zero included, is uncertain.
+A `macro` credit runs once under intent then receipt, and a throw or anything but a clean success is uncertain.
+A knowledge grant is applied only when the learned entry is in the returned `_source`.
+Each kind also exposes a probe for later recovery, answering `applied` or `uncertain` and never unapplied; nothing calls it in this increment, and an `actorInventory` or `macro` probe is always `uncertain`.
+
+These proofs have stated limits:
+
+- the store's revision check is read-then-write rather than compare-and-set, and the held claim is what serializes Fabricate's writers;
+- an actor-property credit and a stack award are read-modify-write, so a concurrent non-Fabricate writer between the read and the write can lose an update;
+- a post-value check assumes Fabricate is the sole writer between its pre-read and its write, and a concurrent writer makes the subwrite uncertain or, coincidentally, falsely applied;
+- an actor-property credit adds to the prepared balance, which an Active Effect can inflate;
+- an `actorInventory` delta that coincidentally equals the credited amount reads as applied;
+- a knowledge probe reads the learned entry with `granted: true` and the intended `grantedBy`, which is not unique to one operation, so a later matching grant also reads as applied;
+- only world actors are supported, and an unlinked token's synthetic actor is refused.
 
 ## The Compatibility Promise
 

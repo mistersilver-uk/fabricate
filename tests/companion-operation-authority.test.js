@@ -14,7 +14,7 @@ import {
   JOURNAL_RUN_CLAIM_PAGE_ID,
   createJournalRunAuthority,
 } from '../src/systems/journalRunAuthority.js';
-import { effectEvidence } from './helpers/companionEffectEvidence.js';
+import { effectEvidence, evidenceOf } from './helpers/companionEffectEvidence.js';
 
 const CLAIM = JOURNAL_RUN_CLAIM_PAGE_ID;
 const OPERATION_ID = 'AbCdEfGhIjKlMn01';
@@ -175,6 +175,13 @@ function storedRecord(state, effectPhase, extra = {}) {
     effectStates: [{ effectId: 'reward', phase: effectPhase, evidence, waiver: null }],
     ...extra,
   });
+}
+
+/** An applying `reward` effect whose v1 evidence has subwrites in `phases`. */
+function inFlight(phases) {
+  return {
+    effectStates: [{ effectId: 'reward', phase: 'applying', evidence: evidenceOf(phases), waiver: null }],
+  };
 }
 
 describe('companion operation authority', () => {
@@ -440,6 +447,7 @@ describe('companion operation authority', () => {
     ['failed', storedRecord('failed', 'knownFailure')],
     ['reviewRequired', storedRecord('reviewRequired', 'reviewRequired')],
     ['pending with an applying effect', storedRecord('pending', 'applying')],
+    ['pending with an applying subwrite', storedRecord('pending', 'applying', inFlight(['applied', 'applying']))],
     ['completed', storedRecord('completed', 'applied', { outcome: { applied: 1 } })],
   ]) {
     it(`leaves a ${label} stored record observation-only`, async () => {
@@ -482,6 +490,46 @@ describe('companion operation authority', () => {
     const result = await companion.submit({ operationId: OPERATION_ID, plan: plan() });
     assert.equal(result.continued, true);
     assert.equal(seen[0].revision, 1, 'the reread stored record, not the request-derived one');
+  });
+
+  it('resumes a pending stored record whose applying effect has no subwrite in flight', async () => {
+    const world = sharedWorld();
+    world.storeRecord(storedRecord('pending', 'applying', inFlight(['applied', 'pending'])));
+    const seen = [];
+    const { companion } = world.realm('gm', { executor: async ({ record }) => seen.push(record) });
+    const result = await companion.submit({ operationId: OPERATION_ID, plan: plan() });
+    assert.equal(result.continued, true);
+    assert.deepEqual(
+      seen[0].effectStates[0].evidence.subwrites.map(({ phase }) => phase),
+      ['applied', 'pending']
+    );
+  });
+
+  it('keeps the run in recovery when the executor reports a claim lost after an intent', async () => {
+    const world = sharedWorld();
+    const { companion } = world.realm('gm', {
+      executor: async () => ({ status: 'stopped', reason: 'claimLost', recoveryRequired: true }),
+    });
+    const result = await companion.submit({ operationId: OPERATION_ID, plan: plan() });
+    assert.equal(result.continued, true);
+    assert.equal(result.reason, 'claimLost');
+    assert.equal(result.recoveryRequired, true);
+    assert.equal(world.pages.has(CLAIM), true);
+    const [request] = Object.values(world.ledger.state.requests).filter(
+      (entry) => entry.kind === 'command'
+    );
+    assert.equal(request.status, 'recoveryRequired');
+  });
+
+  it('releases the claim when the executor returns a stopped summary without recovery', async () => {
+    const world = sharedWorld();
+    const { companion } = world.realm('gm', {
+      executor: async () => ({ status: 'stopped', reason: 'uncertain', recoveryRequired: false }),
+    });
+    const result = await companion.submit({ operationId: OPERATION_ID, plan: plan() });
+    assert.equal(result.continued, true);
+    assert.equal(result.recoveryRequired, undefined);
+    assert.equal(world.pages.has(CLAIM), false);
   });
 
   it('never invokes the executor for invalid input, invalid storage or unavailable storage', async () => {

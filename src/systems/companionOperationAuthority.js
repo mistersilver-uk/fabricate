@@ -1,4 +1,7 @@
-import { observeCompanionOperationId } from './companionOperationRecord.js';
+import {
+  hasInFlightCompanionEffect,
+  observeCompanionOperationId,
+} from './companionOperationRecord.js';
 import { JOURNAL_RUN_CLAIM_PAGE_ID } from './journalRunAuthority.js';
 import { JOURNAL_RUN_COMMAND_TIMEOUT_MS } from './journalRunCommands.js';
 
@@ -26,12 +29,14 @@ function validText(value) {
 
 /**
  * Whether a stored record may reach the executor. Only an accepted or pending record with no
- * applying effect: an applying effect is uncertain evidence a later step must reconcile, and a
- * failed, review-required or awaiting-decision record waits for its own explicit ingress.
+ * mutation in flight: an applying subwrite, or an applying effect without evidence, is uncertain
+ * evidence a later step must reconcile, while an applying effect whose subwrites are all settled
+ * or pending may resume. A failed, review-required or awaiting-decision record waits for its own
+ * explicit ingress.
  */
 function executable(record) {
   if (!EXECUTABLE_STATES.has(record?.state)) return false;
-  return record.effectStates.every((effect) => effect.phase !== 'applying');
+  return !hasInFlightCompanionEffect(record);
 }
 
 /** The one refusal shape; `reason` is a stable code, never prose. */
@@ -81,8 +86,9 @@ function createClaimedAcceptance({ createStore, clock, executor }) {
       return { ...current, continued: false, reason: 'claim-lost' };
     }
     if (typeof executor !== 'function') return { ...current, continued: false };
+    let ran;
     try {
-      await executor({ record: structuredClone(stored.record), heldClaim });
+      ran = await executor({ record: structuredClone(stored.record), heldClaim });
     } catch (error) {
       // Whatever the executor had begun is uncertain, so the claim is retained for reconciliation.
       return {
@@ -94,11 +100,16 @@ function createClaimedAcceptance({ createStore, clock, executor }) {
       };
     }
     const after = await store.read(operationId);
-    return {
+    const settled = {
       ...current,
       record: after.status === 'found' ? after.record : current.record,
       continued: true,
     };
+    // A claim lost after an intent was recorded leaves a write that may still land elsewhere.
+    if (ran?.recoveryRequired === true) {
+      return { ...settled, reason: ran.reason ?? 'claim-lost', recoveryRequired: true };
+    }
+    return settled;
   }
 
   async function acceptUnderClaim({ operationId, plan }, helpers) {
@@ -190,8 +201,10 @@ function buildReply(payload, recipientId, response) {
  *
  * After acceptance the exact claim is verified, the stored record is reread from the server copy,
  * and the claim is verified again before the injected executor is invoked with that stored record
- * and the held-claim context. This increment ships no executor: effects, recovery and public
- * methods belong to later increments, and none of this claims fencing or exactly-once callbacks.
+ * and the held-claim context. Bootstrap wires no executor yet, so no effect runs in this
+ * increment; recovery and public methods belong to later increments, and none of this claims
+ * fencing or exactly-once callbacks. An executor summary with `recoveryRequired: true` keeps the
+ * run in recovery, as a throw does.
  *
  * @param {object} deps
  * @param {object} deps.authority The shared authority from `createJournalRunAuthority`.
@@ -202,7 +215,8 @@ function buildReply(payload, recipientId, response) {
  * @param {Function} deps.emit `(message, options) => void` module-socket adapter.
  * @param {Function} deps.randomId Request and session id supplier.
  * @param {Function} deps.clock Wall-clock milliseconds for acceptance timestamps.
- * @param {Function|null} [deps.executor] `async ({record, heldClaim}) => void`, the later seam.
+ * @param {Function|null} [deps.executor] `async ({record, heldClaim}) => summary`, as
+ *   `createCompanionOperationEffectExecutor` builds; not wired at bootstrap.
  * @param {number} [deps.timeoutMs] Relay reply timeout; expiry never implies failure.
  * @returns {object} Internal `submit`, `handleSubmission` and `handleSocketMessage` methods.
  */
