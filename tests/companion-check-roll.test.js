@@ -936,28 +936,31 @@ const SKILLED_ACTOR = {
 describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
   it('iterates every published capability row, and an unlisted row refuses evaluationUnsupported', async () => {
     for (const mode of CHECK_EVALUATION_CAPABILITIES.modes) {
-      installChat();
-      installRoll({ total: 10 });
-      const { seams } = makeSeams({ real: true });
-      const attribute = mode.targetSources[0] === 'attribute';
-      const evaluation = {
-        product: mode.product,
-        direction: mode.direction,
-        target: attribute
-          ? { source: 'attribute', expression: '@skills.craft.value' }
-          : { source: 'fixed' },
-      };
-      const result = await rollActorCheck(
-        request({
-          actor: SKILLED_ACTOR,
-          dc: attribute ? undefined : 15,
-          evaluation,
-        }),
-        seams
-      );
-      assert.notEqual(result.outcome, 'evaluationUnsupported', JSON.stringify(mode));
-      assert.notEqual(result.outcome, 'evaluationInvalid', JSON.stringify(mode));
-      assert.notEqual(result.outcome, 'targetUnresolved', JSON.stringify(mode));
+      for (const source of mode.targetSources) {
+        installChat();
+        installRoll({ total: 10 });
+        const { seams } = makeSeams({ real: true });
+        const attribute = source === 'attribute';
+        const evaluation = {
+          product: mode.product,
+          direction: mode.direction,
+          target: attribute
+            ? { source: 'attribute', expression: '@skills.craft.value' }
+            : { source: 'fixed' },
+        };
+        const result = await rollActorCheck(
+          request({
+            actor: SKILLED_ACTOR,
+            dc: attribute ? undefined : 15,
+            evaluation,
+          }),
+          seams
+        );
+        assert.ok(
+          ['checkPassed', 'checkFailed', 'rolled'].includes(result.outcome),
+          JSON.stringify({ mode, source })
+        );
+      }
     }
 
     installChat();
@@ -1053,6 +1056,37 @@ describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
       assert.equal(result.outcome, 'evaluationInvalid', `baseAdjustment ${baseAdjustment}`);
       assert.deepEqual(rolled.constructions, []);
     }
+  });
+
+  it('grades a sum/under request with an attribute target, keyed by target', async () => {
+    installChat();
+    installRoll({ total: 40 });
+    const { seams } = makeSeams({ real: true });
+
+    const passed = await rollActorCheck(
+      request({
+        actor: SKILLED_ACTOR,
+        evaluation: { direction: 'under', target: { source: 'attribute', expression: '@skills.craft.value' } },
+      }),
+      seams
+    );
+
+    assert.equal(passed.outcome, 'checkPassed');
+    assert.equal(passed.message, CHECK_ROLL_MESSAGE_KEYS.checkPassedTarget);
+    assert.deepEqual(passed.messageData, { label: 'Fabricate', total: 40, target: 55 });
+
+    installRoll({ total: 90 });
+    const failed = await rollActorCheck(
+      request({
+        actor: SKILLED_ACTOR,
+        evaluation: { direction: 'under', target: { source: 'attribute', expression: '@skills.craft.value' } },
+      }),
+      makeSeams({ real: true }).seams
+    );
+
+    assert.equal(failed.outcome, 'checkFailed');
+    assert.equal(failed.message, CHECK_ROLL_MESSAGE_KEYS.checkFailedTarget);
+    assert.deepEqual(failed.messageData, { label: 'Fabricate', total: 90, target: 55 });
   });
 
   it('grades a fixed sum/under request against its own dc, keyed by target', async () => {
