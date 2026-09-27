@@ -370,11 +370,24 @@ const SITE_MAPPING = [
     anchors: ['readStoredStackQuantity(target, { absentDefault: null, path: quantityPath })'],
   },
   {
+    // The effect-path landing proof on a CREATED item's `_source` (issue 1954): absent reads as
+    // one, exactly as the payload check above admits a source item with no count field.
+    site: 'companionComponentAward created-item landing proof',
+    file: 'src/systems/companionComponentAward.js',
+    accessor: 'readStoredStackQuantity',
+    sites: 1,
+    absentDefault: 1,
+    anchors: [
+      'readStoredStackQuantity(document?._source, { absentDefault: 1, path: quantityPath })',
+    ],
+  },
+  {
+    // The update PAYLOAD, so the effect path can carry its marker in the same write (issue 1954).
     site: 'companionComponentAward stack write',
     file: 'src/systems/companionComponentAward.js',
-    accessor: 'updateStackQuantity',
+    accessor: 'stackQuantityUpdate',
     sites: 1,
-    anchors: ['updateStackQuantity(target, before + quantity, quantityPath)'],
+    anchors: ['stackQuantityUpdate(target, before + quantity, quantityPath)'],
   },
   {
     // The pooled holdings READ counts what a party is carrying (issue 1342), and it must count it

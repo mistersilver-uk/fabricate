@@ -9,6 +9,14 @@ import {
   COMPANION_OPERATION_RECORD_FLAG,
   createCompanionOperationStore,
 } from '../src/systems/companionOperationStore.js';
+import { INTENT, RECEIPT, TARGET, effectEvidence } from './helpers/companionEffectEvidence.js';
+import { expandObject } from './helpers/foundryExpandObject.js';
+import {
+  forEachReplacementForm,
+  isForcedReplacement,
+  recordWrite,
+  replacedKey,
+} from './helpers/forcedDeletion.js';
 
 const OPERATION_ID = 'AbCdEfGhIjKlMn01';
 
@@ -42,6 +50,36 @@ function page(record, id = record.operationId) {
   };
 }
 
+const isMergeable = (value) =>
+  Boolean(value) &&
+  typeof value === 'object' &&
+  !Array.isArray(value) &&
+  !isForcedReplacement(value);
+
+/**
+ * `Document#update` as Foundry applies it: values are dot-expanded, dotted keys merge, while `==`
+ * or the operator replace.
+ */
+function applyDocumentUpdate(document, changes) {
+  for (const [path, value] of Object.entries(changes)) {
+    if (path === '_id') continue;
+    const segments = path.split('.');
+    const leaf = segments.pop();
+    const node = segments.reduce((target, segment) => (target[segment] ??= {}), document);
+    const replaced = replacedKey(leaf, value);
+    if (replaced) node[replaced.key] = structuredClone(expandObject(replaced.value));
+    else mergeInto(node, leaf, expandObject(value));
+  }
+}
+
+function mergeInto(node, key, value) {
+  if (!isMergeable(value) || !isMergeable(node[key])) {
+    node[key] = structuredClone(value);
+    return;
+  }
+  for (const [innerKey, inner] of Object.entries(value)) mergeInto(node[key], innerKey, inner);
+}
+
 function parent(id, pages) {
   return {
     id,
@@ -68,13 +106,11 @@ function harness({ now = 100 } = {}) {
       return [created];
     },
     async updateEmbeddedDocuments(type, updates) {
-      calls.updates.push({ type, updates: structuredClone(updates) });
+      recordWrite(calls.updates, updates, { type, updates });
       const update = updates[0];
       const existing = stored.get(update._id);
       if (!existing) throw new Error('missing page');
-      existing.flags.fabricate.companionOperationRecord = structuredClone(
-        update[COMPANION_OPERATION_RECORD_FLAG]
-      );
+      applyDocumentUpdate(existing, update);
       return [existing];
     },
   };
@@ -98,7 +134,7 @@ function completedRecord() {
   record.effectStates[0] = {
     effectId: 'reward',
     phase: 'applied',
-    evidence: { itemId: 'item-1' },
+    evidence: effectEvidence('applied'),
     waiver: null,
   };
   record.outcome = { awarded: 1 };
@@ -349,4 +385,205 @@ test('invalid input is tagged before storage', async () => {
   assert.deepEqual(await fixture.store.read('bad'), { status: 'invalidInput' });
   assert.deepEqual(await fixture.store.archive(OPERATION_ID, ' '), { status: 'invalidInput' });
   assert.equal(fixture.calls.reads.length, 0);
+});
+
+const SKELETON = {
+  replayClass: 'structuredMarker',
+  subwrites: [{ subwriteId: 'r0.a0', target: TARGET }],
+};
+
+function transitionInput(expectedRevision, change) {
+  return { effectId: 'reward', subwriteId: 'r0.a0', expectedRevision, change };
+}
+
+const applying = (expectedRevision = 0) =>
+  transitionInput(expectedRevision, { type: 'applying', intent: INTENT, skeleton: SKELETON });
+
+forEachReplacementForm('transitionEffect replaces the record flag wholesale and verifies it', async (form) => {
+  form.apply();
+  const fixture = harness({ now: 150 });
+  fixture.stored.set(OPERATION_ID, page(createCompanionOperationRecord(submission(), 100)));
+
+  const result = await fixture.store.transitionEffect(OPERATION_ID, applying());
+  assert.equal(result.status, 'updated');
+  assert.equal(result.record.revision, 1);
+  assert.equal(result.record.updatedAt, 150);
+  assert.equal(result.record.effectStates[0].evidence.subwrites[0].phase, 'applying');
+  assert.deepEqual(fixture.calls.updates, [
+    {
+      type: 'JournalEntryPage',
+      updates: [
+        form.expect({ _id: OPERATION_ID, 'flags.fabricate.==companionOperationRecord': result.record }),
+      ],
+    },
+  ]);
+  assert.deepEqual(
+    fixture.stored.get(OPERATION_ID).flags.fabricate.companionOperationRecord,
+    result.record
+  );
+});
+
+forEachReplacementForm('a key the transition drops is gone from the stored record', async (form) => {
+  form.apply();
+  const fixture = harness({ now: 150 });
+  fixture.stored.set(OPERATION_ID, page(createCompanionOperationRecord(submission(), 100)));
+  const result = await fixture.store.transitionEffect(OPERATION_ID, applying());
+  const [{ updates }] = fixture.calls.updates;
+
+  const lingering = page(result.record);
+  lingering.flags.fabricate.companionOperationRecord.effectStates = { stale: true };
+  lingering.flags.fabricate.companionOperationRecord.archive.staleNote = 'left by a merge';
+  lingering.flags.fabricate.sibling = 'kept';
+  applyDocumentUpdate(lingering, updates[0]);
+  assert.deepEqual(lingering.flags.fabricate.companionOperationRecord, result.record);
+  assert.equal(lingering.flags.fabricate.sibling, 'kept', 'only the record key is replaced');
+
+  const merged = page(result.record);
+  merged.flags.fabricate.companionOperationRecord.archive.staleNote = 'left by a merge';
+  applyDocumentUpdate(merged, { [COMPANION_OPERATION_RECORD_FLAG]: result.record });
+  assert.equal(
+    merged.flags.fabricate.companionOperationRecord.archive.staleNote,
+    'left by a merge',
+    'the fake merges an ordinary dotted update, so the replacement above is what dropped it'
+  );
+});
+
+forEachReplacementForm('a stored applying intent reads back exactly as sent through expansion', async (form) => {
+  form.apply();
+  const fixture = harness({ now: 150 });
+  fixture.stored.set(OPERATION_ID, page(createCompanionOperationRecord(submission(), 100)));
+  const intent = {
+    ...INTENT,
+    postValues: [{ path: 'system.currency.gp', value: 4 }],
+    nested: { list: [{ inner: { deep: 1 } }] },
+  };
+  const change = { type: 'applying', intent, skeleton: SKELETON };
+
+  const result = await fixture.store.transitionEffect(OPERATION_ID, transitionInput(0, change));
+  assert.equal(result.status, 'updated');
+  const stored = fixture.stored.get(OPERATION_ID).flags.fabricate.companionOperationRecord;
+  assert.deepEqual(stored, result.record);
+  assert.deepEqual(stored.effectStates[0].evidence.subwrites[0].intent, intent);
+
+  const dotted = { ...INTENT, postValues: { 'system.currency.gp': 4 } };
+  const refused = await fixture.store.transitionEffect(
+    OPERATION_ID,
+    transitionInput(1, { type: 'applied', receipt: { ...RECEIPT, 'a.b': 1 } })
+  );
+  assert.equal(refused.status, 'invalidTransition');
+  assert.equal(fixture.calls.updates.length, 1, 'a dotted key is refused before any write');
+
+  const fresh = harness({ now: 150 });
+  fresh.stored.set(OPERATION_ID, page(createCompanionOperationRecord(submission(), 100)));
+  const dottedChange = { type: 'applying', intent: dotted, skeleton: SKELETON };
+  const answer = await fresh.store.transitionEffect(OPERATION_ID, transitionInput(0, dottedChange));
+  assert.equal(answer.status, 'invalidTransition');
+  assert.deepEqual(fresh.calls.updates, []);
+});
+
+test('complete persists the derived outcome once every effect is applied', async () => {
+  const fixture = harness({ now: 150 });
+  fixture.stored.set(OPERATION_ID, page(createCompanionOperationRecord(submission(), 100)));
+  await fixture.store.transitionEffect(OPERATION_ID, applying());
+  const applied = await fixture.store.transitionEffect(
+    OPERATION_ID,
+    transitionInput(1, { type: 'applied', receipt: RECEIPT })
+  );
+  assert.equal(applied.record.effectStates[0].phase, 'applied');
+
+  const completed = await fixture.store.complete(OPERATION_ID, { expectedRevision: 2 });
+  assert.equal(completed.status, 'updated');
+  assert.equal(completed.record.state, 'completed');
+  assert.deepEqual(completed.record.outcome.effects[0].subwrites, [
+    { subwriteId: 'r0.a0', receipt: RECEIPT },
+  ]);
+  assert.deepEqual(
+    fixture.stored.get(OPERATION_ID).flags.fabricate.companionOperationRecord,
+    completed.record
+  );
+});
+
+test('a moved revision answers stale with the stored record and writes nothing', async () => {
+  const fixture = harness();
+  fixture.stored.set(OPERATION_ID, page(createCompanionOperationRecord(submission(), 100)));
+  const stale = await fixture.store.transitionEffect(OPERATION_ID, applying(3));
+  assert.equal(stale.status, 'stale');
+  assert.equal(stale.record.revision, 0);
+  assert.deepEqual(await fixture.store.complete(OPERATION_ID, { expectedRevision: 1 }), {
+    status: 'stale',
+    record: stale.record,
+  });
+  assert.equal(fixture.calls.updates.length, 0);
+});
+
+test('a refused transition, bad input or missing record never writes', async () => {
+  const fixture = harness();
+  fixture.stored.set(OPERATION_ID, page(createCompanionOperationRecord(submission(), 100)));
+  const refused = await fixture.store.transitionEffect(
+    OPERATION_ID,
+    transitionInput(0, { type: 'applied', receipt: RECEIPT })
+  );
+  assert.equal(refused.status, 'invalidTransition');
+  assert.equal(refused.record.revision, 0);
+  assert.equal((await fixture.store.complete(OPERATION_ID, { expectedRevision: 0 })).status, 'invalidTransition');
+  assert.deepEqual(await fixture.store.transitionEffect('bad', applying()), { status: 'invalidInput' });
+  assert.deepEqual(await fixture.store.transitionEffect(OPERATION_ID, null), { status: 'invalidInput' });
+  assert.deepEqual(await fixture.store.transitionEffect('ZzCdEfGhIjKlMn01', applying()), {
+    status: 'notFound',
+  });
+  assert.equal(fixture.calls.updates.length, 0);
+});
+
+test('an ambiguous transition write answers only from authoritative readback', async () => {
+  const landed = harness({ now: 150 });
+  landed.stored.set(OPERATION_ID, page(createCompanionOperationRecord(submission(), 100)));
+  const write = landed.ledger.updateEmbeddedDocuments;
+  landed.ledger.updateEmbeddedDocuments = async (...args) => {
+    await write.apply(landed.ledger, args);
+    throw new Error('acknowledgement lost');
+  };
+  const reconciled = await landed.store.transitionEffect(OPERATION_ID, applying());
+  assert.equal(reconciled.status, 'updated');
+  assert.equal(reconciled.record.revision, 1);
+  assert.equal(landed.calls.reads.length, 2);
+
+  const lost = harness();
+  lost.stored.set(OPERATION_ID, page(createCompanionOperationRecord(submission(), 100)));
+  lost.ledger.updateEmbeddedDocuments = async () => {
+    throw new Error('rejected');
+  };
+  assert.deepEqual(await lost.store.transitionEffect(OPERATION_ID, applying()), {
+    status: 'unavailable',
+  });
+
+  const ignored = harness();
+  ignored.stored.set(OPERATION_ID, page(createCompanionOperationRecord(submission(), 100)));
+  ignored.ledger.updateEmbeddedDocuments = async () => [ignored.stored.get(OPERATION_ID)];
+  assert.deepEqual(await ignored.store.transitionEffect(OPERATION_ID, applying()), {
+    status: 'unavailable',
+  });
+
+  const raced = harness({ now: 150 });
+  raced.stored.set(OPERATION_ID, page(createCompanionOperationRecord(submission(), 100)));
+  raced.ledger.updateEmbeddedDocuments = async () => {
+    const other = page(createCompanionOperationRecord(submission(), 100));
+    const winner = harness({ now: 175 });
+    winner.stored.set(OPERATION_ID, other);
+    const moved = await winner.store.transitionEffect(OPERATION_ID, applying());
+    raced.stored.set(OPERATION_ID, page(moved.record));
+    return [];
+  };
+  const stale = await raced.store.transitionEffect(OPERATION_ID, applying());
+  assert.equal(stale.status, 'stale');
+  assert.equal(stale.record.updatedAt, 175);
+
+  const unreadable = harness();
+  unreadable.stored.set(OPERATION_ID, page(createCompanionOperationRecord(submission(), 100)));
+  unreadable.ledger.updateEmbeddedDocuments = async () => {
+    unreadable.stored.set(OPERATION_ID, page({ recordVersion: 999 }));
+    return [];
+  };
+  assert.deepEqual(await unreadable.store.transitionEffect(OPERATION_ID, applying()), {
+    status: 'invalidStored',
+  });
 });

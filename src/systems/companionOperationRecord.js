@@ -1,3 +1,18 @@
+import {
+  CompanionOperationRecordError,
+  assertCompanionEffectEvidence,
+  deriveNonterminalState,
+  nextCompletedRecord,
+  nextEffectTransition,
+} from './companionOperationEvidence.js';
+
+export {
+  COMPANION_REPLAY_CLASSES,
+  deriveCompanionEffectPhase,
+  hasInFlightCompanionEffect,
+  CompanionOperationRecordError,
+} from './companionOperationEvidence.js';
+
 const OPERATION_ID_PATTERN = /^[A-Za-z0-9]{16}$/u;
 const RECORD_STATES = new Set([
   'accepted',
@@ -19,15 +34,6 @@ const EFFECT_PHASES = new Set([
 ]);
 const TERMINAL_STATES = new Set(['completed', 'completedWithOmissions']);
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-
-/** Invalid companion operation input or persisted evidence, identified by a stable internal code. */
-export class CompanionOperationRecordError extends Error {
-  constructor(message, code) {
-    super(message);
-    this.name = 'CompanionOperationRecordError';
-    this.code = code;
-  }
-}
 
 /** Create the immutable accepted snapshot for one validated operation submission. */
 export function createCompanionOperationRecord(submission, acceptedAt) {
@@ -139,6 +145,28 @@ export function archiveCompanionOperationRecord(record, { hiddenBy, hiddenAt } =
     },
   };
   return observeCompanionOperationRecord(next);
+}
+
+/**
+ * Apply one effect change as the next revision; throws `COMPANION_OPERATION_STALE_REVISION` or
+ * `INVALID_COMPANION_EFFECT_TRANSITION`. Input: `{ effectId, subwriteId, expectedRevision, at, change }`.
+ */
+export function transitionCompanionOperationEffect(record, input) {
+  return observeTransition(nextEffectTransition(observeCompanionOperationRecord(record), input));
+}
+
+/** Complete a record whose every effect is applied, deriving its outcome from the receipts. */
+export function completeCompanionOperationRecord(record, input) {
+  return observeTransition(nextCompletedRecord(observeCompanionOperationRecord(record), input));
+}
+
+function observeTransition(next) {
+  try {
+    return observeCompanionOperationRecord(next);
+  } catch (error) {
+    if (!(error instanceof CompanionOperationRecordError)) throw error;
+    return invalid(error.message, 'INVALID_COMPANION_EFFECT_TRANSITION');
+  }
 }
 
 function normalizePlan(value, code) {
@@ -312,6 +340,7 @@ function assertSlotInvariants(record, code) {
       invalid('An effect waiver must agree with the waived phase', code);
     }
   }
+  assertCompanionEffectEvidence(record.effectStates, code);
   const decisions = new Map(record.decisionStates.map((slot) => [slot.decisionId, slot]));
   for (const [index, effect] of record.plan.effects.entries()) {
     const hasPendingDependency = effect.requiresDecisionIds.some(
@@ -337,7 +366,7 @@ function assertRecordState(record, code) {
     return;
   }
   if (record.outcome !== null) invalid('A nonterminal record cannot carry an outcome', code);
-  const expected = expectedNonterminalState(record);
+  const expected = deriveNonterminalState(record);
   if (record.state !== expected) invalid('Record state contradicts its effect blockers', code);
 }
 
@@ -355,19 +384,6 @@ function assertAcceptedState(record, code) {
       (slot) => slot.phase === 'pending' && slot.evidence === null && slot.waiver === null
     );
   if (!allPending) invalid('Accepted state must be the exact initial snapshot', code);
-}
-
-function expectedNonterminalState(record) {
-  if (record.effectStates.some(({ phase }) => phase === 'reviewRequired')) return 'reviewRequired';
-  if (record.effectStates.some(({ phase }) => phase === 'knownFailure')) return 'failed';
-  const decisions = new Map(record.decisionStates.map((slot) => [slot.decisionId, slot.state]));
-  const awaitsDecision = record.plan.effects.some(
-    (effect, index) =>
-      record.effectStates[index].phase === 'pending' &&
-      effect.requiresDecisionIds.some((decisionId) => decisions.get(decisionId) === 'pending')
-  );
-  const applying = record.effectStates.some(({ phase }) => phase === 'applying');
-  return awaitsDecision && !applying ? 'awaitingDecision' : 'pending';
 }
 
 function assertTerminalState(record, code) {

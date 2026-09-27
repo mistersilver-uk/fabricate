@@ -858,8 +858,9 @@ type CurrencyConfig = {
     The credit additionally requires a positive SAFE-INTEGER amount, refusing anything else rather than truncating it, because a truncated amount is a different amount and because `current + amount` stops being exact beyond that range; the check is deliberately NOT narrowed to match, since narrowing what a published member accepts is a `schemaVersion` bump.
 13. The CHECK performs no write, and it is GM-gated at the facade, so it introduces no player-reachable trigger for GM-authored macro code with caller-chosen arguments.
     That first conjunct is what licensed a world-scoped surface reaching GM-authored macro code with caller-chosen arguments at all, and it is NOT true of the credit.
-14. The CREDIT performs exactly one write per call, and it reaches a GM macro — `increment` — that has never before been reachable from a companion.
+14. The CREDIT performs exactly one actor write per call, and it reaches a GM macro — `increment` — that has never before been reachable from a companion.
     Its safety therefore rests on TWO gates rather than one: the GM gate at the facade, and the call-site and election gate that requires a caller declaring a `broadcast` call site to be this client's elected executor.
+    A companion effect credit keeps that one write: an `actorProperty` credit carries the effect marker in the same update (see § Companion Effect Marker), an `actorInventory` or `macro` credit carries none, and the operation record's intent and receipt are written to the ledger page rather than the actor.
 15. A THIRD pair of world-scoped paths reads and spends against a SET of actors: the pooled balance read and the pooled debit behind the companion contract's pooled holdings members.
     They answer against the WORLD configuration alone on requirement 10's reasoning, and neither consults a crafting system's `requirements.currency.enabled` toggle.
     The pooled read is the only currency path that fires a GM's `balance` macro, and it fires it once per actor, SERIALLY: firing N of a world's own automation concurrently is a behaviour a GM cannot reason about, and the set is a party, so N is small.
@@ -4656,7 +4657,9 @@ Finite timestamps are injected audit-only wall-clock values and never arbitrate 
 
 A pending decision has null value and evidence, while a resolved decision has non-null saved value and evidence; false, zero and the empty string are valid saved JSON values.
 A pending effect has null evidence and waiver.
-Applied, known-failure and review-required effects require non-null durable evidence; an applying effect may retain evidence but has no waiver.
+Applied, known-failure and review-required effects require non-null durable evidence, and an applying effect has no waiver.
+An applying effect carries either v1 effect evidence or null; one with null evidence is in flight and observation-only, because nothing proves which of its writes happened.
+Every non-null effect evidence satisfies § Companion Effect Evidence.
 A waiver is present if and only if the effect is waived and records a nonblank user, finite timestamp and nonblank reason.
 An unresolved decision dependency permits its effect only to remain pending or be waived.
 
@@ -4675,11 +4678,75 @@ The record is stored on one embedded `JournalEntryPage` whose id is the operatio
 Acceptance first reads that exact parent and page authoritatively; a valid existing record answers duplicate or conflict without issuing a normal-retry create.
 Only a proven absent page in a present readable ledger permits `createEmbeddedDocuments('JournalEntryPage', ..., { keepId: true })`, preserving embedded-id uniqueness as the race boundary.
 A missing parent, unreadable response, malformed flag, rejected write without conclusive readback, empty or cancelled write result, wrong returned id or unverified acknowledgement fails closed.
-After an ambiguous create or archive write, only authoritative readback proving the stored state may report success.
+After an ambiguous create, archive or effect-transition write, only authoritative readback proving the stored state may report success.
 
 Every input and output boundary returns a detached snapshot, including the accepted plan captured before the first awaited write.
 Changing caller input while persistence is pending or changing a returned record cannot alter stored state or later plan comparison.
 The adapter claims neither a V13 compare-and-swap nor a transaction across documents; runtime execution serialization, claims, effects and public methods belong to later delivery increments.
+
+### Companion Effect Evidence
+
+An effect's evidence, when non-null, is exactly `{ evidenceVersion: 1, replayClass, failure, subwrites }`, and each subwrite is exactly `{ subwriteId, target, phase, intent, receipt, failure }`.
+Every key is always present: an empty value is `null`, never an absent key.
+A subwrite id is a nonblank string unique within its effect, its `target` is always a JSON object, and a non-null `intent`, `receipt` or `failure` is a JSON object.
+Unknown versions, missing or extra keys and any pairing below that does not hold fail closed as an invalid record.
+No object key at any depth under a subwrite's `target`, `intent`, `receipt` or `failure`, or under the effect-level `failure`, may contain a `.`: Foundry expands a dotted key on every document write, so such a record could never read back equal to the one sent, and it fails closed as an invalid record.
+A document path therefore travels as a value, never as a key: an `actorProperty` currency credit's intent is `{ unitId, amount, baseValue, creditedBase, strategy, postValues }`, where `postValues` is the list `[{ path, value }]` of the balances its one update intends, and every other credit's intent carries `postValues: null`.
+
+`replayClass` names how a subwrite's effect can be proven, from a closed set:
+
+- `structuredMarker`: the write carries the effect marker, so the target document itself proves it;
+- `structuredObserved`: the write cannot carry the marker, and only the delta measured during the write proves it;
+- `idempotentKey`: the target's own key (a learned-recipe entry) proves it, and no marker is written;
+- `opaqueMacro`: nothing proves it, so an interrupted run always needs review.
+
+Two `failure` fields mean different things.
+The effect-level `failure` is set only by an `effectFailure` change, which refuses a pending effect as a whole before any subwrite exists: it forces `replayClass: null` and `subwrites: []`, and it is the only evidence with no subwrites.
+A subwrite's `failure` carries the detail of that subwrite's `knownFailure` or `uncertain` phase.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Subwrite phase | `intent` | `receipt` | `failure` |
+| --- | --- | --- | --- |
+| `pending` | null | null | null |
+| `applying` | set | null | null |
+| `applied` | set; null only for an `idempotentKey` receipt `{ result: 'alreadyKnown' }` | set | null |
+| `knownFailure` | optional | null | set |
+| `uncertain` | set | null | set |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The effect phase is derived from its evidence and a stored phase that disagrees is invalid; a waived effect's evidence is checked for shape only.
+Highest precedence first: an effect-level failure gives `knownFailure`; any `uncertain` subwrite gives `reviewRequired`; any `pending` or `applying` subwrite gives `applying`; any `knownFailure` subwrite gives `knownFailure`; otherwise every subwrite is applied and the effect is `applied`.
+A subwrite failing while siblings are still pending therefore leaves the record `pending`, and an uncertain subwrite rolls up to a review-required effect and record.
+At most one subwrite in the whole record is `applying`.
+A mutation is in flight when a subwrite is `applying` or an `applying` effect has null evidence; otherwise only pending subwrites may be resumed.
+
+One effect change is one transition, applied to one subwrite named by effect and subwrite id, and it advances the revision by one and sets `updatedAt`:
+
+- `applying { intent }` from a pending subwrite, only while nothing is in flight;
+- `applied { receipt }` from an applying subwrite, or directly from a pending subwrite of an `idempotentKey` effect whose receipt is `{ result: 'alreadyKnown' }`, with intent left null;
+- `knownFailure { failure }` from a pending or applying subwrite;
+- `uncertain { failure }` from an applying subwrite;
+- `effectFailure { failure }` from a pending effect, naming no subwrite.
+
+The first change a pending effect takes carries a `skeleton` of its `replayClass` and every subwrite's id and target, which it fills in as pending subwrites; an effect that already has evidence refuses one.
+A settled subwrite (`applied`, `knownFailure` or `uncertain`) never changes here: waiver and retry belong to a later increment.
+A change on a terminal record, on an effect whose phase is neither pending nor applying, or on an effect with an unresolved decision is refused as `INVALID_COMPANION_EFFECT_TRANSITION`, and an expected revision that is not the stored one as `COMPANION_OPERATION_STALE_REVISION`.
+A record whose every effect is `applied` completes with the outcome `{ schemaVersion: 1, effects: [{ effectId, kind, subwrites: [{ subwriteId, receipt }] }] }`, derived from the evidence rather than supplied.
+
+A transition write reads the page authoritatively, answers `stale` with the stored record when the revision moved, and otherwise replaces the record flag wholesale by forced replacement, so a key the next record omits cannot survive a merge.
+The write is verified against the returned page; an ambiguous result rereads and answers `updated` only when the stored record equals the intended one, `stale` when the revision moved, and `unavailable` otherwise.
+This is read-then-write, not compare-and-set: the held run claim is what serializes writers.
+
+### Companion Effect Marker
+
+A write made for a `structuredMarker` subwrite carries the marker `{ operationId, effectId, subwriteId }` at `flags.fabricate.companionEffect` of the document it writes, in the same create or update that carries the value.
+In create data it is a plain nested object; in an update it is written by forced replacement of that one key.
+It is never written through `setFabricateFlag`, which nests beneath `flags.fabricate.fabricate`, and a receipt or probe reads the same path.
+The marker is one Fabricate-owned slot per document: it is overwritten by a later operation, never accumulated and never cleared, and a write outside the effect path omits the key rather than writing `null`.
+It is operation evidence, not an idempotency key: a marker proves a write only together with the intended value at its path, and a missing or overwritten marker makes the subwrite uncertain, never unapplied.
+For a stacked item the intended value is the stored count, which must be present; a created item whose source carries no count field holds one unit, so it proves a quantity of 1 exactly as the award admitted it.
 
 ## Behavioural Ownership
 

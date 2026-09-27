@@ -143,27 +143,60 @@ export class ActorPropertyCoinSpender {
    * write is judged by its return (issue 1301): `Document#update` resolves `undefined` for an empty
    * diff, which an off-schema `actorPath` produces, so that answers `wroteNothing` and a cancel
    * reports `partialRefund`. The test sits inside the zero-updates guard, as a non-positive amount
-   * legitimately writes nothing.
+   * legitimately writes nothing. `ctx.markerUpdate` (issue 1954) rides in the same update only
+   * when there is a value to write, so a marker never makes an empty refund look written; that
+   * path also answers the `updates` and the returned `document` for a `_source` check.
    */
-  async refund(actor, { unit, amount } = {}, { profile } = {}) {
+  async refund(actor, { unit, amount } = {}, { profile, markerUpdate = null } = {}) {
     const refund = buildCurrencyRefundUpdates(
       actor,
       { unit: unit?.id, amount },
       profile?.units || []
     );
     if (!refund.valid) return { valid: false, wroteNothing: true, message: refund.message };
-    if (Object.keys(refund.updates || {}).length > 0) {
-      const written = await actor.update(refund.updates);
+    const described = formatCurrencyRequirement({ unit: unit?.id, amount }, profile?.units || []);
+    const hasUpdates = Object.keys(refund.updates || {}).length > 0;
+    if (markerUpdate && !hasUpdates) {
+      return {
+        valid: false,
+        wroteNothing: true,
+        message: `Refunding ${described} writes nothing.`,
+      };
+    }
+    let written;
+    if (hasUpdates) {
+      written = await actor.update({ ...refund.updates, ...markerUpdate });
       if (written === undefined || written === null) {
         return {
           valid: false,
           wroteNothing: true,
-          message: `Foundry accepted no change when refunding ${formatCurrencyRequirement({ unit: unit?.id, amount }, profile?.units || [])}. The configured currency path may not exist on this actor.`,
+          message: `Foundry accepted no change when refunding ${described}. The configured currency path may not exist on this actor.`,
         };
       }
     }
+    if (markerUpdate) {
+      return {
+        valid: true,
+        formatted: refund.formatted,
+        updates: refund.updates,
+        document: written,
+      };
+    }
     return { valid: true, formatted: refund.formatted };
   }
+}
+
+/** How a strategy's credit can be proven after the fact (issue 1954), or `null` when unknown. */
+const CURRENCY_REPLAY_CLASSES = Object.freeze({
+  actorProperty: 'structuredMarker',
+  actorInventory: 'structuredObserved',
+  macro: 'opaqueMacro',
+});
+
+export function currencyStrategyReplayClass(strategy) {
+  return Object.hasOwn(CURRENCY_REPLAY_CLASSES, strategy)
+    ? CURRENCY_REPLAY_CLASSES[strategy]
+    : null;
 }
 
 /**
