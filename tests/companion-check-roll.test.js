@@ -894,6 +894,27 @@ describe('evaluation dispatch and executed evidence', () => {
     assert.deepEqual(result.diceGroups, diceGroups);
   });
 
+  it('never routes a misconfigured SUM result through the count pool-refusal mapping', async () => {
+    // The `counted &&` guard on `discriminateCheckOutcome`'s misconfigured branch: without it, a
+    // SUM result that happens to carry `misconfigured: true` (a shape only a count refusal
+    // produces today) would be misread as a count pool refusal instead of falling through to the
+    // ordinary `value === null` rollFailed step.
+    const { seams } = makeSeams({
+      runPassFail: async () => ({
+        misconfigured: true,
+        value: null,
+        data: { refusedInput: 'base' },
+      }),
+    });
+    const result = await rollActorCheck(
+      request({ dc: 15, evaluation: { product: 'sum', direction: 'over' } }),
+      seams
+    );
+    assert.notEqual(result.outcome, 'poolUnresolved');
+    assert.notEqual(result.outcome, 'evaluationInvalid');
+    assert.equal(result.outcome, 'rollFailed');
+  });
+
   it('projects graded and ungraded evidence from the real shared runners', async () => {
     installChat();
     installRoll({ total: 0 });
@@ -981,10 +1002,14 @@ describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
     }
   });
 
-  it('iterates every published COUNT capability row (issue 2004), always graded', async () => {
+  it('iterates every published COUNT capability row (issue 2004), graded against pool.required regardless of target source', async () => {
+    // Both faces sit above the threshold (8): `over` qualifies both (net 2, passes a required of
+    // 1), `under` qualifies neither (net 0, fails) — a discriminating pair, so the two directions
+    // cannot share an outcome by accident.
+    const EXPECTED = { over: { outcome: 'checkPassed', total: 2 }, under: { outcome: 'checkFailed', total: 0 } };
     for (const mode of CHECK_EVALUATION_CAPABILITIES.modes.filter((m) => m.product === 'count')) {
       for (const source of mode.targetSources) {
-        const dice = installCountDice({ faces: [9, 3] });
+        const dice = installCountDice({ faces: [9, 9] });
         try {
           const { seams } = makeSeams({ real: true });
           const evaluation = countEvaluation({ direction: mode.direction, required: 1 });
@@ -993,10 +1018,9 @@ describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
             request({ actor: SKILLED_ACTOR, evaluation }),
             seams
           );
-          assert.ok(
-            ['checkPassed', 'checkFailed'].includes(result.outcome),
-            JSON.stringify({ mode, source, outcome: result.outcome })
-          );
+          const expected = EXPECTED[mode.direction];
+          assert.equal(result.outcome, expected.outcome, JSON.stringify({ mode, source }));
+          assert.equal(result.total, expected.total, JSON.stringify({ mode, source }));
         } finally {
           dice.restore();
         }
@@ -1245,7 +1269,7 @@ describe('count check rows: no formula, ignores the caller dc and target', () =>
 
   it('answers evaluationInvalid for a count refusal naming a different input, not poolUnresolved', async () => {
     installChat();
-    installRoll();
+    const rolled = installRoll();
     const { seams } = makeSeams({ real: true });
 
     const evaluation = countEvaluation({
@@ -1255,6 +1279,7 @@ describe('count check rows: no formula, ignores the caller dc and target', () =>
 
     assert.equal(result.outcome, 'evaluationInvalid');
     assert.deepEqual(result.messageData, { label: 'Fabricate' });
+    assert.deepEqual(rolled.constructions, [], 'an evaluationInvalid refusal never constructs a Roll');
   });
 
   it('needs no formula at all: a blank formula still rolls a count check', async () => {
