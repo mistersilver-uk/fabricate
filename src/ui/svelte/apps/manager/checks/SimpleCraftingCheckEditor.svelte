@@ -61,6 +61,8 @@
     trackMax = null,
     // The Preview-as actor, `{ name, rollData }`, that a character-value target resolves against.
     previewCharacter = null,
+    // The previewed actor's flat check-modifier total; a roll-under strip adds it to the target.
+    previewModifierTotal = 0,
     onSelectPreviewRecord = () => {},
     onChange = () => {},
   } = $props();
@@ -108,6 +110,7 @@
             anchor: previewedTier ? Number(previewedTier.dc) : dc,
             tier: previewedTier,
             character: previewCharacter,
+            modifiers: previewModifierTotal,
           },
           text
         )

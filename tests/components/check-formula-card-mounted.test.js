@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { formulaTokenIcon } from '../../src/ui/svelte/apps/manager/checks/checksCopy.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -210,6 +211,42 @@ describe('a suggestion chip appends its term when CLICKED', () => {
     const chip = target.querySelector('[data-check-formula-token]');
     chip.click();
     assert.equal(emitted.at(-1).rollFormula, chip.dataset.checkFormulaToken);
+  });
+});
+
+describe('a suggestion chip carries its reference kind glyph (issue 2005, prototype)', () => {
+  it('draws the prototype kind glyph after the + verb, and none for a kind it has no glyph for', async () => {
+    const target = await harness.mount({ rollFormula: '1d20', foundrySystemId: 'dnd5e' });
+    const kinds = Object.fromEntries(
+      [...target.querySelectorAll('[data-check-formula-token]')].map((chip) => [
+        chip.dataset.checkFormulaToken,
+        [...(chip.querySelector('[data-check-formula-token-kind]')?.classList ?? [])]
+          .filter((token) => token.startsWith('fa'))
+          .join(' '),
+      ])
+    );
+    assert.deepEqual(kinds, {
+      '@abilities.int.mod': 'fas fa-hand',
+      '@abilities.wis.mod': 'fas fa-hand',
+      '@skills.sur.total': '',
+      2: '',
+      '1d4': 'fas fa-dice-d20',
+    });
+    const chip = target.querySelector('[data-check-formula-token="1d4"]');
+    assert.deepEqual(
+      [...chip.children].map((child) => child.tagName),
+      ['I', 'I', 'SPAN'],
+      'the + verb, then the kind glyph, then the term'
+    );
+  });
+
+  it('maps every prototype kind to its Font Awesome Free glyph', () => {
+    assert.deepEqual(
+      ['@prof', '@abilities.wis.mod', '@ingredients', '@level', '1d4', '@skills.sur.total', '2'].map(
+        formulaTokenIcon
+      ),
+      ['fas fa-medal', 'fas fa-hand', 'fas fa-flask', 'fas fa-arrow-up-9-1', 'fas fa-dice-d20', '', '']
+    );
   });
 });
 

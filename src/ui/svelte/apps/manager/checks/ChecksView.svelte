@@ -41,6 +41,8 @@
     resolveActiveCraftingCheckFormula,
     resolveActiveGatheringCheckFormula,
     resolveActiveSalvageCheckFormula,
+    makeRollDataExpressionResolver,
+    resolveCheckModifierContribution,
     resolveEligibleModifierIds,
     resolveModifierPolicy,
   } from '../../../../../systems/checkModifierResolver.js';
@@ -901,6 +903,15 @@
   // THE SAME CONTEXT THE RUNNER IS HANDED: it appends the scalar, so a histogram computed
   // without this describes a formula nothing rolls.
   const previewModifier = $derived(previewPlan.args?.craftingModifier ?? null);
+  // The previewed actor's flat check-modifier total, which a roll-under strip adds to its target.
+  const previewModifierTotal = $derived.by(() => {
+    if (!previewActor || !previewModifier) return 0;
+    const { scalar } = resolveCheckModifierContribution(
+      previewModifier,
+      makeRollDataExpressionResolver(previewActor)
+    );
+    return Number.isFinite(scalar) ? scalar : 0;
+  });
 
   const enumeration = $derived(
     previewFormula === ''
@@ -1181,6 +1192,7 @@
     previewDcOverride: previewRecord?.dc ?? null,
     previewLabel: previewRecord?.name ?? '',
     previewCharacter,
+    previewModifierTotal,
     trackMin: previewTrack.min,
     trackMax: previewTrack.max,
     onSelectPreviewRecord: selectPreviewRecord,
@@ -1192,6 +1204,7 @@
     trackMin: previewTrack.min,
     trackMax: previewTrack.max,
     previewCharacter,
+    previewModifierTotal,
     onSelectPreviewRecord: selectPreviewRecord,
   });
   const previewActorSummary = $derived(
@@ -1566,6 +1579,7 @@
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
               {recordNoun}
+              {recordNounPlural}
               value={craftingCheck}
               {resolutionMode}
               section={activeSection}
@@ -1602,6 +1616,7 @@
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
               {recordNoun}
+              {recordNounPlural}
               value={craftingCheck}
               {resolutionMode}
               section={activeSection}
@@ -1706,6 +1721,7 @@
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
               {recordNoun}
+              {recordNounPlural}
               value={salvageCheckRouted}
               showTiers={false}
               section={activeSection}
@@ -1848,6 +1864,7 @@
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
               {recordNoun}
+              {recordNounPlural}
               value={gatheringCheckRouted}
               showTiers={false}
               section={activeSection}

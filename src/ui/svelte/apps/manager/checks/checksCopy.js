@@ -154,3 +154,56 @@ export function checkTargetChip(evaluation, dc, text) {
     dc: Number(dc ?? 0) || 0,
   });
 }
+
+/**
+ * The Check type chooser's two options (the prototype's copy), each sentence resolved with the
+ * activity's own record words before it reaches `RadioCardGroup`, which takes no interpolation.
+ * Icons name what a tier threshold IS: an offset from the record's DC, or a measured segment.
+ */
+export function checkTypeOptions(text, { record, records }) {
+  const words = { record, records };
+  return [
+    {
+      value: 'relative',
+      icon: 'fas fa-plus-minus',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeRelative',
+      fallback: 'Relative',
+      description: interpolate(
+        text(
+          'FABRICATE.Admin.Manager.Checks.Crafting.TypeRelativeDesc',
+          "Bands are offsets from the {record}'s own DC, so they move with it — DC −10 to −5 might be Bad. Each {record} picks a difficulty tier or overrides the DC with a number."
+        ),
+        words
+      ),
+    },
+    {
+      value: 'fixed',
+      icon: 'fas fa-ruler',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixed',
+      fallback: 'Fixed',
+      description: interpolate(
+        text(
+          'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixedDesc',
+          'Bands are absolute roll values and never move — 13 to 17 is always Good. {records} carry no DC at all; they only route their result groups to these tiers.'
+        ),
+        words
+      ),
+    },
+  ];
+}
+
+/** The prototype's reference-kind glyphs, each a Font Awesome Free name, first match wins. */
+const FORMULA_TOKEN_KINDS = Object.freeze([
+  [/^\d*d\d+/i, 'fas fa-dice-d20'],
+  [/^@prof\b/, 'fas fa-medal'],
+  [/^@abilities\./, 'fas fa-hand'],
+  [/^@ingredients\b/, 'fas fa-flask'],
+  [/^@(?:details\.)?level\b/, 'fas fa-arrow-up-9-1'],
+]);
+
+/** A quick formula token's kind glyph (a die, proficiency, an ability…), or `''` for a kind the
+ *  prototype draws none for. */
+export function formulaTokenIcon(token) {
+  const source = String(token ?? '').trim();
+  return FORMULA_TOKEN_KINDS.find(([pattern]) => pattern.test(source))?.[1] ?? '';
+}

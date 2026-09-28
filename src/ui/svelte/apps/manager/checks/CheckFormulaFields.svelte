@@ -29,7 +29,7 @@
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import CheckPromptOptions from './CheckPromptOptions.svelte';
-  import { underComparisonPhrase } from './checksCopy.js';
+  import { formulaTokenIcon, underComparisonPhrase } from './checksCopy.js';
 
   let {
     rollFormula = '',
@@ -327,6 +327,13 @@
       >
         <!-- The verb as a GLYPH: a literal `+` in the label reads as part of the expression. -->
         <i class="fas fa-plus" aria-hidden="true"></i>
+        {#if formulaTokenIcon(token)}
+          <i
+            class={`${formulaTokenIcon(token)} is-kind`}
+            aria-hidden="true"
+            data-check-formula-token-kind
+          ></i>
+        {/if}
         <span>{token}</span>
       </button>
     {/each}

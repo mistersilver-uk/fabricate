@@ -35,7 +35,7 @@
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
-  import { checkTargetChip } from './checksCopy.js';
+  import { checkTargetChip, checkTypeOptions } from './checksCopy.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import Select from '../../../components/Select.svelte';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
@@ -61,6 +61,7 @@
     // The activity's own word for what a check is rolled for: hard-coding one is how a gathering
     // screen comes to talk about recipes.
     recordNoun = 'recipe',
+    recordNounPlural = 'Recipes',
     // The check modifiers this check APPLIES and the rule combining them, from the same
     // derivation the Modifiers section counts from rather than a second opinion.
     appliedModifiers = [],
@@ -73,6 +74,8 @@
     previewLabel = '',
     // The Preview-as actor, `{ name, rollData }`, that a character-value strip resolves against.
     previewCharacter = null,
+    // The previewed actor's flat check-modifier total; a roll-under strip adds it to the target.
+    previewModifierTotal = 0,
     trackMin = null,
     trackMax = null,
     onSelectPreviewRecord = () => {},
@@ -107,25 +110,9 @@
     return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
   }
 
-  // Icons name what a tier threshold IS: an offset from the record's DC, or a measured segment.
-  const TYPE_OPTIONS = [
-    {
-      value: 'relative',
-      icon: 'fas fa-plus-minus',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeRelative',
-      fallback: 'Relative',
-      descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeRelativeDesc',
-      descFallback: 'Tier thresholds are relative to the recipe DC, e.g. DC -5 or DC +10.',
-    },
-    {
-      value: 'fixed',
-      icon: 'fas fa-ruler',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixed',
-      fallback: 'Fixed',
-      descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixedDesc',
-      descFallback: 'Each tier owns a non-overlapping segment of the roll value range.',
-    },
-  ];
+  const TYPE_OPTIONS = $derived(
+    checkTypeOptions(text, { record: recordNoun, records: recordNounPlural })
+  );
 
   const type = $derived(value?.type === 'fixed' ? 'fixed' : 'relative');
   // Relative and fixed tiers are independent lists and only the active one is ever written.
@@ -303,6 +290,7 @@
             anchor: previewDc,
             tier: previewedTier,
             character: previewCharacter,
+            modifiers: previewModifierTotal,
           },
           text
         )

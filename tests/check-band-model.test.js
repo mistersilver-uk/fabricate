@@ -280,12 +280,34 @@ describe('previewBandTarget', () => {
 
   it('names the base adjustment when the previewed tier sets none', () => {
     const evaluation = attribute('over', 'add', -5);
-    assert.equal(previewBandTarget({ evaluation, anchor: 0, character: idrin }, fallback).source, 'Idrin 55, base −5');
+    assert.equal(
+      previewBandTarget({ evaluation, anchor: 0, character: idrin }, fallback).source,
+      '@skills.craft.value 55, base −5'
+    );
     assert.equal(
       previewBandTarget({ evaluation, anchor: 0, tier: { name: 'Hard', adjustment: -2 }, character: idrin }, fallback)
         .source,
-      'Idrin 55, Hard −2'
+      '@skills.craft.value 55, Hard −2'
     );
+  });
+
+  it('raises a roll-under target by the modifiers and names them, and leaves roll-over alone', () => {
+    const under = previewBandTarget(
+      { evaluation: attribute('under'), anchor: 0, character: idrin, modifiers: 1 },
+      fallback
+    );
+    assert.equal(under.target, 56);
+    assert.equal(under.source, '@skills.craft.value 55, modifiers +1');
+    const fixedUnder = previewBandTarget(
+      { evaluation: { product: 'sum', direction: 'under' }, anchor: 10, character: idrin, modifiers: 1 },
+      fallback
+    );
+    assert.deepEqual([fixedUnder.target, fixedUnder.source], [11, 'includes modifiers +1']);
+    const over = previewBandTarget(
+      { evaluation: attribute('over'), anchor: 0, character: idrin, modifiers: 1 },
+      fallback
+    );
+    assert.deepEqual([over.target, over.source], [55, '@skills.craft.value 55']);
   });
 
   it('leaves an actor-free literal unsourced', () => {

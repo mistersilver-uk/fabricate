@@ -10293,6 +10293,12 @@
   opacity: 0.6;
 }
 
+/* The token's kind glyph (a die, an ability…) at full ink, beside the quieter `+` verb. */
+.fabricate-manager .manager-checks-formula-token > i.is-kind {
+  font-size: 9px;
+  opacity: 1;
+}
+
 .fabricate-manager .manager-checks-formula-token:hover {
   border-color: var(--fab-accent);
   color: var(--fab-text);

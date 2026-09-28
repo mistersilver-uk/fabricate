@@ -287,11 +287,17 @@ export function previewScaleSentence(state, { direction, comparison }, text) {
 }
 
 /**
- * The previewed target plus the `source` reading {@link describeBandScale} names: the actor's
- * value and the adjustment applied, the previewed tier's or else the base. Without an actor the
- * target is unsourced. `tier` is `{ name, adjustment }` or null for the base.
+ * The previewed target plus the `source` reading {@link describeBandScale} names: the typed
+ * expression and its value (the maintainer's 2026-09-28 ruling puts the GM's formula where the
+ * prototype shows a friendly label), the adjustment applied, the previewed tier's or else the
+ * base, and the check modifiers a roll-under adds to its target. Without an actor the target is
+ * unsourced. `tier` is `{ name, adjustment }` or null for the base; `modifiers` is the previewed
+ * actor's deterministic check-modifier total.
  */
-export function previewBandTarget({ evaluation, anchor, tier = null, character = null }, text) {
+export function previewBandTarget(
+  { evaluation, anchor, tier = null, character = null, modifiers = 0 },
+  text
+) {
   const normalized = normalizeCheckEvaluation(evaluation);
   const resolved = resolvePreviewTarget({
     evaluation: normalized,
@@ -299,13 +305,29 @@ export function previewBandTarget({ evaluation, anchor, tier = null, character =
     adjustment: tier?.adjustment ?? null,
     character,
   });
-  if (resolved.state !== 'ok' || normalized.target.source !== 'attribute' || !character) {
-    return { ...resolved, source: '' };
+  if (resolved.state !== 'ok') return { ...resolved, source: '' };
+  // Under, the modifiers raise the target rather than the roll, so they are part of it.
+  const delta = normalized.direction === 'under' && Number.isFinite(modifiers) ? modifiers : 0;
+  const target = resolved.target + delta;
+  const modifierPart = delta
+    ? interpolate(
+        text('FABRICATE.Admin.Manager.Checks.Evaluation.ScaleSourceModifiers', 'modifiers {total}'),
+        { total: formatCheckAdjustment('add', delta) }
+      )
+    : '';
+  if (normalized.target.source !== 'attribute' || !character) {
+    const source = modifierPart
+      ? interpolate(
+          text('FABRICATE.Admin.Manager.Checks.Evaluation.ScaleSourceIncludes', 'includes {part}'),
+          { part: modifierPart }
+        )
+      : '';
+    return { ...resolved, target, source };
   }
   const parts = [
     interpolate(
-      text('FABRICATE.Admin.Manager.Checks.Evaluation.ScaleSourceActor', '{actor} {value}'),
-      { actor: character.name, value: resolved.value }
+      text('FABRICATE.Admin.Manager.Checks.Evaluation.ScaleSourceValue', '{expression} {value}'),
+      { expression: normalized.target.expression.trim(), value: resolved.value }
     ),
   ];
   const { adjustmentKind, baseAdjustment } = normalized.target;
@@ -320,7 +342,8 @@ export function previewBandTarget({ evaluation, anchor, tier = null, character =
       )
     );
   }
-  return { ...resolved, source: parts.join(', ') };
+  if (modifierPart) parts.push(modifierPart);
+  return { ...resolved, target, source: parts.join(', ') };
 }
 
 /** Why a read-only strip draws nothing, from a non-ok {@link resolvePreviewTarget} state. */
