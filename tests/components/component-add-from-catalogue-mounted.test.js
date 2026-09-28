@@ -586,8 +586,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
     await open();
     const root = panel();
     assert.ok(root.hasAttribute('data-manager-modal'), 'it IS the shared chrome');
-    // Maintainer ruling 2026-09-28 ("Move them too"): every Fabricate dialog is banded.
-    assert.ok(root.classList.contains('is-banded'), 'in the banded library Modal frame');
+    // Maintainer rulings 2026-09-28: ManagerModal draws one frame, the library's banded Modal.
     assert.ok(root.querySelector('.manager-modal-body [data-component-add-from-catalogue-search]'));
     assert.ok(
       document.querySelector('[data-manager-modal-close]').classList.contains('is-size-26'),

@@ -58,7 +58,7 @@ Other Chip presentations MUST retain their default geometry.
 Chip's `density="list"` MUST explicitly use the rendered library specimen's 1.6 line-height with 9px/600 type, 1px/space-2 padding and stadium radius: 18.4px bordered or 16.4px bare for a single text line.
 The independently specified icon-only list square MUST remain 15px; the default density's line-height MUST remain 1.
 IconButton's opt-in numeric `size={24}` and `size={26}` MUST each own a square border-box of that side, both minimum dimensions, zero padding and a fixed flex-basis of that side; other callers retain their existing default or pager geometry.
-The banded ManagerModal's close MUST be the 26px square, unfilled at radius 7 in `--fab-text-muted` ink with an 11px glyph, under a 60px header, by maintainer ruling (2026-09-28).
+ManagerModal's close MUST be the 26px square, unfilled at radius 7 in `--fab-text-muted` ink with an 11px glyph, under a 60px header, by maintainer ruling (2026-09-28).
 EmptyState's opt-in `fill` MUST stretch its border-box to the bounded host's full width and height with a zero minimum height while preserving its chosen variant's appearance and content.
 The host owns that allocation and MUST NOT derive it from the current page's record count.
 
@@ -1666,9 +1666,9 @@ The modal portals into the application root so it stacks above the window rather
 It dismisses on an outside click; a step that would lose work confirms first.
 
 The interactive roll prompt also renders in this chrome, and it is a decision rather than a flow: one header, a scrolling body and a footer rail of equal actions, drawn as the library's banded Modal.
-The import report, the import folder mapping and the add-from-catalogue picker draw the same banded frame, by maintainer ruling (2026-09-28), so every Fabricate dialog shares one header, body and footer treatment.
+ManagerModal draws ONE frame, the library's banded Modal, with no unbanded option: the import report, the import folder mapping and the add-from-catalogue picker draw it too, by maintainer ruling (2026-09-28), so every Fabricate dialog shares one header, body and footer treatment.
 It mounts over the Fabricate window the player started the roll from — the one holding focus, or the one under the pointer when the clicked button disabled itself and left focus nowhere — and otherwise over a themed standalone layer on the page, which stays frontmost; it answers as a dismissal when the window hosting it closes.
-Its differences from the flow are additive `ManagerModal` props whose defaults leave every other caller unchanged: a stray outside click never dismisses it, focus enters it, Tab stays inside it, it owns every key while open, Escape and the close control dismiss it, and focus returns to the opener, or to the window hosting it while the opener is still disabled.
+Its behavioural differences from the flow are additive `ManagerModal` props whose defaults leave every other caller unchanged: a stray outside click never dismisses it, focus enters it, Tab stays inside it, it owns every key while open, Escape and the close control dismiss it, and focus returns to the opener, or to the window hosting it while the opener is still disabled.
 
 #### Scenario: An import needs two steps
 

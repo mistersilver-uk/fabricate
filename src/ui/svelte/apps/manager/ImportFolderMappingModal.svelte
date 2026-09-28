@@ -239,7 +239,6 @@
   )}
   closeLabel={text('FABRICATE.Admin.ImportReport.Close', 'Close')}
   rootAttributes={{ 'data-import-mapping': '' }}
-  banded
   {onClose}
 >
   {#snippet body()}

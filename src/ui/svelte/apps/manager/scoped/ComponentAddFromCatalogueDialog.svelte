@@ -197,7 +197,6 @@
   closeLabel={text('FABRICATE.Admin.Manager.Component.AddFrom.Close', 'Close')}
   rootAttributes={{ 'data-component-add-from-catalogue-dialog': '' }}
   width="580px"
-  banded
   onClose={dismiss}
 >
   {#snippet body()}

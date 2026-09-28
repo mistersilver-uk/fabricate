@@ -212,8 +212,7 @@ describe('ImportReportModal (mounted)', () => {
     const root = modal();
     assert.ok(!root.querySelector('form'), 'no form wraps body and footer without onSubmit');
     assert.ok(!root.querySelector('.manager-modal-footer').classList.contains('is-equal'));
-    // Maintainer ruling 2026-09-28 ("Move them too"): every Fabricate dialog is banded.
-    assert.ok(root.classList.contains('is-banded'), 'the report draws the banded library Modal');
+    // Maintainer rulings 2026-09-28: ManagerModal draws one frame, the library's banded Modal.
     assert.ok(root.querySelector('.manager-modal-body > .manager-import-report-list'), 'in a padded body');
     const close = root.querySelector('[data-manager-modal-close]');
     assert.ok(close.classList.contains('is-size-26'), 'the banded frame’s 26px close');

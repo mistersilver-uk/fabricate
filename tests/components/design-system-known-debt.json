@@ -179,7 +179,6 @@
     "src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte | border-radius | 10px | 1",
     "src/ui/svelte/apps/manager/ImportReportModal.svelte | border-radius | 10px | 1",
     "src/ui/svelte/apps/manager/ItemPageInspector.svelte | border-radius | var(--fab-books-control-radius) => 5px | 1",
-    "src/ui/svelte/apps/manager/ManagerModal.svelte | border-radius | 12px | 1",
     "src/ui/svelte/apps/manager/PartyAddMemberPanel.svelte | border-radius | 10px | 1",
     "src/ui/svelte/apps/manager/PartyAddMemberPanel.svelte | border-radius | 8px | 1",
     "src/ui/svelte/apps/manager/PartyExpandedBody.svelte | border-radius | 8px | 3",

@@ -80,7 +80,6 @@
   trapFocus
   initialFocus="input[name='situationalBonus'], button[type='submit']"
   footerLayout="equal"
-  banded
   onClose={dismiss}
   onSubmit={(event) => answer(event.target, 'normal')}
 >
@@ -452,7 +451,7 @@
   }
   /* `100%` is the viewport at scale 1 and the window when Foundry scales it with a transform,
      where `vh` would overflow the window. */
-  :global(.manager-modal.is-banded[data-roll-prompt]) {
+  :global(.manager-modal[data-manager-modal][data-roll-prompt]) {
     max-height: min(640px, calc(100% - (2 * var(--fab-space-4))));
   }
   .prompt-action {

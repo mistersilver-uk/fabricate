@@ -2,9 +2,11 @@
   The manager's ONE modal-dialog chrome (issue 877): every centred, portaled manager dialog renders
   through it, so "modal dialog" has a single implementation rather than one per feature. It owns the
   chrome only — the portal, the fixed centring and panel surface, the title/subtitle heading, the
-  round close control and the right-aligned footer rail. Everything between header and footer is the
+  close control and the right-aligned footer rail. Everything between header and footer is the
   caller's `body` snippet, which keeps its own style scope, and `rootAttributes` lets a caller keep
   its own stable automation hook on the dialog root without this component knowing the feature.
+  It draws ONE frame, the library's banded Modal measured off the prototype: a 60px `--fab-bg-2`
+  header band, a padded body and a `--fab-bg-2` footer band (maintainer rulings 2026-09-28).
 
   Props added for the roll prompt (issue 2021); each default leaves an earlier caller unchanged:
   | prop | values | default | contract |
@@ -13,7 +15,6 @@
   | `trapFocus` | boolean | `false` | Focus enters on open, Tab cycles inside, the modal owns every key, and focus returns to the opener, or the host while the opener is disabled. |
   | `initialFocus` | selector | `''` | The element `trapFocus` focuses first; the first focusable one when absent. |
   | `footerLayout` | `'end'` \| `'equal'` | `'end'` | `equal` gives every footer child one equal share of the rail. |
-  | `banded` | boolean | `false` | The design-system Modal: header and footer bands on `--fab-bg-2`, a padded body, a 14px serif title and an unfilled 26px close (maintainer ruling 2026-09-28). |
   | `onSubmit(event)` | function | none | Wraps body and footer in one form; Enter submits through its first submit button. |
 -->
 <script>
@@ -36,7 +37,6 @@
     trapFocus = false,
     initialFocus = '',
     footerLayout = 'end',
-    banded = false,
     onSubmit = undefined,
   } = $props();
 
@@ -126,10 +126,8 @@
 </script>
 
 {#snippet content()}
-  {#if body && banded}
+  {#if body}
     <div class="manager-modal-body">{@render body()}</div>
-  {:else if body}
-    {@render body()}
   {/if}
 
   {#if footer}
@@ -143,7 +141,6 @@
   <div class="manager-modal-overlay" data-manager-modal-overlay>
     <div
       class="manager-modal"
-      class:is-banded={banded}
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -165,7 +162,7 @@
         </div>
         <IconButton
           data-manager-modal-close=""
-          size={banded ? 26 : 'default'}
+          size={26}
           ariaLabel={closeLabel}
           onclick={() => onClose()}
         >
@@ -187,6 +184,7 @@
     display: contents;
   }
 
+  /* The library's canonical Modal, measured off the prototype (maintainer ruling 2026-09-28). */
   .manager-modal {
     position: fixed;
     top: 50%;
@@ -195,82 +193,41 @@
     z-index: 100;
     display: flex;
     flex-direction: column;
-    gap: var(--fab-space-3);
     width: min(var(--manager-modal-width, 560px), calc(100vw - 48px));
     max-height: min(640px, calc(100vh - 64px));
-    padding: var(--fab-space-4);
+    overflow: hidden;
     background: var(--fab-bg-1);
     border: 1px solid var(--fab-border-strong);
-    border-radius: 12px;
+    border-radius: 11px;
     box-shadow: var(--fab-shadow-lg);
   }
 
   .manager-modal-header {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    gap: var(--fab-space-2);
-  }
-
-  .manager-modal-title {
-    margin: 0;
-    font-weight: 600;
-    font-size: 0.95rem;
-    color: var(--fab-text);
-  }
-
-  .manager-modal-subtitle {
-    margin: var(--fab-space-2xs) 0 0;
-    color: var(--fab-text-muted);
-    font-size: 0.72rem;
-  }
-
-  .manager-modal-form {
-    display: contents;
-  }
-
-  .manager-modal-footer {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--fab-space-2);
-  }
-
-  .manager-modal-footer.is-equal > :global(*) {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-
-  /* The library's canonical Modal: banded header and footer around a padded body. */
-  .manager-modal.is-banded {
-    gap: 0;
-    padding: 0;
-    border-radius: 11px;
-    overflow: hidden;
-  }
-
-  /* The banded frame is the prototype's, measured (maintainer ruling 2026-09-28): a 60px header. */
-  .is-banded .manager-modal-header {
-    align-items: center;
     gap: calc(var(--fab-space-2) + var(--fab-space-2xs));
     padding: var(--fab-space-3) calc(var(--fab-space-3) + var(--fab-space-2xs));
     border-bottom: 1px solid var(--fab-border);
     background: var(--fab-bg-2);
   }
 
-  .is-banded .manager-modal-heading {
+  .manager-modal-heading {
     flex: 1 1 auto;
     min-width: 0;
   }
 
-  .is-banded .manager-modal-title {
+  .manager-modal-title {
+    margin: 0;
+    color: var(--fab-text);
     font-family: var(--fab-font-serif);
     font-size: 14px;
+    font-weight: 600;
     line-height: normal;
   }
 
-  .is-banded .manager-modal-subtitle {
-    margin-top: 1px;
+  .manager-modal-subtitle {
+    margin: 1px 0 0;
     color: var(--fab-text-subtle);
     font-size: 10.5px;
     font-weight: 500;
@@ -278,7 +235,7 @@
   }
 
   /* Paint only, at (0,3,0): above the family's resting paint and below its hover. */
-  .is-banded :global([data-manager-modal-close]) {
+  .manager-modal :global([data-manager-modal-close]) {
     display: grid;
     place-items: center;
     gap: normal;
@@ -286,6 +243,10 @@
     color: var(--fab-text-muted);
     background: transparent;
     font-size: 11px;
+  }
+
+  .manager-modal-form {
+    display: contents;
   }
 
   .manager-modal-body {
@@ -296,9 +257,18 @@
     padding: calc(var(--fab-space-3) + var(--fab-space-2xs)) var(--fab-space-4);
   }
 
-  .is-banded .manager-modal-footer {
+  .manager-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--fab-space-2);
     padding: var(--fab-space-3) var(--fab-space-4) calc(var(--fab-space-3) + var(--fab-space-2xs));
     border-top: 1px solid var(--fab-border);
     background: var(--fab-bg-2);
+  }
+
+  .manager-modal-footer.is-equal > :global(*) {
+    flex: 1 1 0;
+    min-width: 0;
   }
 </style>
