@@ -44,6 +44,12 @@ export const ODDS_REASONS = Object.freeze({
   stringTerm: 'string-term',
   unresolvedRollData: 'unresolved-roll-data',
   preRollNotEnumerable: COUNT_ODDS_REASONS.preRollNotEnumerable,
+  // A success-counting pool (issue 2004): the two the preview abstains with, then two refusals.
+  countPathUnresolved: 'count-path-unresolved',
+  countValueNotNumeric: 'count-value-not-numeric',
+  countResidualTooLarge: COUNT_ODDS_REASONS.residualTooLarge,
+  countFaceTriggerNotEnumerable: 'count-face-trigger-not-enumerable',
+  countPoolTooLarge: 'pool-too-large',
 });
 
 /**
@@ -351,9 +357,9 @@ function diceGroupsFor(dice, assignment) {
 
 /**
  * A percentage, to one decimal place, that still sums to 100 across a partition.
- * @param {number} count Outcomes in this bucket.
+ * @param {number} count Outcomes in this bucket, or its probability with a `total` of 1.
  * @param {number} total Outcomes in the whole enumerated space. @returns {number} */
-function percentOf(count, total) {
+export function percentOf(count, total) {
   return Math.round((count / total) * 1000) / 10;
 }
 

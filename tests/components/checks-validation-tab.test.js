@@ -285,6 +285,62 @@ describe('ChecksValidationTab (mounted)', () => {
     harness.remount();
   });
 
+  it('lists the count pool faults route-only, and a count transient without counting it (issue 2004)', async () => {
+    const section = {
+      subsystem: 'crafting',
+      mode: 'simple',
+      check: {
+        rollFormula: '',
+        evaluation: {
+          product: 'count',
+          direction: 'under',
+          pool: { die: 20, base: '2d4', threshold: '1d4 + 6', required: 3 },
+        },
+        tiers: [{ id: 'u', name: 'Unset Work', successes: null }],
+      },
+    };
+    const calls = [];
+    const target = await harness.mount({
+      sections: [section],
+      onSelectIssue: (route, focusTarget) => calls.push([route, focusTarget]),
+    });
+    for (const id of ['countPoolInvalid', 'countThresholdInvalid', 'countTierWithoutSuccesses']) {
+      const row = target.querySelector(`[data-issue="${id}"]`);
+      assert.ok(Boolean(row), `${id} is listed`);
+      row.querySelector('.manager-recipe-val-view').click();
+    }
+    assert.ok(!target.querySelector('[data-issue="noRollFormula"]'), 'the retained formula is inert');
+    assert.deepEqual(
+      calls.map(([route, focusTarget]) => [route.section, focusTarget]),
+      [
+        ['roll', undefined],
+        ['roll', undefined],
+        ['roll', undefined],
+      ],
+      'no count control exists to focus until #2006, so each row changes route alone'
+    );
+    harness.remount();
+
+    const pooled = {
+      ...section,
+      check: {
+        rollFormula: '',
+        evaluation: { product: 'count', pool: { base: '@skills.smith.rank', required: 1 } },
+      },
+    };
+    const without = await harness.mount({ sections: [pooled] });
+    const counted = railCounts(without);
+    harness.remount();
+    const withActor = await harness.mount({
+      sections: [pooled],
+      previewActor: { name: 'Vosk', rollData: {} },
+    });
+    const row = withActor.querySelector('[data-issue="countPathUnresolvedForPreview"]');
+    assert.ok(row?.hasAttribute('data-issue-transient'), 'listed, and marked transient');
+    assert.deepEqual(railCounts(withActor), counted, 'the tally is what it was with no actor');
+    harness.remount();
+  });
+
   it('deep-links each issue to the ACTIVITY and the SECTION that owns its control', async () => {
     // The whole point of rebuilding on the shared surface. A GM who reads "no roll formula"
     // on this route has to get to the control that fixes it, and the section is half of
