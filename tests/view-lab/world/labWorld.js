@@ -80,6 +80,9 @@ const CHECK_OVERRIDE_STATES = Object.freeze({
   custom: { source: 'attribute', kind: 'multiply', salvage: [15, 0.7], task: [15, 0.7] },
   // Routed salvage whose `routed` check alone reads a character value: the override must follow it.
   routed: { source: 'attribute', kind: 'add', salvage: [15, -2], task: [15, -2], routed: true },
+  // A kept override authored under `add`, invalidated by a switch to `multiply` (issue 2078): the
+  // field itself, not just readiness, must name it.
+  invalid: { source: 'attribute', kind: 'multiply', salvage: [15, -2], task: [15, -2] },
 });
 
 /** A relative routed check over `evaluation`, as the salvage and gathering states seed it. */
