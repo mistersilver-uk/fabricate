@@ -82,18 +82,21 @@ export async function evaluateToolPrerequisiteGate({
   };
 }
 
-async function evaluateEnabledBonus({ tool, actor, eligible, evaluateExpression }) {
+/** A Tool's bonus expression when it can contribute (enabled, eligible and authored), else ''. */
+export function toolBonusExpression(tool, eligible) {
   const bonus = tool?.bonus || {};
   const expression = typeof bonus.expression === 'string' ? bonus.expression.trim() : '';
-  if (
-    tool?.enabled === false ||
-    bonus.enabled !== true ||
-    !eligible ||
-    !expression ||
-    typeof evaluateExpression !== 'function'
-  ) {
-    return { value: 0 };
-  }
+  return tool?.enabled === false || bonus.enabled !== true || !eligible ? '' : expression;
+}
+
+/** The actor a Tool's gate and bonus read: its matched item's owner, else the primary actor. */
+export function toolBonusActor({ matchedItem = null, primaryActor = null } = {}) {
+  return matchedItem?.parent || primaryActor || null;
+}
+
+async function evaluateEnabledBonus({ tool, actor, eligible, evaluateExpression }) {
+  const expression = toolBonusExpression(tool, eligible);
+  if (!expression || typeof evaluateExpression !== 'function') return { value: 0 };
   let result;
   try {
     result = await evaluateExpression({ actor, expression, tool });
@@ -122,7 +125,7 @@ export async function evaluateToolCheckContribution({
   evaluatePrerequisite,
   evaluateExpression,
 } = {}) {
-  const actor = matchedItem?.parent || primaryActor || null;
+  const actor = toolBonusActor({ matchedItem, primaryActor });
   const gate = await evaluateToolPrerequisiteGate({
     tool,
     actor,

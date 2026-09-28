@@ -159,6 +159,7 @@ import {
   resolvedComponentsFor,
   resolvedEssencesFor,
   resolvedToolsFor,
+  salvageToolsFor,
 } from './scopedEntityReads.js';
 import { SignatureValidator, signatureDominates } from './SignatureValidator.js';
 import {
@@ -6826,18 +6827,7 @@ export class CraftingEngine {
   /** Resolve a component's salvage `toolIds` to library Tool objects from the owning system.
    * Unknown ids are skipped rather than throwing, and ids are deduped. */
   _resolveSalvageTools(system, salvage) {
-    const ids = Array.isArray(salvage?.toolIds) ? salvage.toolIds : [];
-    const library = resolvedToolsFor(system);
-    const seen = new Set();
-    const tools = [];
-    for (const rawId of ids) {
-      const id = String(rawId ?? '').trim();
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      const tool = library.find((entry) => entry?.id === id);
-      if (tool) tools.push(tool);
-    }
-    return tools;
+    return salvageToolsFor(system, salvage);
   }
 
   /**

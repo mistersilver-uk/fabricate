@@ -65,6 +65,7 @@ import { resolveRecipeImage } from '../svelte/util/craftingImageDefaults.js';
 
 import { describeCheckTarget } from './checkDescriptor.js';
 import { CRAFTING_BROWSE_STATUS, deriveBrowseStatus } from './craftingBrowseStatus.js';
+import { recipeHeldToolBonus } from './heldToolBonus.js';
 import { SUMMARY_AUDIENCE, projectRecipeSummary } from './summaryProjection.js';
 
 /**
@@ -586,7 +587,11 @@ export class CraftingListingBuilder {
       // counts AUTHORED steps and ignores `features.multiStepRecipes`, so a collapsed chain
       // still headlines its terminal product, unlike the Journal run model's `multiStep`.
       stepCount: this._executionSteps(recipe).length,
-      check: this._buildCheck(system, mode, recipe, craftingActor),
+      check: this._buildCheck(system, mode, recipe, craftingActor, {
+        view: this._stepRecipeView(recipe, firstStep),
+        sets: firstStepSets,
+        craftSources,
+      }),
       outcomeTiers: this._buildOutcomeTiers({ recipe, system, mode }),
       duration: this._buildDuration({ recipe, system, mode }),
       result: this._buildResult({ recipe, system, mode, defaultSet }),
@@ -877,9 +882,10 @@ export class CraftingListingBuilder {
    * @param {object|null} [craftingActor] - The acting character, for @-placeholder
    *   resolution of the display formula. Omitted (null) for a teaser projection so
    *   formula resolution stays suppressed.
+   * @param {object|null} [toolScope] - `{ view, sets, craftSources }`, for the held Tool bonus.
    * @private
    */
-  _buildCheck(system, mode, recipe, craftingActor = null) {
+  _buildCheck(system, mode, recipe, craftingActor = null, toolScope = null) {
     const checks = system?.craftingCheck ?? {};
     // Alchemy selects its check slot from the SYSTEM-level `alchemy.checkMode`:
     // none → no check card, simple → the pass/fail slot, tiered → the routed slot.
@@ -960,6 +966,7 @@ export class CraftingListingBuilder {
         anchor: this._resolveDisplayDc(config, recipe),
         actor: craftingActor,
         modifiers: appliedModifiers,
+        tools: recipeHeldToolBonus(this.recipeManager, craftingActor, toolScope),
         localize: this.localize,
       });
     return {

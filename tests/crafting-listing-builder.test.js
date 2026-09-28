@@ -8,7 +8,11 @@ import {
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 import { resolveCheckFormulaDisplay } from '../src/systems/checkRoll.js';
 import { describeCheckTarget } from '../src/ui/presenters/checkDescriptor.js';
+import { underTargetPromptFields } from '../src/systems/checkRollDecision.js';
+import { promptJournalStageCheck } from '../src/bootstrap/journalOperations.js';
+import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
 import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
+import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { DEFAULT_RECIPE_IMAGE } from '../src/models/Recipe.js';
@@ -1481,6 +1485,58 @@ describe('CraftingListingBuilder — the check card names a roll-under or charac
 
   it('names no target for a dynamic (macro) roll-under check (D6)', () => {
     assert.ok(!Object.hasOwn(checkOf({ evaluation: { direction: 'under' }, dcMode: 'dynamic' }), 'target'));
+  });
+
+  describe('a held Tool bonus on the card (G3, maintainer ruling 2026-09-28)', () => {
+    const toolState = (expression, extra = {}) => ({
+      available: true,
+      bonusEligible: true,
+      contributionInput: { tool: { id: `t-${expression}`, bonus: { enabled: true, expression } }, primaryActor: SERA },
+      ...extra,
+    });
+    const cardWith = (statesBySet, sets = [{ id: 'set-1' }]) => {
+      const builder = makeBuilder({
+        system: makeSystem({ craftingCheck: { simple: { rollFormula: '1d20', dc: 11, evaluation: { direction: 'under' } }, routed: {}, progressive: {} } }),
+        entries: [{ recipe: makeRecipe({ ingredientSets: sets }), access: { reason: 'ok' } }],
+        localize: format,
+      });
+      builder.recipeManager.getToolsForSet = (_view, set) => [set?.id ?? 'none'];
+      builder.recipeManager.resolveToolStates = (_view, [setId]) => statesBySet[setId] ?? [];
+      return builder.buildRecipeDetail({ recipeId: 'recipe-1', craftingActor: SERA, viewer: PLAYER }).check.target;
+    };
+
+    it('adds a held flat Tool bonus exactly as the prompt chip does', async () => {
+      const card = cardWith({ 'set-1': [toolState('2')] });
+      assert.deepEqual(card, { direction: 'under', text: 'Target 13 · stay at or under', source: 'Base 11 · tools +2' });
+      const surface = stubPromptSurface(() => null);
+      try {
+        await promptJournalStageCheck({
+          label: 'Iron Sword', displayFormula: '1d20', target: 11, direction: 'under', comparison: 'meet',
+          ...underTargetPromptFields({ product: 'sum', direction: 'under' }, { toolContributions: [{ value: 2 }] }),
+        });
+      } finally {
+        surface.restore();
+      }
+      const chip = rollPromptTarget(surface.view, []);
+      assert.deepEqual([card.text, card.source], [chip.chipText, chip.source], 'the card agrees with the chip');
+    });
+
+    it('names a rolled Tool bonus as pending, and omits an unheld, ineligible or absent one', () => {
+      assert.equal(cardWith({ 'set-1': [toolState('1d4')] }).text, 'Target 11 + 1d4 · stay at or under');
+      for (const states of [[], [toolState('2', { available: false })], [toolState('2', { bonusEligible: false })]]) {
+        assert.equal(cardWith({ 'set-1': states }).text, 'Target 11 · stay at or under');
+      }
+    });
+
+    it('omits the bonus when it depends on which set the prompt is given (an ambiguous choice)', () => {
+      const sets = [{ id: 'set-1' }, { id: 'set-2' }];
+      assert.equal(cardWith({ 'set-1': [toolState('2')], 'set-2': [toolState('3')] }, sets).text, 'Target 11 · stay at or under');
+      assert.equal(
+        cardWith({ 'set-1': [toolState('2')], 'set-2': [toolState('2')] }, sets).text,
+        'Target 13 · stay at or under',
+        'the same bonus whichever set is used is no choice at all'
+      );
+    });
   });
 
   it('says a character value cannot be read rather than invent one, and names none with no character', () => {

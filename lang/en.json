@@ -885,6 +885,7 @@
           "TargetAdjustment": "{label} {value}",
           "TargetDifficulty": "difficulty {value}",
           "TargetBase": "Base {value}",
+          "TargetTools": "tools {value}",
           "TargetModifiers": "modifiers {value}",
           "TargetPending": "{target} + {formula}"
         },

@@ -1,8 +1,15 @@
+import {
+  buildCheckModifierContext,
+  makeRollDataExpressionResolver,
+  resolveCheckModifierContribution,
+} from '../../systems/checkModifierResolver.js';
 import { activeCheckEvaluation, isFixedSumOver } from '../../systems/checkTarget.js';
 import { countRequired } from '../../systems/countCheck.js';
 import { isCountCheck } from '../../systems/salvageCheckUsability.js';
+import { salvageToolsFor } from '../../systems/scopedEntityReads.js';
 
 import { comparisonText, describeCheckTarget } from './checkDescriptor.js';
+import { heldToolBonus } from './heldToolBonus.js';
 
 /** The salvage check's fixed anchor; fixed routing, stages and a count check have none. */
 function salvageAnchorDc({ mode, routedType, config, component }) {
@@ -20,11 +27,41 @@ export function salvageDisplayDc(input) {
 }
 
 /**
+ * What the salvage prompt adds to its target before any roll: the library modifiers it applies,
+ * resolved as the versioned prompt resolves them, and the salvager's held Tool bonus, from the
+ * same tool states the engine validates (the component's required Tools, on that one actor).
+ */
+function salvageBenefits({ system, component, recipeManager, actor }) {
+  const context = buildCheckModifierContext(system, 'salvage', component);
+  const modifiers = resolveCheckModifierContribution(
+    context,
+    makeRollDataExpressionResolver(actor)
+  ).selected.filter((entry) => !entry.blocked);
+  const tools = salvageToolsFor(system, component?.salvage);
+  const states =
+    tools.length > 0 && typeof recipeManager?.resolveToolStates === 'function'
+      ? recipeManager.resolveToolStates({ craftingSystemId: system?.id ?? null }, tools, [actor], {
+          primaryActor: actor,
+        })
+      : [];
+  return { modifiers, tools: heldToolBonus([states]) };
+}
+
+/**
  * The Salvage tab's target for a summed pass/fail or relative check other than sum/over/fixed
  * (issue 2005): the banner's `rule`, and the check card's `{ direction, text, source }` or
- * `{ unresolved }` for the salvaging character. Null for sum/over/fixed, a count, stages or ranges.
+ * `{ unresolved }` for the salvaging character, naming the modifiers and held Tool bonus the
+ * prompt adds. Null for sum/over/fixed, a count, stages or ranges.
  */
-export function salvageCheckTarget({ mode, config, component, actor, localize }) {
+export function salvageCheckTarget({
+  mode,
+  config,
+  component,
+  system = null,
+  recipeManager = null,
+  actor,
+  localize,
+}) {
   const evaluation = activeCheckEvaluation(config);
   const routedType = config?.type === 'fixed' ? 'fixed' : 'relative';
   if (evaluation.product !== 'sum' || isFixedSumOver(evaluation)) return null;
@@ -35,6 +72,7 @@ export function salvageCheckTarget({ mode, config, component, actor, localize })
     evaluation,
     anchor: salvageAnchorDc({ mode, routedType, config, component }),
     actor,
+    ...salvageBenefits({ system, component, recipeManager, actor }),
     localize,
     activityKey: 'FABRICATE.App.Inventory.Detail.KindSalvage',
   });

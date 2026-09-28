@@ -74,6 +74,7 @@ import {
   resolvedComponentsFor,
   resolvedEssencesFor,
   resolvedToolsFor,
+  salvageToolsFor,
 } from '../../systems/scopedEntityReads.js';
 import { computeSystemVisibility } from '../../systems/systemValidation.js';
 import { effectiveToolBreakageAuthority } from '../../systems/toolBreakageAuthority.js';
@@ -1565,6 +1566,8 @@ export class InventoryListingBuilder {
         mode,
         config,
         component,
+        system,
+        recipeManager: this.recipeManager,
         actor: targetActor,
         localize: this.localize,
       }),
@@ -1634,18 +1637,7 @@ export class InventoryListingBuilder {
    * @private
    */
   _salvageToolStates({ system, salvage, componentById, targetActor }) {
-    const ids = Array.isArray(salvage?.toolIds) ? salvage.toolIds : [];
-    if (ids.length === 0) return [];
-    const library = resolvedToolsFor(system);
-    const seen = new Set();
-    const tools = [];
-    for (const rawId of ids) {
-      const id = String(rawId ?? '').trim();
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      const tool = library.find((entry) => entry?.id === id);
-      if (tool) tools.push(tool);
-    }
+    const tools = salvageToolsFor(system, salvage);
     if (tools.length === 0) return [];
 
     const systemId = stringOrNull(system?.id);

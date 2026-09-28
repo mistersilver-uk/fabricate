@@ -66,6 +66,27 @@ function appliedBenefits(modifiers, direction) {
   return { flat, pending };
 }
 
+/** The benefits a roll-under target names: held Tool bonuses, then applied library modifiers. */
+function rollUnderBenefits(tools, modifiers, direction) {
+  const applied = appliedBenefits(modifiers, direction);
+  const held = direction === 'under' && tools ? tools : { flat: 0, pending: [] };
+  return {
+    tools: held.flat,
+    modifiers: applied.flat,
+    pending: [...held.pending, ...applied.pending],
+  };
+}
+
+/** Each nonzero benefit group as the prompt's line names it: `tools +2`, `modifiers +1`. */
+function benefitParts({ tools, modifiers }, localize) {
+  return [
+    ['FABRICATE.App.Crafting.Check.TargetTools', tools],
+    ['FABRICATE.App.Crafting.Check.TargetModifiers', modifiers],
+  ]
+    .filter(([, value]) => value)
+    .map(([key, value]) => localize(key, { value: formatSignedStep(value) }));
+}
+
 function targetValue(target, pending, localize) {
   return pending.length === 0
     ? target
@@ -79,8 +100,9 @@ function targetValue(target, pending, localize) {
  * `{ direction, text, source }`, `{ unresolved: reason }`, or null when the card names no target:
  * sum/over/fixed keeps its DC chip, and a count, progressive, routed or macro-moved check, a
  * fixed-range one, or a character value with no acting character, has no single target to name.
- * `modifiers` are the library entries the display resolver applied for this character; `tier`
- * (`{ adjustment, name }`) replaces the recipe's selected tier for an activity without recipes.
+ * `modifiers` are the library entries the display resolver applied for this character, `tools`
+ * the held Tool bonus (`{ flat, pending }`, see `heldToolBonus`), and `tier` (`{ adjustment,
+ * name }`) replaces the recipe's selected tier for an activity without recipes.
  */
 export function describeCheckTarget({
   config,
@@ -90,6 +112,7 @@ export function describeCheckTarget({
   anchor,
   actor,
   modifiers = [],
+  tools = null,
   localize,
   activityKey = 'FABRICATE.App.Nav.Crafting',
 }) {
@@ -110,9 +133,13 @@ export function describeCheckTarget({
     const label = localize(activityKey);
     return { unresolved: localize('FABRICATE.Check.Roll.TargetUnresolved', { label }) };
   }
-  const { flat, pending } = appliedBenefits(modifiers, evaluation.direction);
+  const benefits = rollUnderBenefits(tools, modifiers, evaluation.direction);
   const text = localize('FABRICATE.App.Crafting.Check.TargetLine', {
-    target: targetValue(resolved.target + flat, pending, localize),
+    target: targetValue(
+      resolved.target + benefits.tools + benefits.modifiers,
+      benefits.pending,
+      localize
+    ),
     comparison: comparisonText(evaluation, config, localize),
   });
   const basis = attribute
@@ -122,14 +149,12 @@ export function describeCheckTarget({
         readRollData,
       })
     : null;
-  const parts = basis
-    ? sourceFacts(basis, actor?.name ?? '', localize)
-    : [localize('FABRICATE.App.Crafting.Check.TargetBase', { value: resolved.target })];
-  if (flat) {
-    parts.push(
-      localize('FABRICATE.App.Crafting.Check.TargetModifiers', { value: formatSignedStep(flat) })
-    );
-  }
+  const parts = [
+    ...(basis
+      ? sourceFacts(basis, actor?.name ?? '', localize)
+      : [localize('FABRICATE.App.Crafting.Check.TargetBase', { value: resolved.target })]),
+    ...benefitParts(benefits, localize),
+  ];
   return {
     direction: evaluation.direction,
     text,
