@@ -439,6 +439,16 @@ describe('the count readout', () => {
     );
   });
 
+  it('keeps a rescued botch’s success copy, the net-below-zero fact still marked', async () => {
+    const rescue = { id: 'r', condition: { type: 'rollTotal', operator: '<', value: 0 }, outcome: 'success' };
+    const draft = { ...SMITHING, checkBreakage: { triggers: [rescue] } };
+    const { readout } = await rolled(plan({ draft }), [1, 1, 1, 1, 1, 1]);
+    assert.equal(readout.count.botch, true, 'the net is below zero');
+    assert.equal(readout.bandSuccess, true);
+    assert.equal(readout.bandName, 'Success');
+    assert.equal(readout.bandDetail, 'The result group is produced.');
+  });
+
   it('fails a zero pool with no tiles, no total and no Roll', async () => {
     const draft = {
       thresholdMode: 'meet',
@@ -459,6 +469,11 @@ describe('the count readout', () => {
     assert.equal(readout.total, -1);
     assert.equal(readout.bandName, 'Awards 0');
     assert.equal(readout.marginLabel, '', 'a progressive check grades no required count');
+    assert.equal(
+      readout.bandDetail,
+      'The value is spent down the recipe’s ordered results, each costing its own difficulty.',
+      'a progressive net below zero keeps its award detail'
+    );
   });
 
   it('states that a dynamic required count was not previewed by running its macro', () => {

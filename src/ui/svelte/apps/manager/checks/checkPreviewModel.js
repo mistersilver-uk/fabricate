@@ -448,9 +448,12 @@ function countReadoutFields(plan, result, band, text) {
   };
 }
 
-/** A botch says so; a pass/fail count names no DC; routed and progressive keep their own. */
+/**
+ * A botch the grader did not rescue says so; a pass/fail count names no DC; routed and progressive
+ * keep their own.
+ */
 function countBandDetail(plan, count, band, text) {
-  if (count?.botch) {
+  if (count?.botch && !band.success) {
     return text(
       'FABRICATE.Admin.Manager.Checks.Simulator.BandBotch',
       'Botched. Nothing is produced; the failure policy applies.'
