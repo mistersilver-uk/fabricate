@@ -1363,6 +1363,42 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     );
   });
 
+  it('a roll-under salvage states its target, source and rule in place of the DC (issue 2005, R4)', async () => {
+    const rule = 'Roll to break this down. The total must stay at or under the target to recover the materials below.';
+    const target = {
+      rule,
+      direction: 'under',
+      text: 'Target 10 · stay at or under',
+      source: 'Akra @skills.craft.value 12 · difficulty −2',
+    };
+    const { services } = salvageServices(salvageItem({ checkUsable: true, dc: null, target }));
+    const root = await openSalvage(services);
+    const line = root.querySelector('[data-inventory-salvage-target="under"]');
+    assert.equal(line.textContent.trim(), 'Target 10 · stay at or under');
+    assert.equal(
+      root.querySelector('[data-inventory-salvage-target-source]').textContent.trim(),
+      'Akra @skills.craft.value 12 · difficulty −2'
+    );
+    assert.ok(!root.querySelector('[data-inventory-salvage-dc]'), 'no DC beside a target');
+    assert.match(root.querySelector('[data-inventory-salvage-banner]').textContent, /stay at or under the target/);
+    assert.doesNotMatch(root.querySelector('[data-inventory-salvage-banner]').textContent, /Meet the DC/);
+  });
+
+  it('a relative routed roll-under salvage states its base target in place of the DC', async () => {
+    const target = { rule: 'unused', direction: 'under', text: 'Target 50 · stay at or under', source: '' };
+    const { services } = salvageServices(
+      salvageItem({ mode: 'routed', checkUsable: true, routedType: 'relative', dc: null, target })
+    );
+    const root = await openSalvage(services);
+    assert.equal(
+      root.querySelector('[data-inventory-salvage-body="routed"] [data-inventory-salvage-target="under"]')
+        .textContent.trim(),
+      'Target 50 · stay at or under'
+    );
+    assert.ok(!root.querySelector('[data-inventory-salvage-dc]'));
+    assert.doesNotMatch(root.querySelector('[data-inventory-salvage-banner]').textContent, /unused/);
+  });
+
   // AC2, rendering half. The builder decides the numbers.
   it('routed + fixed renders authored ranges and NO DC; routed + relative renders thresholds', async () => {
     const fixed = salvageServices(

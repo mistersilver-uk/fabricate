@@ -19,6 +19,12 @@ const COMPARISON_KEYS = Object.freeze({
   },
 });
 
+/** `stay at or under`, `stay under`, `meet or beat` or `beat`, for a summed check's direction. */
+export function comparisonText(evaluation, config, localize) {
+  const comparison = config?.thresholdMode === 'exceed' ? 'exceed' : 'meet';
+  return localize(COMPARISON_KEYS[evaluation.direction === 'under' ? 'under' : 'over'][comparison]);
+}
+
 function selectedTier(config, recipe) {
   const tiers = Array.isArray(config?.tiers) ? config.tiers : [];
   return recipe?.checkTierId
@@ -73,23 +79,27 @@ function targetValue(target, pending, localize) {
  * `{ direction, text, source }`, `{ unresolved: reason }`, or null when the card names no target:
  * sum/over/fixed keeps its DC chip, and a count, progressive, routed or macro-moved check, a
  * fixed-range one, or a character value with no acting character, has no single target to name.
- * `modifiers` are the library entries the display resolver applied for this character.
+ * `modifiers` are the library entries the display resolver applied for this character; `tier`
+ * (`{ adjustment, name }`) replaces the recipe's selected tier for an activity without recipes.
  */
 export function describeCheckTarget({
   config,
-  recipe,
+  recipe = null,
+  tier = null,
   evaluation,
   anchor,
   actor,
   modifiers = [],
   localize,
+  activityKey = 'FABRICATE.App.Nav.Crafting',
 }) {
   if (config?.type === 'fixed') return null;
   if (evaluation.product !== 'sum' || config?.dcMode === 'dynamic') return null;
   const attribute = evaluation.target.source === 'attribute';
   if (!attribute && evaluation.direction !== 'under') return null;
   if (attribute ? !actor : !Number.isFinite(Number(anchor))) return null;
-  const override = selectedTier(config, recipe)?.adjustment ?? null;
+  const selected = tier ?? selectedTier(config, recipe);
+  const override = selected?.adjustment ?? null;
   const readRollData = () => actor?.getRollData?.() ?? actor?.system ?? {};
   const resolved = resolveActivityTarget(config, {
     anchor: Math.trunc(Number(anchor)),
@@ -97,19 +107,18 @@ export function describeCheckTarget({
     readRollData,
   });
   if (!resolved.ok) {
-    const label = localize('FABRICATE.App.Nav.Crafting');
+    const label = localize(activityKey);
     return { unresolved: localize('FABRICATE.Check.Roll.TargetUnresolved', { label }) };
   }
-  const comparison = config.thresholdMode === 'exceed' ? 'exceed' : 'meet';
   const { flat, pending } = appliedBenefits(modifiers, evaluation.direction);
   const text = localize('FABRICATE.App.Crafting.Check.TargetLine', {
     target: targetValue(resolved.target + flat, pending, localize),
-    comparison: localize(COMPARISON_KEYS[evaluation.direction][comparison]),
+    comparison: comparisonText(evaluation, config, localize),
   });
   const basis = attribute
     ? attributeTargetBasis(config, {
         override,
-        label: selectedTier(config, recipe)?.name ?? '',
+        label: selected?.name ?? '',
         readRollData,
       })
     : null;

@@ -2,6 +2,9 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { InventoryListingBuilder } from '../src/ui/presenters/InventoryListingBuilder.js';
+import { fill } from '../src/utils/fillPlaceholders.js';
+
+import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
 import {
   REPORTER_ENRICHER_DESCRIPTION,
   REPORTER_RESOLVED_EXPECTED,
@@ -2182,5 +2185,61 @@ describe('InventoryListingBuilder — item-sourced tools (issue 1119)', () => {
     assert.equal(whetstone.isTool, true, 'and it is badged as a tool');
     assert.equal(whetstone.isToolOnly, false);
     assert.equal(whetstone.systems.length, 1, 'one systems[] entry, not two');
+  });
+});
+
+describe('InventoryListingBuilder - a roll-under or character-value salvage target (issue 2005, R4)', () => {
+  const format = (key, data = {}) => fill(shippedLocalize(key), data);
+  const salvageFor = (mode, check, { salvage = {}, skills = null } = {}) => {
+    const { builder } = makeBuilder({ systems: [salvageSystem({ mode, check, salvage })] });
+    builder.localize = format;
+    const akra = actor('a1', 'Akra', [item('Iron', 1)], skills ? { system: { skills } } : {});
+    const listing = builder.buildListing({ craftingActor: akra, viewer: { isGM: true, id: 'gm' } });
+    return rowByComponent(listing, 'c1').salvage;
+  };
+  const under = { direction: 'under' };
+  const skill = { source: 'attribute', expression: '@skills.craft.value' };
+
+  it('states a fixed roll-under target and rule in place of the DC', () => {
+    const salvage = salvageFor('simple', { simple: { rollFormula: '3d6', dc: 12, evaluation: under } }, {
+      salvage: { dcOverride: 13 },
+    });
+    assert.equal(salvage.dc, null, 'no DC to meet on a roll-under check');
+    assert.deepEqual(salvage.target, {
+      rule: 'Roll to break this down. The total must stay at or under the target to recover the materials below.',
+      direction: 'under',
+      text: 'Target 13 · stay at or under',
+      source: '',
+    });
+  });
+
+  it("names a character value by the salvager's name, the typed formula and the adjustment", () => {
+    const salvage = salvageFor(
+      'simple',
+      { simple: { rollFormula: '3d6', thresholdMode: 'exceed', evaluation: { ...under, target: skill } } },
+      { salvage: { adjustmentOverride: -2 }, skills: { craft: { value: 12 } } }
+    );
+    assert.equal(salvage.dc, null);
+    assert.equal(salvage.target.text, 'Target 10 · stay under');
+    assert.equal(salvage.target.source, 'Akra @skills.craft.value 12 · difficulty −2');
+  });
+
+  it('states the base target of a relative routed roll-under check, and none for a fixed range', () => {
+    const outcomes = { relativeOutcomes: [{ id: 'ok', name: 'Ok', success: true, dc: 0 }] };
+    const relative = salvageFor('routed', {
+      routed: { type: 'relative', rollFormula: '1d100', dc: 50, evaluation: under, ...outcomes },
+    });
+    assert.equal(relative.dc, null);
+    assert.equal(relative.target.text, 'Target 50 · stay at or under');
+    const fixed = salvageFor('routed', {
+      routed: { type: 'fixed', rollFormula: '1d100', evaluation: under, fixedOutcomes: [] },
+    });
+    assert.equal(fixed.target, null);
+  });
+
+  it('leaves a sum/over fixed salvage its DC and no target', () => {
+    const salvage = salvageFor('simple', { simple: { rollFormula: '1d20', dc: 12 } });
+    assert.equal(salvage.dc, 12);
+    assert.equal(salvage.target, null);
   });
 });

@@ -34,6 +34,8 @@
   const routedType = $derived(salvage?.routedType === 'fixed' ? 'fixed' : 'relative');
   const outcomes = $derived(Array.isArray(salvage?.routedOutcomes) ? salvage.routedOutcomes : []);
   const dc = $derived(Number.isFinite(salvage?.dc) ? salvage.dc : null);
+  // A relative roll-under or character-value check's base target, in place of a DC (issue 2005).
+  const target = $derived(salvage?.target ?? null);
   const rolledOutcomeId = $derived(
     result?.state === 'success' ? (result?.outcomeId ?? null) : null
   );
@@ -48,12 +50,21 @@
     <Kicker as="span">{localize('FABRICATE.App.Inventory.Salvage.OutcomesTitle')}</Kicker>
     <!-- Present for RELATIVE only: a fixed check has no DC — checkRoll never reads one
          and the GM editor hides the field entirely for that pairing. -->
-    {#if dc !== null}
+    {#if target?.text}
+      <span class="salvage-dc" data-inventory-salvage-target={target.direction}>{target.text}</span>
+    {:else if dc !== null}
       <span class="salvage-dc" data-inventory-salvage-dc={String(dc)}>
         {localize('FABRICATE.App.Inventory.Salvage.Dc', { dc })}
       </span>
     {/if}
   </p>
+  {#if target?.source}
+    <p class="salvage-target-source" data-inventory-salvage-target-source>{target.source}</p>
+  {:else if target?.unresolved}
+    <p class="salvage-target-source" data-inventory-salvage-target-unresolved>
+      {target.unresolved}
+    </p>
+  {/if}
 
   {#if outcomes.length === 0}
     <EmptyState note hint={localize('FABRICATE.App.Inventory.Salvage.NoOutcomes')} />
@@ -137,6 +148,12 @@
      and the ink — so what is left here is what was genuinely the CALLER's: the flex row that
      places the label beside its trailing figure, and the `line-height` that sets THAT figure's
      leading. The kicker declares its own 1.3 and is unaffected by the inherited value. */
+  .salvage-target-source {
+    margin: 0;
+    font-size: 11px;
+    color: var(--fab-text-muted);
+  }
+
   .salvage-body-title {
     display: flex;
     align-items: center;

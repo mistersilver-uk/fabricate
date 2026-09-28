@@ -1,15 +1,46 @@
-import { activeCheckEvaluation } from '../../systems/checkTarget.js';
+import { activeCheckEvaluation, isFixedSumOver } from '../../systems/checkTarget.js';
 import { countRequired } from '../../systems/countCheck.js';
 import { isCountCheck } from '../../systems/salvageCheckUsability.js';
 
-/** The salvage DC shown to players; fixed routing, stages and a count check have no single DC. */
-export function salvageDisplayDc({ mode, routedType, config, component }) {
+import { comparisonText, describeCheckTarget } from './checkDescriptor.js';
+
+/** The salvage check's fixed anchor; fixed routing, stages and a count check have none. */
+function salvageAnchorDc({ mode, routedType, config, component }) {
   if (mode === 'progressive' || (mode === 'routed' && routedType === 'fixed')) return null;
   if (isCountCheck(config)) return null;
   const override = component?.salvage?.dcOverride;
   if (Number.isFinite(override)) return Math.trunc(override);
   const dc = Number(config?.dc);
   return Number.isFinite(dc) ? Math.trunc(dc) : 15;
+}
+
+/** The salvage DC shown to players: only a fixed sum/over check has a DC to meet or beat. */
+export function salvageDisplayDc(input) {
+  return isFixedSumOver(activeCheckEvaluation(input.config)) ? salvageAnchorDc(input) : null;
+}
+
+/**
+ * The Salvage tab's target for a summed pass/fail or relative check other than sum/over/fixed
+ * (issue 2005): the banner's `rule`, and the check card's `{ direction, text, source }` or
+ * `{ unresolved }` for the salvaging character. Null for sum/over/fixed, a count, stages or ranges.
+ */
+export function salvageCheckTarget({ mode, config, component, actor, localize }) {
+  const evaluation = activeCheckEvaluation(config);
+  const routedType = config?.type === 'fixed' ? 'fixed' : 'relative';
+  if (evaluation.product !== 'sum' || isFixedSumOver(evaluation)) return null;
+  if (mode === 'progressive' || (mode === 'routed' && routedType === 'fixed')) return null;
+  const target = describeCheckTarget({
+    config,
+    tier: { adjustment: component?.salvage?.adjustmentOverride ?? null, name: '' },
+    evaluation,
+    anchor: salvageAnchorDc({ mode, routedType, config, component }),
+    actor,
+    localize,
+    activityKey: 'FABRICATE.App.Inventory.Detail.KindSalvage',
+  });
+  const comparison = comparisonText(evaluation, config, localize);
+  const rule = localize('FABRICATE.App.Inventory.Salvage.BannerSimpleRuleTarget', { comparison });
+  return { rule, ...target };
 }
 
 /**
@@ -34,7 +65,7 @@ export function salvageCheckNeed({ mode, config, checkUsable, component }) {
       destination: evaluation.pool?.modifierDestination === 'threshold' ? 'threshold' : 'pool',
     };
   }
-  const dc = salvageDisplayDc({ mode, routedType, config, component });
+  const dc = salvageAnchorDc({ mode, routedType, config, component });
   if (!Number.isFinite(dc)) return { kind: 'noSingleTarget' };
   // Only a summed check reaches here: a count check returned above.
   return evaluation.direction === 'under' ? { kind: 'target', target: dc } : { kind: 'dc', dc };
