@@ -108,7 +108,12 @@ export function executedCheckEvidence(data) {
     comparison: oneOf(['meet', 'exceed'], data.comparison),
     margin: numberOrNull(data.margin),
   };
-  if (text(data.resolvedFormula)) evidence.formula = text(data.resolvedFormula);
+  if (text(data.resolvedFormula)) {
+    evidence.formula = text(data.resolvedFormula);
+    // The typed formula: a Journal check's `rollFormula`, a direct runner's `formula`.
+    const typed = text(data.rollFormula) || text(data.formula);
+    if (typed) evidence.rollFormula = typed;
+  }
   if (Array.isArray(data.diceGroups)) evidence.dice = diceRows(data.diceGroups);
   if (Array.isArray(data.preRolls)) {
     evidence.preRolls = data.preRolls.map(preRollRow).filter(Boolean);

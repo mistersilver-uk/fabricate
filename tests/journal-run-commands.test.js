@@ -2157,6 +2157,7 @@ describe('journal run command protocol', () => {
     const data = {
       ...UNDER_DATA,
       resolvedFormula: '3d6 + 7',
+      rollFormula: '3d6 + @secret.formula',
       targetExpression: '@secret.sentinel',
       targetActor: 'Hidden NPC',
       targetTerms: [
@@ -2167,13 +2168,14 @@ describe('journal run command protocol', () => {
         { source: 'library', label: 'PRIVATE-LABEL', expression: '1d4+@priv', total: 3, destination: 'target' },
       ],
     };
-    const markers = /PRIVATE-LABEL|PRIVATE-TIER|@secret\.sentinel|Hidden NPC|@priv|3d6 \+ 7/;
+    const markers = /PRIVATE-LABEL|PRIVATE-TIER|@secret\.sentinel|@secret\.formula|Hidden NPC|@priv|3d6 \+ 7/;
     for (const rollMode of ['publicroll', 'gmroll', 'selfroll']) {
       const hidden = await evidenceReply({ entitled: false, rollMode, data });
       assert.doesNotMatch(JSON.stringify(hidden), markers, rollMode);
     }
     const shown = await evidenceReply({ entitled: true, data });
     assert.match(JSON.stringify(shown), /PRIVATE-LABEL/, 'positive control: the markers were seeded');
+    assert.equal(shown.check.evidence.rollFormula, '3d6 + @secret.formula', 'an entitled reply has it');
   });
 
   it('accepts replies only from the elected GM for this recipient/session/correlation', async () => {

@@ -96,3 +96,32 @@ test('a flavoured term is named in words, never as its raw roll flavour (frame 3
     '1d20 (11) + 2 Smith’s Hammer + 1 modifiers + (1d4) modifiers = 17'
   );
 });
+
+test('a character value is labelled with its typed path, matched by position (G7)', () => {
+  const typed = (formula, rollFormula) => ({
+    ...summed('over', formula, [{ group: '1d20', results: [14] }], 24),
+    rollFormula,
+  });
+  assert.equal(
+    line(typed('1d20 + 3 + 7[Modifiers]', '1d20 + @abilities.int.mod')),
+    '1d20 (14) + 3 @abilities.int.mod + 7 modifiers = 24',
+    'frame 37 with the typed formula in place of "prof"'
+  );
+  assert.equal(
+    line(typed('1d20 + 3 - 2 + 1', '1d20 + @abilities.int.mod - @skills.smith.penalty + 1')),
+    '1d20 (14) + 3 @abilities.int.mod - 2 @skills.smith.penalty + 1 = 24',
+    'two paths, each at its own place, and an authored number left bare'
+  );
+  assert.equal(
+    line(typed('1d20 + -2', '1d20 + @abilities.str.mod')),
+    '1d20 (14) + -2 @abilities.str.mod = 24',
+    'a negative value is one operand'
+  );
+  assert.equal(
+    line(typed('1d20 + 2[Hammer 🔨] + 3', '1d20 + 2 + @abilities.int.mod')),
+    '1d20 (14) + 2 Hammer 🔨 + 3 @abilities.int.mod = 24',
+    'a flavour spelling an astral character does not shift the later operands'
+  );
+  const { rollFormula: _typed, formula: _authored, ...legacy } = typed('1d20 + 3', '1d20 + @x');
+  assert.equal(line(legacy), '1d20 (14) + 3 = 24', 'a record without its typed formula stays bare');
+});

@@ -1611,7 +1611,9 @@ describe('journal run authority ledger', () => {
       const hidden = await evaluatePreparedRunCheck(preparation(), actor, {}, { secret: true });
       assert.ok(!Object.hasOwn(hidden.data, 'targetTerms'), 'a secret projection omits them');
       assert.equal(visible.data.resolvedFormula, '3d6', 'the dice line has its formula (M1)');
+      assert.equal(visible.data.rollFormula, '3d6', 'and its typed formula (G7)');
       assert.ok(!Object.hasOwn(hidden.data, 'resolvedFormula'), 'a secret roll hands back none');
+      assert.ok(!Object.hasOwn(hidden.data, 'rollFormula'), 'nor its typed formula');
 
       const world = sharedAuthorityWorld();
       const authority = world.realm();
