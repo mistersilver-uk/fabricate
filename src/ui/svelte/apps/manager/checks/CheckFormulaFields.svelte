@@ -29,7 +29,7 @@
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import CheckPromptOptions from './CheckPromptOptions.svelte';
-  import { formulaTokenIcon, underComparisonPhrase } from './checksCopy.js';
+  import { formulaTokenIcon, interpolate, underComparisonPhrase } from './checksCopy.js';
 
   let {
     rollFormula = '',
@@ -142,23 +142,30 @@
   const DEFAULT_MODIFIER_ICON = 'fas fa-wand-magic-sparkles';
   const applied = $derived(Array.isArray(appliedModifiers) ? appliedModifiers : []);
 
+  // The prototype's under sentence: the raw-dice rule, naming the previewed tier's adjustment.
+  function underRuleSentence() {
+    if (!underTier) {
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Evaluation.UnderRule',
+        'The dice are compared raw. Every modifier that applies raises the target instead of being added to the roll.'
+      );
+    }
+    const sentence = underTier.name
+      ? text(
+          'FABRICATE.Admin.Manager.Checks.Evaluation.UnderRuleWithTier',
+          'The dice are compared raw. Every modifier that applies raises the target instead of being added to the roll; the {tier} adjustment ({adjustment}) is applied first.'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Checks.Evaluation.UnderRuleWithUnnamedTier',
+          "The dice are compared raw. Every modifier that applies raises the target instead of being added to the roll; the tier's adjustment ({adjustment}) is applied first."
+        );
+    return interpolate(sentence, { tier: underTier.name, adjustment: underTier.adjustment });
+  }
+
   // ONE sentence naming the rule in force, restating what the Modifiers section authors. Under,
   // the dice are compared raw, so the sentence names where the modifiers land instead.
   const ruleSentence = $derived.by(() => {
-    if (underInset) {
-      const lead = text(
-        'FABRICATE.Admin.Manager.Checks.Evaluation.UnderRule',
-        'The dice are compared raw. Every modifier that applies raises the target instead of being added to the roll'
-      );
-      if (!underTier) return `${lead}.`;
-      const clause = text(
-        'FABRICATE.Admin.Manager.Checks.Evaluation.UnderRuleTier',
-        '; the {tier} adjustment ({adjustment}) is applied first.'
-      )
-        .replaceAll('{tier}', underTier.name)
-        .replaceAll('{adjustment}', underTier.adjustment);
-      return `${lead}${clause}`;
-    }
+    if (underInset) return underRuleSentence();
     if (applied.length === 0) {
       return text(
         'FABRICATE.Admin.Manager.Checks.Crafting.ResolvedNoModifiers',
