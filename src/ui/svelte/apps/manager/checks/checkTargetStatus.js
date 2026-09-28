@@ -21,6 +21,22 @@ export function missingTargetPaths(expression, rollData = {}) {
   );
 }
 
+/**
+ * The fault a character-value expression carries whatever character reads it: `dice` or `invalid`
+ * once every path is neutralized to a number, else null.
+ */
+export function targetExpressionFault(expression) {
+  if (!String(expression ?? '').trim()) return null;
+  const neutralized = String(expression ?? '').replaceAll(PATH_TOKEN, '1');
+  const read = resolveDeterministicExpression(neutralized, {}, { pathMode: 'foundry' });
+  return !read.ok && (read.reason === 'dice' || read.reason === 'invalid') ? read.reason : null;
+}
+
+/** Whether `source` reads a character value through an `@` path. */
+export function readsCharacter(source) {
+  return (String(source ?? '').match(PATH_TOKEN) ?? []).length > 0;
+}
+
 /** The runtime's refusal sentence for `reason`, localized through the Studio's `text`. */
 export function targetRefusalSentence(reason, text) {
   const subject = text('FABRICATE.Admin.Manager.Checks.Evaluation.RefusalSubject', 'This');

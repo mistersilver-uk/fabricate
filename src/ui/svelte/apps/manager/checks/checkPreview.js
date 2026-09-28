@@ -13,10 +13,21 @@
 import { isPlayerCharacterActor } from '../../../../../config/playerCharacterTypes.js';
 import { buildCheckModifierContext } from '../../../../../systems/checkModifierResolver.js';
 import {
+  planModifierPlacement,
+  SUM_OVER_EVALUATION,
+} from '../../../../../systems/checkModifierRouter.js';
+import {
   runFormulaPassFail,
   runFormulaProgressive,
   runFormulaRouted,
 } from '../../../../../systems/checkRoll.js';
+import {
+  activeCheckEvaluation,
+  actorRollData,
+  isFixedSumOver,
+  resolveActivityTarget,
+} from '../../../../../systems/checkTarget.js';
+import { normalizeNullableAdjustment } from '../../../../../systems/normalize/checkEvaluation.js';
 import { appendToolBonusTerms } from '../../../../../systems/toolCheckBonus.js';
 
 import { NO_ACTOR_ID } from './previewActorId.js';
@@ -85,15 +96,15 @@ export function cloneRollData(actor) {
 }
 
 /**
- * The records a check can be previewed AGAINST: whatever supplies the DC, which for a simple or
- * relative-routed check is its OWN authored recipe tiers, the default DC always offered first. A
- * FIXED routed check's bands are the same for every record and the selector still lists them,
- * the readout being per-record. A RECORD SUPPLIES A DC AND NOTHING ELSE: a progressive check has
- * none, its award count coming from the check's preview sandbox.
+ * The records a check can be previewed against: whatever supplies the target, which for a simple
+ * or relative-routed check is its own authored recipe tiers, the default always offered first. A
+ * fixed routed check's bands are the same for every record and the selector still lists them,
+ * the readout being per-record. A record supplies a DC and an adjustment and nothing else: a
+ * character-value target reads the adjustment (null inherits the base), every other the DC.
  * @param {object} params Params.
  * @param {object|null} params.check The active check draft.
  * @param {string} [params.defaultLabel] The localized name of the default record.
- * @returns {Array<{id: string, name: string, dc: number}>} The records, default first. */
+ * @returns {Array<{id: string, name: string, dc: number, adjustment: ?number}>} Default first. */
 export function buildPreviewRecords({ check, defaultLabel = 'Default' }) {
   const baseDc = Number(check?.dc ?? 0);
   const records = [
@@ -101,6 +112,7 @@ export function buildPreviewRecords({ check, defaultLabel = 'Default' }) {
       id: DEFAULT_RECORD_ID,
       name: defaultLabel,
       dc: Number.isFinite(baseDc) ? baseDc : 0,
+      adjustment: null,
     },
   ];
   for (const tier of Array.isArray(check?.tiers) ? check.tiers : []) {
@@ -110,13 +122,26 @@ export function buildPreviewRecords({ check, defaultLabel = 'Default' }) {
       id: String(tier.id),
       name: String(tier.name ?? ''),
       dc: Number.isFinite(dc) ? dc : records[0].dc,
+      adjustment: normalizeNullableAdjustment(tier.adjustment),
     });
   }
   return records;
 }
 
 /**
+ * The evaluation a preview grades by: the check's own summed one. A count check still previews
+ * as sum/over until its own preview lands (issue 2004).
+ */
+export function previewEvaluation(draft) {
+  const evaluation = activeCheckEvaluation(draft);
+  return evaluation.product === 'sum' ? evaluation : SUM_OVER_EVALUATION;
+}
+
+/**
  * Build the argument bag the engines build, for one previewed (activity, mode, record, actor).
+ * The target resolves as the runtime resolves it, with the record's adjustment and the actor's
+ * roll data, and never through a macro; `target` is its `{ ok, target, source }` or `{ ok: false,
+ * reason }`, null for a progressive check, which has none.
  * @param {object} params Params.
  * @param {'crafting'|'salvage'|'gathering'} params.activity Which activity's check.
  * @param {'simple'|'routed'|'progressive'} params.mode The readiness mode.
@@ -128,7 +153,8 @@ export function buildPreviewRecords({ check, defaultLabel = 'Default' }) {
  * @param {Array<{value: number, label: string}>} [params.toolTerms] Tool contributions, which
  *   gathering has no seam for and a preview never populates.
  * @returns {{kind: 'passFail'|'routed'|'progressive'|null, formula: string, dc: number,
- *   dynamicDc: boolean, actor: object|null, args: object}} `kind: null` means nothing rolls. */
+ *   dynamicDc: boolean, actor: object|null, evaluation: object, target: ?object, args: object}}
+ *   `kind: null` means nothing rolls. */
 export function buildPreviewCheckArgs({
   activity,
   mode,
@@ -140,17 +166,21 @@ export function buildPreviewCheckArgs({
   toolTerms = [],
 }) {
   const kind = RUNNER_KINDS.get(mode) ?? null;
+  const evaluation = previewEvaluation(draft);
+  const fixedSumOver = isFixedSumOver(evaluation);
   const authored = String(draft?.rollFormula ?? '').trim();
   // This branch is about which activities HAVE the tool-bonus seam, not about the data.
-  const formula =
-    activity === 'gathering' ? authored : appendToolBonusTerms(authored, toolTerms ?? []);
+  const tools = activity === 'gathering' ? [] : toolContributions(toolTerms);
+  const placed = planModifierPlacement({ evaluation, contributions: tools });
+  const formula = appendToolBonusTerms(authored, placed.appendTerms);
 
   // A dynamic DC is resolved by RUNNING a macro; the preview refuses and falls back to the
   // static DC, the same value the engine's own try/catch falls back to.
   const dynamicDc = draft?.dcMode === 'dynamic';
-  const recordDc = Number(record?.dc);
-  const authoredDc = Number(draft?.dc ?? 0);
-  const dc = Number.isFinite(recordDc) ? recordDc : Number.isFinite(authoredDc) ? authoredDc : 0;
+  const dc = previewDc(record, draft);
+  const target =
+    kind === 'progressive' ? null : previewTarget({ draft, evaluation, dc, record, actor });
+  const gradedDc = target?.ok ? target.target : dc;
 
   const craftingModifier = system ? buildCheckModifierContext(system, activity, subject) : null;
   const triggers = Array.isArray(draft?.checkBreakage?.triggers)
@@ -162,26 +192,24 @@ export function buildPreviewCheckArgs({
     triggers,
     actor,
     // `rollOptions: null` — see the module header — stated so a reader can check the "posts
-    // nothing, prompts nothing" claim against it.
-    rollOptions: null,
+    // nothing, prompts nothing" claim against it. Tools a roll-under places on its target ride
+    // as the contributions the runner settles, which prompt nothing either.
+    rollOptions: fixedSumOver || tools.length === 0 ? null : { toolContributions: tools },
     craftingModifier,
+    ...(!fixedSumOver && { evaluation }),
   };
+  const plan = { kind, formula, dc, dynamicDc, actor, evaluation, target };
 
-  if (kind === 'progressive') {
-    return { kind, formula, dc, dynamicDc, actor, args: shared };
-  }
+  if (kind === 'progressive') return { ...plan, args: shared };
 
+  const thresholdMode = draft?.thresholdMode === 'exceed' ? 'exceed' : 'meet';
   if (kind === 'routed') {
     return {
-      kind,
-      formula,
-      dc,
-      dynamicDc,
-      actor,
+      ...plan,
       args: {
         ...shared,
-        dc,
-        thresholdMode: draft?.thresholdMode === 'exceed' ? 'exceed' : 'meet',
+        dc: gradedDc,
+        thresholdMode,
         type: draft?.type === 'fixed' ? 'fixed' : 'relative',
         relativeOutcomes: Array.isArray(draft?.relativeOutcomes) ? draft.relativeOutcomes : [],
         fixedOutcomes: Array.isArray(draft?.fixedOutcomes) ? draft.fixedOutcomes : [],
@@ -194,18 +222,39 @@ export function buildPreviewCheckArgs({
     };
   }
 
-  return {
-    kind,
-    formula,
-    dc,
-    dynamicDc,
-    actor,
-    args: {
-      ...shared,
-      dc,
-      thresholdMode: draft?.thresholdMode === 'exceed' ? 'exceed' : 'meet',
-    },
-  };
+  return { ...plan, args: { ...shared, dc: gradedDc, thresholdMode } };
+}
+
+/** The record's DC, else the check's own, else 0. */
+function previewDc(record, draft) {
+  const recordDc = Number(record?.dc);
+  if (Number.isFinite(recordDc)) return recordDc;
+  const authoredDc = Number(draft?.dc ?? 0);
+  return Number.isFinite(authoredDc) ? authoredDc : 0;
+}
+
+/** The target as the runtime resolves it: the record's adjustment over the actor's roll data. */
+function previewTarget({ draft, evaluation, dc, record, actor }) {
+  return resolveActivityTarget(
+    { type: draft?.type, evaluation },
+    {
+      anchor: dc,
+      override: record?.adjustment ?? null,
+      readRollData: () => actorRollData(actor),
+    }
+  );
+}
+
+/** Tool terms as the runtime's scalar Tool contributions. */
+function toolContributions(toolTerms) {
+  return (Array.isArray(toolTerms) ? toolTerms : [])
+    .map((term) => ({
+      source: 'tool',
+      label: String(term?.label ?? ''),
+      form: 'scalar',
+      value: Number(term?.value),
+    }))
+    .filter((term) => Number.isFinite(term.value));
 }
 
 /** Roll the preview through the engine's own runner.

@@ -69,6 +69,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // The "No actor" id, a leaf `checkPreview.js` and the shared Preview-as picker both read.
   'src/ui/svelte/apps/manager/checks/previewActorId.js',
   'src/ui/svelte/apps/manager/checks/checkOdds.js',
+  'src/ui/svelte/apps/manager/checks/checkPreviewModel.js',
   // The Studio's adjustment labels and read-only band pictures (issue 2005).
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
   'src/ui/svelte/apps/manager/checks/checkBandModel.js',

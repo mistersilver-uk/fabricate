@@ -27,6 +27,21 @@ export const CHECK_TICK_LABELS = Object.freeze({
     'CheckTierStepTargetsResolve',
     'Tier-step targets name exactly one existing tier',
   ],
+  attributeTargetSet: ['CheckAttributeTargetSet', 'Has a character value to measure against'],
+  attributeTargetReadable: [
+    'CheckAttributeTargetReadable',
+    'The character value can be worked out',
+  ],
+  recipeTiersSetAdjustment: [
+    'CheckRecipeTiersSetAdjustment',
+    'Every recipe tier sets an adjustment',
+  ],
+  adjustmentsSuitKind: ['CheckAdjustmentsSuitKind', 'Every adjustment suits its kind'],
+  singleOtherwiseTier: ['CheckSingleOtherwiseTier', 'Exactly one Otherwise tier'],
+  progressiveHigherIsBetter: [
+    'CheckProgressiveHigherIsBetter',
+    'Progressive checks use Higher is better',
+  ],
 });
 
 /** The ISSUES a check can raise, keyed by `CHECK_READINESS_ISSUE_IDS` member. */
@@ -93,6 +108,82 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
     'IssueMultipleTierStepTargets',
     'Two or more triggers set a target tier; if more than one matches, the lowest-ranked wins.',
   ],
+  attributeTargetMissing: [
+    'IssueAttributeTargetMissing',
+    'This check measures against a character value but names none. Enter a number or a character path.',
+  ],
+  attributeTargetInvalid: [
+    'IssueAttributeTargetInvalid',
+    "This check's character value uses dice or cannot be read as arithmetic. Use a number, a character path, or arithmetic on them without dice.",
+  ],
+  attributeTierWithoutAdjustment: [
+    'IssueAttributeTierWithoutAdjustment',
+    '{names} set no difficulty adjustment, so they use the base adjustment and are no harder than the default. Give each tier its own adjustment.',
+  ],
+  adjustmentInvalidForKind: [
+    'IssueAdjustmentInvalidForKind',
+    'An added adjustment must be a finite number and a multiplier must be above zero; {names} is not.',
+  ],
+  otherwiseTierMissing: [
+    'IssueOtherwiseTierMissing',
+    'No outcome tier is marked Otherwise, so a roll that meets no multiplied threshold has nowhere to go. Leave exactly one tier without a multiplier.',
+  ],
+  multipleOtherwiseTiers: [
+    'IssueMultipleOtherwiseTiers',
+    '{names} are all marked Otherwise. Leave exactly one tier without a multiplier.',
+  ],
+  progressiveUnderUnsupported: [
+    'IssueProgressiveUnderUnsupported',
+    'A progressive check spends its total as a budget, so Lower is better cannot apply. Switch this check to Higher is better.',
+  ],
+  attributePathUnresolvedForPreview: [
+    'IssueAttributePathUnresolvedForPreview',
+    '{actor} has no value at {path}, so this check cannot roll for them.',
+  ],
+  attributeValueNotNumeric: [
+    'IssueAttributeValueNotNumeric',
+    'The value this check reads from {actor} is not a number, so this check cannot roll for them.',
+  ],
+});
+
+/**
+ * Titles for the issues that render as a title over their sentence, in the Validation row and the
+ * section notice alike; every other issue's sentence is its title.
+ */
+export const CHECK_ISSUE_TITLES = Object.freeze({
+  attributeTargetMissing: [
+    'IssueAttributeTargetMissingTitle',
+    'No character value to measure against',
+  ],
+  attributeTargetInvalid: [
+    'IssueAttributeTargetInvalidTitle',
+    'The character value cannot be worked out',
+  ],
+  attributeTierWithoutAdjustment: [
+    'IssueAttributeTierWithoutAdjustmentTitle',
+    'A recipe tier has no difficulty adjustment',
+  ],
+  adjustmentInvalidForKind: [
+    'IssueAdjustmentInvalidForKindTitle',
+    'An adjustment does not suit its kind',
+  ],
+  otherwiseTierMissing: ['IssueOtherwiseTierMissingTitle', 'No tier is marked Otherwise'],
+  multipleOtherwiseTiers: [
+    'IssueMultipleOtherwiseTiersTitle',
+    'More than one tier is marked Otherwise',
+  ],
+  progressiveUnderUnsupported: [
+    'IssueProgressiveUnderUnsupportedTitle',
+    'Lower is better cannot drive a progressive check',
+  ],
+  attributePathUnresolvedForPreview: [
+    'IssueAttributePathUnresolvedForPreviewTitle',
+    'A character path does not resolve',
+  ],
+  attributeValueNotNumeric: [
+    'IssueAttributeValueNotNumericTitle',
+    'A character value is not a number',
+  ],
 });
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Validation.';
@@ -113,6 +204,30 @@ export function checkIssueCopy(id) {
  *  @param {string} id A check tick id. @returns {{ key: string, fallback: string }} */
 export function checkTickCopy(id) {
   return copyFor(CHECK_TICK_LABELS, id);
+}
+
+/** An issue's data with a faulted base adjustment named, in the reader's language, before the rest. */
+function issueData(data, text) {
+  if (!data?.baseAdjustment) return data;
+  const base = text(
+    'FABRICATE.Admin.Manager.Checks.Evaluation.RecordBaseAdjustment',
+    'base adjustment'
+  );
+  const named = `${base.charAt(0).toLocaleUpperCase()}${base.slice(1)}`;
+  return { ...data, names: [named, data.names].filter(Boolean).join(', ') };
+}
+
+/**
+ * The words one readiness issue renders, `{ title, detail }`: a titled issue's sentence is its
+ * detail, and any other issue's sentence is its title with no detail. `text(key, fallback, data)`.
+ */
+export function checkIssueText(id, data, text) {
+  const resolved = issueData(data, text);
+  const copy = checkIssueCopy(id);
+  const sentence = interpolate(text(copy.key, copy.fallback, resolved), resolved);
+  const title = CHECK_ISSUE_TITLES[id];
+  if (!title) return { title: sentence, detail: '' };
+  return { title: text(`${NAMESPACE}${title[0]}`, title[1]), detail: sentence };
 }
 
 /**

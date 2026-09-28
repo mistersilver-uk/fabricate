@@ -22,6 +22,7 @@
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
   import {
+    bandToneFor,
     bandsAreEditable,
     buildRoutedBands,
     describeBandRange,
@@ -244,18 +245,8 @@
   // ink to 1.74:1. Each tone brings its OWN ink rather than one `--fab-text`, which is what
   // buys the headroom: measured across five tones, seven palettes and every band count the
   // floor is 7.12:1 — see the AA gate in tests/components/manager-layout.test.js.
-  const BAND_TONES = ['danger', 'warning', 'success', 'info', 'accent'];
   const BAND_TONE_MIX = 26;
   const BAND_TONE_BASE = 'var(--fab-bg-0)';
-
-  /**
-   * The tone for the band at `position` of `count`, in value order. A single band takes the
-   * MIDDLE tone, and counts above five reuse one — the cost of a five-stop ramp, stated here.
-   */
-  function toneFor(position, count) {
-    if (count <= 1) return BAND_TONES[Math.floor(BAND_TONES.length / 2)];
-    return BAND_TONES[Math.round((position * (BAND_TONES.length - 1)) / (count - 1))];
-  }
 
   function bandFill(tone) {
     return `color-mix(in oklab, var(--fab-${tone}) ${BAND_TONE_MIX}%, ${BAND_TONE_BASE})`;
@@ -295,7 +286,7 @@
     });
     return bands.map((band, position) => {
       const rank = graded.direction === 'under' ? bands.length - 1 - position : position;
-      const tone = toneFor(rank, bands.length);
+      const tone = bandToneFor(rank, bands.length);
       return {
         ...band,
         range: describeBandRange(band, text),
@@ -344,7 +335,7 @@
     );
     const toneByIndex = {};
     ordered.forEach((row, position) => {
-      toneByIndex[row.index] = toneFor(position, ordered.length);
+      toneByIndex[row.index] = bandToneFor(position, ordered.length);
     });
     return rows.map((row) => {
       const tone = toneByIndex[row.index];

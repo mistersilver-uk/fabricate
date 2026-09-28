@@ -25,6 +25,18 @@ import { missingTargetPaths, targetRefusalSentence } from './checkTargetStatus.j
 const WINDOW_PADDING = 5;
 const MAX_WINDOW = 5000;
 
+/** The five-stop band ramp, worst to best, shared by the tier strip and the odds bars. */
+export const BAND_TONES = Object.freeze(['danger', 'warning', 'success', 'info', 'accent']);
+
+/**
+ * The tone for the band at `position` of `count`, worst first. A single band takes the MIDDLE
+ * tone, and counts above five reuse one — the cost of a five-stop ramp.
+ */
+export function bandToneFor(position, count) {
+  if (count <= 1) return BAND_TONES[Math.floor(BAND_TONES.length / 2)];
+  return BAND_TONES[Math.round((position * (BAND_TONES.length - 1)) / (count - 1))];
+}
+
 /**
  * Whether a strip keeps its drag handles: only summed roll-over against a fixed DC (R2), judged by
  * the evaluation the runtime grades with, so an inert count record keeps them.
