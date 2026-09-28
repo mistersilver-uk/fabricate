@@ -89,6 +89,87 @@ const parityCase = ({ id, label, frame, query = {}, steps, expectSelector }) =>
     sourceMatches: PARITY_SOURCES,
   });
 
+/*
+ * The roll-under preview states (issue 2003): the Studio's odds panel, simulator readout,
+ * abstention and readiness for roll-under and character-value checks, each on the frame it answers.
+ */
+const UNDER_FIXED_STEPS = Object.freeze([
+  ...parityFormula('1d20'),
+  ...previewAsActor('lab-actor-idrin'),
+  ...PARITY_UNDER,
+  ...parityType('[data-check-dc]', 1, '10'),
+  ...parityTiers(2, PARITY_WORK_TIERS, '[data-tier-dc]', ['12', '10', '8', '6']),
+  ...parityPreview(2),
+]);
+/** Runework's multiplied character value (Idrin's 55) routed across Failure to Extreme. */
+const underMultiplySteps = (expression, actor = 'lab-actor-idrin') => [
+  ...parityFormula('1d100'),
+  ...(actor ? previewAsActor(actor) : []),
+  ...PARITY_UNDER,
+  ...parityAttribute(expression),
+  ...PARITY_MULTIPLY,
+  ...parityType('[data-check-base-adjustment]', 1, '1'),
+  ...parityTiers(0, ['Standard', 'Demanding'], '[data-tier-adjustment]', ['1', '1/2']),
+  ...parityPreview(1),
+  ...parityOutcomes(
+    ['Failure', 'Regular', 'Hard', 'Extreme'],
+    '[data-outcome-adjustment]',
+    [
+      [2, '1'],
+      [3, '1/2'],
+      [4, '1/5'],
+    ],
+    ['failure', 'success', 'success', 'success']
+  ),
+];
+const SCROLL_ODDS = Object.freeze([{ selector: '[data-checks-odds]', scroll: true }]);
+const ROLL_PREVIEW = Object.freeze([
+  { selector: '[data-checks-simulator-roll]' },
+  { selector: '[data-checks-simulator-panel]', scroll: true },
+]);
+/** Rewrite one of Runework's library modifiers to roll `expression`, before opening Checks. */
+const runeworkRollingModifier = (expression) => [
+  { selector: '#manager-world-nav-rules', press: 'Enter' },
+  { selector: '#manager-rules-nav-modifiers', press: 'Enter' },
+  { selector: '[data-world-modifier="rw-mod-chisel"] [data-toggle-modifier]' },
+  {
+    selector: '[data-world-modifier="rw-mod-chisel"] [data-world-modifier-field="expression"]',
+    fill: expression,
+  },
+  { selector: '[data-world-modifier-done="rw-mod-chisel"]' },
+];
+const UNDER_OUTCOMES_FIXED = Object.freeze([
+  ...parityFormula('1d20'),
+  ...previewAsActor('lab-actor-idrin'),
+  ...PARITY_UNDER,
+  ...parityTiers(0, ['Standard Work'], '[data-tier-dc]', ['10']),
+  ...parityPreview(1),
+  ...parityOutcomes(
+    ['Botched', 'Flawed', 'Success', 'Fine'],
+    '[data-outcome-dc]',
+    [
+      [1, '-4'],
+      [2, '-1'],
+      [3, '0'],
+      [4, '+3'],
+    ],
+    ['failure', 'failure', 'success', 'success']
+  ),
+]);
+const underCase = ({ id, label, frame, query = {}, steps, expectView, expectSelector, nav }) =>
+  managerCase({
+    id,
+    label: `Manager — Checks roll-under preview, ${label} (prototype state ${frame})`,
+    reaches: 'beyond',
+    smokeLabels: [],
+    query,
+    steps: ['Checks', { selector: nav ?? '#manager-checks-nav-crafting' }, ...steps],
+    expectView: expectView ?? 'checks-crafting',
+    expectSelector,
+    kinds: ['manager', 'checks'],
+    sourceMatches: PARITY_SOURCES,
+  });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-gathering',
@@ -906,5 +987,155 @@ export const CASES = Object.freeze([
       ),
     ],
     expectSelector: '.fabricate-manager [data-outcome-head]',
+  }),
+  underCase({
+    id: 'manager-checks-under-fixed-rolled',
+    label: 'fixed target, rolled',
+    frame: 3,
+    steps: [...UNDER_FIXED_STEPS, ...ROLL_PREVIEW],
+    expectSelector:
+      '.fabricate-manager [data-checks-simulator-readout][data-checks-simulator-direction="under"] [data-checks-simulator-target]',
+  }),
+  underCase({
+    id: 'manager-checks-under-attribute-odds',
+    label: 'multiplied character value, odds',
+    frame: 5,
+    query: { system: 'lab-runework' },
+    steps: [...underMultiplySteps('@skills.med.mod + 51'), ...SCROLL_ODDS],
+    expectSelector:
+      '.fabricate-manager [data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-checks-odds-bar]',
+  }),
+  underCase({
+    id: 'manager-checks-under-attribute-rolled',
+    label: 'multiplied character value, rolled',
+    frame: 5,
+    query: { system: 'lab-runework' },
+    steps: [...underMultiplySteps('@skills.med.mod + 51'), ...ROLL_PREVIEW],
+    expectSelector:
+      '.fabricate-manager [data-checks-simulator-readout][data-checks-simulator-direction="under"]',
+  }),
+  underCase({
+    id: 'manager-checks-under-no-actor',
+    label: 'character value, no character chosen',
+    frame: 10,
+    query: { system: 'lab-runework' },
+    steps: [...underMultiplySteps('@skills.med.mod + 51', null), ...SCROLL_ODDS],
+    expectSelector:
+      '.fabricate-manager' +
+      ':has([data-checks-odds-reason="needs-preview-actor"])' +
+      ':has([data-checks-simulator-state="needs-preview-actor"])',
+  }),
+  underCase({
+    id: 'manager-checks-under-missing-path',
+    label: 'character value the character lacks',
+    frame: 19,
+    query: { system: 'lab-runework' },
+    steps: [
+      ...underMultiplySteps('@skills.craft.value'),
+      { selector: '#checks-section-roll' },
+      ...SCROLL_ODDS,
+    ],
+    expectSelector:
+      '.fabricate-manager' +
+      ':has([data-checks-odds-reason="attribute-path-unresolved"])' +
+      ':has([data-checks-section-callout="attributePathUnresolvedForPreview"])',
+  }),
+  underCase({
+    id: 'manager-checks-under-missing-path-validation',
+    label: 'character value the character lacks, Validation',
+    frame: 19,
+    query: { system: 'lab-runework' },
+    steps: [
+      ...underMultiplySteps('@skills.craft.value'),
+      { selector: '#manager-checks-nav-validation' },
+      { selector: '[data-issue="attributePathUnresolvedForPreview"]', scroll: true },
+    ],
+    expectView: 'checks-validation',
+    expectSelector:
+      '.fabricate-manager [data-issue="attributePathUnresolvedForPreview"][data-issue-transient]',
+  }),
+  underCase({
+    id: 'manager-checks-under-readiness',
+    label: 'readiness faults, Validation',
+    frame: 18,
+    query: { system: 'lab-runework' },
+    steps: [
+      ...parityFormula('1d100'),
+      ...PARITY_UNDER,
+      ...parityAttribute('@skills.med.mod + 1d6'),
+      ...parityType('[data-check-base-adjustment]', 1, '-2'),
+      ...PARITY_MULTIPLY,
+      ...parityTiers(0, ['Standard', 'Demanding', 'Heroic'], '[data-tier-adjustment]', [
+        '1',
+        '1/2',
+      ]),
+      ...parityOutcomes(
+        ['Failure', 'Botch', 'Hard', 'Extreme'],
+        '[data-outcome-adjustment]',
+        [
+          [3, '1/2'],
+          [4, '1/5'],
+        ],
+        ['failure', 'failure', 'success', 'success']
+      ),
+      { selector: '#manager-checks-nav-validation' },
+      { selector: '[data-issue="attributeTargetInvalid"]', scroll: true },
+    ],
+    expectView: 'checks-validation',
+    expectSelector:
+      '.fabricate-manager' +
+      ':has([data-issue="attributeTargetInvalid"])' +
+      ':has([data-issue="attributeTierWithoutAdjustment"])' +
+      ':has([data-issue="adjustmentInvalidForKind"])' +
+      ':has([data-issue="multipleOtherwiseTiers"])',
+  }),
+  underCase({
+    id: 'manager-checks-under-progressive',
+    label: 'progressive check set to lower is better',
+    frame: 20,
+    query: { system: 'lab-herbalism' },
+    steps: [...previewAsActor('lab-actor-idrin'), ...PARITY_UNDER, ...SCROLL_ODDS],
+    expectSelector:
+      '.fabricate-manager' +
+      ':has([data-checks-section-callout="progressiveUnderUnsupported"])' +
+      ':has([data-checks-odds-reason="progressive-under-unsupported"])',
+  }),
+  managerCase({
+    id: 'manager-checks-under-preroll-joint',
+    label:
+      'Manager — Checks roll-under preview, a rolled 1d4 bonus charted jointly (prototype state 11)',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      ...runeworkRollingModifier('1d4'),
+      ...PARITY_NAV,
+      ...UNDER_OUTCOMES_FIXED,
+      ...SCROLL_ODDS,
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager:has([data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-checks-odds-bar]):has([data-checks-odds-domain])',
+    kinds: ['manager', 'checks'],
+    sourceMatches: PARITY_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-checks-under-preroll-abstain',
+    label:
+      'Manager — Checks roll-under preview, a rolled 2d4 bonus not charted (prototype state 11)',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      ...runeworkRollingModifier('2d4'),
+      ...PARITY_NAV,
+      ...UNDER_OUTCOMES_FIXED,
+      ...SCROLL_ODDS,
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager [data-checks-odds-reason="modifier-preroll-not-enumerable"]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: PARITY_SOURCES,
   }),
 ]);

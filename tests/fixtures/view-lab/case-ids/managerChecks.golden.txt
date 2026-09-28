@@ -34,3 +34,13 @@ manager-checks-parity-progressive
 manager-checks-parity-under-attribute-no-actor
 manager-checks-parity-outcomes-multiply
 manager-checks-parity-outcomes-under-fixed
+manager-checks-under-fixed-rolled
+manager-checks-under-attribute-odds
+manager-checks-under-attribute-rolled
+manager-checks-under-no-actor
+manager-checks-under-missing-path
+manager-checks-under-missing-path-validation
+manager-checks-under-readiness
+manager-checks-under-progressive
+manager-checks-under-preroll-joint
+manager-checks-under-preroll-abstain
