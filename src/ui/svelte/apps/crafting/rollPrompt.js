@@ -195,6 +195,11 @@ export async function waitForPrompt(data, allowAdvantage, choicePlan, open = res
   return translatePromptAnswer(answer, { defaultRollMode, choicePlan });
 }
 
+/** A bulk row's need rolls under when it names a target or reads an under character value. */
+function rollsUnder(need) {
+  return need?.kind === 'target' || (need?.kind === 'noSingleTarget' && need.direction === 'under');
+}
+
 /**
  * `displayFormula` is the producer's base without the itemised modifier terms, shown as chips.
  * `target` (else `dc`) is the pre-modifier number; `direction: 'under'` names it a target, which
@@ -252,10 +257,9 @@ export function buildBulkPromptData({ count, subjects, activity, actorName } = {
   });
   return {
     kind: 'bulk',
-    // Every row a fixed roll-under target gets the roll-under bonus help; any `dc` row
-    // (or an empty batch) keeps today's roll-over copy, since a mix has no single answer.
-    direction:
-      rows.length > 0 && rows.every((row) => row?.need?.kind === 'target') ? 'under' : 'over',
+    // Every row rolling under (a fixed target or a character value) gets the roll-under bonus
+    // help; any other row (or an empty batch) keeps the roll-over copy.
+    direction: rows.length > 0 && rows.every((row) => rollsUnder(row?.need)) ? 'under' : 'over',
     title: activity
       ? fill(promptLabel('CheckTitlePlural', '{activity} checks'), { activity })
       : promptLabel('BulkTitle', 'Bulk check'),

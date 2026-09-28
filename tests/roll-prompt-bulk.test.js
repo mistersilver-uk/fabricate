@@ -61,6 +61,15 @@ describe('bulk roll prompt adapter', () => {
     assert.equal(buildBulkPromptData({ subjects: [] }).direction, 'over');
   });
 
+  it('counts an under character-value row as rolling under, and an over one as not', () => {
+    const target = { need: { kind: 'target', target: 12 } };
+    const underValue = { need: { kind: 'noSingleTarget', direction: 'under' } };
+    const overValue = { need: { kind: 'noSingleTarget', direction: 'over' } };
+    assert.equal(buildBulkPromptData({ subjects: [target, underValue] }).direction, 'under');
+    assert.equal(buildBulkPromptData({ subjects: [target, overValue] }).direction, 'over');
+    assert.equal(buildBulkPromptData({ subjects: [{ need: { kind: 'noSingleTarget' } }] }).direction, 'over');
+  });
+
   it('gives an all-target batch the roll-under bonus help; a mixed batch keeps roll-over copy', async () => {
     const under = [
       { name: 'Tempered Blade', need: { kind: 'target', target: 12 } },

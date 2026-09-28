@@ -30,8 +30,6 @@ const BULK_PROMPT_ROWS = (help, rows) =>
     .join('');
 const UNDER_BONUS_HELP =
   'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.';
-const OVER_BONUS_HELP =
-  'A bonus adds to the total. A rolled bonus such as 1d4 is rolled with the check.';
 const BULK_PROMPT_SOURCES = [
   ...BULK_DEFAULTS.sourceMatches,
   /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
@@ -475,7 +473,7 @@ export const CASES = Object.freeze([
       SHIFT_CLICK('lab-runework:rw-slag'),
       { selector: '[data-inventory-bulk-salvage]' },
     ],
-    expectSelector: BULK_PROMPT_ROWS(OVER_BONUS_HELP, [
+    expectSelector: BULK_PROMPT_ROWS(UNDER_BONUS_HELP, [
       ['Air Shard', 'Target 12'],
       ['Ruined Slag', 'No single target'],
     ]),

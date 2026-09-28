@@ -19,7 +19,9 @@ export function salvageCheckNeed({ mode, config, checkUsable, component }) {
   if (!checkUsable) return { kind: 'noCheck' };
   const evaluation = activeCheckEvaluation(config);
   const summed = evaluation.product === 'sum';
-  if (summed && evaluation.target.source === 'attribute') return { kind: 'noSingleTarget' };
+  if (summed && evaluation.target.source === 'attribute') {
+    return { kind: 'noSingleTarget', direction: evaluation.direction };
+  }
   const routedType = mode === 'routed' && config?.type === 'fixed' ? 'fixed' : 'relative';
   const dc = salvageDisplayDc({ mode, routedType, config, component });
   if (!Number.isFinite(dc)) return { kind: 'noSingleTarget' };

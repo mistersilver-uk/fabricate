@@ -600,7 +600,7 @@ describe('BulkSalvageService.run: the ONE roll prompt', () => {
     });
     assert.deepEqual(prompts[0].subjects.map((subject) => subject.need), [
       { kind: 'target', target: 12 },
-      { kind: 'noSingleTarget' },
+      { kind: 'noSingleTarget', direction: 'under' },
     ]);
   });
 
