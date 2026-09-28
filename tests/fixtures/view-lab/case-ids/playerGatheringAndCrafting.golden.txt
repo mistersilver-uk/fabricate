@@ -5,6 +5,8 @@ player-crafting-check-under
 player-crafting-roll-prompt-under-bonus-off
 player-crafting-roll-prompt-under-rolled-bonus
 player-crafting-roll-prompt-over-attribute
+player-crafting-check-descriptor-under-resolved
+player-crafting-check-descriptor-under-unresolved
 player-crafting-roll-result-under-pass
 player-crafting-roll-result-under-fail
 player-crafting-chat-card-under-public

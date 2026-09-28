@@ -93,18 +93,28 @@ const EVIDENCE_STATES = {
   'under-evidence-fail': { rollFormula: '1d4 + 20' },
   'under-bonus-off': { rollFormula: '1d20', offerSituationalBonus: false },
   'over-attribute': { rollFormula: '1d20', direction: 'over' },
+  // A path the crafter has no value at, so the check card says so rather than name a target.
+  'under-unresolved': { rollFormula: '1d20', expression: '@skills.missing.level' },
   'over-evidence': { control: true },
   'salvage-under-evidence': { salvage: true },
 };
 
-async function seedCheckEvidence(world, { rollFormula, offerSituationalBonus, direction, control, salvage }) {
+async function seedCheckEvidence(
+  world,
+  { rollFormula, offerSituationalBonus, direction, expression, control, salvage }
+) {
   const manager = world.fabricate.craftingSystemManager;
   if (!control && !salvage) await seedRollUnder(world);
   const system = manager.getSystem('lab-smithing');
   const simple = system.craftingCheck.simple;
-  const evaluation = direction
-    ? normalizeCheckEvaluation({ ...simple.evaluation, direction })
-    : simple.evaluation;
+  const evaluation =
+    direction || expression
+      ? normalizeCheckEvaluation({
+          ...simple.evaluation,
+          ...(direction && { direction }),
+          ...(expression && { target: { ...simple.evaluation.target, expression } }),
+        })
+      : simple.evaluation;
   await manager.updateSystem(system.id, {
     features: { ...system.features, chatOutput: true },
     ...(!control &&

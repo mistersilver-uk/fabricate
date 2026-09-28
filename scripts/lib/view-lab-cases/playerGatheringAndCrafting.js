@@ -51,6 +51,11 @@ const RESULT_SOURCES = [
   /^src\/ui\/presenters\/check(?:Display|EvidenceRows)\.js$/,
   /^src\/ui\/svelte\/stores\/craftingStore/,
 ];
+const DESCRIPTOR_SOURCES = [
+  CRAFTING_SHARED,
+  CRAFTING_SIMPLE,
+  /^src\/ui\/presenters\/(?:CraftingListingBuilder|checkDescriptor)\.js$/,
+];
 const CHAT_SOURCES = [
   /^src\/ui\/presenters\/(?:CraftingChatCard|checkDisplay|checkEvidenceRows)\.js$/,
   /^src\/systems\/craftCardFields\.js$/,
@@ -191,6 +196,34 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: PROMPT_SOURCES,
   }),
+  // The recipe's check card names the target and its source fact, or why the target cannot be read.
+  playerCase({
+    id: 'player-crafting-check-descriptor-under-resolved',
+    label: 'Player app — roll-under check card naming its character-value target',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', rollPromptState: 'under' },
+    steps: [CRAFT_HORSESHOE[0], { selector: '[data-recipe-section="check"]', scroll: true }],
+    expectSelector:
+      '[data-recipe-section="check"]:not(:has([data-check-dc]))' +
+      ':has([data-check-target="under"]:has-text("Target 10 · stay at or under"))' +
+      ':has([data-check-target-source]:has-text("Sera Vane @skills"):has-text("level 12, Hard Work −2"))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: DESCRIPTOR_SOURCES,
+  }),
+  playerCase({
+    id: 'player-crafting-check-descriptor-under-unresolved',
+    label: 'Player app — roll-under check card whose character value cannot be read',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', rollPromptState: 'under-unresolved' },
+    steps: [CRAFT_HORSESHOE[0], { selector: '[data-recipe-section="check"]', scroll: true }],
+    expectSelector:
+      '[data-recipe-section="check"]:not(:has([data-check-target]))' +
+      ' [data-check-target-unresolved]:has-text("could not read a number for its target")',
+    kinds: ['player', 'crafting'],
+    sourceMatches: DESCRIPTOR_SOURCES,
+  }),
   // The player result box's Target, Pre-rolled and Margin rows for a passed and a failed roll-under.
   playerCase({
     id: 'player-crafting-roll-result-under-pass',
@@ -200,7 +233,9 @@ export const CASES = Object.freeze([
     query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence' },
     steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ROLL, { selector: RESULT_BOX, scroll: true }],
     expectSelector:
-      `${RESULT_BOX}[data-roll-success="true"] ${EVIDENCE_ROWS('target', 'preRolled', 'margin')}`,
+      `${RESULT_BOX}[data-roll-success="true"]` +
+      ':has([data-roll-summary]:text-is("The result group is produced.")) ' +
+      EVIDENCE_ROWS('target', 'preRolled', 'margin'),
     kinds: ['player', 'crafting'],
     sourceMatches: RESULT_SOURCES,
   }),
@@ -214,7 +249,9 @@ export const CASES = Object.freeze([
     // The resolved-failure toast the player is shown, which the lab reports as a console warning.
     allowedConsoleErrors: [/Your crafting check failed/],
     expectSelector:
-      `${RESULT_BOX}[data-roll-success="false"] ${EVIDENCE_ROWS('target', 'preRolled', 'margin')}`,
+      `${RESULT_BOX}[data-roll-success="false"]` +
+      ':has([data-roll-summary]:text-is("Nothing is produced; the failure policy applies.")) ' +
+      EVIDENCE_ROWS('target', 'preRolled', 'margin'),
     kinds: ['player', 'crafting'],
     sourceMatches: RESULT_SOURCES,
   }),
