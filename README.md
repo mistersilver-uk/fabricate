@@ -2,37 +2,34 @@
 ![Supported Foundry version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fgithub.com%2Fmistersilver-uk%2Ffabricate%2Freleases%2Flatest%2Fdownload%2Fmodule.json&query=%24.compatibility%5Bminimum%2Cverified%5D&label=foundry-vtt&prefix=v&style=for-the-badge&color=fe6a1f)
 ![Latest Release Download Count](https://img.shields.io/github/downloads/mistersilver-uk/fabricate/latest/total?sort=semver&style=for-the-badge&cacheSeconds=3600)
 ![Total Release Download Count](https://img.shields.io/github/downloads/mistersilver-uk/fabricate/total?label=total%20downloads&style=for-the-badge&cacheSeconds=3600)
+![Forge Installs](https://img.shields.io/badge/dynamic/json?label=Forge%20Installs&query=package.installs&suffix=%25&url=https%3A%2F%2Fforge-vtt.com%2Fapi%2Fbazaar%2Fpackage%2Ffabricate&colorB=4aa94a&style=for-the-badge&cacheSeconds=3600)
 <!--- Social badges --->
 [![Support me on Patreon](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Fshieldsio-patreon.vercel.app%2Fapi%3Fusername%3Dmistersilver%26type%3Dpatrons&style=for-the-badge)](https://patreon.com/mistersilver)
 [![Discord](https://dcbadge.limes.pink/api/server/APHyMzhPTk)](https://discord.gg/APHyMzhPTk)
 
-<!--- Forge Bazaar Install % Badge -->
-<!--- replace <your-module-name> with the `name` in your manifest -->
-<!--- ![Forge Installs](https://img.shields.io/badge/dynamic/json?label=Forge%20Installs&query=package.installs&suffix=%25&url=https%3A%2F%2Fforge-vtt.com%2Fapi%2Fbazaar%2Fpackage%2Ffabricate&colorB=4aa94a) -->
+![Fabricate repository preview](/docs/img/fabricate-logo.jpg)
 
-![Fabricate repository preview](/assets/img/fabricate-logo.jpg)
-
-# Fabricate - Universal Gathering & Crafting System
+# Fabricate: Universal Gathering & Crafting System
 
 A system-agnostic, flexible crafting and gathering module for Foundry Virtual Tabletop that supports any tabletop RPG system and any crafting system you can imagine.
 
 ## Features
 
-- **System-Agnostic** — Works with any Foundry game system, with no dependency on D&D 5e, Pathfinder, or any single ruleset.
-- **Crafting Systems** — Define independent crafting systems, each with their own managed items, essences, and feature toggles.
-- **Player Crafting** — Players browse recipes, choose an actor and component sources, roll checks, and craft from the Crafting tab, with a built-in shopping list.
-- **Recipe Authoring** — Author complete recipes in the GM admin panel, with tabs for overview, ingredients, results, tools, access, and validation.
-- **Recipes** — Simple or multi-step recipes with ingredient sets, tools, and result groups.
-- **Resolution Modes** — Simple, routed by ingredients, routed by check, progressive, and alchemy crafting, with optional skill checks.
-- **Visibility and Knowledge** — Control which recipes players can see via player lists or knowledge-based discovery, with recipe books and scrolls that teach them.
-- **Essences** — Infuse items with abstract essences for flexible ingredient matching.
-- **Tools** — Tools and workstations with optional usage tracking and breakage mechanics.
-- **Active Effect Transfer** — Transfer effects from ingredients to crafted items.
-- **Macro Integration** — Hook into success and failure outcomes with custom macros.
-- **Time and Currency Requirements** — Optional time or currency costs per crafting system.
-- **Salvage** — Players break down managed items into their component parts.
-- **Gathering** — Explore environments, attempt gathering tasks, avoid or encounter hazards and harvest resources.
-- **Journal** — Players monitor crafting, gathering, and salvage runs in one place, and continue multi-step crafting runs.
+- **System-Agnostic**: Works with any Foundry game system, with no dependency on D&D 5e, Pathfinder, or any single ruleset.
+- **Crafting Systems**: Define independent crafting systems, each with their own managed items, essences, and feature toggles.
+- **Player Crafting**: Players browse recipes, choose an actor and component sources, roll checks, and craft from the Crafting tab, with a built-in shopping list.
+- **Recipe Authoring**: Author complete recipes in the GM admin panel, with tabs for overview, ingredients, results, tools, access, and validation.
+- **Recipes**: Simple or multi-step recipes with ingredient sets, tools, and result groups.
+- **Resolution Modes**: Simple, routed by ingredients, routed by check, progressive, and alchemy crafting, with optional skill checks.
+- **Visibility and Knowledge**: Control which recipes players can see via player lists or knowledge-based discovery, with recipe books and scrolls that teach them.
+- **Essences**: Infuse items with abstract essences for flexible ingredient matching.
+- **Tools**: Tools and workstations with optional usage tracking and breakage mechanics.
+- **Active Effect Transfer**: Transfer effects from ingredients to crafted items.
+- **Macro Integration**: Hook into success and failure outcomes with custom macros.
+- **Time and Currency Requirements**: Optional time or currency costs per crafting system.
+- **Salvage**: Players break down managed items into their component parts.
+- **Gathering**: Explore environments, attempt gathering tasks, avoid or encounter hazards and harvest resources.
+- **Journal**: Players monitor crafting, gathering, and salvage runs in one place, collect results, and continue multi-step crafting runs.
 
 ## Installation
 
@@ -54,6 +51,15 @@ See [quickstart](https://mistersilver-uk.github.io/fabricate/help/quickstart.htm
 ## Documentation
 
 Check out the full [docs site](https://mistersilver-uk.github.io/fabricate).
+
+## Crafting Content
+
+![Foe folio icons preview](/docs/img/crafting-icons-preview.jpg)
+
+Building your own crafting systems and needing assets to bring them to life?
+Check out my growing collection of [Crafting Icons](https://www.patreon.com/collection/2154139) over on my Patreon.
+
+_Art by [Joseph J Ramirez](https://josephjramirez.carbonmade.com/) and [Anika Roznowicz](https://anikakinka.wpcomstaging.com/)._
 
 ## Development
 
