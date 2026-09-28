@@ -491,8 +491,20 @@ export function countCeilingIssues({ base, ceiling, requirements }) {
   };
 }
 
+/**
+ * The dice a literal base rolls, as the runtime settles it with no benefit applied, or the refusal.
+ * The threshold and face rules are neutralized, so only the base decides.
+ */
+function literalBaseDice(evaluation, thresholdMode) {
+  const off = { enabled: false };
+  const pool = { ...evaluation.pool, threshold: '1', explode: off, cancel: off };
+  const placement = { preRolls: [], poolDelta: 0, thresholdDelta: 0 };
+  return resolvePool({ evaluation: { ...evaluation, pool }, thresholdMode, placement });
+}
+
 /** Recipe tiers set their own successes, and a literal base pool can meet every required count. */
-function countRequiredReadiness(result, check, { pool }, activity) {
+function countRequiredReadiness(result, check, evaluation, { activity, thresholdMode }) {
+  const { pool } = evaluation;
   const tiers = activity === 'crafting' && Array.isArray(check?.tiers) ? check.tiers : [];
   const tierRequired = tiers.map((tier) => ({
     name: trimmed(tier?.name) || String(tier?.id ?? ''),
@@ -512,9 +524,9 @@ function countRequiredReadiness(result, check, { pool }, activity) {
     result.checks.push({ id: 'countPoolCharacterDependent', satisfied: true });
     return;
   }
-  const read = resolveDeterministicExpression(pool.base, {}, { pathMode: 'foundry' });
+  const read = literalBaseDice(evaluation, thresholdMode);
   if (!read.ok) return;
-  const base = Math.floor(read.value);
+  const base = read.policy.dice;
   const requirements = [
     { name: DEFAULT_REQUIRED_NAME, required: pool.required },
     ...tierRequired.map((tier) => ({ name: tier.name, required: tier.successes ?? pool.required })),
@@ -568,7 +580,7 @@ function countReadiness(result, check, evaluation, { mode, activity, previewActo
   if (thresholdFault) pushIssue(result.issues, 'countThresholdInvalid', 'critical');
   countFaceReadiness(result, evaluation, thresholdMode);
   const gradesRequired = mode === 'simple' || (mode === 'routed' && check?.type !== 'fixed');
-  if (gradesRequired) countRequiredReadiness(result, check, evaluation, activity);
+  if (gradesRequired) countRequiredReadiness(result, check, evaluation, { activity, thresholdMode });
   if (previewActor && !baseFault && !thresholdFault) {
     previewActorPoolWarnings(result.transient, evaluation, thresholdMode, previewActor);
   }

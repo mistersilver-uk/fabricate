@@ -198,6 +198,18 @@ describe('count readiness raises each id with its copy, section and severity', (
     assert.ok(issue(over, 'countRequiredExceedsMaxPool'), 'a 3.9 base rounds down to 3');
   });
 
+  it('floors a literal base as the runtime does: float noise, the one-die minimum, no negative dice', () => {
+    const raises = (pool) => issue(evaluateCheckReadiness(check(pool), { mode: 'simple' }), 'countRequiredExceedsMaxPool');
+    assert.ok(!raises({ base: '0', required: 1, zeroPoolFails: false }), 'a pool that cannot empty rolls one die');
+    for (const base of ['0.7 + 0.2 + 0.1', '0.3 + 0.3 + 0.3 + 0.1']) {
+      assert.ok(!raises({ base, required: 1 }), `${base} rolls one die, not none`);
+    }
+    const negative = raises({ base: '-2', required: 1 });
+    assert.ok(negative, 'a pool below zero cannot meet one success');
+    const sentence = checkIssueSentence(negative.id, negative.data, text);
+    assert.ok(!/[-−]2 dice/.test(sentence), `no negative dice: ${sentence}`);
+  });
+
   it('countRequiredExceedsBasePool, reachable once a ceiling rises above the base', () => {
     const requirements = [
       { name: 'Default', required: 2 },
