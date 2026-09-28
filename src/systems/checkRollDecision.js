@@ -188,6 +188,20 @@ function applySituationalBonus(formula, rawBonus, evaluation, Roll) {
 }
 
 /**
+ * The contributions a decision places and their plan: Tool contributions, the selected library
+ * entries, then any the prompt's answer added. The Studio preview plans with no answer, as a
+ * roll with no prompt does.
+ */
+export function planDecisionPlacement({ evaluation, toolContributions, selected, answered = [] }) {
+  const contributions = [
+    ...(Array.isArray(toolContributions) ? toolContributions : []),
+    ...resolvedLibraryContributions(selected),
+    ...answered,
+  ];
+  return { contributions, placementPlan: planModifierPlacement({ evaluation, contributions }) };
+}
+
+/**
  * The prompt returns a decision, but never determines the selected modifier data directly.
  * `deferred` means the offered `modifierChoice` is selected by that decision; a count check
  * passes the `countPolicy` its pool resolved to before the prompt.
@@ -249,13 +263,12 @@ export async function resolveCheckDecision({
     if (choice.rollMode) rollMode = choice.rollMode;
   }
 
-  const contributions = [
-    ...(Array.isArray(options?.toolContributions) ? options.toolContributions : []),
-    ...resolvedLibraryContributions(selectedModifiers),
-    ...(situational ? [situational] : []),
-    ...(advantageContribution ? [advantageContribution] : []),
-  ];
-  const placementPlan = planModifierPlacement({ evaluation, contributions });
+  const { contributions, placementPlan } = planDecisionPlacement({
+    evaluation,
+    toolContributions: options?.toolContributions,
+    selected: selectedModifiers,
+    answered: [situational, advantageContribution].filter(Boolean),
+  });
   return {
     formula,
     flavor,

@@ -3,14 +3,9 @@
  * outcome and the simulator's per-die readout. Pure; odds come from `countOdds.js`, each outcome is
  * graded by the runtime's own count graders, and faces are marked by `countEvaluation.js`.
  */
-import {
-  resolveCheckModifierFormula,
-  resolvedLibraryContributions,
-} from '../../../../../systems/checkModifierResolver.js';
-import {
-  planModifierPlacement,
-  SUM_OVER_EVALUATION,
-} from '../../../../../systems/checkModifierRouter.js';
+import { resolveCheckModifierFormula } from '../../../../../systems/checkModifierResolver.js';
+import { SUM_OVER_EVALUATION } from '../../../../../systems/checkModifierRouter.js';
+import { planDecisionPlacement } from '../../../../../systems/checkRollDecision.js';
 import { routedOutcomeOrder, triggerMovesOutcome } from '../../../../../systems/checkRouting.js';
 import { actorRollData } from '../../../../../systems/checkTarget.js';
 import { countRequired } from '../../../../../systems/countCheck.js';
@@ -115,11 +110,8 @@ function countPlacement(plan, Roll) {
     Roll,
     evaluation
   );
-  const tools = args?.rollOptions?.toolContributions ?? [];
-  return planModifierPlacement({
-    evaluation,
-    contributions: [...tools, ...resolvedLibraryContributions(selected)],
-  });
+  const toolContributions = args?.rollOptions?.toolContributions;
+  return planDecisionPlacement({ evaluation, toolContributions, selected }).placementPlan;
 }
 
 const FACE_AGGREGATES = new Set(['anyDie', 'allDice']);
