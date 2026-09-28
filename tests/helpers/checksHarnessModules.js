@@ -70,6 +70,8 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/previewActorId.js',
   'src/ui/svelte/apps/manager/checks/checkOdds.js',
   'src/ui/svelte/apps/manager/checks/checkPreviewModel.js',
+  // The simulator's rolled readout the preview model re-exports (issue 2080).
+  'src/ui/svelte/apps/manager/checks/checkReadoutModel.js',
   // The success-counting preview the model delegates to (issue 2004).
   'src/ui/svelte/apps/manager/checks/countPreviewModel.js',
   // The Studio's adjustment labels and read-only band pictures (issue 2005).

@@ -375,6 +375,15 @@ export function interpolate(sentence, data) {
   );
 }
 
+/** U+2212, the minus the Studio writes every negative number with. */
+export const MINUS = '−';
+
+/** A number with the true minus; `plus` signs zero and above too, as `margin +0` reads. */
+export function formatSigned(value, { plus = false } = {}) {
+  if (value < 0) return `${MINUS}${Math.abs(value)}`;
+  return plus ? `+${value}` : String(value);
+}
+
 /** The roll-under comparison word: `at or under`, or `under` for a strict comparison. */
 export function underComparisonPhrase(thresholdMode, text) {
   return thresholdMode === 'exceed'
