@@ -17,7 +17,13 @@ import { resolveProgressiveAward as resolveProgressiveAwardLoop } from '../utils
 import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOutcomeKeywords.js';
 
 import { buildCheckModifierContext } from './checkModifierResolver.js';
-import { evaluateSituationalBonus, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
+import {
+  evaluateSituationalBonus,
+  resolveCheckFormulaDisplay,
+  resolveRolledFormula,
+  runFormulaProgressive,
+  runFormulaRouted,
+} from './checkRoll.js';
 import { countPromptFields, underTargetPromptFields } from './checkRollDecision.js';
 import {
   activeCheckEvaluation,
@@ -774,11 +780,27 @@ export class GatheringEngine {
     // numbers, so both keep the prompt's target fields empty, as a count check's already are.
     const routedFixed = mode === 'routed' && config?.type === 'fixed';
     const showTarget = !secret && !count && !routedFixed && Number.isFinite(dc);
+    // A count check shows its pool line, never a formula, and a hidden task names neither the
+    // formula nor the actor, as crafting's versioned check names both for every other task.
+    const shown = secret || count ? '' : rollFormula;
+    const formula = resolveRolledFormula(
+      shown,
+      actor,
+      buildCheckModifierContext(system, 'gathering', task),
+      undefined,
+      evaluation
+    );
     return {
       required: requiresCheck,
       publicPrompt: {
         label,
         mode: checkMode,
+        actorName: secret ? '' : (actor?.name ?? ''),
+        formula,
+        resolvedFormula:
+          resolveCheckFormulaDisplay(formula, actor, null, undefined, evaluation)?.display ?? null,
+        displayFormula:
+          resolveCheckFormulaDisplay(shown, actor, null, undefined, evaluation)?.display ?? shown,
         allowsSituationalModifier: hasActiveCheck(config, rollFormula),
         offerSituationalBonus: config?.offerSituationalBonus !== false,
         // A count check offers no advantage until it is mode-aware (issue 2007).

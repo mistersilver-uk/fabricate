@@ -153,7 +153,8 @@ export const CASES = Object.freeze([
     expectTab: 'journal',
     expectSelector:
       '.fabricate-app .manager-modal[data-roll-prompt="single"]' +
-      ':has(.manager-modal-subtitle:has-text("Tend the Slow Bloom"))' +
+      ':has(.manager-modal-subtitle:has-text("Brenna Karrunsdottir · Tend the Slow Bloom"))' +
+      ':has(.formula-content .formula:text-is("1d20"))' +
       ':has(.target-row > .manager-chip[data-roll-prompt-target="under"]:has-text("Target 2 · stay at or under"))',
     kinds: ['player', 'journal', 'gathering'],
     sourceMatches: [

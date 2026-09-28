@@ -766,6 +766,60 @@ test('the gathering versioned descriptor keeps a hidden task and a fixed-range c
   assert.equal(fixedRange.comparison, null);
 });
 
+test('the gathering versioned descriptor names the formula and actor crafting names', () => {
+  installCountingRoll();
+  const engine = new GatheringEngine({ localize: (key) => key });
+  const { system, environment, task } = gatheringFixture({ mode: 'routed' });
+  Object.assign(system.gatheringCraftingCheck.routed, { rollFormula: '1d20', evaluation: SUM_UNDER });
+  const actor = { uuid: 'Actor.g', name: 'Scavenger', system: {} };
+  const describeAs = (run) =>
+    engine._versionedCheckDescriptor({
+      actor,
+      run,
+      system,
+      environment,
+      task: { ...task, resolutionMode: 'routed' },
+    }).publicPrompt;
+
+  const visible = describeAs({ taskId: task.id });
+  assert.equal(visible.actorName, 'Scavenger');
+  assert.deepEqual(
+    [visible.formula, visible.resolvedFormula, visible.displayFormula],
+    ['1d20', '1d20', '1d20'],
+    'the retained formula reaches the prompt, resolved and displayed the same with nothing to expand'
+  );
+
+  const hidden = describeAs({ taskId: `blind:${environment.id}` });
+  assert.equal(hidden.actorName, '', 'a hidden task names no actor either');
+  assert.deepEqual(
+    [hidden.formula, hidden.resolvedFormula, hidden.displayFormula],
+    ['', null, ''],
+    'a hidden task names no formula'
+  );
+});
+
+test('the gathering versioned descriptor names no formula for a count check', () => {
+  const engine = new GatheringEngine({ localize: (key) => key });
+  const { system, environment, task } = gatheringFixture({ mode: 'routed' });
+  Object.assign(system.gatheringCraftingCheck.routed, {
+    rollFormula: '1d20',
+    evaluation: { product: 'count', direction: 'over', pool: { base: '3', threshold: '8' } },
+  });
+  const publicPrompt = engine._versionedCheckDescriptor({
+    actor: { uuid: 'Actor.g', name: 'Scavenger', system: {} },
+    run: { taskId: task.id },
+    system,
+    environment,
+    task: { ...task, resolutionMode: 'routed' },
+  }).publicPrompt;
+  assert.deepEqual(
+    [publicPrompt.formula, publicPrompt.resolvedFormula, publicPrompt.displayFormula],
+    ['', null, ''],
+    "a count check shows its pool line, per today's count prompt, never a formula"
+  );
+  assert.equal(publicPrompt.actorName, 'Scavenger', 'a count check still names the actor');
+});
+
 test('a Journal-prompted roll-under gathering check shows its target chip and roll-under help', async () => {
   const engine = new GatheringEngine({ localize: (key) => key });
   const { system, environment, task } = gatheringFixture({ mode: 'routed' });
@@ -781,14 +835,7 @@ test('a Journal-prompted roll-under gathering check shows its target chip and ro
   });
   const surface = stubPromptSurface(() => null);
   try {
-    await promptJournalStageCheck({
-      subject: descriptor.publicPrompt.label,
-      actorName: 'Scavenger',
-      formula: '1d20',
-      resolvedFormula: '1d20',
-      displayFormula: '1d20',
-      ...descriptor.publicPrompt,
-    });
+    await promptJournalStageCheck({ subject: descriptor.publicPrompt.label, ...descriptor.publicPrompt });
   } finally {
     surface.restore();
   }
@@ -799,6 +846,8 @@ test('a Journal-prompted roll-under gathering check shows its target chip and ro
     surface.view.labels.bonusHelp,
     'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
   );
+  assert.equal(surface.view.subtitle, 'Scavenger · Forage', 'the Journal subtitle names the actor and task');
+  assert.equal(surface.view.formula, '1d20', 'the retained formula reaches the prompt untouched');
 });
 
 // ── the prepared evaluator ────────────────────────────────────────────────────
