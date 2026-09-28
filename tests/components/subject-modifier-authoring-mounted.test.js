@@ -312,7 +312,8 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/model/complicationSummary.js',
     'src/systems/characterPrerequisites.js',
     // The gathering host's seven converted option vocabularies (issue 1510).
-    'src/ui/svelte/apps/manager/gatheringTaskSelectOptions.js',    // The task check override reads the evaluation and formats an adjustment (issue 2005).
+    'src/ui/svelte/apps/manager/gatheringTaskSelectOptions.js',
+    // The task check override reads the evaluation and formats an adjustment (issue 2005).
     'src/systems/normalize/checkEvaluation.js',
     'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
     'src/utils/scalars.js',

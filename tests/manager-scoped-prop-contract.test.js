@@ -121,8 +121,8 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // ADDED BY ISSUE 1706's SHARED BULK-SELECTION COMPOSABLE.
   './bulkSelection.svelte.js',
   './checks/ChecksView.svelte',
-  // ADDED BY ISSUE 2005, with `./component/salvageDcPresets.js` below: the salvage override's
-  // Player sees line resolves for the first player character through the preview's own roster.
+  // ADDED BY ISSUE 2005, with `./component/salvageDcPresets.js` below: the salvage and task
+  // overrides' Preview-as roster and roll-data lookup, and the salvage preset tiers.
   './checks/checkPreview.js',
   './checks/checkTriggerSummary.js',
   './checks/checksCopy.js',
