@@ -1915,6 +1915,7 @@
         "SituationalLabel": "Situational",
         "DiceLine": "{formula} = {total}",
         "DiceLineUnder": "{formula} = {total}, compared as rolled",
+        "DiceModifiers": "modifiers",
         "Success": "Success",
         "Failure": "Failure"
       }

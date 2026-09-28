@@ -53,13 +53,13 @@ test('a die the record cannot match, and a record without a formula, invent noth
   assert.equal(line({ ...summed('over', '', [], 9), resolvedFormula: undefined }), '');
 });
 
-test('a flavor tag is dropped and a bracketed or clamped term is never annotated (G4)', () => {
+test('a flavor tag never splits a term, and a bracketed or clamped term is never annotated (G4)', () => {
   assert.equal(
     line(summed('over', '1d20[attack] + (1d4[fire])', [
       { group: '1d20', results: [14] },
       { group: '1d4', results: [3] },
     ], 17)),
-    '1d20 (14) + (1d4) = 17'
+    '1d20 (14) attack + (1d4 fire) = 17'
   );
   assert.equal(
     line(summed('over', 'max(1d4, 2) + 1d6', [
@@ -68,5 +68,31 @@ test('a flavor tag is dropped and a bracketed or clamped term is never annotated
     ], 7)),
     'max(1d4, 2) + 1d6 (5) = 7',
     'the clamped die keeps its place in dice order, so the later die still matches'
+  );
+  assert.equal(
+    line(summed('over', '1d20 + 2[Ring of 2d6]', [{ group: '1d20', results: [9] }], 11)),
+    '1d20 (9) + 2 Ring of 2d6 = 11',
+    'a die named in a flavour is never read as a term'
+  );
+});
+
+test('a flavoured term is named in words, never as its raw roll flavour (frame 37, #2088 r2)', () => {
+  assert.equal(
+    line(summed('over', '1d20 + 3 + 7[Modifiers]', [{ group: '1d20', results: [14] }], 24)),
+    '1d20 (14) + 3 + 7 modifiers = 24'
+  );
+  assert.equal(
+    line(
+      summed(
+        'over',
+        '1d20 + 2[Smith’s Hammer] + 1[Modifiers] + (1d4)[Modifiers]',
+        [
+          { group: '1d20', results: [11] },
+          { group: '1d4', results: [3] },
+        ],
+        17
+      )
+    ),
+    '1d20 (11) + 2 Smith’s Hammer + 1 modifiers + (1d4) modifiers = 17'
   );
 });

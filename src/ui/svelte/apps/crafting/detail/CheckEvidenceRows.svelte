@@ -47,10 +47,6 @@
     background: var(--fab-bg-2);
   }
 
-  .check-evidence-row:last-child {
-    border-bottom: 0;
-  }
-
   /* The Crafting run column is about 289px wide: the rows take the chat card's key column. */
   @container (max-width: 360px) {
     .check-evidence-row {
