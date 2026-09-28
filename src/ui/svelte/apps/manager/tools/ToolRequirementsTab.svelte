@@ -561,11 +561,6 @@
     border-top: 1px solid var(--fab-border);
   }
 
-  /* THE `World modifiers` EYEBROW AND ITS HAIRLINE. The eyebrow's type stays `manager-kicker`'s,
-     so this tab has one heading voice; only the rule is added, on THIS eyebrow alone, because it
-     marks where the world's library begins rather than heading a question the way
-     `Which prerequisites` does. `margin: 0` stays, because the section's own flex gap is already
-     the reference's step and the shared class adds to it. */
   /* Checks Studio frame 26: the kicker over a hairline table of `bg-1` rows, a 150px label track. */
   .manager-tool-bonus-behaviour-block {
     display: flex;
@@ -606,6 +601,11 @@
     font-size: 0.69rem;
   }
 
+  /* The `World modifiers` eyebrow and its hairline. The eyebrow's type stays `manager-kicker`'s,
+     so this tab has one heading voice; only the rule is added, on this eyebrow alone, because it
+     marks where the world's library begins rather than heading a question the way
+     `Which prerequisites` does. `margin: 0` stays, because the section's own flex gap is already
+     the reference's step and the shared class adds to it. */
   .manager-tool-bonus-kicker {
     display: flex;
     gap: var(--fab-space-2);
