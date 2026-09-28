@@ -11,7 +11,7 @@ import {
   planModifierPlacement,
   SUM_OVER_EVALUATION,
 } from '../../../../../systems/checkModifierRouter.js';
-import { routedOutcomeOrder } from '../../../../../systems/checkRouting.js';
+import { routedOutcomeOrder, triggerMovesOutcome } from '../../../../../systems/checkRouting.js';
 import { actorRollData } from '../../../../../systems/checkTarget.js';
 import { countRequired } from '../../../../../systems/countCheck.js';
 import {
@@ -127,14 +127,15 @@ const FACE_AGGREGATES = new Set(['anyDie', 'allDice']);
 /**
  * The triggers with each any-die or all-dice condition on the pool replaced by a synthetic group
  * holding its joint mark, and those conditions as `countOdds` face aggregates; `null` when a
- * condition reads the dice in a way a net distribution cannot follow.
+ * condition that can move an outcome reads the dice in a way a net distribution cannot follow.
  */
 function faceTriggerView(triggers) {
   const aggregates = [];
   const rewritten = [];
   for (const trigger of Array.isArray(triggers) ? triggers : []) {
     const condition = trigger?.condition;
-    if (condition?.type !== 'diceGroup' || Number(condition.groupId) !== 0) {
+    const facesPool = condition?.type === 'diceGroup' && Number(condition.groupId) === 0;
+    if (!facesPool || !triggerMovesOutcome(trigger)) {
       rewritten.push(trigger);
       continue;
     }

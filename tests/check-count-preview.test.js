@@ -306,6 +306,24 @@ describe('count odds', () => {
     assert.equal(odds.product, 'count');
   });
 
+  it('charts past a face trigger that cannot change an outcome', () => {
+    const inert = (id, effect) => ({
+      id,
+      condition: { type: 'diceGroup', groupId: 0, aggregate: 'highestDie', operator: '==', value: 10 },
+      outcome: 'none',
+      breakTools: false,
+      tierStep: { mode: 'none' },
+      ...effect,
+    });
+    const without = oddsFor(plan({ draft: SMITHING }));
+    for (const trigger of [inert('tools', { breakTools: true }), inert('step', { tierStep: { mode: 'sideways' } })]) {
+      const draft = { ...SMITHING, checkBreakage: { triggers: [trigger] } };
+      const odds = oddsFor(plan({ draft }));
+      assert.equal(odds.enumerable, true, `${trigger.id} moves no outcome, so the chart stands`);
+      assert.deepEqual(rowsOf(odds), rowsOf(without));
+    }
+  });
+
   it('abstains when explosions leave too much mass unexpanded', () => {
     const draft = {
       ...SMITHING,
