@@ -146,7 +146,8 @@ describe('a count preview plan', () => {
     const evaluation = normalizeCheckEvaluation(SMITHING.evaluation);
     assert.equal(
       countDigestFormula(SMITHING, evaluation, text),
-      'Roll · @skills.smith.rank + 2d10 · each ≥ 8'
+      'Roll · (@skills.smith.rank + 2)d10 · each ≥ 8',
+      'a base that reads the character is bracketed, so it is not read as a sum with the dice'
     );
     const strictUnder = normalizeCheckEvaluation(count({ die: 20, base: '2', threshold: '13' }, 'under'));
     assert.equal(
@@ -367,7 +368,7 @@ describe('the count readout', () => {
     assert.equal(readout.count.faces[1].label, '10, qualified and exploded');
     assert.equal(readout.total, 2);
     assert.equal(readout.breakdown, '4 qualified − 2 cancelled = 2 net');
-    assert.equal(readout.marginLabel, '2 needed · margin 0');
+    assert.equal(readout.marginLabel, '2 needed · margin +0', 'a zero margin is signed');
     assert.equal(readout.bandName, 'Success');
     assert.equal(readout.bandDetail, 'The result group is produced.');
     assert.equal(readout.hasFormula, true);
@@ -430,6 +431,12 @@ describe('the count readout', () => {
     assert.equal(readout.count.botch, true);
     assert.deepEqual(readout.count.faces.map((tile) => tile.marks.join(' ')), ['cancelled', 'cancelled', 'cancelled']);
     assert.equal(readout.bandDetail, 'Botched. Nothing is produced; the failure policy applies.');
+    assert.equal(readout.bandName, 'Botch', 'named as the odds panel names it, not as its band');
+    assert.equal(
+      readout.marginLabel,
+      '1 needed · a net below zero is a botch',
+      "the record's count, not the Failure tier's 0 the net graded into"
+    );
   });
 
   it('fails a zero pool with no tiles, no total and no Roll', async () => {

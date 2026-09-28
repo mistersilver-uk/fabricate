@@ -439,6 +439,11 @@ function countReadoutFields(plan, result, band, text) {
     marginLabel: count?.marginLabel ?? '',
     breakdown: count?.breakdown ?? '',
     dieLabel: count?.dieLabel ?? '',
+    // A botch is named as the odds panel names it, over the band it grades into.
+    bandName:
+      count?.botch && !band.success
+        ? text('FABRICATE.Admin.Manager.Checks.Odds.Botch', 'Botch')
+        : band.name,
     bandDetail: countBandDetail(plan, count, band, text),
   };
 }

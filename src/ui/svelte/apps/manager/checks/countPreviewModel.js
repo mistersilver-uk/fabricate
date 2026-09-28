@@ -35,21 +35,23 @@ import { missingTargetPaths, readsCharacter, targetExpressionFault } from './che
 /** U+2212, the minus the Studio writes a negative count with. */
 const MINUS = '−';
 
-/** A signed count with the true minus; `plus` adds `+` to a positive one. */
+/** A signed count with the true minus; `plus` adds `+` to zero and above, as `margin +0` reads. */
 function formatCount(value, { plus = false } = {}) {
   if (value < 0) return `${MINUS}${Math.abs(value)}`;
-  return plus && value > 0 ? `+${value}` : String(value);
+  return plus ? `+${value}` : String(value);
 }
 
 /**
  * The digest's roll row for a count check, `Roll · {base}d{die} · each {comparison} {threshold}`,
- * with the authored expressions; `null` for any other check.
+ * with the authored expressions; `null` for any other check. A base that is not a whole number is
+ * bracketed, `(@skills.smith.rank + 2)d10`, so it does not read as a sum with the dice.
  */
 export function countDigestFormula(check, evaluation, text) {
   if (evaluation.product !== 'count') return null;
   const { base, die, threshold } = evaluation.pool;
+  const authored = String(base ?? '').trim();
   const values = countFormulaValues({
-    dice: base,
+    dice: authored === '' || /^\d+$/.test(authored) ? authored : `(${authored})`,
     die,
     direction: evaluation.direction,
     comparison: check?.thresholdMode,
@@ -392,23 +394,30 @@ export function buildCountReadout(plan, result, text) {
       )
     : '';
   const margin = finiteOrNaN(data.margin);
+  const botch = Number.isFinite(net) && net < 0;
+  // A botch states why instead of a margin, against the record's own count, as the player's
+  // result box does; a margin reads against the count the runner graded it by.
+  const required = botch && Number.isFinite(plan.dc) ? plan.dc : net - margin;
+  const marginCopy = botch
+    ? [
+        'FABRICATE.Admin.Manager.Checks.Simulator.VsRequiredBotch',
+        '{required} needed · a net below zero is a botch',
+      ]
+    : [
+        'FABRICATE.Admin.Manager.Checks.Simulator.VsRequired',
+        '{required} needed · margin {margin}',
+      ];
   const marginLabel =
     Number.isFinite(net) && Number.isFinite(margin)
-      ? interpolate(
-          text(
-            'FABRICATE.Admin.Manager.Checks.Simulator.VsRequired',
-            '{required} needed · margin {margin}'
-          ),
-          {
-            required: net - margin,
-            margin: formatCount(margin, { plus: true }),
-          }
-        )
+      ? interpolate(text(...marginCopy), {
+          required,
+          margin: formatCount(margin, { plus: true }),
+        })
       : '';
   return {
     faces,
     zeroPool,
-    botch: Number.isFinite(net) && net < 0,
+    botch,
     breakdown,
     marginLabel,
     shownTotal: Number.isFinite(net) ? formatCount(net) : '',

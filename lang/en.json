@@ -6532,6 +6532,7 @@
             "CountLegend": "✓ qualified · ✕ cancelled · ↻ exploded",
             "CountNet": "{qualified} qualified − {cancelled} cancelled = {net} net",
             "VsRequired": "{required} needed · margin {margin}",
+            "VsRequiredBotch": "{required} needed · a net below zero is a botch",
             "BandBotch": "Botched. Nothing is produced; the failure policy applies.",
             "ZeroPool": "A pool reduced to zero fails automatically. Nothing was rolled.",
             "FaceMarked": "{face}, {marks}",

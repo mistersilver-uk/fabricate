@@ -137,7 +137,7 @@ describe('count odds and the simulator readout', () => {
     assert.equal(domain.dataset.checksOddsExpected, '1.33');
     assert.equal(
       root.querySelector('[data-checks-digest-row="formula"]').textContent.trim(),
-      'Roll · @skills.smith.rank + 2d10 · each ≥ 8',
+      'Roll · (@skills.smith.rank + 2)d10 · each ≥ 8',
       'the retained formula is inert on the digest too'
     );
   });
@@ -172,8 +172,13 @@ describe('count odds and the simulator readout', () => {
     );
     assert.equal(
       readout.querySelector('[data-checks-simulator-margin]').textContent.trim(),
-      '2 needed · margin 0'
+      '2 needed · margin +0'
     );
+    // The tile's tone is the face's result: success for a qualifier, danger for a cancel.
+    const tone = (tile) => tile.querySelector('.fab-medallion').className;
+    assert.match(tone(tiles[0]), /is-tone-success/);
+    assert.match(tone(tiles[2]), /is-tone-danger/);
+    assert.doesNotMatch(tone(tiles[3]), /is-tone-/, 'a face that did nothing is untoned');
     assert.ok(root.querySelector('[data-checks-simulator-legend]'));
     assert.equal(root.querySelector('[data-checks-simulator-band]').dataset.checksSimulatorBand, 'success');
   });
@@ -246,6 +251,10 @@ describe('count odds and the simulator readout', () => {
     assert.equal(total.dataset.checksSimulatorTotal, '-3');
     assert.equal(total.textContent.trim(), '−3');
     assert.match(root.querySelector('[data-checks-simulator-band]').textContent, /Botched/);
+    assert.equal(
+      root.querySelector('[data-checks-simulator-band-name]').textContent.trim(),
+      'Botch'
+    );
   });
 
   it('states that a dynamic required count is not previewed by running its macro', async () => {

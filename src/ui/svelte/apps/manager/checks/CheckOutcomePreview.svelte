@@ -48,6 +48,12 @@
     cancelled: 'fas fa-xmark',
     exploded: 'fas fa-rotate',
   };
+  // A count face is toned by what it did: a cancel reads danger, a success or explosion success.
+  function faceTone(marks) {
+    if (!marks) return '';
+    if (marks.includes('cancelled')) return 'danger';
+    return marks.includes('qualified') || marks.includes('exploded') ? 'success' : '';
+  }
   const marginLabel = $derived.by(() => {
     if (preview?.marginLabel) return preview.marginLabel;
     return Number.isFinite(preview?.margin) ? preview.gradeLabel : '';
@@ -74,19 +80,19 @@
      glyph; a count face's marks replace the die caption. -->
 {#snippet faceTile(tile)}
   <span
-    class="manager-checks-simulator-face"
+    class={`manager-checks-simulator-face ${tile.marks ? `is-count is-${faceTone(tile.marks) || 'plain'}` : ''}`}
     data-checks-simulator-face={tile.index}
     data-checks-simulator-face-marks={tile.marks?.join(' ')}
     role={tile.marks ? 'img' : undefined}
     aria-label={tile.marks ? tile.label : undefined}
   >
-    <Medallion icon="" size={38} />
+    <Medallion icon="" size={38} tone={faceTone(tile.marks)} />
     <small data-checks-simulator-face-value aria-hidden={tile.marks ? 'true' : undefined}>
       <strong>{tile.face}</strong>
       {#if tile.marks}
         <span class="manager-checks-simulator-marks">
           {#each tile.marks as mark (mark)}
-            <i class={`${MARK_GLYPHS[mark]} is-${mark}`} aria-hidden="true"></i>
+            <i class={MARK_GLYPHS[mark]} aria-hidden="true"></i>
           {/each}
         </span>
       {:else}
@@ -171,10 +177,21 @@
           data-checks-simulator-product={preview.product}
           data-checks-simulator-botch={count?.botch ? '' : undefined}
         >
-          <span class="manager-checks-simulator-faces">
-            {#each faces as tile (tile.index)}
-              {@render faceTile(tile)}
-            {/each}
+          <!-- The legend sits under the tiles it explains, as the player's result box draws it. -->
+          <span class="manager-checks-simulator-dice">
+            <span class="manager-checks-simulator-faces">
+              {#each faces as tile (tile.index)}
+                {@render faceTile(tile)}
+              {/each}
+            </span>
+            {#if count}
+              <span class="manager-muted" data-checks-simulator-legend>
+                {text(
+                  'FABRICATE.Admin.Manager.Checks.Simulator.CountLegend',
+                  '✓ qualified · ✕ cancelled · ↻ exploded'
+                )}
+              </span>
+            {/if}
           </span>
           <span class="manager-checks-simulator-numbers">
             <small data-checks-simulator-breakdown>{preview.breakdown}</small>
@@ -188,14 +205,6 @@
             {/if}
           </span>
         </div>
-        {#if count}
-          <p class="manager-muted" data-checks-simulator-legend>
-            {text(
-              'FABRICATE.Admin.Manager.Checks.Simulator.CountLegend',
-              '✓ qualified · ✕ cancelled · ↻ exploded'
-            )}
-          </p>
-        {/if}
       {/if}
 
       {#if preview.bandName || preview.bandDetail}
@@ -271,26 +280,24 @@
   .manager-checks-simulator-faces {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--fab-space-1);
+    gap: var(--fab-space-chip);
     min-width: 0;
   }
 
-  .manager-checks-simulator-marks {
+  .manager-checks-simulator-dice {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-chip);
+    min-width: 0;
+  }
+
+  /* A mark takes its tile's ink, so the tile's tone is the one colour a face carries; this beats
+     the die caption's rule below, which would otherwise reach the marks too. */
+  .manager-checks-simulator-face small .manager-checks-simulator-marks {
     display: flex;
     gap: var(--fab-space-2xs);
-    font-size: 0.5rem;
-  }
-
-  .manager-checks-simulator-marks .is-qualified {
-    color: var(--fab-success);
-  }
-
-  .manager-checks-simulator-marks .is-cancelled {
-    color: var(--fab-danger);
-  }
-
-  .manager-checks-simulator-marks .is-exploded {
-    color: var(--fab-accent);
+    color: inherit;
+    font-size: 9px;
   }
 
   .manager-checks-simulator-face {
@@ -319,8 +326,25 @@
   .manager-checks-simulator-face small strong {
     color: var(--fab-text);
     font-size: 1rem;
-    font-weight: 700;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
+  }
+
+  .manager-checks-simulator-face.is-count small {
+    color: var(--fab-text-muted);
+  }
+
+  .manager-checks-simulator-face.is-success small {
+    color: var(--fab-success-text);
+  }
+
+  .manager-checks-simulator-face.is-danger small {
+    color: var(--fab-danger-text);
+  }
+
+  .manager-checks-simulator-face.is-count small strong {
+    color: inherit;
+    font-size: 14px;
   }
 
   .manager-checks-simulator-face small span {
