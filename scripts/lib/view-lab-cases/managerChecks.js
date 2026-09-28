@@ -1043,7 +1043,7 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager' +
       ':has([data-checks-odds-reason="attribute-path-unresolved"])' +
-      ':has([data-checks-section-callout="attributePathUnresolvedForPreview"])',
+      ':has([data-checks-section-notice="attributePathUnresolvedForPreview"])',
   }),
   underCase({
     id: 'manager-checks-under-missing-path-validation',
@@ -1102,7 +1102,7 @@ export const CASES = Object.freeze([
     steps: [...previewAsActor('lab-actor-idrin'), ...PARITY_UNDER, ...SCROLL_ODDS],
     expectSelector:
       '.fabricate-manager' +
-      ':has([data-checks-section-callout="progressiveUnderUnsupported"])' +
+      ':has([data-checks-section-notice="progressiveUnderUnsupported"])' +
       ':has([data-checks-odds-reason="progressive-under-unsupported"])',
   }),
   managerCase({

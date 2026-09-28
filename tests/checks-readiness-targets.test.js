@@ -1,15 +1,16 @@
 /** Checks readiness for roll-under and character-value targets (issue 2003). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   evaluateCheckReadiness,
   sectionForIssue,
 } from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
 import {
-  checkIssueCopy,
+  CHECK_ISSUE_TITLES,
+  checkIssueText,
   checkTickCopy,
-  interpolate,
 } from '../src/ui/svelte/apps/manager/checks/checksCopy.js';
 
 const attribute = (expression, extra = {}) => ({
@@ -23,7 +24,8 @@ const VOSK = { name: 'Vosk', rollData: { skills: {} } };
 const ids = (list) => list.map((issue) => issue.id);
 const issue = (result, id) => [...result.issues, ...result.transient].find((row) => row.id === id);
 const tick = (result, id) => result.checks.find((row) => row.id === id);
-const sentence = (entry) => interpolate(checkIssueCopy(entry.id).fallback, entry.data);
+const english = (_key, fallback) => fallback;
+const sentence = (entry) => checkIssueText(entry.id, entry.data, english).detail;
 
 const ROUTED_MULTIPLY = {
   rollFormula: '1d100',
@@ -135,6 +137,15 @@ describe('target readiness raises each id with its copy, section and severity', 
       sentence:
         'An added adjustment must be a finite number and a multiplier must be above zero; Base adjustment, Grim, Zeroed is not.',
     });
+    const { data } = issue(result, 'adjustmentInvalidForKind');
+    assert.deepEqual(data, { names: 'Grim, Zeroed', baseAdjustment: true }, 'no English in the data');
+    const german = (key, fallback) =>
+      key.endsWith('.RecordBaseAdjustment') ? 'Grundanpassung' : fallback;
+    assert.match(
+      checkIssueText('adjustmentInvalidForKind', data, german).detail,
+      /; Grundanpassung, Grim, Zeroed is not\.$/u,
+      'the copy layer names the base adjustment in the reader’s language'
+    );
     const added = evaluateCheckReadiness(
       { rollFormula: '1d20', evaluation: attribute('@x', { adjustmentKind: 'add', baseAdjustment: -4 }) },
       { mode: 'simple' }
@@ -261,5 +272,30 @@ describe('readiness validates only what the active mode reads', () => {
       { mode: 'routed', previewActor: VOSK }
     );
     assert.deepEqual([ids(fixedRanges.issues), ids(fixedRanges.transient)], [[], []]);
+  });
+});
+
+describe('the new issues render a title over their sentence', () => {
+  it('titles each new issue and keeps its sentence as the detail', () => {
+    const data = { actor: 'Vosk', path: '@skills.craft.value' };
+    assert.deepEqual(checkIssueText('attributePathUnresolvedForPreview', data, english), {
+      title: 'A character path does not resolve',
+      detail: 'Vosk has no value at @skills.craft.value, so this check cannot roll for them.',
+    });
+  });
+
+  it('localizes every title under the Validation namespace, as its fallback reads', () => {
+    const en = JSON.parse(readFileSync(new URL('../lang/en.json', import.meta.url), 'utf8'));
+    const validation = en.FABRICATE.Admin.Manager.Checks.Validation;
+    for (const [id, [key, fallback]] of Object.entries(CHECK_ISSUE_TITLES)) {
+      assert.equal(validation[key], fallback, `${id} resolves to ${key}`);
+    }
+  });
+
+  it('leaves an existing issue as one sentence with no detail', () => {
+    assert.deepEqual(checkIssueText('noRollFormula', undefined, english), {
+      title: 'This check has no roll formula; it will not resolve until one is set.',
+      detail: '',
+    });
   });
 });

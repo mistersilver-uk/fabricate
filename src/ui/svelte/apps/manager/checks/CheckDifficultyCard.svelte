@@ -278,6 +278,7 @@
             dataField="check-target-expression"
             inputAttrs={{
               'data-check-target-expression': '',
+              'data-validation-target': 'checks-target-expression',
               'aria-label': text(
                 'FABRICATE.Admin.Manager.Checks.Evaluation.SourceAttribute',
                 'Character value'

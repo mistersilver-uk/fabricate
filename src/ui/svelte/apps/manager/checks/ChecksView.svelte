@@ -25,17 +25,19 @@
   import CraftingModifierCatalogueCard from './CraftingModifierCatalogueCard.svelte';
   import ChecksValidationTab from './ChecksValidationTab.svelte';
   import {
+    CHECK_ISSUE_CONTROLS,
     CHECK_SECTION_IDS,
     evaluateCheckReadiness,
     readinessModeForSlot,
     sectionForIssue,
   } from './checksReadiness.js';
   import Callout from '../../../components/Callout.svelte';
+  import Notice from '../../../components/Notice.svelte';
   import CheckModeCallout from './CheckModeCallout.svelte';
   import { focusValidationTarget } from '../validationFocus.js';
   import { announceValidationOutcome } from '../validationAnnouncement.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
-  import { checkIssueCopy, interpolate } from './checksCopy.js';
+  import { CHECK_ISSUE_TITLES, checkIssueText } from './checksCopy.js';
   import {
     buildCheckModifierContext,
     resolveActiveCraftingCheckFormula,
@@ -166,11 +168,6 @@
   }
 
   /** The Validation route's own sentence for a readiness issue — the same one, not a copy. */
-  function issueSentence(id, data) {
-    const copy = checkIssueCopy(id);
-    return interpolate(text(copy.key, copy.fallback, data), data);
-  }
-
   // The alchemy check-mode selector, at the TOP of the crafting route's roll section, STAGING
   // the mode on the root's draft and swapping the editor below. "NO CHECK" IS NOT A MODE
   // HERE: the persisted enum still carries `none`, but a third radio made the on/off decision
@@ -809,16 +806,26 @@
     return resolutionMode;
   });
 
-  // Transient warnings explain themselves here but never feed a dot, badge or tally.
+  // Transient warnings explain themselves here but never feed a dot, badge or tally. A titled
+  // issue is a notice at the top of the pane; any other is a callout under the mode card.
   const activeSectionIssues = $derived(
     [...activeReadiness.issues, ...activeReadiness.transient]
       .filter((issue) => sectionForIssue(issue.id) === activeSection)
       .map((issue) => ({
         id: issue.id,
         tone: issue.severity === 'critical' ? 'warning' : 'info',
-        text: issueSentence(issue.id, issue.data),
+        titled: Object.hasOwn(CHECK_ISSUE_TITLES, issue.id),
+        ...checkIssueText(issue.id, issue.data, text),
       }))
   );
+  const sectionNotices = $derived(activeSectionIssues.filter((issue) => issue.titled));
+  const sectionCallouts = $derived(activeSectionIssues.filter((issue) => !issue.titled));
+  const reviewLabel = text('FABRICATE.Admin.Manager.Checks.Validation.Review', 'Review');
+
+  /** A notice's Review: the control its issue names, else its section, as a Validation row's View. */
+  function reviewIssue(id) {
+    selectIssue({ activity, section: activeSection }, CHECK_ISSUE_CONTROLS[id]);
+  }
 
   // ONE previewed record, three readers, so it lives HERE; two copies is how two surfaces
   // disagree about which record is previewed.
@@ -879,7 +886,7 @@
     })
   );
   const previewAbstaining = $derived(previewAbstention(previewPlan, previewCharacter));
-  // THE SAME CONTEXT THE RUNNER IS HANDED: it places the modifiers, so a histogram computed
+  // The same context the runner is handed: it places the modifiers, so a histogram computed
   // without this describes a formula nothing rolls.
   const previewModifier = $derived(previewPlan.args?.craftingModifier ?? null);
   // The previewed actor's flat check-modifier total, which a roll-under strip adds to its target.
@@ -1186,6 +1193,22 @@
       data-keyboard-focus="true"
       bind:this={sectionPanel}
     >
+      <!-- A titled issue opens the pane as the prototype draws it: amber, title over detail. -->
+      {#if activity !== 'validation' && !routeIsOff && sectionNotices.length > 0}
+        <div class="manager-checks-section-callouts" data-checks-section-notices={activeSection}>
+          {#each sectionNotices as issue (issue.id)}
+            <Notice
+              tone="warning"
+              title={issue.title}
+              detail={issue.detail}
+              action={{ label: reviewLabel, onClick: () => reviewIssue(issue.id) }}
+              dataAttr="data-checks-section-notice"
+              dataValue={issue.id}
+            />
+          {/each}
+        </div>
+      {/if}
+
       {#if paneHead && !routeIsOff}
         <header class="manager-checks-pane-head" data-checks-pane-head={activeSection}>
           <h2 class="manager-checks-pane-title">{paneHead.title}</h2>
@@ -1206,14 +1229,14 @@
         />
       {/if}
 
-      {#if activity !== 'validation' && !routeIsOff && activeSectionIssues.length > 0}
+      {#if activity !== 'validation' && !routeIsOff && sectionCallouts.length > 0}
         <div class="manager-checks-section-callouts" data-checks-section-callouts={activeSection}>
           <!-- The tone is DERIVED and both values stand: a readiness issue is a statement about the
                          live record, which is what `info` is for, and a critical one is the hazard. -->
-          {#each activeSectionIssues as issue (issue.id)}
+          {#each sectionCallouts as issue (issue.id)}
             <Callout
               tone={issue.tone}
-              text={issue.text}
+              text={issue.title}
               dataAttr="data-checks-section-callout"
               dataValue={issue.id}
             />

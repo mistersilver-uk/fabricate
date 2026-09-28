@@ -146,6 +146,46 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
   ],
 });
 
+/**
+ * Titles for the issues that render as a title over their sentence, in the Validation row and the
+ * section notice alike; every other issue's sentence is its title.
+ */
+export const CHECK_ISSUE_TITLES = Object.freeze({
+  attributeTargetMissing: [
+    'IssueAttributeTargetMissingTitle',
+    'No character value to measure against',
+  ],
+  attributeTargetInvalid: [
+    'IssueAttributeTargetInvalidTitle',
+    'The character value cannot be worked out',
+  ],
+  attributeTierWithoutAdjustment: [
+    'IssueAttributeTierWithoutAdjustmentTitle',
+    'A recipe tier has no difficulty adjustment',
+  ],
+  adjustmentInvalidForKind: [
+    'IssueAdjustmentInvalidForKindTitle',
+    'An adjustment does not suit its kind',
+  ],
+  otherwiseTierMissing: ['IssueOtherwiseTierMissingTitle', 'No tier is marked Otherwise'],
+  multipleOtherwiseTiers: [
+    'IssueMultipleOtherwiseTiersTitle',
+    'More than one tier is marked Otherwise',
+  ],
+  progressiveUnderUnsupported: [
+    'IssueProgressiveUnderUnsupportedTitle',
+    'Lower is better cannot drive a progressive check',
+  ],
+  attributePathUnresolvedForPreview: [
+    'IssueAttributePathUnresolvedForPreviewTitle',
+    'A character path does not resolve',
+  ],
+  attributeValueNotNumeric: [
+    'IssueAttributeValueNotNumericTitle',
+    'A character value is not a number',
+  ],
+});
+
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Validation.';
 
 function copyFor(map, id) {
@@ -164,6 +204,30 @@ export function checkIssueCopy(id) {
  *  @param {string} id A check tick id. @returns {{ key: string, fallback: string }} */
 export function checkTickCopy(id) {
   return copyFor(CHECK_TICK_LABELS, id);
+}
+
+/** An issue's data with a faulted base adjustment named, in the reader's language, before the rest. */
+function issueData(data, text) {
+  if (!data?.baseAdjustment) return data;
+  const base = text(
+    'FABRICATE.Admin.Manager.Checks.Evaluation.RecordBaseAdjustment',
+    'base adjustment'
+  );
+  const named = `${base.charAt(0).toLocaleUpperCase()}${base.slice(1)}`;
+  return { ...data, names: [named, data.names].filter(Boolean).join(', ') };
+}
+
+/**
+ * The words one readiness issue renders, `{ title, detail }`: a titled issue's sentence is its
+ * detail, and any other issue's sentence is its title with no detail. `text(key, fallback, data)`.
+ */
+export function checkIssueText(id, data, text) {
+  const resolved = issueData(data, text);
+  const copy = checkIssueCopy(id);
+  const sentence = interpolate(text(copy.key, copy.fallback, resolved), resolved);
+  const title = CHECK_ISSUE_TITLES[id];
+  if (!title) return { title: sentence, detail: '' };
+  return { title: text(`${NAMESPACE}${title[0]}`, title[1]), detail: sentence };
 }
 
 /**

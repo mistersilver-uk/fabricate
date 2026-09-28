@@ -975,18 +975,51 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
     assert.ok(root.querySelector('[data-checks-simulator-state="needs-preview-actor"]'));
   });
 
-  it('names the actor lacking the path in the odds, the callout and not the section dot', async () => {
+  it('names the actor lacking the path in the odds, the notice and not the section dot', async () => {
     const root = await mountChecks({ craftingCheck: UNDER_ROUTED });
     const dots = () => root.querySelectorAll('[data-checks-section-dot]').length;
     const before = dots();
     await choosePreviewActor(root, 'bare');
     assert.equal(odds(root).dataset.checksOddsReason, 'attribute-path-unresolved');
     assert.match(odds(root).textContent, /Bare Hands is missing a value this check reads \(@prof\)/);
-    const callout = root.querySelector(
-      '[data-checks-section-callout="attributePathUnresolvedForPreview"]'
+    const notice = root.querySelector(
+      '[data-checks-section-notice="attributePathUnresolvedForPreview"]'
     );
-    assert.ok(Boolean(callout), 'the roll section explains the warning');
+    assert.ok(Boolean(notice), 'the roll section explains the warning');
+    assert.equal(notice.dataset.noticeTone, 'warning', 'amber, as the prototype draws it');
+    assert.equal(
+      notice.querySelector('.fab-notice-title').textContent.trim(),
+      'A character path does not resolve'
+    );
+    assert.match(
+      notice.querySelector('.fab-notice-detail').textContent,
+      /IssueAttributePathUnresolvedForPreview:\{"actor":"Bare Hands","path":"@prof"\}/u,
+      'the detail is the Validation sentence, naming the actor and the path'
+    );
+    assert.ok(
+      !root.querySelector('[data-checks-section-callout="attributePathUnresolvedForPreview"]'),
+      'a titled issue is a notice, not a second callout'
+    );
     assert.equal(dots(), before, 'a transient warning puts no dot on a section');
+  });
+
+  it('opens the pane with the notice, whose Review focuses the character-value field', async () => {
+    const root = await mountChecks({ craftingCheck: UNDER_ROUTED });
+    await choosePreviewActor(root, 'bare');
+    const panel = root.querySelector('[role="tabpanel"]');
+    assert.ok(
+      panel.firstElementChild.matches('[data-checks-section-notices="roll"]'),
+      'the notice is the first thing in the pane'
+    );
+    const review = panel.querySelector(
+      '[data-checks-section-notice="attributePathUnresolvedForPreview"] [data-notice-action]'
+    );
+    assert.equal(review.textContent.trim(), 'Review');
+    review.click();
+    for (let attempt = 0; attempt < 4; attempt += 1) await settle();
+    const field = root.querySelector('[data-validation-target="checks-target-expression"]');
+    assert.ok(Boolean(field), 'the character-value field carries its address');
+    assert.ok(root.ownerDocument.activeElement === field, 'Review focuses the offending control');
   });
 
   it('describes a pass/fail roll-under band in its own terms', async () => {

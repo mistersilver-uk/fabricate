@@ -8,14 +8,18 @@
   THE HERO STATES THE UNSAVED CONDITION: the badges, dots and counters are a DRAFT PREVIEW while
   the ENABLE gate reads COMMITTED state, so a draft that clears every blocking issue must NOT be
   reported as "Ready to enable". `sections` is the list of in-play subsystem checks `ChecksView`
-  resolves; a subsystem that is switched off is omitted upstream. A TRANSIENT warning names the
+  resolves; a subsystem that is switched off is omitted upstream. A transient warning names the
   Preview-as actor: it renders as a row but is never counted in the tally or the hero.
 -->
 <script>
   import EditorValidationSurface from '../../../components/EditorValidationSurface.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import { checkIssueCopy, checkTickCopy, interpolate } from './checksCopy.js';
-  import { evaluateCheckReadiness, sectionForIssue } from './checksReadiness.js';
+  import { checkIssueText, checkTickCopy } from './checksCopy.js';
+  import {
+    CHECK_ISSUE_CONTROLS,
+    evaluateCheckReadiness,
+    sectionForIssue,
+  } from './checksReadiness.js';
 
   let {
     sections = [],
@@ -49,12 +53,6 @@
     const copy = checkTickCopy(id);
     return text(copy.key, copy.fallback);
   }
-  // `data` is the optional interpolation payload an issue carries when its sentence names
-  // something; the English fallback is interpolated by hand, so no world reads `{names}`.
-  function issueTitle(id, data) {
-    const copy = checkIssueCopy(id);
-    return interpolate(text(copy.key, copy.fallback, data), data);
-  }
 
   const evaluated = $derived(
     sections.map((section) => ({
@@ -67,29 +65,6 @@
       }),
     }))
   );
-
-  /**
-   * WHICH CONTROL EACH ISSUE NAMES — the `data-validation-target` half of a row's address, keyed
-   * by ISSUE ID rather than by section, because a section is not one control: `roll` renders the
-   * formula field and the Difficulty card, and only the field is ever the offender. A row's
-   * `target` is the ROUTE, resolved through `CHECK_ISSUE_SECTIONS`.
-   *
-   * ROUTE-ONLY IS A STATED OUTCOME, NEVER A SILENT ONE: such a row still renders a View button
-   * and changes route, focusing nothing, and the mounted suite asserts which shape a row is.
-   * Most ids are route-only — an Outcomes issue is about one tier among several authored INLINE
-   * with no id on the row, a bounds or expression fault NAMES the entries itself, and an
-   * inert-selection issue's remedy is the mode or the formula. The two addresses are
-   * `checks-roll-formula` and the SET-level `checks-triggers`.
-   *
-   * @type {Readonly<Record<string, string>>}
-   */
-  const CHECK_ISSUE_CONTROLS = Object.freeze({
-    noRollFormula: 'checks-roll-formula',
-    retiredPlaceholderBreaksFormula: 'checks-roll-formula',
-    retiredPlaceholderInFormula: 'checks-roll-formula',
-    danglingTierStepTarget: 'checks-triggers',
-    multipleTierStepTargets: 'checks-triggers',
-  });
 
   // ONE row per check tick and per issue, BUILT in that order, so a group reads as "what holds"
   // then "what does not"; an issue's row carries the deep-link target and a satisfied tick has
@@ -104,7 +79,7 @@
   function issueRow(subsystem, issue, transient) {
     return {
       id: issue.id,
-      title: issueTitle(issue.id, issue.data),
+      ...checkIssueText(issue.id, issue.data, text),
       status: issue.severity === 'critical' ? 'block' : 'warn',
       transient,
       target: { activity: subsystem, section: sectionForIssue(issue.id) },

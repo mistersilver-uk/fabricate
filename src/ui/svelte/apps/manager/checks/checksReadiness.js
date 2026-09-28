@@ -116,6 +116,23 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
 });
 
 /**
+ * Which control each issue names: the `data-validation-target` a Validation row's View and a
+ * section notice's Review focus. An id with none is route-only and focuses its section: an
+ * Outcomes tier carries no id, and a modifier fault names its own entries.
+ * @type {Readonly<Record<string, string>>} */
+export const CHECK_ISSUE_CONTROLS = Object.freeze({
+  noRollFormula: 'checks-roll-formula',
+  retiredPlaceholderBreaksFormula: 'checks-roll-formula',
+  retiredPlaceholderInFormula: 'checks-roll-formula',
+  danglingTierStepTarget: 'checks-triggers',
+  multipleTierStepTargets: 'checks-triggers',
+  attributeTargetMissing: 'checks-target-expression',
+  attributeTargetInvalid: 'checks-target-expression',
+  attributePathUnresolvedForPreview: 'checks-target-expression',
+  attributeValueNotNumeric: 'checks-target-expression',
+});
+
+/**
  * The mode this evaluator answers "this activity rolls no check at all" under. Gathering `d100`
  * and alchemy `none` are the reachable members, differing only in WHY, which the modifier issue
  * splits on; the name is "no check to AUTHOR", not a claim that nothing is rolled.
@@ -320,9 +337,6 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
   return { checks, issues };
 }
 
-/** The name a base adjustment is listed under beside tier and outcome names. */
-const BASE_ADJUSTMENT_NAME = 'Base adjustment';
-
 /** The two transient warnings: the Preview-as actor's value at the target cannot be read. */
 function previewActorTargetWarnings(transient, expression, previewActor) {
   const rollData = previewActor.rollData ?? {};
@@ -372,17 +386,22 @@ function recipeTierReadiness(result, tiers) {
   }
 }
 
-/** The base and every set tier adjustment suit the target's adjustment kind. */
+/**
+ * The base and every set tier adjustment suit the target's adjustment kind. A faulted base is
+ * flagged as `baseAdjustment` rather than named, so the copy layer names it in the reader's language.
+ */
 function adjustmentKindReadiness(result, { adjustmentKind: kind, baseAdjustment }, set) {
-  const adjusted = [
-    ...(baseAdjustment === null ? [] : [{ name: BASE_ADJUSTMENT_NAME, value: baseAdjustment }]),
-    ...set,
-  ];
-  const invalid = adjusted.filter((entry) => !isValidTargetAdjustment(kind, entry.value));
-  result.checks.push({ id: 'adjustmentsSuitKind', satisfied: invalid.length === 0 });
-  if (invalid.length > 0) {
+  const suits = (value) => isValidTargetAdjustment(kind, value);
+  const baseInvalid = baseAdjustment !== null && !suits(baseAdjustment);
+  const invalid = set.filter((entry) => !suits(entry.value));
+  result.checks.push({
+    id: 'adjustmentsSuitKind',
+    satisfied: !baseInvalid && invalid.length === 0,
+  });
+  if (baseInvalid || invalid.length > 0) {
     const names = invalid.map((entry) => entry.name).join(', ');
-    pushIssue(result.issues, 'adjustmentInvalidForKind', 'critical', { names });
+    const data = baseInvalid ? { names, baseAdjustment: true } : { names };
+    pushIssue(result.issues, 'adjustmentInvalidForKind', 'critical', data);
   }
 }
 
