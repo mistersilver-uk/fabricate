@@ -620,11 +620,13 @@ function serializedOperationResult(result, { secret = false, runId = '' } = {}) 
 
 /**
  * A crafting reply carries the executed check's display projection for the player's result box
- * (issue 2005); a secret check hands over nothing, and a stage without a rolled check adds no key.
+ * (issue 2005). A secret or blind check hands over nothing, since the roller never sees a blind
+ * roll, and a stage without a rolled check adds no key.
  */
 function withExecutedCheck(response, runType, checkResult) {
   const check = runType === 'crafting' ? checkDisplayForCard(checkResult) : null;
-  return check?.evidence ? { ...response, check } : response;
+  if (!check?.evidence || check.visibility?.rollMode === 'blindroll') return response;
+  return { ...response, check };
 }
 
 /**

@@ -2071,45 +2071,73 @@ describe('journal run command protocol', () => {
     );
   });
 
-  it('hands a visible crafting reply its executed check projection, and a secret one none (issue 2005)', async () => {
-    const reply = async (secret) => {
-      const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
-      const { service } = commandHarness({
-        currentUserId: 'gm',
-        run,
-        promptCheck: async () => ({ confirmed: true }),
-        operations: {
-          crafting: {
-            getRun: () => run,
-            describeCheck: async () => ({
-              required: true,
-              publicPrompt: { label: 'Known recipe' },
-              privateEvaluation: { rollFormula: '3d6' },
-            }),
-            evaluateCheck: async () => ({
-              engineEvaluated: true,
-              success: true,
-              secret,
-              data: { ...UNDER_DATA, targetTerms: [{ kind: 'anchor', value: 14, path: '@x' }] },
-              visibility: { rollMode: 'publicroll', secret },
-            }),
-            execute: async () => ({ success: true, runId: run.id, runRevision: 4 }),
-          },
+  /** A crafting (or other) execute reply over a check the operations describe and evaluate. */
+  const evidenceReply = async ({
+    secret = false,
+    rollMode = 'publicroll',
+    runType = 'crafting',
+    required = true,
+  } = {}) => {
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      run,
+      promptCheck: async () => ({ confirmed: true }),
+      operations: {
+        [runType]: {
+          getRun: () => run,
+          describeCheck: async () =>
+            required
+              ? {
+                  required: true,
+                  publicPrompt: { label: 'Known recipe' },
+                  privateEvaluation: { rollFormula: '3d6' },
+                }
+              : { required: false },
+          evaluateCheck: async () => ({
+            engineEvaluated: true,
+            success: true,
+            secret,
+            data: { ...UNDER_DATA, targetTerms: [{ kind: 'anchor', value: 14, path: '@x' }] },
+            visibility: { rollMode, secret },
+          }),
+          execute: async () => ({ success: true, runId: run.id, runRevision: 4 }),
         },
-      });
-      return service.executeJournalRunCommand({
-        actorUuid: 'Actor.a',
-        runType: 'crafting',
-        runId: run.id,
-        expectedRevision: 3,
-        action: 'execute',
-      });
-    };
-    const visible = await reply(false);
+      },
+    });
+    return service.executeJournalRunCommand({
+      actorUuid: 'Actor.a',
+      runType,
+      runId: run.id,
+      expectedRevision: 3,
+      action: 'execute',
+    });
+  };
+
+  it('hands a visible crafting reply its executed check projection, and a secret one none (issue 2005)', async () => {
+    const visible = await evidenceReply();
     assert.equal(visible.check.evidence.target, 14);
     assert.deepEqual(visible.check.visibility, { rollMode: 'publicroll', secret: false });
     assert.doesNotMatch(JSON.stringify(visible.check), /@x|path/, 'the projection is an allowlist');
-    assert.ok(!Object.hasOwn(await reply(true), 'check'), 'a secret reply carries no evidence');
+    assert.ok(!Object.hasOwn(await evidenceReply({ secret: true }), 'check'), 'a secret reply carries no evidence');
+  });
+
+  it('hands a blind roll no evidence, and the roller its own private roll (R8)', async () => {
+    const blind = await evidenceReply({ rollMode: 'blindroll' });
+    assert.equal(blind.success, true, 'positive control: the command still succeeds');
+    assert.ok(!Object.hasOwn(blind, 'check'), 'the roller never sees a blind roll');
+    for (const rollMode of ['gmroll', 'selfroll']) {
+      assert.equal((await evidenceReply({ rollMode })).check.evidence.target, 14, rollMode);
+    }
+  });
+
+  it('adds no check key for a stage with no rolled check, or for a gathering run (QE8 P3, P4)', async () => {
+    const unrolled = await evidenceReply({ required: false });
+    assert.equal(unrolled.success, true);
+    assert.ok(!Object.hasOwn(unrolled, 'check'), 'no rolled check, no key');
+    const gathering = await evidenceReply({ runType: 'gathering' });
+    assert.equal(gathering.success, true);
+    assert.ok(!Object.hasOwn(gathering, 'check'), 'the projection is a crafting reply field');
   });
 
   it('accepts replies only from the elected GM for this recipient/session/correlation', async () => {
