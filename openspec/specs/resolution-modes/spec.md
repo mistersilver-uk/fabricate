@@ -313,7 +313,7 @@ Under sum/under the settled `targetDelta` raises or lowers the effective target 
 Shared comparison accepts meet or strict exceed with over or under direction; ranking returns a new best-first array, ranks non-finite values last, and retains the first authored member of each tie without mutating its input.
 Effective margin follows the selected direction and is benefit-positive: `total − target` over and `target − total` under.
 The formula runners, the routed classifier and the prepared evaluator grade a summed total over or under a fixed or character-value target; § Structured Count Evaluation below governs a `product: 'count'` record instead.
-The Checks Studio preview and odds enumerator grade every record by its own product, `sum/over` and `count` alike.
+The Checks Studio preview and odds enumerator grade every record by its own product, agreeing with the runtime: a `sum` record by its authored over-or-under direction and fixed-or-attribute target, and a `count` record per § Structured Count Evaluation.
 The authored evaluation record, including fields the selected mode does not read, survives normalization and export/import.
 A deterministic expression accepts finite numbers, roll-data paths, arithmetic, parentheses and floor, ceil and round without rolling dice.
 A roll-data path reads only the roll data's own keys and resolves a finite number or a decimal numeric string; a missing, null or blank value is an unresolved path, and a boolean, array, object or non-decimal string is refused as non-finite rather than coerced.
