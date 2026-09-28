@@ -247,6 +247,14 @@ describe('roll prompt adapter', () => {
     }, 'a character-value target explains itself with no modifier applied');
     const halved = { ...hardWork, adjustment: { kind: 'multiply', value: 0.5, label: '' } };
     assert.equal((await target({ targetBasis: halved, dc: 6, target: 6 })).source, '@skills.smith.level 12 · difficulty ×0.5');
+    const floored = { expression: '@skills.lore.level', value: 9, adjustment: { kind: 'multiply', value: 0.5, label: '' } };
+    assert.deepEqual(await target({ targetBasis: floored, dc: 4, target: 4 }), {
+      chipText: 'Target 4 · stay at or under', source: '@skills.lore.level 9 · difficulty ×0.5',
+    }, 'the line names the value and multiplier before the floor; the chip names the floored target');
+    const bare = { expression: '@skills.smith.level', value: 12, adjustment: null };
+    assert.deepEqual(await target({ targetBasis: bare, dc: 12, target: 12 }), {
+      chipText: 'Target 12 · stay at or under', source: '@skills.smith.level 12',
+    }, 'an unadjusted character value still names itself, with no difficulty part');
     assert.deepEqual(await target({ dc: 15, target: 15, toolBonus: 2, selectedModifiers: [{ value: 1 }, { value: -4 }] }), {
       chipText: 'Target 14 · stay at or under', source: 'Base 15 · tools +2 · modifiers -3',
     }, 'a fixed target names its base once something raised it');
