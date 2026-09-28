@@ -297,14 +297,17 @@ export async function runCountPassFail({ dc: required, triggers, actor, label, .
   return roll.exit ?? gradeCountPassFail(roll.rolled, { required, triggers, label });
 }
 
-/** `runFormulaRouted` for a count check; headless it routes nothing rather than block. */
+/**
+ * `runFormulaRouted` for a count check; headless it routes nothing rather than block. Fixed ranges
+ * grade the net itself, so its prompt names no required count.
+ */
 export async function runCountRouted({ dc: required, actor, label, type, ...input }) {
   const { relativeOutcomes, fixedOutcomes, triggers, clampToNearest, minOutcomeId } = input;
   const roll = await rollCountCheck({
     actor,
     label,
     kind: 'routed ',
-    options: countOptions({ ...input, required }),
+    options: countOptions({ ...input, required: type === 'fixed' ? null : required }),
     headless: {
       success: true,
       outcome: null,

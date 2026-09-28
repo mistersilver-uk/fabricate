@@ -774,12 +774,13 @@ export class GatheringEngine {
         allowsSituationalModifier: hasActiveCheck(config, rollFormula),
         // A count check offers no advantage until it is mode-aware (issue 2007).
         allowAdvantage: !count && Boolean(rollFormula && /(?:^|\W)d20(?:\W|$)/i.test(rollFormula)),
-        // A hidden task's prompt keeps the count wording but shows no pool or required count.
+        // A hidden task's prompt keeps the count wording but shows no pool or required count,
+        // and fixed ranges grade the net, so they name no required count either.
         ...(count &&
           countPromptFields(
             evaluation,
             secret ? null : target.policy,
-            secret ? null : target.target
+            secret || config?.type === 'fixed' ? null : target.target
           )),
       },
       privateEvaluation: {

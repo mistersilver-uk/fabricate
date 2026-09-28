@@ -1065,6 +1065,35 @@ test('the interactive count prompt reads the pre-modifier pool and each runner\'
   }
 });
 
+test('a fixed-range routed count prompt names no required count, since ranges grade the net', async () => {
+  const prompted = [];
+  const rollOptions = { interactive: true, prompt: async (input) => prompted.push(input) && null };
+  const routed = (type) =>
+    runFormulaRouted({
+      formula: '', dc: 1, type, relativeOutcomes: LADDER, fixedOutcomes: RANGES, clampToNearest: true,
+      actor: ACTOR, evaluation: normalized({ base: '3', threshold: '5' }, 'under'), rollOptions,
+    });
+  await withDice([], async () => {
+    await routed('fixed');
+    await routed('relative');
+  });
+  assert.deepEqual(prompted.map(({ required }) => required), [null, 1]);
+
+  const engine = new GatheringEngine({ localize: (key) => key });
+  const { system, environment, task } = gatheringFixture({ mode: 'routed' });
+  const describe = (type) => {
+    system.gatheringCraftingCheck.routed = routedCheck(countEvaluation({ required: 2 }), {
+      type, fixedOutcomes: RANGES,
+    });
+    return engine._versionedCheckDescriptor({
+      actor: { uuid: 'Actor.g', system: {} }, run: { taskId: task.id }, system, environment,
+      task: { ...task, resolutionMode: 'routed' },
+    }).publicPrompt;
+  };
+  assert.deepEqual([describe('fixed').required, describe('relative').required], [null, 2]);
+  assert.equal(describe('fixed').pool, 2, 'the pool line still shows');
+});
+
 test('a zero pool fails in every mode with no Roll and no triggers, even needing nothing', async () => {
   const zero = normalized({ base: '0', required: 0 });
   const triggers = [

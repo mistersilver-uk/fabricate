@@ -7335,6 +7335,7 @@ function versionedCheckPrompt({
     ? shown
     : resolveRolledFormula(shown, actor, modifierContext, undefined, evaluation);
   const target = !counts && activeCheck.slot === 'simple' && Number.isFinite(dc) ? dc : null;
+  const routedFixed = activeCheck.slot === 'routed' && activeCheck.config?.type === 'fixed';
   const comparison = activeCheck.config?.thresholdMode === 'exceed' ? 'exceed' : 'meet';
   const activityKey = 'FABRICATE.App.Nav.Crafting';
   const localizedActivity = globalThis.game?.i18n?.localize?.(activityKey);
@@ -7365,8 +7366,9 @@ function versionedCheckPrompt({
     // A count check offers no advantage until it is mode-aware (issue 2007).
     allowAdvantage: !counts && hasPlainD20(activeCheck.rollFormula),
     modifierChoice: publicModifierChoice(modifierChoice),
-    // The pool resolved before any Tool roll, and the required count the macro settled.
-    ...(counts && countPromptFields(evaluation, countPolicy, dc)),
+    // The pool resolved before any Tool roll, and the required count the macro settled, which
+    // fixed ranges never read.
+    ...(counts && countPromptFields(evaluation, countPolicy, routedFixed ? null : dc)),
   };
 }
 
