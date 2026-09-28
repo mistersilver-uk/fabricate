@@ -289,15 +289,16 @@ They change no existing contract: the crafting and gathering economies, legacy c
    Simple mode always carries a system-level check that is either active or deactivated;
    `routedByCheck` and progressive modes REQUIRE a configured check, while `routedByIngredients` (like simple) has an OPTIONAL check.
    A check is **usable** iff the active mode's check config carries an authored roll formula
-   (`simple.rollFormula` / `routed.rollFormula` / `progressive.rollFormula`), in which case it is
-   engine-evaluated as above; `craftingCheck.enabled` (or `features.craftingChecks`) is only the on/off toggle
+   (`simple.rollFormula` / `routed.rollFormula` / `progressive.rollFormula`) or an active
+   `product: 'count'` evaluation, in which case it is engine-evaluated as above; `craftingCheck.enabled` (or `features.craftingChecks`) is only the on/off toggle
    gating the OPTIONAL **simple**-mode check, not a proxy for "the check works" — `routedByIngredients` and
-   alchemy-Simple run on an authored formula alone, ungated by that toggle.
+   alchemy-Simple run on an authored formula or an active count evaluation alone, ungated by that toggle.
    The deprecated macro / built-in adapter check sources (root `macroUuid`, `successMacroUuid`,
    `failureMacroUuid`, `checkSource`, and the `builtIn` adapter config) were removed in 1.8.0;
    there is no longer a `checkSource` axis. (The dynamic-DC macro on `simple.macroUuid` is a
    different feature and is retained.)
-   A mode that requires a check but has no roll formula configured is a system misconfiguration
+   A mode that requires a check but has neither a roll formula nor an active `product: 'count'`
+   evaluation configured is a system misconfiguration
    surfaced by system-level validation (and a loud runtime failure), not a silent no-op.
    A `breakTools` flag is honoured for forced tool breakage ONLY from engine-evaluated
    roll-formula checks (`engineEvaluated === true`).
