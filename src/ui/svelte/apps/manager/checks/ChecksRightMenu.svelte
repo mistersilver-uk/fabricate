@@ -22,7 +22,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import CheckOddsPanel from './CheckOddsPanel.svelte';
   import CheckOutcomePreview from './CheckOutcomePreview.svelte';
-  import SearchablePopover from '../../../components/SearchablePopover.svelte';
+  import PreviewAsPicker from './PreviewAsPicker.svelte';
   import Select from '../../../components/Select.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
@@ -107,34 +107,6 @@
         )
   );
 
-  // The "Preview as" option list. "No actor" LEADS, always, and is a real option rather than a
-  // search's empty state: it is the selection under which the readout renders its
-  // unresolved-roll-data warning, hence its own `data-popover-option` handle.
-  const noActorLabel = text('FABRICATE.Admin.Manager.Checks.PreviewAs.NoActor', 'No actor');
-  const previewActorLabel = text(
-    'FABRICATE.Admin.Manager.Checks.PreviewAs.Actor',
-    'Preview as actor'
-  );
-  const selectedPreviewActor = $derived(
-    previewActorId === NO_ACTOR_ID
-      ? null
-      : (previewActors.find((actor) => actor.id === previewActorId) ?? null)
-  );
-  const previewActorOptions = $derived([
-    {
-      id: NO_ACTOR_ID,
-      label: noActorLabel,
-      icon: 'fas fa-user-slash',
-      dataId: 'no-actor',
-    },
-    ...previewActors.map((actor) => ({
-      id: actor.id,
-      label: actor.name,
-      icon: 'fas fa-user',
-      img: actor.img || '',
-      dataId: actor.id,
-    })),
-  ]);
   const previewRecordOptions = $derived(previewRecordSelectOptions(previewRecords));
 
   const DOCS_BASE = 'https://mistersilver-uk.github.io/fabricate';
@@ -449,10 +421,8 @@
            bestiary. Membership is `listPreviewActors`'s shared, GM-configurable player-character
            predicate, so this screen gets no narrower answer of its own.
 
-           The control is the shipped `SearchablePopover`, which searches and renders each actor's own
-           portrait, so a GM picks a face rather than reading a list.
-           `data-checks-preview-actor` stays ON THE TRIGGER via `triggerData`, because a mounted suite
-           and six View Lab cases address the control through it.
+           The control is `PreviewAsPicker`, shared with the salvage and task check overrides; its
+           default `data-checks-preview-actor` trigger hook is the one suites and cases address.
 
            "No actor" is an explicit option rather than an absence: under it every `@` key resolves to
            0 and the readout renders its unresolved warning instead of a plausible wrong total. -->
@@ -463,29 +433,9 @@
         )}
       </div>
       <InspectorCard data-checks-preview-as="">
-        <SearchablePopover
+        <PreviewAsPicker
+          actors={previewActors}
           value={previewActorId}
-          options={previewActorOptions}
-          pickerClass="manager-checks-preview-actor"
-          triggerClass="fabricate-button manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger"
-          triggerData={{ 'data-checks-preview-actor': '' }}
-          triggerIcon={selectedPreviewActor ? '' : 'fas fa-user-slash'}
-          triggerImg={selectedPreviewActor?.img || ''}
-          triggerLabel={selectedPreviewActor?.name || noActorLabel}
-          triggerAriaLabel={previewActorLabel}
-          dialogAriaLabel={previewActorLabel}
-          searchPlaceholder={text(
-            'FABRICATE.Admin.Manager.Checks.PreviewAs.ActorSearchPlaceholder',
-            'Search characters...'
-          )}
-          searchAriaLabel={text(
-            'FABRICATE.Admin.Manager.Checks.PreviewAs.ActorSearchLabel',
-            'Search characters'
-          )}
-          emptyHint={text(
-            'FABRICATE.Admin.Manager.Checks.PreviewAs.NoActorMatches',
-            'No characters match your search.'
-          )}
           onChoose={(id) => onSelectPreviewActor(id)}
         />
         {#if previewActorSummary}

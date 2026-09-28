@@ -7,7 +7,40 @@ import {
   BULK_DELETE_CARD_PATTERN,
   BULK_EDIT_CHROME_PATTERN,
 } from './caseConstants.js';
-import { chooseSelectOption, managerCase } from './caseFactories.js';
+import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories.js';
+
+/**
+ * The salvage check override states (issue 2005), one per state the approved prototype's frames 23
+ * and 24 depict, on Smithing's Longsword under `checkOverride` (`tests/view-lab/world/labWorld.js`).
+ * `sees` is the Player sees state; a `resolved` case chooses a character in its Preview-as picker.
+ */
+const OVERRIDE_PREVIEW = '[data-salvage-dc-override] [data-override-preview-actor]';
+const overrideCase = ({ id, label, field, frame, sees }) =>
+  managerCase({
+    id,
+    label: `Manager — Component edit salvage override, ${label} (prototype state ${frame})`,
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {
+      system: 'lab-smithing',
+      checkOverride: id.slice('manager-component-edit-salvage-override-'.length),
+    },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector: '.manager-component-row[data-component-id="sm-longsword"] [data-component-edit]',
+      },
+      { selector: '[data-salvage-dc-override]', scroll: true },
+      ...(sees === 'resolved' ? previewAsActor('lab-actor-idrin', OVERRIDE_PREVIEW) : []),
+    ],
+    expectView: 'component-edit',
+    expectSelector: `.fabricate-manager [data-salvage-dc-override][data-salvage-override-field="${field}"] [data-override-player-sees="${sees}"]`,
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/component\/(CheckOverrideField\.svelte|OverridePlayerSees\.svelte|overridePlayerSees\.js|salvageDcPresets\.js|componentEditSelectOptions\.js)$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/PreviewAsPicker\.svelte$/,
+    ],
+  });
 
 export const CASES = Object.freeze([
   managerCase({
@@ -684,5 +717,56 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeResultItemRow\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
     ],
+  }),
+  overrideCase({
+    id: 'manager-component-edit-salvage-override-fixed-over',
+    label: 'higher is better, fixed DC',
+    field: 'dcOverride',
+    frame: 23,
+    sees: 'fixed',
+  }),
+  overrideCase({
+    id: 'manager-component-edit-salvage-override-fixed-under',
+    label: 'lower is better, fixed target',
+    field: 'dcOverride',
+    frame: 23,
+    sees: 'fixed',
+  }),
+  overrideCase({
+    id: 'manager-component-edit-salvage-override-add',
+    label: 'character value, added adjustment, a character chosen',
+    field: 'adjustmentOverride',
+    frame: 24,
+    sees: 'resolved',
+  }),
+  overrideCase({
+    id: 'manager-component-edit-salvage-override-multiply',
+    label: 'character value, multiplied adjustment, a character chosen',
+    field: 'adjustmentOverride',
+    frame: 24,
+    sees: 'resolved',
+  }),
+  overrideCase({
+    id: 'manager-component-edit-salvage-override-default',
+    label: 'character value, system default, no character chosen',
+    field: 'adjustmentOverride',
+    frame: 24,
+    sees: 'no-character',
+  }),
+  overrideCase({
+    id: 'manager-component-edit-salvage-override-custom',
+    label: 'character value, custom multiplier, a character chosen',
+    field: 'adjustmentOverride',
+    frame: 24,
+    sees: 'resolved',
+  }),
+  // Routed salvage whose `simple` check is a fixed DC: the adjustment field proves the override
+  // reads the routed sub-object salvage rolls.
+  overrideCase({
+    id: 'manager-component-edit-salvage-override-routed',
+    label: 'routed salvage reading a character value, a character chosen',
+    field: 'adjustmentOverride',
+    frame: 24,
+    sees: 'resolved',
   }),
 ]);

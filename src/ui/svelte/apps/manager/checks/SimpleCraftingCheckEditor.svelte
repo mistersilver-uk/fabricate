@@ -338,6 +338,7 @@
       rollFormula={value?.rollFormula || ''}
       kind="simple"
       showBreakTools={checkDriven}
+      {evaluation}
       onChange={(checkBreakage) => emit({ checkBreakage })}
     />
   {/if}

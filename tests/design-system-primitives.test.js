@@ -220,7 +220,8 @@ test('the inputs every property below quantifies over are alive', () => {
   // 48 as of issue 1392, which promoted `apps/manager/VocabularyPanel.svelte`: the World Vocabulary
   // screen is its second independent caller, and property (e) below reported it as a component that
   // had crossed the membership bar with nobody adjudicating it.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 65, 'the shipped primitive set changed size');
+  // 67 as of issue 2005, which promoted the shared Preview-as picker and the Player sees block.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 67, 'the shipped primitive set changed size');
   assert.equal(NOT_A_PRIMITIVE.length, 16, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
