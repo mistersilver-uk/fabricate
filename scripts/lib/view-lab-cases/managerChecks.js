@@ -1240,7 +1240,7 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager' +
       ':has([data-checks-odds-reason="count-path-unresolved"])' +
-      ':has([data-checks-section-callout="countPathUnresolvedForPreview"])',
+      ':has([data-checks-section-notice="countPathUnresolvedForPreview"])',
   }),
   countCase({
     id: 'manager-checks-count-missing-path-validation',
@@ -1318,8 +1318,8 @@ export const CASES = Object.freeze([
     steps: [],
     expectSelector:
       '.fabricate-manager' +
-      ':has([data-checks-section-callout="countRequiredExceedsMaxPool"])' +
-      ':has([data-checks-section-callout="countTierWithoutSuccesses"])',
+      ':has([data-checks-section-notice="countRequiredExceedsMaxPool"])' +
+      ':has([data-checks-section-notice="countTierWithoutSuccesses"])',
   }),
   countCase({
     id: 'manager-checks-count-readiness',

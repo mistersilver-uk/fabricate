@@ -260,6 +260,35 @@ export const CHECK_ISSUE_TITLES = Object.freeze({
     'IssueAttributeValueNotNumericTitle',
     'A character value is not a number',
   ],
+  // Success-counting pools (issue 2004); frames 07, 08 and 19 draw three of these titles.
+  countPoolInvalid: ['IssueCountPoolInvalidTitle', 'The base pool cannot be worked out'],
+  countThresholdInvalid: [
+    'IssueCountThresholdInvalidTitle',
+    'The success threshold cannot be worked out',
+  ],
+  countFaceBeyondDie: ['IssueCountFaceBeyondDieTitle', 'A face is not on the die'],
+  countExplodeUnbounded: ['IssueCountExplodeUnboundedTitle', 'The dice would explode forever'],
+  countTierWithoutSuccesses: [
+    'IssueCountTierWithoutSuccessesTitle',
+    'A recipe tier sets no successes needed',
+  ],
+  countRequiredExceedsMaxPool: [
+    'IssueCountRequiredExceedsMaxPoolTitle',
+    'Successes needed above the most dice that can be rolled',
+  ],
+  countRequiredExceedsBasePool: [
+    'IssueCountRequiredExceedsBasePoolTitle',
+    'Successes needed above the base pool',
+  ],
+  countPoolTooLarge: ['IssueCountPoolTooLargeTitle', 'The base pool is too large to roll'],
+  countPathUnresolvedForPreview: [
+    'IssueCountPathUnresolvedForPreviewTitle',
+    'A character path does not resolve',
+  ],
+  countValueNotNumericForPreview: [
+    'IssueCountValueNotNumericForPreviewTitle',
+    'A character value is not a number',
+  ],
 });
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Validation.';

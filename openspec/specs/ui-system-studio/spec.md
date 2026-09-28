@@ -287,8 +287,9 @@ Negative counts use the true minus sign.
 
 Readiness raises, in The roll: `countPoolInvalid` and `countThresholdInvalid` (critical: blank, dice or not arithmetic once every path is neutralized), `countFaceBeyondDie` (warning: an enabled explode or cancel face beyond the die, naming what follows), `countExplodeUnbounded` (critical: a recursive explosion on every face), `countTierWithoutSuccesses` (a warning until issue 2006 adds the control: a crafting recipe tier with no successes needed), and, for a literal base, `countPoolTooLarge` (critical: above the 999 dice Foundry rolls at once, raising no ceiling row), `countRequiredExceedsMaxPool` (critical) and `countRequiredExceedsBasePool` (warning) against the authored ceiling, which is the base alone until additional dice (issue 2008) raise it; the base settles through the runtime's own pool resolver, so it floors float noise, rolls at least one die when a zero pool does not fail, and never reads below zero dice.
 A base reading the character raises no ceiling issue and ticks `countPoolCharacterDependent`; fixed ranges and progressive checks grade no required count.
-These rows are route-only until issue 2006 adds the controls that clear them.
-With a Preview-as actor chosen it raises the TRANSIENT `countPathUnresolvedForPreview` and `countValueNotNumericForPreview`, which follow the same rule as the roll-under transient warnings: a section callout and a Validation row, and never a badge, dot, tally or enable gate.
+Each count issue carries a short title over its sentence, frame 08's `Successes needed above the most dice that can be rolled`, frame 07's `Successes needed above the base pool` and frame 19's `A character path does not resolve` among them, so its Validation row shows the title with the sentence as detail and its section opens with the shared amber `Notice`.
+These rows are route-only until issue 2006 adds the controls that clear them, so a notice's Review focuses the section.
+With a Preview-as actor chosen it raises the TRANSIENT `countPathUnresolvedForPreview` and `countValueNotNumericForPreview`, which follow the same rule as the roll-under transient warnings: a section notice and a Validation row, and never a badge, dot, tally or enable gate.
 
 #### Check Trigger Controls
 

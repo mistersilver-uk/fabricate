@@ -212,10 +212,23 @@ describe('count odds and the simulator readout', () => {
       'Vosk is missing a value this check reads (@skills.smith.rank), so it cannot resolve for them.'
     );
     assert.equal(rollButton(root).disabled, true);
-    const callout = root.querySelector(
-      '[data-checks-section-callout="countPathUnresolvedForPreview"]'
+    const notice = root.querySelector('[data-checks-section-notice="countPathUnresolvedForPreview"]');
+    assert.ok(Boolean(notice), 'the roll section opens with a notice explaining the warning');
+    assert.equal(notice.dataset.noticeTone, 'warning', 'amber, as frame 19 draws it');
+    assert.equal(
+      notice.querySelector('.fab-notice-title').textContent.trim(),
+      'A character path does not resolve'
     );
-    assert.ok(Boolean(callout), 'the roll section explains the warning');
+    assert.match(
+      notice.querySelector('.fab-notice-detail').textContent,
+      /IssueCountPathUnresolvedForPreview:\{"actor":"Vosk","path":"@skills\.smith\.rank"\}/u,
+      'the detail is the Validation sentence, naming the actor and the path'
+    );
+    const panel = root.querySelector('[role="tabpanel"]');
+    assert.ok(panel.firstElementChild.matches('[data-checks-section-notices="roll"]'), 'it opens the pane');
+    notice.querySelector('[data-notice-action]').click();
+    await settle();
+    assert.ok(root.ownerDocument.activeElement === panel, 'no count control exists yet, so Review focuses the section');
     assert.equal(dots(), before, 'a transient warning puts no dot on a section');
   });
 
@@ -302,8 +315,10 @@ describe('count readiness on the route', () => {
       tiers: [{ id: 'unset', name: 'Unset Work', dc: 12, successes: null }],
     });
     for (const id of ['countThresholdInvalid', 'countTierWithoutSuccesses', 'countRequiredExceedsMaxPool']) {
-      assert.ok(root.querySelector(`[data-checks-section-callout="${id}"]`), `${id} is explained`);
+      assert.ok(root.querySelector(`[data-checks-section-notice="${id}"]`), `${id} is explained`);
+      assert.ok(!root.querySelector(`[data-checks-section-callout="${id}"]`), `${id} is a notice, not a callout`);
     }
     assert.ok(!root.querySelector('[data-checks-section-callout="noRollFormula"]'));
+    assert.ok(!root.querySelector('[data-checks-section-notice="noRollFormula"]'));
   });
 });

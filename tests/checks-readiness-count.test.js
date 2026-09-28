@@ -9,6 +9,7 @@ import {
 } from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
 import {
   checkIssueSentence,
+  checkIssueText,
   checkTickCopy,
 } from '../src/ui/svelte/apps/manager/checks/checksCopy.js';
 
@@ -278,6 +279,29 @@ describe('count readiness raises each id with its copy, section and severity', (
     ]) {
       const result = evaluateCheckReadiness({ ...FAULTS, ...extra }, { mode, activity: 'crafting' });
       assert.deepEqual(ids(result.issues), [], `${mode} raises no required-count row`);
+    }
+  });
+});
+
+describe('every count issue carries a title over its sentence', () => {
+  it('titles each id, the prototype’s own where it draws one', () => {
+    const titles = {
+      countPoolInvalid: 'The base pool cannot be worked out',
+      countThresholdInvalid: 'The success threshold cannot be worked out',
+      countFaceBeyondDie: 'A face is not on the die',
+      countExplodeUnbounded: 'The dice would explode forever',
+      countTierWithoutSuccesses: 'A recipe tier sets no successes needed',
+      countRequiredExceedsMaxPool: 'Successes needed above the most dice that can be rolled',
+      countRequiredExceedsBasePool: 'Successes needed above the base pool',
+      countPoolTooLarge: 'The base pool is too large to roll',
+      countPathUnresolvedForPreview: 'A character path does not resolve',
+      countValueNotNumericForPreview: 'A character value is not a number',
+    };
+    for (const [id, title] of Object.entries(titles)) {
+      const data = { names: 'Arcane Work', actor: 'Vosk', path: '@x', ceiling: 2, base: 2, max: 999 };
+      const words = checkIssueText(id, data, text);
+      assert.equal(words.title, title, `${id} is titled`);
+      assert.equal(words.detail, checkIssueSentence(id, data, text), `${id} keeps its sentence as detail`);
     }
   });
 });
