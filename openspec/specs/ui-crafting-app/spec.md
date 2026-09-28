@@ -238,7 +238,15 @@ Advantage-eligible checks offer Disadvantage, Roll and Advantage in that order, 
 Roll is the form's only submit button, so Enter from any field rolls normally and never with Advantage or Disadvantage.
 Displayed comparison and applied modifiers come from the actual normalized runner and the selected formula contributions, and existing result keys and advantage eligibility are unchanged.
 The posted roll's chat flavor, on the direct and versioned paths alike, carries the `(DC n)` suffix only for a summed roll-over check against a fixed DC; any other evaluation posts no DC in its flavor.
-Count and pool controls belong to their evaluation-mode requirements and do not appear as inactive controls in this summing baseline.
+- **The count prompt.**
+A `product: 'count'` check shows no formula and no DC chip; its body instead reads a pool line (`{pool}d{die} · each {comparison} {threshold}`, the chat card's own wording so the two cannot disagree), a rule line naming the qualifying threshold and any face rule ("best face explodes", "worst face cancels", or a named face onward, each once or every time), and a successes chip ("N successes needed").
+Its modifier-destination copy and situational-bonus help ("Each adds dice"/"Each moves the threshold") replace the summed wording, matching `pool.modifierDestination`.
+A hidden or redacted pool, meaning its `pool`, `die` and `threshold` are all unresolved, shows neither the pool line nor the rule line, but keeps its successes chip and modifier-destination wording, and never falls back to the retained roll formula or a summed DC.
+A fixed-range routed count check reads no `pool.required` either, so its prompt shows no successes chip, matching a fixed-range routed sum check's own missing DC chip.
+- **The roll-under target chip.**
+A summed roll-under check's target chip names the target after the player's applied flat modifiers and any Tool bonus, both of which raise it and are known before the roll, unlike the situational bonus, which is applied only once rolled.
+Beneath the chip, a character-value target's explanation line always names its basis: the exact expression the GM authored and the value it resolved from the acting character, with any Difficulty Adjustment named beside it.
+A fixed target's line stays empty unless a Tool bonus or a flat modifier raised it, in which case it names the base value alongside whichever raised it.
 
 - **The companion path opens the SAME dialog, on the EXECUTING GM's client.**
 A Standalone Check Roll published to a companion (`companion-api/spec.md`) opens this dialog and no other — never the subject player's client, and never a relayed one.
