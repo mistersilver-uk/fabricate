@@ -346,6 +346,10 @@ describe('roll-under odds place the modifiers on the target (QE7)', () => {
     assert.equal(fixed.caption, 'exact · 1d20');
     const joint = previewEnumerated(plan({ draft: SIMPLE_UNDER, system: systemWith('1d4') }));
     assert.equal(joint.caption, 'exact · 1d20 with 1d4');
+    const bounded = systemWith('1d4');
+    Object.assign(bounded.modifiers[0], { min: -1, max: 5 });
+    const clamped = previewEnumerated(plan({ draft: SIMPLE_UNDER, system: bounded }));
+    assert.equal(clamped.caption, 'exact · 1d20 with 1d4', 'the bounds clamp is not a die');
     const over = previewEnumerated(plan({ draft: { rollFormula: '1d20', dc: 10 } }));
     assert.equal(over.caption, '', 'roll-over against a fixed DC counts its faces');
   });

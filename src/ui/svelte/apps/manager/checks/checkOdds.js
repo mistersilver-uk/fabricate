@@ -284,13 +284,10 @@ function targetPlacement(placement, rollData, Roll) {
     }
     deltas = deltas.flatMap((delta) => entry.totals.map((total) => delta + total));
   }
+  // The dice alone: a bounded modifier's expression carries its clamp, which no heading should read.
   const bonuses = pending
     .filter((_, index) => totals.entries[index].totals.length > 1)
-    .map((entry) =>
-      String(entry.expression ?? '')
-        .trim()
-        .replace(/^\(([^()]*)\)$/u, '$1')
-    );
+    .flatMap((entry) => String(entry.expression ?? '').match(/\d*d\d+/giu) ?? []);
   return { moves, deltas, bonuses };
 }
 
