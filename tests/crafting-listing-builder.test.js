@@ -9,6 +9,10 @@ import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 import { resolveCheckFormulaDisplay } from '../src/systems/checkRoll.js';
 import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
 
+import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { DEFAULT_RECIPE_IMAGE } from '../src/models/Recipe.js';
+import { authoredComplication } from './helpers/complicationFixtures.js';
+
 /** A `Roll` for display resolution: `@path` reads roll data and every formula validates. */
 const FORMULA_ROLL = {
   replaceFormulaData: (formula, data) =>
@@ -17,9 +21,6 @@ const FORMULA_ROLL = {
     ),
   validate: () => true,
 };
-import { CraftingEngine } from '../src/systems/CraftingEngine.js';
-import { DEFAULT_RECIPE_IMAGE } from '../src/models/Recipe.js';
-import { authoredComplication } from './helpers/complicationFixtures.js';
 
 // A minimal CraftingEngine used ONLY to pin the player-listing DC to the number the engine actually
 // rolls against (`_resolveSimpleCheckDc`), so the parity assertions bind to real engine behaviour

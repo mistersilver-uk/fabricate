@@ -2289,9 +2289,7 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   );
 
   // The check above is only worth anything if it looked at the cases. It did not, in its first
-  // draft, and passed clean. 31 rather than 28 as of issue 1513, and the three that joined are
-  // three DIFFERENT things this scan now sees; issue 2005 adds ten prompt, check-card, result and
-  // salvage frames.
+  // draft, and passed clean.
   assert.equal(
     examined.length,
     60,

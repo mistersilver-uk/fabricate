@@ -201,8 +201,6 @@
  * the option cards' checked radio, the formula card's body, the inset glyphs and the quick tokens'
  * kind glyph — leaving 2,540 rules, 3,040 keys and 2,934 singletons once merged with epic 1997's;
  * the repeated table is unmoved. Re-derived by running the same census command.
- * Issue 2005's result-card evidence rows add six singleton rules: 2,546 rules, 3,046 keys and
- * 2,940 singletons, the repeated table unmoved.
  */
 import { readFileSync } from 'node:fs';
 
