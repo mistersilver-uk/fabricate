@@ -6,7 +6,7 @@
   code under the SonarCloud duplication budget). A `danger` flag tints the value
   with the danger token (used for a step's failure copy). A `null` icon draws none, and
   `keyed` sets the label as a key column (`--journal-fact-key-width`, default 120px)
-  beside a left-aligned, wrapping value: recorded check evidence (issue 2005).
+  beside a left-aligned, wrapping 13px value: recorded check evidence (issue 2005).
 -->
 <script>
   let {
@@ -72,7 +72,9 @@
     grid-template-columns: var(--journal-fact-key-width, 120px) minmax(0, 1fr);
     padding: 0;
   }
+  /* The keyed value takes the `.k-fact` atom's 13px mono (design system), as the inline form does. */
   .journal-fact-row.is-keyed .journal-fact-value {
+    font-size: 13px;
     line-height: 1.45;
     text-align: left;
   }
