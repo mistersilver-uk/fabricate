@@ -148,6 +148,15 @@ test('a pass/fail forced success fires on a raw negative net', async () => {
     runFormulaPassFail({ formula: '', dc: 1, actor: ACTOR, evaluation: normalized(cancelWorst), triggers: [lucky] })
   );
   assert.deepEqual([result.success, result.data.total], [true, -1]);
+  assert.equal(result.data.forcedOutcome, 'success');
+});
+
+test('a pass/fail check with no matching trigger leaves data.forcedOutcome absent', async () => {
+  const lucky = { id: 'x', outcome: 'success', condition: { type: 'rollTotal', operator: '<', value: 0 } };
+  const result = await withDice([9, 9], () =>
+    runFormulaPassFail({ formula: '', dc: 1, actor: ACTOR, evaluation: normalized({}), triggers: [lucky] })
+  );
+  assert.equal(result.data.forcedOutcome, undefined);
 });
 
 test('routed count exceed grades the net as met: a net equal to the tier count matches', async () => {
@@ -168,6 +177,30 @@ test('routed count exceed grades the net as met: a net equal to the tier count m
     })
   );
   assert.equal(result.outcome, 'Fine', '9 exceeds 8 and 8 does not: a net of 1 meets 1');
+  assert.equal(result.data.forcedOutcome, undefined, 'no trigger fired');
+});
+
+test('routed count: a failure trigger reroutes to the worst failing tier and names it', async () => {
+  const fail = { id: 'f', outcome: 'failure', condition: { type: 'rollTotal', operator: '>=', value: 0 } };
+  const result = await withDice([9, 8], () =>
+    runFormulaRouted({
+      formula: '',
+      dc: 1,
+      thresholdMode: 'exceed',
+      type: 'relative',
+      relativeOutcomes: [
+        { id: 'fine', name: 'Fine', success: true, dc: 0 },
+        { id: 'botch', name: 'Botch', success: false, dc: -1 },
+      ],
+      fixedOutcomes: [],
+      clampToNearest: true,
+      triggers: [fail],
+      actor: ACTOR,
+      evaluation: normalized({}),
+    })
+  );
+  assert.equal(result.outcome, 'Botch');
+  assert.equal(result.data.forcedOutcome, 'failure');
 });
 
 /** Relative count tiers against a required count of 1: Fine needs 2, Success 1, Botch 0. */
@@ -234,4 +267,12 @@ test('a progressive forced failure spends nothing, even with successes', async (
     runFormulaProgressive({ formula: '', triggers: [fail], actor: ACTOR, evaluation: normalized({}) })
   );
   assert.deepEqual([result.value, result.data.total], [0, 2]);
+  assert.equal(result.data.forcedOutcome, 'failure');
+});
+
+test('a progressive count check with no matching trigger leaves data.forcedOutcome absent', async () => {
+  const result = await withDice([9, 9], () =>
+    runFormulaProgressive({ formula: '', actor: ACTOR, evaluation: normalized({}) })
+  );
+  assert.equal(result.data.forcedOutcome, undefined);
 });

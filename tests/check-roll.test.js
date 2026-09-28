@@ -1211,6 +1211,7 @@ test('runFormulaPassFail: meet comparison passes at/above the DC', async () => {
   assert.equal(r.outcome, 'pass');
   assert.equal(r.value, 15);
   assert.equal(r.data.comparison, 'meet');
+  assert.equal(r.data.forcedOutcome, undefined, 'no trigger fired, so no forced outcome is named');
 });
 
 test('runFormulaPassFail: a forced-failure trigger overrides the comparison; label drives the message', async () => {
@@ -1226,6 +1227,21 @@ test('runFormulaPassFail: a forced-failure trigger overrides the comparison; lab
   });
   assert.equal(r.success, false);
   assert.equal(r.message, 'Salvage check failed');
+  assert.equal(r.data.forcedOutcome, 'failure');
+});
+
+test('runFormulaPassFail: a forced-success trigger records data.forcedOutcome', async () => {
+  // total 3 would fail dc 20, but the trigger matches the rolled group total (3) and forces success.
+  stubRoll(3, [{ number: 1, faces: 20, total: 3 }]);
+  const r = await runFormulaPassFail({
+    formula: '1d20',
+    dc: 20,
+    thresholdMode: 'meet',
+    triggers: [totalTrigger({ groupId: 0, value: 3, outcome: 'success' })],
+    actor: ACTOR,
+  });
+  assert.equal(r.success, true);
+  assert.equal(r.data.forcedOutcome, 'success');
 });
 
 test('runFormulaPassFail: a throwing roll fails with a labelled message', async () => {
@@ -1280,31 +1296,31 @@ test('runFormulaPassFail: records the @-resolved formula + total + dc for the jo
 
 test('runFormulaProgressive: the total is the value; success/failure triggers force all/none', async () => {
   stubRoll(8, [{ number: 2, faces: 6, total: 8 }]);
-  assert.equal((await runFormulaProgressive({ formula: '2d6', actor: ACTOR })).value, 8);
+  const unforced = await runFormulaProgressive({ formula: '2d6', actor: ACTOR });
+  assert.equal(unforced.value, 8);
+  assert.equal(
+    unforced.data.forcedOutcome,
+    undefined,
+    'no trigger fired, so no forced outcome is named'
+  );
 
   stubRoll(3, [{ number: 2, faces: 6, total: 12 }]);
-  assert.equal(
-    (
-      await runFormulaProgressive({
-        formula: '2d6',
-        triggers: [totalTrigger({ groupId: 0, value: 12, outcome: 'success' })],
-        actor: ACTOR,
-      })
-    ).value,
-    Number.MAX_SAFE_INTEGER
-  );
+  const forcedSuccess = await runFormulaProgressive({
+    formula: '2d6',
+    triggers: [totalTrigger({ groupId: 0, value: 12, outcome: 'success' })],
+    actor: ACTOR,
+  });
+  assert.equal(forcedSuccess.value, Number.MAX_SAFE_INTEGER);
+  assert.equal(forcedSuccess.data.forcedOutcome, 'success');
 
   stubRoll(9, [{ number: 2, faces: 6, total: 2 }]);
-  assert.equal(
-    (
-      await runFormulaProgressive({
-        formula: '2d6',
-        triggers: [totalTrigger({ groupId: 0, value: 2, outcome: 'failure' })],
-        actor: ACTOR,
-      })
-    ).value,
-    0
-  );
+  const forcedFailure = await runFormulaProgressive({
+    formula: '2d6',
+    triggers: [totalTrigger({ groupId: 0, value: 2, outcome: 'failure' })],
+    actor: ACTOR,
+  });
+  assert.equal(forcedFailure.value, 0);
+  assert.equal(forcedFailure.data.forcedOutcome, 'failure');
 });
 
 test('runFormulaProgressive: no dice engine awards nothing (value 0) without blocking', async () => {
@@ -1439,6 +1455,7 @@ test('runFormulaRouted: a success trigger forces the highest succeeding tier', a
   });
   assert.equal(r.outcome, 'Critical Success');
   assert.equal(r.success, true);
+  assert.equal(r.data.forcedOutcome, 'success');
 });
 
 test('runFormulaRouted: a failure trigger forces the lowest failing tier', async () => {
@@ -1455,6 +1472,21 @@ test('runFormulaRouted: a failure trigger forces the lowest failing tier', async
   });
   assert.equal(r.outcome, 'Failure');
   assert.equal(r.success, false);
+  assert.equal(r.data.forcedOutcome, 'failure');
+});
+
+test('runFormulaRouted: no trigger fires leaves data.forcedOutcome absent', async () => {
+  stubRoll(20, [{ number: 1, faces: 20, total: 20 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 15,
+    thresholdMode: 'meet',
+    type: 'relative',
+    relativeOutcomes: RELATIVE,
+    actor: ACTOR,
+  });
+  assert.equal(r.outcome, 'Success', '20 meets the Success threshold (15) but not Critical (25)');
+  assert.equal(r.data.forcedOutcome, undefined);
 });
 
 test('runFormulaRouted: a forced disposition with no matching tier leaves outcome null', async () => {
@@ -1471,6 +1503,7 @@ test('runFormulaRouted: a forced disposition with no matching tier leaves outcom
   assert.equal(r.outcome, null);
   assert.equal(r.success, false);
   assert.equal(r.data.target, null);
+  assert.equal(r.data.forcedOutcome, 'failure', 'the forced disposition still names itself');
   assert.equal(r.data.margin, null);
 });
 
@@ -1862,6 +1895,64 @@ test('a prepared progressive check records sum/over evidence with no comparison 
     ['sum', 'over', null, null, null, null, null]
   );
   assert.equal(result.value, 9);
+  assert.equal(result.data.forcedOutcome, undefined, 'no trigger fired, so nothing is named');
+});
+
+test('a prepared simple check names a trigger-forced outcome; absent otherwise', async () => {
+  // total 12 would fail dc 20 on its own, but the trigger forces success.
+  stubRoll(12, [{ number: 1, faces: 20, total: 12 }]);
+  const forced = await evaluatePreparedRunCheck(
+    preparedCheck(
+      'simple',
+      { triggers: [totalTrigger({ groupId: 0, value: 12, outcome: 'success' })] },
+      { dc: 20, thresholdMode: 'meet' }
+    ),
+    ACTOR
+  );
+  assert.equal(forced.success, true);
+  assert.equal(forced.data.forcedOutcome, 'success');
+
+  stubRoll(12, [{ number: 1, faces: 20, total: 12 }]);
+  const unforced = await evaluatePreparedRunCheck(
+    preparedCheck('simple', {}, { dc: 20, thresholdMode: 'meet' }),
+    ACTOR
+  );
+  assert.equal(unforced.success, false);
+  assert.equal(unforced.data.forcedOutcome, undefined);
+});
+
+test('a prepared routed check names a trigger-forced tier from classifyCheckTotal', async () => {
+  // total 18 would match "good", but the failure trigger reroutes to the worst failing tier.
+  stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
+  const result = await evaluatePreparedRunCheck(
+    preparedCheck(
+      'routed',
+      {
+        type: 'relative',
+        relativeOutcomes: [
+          { id: 'good', name: 'Success', success: true, dc: 0 },
+          { id: 'bad', name: 'Failure', success: false, dc: -5 },
+        ],
+        triggers: [totalTrigger({ groupId: 0, value: 18, outcome: 'failure' })],
+      },
+      { dc: 15 }
+    ),
+    ACTOR
+  );
+  assert.equal(result.outcome, 'Failure');
+  assert.equal(result.data.forcedOutcome, 'failure');
+});
+
+test('a prepared progressive check names a trigger-forced outcome', async () => {
+  stubRoll(9, [{ number: 1, faces: 20, total: 9 }]);
+  const result = await evaluatePreparedRunCheck(
+    preparedCheck('progressive', {
+      triggers: [totalTrigger({ groupId: 0, value: 9, outcome: 'failure' })],
+    }),
+    ACTOR
+  );
+  assert.equal(result.value, 0);
+  assert.equal(result.data.forcedOutcome, 'failure');
 });
 
 test('fixed and progressive rolls have null targets; unrolled exits add no execution metadata', async () => {

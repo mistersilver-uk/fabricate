@@ -162,7 +162,10 @@ export function gradeCountPassFail(rolled, { required, triggers, label = 'Crafti
     success,
     outcome: success ? 'pass' : 'fail',
     value: net,
-    data: rolledEvidence(rolled, required),
+    data: {
+      ...rolledEvidence(rolled, required),
+      ...(forced && { forcedOutcome: forced.disposition }),
+    },
     message: success ? null : `${label} check failed`,
   };
 }
@@ -209,6 +212,7 @@ export function gradeCountRouted(rolled, { required, label = 'Crafting', ...rout
       outcomeId: matched?.id ?? null,
       success,
       breakTools: classified.breakTools,
+      ...(classified.forcedDisposition && { forcedOutcome: classified.forcedDisposition }),
       ...(classified.tierStepApplied && { tierStepApplied: classified.tierStepApplied }),
       ...(classified.minTierFailed && {
         minTierFailed: true,
@@ -244,7 +248,11 @@ export function gradeCountProgressive(rolled, { triggers }) {
     success: true,
     outcome: null,
     value,
-    data: { ...rolledEvidence(rolled, null), value },
+    data: {
+      ...rolledEvidence(rolled, null),
+      value,
+      ...(forced && { forcedOutcome: forced.disposition }),
+    },
   };
 }
 

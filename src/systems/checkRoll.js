@@ -385,6 +385,7 @@ function gradePreparedTotal(
         outcomeId: classified.matched?.id ?? null,
         success: classified.success,
         breakTools: classified.breakTools,
+        ...(classified.forcedDisposition && { forcedOutcome: classified.forcedDisposition }),
         ...(classified.tierStepApplied && { tierStepApplied: classified.tierStepApplied }),
         ...(classified.minTierFailed && {
           minTierFailed: true,
@@ -402,7 +403,11 @@ function gradePreparedTotal(
       success: true,
       outcome: null,
       value,
-      data: { ...executedSumEvidence(total, null, null), value },
+      data: {
+        ...executedSumEvidence(total, null, null),
+        value,
+        ...(forced && { forcedOutcome: forced.disposition }),
+      },
     };
   }
   const target = effectiveTarget(Number(anchor), grading, targetDelta);
@@ -416,6 +421,7 @@ function gradePreparedTotal(
     data: {
       ...executedSumEvidence(total, target, comparison, grading.direction),
       ...terms(target, null),
+      ...(forced && { forcedOutcome: forced.disposition }),
     },
   };
 }
@@ -759,6 +765,7 @@ export async function runFormulaPassFail({
         targetTermsEvidence({ grading, target, anchor: dc, baseTerms: targetTerms, rolled })),
       diceGroups,
       ...preRollEvidence(rolled),
+      ...(forced && { forcedOutcome: forced.disposition }),
     },
     message: success ? null : `${label} check failed`,
     ...reportedVisibility(rolled),
@@ -828,6 +835,7 @@ export async function runFormulaProgressive({
       diceGroups,
       ...(formula && executedSumEvidence(total, null, null)),
       ...preRollEvidence(rolled),
+      ...(forced && { forcedOutcome: forced.disposition }),
     },
     ...reportedVisibility(rolled),
   };
@@ -939,6 +947,8 @@ export async function runFormulaRouted({
       success,
       breakTools: classified.breakTools,
       diceGroups,
+      // Only when a trigger decided or rerouted the outcome (issue 2080 R5).
+      ...(classified.forcedDisposition && { forcedOutcome: classified.forcedDisposition }),
       // Only on a real tier change (issue 975).
       ...(classified.tierStepApplied && { tierStepApplied: classified.tierStepApplied }),
       // Only on a min-tier failure: the post-step tier the gate blocked.
