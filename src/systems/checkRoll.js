@@ -539,6 +539,8 @@ export async function evaluatePreparedRunCheck(
     data: {
       dc: config.resolvedDc ?? config.dc,
       total,
+      // The formula the dice line states; a secret roll hands back none.
+      ...(rolled.resolvedFormula && { resolvedFormula: rolled.resolvedFormula }),
       diceGroups,
       ...(!secret && preRollEvidence(rolled)),
       ...graded.data,

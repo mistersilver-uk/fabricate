@@ -212,7 +212,7 @@ export const CASES = Object.freeze([
     query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under' },
     steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS],
     expectSelector:
-      `${SINGLE_PROMPT} .target-row[aria-live="polite"]` +
+      `${SINGLE_PROMPT} .target-live[aria-live="polite"] .target-row` +
       ' > .manager-chip:has-text("Target 11 + 1d4 · stay at or under")',
     kinds: ['player', 'crafting'],
     sourceMatches: PROMPT_SOURCES,
@@ -239,8 +239,9 @@ export const CASES = Object.freeze([
     steps: [CRAFT_HORSESHOE[0], { selector: '[data-recipe-section="check"]', scroll: true }],
     expectSelector:
       '[data-recipe-section="check"]:not(:has([data-check-dc]))' +
-      ':has([data-check-target="under"]:has-text("Target 10 · stay at or under"))' +
-      ':has([data-check-target-source]:has-text("Sera Vane @skills"):has-text("level 12, Hard Work −2"))',
+      ':has([data-check-target="under"]:has-text("Target 11 · stay at or under"))' +
+      ':has([data-check-target-source]:has-text("Sera Vane @skills")' +
+      ':has-text("level 12 · Hard Work −2 · modifiers +1"))',
     kinds: ['player', 'crafting'],
     sourceMatches: DESCRIPTOR_SOURCES,
   }),
@@ -296,7 +297,9 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence', chatLog: '1' },
     steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ROLL],
-    expectSelector: `${CHAT_CARD} .fabricate-craft-chat__evidence:has([data-check-evidence="preRolled"])`,
+    expectSelector:
+      `${CHAT_CARD}:has(.fabricate-craft-chat__result):has(.fabricate-craft-chat__dice) ` +
+      '.fabricate-craft-chat__evidence:has([data-check-evidence="preRolled"])',
     expectVisible: `${LAB_CHAT('public')} .fabricate-craft-chat__evidence`,
     kinds: ['player', 'crafting'],
     sourceMatches: CHAT_SOURCES,
@@ -308,7 +311,9 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence', chatLog: '1' },
     steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ...ROLL_MODE('gmroll'), ROLL],
-    expectSelector: `${CHAT_CARD}:has(.fabricate-craft-chat__roll):not(:has(.fabricate-craft-chat__evidence))`,
+    expectSelector:
+      `${CHAT_CARD}:has(.fabricate-craft-chat__result):has(.fabricate-craft-chat__roll)` +
+      ':not(:has(.fabricate-craft-chat__dice)):not(:has(.fabricate-craft-chat__evidence))',
     expectVisible: LAB_CHAT('whisper'),
     kinds: ['player', 'crafting'],
     sourceMatches: CHAT_SOURCES,
@@ -320,20 +325,24 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence', chatLog: '1' },
     steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ...ROLL_MODE('blindroll'), ROLL],
-    expectSelector: `${CHAT_CARD}:has(.fabricate-craft-chat__roll):not(:has(.fabricate-craft-chat__evidence))`,
+    expectSelector:
+      `${CHAT_CARD}:has(.fabricate-craft-chat__result):has(.fabricate-craft-chat__roll)` +
+      ':not(:has(.fabricate-craft-chat__dice)):not(:has(.fabricate-craft-chat__evidence))',
     expectVisible: LAB_CHAT('blind'),
     kinds: ['player', 'crafting'],
     sourceMatches: CHAT_SOURCES,
   }),
-  // The control: a sum/over fixed card gains no rows.
+  // The control: a sum/over fixed card gains the pill, dice line, and Needed and Margin rows (M1, M3).
   playerCase({
     id: 'player-crafting-chat-card-over-control',
-    label: 'Player app — roll-over crafting result card, unchanged by the evidence rows',
+    label: 'Player app — roll-over crafting result card, with its Needed and Margin rows',
     smokeLabels: [],
     reaches: 'beyond',
     query: { tab: 'crafting', rollPromptState: 'over-evidence', chatLog: '1' },
     steps: [...CRAFT_HORSESHOE],
-    expectSelector: `${CHAT_CARD}:has(.fabricate-craft-chat__roll):not(:has(.fabricate-craft-chat__evidence))`,
+    expectSelector:
+      `${CHAT_CARD}:has(.fabricate-craft-chat__result)` +
+      ':has([data-check-evidence="needed"]):has([data-check-evidence="margin"])',
     kinds: ['player', 'crafting'],
     sourceMatches: CHAT_SOURCES,
   }),

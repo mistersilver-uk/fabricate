@@ -16162,8 +16162,10 @@
   font-weight: 700;
 }
 
-/* A crafting check's Success or Failure pill and its dice line (issue 2005, frames 37 and 38), in the card's own chat ink. */
+/* A crafting check's Success or Failure pill and its dice line (issue 2005, frames 37 and 38). The tone is mixed into the chat's own ink, so the pill reads on parchment and on a dark chat theme alike. */
 .fabricate-craft-chat__result {
+  --fabricate-craft-chat-tone: var(--fab-success);
+
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
@@ -16171,16 +16173,14 @@
   padding: var(--fab-space-2xs) var(--fab-space-2);
   border: 1px solid currentcolor;
   border-radius: 999px;
+  background: color-mix(in srgb, var(--fabricate-craft-chat-tone) 18%, transparent);
+  color: color-mix(in srgb, var(--fabricate-craft-chat-tone) 45%, currentcolor);
   font-size: 0.85em;
   font-weight: 700;
 }
 
-.fabricate-craft-chat__result--success {
-  color: var(--fab-success);
-}
-
 .fabricate-craft-chat__result--failure {
-  color: var(--fab-danger);
+  --fabricate-craft-chat-tone: var(--fab-danger);
 }
 
 .fabricate-craft-chat__dice {
