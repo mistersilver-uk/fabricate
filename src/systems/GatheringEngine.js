@@ -537,11 +537,15 @@ export class GatheringEngine {
         'AUTHORITY_UNAVAILABLE'
       );
     }
-    return evaluate(privateEvaluation, actor, decision, {
-      secret: privateEvaluation?.secret === true,
-      failureMessage: 'Gathering check failed',
-      label: 'Gathering',
-    });
+    // The gathering card states no roll (R4), and a check result persists whole on the run, so
+    // the executed visibility the crafting and salvage cards gate on is dropped here.
+    return Promise.resolve(
+      evaluate(privateEvaluation, actor, decision, {
+        secret: privateEvaluation?.secret === true,
+        failureMessage: 'Gathering check failed',
+        label: 'Gathering',
+      })
+    ).then(withoutVisibility);
   }
 
   async executeVersionedStage({
@@ -770,6 +774,7 @@ export class GatheringEngine {
         label,
         mode: checkMode,
         allowsSituationalModifier: hasActiveCheck(config, rollFormula),
+        offerSituationalBonus: config?.offerSituationalBonus !== false,
         // A count check offers no advantage until it is mode-aware (issue 2007).
         allowAdvantage: !count && Boolean(rollFormula && /(?:^|\W)d20(?:\W|$)/i.test(rollFormula)),
       },
@@ -789,6 +794,7 @@ export class GatheringEngine {
           dc: target.source === 'fixed' ? dc : null,
           target: dc,
           targetSource: count ? null : target.source,
+          targetTerms: count || dc === null ? null : (target.terms ?? null),
           ...(count && { count }),
           thresholdMode: stringOrNull(config?.thresholdMode),
           type: stringOrNull(config?.type),
@@ -3777,6 +3783,7 @@ export class GatheringEngine {
     return runFormulaRouted({
       formula: rollFormula,
       dc: target.target,
+      targetTerms: target.terms,
       thresholdMode: routed.thresholdMode,
       type: routed.type,
       relativeOutcomes: routed.relativeOutcomes,
@@ -3788,15 +3795,18 @@ export class GatheringEngine {
       evaluation,
       // Clamp a below-lowest total to the closest tier, as crafting and salvage do.
       clampToNearest: true,
-      rollOptions: buildInteractiveRollOptions({
-        interactive,
-        actor,
-        name: task?.name,
-        activity: 'Gathering',
-        img: task?.img,
-        dc: target.target,
-        evaluation,
-      }),
+      rollOptions: {
+        ...buildInteractiveRollOptions({
+          interactive,
+          actor,
+          name: task?.name,
+          activity: 'Gathering',
+          img: task?.img,
+          dc: target.target,
+          evaluation,
+        }),
+        offerSituationalBonus: routed?.offerSituationalBonus !== false,
+      },
     });
   }
 
@@ -4012,13 +4022,16 @@ export class GatheringEngine {
         label: 'Gathering',
         craftingModifier: buildCheckModifierContext(system, 'gathering', task),
         evaluation,
-        rollOptions: buildInteractiveRollOptions({
-          interactive,
-          actor,
-          name: task?.name,
-          activity: 'Gathering',
-          img: task?.img,
-        }),
+        rollOptions: {
+          ...buildInteractiveRollOptions({
+            interactive,
+            actor,
+            name: task?.name,
+            activity: 'Gathering',
+            img: task?.img,
+          }),
+          offerSituationalBonus: progressive?.offerSituationalBonus !== false,
+        },
       });
       // A cancelled roll makes `_resolveProgressiveOutcome` abort with zero mutation.
       if (rolled.cancelled) {
@@ -4915,6 +4928,13 @@ function normalizeToolResult(result) {
  * @param {boolean} [options.retainFailureResultGroups] Carry `raw.resultGroups` through a failed
  *   outcome (issue 1098); only the routed failure branch opts in.
  */
+/** A prepared check result without its unpersisted executed visibility. */
+function withoutVisibility(evaluated) {
+  if (!evaluated || typeof evaluated !== 'object') return evaluated;
+  const { visibility: _visibility, ...result } = evaluated;
+  return result;
+}
+
 function normalizeTerminalOutcome(raw, { retainFailureResultGroups = false } = {}) {
   if (!raw || typeof raw !== 'object') {
     return misconfiguredOutcome({

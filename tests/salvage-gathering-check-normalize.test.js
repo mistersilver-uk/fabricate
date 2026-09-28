@@ -29,6 +29,7 @@ test('_normalizeSalvageCraftingCheck adds default simple/routed/progressive sub-
   assert.deepEqual(check.simple, {
     rollFormula: '',
     evaluation: normalizeCheckEvaluation(),
+    offerSituationalBonus: true,
     dc: 15,
     thresholdMode: 'meet',
     dcMode: 'static',
@@ -42,6 +43,7 @@ test('_normalizeSalvageCraftingCheck adds default simple/routed/progressive sub-
     awardMode: 'equal',
     rollFormula: '',
     evaluation: normalizeCheckEvaluation(),
+    offerSituationalBonus: true,
     checkBreakage: { triggers: [] },
   });
 });
@@ -78,6 +80,7 @@ test('_normalizeGatheringCraftingCheck defaults to disabled with progressive/rou
     awardMode: 'equal',
     rollFormula: '',
     evaluation: normalizeCheckEvaluation(),
+    offerSituationalBonus: true,
     checkBreakage: { triggers: [] },
   });
   assert.equal(check.routed.type, 'relative');

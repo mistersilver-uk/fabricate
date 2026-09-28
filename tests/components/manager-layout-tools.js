@@ -603,17 +603,10 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
       'fabricate-card manager-inspector-card manager-checks-card'
     );
     assert.equal(fixed.cardRadius, 11, "the studio card contract's own radius is 11px");
-    assert.equal(
-      fixed.optionPaddingLeft,
-      13,
-      "the combination-rule card's studio padding is 13px left/right"
-    );
-    assert.equal(
-      fixed.optionPaddingTop,
-      12,
-      "the combination-rule card's studio padding is 12px top/bottom"
-    );
-    assert.equal(fixed.optionRadius, 10, "the combination-rule card's studio radius is 10px");
+    // The library's `<OptionCards>` states padding 12px and radius 11px, so the primitive owns them.
+    assert.equal(fixed.optionPaddingLeft, 12, "the combination-rule card's padding is 12px");
+    assert.equal(fixed.optionPaddingTop, 12, "the combination-rule card's padding is 12px");
+    assert.equal(fixed.optionRadius, 11, "the combination-rule card's radius is 11px");
 
     // MUTATION PROOF, same page: reintroducing the defect.
     const broken = await modifiersCombinationRuleMetrics(
@@ -629,12 +622,6 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
       broken.cardBackground,
       fixed.cardBackground,
       'expected the bare card shell to fall back to the generic translucent fill'
-    );
-    assert.notEqual(
-      broken.optionPaddingLeft,
-      fixed.optionPaddingLeft,
-      `expected the bare shell to drop the combination-rule cards off 13px padding ` +
-        `(bare: ${broken.optionPaddingLeft}px)`
     );
     assert.notEqual(
       broken.optionGap,

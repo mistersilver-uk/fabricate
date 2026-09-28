@@ -440,6 +440,176 @@ describe('the outcome-preview readout', () => {
   });
 });
 
+describe('the evaluation reaches the stack, the editors and the preview (issue 2005)', () => {
+  const underFixed = { product: 'sum', direction: 'under', target: { source: 'fixed' } };
+  const attribute = {
+    product: 'sum',
+    direction: 'under',
+    target: { source: 'attribute', expression: '@prof', adjustmentKind: 'multiply' },
+  };
+
+  it('states the authored evaluation on the editor stack', async () => {
+    const root = await mountChecks({ craftingCheck: { ...ROUTED_CHECK, evaluation: attribute } });
+    const stack = root.querySelector('[data-checks-panel="crafting"]');
+    assert.deepEqual(
+      [
+        stack.dataset.checksEvaluationDirection,
+        stack.dataset.checksTargetSource,
+        stack.dataset.checksAdjustmentKind,
+      ],
+      ['under', 'attribute', 'multiply']
+    );
+  });
+
+  it('states the authored evaluation on the salvage stack too', async () => {
+    const root = await mountChecks({
+      activity: 'salvage',
+      salvageResolutionMode: 'simple',
+      salvageCheckSimple: { ...SIMPLE_CHECK, evaluation: attribute },
+      activation: { salvage: { enabled: true, optional: false } },
+      features: { salvage: true },
+    });
+    const stack = root.querySelector('[data-checks-panel="salvage"]');
+    assert.ok(Boolean(stack), 'the salvage stack renders');
+    assert.deepEqual(
+      [
+        stack.dataset.checksEvaluationDirection,
+        stack.dataset.checksTargetSource,
+        stack.dataset.checksAdjustmentKind,
+      ],
+      ['under', 'attribute', 'multiply']
+    );
+  });
+
+  it('reads the character value for the Preview-as actor in the routed and simple editors', async () => {
+    const routed = await mountChecks({ craftingCheck: { ...ROUTED_CHECK, evaluation: attribute } });
+    await choosePreviewActor(routed, 'sera');
+    assert.equal(
+      routed.querySelector('[data-check-target-resolution]')?.textContent.trim(),
+      'Sera Vane → 3'
+    );
+    harness.remount();
+    const simple = await mountChecks({
+      resolutionMode: 'simple',
+      craftingCheck: null,
+      craftingCheckSimple: { ...SIMPLE_CHECK, evaluation: attribute },
+    });
+    await choosePreviewActor(simple, 'sera');
+    assert.equal(
+      simple.querySelector('[data-check-target-resolution]')?.textContent.trim(),
+      'Sera Vane → 3'
+    );
+  });
+
+  const KIT = {
+    modifiers: [{ id: 'mod-kit', label: 'Kit', expression: '2' }],
+    craftingDefaultModifierPolicy: 'addAll',
+    craftingDefaultModifierIds: ['mod-kit'],
+  };
+
+  it('raises a roll-under target by the previewed modifiers in the routed and simple strips', async () => {
+    const routed = await mountChecks({
+      craftingCheck: { ...ROUTED_CHECK, evaluation: underFixed },
+      requestedSection: 'outcomes',
+      requestedSectionNonce: 1,
+      ...KIT,
+    });
+    await choosePreviewActor(routed, 'sera');
+    assert.match(
+      routed.querySelector('[data-outcome-band-scale]').textContent.trim(),
+      /^Target 14 \(includes modifiers \+2\)\./
+    );
+    harness.remount();
+    const simple = await mountChecks({
+      resolutionMode: 'simple',
+      craftingCheck: null,
+      craftingCheckSimple: { ...SIMPLE_CHECK, evaluation: underFixed },
+      requestedSection: 'outcomes',
+      requestedSectionNonce: 1,
+      ...KIT,
+    });
+    await choosePreviewActor(simple, 'sera');
+    assert.match(
+      simple.querySelector('[data-simple-band-scale]').textContent.trim(),
+      /^Target 12 \(includes modifiers \+2\)\./
+    );
+  });
+
+  it('reads each record as its target under a fixed roll-under check', async () => {
+    const root = await mountChecks({ craftingCheck: { ...ROUTED_CHECK, evaluation: underFixed } });
+    assert.deepEqual(selectOptionLabels(root, RAIL_RECORD), [
+      'Default · target 12',
+      'Uncommon Craft · target 12',
+      'Rare Craft · target 20',
+    ]);
+  });
+
+  it("words the check-type options with each activity's own records", async () => {
+    const descriptions = (root) =>
+      [...root.querySelectorAll('[data-check-type-option]')].map((option) =>
+        option.textContent.replaceAll(/\s+/g, ' ').trim()
+      );
+    const salvage = await mountChecks({
+      activity: 'salvage',
+      salvageResolutionMode: 'routed',
+      salvageCheckRouted: ROUTED_CHECK,
+      activation: { salvage: { enabled: true, optional: false } },
+      features: { salvage: true },
+      requestedSection: 'outcomes',
+      requestedSectionNonce: 1,
+    });
+    const salvageCopy = descriptions(salvage);
+    assert.match(salvageCopy[0], /offsets from the salvageable item's own DC/);
+    assert.match(salvageCopy[1], /Salvageable items carry no DC at all/);
+    harness.remount();
+    const gathering = await mountChecks({
+      activity: 'gathering',
+      gatheringResolutionMode: 'routed',
+      gatheringCheckRouted: ROUTED_CHECK,
+      activation: { gathering: { enabled: true, optional: false } },
+      features: { gathering: true },
+      requestedSection: 'outcomes',
+      requestedSectionNonce: 1,
+    });
+    const gatheringCopy = descriptions(gathering);
+    assert.match(gatheringCopy[0], /offsets from the gathering task's own DC/);
+    assert.match(gatheringCopy[1], /Gathering tasks carry no DC at all/);
+    for (const copy of [...salvageCopy, ...gatheringCopy]) {
+      assert.doesNotMatch(copy, /\{records?\}/, 'no placeholder is left');
+    }
+  });
+
+  it('drops a stale readout when only the previewed tier changes underneath it', async () => {
+    const root = await mountChecks();
+    await choose(root, RAIL_RECORD, 'rare');
+    await choosePreviewActor(root, 'sera');
+    await rollAndSettle(root);
+    assert.ok(root.querySelector('[data-checks-simulator-readout]'));
+    const tiers = ROUTED_CHECK.tiers.map((tier) =>
+      tier.id === 'rare' ? { ...tier, adjustment: -2 } : tier
+    );
+    await harness.setProps({ craftingCheck: { ...ROUTED_CHECK, tiers } });
+    await settle();
+    assert.ok(
+      !root.querySelector('[data-checks-simulator-readout]'),
+      'a result graded against the old tier must not stay on screen'
+    );
+  });
+
+  it('drops a stale readout when the evaluation changes underneath it', async () => {
+    const root = await mountChecks();
+    await choosePreviewActor(root, 'sera');
+    await rollAndSettle(root);
+    assert.ok(root.querySelector('[data-checks-simulator-readout]'));
+    await harness.setProps({ craftingCheck: { ...ROUTED_CHECK, evaluation: underFixed } });
+    await settle();
+    assert.ok(
+      !root.querySelector('[data-checks-simulator-readout]'),
+      'a result graded the other way round must not stay on screen'
+    );
+  });
+});
+
 describe('the odds histogram', () => {
   it('withholds the formula average and states the odds refusal after the formula control changes', async () => {
     const changes = [];

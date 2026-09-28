@@ -12,6 +12,7 @@ import { CHECK_MODIFIER_TERM_LABEL } from './toolCheckBonus.js';
 /** The deferred `playerPicks` slot the prompt shows as a trailing term, where the resolved term lands. */
 const DEFERRED_MODIFIER_SLOT = `(modifier)[${CHECK_MODIFIER_TERM_LABEL}]`;
 const KEEP_UNDER = { advantage: 'disadvantage', disadvantage: 'advantage' };
+const BENEFIT_SOURCES = Object.freeze(['tool', 'library', 'situational', 'advantage']);
 
 function requestedModifierIds(modifierChoice, choice) {
   if (Array.isArray(choice?.chosenModifierIds)) return choice.chosenModifierIds;
@@ -90,6 +91,8 @@ function promptInput({
     thresholdMode: options.thresholdMode === 'exceed' ? 'exceed' : 'meet',
     // A count check offers no advantage until it is mode-aware (issue 2007).
     allowAdvantage: evaluation.product !== 'count' && hasPlainD20(authoredFormula.trim()),
+    // Display only: a bonus the decision carries still applies when the offer is off.
+    offerSituationalBonus: options.offerSituationalBonus !== false,
   };
 }
 
@@ -187,20 +190,38 @@ export async function resolveCheckDecision({
     if (choice.rollMode) rollMode = choice.rollMode;
   }
 
-  const placementPlan = planModifierPlacement({
-    evaluation,
-    contributions: [
-      ...(Array.isArray(options?.toolContributions) ? options.toolContributions : []),
-      ...resolvedLibraryContributions(selectedModifiers),
-      ...(situational ? [situational] : []),
-      ...(advantageContribution ? [advantageContribution] : []),
-    ],
-  });
+  const contributions = [
+    ...(Array.isArray(options?.toolContributions) ? options.toolContributions : []),
+    ...resolvedLibraryContributions(selectedModifiers),
+    ...(situational ? [situational] : []),
+    ...(advantageContribution ? [advantageContribution] : []),
+  ];
+  const placementPlan = planModifierPlacement({ evaluation, contributions });
   return {
     formula,
     flavor,
     rollMode,
     placementPlan,
+    benefitTerms: targetBenefitTerms(evaluation, contributions),
     resolvedFormula: displayFormula(formula, actor)?.display ?? null,
   };
+}
+
+/**
+ * The settled scalar benefits a summed roll-under target gains, one nonzero `benefit` term per
+ * router source in placement order. A pre-rolled benefit is evidenced by its `preRolls` entry
+ * instead, so the terms and the pre-rolls together fold to the executed target (issue 2005).
+ */
+function targetBenefitTerms(evaluation, contributions) {
+  if (evaluation?.product !== 'sum' || evaluation.direction !== 'under') return [];
+  const totals = new Map();
+  for (const { source, form, value, preRoll } of contributions) {
+    if (form !== 'scalar' || preRoll) continue;
+    totals.set(source, (totals.get(source) ?? 0) + value);
+  }
+  return BENEFIT_SOURCES.filter((source) => (totals.get(source) ?? 0) !== 0).map((source) => ({
+    kind: 'benefit',
+    value: totals.get(source),
+    source,
+  }));
 }

@@ -155,6 +155,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "checkBreakage": {
           "triggers": []
         }
@@ -207,6 +208,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -261,6 +263,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -329,6 +332,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -382,6 +386,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -437,6 +442,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "checkBreakage": {
           "triggers": []
         }
@@ -497,6 +503,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "checkBreakage": {
           "triggers": []
         }
@@ -545,6 +552,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1032,6 +1040,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "checkBreakage": {
           "triggers": []
         }
@@ -1084,6 +1093,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1138,6 +1148,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1206,6 +1217,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1259,6 +1271,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1314,6 +1327,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "checkBreakage": {
           "triggers": []
         }
@@ -1374,6 +1388,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "checkBreakage": {
           "triggers": []
         }
@@ -1422,6 +1437,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1698,6 +1714,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "checkBreakage": {
           "triggers": []
         }
@@ -1750,6 +1767,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1804,6 +1822,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1872,6 +1891,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1925,6 +1945,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1980,6 +2001,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "checkBreakage": {
           "triggers": []
         }
@@ -2040,6 +2062,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "checkBreakage": {
           "triggers": []
         }
@@ -2088,6 +2111,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -2556,6 +2580,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "checkBreakage": {
           "triggers": []
         }
@@ -2608,6 +2633,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -2662,6 +2688,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -2730,6 +2757,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -2783,6 +2811,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -2838,6 +2867,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "checkBreakage": {
           "triggers": []
         }
@@ -2898,6 +2928,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "checkBreakage": {
           "triggers": []
         }
@@ -2946,6 +2977,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -3425,6 +3457,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "checkBreakage": {
           "triggers": []
         }
@@ -3477,6 +3510,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -3531,6 +3565,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -3599,6 +3634,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -3652,6 +3688,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -3707,6 +3744,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "checkBreakage": {
           "triggers": []
         }
@@ -3767,6 +3805,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "checkBreakage": {
           "triggers": []
         }
@@ -3815,6 +3854,7 @@
             }
           }
         },
+        "offerSituationalBonus": true,
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
