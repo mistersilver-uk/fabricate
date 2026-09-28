@@ -46,7 +46,10 @@ export const MARGIN_NOTES = Object.freeze({
     'margin',
     'Margin is shown so that higher is always better: how far over the target the total landed.',
   ],
-  count: ['margin', 'Margin is shown so that higher is always better: successes over what was needed.'],
+  count: [
+    'margin',
+    'Margin is shown so that higher is always better: successes over what was needed.',
+  ],
 });
 
 /** A roll-total trigger that fires on every roll and forces `outcome` (R5). */

@@ -271,15 +271,14 @@
     min-width: 0;
   }
 
+  /* The breakdown and target line wrap rather than truncate, as the prototype's do. */
   .manager-checks-simulator-numbers [data-checks-simulator-breakdown] {
-    overflow: hidden;
     margin-bottom: var(--fab-space-1);
     color: var(--fab-text-subtle);
     font-family: var(--fab-font-mono);
     font-size: 9.5px;
     line-height: 1.4;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   .manager-checks-simulator-total-line {
@@ -299,13 +298,11 @@
   }
 
   .manager-checks-simulator-total-line small {
-    overflow: hidden;
+    min-width: 0;
     color: var(--fab-text-muted);
     font-family: var(--fab-font-mono);
     font-size: 10px;
     font-weight: 500;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   /* The result card, toned by the graded result on its family's own tokens, as `Notice` is. */
