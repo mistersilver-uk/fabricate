@@ -47,7 +47,8 @@ export { rolledDiceGroups } from './checkRollOutput.js';
 /**
  * `data.targetTerms` outside sum/over/fixed (issue 2005): the resolved target's terms, else its
  * anchor, then the rolled tier's step, then the settled scalar benefits. Folded in order with
- * `preRolls` they reproduce `data.target`. A term is `{ kind, value, source? }` and nothing else.
+ * `preRolls` they reproduce `data.target`. A term is `{ kind, value, source? }` and nothing else;
+ * `data.targetSource` names whether the anchor was a fixed number or a character value.
  */
 function targetTermsEvidence({ grading, target, anchor, baseTerms, tierTerm = null, rolled }) {
   if (target === null || (grading.direction === 'over' && grading.source === 'fixed')) return {};
@@ -57,6 +58,7 @@ function targetTermsEvidence({ grading, target, anchor, baseTerms, tierTerm = nu
       : [{ kind: 'anchor', value: anchor }];
   const benefits = grading.direction === 'under' ? (rolled?.benefitTerms ?? []) : [];
   return {
+    targetSource: grading.source,
     targetTerms: [
       ...base.map(({ kind, value }) => ({ kind, value })),
       ...(tierTerm ? [tierTerm] : []),

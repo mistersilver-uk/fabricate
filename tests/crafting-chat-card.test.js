@@ -16,6 +16,15 @@ import { buildGmComplicationCardContent } from '../src/systems/complicationRunti
 import { buildGatheringChatContent } from '../src/ui/presenters/GatheringChatCard.js';
 import { buildSalvageChatContent } from '../src/ui/presenters/SalvageChatCard.js';
 
+import {
+  NOT_PUBLIC,
+  OVER_FIXED_DATA,
+  UNDER_DATA,
+  UNDER_ROWS,
+  executedCheck,
+  shippedLocalize as shippedKeyLocalize,
+} from './helpers/checkEvidenceFixtures.js';
+
 /** The SHIPPED localization, so a placeholder assertion reads the real string. */
 const LANG = JSON.parse(
   readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'lang', 'en.json'), 'utf8')
@@ -973,4 +982,116 @@ test('1645: the rolled run stays readable at chat width where a label would be e
   } finally {
     await context.close();
   }
+});
+
+// ── executed check evidence rows (issue 2005) ──────────────────────────────────
+
+/** `[id, label, text]` for every evidence row a card renders, in order. */
+function evidenceRowsOf(html) {
+  return [
+    ...html.matchAll(
+      /data-check-evidence="(\w+)"><dt[^>]*>([^<]*)<\/dt><dd[^>]*>([^<]*)<\/dd>/g
+    ),
+  ].map(([, id, label, text]) => [id, label.replaceAll('⁠', ''), text.replaceAll('⁠', '')]);
+}
+
+test('a public sum/under card states the executed Target, Pre-rolled and Margin rows', () => {
+  const html = buildCraftingChatContent(successModel({ check: executedCheck() }), shippedKeyLocalize);
+  assert.deepEqual(evidenceRowsOf(html), UNDER_ROWS);
+  assert.ok(
+    html.indexOf('fabricate-craft-chat__evidence') < html.indexOf('fabricate-craft-chat__section'),
+    'the rows sit with the roll, above what the craft produced'
+  );
+});
+
+test('a card omits the rows for every secret, whispered, blind, self or unknown check (Q19)', () => {
+  const bare = buildCraftingChatContent(successModel(), shippedKeyLocalize);
+  for (const visibility of NOT_PUBLIC) {
+    const html = buildCraftingChatContent(
+      successModel({ check: executedCheck(UNDER_DATA, visibility) }),
+      shippedKeyLocalize
+    );
+    assert.equal(html, bare, `no evidence for ${JSON.stringify(visibility)}`);
+  }
+});
+
+test('a sum/over fixed card gains no rows and stays byte-identical', () => {
+  for (const status of ['succeeded', 'failed']) {
+    const model = status === 'succeeded' ? successModel({ rollValue: 15 }) : failureModel();
+    const bare = buildCraftingChatContent(model, shippedKeyLocalize);
+    const withCheck = buildCraftingChatContent(
+      { ...model, check: executedCheck(OVER_FIXED_DATA) },
+      shippedKeyLocalize
+    );
+    assert.equal(withCheck, bare, status);
+  }
+});
+
+test('a fixed target, an over character value, a range and a legacy record word their own rows', () => {
+  const rows = (data) =>
+    evidenceRowsOf(buildCraftingChatContent(successModel({ check: executedCheck(data) }), shippedKeyLocalize));
+  const fixedUnder = {
+    ...UNDER_DATA,
+    total: 16,
+    target: 14,
+    margin: -2,
+    preRolls: [],
+    targetSource: 'fixed',
+    targetTerms: [
+      { kind: 'anchor', value: 12 },
+      { kind: 'benefit', value: 2, source: 'tool' },
+    ],
+  };
+  assert.deepEqual(rows(fixedUnder), [
+    ['target', 'Target', '14 · fixed, tools +2'],
+    ['margin', 'Margin', '−2 under the target'],
+  ]);
+  const overAttribute = {
+    ...OVER_FIXED_DATA,
+    dc: null,
+    target: 27,
+    total: 30,
+    targetSource: 'attribute',
+    targetTerms: [
+      { kind: 'anchor', value: 55 },
+      { kind: 'multiplier', value: 0.5 },
+    ],
+  };
+  assert.deepEqual(rows(overAttribute), [
+    ['target', 'Target', '27 · character value 55, difficulty ×½'],
+    ['margin', 'Margin', '+3'],
+  ]);
+  // A fixed range or Otherwise has no target, so it invents neither a target nor a margin.
+  assert.deepEqual(rows({ ...UNDER_DATA, target: null, margin: null }), [UNDER_ROWS[1]]);
+  const { preRolls: _preRolls, targetTerms: _terms, targetSource: _source, ...legacy } = UNDER_DATA;
+  assert.deepEqual(rows(legacy), [
+    ['target', 'Target', '14'],
+    ['margin', 'Margin', '+5 under the target'],
+  ]);
+});
+
+test('labels carrying [[ or @ reach the card with neither enrichment pattern left to match', () => {
+  const data = {
+    ...UNDER_DATA,
+    preRolls: [
+      {
+        source: 'library',
+        label: '[[1d20]] @abilities.str.value [[[/r 1d6]]]',
+        expression: '1d4',
+        total: 3,
+        destination: 'target',
+      },
+    ],
+  };
+  const html = buildCraftingChatContent(successModel({ check: executedCheck(data) }), shippedKeyLocalize);
+  const evidence = html.slice(html.indexOf('<dl'), html.indexOf('</dl>'));
+  assert.ok(evidence.includes('abilities.str.value'), 'the label is still stated');
+  // Foundry's inline-roll opener and its `@path` / `@Type[` reference forms.
+  assert.doesNotMatch(evidence, /\[\[/);
+  assert.doesNotMatch(evidence, /@\w/);
+  assert.equal(
+    evidenceRowsOf(html)[1][2],
+    '[[1d20]] @abilities.str.value [[[/r 1d6]]] 1d4 rolled 3, raising the target',
+    'only invisible joiners were added'
+  );
 });

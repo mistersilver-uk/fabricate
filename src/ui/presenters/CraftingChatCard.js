@@ -19,6 +19,9 @@
  * wrapper, so a card that has none is byte-identical — asserted, not assumed.
  */
 
+import { isPublicCheckDisplay } from './checkDisplay.js';
+import { checkEvidenceRows } from './checkEvidenceRows.js';
+
 const ITEM_FALLBACK_IMG = 'icons/svg/item-bag.svg';
 
 /**
@@ -165,6 +168,36 @@ export function renderRollTotal(value, label) {
     `<span class="fabricate-craft-chat__roll-label">${esc(label)}</span>`,
     `<span class="fabricate-craft-chat__roll-value">${esc(value)}</span>`,
     '</div>',
+  ].join('');
+}
+
+/**
+ * Escaped text in which no `[[` or `@` survives, so neither Foundry enrichment pass, inline rolls at
+ * creation nor `enrichHTML` with roll data at render, can match inside it: a word joiner (U+2060)
+ * follows every `@` and every `[` that opens a second.
+ */
+export function inertText(value) {
+  return esc(value)
+    .replaceAll(/\[(?=\[)/g, '[\u{2060}')
+    .replaceAll('@', '@\u{2060}');
+}
+
+/**
+ * The executed check's Target, Pre-rolled and Margin rows (issue 2005), or '' for a check that is
+ * not public and non-secret, a sum/over/fixed check or no check. Text only: never a Roll or a flag.
+ */
+export function renderCheckEvidenceRows(check, localize = (key) => key) {
+  const rows = isPublicCheckDisplay(check) ? checkEvidenceRows(check, localize) : [];
+  if (rows.length === 0) return '';
+  return [
+    '<dl class="fabricate-craft-chat__evidence">',
+    ...rows.map(
+      ({ id, label, text }) =>
+        `<div class="fabricate-craft-chat__evidence-row" data-check-evidence="${id}">` +
+        `<dt class="fabricate-craft-chat__evidence-label">${inertText(label)}</dt>` +
+        `<dd class="fabricate-craft-chat__evidence-value">${inertText(text)}</dd></div>`
+    ),
+    '</dl>',
   ].join('');
 }
 
@@ -424,6 +457,8 @@ export function renderComplications({
  *   finite (a no-check "Guaranteed" craft/salvage omits it).
  * @param {{mode:'target'|'up'|'down',steps:number}} [model.tierStep] - Realized routed
  *   tier-step evidence (`data.tierStepApplied`), present only on an actual tier change.
+ * @param {object|null} [model.check] - The executed check's display projection, whose evidence
+ *   rows render only for a public, non-secret check (issue 2005).
  * @param {string}  [model.failureReason]
  * @param {Array<{name:string,description:string,severity:string,componentName:string}>}
  *   [model.complications] - Component complications this resolution FIRED, already
@@ -446,6 +481,7 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
 
   const rollTotal = renderRollTotal(model.rollValue, loc(keys.roll));
   const tierStep = renderTierStep(model.tierStep, keys, loc);
+  const evidence = renderCheckEvidenceRows(model.check, loc);
 
   const notice =
     !succeeded && model.failureReason
@@ -510,6 +546,7 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
     `<div class="fabricate-craft-chat__subtitle">${subtitleParts.join(' · ')}</div>`,
     '</header>',
     rollTotal,
+    evidence,
     tierStep,
     notice,
     ...sections,
@@ -541,6 +578,7 @@ export function buildCraftingChatContent(model = {}, localize = (key) => key) {
       tools: model.tools,
       rollValue: model.rollValue,
       tierStep: model.tierStep,
+      check: model.check,
       failureReason: model.failureReason,
       complications: model.complications,
     },

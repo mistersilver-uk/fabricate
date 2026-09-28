@@ -7,6 +7,15 @@ import assert from 'node:assert/strict';
 
 import { buildSalvageChatContent } from '../src/ui/presenters/SalvageChatCard.js';
 
+import {
+  NOT_PUBLIC,
+  OVER_FIXED_DATA,
+  UNDER_DATA,
+  UNDER_ROWS,
+  executedCheck,
+  shippedLocalize,
+} from './helpers/checkEvidenceFixtures.js';
+
 function successModel(overrides = {}) {
   return {
     status: 'succeeded',
@@ -163,5 +172,20 @@ test('routes every label through the localize function', () => {
   });
   for (const key of ['SalvageSuccess', 'SalvageActor', 'SalvageSource', 'SalvageRecovered', 'SalvageConsumed', 'SalvageTools']) {
     assert.ok(seen.includes(`FABRICATE.Chat.${key}`), `localize asked for FABRICATE.Chat.${key}`);
+  }
+});
+
+test('a salvage card states public roll-under evidence and nothing for a private or sum/over check (issue 2005)', () => {
+  const shown = buildSalvageChatContent(successModel({ check: executedCheck() }), shippedLocalize);
+  assert.ok(shown.includes('<dl class="fabricate-craft-chat__evidence">'));
+  for (const [, label, text] of UNDER_ROWS) {
+    assert.ok(shown.includes(label) && shown.includes(text), text);
+  }
+  const bare = buildSalvageChatContent(failureModel(), shippedLocalize);
+  for (const check of [
+    ...NOT_PUBLIC.map((visibility) => executedCheck(UNDER_DATA, visibility)),
+    executedCheck(OVER_FIXED_DATA),
+  ]) {
+    assert.equal(buildSalvageChatContent(failureModel({ check }), shippedLocalize), bare);
   }
 });

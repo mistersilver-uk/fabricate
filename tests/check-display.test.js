@@ -7,6 +7,7 @@ import {
   executedCheckDisplay,
   executedCheckEvidence,
   foldTargetTerms,
+  isPublicCheckDisplay,
   sanitizeTargetTerms,
 } from '../src/ui/presenters/checkDisplay.js';
 
@@ -155,5 +156,31 @@ describe('buildCheckDisplay', () => {
     assert.equal(over.destination, 'append');
     assert.equal(over.visibility, null, 'an unknown visibility is never read as public');
     assert.ok(!Object.hasOwn(over.evidence, 'targetTerms'));
+  });
+});
+
+describe('isPublicCheckDisplay', () => {
+  it('admits only a public, non-secret roll; an unknown visibility is never public', () => {
+    const display = (visibility) => executedCheckDisplay({ data: EXECUTED, visibility });
+    assert.equal(isPublicCheckDisplay(display({ rollMode: 'publicroll', secret: false })), true);
+    for (const visibility of [
+      { rollMode: 'publicroll', secret: true },
+      { rollMode: 'gmroll' },
+      { rollMode: 'blindroll' },
+      { rollMode: 'selfroll' },
+      { rollMode: 'public' },
+      null,
+    ]) {
+      assert.equal(isPublicCheckDisplay(display(visibility)), false, JSON.stringify(visibility));
+    }
+    assert.equal(isPublicCheckDisplay(null), false);
+  });
+
+  it('keeps the executed target source beside its terms, and only there', () => {
+    const withSource = executedCheckEvidence({ ...EXECUTED, targetSource: 'attribute' });
+    assert.equal(withSource.targetSource, 'attribute');
+    const { targetTerms: _terms, ...untermed } = EXECUTED;
+    assert.ok(!Object.hasOwn(executedCheckEvidence({ ...untermed, targetSource: 'fixed' }), 'targetSource'));
+    assert.ok(!Object.hasOwn(executedCheckEvidence({ ...EXECUTED, targetSource: '@x' }), 'targetSource'));
   });
 });

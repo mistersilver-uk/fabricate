@@ -22,6 +22,13 @@ import {
   craftingSystemLookup,
   recordedSalvageResults,
 } from './helpers/bulkSalvageFixtures.js';
+import {
+  NOT_PUBLIC,
+  OVER_FIXED_DATA,
+  UNDER_DATA,
+  executedCheck,
+  shippedLocalize,
+} from './helpers/checkEvidenceFixtures.js';
 
 /** A localizer that renders each key as a readable, greppable token. */
 const loc = (key) => `[${key.split('.').at(-1)}]`;
@@ -437,5 +444,78 @@ describe('buildBulkSalvageChatContent: every row’s complications on the ONE ca
   it('a run that fired nothing renders no section at all', () => {
     const html = card({ ...MODEL, complications: [] });
     assert.ok(!html.includes('--complications'), 'no empty heading, no empty grid');
+  });
+});
+
+describe('buildBulkSalvageChatContent: each subject states its own executed evidence (issue 2005)', () => {
+  const model = (subjects) => ({
+    status: 'succeeded',
+    actorNames: ['Akra'],
+    counts: { total: subjects.length, succeeded: subjects.length, failed: 0 },
+    subjects,
+  });
+
+  it('a public roll-under subject carries its rows, and a private one in the same batch none', () => {
+    const html = buildBulkSalvageChatContent(
+      model([
+        cardSubject({ name: 'Iron Ore', rollValue: 9, check: executedCheck() }),
+        cardSubject({
+          name: 'Boar Hide',
+          rollValue: 9,
+          check: executedCheck(UNDER_DATA, NOT_PUBLIC[0]),
+        }),
+      ]),
+      shippedLocalize
+    );
+    const rows = html.split('<li ').slice(1);
+    assert.match(rows[0], /fabricate-craft-chat__item--evidence/);
+    assert.match(rows[0], /data-check-evidence="target"/);
+    assert.ok(rows[0].includes('+5 under the target'));
+    assert.doesNotMatch(rows[1], /evidence/, 'the gmroll subject states nothing beyond its roll');
+  });
+
+  it('every non-public subject, and a sum/over fixed one, leaves the card byte-identical (Q19)', () => {
+    const bare = buildBulkSalvageChatContent(model([cardSubject({ rollValue: 15 })]), shippedLocalize);
+    const checks = [
+      ...NOT_PUBLIC.map((visibility) => executedCheck(UNDER_DATA, visibility)),
+      executedCheck(OVER_FIXED_DATA),
+    ];
+    for (const check of checks) {
+      const html = buildBulkSalvageChatContent(
+        model([cardSubject({ rollValue: 15, check })]),
+        shippedLocalize
+      );
+      assert.equal(html, bare, JSON.stringify(check.visibility));
+    }
+  });
+
+  it('the service hands each row its own executed projection from the salvage result', async () => {
+    const posted = [];
+    const service = new BulkSalvageService({
+      salvage: async (actorUuid, systemId, componentId) => ({
+        success: true,
+        results: [],
+        check: executedCheck(UNDER_DATA, componentId === 'comp-ore' ? undefined : NOT_PUBLIC[1]),
+      }),
+      getCraftingSystem: craftingSystemLookup([
+        bulkSystem({
+          id: 'sys-a',
+          components: [
+            bulkComponent({ id: 'comp-ore', name: 'Iron Ore' }),
+            bulkComponent({ id: 'comp-hide', name: 'Boar Hide' }),
+          ],
+        }),
+      ]),
+      postChatMessage: async (message) => posted.push(message),
+      localize: shippedLocalize,
+    });
+    await service.run({
+      targets: [
+        bulkTarget({ systemId: 'sys-a', componentId: 'comp-ore' }),
+        bulkTarget({ systemId: 'sys-a', componentId: 'comp-hide' }),
+      ],
+      interactive: false,
+    });
+    assert.equal(occurrences(posted[0].content, 'data-check-evidence="target"'), 1);
   });
 });

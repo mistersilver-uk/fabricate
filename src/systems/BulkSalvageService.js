@@ -396,6 +396,7 @@ export class BulkSalvageService {
       item.message = result?.message ?? '';
       item.rollValue = rowRollValue(salvageRun?.checkResult, result);
       item.tierStep = salvageRun?.checkResult?.data?.tierStepApplied ?? null;
+      item.check = result?.check ?? null;
       item.results = awardReceipts(result?.results).map((created) => ({
         name: created?.name || '',
         img: created?.img || '',
@@ -449,6 +450,7 @@ export class BulkSalvageService {
           outcome: item.outcome,
           rollValue: item.rollValue,
           tierStep: item.tierStep,
+          check: item.check ?? null,
           message: item.message,
         })),
         results: sumChatEntriesByName(subjects.flatMap((item) => item.results)),

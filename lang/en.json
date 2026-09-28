@@ -1873,6 +1873,23 @@
         "PoolNonFinite": "{label} check cannot roll: its dice pool is not a number once modifiers apply.",
         "PoolTooLarge": "{label} check cannot roll: its dice pool is more than 999 dice once modifiers apply.",
         "Misconfigured": "{label} check cannot roll: its dice pool is misconfigured."
+      },
+      "Evidence": {
+        "Target": "Target",
+        "PreRolled": "Pre-rolled",
+        "Margin": "Margin",
+        "TargetTerms": "{target} · {terms}",
+        "CharacterValue": "character value {value}",
+        "Fixed": "fixed",
+        "Difficulty": "difficulty {value}",
+        "Tools": "tools {value}",
+        "Modifiers": "modifiers {value}",
+        "Situational": "situational {value}",
+        "PreRoll": "{label} {formula} rolled {total}, raising the target",
+        "MarginUnder": "{margin} under the target",
+        "ToolLabel": "Tool",
+        "ModifierLabel": "Modifier",
+        "SituationalLabel": "Situational"
       }
     },
     "Knowledge": {

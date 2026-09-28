@@ -85,7 +85,11 @@ export function executedCheckEvidence(data) {
   if (Array.isArray(data.preRolls)) {
     evidence.preRolls = data.preRolls.map(preRollRow).filter(Boolean);
   }
-  if (Array.isArray(data.targetTerms)) evidence.targetTerms = sanitizeTargetTerms(data.targetTerms);
+  if (Array.isArray(data.targetTerms)) {
+    evidence.targetTerms = sanitizeTargetTerms(data.targetTerms);
+    const targetSource = oneOf(['fixed', 'attribute'], data.targetSource);
+    if (targetSource) evidence.targetSource = targetSource;
+  }
   return evidence;
 }
 
@@ -120,6 +124,14 @@ export function buildCheckDisplay({
     evidence: evidence ? structuredClone(evidence) : null,
     visibility: executedVisibility(visibility),
   });
+}
+
+/**
+ * Whether a chat card may state a projection's evidence: only a public, non-secret check. Every
+ * client receives a card's content whatever its whisper, so an unknown visibility is never public.
+ */
+export function isPublicCheckDisplay(display) {
+  return display?.visibility?.rollMode === 'publicroll' && display.visibility.secret !== true;
 }
 
 /** The projection of an executed check result for a result box or chat card. */

@@ -16162,6 +16162,44 @@
   font-weight: 700;
 }
 
+/* The executed check's Target, Pre-rolled and Margin rows (issue 2005): a key column beside wrapping text, as the prototype's chat card sets them. */
+.fabricate-craft-chat__evidence {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  margin: 0;
+}
+
+.fabricate-craft-chat__evidence-row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: var(--fab-space-chip);
+  font-size: 0.85em;
+}
+
+.fabricate-craft-chat__evidence-label {
+  margin: 0;
+  font-weight: 600;
+  opacity: 0.58;
+}
+
+.fabricate-craft-chat__evidence-value {
+  margin: 0;
+  font-weight: 500;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* A bulk subject row that states its evidence spans the card and wraps its rows beneath its name. */
+.fabricate-craft-chat__item--evidence {
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+}
+
+.fabricate-craft-chat__item--evidence .fabricate-craft-chat__evidence {
+  flex: 1 0 100%;
+}
+
 .fabricate-gather-chat__section,
 .fabricate-craft-chat__section {
   display: flex;
