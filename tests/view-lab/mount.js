@@ -111,6 +111,8 @@ function readParams() {
     system: params.get('system') ?? null,
     gatheringTaskMode: params.get('gatheringTaskMode') ?? null,
     rollPromptState: params.get('rollPromptState') ?? null,
+    // A success-counting Checks Studio state seeded onto Karrun Forgecraft (issue 2004).
+    checkPreviewState: params.get('checkPreviewState') ?? null,
     journalCaseState: params.get('journalCaseState') ?? null,
     // TWO things, and the name says only the second: a world seeded with NO crafting systems, and
     // the persisted selection cleared through the real admin store after construction.
@@ -891,6 +893,7 @@ async function boot() {
         noSceneRegions: params.noSceneRegions,
         gatheringTaskMode: params.gatheringTaskMode,
         journalCaseState: params.journalCaseState,
+        checkPreviewState: params.checkPreviewState,
       });
   await seedRollPromptFixture(world, params.rollPromptState);
   if (params.longDowntimeLabels) applyLongDowntimeLocalization(world);

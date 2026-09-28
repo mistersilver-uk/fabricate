@@ -2,17 +2,88 @@
 import { evaluateNumericExpression } from '../../../src/systems/checkModifierResolver.js';
 
 /**
- * `NdS` with an optional keep-highest / keep-lowest modifier. That check no longer stands where its
- * own note said it did, and the note is corrected rather than deleted because the correction is the
- * interesting part (issue 1118).
+ * `NdS` with an optional keep-highest / keep-lowest modifier, or the native explosion a count Roll
+ * writes: `x`/`xo`, bare or with a comparison and face (issue 2004). That check no longer stands
+ * where its own note said it did, and the note is corrected rather than deleted because the
+ * correction is the interesting part (issue 1118).
  */
-const DIE_TERM = /(\d*)d(\d+)(?:(kh|kl)(\d*))?/gi;
+const DIE_TERM = /(\d*)d(\d+)(?:(kh|kl)(\d*)|(xo?)(?:(<=|>=|<|>|=)(\d+))?)?/gi;
+
+/** Core's `Die#explode` recursion limit, and the message a count Roll recognizes. */
+const MAX_EXPLOSIONS = 1000;
+
+function compareFace(face, comparison, target) {
+  if (comparison === '<=') return face <= target;
+  if (comparison === '>=') return face >= target;
+  if (comparison === '<') return face < target;
+  if (comparison === '>') return face > target;
+  return face === target;
+}
+
+/**
+ * Core's explosion loop: each result matching the comparison is marked `exploded` and appends one
+ * die; `xo` tests the original dice only.
+ */
+function explodeResults(results, { sides, once, comparison = '=', target = sides, roll }) {
+  const initial = results.length;
+  for (let checked = 0; checked < results.length; checked += 1) {
+    if (!once && checked >= MAX_EXPLOSIONS) {
+      throw new Error('Maximum recursion depth for exploding dice roll exceeded');
+    }
+    const entry = results[checked];
+    if (compareFace(entry.result, comparison, target)) {
+      entry.exploded = true;
+      results.push({ result: roll(), active: true });
+    }
+    if (once && checked + 1 === initial) break;
+  }
+}
 
 /** A Foundry flavour annotation, e.g. the `[Rune Stylus]` that `appendToolBonusTerms` emits. */
 const FLAVOUR_SPAN = /\[[^\]]*\]/g;
 
 /** A die term that survived the substitution pass — i.e. one this parser does not understand. */
 const UNPARSED_DIE = /\dd\d/i;
+
+/** A die term's count and sides, or null for a shape the lab leaves unrolled. */
+function dieShape(count, faces) {
+  const number = count === '' ? 1 : Number(count);
+  const sides = Number(faces);
+  if (!Number.isInteger(number) || number < 1) return null;
+  if (!Number.isInteger(sides) || sides < 1) return null;
+  return { number, sides };
+}
+
+/**
+ * Roll one die term: keep-highest/lowest marks the dropped faces inactive, and an explosion marks
+ * each exploding face and appends its die. `active: true` on a kept die matches every
+ * Foundry-shaped dice fixture in this repo (`tests/check-roll.test.js`).
+ */
+function rollDieTerm({ number, sides }, [keep, keepCount, explode, comparison, target], random) {
+  const roll = () => Math.floor(random() * sides) + 1;
+  if (explode) {
+    const results = Array.from({ length: number }, () => ({ result: roll(), active: true }));
+    const face = target === undefined ? sides : Number(target);
+    explodeResults(results, { sides, once: explode === 'xo', comparison, target: face, roll });
+    return { results, total: results.reduce((sum, entry) => sum + entry.result, 0) };
+  }
+  const rolls = Array.from({ length: number }, roll);
+  const keepN = keep ? (keepCount === '' ? 1 : Number(keepCount)) : number;
+  const ranked = rolls
+    .map((result, index) => ({ result, index }))
+    .toSorted((left, right) =>
+      keep === 'kl' ? left.result - right.result : right.result - left.result
+    );
+  const kept = new Set(
+    ranked.slice(0, Math.max(0, Math.min(keepN, number))).map((entry) => entry.index)
+  );
+  const results = rolls.map((result, index) => ({ result, active: !keep || kept.has(index) }));
+  const total = rolls.reduce(
+    (sum, result, index) => (!keep || kept.has(index) ? sum + result : sum),
+    0
+  );
+  return { results, total };
+}
 
 /**
  * Build the lab's `Roll` class over an injected entropy source.
@@ -36,15 +107,33 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
      */
     constructor(formula, data = {}, options = {}) {
       this.data = data;
+      this._total = undefined;
       this.options = options;
       // Core substitutes data while constructing terms; serialized rolls carry the resolved
       // formula, not the actor's data. Resolve here so restoration needs no live actor lookup.
       this.formula = replaceFormulaData(String(formula ?? ''), data, { missing: '0' });
-      this.dice = [];
-      this.terms = [];
-      this.total = undefined;
+      // Core parses its terms at construction, so a Roll's dice exist, unevaluated, before it rolls.
+      this.dice = [...this.formula.replaceAll(FLAVOUR_SPAN, '').matchAll(DIE_TERM)]
+        .map(([, count, faces]) => dieShape(count, faces))
+        .filter(Boolean)
+        .map(({ number, sides }) => ({ number, faces: sides, results: [], total: undefined }));
+      this.terms = [...this.dice];
       this.result = '';
       this._evaluated = false;
+    }
+
+    /** Core's `total` reads `_total`, which a count Roll sets to its net after evaluating. */
+    get total() {
+      return this._total;
+    }
+
+    set total(value) {
+      this._total = value;
+    }
+
+    /** Core's formula field, which a count Roll compares against the policy it replays. */
+    get _formula() {
+      return this.formula;
     }
 
     /**
@@ -60,41 +149,19 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
       const substituted = replaceFormulaData(this.formula, this.data, { missing: '0' });
       // Strip flavour spans before the die pass.
       const masked = substituted.replaceAll(FLAVOUR_SPAN, '');
-      const rolledOut = masked.replaceAll(DIE_TERM, (match, count, faces, keep, keepCount) => {
-        const number = count === '' ? 1 : Number(count);
-        const sides = Number(faces);
-        if (!Number.isInteger(number) || number < 1) return match;
-        if (!Number.isInteger(sides) || sides < 1) return match;
-        const rolls = Array.from({ length: number }, () => Math.floor(random() * sides) + 1);
-        const keepN = keep ? (keepCount === '' ? 1 : Number(keepCount)) : number;
-        const ranked = rolls
-          .map((result, index) => ({ result, index }))
-          .toSorted((left, right) =>
-            keep === 'kl' ? left.result - right.result : right.result - left.result
-          );
-        const kept = new Set(
-          ranked.slice(0, Math.max(0, Math.min(keepN, number))).map((entry) => entry.index)
-        );
-        // `active: true` on a kept die, matching every Foundry-shaped dice fixture in this repo
-        // (`tests/check-roll.test.js`, `check-roll-dice.test.js`, `check-roll-tier-step.test.js`).
-        const results = rolls.map((result, index) => ({
-          result,
-          active: !keep || kept.has(index),
-        }));
-        const total = rolls.reduce(
-          (sum, result, index) => (!keep || kept.has(index) ? sum + result : sum),
-          0
-        );
-        const die = { number, faces: sides, results, total };
-        this.dice.push(die);
-        this.terms.push(die);
-        return String(total);
+      let next = 0;
+      const rolledOut = masked.replaceAll(DIE_TERM, (match, count, faces, ...modifiers) => {
+        const shape = dieShape(count, faces);
+        if (!shape) return match;
+        const die = this.dice[next++];
+        Object.assign(die, rollDieTerm(shape, modifiers, random));
+        return String(die.total);
       });
       // Fail loudly on a die term this parser does not understand.
       if (UNPARSED_DIE.test(rolledOut)) {
         throw new Error(
           `View Lab Roll cannot evaluate "${this.formula}": the die term in "${rolledOut}" uses a ` +
-            'modifier this harness does not implement (only NdS with optional kh/kl). Extend ' +
+            'modifier this harness does not implement (only NdS with kh/kl or an explosion). Extend ' +
             'DIE_TERM in tests/view-lab/foundry/labRoll.js rather than letting it score partially.'
         );
       }
@@ -135,10 +202,11 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
       }
       const snapshot = structuredClone(data);
       const roll = new this(snapshot.formula, snapshot.data, snapshot.options);
-      roll.terms = snapshot.terms;
       if (snapshot.evaluated ?? true) {
         roll.total = snapshot.total;
         roll.dice = snapshot.dice ?? [];
+        // The lab's terms are its dice, the same objects, as a count Roll's replay requires.
+        roll.terms = [...roll.dice];
         roll._evaluated = true;
         // Rebuild only the lab's diagnostic expression, using saved group totals. Never
         // reduce the expression or evaluate the dice again: the stored total is authoritative.
@@ -221,7 +289,7 @@ function labDieTerm({ number, denominationSource, modifiers }) {
     number,
     faces,
     denomination,
-    modifiers: modifiers ? (modifiers.match(/[a-z]+[<>=]?-?\d*/gi) ?? []) : [],
+    modifiers: modifiers ? (modifiers.match(/[a-z]+(?:[<>=]{1,2})?-?\d*/gi) ?? []) : [],
     isDeterministic: false,
   };
 }
@@ -230,7 +298,7 @@ function labDieTerm({ number, denominationSource, modifiers }) {
 const SUB_ROLL_DIE = /^(\d*)d\(/i;
 
 /** `NdS` with an optional trailing modifier run. */
-const LAB_DIE = /^(\d*)d(\d+|[fc])((?:[a-z]+[<>=]?-?\d*)*)/i;
+const LAB_DIE = /^(\d*)d(\d+|[fc])((?:[a-z]+(?:[<>=]{1,2})?-?\d*)*)/i;
 
 /** A math function opening, e.g. `max(`. */
 const LAB_FUNCTION = /^([a-z][a-z0-9]*)\(/i;
