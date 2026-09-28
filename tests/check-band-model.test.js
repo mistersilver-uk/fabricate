@@ -12,6 +12,7 @@ import {
   previewBandTarget,
   resolvePreviewTarget,
 } from '../src/ui/svelte/apps/manager/checks/checkBandModel.js';
+import { classifyCheckTotal } from '../src/systems/checkRouting.js';
 import {
   missingTargetPaths,
   targetValueStatus,
@@ -135,6 +136,44 @@ describe('buildRoutedBands', () => {
     });
     assert.equal(summary(bands), 'A: 5 or under; B: 6 or over');
     assert.deepEqual(bands.map((band) => band.index), [1, 0]);
+  });
+
+  it('adds a roll-under modifier total after the multiply, as the runtime routes it', () => {
+    const idrin = { name: 'Idrin', rollData: { skills: { craft: { value: 55 } } } };
+    const evaluation = attribute('under', 'multiply');
+    const previewed = previewBandTarget(
+      { evaluation, anchor: 0, tier: { name: 'Standard', adjustment: 1 }, character: idrin, modifiers: 6 },
+      fallback
+    );
+    assert.deepEqual([previewed.anchor, previewed.delta, previewed.target], [55, 6, 61]);
+    const bands = buildRoutedBands({
+      evaluation,
+      comparison: 'meet',
+      anchor: previewed.anchor,
+      targetDelta: previewed.delta,
+      type: 'relative',
+      outcomes: LADDER,
+    });
+    assert.deepEqual(
+      bands.map((band) => `${band.name}: ${describeBandRange(band, fallback)}`),
+      ['Extreme: 17 or under', 'Hard: 18–33', 'Regular: 34–61', 'Otherwise: 62 or over']
+    );
+    for (let total = bands[0].from; total <= bands.at(-1).to; total += 1) {
+      const { matched } = classifyCheckTotal({
+        type: 'relative',
+        total,
+        dc: 55,
+        targetDelta: 6,
+        comparison: 'meet',
+        relativeOutcomes: LADDER,
+        fixedOutcomes: [],
+        triggers: [],
+        clampToNearest: true,
+        evaluation,
+      });
+      const band = bands.find((entry) => total >= entry.from && total <= entry.to);
+      assert.equal(band.id, matched.id, `total ${total}`);
+    }
   });
 
   it('draws nothing with no tiers', () => {
@@ -314,6 +353,8 @@ describe('previewBandTarget', () => {
     const evaluation = { ...attribute('under'), target: { source: 'attribute', expression: '14' } };
     assert.deepEqual(previewBandTarget({ evaluation, anchor: 0 }, fallback), {
       state: 'ok',
+      anchor: 14,
+      delta: 0,
       target: 14,
       value: 14,
       source: '',

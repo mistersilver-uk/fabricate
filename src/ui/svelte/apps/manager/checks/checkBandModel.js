@@ -131,29 +131,31 @@ export function buildPassFailBands({
   });
 }
 
-function relativeEdges(normalized, anchor, outcomes) {
+/** Each relative tier's threshold as the runtime's routing computes it; NaN for Otherwise. */
+function relativeEdges(normalized, anchor, delta, outcomes) {
   const multiply =
     normalized.target.source === 'attribute' && normalized.target.adjustmentKind === 'multiply';
   return outcomes.map((outcome) => {
     if (multiply) {
       return outcome.adjustment == null
         ? NaN
-        : multiplyTierThreshold(anchor, Number(outcome.adjustment));
+        : multiplyTierThreshold(anchor, Number(outcome.adjustment)) + delta;
     }
     const step = Number(outcome.dc);
-    return normalized.direction === 'under' ? anchor - step : anchor + step;
+    return normalized.direction === 'under' ? anchor - step + delta : anchor + step;
   });
 }
 
 /**
  * A routed check's tier bands in value order. Relative tiers are classified by the runtime's
- * routing against `anchor`; fixed ranges are drawn as authored, and a gap or overlap is left
- * for the strip's own fallback.
+ * routing against `anchor` and the settled `targetDelta`; fixed ranges are drawn as authored, and
+ * a gap or overlap is left for the strip's own fallback.
  */
 export function buildRoutedBands({
   evaluation,
   comparison,
   anchor,
+  targetDelta = 0,
   type,
   outcomes,
   min = null,
@@ -177,13 +179,15 @@ export function buildRoutedBands({
     }));
   }
   const normalized = normalizeCheckEvaluation(evaluation);
-  const window = drawWindow(relativeEdges(normalized, anchor, list), min, max);
+  const delta = normalized.direction === 'under' ? Number(targetDelta) || 0 : 0;
+  const window = drawWindow(relativeEdges(normalized, anchor, delta, list), min, max);
   if (!window) return [];
   return runsOver(window.low, window.high, (total) => {
     const { matched } = classifyCheckTotal({
       type: 'relative',
       total,
       dc: anchor,
+      targetDelta,
       comparison,
       relativeOutcomes: list,
       fixedOutcomes: [],
@@ -287,12 +291,10 @@ export function previewScaleSentence(state, { direction, comparison }, text) {
 }
 
 /**
- * The previewed target plus the `source` reading {@link describeBandScale} names: the actor, the
- * typed expression and its value (the maintainer's 2026-09-28 ruling puts the GM's formula where
- * the prototype shows a friendly label), the adjustment applied, the previewed tier's or else the
- * base, and the check modifiers a roll-under adds to its target. Without an actor the target is
- * unsourced. `tier` is `{ name, adjustment }` or null for the base; `modifiers` is the previewed
- * actor's deterministic check-modifier total.
+ * The previewed target and the `source` reading {@link describeBandScale} names: the actor, the
+ * typed expression and its value, the tier's (else the base) adjustment, and any roll-under
+ * modifiers. `anchor` is the resolved target before those modifiers and `delta` their total, as the
+ * runtime routes them; `target` is their sum. `tier` is `{ name, adjustment }` or null for the base.
  */
 export function previewBandTarget(
   { evaluation, anchor, tier = null, character = null, modifiers = 0 },
@@ -306,9 +308,9 @@ export function previewBandTarget(
     character,
   });
   if (resolved.state !== 'ok') return { ...resolved, source: '' };
-  // Under, the modifiers raise the target rather than the roll, so they are part of it.
   const delta = normalized.direction === 'under' && Number.isFinite(modifiers) ? modifiers : 0;
-  const target = resolved.target + delta;
+  const anchorTarget = resolved.target;
+  const target = anchorTarget + delta;
   const modifierPart = delta
     ? interpolate(
         text('FABRICATE.Admin.Manager.Checks.Evaluation.ScaleSourceModifiers', 'modifiers {total}'),
@@ -322,7 +324,7 @@ export function previewBandTarget(
           { part: modifierPart }
         )
       : '';
-    return { ...resolved, target, source };
+    return { ...resolved, anchor: anchorTarget, delta, target, source };
   }
   const parts = [
     interpolate(
@@ -350,7 +352,7 @@ export function previewBandTarget(
     );
   }
   if (modifierPart) parts.push(modifierPart);
-  return { ...resolved, target, source: parts.join(', ') };
+  return { ...resolved, anchor: anchorTarget, delta, target, source: parts.join(', ') };
 }
 
 /** Why a read-only strip draws nothing, from a non-ok {@link resolvePreviewTarget} state. */

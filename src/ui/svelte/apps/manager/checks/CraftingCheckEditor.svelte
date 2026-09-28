@@ -300,7 +300,8 @@
     const bands = buildRoutedBands({
       evaluation: graded,
       comparison,
-      anchor: readonlyTarget?.target ?? null,
+      anchor: readonlyTarget?.anchor ?? null,
+      targetDelta: readonlyTarget?.delta ?? 0,
       type,
       outcomes,
       min: trackMin,
