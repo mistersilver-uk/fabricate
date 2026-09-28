@@ -214,6 +214,61 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
     );
   });
 
+  it('adds the previewed modifiers after the multiply, as the runtime routes them', async () => {
+    const state = await mount(routedCheck(), { previewModifierTotal: 6 });
+    assert.deepEqual(bandList(state.root, 'data-outcome-band-strip'), [
+      'Extreme: 17 or under',
+      'Hard: 18–33',
+      'Regular: 34–61',
+      'Otherwise: 62 or over',
+    ]);
+    assert.match(
+      state.root.querySelector('[data-outcome-band-scale]').textContent,
+      /^Target 61 \(Idrin @skills\.craft\.value 55, modifiers \+6\)\./
+    );
+  });
+
+  it("states the under rule, naming the previewed tier's adjustment when it has one", async () => {
+    const underAdd = evaluation({}, { adjustmentKind: 'add' });
+    const raw =
+      'The dice are compared raw. Every modifier that applies raises the target instead of being added to the roll';
+    const rule = (root) => root.querySelector('[data-check-formula-rule]').textContent.trim();
+    const state = await mount(routedCheck(underAdd));
+    assert.equal(rule(state.root), `${raw}.`);
+    chooseSelectOption(state.root, '[data-preview-against-select]', 't-hard');
+    await routedHarness.setProps({ value: state.value });
+    assert.equal(rule(state.root), `${raw}; the Hard work adjustment (−2) is applied first.`);
+
+    routedHarness.remount();
+    const unnamed = routedCheck(underAdd);
+    unnamed.tiers = unnamed.tiers.map((tier) => (tier.id === 't-hard' ? { ...tier, name: '' } : tier));
+    const second = await mount(unnamed);
+    chooseSelectOption(second.root, '[data-preview-against-select]', 't-hard');
+    await routedHarness.setProps({ value: second.value });
+    assert.equal(rule(second.root), `${raw}; the tier's adjustment (−2) is applied first.`);
+  });
+
+  it('types a signed benefit offset into an outcome row', async () => {
+    const state = await mount(routedCheck(evaluation({}, { adjustmentKind: 'add' })));
+    const field = () => state.root.querySelector('[data-outcome-row="hard"] [data-outcome-dc]');
+    await state.act(() => typeFormatted(field(), '−7'));
+    assert.equal(state.value.relativeOutcomes[1].dc, -7);
+    assert.equal(field().value, '−7');
+    await state.act(() => typeFormatted(field(), '+4'));
+    assert.equal(state.value.relativeOutcomes[1].dc, 4);
+    assert.equal(field().value, '+4');
+  });
+
+  it("toggles an outcome's break-tools switch under a check-driven authority", async () => {
+    const state = await mount(routedCheck(), { breakageAuthority: 'checkDriven' });
+    const toggle = () => state.root.querySelector('[data-outcome-row="extreme"] [data-outcome-break]');
+    assert.ok(toggle(), 'the switch renders');
+    await state.act(() => toggle().click());
+    assert.equal(state.value.relativeOutcomes[0].breakTools, true);
+    await state.act(() => toggle().click());
+    assert.equal(state.value.relativeOutcomes[0].breakTools, false);
+  });
+
   it('switches the check type to fixed and back without touching the evaluation', async () => {
     const start = routedCheck(BASE_HALF);
     const state = await mount(start);
@@ -326,8 +381,12 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
     const row = () => state.root.querySelector('[data-tier-row="t-unset"]');
     const missing = row().querySelector('[data-tier-adjustment-missing]');
     assert.ok(missing, 'the gap is named');
-    const units = [...row().querySelectorAll('.manager-checks-tier-unit')];
-    assert.ok(units.indexOf(missing) < units.length - 1, 'the gap is named before the unit');
+    const unit = row().querySelector('.manager-checks-tier-unit');
+    assert.ok(unit, 'the row draws its unit');
+    assert.ok(
+      Boolean(missing.compareDocumentPosition(unit) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING),
+      'the gap is named before the unit'
+    );
     assert.equal(
       row().querySelector('[data-tier-adjustment]').getAttribute('aria-describedby'),
       missing.id
