@@ -34,12 +34,9 @@ export function managerCase(entry) {
   };
 }
 
-/** Choose an actor in the Checks rail's "Preview as" picker. */
-export function previewAsActor(actorId) {
-  return [
-    { selector: '[data-checks-preview-actor]' },
-    { selector: `[data-popover-option="${actorId}"]` },
-  ];
+/** Choose an actor in a "Preview as" picker: the Checks rail's by default, or another trigger's. */
+export function previewAsActor(actorId, trigger = '[data-checks-preview-actor]') {
+  return [{ selector: trigger }, { selector: `[data-popover-option="${actorId}"]` }];
 }
 
 /** Choose a value on one of the app's own `<Select>` controls. */

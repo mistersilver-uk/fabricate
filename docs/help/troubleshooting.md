@@ -118,7 +118,7 @@ Recipes resolve immediately with no skill check, even though the Routed by check
 
 - The system's **Combination rule** is not **By recipe**.
   That is the one rule that hands the selection to the recipe author, so it is the only rule under which the control appears.
-  Under **Add all**, **Highest**, and **Player picks** the system decides, and the tab shows nothing rather than a control the system would ignore.
+  Under **Apply all**, **Highest**, and **Player picks** the system decides, and the tab shows nothing rather than a control the system would ignore.
 - The system's modifier library is empty, so there is nothing to pick from.
 - The system's active crafting check cannot use a modifier right now.
   Either the resolution mode rolls no check at all, or the check has no roll formula authored yet.

@@ -110,6 +110,7 @@ function readParams() {
     // Which crafting system the manager opens on.
     system: params.get('system') ?? null,
     gatheringTaskMode: params.get('gatheringTaskMode') ?? null,
+    checkOverride: params.get('checkOverride') ?? null,
     rollPromptState: params.get('rollPromptState') ?? null,
     // A success-counting Checks Studio state seeded onto Karrun Forgecraft (issue 2004).
     checkPreviewState: params.get('checkPreviewState') ?? null,
@@ -892,6 +893,7 @@ async function boot() {
         noInteractables: params.noInteractables,
         noSceneRegions: params.noSceneRegions,
         gatheringTaskMode: params.gatheringTaskMode,
+        checkOverride: params.checkOverride,
         journalCaseState: params.journalCaseState,
         checkPreviewState: params.checkPreviewState,
       });

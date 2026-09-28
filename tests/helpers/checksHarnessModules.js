@@ -66,6 +66,8 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/config/gatheringCharacterModifierPresets.js',
   // The outcome simulator and the odds enumerator (issue 1097), plus the engine modules they drive.
   'src/ui/svelte/apps/manager/checks/checkPreview.js',
+  // The "No actor" id, a leaf `checkPreview.js` and the shared Preview-as picker both read.
+  'src/ui/svelte/apps/manager/checks/previewActorId.js',
   'src/ui/svelte/apps/manager/checks/checkOdds.js',
   'src/ui/svelte/apps/manager/checks/checkPreviewModel.js',
   // The success-counting preview the model delegates to (issue 2004).
@@ -191,6 +193,8 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // THE manager's editor tab strip (issue 1362).
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte',
+  // The rail's Preview-as picker, shared with the salvage and task check overrides (issue 2005).
+  'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte',
   'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte',

@@ -121,12 +121,16 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // ADDED BY ISSUE 1706's SHARED BULK-SELECTION COMPOSABLE.
   './bulkSelection.svelte.js',
   './checks/ChecksView.svelte',
+  // ADDED BY ISSUE 2005, with `./component/salvageDcPresets.js` below: the salvage and task
+  // overrides' Preview-as roster and roll-data lookup, and the salvage preset tiers.
+  './checks/checkPreview.js',
   './checks/checkTriggerSummary.js',
   './checks/checksCopy.js',
   './checks/checksNav.js',
   // Added by issue 1721: the Checks Studio's drafts and rail group are their own unit, which took
   // `checkModifierResolver.js`, `progressiveCheckSandbox.js` and `checksReadiness.js` with them.
   './checks/checksRouteModel.svelte.js',
+  './component/salvageDcPresets.js',
   './components/ComponentBrowserInspector.svelte',
   './components/ComponentBulkEditPanel.svelte',
   './crafting/craftingNav.js',

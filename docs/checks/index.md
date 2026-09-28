@@ -233,7 +233,7 @@ It also decides **who chooses them, and when**.
 
 | Combination rule | Who chooses | What it does | When you would want it |
 |:-----------------|:------------|:-------------|:------------------------|
-| **Add all** | Nobody. The system's default set applies as it stands. | Sums every modifier in the default set. | The recipe rewards stacking every relevant skill or tool bonus at once. |
+| **Apply all** | Nobody. The system's default set applies as it stands. | Sums every modifier in the default set. | The recipe rewards stacking every relevant skill or tool bonus at once. |
 | **Highest** | Nobody. The system's default set applies as it stands. | Adds only the single best modifier in the default set. Best means highest on average, so a `1d4` beats a flat `+2`, and a winner that rolls dice is added as dice. A modifier with no average, because its dice total is transformed rather than summed, is added only when nothing else in the set has an average. It is not a keep-highest dice roll across the set. | Several skills can substitute for each other, and only the best should count. |
 | **By recipe** / **By component** / **By gathering task** | You do, per record, on that record's own editor. | Sums the modifiers that record picked. | Different recipes (or components, or gathering tasks) in one system draw on different skills, and you want to decide that once, while authoring the record. |
 | **Player picks** | The player does, at roll time. | Sums the modifiers the player picked. | You want the player to decide, in the moment, which of their skills they are relying on for that attempt. |
@@ -254,7 +254,7 @@ The by-record rule is one rule with three labels: it reads **By recipe** on Craf
 There is no separate "Default modifiers" picker: each library entry carries its own switch, on its own row, and the entries you switch on ARE the activity's default set.
 The switch's word changes with the combination rule, because the rule is what "on" means, and its off word answers it:
 
-- Under **Add all** an entry reads **Applied** or **Not applied** — the set that applies, to every attempt in the system.
+- Under **Apply all** an entry reads **Applied** or **Not applied** — the set that applies, to every attempt in the system.
 - Under **Highest** it reads **Considered** or **Not considered** — the entries compared, of which only the largest is added.
 - Under **Player picks** it reads **Selectable** or **Not selectable** — the menu the player chooses from at roll time.
 - Under the by-record rule it reads **Selectable** or **Not selectable** as well, because both rules mark the entries someone else may choose from.
@@ -329,7 +329,7 @@ The picks are summed at roll time, and nothing is asked of the player.
 **If a recipe's Eligible modifiers control is not on its Overview tab**, this section is almost always why.
 The control appears only when the system's combination rule is **By recipe** and the system has at least one entry in its Modifiers library.
 Salvage and Gathering have the same control on the component editor's Salvage section and in the gathering task editor, under their own activity's rule.
-Under **Add all**, **Highest**, or **Player picks** the recipe has nothing to choose, so the tab shows nothing at all rather than a control the system would ignore.
+Under **Apply all**, **Highest**, or **Player picks** the recipe has nothing to choose, so the tab shows nothing at all rather than a control the system would ignore.
 Open **Checks › Crafting** for that recipe's system and look at the **Combination rule** on the **Modifiers** section.
 If the rule is already **By recipe** and the control is still missing, the recipe's Overview tab shows a banner in its place naming which of the causes in [When check modifiers do nothing](#when-check-modifiers-do-nothing) applies.
 

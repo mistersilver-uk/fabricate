@@ -313,6 +313,17 @@ const gatheringHarness = createMountedComponentHarness({
     'src/systems/characterPrerequisites.js',
     // The gathering host's seven converted option vocabularies (issue 1510).
     'src/ui/svelte/apps/manager/gatheringTaskSelectOptions.js',
+    // The task check override reads the evaluation and formats an adjustment (issue 2005).
+    'src/systems/normalize/checkEvaluation.js',
+    'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+    'src/utils/scalars.js',
+    'src/ui/svelte/apps/manager/checks/checksCopy.js',
+    // Its Player sees line, which resolves the target and names the Preview-as character.
+    'src/systems/checkTarget.js',
+    'src/systems/checkEvaluation.js',
+    'src/utils/localizeWithFallback.js',
+    'src/ui/svelte/apps/manager/checks/previewActorId.js',
+    'src/ui/svelte/apps/manager/component/overridePlayerSees.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
@@ -337,6 +348,11 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ModifierPillSelect.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
+    'src/ui/svelte/components/Notice.svelte',
+    'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
+    'src/ui/svelte/components/Callout.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
+    'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
     GATHERING_PATH,
   ],
   componentPath: GATHERING_PATH,
