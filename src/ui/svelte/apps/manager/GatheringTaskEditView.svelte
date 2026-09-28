@@ -30,6 +30,14 @@
   import RadioCardGroup from '../../components/RadioCardGroup.svelte';
   import RecipeResultsSection from './recipe/RecipeResultsSection.svelte';
   import RecipeResultGroupCard from './recipe/RecipeResultGroupCard.svelte';
+  import Notice from '../../components/Notice.svelte';
+  import { normalizeCheckEvaluation } from '../../../../systems/normalize/checkEvaluation.js';
+  import {
+    MULTIPLIER_STOPS,
+    formatCheckAdjustment,
+    parseCheckAdjustment,
+  } from './checks/checkAdjustmentLabel.js';
+  import { interpolate, underComparisonPhrase } from './checks/checksCopy.js';
 
   let {
     task = null,
@@ -37,6 +45,8 @@
     nodesEnabled = false,
     resolutionMode = null,
     routedOutcomeTiers = [],
+    // The routed gathering check, whose evaluation picks the override field (issue 2005).
+    checkConfig = null,
     resultValidationErrors = [],
     itemCards = [],
     managedItemOptions = [],
@@ -678,12 +688,17 @@
   function removeStaminaCostModifier(index) {
     onUpdateTask({ staminaCostModifiers: staminaCostModifiers.filter((_, i) => i !== index) });
   }
-  // Per-task gathering DC override (progressive has no DC, so the field is shown
-  // only for routed; d100 has no DC either). null = use the system gathering
-  // check default DC. The Stepper renders an unset value blank on its own
-  // (allowUnset), so this only normalizes `undefined` to `null`.
+  // Per-task check override, routed only (progressive has no target). One field (R3, issue 2005):
+  // `dcOverride` under a fixed target, `adjustmentOverride` under a character value, and neither
+  // is ever rewritten by the other. null = use the system gathering check's own value.
   const dcOverrideEnabled = $derived(taskResolutionMode === 'routed');
+  const checkEvaluation = $derived(normalizeCheckEvaluation(checkConfig?.evaluation));
+  const overrideAttribute = $derived(checkEvaluation.target.source === 'attribute');
+  const overrideUnder = $derived(checkEvaluation.direction === 'under');
+  const overrideKind = $derived(checkEvaluation.target.adjustmentKind);
+  const overrideCmp = $derived(underComparisonPhrase(checkConfig?.thresholdMode, text));
   const dcOverrideValue = $derived(task?.dcOverride ?? null);
+  const adjustmentOverrideValue = $derived(task?.adjustmentOverride ?? null);
   function updateDcOverride(value) {
     if (value === null || value === undefined) {
       onUpdateTask({ dcOverride: null });
@@ -692,6 +707,78 @@
     const next = Number(value);
     onUpdateTask({ dcOverride: Number.isFinite(next) ? Math.trunc(next) : null });
   }
+  // Never truncated: a multiplier such as ×0.7 is exact.
+  function updateAdjustmentOverride(value) {
+    onUpdateTask({ adjustmentOverride: Number.isFinite(value) ? value : null });
+  }
+  const formatOverride = (value) => formatCheckAdjustment(overrideKind, value);
+  const parseOverride = (value) => parseCheckAdjustment(overrideKind, value);
+  const overrideCopy = $derived.by(() => {
+    if (overrideAttribute) {
+      return {
+        title: text(
+          'FABRICATE.Admin.Manager.Gathering.TaskOverrideAdjustment',
+          'Difficulty adjustment override'
+        ),
+        hint:
+          overrideKind === 'multiply'
+            ? text(
+                'FABRICATE.Admin.Manager.Gathering.TaskOverrideMultiplyHint',
+                'Adjusts the character value this task is attempted against. Multiplied, rounded down.'
+              )
+            : text(
+                'FABRICATE.Admin.Manager.Gathering.TaskOverrideAddHint',
+                'Adjusts the character value this task is attempted against. Added to the value.'
+              ),
+        label: text('FABRICATE.Admin.Manager.Gathering.TaskOverrideAdjustmentLabel', 'Adjustment'),
+      };
+    }
+    if (overrideUnder) {
+      return {
+        title: text('FABRICATE.Admin.Manager.Gathering.TaskOverrideTarget', 'Target override'),
+        hint: interpolate(
+          text(
+            'FABRICATE.Admin.Manager.Gathering.TaskOverrideTargetHint',
+            'Replaces the system target for this task. The total must stay {cmp} it.'
+          ),
+          { cmp: overrideCmp }
+        ),
+        label: text('FABRICATE.Admin.Manager.Gathering.TaskOverrideTargetLabel', 'Target'),
+      };
+    }
+    return {
+      title: text('FABRICATE.Admin.Manager.Gathering.TaskDcOverrideTitle', 'Check DC override'),
+      hint: text(
+        'FABRICATE.Admin.Manager.Gathering.TaskDcOverrideHint',
+        'Override the system gathering check DC for this task. Leave blank to use the system default.'
+      ),
+      label: text('FABRICATE.Admin.Manager.Gathering.TaskDcOverride', 'DC'),
+    };
+  });
+  const isOverrideSet = (value) =>
+    ![null, undefined, ''].includes(value) && Number.isFinite(Number(value));
+  // The dormant field is kept rather than cleared; the notice says so.
+  const keptOverrideNotice = $derived.by(() => {
+    if (overrideAttribute && isOverrideSet(dcOverrideValue)) {
+      return interpolate(
+        text(
+          'FABRICATE.Admin.Manager.Gathering.TaskOverrideKeptDc',
+          'A DC override of {dc} is kept on this task. This system does not read it, so it is not shown for editing.'
+        ),
+        { dc: dcOverrideValue }
+      );
+    }
+    if (!overrideAttribute && isOverrideSet(adjustmentOverrideValue)) {
+      return interpolate(
+        text(
+          'FABRICATE.Admin.Manager.Gathering.TaskOverrideKeptAdjustment',
+          'A difficulty adjustment override of {adjustment} is kept on this task. This system does not read it, so it is not shown for editing.'
+        ),
+        { adjustment: formatCheckAdjustment(overrideKind, adjustmentOverrideValue) }
+      );
+    }
+    return '';
+  });
 
   // Resource-node authoring (enforced only when the system has resource nodes enabled).
   const DEFAULT_NODES = {
@@ -1391,42 +1478,69 @@
     {/if}
 
     {#if dcOverrideEnabled}
-      <section class="manager-task-dc-card" data-gathering-task-dc>
-        {@render taskCardHeader(
-          text('FABRICATE.Admin.Manager.Gathering.TaskDcOverrideTitle', 'Check DC override'),
-          text(
-            'FABRICATE.Admin.Manager.Gathering.TaskDcOverrideHint',
-            'Override the system gathering check DC for this task. Leave blank to use the system default.'
-          )
-        )}
+      <section
+        class="manager-task-dc-card"
+        data-gathering-task-dc
+        data-gathering-task-override-field={overrideAttribute ? 'adjustmentOverride' : 'dcOverride'}
+      >
+        {@render taskCardHeader(overrideCopy.title, overrideCopy.hint)}
 
         <div class="manager-task-dc-row">
           <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
           <Field as="div" class="manager-task-dc-field">
-            <span>{text('FABRICATE.Admin.Manager.Gathering.TaskDcOverride', 'DC')}</span>
-            <!-- `min={0}` because a DC below zero is not a DC, and an unset field steps from
-                 `min ?? 0` — without it one click of `−` on the blank field commits -1.
+            <span>{overrideCopy.label}</span>
+            {#if overrideAttribute}
+              <!-- Keyed by kind, so a switch re-reads the kept value through the other formatter. -->
+              {#key overrideKind}
+                <Stepper
+                  value={adjustmentOverrideValue}
+                  allowUnset
+                  fill
+                  density="comfortable"
+                  formatValue={formatOverride}
+                  parseValue={parseOverride}
+                  stops={overrideKind === 'multiply' ? MULTIPLIER_STOPS : []}
+                  placeholder={text(
+                    'FABRICATE.Admin.Manager.Gathering.TaskDcOverridePlaceholder',
+                    'System default'
+                  )}
+                  {...stepperLabels(overrideCopy.label)}
+                  inputProps={{ 'data-gathering-task-adjustment-override': '' }}
+                  onChange={(next) => updateAdjustmentOverride(next)}
+                />
+              {/key}
+            {:else}
+              <!-- `min={0}` because a DC below zero is not a DC, and an unset field steps from
+                   `min ?? 0` — without it one click of `−` on the blank field commits -1.
 
-                 `fill` needs a slot to fill, and this card had none: the width comes from
-                 `.manager-task-dc-field`'s `max-width` in this component's `<style>`. See the note
-                 there for why dropping `fill` would not have been the fix. -->
-            <Stepper
-              value={dcOverrideValue}
-              allowUnset
-              step={1}
-              min={0}
-              fill
-              density="comfortable"
-              placeholder={text(
-                'FABRICATE.Admin.Manager.Gathering.TaskDcOverridePlaceholder',
-                'System default'
-              )}
-              {...stepperLabels(text('FABRICATE.Admin.Manager.Gathering.TaskDcOverride', 'DC'))}
-              inputProps={{ 'data-gathering-task-dc-override': '' }}
-              onChange={(next) => updateDcOverride(next)}
-            />
+                   `fill` needs a slot to fill, and this card had none: the width comes from
+                   `.manager-task-dc-field`'s `max-width` in this component's `<style>`. See the note
+                   there for why dropping `fill` would not have been the fix. -->
+              <Stepper
+                value={dcOverrideValue}
+                allowUnset
+                step={1}
+                min={0}
+                fill
+                density="comfortable"
+                placeholder={text(
+                  'FABRICATE.Admin.Manager.Gathering.TaskDcOverridePlaceholder',
+                  'System default'
+                )}
+                {...stepperLabels(overrideCopy.label)}
+                inputProps={{ 'data-gathering-task-dc-override': '' }}
+                onChange={(next) => updateDcOverride(next)}
+              />
+            {/if}
           </Field>
         </div>
+        {#if keptOverrideNotice}
+          <Notice
+            tone="info"
+            title={keptOverrideNotice}
+            dataAttr="data-gathering-task-override-kept"
+          />
+        {/if}
       </section>
     {/if}
 

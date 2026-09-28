@@ -20212,7 +20212,7 @@
 /* `proto:1429`: `Salvage check DC` is a title over a note, radius 9, `surface-soft` behind a `border-strong` hairline. Its 34px snapped the reference's 32, and it now uses the shared control's `toolbar` rung (issue 1510), which matches without an override. */
 .fabricate-manager .manager-salvage-dc-card {
   display: flex;
-  flex-wrap: wrap;
+  flex-flow: row wrap;
   gap: var(--fab-space-3);
   align-items: center;
 }

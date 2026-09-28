@@ -33,6 +33,8 @@
   import { parseDiceGroups } from '../../../../utils/craftingCheckExpression.js';
   import { interpolate } from './checks/checksCopy.js';
   import { summariseCondition } from './checks/checkTriggerSummary.js';
+  import { cloneRollData, listPreviewActors, resolvePreviewActor } from './checks/checkPreview.js';
+  import { salvagePresetTiers } from './component/salvageDcPresets.js';
   import { buildVocabularyUsage, dedupeVocabularyEntries } from '../../../model/vocabularyUsage.js';
   import { createRecipeBrowserState } from '../../../model/recipeBrowserModel.js';
   import {
@@ -601,11 +603,23 @@
   const salvageCheckEnabled = $derived(selectedSystem?.salvageCraftingCheck?.enabled === true);
   // DC presets come from `salvageCraftingCheck.simple.tiers` in EVERY resolution mode,
   // routed included (decision 7, case 5) — there is no `.routed.tiers` sibling.
-  const salvageCheckTiers = $derived(selectedSystem?.salvageCraftingCheck?.simple?.tiers || []);
+  const salvageCheckTiers = $derived(salvagePresetTiers(selectedSystem?.salvageCraftingCheck));
   const salvageCheckDcMode = $derived(
     selectedSystem?.salvageCraftingCheck?.simple?.dcMode || 'static'
   );
   const salvageCheckDc = $derived(selectedSystem?.salvageCraftingCheck?.simple?.dc ?? 0);
+  // The sub-object the salvage mode rolls, whose evaluation picks the override field (issue 2005).
+  const salvageCheckConfig = $derived(
+    selectedSystem?.salvageCraftingCheck?.[
+      salvageResolutionMode === 'routed' ? 'routed' : 'simple'
+    ] ?? null
+  );
+  // Whom the salvage override's Player sees line resolves for: the first player character, by name.
+  const salvagePreviewCharacter = $derived.by(() => {
+    if (currentView !== 'component-edit') return null;
+    const actor = resolvePreviewActor(listPreviewActors()[0]?.id);
+    return actor ? { name: actor.name, rollData: cloneRollData(actor) } : null;
+  });
   // System components offered to the salvage yield picker.
   const salvageComponentOptions = $derived(selectedSystem?.managedItemOptions || []);
 
@@ -5425,6 +5439,7 @@
         nodesEnabled={gathering.selectedGatheringTaskNodesEnabled}
         resolutionMode={gathering.gatheringTaskResolutionMode}
         routedOutcomeTiers={gathering.gatheringTaskRoutedOutcomeTiers}
+        checkConfig={selectedSystem?.gatheringCraftingCheck?.routed ?? null}
         resultValidationErrors={gathering.gatheringTaskValidation.resultErrors || []}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
@@ -5593,6 +5608,8 @@
           salvageModifierDefaultIds={selectedSystem?.salvageCraftingCheck?.defaultModifierIds || []}
           {salvageCheckDcMode}
           {salvageCheckDc}
+          {salvageCheckConfig}
+          {salvagePreviewCharacter}
           componentOptions={salvageComponentOptions}
           {complicationActivities}
           {complicationTriggerOptions}

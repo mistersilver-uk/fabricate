@@ -12,7 +12,6 @@
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Stepper from '../../components/Stepper.svelte';
   import SubjectModifierPicker from './SubjectModifierPicker.svelte';
-  import { stepperLabels } from '../../components/stepperLabels.js';
   import SearchablePopover from '../../components/SearchablePopover.svelte';
   import Select from '../../components/Select.svelte';
   import ComponentIdentityStrip from './component/ComponentIdentityStrip.svelte';
@@ -41,14 +40,10 @@
   // The add-new offer projection (issue 1036): only what this grid RENDERS is narrowed. The draft
   // stays unfiltered — it is the sole source `buildComponentEditorUpdates` rebuilds essences from.
   import { visibleEssenceOptions } from '../../../model/essenceValidation.js';
-  import {
-    SALVAGE_DC_CUSTOM,
-    resolveSalvageDcSelection,
-    salvageDcOverrideForSelection,
-  } from './component/salvageDcPresets.js';
+  // The salvage check override (issue 2005): the DC or the character-value adjustment.
+  import CheckOverrideField from './component/CheckOverrideField.svelte';
   import {
     buildComponentCategoryOptions,
-    buildSalvageDcSelectOptions,
     buildSalvageRouteOptions,
   } from './component/componentEditSelectOptions.js';
   import { salvageResolutionModeOptions } from './resolutionModeOptions.js';
@@ -84,6 +79,10 @@
     salvageCheckTiers = [],
     salvageCheckDcMode = 'static',
     salvageCheckDc = 0,
+    // The active salvage check sub-object, whose `evaluation` decides which override is edited,
+    // and the character its Player sees line resolves against (issue 2005).
+    salvageCheckConfig = null,
+    salvagePreviewCharacter = null,
     // The SYSTEM's check-modifier catalogue and the SALVAGE check's selection over it (issue 1095).
     // The picker renders only under `bySubject` and only over a non-empty catalogue.
     // `salvageModifierMaxPicks` is NOT coerced on the way here; `resolveMaxModifierPicks` owns
@@ -291,9 +290,6 @@
     salvageDraft = cloneSalvage(component?.salvage);
     complicationsDraft = cloneComplications(component?.complications);
     saveFailed = false;
-    // Transient UI state, not draft data. Reset with the drafts, or a second component would
-    // inherit the first's open custom input.
-    salvageDcCustomSelected = false;
     lastComponentKey = componentKey;
   });
 
@@ -649,6 +645,7 @@
         ? [...source.checkModifierIds]
         : null,
       dcOverride: source.dcOverride ?? null,
+      adjustmentOverride: source.adjustmentOverride ?? null,
       // Default FALSE, matching `_normalizeSalvage` (issue 676). Do NOT copy the `!== false` shape
       // of `allowPlayerResultReorder` below: that would flip every component in every world to
       // salvageable. It also normalizes the DIRTY-CHECK BASELINE, so toggling off then on cleans.
@@ -700,6 +697,7 @@
       resultGroups: salvage.resultGroups,
       outcomeRouting: salvage.outcomeRouting,
       dcOverride: salvage.dcOverride,
+      adjustmentOverride: salvage.adjustmentOverride,
       allowPlayerResultReorder: salvage.allowPlayerResultReorder,
       // Omit this and the issue-651 bug returns verbatim for the modifier pick.
       checkModifierIds: salvage.checkModifierIds,
@@ -812,12 +810,13 @@
     }
     if (showEssences) updates.essences = essenceMapFrom(essenceDraft);
     if (showSalvage) {
-      // Preserved salvage fields first, then the three authored ones, so the rest survive a save.
+      // Preserved salvage fields first, then the authored ones, so the rest survive a save.
       updates.salvage = {
         ...salvageDraft,
         resultGroups: salvageDraft.resultGroups,
         outcomeRouting: salvageDraft.outcomeRouting,
         dcOverride: salvageDraft.dcOverride,
+        adjustmentOverride: salvageDraft.adjustmentOverride,
         allowPlayerResultReorder: salvageDraft.allowPlayerResultReorder,
       };
       // ABSENCE IS A VALUE HERE: the normalizer keys authoredness on `Array.isArray`, so the key
@@ -911,27 +910,6 @@
   const salvageModeLabel = $derived(
     salvageModeOption ? text(salvageModeOption.labelKey, salvageModeOption.fallback) : ''
   );
-
-  const salvageDcOptions = $derived(
-    buildSalvageDcSelectOptions(salvageCheckTiers, salvageCheckDcMode, salvageCheckDc, text)
-  );
-  // The PERSISTED value derives the selection — never an `$effect` that writes back. An off-tier
-  // `dcOverride: 14` selects Custom… and displays 14 verbatim, never snapping to a tier, and
-  // rendering never marks the editor dirty (AC8a). But `Custom…` and `System default` both persist
-  // `null`, so the GM's CHOICE is staged separately and deliberately NOT in the draft.
-  let salvageDcCustomSelected = $state(false);
-  const salvageDcSelection = $derived(
-    salvageDcCustomSelected
-      ? SALVAGE_DC_CUSTOM
-      : resolveSalvageDcSelection(salvageDraft.dcOverride, salvageCheckTiers)
-  );
-  const salvageDcShowCustomInput = $derived(salvageDcSelection === SALVAGE_DC_CUSTOM);
-
-  function setSalvageDcSelection(selection) {
-    // Sticky only while Custom… is live; picking a tier hands control back to the persisted value.
-    salvageDcCustomSelected = selection === SALVAGE_DC_CUSTOM;
-    setSalvage({ dcOverride: salvageDcOverrideForSelection(selection, salvageDraft.dcOverride) });
-  }
 
   function setSalvage(next) {
     salvageDraft = { ...salvageDraft, ...next };
@@ -1054,12 +1032,6 @@
     if (groupId) next[outcomeName] = groupId;
     else delete next[outcomeName];
     setSalvage({ outcomeRouting: next });
-  }
-
-  // `Stepper` reports a clamped NUMBER, or `null` when an `allowUnset` field is cleared. The `null`
-  // fold stays: `null` is the persisted "inherit the system salvage DC" value.
-  function setSalvageDcOverride(next) {
-    setSalvage({ dcOverride: Number.isFinite(next) ? next : null });
   }
 
   function salvageComponentName(componentId) {
@@ -2224,74 +2196,24 @@
             {/if}
 
             {#if salvageShowChrome && salvageShowDcOverride}
-              <!-- A `--fab-bg-1` well titled `Salvage check DC`, whose note names where the presets
-               come from. -->
-              <Field as="div" class="manager-salvage-dc-card" data-salvage-dc-override="">
-                <div class="manager-salvage-dc-copy">
-                  <span id={`${instanceId}-salvage-dc-title`} class="manager-salvage-dc-title"
-                    >{text(
-                      'FABRICATE.Admin.Manager.Component.SalvageEditor.DcOverride',
-                      'Salvage check DC'
-                    )}</span
-                  >
-                  <span class="manager-salvage-dc-note"
-                    >{text(
-                      'FABRICATE.Admin.Manager.Component.SalvageEditor.DcOverrideHint',
-                      'Preset tiers come from this system’s Checks screen.'
-                    )}</span
-                  >
-                </div>
-                <!-- Presets are the SYSTEM'S authored salvage check tiers (decision 7), never a
-                 hard-coded DC list. Storage is unchanged: null = system default, else an integer. -->
-                <Select
-                  size="toolbar"
-                  class="manager-salvage-dc-select"
-                  value={salvageDcSelection}
-                  options={salvageDcOptions}
-                  ariaLabelledBy={`${instanceId}-salvage-dc-title`}
+              <!-- Keyed per component: its staged Custom… choice is transient UI state, and a second
+               component must not inherit the first's open custom input. The PERSISTED value derives
+               the selection, so an off-tier override shows verbatim and rendering never dirties. -->
+              {#key componentKey}
+                <CheckOverrideField
+                  config={salvageCheckConfig}
+                  dcOverride={salvageDraft.dcOverride}
+                  adjustmentOverride={salvageDraft.adjustmentOverride}
+                  tiers={salvageCheckTiers}
+                  dcMode={salvageCheckDcMode}
+                  systemDc={salvageCheckDc}
+                  previewCharacter={salvagePreviewCharacter}
+                  {instanceId}
                   disabled={saving}
-                  triggerData={{ 'data-salvage-dc-preset': '' }}
-                  onChange={setSalvageDcSelection}
+                  onChange={setSalvage}
+                  onManagePresets={() => onManageCheckPresets()}
                 />
-                {#if salvageDcShowCustomInput}
-                  <!-- `allowUnset`: a cleared field is "inherit the system salvage check DC", the
-                   same `dcOverride: null` the preset select writes. `min={0}` because an unset field
-                   steps from `min ?? 0`, so without it one `−` click commits -1. `fill` needs a slot,
-                   supplied by the `[data-salvage-dc-override] .fab-stepper` cap in the global sheet. -->
-                  <Stepper
-                    value={salvageDraft.dcOverride}
-                    allowUnset
-                    step={1}
-                    min={0}
-                    fill
-                    disabled={saving}
-                    {...stepperLabels(
-                      text(
-                        'FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustomLabel',
-                        'Custom salvage DC'
-                      )
-                    )}
-                    inputProps={{ 'data-salvage-dc-custom': '' }}
-                    onChange={setSalvageDcOverride}
-                  />
-                {/if}
-                <!-- Kept by decision 7. The zero-authored-tiers case is the COMMON one and is
-                 exactly why it exists: with no presets to choose, this is the way forward. -->
-                <ManagerButton
-                  class="manager-salvage-manage-presets"
-                  data-salvage-manage-presets
-                  onclick={() => onManageCheckPresets()}
-                  disabled={saving}
-                >
-                  <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-                  <span
-                    >{text(
-                      'FABRICATE.Admin.Manager.Component.SalvageEditor.ManagePresets',
-                      'Manage presets'
-                    )}</span
-                  >
-                </ManagerButton>
-              </Field>
+              {/key}
             {/if}
           </section>
         {/if}
