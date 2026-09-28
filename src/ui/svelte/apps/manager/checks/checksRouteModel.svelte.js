@@ -524,9 +524,9 @@ export function createChecksRouteModel(inputs = {}) {
   );
   const checksDirty = $derived(checksDirtyActivities.length > 0);
   const checksSaving = $derived(ACTIVITIES.some((activity) => activities[activity].saving));
-  // Readiness's raw override records (issue 2078), re-derived only when the thunks' own
-  // dependencies change — see `components`/`gatheringTasks` at the call site for why these are
-  // lazy in the first place.
+  // Readiness's raw override records (issue 2078). The rail's nav badge reads these on EVERY
+  // view, not only an open Checks route, so `$derived` is what keeps the walk cheap: each thunk
+  // runs again only when a tracked dependency changes, never once per unrelated re-render.
   const checksComponents = $derived(inputs.components?.() ?? []);
   const checksGatheringTasks = $derived(inputs.gatheringTasks?.() ?? []);
   const rail = createChecksRail({

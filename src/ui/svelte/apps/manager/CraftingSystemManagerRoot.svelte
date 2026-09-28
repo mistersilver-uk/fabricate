@@ -416,8 +416,10 @@
     currentView: () => currentView,
     // Readiness needs the raw records overrides live on, outside any check draft (issue 2078):
     // every component (its persisted `salvage`, not the search-filtered `itemCards` projection)
-    // and every gathering task of the selected system. Both thunks so nothing is walked unless
-    // the Checks route actually reads them.
+    // and every gathering task of the selected system. Both feed the rail's always-visible nav
+    // badge too, not only an open Checks route, so BOTH thunks stay behind `$derived` in
+    // `checksRouteModel.svelte.js`: recomputed only when a tracked dependency changes, never once
+    // per render.
     components: () => store?.componentsForSystem?.(selectedSystemId) ?? [],
     gatheringTasks: () => $viewState.gatheringConfig?.systems?.[selectedSystemId]?.tasks ?? [],
   });
